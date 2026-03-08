@@ -51,24 +51,20 @@ TEST(ParserSection6, EventVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
 }
 
-// §6.17: Event type has zero width (it's a handle to a synchronization object).
 TEST(ParserSection6, EventTypeWidthZero) {
   DataType dt;
   dt.kind = DataTypeKind::kEvent;
   EXPECT_EQ(EvalTypeWidth(dt), 0u);
 }
 
-// §6.17: Event is not an integral type.
 TEST(ParserSection6, EventNotIntegral) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kEvent));
 }
 
-// §6.17: Event is not a 4-state type.
 TEST(ParserSection6, EventNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kEvent));
 }
 
-// §6.17: event variable assigned another event variable.
 TEST(ParserSection6, EventAssignEvent) {
   auto r = Parse(
       "module t;\n"
@@ -84,7 +80,6 @@ TEST(ParserSection6, EventAssignEvent) {
   EXPECT_NE(item1->init_expr, nullptr);
 }
 
-// §6.17: event variable assigned null.
 TEST(ParserSection6, EventAssignNull) {
   auto r = Parse(
       "module t;\n"
@@ -97,4 +92,4 @@ TEST(ParserSection6, EventAssignNull) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}  // namespace
+}

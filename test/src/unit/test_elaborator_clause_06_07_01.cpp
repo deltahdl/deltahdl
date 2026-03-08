@@ -82,7 +82,6 @@ TEST(NetDecl, InvalidNetDataTypeString) {
   EXPECT_FALSE(ValidateNetDataType(NetDataTypeKind::kString));
 }
 
-// §6.7.2: User-defined nettype produces a net in elaboration.
 TEST(NetDecl, UserDefinedNettypeCreatesNet) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -94,7 +93,7 @@ TEST(NetDecl, UserDefinedNettypeCreatesNet) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
-  // The user-defined nettype decl should produce a net, not a variable.
+
   bool found_net = false;
   for (auto& net : mod->nets) {
     if (net.name == "t.x") found_net = true;
@@ -102,7 +101,6 @@ TEST(NetDecl, UserDefinedNettypeCreatesNet) {
   EXPECT_TRUE(found_net);
 }
 
-// §6.7.2: Array of user-defined nettype.
 TEST(NetDecl, UserDefinedNettypeArrayCreatesNet) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -122,7 +120,6 @@ TEST(NetDecl, ChargeStrengthOnTriregIsValid) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
-// §6.3.2.1: trireg with explicit (small) charge strength.
 TEST(Elaborator, TriregExplicitChargeStrengthSmall) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -143,7 +140,6 @@ TEST(Elaborator, TriregExplicitChargeStrengthSmall) {
   EXPECT_TRUE(found);
 }
 
-// §6.3.2.1: trireg with explicit (large) charge strength.
 TEST(Elaborator, TriregExplicitChargeStrengthLarge) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -164,7 +160,6 @@ TEST(Elaborator, TriregExplicitChargeStrengthLarge) {
   EXPECT_TRUE(found);
 }
 
-// §6.3.2.1: trireg with explicit (medium) charge strength.
 TEST(Elaborator, TriregExplicitChargeStrengthMedium) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -199,4 +194,4 @@ TEST(NetDecl, ScalaredWithPackedDimensionOk) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
-}  // namespace
+}

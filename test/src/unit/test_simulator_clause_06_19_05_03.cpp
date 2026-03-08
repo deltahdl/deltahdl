@@ -91,4 +91,4 @@ TEST(EnumMethods, FullIteration) {
   EXPECT_EQ(visited, (std::vector<uint64_t>{10, 20, 30, 40, 10}));
 }
 
-}  // namespace
+}

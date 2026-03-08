@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.7.1 — patterns
-
 TEST(ParserA60701, AssignmentPatternExprList) {
   auto r = Parse(
       "module m;\n"
@@ -124,4 +122,4 @@ TEST(ParserA60701, CondPatternMatches) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

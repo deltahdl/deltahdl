@@ -37,8 +37,6 @@ TEST(ElabClause1003, Validate_LegalDriveStrengthHighz0Strong1) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §10.3.4: Drive strength applies only to scalar nets.
-
 TEST(ElabClause100304, DriveStrengthOnVectorNet_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -61,8 +59,6 @@ TEST(ElabClause100304, DriveStrengthOnScalarNet_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §10.3.4: Exception — supply0/supply1 nets are excluded from scalar-only rule.
-
 TEST(ElabClause100304, DriveStrengthOnSupply0Net_NoError) {
   ElabFixture f;
   ElaborateSrc(
@@ -72,8 +68,6 @@ TEST(ElabClause100304, DriveStrengthOnSupply0Net_NoError) {
       f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
-
-// §10.3.4: Default strength is (strong1, strong0) — stored as 0 in RTLIR.
 
 TEST(ElabClause100304, DefaultStrengthIsZero) {
   ElabFixture f;
@@ -90,8 +84,6 @@ TEST(ElabClause100304, DefaultStrengthIsZero) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 0u);
 }
 
-// §10.3.4: Strength values are preserved in RTLIR.
-
 TEST(ElabClause100304, StrengthPreservedInRtlir) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -103,11 +95,9 @@ TEST(ElabClause100304, StrengthPreservedInRtlir) {
   ASSERT_NE(design, nullptr);
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 1u);
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 3u);  // pull0
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);  // supply1
+  EXPECT_EQ(mod->assigns[0].drive_strength0, 3u);
+  EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);
 }
-
-// §10.3.4: Net declaration with drive strength on scalar net.
 
 TEST(ElabClause100304, NetDeclStrengthScalar_Ok) {
   ElabFixture f;
@@ -129,7 +119,6 @@ TEST(ElabClause100304, NetDeclStrengthVector_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.3.2.2: Continuous assignment without drive strength has defaults (0, 0).
 TEST(Elaborator, ContAssignNoDriveStrengthDefault) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -146,7 +135,6 @@ TEST(Elaborator, ContAssignNoDriveStrengthDefault) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 0u);
 }
 
-// §6.3.2.2: Drive strength (highz1, highz0) — reversed order, also illegal.
 TEST(Elaborator, DriveStrengthHighz1Highz0IsError) {
   ElabFixture f;
   Elaborate(
@@ -158,7 +146,6 @@ TEST(Elaborator, DriveStrengthHighz1Highz0IsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.3.2.2: Drive strength supply0, supply1 is valid.
 TEST(Elaborator, DriveStrengthSupply0Supply1Valid) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -171,11 +158,10 @@ TEST(Elaborator, DriveStrengthSupply0Supply1Valid) {
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
   ASSERT_FALSE(mod->assigns.empty());
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 5u);  // supply0
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);  // supply1
+  EXPECT_EQ(mod->assigns[0].drive_strength0, 5u);
+  EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);
 }
 
-// §6.3.2.2: Drive strength with highz0 on one side is valid.
 TEST(Elaborator, DriveStrengthHighz0Strong1Valid) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -188,8 +174,8 @@ TEST(Elaborator, DriveStrengthHighz0Strong1Valid) {
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
   ASSERT_FALSE(mod->assigns.empty());
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 1u);  // highz0
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 4u);  // strong1
+  EXPECT_EQ(mod->assigns[0].drive_strength0, 1u);
+  EXPECT_EQ(mod->assigns[0].drive_strength1, 4u);
 }
 
-}  // namespace
+}

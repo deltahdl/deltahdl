@@ -20,4 +20,4 @@ TEST(ParserSection18, GetSetRandstateRoundtrip) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

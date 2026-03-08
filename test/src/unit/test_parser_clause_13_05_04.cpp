@@ -194,4 +194,4 @@ TEST(ParserSection13, PositionalArgsNoNamedArgs) {
   EXPECT_TRUE(call->arg_names.empty());
 }
 
-}  // namespace
+}

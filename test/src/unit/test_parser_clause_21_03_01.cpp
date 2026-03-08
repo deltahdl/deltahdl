@@ -15,4 +15,4 @@ TEST(ParserSection21, FopenFcloseCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

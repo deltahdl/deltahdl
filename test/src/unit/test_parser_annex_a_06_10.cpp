@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.10 — assertion statements
-
 TEST(ParserA610, SimpleImmediateAssertSemicolon) {
   auto r = Parse(
       "module m;\n"
@@ -201,4 +199,4 @@ TEST(ParserA610, AssertWithBeginEnd) {
   EXPECT_EQ(stmt->assert_pass_stmt->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

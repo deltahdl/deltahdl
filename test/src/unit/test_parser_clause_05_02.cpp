@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.2: free format layout ---
-
 TEST(ParserClause05, Cl5_2_FreeFormatSingleLine) {
   EXPECT_TRUE(ParseOk("module t; logic a; endmodule"));
 }
@@ -22,7 +20,7 @@ TEST(ParserClause05, Cl5_2_FreeFormatMultiline) {
 }
 
 TEST(ParserClause05, Cl5_2_FreeFormatMaximallyCompact) {
-  // No optional whitespace between tokens
+
   EXPECT_TRUE(ParseOk("module t;logic a;endmodule"));
 }
 
@@ -44,8 +42,6 @@ TEST(ParserClause05, Cl5_2_WhitespaceVariationsProduceSameAST) {
   EXPECT_EQ(compact.cu->modules[0]->name, spread.cu->modules[0]->name);
 }
 
-// --- §5.2: all seven token categories parsed correctly ---
-
 TEST(ParserClause05, Cl5_2_AllTokenCategoriesParsed) {
   EXPECT_TRUE(
       ParseOk("module t; // line comment\n"
@@ -55,10 +51,8 @@ TEST(ParserClause05, Cl5_2_AllTokenCategoriesParsed) {
               "endmodule\n"));
 }
 
-// --- §5.2: escaped identifiers are exception to free format ---
-
 TEST(ParserClause05, Cl5_2_EscapedIdentifierPreservesWhitespaceRule) {
-  // Escaped identifier requires terminating whitespace
+
   auto r = Parse(
       "module t;\n"
       "  logic \\my+sig ;\n"
@@ -69,14 +63,12 @@ TEST(ParserClause05, Cl5_2_EscapedIdentifierPreservesWhitespaceRule) {
 }
 
 TEST(ParserClause05, Cl5_2_EscapedKeywordAsIdentifier) {
-  // Escaped keyword is treated as user-defined identifier
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic \\module ;\n"
               "endmodule\n"));
 }
-
-// --- §5.2: edge cases ---
 
 TEST(ParserClause05, Cl5_2_TabsAndFormfeedsAsWhitespace) {
   EXPECT_TRUE(ParseOk("module\tt\f;\flogic\ta\t;\tendmodule"));
@@ -86,4 +78,4 @@ TEST(ParserClause05, Cl5_2_EmptyModuleBody) {
   EXPECT_TRUE(ParseOk("module t; endmodule"));
 }
 
-}  // namespace
+}

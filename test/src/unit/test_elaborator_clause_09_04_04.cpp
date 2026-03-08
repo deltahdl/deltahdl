@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.4: Wait on sequence.triggered elaborates.
 TEST(ElabClause09_04_04, WaitSequenceTriggeredElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,7 +21,6 @@ TEST(ElabClause09_04_04, WaitSequenceTriggeredElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.4: Wait on OR of multiple sequence.triggered elaborates.
 TEST(ElabClause09_04_04, WaitMultipleTriggeredElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -43,7 +41,6 @@ TEST(ElabClause09_04_04, WaitMultipleTriggeredElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.4: Wait on sequence.triggered with action statement elaborates.
 TEST(ElabClause09_04_04, WaitTriggeredWithActionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -62,4 +59,4 @@ TEST(ElabClause09_04_04, WaitTriggeredWithActionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

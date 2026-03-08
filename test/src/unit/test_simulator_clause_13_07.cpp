@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §13.7/§23.8.1: Forward reference — call function declared after initial
-// block.
 TEST(Sim1370, ForwardFunctionCallSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -21,7 +19,6 @@ TEST(Sim1370, ForwardFunctionCallSimulates) {
   LowerRunAndCheck(f, design, {{"x", 42u}});
 }
 
-// §13.7/§23.8.1: Forward reference — task declared after use.
 TEST(Sim1370, ForwardTaskCallSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -39,7 +36,6 @@ TEST(Sim1370, ForwardTaskCallSimulates) {
   LowerRunAndCheck(f, design, {{"x", 99u}});
 }
 
-// §13.7: Function calling another function declared after it.
 TEST(Sim1370, FunctionCallsForwardFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -57,4 +53,4 @@ TEST(Sim1370, FunctionCallsForwardFunction) {
   LowerRunAndCheck(f, design, {{"x", 31u}});
 }
 
-}  // namespace
+}

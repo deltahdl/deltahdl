@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.6.2: Disable named block elaborates.
 TEST(ElabClause09_06_02, DisableNamedBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,7 +20,6 @@ TEST(ElabClause09_06_02, DisableNamedBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.6.2: Disable task name elaborates.
 TEST(ElabClause09_06_02, DisableTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -38,7 +36,6 @@ TEST(ElabClause09_06_02, DisableTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.6.2: Disable from another process targeting a named block elaborates.
 TEST(ElabClause09_06_02, DisableFromOtherProcessElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -58,7 +55,6 @@ TEST(ElabClause09_06_02, DisableFromOtherProcessElaborates) {
   EXPECT_EQ(design->top_modules[0]->processes.size(), 2u);
 }
 
-// §9.6.2: Disable with conditional guard elaborates.
 TEST(ElabClause09_06_02, DisableConditionalElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -76,7 +72,6 @@ TEST(ElabClause09_06_02, DisableConditionalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.6.2: Disable in always block elaborates.
 TEST(ElabClause09_06_02, DisableInAlwaysElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -95,4 +90,4 @@ TEST(ElabClause09_06_02, DisableInAlwaysElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

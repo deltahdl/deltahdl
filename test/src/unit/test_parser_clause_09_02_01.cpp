@@ -70,8 +70,6 @@ TEST(ParserSection9, InitialBlock) {
   EXPECT_TRUE(found);
 }
 
-// §9.2.1: initial_construct ::= initial statement_or_null
-// The body can be a begin-end block with variable initialization.
 TEST(ParserClause09_02_01, InitialBeginEndWithInit) {
   auto r = Parse(
       "module m;\n"
@@ -89,7 +87,6 @@ TEST(ParserClause09_02_01, InitialBeginEndWithInit) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
-// §9.2.1: initial with waveform stimulus using delays.
 TEST(ParserClause09_02_01, InitialWaveformStimulus) {
   auto r = Parse(
       "module m;\n"
@@ -110,7 +107,6 @@ TEST(ParserClause09_02_01, InitialWaveformStimulus) {
   EXPECT_EQ(item->body->stmts.size(), 5u);
 }
 
-// §9.2.1: initial_construct accepts statement_or_null (null statement = ;).
 TEST(ParserClause09_02_01, InitialNullStatement) {
   auto r = Parse(
       "module m;\n"
@@ -122,4 +118,4 @@ TEST(ParserClause09_02_01, InitialNullStatement) {
   ASSERT_NE(item, nullptr);
 }
 
-}  // namespace
+}

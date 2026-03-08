@@ -97,4 +97,4 @@ TEST(ParserSection7, ArrayMethodReverse) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-}  // namespace
+}

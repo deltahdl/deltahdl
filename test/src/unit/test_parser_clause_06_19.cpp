@@ -83,19 +83,16 @@ TEST(ParserA221, EnumBaseTypeIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.19: Enum is an integral type (default base is int, 32-bit).
 TEST(ParserSection6, EnumIsIntegral) {
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kEnum));
 }
 
-// §6.19: Default enum width is 32 (int base type).
 TEST(ParserSection6, EnumDefaultWidth32) {
   DataType dt;
   dt.kind = DataTypeKind::kEnum;
   EXPECT_EQ(EvalTypeWidth(dt), 32u);
 }
 
-// §6.19: First unassigned name gets value 0.
 TEST(ParserSection6, EnumFirstNameDefaultsToZero) {
   auto r = Parse(
       "module m;\n"
@@ -105,14 +102,13 @@ TEST(ParserSection6, EnumFirstNameDefaultsToZero) {
   EXPECT_FALSE(r.has_errors);
   auto& members = r.cu->modules[0]->items[0]->data_type.enum_members;
   ASSERT_EQ(members.size(), 3u);
-  // First member has no explicit value (defaults to 0).
+
   EXPECT_EQ(members[0].value, nullptr);
-  // Other members also have no explicit value (auto-incremented).
+
   EXPECT_EQ(members[1].value, nullptr);
   EXPECT_EQ(members[2].value, nullptr);
 }
 
-// §6.19: Enum with mixed assigned/auto-incremented values.
 TEST(ParserSection6, EnumMixedValues) {
   auto r = Parse(
       "module m;\n"
@@ -127,7 +123,6 @@ TEST(ParserSection6, EnumMixedValues) {
   EXPECT_EQ(members[2].value, nullptr);
 }
 
-// §6.19: 4-state enum base type allows x/z values.
 TEST(ParserSection6, Enum4StateBaseXZ) {
   auto r = Parse(
       "module m;\n"
@@ -137,4 +132,4 @@ TEST(ParserSection6, Enum4StateBaseXZ) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

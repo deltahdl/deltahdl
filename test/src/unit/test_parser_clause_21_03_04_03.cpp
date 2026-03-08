@@ -23,4 +23,4 @@ TEST(ParserSection21, SscanfCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

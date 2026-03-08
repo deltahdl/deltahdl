@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 
@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §8.26.2: Interface class extends another interface class — OK.
 TEST(ElabA8262, InterfaceExtendsInterfaceOk) {
   EXPECT_TRUE(
       ElabOk("interface class A;\n"
@@ -19,7 +18,6 @@ TEST(ElabA8262, InterfaceExtendsInterfaceOk) {
              "endmodule\n"));
 }
 
-// §8.26.2: Interface class cannot use implements.
 TEST(ElabA8262, InterfaceImplementsError) {
   EXPECT_FALSE(
       ElabOk("interface class A;\n"
@@ -32,7 +30,6 @@ TEST(ElabA8262, InterfaceImplementsError) {
              "endmodule\n"));
 }
 
-// §8.26.2: Interface class cannot extend a regular class.
 TEST(ElabA8262, InterfaceExtendsClassError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
@@ -44,7 +41,6 @@ TEST(ElabA8262, InterfaceExtendsClassError) {
              "endmodule\n"));
 }
 
-// §8.26.2: Regular class cannot extend an interface class.
 TEST(ElabA8262, ClassExtendsInterfaceError) {
   EXPECT_FALSE(
       ElabOk("interface class IC;\n"
@@ -58,7 +54,6 @@ TEST(ElabA8262, ClassExtendsInterfaceError) {
              "endmodule\n"));
 }
 
-// §8.26.2: Class implements interface class — OK.
 TEST(ElabA8262, ClassImplementsInterfaceOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
@@ -72,7 +67,6 @@ TEST(ElabA8262, ClassImplementsInterfaceOk) {
              "endmodule\n"));
 }
 
-// §8.26.2: Class extends base and implements interface — OK.
 TEST(ElabA8262, ClassExtendsAndImplementsOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
@@ -88,7 +82,6 @@ TEST(ElabA8262, ClassExtendsAndImplementsOk) {
              "endmodule\n"));
 }
 
-// §8.26.2: Class implements multiple interfaces — OK.
 TEST(ElabA8262, ClassImplementsMultipleOk) {
   EXPECT_TRUE(
       ElabOk("interface class A;\n"
@@ -107,7 +100,6 @@ TEST(ElabA8262, ClassImplementsMultipleOk) {
              "endmodule\n"));
 }
 
-// §8.26.2: Non-abstract class missing implementation — error.
 TEST(ElabA8262, ClassMissingImplementationError) {
   EXPECT_FALSE(
       ElabOk("interface class IC;\n"
@@ -119,7 +111,6 @@ TEST(ElabA8262, ClassMissingImplementationError) {
              "endmodule\n"));
 }
 
-// §8.26.6.1: Inherited method from base class satisfies interface — OK.
 TEST(ElabA82661, InheritedMethodSatisfiesInterfaceOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfClass;\n"
@@ -140,8 +131,6 @@ TEST(ElabA82661, InheritedMethodSatisfiesInterfaceOk) {
              "endmodule\n"));
 }
 
-// §8.26.9: Interface class with pure virtual methods — randomize is
-// separate (OK, no data members to randomize).
 TEST(ElabA8269, InterfaceClassPureVirtualOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
@@ -160,4 +149,4 @@ TEST(ElabA8269, InterfaceClassPureVirtualOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

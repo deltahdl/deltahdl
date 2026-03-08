@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §10.5: Variable initialization occurs before initial blocks.
 TEST(SimCh10c, VarInitBeforeInitialBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -22,11 +21,10 @@ TEST(SimCh10c, VarInitBeforeInitialBlock) {
   f.scheduler.Run();
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
-  // y should see x's initialized value of 42.
+
   EXPECT_EQ(y->value.ToUint64(), 42u);
 }
 
-// §10.5: Variable initialization is not a continuous assignment.
 TEST(SimCh10c, VarInitIsNotContinuous) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -47,13 +45,12 @@ TEST(SimCh10c, VarInitIsNotContinuous) {
   auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(b, nullptr);
-  // a is overwritten by the blocking assign.
+
   EXPECT_EQ(a->value.ToUint64(), 99u);
-  // b captured a's initialized value (10), not the later value.
+
   EXPECT_EQ(b->value.ToUint64(), 10u);
 }
 
-// §10.5: Variable holds initialized value until next assignment.
 TEST(SimCh10c, VarInitHoldsUntilAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -67,11 +64,10 @@ TEST(SimCh10c, VarInitHoldsUntilAssignment) {
   f.scheduler.Run();
   auto* x = f.ctx.FindVariable("x");
   ASSERT_NE(x, nullptr);
-  // No assignments occurred, so x retains its initialized value.
+
   EXPECT_EQ(x->value.ToUint64(), 100u);
 }
 
-// §10.5: Logic variable with expression initializer.
 TEST(SimCh10c, VarInitWithExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -88,7 +84,6 @@ TEST(SimCh10c, VarInitWithExpression) {
   EXPECT_EQ(v->value.ToUint64(), 0x30u);
 }
 
-// §10.5: Multiple variables initialized in one declaration.
 TEST(SimCh10c, MultipleVarInitSameDecl) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -105,7 +100,6 @@ TEST(SimCh10c, MultipleVarInitSameDecl) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 3u);
 }
 
-// §10.5: Variable initialization before always block.
 TEST(SimCh10c, VarInitBeforeAlwaysBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -127,8 +121,8 @@ TEST(SimCh10c, VarInitBeforeAlwaysBlock) {
   f.scheduler.Run();
   auto* result = f.ctx.FindVariable("result");
   ASSERT_NE(result, nullptr);
-  // always_ff fires on posedge clk, capturing count's initialized value.
+
   EXPECT_EQ(result->value.ToUint64(), 5u);
 }
 
-}  // namespace
+}

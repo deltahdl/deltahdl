@@ -18,4 +18,4 @@ TEST(ParserSection28, GateWithDelay) {
   ASSERT_EQ(item->gate_terminals.size(), 3);
 }
 
-}  // namespace
+}

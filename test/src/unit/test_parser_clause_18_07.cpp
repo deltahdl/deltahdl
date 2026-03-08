@@ -68,4 +68,4 @@ TEST(ParserSection18, RandomizeWithIdListAndConstraint) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

@@ -20,4 +20,4 @@ TEST(ParserA29, ImportThenDirectionPorts) {
   EXPECT_EQ(mp->ports[1].name, "data");
 }
 
-}  // namespace
+}

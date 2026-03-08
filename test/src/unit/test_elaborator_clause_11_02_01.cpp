@@ -22,4 +22,4 @@ TEST(ConstEval, ScopedUnresolved) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("UNKNOWN", f), scope), std::nullopt);
 }
 
-}  // namespace
+}

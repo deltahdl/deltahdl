@@ -24,4 +24,4 @@ TEST(SimA81, StreamingMultipleElements) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-}  // namespace
+}

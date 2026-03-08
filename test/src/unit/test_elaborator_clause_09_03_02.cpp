@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 
@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §9.3.2: fork/join elaborates within an initial process.
 TEST(ElabClause09_03_02, ForkJoinInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,7 +23,6 @@ TEST(ElabClause09_03_02, ForkJoinInInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.2: fork/join_any elaborates without errors.
 TEST(ElabClause09_03_02, ForkJoinAnyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -42,7 +40,6 @@ TEST(ElabClause09_03_02, ForkJoinAnyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.2: fork/join_none elaborates without errors.
 TEST(ElabClause09_03_02, ForkJoinNoneElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -60,7 +57,6 @@ TEST(ElabClause09_03_02, ForkJoinNoneElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.2: Empty fork/join elaborates without errors.
 TEST(ElabClause09_03_02, EmptyForkJoinElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -75,7 +71,6 @@ TEST(ElabClause09_03_02, EmptyForkJoinElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.2: begin-end inside fork creates a single sequential process.
 TEST(ElabClause09_03_02, BeginEndInsideForkElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -95,4 +90,4 @@ TEST(ElabClause09_03_02, BeginEndInsideForkElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

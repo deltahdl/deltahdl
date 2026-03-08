@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §8.21: Abstract class flag.
 TEST(ClassSim, AbstractClassFlag) {
   SimFixture f;
   auto* abstract_type = MakeClassType(f, "AbstractBase", {});
@@ -17,7 +16,6 @@ TEST(ClassSim, AbstractClassFlag) {
   EXPECT_TRUE(abstract_type->is_abstract);
 }
 
-// §8.21: Pure virtual method — null body in vtable.
 TEST(ClassSim, PureVirtualMethodNullBody) {
   SimFixture f;
   auto* abstract_type = MakeClassType(f, "Shape", {});
@@ -39,8 +37,6 @@ TEST(ClassSim, PureVirtualMethodNullBody) {
   EXPECT_EQ(resolved, method);
 }
 
-// §8.21: Abstract base with multiple pure virtuals — concrete must override
-// all.
 TEST(ClassSim, MultiplePureVirtualsOverridden) {
   SimFixture f;
   auto* abstract_type = MakeClassType(f, "Base", {});
@@ -66,7 +62,6 @@ TEST(ClassSim, MultiplePureVirtualsOverridden) {
   EXPECT_EQ(obj->ResolveVirtualMethod("perimeter"), perim_fn);
 }
 
-// §8.21: Abstract class extending abstract — vtable still has null entries.
 TEST(ClassSim, AbstractExtendsAbstractVtable) {
   SimFixture f;
   auto* base = MakeClassType(f, "Shape", {});
@@ -79,16 +74,14 @@ TEST(ClassSim, AbstractExtendsAbstractVtable) {
   mid->vtable.push_back({"area", nullptr, base});
   mid->vtable.push_back({"perimeter", nullptr, mid});
 
-  // Both pure virtuals still have null methods.
   EXPECT_EQ(mid->vtable[0].method, nullptr);
   EXPECT_EQ(mid->vtable[1].method, nullptr);
 }
 
-// §8.21: Non-abstract class is not marked abstract.
 TEST(ClassSim, ConcreteClassNotAbstract) {
   SimFixture f;
   auto* type = MakeClassType(f, "ConcreteClass", {"x"});
   EXPECT_FALSE(type->is_abstract);
 }
 
-}  // namespace
+}

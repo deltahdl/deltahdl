@@ -12,4 +12,4 @@ TEST(ParserA301, GateInst_ComplexTerminalExpressions) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

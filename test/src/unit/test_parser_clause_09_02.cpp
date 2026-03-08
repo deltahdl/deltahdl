@@ -47,7 +47,6 @@ TEST(ParserSection9c, MultipleInitialProcedures) {
   EXPECT_EQ(count, 3);
 }
 
-// §9.2 Syntax 9-1: All six structured procedure types coexist in one module.
 TEST(ParserClause09_02, Syntax9_1_AllSixProcedureTypes) {
   auto r = Parse(
       "module m;\n"
@@ -70,7 +69,6 @@ TEST(ParserClause09_02, Syntax9_1_AllSixProcedureTypes) {
   EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kFinalBlock));
 }
 
-// §9.2: No limit to the number of initial and always procedures.
 TEST(ParserClause09_02, NoLimitOnProcedureCount) {
   auto r = Parse(
       "module m;\n"
@@ -91,7 +89,6 @@ TEST(ParserClause09_02, NoLimitOnProcedureCount) {
   EXPECT_EQ(CountItemsByKind(items, ModuleItemKind::kAlwaysBlock), 4u);
 }
 
-// §9.2: Final block parses as module item.
 TEST(ParserClause09_02, FinalBlockParsing) {
   auto r = Parse(
       "module m;\n"
@@ -105,7 +102,6 @@ TEST(ParserClause09_02, FinalBlockParsing) {
   ASSERT_NE(item->body, nullptr);
 }
 
-// §9.2: Multiple final blocks in one module.
 TEST(ParserClause09_02, MultipleFinalBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -120,7 +116,6 @@ TEST(ParserClause09_02, MultipleFinalBlocks) {
       3u);
 }
 
-// §9.2: always_keyword variants map to correct AlwaysKind.
 TEST(ParserClause09_02, AlwaysKeywordVariants) {
   auto r = Parse(
       "module m;\n"
@@ -139,4 +134,4 @@ TEST(ParserClause09_02, AlwaysKeywordVariants) {
   EXPECT_TRUE(HasAlwaysOfKind(items, AlwaysKind::kAlwaysFF));
 }
 
-}  // namespace
+}

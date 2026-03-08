@@ -10,8 +10,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
   return pp.Preprocess(fid);
 }
 
-// --- §22.10: Basic `celldefine / `endcelldefine toggle ---
-
 TEST(Preprocessor, Celldefine_Toggle) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -22,8 +20,6 @@ TEST(Preprocessor, Celldefine_Toggle) {
   EXPECT_FALSE(pp.InCelldefine());
 }
 
-// --- §22.10: `celldefine sets state ---
-
 TEST(Preprocessor, Celldefine_SetsState) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -31,8 +27,6 @@ TEST(Preprocessor, Celldefine_SetsState) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(pp.InCelldefine());
 }
-
-// --- §22.10: `endcelldefine clears state ---
 
 TEST(Preprocessor, Endcelldefine_ClearsState) {
   PreprocFixture f;
@@ -43,8 +37,6 @@ TEST(Preprocessor, Endcelldefine_ClearsState) {
   EXPECT_FALSE(pp.InCelldefine());
 }
 
-// --- §22.10: `endcelldefine without prior `celldefine (no-op, no error) ---
-
 TEST(Preprocessor, Endcelldefine_WithoutPrior_NoError) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -53,8 +45,6 @@ TEST(Preprocessor, Endcelldefine_WithoutPrior_NoError) {
   EXPECT_FALSE(pp.InCelldefine());
 }
 
-// --- §22.10: `celldefine without `endcelldefine (independent, no error) ---
-
 TEST(Preprocessor, Celldefine_NoPairing_NoError) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -62,8 +52,6 @@ TEST(Preprocessor, Celldefine_NoPairing_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(pp.InCelldefine());
 }
-
-// --- §22.10: Most recent occurrence controls ---
 
 TEST(Preprocessor, Celldefine_MostRecentWins) {
   PreprocFixture f;
@@ -76,8 +64,6 @@ TEST(Preprocessor, Celldefine_MostRecentWins) {
   EXPECT_TRUE(pp.InCelldefine());
 }
 
-// --- §22.10: Multiple pairs in single source ---
-
 TEST(Preprocessor, Celldefine_MultiplePairs) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -88,8 +74,6 @@ TEST(Preprocessor, Celldefine_MultiplePairs) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_FALSE(pp.InCelldefine());
 }
-
-// --- §22.10: Directives may appear inside design elements (no error) ---
 
 TEST(Preprocessor, Celldefine_InsideModule_NoError) {
   PreprocFixture f;
@@ -107,8 +91,6 @@ TEST(Preprocessor, Endcelldefine_InsideModule_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_FALSE(pp.InCelldefine());
 }
-
-// --- §22.10: Directive produces no output ---
 
 TEST(Preprocessor, Celldefine_NoOutput) {
   PreprocFixture f;
@@ -130,8 +112,6 @@ TEST(Preprocessor, Endcelldefine_NoOutput) {
   EXPECT_TRUE(trimmed.empty());
 }
 
-// --- §22.10: Trailing content on same line passes through ---
-
 TEST(Preprocessor, Celldefine_TrailingContent) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -147,8 +127,6 @@ TEST(Preprocessor, Endcelldefine_TrailingContent) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(out.find("wire x;"), std::string::npos);
 }
-
-// --- §22.10: `resetall includes effects of `endcelldefine ---
 
 TEST(Preprocessor, Celldefine_ResetallClears) {
   PreprocFixture f;

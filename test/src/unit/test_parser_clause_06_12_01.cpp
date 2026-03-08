@@ -28,4 +28,4 @@ TEST(ParserSection6, IntToRealAssignment) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

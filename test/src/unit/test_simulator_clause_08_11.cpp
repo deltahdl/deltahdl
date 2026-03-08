@@ -35,7 +35,6 @@ TEST(ClassSim, NestedThisScoping) {
   EXPECT_EQ(f.ctx.CurrentThis(), nullptr);
 }
 
-// §8.11: this property access reads from the current this object.
 TEST(ClassSim, ThisPropertyAccess) {
   SimFixture f;
   auto* type = MakeClassType(f, "Demo", {"x"});
@@ -52,7 +51,6 @@ TEST(ClassSim, ThisPropertyAccess) {
   f.ctx.PopThis();
 }
 
-// §8.11: this refers to the correct object in nested calls.
 TEST(ClassSim, ThisCorrectObjectInNestedCalls) {
   SimFixture f;
   auto* type = MakeClassType(f, "C", {"val"});
@@ -74,4 +72,4 @@ TEST(ClassSim, ThisCorrectObjectInNestedCalls) {
   f.ctx.PopThis();
 }
 
-}  // namespace
+}

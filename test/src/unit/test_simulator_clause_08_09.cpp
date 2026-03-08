@@ -22,7 +22,6 @@ TEST(ClassSim, StaticPropertySharedAcrossInstances) {
   EXPECT_EQ(type->static_properties["counter"].ToUint64(), 42u);
 }
 
-// §8.9: Static property initialized once on the type, not per instance.
 TEST(ClassSim, StaticPropertyInitializedOnce) {
   SimFixture f;
   auto* type = MakeClassType(f, "Counter", {});
@@ -32,15 +31,12 @@ TEST(ClassSim, StaticPropertyInitializedOnce) {
   MakeObj(f, type);
   MakeObj(f, type);
 
-  // Both instances see the same static value on the type.
   EXPECT_EQ(type->static_properties["count"].ToUint64(), 10u);
 
-  // Modifying the static property is visible globally.
   type->static_properties["count"] = MakeLogic4VecVal(f.arena, 32, 99);
   EXPECT_EQ(type->static_properties["count"].ToUint64(), 99u);
 }
 
-// §8.9: Static property can be used without creating an object.
 TEST(ClassSim, StaticPropertyWithoutInstance) {
   SimFixture f;
   auto* info = f.arena.Create<ClassTypeInfo>();
@@ -49,10 +45,9 @@ TEST(ClassSim, StaticPropertyWithoutInstance) {
   info->static_properties["shared"] = MakeLogic4VecVal(f.arena, 32, 7);
   f.ctx.RegisterClassType("NoInst", info);
 
-  // Access without creating any objects.
   auto* found = f.ctx.FindClassType("NoInst");
   ASSERT_NE(found, nullptr);
   EXPECT_EQ(found->static_properties.at("shared").ToUint64(), 7u);
 }
 
-}  // namespace
+}

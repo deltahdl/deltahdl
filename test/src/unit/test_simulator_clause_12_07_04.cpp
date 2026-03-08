@@ -46,7 +46,6 @@ TEST(SimA608, WhileZeroIter) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §12.7.4: while with break.
 TEST(SimA608, WhileBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -70,7 +69,6 @@ TEST(SimA608, WhileBreak) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §12.7.4: while with continue.
 TEST(SimA608, WhileContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -93,11 +91,10 @@ TEST(SimA608, WhileContinue) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("sum");
   ASSERT_NE(var, nullptr);
-  // sum = 1+2+4+5 = 12 (skip 3)
+
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-// §12.7.4: while with block body.
 TEST(SimA608, WhileBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -122,4 +119,4 @@ TEST(SimA608, WhileBlock) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// §10.10.3
+
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §10.10.3: Nested concatenation in unpacked array concat is an error.
 TEST(ElabCh10j, NestedConcatInUnpackedArrayConcatError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +19,6 @@ TEST(ElabCh10j, NestedConcatInUnpackedArrayConcatError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §10.10.3: Typed assignment pattern as element of unpacked array concat is OK.
 TEST(ElabCh10j, TypedAssignPatternInArrayConcatOk) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -35,7 +33,6 @@ TEST(ElabCh10j, TypedAssignPatternInArrayConcatOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10.3: String concat inside unpacked array concat of strings is OK.
 TEST(ElabCh10j, StringConcatInStringArrayConcatOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -50,7 +47,6 @@ TEST(ElabCh10j, StringConcatInStringArrayConcatOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10.3: Assignment pattern containing unpacked array concat elaborates OK.
 TEST(ElabCh10j, AssignPatternWithArrayConcatOk) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -64,7 +60,6 @@ TEST(ElabCh10j, AssignPatternWithArrayConcatOk) {
   ASSERT_NE(design, nullptr);
 }
 
-// §10.10.3: Scalar elements in unpacked array concat are self-determined (OK).
 TEST(ElabCh10j, ScalarElementsSelfDetermined) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -77,7 +72,6 @@ TEST(ElabCh10j, ScalarElementsSelfDetermined) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10.3: Identifier (array variable) as element is self-determined (OK).
 TEST(ElabCh10j, ArrayIdentifierSelfDetermined) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -91,8 +85,6 @@ TEST(ElabCh10j, ArrayIdentifierSelfDetermined) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10.3: Multiple nested concats in unpacked array concat each produce
-// error.
 TEST(ElabCh10j, MultipleNestedConcatsError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -105,4 +97,4 @@ TEST(ElabCh10j, MultipleNestedConcatsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

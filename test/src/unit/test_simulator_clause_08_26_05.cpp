@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §8.26.5: Interface class type — IsA works through implementing class.
 TEST(ClassSim, InterfaceClassIsACheck) {
   SimFixture f;
 
@@ -19,10 +18,9 @@ TEST(ClassSim, InterfaceClassIsACheck) {
   impl_type->parent = iface_type;
   f.ctx.RegisterClassType("C", impl_type);
 
-  // C IsA IC (through parent chain).
   EXPECT_TRUE(impl_type->IsA(iface_type));
-  // IC is not IsA C.
+
   EXPECT_FALSE(iface_type->IsA(impl_type));
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -32,4 +32,4 @@ TEST(CanonicalSimulationSemantics, CanonicalSimulationSemantics) {
   EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 18u);
 }
 
-}  // namespace
+}

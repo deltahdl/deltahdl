@@ -95,4 +95,4 @@ TEST(SimA85, NetLvalueConcatProcedural) {
   LowerRunAndCheck(f, design, {{"a", 0xAu}, {"b", 0x5u}});
 }
 
-}  // namespace
+}

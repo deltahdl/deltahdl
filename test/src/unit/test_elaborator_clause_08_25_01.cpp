@@ -22,7 +22,6 @@ TEST(Elaboration, ParameterizedType_Vector) {
   EXPECT_EQ(mod->variables[0].width, 8);
 }
 
-// §8.25.1: Default specialization C#()::member — elaborates OK.
 TEST(ElabA8251, DefaultSpecializationScopeOk) {
   EXPECT_TRUE(
       ElabOk("class C #(type T = int);\n"
@@ -33,7 +32,6 @@ TEST(ElabA8251, DefaultSpecializationScopeOk) {
              "endmodule\n"));
 }
 
-// §8.25.1: Parameterized scope with value parameter — elaborates OK.
 TEST(ElabA8251, ValueParamScopeOk) {
   EXPECT_TRUE(
       ElabOk("class C #(int p = 1);\n"
@@ -43,4 +41,4 @@ TEST(ElabA8251, ValueParamScopeOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

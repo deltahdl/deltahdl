@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §A.1.10 Constraints
-
-// constraint_declaration ::= [static] constraint [dynamic_override] id { ... }
 TEST(ConstraintsA110, BasicConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -17,7 +14,6 @@ TEST(ConstraintsA110, BasicConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// constraint_block_item ::= solve before
 TEST(ConstraintsA110, SolveBefore) {
   auto r = Parse(
       "class C;\n"
@@ -28,7 +24,6 @@ TEST(ConstraintsA110, SolveBefore) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// constraint_expression ::= [soft] expression_or_dist ;
 TEST(ConstraintsA110, SoftConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -39,7 +34,6 @@ TEST(ConstraintsA110, SoftConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// constraint_expression ::= expression -> constraint_set
 TEST(ConstraintsA110, ImplicationConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -50,8 +44,6 @@ TEST(ConstraintsA110, ImplicationConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// constraint_expression ::= if (expression) constraint_set [else
-// constraint_set]
 TEST(ConstraintsA110, IfElseConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -65,7 +57,6 @@ TEST(ConstraintsA110, IfElseConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// constraint_expression ::= foreach
 TEST(ConstraintsA110, ForeachConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -78,7 +69,6 @@ TEST(ConstraintsA110, ForeachConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// constraint_expression ::= disable soft constraint_primary ;
 TEST(ConstraintsA110, DisableSoft) {
   auto r = Parse(
       "class C;\n"
@@ -90,7 +80,6 @@ TEST(ConstraintsA110, DisableSoft) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// uniqueness_constraint ::= unique { range_list }
 TEST(ConstraintsA110, UniquenessConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -101,7 +90,6 @@ TEST(ConstraintsA110, UniquenessConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// expression_or_dist ::= expression [ dist { dist_list } ]
 TEST(ConstraintsA110, DistConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -114,7 +102,6 @@ TEST(ConstraintsA110, DistConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// constraint_prototype
 TEST(ConstraintsA110, ConstraintPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -125,7 +112,6 @@ TEST(ConstraintsA110, ConstraintPrototype) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// extern_constraint_declaration
 TEST(ConstraintsA110, ExternConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -136,7 +122,6 @@ TEST(ConstraintsA110, ExternConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// static constraint
 TEST(ConstraintsA110, StaticConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -147,7 +132,6 @@ TEST(ConstraintsA110, StaticConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Multiple constraints in same class
 TEST(ConstraintsA110, MultipleConstraints) {
   auto r = Parse(
       "class C;\n"
@@ -160,7 +144,6 @@ TEST(ConstraintsA110, MultipleConstraints) {
   EXPECT_GE(r.cu->classes[0]->members.size(), 4u);
 }
 
-// Empty constraint block
 TEST(ConstraintsA110, EmptyConstraintBlock) {
   auto r = Parse(
       "class C;\n"
@@ -170,7 +153,6 @@ TEST(ConstraintsA110, EmptyConstraintBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Constraint with inside
 TEST(ConstraintsA110, InsideConstraint) {
   auto r = Parse(
       "class C;\n"
@@ -181,4 +163,4 @@ TEST(ConstraintsA110, InsideConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

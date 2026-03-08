@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.7.2: elaboration of real literal forms ---
-
 TEST(ElabClause05, Cl5_7_2_FixedPointElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -54,4 +52,4 @@ TEST(ElabClause05, Cl5_7_2_NegativeExponentElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

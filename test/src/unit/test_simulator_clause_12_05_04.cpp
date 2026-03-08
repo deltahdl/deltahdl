@@ -1,4 +1,4 @@
-// §12.5.4: Set membership case statement.
+
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §12.5.4: Basic value match — case(sel) inside matches exact value.
 TEST(SimA607, CaseInsideMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -33,7 +32,6 @@ TEST(SimA607, CaseInsideMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.5.4: No value matches → default is executed.
 TEST(SimA607, CaseInsideDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -58,7 +56,6 @@ TEST(SimA607, CaseInsideDefault) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// §12.5.4: Comma-separated values in a single case item — first item matches.
 TEST(SimA607, CaseInsideCommaValues) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -82,7 +79,6 @@ TEST(SimA607, CaseInsideCommaValues) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.5.4: Range match [lo:hi] in case item.
 TEST(SimA607, CaseInsideRangeMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -106,7 +102,6 @@ TEST(SimA607, CaseInsideRangeMatch) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.5.4: Range match — value outside range → no match.
 TEST(SimA607, CaseInsideRangeNoMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -130,7 +125,6 @@ TEST(SimA607, CaseInsideRangeNoMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.5.4: Asymmetric wildcard — x/z bits in pattern are don't-cares.
 TEST(SimA607, CaseInsideWildcardInPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -154,7 +148,6 @@ TEST(SimA607, CaseInsideWildcardInPattern) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.5.4: Asymmetric wildcard — x in selector does NOT match (no wildcard).
 TEST(SimA607, CaseInsideXInSelectorNoMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -177,11 +170,10 @@ TEST(SimA607, CaseInsideXInSelectorNoMatch) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // x in selector → no value matches → default
+
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §12.5.4: unique case inside with overlap → violation.
 TEST(SimA607, UniqueCaseInsideOverlapViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -202,13 +194,12 @@ TEST(SimA607, UniqueCaseInsideOverlapViolation) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // First matching item is executed.
+
   EXPECT_EQ(var->value.ToUint64(), 10u);
-  // Overlap detected → violation.
+
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.4: priority case inside, no match → violation.
 TEST(SimA607, PriorityCaseInsideNoMatchViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -231,7 +222,6 @@ TEST(SimA607, PriorityCaseInsideNoMatchViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.4: LRM example — priority casez with bit patterns.
 TEST(SimA607, CaseInsideLRMExample) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -254,8 +244,8 @@ TEST(SimA607, CaseInsideLRMExample) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // status=1 matches first item (1, 3)
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

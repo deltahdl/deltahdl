@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.2: each token consists of one or more characters ---
-
 TEST(LexerClause05, Cl5_2_EachTokenHasOneOrMoreChars) {
   auto tokens = Lex("module m; logic [7:0] x = 8'hFF + 1; endmodule");
   for (size_t i = 0; i + 1 < tokens.size(); ++i) {
@@ -30,8 +28,6 @@ TEST(LexerClause05, Cl5_2_MultiCharTokensHaveSizeGreaterThanOne) {
   auto r2 = LexOne("8'hFF");
   EXPECT_GT(r2.token.text.size(), 1u);
 }
-
-// --- §5.2: free format layout ---
 
 TEST(LexerClause05, Cl5_2_FreeFormatTokensOnOneLine) {
   auto tokens = Lex("module m;logic a;endmodule");
@@ -66,7 +62,6 @@ TEST(LexerClause05, Cl5_2_WhitespaceVariationsProduceSameTokens) {
   auto tabbed = Lex("a\t+\tb");
   auto newlined = Lex("a\n+\nb");
 
-  // All should produce: identifier, plus, identifier, EOF
   ASSERT_EQ(compact.size(), 4u);
   ASSERT_EQ(spaced.size(), 4u);
   ASSERT_EQ(tabbed.size(), 4u);
@@ -93,8 +88,6 @@ TEST(LexerClause05, Cl5_2_MixedWhitespaceAsTokenSeparators) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-// --- §5.2: exception for escaped identifiers (whitespace terminates them) ---
-
 TEST(LexerClause05, Cl5_2_EscapedIdentifierTerminatedBySpace) {
   auto tokens = Lex("\\abc def");
   ASSERT_GE(tokens.size(), 3u);
@@ -119,23 +112,20 @@ TEST(LexerClause05, Cl5_2_EscapedIdentifierTerminatedByTab) {
 }
 
 TEST(LexerClause05, Cl5_2_EscapedIdentifierIncludesSpecialChars) {
-  // Whitespace is significant for escaped identifiers: everything between
-  // the backslash and the terminating whitespace is the identifier.
+
   auto r = LexOne("\\a+b*c ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
 }
 
-// --- §5.2: all seven token categories ---
-
 TEST(LexerClause05, Cl5_2_WhitespaceCategory) {
-  // Whitespace is consumed but not emitted as tokens
+
   auto tokens = Lex("   ");
   ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
 TEST(LexerClause05, Cl5_2_CommentCategory) {
-  // Comments are consumed but not emitted as tokens
+
   auto tokens = Lex("a // line comment\nb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -168,8 +158,7 @@ TEST(LexerClause05, Cl5_2_KeywordCategory) {
 }
 
 TEST(LexerClause05, Cl5_2_AllSevenCategoriesInOneStream) {
-  // Whitespace (implicit), comment (stripped), operator, number,
-  // string literal, identifier, keyword
+
   auto tokens = Lex("module /* comment */ m; logic x = 42 + \"s\"; endmodule");
   bool has_operator = false;
   bool has_number = false;
@@ -192,12 +181,10 @@ TEST(LexerClause05, Cl5_2_AllSevenCategoriesInOneStream) {
   EXPECT_TRUE(has_keyword);
 }
 
-// --- §5.2: edge cases ---
-
 TEST(LexerClause05, Cl5_2_AdjacentOperatorsWithoutWhitespace) {
-  // Operators adjacent without whitespace should still be lexed correctly
+
   auto tokens = Lex("a+b-c");
-  ASSERT_EQ(tokens.size(), 6u);  // a + b - c EOF
+  ASSERT_EQ(tokens.size(), 6u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kPlus);
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
@@ -207,7 +194,7 @@ TEST(LexerClause05, Cl5_2_AdjacentOperatorsWithoutWhitespace) {
 
 TEST(LexerClause05, Cl5_2_TokensAdjacentToPunctuation) {
   auto tokens = Lex("a(b)");
-  ASSERT_EQ(tokens.size(), 5u);  // a ( b ) EOF
+  ASSERT_EQ(tokens.size(), 5u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kLParen);
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
@@ -215,11 +202,11 @@ TEST(LexerClause05, Cl5_2_TokensAdjacentToPunctuation) {
 }
 
 TEST(LexerClause05, Cl5_2_FormfeedIsWhitespace) {
-  // Formfeed (\f) is whitespace and should separate tokens
+
   auto tokens = Lex("a\fb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-}  // namespace
+}

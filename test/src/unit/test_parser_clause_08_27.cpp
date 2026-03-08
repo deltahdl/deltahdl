@@ -26,7 +26,6 @@ TEST(ParserSection8, TypedefClass) {
   EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
 }
 
-// §8.27: Mutual class references resolved by forward typedef.
 TEST(ParserSection8, TypedefClassMutualReference) {
   auto r = Parse(
       "typedef class C2;\n"
@@ -43,7 +42,6 @@ TEST(ParserSection8, TypedefClassMutualReference) {
   EXPECT_EQ(r.cu->classes[1]->name, "C2");
 }
 
-// §8.27: typedef interface class forward declaration.
 TEST(ParserSection8, TypedefInterfaceClass) {
   auto r = Parse(
       "typedef interface class IC;\n"
@@ -56,4 +54,4 @@ TEST(ParserSection8, TypedefInterfaceClass) {
   EXPECT_TRUE(r.cu->classes[0]->is_interface);
 }
 
-}  // namespace
+}

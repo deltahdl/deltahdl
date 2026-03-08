@@ -64,4 +64,4 @@ TEST(RemovalBasic, RemovalBasic) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kRemoval);
 }
 
-}  // namespace
+}

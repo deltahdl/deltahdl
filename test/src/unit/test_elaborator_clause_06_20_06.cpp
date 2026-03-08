@@ -40,7 +40,6 @@ TEST(Elaboration, ConstVarReassign_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.20.6: Const real variable with init is ok.
 TEST(Elaboration, ConstRealWithInit_OK) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -52,7 +51,6 @@ TEST(Elaboration, ConstRealWithInit_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.20.6: Const string variable with init is ok.
 TEST(Elaboration, ConstStringWithInit_OK) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -64,4 +62,4 @@ TEST(Elaboration, ConstStringWithInit_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

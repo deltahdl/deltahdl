@@ -90,4 +90,4 @@ TEST(ParserA213, PackageExportSingleItem) {
   EXPECT_EQ(item->import_item.item_name, "some_func");
 }
 
-}  // namespace
+}

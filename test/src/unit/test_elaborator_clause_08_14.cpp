@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.14: Subclass with overridden property elaborates OK.
 TEST(ElabA814, SubclassOverriddenPropertyOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -24,7 +23,6 @@ TEST(ElabA814, SubclassOverriddenPropertyOk) {
              "endmodule\n"));
 }
 
-// §8.14: Subclass handle assigned to base class variable elaborates.
 TEST(ElabA814, SubclassHandleToBaseVariableOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -43,7 +41,6 @@ TEST(ElabA814, SubclassHandleToBaseVariableOk) {
              "endmodule\n"));
 }
 
-// §8.14: Base class access through base class variable elaborates.
 TEST(ElabA814, BaseClassMemberAccessOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -68,4 +65,4 @@ TEST(ElabA814, BaseClassMemberAccessOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §A.10 clarification 38: embedded spaces are illegal in numbers
-
 TEST(LexerA10, NoSpacesInDecimalNumber) {
   auto tokens = Lex("123");
   ASSERT_GE(tokens.size(), 2u);
@@ -53,9 +51,6 @@ TEST(LexerA10, NoSpaceInExponentNumber) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kRealLiteral);
 }
 
-// §A.10 clarification 49: time_literal number shall not be followed by
-// white_space (before the time unit)
-
 TEST(LexerA10, TimeLiteralNoSpace) {
   auto tokens = Lex("10ns");
   ASSERT_GE(tokens.size(), 2u);
@@ -83,9 +78,6 @@ TEST(LexerA10, TimeLiteralFixedPoint) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
 }
 
-// §A.10 clarification 53: apostrophe in unbased_unsized_literal
-// shall not be followed by white_space
-
 TEST(LexerA10, UnbasedUnsizedNoSpace) {
   auto tokens = Lex("'0");
   ASSERT_GE(tokens.size(), 2u);
@@ -109,9 +101,6 @@ TEST(LexerA10, UnbasedUnsizedZNoSpace) {
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
 }
-
-// §A.10 clarification 54: simple_identifier shall start with alpha or
-// underscore, have at least one char, and no spaces
 
 TEST(LexerA10, SimpleIdentStartsWithAlpha) {
   auto tokens = Lex("abc");
@@ -140,9 +129,6 @@ TEST(LexerA10, SpaceSplitsIdentifiers) {
   EXPECT_EQ(tokens[1].text, "bar");
 }
 
-// §A.10 clarification 55: $ in system_tf_identifier shall not be followed
-// by white_space; system_tf_identifier shall not be escaped
-
 TEST(LexerA10, SystemIdNoSpaceAfterDollar) {
   auto tokens = Lex("$display");
   ASSERT_GE(tokens.size(), 2u);
@@ -162,8 +148,6 @@ TEST(LexerA10, SystemIdWithDigitsOk) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
 }
 
-// §A.10 clarification 56: EOF terminates token stream
-
 TEST(LexerA10, EofTerminatesStream) {
   auto tokens = Lex("module");
   ASSERT_GE(tokens.size(), 2u);
@@ -176,4 +160,4 @@ TEST(LexerA10, EmptyInputHasEof) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-}  // namespace
+}

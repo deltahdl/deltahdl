@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.2.2.3: always_latch with timing control produces an error.
 TEST(ElabClause09_02_02_03, TimingControlInAlwaysLatchErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(ElabClause09_02_02_03, TimingControlInAlwaysLatchErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.3: always_latch with fork-join produces an error.
 TEST(ElabClause09_02_02_03, ForkJoinInAlwaysLatchErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -36,7 +34,6 @@ TEST(ElabClause09_02_02_03, ForkJoinInAlwaysLatchErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.3: always_latch with incomplete if (no else) does not warn.
 TEST(ElabClause09_02_02_03, IncompleteIfNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,7 +48,6 @@ TEST(ElabClause09_02_02_03, IncompleteIfNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §9.2.2.3: always_latch with complete if/else warns (not latched).
 TEST(ElabClause09_02_02_03, CompleteIfElseWarnsNotLatched) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -67,7 +63,6 @@ TEST(ElabClause09_02_02_03, CompleteIfElseWarnsNotLatched) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §9.2.2.3: always_latch with case without default does not warn.
 TEST(ElabClause09_02_02_03, CaseWithoutDefaultNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -86,7 +81,6 @@ TEST(ElabClause09_02_02_03, CaseWithoutDefaultNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §9.2.2.3: always_latch with case + default warns (not latched).
 TEST(ElabClause09_02_02_03, CaseWithDefaultWarnsNotLatched) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -106,7 +100,6 @@ TEST(ElabClause09_02_02_03, CaseWithDefaultWarnsNotLatched) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §9.2.2.3: always_latch elaborates to kAlwaysLatch process kind.
 TEST(ElabClause09_02_02_03, AlwaysLatchElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -126,7 +119,6 @@ TEST(ElabClause09_02_02_03, AlwaysLatchElaboratesToCorrectKind) {
   EXPECT_TRUE(found);
 }
 
-// §9.2.2.3: Multi-driver: same variable in two always_latch blocks.
 TEST(ElabClause09_02_02_03, MultiDriverTwoAlwaysLatchErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -777,4 +769,4 @@ TEST(SimCh9c, BeginEndBlockWithArithmetic) {
   EXPECT_EQ(q->value.ToUint64(), 0x30u);
 }
 
-}  // namespace
+}

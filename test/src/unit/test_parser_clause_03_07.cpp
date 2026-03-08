@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §3.7: Built-in primitives represent low-level logic gates and switches.
-
 TEST(ParserClause03, Cl3_7_BuiltInNInputGates) {
   auto r = Parse(
       "module m;\n"
@@ -93,8 +91,6 @@ TEST(ParserClause03, Cl3_7_BuiltInPullGates) {
               "endmodule\n"));
 }
 
-// §3.7: UDPs are enclosed between primitive...endprimitive.
-
 TEST(ParserClause03, Cl3_7_UdpEnclosedByKeywords) {
   auto r = Parse(
       "primitive udp_buf (output out, input in);\n"
@@ -137,4 +133,4 @@ TEST(ParserClause03, Cl3_7_BuiltInAndUdpCoexist) {
   EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
 }
 
-}  // namespace
+}

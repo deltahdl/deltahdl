@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include <gtest/gtest.h>
 
@@ -16,7 +16,6 @@ TEST(NetDecl, ChargeStrengthOnTriIsError) {
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-// §6.3.2.1: trireg without explicit charge strength defaults to kMedium.
 TEST(Elaborator, TriregDefaultChargeStrengthMedium) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -37,4 +36,4 @@ TEST(Elaborator, TriregDefaultChargeStrengthMedium) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

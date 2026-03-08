@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.11 — clocking block
-
 TEST(ParserA611, ClockingDeclBasic) {
   auto r = Parse(
       "module m;\n"
@@ -245,4 +243,4 @@ TEST(ParserA611, CycleDelayIntegralNumber) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

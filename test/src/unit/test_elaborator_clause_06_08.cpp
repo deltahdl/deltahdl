@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §6.8/§6.20.6: Const variable must have an initializer.
 TEST(VarDecl, ConstWithoutInitializerIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -17,7 +16,6 @@ TEST(VarDecl, ConstWithoutInitializerIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.8/§6.20.6: Const variable with initializer is valid.
 TEST(VarDecl, ConstWithInitializerOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -29,7 +27,6 @@ TEST(VarDecl, ConstWithInitializerOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.8: Redeclaration of the same name is an error.
 TEST(VarDecl, RedeclarationIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -41,7 +38,6 @@ TEST(VarDecl, RedeclarationIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.8: Variable with initializer produces correct RTLIR.
 TEST(VarDecl, InitializerPreservedInRtlir) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -56,7 +52,6 @@ TEST(VarDecl, InitializerPreservedInRtlir) {
   EXPECT_NE(mod->variables[0].init_expr, nullptr);
 }
 
-// §6.8: 4-state type (logic) is correctly identified.
 TEST(VarDecl, LogicIs4State) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -72,7 +67,6 @@ TEST(VarDecl, LogicIs4State) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// §6.8: 2-state type (int) is correctly identified.
 TEST(VarDecl, IntIs2State) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -88,7 +82,6 @@ TEST(VarDecl, IntIs2State) {
   EXPECT_EQ(mod->variables[0].width, 32u);
 }
 
-// §6.8: Signed type (int) is correctly identified.
 TEST(VarDecl, IntIsSigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -103,7 +96,6 @@ TEST(VarDecl, IntIsSigned) {
   EXPECT_TRUE(mod->variables[0].is_signed);
 }
 
-// §6.8: Real variable is correctly identified.
 TEST(VarDecl, RealIsReal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -118,7 +110,6 @@ TEST(VarDecl, RealIsReal) {
   EXPECT_TRUE(mod->variables[0].is_real);
 }
 
-// §6.8: String variable is correctly identified.
 TEST(VarDecl, StringIsString) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -133,7 +124,6 @@ TEST(VarDecl, StringIsString) {
   EXPECT_TRUE(mod->variables[0].is_string);
 }
 
-// §6.8: Event variable is correctly identified.
 TEST(VarDecl, EventIsEvent) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -148,7 +138,6 @@ TEST(VarDecl, EventIsEvent) {
   EXPECT_TRUE(mod->variables[0].is_event);
 }
 
-// §6.8: Multiple variable declarations produce multiple RTLIR variables.
 TEST(VarDecl, MultipleVarsInOneStatement) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -165,4 +154,4 @@ TEST(VarDecl, MultipleVarsInOneStatement) {
   EXPECT_EQ(mod->variables[2].name, "t.c");
 }
 
-}  // namespace
+}

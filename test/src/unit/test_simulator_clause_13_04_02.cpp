@@ -74,7 +74,6 @@ TEST(Functions, StaticFunctionWithArgs) {
   EXPECT_EQ(EvalExpr(c3, f.ctx, f.arena).ToUint64(), 10u);
 }
 
-// §13.4.2: Static function variables persist between calls (end-to-end).
 TEST(Sim1342, StaticFunctionVarsPersist) {
   auto val = RunAndGet(
       "module t;\n"
@@ -94,7 +93,6 @@ TEST(Sim1342, StaticFunctionVarsPersist) {
   EXPECT_EQ(val, 3u);
 }
 
-// §13.4.2: Automatic function variables are fresh each call.
 TEST(Sim1342, AutomaticFunctionVarsFresh) {
   auto val = RunAndGet(
       "module t;\n"
@@ -114,7 +112,6 @@ TEST(Sim1342, AutomaticFunctionVarsFresh) {
   EXPECT_EQ(val, 1u);
 }
 
-// §13.4.2: Default function (no qualifier) is static.
 TEST(Sim1342, DefaultFunctionIsStatic) {
   auto val = RunAndGet(
       "module t;\n"
@@ -133,7 +130,6 @@ TEST(Sim1342, DefaultFunctionIsStatic) {
   EXPECT_EQ(val, 2u);
 }
 
-// §13.4.2: Static var in automatic function persists.
 TEST(Sim1342, StaticVarInAutoFuncPersists) {
   auto val = RunAndGet(
       "module t;\n"
@@ -153,7 +149,6 @@ TEST(Sim1342, StaticVarInAutoFuncPersists) {
   EXPECT_EQ(val, 3u);
 }
 
-// §13.4.2: Automatic var in static function is fresh each call.
 TEST(Sim1342, AutoVarInStaticFuncFresh) {
   auto val = RunAndGet(
       "module t;\n"
@@ -169,11 +164,10 @@ TEST(Sim1342, AutoVarInStaticFuncFresh) {
       "  end\n"
       "endmodule\n",
       "result");
-  // tmp is automatic: re-initialized to 10 each call, then +1 = 11.
+
   EXPECT_EQ(val, 11u);
 }
 
-// §13.4.2: Recursive automatic function (factorial from LRM example).
 TEST(Sim1342, RecursiveAutoFunction) {
   auto val = RunAndGet(
       "module t;\n"
@@ -192,4 +186,4 @@ TEST(Sim1342, RecursiveAutoFunction) {
   EXPECT_EQ(val, 120u);
 }
 
-}  // namespace
+}

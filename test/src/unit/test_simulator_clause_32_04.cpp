@@ -294,4 +294,4 @@ TEST(SdfParser, ParseMinTypMaxDelay_FallValues) {
   EXPECT_EQ(io.fall.max_val, 6u);
 }
 
-}  // namespace
+}

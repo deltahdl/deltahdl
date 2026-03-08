@@ -32,7 +32,6 @@ TEST(SimA608, ForeachBasic) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.7.3: foreach with block body.
 TEST(SimA608, ForeachBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -64,7 +63,6 @@ TEST(SimA608, ForeachBlock) {
   EXPECT_EQ(vc->value.ToUint64(), 3u);
 }
 
-// §12.7.3: foreach with break — exits loop early.
 TEST(SimA608, ForeachBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -90,7 +88,6 @@ TEST(SimA608, ForeachBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §12.7.3: foreach loop variable is read-only and accessible.
 TEST(SimA608, ForeachIteratorValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -110,8 +107,8 @@ TEST(SimA608, ForeachIteratorValue) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("last_i");
   ASSERT_NE(var, nullptr);
-  // Last iteration: i=3.
+
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-}  // namespace
+}

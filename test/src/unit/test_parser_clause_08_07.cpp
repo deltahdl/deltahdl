@@ -148,7 +148,6 @@ TEST(ParserSection8, ClassWithInitializer) {
   EXPECT_NE(cls->members[0]->init_expr, nullptr);
 }
 
-// §8.7: Constructor with local qualifier is legal.
 TEST(ParserA87, ConstructorLocalQualifierLegal) {
   ParseOk(
       "class C;\n"
@@ -157,7 +156,6 @@ TEST(ParserA87, ConstructorLocalQualifierLegal) {
       "endclass\n");
 }
 
-// §8.7: Constructor with protected qualifier is legal.
 TEST(ParserA87, ConstructorProtectedQualifierLegal) {
   ParseOk(
       "class C;\n"
@@ -166,7 +164,6 @@ TEST(ParserA87, ConstructorProtectedQualifierLegal) {
       "endclass\n");
 }
 
-// §8.7: Constructor shall not be static.
 TEST(ParserA87, ConstructorStaticError) {
   auto r = Parse(
       "class C;\n"
@@ -176,7 +173,6 @@ TEST(ParserA87, ConstructorStaticError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §8.7: Constructor shall not be virtual.
 TEST(ParserA87, ConstructorVirtualError) {
   auto r = Parse(
       "class C;\n"
@@ -186,7 +182,6 @@ TEST(ParserA87, ConstructorVirtualError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §8.7: Constructor with default argument values.
 TEST(ParserA87, ConstructorDefaultArgs) {
   auto r = Parse(
       "class Packet;\n"
@@ -208,7 +203,6 @@ TEST(ParserA87, ConstructorDefaultArgs) {
   EXPECT_NE(m->method->func_args[1].default_value, nullptr);
 }
 
-// §8.7: Class without explicit constructor (implicit new).
 TEST(ParserA87, ImplicitConstructor) {
   auto r = Parse(
       "class C;\n"
@@ -222,7 +216,6 @@ TEST(ParserA87, ImplicitConstructor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §8.7: Constructor with super.new() call.
 TEST(ParserA87, ConstructorSuperNewCall) {
   ParseOk(
       "class Base;\n"
@@ -236,7 +229,6 @@ TEST(ParserA87, ConstructorSuperNewCall) {
       "endclass\n");
 }
 
-// §8.7: Constructor with super.new(args) call.
 TEST(ParserA87, ConstructorSuperNewWithArgs) {
   ParseOk(
       "class Base;\n"
@@ -262,4 +254,4 @@ TEST(ParserSection8, ConstructorEndLabel) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

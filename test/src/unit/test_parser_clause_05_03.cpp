@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.3: whitespace characters as token separators ---
-
 TEST(ParserClause05, Cl5_3_TabDelimiter) {
   EXPECT_TRUE(ParseOk("module\tt;\tlogic\ta;\tendmodule"));
 }
@@ -42,8 +40,6 @@ TEST(ParserClause05, Cl5_3_MultipleConsecutiveWhitespace) {
       ParseOk("module   \t\t   t  \n\n\n ;   logic   a  ;   endmodule"));
 }
 
-// --- §5.3: whitespace ignored (same AST regardless of formatting) ---
-
 TEST(ParserClause05, Cl5_3_MinimalWhitespace) {
   EXPECT_TRUE(ParseOk("module t;endmodule"));
 }
@@ -64,8 +60,6 @@ TEST(ParserClause05, Cl5_3_MixedTokensNoWhitespace) {
   EXPECT_TRUE(ParseOk("module m;logic a;assign a=1'b0;endmodule"));
 }
 
-// --- §5.3: blanks and tabs significant inside string literals ---
-
 TEST(ParserClause05, Cl5_3_WhitespaceInsideStringPreserved) {
   auto r = Parse(
       "module m;\n"
@@ -80,8 +74,6 @@ TEST(ParserClause05, Cl5_3_WhitespaceInsideStringPreserved) {
   EXPECT_NE(stmt->expr->args[0]->text.find("  hello   world  "),
             std::string_view::npos);
 }
-
-// --- §5.3: free format across statements ---
 
 TEST(ParserClause05, Cl5_3_OperatorFollowedByNumber) {
   auto r = Parse(
@@ -142,4 +134,4 @@ TEST(ParserClause05, Cl5_3_TabCharactersInDeclarations) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

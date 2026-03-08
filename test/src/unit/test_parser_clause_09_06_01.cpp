@@ -73,4 +73,4 @@ TEST(ParserA605, WaitFork) {
   EXPECT_EQ(stmt->kind, StmtKind::kWaitFork);
 }
 
-}  // namespace
+}

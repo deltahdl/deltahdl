@@ -162,4 +162,4 @@ TEST(ParserSection7, StructMemberDefaultInit) {
   EXPECT_NE(item->typedef_type.struct_members[2].init_expr, nullptr);
 }
 
-}  // namespace
+}

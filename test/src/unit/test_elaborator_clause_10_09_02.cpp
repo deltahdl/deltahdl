@@ -166,7 +166,6 @@ TEST(Elaboration, StructPattern_DuplicateKey) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §10.9.2: Struct pattern that does not cover all members is an error.
 TEST(Elaboration, StructPattern_UncoveredMember) {
   ElabFixture f;
   ElaborateSrc(
@@ -192,7 +191,6 @@ TEST(ElabA60701, StructNamedPatternElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-// §11.2.2: Unpacked struct and array constructors can be aggregate expressions.
 TEST(AggregateExpr, AssignmentPatternAsAggregate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -206,7 +204,6 @@ TEST(AggregateExpr, AssignmentPatternAsAggregate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.9: Struct pattern type-keyed in full simulation.
 TEST(SimCh10i, StructTypeKeyedPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -227,8 +224,8 @@ TEST(SimCh10i, StructTypeKeyedPattern) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("m");
   ASSERT_NE(var, nullptr);
-  // a (int, 32 bits at [39:8]) = 99, b (logic, 8 bits at [7:0]) = 0.
+
   EXPECT_EQ(var->value.ToUint64(), uint64_t{99} << 8);
 }
 
-}  // namespace
+}

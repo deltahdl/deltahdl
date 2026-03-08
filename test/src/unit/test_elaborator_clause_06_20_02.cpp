@@ -49,7 +49,6 @@ TEST(ElabA84, ConstantPrimaryParameterRef) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2: Parameter depending on earlier parameter.
 TEST(ElabA84, ParameterDependsOnEarlier) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -62,7 +61,6 @@ TEST(ElabA84, ParameterDependsOnEarlier) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2: Parameter with explicit signed range.
 TEST(ElabA84, ParameterSignedRange) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -74,7 +72,6 @@ TEST(ElabA84, ParameterSignedRange) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2: Multiple parameters in one declaration.
 TEST(ElabA84, MultipleParamsOneDeclLine) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -86,7 +83,6 @@ TEST(ElabA84, MultipleParamsOneDeclLine) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2: Real parameter.
 TEST(ElabA84, RealParameter) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -98,4 +94,4 @@ TEST(ElabA84, RealParameter) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

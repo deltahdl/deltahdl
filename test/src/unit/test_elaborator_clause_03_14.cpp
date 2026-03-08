@@ -2,8 +2,6 @@
 
 namespace {
 
-// §3.14: Precision shall be at least as precise as the time unit.
-
 TEST(ElabClause03, Cl3_14_PrecisionLessPreciseThanUnit) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -32,8 +30,6 @@ TEST(ElabClause03, Cl3_14_NoTimescaleElaboratesOk) {
   EXPECT_TRUE(ElabOk("module m; logic x; endmodule\n"));
 }
 
-// §3.14: Time values used for delays and procedural timing.
-
 TEST(ElabClause03, Cl3_14_ModuleWithDelayElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -44,4 +40,4 @@ TEST(ElabClause03, Cl3_14_ModuleWithDelayElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

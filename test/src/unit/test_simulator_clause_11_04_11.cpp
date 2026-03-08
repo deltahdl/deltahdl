@@ -112,4 +112,4 @@ TEST(SimA83, NestedTernary) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

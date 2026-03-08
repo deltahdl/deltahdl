@@ -110,7 +110,6 @@ TEST(SimCh4, ProcessWithLoop) {
   EXPECT_EQ(result, 15u);
 }
 
-// §12.7.1: Continue in for-loop — skips to step.
 TEST(SimA608, ForContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -131,11 +130,10 @@ TEST(SimA608, ForContinue) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("sum");
   ASSERT_NE(var, nullptr);
-  // Iterations 0,1,2,4,5 increment → 5.
+
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §12.7.1: Nested for-loops.
 TEST(SimA608, ForNested) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -158,7 +156,6 @@ TEST(SimA608, ForNested) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-// §12.7.1: For-loop with zero iterations — condition false initially.
 TEST(SimA608, ForZeroIterations) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -180,7 +177,6 @@ TEST(SimA608, ForZeroIterations) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §12.7.1: For-loop with decrement step.
 TEST(SimA608, ForDecrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -202,4 +198,4 @@ TEST(SimA608, ForDecrement) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

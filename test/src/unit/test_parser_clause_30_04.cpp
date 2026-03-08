@@ -27,4 +27,4 @@ TEST(ParserA702, MultiplePathDeclarations) {
   }
 }
 
-}  // namespace
+}

@@ -4,7 +4,6 @@
 using namespace delta;
 namespace {
 
-// §7.9.4: first() parsed as method call on int-keyed associative array.
 TEST(ParserSection7, AssocArrayFirstMethodIntKey) {
   auto r = Parse(
       "module t;\n"
@@ -21,7 +20,6 @@ TEST(ParserSection7, AssocArrayFirstMethodIntKey) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-// §7.9.4: first() parsed as method call on string-keyed associative array.
 TEST(ParserSection7, AssocArrayFirstMethodStringKey) {
   auto r = Parse(
       "module t;\n"
@@ -38,7 +36,6 @@ TEST(ParserSection7, AssocArrayFirstMethodStringKey) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-// §7.9.4: first() in if-condition context.
 TEST(ParserSection7, AssocArrayFirstInIfCondition) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -48,7 +45,6 @@ TEST(ParserSection7, AssocArrayFirstInIfCondition) {
               "endmodule\n"));
 }
 
-// §7.9.4: first() return value used in assignment.
 TEST(ParserSection7, AssocArrayFirstReturnAssigned) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -59,4 +55,4 @@ TEST(ParserSection7, AssocArrayFirstReturnAssigned) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

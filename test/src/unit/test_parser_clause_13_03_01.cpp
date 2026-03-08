@@ -273,7 +273,6 @@ TEST(ParserSection4, Sec4_9_4_AutoTaskExplicitAutoLocals) {
   EXPECT_NE(t->func_body_stmts[0]->var_init, nullptr);
 }
 
-// §13.3.1: Static local variable inside automatic task.
 TEST(ParserSection13, StaticVarInAutoTask) {
   auto r = Parse(
       "module m;\n"
@@ -292,7 +291,6 @@ TEST(ParserSection13, StaticVarInAutoTask) {
   EXPECT_TRUE(t->func_body_stmts[0]->var_is_static);
 }
 
-// §13.3.1: Automatic local variable inside static task.
 TEST(ParserSection13, AutoVarInStaticTask) {
   auto r = Parse(
       "module m;\n"
@@ -311,4 +309,4 @@ TEST(ParserSection13, AutoVarInStaticTask) {
   EXPECT_TRUE(t->func_body_stmts[0]->var_is_automatic);
 }
 
-}  // namespace
+}

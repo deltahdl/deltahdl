@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.6.1: escaped identifiers as declaration names ---
-
 TEST(ParserClause05, Cl5_6_1_EscapedIdentifierAsName) {
   EXPECT_TRUE(ParseOk("module t; wire \\bus+index ; endmodule"));
 }
@@ -34,8 +32,6 @@ TEST(ParserClause05, Cl5_6_1_EscapedIdentBraces) {
   EXPECT_TRUE(ParseOk("module m; wire \\{a,b} ; endmodule"));
 }
 
-// --- §5.6.1: escaped identifier in expression context ---
-
 TEST(ParserClause05, Cl5_6_1_EscapedIdentInExpression) {
   auto r = Parse(
       "module m;\n"
@@ -46,8 +42,6 @@ TEST(ParserClause05, Cl5_6_1_EscapedIdentInExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- §5.6.1: escaped identifier in let declaration ---
-
 TEST(ParserClause05, Cl5_6_1_EscapedIdentInLetDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -55,4 +49,4 @@ TEST(ParserClause05, Cl5_6_1_EscapedIdentInLetDecl) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

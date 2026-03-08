@@ -27,4 +27,4 @@ TEST(IpcSync, MailboxNumReflectsState) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-}  // namespace
+}

@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.2.2.4: always_ff with no event control produces an error.
 TEST(ElabClause09_02_02_04, MissingEventControlErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -16,7 +15,6 @@ TEST(ElabClause09_02_02_04, MissingEventControlErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.4: always_ff with blocking timing control in body produces an error.
 TEST(ElabClause09_02_02_04, BlockingTimingControlInBodyErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -28,7 +26,6 @@ TEST(ElabClause09_02_02_04, BlockingTimingControlInBodyErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.4: always_ff with fork-join produces an error.
 TEST(ElabClause09_02_02_04, ForkJoinInAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -45,7 +42,6 @@ TEST(ElabClause09_02_02_04, ForkJoinInAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.4: Valid always_ff with posedge clock, no errors.
 TEST(ElabClause09_02_02_04, ValidPosedgeClockNoErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -58,7 +54,6 @@ TEST(ElabClause09_02_02_04, ValidPosedgeClockNoErrors) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.2.2.4: always_ff elaborates to kAlwaysFF process kind.
 TEST(ElabClause09_02_02_04, ElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -77,8 +72,6 @@ TEST(ElabClause09_02_02_04, ElaboratesToCorrectKind) {
   EXPECT_TRUE(found);
 }
 
-// §9.2.2.4: always_ff sensitivity list is preserved (posedge clk or negedge
-// rst).
 TEST(ElabClause09_02_02_04, SensitivityListPreserved) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -105,7 +98,6 @@ TEST(ElabClause09_02_02_04, SensitivityListPreserved) {
   EXPECT_TRUE(found);
 }
 
-// §9.2.2.4: always_ff with no edge events warns about non-sequential logic.
 TEST(ElabClause09_02_02_04, NoEdgeWarnsNotSequential) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -119,7 +111,6 @@ TEST(ElabClause09_02_02_04, NoEdgeWarnsNotSequential) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §9.2.2.4: always_ff with posedge clock does not warn.
 TEST(ElabClause09_02_02_04, PosedgeClockNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -133,7 +124,6 @@ TEST(ElabClause09_02_02_04, PosedgeClockNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §9.2.2.4: Multi-driver: same variable in two always_ff blocks.
 TEST(ElabClause09_02_02_04, MultiDriverTwoAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -146,7 +136,6 @@ TEST(ElabClause09_02_02_04, MultiDriverTwoAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.4: Multi-driver: always_ff and continuous assignment.
 TEST(ElabClause09_02_02_04, MultiDriverFFAndContAssignErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -159,7 +148,6 @@ TEST(ElabClause09_02_02_04, MultiDriverFFAndContAssignErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.4: Multi-driver: always_ff and always_comb same variable.
 TEST(ElabClause09_02_02_04, MultiDriverFFAndCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -172,7 +160,6 @@ TEST(ElabClause09_02_02_04, MultiDriverFFAndCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.4: Different variables in separate always_ff blocks, no error.
 TEST(ElabClause09_02_02_04, DifferentVarsInSeparateFFOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -186,7 +173,6 @@ TEST(ElabClause09_02_02_04, DifferentVarsInSeparateFFOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.2: fork/join in always_ff is an error.
 TEST(ElabClause09_03_02, ForkInAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -203,7 +189,6 @@ TEST(ElabClause09_03_02, ForkInAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.6.1: Wait fork is a timing control, error in always_ff.
 TEST(ElabClause09_06_01, WaitForkInAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -218,4 +203,4 @@ TEST(ElabClause09_06_01, WaitForkInAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

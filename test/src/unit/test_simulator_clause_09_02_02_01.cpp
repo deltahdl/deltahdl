@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §9.2.2.1: Clock oscillator repeats with delay.
 TEST(SimClause09_02_02_01, ClockOscillatorWithDelay) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -26,7 +25,6 @@ TEST(SimClause09_02_02_01, ClockOscillatorWithDelay) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §9.2.2.1: Two-phase clock with begin-end block.
 TEST(SimClause09_02_02_01, TwoPhaseClockBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -49,7 +47,6 @@ TEST(SimClause09_02_02_01, TwoPhaseClockBeginEnd) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.2.2.1: always repeats continuously throughout simulation.
 TEST(SimClause09_02_02_01, AlwaysRepeatsContinuously) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -69,4 +66,4 @@ TEST(SimClause09_02_02_01, AlwaysRepeatsContinuously) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

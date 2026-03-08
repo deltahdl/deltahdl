@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.30.1: weak_reference declaration elaborates OK.
 TEST(ElabA8301, WeakReferenceDeclOk) {
   EXPECT_TRUE(
       ElabOk("class my_obj;\n"
@@ -14,4 +13,4 @@ TEST(ElabA8301, WeakReferenceDeclOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.13: built-in method call with dot notation ---
-
 TEST(ParserClause05, Cl5_13_MethodCallWithParens) {
   auto r = Parse(
       "module m;\n"
@@ -21,8 +19,6 @@ TEST(ParserClause05, Cl5_13_MethodCallWithParens) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-// --- §5.13: empty parentheses are optional ---
-
 TEST(ParserClause05, Cl5_13_MethodCallNoParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -30,8 +26,6 @@ TEST(ParserClause05, Cl5_13_MethodCallNoParens) {
               "  initial x = q.size;\n"
               "endmodule\n"));
 }
-
-// --- §5.13: chained member access ---
 
 TEST(ParserClause05, Cl5_13_ChainedAccess) {
   auto r = Parse(
@@ -45,8 +39,6 @@ TEST(ParserClause05, Cl5_13_ChainedAccess) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-// --- §5.13: method call with arguments ---
-
 TEST(ParserClause05, Cl5_13_MethodWithArg) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -54,8 +46,6 @@ TEST(ParserClause05, Cl5_13_MethodWithArg) {
               "  initial q.push_back(8'hAA);\n"
               "endmodule\n"));
 }
-
-// --- §5.13: method call in expression ---
 
 TEST(ParserClause05, Cl5_13_MethodInExpression) {
   EXPECT_TRUE(
@@ -65,8 +55,6 @@ TEST(ParserClause05, Cl5_13_MethodInExpression) {
               "  initial r = arr.size() + 1;\n"
               "endmodule\n"));
 }
-
-// --- §5.13: mutating method as statement ---
 
 TEST(ParserClause05, Cl5_13_MutatingMethodStatement) {
   EXPECT_TRUE(
@@ -83,8 +71,6 @@ TEST(ParserClause05, Cl5_13_MutatingMethodStatementNoParens) {
               "  initial arr.reverse;\n"
               "endmodule\n"));
 }
-
-// --- §5.13: queue methods ---
 
 TEST(ParserClause05, Cl5_13_QueueDelete) {
   EXPECT_TRUE(
@@ -103,8 +89,6 @@ TEST(ParserClause05, Cl5_13_QueuePopFront) {
               "endmodule\n"));
 }
 
-// --- §5.13: reduction methods ---
-
 TEST(ParserClause05, Cl5_13_ReductionSum) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -113,8 +97,6 @@ TEST(ParserClause05, Cl5_13_ReductionSum) {
               "  initial total = arr.sum();\n"
               "endmodule\n"));
 }
-
-// --- §5.13: dynamic array method ---
 
 TEST(ParserClause05, Cl5_13_DynArraySize) {
   EXPECT_TRUE(
@@ -125,4 +107,4 @@ TEST(ParserClause05, Cl5_13_DynArraySize) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

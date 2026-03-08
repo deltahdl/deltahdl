@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §13.8: Virtual class with parameterized static function elaborates.
 TEST(Elab1380, VirtualClassStaticFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,7 +21,6 @@ TEST(Elab1380, VirtualClassStaticFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.8: Virtual class with parameterized static task elaborates.
 TEST(Elab1380, VirtualClassStaticTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -39,7 +37,6 @@ TEST(Elab1380, VirtualClassStaticTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.8: Multiple static methods in parameterized class.
 TEST(Elab1380, MultipleStaticMethods) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -61,7 +58,6 @@ TEST(Elab1380, MultipleStaticMethods) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.8: Different specializations of same parameterized class.
 TEST(Elab1380, DifferentSpecializations) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -81,7 +77,6 @@ TEST(Elab1380, DifferentSpecializations) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.8: Parameterized class with type parameter elaborates.
 TEST(Elab1380, TypeParameterElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -95,7 +90,6 @@ TEST(Elab1380, TypeParameterElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.8: Parameter used in for-loop bound inside static method.
 TEST(Elab1380, ParamInForLoopBound) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -118,4 +112,4 @@ TEST(Elab1380, ParamInForLoopBound) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

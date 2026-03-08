@@ -299,4 +299,4 @@ TEST(ParserA701, SpecifyItemPathDeclaration) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// §10.10.2
+
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §10.10.2: Concatenation braces disambiguate based on target type.
 TEST(ElabCh10j, ConcatBracesDisambiguateByTarget) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -23,4 +22,4 @@ TEST(ElabCh10j, ConcatBracesDisambiguateByTarget) {
   ASSERT_NE(design, nullptr);
 }
 
-}  // namespace
+}

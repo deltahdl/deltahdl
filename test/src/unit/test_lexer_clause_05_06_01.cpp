@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.6.1: escaped identifiers start with backslash, end at whitespace ---
-
 TEST(LexerClause05, Cl5_6_1_BasicEscapedIdentifier) {
   auto r = LexOne("\\cpu3 ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
@@ -46,8 +44,6 @@ TEST(LexerClause05, Cl5_6_1_TerminatedByEof) {
   EXPECT_EQ(tokens[0].text, "\\esc_id");
 }
 
-// --- §5.6.1: printable ASCII 33-126 allowed in escaped identifiers ---
-
 TEST(LexerClause05, Cl5_6_1_SpecialCharsInEscaped) {
   auto r = LexOne("\\***error-condition*** ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
@@ -72,8 +68,6 @@ TEST(LexerClause05, Cl5_6_1_PlusSign) {
   EXPECT_EQ(r.token.text, "\\busa+index");
 }
 
-// --- §5.6.1: escaped keyword is not interpreted as keyword ---
-
 TEST(LexerClause05, Cl5_6_1_EscapedKeywordIsIdentifier) {
   auto r = LexOne("\\module ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
@@ -85,8 +79,6 @@ TEST(LexerClause05, Cl5_6_1_EscapedBeginIsIdentifier) {
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
 }
 
-// --- §5.6.1: max length applies to escaped identifiers too ---
-
 TEST(LexerClause05, Cl5_6_1_MaxLengthOk) {
   std::string id = "\\" + std::string(1023, 'a') + " ";
   auto [tokens, errors] = LexWithDiag(id);
@@ -94,8 +86,6 @@ TEST(LexerClause05, Cl5_6_1_MaxLengthOk) {
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
 }
-
-// --- §5.6.1: multiple escaped identifiers in sequence ---
 
 TEST(LexerClause05, Cl5_6_1_MultipleEscapedInSequence) {
   auto tokens = Lex("\\abc \\def \\ghi ");
@@ -108,4 +98,4 @@ TEST(LexerClause05, Cl5_6_1_MultipleEscapedInSequence) {
   EXPECT_EQ(tokens[2].text, "\\ghi");
 }
 
-}  // namespace
+}

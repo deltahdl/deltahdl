@@ -297,7 +297,6 @@ TEST(SimA608, NestedLoopInnerBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §12.8: return with expression from non-void function.
 TEST(SimA605, JumpReturnWithValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -320,7 +319,6 @@ TEST(SimA605, JumpReturnWithValue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §12.8: return early from non-void function.
 TEST(SimA605, JumpReturnEarlyFromFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -370,4 +368,4 @@ TEST(SimA608, NestedLoopInnerContinue) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-}  // namespace
+}

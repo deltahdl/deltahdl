@@ -41,4 +41,4 @@ TEST(SimA70502, NochangeMinTypMaxOffsetsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

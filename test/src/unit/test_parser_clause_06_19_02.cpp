@@ -22,7 +22,6 @@ TEST(ParserA221, EnumNameWithRangeColon) {
   EXPECT_NE(member.value, nullptr);
 }
 
-// §6.19.2: Range with N only generates N members (name0..nameN-1).
 TEST(ParserSection6, EnumRangeNOnly) {
   auto r = Parse(
       "module m;\n"
@@ -32,7 +31,6 @@ TEST(ParserSection6, EnumRangeNOnly) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.19.2: Range with N:M generates nameN..nameM.
 TEST(ParserSection6, EnumRangeNM) {
   auto r = Parse(
       "module m;\n"
@@ -42,4 +40,4 @@ TEST(ParserSection6, EnumRangeNM) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

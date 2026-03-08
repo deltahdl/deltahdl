@@ -13,8 +13,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
 
 namespace {
 
-// --- §E.2: `default_decay_time with integer constant ---
-
 TEST(Preprocessor, DefaultDecayTime_IntegerConstant) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -32,8 +30,6 @@ TEST(Preprocessor, DefaultDecayTime_Zero) {
   EXPECT_EQ(pp.DefaultDecayTime(), 0);
 }
 
-// --- §E.2: `default_decay_time with real constant ---
-
 TEST(Preprocessor, DefaultDecayTime_RealConstant) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -43,8 +39,6 @@ TEST(Preprocessor, DefaultDecayTime_RealConstant) {
   EXPECT_FALSE(pp.DefaultDecayTimeInfinite());
 }
 
-// --- §E.2: `default_decay_time infinite ---
-
 TEST(Preprocessor, DefaultDecayTime_Infinite) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -53,16 +47,12 @@ TEST(Preprocessor, DefaultDecayTime_Infinite) {
   EXPECT_TRUE(pp.DefaultDecayTimeInfinite());
 }
 
-// --- §E.2: `default_decay_time missing argument ---
-
 TEST(Preprocessor, DefaultDecayTime_MissingArgument) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`default_decay_time\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §E.2: `default_decay_time invalid argument ---
 
 TEST(Preprocessor, DefaultDecayTime_InvalidArgument) {
   PreprocFixture f;
@@ -71,16 +61,12 @@ TEST(Preprocessor, DefaultDecayTime_InvalidArgument) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §E.2: `default_decay_time negative value ---
-
 TEST(Preprocessor, DefaultDecayTime_NegativeValue) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`default_decay_time -5\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §E.2: later directive overrides earlier ---
 
 TEST(Preprocessor, DefaultDecayTime_LaterOverrides) {
   PreprocFixture f;
@@ -90,8 +76,6 @@ TEST(Preprocessor, DefaultDecayTime_LaterOverrides) {
   EXPECT_EQ(pp.DefaultDecayTime(), 200);
 }
 
-// --- §E.2: large integer value ---
-
 TEST(Preprocessor, DefaultDecayTime_LargeInteger) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -100,8 +84,6 @@ TEST(Preprocessor, DefaultDecayTime_LargeInteger) {
   EXPECT_EQ(pp.DefaultDecayTime(), 1000000u);
   EXPECT_FALSE(pp.DefaultDecayTimeInfinite());
 }
-
-// --- §E.2: switch from infinite back to finite ---
 
 TEST(Preprocessor, DefaultDecayTime_InfiniteToFinite) {
   PreprocFixture f;
@@ -115,8 +97,6 @@ TEST(Preprocessor, DefaultDecayTime_InfiniteToFinite) {
   EXPECT_FALSE(pp.DefaultDecayTimeInfinite());
 }
 
-// --- §E.2: switch from finite to infinite ---
-
 TEST(Preprocessor, DefaultDecayTime_FiniteToInfinite) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -128,8 +108,6 @@ TEST(Preprocessor, DefaultDecayTime_FiniteToInfinite) {
   EXPECT_TRUE(pp.DefaultDecayTimeInfinite());
 }
 
-// --- §E.2: real value with fractional part ---
-
 TEST(Preprocessor, DefaultDecayTime_RealFractional) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -139,16 +117,12 @@ TEST(Preprocessor, DefaultDecayTime_RealFractional) {
   EXPECT_EQ(pp.DefaultDecayTime(), 99u);
 }
 
-// --- §E.2: illegal inside a design element ---
-
 TEST(Preprocessor, DefaultDecayTime_IllegalInsideDesignElement) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("module m;\n`default_decay_time 10\nendmodule\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §E.3: `default_trireg_strength ---
 
 TEST(Preprocessor, DefaultTriregStrength_Valid) {
   PreprocFixture f;
@@ -174,8 +148,6 @@ TEST(Preprocessor, DefaultTriregStrength_Max250) {
   EXPECT_EQ(pp.DefaultTriregStrength(), 250u);
 }
 
-// --- §E.3: value out of range ---
-
 TEST(Preprocessor, DefaultTriregStrength_Above250) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -190,16 +162,12 @@ TEST(Preprocessor, DefaultTriregStrength_LargeValue) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §E.3: missing argument ---
-
 TEST(Preprocessor, DefaultTriregStrength_MissingArgument) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`default_trireg_strength\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §E.3: invalid argument ---
 
 TEST(Preprocessor, DefaultTriregStrength_InvalidArgument) {
   PreprocFixture f;
@@ -208,8 +176,6 @@ TEST(Preprocessor, DefaultTriregStrength_InvalidArgument) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §E.3: illegal inside a design element ---
-
 TEST(Preprocessor, DefaultTriregStrength_IllegalInsideDesignElement) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -217,8 +183,6 @@ TEST(Preprocessor, DefaultTriregStrength_IllegalInsideDesignElement) {
                    pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §E.3: later overrides earlier ---
 
 TEST(Preprocessor, DefaultTriregStrength_LaterOverrides) {
   PreprocFixture f;
@@ -229,8 +193,6 @@ TEST(Preprocessor, DefaultTriregStrength_LaterOverrides) {
   EXPECT_EQ(pp.DefaultTriregStrength(), 100u);
 }
 
-// --- §E.4: `delay_mode_distributed ---
-
 TEST(Preprocessor, DelayModeDistributed) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -239,16 +201,12 @@ TEST(Preprocessor, DelayModeDistributed) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kDistributed);
 }
 
-// --- §E.4: illegal inside design element ---
-
 TEST(Preprocessor, DelayModeDistributed_IllegalInsideDesignElement) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("module m;\n`delay_mode_distributed\nendmodule\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §E.5: `delay_mode_path ---
 
 TEST(Preprocessor, DelayModePath) {
   PreprocFixture f;
@@ -258,16 +216,12 @@ TEST(Preprocessor, DelayModePath) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kPath);
 }
 
-// --- §E.5: illegal inside design element ---
-
 TEST(Preprocessor, DelayModePath_IllegalInsideDesignElement) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("module m;\n`delay_mode_path\nendmodule\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §E.6: `delay_mode_unit ---
 
 TEST(Preprocessor, DelayModeUnit) {
   PreprocFixture f;
@@ -277,16 +231,12 @@ TEST(Preprocessor, DelayModeUnit) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kUnit);
 }
 
-// --- §E.6: illegal inside design element ---
-
 TEST(Preprocessor, DelayModeUnit_IllegalInsideDesignElement) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("module m;\n`delay_mode_unit\nendmodule\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §E.7: `delay_mode_zero ---
 
 TEST(Preprocessor, DelayModeZero) {
   PreprocFixture f;
@@ -296,16 +246,12 @@ TEST(Preprocessor, DelayModeZero) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kZero);
 }
 
-// --- §E.7: illegal inside design element ---
-
 TEST(Preprocessor, DelayModeZero_IllegalInsideDesignElement) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("module m;\n`delay_mode_zero\nendmodule\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- Delay modes are mutually exclusive (last wins) ---
 
 TEST(Preprocessor, DelayMode_LastWins) {
   PreprocFixture f;
@@ -320,16 +266,12 @@ TEST(Preprocessor, DelayMode_LastWins) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kZero);
 }
 
-// --- Default delay mode is kNone when no directive is used ---
-
 TEST(Preprocessor, DelayMode_DefaultIsNone) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("// no directives\n", f, pp);
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kNone);
 }
-
-// --- §E.1: all six directives combined ---
 
 TEST(Preprocessor, AnnexE_AllDirectivesCombined) {
   PreprocFixture f;
@@ -345,8 +287,6 @@ TEST(Preprocessor, AnnexE_AllDirectivesCombined) {
   EXPECT_EQ(pp.DefaultTriregStrength(), 100u);
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kDistributed);
 }
-
-// --- §E.1 + §22.3: `resetall resets Annex E state ---
 
 TEST(Preprocessor, AnnexE_ResetallResetsState) {
   PreprocFixture f;
@@ -364,8 +304,6 @@ TEST(Preprocessor, AnnexE_ResetallResetsState) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kNone);
 }
 
-// --- Directives cannot be redefined as macros ---
-
 TEST(Preprocessor, AnnexE_CannotRedefineAsMarco) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -380,8 +318,6 @@ TEST(Preprocessor, AnnexE_CannotRedefineDelayModeDistributed) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- Directives are stripped from preprocessor output ---
-
 TEST(Preprocessor, AnnexE_DirectivesStrippedFromOutput) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -391,4 +327,4 @@ TEST(Preprocessor, AnnexE_DirectivesStrippedFromOutput) {
   EXPECT_EQ(out.find("default_decay_time"), std::string::npos);
 }
 
-}  // namespace
+}

@@ -124,7 +124,6 @@ TEST(ParserSection23, NonAnsiMultiplePortsSameDir) {
   }
 }
 
-// list_of_ports ::= ( port { , port } )  — non-ANSI
 TEST(ModuleParamsA13, NonAnsiPorts) {
   auto r = Parse(
       "module m(a, b, y);\n"
@@ -137,4 +136,4 @@ TEST(ModuleParamsA13, NonAnsiPorts) {
   EXPECT_GE(r.cu->modules[0]->ports.size(), 3u);
 }
 
-}  // namespace
+}

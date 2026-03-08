@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.2.2: All four always variants elaborate to distinct RtlirProcessKind.
 TEST(ElabClause09_02_02, FourAlwaysVariantsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -46,7 +45,6 @@ TEST(ElabClause09_02_02, FourAlwaysVariantsElaborate) {
   EXPECT_TRUE(has_ff);
 }
 
-// §9.2.2: Multiple always blocks of the same variant elaborate.
 TEST(ElabClause09_02_02, MultipleAlwaysCombElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -67,4 +65,4 @@ TEST(ElabClause09_02_02, MultipleAlwaysCombElaborate) {
   EXPECT_EQ(comb_count, 2);
 }
 
-}  // namespace
+}

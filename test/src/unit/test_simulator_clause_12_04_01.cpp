@@ -51,4 +51,4 @@ TEST(SimA606, IfElseIfFallsToElse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

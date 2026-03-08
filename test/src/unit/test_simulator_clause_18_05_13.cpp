@@ -73,4 +73,4 @@ TEST(Constraint, SoftConstraintAloneSatisfied) {
   EXPECT_LE(solver.GetValue("x"), 100);
 }
 
-}  // namespace
+}

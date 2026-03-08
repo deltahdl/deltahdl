@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §6.12: Type widths — real=64, shortreal=32, realtime=64.
 TEST(TypeEval, RealTypeWidths) {
   DataType dt;
   dt.kind = DataTypeKind::kReal;
@@ -17,7 +16,6 @@ TEST(TypeEval, RealTypeWidths) {
   EXPECT_EQ(EvalTypeWidth(dt), 64u);
 }
 
-// §6.12: realtime treated synonymously with real.
 TEST(Elaboration, RealtimeSynonymousWithReal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -40,7 +38,6 @@ TEST(Elaboration, RealtimeSynonymousWithReal) {
   EXPECT_TRUE(rt_real);
 }
 
-// §6.12: negedge on real type is illegal.
 TEST(Elaboration, RealNegedge_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -53,7 +50,6 @@ TEST(Elaboration, RealNegedge_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.12: real types are not integral.
 TEST(TypeEval, RealTypesNotIntegral) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kReal));
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kShortreal));
@@ -106,4 +102,4 @@ TEST(ElabA87, NumberRealElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

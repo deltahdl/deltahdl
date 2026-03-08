@@ -10,8 +10,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
   return pp.Preprocess(fid);
 }
 
-// --- §22.12: Basic `line directive sets line number and file ---
-
 TEST(Preprocessor, Line_OverridesLineNumber) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -45,8 +43,6 @@ TEST(Preprocessor, Line_RelativePathFilename) {
   EXPECT_EQ(pp.LineFile(), "../lib/pkg.sv");
 }
 
-// --- §22.12: Level parameter values ---
-
 TEST(Preprocessor, Line_Level0_NoError) {
   PreprocFixture f;
   Preprocess("`line 1 \"test.sv\" 0\n", f);
@@ -71,8 +67,6 @@ TEST(Preprocessor, Line_IllegalLevel) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §22.12: All parameters required ---
-
 TEST(Preprocessor, Line_MissingFilename) {
   PreprocFixture f;
   Preprocess("`line 1\n", f);
@@ -91,8 +85,6 @@ TEST(Preprocessor, Line_MissingAll) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §22.12: Number must be positive integer ---
-
 TEST(Preprocessor, Line_ZeroLineNumber_Error) {
   PreprocFixture f;
   Preprocess("`line 0 \"test.sv\" 0\n", f);
@@ -105,8 +97,6 @@ TEST(Preprocessor, Line_NegativeLineNumber) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §22.12: Filename must be a string literal ---
-
 TEST(Preprocessor, Line_NonStringFilename) {
   PreprocFixture f;
   Preprocess("`line 1 somefile 2\n", f);
@@ -118,8 +108,6 @@ TEST(Preprocessor, Line_UnterminatedFilename) {
   Preprocess("`line 1 \"somefile 0\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §22.12: Only whitespace may appear on the same line ---
 
 TEST(Preprocessor, Line_TrailingContent_Error) {
   PreprocFixture f;
@@ -139,8 +127,6 @@ TEST(Preprocessor, Line_TrailingBlockComment_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §22.12: Directive produces no output ---
-
 TEST(Preprocessor, Line_NoOutput) {
   PreprocFixture f;
   auto out = Preprocess("`line 10 \"foo.sv\" 0\n", f);
@@ -150,8 +136,6 @@ TEST(Preprocessor, Line_NoOutput) {
   EXPECT_TRUE(trimmed.empty());
 }
 
-// --- §22.12: Surrounding code preserved ---
-
 TEST(Preprocessor, Line_SurroundingCodePreserved) {
   PreprocFixture f;
   auto out = Preprocess("wire a;\n`line 5 \"f.sv\" 0\nwire b;\n", f);
@@ -159,8 +143,6 @@ TEST(Preprocessor, Line_SurroundingCodePreserved) {
   EXPECT_NE(out.find("wire a;"), std::string::npos);
   EXPECT_NE(out.find("wire b;"), std::string::npos);
 }
-
-// --- §22.12: `resetall does NOT affect `line ---
 
 TEST(Preprocessor, Line_ResetallDoesNotAffect) {
   PreprocFixture f;
@@ -175,16 +157,12 @@ TEST(Preprocessor, Line_ResetallDoesNotAffect) {
   EXPECT_EQ(pp.LineFile(), "override.sv");
 }
 
-// --- §22.12: `line affects `__LINE__ ---
-
 TEST(Preprocessor, Line_AffectsUnderscoreLineMacro) {
   PreprocFixture f;
   auto out = Preprocess("`line 100 \"test.sv\" 0\n`__LINE__\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(out.find("100"), std::string::npos);
 }
-
-// --- §22.12: `line affects `__FILE__ ---
 
 TEST(Preprocessor, Line_AffectsUnderscoreFileMacro) {
   PreprocFixture f;
@@ -193,27 +171,20 @@ TEST(Preprocessor, Line_AffectsUnderscoreFileMacro) {
   EXPECT_NE(out.find("overridden.sv"), std::string::npos);
 }
 
-// --- §22.12: Line number increments after `line ---
-
 TEST(Preprocessor, Line_IncrementAfterDirective) {
   PreprocFixture f;
-  // `line 10 sets the *following* line to 10. Lines after increment.
+
   auto out = Preprocess("`line 10 \"f.sv\" 0\nfirst\n`__LINE__\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
-  // `__LINE__ is on source line 3. Override at source line 1.
-  // Effective = 10 + (3 - 2) = 11.
+
   EXPECT_NE(out.find("11"), std::string::npos);
 }
-
-// --- §22.12: `line can appear anywhere ---
 
 TEST(Preprocessor, Line_InsideModule_NoError) {
   PreprocFixture f;
   Preprocess("module m;\n`line 5 \"inner.sv\" 0\nendmodule\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
-
-// --- §22.12: `line inside conditional compilation ---
 
 TEST(Preprocessor, Line_InsideIfdef_Active) {
   PreprocFixture f;
@@ -235,8 +206,6 @@ TEST(Preprocessor, Line_InsideIfdef_Inactive) {
   EXPECT_FALSE(pp.HasLineOverride());
 }
 
-// --- §22.12: Multiple `line directives, last wins ---
-
 TEST(Preprocessor, Line_MultipleOverrides_LastWins) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -247,8 +216,6 @@ TEST(Preprocessor, Line_MultipleOverrides_LastWins) {
   EXPECT_EQ(pp.LineFile(), "second.sv");
 }
 
-// --- §22.12: Large line number ---
-
 TEST(Preprocessor, Line_LargeLineNumber) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -256,8 +223,6 @@ TEST(Preprocessor, Line_LargeLineNumber) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(pp.LineOffset(), 999999u);
 }
-
-// --- §22.12: Trailing whitespace after level is OK ---
 
 TEST(Preprocessor, Line_TrailingWhitespaceAfterLevel_NoError) {
   PreprocFixture f;

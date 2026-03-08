@@ -65,19 +65,17 @@ TEST(QueueRef, RefReadsCurrentValue) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 20u);
 }
 
-// §13.5.2: ref changes are immediately visible to both caller and callee.
 TEST(Sim1352, RefImmediateVisibility) {
   FuncFixture f;
 
   auto* x_var = f.ctx.CreateVariable("x", 32);
   x_var->value = MakeLogic4VecVal(f.arena, 32, 0);
 
-  // Function that writes to ref, reads it back, returns read value.
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "write_and_read";
   func->func_args = {{Direction::kRef, false, {}, "r", nullptr, {}}};
-  // r = 42; return r;
+
   func->func_body_stmts.push_back(
       MakeAssign(f.arena, "r", MakeInt(f.arena, 42)));
   func->func_body_stmts.push_back(MakeReturn(f.arena, MakeId(f.arena, "r")));
@@ -86,9 +84,8 @@ TEST(Sim1352, RefImmediateVisibility) {
   auto* call = MakeCall(f.arena, "write_and_read", {MakeId(f.arena, "x")});
   auto result = EvalExpr(call, f.ctx, f.arena);
 
-  // The ref write should be visible to both caller and return value.
   EXPECT_EQ(x_var->value.ToUint64(), 42u);
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-}  // namespace
+}

@@ -62,4 +62,4 @@ TEST(ParserSection6, ModuleLifetimeStatic) {
   EXPECT_EQ(r.cu->modules[0]->name, "t");
 }
 
-}  // namespace
+}

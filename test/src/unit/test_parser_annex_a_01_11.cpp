@@ -5,9 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.1.11 Package items
-
-// package_item ::= package_or_generate_item_declaration
 TEST(PackageItemsA111, NetDeclaration) {
   auto r = Parse(
       "package p;\n"
@@ -50,7 +47,6 @@ TEST(PackageItemsA111, FunctionDeclaration) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
-// package_or_generate_item_declaration ::= checker_declaration
 TEST(PackageItemsA111, CheckerInPackage) {
   auto r = Parse(
       "package p;\n"
@@ -61,7 +57,6 @@ TEST(PackageItemsA111, CheckerInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package_or_generate_item_declaration ::= dpi_import_export
 TEST(PackageItemsA111, DpiImport) {
   auto r = Parse(
       "package p;\n"
@@ -73,7 +68,6 @@ TEST(PackageItemsA111, DpiImport) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kDpiImport));
 }
 
-// package_or_generate_item_declaration ::= class_declaration
 TEST(PackageItemsA111, ClassInPackage) {
   auto r = Parse(
       "package p;\n"
@@ -85,7 +79,6 @@ TEST(PackageItemsA111, ClassInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package_or_generate_item_declaration ::= interface_class_declaration
 TEST(PackageItemsA111, InterfaceClassInPackage) {
   auto r = Parse(
       "package p;\n"
@@ -97,7 +90,6 @@ TEST(PackageItemsA111, InterfaceClassInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package_or_generate_item_declaration ::= local_parameter_declaration ;
 TEST(PackageItemsA111, LocalparamInPackage) {
   auto r = Parse(
       "package p;\n"
@@ -107,7 +99,6 @@ TEST(PackageItemsA111, LocalparamInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package_or_generate_item_declaration ::= parameter_declaration ;
 TEST(PackageItemsA111, ParameterInPackage) {
   auto r = Parse(
       "package p;\n"
@@ -117,7 +108,6 @@ TEST(PackageItemsA111, ParameterInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package_or_generate_item_declaration ::= covergroup_declaration
 TEST(PackageItemsA111, CovergroupInPackage) {
   auto r = Parse(
       "package p;\n"
@@ -129,7 +119,6 @@ TEST(PackageItemsA111, CovergroupInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package_or_generate_item_declaration ::= assertion_item_declaration
 TEST(PackageItemsA111, PropertyInPackage) {
   auto r = Parse(
       "package p;\n"
@@ -141,7 +130,6 @@ TEST(PackageItemsA111, PropertyInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package_or_generate_item_declaration ::= ;
 TEST(PackageItemsA111, NullItem) {
   auto r = Parse(
       "package p;\n"
@@ -151,7 +139,6 @@ TEST(PackageItemsA111, NullItem) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package_item ::= anonymous_program
 TEST(PackageItemsA111, AnonymousProgram) {
   auto r = Parse(
       "package p;\n"
@@ -164,7 +151,6 @@ TEST(PackageItemsA111, AnonymousProgram) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package_item ::= package_export_declaration
 TEST(PackageItemsA111, PackageExport) {
   auto r = Parse(
       "package p;\n"
@@ -175,7 +161,6 @@ TEST(PackageItemsA111, PackageExport) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package_item ::= timeunits_declaration
 TEST(PackageItemsA111, PackageTimeunits) {
   auto r = Parse(
       "package p;\n"
@@ -186,7 +171,6 @@ TEST(PackageItemsA111, PackageTimeunits) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package with typedef
 TEST(PackageItemsA111, PackageTypedef) {
   auto r = Parse(
       "package p;\n"
@@ -197,7 +181,6 @@ TEST(PackageItemsA111, PackageTypedef) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package with import
 TEST(PackageItemsA111, PackageImport) {
   auto r = Parse(
       "package p;\n"
@@ -208,8 +191,6 @@ TEST(PackageItemsA111, PackageImport) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package with package_or_generate_item_declaration ::=
-// class_constructor_declaration
 TEST(PackageItemsA111, ClassConstructorInPackage) {
   auto r = Parse(
       "package p;\n"
@@ -222,7 +203,6 @@ TEST(PackageItemsA111, ClassConstructorInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Package with multiple item types combined
 TEST(PackageItemsA111, MixedPackageItems) {
   auto r = Parse(
       "package p;\n"
@@ -241,4 +221,4 @@ TEST(PackageItemsA111, MixedPackageItems) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 3u);
 }
 
-}  // namespace
+}

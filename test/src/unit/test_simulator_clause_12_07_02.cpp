@@ -46,7 +46,6 @@ TEST(SimA608, RepeatZero) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §12.7.2: Repeat with block body.
 TEST(SimA608, RepeatBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -74,7 +73,6 @@ TEST(SimA608, RepeatBlock) {
   EXPECT_EQ(vb->value.ToUint64(), 6u);
 }
 
-// §12.7.2: Repeat(1) executes body exactly once.
 TEST(SimA608, RepeatOne) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -95,7 +93,6 @@ TEST(SimA608, RepeatOne) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.7.2: Repeat with variable count.
 TEST(SimA608, RepeatVariableCount) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -117,4 +114,4 @@ TEST(SimA608, RepeatVariableCount) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-}  // namespace
+}

@@ -475,7 +475,6 @@ TEST(ParserSection9, ParallelBlockNamedForkJoin) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
 }
 
-// §9.3.4: Matching end label on begin-end is OK.
 TEST(ParserClause09_03_04, MatchingEndLabelBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -487,7 +486,6 @@ TEST(ParserClause09_03_04, MatchingEndLabelBeginEnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §9.3.4: Mismatched end label on begin-end is an error.
 TEST(ParserClause09_03_04, MismatchedEndLabelBeginEndErrors) {
   auto r = Parse(
       "module m;\n"
@@ -498,7 +496,6 @@ TEST(ParserClause09_03_04, MismatchedEndLabelBeginEndErrors) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §9.3.4: Matching end label on fork-join is OK.
 TEST(ParserClause09_03_04, MatchingEndLabelForkJoin) {
   auto r = Parse(
       "module m;\n"
@@ -512,7 +509,6 @@ TEST(ParserClause09_03_04, MatchingEndLabelForkJoin) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §9.3.4: Mismatched end label on fork-join is an error.
 TEST(ParserClause09_03_04, MismatchedEndLabelForkJoinErrors) {
   auto r = Parse(
       "module m;\n"
@@ -525,7 +521,6 @@ TEST(ParserClause09_03_04, MismatchedEndLabelForkJoinErrors) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §9.3.4: End label without start label is OK (no mismatch).
 TEST(ParserClause09_03_04, EndLabelWithoutStartLabelOk) {
   auto r = Parse(
       "module m;\n"
@@ -534,11 +529,10 @@ TEST(ParserClause09_03_04, EndLabelWithoutStartLabelOk) {
       "  end : unnamed_end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // No mismatch error because there's no start name to compare against.
+
   EXPECT_FALSE(r.has_errors);
 }
 
-// §9.3.4: Named block without end label is OK.
 TEST(ParserClause09_03_04, NamedBlockWithoutEndLabelOk) {
   auto r = Parse(
       "module m;\n"
@@ -550,4 +544,4 @@ TEST(ParserClause09_03_04, NamedBlockWithoutEndLabelOk) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

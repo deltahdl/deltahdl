@@ -188,4 +188,4 @@ TEST(ParserA701, SpecifyItemNoshowcancelled) {
   EXPECT_TRUE(si->is_noshowcancelled);
 }
 
-}  // namespace
+}

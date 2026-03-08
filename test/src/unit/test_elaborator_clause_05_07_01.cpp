@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.7.1: elaboration of integer literal forms ---
-
 TEST(ElabClause05, Cl5_7_1_UnbasedUnsizedElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -223,8 +221,6 @@ TEST(ElabClause05, Cl5_7_1_UnderscoredDecimalElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// --- §5.7.1: simulator tests for x/z bit patterns ---
 
 static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
                                           uint32_t mask) {
@@ -614,8 +610,6 @@ TEST(SimClause05, Cl5_7_1_DecimalSingleDigitX) {
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
-// --- §5.7.1: signed designator affects is_signed in eval ---
-
 static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
                               uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -651,8 +645,6 @@ TEST(SimClause05, Cl5_7_1_SignedHexLiteralIsSigned) {
   EXPECT_EQ(result.width, 8u);
   EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
-
-// --- §5.7.1: whitespace between size and base, sized hex ---
 
 TEST(SimClause05, Cl5_7_1_SizedHexLiteral) {
   auto result = RunAndGet(
@@ -694,4 +686,4 @@ TEST(SimClause05, Cl5_7_1_SizeConstantNonzero) {
   EXPECT_EQ(result, 1u);
 }
 
-}  // namespace
+}

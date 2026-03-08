@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_parser.h"
 #include "fixture_simulator.h"
@@ -207,11 +207,10 @@ TEST(ParserSection10, Sec10_4_1_ExprAddition) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-// §11.2.1: Constant expressions can use any operator from Table 11-1.
 TEST(ConstExpr, PowerOperatorInConstantExpr) {
   EvalFixture f;
   ScopeMap scope;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("2 ** 10", f), scope), 1024);
 }
 
-}  // namespace
+}

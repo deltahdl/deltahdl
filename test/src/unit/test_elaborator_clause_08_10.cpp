@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.10: Static method with 'this' reference is illegal.
 TEST(ElabA810, StaticMethodThisError) {
   EXPECT_FALSE(
       ElabOk("class C;\n"
@@ -18,7 +17,6 @@ TEST(ElabA810, StaticMethodThisError) {
              "endmodule\n"));
 }
 
-// §8.10: Static method with 'super' reference is illegal.
 TEST(ElabA810, StaticMethodSuperError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
@@ -34,7 +32,6 @@ TEST(ElabA810, StaticMethodSuperError) {
              "endmodule\n"));
 }
 
-// §8.10: Static method accessing static property is legal.
 TEST(ElabA810, StaticMethodAccessingStaticPropertyOk) {
   EXPECT_TRUE(
       ElabOk("class id;\n"
@@ -48,7 +45,6 @@ TEST(ElabA810, StaticMethodAccessingStaticPropertyOk) {
              "endmodule\n"));
 }
 
-// §8.10: Non-static method using 'this' is fine.
 TEST(ElabA810, NonStaticMethodThisOk) {
   EXPECT_TRUE(
       ElabOk("class Demo;\n"
@@ -62,7 +58,6 @@ TEST(ElabA810, NonStaticMethodThisOk) {
              "endmodule\n"));
 }
 
-// §8.10: Static method with no this/super references is fine.
 TEST(ElabA810, StaticMethodNoThisSuperOk) {
   EXPECT_TRUE(
       ElabOk("class Util;\n"
@@ -75,4 +70,4 @@ TEST(ElabA810, StaticMethodNoThisSuperOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §6.17: event variable elaborates with is_event flag.
 TEST(Elaboration, EventVarIsEvent) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -25,7 +24,6 @@ TEST(Elaboration, EventVarIsEvent) {
   EXPECT_TRUE(found) << "event variable 'ev' not found";
 }
 
-// §6.17: event variable with no initializer (initialized to new sync object).
 TEST(Elaboration, EventDefaultInit_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +35,6 @@ TEST(Elaboration, EventDefaultInit_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.17: event assigned to another event.
 TEST(Elaboration, EventAssignEvent_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -50,7 +47,6 @@ TEST(Elaboration, EventAssignEvent_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.17: event assigned null to break synchronization association.
 TEST(Elaboration, EventAssignNull_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -63,7 +59,6 @@ TEST(Elaboration, EventAssignNull_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.17: event width is zero (not a bit-level type).
 TEST(Elaboration, EventVarWidthZero) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -80,4 +75,4 @@ TEST(Elaboration, EventVarWidthZero) {
   }
 }
 
-}  // namespace
+}

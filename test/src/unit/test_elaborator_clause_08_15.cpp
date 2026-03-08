@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.15: super used in derived class method is legal.
 TEST(ElabA815, SuperInDerivedMethodOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -24,7 +23,6 @@ TEST(ElabA815, SuperInDerivedMethodOk) {
              "endmodule\n"));
 }
 
-// §8.15: super in module-level initial block is illegal.
 TEST(ElabA815, SuperInModuleBlockError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -35,7 +33,6 @@ TEST(ElabA815, SuperInModuleBlockError) {
              "endmodule\n"));
 }
 
-// §8.15: super in static method is illegal (covered by §8.10).
 TEST(ElabA815, SuperInStaticMethodError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
@@ -51,7 +48,6 @@ TEST(ElabA815, SuperInStaticMethodError) {
              "endmodule\n"));
 }
 
-// §8.15: super.new in derived constructor elaborates OK.
 TEST(ElabA815, SuperNewInConstructorOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -68,4 +64,4 @@ TEST(ElabA815, SuperNewInConstructorOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

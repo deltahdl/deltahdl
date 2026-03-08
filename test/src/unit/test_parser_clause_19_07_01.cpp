@@ -13,4 +13,4 @@ TEST(ParserA211, CoverageOption_TypeOption) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

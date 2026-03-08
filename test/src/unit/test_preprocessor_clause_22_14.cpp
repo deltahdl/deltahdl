@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// §22.14 — Basic directive recognition
-// ---------------------------------------------------------------------------
-
 TEST(PreprocSection22_14, BeginKeywordsEmitsMarker) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -19,7 +15,7 @@ TEST(PreprocSection22_14, BeginKeywordsEmitsMarker) {
       "module t; endmodule\n"
       "`end_keywords\n",
       f);
-  // Output should contain at least two keyword markers.
+
   size_t first = out.find(kKeywordMarker);
   ASSERT_NE(first, std::string::npos);
   auto ver = static_cast<KeywordVersion>(out[first + 1]);
@@ -34,7 +30,7 @@ TEST(PreprocSection22_14, EndKeywordsRestoresDefault) {
       "`end_keywords\n"
       "y\n",
       f);
-  // After `end_keywords, a second marker should restore to 1800-2023.
+
   size_t first = out.find(kKeywordMarker);
   ASSERT_NE(first, std::string::npos);
   size_t second = out.find(kKeywordMarker, first + 1);
@@ -42,10 +38,6 @@ TEST(PreprocSection22_14, EndKeywordsRestoresDefault) {
   auto ver = static_cast<KeywordVersion>(out[second + 1]);
   EXPECT_EQ(ver, KeywordVersion::kVer18002023);
 }
-
-// ---------------------------------------------------------------------------
-// §22.14 — All nine version specifiers
-// ---------------------------------------------------------------------------
 
 TEST(PreprocSection22_14, AllVersionSpecifiersRecognized) {
   struct Case {
@@ -77,10 +69,6 @@ TEST(PreprocSection22_14, AllVersionSpecifiersRecognized) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// §22.14 — Error conditions
-// ---------------------------------------------------------------------------
-
 TEST(PreprocSection22_14, ErrorUnrecognizedVersion) {
   PreprocFixture f;
   Preprocess("`begin_keywords \"9999-9999\"\n`end_keywords\n", f);
@@ -111,10 +99,6 @@ TEST(PreprocSection22_14, ErrorEmptyVersionString) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// ---------------------------------------------------------------------------
-// §22.14 — Nesting (stack behavior)
-// ---------------------------------------------------------------------------
-
 TEST(PreprocSection22_14, NestedBeginKeywords) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -128,7 +112,6 @@ TEST(PreprocSection22_14, NestedBeginKeywords) {
       f);
   EXPECT_FALSE(f.diag.HasErrors());
 
-  // Expect markers: 1800-2005, then 1364-1995, then 1800-2005, then 1800-2023.
   size_t pos = 0;
   pos = out.find(kKeywordMarker, pos);
   ASSERT_NE(pos, std::string::npos);
@@ -165,10 +148,6 @@ TEST(PreprocSection22_14, DoubleNestedBeginKeywords) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// ---------------------------------------------------------------------------
-// §22.14 + §22.3 — `resetall does NOT affect begin_keywords
-// ---------------------------------------------------------------------------
-
 TEST(PreprocSection22_14, ResetallDoesNotAffectKeywordVersion) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -178,12 +157,8 @@ TEST(PreprocSection22_14, ResetallDoesNotAffectKeywordVersion) {
       "`end_keywords\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  // end_keywords should still work (stack was not cleared by resetall).
-}
 
-// ---------------------------------------------------------------------------
-// §22.14 — Only outside design elements (§3.2)
-// ---------------------------------------------------------------------------
+}
 
 TEST(PreprocSection22_14, ErrorBeginKeywordsInsideDesignElement) {
   PreprocFixture f;
@@ -207,10 +182,6 @@ TEST(PreprocSection22_14, ErrorEndKeywordsInsideDesignElement) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// ---------------------------------------------------------------------------
-// §22.14 — Conditional compilation interaction
-// ---------------------------------------------------------------------------
-
 TEST(PreprocSection22_14, BeginKeywordsInFalseIfdef) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -220,13 +191,9 @@ TEST(PreprocSection22_14, BeginKeywordsInFalseIfdef) {
       "logic x;\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  // No keyword marker should be emitted when skipped by ifdef.
+
   EXPECT_EQ(out.find(kKeywordMarker), std::string::npos);
 }
-
-// ---------------------------------------------------------------------------
-// §22.14 — Lexer integration: keyword marker switches version
-// ---------------------------------------------------------------------------
 
 TEST(PreprocSection22_14, LexerSeesVersionSwitch) {
   PreprocFixture f;
@@ -237,8 +204,6 @@ TEST(PreprocSection22_14, LexerSeesVersionSwitch) {
       f);
   EXPECT_FALSE(f.diag.HasErrors());
 
-  // Lex the preprocessed output; "logic" should be an identifier under
-  // 1364-2001.
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", out);
@@ -271,7 +236,6 @@ TEST(PreprocSection22_14, LexerSeesKeywordAfterEndKeywords) {
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   auto tokens = lexer.LexAll();
 
-  // First "logic" is identifier (1364-2001), second is keyword (1800-2023).
   std::vector<TokenKind> logic_kinds;
   for (const auto& tok : tokens) {
     if (tok.text == "logic") {
@@ -282,10 +246,6 @@ TEST(PreprocSection22_14, LexerSeesKeywordAfterEndKeywords) {
   EXPECT_EQ(logic_kinds[0], TokenKind::kIdentifier);
   EXPECT_EQ(logic_kinds[1], TokenKind::kKwLogic);
 }
-
-// ---------------------------------------------------------------------------
-// §22.14.1 — Example: "logic" as variable name under 1364-2001
-// ---------------------------------------------------------------------------
 
 TEST(PreprocSection22_14, LogicAsIdentifierUnder1364_2001) {
   PreprocFixture f;
@@ -312,10 +272,6 @@ TEST(PreprocSection22_14, LogicAsIdentifierUnder1364_2001) {
   EXPECT_TRUE(found);
 }
 
-// ---------------------------------------------------------------------------
-// §22.14.1 — Example: "interface" not a keyword under 1364-2005
-// ---------------------------------------------------------------------------
-
 TEST(PreprocSection22_14, InterfaceNotKeywordUnder1364_2005) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -341,10 +297,6 @@ TEST(PreprocSection22_14, InterfaceNotKeywordUnder1364_2005) {
   EXPECT_TRUE(found);
 }
 
-// ---------------------------------------------------------------------------
-// §22.14 — Marker format: sentinel + version byte + newline
-// ---------------------------------------------------------------------------
-
 TEST(PreprocSection22_14, MarkerFormatCorrect) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -360,4 +312,4 @@ TEST(PreprocSection22_14, MarkerFormatCorrect) {
   EXPECT_EQ(out[pos + 2], '\n');
 }
 
-}  // namespace
+}

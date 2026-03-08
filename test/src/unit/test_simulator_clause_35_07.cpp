@@ -46,4 +46,4 @@ TEST(DpiRuntime, CallMissingExportReturnsZero) {
   EXPECT_EQ(result.AsInt(), 0);
 }
 
-}  // namespace
+}

@@ -71,7 +71,6 @@ TEST(Lowerer, FinalBlocksFIFOOrder) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §9.2.3: final does not affect values visible during normal simulation.
 TEST(Lowerer, FinalDoesNotAffectNormalSim) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -95,7 +94,6 @@ TEST(Lowerer, FinalDoesNotAffectNormalSim) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §9.2.3: final with begin-end block assigns multiple variables.
 TEST(Lowerer, FinalBlockMultipleAssignments) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -122,4 +120,4 @@ TEST(Lowerer, FinalBlockMultipleAssignments) {
   EXPECT_EQ(b->value.ToUint64(), 22u);
 }
 
-}  // namespace
+}

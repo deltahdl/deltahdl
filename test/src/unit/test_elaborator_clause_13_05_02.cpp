@@ -33,10 +33,8 @@ TEST(QueueRef, AcceptRefInAutoFunc) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §13.5.2: ref argument in automatic function elaborates OK.
 TEST(Elab1352, RefArgAutoFunctionOk) {
-  // Use ElabFixture for proper elaboration-level test.
-  // (Existing tests above use SimFixture for ValidateRefLifetime directly.)
+
   SimFixture f;
 
   auto* func = f.arena.Create<ModuleItem>();
@@ -49,7 +47,6 @@ TEST(Elab1352, RefArgAutoFunctionOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §13.5.2: const ref argument is accepted.
 TEST(Elab1352, ConstRefArgAccepted) {
   SimFixture f;
 
@@ -63,4 +60,4 @@ TEST(Elab1352, ConstRefArgAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

@@ -227,4 +227,4 @@ TEST(SimA610, MultipleAssertions) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-}  // namespace
+}

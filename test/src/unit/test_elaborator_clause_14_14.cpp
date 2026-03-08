@@ -16,4 +16,4 @@ TEST(ElabA611, GlobalClockingElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

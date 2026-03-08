@@ -64,4 +64,4 @@ TEST(ParserA301, GateInst_NamedUnnamedMixedInMulti) {
   EXPECT_EQ(gates[2]->gate_inst_name, "a3");
 }
 
-}  // namespace
+}

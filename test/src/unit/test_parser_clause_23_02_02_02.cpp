@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -83,7 +83,6 @@ TEST(ParserSection23, AnsiHeaderWithParams) {
   EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
 }
 
-// list_of_port_declarations — ANSI form
 TEST(ModuleParamsA13, AnsiPortDeclarations) {
   auto r = Parse(
       "module m(\n"
@@ -96,7 +95,6 @@ TEST(ModuleParamsA13, AnsiPortDeclarations) {
   EXPECT_EQ(r.cu->modules[0]->ports.size(), 3u);
 }
 
-// port_declaration with all four directions
 TEST(ModuleParamsA13, AllPortDirections) {
   auto r = Parse(
       "module m(\n"
@@ -115,7 +113,6 @@ TEST(ModuleParamsA13, AllPortDirections) {
   EXPECT_EQ(ports[3].direction, Direction::kRef);
 }
 
-// ansi_port_declaration with unpacked dimensions
 TEST(ModuleParamsA13, AnsiPortUnpackedDim) {
   auto r = Parse(
       "module m(\n"
@@ -125,7 +122,6 @@ TEST(ModuleParamsA13, AnsiPortUnpackedDim) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// interface port header
 TEST(ModuleParamsA13, InterfacePortHeader) {
   auto r = Parse(
       "module m(bus_if.master bus);\n"
@@ -134,4 +130,4 @@ TEST(ModuleParamsA13, InterfacePortHeader) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

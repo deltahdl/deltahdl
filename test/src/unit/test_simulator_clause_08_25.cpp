@@ -45,7 +45,6 @@ TEST(ClassSim, ParameterizedClassInstantiation) {
   EXPECT_EQ(obj->GetProperty("second", f.arena).ToUint64(), 20u);
 }
 
-// §8.25.1: ClassTypeInfo with decl stores param metadata for scope resolution.
 TEST(ClassSim, ParameterizedClassDeclParams) {
   SimFixture f;
 
@@ -65,7 +64,6 @@ TEST(ClassSim, ParameterizedClassDeclParams) {
   EXPECT_EQ(found->decl->params[0].first, "p");
 }
 
-// §8.25.1: Static method registered on parameterized class type.
 TEST(ClassSim, ParameterizedClassStaticMethod) {
   SimFixture f;
 
@@ -92,4 +90,4 @@ TEST(ClassSim, ParameterizedClassStaticMethod) {
   EXPECT_TRUE(it->second->is_static);
 }
 
-}  // namespace
+}

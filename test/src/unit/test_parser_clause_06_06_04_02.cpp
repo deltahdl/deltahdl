@@ -4,7 +4,6 @@
 using namespace delta;
 namespace {
 
-// §6.6.4.2: Trireg with three-delay specification including charge decay time.
 TEST(ParserSection6, Sec6_6_4_2_TriregThreeDelayDecay) {
   auto r = Parse(
       "module t;\n"
@@ -24,7 +23,6 @@ TEST(ParserSection6, Sec6_6_4_2_TriregThreeDelayDecay) {
   EXPECT_EQ(item->net_delay_decay->int_val, 50u);
 }
 
-// §6.6.4.2: Trireg with only rise delay (no decay time — ideal capacitive).
 TEST(ParserSection6, Sec6_6_4_2_TriregSingleDelayNoDecay) {
   auto r = Parse(
       "module t;\n"
@@ -40,7 +38,6 @@ TEST(ParserSection6, Sec6_6_4_2_TriregSingleDelayNoDecay) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-// §6.6.4.2: Trireg with rise+fall but no decay (ideal capacitive).
 TEST(ParserSection6, Sec6_6_4_2_TriregTwoDelayNoDecay) {
   auto r = Parse(
       "module t;\n"
@@ -58,7 +55,6 @@ TEST(ParserSection6, Sec6_6_4_2_TriregTwoDelayNoDecay) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-// §6.6.4.2: Trireg with no delay at all (ideal capacitive).
 TEST(ParserSection6, Sec6_6_4_2_TriregNoDelayIdeal) {
   auto r = Parse(
       "module t;\n"
@@ -74,4 +70,4 @@ TEST(ParserSection6, Sec6_6_4_2_TriregNoDelayIdeal) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-}  // namespace
+}

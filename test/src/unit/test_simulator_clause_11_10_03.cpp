@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.10.3: Empty string literal has value zero.
 TEST(SimA11103, EmptyStringLiteralIsZero) {
   SimFixture f;
   auto* expr = ParseExprFrom("\"\"", f);
@@ -17,7 +16,6 @@ TEST(SimA11103, EmptyStringLiteralIsZero) {
   EXPECT_EQ(val.width, 8u);
 }
 
-// §11.10.3: Empty string literal equals ASCII NUL (\0).
 TEST(SimA11103, EmptyStringEqualsNul) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -35,7 +33,6 @@ TEST(SimA11103, EmptyStringEqualsNul) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §11.10.3: Empty string literal is different from string "0".
 TEST(SimA11103, EmptyStringDiffersFromStringZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -50,11 +47,10 @@ TEST(SimA11103, EmptyStringDiffersFromStringZero) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  // "" = 8'h00, "0" = 8'h30 — they are not equal.
+
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §11.10.3: "0" has value 0x30 (ASCII code for '0').
 TEST(SimA11103, StringZeroHasAsciiValue) {
   SimFixture f;
   auto* expr = ParseExprFrom("\"0\"", f);
@@ -63,7 +59,6 @@ TEST(SimA11103, StringZeroHasAsciiValue) {
   EXPECT_EQ(val.ToUint64(), 0x30u);
 }
 
-// §11.10.3: Empty string assigned to vector produces zero.
 TEST(SimA11103, EmptyStringAssignedToVector) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -81,4 +76,4 @@ TEST(SimA11103, EmptyStringAssignedToVector) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-}  // namespace
+}

@@ -30,4 +30,4 @@ TEST(ElabA702, EdgeSensitiveWithDataSourceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

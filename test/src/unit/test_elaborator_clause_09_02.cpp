@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.2: All six structured procedure types elaborate to correct
-// RtlirProcessKind.
 TEST(ElabClause09_02, AllSixProcedureTypesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -56,8 +54,6 @@ TEST(ElabClause09_02, AllSixProcedureTypesElaborate) {
   EXPECT_TRUE(has_final);
 }
 
-// §9.2: No limit to the number of processes — multiple initial/always
-// elaborate.
 TEST(ElabClause09_02, MultipleProcessesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -82,7 +78,6 @@ TEST(ElabClause09_02, MultipleProcessesElaborate) {
   EXPECT_EQ(always_count, 2);
 }
 
-// §9.2: Each process has a body statement.
 TEST(ElabClause09_02, ProcessBodiesNotNull) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -100,4 +95,4 @@ TEST(ElabClause09_02, ProcessBodiesNotNull) {
   }
 }
 
-}  // namespace
+}

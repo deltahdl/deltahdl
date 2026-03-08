@@ -69,7 +69,6 @@ TEST(ParserSection8, ThisKeywordPropertyAccess) {
               "endclass\n"));
 }
 
-// §8.11: this.member used for disambiguation in constructor.
 TEST(ParserA811, ThisDisambiguationInConstructor) {
   auto r = Parse(
       "class Demo;\n"
@@ -87,7 +86,6 @@ TEST(ParserA811, ThisDisambiguationInConstructor) {
   EXPECT_EQ(ctor->method->name, "new");
 }
 
-// §8.11: this with chained member access.
 TEST(ParserA811, ThisChainedMemberAccess) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
@@ -98,7 +96,6 @@ TEST(ParserA811, ThisChainedMemberAccess) {
               "endclass\n"));
 }
 
-// §8.11: this used in method call chain.
 TEST(ParserA811, ThisMethodCallChain) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
@@ -108,4 +105,4 @@ TEST(ParserA811, ThisMethodCallChain) {
               "endclass\n"));
 }
 
-}  // namespace
+}

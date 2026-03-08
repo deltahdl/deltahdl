@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.5 — timing control statements
-
 TEST(ParserA605, DelayControlHash) {
   auto r = Parse(
       "module m;\n"
@@ -271,4 +269,4 @@ TEST(ParserA605, RepeatEventControl) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
 }
 
-}  // namespace
+}

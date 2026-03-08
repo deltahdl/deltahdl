@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §7.10.2.1: size() returns element count.
 TEST(QueueMethods, SizeReturnsCount) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
@@ -19,7 +18,6 @@ TEST(QueueMethods, SizeReturnsCount) {
   EXPECT_EQ(out.ToUint64(), 3u);
 }
 
-// §7.10.2.1: size() returns 0 for empty queue.
 TEST(QueueMethods, SizeReturnsZeroForEmpty) {
   SimFixture f;
   f.ctx.CreateQueue("q", 32);
@@ -30,7 +28,6 @@ TEST(QueueMethods, SizeReturnsZeroForEmpty) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-// §7.10.2.2: insert(idx, val) inserts at position.
 TEST(QueueMethods, InsertAtIndex) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 30});
@@ -43,7 +40,6 @@ TEST(QueueMethods, InsertAtIndex) {
   EXPECT_EQ(q->elements[2].ToUint64(), 30u);
 }
 
-// §7.10.2.2: insert with out-of-range index is no-op.
 TEST(QueueMethods, InsertOutOfRangeIsNoop) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20});
@@ -53,7 +49,6 @@ TEST(QueueMethods, InsertOutOfRangeIsNoop) {
   EXPECT_EQ(q->elements.size(), 2u);
 }
 
-// §7.10.2.3: delete(idx) removes element at index.
 TEST(QueueMethods, DeleteAtIndex) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
@@ -64,7 +59,6 @@ TEST(QueueMethods, DeleteAtIndex) {
   EXPECT_EQ(q->elements[1].ToUint64(), 30u);
 }
 
-// §7.10.2.3: delete() with no args clears entire queue.
 TEST(QueueMethods, DeleteNoArgClearsAll) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
@@ -73,7 +67,6 @@ TEST(QueueMethods, DeleteNoArgClearsAll) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-// §7.10.2.4: pop_front() removes and returns first element.
 TEST(QueueMethods, PopFrontReturnsFirst) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
@@ -86,7 +79,6 @@ TEST(QueueMethods, PopFrontReturnsFirst) {
   EXPECT_EQ(q->elements[0].ToUint64(), 20u);
 }
 
-// §7.10.2.4: pop_front() on empty queue returns 0.
 TEST(QueueMethods, PopFrontEmptyReturnsZero) {
   SimFixture f;
   f.ctx.CreateQueue("q", 32);
@@ -97,7 +89,6 @@ TEST(QueueMethods, PopFrontEmptyReturnsZero) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-// §7.10.2.5: pop_back() removes and returns last element.
 TEST(QueueMethods, PopBackReturnsLast) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
@@ -110,7 +101,6 @@ TEST(QueueMethods, PopBackReturnsLast) {
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);
 }
 
-// §7.10.2.5: pop_back() on empty queue returns 0.
 TEST(QueueMethods, PopBackEmptyReturnsZero) {
   SimFixture f;
   f.ctx.CreateQueue("q", 32);
@@ -121,7 +111,6 @@ TEST(QueueMethods, PopBackEmptyReturnsZero) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-// §7.10.2.6: push_front() inserts at front.
 TEST(QueueMethods, PushFrontInsertsAtFront) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {20, 30});
@@ -133,7 +122,6 @@ TEST(QueueMethods, PushFrontInsertsAtFront) {
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);
 }
 
-// §7.10.2.7: push_back() inserts at end.
 TEST(QueueMethods, PushBackInsertsAtEnd) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20});
@@ -144,4 +132,4 @@ TEST(QueueMethods, PushBackInsertsAtEnd) {
   EXPECT_EQ(q->elements[2].ToUint64(), 30u);
 }
 
-}  // namespace
+}

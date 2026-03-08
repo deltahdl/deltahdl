@@ -23,7 +23,6 @@ TEST(ParserSection8, DynamicCastClassHandles) {
               "endmodule\n"));
 }
 
-// §8.16: Subclass-to-superclass assignment is always legal.
 TEST(ParserA816, SubclassToSuperclassAssign) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
@@ -42,7 +41,6 @@ TEST(ParserA816, SubclassToSuperclassAssign) {
               "endmodule\n"));
 }
 
-// §8.16: $cast as function (returns int).
 TEST(ParserA816, CastAsFunction) {
   EXPECT_TRUE(
       ParseOk("class Base; int x; endclass\n"
@@ -59,7 +57,6 @@ TEST(ParserA816, CastAsFunction) {
               "endmodule\n"));
 }
 
-// §8.16: $cast as task (no return value).
 TEST(ParserA816, CastAsTask) {
   EXPECT_TRUE(
       ParseOk("class Base; int x; endclass\n"
@@ -75,7 +72,6 @@ TEST(ParserA816, CastAsTask) {
               "endmodule\n"));
 }
 
-// §8.16: $cast with null source.
 TEST(ParserA816, CastWithNullSource) {
   EXPECT_TRUE(
       ParseOk("class Base; endclass\n"
@@ -88,7 +84,6 @@ TEST(ParserA816, CastWithNullSource) {
               "endmodule\n"));
 }
 
-// §8.16: Superclass-to-subclass direct assignment parses (elaborator catches).
 TEST(ParserA816, SuperclassToSubclassAssignParses) {
   EXPECT_TRUE(
       ParseOk("class Base; int x; endclass\n"
@@ -103,7 +98,6 @@ TEST(ParserA816, SuperclassToSubclassAssignParses) {
               "endmodule\n"));
 }
 
-// §8.16: $cast in conditional expression.
 TEST(ParserA816, CastInConditional) {
   EXPECT_TRUE(
       ParseOk("class Base; endclass\n"
@@ -120,4 +114,4 @@ TEST(ParserA816, CastInConditional) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

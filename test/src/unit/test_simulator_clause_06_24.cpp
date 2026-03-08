@@ -46,4 +46,4 @@ TEST(EvalOp, CastShortint) {
   EXPECT_EQ(result.width, 16u);
 }
 
-}  // namespace
+}

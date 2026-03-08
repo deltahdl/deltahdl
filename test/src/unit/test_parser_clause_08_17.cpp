@@ -59,7 +59,6 @@ TEST(ParserSection8, ConstructorChainingDefault) {
   ASSERT_EQ(r.cu->classes.size(), 2u);
 }
 
-// §8.17: extends specifier with arguments stores extends_args.
 TEST(ParserA817, ExtendsArgsStored) {
   auto r = Parse(
       "class Base;\n"
@@ -73,7 +72,6 @@ TEST(ParserA817, ExtendsArgsStored) {
   EXPECT_EQ(r.cu->classes[1]->extends_args.size(), 1u);
 }
 
-// §8.17: Constructor chaining — three-level hierarchy parses OK.
 TEST(ParserA817, ThreeLevelChaining) {
   EXPECT_TRUE(
       ParseOk("class A;\n"
@@ -92,7 +90,6 @@ TEST(ParserA817, ThreeLevelChaining) {
               "endclass\n"));
 }
 
-// §8.17: super.new with arguments parses.
 TEST(ParserA817, SuperNewWithMultipleArgs) {
   EXPECT_TRUE(
       ParseOk("class Base;\n"
@@ -106,7 +103,6 @@ TEST(ParserA817, SuperNewWithMultipleArgs) {
               "endclass\n"));
 }
 
-// §8.17: extends with 'default' keyword parses.
 TEST(ParserA817, ExtendsWithDefault) {
   auto r = Parse(
       "class Base;\n"
@@ -122,7 +118,6 @@ TEST(ParserA817, ExtendsWithDefault) {
   EXPECT_TRUE(r.cu->classes[1]->extends_has_default);
 }
 
-// §8.17: No constructor in subclass (implicit super.new) parses OK.
 TEST(ParserA817, ImplicitSuperNewNoConstructor) {
   EXPECT_TRUE(
       ParseOk("class Base;\n"
@@ -162,4 +157,4 @@ TEST(ParserClause08_03, ConstructorDefaultBeforeArgs) {
   EXPECT_FALSE(args[1].is_default);
 }
 
-}  // namespace
+}

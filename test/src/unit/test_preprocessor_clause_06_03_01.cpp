@@ -17,7 +17,6 @@ TEST(ParserSection6, ValueSet_4StateLogicDecl) {
   EXPECT_TRUE(Is4stateType(DataTypeKind::kLogic));
 }
 
-// §6.3.1: reg is 4-state.
 TEST(ParserSection6, ValueSet_4StateRegDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
@@ -30,7 +29,6 @@ TEST(ParserSection6, ValueSet_4StateRegDecl) {
   EXPECT_TRUE(Is4stateType(DataTypeKind::kReg));
 }
 
-// §6.3.1: integer is 4-state.
 TEST(ParserSection6, ValueSet_4StateIntegerDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
@@ -43,7 +41,6 @@ TEST(ParserSection6, ValueSet_4StateIntegerDecl) {
   EXPECT_TRUE(Is4stateType(DataTypeKind::kInteger));
 }
 
-// §6.3.1: bit is 2-state (only 0/1).
 TEST(ParserSection6, ValueSet_2StateBitDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
@@ -56,7 +53,6 @@ TEST(ParserSection6, ValueSet_2StateBitDecl) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kBit));
 }
 
-// §6.3.1: int is 2-state.
 TEST(ParserSection6, ValueSet_2StateIntDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
@@ -69,7 +65,6 @@ TEST(ParserSection6, ValueSet_2StateIntDecl) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kInt));
 }
 
-// §6.3.1: byte is 2-state.
 TEST(ParserSection6, ValueSet_2StateByteDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
@@ -82,4 +77,4 @@ TEST(ParserSection6, ValueSet_2StateByteDecl) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kByte));
 }
 
-}  // namespace
+}

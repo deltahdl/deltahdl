@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §13.7/§23.8.1: Forward reference to function declared later in same module.
 TEST(Elab1370, ForwardFunctionReference) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +19,6 @@ TEST(Elab1370, ForwardFunctionReference) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.7/§23.8.1: Forward reference to task declared later in same module.
 TEST(Elab1370, ForwardTaskReference) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,7 +34,6 @@ TEST(Elab1370, ForwardTaskReference) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.7: Task calling a function defined after it (both forward references).
 TEST(Elab1370, TaskCallsForwardFunction) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -55,7 +52,6 @@ TEST(Elab1370, TaskCallsForwardFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.7: Mutually recursive functions (both declared in same module).
 TEST(Elab1370, MutuallyRecursiveFunctions) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -74,4 +70,4 @@ TEST(Elab1370, MutuallyRecursiveFunctions) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

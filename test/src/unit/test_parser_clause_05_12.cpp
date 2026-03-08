@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.12: attribute on module definition ---
-
 TEST(ParserClause05, Cl5_12_AttrOnModuleDefinition) {
   auto r = Parse(
       "(* optimize_power *)\n"
@@ -22,8 +20,6 @@ TEST(ParserClause05, Cl5_12_AttrOnModuleDefinition) {
 TEST(ParserClause05, Cl5_12_AttrWithValueOnModuleDefinition) {
   EXPECT_TRUE(ParseOk("(* optimize_power = 1 *) module m; endmodule"));
 }
-
-// --- §5.12: attribute on module instantiation ---
 
 TEST(ParserClause05, Cl5_12_AttrOnModuleInstantiation) {
   auto r = Parse(
@@ -54,8 +50,6 @@ TEST(ParserClause05, Cl5_12_AttrWithValueOnInstantiation) {
   EXPECT_NE(items[0]->attrs[0].value, nullptr);
 }
 
-// --- §5.12: attribute on variable declaration ---
-
 TEST(ParserClause05, Cl5_12_AttrOnVarDecl) {
   auto r = Parse(
       "module m;\n"
@@ -81,8 +75,6 @@ TEST(ParserClause05, Cl5_12_AttrWithValueOnVarDecl) {
   EXPECT_NE(item->attrs[0].value, nullptr);
 }
 
-// --- §5.12: attribute on continuous assignment ---
-
 TEST(ParserClause05, Cl5_12_AttrOnContAssign) {
   auto r = Parse(
       "module m;\n"
@@ -97,8 +89,6 @@ TEST(ParserClause05, Cl5_12_AttrOnContAssign) {
   ASSERT_EQ(item->attrs.size(), 1u);
   EXPECT_EQ(item->attrs[0].name, "synthesis_on");
 }
-
-// --- §5.12: multiple attr_specs in one instance ---
 
 TEST(ParserClause05, Cl5_12_MultipleAttrSpecs) {
   auto r = Parse(
@@ -126,8 +116,6 @@ TEST(ParserClause05, Cl5_12_MixedAttrWithAndWithoutValue) {
   EXPECT_NE(item->attrs[1].value, nullptr);
 }
 
-// --- §5.12: multiple separate attribute instances ---
-
 TEST(ParserClause05, Cl5_12_MultipleSeparateInstances) {
   auto r = Parse(
       "module m;\n"
@@ -142,8 +130,6 @@ TEST(ParserClause05, Cl5_12_MultipleSeparateInstances) {
   EXPECT_EQ(item->attrs[0].name, "full_case");
   EXPECT_EQ(item->attrs[1].name, "parallel_case");
 }
-
-// --- §5.12: attribute on case statement ---
 
 TEST(ParserClause05, Cl5_12_AttrOnCaseStatement) {
   auto r = Parse(
@@ -164,8 +150,6 @@ TEST(ParserClause05, Cl5_12_AttrOnCaseStatement) {
   EXPECT_EQ(stmt->attrs[1].name, "parallel_case");
 }
 
-// --- §5.12: attribute on if statement ---
-
 TEST(ParserClause05, Cl5_12_AttrOnIfStatement) {
   auto r = Parse(
       "module m;\n"
@@ -182,8 +166,6 @@ TEST(ParserClause05, Cl5_12_AttrOnIfStatement) {
   EXPECT_EQ(stmt->attrs[0].name, "synthesis_off");
 }
 
-// --- §5.12: attribute on for loop ---
-
 TEST(ParserClause05, Cl5_12_AttrOnForLoop) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -193,8 +175,6 @@ TEST(ParserClause05, Cl5_12_AttrOnForLoop) {
               "  end\n"
               "endmodule\n"));
 }
-
-// --- §5.12: attribute on assignment statement ---
 
 TEST(ParserClause05, Cl5_12_AttrOnAssignment) {
   auto r = Parse(
@@ -210,8 +190,6 @@ TEST(ParserClause05, Cl5_12_AttrOnAssignment) {
   EXPECT_EQ(stmt->attrs[0].name, "weight");
   EXPECT_NE(stmt->attrs[0].value, nullptr);
 }
-
-// --- §5.12: attribute as suffix on operator ---
 
 TEST(ParserClause05, Cl5_12_AttrOnBinaryOperator) {
   EXPECT_TRUE(
@@ -229,8 +207,6 @@ TEST(ParserClause05, Cl5_12_AttrOnTernaryOperator) {
               "endmodule\n"));
 }
 
-// --- §5.12: attribute as suffix on function call ---
-
 TEST(ParserClause05, Cl5_12_AttrOnFunctionCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -246,8 +222,6 @@ TEST(ParserClause05, Cl5_12_AttrOnFunctionCallNoArgs) {
               "  initial a = foo (* bar *) ();\n"
               "endmodule\n"));
 }
-
-// --- §5.12: attribute value is constant expression ---
 
 TEST(ParserClause05, Cl5_12_AttrValueConstExpr) {
   auto r = Parse(
@@ -271,8 +245,6 @@ TEST(ParserClause05, Cl5_12_AttrValueString) {
               "endmodule\n"));
 }
 
-// --- §5.12: nested attributes disallowed ---
-
 TEST(ParserClause05, Cl5_12_NestedAttributeError) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
@@ -287,4 +259,4 @@ TEST(ParserClause05, Cl5_12_NonNestedConstExprOk) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

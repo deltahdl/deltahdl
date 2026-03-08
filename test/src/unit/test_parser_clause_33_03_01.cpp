@@ -230,4 +230,4 @@ TEST(LibraryText, LibraryDeclDirectoryPath) {
   EXPECT_EQ(r.cu->libraries[0]->file_paths[0], "/proj/rtl/");
 }
 
-}  // namespace
+}

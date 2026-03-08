@@ -33,7 +33,6 @@ TEST(ClassSim, HandleNullAssignment) {
   EXPECT_EQ(f.ctx.GetClassObject(null_handle), nullptr);
 }
 
-// §8.12: Shallow copy creates a new independent object.
 TEST(ClassSim, ShallowCopyCreatesNewObject) {
   SimFixture f;
   auto* type = MakeClassType(f, "Packet", {"data"});
@@ -47,7 +46,6 @@ TEST(ClassSim, ShallowCopyCreatesNewObject) {
   EXPECT_EQ(copy->GetProperty("data", f.arena).ToUint64(), 42u);
 }
 
-// §8.12: Shallow copy properties are independent from original.
 TEST(ClassSim, ShallowCopyPropertiesIndependent) {
   SimFixture f;
   auto* type = MakeClassType(f, "C", {"x"});
@@ -56,13 +54,11 @@ TEST(ClassSim, ShallowCopyPropertiesIndependent) {
 
   auto* copy = obj1->ShallowCopy(f.arena);
 
-  // Modifying copy doesn't affect original.
   copy->SetProperty("x", MakeLogic4VecVal(f.arena, 32, 99));
   EXPECT_EQ(obj1->GetProperty("x", f.arena).ToUint64(), 10u);
   EXPECT_EQ(copy->GetProperty("x", f.arena).ToUint64(), 99u);
 }
 
-// §8.12: Shallow copy preserves all properties.
 TEST(ClassSim, ShallowCopyPreservesAllProperties) {
   SimFixture f;
   auto* type = MakeClassType(f, "Multi", {"a", "b", "c"});
@@ -77,7 +73,6 @@ TEST(ClassSim, ShallowCopyPreservesAllProperties) {
   EXPECT_EQ(copy->GetProperty("c", f.arena).ToUint64(), 3u);
 }
 
-// §8.12: Shallow copy of object containing a class handle copies handle only.
 TEST(ClassSim, ShallowCopySharesNestedHandles) {
   SimFixture f;
   auto* inner_type = MakeClassType(f, "Inner", {"val"});
@@ -86,12 +81,12 @@ TEST(ClassSim, ShallowCopySharesNestedHandles) {
 
   auto* outer_type = MakeClassType(f, "Outer", {"ref"});
   auto [outer_handle, outer_obj] = MakeObj(f, outer_type);
-  // Store inner handle as a property value.
+
   outer_obj->SetProperty("ref", MakeLogic4VecVal(f.arena, 64, inner_handle));
 
   auto* copy = outer_obj->ShallowCopy(f.arena);
-  // The copy has the same handle value — both point to the same inner object.
+
   EXPECT_EQ(copy->GetProperty("ref", f.arena).ToUint64(), inner_handle);
 }
 
-}  // namespace
+}

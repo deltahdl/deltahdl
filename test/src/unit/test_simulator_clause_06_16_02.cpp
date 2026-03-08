@@ -15,7 +15,6 @@ TEST(StringMethods, Putc) {
   EXPECT_EQ(VecToString(var->value), "Hello");
 }
 
-// §6.16.2: putc out of bounds — string unchanged.
 TEST(StringMethods, PutcOutOfBounds) {
   StringFixture f;
   auto* var = f.CreateStringVar("s", "abc");
@@ -25,7 +24,6 @@ TEST(StringMethods, PutcOutOfBounds) {
   EXPECT_EQ(VecToString(var->value), "abc");
 }
 
-// §6.16.2: putc with 0 as second arg — string unaffected.
 TEST(StringMethods, PutcZeroByte) {
   StringFixture f;
   auto* var = f.CreateStringVar("s", "abc");
@@ -35,4 +33,4 @@ TEST(StringMethods, PutcZeroByte) {
   EXPECT_EQ(VecToString(var->value), "abc");
 }
 
-}  // namespace
+}

@@ -36,4 +36,4 @@ TEST(ForceRelease, IllegalMixedAssignmentTarget) {
   EXPECT_FALSE(ValidateForceTarget(info));
 }
 
-}  // namespace
+}

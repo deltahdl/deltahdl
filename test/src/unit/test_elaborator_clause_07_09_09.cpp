@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.9.9: Assoc-to-assoc assignment with same type/index is OK.
 TEST(Elaboration, AssocAssignSameTypeOk) {
   ElabFixture f;
   ElaborateSrc(
@@ -17,7 +16,6 @@ TEST(Elaboration, AssocAssignSameTypeOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §7.9.9: Assoc-to-fixed-size array assignment is rejected.
 TEST(Elaboration, AssocToFixedArrayAssign_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -30,7 +28,6 @@ TEST(Elaboration, AssocToFixedArrayAssign_Rejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §7.9.9: Fixed-size to assoc assignment is rejected.
 TEST(Elaboration, FixedArrayToAssocAssign_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -43,7 +40,6 @@ TEST(Elaboration, FixedArrayToAssocAssign_Rejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §7.9.9: Assoc arrays with different index types are rejected.
 TEST(Elaboration, AssocAssignIndexTypeMismatch_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -56,7 +52,6 @@ TEST(Elaboration, AssocAssignIndexTypeMismatch_Rejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §7.9.9: Assoc arrays with same int index and same element type is OK.
 TEST(Elaboration, AssocAssignIntIndexOk) {
   ElabFixture f;
   ElaborateSrc(
@@ -69,4 +64,4 @@ TEST(Elaboration, AssocAssignIntIndexOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

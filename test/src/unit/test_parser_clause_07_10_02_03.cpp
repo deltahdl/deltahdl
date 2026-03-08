@@ -12,4 +12,4 @@ TEST(ParserCh513, BuiltInMethod_Delete) {
               "endmodule"));
 }
 
-}  // namespace
+}

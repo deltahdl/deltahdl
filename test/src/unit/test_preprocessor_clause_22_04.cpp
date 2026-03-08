@@ -10,7 +10,6 @@
 using namespace delta;
 namespace fs = std::filesystem;
 
-// Helper: create a temporary directory with files for include tests.
 struct IncludeTestDir {
   fs::path dir;
 
@@ -22,7 +21,6 @@ struct IncludeTestDir {
 
   ~IncludeTestDir() { fs::remove_all(dir); }
 
-  // Write a file relative to the temp dir.
   fs::path WriteFile(const std::string& rel_path, const std::string& content) {
     auto full = dir / rel_path;
     fs::create_directories(full.parent_path());
@@ -31,8 +29,6 @@ struct IncludeTestDir {
     return full;
   }
 };
-
-// --- §22.4: Content insertion ---
 
 TEST(Preprocessor, Include_DoubleQuote_ContentInsertion) {
   IncludeTestDir tmp;
@@ -69,7 +65,7 @@ TEST(Preprocessor, Include_AngleBracket_SearchesIncludeDirs) {
 
 TEST(Preprocessor, Include_AngleBracket_DoesNotSearchSourceDir) {
   IncludeTestDir tmp;
-  // Place a file next to the source, but NOT in include_dirs.
+
   tmp.WriteFile("local.svh", "wire local_wire;\n");
 
   PreprocFixture f;
@@ -78,11 +74,8 @@ TEST(Preprocessor, Include_AngleBracket_DoesNotSearchSourceDir) {
   Preprocessor pp(f.mgr, f.diag, {});
   auto result = pp.Preprocess(fid);
 
-  // Angle bracket form should NOT find the file in the source directory.
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §22.4: Absolute paths ---
 
 TEST(Preprocessor, Include_AbsolutePath_DoubleQuote) {
   IncludeTestDir tmp;
@@ -106,8 +99,6 @@ TEST(Preprocessor, Include_AbsolutePath_AngleBracket_Error) {
 
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §22.4: Relative path resolution ---
 
 TEST(Preprocessor, Include_RelativeToSourceDir) {
   IncludeTestDir tmp;
@@ -140,12 +131,10 @@ TEST(Preprocessor, Include_IncludeDirs_SearchOrder) {
   auto result = pp.Preprocess(fid);
 
   EXPECT_FALSE(f.diag.HasErrors());
-  // dir_a is listed first, so dir_a/order.svh wins.
+
   EXPECT_NE(result.find("wire from_a;"), std::string::npos);
   EXPECT_EQ(result.find("wire from_b;"), std::string::npos);
 }
-
-// --- §22.4: Nested includes ---
 
 TEST(Preprocessor, Include_NestedIncludes) {
   IncludeTestDir tmp;
@@ -166,7 +155,7 @@ TEST(Preprocessor, Include_NestedIncludes) {
 
 TEST(Preprocessor, Include_MaxDepthExceeded) {
   IncludeTestDir tmp;
-  // Create a self-including file to trigger depth limit.
+
   auto path = tmp.WriteFile("self.svh", "`include \"self.svh\"\n");
 
   PreprocFixture f;
@@ -177,8 +166,6 @@ TEST(Preprocessor, Include_MaxDepthExceeded) {
 
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §22.4: Error conditions ---
 
 TEST(Preprocessor, Include_FileNotFound) {
   PreprocFixture f;
@@ -197,8 +184,6 @@ TEST(Preprocessor, Include_MissingFilename) {
   auto result = Preprocess("`include\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §22.4: Same-line content restrictions ---
 
 TEST(Preprocessor, Include_CommentAfterFilename_OK) {
   PreprocFixture f;
@@ -225,8 +210,6 @@ TEST(Preprocessor, Include_NonCommentTextAfterFilename_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §22.4: Macro expansion in filename ---
-
 TEST(Preprocessor, Include_MacroExpansionInFilename) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -238,8 +221,6 @@ TEST(Preprocessor, Include_MacroExpansionInFilename) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("module m;"), std::string::npos);
 }
-
-// --- §22.4: Include within conditional compilation ---
 
 TEST(Preprocessor, Include_InsideIfdef_Active) {
   PreprocFixture f;
@@ -264,12 +245,9 @@ TEST(Preprocessor, Include_InsideIfdef_Inactive) {
       "module m; endmodule\n",
       f);
 
-  // Should NOT error because include is inside inactive branch.
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("module m;"), std::string::npos);
 }
-
-// --- §22.4: Anywhere placement ---
 
 TEST(Preprocessor, Include_AnywhereInSource) {
   IncludeTestDir tmp;
@@ -289,15 +267,11 @@ TEST(Preprocessor, Include_AnywhereInSource) {
   EXPECT_NE(result.find("assign b = a;"), std::string::npos);
 }
 
-// --- §22.4: Block comment after include filename ---
-
 TEST(Preprocessor, Include_BlockCommentAfterFilename_OK) {
   PreprocFixture f;
   auto result = Preprocess("`include \"/dev/null\" /* block comment */\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
-
-// --- §22.4: Source dir searched before include_dirs (double-quote form) ---
 
 TEST(Preprocessor, Include_SourceDirBeforeIncludeDirs) {
   IncludeTestDir tmp;
@@ -315,12 +289,10 @@ TEST(Preprocessor, Include_SourceDirBeforeIncludeDirs) {
   auto result = pp.Preprocess(fid);
 
   EXPECT_FALSE(f.diag.HasErrors());
-  // Source dir is searched first, so src_dir/priority.svh wins.
+
   EXPECT_NE(result.find("wire from_src;"), std::string::npos);
   EXPECT_EQ(result.find("wire from_inc;"), std::string::npos);
 }
-
-// --- §22.4: Included file defines macros used after the include ---
 
 TEST(Preprocessor, Include_DefinedMacrosAvailableAfterInclude) {
   IncludeTestDir tmp;
@@ -337,8 +309,6 @@ TEST(Preprocessor, Include_DefinedMacrosAvailableAfterInclude) {
   EXPECT_NE(result.find("8"), std::string::npos);
 }
 
-// --- §22.4: Include from macro body expansion ---
-
 TEST(Preprocessor, Include_FromMacroBodyExpansion) {
   IncludeTestDir tmp;
   tmp.WriteFile("via_macro.svh", "wire via_macro;\n");
@@ -354,8 +324,6 @@ TEST(Preprocessor, Include_FromMacroBodyExpansion) {
   EXPECT_NE(result.find("wire via_macro;"), std::string::npos);
 }
 
-// --- §22.4: Double-quote form falls back to include_dirs ---
-
 TEST(Preprocessor, Include_DoubleQuote_FallsBackToIncludeDirs) {
   IncludeTestDir tmp;
   fs::create_directories(tmp.dir / "inc");
@@ -364,7 +332,7 @@ TEST(Preprocessor, Include_DoubleQuote_FallsBackToIncludeDirs) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.include_dirs.push_back((tmp.dir / "inc").string());
-  // Source is in a directory that does NOT contain fallback.svh.
+
   auto fid = f.mgr.AddFile("<test>", "`include \"fallback.svh\"\n");
   Preprocessor pp(f.mgr, f.diag, std::move(cfg));
   auto result = pp.Preprocess(fid);
@@ -373,15 +341,11 @@ TEST(Preprocessor, Include_DoubleQuote_FallsBackToIncludeDirs) {
   EXPECT_NE(result.find("wire fallback;"), std::string::npos);
 }
 
-// --- §22.4: Angle-bracket with non-existent include dir ---
-
 TEST(Preprocessor, Include_AngleBracket_NoIncludeDirs_Error) {
   PreprocFixture f;
   auto result = Preprocess("`include <missing.svh>\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §22.4: Subdirectory relative path ---
 
 TEST(Preprocessor, Include_SubdirectoryRelativePath) {
   IncludeTestDir tmp;
@@ -398,11 +362,9 @@ TEST(Preprocessor, Include_SubdirectoryRelativePath) {
   EXPECT_NE(result.find("wire count;"), std::string::npos);
 }
 
-// --- §22.4: Include depth boundary ---
-
 TEST(Preprocessor, Include_DepthBoundary_15LevelsSucceeds) {
   IncludeTestDir tmp;
-  // Create a chain of 15 files, each including the next.
+
   for (int i = 14; i >= 0; --i) {
     std::string name = "level_" + std::to_string(i) + ".svh";
     std::string content;
@@ -420,11 +382,9 @@ TEST(Preprocessor, Include_DepthBoundary_15LevelsSucceeds) {
   auto result = pp.Preprocess(fid);
 
   EXPECT_FALSE(f.diag.HasErrors());
-  // Verify deepest file was included (depth 15: top -> level_0 ... level_14).
+
   EXPECT_NE(result.find("wire w14;"), std::string::npos);
 }
-
-// --- §22.4: Include of empty file ---
 
 TEST(Preprocessor, Include_EmptyFile) {
   IncludeTestDir tmp;
@@ -439,8 +399,6 @@ TEST(Preprocessor, Include_EmptyFile) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("module m;"), std::string::npos);
 }
-
-// --- §22.4: Directive state persists across included files ---
 
 TEST(Preprocessor, Include_DirectiveStatePersistsAcrossIncludes) {
   IncludeTestDir tmp;
@@ -457,8 +415,6 @@ TEST(Preprocessor, Include_DirectiveStatePersistsAcrossIncludes) {
   EXPECT_TRUE(pp.HasTimescale());
 }
 
-// --- §22.4: Included file with `resetall ---
-
 TEST(Preprocessor, Include_ResetallInIncludedFile) {
   IncludeTestDir tmp;
   tmp.WriteFile("reset.svh", "`resetall\n");
@@ -472,6 +428,6 @@ TEST(Preprocessor, Include_ResetallInIncludedFile) {
   pp.Preprocess(fid);
 
   EXPECT_FALSE(f.diag.HasErrors());
-  // `resetall in included file should reset state.
+
   EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
 }

@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §3.9: Packages provide a shared declaration space.
-
 TEST(ParserClause03, Cl3_9_PackageEnclosedByKeywords) {
   auto r = Parse("package pkg; endpackage");
   ASSERT_NE(r.cu, nullptr);
@@ -31,8 +29,6 @@ TEST(ParserClause03, Cl3_9_PackageWithFunction) {
               "  function int add(int a, int b); return a + b; endfunction\n"
               "endpackage\n"));
 }
-
-// §3.9: Package declarations can be imported into other building blocks.
 
 TEST(ParserClause03, Cl3_9_ImportIntoModule) {
   auto r = Parse(
@@ -82,8 +78,6 @@ TEST(ParserClause03, Cl3_9_NamedImport) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §3.9: LRM ComplexPkg example.
-
 TEST(ParserClause03, Cl3_9_ComplexPkgExample) {
   auto r = Parse(
       "package ComplexPkg;\n"
@@ -105,12 +99,10 @@ TEST(ParserClause03, Cl3_9_ComplexPkgExample) {
   EXPECT_EQ(r.cu->packages[0]->name, "ComplexPkg");
 }
 
-// §3.9: Module/interface/program/checker declarations are local.
-
 TEST(ParserClause03, Cl3_9_LocalScopesDoNotConflict) {
   EXPECT_TRUE(
       ParseOk("module a; logic x; endmodule\n"
               "module b; logic x; endmodule\n"));
 }
 
-}  // namespace
+}

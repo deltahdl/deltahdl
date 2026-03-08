@@ -76,7 +76,6 @@ TEST(ClassSim, MethodResolutionWalksChain) {
   EXPECT_EQ(resolved, m);
 }
 
-// §8.13: IsA checks inheritance chain.
 TEST(ClassSim, IsAReflexive) {
   SimFixture f;
   auto* type = MakeClassType(f, "A", {});
@@ -106,7 +105,6 @@ TEST(ClassSim, IsAMultiLevel) {
   EXPECT_FALSE(a->IsA(c));
 }
 
-// §8.13: Derived method overrides base method in resolution.
 TEST(ClassSim, DerivedMethodOverridesBase) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {});
@@ -127,4 +125,4 @@ TEST(ClassSim, DerivedMethodOverridesBase) {
   EXPECT_EQ(resolved, derived_method);
 }
 
-}  // namespace
+}

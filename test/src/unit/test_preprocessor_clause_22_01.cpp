@@ -4,11 +4,6 @@
 
 using namespace delta;
 
-// §22.1: All compiler directives listed in the General section must be
-// recognized by the preprocessor.
-
-// --- Smoke tests: each directive from §22.1 is handled without error ---
-
 TEST(Preprocessor, Clause22_1_DefineRecognized) {
   PreprocFixture f;
   Preprocess("`define MY_MACRO 1\n", f);
@@ -136,8 +131,6 @@ TEST(Preprocessor, Clause22_1_LineeMacroRecognized) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// --- §22.1 + §22.5.1: Directive names cannot be redefined as macros ---
-
 TEST(Preprocessor, Clause22_1_CannotRedefine_define) {
   PreprocFixture f;
   Preprocess("`define define 1\n", f);
@@ -258,8 +251,6 @@ TEST(Preprocessor, Clause22_1_CannotRedefine_end_keywords) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §22.1: User-defined macros are distinct from compiler directives ---
-
 TEST(Preprocessor, Clause22_1_UserMacroNotConfusedWithDirective) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -270,12 +261,9 @@ TEST(Preprocessor, Clause22_1_UserMacroNotConfusedWithDirective) {
   EXPECT_NE(result.find("42"), std::string::npos);
 }
 
-// --- §22.1: Include with angle brackets is a distinct form ---
-
 TEST(Preprocessor, Clause22_1_IncludeWithAngleBrackets) {
   PreprocFixture f;
-  // Angle-bracket include searches only include dirs.
-  // Without include dirs, file not found is expected.
+
   Preprocess("`include <nonexistent.svh>\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }

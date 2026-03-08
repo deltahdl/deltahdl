@@ -17,4 +17,4 @@ TEST(Eval, VariableLookup) {
   EXPECT_EQ(result.ToUint64(), 123u);
 }
 
-}  // namespace
+}

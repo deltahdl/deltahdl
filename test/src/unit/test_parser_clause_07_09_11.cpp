@@ -3,7 +3,6 @@
 using namespace delta;
 namespace {
 
-// §7.9.11: Assoc array literal with default.
 TEST(ParserSection7, AssocArrayLiteralWithDefault) {
   auto r = Parse(
       "module t;\n"
@@ -13,7 +12,6 @@ TEST(ParserSection7, AssocArrayLiteralWithDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §7.9.11: Assoc array literal with key-value pairs.
 TEST(ParserSection7, AssocArrayLiteralKeyValue) {
   auto r = Parse(
       "module t;\n"
@@ -23,4 +21,4 @@ TEST(ParserSection7, AssocArrayLiteralKeyValue) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

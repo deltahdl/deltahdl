@@ -33,4 +33,4 @@ TEST(ProgramSim, ReactiveContextFlag) {
   ctx.SetCurrentProcess(nullptr);
 }
 
-}  // namespace
+}

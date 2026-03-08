@@ -24,7 +24,6 @@ TEST(Lowerer, VariableCreation) {
   ASSERT_NE(var, nullptr);
 }
 
-// §6.8: Variable with initializer gets the initialized value.
 TEST(Lowerer, VariableWithInitializer) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -43,7 +42,6 @@ TEST(Lowerer, VariableWithInitializer) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §6.8: Multiple variables created from one statement.
 TEST(Lowerer, MultipleVariableCreation) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -61,7 +59,6 @@ TEST(Lowerer, MultipleVariableCreation) {
   EXPECT_NE(f.ctx.FindVariable("c"), nullptr);
 }
 
-// §6.8: Variable with logic type starts at default (x for 4-state).
 TEST(Lowerer, Logic4StateDefaultInit) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -76,8 +73,8 @@ TEST(Lowerer, Logic4StateDefaultInit) {
 
   auto* var = f.ctx.FindVariable("data");
   ASSERT_NE(var, nullptr);
-  // 4-state default is x (aval=1, bval=1 for each word).
+
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
-}  // namespace
+}

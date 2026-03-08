@@ -48,7 +48,6 @@ TEST(ClassSim, SuperNewWithArgs) {
   EXPECT_EQ(base_ctor->func_args.size(), 1u);
 }
 
-// §8.17: Three-level hierarchy — all properties accessible after chaining.
 TEST(ClassSim, ThreeLevelConstructorChaining) {
   SimFixture f;
   auto* grand = MakeClassType(f, "Grand", {"g_val"});
@@ -68,7 +67,6 @@ TEST(ClassSim, ThreeLevelConstructorChaining) {
   EXPECT_EQ(obj->GetProperty("l_val", f.arena).ToUint64(), 3u);
 }
 
-// §8.17: Base constructor registered in methods map is resolvable.
 TEST(ClassSim, BaseConstructorResolvable) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {"x"});
@@ -80,10 +78,9 @@ TEST(ClassSim, BaseConstructorResolvable) {
   auto* derived = MakeClassType(f, "Child", {"y"});
   derived->parent = base;
 
-  // ResolveMethod walks type chain — child can find base's "new".
   auto [handle, obj] = MakeObj(f, derived);
   auto* resolved = obj->ResolveMethod("new");
   EXPECT_EQ(resolved, ctor);
 }
 
-}  // namespace
+}

@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.7 — case statements
-
 TEST(ParserA607, CaseBasic) {
   auto r = Parse(
       "module m;\n"
@@ -186,4 +184,4 @@ TEST(ParserA607, CaseWithBeginEnd) {
   EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

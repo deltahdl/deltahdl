@@ -263,7 +263,6 @@ TEST(SimA607, CaseWithBlockBody) {
   EXPECT_EQ(y->value.ToUint64(), 6u);
 }
 
-// §12.5: 4-state exact comparison — x only matches x, z only matches z.
 TEST(SimA607, CaseExactXMatchesX) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -288,7 +287,6 @@ TEST(SimA607, CaseExactXMatchesX) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.5: 4-state exact comparison — z only matches z, not 0.
 TEST(SimA607, CaseExactZMatchesZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -313,7 +311,6 @@ TEST(SimA607, CaseExactZMatchesZ) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// §12.5: 4-state exact comparison — x does NOT match 0 in plain case.
 TEST(SimA607, CaseXDoesNotMatchZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -335,12 +332,10 @@ TEST(SimA607, CaseXDoesNotMatchZero) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // x should remain 42 — no case item matches.
+
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §12.5: case_expression evaluated once, linear search terminates at first
-// match.
 TEST(SimA607, CaseLinearSearchFirstMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -362,8 +357,8 @@ TEST(SimA607, CaseLinearSearchFirstMatch) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // First matching item wins — linear search.
+
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

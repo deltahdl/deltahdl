@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §4.9: Scheduling semantics — elaboration of assignment constructs ---
-
 TEST(ElabCh49, ContinuousAssignElaboratesToRtlirAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -216,4 +214,4 @@ TEST(ElabCh49, MultipleAssignStatementsInInitialBlock) {
   EXPECT_EQ(mod->assigns.size(), 0u);
 }
 
-}  // namespace
+}

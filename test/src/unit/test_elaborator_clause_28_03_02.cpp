@@ -27,4 +27,4 @@ TEST(GateDecl, DefaultStrengthIsStrong) {
   EXPECT_TRUE(ValidateGateDecl(info));
 }
 
-}  // namespace
+}

@@ -175,4 +175,4 @@ TEST(SimA88, QuotedStringWidthPerCharacter) {
   EXPECT_EQ(v, 0x414243u);
 }
 
-}  // namespace
+}

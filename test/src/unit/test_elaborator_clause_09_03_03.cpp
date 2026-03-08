@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.3.3: Nested sequential blocks elaborate correctly.
 TEST(ElabClause09_03_03, NestedSeqBlocksElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,7 +21,6 @@ TEST(ElabClause09_03_03, NestedSeqBlocksElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.3: Fork inside sequential block elaborates.
 TEST(ElabClause09_03_03, ForkInsideSeqBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -41,7 +39,6 @@ TEST(ElabClause09_03_03, ForkInsideSeqBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.3: Sequential block inside fork elaborates.
 TEST(ElabClause09_03_03, SeqBlockInsideForkElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -62,7 +59,6 @@ TEST(ElabClause09_03_03, SeqBlockInsideForkElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.3: Deeply nested blocks elaborate without errors.
 TEST(ElabClause09_03_03, DeeplyNestedBlocksElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -83,7 +79,6 @@ TEST(ElabClause09_03_03, DeeplyNestedBlocksElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.2: Nested fork/join in initial elaborates.
 TEST(ElabClause09_03_02, NestedForkElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -106,4 +101,4 @@ TEST(ElabClause09_03_02, NestedForkElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

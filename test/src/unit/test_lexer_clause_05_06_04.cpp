@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.6.4: compiler directives begin with backtick ---
-
 TEST(LexerClause05, Cl5_6_4_BacktickIsUnexpectedInLexer) {
   SourceManager mgr;
   DiagEngine diag(mgr);
@@ -19,4 +17,4 @@ TEST(LexerClause05, Cl5_6_4_BacktickIsUnexpectedInLexer) {
   EXPECT_TRUE(diag.HasErrors());
 }
 
-}  // namespace
+}

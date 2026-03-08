@@ -2,8 +2,6 @@
 
 namespace {
 
-// §3.9: Packages provide a shared declaration space.
-
 TEST(ElabClause03, Cl3_9_PackageImportedIntoModule) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -31,4 +29,4 @@ TEST(ElabClause03, Cl3_9_LocalScopesDoNotConflict) {
              "module b; logic x; endmodule\n"));
 }
 
-}  // namespace
+}

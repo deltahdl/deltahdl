@@ -1,4 +1,4 @@
-// §18.4
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -50,4 +50,4 @@ TEST(ParserClause08_03, ErrorBothRandAndRandc) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -407,7 +407,6 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithOutputArg) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-// §13.4: Default function argument direction is input.
 TEST(ParserSection13, FunctionDefaultDirectionInput) {
   auto r = Parse(
       "module m;\n"
@@ -423,7 +422,6 @@ TEST(ParserSection13, FunctionDefaultDirectionInput) {
   EXPECT_EQ(fn->func_args[1].direction, Direction::kInput);
 }
 
-// §13.4: Direction stickiness — output sticks to subsequent args.
 TEST(ParserSection13, FunctionDirectionStickyOutput) {
   auto r = Parse(
       "module m;\n"
@@ -438,7 +436,6 @@ TEST(ParserSection13, FunctionDirectionStickyOutput) {
   EXPECT_EQ(fn->func_args[1].direction, Direction::kOutput);
 }
 
-// §13.4: Multiple statements in function body executed sequentially.
 TEST(ParserSection13, FunctionMultipleStmtsSequential) {
   auto r = Parse(
       "module m;\n"
@@ -455,7 +452,6 @@ TEST(ParserSection13, FunctionMultipleStmtsSequential) {
   ASSERT_GE(fn->func_body_stmts.size(), 3u);
 }
 
-// §13.4: Function with ref argument.
 TEST(ParserSection13, FunctionRefArg) {
   auto r = Parse(
       "module m;\n"
@@ -471,4 +467,4 @@ TEST(ParserSection13, FunctionRefArg) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
 }
 
-}  // namespace
+}

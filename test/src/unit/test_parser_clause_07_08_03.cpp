@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.8.3: Associative array with class index parses correctly.
 TEST(ParserSection7, AssocArrayClassIndex) {
   auto r = Parse(
       "module t;\n"
@@ -17,7 +16,6 @@ TEST(ParserSection7, AssocArrayClassIndex) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §7.8.3: Class index dimension is parsed as identifier with class name.
 TEST(ParserSection7, AssocArrayClassIndex_DimExpr) {
   auto r = Parse(
       "module t;\n"
@@ -28,7 +26,7 @@ TEST(ParserSection7, AssocArrayClassIndex_DimExpr) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  // The variable decl is the second item (after the class decl).
+
   auto& items = r.cu->modules[0]->items;
   ModuleItem* var_item = nullptr;
   for (auto* item : items) {
@@ -44,7 +42,6 @@ TEST(ParserSection7, AssocArrayClassIndex_DimExpr) {
   EXPECT_EQ(var_item->unpacked_dims[0]->text, "MyClass");
 }
 
-// §7.8.3: Multiple variables with the same class index type.
 TEST(ParserSection7, AssocArrayClassIndex_MultipleVars) {
   auto r = Parse(
       "module t;\n"
@@ -58,7 +55,6 @@ TEST(ParserSection7, AssocArrayClassIndex_MultipleVars) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §7.8.3: Different element types with class index.
 TEST(ParserSection7, AssocArrayClassIndex_DifferentElemTypes) {
   auto r = Parse(
       "module t;\n"
@@ -71,4 +67,4 @@ TEST(ParserSection7, AssocArrayClassIndex_DifferentElemTypes) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -55,4 +55,4 @@ TEST(ParserAnnexG, AnnexGMailboxUsage) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

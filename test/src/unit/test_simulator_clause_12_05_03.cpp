@@ -53,7 +53,6 @@ TEST(SimA607, PriorityCaseFirstMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.5.3: unique case with overlapping items → overlap violation.
 TEST(SimA607, UniqueCaseOverlapViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -74,13 +73,12 @@ TEST(SimA607, UniqueCaseOverlapViolation) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // First matching item is executed.
+
   EXPECT_EQ(var->value.ToUint64(), 10u);
-  // Overlap detected → violation.
+
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3: unique0 case with overlapping items → overlap violation.
 TEST(SimA607, Unique0CaseOverlapViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -105,7 +103,6 @@ TEST(SimA607, Unique0CaseOverlapViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3: unique case, no match, no default → violation.
 TEST(SimA607, UniqueCaseNoMatchNoDefaultViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -128,7 +125,6 @@ TEST(SimA607, UniqueCaseNoMatchNoDefaultViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3: unique0 case, no match, no default → NO violation.
 TEST(SimA607, Unique0CaseNoMatchNoDefaultNoViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -151,7 +147,6 @@ TEST(SimA607, Unique0CaseNoMatchNoDefaultNoViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.5.3: priority case, no match, no default → violation.
 TEST(SimA607, PriorityCaseNoMatchNoDefaultViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -174,7 +169,6 @@ TEST(SimA607, PriorityCaseNoMatchNoDefaultViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3: unique case, single match, no overlap → no violation.
 TEST(SimA607, UniqueCaseSingleMatchNoViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -200,7 +194,6 @@ TEST(SimA607, UniqueCaseSingleMatchNoViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.5.3: unique case with default, no match → no violation.
 TEST(SimA607, UniqueCaseNoMatchWithDefaultNoViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -226,4 +219,4 @@ TEST(SimA607, UniqueCaseNoMatchWithDefaultNoViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-}  // namespace
+}

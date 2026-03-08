@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.4: line comments stripped during parsing ---
-
 TEST(ParserClause05, Cl5_4_CommentDoesNotProduceTokens) {
   auto r = Parse(
       "module m;\n"
@@ -45,8 +43,6 @@ TEST(ParserClause05, Cl5_4_OneLineCommentEndsAtNewline) {
               "endmodule\n"));
 }
 
-// --- §5.4: block comments stripped during parsing ---
-
 TEST(ParserClause05, Cl5_4_BlockCommentBetweenTokens) {
   EXPECT_TRUE(ParseOk("module/* comment */t;/* another */endmodule"));
 }
@@ -79,16 +75,12 @@ TEST(ParserClause05, Cl5_4_BlockCommentInLibraryText) {
   ASSERT_EQ(r.cu->libraries.size(), 1u);
 }
 
-// --- §5.4: // has no meaning inside block comment ---
-
 TEST(ParserClause05, Cl5_4_LineCommentTokenInsideBlockComment) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  /* // not special */ logic a;\n"
               "endmodule\n"));
 }
-
-// --- §5.4: /* */ has no meaning inside line comment ---
 
 TEST(ParserClause05, Cl5_4_BlockCommentStartInsideLineComment) {
   EXPECT_TRUE(
@@ -98,17 +90,13 @@ TEST(ParserClause05, Cl5_4_BlockCommentStartInsideLineComment) {
               "endmodule\n"));
 }
 
-// --- §5.4: block comments do not nest ---
-
 TEST(ParserClause05, Cl5_4_NestedBlockCommentClosesAtFirstEnd) {
-  // /* outer /* inner */ closes at first */; next token is visible
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic /* outer /* inner */ a;\n"
               "endmodule\n"));
 }
-
-// --- §5.4: comment-only files ---
 
 TEST(ParserClause05, Cl5_4_EmptyCuCommentsOnly) {
   auto r = Parse(
@@ -120,4 +108,4 @@ TEST(ParserClause05, Cl5_4_EmptyCuCommentsOnly) {
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
-}  // namespace
+}

@@ -32,4 +32,4 @@ TEST(SourceText, PackageItemTimeunitsDecl) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-}  // namespace
+}

@@ -4,7 +4,6 @@
 using namespace delta;
 namespace {
 
-// §8.23: Class scope resolution with typedef.
 TEST(ParserA221, ClassScope) {
   auto r = Parse(
       "class base_cls;\n"
@@ -15,7 +14,6 @@ TEST(ParserA221, ClassScope) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §8.23: Nested class declaration.
 TEST(SourceText, ClassNestedClass) {
   auto r = Parse(
       "class Outer;\n"
@@ -31,7 +29,6 @@ TEST(SourceText, ClassNestedClass) {
   EXPECT_EQ(members[0]->nested_class->name, "Inner");
 }
 
-// §8.23: Class with typedef enum.
 TEST(ParserSection8, ClassWithTypedef) {
   auto r = Parse(
       "class test_cls;\n"
@@ -42,7 +39,6 @@ TEST(ParserSection8, ClassWithTypedef) {
   EXPECT_EQ(r.cu->classes[0]->name, "test_cls");
 }
 
-// §8.23: Nested class with properties.
 TEST(ParserSection8, NestedClass) {
   auto r = Parse(
       "class Outer;\n"
@@ -56,7 +52,6 @@ TEST(ParserSection8, NestedClass) {
   EXPECT_EQ(r.cu->classes[0]->name, "Outer");
 }
 
-// §8.23: Class scope resolution — static method call.
 TEST(ParserSection8, ClassScopeResolutionStaticMethod) {
   auto r = Parse(
       "class Base;\n"
@@ -70,7 +65,6 @@ TEST(ParserSection8, ClassScopeResolutionStaticMethod) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §8.23: Class scope resolution — enum member.
 TEST(ParserSection8, ClassScopeResolutionEnum) {
   auto r = Parse(
       "class Base;\n"
@@ -83,7 +77,6 @@ TEST(ParserSection8, ClassScopeResolutionEnum) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §8.23: Class scope resolution — typedef.
 TEST(ParserSection8, ClassScopeResolutionTypedef) {
   auto r = Parse(
       "class Outer;\n"
@@ -96,7 +89,6 @@ TEST(ParserSection8, ClassScopeResolutionTypedef) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §8.23: Class scope resolution — parameter.
 TEST(ParserSection8, ClassScopeResolutionParameter) {
   auto r = Parse(
       "class Cfg;\n"
@@ -109,7 +101,6 @@ TEST(ParserSection8, ClassScopeResolutionParameter) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §8.23: Class scope resolution in module declaration.
 TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
   EXPECT_TRUE(
       ParseOk("class base;\n"
@@ -120,7 +111,6 @@ TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
               "endmodule\n"));
 }
 
-// §8.23: Chained class scope resolution.
 TEST(ParserSection8_23, ChainedClassScope) {
   auto r = Parse(
       "class Outer;\n"
@@ -135,7 +125,6 @@ TEST(ParserSection8_23, ChainedClassScope) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §8.23: Superclass access from derived class using ::.
 TEST(ParserSection8_23, SuperclassScopeAccess) {
   auto r = Parse(
       "class Base;\n"
@@ -150,4 +139,4 @@ TEST(ParserSection8_23, SuperclassScopeAccess) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

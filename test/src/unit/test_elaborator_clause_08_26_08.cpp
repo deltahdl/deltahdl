@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.26.8: Interface class with default argument values — elaborates OK.
 TEST(ElabA8268, InterfaceMethodDefaultArgsOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
@@ -18,4 +17,4 @@ TEST(ElabA8268, InterfaceMethodDefaultArgsOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

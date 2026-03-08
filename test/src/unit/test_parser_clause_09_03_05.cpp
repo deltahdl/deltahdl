@@ -181,7 +181,6 @@ TEST(ParserSection12, StatementLabelOnForever) {
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
 }
 
-// §9.3.5: Label and block name simultaneously is illegal.
 TEST(ParserClause09_03_05, LabelAndBlockNameErrors) {
   auto r = Parse(
       "module m;\n"
@@ -194,7 +193,6 @@ TEST(ParserClause09_03_05, LabelAndBlockNameErrors) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §9.3.5: Parser stores label on statement.
 TEST(ParserClause09_03_05, LabelStoredOnStmt) {
   auto r = Parse(
       "module m;\n"
@@ -211,4 +209,4 @@ TEST(ParserClause09_03_05, LabelStoredOnStmt) {
   EXPECT_EQ(item->body->stmts[0]->label, "lbl");
 }
 
-}  // namespace
+}

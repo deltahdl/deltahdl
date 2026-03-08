@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.7: Task with fixed-size array formal argument.
 TEST(ParserSection7, TaskWithArrayArg) {
   auto r = Parse(
       "module m;\n"
@@ -21,7 +20,6 @@ TEST(ParserSection7, TaskWithArrayArg) {
   EXPECT_GE(item->func_args[0].unpacked_dims.size(), 2u);
 }
 
-// §7.7: Function with dynamic array formal argument.
 TEST(ParserSection7, FuncWithDynamicArrayArg) {
   auto r = Parse(
       "module m;\n"
@@ -36,11 +34,10 @@ TEST(ParserSection7, FuncWithDynamicArrayArg) {
   ASSERT_EQ(item->func_args.size(), 1u);
   EXPECT_EQ(item->func_args[0].data_type.kind, DataTypeKind::kInt);
   ASSERT_EQ(item->func_args[0].unpacked_dims.size(), 1u);
-  // Dynamic array dim is nullptr.
+
   EXPECT_EQ(item->func_args[0].unpacked_dims[0], nullptr);
 }
 
-// §7.7: Task with multiple array args of different sizes.
 TEST(ParserSection7, TaskWithMultipleArrayArgs) {
   auto r = Parse(
       "module m;\n"
@@ -57,7 +54,6 @@ TEST(ParserSection7, TaskWithMultipleArrayArgs) {
   EXPECT_FALSE(item->func_args[1].unpacked_dims.empty());
 }
 
-// §7.7: Function with string array formal.
 TEST(ParserSection7, FuncWithStringArrayArg) {
   auto r = Parse(
       "module m;\n"
@@ -72,4 +68,4 @@ TEST(ParserSection7, FuncWithStringArrayArg) {
   EXPECT_FALSE(item->func_args[0].unpacked_dims.empty());
 }
 
-}  // namespace
+}

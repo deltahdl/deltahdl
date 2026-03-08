@@ -33,4 +33,4 @@ TEST_F(ProtectedTest, RuntimeLicensePragma) {
   EXPECT_NE(result.find("module m;"), std::string::npos);
 }
 
-}  // namespace
+}

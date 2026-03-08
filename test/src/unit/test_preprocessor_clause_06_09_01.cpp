@@ -45,4 +45,4 @@ TEST(ParserSection6, VectorUnsignedExplicit) {
   EXPECT_FALSE(item->data_type.is_signed);
 }
 
-}  // namespace
+}

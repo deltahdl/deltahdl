@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.4: Sequence instance in event control elaborates.
 TEST(ElabClause09_04_02_04, SequenceEventElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +19,6 @@ TEST(ElabClause09_04_02_04, SequenceEventElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.2.4: Module with sequence declaration and event control.
 TEST(ElabClause09_04_02_04, SequenceDeclarationAndUsage) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -38,4 +36,4 @@ TEST(ElabClause09_04_02_04, SequenceDeclarationAndUsage) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

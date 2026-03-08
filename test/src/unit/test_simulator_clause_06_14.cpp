@@ -30,4 +30,4 @@ TEST(Lowerer, ChandleNullDefault) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

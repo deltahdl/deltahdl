@@ -177,4 +177,4 @@ TEST(ParserA60701, CaseMatchesMultipleItems) {
   ASSERT_EQ(stmt->case_items.size(), 4u);
 }
 
-}  // namespace
+}

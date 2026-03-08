@@ -14,4 +14,4 @@ TEST(SysTask, RealtimeReturns64Bit) {
   EXPECT_EQ(result.width, 64u);
 }
 
-}  // namespace
+}

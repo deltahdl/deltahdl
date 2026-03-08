@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §E.4: `delay_mode_distributed before module.
 TEST(ParserAnnexE, AnnexEMultipleDirectives) {
   auto r = ParseWithPreprocessor(
       "`default_decay_time 100\n"
@@ -18,7 +17,6 @@ TEST(ParserAnnexE, AnnexEMultipleDirectives) {
   }
 }
 
-// §E.4: delay_mode_distributed propagated to CU.
 TEST(ParserAnnexE2, AnnexEDelayModeDistributed) {
   auto r = ParseWithPreprocessor(
       "`delay_mode_distributed\n"
@@ -28,7 +26,6 @@ TEST(ParserAnnexE2, AnnexEDelayModeDistributed) {
   EXPECT_EQ(r.cu->delay_mode_directive, DelayModeDirective::kDistributed);
 }
 
-// §E.4: no directive means kNone in CU.
 TEST(ParserAnnexE2, AnnexEDelayMode_NoDirective) {
   auto r = ParseWithPreprocessor("module m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -36,4 +33,4 @@ TEST(ParserAnnexE2, AnnexEDelayMode_NoDirective) {
   EXPECT_EQ(r.cu->delay_mode_directive, DelayModeDirective::kNone);
 }
 
-}  // namespace
+}

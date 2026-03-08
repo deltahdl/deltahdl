@@ -4,11 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §3.3: A module is enclosed between module...endmodule and can contain
-// the constructs enumerated in this clause.
-
-// --- Ports ---
-
 TEST(ParserClause03, Cl3_3_ModuleWithPortDeclarations) {
   auto r = Parse(
       "module m(input wire a, b, sel, output logic y);\n"
@@ -18,8 +13,6 @@ TEST(ParserClause03, Cl3_3_ModuleWithPortDeclarations) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_FALSE(r.cu->modules[0]->ports.empty());
 }
-
-// --- Data declarations (nets, variables, structures, unions) ---
 
 TEST(ParserClause03, Cl3_3_ModuleWithNetDecl) {
   auto r = Parse(
@@ -61,8 +54,6 @@ TEST(ParserClause03, Cl3_3_ModuleWithUnionDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- Constant declarations ---
-
 TEST(ParserClause03, Cl3_3_ModuleWithParamDecl) {
   auto r = Parse(
       "module m;\n"
@@ -78,8 +69,6 @@ TEST(ParserClause03, Cl3_3_ModuleWithParamDecl) {
   EXPECT_EQ(param_count, 2);
 }
 
-// --- User-defined type definitions ---
-
 TEST(ParserClause03, Cl3_3_ModuleWithTypedef) {
   auto r = Parse(
       "module m;\n"
@@ -90,8 +79,6 @@ TEST(ParserClause03, Cl3_3_ModuleWithTypedef) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
 }
-
-// --- Class definitions ---
 
 TEST(ParserClause03, Cl3_3_ModuleWithClassDecl) {
   auto r = Parse(
@@ -105,8 +92,6 @@ TEST(ParserClause03, Cl3_3_ModuleWithClassDecl) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kClassDecl);
 }
 
-// --- Imports of declarations from packages ---
-
 TEST(ParserClause03, Cl3_3_ModuleWithImport) {
   auto r = Parse(
       "package pkg; typedef int myint; endpackage\n"
@@ -117,8 +102,6 @@ TEST(ParserClause03, Cl3_3_ModuleWithImport) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kImportDecl);
 }
-
-// --- Subroutine definitions ---
 
 TEST(ParserClause03, Cl3_3_ModuleWithFunction) {
   auto r = Parse(
@@ -142,8 +125,6 @@ TEST(ParserClause03, Cl3_3_ModuleWithTask) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
 }
-
-// --- Instantiations ---
 
 TEST(ParserClause03, Cl3_3_ModuleWithModuleInst) {
   auto r = Parse(
@@ -171,8 +152,6 @@ TEST(ParserClause03, Cl3_3_ModuleWithGateInst) {
   EXPECT_TRUE(has_gate);
 }
 
-// --- Continuous assignments ---
-
 TEST(ParserClause03, Cl3_3_ModuleWithContAssign) {
   auto r = Parse(
       "module m;\n"
@@ -187,8 +166,6 @@ TEST(ParserClause03, Cl3_3_ModuleWithContAssign) {
   }
   EXPECT_TRUE(has_assign);
 }
-
-// --- Procedural blocks ---
 
 TEST(ParserClause03, Cl3_3_ModuleWithInitialBlock) {
   auto r = Parse(
@@ -246,8 +223,6 @@ TEST(ParserClause03, Cl3_3_ModuleWithAlwaysLatch) {
               "endmodule\n"));
 }
 
-// --- Generate blocks ---
-
 TEST(ParserClause03, Cl3_3_ModuleWithGenerateFor) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -268,8 +243,6 @@ TEST(ParserClause03, Cl3_3_ModuleWithGenerateIf) {
               "endmodule\n"));
 }
 
-// --- Specify blocks ---
-
 TEST(ParserClause03, Cl3_3_ModuleWithSpecifyBlock) {
   auto r = Parse(
       "module m(input a, output y);\n"
@@ -286,8 +259,6 @@ TEST(ParserClause03, Cl3_3_ModuleWithSpecifyBlock) {
   }
   EXPECT_TRUE(has_specify);
 }
-
-// --- LRM §3.3 mux2to1 example ---
 
 TEST(ParserClause03, Cl3_3_Mux2to1Example) {
   auto r = Parse(
@@ -306,8 +277,6 @@ TEST(ParserClause03, Cl3_3_Mux2to1Example) {
   EXPECT_FALSE(r.cu->modules[0]->items.empty());
 }
 
-// --- Combined: module with many construct types ---
-
 TEST(ParserClause03, Cl3_3_ModuleWithMixedContents) {
   EXPECT_TRUE(ParseOk(
       "module m #(parameter int W = 8) (input logic clk, output logic [W-1:0] "
@@ -323,4 +292,4 @@ TEST(ParserClause03, Cl3_3_ModuleWithMixedContents) {
       "endmodule\n"));
 }
 
-}  // namespace
+}

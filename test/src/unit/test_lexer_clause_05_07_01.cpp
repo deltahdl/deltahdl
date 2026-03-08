@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.7.1: unsized decimal numbers ---
-
 TEST(LexerClause05, Cl5_7_1_UnsizedDecimal) {
   auto r = LexOne("659 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -19,8 +17,6 @@ TEST(LexerClause05, Cl5_7_1_UnsizedDecimalZero) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "0");
 }
-
-// --- §5.7.1: based literal constants ---
 
 TEST(LexerClause05, Cl5_7_1_UnsizedHex) {
   auto r = LexOne("'h837FF ");
@@ -58,8 +54,6 @@ TEST(LexerClause05, Cl5_7_1_SizedOctal) {
   EXPECT_EQ(r.token.text, "8'o77");
 }
 
-// --- §5.7.1: signed specifier ---
-
 TEST(LexerClause05, Cl5_7_1_SignedHex) {
   auto r = LexOne("4'shf ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -78,8 +72,6 @@ TEST(LexerClause05, Cl5_7_1_SignedUpperS) {
   EXPECT_EQ(r.token.text, "4'Shf");
 }
 
-// --- §5.7.1: base format case insensitive ---
-
 TEST(LexerClause05, Cl5_7_1_BaseUpperH) {
   auto r = LexOne("8'HAB ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -95,8 +87,6 @@ TEST(LexerClause05, Cl5_7_1_BaseUpperO) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-// --- §5.7.1: whitespace between size, base, digits ---
-
 TEST(LexerClause05, Cl5_7_1_WhitespaceSizeAndBase) {
   auto r = LexOne("5 'D 3 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -106,8 +96,6 @@ TEST(LexerClause05, Cl5_7_1_WhitespaceBaseAndDigits) {
   auto r = LexOne("32 'h 12ab_f001 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
-
-// --- §5.7.1: x, z, ? values ---
 
 TEST(LexerClause05, Cl5_7_1_XValueInHex) {
   auto r = LexOne("12'hx ");
@@ -129,8 +117,6 @@ TEST(LexerClause05, Cl5_7_1_QuestionMarkSigned) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-// --- §5.7.1: underscore in numbers ---
-
 TEST(LexerClause05, Cl5_7_1_UnderscoreInDecimal) {
   auto r = LexOne("27_195_000 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -146,8 +132,6 @@ TEST(LexerClause05, Cl5_7_1_UnderscoreInHex) {
   auto r = LexOne("32'h12ab_f001 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
-
-// --- §5.7.1: unbased unsized literals ---
 
 TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedZero) {
   auto r = LexOne("'0 ");
@@ -181,8 +165,6 @@ TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedUpperZ) {
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-// --- §5.7.1: error conditions ---
-
 TEST(LexerClause05, Cl5_7_1_NoDigitsAfterBaseError) {
   auto [tokens, errors] = LexWithDiag("8'd-6");
   EXPECT_TRUE(errors);
@@ -198,8 +180,6 @@ TEST(LexerClause05, Cl5_7_1_DecimalXZMultiError) {
   EXPECT_TRUE(errors);
 }
 
-// --- §5.7.1: hex digits case insensitive ---
-
 TEST(LexerClause05, Cl5_7_1_HexDigitsCaseInsensitive) {
   auto r1 = LexOne("8'habcd ");
   auto r2 = LexOne("8'hABCD ");
@@ -207,11 +187,9 @@ TEST(LexerClause05, Cl5_7_1_HexDigitsCaseInsensitive) {
   EXPECT_EQ(r2.token.kind, TokenKind::kIntLiteral);
 }
 
-// --- §5.7.1: large unsized number ---
-
 TEST(LexerClause05, Cl5_7_1_LargeUnsizedHex) {
   auto r = LexOne("'h7_0000_0000 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-}  // namespace
+}

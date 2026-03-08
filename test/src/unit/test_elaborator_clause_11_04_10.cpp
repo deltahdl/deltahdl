@@ -182,4 +182,4 @@ TEST(SimCh10, BlockingAssignShiftOps) {
   EXPECT_EQ(shr->value.ToUint64(), 0x03u);
 }
 
-}  // namespace
+}

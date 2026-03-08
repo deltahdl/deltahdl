@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §22.14.7 — IEEE Std 1800-2009 keywords (Table 22-5)
-
 TEST(Lexer, KeywordVersion_1800_2009_NewKeywordsPresent) {
   const char* kNewKeywords[] = {
       "accept_on",      "checker",        "endchecker",   "eventually",
@@ -38,7 +36,7 @@ TEST(Lexer, KeywordVersion_1800_2009_NewKeywordsNotIn1800_2005) {
 }
 
 TEST(Lexer, KeywordVersion_1800_2009_Includes1800_2005Keywords) {
-  // Table 22-4 keywords should be present.
+
   EXPECT_TRUE(LookupKeyword("logic", KeywordVersion::kVer18002009).has_value());
   EXPECT_TRUE(
       LookupKeyword("interface", KeywordVersion::kVer18002009).has_value());
@@ -47,9 +45,9 @@ TEST(Lexer, KeywordVersion_1800_2009_Includes1800_2005Keywords) {
 }
 
 TEST(Lexer, KeywordVersion_1800_2009_ImplementsNotKeyword) {
-  // "implements" is 1800-2012 (Table 22-6), not in 1800-2009.
+
   auto kw = LookupKeyword("implements", KeywordVersion::kVer18002009);
   EXPECT_FALSE(kw.has_value());
 }
 
-}  // namespace
+}

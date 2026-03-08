@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §3.1: Design elements are the primary building blocks. The CompilationUnit
-// collects all design element types into separate collections.
-
 TEST(ParserClause03, Cl3_1_EmptySourceProducesValidCU) {
   auto r = Parse("");
   ASSERT_NE(r.cu, nullptr);
@@ -144,4 +141,4 @@ TEST(ParserClause03, Cl3_1_UnclosedDesignElementIsError) {
   EXPECT_FALSE(ParseOk("module m;"));
 }
 
-}  // namespace
+}

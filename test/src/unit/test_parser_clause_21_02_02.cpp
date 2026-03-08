@@ -40,4 +40,4 @@ TEST(ParserSection21, StrobebHexOctal) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

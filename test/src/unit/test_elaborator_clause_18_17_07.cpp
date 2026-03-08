@@ -20,4 +20,4 @@ TEST(ElabA612, ProductionPortsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

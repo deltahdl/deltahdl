@@ -24,8 +24,6 @@ TEST(Elaboration, UnpackedStructMemberDefault_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2.2: Members of unpacked structs containing a union shall not have
-// individual default member values.
 TEST(Elaboration, UnpackedStructWithUnionMemberDefault_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -52,7 +50,6 @@ TEST(Elaboration, UnpackedStructWithUnionNoDefault_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2.2: Explicit init on variable overrides typedef defaults.
 TEST(Elaboration, ExplicitInitOverridesDefault) {
   ElabFixture f;
   ElaborateSrc(
@@ -67,7 +64,6 @@ TEST(Elaboration, ExplicitInitOverridesDefault) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §11.2.2: Unpacked struct data objects can be used as aggregate expressions.
 TEST(AggregateExpr, UnpackedStructAssignment) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -81,4 +77,4 @@ TEST(AggregateExpr, UnpackedStructAssignment) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

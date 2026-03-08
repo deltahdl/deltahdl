@@ -26,4 +26,4 @@ TEST(ParserA211, SetCovergroupExpression) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

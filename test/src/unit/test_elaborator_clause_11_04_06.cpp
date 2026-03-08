@@ -28,4 +28,4 @@ TEST(ElabA86, BinaryWildcardNeqElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -655,4 +655,4 @@ TEST(ParserSection7, PackedStructPartSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-}  // namespace
+}

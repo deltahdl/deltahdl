@@ -3,7 +3,6 @@
 using namespace delta;
 namespace {
 
-// §7.9.10: Function with associative array argument parses.
 TEST(ParserSection7, FuncWithAssocArrayArg) {
   auto r = Parse(
       "module t;\n"
@@ -14,7 +13,6 @@ TEST(ParserSection7, FuncWithAssocArrayArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §7.9.10: Task with assoc array input and output.
 TEST(ParserSection7, TaskWithAssocArrayInOut) {
   auto r = Parse(
       "module t;\n"
@@ -25,4 +23,4 @@ TEST(ParserSection7, TaskWithAssocArrayInOut) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -32,4 +32,4 @@ TEST(ParserSection23, NestedModuleMultiple) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

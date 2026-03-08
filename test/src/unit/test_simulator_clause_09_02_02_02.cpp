@@ -145,7 +145,6 @@ TEST(SimCh4, AlwaysCombWithBeginEnd) {
   EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 7u);
 }
 
-// §9.2.2.2: always_comb triggers after initial at time zero.
 TEST(SimClause09_02_02_02, AlwaysCombTriggersAfterInitial) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -165,7 +164,6 @@ TEST(SimClause09_02_02_02, AlwaysCombTriggersAfterInitial) {
   EXPECT_EQ(b->value.ToUint64(), 99u);
 }
 
-// §9.2.2.2: always_comb retriggers when input changes.
 TEST(SimClause09_02_02_02, AlwaysCombRetriggersOnChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -188,7 +186,6 @@ TEST(SimClause09_02_02_02, AlwaysCombRetriggersOnChange) {
   EXPECT_EQ(b->value.ToUint64(), 11u);
 }
 
-// §9.2.2.2: always_comb with if/else mux pattern.
 TEST(SimClause09_02_02_02, AlwaysCombMuxPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -215,4 +212,4 @@ TEST(SimClause09_02_02_02, AlwaysCombMuxPattern) {
   EXPECT_EQ(y->value.ToUint64(), 22u);
 }
 
-}  // namespace
+}

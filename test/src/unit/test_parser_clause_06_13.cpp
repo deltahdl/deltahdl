@@ -7,7 +7,6 @@
 using namespace delta;
 namespace {
 
-// §6.13: void as function return type.
 TEST(ParserSection6, VoidFunctionReturn) {
   auto r = Parse(
       "module t;\n"
@@ -21,7 +20,6 @@ TEST(ParserSection6, VoidFunctionReturn) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-// §6.13: void function with body parses ok.
 TEST(ParserSection6, VoidFunctionWithBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -31,7 +29,6 @@ TEST(ParserSection6, VoidFunctionWithBody) {
               "endmodule\n"));
 }
 
-// §6.13: void function with arguments.
 TEST(ParserSection6, VoidFunctionWithArgs) {
   auto r = Parse(
       "module m;\n"
@@ -46,24 +43,20 @@ TEST(ParserSection6, VoidFunctionWithArgs) {
   ASSERT_EQ(item->func_args.size(), 1u);
 }
 
-// §6.13: void type has zero width.
 TEST(TypeEval, VoidTypeWidthIsZero) {
   DataType dt;
   dt.kind = DataTypeKind::kVoid;
   EXPECT_EQ(EvalTypeWidth(dt), 0u);
 }
 
-// §6.13: void is not integral.
 TEST(TypeEval, VoidNotIntegral) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kVoid));
 }
 
-// §6.13: void is not 4-state.
 TEST(TypeEval, VoidNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kVoid));
 }
 
-// §6.13: void function returning a value is an error.
 TEST(Elaboration, VoidFunctionReturnsValue_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -76,7 +69,6 @@ TEST(Elaboration, VoidFunctionReturnsValue_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.13: void function with bare return is ok.
 TEST(Elaboration, VoidFunctionBareReturn_Ok) {
   ElabFixture f;
   ElaborateSrc(
@@ -89,7 +81,6 @@ TEST(Elaboration, VoidFunctionBareReturn_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.13: void function with no return is ok.
 TEST(Elaboration, VoidFunctionNoReturn_Ok) {
   ElabFixture f;
   ElaborateSrc(
@@ -102,4 +93,4 @@ TEST(Elaboration, VoidFunctionNoReturn_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

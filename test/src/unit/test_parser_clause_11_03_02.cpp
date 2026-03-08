@@ -151,4 +151,4 @@ TEST(ParserSection11, OperatorPrecedenceCompareAndLogical) {
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
 
-}  // namespace
+}

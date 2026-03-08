@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §4.3: Process kind classification during elaboration ---
-
 TEST(ElabCh43, InitialBlockElaboratesToInitialProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -221,4 +219,4 @@ TEST(ElabCh43, ModuleWithOnlyContinuousAssignsHasNoProcesses) {
   EXPECT_GE(mod->assigns.size(), 2u);
 }
 
-}  // namespace
+}

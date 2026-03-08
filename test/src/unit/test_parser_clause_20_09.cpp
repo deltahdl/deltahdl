@@ -65,25 +65,22 @@ TEST(ParserAnnexD2, AnnexDOnehot) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §11.2.1: $countones with constant arg is constant.
 TEST(ConstExpr, CountonesConstantArg) {
   EvalFixture f;
   auto* e = ParseExprFrom("$countones(8'hFF)", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-// §11.2.1: $onehot with constant arg is constant.
 TEST(ConstExpr, OnehotConstantArg) {
   EvalFixture f;
   auto* e = ParseExprFrom("$onehot(8'h04)", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-// §11.2.1: $onehot0 with constant arg is constant.
 TEST(ConstExpr, Onehot0ConstantArg) {
   EvalFixture f;
   auto* e = ParseExprFrom("$onehot0(8'h00)", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-}  // namespace
+}

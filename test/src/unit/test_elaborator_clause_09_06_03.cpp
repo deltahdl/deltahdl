@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.6.3: Disable fork after join_any elaborates.
 TEST(ElabClause09_06_03, DisableForkAfterJoinAnyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -23,7 +22,6 @@ TEST(ElabClause09_06_03, DisableForkAfterJoinAnyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.6.3: Disable fork after join_none elaborates.
 TEST(ElabClause09_06_03, DisableForkAfterJoinNoneElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -42,7 +40,6 @@ TEST(ElabClause09_06_03, DisableForkAfterJoinNoneElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.6.3: Disable fork standalone (no preceding fork) elaborates.
 TEST(ElabClause09_06_03, DisableForkStandaloneElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -56,7 +53,6 @@ TEST(ElabClause09_06_03, DisableForkStandaloneElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.6.3: Disable fork in task elaborates.
 TEST(ElabClause09_06_03, DisableForkInTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -75,4 +71,4 @@ TEST(ElabClause09_06_03, DisableForkInTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

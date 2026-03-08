@@ -115,7 +115,6 @@ TEST(ParserSection8, ClassWithTask) {
   EXPECT_EQ(m->method->kind, ModuleItemKind::kTaskDecl);
 }
 
-// §8.6: Method call via dot notation parses correctly.
 TEST(ParserA86, MethodCallDotNotation) {
   auto r = Parse(
       "class Packet;\n"
@@ -135,7 +134,6 @@ TEST(ParserA86, MethodCallDotNotation) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §8.6: Automatic lifetime on class method is legal (default).
 TEST(ParserA86, MethodAutomaticLifetimeLegal) {
   ParseOk(
       "class C;\n"
@@ -144,7 +142,6 @@ TEST(ParserA86, MethodAutomaticLifetimeLegal) {
       "endclass\n");
 }
 
-// §8.6: No explicit lifetime on class method is legal (implicit automatic).
 TEST(ParserA86, MethodNoLifetimeLegal) {
   ParseOk(
       "class C;\n"
@@ -153,7 +150,6 @@ TEST(ParserA86, MethodNoLifetimeLegal) {
       "endclass\n");
 }
 
-// §8.6: Static lifetime on class function is illegal.
 TEST(ParserA86, FunctionStaticLifetimeError) {
   auto r = Parse(
       "class C;\n"
@@ -163,7 +159,6 @@ TEST(ParserA86, FunctionStaticLifetimeError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §8.6: Static lifetime on class task is illegal.
 TEST(ParserA86, TaskStaticLifetimeError) {
   auto r = Parse(
       "class C;\n"
@@ -173,8 +168,6 @@ TEST(ParserA86, TaskStaticLifetimeError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §8.6: Static class qualifier (static method) is NOT the same as static
-// lifetime and is legal.
 TEST(ParserA86, StaticClassQualifierLegal) {
   ParseOk(
       "class C;\n"
@@ -183,7 +176,6 @@ TEST(ParserA86, StaticClassQualifierLegal) {
       "endclass\n");
 }
 
-// §8.6: Method with both static qualifier and automatic lifetime is legal.
 TEST(ParserA86, StaticQualifierAutoLifetimeLegal) {
   ParseOk(
       "class C;\n"
@@ -192,4 +184,4 @@ TEST(ParserA86, StaticQualifierAutoLifetimeLegal) {
       "endclass\n");
 }
 
-}  // namespace
+}

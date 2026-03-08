@@ -1,4 +1,4 @@
-// §4.6
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -27,4 +27,4 @@ TEST(ParserSection4, Sec4_6_BlockingAssignOrdering) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

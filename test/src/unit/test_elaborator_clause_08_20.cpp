@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.20: Virtual method in base class is OK.
 TEST(ElabA820, VirtualMethodOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -15,7 +14,6 @@ TEST(ElabA820, VirtualMethodOk) {
              "endmodule\n"));
 }
 
-// §8.20: Virtual method override in derived is OK.
 TEST(ElabA820, VirtualOverrideOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -29,7 +27,6 @@ TEST(ElabA820, VirtualOverrideOk) {
              "endmodule\n"));
 }
 
-// §8.20: :initial and :extends mutually exclusive — error.
 TEST(ElabA820, InitialAndExtendsError) {
   EXPECT_FALSE(
       ElabOk("class C;\n"
@@ -40,7 +37,6 @@ TEST(ElabA820, InitialAndExtendsError) {
              "endmodule\n"));
 }
 
-// §8.20: :initial on method overriding virtual base method — error.
 TEST(ElabA820, InitialOverridesVirtualError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
@@ -54,7 +50,6 @@ TEST(ElabA820, InitialOverridesVirtualError) {
              "endmodule\n"));
 }
 
-// §8.20: :extends on method not overriding a virtual — error.
 TEST(ElabA820, ExtendsNoVirtualBaseError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
@@ -68,7 +63,6 @@ TEST(ElabA820, ExtendsNoVirtualBaseError) {
              "endmodule\n"));
 }
 
-// §8.20: Override :final method — error.
 TEST(ElabA820, OverrideFinalError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
@@ -82,7 +76,6 @@ TEST(ElabA820, OverrideFinalError) {
              "endmodule\n"));
 }
 
-// §8.20: :initial on non-virtual base method is OK.
 TEST(ElabA820, InitialNonVirtualBaseOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -96,7 +89,6 @@ TEST(ElabA820, InitialNonVirtualBaseOk) {
              "endmodule\n"));
 }
 
-// §8.20: :extends :final combined is OK when overriding virtual.
 TEST(ElabA820, ExtendsFinalOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -110,4 +102,4 @@ TEST(ElabA820, ExtendsFinalOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

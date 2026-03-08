@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -9,7 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §9.2.2.2.2: always @* elaborates as kAlways, not kAlwaysComb.
 TEST(ElabClause09_02_02_02_02, AlwaysStarIsAlwaysKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,7 +23,6 @@ TEST(ElabClause09_02_02_02_02, AlwaysStarIsAlwaysKind) {
   EXPECT_EQ(proc.kind, RtlirProcessKind::kAlways);
 }
 
-// §9.2.2.2.2: always @* allows multiple processes to assign same variable.
 TEST(ElabClause09_02_02_02_02, AlwaysStarNoMultiDriverError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -38,7 +36,6 @@ TEST(ElabClause09_02_02_02_02, AlwaysStarNoMultiDriverError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.2.2.2.2: always @* can contain timing controls (no error).
 TEST(ElabClause09_02_02_02_02, AlwaysStarAllowsTimingControl) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,7 +48,6 @@ TEST(ElabClause09_02_02_02_02, AlwaysStarAllowsTimingControl) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.2.2.2.2: always_comb rejects timing controls (contrast with always @*).
 TEST(ElabClause09_02_02_02_02, AlwaysCombRejectsTimingControl) {
   ElabFixture f;
   ElaborateSrc(
@@ -149,7 +145,6 @@ TEST(SimCh9d, AlwaysStarEquivAlwaysComb) {
   EXPECT_EQ(y_star->value.ToUint64(), y_comb->value.ToUint64());
 }
 
-// §9.4.2: Event control in always_comb is an error.
 TEST(ElabClause09_04_02, EventControlInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -161,7 +156,6 @@ TEST(ElabClause09_04_02, EventControlInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.4.3: Wait in always_comb is an error (timing control).
 TEST(ElabClause09_04_03, WaitInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -173,4 +167,4 @@ TEST(ElabClause09_04_03, WaitInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

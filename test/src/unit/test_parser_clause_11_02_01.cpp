@@ -99,29 +99,24 @@ TEST(ParserA84, ConstantSelectParameterExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §11.2.1: IsConstantExpr — integer literal is constant.
 TEST(ConstExpr, IntLiteralIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("42", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-// §11.2.1: IsConstantExpr — real literal is constant.
 TEST(ConstExpr, RealLiteralIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("3.14", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-// §11.2.1: IsConstantExpr — string literal is constant.
 TEST(ConstExpr, StringLiteralIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("\"hello\"", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-// §11.2.1: IsConstantExpr — parameter identifier is constant
-// when resolved in scope.
 TEST(ConstExpr, ParameterIdentifierIsConstant) {
   EvalFixture f;
   ScopeMap scope = {{"WIDTH", 8}};
@@ -129,71 +124,60 @@ TEST(ConstExpr, ParameterIdentifierIsConstant) {
   EXPECT_TRUE(IsConstantExpr(e, scope));
 }
 
-// §11.2.1: IsConstantExpr — unresolved identifier is not constant.
 TEST(ConstExpr, UnresolvedIdentifierNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("x", f);
   EXPECT_FALSE(IsConstantExpr(e));
 }
 
-// §11.2.1: IsConstantExpr — unary on constant is constant.
 TEST(ConstExpr, UnaryOnConstantIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("-42", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-// §11.2.1: IsConstantExpr — binary on constants is constant.
 TEST(ConstExpr, BinaryOnConstantsIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("3 + 4", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-// §11.2.1: IsConstantExpr — binary with non-constant operand is not constant.
 TEST(ConstExpr, BinaryWithNonConstantNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("x + 4", f);
   EXPECT_FALSE(IsConstantExpr(e));
 }
 
-// §11.2.1: IsConstantExpr — ternary on constants is constant.
 TEST(ConstExpr, TernaryOnConstantsIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("1 ? 10 : 20", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-// §11.2.1: IsConstantExpr — concatenation of constants is constant.
 TEST(ConstExpr, ConcatenationOfConstantsIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("{4'd1, 4'd2}", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-// §11.2.1: IsConstantExpr — replication of constants is constant.
 TEST(ConstExpr, ReplicationOfConstantsIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("{4{1'b1}}", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-// §11.2.1: Constant system function call — $clog2 with constant arg.
 TEST(ConstExpr, Clog2ConstantSysFuncIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$clog2(8)", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-// §11.2.1: Constant system function call — $clog2 with non-constant arg
-// is not constant.
 TEST(ConstExpr, Clog2NonConstantArgNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$clog2(x)", f);
   EXPECT_FALSE(IsConstantExpr(e));
 }
 
-// §11.2.1: ConstEvalReal — non-constant returns nullopt.
 TEST(ConstEvalReal, NonConstantReturnsNullopt) {
   EvalFixture f;
   auto* e = ParseExprFrom("x", f);
@@ -201,11 +185,10 @@ TEST(ConstEvalReal, NonConstantReturnsNullopt) {
   EXPECT_FALSE(val.has_value());
 }
 
-// §11.2.1: Unbased unsized literal is a constant expression.
 TEST(ConstExpr, UnbasedUnsizedLiteralIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("'1", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-}  // namespace
+}

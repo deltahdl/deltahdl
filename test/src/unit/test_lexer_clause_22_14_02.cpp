@@ -17,4 +17,4 @@ TEST(Lexer, KeywordVersion_1364_1995_AutomaticIsNotKeyword) {
   EXPECT_FALSE(kw.has_value());
 }
 
-}  // namespace
+}

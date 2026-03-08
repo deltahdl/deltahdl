@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §3.1: Design elements are introduced by the keywords module, program,
-// interface, checker, package, primitive, and config.
-
 TEST(LexerClause03, Cl3_1_ModuleKeyword) {
   auto r = LexOne("module");
   EXPECT_EQ(r.token.kind, TokenKind::kKwModule);
@@ -87,4 +84,4 @@ TEST(LexerClause03, Cl3_1_DesignElementKeywordsAreNotIdentifiers) {
   }
 }
 
-}  // namespace
+}

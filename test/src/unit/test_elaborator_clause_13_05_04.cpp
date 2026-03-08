@@ -30,7 +30,6 @@ TEST(ElabA82, NamedArgsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.5.4: Named arg with unknown parameter name is an error.
 TEST(Elab1354, UnknownNamedArgError) {
   ElabFixture f;
   ElaborateSrc(
@@ -43,7 +42,6 @@ TEST(Elab1354, UnknownNamedArgError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.5.4: Mixed positional then named is OK.
 TEST(Elab1354, MixedPositionalNamedOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -59,4 +57,4 @@ TEST(Elab1354, MixedPositionalNamedOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

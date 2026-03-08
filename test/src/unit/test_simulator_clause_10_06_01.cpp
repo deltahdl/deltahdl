@@ -78,7 +78,6 @@ TEST(StmtExec, AssignDeassignBlockingAssign) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-// §10.6.1: End-to-end assign overrides procedural assignments.
 TEST(SimCh10d, AssignOverridesProceduralAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -99,7 +98,6 @@ TEST(SimCh10d, AssignOverridesProceduralAssign) {
   EXPECT_TRUE(q->is_forced);
 }
 
-// §10.6.1: Deassign then procedural assign works normally.
 TEST(SimCh10d, DeassignThenProceduralAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -122,7 +120,6 @@ TEST(SimCh10d, DeassignThenProceduralAssign) {
   EXPECT_EQ(q->value.ToUint64(), 77u);
 }
 
-// §10.6.1: Deassign retains value until next procedural assignment.
 TEST(SimCh10d, DeassignRetainsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -141,11 +138,10 @@ TEST(SimCh10d, DeassignRetainsValue) {
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_FALSE(q->is_forced);
-  // Value holds at 50 after deassign — no procedural assign changes it.
+
   EXPECT_EQ(q->value.ToUint64(), 50u);
 }
 
-// §10.6.1: Second assign to same variable replaces first.
 TEST(SimCh10d, ReAssignReplacesFirst) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -167,7 +163,6 @@ TEST(SimCh10d, ReAssignReplacesFirst) {
   EXPECT_TRUE(q->is_forced);
 }
 
-// §10.6.1: Assign with expression RHS.
 TEST(SimCh10d, AssignExpressionRhs) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -189,4 +184,4 @@ TEST(SimCh10d, AssignExpressionRhs) {
   EXPECT_EQ(c->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

@@ -38,4 +38,4 @@ TEST(WiredLogic, WiredOrBothZero) {
   EXPECT_EQ(result.value, Val4::kV0);
 }
 
-}  // namespace
+}

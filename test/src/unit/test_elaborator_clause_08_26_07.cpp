@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.26.7: Virtual class partially implements interface — OK.
 TEST(ElabA8267, VirtualClassPartialImplOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfClass;\n"
@@ -21,7 +20,6 @@ TEST(ElabA8267, VirtualClassPartialImplOk) {
              "endmodule\n"));
 }
 
-// §8.26.7: Concrete class completes partial implementation — OK.
 TEST(ElabA8267, ConcreteClassCompletesPartialOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfClass;\n"
@@ -43,7 +41,6 @@ TEST(ElabA8267, ConcreteClassCompletesPartialOk) {
              "endmodule\n"));
 }
 
-// §8.26.7: Virtual class with no implementation — OK (all remain pure).
 TEST(ElabA8267, VirtualClassNoImplOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfClass;\n"
@@ -55,4 +52,4 @@ TEST(ElabA8267, VirtualClassNoImplOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

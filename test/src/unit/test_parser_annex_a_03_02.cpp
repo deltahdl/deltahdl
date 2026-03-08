@@ -143,4 +143,4 @@ TEST(ParserA302, PullupStrength_SingleStrength1_MultipleInstances) {
   EXPECT_EQ(gates[1]->drive_strength1, 3u);
 }
 
-}  // namespace
+}

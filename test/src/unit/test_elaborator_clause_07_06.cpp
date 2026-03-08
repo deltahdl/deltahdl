@@ -14,7 +14,6 @@ TEST(ParserA25, UnsizedDimWithInitInferSize) {
   EXPECT_EQ(mod->variables[0].unpacked_size, 3u);
 }
 
-// §7.6: Compatible array types in continuous assignment — OK.
 TEST(Elaboration, ArrayAssignCompatibleTypes) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -23,7 +22,6 @@ TEST(Elaboration, ArrayAssignCompatibleTypes) {
              "endmodule\n"));
 }
 
-// §7.6: Fixed-size array size mismatch — error.
 TEST(Elaboration, ArrayAssignSizeMismatch) {
   ElabFixture f;
   ElaborateSrc(
@@ -35,7 +33,6 @@ TEST(Elaboration, ArrayAssignSizeMismatch) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.6: Array element type mismatch — error.
 TEST(Elaboration, ArrayAssignTypeMismatch) {
   ElabFixture f;
   ElaborateSrc(
@@ -48,7 +45,6 @@ TEST(Elaboration, ArrayAssignTypeMismatch) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.6: Same element type, same size — no error.
 TEST(Elaboration, ArrayAssignSameTypeSameSize) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -57,7 +53,6 @@ TEST(Elaboration, ArrayAssignSameTypeSameSize) {
              "endmodule\n"));
 }
 
-// §7.6: Packed array treated as vector — vector to packed array is OK.
 TEST(Elaboration, PackedArrayVectorAssign) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -67,7 +62,6 @@ TEST(Elaboration, PackedArrayVectorAssign) {
              "endmodule\n"));
 }
 
-// §7.6: Wire-to-variable assignment compatibility.
 TEST(Elaboration, WireToVarArrayAssign) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -77,7 +71,6 @@ TEST(Elaboration, WireToVarArrayAssign) {
              "endmodule\n"));
 }
 
-// §11.2.2: Unpacked array data objects can be used as aggregate expressions.
 TEST(AggregateExpr, UnpackedArrayAssignment) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -91,4 +84,4 @@ TEST(AggregateExpr, UnpackedArrayAssignment) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

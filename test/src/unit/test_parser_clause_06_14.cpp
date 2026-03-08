@@ -7,19 +7,16 @@ using namespace delta;
 
 namespace {
 
-// §6.14: chandle width is at least pointer-sized (64-bit).
 TEST(TypeEval, ChandleWidth64) {
   DataType dt;
   dt.kind = DataTypeKind::kChandle;
   EXPECT_EQ(EvalTypeWidth(dt), 64u);
 }
 
-// §6.14: chandle is not integral.
 TEST(TypeEval, ChandleNotIntegral) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kChandle));
 }
 
-// §6.14: chandle is not 4-state.
 TEST(TypeEval, ChandleNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kChandle));
 }
@@ -75,7 +72,6 @@ TEST(ParserSection6, ChandleVarDecl) {
   EXPECT_EQ(item->name, "ch");
 }
 
-// §6.14: chandle as function return type.
 TEST(ParserSection6, ChandleFunctionReturn) {
   auto r = Parse(
       "module m;\n"
@@ -90,7 +86,6 @@ TEST(ParserSection6, ChandleFunctionReturn) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kChandle);
 }
 
-// §6.14: chandle as function argument.
 TEST(ParserSection6, ChandleFunctionArg) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -99,7 +94,6 @@ TEST(ParserSection6, ChandleFunctionArg) {
               "endmodule\n"));
 }
 
-// §6.14: chandle assignment to null.
 TEST(ParserSection6, ChandleAssignNull) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -108,7 +102,6 @@ TEST(ParserSection6, ChandleAssignNull) {
               "endmodule\n"));
 }
 
-// §6.14: chandle equality with null.
 TEST(ParserSection6, ChandleEqualityWithNull) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -118,4 +111,4 @@ TEST(ParserSection6, ChandleEqualityWithNull) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

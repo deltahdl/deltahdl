@@ -85,8 +85,6 @@ TEST(ParserSection22, TimescaleModuleNamePreserved) {
   EXPECT_EQ(r.cu->modules[0]->name, "foo");
 }
 
-// --- §22.7: precision must be at least as precise as unit ---
-
 TEST(Preprocessor, Timescale_PrecisionLessPreciseThanUnit) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -100,8 +98,6 @@ TEST(Preprocessor, Timescale_PrecisionEqualToUnit) {
   PreprocessWithPP("`timescale 1ns / 1ns\n", f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
 }
-
-// --- §22.7: invalid magnitudes ---
 
 TEST(Preprocessor, Timescale_InvalidMagnitude5) {
   PreprocFixture f;
@@ -123,8 +119,6 @@ TEST(Preprocessor, Timescale_InvalidMagnitude1000) {
   PreprocessWithPP("`timescale 1000ns / 1ns\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §22.7: all valid unit strings ---
 
 TEST(Preprocessor, Timescale_UnitS) {
   PreprocFixture f;
@@ -158,8 +152,6 @@ TEST(Preprocessor, Timescale_UnitFs) {
   EXPECT_EQ(pp.CurrentTimescale().unit, TimeUnit::kFs);
 }
 
-// --- §22.7: spaces between magnitude and unit ---
-
 TEST(Preprocessor, Timescale_SpaceBetweenMagnitudeAndUnit) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -168,8 +160,6 @@ TEST(Preprocessor, Timescale_SpaceBetweenMagnitudeAndUnit) {
   EXPECT_EQ(pp.CurrentTimescale().unit, TimeUnit::kNs);
   EXPECT_EQ(pp.CurrentTimescale().precision, TimeUnit::kPs);
 }
-
-// --- §22.7: later timescale overrides earlier ---
 
 TEST(Preprocessor, Timescale_LaterOverridesEarlier) {
   PreprocFixture f;
@@ -180,16 +170,12 @@ TEST(Preprocessor, Timescale_LaterOverridesEarlier) {
   EXPECT_EQ(pp.CurrentTimescale().magnitude, 10);
 }
 
-// --- §22.7: illegal inside a design element ---
-
 TEST(Preprocessor, Timescale_IllegalInsideDesignElement) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("module foo;\n`timescale 1ns / 1ps\nendmodule\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §22.7: missing slash (no precision) ---
 
 TEST(Preprocessor, Timescale_MissingSlash) {
   PreprocFixture f;
@@ -198,16 +184,12 @@ TEST(Preprocessor, Timescale_MissingSlash) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §22.7: missing precision after slash ---
-
 TEST(Preprocessor, Timescale_MissingPrecisionAfterSlash) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1ns /\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §22.7: global precision tracks finest across multiple timescales ---
 
 TEST(Preprocessor, Timescale_GlobalPrecisionTracksFines) {
   PreprocFixture f;
@@ -220,8 +202,6 @@ TEST(Preprocessor, Timescale_GlobalPrecisionTracksFines) {
   EXPECT_EQ(pp.GlobalPrecision(), TimeUnit::kPs);
 }
 
-// --- §22.7: invalid precision unit ---
-
 TEST(Preprocessor, Timescale_InvalidPrecisionUnit) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -229,10 +209,8 @@ TEST(Preprocessor, Timescale_InvalidPrecisionUnit) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §22.7: precision-magnitude must not exceed unit-magnitude ---
-
 TEST(Preprocessor, Timescale_PrecisionSameUnitLargerMagnitudeError) {
-  // 10ns is less precise than 1ns — should error.
+
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1ns / 10ns\n", f, pp);
@@ -240,8 +218,7 @@ TEST(Preprocessor, Timescale_PrecisionSameUnitLargerMagnitudeError) {
 }
 
 TEST(Preprocessor, Timescale_PrecisionSameUnitSmallerMagnitudeOk) {
-  // 1ns unit, 1ns precision — same, should pass.
-  // 10ns unit, 1ns precision — precision is finer, should pass.
+
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 10ns / 1ns\n", f, pp);
@@ -256,17 +233,15 @@ TEST(Preprocessor, Timescale_100nsUnit10nsPrecisionOk) {
 }
 
 TEST(Preprocessor, Timescale_10nsUnit100nsError) {
-  // 100ns is less precise than 10ns.
+
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 10ns / 100ns\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §22.7: global precision tracking with magnitude ---
-
 TEST(Preprocessor, Timescale_GlobalPrecisionWithMagnitude) {
-  // 10ps is less precise than 1ps — global should remain 1ps.
+
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP(
@@ -276,8 +251,6 @@ TEST(Preprocessor, Timescale_GlobalPrecisionWithMagnitude) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(pp.GlobalPrecision(), TimeUnit::kPs);
 }
-
-// --- §22.7: resetall then timescale re-establishment ---
 
 TEST(Preprocessor, Timescale_ResetallThenTimescale) {
   PreprocFixture f;
@@ -304,4 +277,4 @@ TEST(Preprocessor, Timescale_ResetallClearsTimescale) {
   EXPECT_FALSE(pp.HasTimescale());
 }
 
-}  // namespace
+}

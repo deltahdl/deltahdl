@@ -18,7 +18,6 @@ static Logic4Vec MakeAllZ(Arena& arena, uint32_t width) {
 
 namespace {
 
-// §6.6.4.2: Charge decays to X after decay_ticks elapse.
 TEST(ChargeDecay, DecayChangesValueToX) {
   Arena arena;
   Scheduler sched(arena);
@@ -38,7 +37,6 @@ TEST(ChargeDecay, DecayChangesValueToX) {
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
-// §6.6.4.2: Ideal capacitive state — no decay when decay_ticks is zero.
 TEST(ChargeDecay, NoDecayWhenDecayTicksZero) {
   Arena arena;
   Scheduler sched(arena);
@@ -54,7 +52,6 @@ TEST(ChargeDecay, NoDecayWhenDecayTicksZero) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §6.6.4.2: Decay cancelled when drivers turn back on.
 TEST(ChargeDecay, DecayCancelledWhenDriverReturns) {
   Arena arena;
   Scheduler sched(arena);
@@ -76,7 +73,6 @@ TEST(ChargeDecay, DecayCancelledWhenDriverReturns) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §6.6.4.2: No decay scheduled when no scheduler is provided.
 TEST(ChargeDecay, NoDecayScheduledWithoutScheduler) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -91,7 +87,6 @@ TEST(ChargeDecay, NoDecayScheduledWithoutScheduler) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §6.6.4.2: Charge decay from value 0 transitions to X.
 TEST(ChargeDecay, DecayFromZeroToX) {
   Arena arena;
   Scheduler sched(arena);
@@ -111,7 +106,6 @@ TEST(ChargeDecay, DecayFromZeroToX) {
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
-// §6.6.4.2: Multiple decay cycles — decay starts, is cancelled, then restarts.
 TEST(ChargeDecay, MultipleCyclesDecayCancelRestart) {
   Arena arena;
   Scheduler sched(arena);
@@ -122,27 +116,22 @@ TEST(ChargeDecay, MultipleCyclesDecayCancelRestart) {
   net.resolved = var;
   net.decay_ticks = 50;
 
-  // First cycle: drivers go Z, decay is scheduled.
   net.drivers.push_back(MakeAllZ(arena, 8));
   net.Resolve(arena, &sched);
   ASSERT_TRUE(sched.HasEvents());
 
-  // Driver returns — cancels first decay.
   net.drivers[0] = MakeLogic4VecVal(arena, 8, 77);
   net.Resolve(arena, &sched);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 
-  // Second cycle: drivers go Z again, new decay is scheduled.
   net.drivers[0] = MakeAllZ(arena, 8);
   net.Resolve(arena, &sched);
 
-  // Run scheduler — only the second decay fires.
   sched.Run();
   EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
-// §6.6.4.2: Ideal capacitive state — trireg retains value indefinitely.
 TEST(ChargeDecay, IdealCapacitiveRetainsValue) {
   Arena arena;
   Scheduler sched(arena);
@@ -153,7 +142,6 @@ TEST(ChargeDecay, IdealCapacitiveRetainsValue) {
   net.resolved = var;
   net.decay_ticks = 0;
 
-  // Multiple resolves with all-Z drivers — value never changes.
   net.drivers.push_back(MakeAllZ(arena, 8));
   net.Resolve(arena, &sched);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
@@ -164,4 +152,4 @@ TEST(ChargeDecay, IdealCapacitiveRetainsValue) {
   EXPECT_FALSE(sched.HasEvents());
 }
 
-}  // namespace
+}

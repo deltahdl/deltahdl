@@ -1,4 +1,9 @@
-// Non-LRM tests
+
+
+#include <cstdint>
+#include <initializer_list>
+#include <string>
+#include <utility>
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -7,8 +12,21 @@ using namespace delta;
 
 namespace {
 
-// §10.10.1: Unpacked array concat vs assignment pattern produce the same
-// result.
+void RunAndExpectArray(
+    SimFixture& f, RtlirDesign* design, const std::string& name,
+    std::initializer_list<std::pair<int, uint64_t>> expected) {
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  for (const auto& [idx, val] : expected) {
+    auto key = name + "[" + std::to_string(idx) + "]";
+    auto* var = f.ctx.FindVariable(key);
+    ASSERT_NE(var, nullptr) << key;
+    EXPECT_EQ(var->value.ToUint64(), val) << key;
+  }
+}
+
 TEST(SimCh10j, ConcatAndPatternEquivalent) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -36,7 +54,6 @@ TEST(SimCh10j, ConcatAndPatternEquivalent) {
   }
 }
 
-// §10.10: Unpacked array concatenation from scalar elements.
 TEST(SimCh10j, UnpackedArrayConcatScalarElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -47,22 +64,9 @@ TEST(SimCh10j, UnpackedArrayConcatScalarElements) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  auto* e2 = f.ctx.FindVariable("arr[2]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  ASSERT_NE(e2, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 1u);
-  EXPECT_EQ(e1->value.ToUint64(), 2u);
-  EXPECT_EQ(e2->value.ToUint64(), 3u);
+  RunAndExpectArray(f, design, "arr", {{0, 1}, {1, 2}, {2, 3}});
 }
 
-// §10.10: Array items in unpacked array concatenation elaborate.
 TEST(ArrayItemExpansionElaborates, ArrayItemExpansionElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -74,7 +78,6 @@ TEST(ArrayItemExpansionElaborates, ArrayItemExpansionElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-// §10.10: Mixed scalar and array items in unpacked array concatenation.
 TEST(UnpackedArrayConcatMixed, UnpackedArrayConcatMixed) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -101,7 +104,6 @@ TEST(UnpackedArrayConcatMixed, UnpackedArrayConcatMixed) {
   EXPECT_EQ(b2->value.ToUint64(), 3u);
 }
 
-// §10.10: Unpacked array concatenation with descending-range target.
 TEST(UnpackedArrayConcatDescending, UnpackedArrayConcatDescending) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -112,22 +114,9 @@ TEST(UnpackedArrayConcatDescending, UnpackedArrayConcatDescending) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  auto* e2 = f.ctx.FindVariable("arr[2]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  ASSERT_NE(e2, nullptr);
-  EXPECT_EQ(e2->value.ToUint64(), 10u);
-  EXPECT_EQ(e1->value.ToUint64(), 20u);
-  EXPECT_EQ(e0->value.ToUint64(), 30u);
+  RunAndExpectArray(f, design, "arr", {{2, 10}, {1, 20}, {0, 30}});
 }
 
-// §10.10: Mixed scalars and arrays in unpacked array concatenation.
 TEST(MixedScalarArrayConcatenation, MixedScalarArrayElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -139,4 +128,4 @@ TEST(MixedScalarArrayConcatenation, MixedScalarArrayElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}  // namespace
+}

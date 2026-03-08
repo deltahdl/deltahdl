@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.8.3: Class-indexed associative array is recognized as associative.
 TEST(Elaboration, AssocArrayClassIndex_IsAssoc) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -28,7 +27,6 @@ TEST(Elaboration, AssocArrayClassIndex_IsAssoc) {
   EXPECT_TRUE(found);
 }
 
-// §7.8.3: Class-indexed associative array has is_class_index set.
 TEST(Elaboration, AssocArrayClassIndex_IsClassIndex) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -53,8 +51,6 @@ TEST(Elaboration, AssocArrayClassIndex_IsClassIndex) {
   EXPECT_TRUE(found);
 }
 
-// §7.8.3: Class-indexed assoc array has 64-bit index width (handles are
-// 64-bit).
 TEST(Elaboration, AssocArrayClassIndex_IndexWidth64) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -78,7 +74,6 @@ TEST(Elaboration, AssocArrayClassIndex_IndexWidth64) {
   EXPECT_TRUE(found);
 }
 
-// §7.8.3: Class-indexed assoc array is not a string index.
 TEST(Elaboration, AssocArrayClassIndex_NotStringIndex) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -102,7 +97,6 @@ TEST(Elaboration, AssocArrayClassIndex_NotStringIndex) {
   EXPECT_TRUE(found);
 }
 
-// §7.8.3: Assignment between arrays with same class index type is OK.
 TEST(Elaboration, AssocArrayClassIndex_SameTypeAssignOk) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
@@ -115,7 +109,6 @@ TEST(Elaboration, AssocArrayClassIndex_SameTypeAssignOk) {
              "endmodule\n"));
 }
 
-// §7.8.3: Assignment between arrays with different class index types is error.
 TEST(Elaboration, AssocArrayClassIndex_DifferentTypeAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -134,7 +127,6 @@ TEST(Elaboration, AssocArrayClassIndex_DifferentTypeAssignError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.8.3: Assignment between class-indexed and int-indexed arrays is error.
 TEST(Elaboration, AssocArrayClassIndex_MixedTypeAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -150,4 +142,4 @@ TEST(Elaboration, AssocArrayClassIndex_MixedTypeAssignError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

@@ -132,4 +132,4 @@ TEST(EvalOpXZ, IdentifierStringPropagation) {
   EXPECT_TRUE(result.is_string);
 }
 
-}  // namespace
+}

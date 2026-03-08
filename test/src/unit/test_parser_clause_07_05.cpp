@@ -39,4 +39,4 @@ TEST(ParserSection7, DynamicArrayMultiDim) {
   EXPECT_EQ(item->name, "mem");
 }
 
-}  // namespace
+}

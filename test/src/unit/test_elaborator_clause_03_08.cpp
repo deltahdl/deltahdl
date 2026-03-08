@@ -2,8 +2,6 @@
 
 namespace {
 
-// §3.8: Subroutines — tasks and functions.
-
 TEST(ElabClause03, Cl3_8_FunctionWithReturnElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -38,4 +36,4 @@ TEST(ElabClause03, Cl3_8_TaskAndFunctionCoexistElaborate) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

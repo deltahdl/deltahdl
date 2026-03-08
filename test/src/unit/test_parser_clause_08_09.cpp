@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.9: Static property declaration parses correctly.
 TEST(ParserA89, StaticPropertyDeclaration) {
   auto r = Parse(
       "class Packet;\n"
@@ -20,7 +19,6 @@ TEST(ParserA89, StaticPropertyDeclaration) {
   EXPECT_TRUE(cls->members[0]->is_static);
 }
 
-// §8.9: Static property with initializer.
 TEST(ParserA89, StaticPropertyWithInitializer) {
   auto r = Parse(
       "class Packet;\n"
@@ -34,7 +32,6 @@ TEST(ParserA89, StaticPropertyWithInitializer) {
   EXPECT_NE(cls->members[0]->init_expr, nullptr);
 }
 
-// §8.9: Mix of static and instance properties.
 TEST(ParserA89, MixedStaticAndInstanceProperties) {
   auto r = Parse(
       "class C;\n"
@@ -54,7 +51,6 @@ TEST(ParserA89, MixedStaticAndInstanceProperties) {
   EXPECT_EQ(cls->members[2]->name, "name");
 }
 
-// §8.9: Static property accessed via instance dot notation.
 TEST(ParserA89, StaticPropertyAccessViaInstance) {
   ParseOk(
       "class Packet;\n"
@@ -69,7 +65,6 @@ TEST(ParserA89, StaticPropertyAccessViaInstance) {
       "endmodule\n");
 }
 
-// §8.9: Static property accessed via class scope resolution.
 TEST(ParserA89, StaticPropertyAccessViaScope) {
   ParseOk(
       "class Packet;\n"
@@ -83,4 +78,4 @@ TEST(ParserA89, StaticPropertyAccessViaScope) {
       "endmodule\n");
 }
 
-}  // namespace
+}

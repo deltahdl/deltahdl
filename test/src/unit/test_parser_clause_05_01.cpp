@@ -4,11 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §5.1: Clause 5 covers lexical tokens, literals, built-in method calls,
-// and attributes. Verify the parser handles all four areas.
-
-// --- Area 1: Lexical tokens ---
-
 TEST(ParserClause05, Cl5_1_SourceWithAllTokenCategoriesParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -34,8 +29,6 @@ TEST(ParserClause05, Cl5_1_CommentsDoNotAffectParseResult) {
   ASSERT_EQ(without.cu->modules.size(), 1u);
   EXPECT_EQ(with.cu->modules[0]->name, without.cu->modules[0]->name);
 }
-
-// --- Area 2: Literals ---
 
 TEST(ParserClause05, Cl5_1_IntegerLiteralInExpression) {
   EXPECT_TRUE(
@@ -76,7 +69,7 @@ TEST(ParserClause05, Cl5_1_UnbasedUnsizedLiteralInExpression) {
 }
 
 TEST(ParserClause05, Cl5_1_ArrayLiteralParses) {
-  // §5.11: array literals use assignment pattern syntax '{...}
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int arr [0:1];\n"
@@ -85,7 +78,7 @@ TEST(ParserClause05, Cl5_1_ArrayLiteralParses) {
 }
 
 TEST(ParserClause05, Cl5_1_StructureLiteralParses) {
-  // §5.10: structure literals use assignment pattern syntax '{...}
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; int b; } ab_t;\n"
@@ -126,8 +119,6 @@ TEST(ParserClause05, Cl5_1_EscapedIdentifierInExpression) {
               "endmodule\n"));
 }
 
-// --- Area 3: Built-in method calls ---
-
 TEST(ParserClause05, Cl5_1_SystemTaskCallParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -147,7 +138,7 @@ TEST(ParserClause05, Cl5_1_SystemFunctionInExpression) {
 }
 
 TEST(ParserClause05, Cl5_1_BuiltinMethodCallParses) {
-  // §5.13: built-in methods use dot notation
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int q[$];\n"
@@ -157,7 +148,7 @@ TEST(ParserClause05, Cl5_1_BuiltinMethodCallParses) {
 }
 
 TEST(ParserClause05, Cl5_1_BuiltinMethodCallWithoutParensParses) {
-  // §5.13: empty parentheses are optional for no-argument methods
+
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int q[$];\n"
@@ -165,8 +156,6 @@ TEST(ParserClause05, Cl5_1_BuiltinMethodCallWithoutParensParses) {
               "  initial sz = q.size;\n"
               "endmodule\n"));
 }
-
-// --- Area 4: Attributes ---
 
 TEST(ParserClause05, Cl5_1_AttributeOnModuleParses) {
   auto r = Parse(
@@ -201,8 +190,6 @@ TEST(ParserClause05, Cl5_1_MultipleAttributesOnModule) {
   EXPECT_GE(r.cu->modules[0]->attrs.size(), 2u);
 }
 
-// --- Integration: all four areas combined ---
-
 TEST(ParserClause05, Cl5_1_AllFourAreasInOneParse) {
   EXPECT_TRUE(
       ParseOk("(* optimize *) module t;\n"
@@ -214,8 +201,6 @@ TEST(ParserClause05, Cl5_1_AllFourAreasInOneParse) {
               "endmodule\n"));
 }
 
-// --- Error conditions ---
-
 TEST(ParserClause05, Cl5_1_UnterminatedAttributeIsError) {
   EXPECT_FALSE(ParseOk("(* missing_end module t; endmodule"));
 }
@@ -224,4 +209,4 @@ TEST(ParserClause05, Cl5_1_EmptyAttributeIsError) {
   EXPECT_FALSE(ParseOk("(* *) module t; endmodule"));
 }
 
-}  // namespace
+}

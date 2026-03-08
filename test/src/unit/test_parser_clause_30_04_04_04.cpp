@@ -87,4 +87,4 @@ TEST(ParserSection28, Sec28_12_IfnonePath) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
-}  // namespace
+}

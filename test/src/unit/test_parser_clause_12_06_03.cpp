@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §12.6.3: matches in ternary predicate parses correctly.
 TEST(ParserA60703, MatchesInTernary) {
   auto r = Parse(
       "module m;\n"
@@ -16,7 +15,6 @@ TEST(ParserA60703, MatchesInTernary) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §12.6.3: matches with &&& in ternary predicate.
 TEST(ParserA60703, MatchesWithGuardInTernary) {
   auto r = Parse(
       "module m;\n"
@@ -28,7 +26,6 @@ TEST(ParserA60703, MatchesWithGuardInTernary) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §12.6.3: matches with wildcard pattern in ternary.
 TEST(ParserA60703, MatchesWildcardInTernary) {
   auto r = Parse(
       "module m;\n"
@@ -40,4 +37,4 @@ TEST(ParserA60703, MatchesWildcardInTernary) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

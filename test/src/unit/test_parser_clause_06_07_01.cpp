@@ -705,7 +705,6 @@ TEST(ParserSection6, Sec6_7_1_Supply1WithRange) {
               "endmodule\n"));
 }
 
-// §6.7.1: Net type keyword shall not be followed directly by 'reg'.
 TEST(ParserSection6, Sec6_7_1_TriRegDirectlyIsError) {
   EXPECT_FALSE(
       ParseOk("module t;\n"
@@ -727,7 +726,6 @@ TEST(ParserSection6, Sec6_7_1_WandRegDirectlyIsError) {
               "endmodule\n"));
 }
 
-// 'reg' is OK when there are lexical elements between net keyword and 'reg'.
 TEST(ParserSection6, Sec6_7_1_WireVectoredRegOk) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -742,7 +740,6 @@ TEST(ParserSection6, Sec6_7_1_WireDriveStrengthRegOk) {
               "endmodule\n"));
 }
 
-// Identifier 'reg_name' is not the keyword 'reg' — should parse fine.
 TEST(ParserSection6, Sec6_7_1_IdentifierStartingWithRegOk) {
   auto r = Parse(
       "module t;\n"
@@ -756,7 +753,6 @@ TEST(ParserSection6, Sec6_7_1_IdentifierStartingWithRegOk) {
   EXPECT_EQ(item->name, "reg_name");
 }
 
-// §6.7.1: Trireg with charge strength — default to medium.
 TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthLarge) {
   auto r = Parse(
       "module t;\n"
@@ -772,7 +768,6 @@ TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthLarge) {
   EXPECT_EQ(item->name, "cap1");
 }
 
-// §6.7.1: Net with 3-value delay (rise, fall, decay).
 TEST(ParserSection6, Sec6_7_1_Delay3RiseFallDecay) {
   auto r = Parse(
       "module t;\n"
@@ -853,7 +848,6 @@ TEST(ParserSection6, TriregChargeStrengthSmall) {
   EXPECT_EQ(item->data_type.charge_strength, 1);
 }
 
-// §6.3.2.1: trireg with charge strength and signed vector.
 TEST(ParserSection6, TriregChargeStrengthSignedVector) {
   auto r = Parse(
       "module t;\n"
@@ -869,7 +863,6 @@ TEST(ParserSection6, TriregChargeStrengthSignedVector) {
   EXPECT_EQ(item->name, "cap2");
 }
 
-// §6.3.2.2: Drive strength with supply0.
 TEST(ParserA222, DriveStrengthSupply0Weak1) {
   auto r = Parse(
       "module m;\n"
@@ -879,11 +872,10 @@ TEST(ParserA222, DriveStrengthSupply0Weak1) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 5u);  // supply0
-  EXPECT_EQ(item->drive_strength1, 2u);  // weak1
+  EXPECT_EQ(item->drive_strength0, 5u);
+  EXPECT_EQ(item->drive_strength1, 2u);
 }
 
-// §6.3.2.2: Drive strength weak0, weak1.
 TEST(ParserA222, DriveStrengthWeak0Weak1) {
   auto r = Parse(
       "module m;\n"
@@ -893,11 +885,10 @@ TEST(ParserA222, DriveStrengthWeak0Weak1) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 2u);  // weak0
-  EXPECT_EQ(item->drive_strength1, 2u);  // weak1
+  EXPECT_EQ(item->drive_strength0, 2u);
+  EXPECT_EQ(item->drive_strength1, 2u);
 }
 
-// §6.3.2.2: Drive strength highz0, strong1.
 TEST(ParserA222, DriveStrengthHighz0Strong1) {
   auto r = Parse(
       "module m;\n"
@@ -907,11 +898,10 @@ TEST(ParserA222, DriveStrengthHighz0Strong1) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 1u);  // highz0
-  EXPECT_EQ(item->drive_strength1, 4u);  // strong1
+  EXPECT_EQ(item->drive_strength0, 1u);
+  EXPECT_EQ(item->drive_strength1, 4u);
 }
 
-// §6.3.2.2: Drive strength supply0, supply1.
 TEST(ParserA222, DriveStrengthSupply0Supply1) {
   auto r = Parse(
       "module m;\n"
@@ -921,11 +911,10 @@ TEST(ParserA222, DriveStrengthSupply0Supply1) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 5u);  // supply0
-  EXPECT_EQ(item->drive_strength1, 5u);  // supply1
+  EXPECT_EQ(item->drive_strength0, 5u);
+  EXPECT_EQ(item->drive_strength1, 5u);
 }
 
-// §6.3.2.2: Drive strength highz1, pull0 — reversed order.
 TEST(ParserA222, DriveStrengthHighz1Pull0) {
   auto r = Parse(
       "module m;\n"
@@ -935,11 +924,10 @@ TEST(ParserA222, DriveStrengthHighz1Pull0) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 3u);  // pull0
-  EXPECT_EQ(item->drive_strength1, 1u);  // highz1
+  EXPECT_EQ(item->drive_strength0, 3u);
+  EXPECT_EQ(item->drive_strength1, 1u);
 }
 
-// §6.3.2.2: Net declaration without drive strength has default (0, 0).
 TEST(ParserA222, NetDeclNoDriveStrengthDefault) {
   auto r = Parse(
       "module m;\n"
@@ -968,4 +956,4 @@ TEST(ParserSection6, Sec6_7_1_VectoredWithExplicitType) {
   EXPECT_EQ(item->name, "v");
 }
 
-}  // namespace
+}

@@ -51,4 +51,4 @@ TEST(ParserA604, FunctionStatementWithAttribute) {
   EXPECT_EQ(func->func_body_stmts[0]->attrs[0].name, "inline");
 }
 
-}  // namespace
+}

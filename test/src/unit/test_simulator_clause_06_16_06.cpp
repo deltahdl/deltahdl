@@ -33,4 +33,4 @@ TEST(StringMethods, CompareLessThan) {
   EXPECT_LT(signed_val, 0);
 }
 
-}  // namespace
+}

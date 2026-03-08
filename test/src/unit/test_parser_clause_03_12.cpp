@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §3.12: Compilation reads source and checks syntax/semantics.
-
 TEST(ParserClause03, Cl3_12_CompilationProducesAST) {
   auto r = Parse(
       "module m;\n"
@@ -18,9 +16,6 @@ TEST(ParserClause03, Cl3_12_CompilationProducesAST) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
-
-// §3.12: Elaboration binds module, program, interface, checker, and
-// primitive instances.
 
 TEST(ParserClause03, Cl3_12_AllDesignElementTypesCompile) {
   auto r = Parse(
@@ -36,8 +31,6 @@ TEST(ParserClause03, Cl3_12_AllDesignElementTypesCompile) {
   EXPECT_EQ(r.cu->checkers.size(), 1u);
 }
 
-// §3.12: Elaboration expands instantiations and computes parameter values.
-
 TEST(ParserClause03, Cl3_12_ParameterOverrideCompiles) {
   auto r = Parse(
       "module sub #(parameter W = 8);\n"
@@ -50,8 +43,6 @@ TEST(ParserClause03, Cl3_12_ParameterOverrideCompiles) {
   EXPECT_TRUE(
       HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
 }
-
-// §3.12: Package compilation must precede references to it.
 
 TEST(ParserClause03, Cl3_12_PackagePrecedesImport) {
   auto r = Parse(
@@ -69,8 +60,6 @@ TEST(ParserClause03, Cl3_12_PackagePrecedesImport) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
 }
 
-// §3.12: Compilation handles multiple design elements in order.
-
 TEST(ParserClause03, Cl3_12_OrderOfDesignElements) {
   auto r = Parse(
       "package p; endpackage\n"
@@ -84,4 +73,4 @@ TEST(ParserClause03, Cl3_12_OrderOfDesignElements) {
   EXPECT_EQ(r.cu->modules[1]->name, "b");
 }
 
-}  // namespace
+}

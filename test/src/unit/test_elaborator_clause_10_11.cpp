@@ -17,7 +17,6 @@ void ExpectThreeNetsAllEqual(SimFixture& f, uint64_t expected) {
   EXPECT_EQ(vc->value.ToUint64(), expected);
 }
 
-// §10.11: Basic two-net alias elaborates without errors.
 TEST(ElabCh10k, AliasTwoNetsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -30,7 +29,6 @@ TEST(ElabCh10k, AliasTwoNetsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.11: Three-net alias elaborates.
 TEST(ElabCh10k, AliasThreeNetsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -43,7 +41,6 @@ TEST(ElabCh10k, AliasThreeNetsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.11: Alias with bit-select concatenation elaborates.
 TEST(ElabCh10k, AliasBitSelectConcatElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -56,7 +53,6 @@ TEST(ElabCh10k, AliasBitSelectConcatElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.11: Alias stores net expressions in the RTLIR.
 TEST(ElabCh10k, AliasStoresNetsInRtlir) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -71,7 +67,6 @@ TEST(ElabCh10k, AliasStoresNetsInRtlir) {
   EXPECT_EQ(design->top_modules[0]->aliases[0].nets.size(), 2u);
 }
 
-// §10.11: Multiple alias statements accumulate in the RTLIR.
 TEST(ElabCh10k, MultipleAliasStatementsAccumulate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -86,7 +81,6 @@ TEST(ElabCh10k, MultipleAliasStatementsAccumulate) {
   EXPECT_EQ(design->top_modules[0]->aliases.size(), 2u);
 }
 
-// §10.11: Variables cannot be used in alias — error expected.
 TEST(ElabCh10k, AliasVariableIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -99,7 +93,6 @@ TEST(ElabCh10k, AliasVariableIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §10.11: Alias of net to itself is illegal.
 TEST(ElabCh10k, AliasSelfIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -111,7 +104,6 @@ TEST(ElabCh10k, AliasSelfIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §10.11: Writing to one aliased net is visible from the other.
 TEST(AliasNetsShareValue, AliasNetsShareValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -131,7 +123,6 @@ TEST(AliasNetsShareValue, AliasNetsShareValue) {
   EXPECT_EQ(vb->value.ToUint64(), 1u);
 }
 
-// §10.11: Three-way alias — all nets see the driven value.
 TEST(AliasThreeNetsShareValue, AliasThreeNetsShareValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -146,7 +137,6 @@ TEST(AliasThreeNetsShareValue, AliasThreeNetsShareValue) {
   ExpectThreeNetsAllEqual(f, 1u);
 }
 
-// §10.11: Multi-bit aliased nets share the full value.
 TEST(AliasMultiBitNetsShareValue, AliasMultiBitNetsShareValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -166,7 +156,6 @@ TEST(AliasMultiBitNetsShareValue, AliasMultiBitNetsShareValue) {
   EXPECT_EQ(vy->value.ToUint64(), 0xABu);
 }
 
-// §10.11: Cumulative aliases — same net in multiple statements.
 TEST(CumulativeAliases, CumulativeAliases) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -182,4 +171,4 @@ TEST(CumulativeAliases, CumulativeAliases) {
   ExpectThreeNetsAllEqual(f, 1u);
 }
 
-}  // namespace
+}

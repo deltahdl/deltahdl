@@ -27,7 +27,6 @@ TEST(SimCh4, AlwaysCombReactsToDelayedChange) {
   EXPECT_EQ(var->value.ToUint64(), 14u);
 }
 
-// §9.2.2.2.1: Sensitivity on all read inputs triggers re-evaluation.
 TEST(SimClause09_02_02_02_01, SensitivityTriggersOnAllInputs) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -51,7 +50,6 @@ TEST(SimClause09_02_02_02_01, SensitivityTriggersOnAllInputs) {
   EXPECT_EQ(y->value.ToUint64(), 11u);
 }
 
-// §9.2.2.2.1: Written-only variables don't trigger re-evaluation.
 TEST(SimClause09_02_02_02_01, WrittenOnlyVarNoRetrigger) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -73,7 +71,6 @@ TEST(SimClause09_02_02_02_01, WrittenOnlyVarNoRetrigger) {
   EXPECT_EQ(y->value.ToUint64(), 6u);
 }
 
-// §9.2.2.2.1: Ternary condition and branches all contribute to sensitivity.
 TEST(SimClause09_02_02_02_01, TernaryAllInputsSensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -99,4 +96,4 @@ TEST(SimClause09_02_02_02_01, TernaryAllInputsSensitive) {
   EXPECT_EQ(y->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

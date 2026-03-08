@@ -47,4 +47,4 @@ TEST(EvalOpXZ, TernaryWidthFromBranches) {
   EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -63,7 +63,6 @@ TEST(ParserSection6, Sec6_7_1_WireScalaredQualifier) {
   EXPECT_EQ(item->name, "sc");
 }
 
-// §6.9.2: LRM example — tri1 scalared [63:0] bus64.
 TEST(ParserSection6, Sec6_9_2_Tri1ScalaredBus) {
   auto r = Parse(
       "module t;\n"
@@ -80,7 +79,6 @@ TEST(ParserSection6, Sec6_9_2_Tri1ScalaredBus) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 63u);
 }
 
-// §6.9.2: LRM example — tri vectored [31:0] data.
 TEST(ParserSection6, Sec6_9_2_TriVectoredData) {
   auto r = Parse(
       "module t;\n"
@@ -97,7 +95,6 @@ TEST(ParserSection6, Sec6_9_2_TriVectoredData) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 31u);
 }
 
-// §6.9.2: Vectored without packed dimension should be validation error.
 TEST(ParserSection6, Sec6_9_2_VectoredWithoutPackedDim) {
   NetDeclInfo info;
   info.is_vectored = true;
@@ -105,7 +102,6 @@ TEST(ParserSection6, Sec6_9_2_VectoredWithoutPackedDim) {
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-// §6.9.2: Scalared without packed dimension should be validation error.
 TEST(ParserSection6, Sec6_9_2_ScalaredWithoutPackedDim) {
   NetDeclInfo info;
   info.is_scalared = true;
@@ -113,4 +109,4 @@ TEST(ParserSection6, Sec6_9_2_ScalaredWithoutPackedDim) {
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-}  // namespace
+}

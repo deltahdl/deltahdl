@@ -25,4 +25,4 @@ TEST(SimA84, PrimaryMemberAccess) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-}  // namespace
+}

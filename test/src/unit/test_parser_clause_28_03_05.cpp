@@ -48,4 +48,4 @@ TEST(ParserSection23, InstanceArrayRange) {
   EXPECT_NE(item->inst_range_right, nullptr);
 }
 
-}  // namespace
+}

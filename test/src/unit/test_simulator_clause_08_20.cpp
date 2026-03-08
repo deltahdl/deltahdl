@@ -91,7 +91,6 @@ TEST(ClassSim, EmptyVTable) {
   EXPECT_EQ(type->FindVTableIndex("anything"), -1);
 }
 
-// §8.20: Virtual method dispatch through three-level hierarchy.
 TEST(ClassSim, VirtualMethodThreeLevelHierarchy) {
   SimFixture f;
   auto* grand = MakeClassType(f, "Grand", {});
@@ -116,7 +115,6 @@ TEST(ClassSim, VirtualMethodThreeLevelHierarchy) {
   EXPECT_EQ(obj->ResolveVirtualMethod("action"), leaf_method);
 }
 
-// §8.20: Non-virtual method dispatch does NOT use vtable.
 TEST(ClassSim, NonVirtualMethodUsesResolveMethod) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {});
@@ -134,11 +132,10 @@ TEST(ClassSim, NonVirtualMethodUsesResolveMethod) {
   derived->methods["printA"] = derived_method;
 
   auto [handle, obj] = MakeObj(f, derived);
-  // ResolveMethod returns the derived's non-virtual method.
+
   EXPECT_EQ(obj->ResolveMethod("printA"), derived_method);
 }
 
-// §8.20: :final stored on ModuleItem.
 TEST(ClassSim, MethodFinalFlag) {
   SimFixture f;
   auto* method = f.arena.Create<ModuleItem>();
@@ -148,4 +145,4 @@ TEST(ClassSim, MethodFinalFlag) {
   EXPECT_TRUE(method->is_method_final);
 }
 
-}  // namespace
+}

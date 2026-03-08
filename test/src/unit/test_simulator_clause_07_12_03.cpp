@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §7.12.3: sum() returns sum of all elements.
 TEST(ArrayReduction, SumAllElements) {
   SimFixture f;
   MakeDynArray(f, "arr", {10, 20, 30, 40});
@@ -16,7 +15,6 @@ TEST(ArrayReduction, SumAllElements) {
   EXPECT_EQ(out.ToUint64(), 100u);
 }
 
-// §7.12.3: product() returns product of all elements.
 TEST(ArrayReduction, ProductAllElements) {
   SimFixture f;
   MakeDynArray(f, "arr", {2, 3, 5});
@@ -26,7 +24,6 @@ TEST(ArrayReduction, ProductAllElements) {
   EXPECT_EQ(out.ToUint64(), 30u);
 }
 
-// §7.12.3: and() returns bitwise AND of all elements.
 TEST(ArrayReduction, AndAllElements) {
   SimFixture f;
   MakeDynArray(f, "arr", {0xFF, 0x0F, 0x03});
@@ -36,7 +33,6 @@ TEST(ArrayReduction, AndAllElements) {
   EXPECT_EQ(out.ToUint64(), 0x03u);
 }
 
-// §7.12.3: or() returns bitwise OR of all elements.
 TEST(ArrayReduction, OrAllElements) {
   SimFixture f;
   MakeDynArray(f, "arr", {0x01, 0x02, 0x04});
@@ -46,7 +42,6 @@ TEST(ArrayReduction, OrAllElements) {
   EXPECT_EQ(out.ToUint64(), 0x07u);
 }
 
-// §7.12.3: xor() returns bitwise XOR of all elements.
 TEST(ArrayReduction, XorAllElements) {
   SimFixture f;
   MakeDynArray(f, "arr", {0x0F, 0xFF, 0xF0});
@@ -56,4 +51,4 @@ TEST(ArrayReduction, XorAllElements) {
   EXPECT_EQ(out.ToUint64(), 0x00u);
 }
 
-}  // namespace
+}

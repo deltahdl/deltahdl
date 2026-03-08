@@ -21,4 +21,4 @@ TEST(ElabA612, RandJoinElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -43,7 +43,6 @@ TEST(Types, Logic4VecCreationAndToString) {
   EXPECT_EQ(vec.ToString(), "10100101");
 }
 
-// §6.3.1: 0 and 1 are logical complements of one another.
 TEST(Types, Logic4Not_ComplementProperty) {
   Logic4Word zero = {0, 0};
   Logic4Word one = {1, 0};
@@ -53,7 +52,6 @@ TEST(Types, Logic4Not_ComplementProperty) {
   EXPECT_TRUE(not_one.IsZero());
 }
 
-// §6.3.1: NOT of x yields x, NOT of z yields x.
 TEST(Types, Logic4Not_UnknownValues) {
   Logic4Word x = {0, 1};
   Logic4Word z = {1, 1};
@@ -63,7 +61,6 @@ TEST(Types, Logic4Not_UnknownValues) {
   EXPECT_FALSE(not_z.IsKnown());
 }
 
-// §6.3.1: AND truth table with x/z. 0&x=0, 1&x=x.
 TEST(Types, Logic4And_WithUnknowns) {
   Logic4Word zero = {0, 0};
   Logic4Word one = {1, 0};
@@ -79,7 +76,6 @@ TEST(Types, Logic4And_WithUnknowns) {
   EXPECT_FALSE(x_and_x.IsKnown());
 }
 
-// §6.3.1: OR truth table with x/z. 1|x=1, 0|x=x.
 TEST(Types, Logic4Or_WithUnknowns) {
   Logic4Word zero = {0, 0};
   Logic4Word one = {1, 0};
@@ -92,7 +88,6 @@ TEST(Types, Logic4Or_WithUnknowns) {
   EXPECT_FALSE(zero_or_x.IsKnown());
 }
 
-// §6.3.1: XOR truth table with x/z. Any unknown input produces unknown.
 TEST(Types, Logic4Xor_WithUnknowns) {
   Logic4Word zero = {0, 0};
   Logic4Word one = {1, 0};
@@ -108,7 +103,6 @@ TEST(Types, Logic4Xor_WithUnknowns) {
   EXPECT_FALSE(one_xor_x.IsKnown());
 }
 
-// §6.3.1: AND/OR with known values.
 TEST(Types, Logic4AndOr_KnownValues) {
   Logic4Word zero = {0, 0};
   Logic4Word one = {1, 0};
@@ -132,7 +126,6 @@ TEST(Types, Logic4AndOr_KnownValues) {
   EXPECT_TRUE(or_11.IsOne());
 }
 
-// §6.3.1: z at gate input treated as x.
 TEST(Types, Logic4And_ZTreatedAsX) {
   Logic4Word zero = {0, 0};
   Logic4Word one = {1, 0};
@@ -145,18 +138,16 @@ TEST(Types, Logic4And_ZTreatedAsX) {
   EXPECT_FALSE(one_and_z.IsKnown());
 }
 
-// §6.3.1: Logic4Vec with x/z bits in ToString.
 TEST(Types, Logic4Vec_XZToString) {
   Arena arena;
   auto vec = MakeLogic4Vec(arena, 4);
-  // Set bit 3=1, bit 2=x, bit 1=z, bit 0=0
-  vec.words[0].aval = 0b1010;  // bits: 3=1, 2=0, 1=1, 0=0
-  vec.words[0].bval = 0b0110;  // bits: 3=0, 2=1, 1=1, 0=0
+
+  vec.words[0].aval = 0b1010;
+  vec.words[0].bval = 0b0110;
   EXPECT_EQ(vec.ToString(), "1xz0");
   EXPECT_FALSE(vec.IsKnown());
 }
 
-// §6.3.1: 2-state logic stores only 0 and 1.
 TEST(Types, Logic2Vec_BasicOperations) {
   Logic2Vec vec;
   vec.width = 8;
@@ -166,4 +157,4 @@ TEST(Types, Logic2Vec_BasicOperations) {
   EXPECT_EQ(vec.ToUint64(), 0xFF);
 }
 
-}  // namespace
+}

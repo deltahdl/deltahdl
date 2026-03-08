@@ -19,4 +19,4 @@ TEST(ParserSection6, Sec6_5_TriregDecl) {
   EXPECT_EQ(item->name, "cap");
 }
 
-}  // namespace
+}

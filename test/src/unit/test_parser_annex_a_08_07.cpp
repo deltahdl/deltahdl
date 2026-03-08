@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.8.7 — decimal_number (unsigned_number)
-
 TEST(ParserA87, UnsignedDecimal) {
   auto r = Parse("module m; initial x = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -25,8 +23,6 @@ TEST(ParserA87, UnsignedDecimalWithUnderscore) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// §A.8.7 — sized decimal_number
-
 TEST(ParserA87, SizedDecimal) {
   auto r = Parse("module m; initial x = 8'd255; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -44,8 +40,6 @@ TEST(ParserA87, SignedDecimal) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
-
-// §A.8.7 — decimal_base x_digit / z_digit
 
 TEST(ParserA87, XDigitUpper) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'hX; endmodule\n");
@@ -92,8 +86,6 @@ TEST(ParserA87, DecimalBaseQuestionMark) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// §A.8.7 — binary_number
-
 TEST(ParserA87, BinaryNumber) {
   auto r = Parse("module m; initial x = 4'b1010; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -130,8 +122,6 @@ TEST(ParserA87, BinaryWithXZ) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// §A.8.7 — octal_number
-
 TEST(ParserA87, OctalNumber) {
   auto r = Parse("module m; initial x = 8'o77; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -149,8 +139,6 @@ TEST(ParserA87, SignedOctalNumber) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
-
-// §A.8.7 — hex_number
 
 TEST(ParserA87, HexNumber) {
   auto r = Parse("module m; initial x = 8'hFF; endmodule\n");
@@ -179,8 +167,6 @@ TEST(ParserA87, HexWithUnderscore) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// §A.8.7 — unsized numbers (no size prefix)
-
 TEST(ParserA87, UnsizedHex) {
   auto r = Parse("module m; initial x = 'hAB; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -207,8 +193,6 @@ TEST(ParserA87, UnsizedOctal) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
-
-// §A.8.7 — real_number
 
 TEST(ParserA87, FixedPointNumber) {
   auto r = Parse("module m; initial x = 3.14; endmodule\n");
@@ -246,8 +230,6 @@ TEST(ParserA87, RealWithPosExponent) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-// §A.8.7 — unbased_unsized_literal
-
 TEST(ParserA87, UnbasedUnsizedZero) {
   auto r = Parse("module m; initial x = '0; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -284,4 +266,4 @@ TEST(ParserA87, UnbasedUnsizedZ) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 
@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §8.26.3: Types inherited by extending interface class — OK.
 TEST(ElabA8263, TypesInheritedByExtendingInterfaceOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfA;\n"
@@ -20,7 +19,6 @@ TEST(ElabA8263, TypesInheritedByExtendingInterfaceOk) {
              "endmodule\n"));
 }
 
-// §8.26.3: Implementing class uses scope resolution for interface types — OK.
 TEST(ElabA8263, ImplementingClassScopeResOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfC;\n"
@@ -34,4 +32,4 @@ TEST(ElabA8263, ImplementingClassScopeResOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

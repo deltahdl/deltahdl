@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §6.22.6: Wire nets of same data type match.
 TEST(ParserSection6, MatchingNettypesSameWire) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -17,7 +16,6 @@ TEST(ParserSection6, MatchingNettypesSameWire) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.22.6: Tri and wire are matching nettypes.
 TEST(ParserSection6, MatchingNettypesWireAndTri) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
@@ -29,4 +27,4 @@ TEST(ParserSection6, MatchingNettypesWireAndTri) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

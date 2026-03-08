@@ -141,4 +141,4 @@ TEST(EvalAdv, RealIncrementBy1Point0) {
   EXPECT_DOUBLE_EQ(AdvToDouble(result), 3.5);
 }
 
-}  // namespace
+}

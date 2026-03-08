@@ -115,8 +115,6 @@ TEST(SimA607, SequentialCaseStatements) {
   EXPECT_EQ(y->value.ToUint64(), 22u);
 }
 
-// §12.5.2: Priority encoder pattern — constant case_expression with bit-select
-// case_item_expressions.
 TEST(SimA607, ConstCaseExprPriorityEncoder) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -140,11 +138,10 @@ TEST(SimA607, ConstCaseExprPriorityEncoder) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // encode[2]=0 (no match), encode[1]=1 (match) → x = 1.
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.5.2: Constant case_expression, no matching item → default.
 TEST(SimA607, ConstCaseExprFallsToDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -168,8 +165,8 @@ TEST(SimA607, ConstCaseExprFallsToDefault) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // All bits are 0, none match 1 → default.
+
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

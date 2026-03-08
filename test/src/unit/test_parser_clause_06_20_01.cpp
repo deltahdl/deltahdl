@@ -93,7 +93,6 @@ TEST(SourceText, ParamPortLocalparam) {
   EXPECT_EQ(r.cu->modules[0]->params[0].first, "X");
 }
 
-// parameter_port_declaration with data_type list_of_param_assignments
 TEST(ModuleParamsA13, TypedParamPort) {
   auto r = Parse(
       "module m #(parameter int W = 8, int D = 4)(\n"
@@ -113,4 +112,4 @@ TEST(ParserA23, ListOfSpecparamAssignmentsSingle) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

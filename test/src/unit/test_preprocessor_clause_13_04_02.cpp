@@ -20,4 +20,4 @@ TEST(ParserSection6, AutomaticFunctionLocalVar) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-}  // namespace
+}

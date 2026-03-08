@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.3: whitespace characters ---
-
 TEST(LexerClause05, Cl5_3_SpaceIsWhitespace) {
   auto tokens = Lex("a b");
   ASSERT_EQ(tokens.size(), 3u);
@@ -70,8 +68,6 @@ TEST(LexerClause05, Cl5_3_EofOnlyInput) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-// --- §5.3: whitespace ignored except as token separator ---
-
 TEST(LexerClause05, Cl5_3_WhitespaceNotEmittedAsToken) {
   auto tokens = Lex("  \t\n\f\v  a  \t\n\f\v  ");
   ASSERT_EQ(tokens.size(), 2u);
@@ -80,8 +76,7 @@ TEST(LexerClause05, Cl5_3_WhitespaceNotEmittedAsToken) {
 }
 
 TEST(LexerClause05, Cl5_3_WhitespaceOnlySeparatesTokens) {
-  // Without whitespace: "modulem" lexes as one identifier
-  // With whitespace: "module m" lexes as keyword + identifier
+
   auto no_ws = Lex("modulem");
   ASSERT_EQ(no_ws.size(), 2u);
   EXPECT_EQ(no_ws[0].kind, TokenKind::kIdentifier);
@@ -116,8 +111,6 @@ TEST(LexerClause05, Cl5_3_WhitespaceVariationsProduceSameTokenKinds) {
   }
 }
 
-// --- §5.3: blanks and tabs significant inside string literals ---
-
 TEST(LexerClause05, Cl5_3_SpacesPreservedInStringLiteral) {
   auto r = LexOne("\"  hello   world  \"");
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
@@ -146,8 +139,6 @@ TEST(LexerClause05, Cl5_3_StringLiteralWithOnlyTabs) {
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
 }
 
-// --- §5.3: source location tracking across whitespace ---
-
 TEST(LexerClause05, Cl5_3_SourceLocationsAcrossNewlines) {
   auto tokens = Lex("a\nb c");
   ASSERT_GE(tokens.size(), 3u);
@@ -164,11 +155,9 @@ TEST(LexerClause05, Cl5_3_SourceLocationsAcrossTabsAndSpaces) {
   ASSERT_GE(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].loc.line, 1u);
   EXPECT_EQ(tokens[0].loc.column, 1u);
-  // b should be at column > 1
+
   EXPECT_GT(tokens[1].loc.column, 1u);
 }
-
-// --- §5.3: edge cases ---
 
 TEST(LexerClause05, Cl5_3_WhitespaceOnlyInputProducesEof) {
   auto tokens = Lex("   \t\n\f\v\r\n   ");
@@ -198,4 +187,4 @@ TEST(LexerClause05, Cl5_3_OperatorsDoNotNeedWhitespaceSeparation) {
   EXPECT_EQ(tokens[2].text, "b");
 }
 
-}  // namespace
+}

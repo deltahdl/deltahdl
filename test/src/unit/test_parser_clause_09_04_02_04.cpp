@@ -29,4 +29,4 @@ TEST(ParserSection9b, SequenceEventInEventControl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -214,4 +214,4 @@ TEST(EvalAdv, SignedEqNeg) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-}  // namespace
+}

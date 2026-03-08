@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.12 — randsequence
-
 TEST(ParserA612, RandsequenceWithName) {
   auto r = Parse(
       "module m;\n"
@@ -200,4 +198,4 @@ TEST(ParserA612, NestedRandsequence) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

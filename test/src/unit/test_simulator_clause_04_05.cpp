@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -174,4 +174,4 @@ TEST(Scheduler, InitialState) {
   EXPECT_EQ(sched.CurrentTime().ticks, 0);
 }
 
-}  // namespace
+}

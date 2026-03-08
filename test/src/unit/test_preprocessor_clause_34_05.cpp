@@ -38,4 +38,4 @@ TEST_F(ProtectedTest, BeginEndEnvelope) {
   EXPECT_EQ(result.find("pragma"), std::string::npos);
 }
 
-}  // namespace
+}

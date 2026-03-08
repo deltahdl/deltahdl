@@ -35,4 +35,4 @@ TEST(ParserSection16, MulticlockPropertyDeclImplication) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

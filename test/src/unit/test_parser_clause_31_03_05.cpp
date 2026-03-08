@@ -63,4 +63,4 @@ TEST(RecoveryTimingCheck, RecoveryBasic) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecovery);
 }
 
-}  // namespace
+}

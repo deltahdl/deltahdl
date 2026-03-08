@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 
@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §9.6.1: Wait fork elaborates in an initial block.
 TEST(ElabClause09_06_01, WaitForkInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,7 +23,6 @@ TEST(ElabClause09_06_01, WaitForkInInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.6.1: Wait fork standalone (no preceding fork) still elaborates.
 TEST(ElabClause09_06_01, WaitForkStandaloneElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -38,7 +36,6 @@ TEST(ElabClause09_06_01, WaitForkStandaloneElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.6.1: Wait fork is a timing control, error in always_comb.
 TEST(WaitForkInAlwaysComb, WaitForkInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -53,4 +50,4 @@ TEST(WaitForkInAlwaysComb, WaitForkInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

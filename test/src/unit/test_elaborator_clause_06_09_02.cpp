@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include <gtest/gtest.h>
 
@@ -9,7 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §6.9.2: Vectored net elaborates without error.
 TEST(NetDecl, VectoredNetElaboratesOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,7 +23,6 @@ TEST(NetDecl, VectoredNetElaboratesOk) {
   EXPECT_EQ(mod->nets[0].width, 32u);
 }
 
-// §6.9.2: Scalared net elaborates without error.
 TEST(NetDecl, ScalaredNetElaboratesOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -39,4 +37,4 @@ TEST(NetDecl, ScalaredNetElaboratesOk) {
   EXPECT_EQ(mod->nets[0].width, 64u);
 }
 
-}  // namespace
+}

@@ -177,7 +177,6 @@ TEST(SimCh10, BlockingAssignTypeCast) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-// §6.24.1: Cast real multiplication to int — truncates fractional part.
 TEST(SimCh6, CastRealMulToInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -197,7 +196,6 @@ TEST(SimCh6, CastRealMulToInt) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-// §6.24.1: shortint cast of concatenation.
 TEST(SimCh6, CastConcatToShortint) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -217,7 +215,6 @@ TEST(SimCh6, CastConcatToShortint) {
   EXPECT_EQ(var->value.ToUint64(), 0xFACEu);
 }
 
-// §6.24.1: byte cast truncates wider value.
 TEST(SimCh6, CastByteTruncate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -237,4 +234,4 @@ TEST(SimCh6, CastByteTruncate) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-}  // namespace
+}

@@ -703,7 +703,6 @@ TEST(SimCh6b, TypeOpByteFromWiderAssignment) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// §6.23: localparam type = type(int); variable uses the resolved type.
 TEST(SimCh6b, TypeOpLocalparamType) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -726,7 +725,6 @@ TEST(SimCh6b, TypeOpLocalparamType) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// §6.23: type operator on packed vector type.
 TEST(SimCh6b, TypeOpLogicVector) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -751,4 +749,4 @@ TEST(SimCh6b, TypeOpLogicVector) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-}  // namespace
+}

@@ -48,7 +48,6 @@ TEST(SourceText, ClassNestedInterfaceClass) {
   EXPECT_TRUE(members[0]->nested_class->is_interface);
 }
 
-// --- §8.3 interface class extends multiple bases (§8.26) ---
 TEST(ParserClause08_03, InterfaceClassExtendsMultiple) {
   auto r = Parse(
       "interface class IFace extends IBase1, IBase2;\n"
@@ -60,4 +59,4 @@ TEST(ParserClause08_03, InterfaceClassExtendsMultiple) {
   EXPECT_EQ(r.cu->classes[0]->base_class, "IBase1");
 }
 
-}  // namespace
+}

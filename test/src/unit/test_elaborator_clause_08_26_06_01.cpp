@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 
@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §8.26.6.1: Single implementation resolves same-name methods from two
-// interfaces — OK.
 TEST(ElabA82661, SingleImplResolvesConflictOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfBase1;\n"
@@ -25,7 +23,6 @@ TEST(ElabA82661, SingleImplResolvesConflictOk) {
              "endmodule\n"));
 }
 
-// §8.26.6.1: Extends abstract + implements interface — single impl OK.
 TEST(ElabA82661, ExtendsAndImplementsConflictOk) {
   EXPECT_TRUE(ElabOk(
       "interface class IntfBase1;\n"
@@ -46,8 +43,6 @@ TEST(ElabA82661, ExtendsAndImplementsConflictOk) {
       "endmodule\n"));
 }
 
-// §8.26.6.2: Interface class inherits from two — no conflict if no
-// overlapping names.
 TEST(ElabA82662, NoConflictNoOverlapOk) {
   EXPECT_TRUE(
       ElabOk("interface class A;\n"
@@ -63,4 +58,4 @@ TEST(ElabA82662, NoConflictNoOverlapOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

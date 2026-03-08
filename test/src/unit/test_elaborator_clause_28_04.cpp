@@ -86,4 +86,4 @@ TEST(ParserSection28, ElaborateMultiInputAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-}  // namespace
+}

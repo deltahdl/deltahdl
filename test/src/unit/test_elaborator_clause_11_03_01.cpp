@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §11.3.1: Case equality (===) shall not be used with real operands.
 TEST(RealOps, CaseEqualityOnRealIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -17,7 +16,6 @@ TEST(RealOps, CaseEqualityOnRealIsIllegal) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §11.3.1: Case inequality (!==) shall not be used with real operands.
 TEST(RealOps, CaseInequalityOnRealIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -30,7 +28,6 @@ TEST(RealOps, CaseInequalityOnRealIsIllegal) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §11.3.1: Wildcard equality (==?) shall not be used with real operands.
 TEST(RealOps, WildcardEqualityOnRealIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -43,7 +40,6 @@ TEST(RealOps, WildcardEqualityOnRealIsIllegal) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §11.3.1: Bitwise operators shall not be used with real operands.
 TEST(RealOps, BitwiseAndOnRealIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -56,7 +52,6 @@ TEST(RealOps, BitwiseAndOnRealIsIllegal) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §11.3.1: Bitwise OR on real is illegal.
 TEST(RealOps, BitwiseOrOnRealIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -69,7 +64,6 @@ TEST(RealOps, BitwiseOrOnRealIsIllegal) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §11.3.1: Bitwise XOR on real is illegal.
 TEST(RealOps, BitwiseXorOnRealIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -82,7 +76,6 @@ TEST(RealOps, BitwiseXorOnRealIsIllegal) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §11.3.1: Bitwise negation (~) on real is illegal.
 TEST(RealOps, BitwiseNegOnRealIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -95,7 +88,6 @@ TEST(RealOps, BitwiseNegOnRealIsIllegal) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §11.3.1: Shift operators on real are illegal.
 TEST(RealOps, ShiftOnRealIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -108,7 +100,6 @@ TEST(RealOps, ShiftOnRealIsIllegal) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §11.3.1: Modulus on real is illegal.
 TEST(RealOps, ModulusOnRealIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -121,7 +112,6 @@ TEST(RealOps, ModulusOnRealIsIllegal) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §11.3.1: Logical operators on real are legal (result is single-bit).
 TEST(RealOps, LogicalAndOnRealIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -134,7 +124,6 @@ TEST(RealOps, LogicalAndOnRealIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.3.1: Relational operators on real are legal (result is single-bit).
 TEST(RealOps, RelationalOnRealIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -147,7 +136,6 @@ TEST(RealOps, RelationalOnRealIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.3.1: Arithmetic operators on real are legal.
 TEST(RealOps, ArithOnRealIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -159,7 +147,6 @@ TEST(RealOps, ArithOnRealIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.3.1: Logical equality (==) on real is legal.
 TEST(RealOps, LogicalEqualityOnRealIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -172,7 +159,6 @@ TEST(RealOps, LogicalEqualityOnRealIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.3.1: Logical negation (!) on real is legal.
 TEST(RealOps, LogicalNegOnRealIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -185,7 +171,6 @@ TEST(RealOps, LogicalNegOnRealIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.3.1: Unary + and - on real are legal.
 TEST(RealOps, UnaryPlusMinusOnRealIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -200,4 +185,4 @@ TEST(RealOps, UnaryPlusMinusOnRealIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

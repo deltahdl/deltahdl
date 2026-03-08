@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.1.6 Interface items
-
 TEST(SourceText, InterfaceMultipleItemTypes) {
   auto r = Parse(
       "interface bus_if;\n"
@@ -28,7 +26,6 @@ TEST(SourceText, InterfaceMultipleItemTypes) {
       HasItemKindNamed(ifc->items, ModuleItemKind::kTaskDecl, "run_parallel"));
 }
 
-// interface_or_generate_item ::= module_common_item
 TEST(InterfaceItemsA16, InterfaceContinuousAssign) {
   auto r = Parse(
       "interface ifc;\n"
@@ -41,7 +38,6 @@ TEST(InterfaceItemsA16, InterfaceContinuousAssign) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kContAssign));
 }
 
-// interface_or_generate_item ::= extern_tf_declaration
 TEST(InterfaceItemsA16, ExternMethodPrototype) {
   auto r = Parse(
       "interface ifc;\n"
@@ -69,7 +65,6 @@ TEST(InterfaceItemsA16, ExternForkjoinTask) {
   EXPECT_TRUE(task->is_forkjoin);
 }
 
-// non_port_interface_item ::= generate_region
 TEST(InterfaceItemsA16, InterfaceGenerateRegion) {
   auto r = Parse(
       "interface ifc;\n"
@@ -81,7 +76,6 @@ TEST(InterfaceItemsA16, InterfaceGenerateRegion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// non_port_interface_item ::= program_declaration
 TEST(InterfaceItemsA16, InterfaceNestedProgram) {
   auto r = Parse(
       "interface ifc;\n"
@@ -92,7 +86,6 @@ TEST(InterfaceItemsA16, InterfaceNestedProgram) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// non_port_interface_item ::= modport_declaration
 TEST(InterfaceItemsA16, ModportDeclaration) {
   auto r = Parse(
       "interface ifc;\n"
@@ -105,7 +98,6 @@ TEST(InterfaceItemsA16, ModportDeclaration) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
 }
 
-// non_port_interface_item ::= interface_declaration (nested)
 TEST(InterfaceItemsA16, InterfaceNestedInterface) {
   auto r = Parse(
       "interface outer_ifc;\n"
@@ -116,7 +108,6 @@ TEST(InterfaceItemsA16, InterfaceNestedInterface) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// non_port_interface_item ::= timeunits_declaration
 TEST(InterfaceItemsA16, InterfaceTimeunits) {
   auto r = Parse(
       "interface ifc;\n"
@@ -127,7 +118,6 @@ TEST(InterfaceItemsA16, InterfaceTimeunits) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// interface_item ::= port_declaration ;
 TEST(InterfaceItemsA16, InterfacePortDecl) {
   auto r = Parse(
       "interface ifc(a, b);\n"
@@ -138,7 +128,6 @@ TEST(InterfaceItemsA16, InterfacePortDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// interface with always construct (via module_common_item)
 TEST(InterfaceItemsA16, InterfaceAlways) {
   auto r = Parse(
       "interface ifc;\n"
@@ -149,7 +138,6 @@ TEST(InterfaceItemsA16, InterfaceAlways) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// interface with initial (via module_common_item)
 TEST(InterfaceItemsA16, InterfaceInitial) {
   auto r = Parse(
       "interface ifc;\n"
@@ -161,7 +149,6 @@ TEST(InterfaceItemsA16, InterfaceInitial) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-// assertion_item in interface (via module_common_item)
 TEST(InterfaceItemsA16, InterfaceAssertProperty) {
   auto r = Parse(
       "interface ifc;\n"
@@ -171,4 +158,4 @@ TEST(InterfaceItemsA16, InterfaceAssertProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

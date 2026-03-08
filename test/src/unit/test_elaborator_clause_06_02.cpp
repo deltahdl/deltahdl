@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §6.2: A variable is a data object with an associated data type.
 TEST(DataTypesAndObjects, VariableIsDataObject) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -21,7 +20,6 @@ TEST(DataTypesAndObjects, VariableIsDataObject) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
-// §6.2: A net is a data object with an associated data type.
 TEST(DataTypesAndObjects, NetIsDataObject) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -38,7 +36,6 @@ TEST(DataTypesAndObjects, NetIsDataObject) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kWire);
 }
 
-// §6.2: A parameter is a data object with an associated data type.
 TEST(DataTypesAndObjects, ParameterIsDataObject) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -61,7 +58,6 @@ TEST(DataTypesAndObjects, ParameterIsDataObject) {
   EXPECT_TRUE(found);
 }
 
-// §6.2: Data types can declare multiple data objects.
 TEST(DataTypesAndObjects, TypeDeclaresMultipleObjects) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -84,7 +80,6 @@ TEST(DataTypesAndObjects, TypeDeclaresMultipleObjects) {
   EXPECT_TRUE(found_c);
 }
 
-// §6.2: User-defined data types constructed from other data types.
 TEST(DataTypesAndObjects, TypedefCreatesUserDefinedType) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -107,7 +102,6 @@ TEST(DataTypesAndObjects, TypedefCreatesUserDefinedType) {
   EXPECT_TRUE(found);
 }
 
-// §6.2: 2-state variable is a data object with 2-state type.
 TEST(DataTypesAndObjects, TwoStateVariableType) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -129,7 +123,6 @@ TEST(DataTypesAndObjects, TwoStateVariableType) {
   EXPECT_TRUE(found);
 }
 
-// §6.2: Integer variable types (int) are data objects.
 TEST(DataTypesAndObjects, IntVariableIsDataObject) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -152,7 +145,6 @@ TEST(DataTypesAndObjects, IntVariableIsDataObject) {
   EXPECT_TRUE(found);
 }
 
-// §6.2: Real variable is a data object.
 TEST(DataTypesAndObjects, RealVariableIsDataObject) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -173,7 +165,6 @@ TEST(DataTypesAndObjects, RealVariableIsDataObject) {
   EXPECT_TRUE(found);
 }
 
-// §6.2: String variable is a data object.
 TEST(DataTypesAndObjects, StringVariableIsDataObject) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -194,7 +185,6 @@ TEST(DataTypesAndObjects, StringVariableIsDataObject) {
   EXPECT_TRUE(found);
 }
 
-// §6.2: Nets of different types are all data objects.
 TEST(DataTypesAndObjects, DifferentNetTypesAreDataObjects) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -234,4 +224,4 @@ TEST(DataTypesAndObjects, DifferentNetTypesAreDataObjects) {
   EXPECT_TRUE(found_wo);
 }
 
-}  // namespace
+}

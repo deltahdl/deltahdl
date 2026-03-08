@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §E.5: delay_mode_path propagated to CU.
 TEST(ParserAnnexE2, AnnexEDelayModePath) {
   auto r = ParseWithPreprocessor(
       "`delay_mode_path\n"
@@ -14,4 +13,4 @@ TEST(ParserAnnexE2, AnnexEDelayModePath) {
   EXPECT_EQ(r.cu->delay_mode_directive, DelayModeDirective::kPath);
 }
 
-}  // namespace
+}

@@ -19,4 +19,4 @@ TEST(ElabA611, SkewVariationsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

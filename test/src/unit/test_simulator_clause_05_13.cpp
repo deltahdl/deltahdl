@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.13: array.size() with and without parens ---
-
 TEST(SimClause05, Cl5_13_ArraySizeWithParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -40,8 +38,6 @@ TEST(SimClause05, Cl5_13_ArraySizeNoParens) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 3u);
 }
 
-// --- §5.13: method call in expression ---
-
 TEST(SimClause05, Cl5_13_MethodInExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -57,8 +53,6 @@ TEST(SimClause05, Cl5_13_MethodInExpression) {
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 6u);
 }
-
-// --- §5.13: queue methods ---
 
 TEST(SimClause05, Cl5_13_QueuePushBackAndSize) {
   SimFixture f;
@@ -130,8 +124,6 @@ TEST(SimClause05, Cl5_13_QueuePopFront) {
   EXPECT_EQ(q->elements[1].ToUint64(), 0x30u);
 }
 
-// --- §5.13: reduction methods ---
-
 TEST(SimClause05, Cl5_13_ArraySum) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -147,8 +139,6 @@ TEST(SimClause05, Cl5_13_ArraySum) {
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
 }
-
-// --- §5.13: mutating methods ---
 
 TEST(SimClause05, Cl5_13_ArrayReverseWithParens) {
   SimFixture f;
@@ -184,8 +174,6 @@ TEST(SimClause05, Cl5_13_ArrayReverseNoParens) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x11);
 }
 
-// --- §5.13: dynamic array methods ---
-
 TEST(SimClause05, Cl5_13_DynArraySize) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -202,4 +190,4 @@ TEST(SimClause05, Cl5_13_DynArraySize) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

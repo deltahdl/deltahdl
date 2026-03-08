@@ -186,7 +186,6 @@ TEST(ParserCh5, UnpackedDim_Typedef) {
   EXPECT_TRUE(ParseOk5("module m; typedef int triple[1:3]; endmodule"));
 }
 
-// §6.18: Bare forward typedef (typedef type_identifier;).
 TEST(ParserSection6, BareForwardTypedef) {
   auto r = Parse(
       "module m;\n"
@@ -197,7 +196,6 @@ TEST(ParserSection6, BareForwardTypedef) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.18: Forward typedef followed by actual definition in same scope.
 TEST(ParserSection6, ForwardTypedefThenDefinition) {
   auto r = Parse(
       "module m;\n"
@@ -208,7 +206,6 @@ TEST(ParserSection6, ForwardTypedefThenDefinition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.18: Multiple forward typedefs for same identifier.
 TEST(ParserSection6, MultipleForwardTypedefs) {
   auto r = Parse(
       "module m;\n"
@@ -219,7 +216,6 @@ TEST(ParserSection6, MultipleForwardTypedefs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.18: Forward typedef after actual definition.
 TEST(ParserSection6, ForwardTypedefAfterDefinition) {
   auto r = Parse(
       "module m;\n"
@@ -230,7 +226,6 @@ TEST(ParserSection6, ForwardTypedefAfterDefinition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.18: Typedef used for casting complex data types.
 TEST(ParserSection6, TypedefForCastingUse) {
   auto r = Parse(
       "module m;\n"
@@ -242,7 +237,6 @@ TEST(ParserSection6, TypedefForCastingUse) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.18: Typedef of enum type.
 TEST(ParserSection6, TypedefEnum) {
   auto r = Parse(
       "module m;\n"
@@ -259,4 +253,4 @@ TEST(ParserSection6, TypedefEnum) {
   EXPECT_EQ(var->data_type.type_name, "my_enum");
 }
 
-}  // namespace
+}

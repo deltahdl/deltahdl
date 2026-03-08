@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §E.2: `default_decay_time integer before module.
 TEST(ParserAnnexE, AnnexEDefaultDecayTimeInteger) {
   auto r =
       ParseWithPreprocessor("`default_decay_time 10\nmodule m; endmodule\n");
@@ -15,7 +14,6 @@ TEST(ParserAnnexE, AnnexEDefaultDecayTimeInteger) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-// §E.2: `default_decay_time real before module.
 TEST(ParserAnnexE, AnnexEDefaultDecayTimeReal) {
   auto r =
       ParseWithPreprocessor("`default_decay_time 3.5\nmodule m; endmodule\n");
@@ -25,7 +23,6 @@ TEST(ParserAnnexE, AnnexEDefaultDecayTimeReal) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-// §E.2: `default_decay_time infinite before module.
 TEST(ParserAnnexE, AnnexEDefaultDecayTimeInfinite) {
   auto r = ParseWithPreprocessor(
       "`default_decay_time infinite\nmodule m; endmodule\n");
@@ -35,7 +32,6 @@ TEST(ParserAnnexE, AnnexEDefaultDecayTimeInfinite) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-// §E.2: multiple modules after directive.
 TEST(ParserAnnexE, AnnexEDefaultDecayTimeMultipleModules) {
   auto r = ParseWithPreprocessor(
       "`default_decay_time 50\n"
@@ -48,4 +44,4 @@ TEST(ParserAnnexE, AnnexEDefaultDecayTimeMultipleModules) {
   EXPECT_EQ(r.cu->modules[1]->name, "b");
 }
 
-}  // namespace
+}

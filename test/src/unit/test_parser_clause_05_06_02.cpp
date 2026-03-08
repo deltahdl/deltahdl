@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.6.2: keywords are lowercase only ---
-
 TEST(ParserClause05, Cl5_6_2_KeywordsAreReserved) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -23,10 +21,8 @@ TEST(ParserClause05, Cl5_6_2_UppercaseNotKeyword) {
   EXPECT_FALSE(ParseOk("MODULE m; endmodule"));
 }
 
-// --- §5.6.2: escaped keyword is not interpreted as keyword ---
-
 TEST(ParserClause05, Cl5_6_2_EscapedKeywordAsIdentifier) {
   EXPECT_TRUE(ParseOk("module m; logic \\begin ; endmodule"));
 }
 
-}  // namespace
+}

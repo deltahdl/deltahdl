@@ -85,4 +85,4 @@ TEST(ElabA701, EmptySpecifyBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

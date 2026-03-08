@@ -276,4 +276,4 @@ TEST(SimA85, VarLvalueIndexedPartSelectMinus) {
   EXPECT_EQ(var->value.ToUint64(), 0xCD00u);
 }
 
-}  // namespace
+}

@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §9.2.2.2: always_comb with delay control produces an error.
 TEST(ElabClause09_02_02_02, TimingControlInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -20,7 +19,6 @@ TEST(ElabClause09_02_02_02, TimingControlInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.2: always_comb with event control produces an error.
 TEST(ElabClause09_02_02_02, EventControlInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -32,7 +30,6 @@ TEST(ElabClause09_02_02_02, EventControlInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.2: always_comb with wait statement produces an error.
 TEST(ElabClause09_02_02_02, WaitInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -46,7 +43,6 @@ TEST(ElabClause09_02_02_02, WaitInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.2: always_comb with fork-join produces an error.
 TEST(ElabClause09_02_02_02, ForkJoinInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -63,7 +59,6 @@ TEST(ElabClause09_02_02_02, ForkJoinInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.2: always_comb with incomplete if warns about latched behavior.
 TEST(ElabClause09_02_02_02, IncompleteIfWarnsLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -77,7 +72,6 @@ TEST(ElabClause09_02_02_02, IncompleteIfWarnsLatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §9.2.2.2: always_comb with complete if/else does not warn.
 TEST(ElabClause09_02_02_02, CompleteIfElseNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -93,7 +87,6 @@ TEST(ElabClause09_02_02_02, CompleteIfElseNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §9.2.2.2: always_comb with case without default warns about latched behavior.
 TEST(ElabClause09_02_02_02, CaseWithoutDefaultWarnsLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -111,7 +104,6 @@ TEST(ElabClause09_02_02_02, CaseWithoutDefaultWarnsLatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §9.2.2.2: always_comb with case + default does not warn.
 TEST(ElabClause09_02_02_02, CaseWithDefaultNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -131,7 +123,6 @@ TEST(ElabClause09_02_02_02, CaseWithDefaultNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §9.2.2.2: Multi-driver: same variable in two always_comb blocks.
 TEST(ElabClause09_02_02_02, MultiDriverTwoAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -144,7 +135,6 @@ TEST(ElabClause09_02_02_02, MultiDriverTwoAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.2: Multi-driver: always_comb + continuous assignment on same variable.
 TEST(ElabClause09_02_02_02, MultiDriverCombAndContAssignErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -157,7 +147,6 @@ TEST(ElabClause09_02_02_02, MultiDriverCombAndContAssignErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.2.2: Different variables in separate always_comb blocks is fine.
 TEST(ElabClause09_02_02_02, DifferentVarsInSeparateCombOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -171,7 +160,6 @@ TEST(ElabClause09_02_02_02, DifferentVarsInSeparateCombOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.2.2.2: always_comb elaborates to kAlwaysComb process kind.
 TEST(ElabClause09_02_02_02, AlwaysCombElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -190,7 +178,6 @@ TEST(ElabClause09_02_02_02, AlwaysCombElaboratesToCorrectKind) {
   EXPECT_TRUE(found);
 }
 
-// §9.2.2.2: always_comb without timing control is fine (no zero-delay warning).
 TEST(ElabClause09_02_02_02, AlwaysCombNoTimingControlNoZeroDelayWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -350,7 +337,6 @@ TEST(SimCh9b, AlwaysCombBlockMultipleOutputs) {
   EXPECT_EQ(diff->value.ToUint64(), 0x1Bu);
 }
 
-// §9.3.2: fork/join in always_comb is an error.
 TEST(ElabClause09_03_02, ForkInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -367,7 +353,6 @@ TEST(ElabClause09_03_02, ForkInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.4.1: Delay in always_comb is an error.
 TEST(ElabClause09_04_01, DelayInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -578,7 +563,6 @@ TEST(AlwaysCombIfElseFalseBranch, AlwaysCombIfElseFalseBranch) {
   EXPECT_EQ(y->value.ToUint64(), 0xBBu);
 }
 
-// §9.2.2.2.2: always_comb elaborates to kAlwaysComb.
 TEST(AlwaysCombIsAlwaysCombKind, AlwaysCombIsAlwaysCombKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -715,7 +699,6 @@ TEST(AlwaysCombOutputAfterRun, AlwaysCombOutputAfterRun) {
   EXPECT_EQ(result->value.ToUint64(), 100u);
 }
 
-// §9.2.2.2.2: always_comb auto-executes at time zero, result is set.
 TEST(AlwaysCombTimeZeroExecution, AlwaysCombTimeZeroExecution) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -734,4 +717,4 @@ TEST(AlwaysCombTimeZeroExecution, AlwaysCombTimeZeroExecution) {
   EXPECT_EQ(y->value.ToUint64(), 77u);
 }
 
-}  // namespace
+}

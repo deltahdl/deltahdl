@@ -202,4 +202,4 @@ TEST(SimCh10, BlockingAssignChain) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 1u}, {"c", 1u}});
 }
 
-}  // namespace
+}

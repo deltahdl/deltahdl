@@ -185,7 +185,6 @@ TEST(ParserA221, NonIntegerTypes) {
             DataTypeKind::kRealtime);
 }
 
-// §11.2.1: ConstEvalReal — division by zero returns nullopt.
 TEST(ConstEvalReal, DivByZeroReturnsNullopt) {
   EvalFixture f;
   auto* e = ParseExprFrom("1.0 / 0.0", f);
@@ -193,4 +192,4 @@ TEST(ConstEvalReal, DivByZeroReturnsNullopt) {
   EXPECT_FALSE(val.has_value());
 }
 
-}  // namespace
+}

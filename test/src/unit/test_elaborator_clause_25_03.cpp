@@ -48,4 +48,4 @@ TEST(ParserAnnexA0412, ElaborationInterfaceInsideInterface) {
   EXPECT_NE(outer->children[0].resolved, nullptr);
 }
 
-}  // namespace
+}

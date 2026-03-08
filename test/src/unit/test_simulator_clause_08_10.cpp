@@ -26,7 +26,6 @@ TEST(ClassSim, StaticMethodResolution) {
   EXPECT_TRUE(it->second->is_static);
 }
 
-// §8.10: Static method callable without creating an instance.
 TEST(ClassSim, StaticMethodCallableWithoutInstance) {
   SimFixture f;
   auto* type = MakeClassType(f, "Counter", {});
@@ -40,13 +39,11 @@ TEST(ClassSim, StaticMethodCallableWithoutInstance) {
   method->func_body_stmts.push_back(MakeReturn(f.arena, MkInt(f.arena, 0)));
   type->methods["get_count"] = method;
 
-  // No instance created — static method is still on the type.
   auto it = type->methods.find("get_count");
   ASSERT_NE(it, type->methods.end());
   EXPECT_TRUE(it->second->is_static);
 }
 
-// §8.10: Static method can access static properties on the type.
 TEST(ClassSim, StaticMethodAccessesStaticProperty) {
   SimFixture f;
   auto* type = MakeClassType(f, "id", {});
@@ -59,9 +56,8 @@ TEST(ClassSim, StaticMethodAccessesStaticProperty) {
   method->is_static = true;
   type->methods["next_id"] = method;
 
-  // Static method exists on the type, and static property is accessible.
   ASSERT_NE(type->methods.count("next_id"), 0u);
   EXPECT_EQ(type->static_properties["current"].ToUint64(), 42u);
 }
 
-}  // namespace
+}

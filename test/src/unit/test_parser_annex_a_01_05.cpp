@@ -4,11 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §A.1.5 Configuration source text
-
-// config_declaration ::= config id ; { localparam ; } design_stmt
-//                        { config_rule_statement } endconfig [ : id ]
-
 TEST(ConfigA15, BasicConfig) {
   auto r = Parse(
       "config cfg;\n"
@@ -29,7 +24,6 @@ TEST(ConfigA15, ConfigWithEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// design_statement ::= design { [lib.] cell } ;
 TEST(ConfigA15, DesignMultipleCells) {
   auto r = Parse(
       "config cfg;\n"
@@ -40,7 +34,6 @@ TEST(ConfigA15, DesignMultipleCells) {
   EXPECT_EQ(r.cu->configs[0]->design_cells.size(), 2u);
 }
 
-// default_clause liblist_clause
 TEST(ConfigA15, DefaultLiblist) {
   auto r = Parse(
       "config cfg;\n"
@@ -54,7 +47,6 @@ TEST(ConfigA15, DefaultLiblist) {
   EXPECT_EQ(r.cu->configs[0]->rules[0]->liblist.size(), 2u);
 }
 
-// inst_clause liblist_clause
 TEST(ConfigA15, InstLiblist) {
   auto r = Parse(
       "config cfg;\n"
@@ -67,7 +59,6 @@ TEST(ConfigA15, InstLiblist) {
   EXPECT_EQ(r.cu->configs[0]->rules[0]->kind, ConfigRuleKind::kInstance);
 }
 
-// inst_clause use_clause
 TEST(ConfigA15, InstUseClause) {
   auto r = Parse(
       "config cfg;\n"
@@ -82,7 +73,6 @@ TEST(ConfigA15, InstUseClause) {
   EXPECT_EQ(rule->use_cell, "alt_cell");
 }
 
-// cell_clause liblist_clause
 TEST(ConfigA15, CellLiblist) {
   auto r = Parse(
       "config cfg;\n"
@@ -96,7 +86,6 @@ TEST(ConfigA15, CellLiblist) {
   EXPECT_EQ(rule->cell_name, "adder");
 }
 
-// cell_clause with library-qualified cell: cell [lib.] cell_id
 TEST(ConfigA15, CellLibQualified) {
   auto r = Parse(
       "config cfg;\n"
@@ -110,7 +99,6 @@ TEST(ConfigA15, CellLibQualified) {
   EXPECT_EQ(rule->cell_name, "and2");
 }
 
-// use_clause with :config suffix
 TEST(ConfigA15, UseClauseConfig) {
   auto r = Parse(
       "config cfg;\n"
@@ -123,7 +111,6 @@ TEST(ConfigA15, UseClauseConfig) {
   EXPECT_TRUE(rule->use_config);
 }
 
-// use_clause with named parameter assignments
 TEST(ConfigA15, UseClauseWithParams) {
   auto r = Parse(
       "config cfg;\n"
@@ -136,7 +123,6 @@ TEST(ConfigA15, UseClauseWithParams) {
   EXPECT_EQ(rule->use_params.size(), 2u);
 }
 
-// config with localparam
 TEST(ConfigA15, ConfigWithLocalparam) {
   auto r = Parse(
       "config cfg;\n"
@@ -148,7 +134,6 @@ TEST(ConfigA15, ConfigWithLocalparam) {
   EXPECT_EQ(r.cu->configs[0]->local_params.size(), 1u);
 }
 
-// Multiple config rules
 TEST(ConfigA15, MultipleRules) {
   auto r = Parse(
       "config cfg;\n"
@@ -162,4 +147,4 @@ TEST(ConfigA15, MultipleRules) {
   EXPECT_EQ(r.cu->configs[0]->rules.size(), 3u);
 }
 
-}  // namespace
+}

@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §13.5.3: Missing argument with no default value is an error.
 TEST(Elab1353, MissingArgNoDefaultError) {
   ElabFixture f;
   ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(Elab1353, MissingArgNoDefaultError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.5.3: Missing argument with a default value is OK.
 TEST(Elab1353, MissingArgWithDefaultOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -35,7 +33,6 @@ TEST(Elab1353, MissingArgWithDefaultOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.5.3: All args have defaults, calling with no args is OK.
 TEST(Elab1353, AllDefaultsNoArgsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,4 +48,4 @@ TEST(Elab1353, AllDefaultsNoArgsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

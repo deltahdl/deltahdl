@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §6.16: string variable elaborates with is_string flag.
 TEST(Elaboration, StringVarIsString) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -26,7 +25,6 @@ TEST(Elaboration, StringVarIsString) {
   EXPECT_TRUE(found) << "string variable 's' not found";
 }
 
-// §6.16: string defaults to empty string (no error).
 TEST(Elaboration, StringDefaultEmpty_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -38,7 +36,6 @@ TEST(Elaboration, StringDefaultEmpty_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.16: string with initializer elaborates ok.
 TEST(Elaboration, StringWithInit_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -50,4 +47,4 @@ TEST(Elaboration, StringWithInit_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

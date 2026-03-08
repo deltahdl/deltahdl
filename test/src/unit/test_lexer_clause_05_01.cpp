@@ -6,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §5.1: Clause 5 covers lexical tokens, literals, built-in method calls,
-// and attributes. Verify the lexer handles all four areas.
-
-// --- Area 1: Lexical tokens (whitespace, comments, operators) ---
-
 TEST(LexerClause05, Cl5_1_TokenStreamEndsWithEof) {
   auto tokens = Lex("module m; endmodule");
   ASSERT_FALSE(tokens.empty());
@@ -31,7 +26,7 @@ TEST(LexerClause05, Cl5_1_WhitespaceOnlyProducesEof) {
 
 TEST(LexerClause05, Cl5_1_WhitespaceIsNotEmittedAsToken) {
   auto tokens = Lex("a  b");
-  ASSERT_EQ(tokens.size(), 3u);  // a, b, EOF
+  ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
@@ -71,8 +66,6 @@ TEST(LexerClause05, Cl5_1_KeywordDistinctFromIdentifier) {
   EXPECT_EQ(id.token.kind, TokenKind::kIdentifier);
 }
 
-// --- Area 2: Integer, real, string, array, structure, and time literals ---
-
 TEST(LexerClause05, Cl5_1_IntegerLiteralRecognized) {
   auto r = LexOne("32'd100");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
@@ -99,7 +92,7 @@ TEST(LexerClause05, Cl5_1_UnbasedUnsizedLiteralRecognized) {
 }
 
 TEST(LexerClause05, Cl5_1_ArrayStructLiteralTokenRecognized) {
-  // '{ is the prefix for array and structure literals (§5.10/§5.11)
+
   auto r = LexOne("'{");
   EXPECT_EQ(r.token.kind, TokenKind::kApostropheLBrace);
 }
@@ -114,8 +107,6 @@ TEST(LexerClause05, Cl5_1_EscapedIdentifierRecognized) {
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
 }
 
-// --- Area 3: Built-in method calls ---
-
 TEST(LexerClause05, Cl5_1_SystemIdentifierRecognized) {
   auto r = LexOne("$display");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
@@ -128,7 +119,7 @@ TEST(LexerClause05, Cl5_1_SystemIdentifierPreservesDollarPrefix) {
 }
 
 TEST(LexerClause05, Cl5_1_DotTokenForBuiltinMethodCalls) {
-  // §5.13: built-in methods use dot notation (object.method)
+
   auto tokens = Lex("arr.size");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -136,23 +127,19 @@ TEST(LexerClause05, Cl5_1_DotTokenForBuiltinMethodCalls) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
 }
 
-// --- Area 4: Attributes ---
-
 TEST(LexerClause05, Cl5_1_AttributeStartTokenRecognized) {
   auto r = LexOne("(*");
   EXPECT_EQ(r.token.kind, TokenKind::kAttrStart);
 }
 
 TEST(LexerClause05, Cl5_1_AttributeEndTokenRecognized) {
-  // Lex "(* foo *)" and verify start and end tokens
+
   auto tokens = Lex("(* foo *)");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[2].kind, TokenKind::kAttrEnd);
 }
-
-// --- Integration: all four areas in one token stream ---
 
 TEST(LexerClause05, Cl5_1_AllFourAreasInOneStream) {
   auto tokens =
@@ -162,8 +149,6 @@ TEST(LexerClause05, Cl5_1_AllFourAreasInOneStream) {
           "  initial $display(\"msg\");\n"
           "endmodule\n");
 
-  // Should contain: attribute tokens, keywords, operators, integer literal,
-  // real literal, string literal, system identifier, identifiers
   bool has_attr_start = false;
   bool has_keyword = false;
   bool has_operator = false;
@@ -194,8 +179,6 @@ TEST(LexerClause05, Cl5_1_AllFourAreasInOneStream) {
   EXPECT_TRUE(has_identifier);
 }
 
-// --- Error conditions ---
-
 TEST(LexerClause05, Cl5_1_UnterminatedBlockCommentIsError) {
   auto r = LexWithDiag("a /* unterminated");
   EXPECT_TRUE(r.has_errors);
@@ -206,4 +189,4 @@ TEST(LexerClause05, Cl5_1_UnterminatedStringIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -22,4 +22,4 @@ TEST(ParserSection7, Sec7_2_2_StructComparison) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kEqEq);
 }
 
-}  // namespace
+}

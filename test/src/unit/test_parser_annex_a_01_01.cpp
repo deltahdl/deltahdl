@@ -4,10 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §A.1.1 library_text ::= { library_description }
-// library_description ::= library_declaration | include_statement
-//                        | config_declaration | ;
-
 TEST(LibraryText, NullDescription) {
   auto r = ParseLibrary(";\n;\n");
   ASSERT_NE(r.cu, nullptr);
@@ -23,10 +19,6 @@ TEST(LibraryText, EmptyInput) {
   EXPECT_TRUE(r.cu->lib_includes.empty());
   EXPECT_TRUE(r.cu->configs.empty());
 }
-
-// §A.1.1 library_declaration ::=
-//   library library_identifier file_path_spec { , file_path_spec }
-//   [ -incdir file_path_spec { , file_path_spec } ] ;
 
 TEST(LibraryText, SingleLibraryDecl) {
   auto r = ParseLibrary("library mylib \"file.sv\";\n");
@@ -69,16 +61,12 @@ TEST(LibraryText, MultipleLibraryDecls) {
   EXPECT_EQ(r.cu->libraries[1]->name, "rtl");
 }
 
-// §A.1.1 include_statement ::= include file_path_spec ;
-
 TEST(LibraryText, IncludeStatement) {
   auto r = ParseLibrary("include \"extra.svlib\";\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->lib_includes.size(), 1u);
 }
-
-// library_text allows config_declaration alongside libraries
 
 TEST(LibraryText, ConfigInLibraryText) {
   auto r = ParseLibrary(
@@ -107,11 +95,9 @@ TEST(LibraryText, MixedDescriptions) {
   EXPECT_EQ(r.cu->configs.size(), 1u);
 }
 
-// Error: unexpected token in library text
-
 TEST(LibraryText, ErrorUnexpectedToken) {
   auto r = ParseLibrary("module m; endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

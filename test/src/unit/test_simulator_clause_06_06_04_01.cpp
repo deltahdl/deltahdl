@@ -30,7 +30,6 @@ static Net MakeTriregNet(Arena& arena, Variable*& var, Strength strength,
 
 namespace {
 
-// §6.6.4.1: Larger charge strength overrides smaller — value propagates.
 TEST(CapacitiveNetwork, LargerOverridesSmaller) {
   Arena arena;
   Variable* var_a = nullptr;
@@ -43,7 +42,6 @@ TEST(CapacitiveNetwork, LargerOverridesSmaller) {
   EXPECT_EQ(var_a->value.ToUint64(), 1u);
 }
 
-// §6.6.4.1: Reverse argument order — smaller is first arg.
 TEST(CapacitiveNetwork, SmallerFirstArgStillOverridden) {
   Arena arena;
   Variable* var_a = nullptr;
@@ -56,7 +54,6 @@ TEST(CapacitiveNetwork, SmallerFirstArgStillOverridden) {
   EXPECT_EQ(var_b->value.ToUint64(), 1u);
 }
 
-// §6.6.4.1: Equal strength, different values → both x.
 TEST(CapacitiveNetwork, EqualStrengthDifferentValuesToX) {
   Arena arena;
   Variable* var_a = nullptr;
@@ -72,7 +69,6 @@ TEST(CapacitiveNetwork, EqualStrengthDifferentValuesToX) {
   EXPECT_EQ(var_b->value.words[0].bval & 0xFF, 0xFFu);
 }
 
-// §6.6.4.1: Equal strength, same value → retained.
 TEST(CapacitiveNetwork, EqualStrengthSameValueRetained) {
   Arena arena;
   Variable* var_a = nullptr;
@@ -85,7 +81,6 @@ TEST(CapacitiveNetwork, EqualStrengthSameValueRetained) {
   EXPECT_EQ(var_b->value.ToUint64(), 55u);
 }
 
-// §6.6.4.1: No propagation unless both nets are in capacitive state.
 TEST(CapacitiveNetwork, OnlyWhenBothCapacitive) {
   Arena arena;
   Variable* var_a = nullptr;
@@ -106,7 +101,6 @@ TEST(CapacitiveNetwork, OnlyWhenBothCapacitive) {
   EXPECT_EQ(var_b->value.ToUint64(), 0u);
 }
 
-// §6.6.4.1: Charge strength sharing — smaller net adopts larger's strength.
 TEST(CapacitiveNetwork, SmallerAdoptsLargerChargeStrength) {
   Arena arena;
   Variable* var_a = nullptr;
@@ -119,7 +113,6 @@ TEST(CapacitiveNetwork, SmallerAdoptsLargerChargeStrength) {
   EXPECT_EQ(a.charge_strength, Strength::kLarge);
 }
 
-// §6.6.4.1: DisconnectCharge restores base charge strength.
 TEST(CapacitiveNetwork, DisconnectRestoresBaseStrength) {
   Arena arena;
   Variable* var_a = nullptr;
@@ -134,7 +127,6 @@ TEST(CapacitiveNetwork, DisconnectRestoresBaseStrength) {
   EXPECT_EQ(b.charge_strength, Strength::kSmall);
 }
 
-// §6.6.4.1: Equal strength propagation does not change charge strength.
 TEST(CapacitiveNetwork, EqualStrengthNoChargeStrengthChange) {
   Arena arena;
   Variable* var_a = nullptr;
@@ -147,12 +139,11 @@ TEST(CapacitiveNetwork, EqualStrengthNoChargeStrengthChange) {
   EXPECT_EQ(b.charge_strength, Strength::kMedium);
 }
 
-// §6.6.4.1: Multi-word vector propagation works correctly.
 TEST(CapacitiveNetwork, MultiWordVectorPropagation) {
   Arena arena;
   Variable* var_a = nullptr;
   Variable* var_b = nullptr;
-  // Use 128-bit width (2 words).
+
   Net a = MakeTriregNet(arena, var_a, Strength::kLarge, 128, 0xDEAD);
   Net b = MakeTriregNet(arena, var_b, Strength::kSmall, 128, 0xBEEF);
 
@@ -161,4 +152,4 @@ TEST(CapacitiveNetwork, MultiWordVectorPropagation) {
   EXPECT_EQ(var_a->value.ToUint64(), 0xDEADu);
 }
 
-}  // namespace
+}

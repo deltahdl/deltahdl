@@ -169,4 +169,4 @@ TEST(Clocking, PerSignalSkewOverridesDefault) {
   EXPECT_EQ(default_skew.ticks, 5u);
 }
 
-}  // namespace
+}

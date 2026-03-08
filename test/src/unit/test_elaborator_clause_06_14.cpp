@@ -46,7 +46,6 @@ TEST(Elaboration, ChandleVarDecl_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.14: chandle-to-chandle assignment is ok.
 TEST(Elaboration, ChandleToChandleAssign_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -59,7 +58,6 @@ TEST(Elaboration, ChandleToChandleAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.14: chandle assigned to null is ok.
 TEST(Elaboration, ChandleAssignNull_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -72,4 +70,4 @@ TEST(Elaboration, ChandleAssignNull_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

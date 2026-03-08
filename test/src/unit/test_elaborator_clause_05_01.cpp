@@ -2,10 +2,6 @@
 
 namespace {
 
-// §5.1: Clause 5 covers lexical tokens, literals, built-in method calls,
-// and attributes. Verify that the elaborator accepts modules using all
-// four areas described in the overview.
-
 TEST(ElabClause05, Cl5_1_ModuleWithIntegerLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -50,7 +46,7 @@ TEST(ElabClause05, Cl5_1_ModuleWithUnbasedUnsizedLiteralElaborates) {
 }
 
 TEST(ElabClause05, Cl5_1_ModuleWithArrayLiteralElaborates) {
-  // §5.11: array literals use '{ } syntax
+
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  int arr [0:1];\n"
@@ -59,7 +55,7 @@ TEST(ElabClause05, Cl5_1_ModuleWithArrayLiteralElaborates) {
 }
 
 TEST(ElabClause05, Cl5_1_ModuleWithStructureLiteralElaborates) {
-  // §5.10: structure literals use '{ } syntax
+
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct { int a; int b; } ab_t;\n"
@@ -69,7 +65,7 @@ TEST(ElabClause05, Cl5_1_ModuleWithStructureLiteralElaborates) {
 }
 
 TEST(ElabClause05, Cl5_1_ModuleWithBuiltinMethodElaborates) {
-  // §5.13: built-in methods use dot notation
+
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  int q[$];\n"
@@ -103,4 +99,4 @@ TEST(ElabClause05, Cl5_1_CommentsDoNotAffectElaboration) {
              "endmodule /* end */\n"));
 }
 
-}  // namespace
+}

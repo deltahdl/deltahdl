@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 
@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.3: Wait statement elaborates in initial block.
 TEST(ElabClause09_04_03, WaitStatementElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,7 +21,6 @@ TEST(ElabClause09_04_03, WaitStatementElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.3: Wait with null statement elaborates.
 TEST(ElabClause09_04_03, WaitNullStatementElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +35,6 @@ TEST(ElabClause09_04_03, WaitNullStatementElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.3: Wait with block statement elaborates.
 TEST(ElabClause09_04_03, WaitWithBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -56,7 +53,6 @@ TEST(ElabClause09_04_03, WaitWithBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.3: Wait with negated expression elaborates.
 TEST(ElabClause09_04_03, WaitNegatedExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -72,4 +68,4 @@ TEST(ElabClause09_04_03, WaitNegatedExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

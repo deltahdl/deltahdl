@@ -17,4 +17,4 @@ TEST(ParserAnnexD2, AnnexDKeyNokey) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

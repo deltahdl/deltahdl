@@ -26,7 +26,6 @@ TEST(ParserSection6, Sec6_6_7_NettypeUsedForNetDecl) {
               "endmodule\n"));
 }
 
-// §6.7.2: Array of nets with user-defined nettype.
 TEST(ParserSection6, Sec6_7_2_NettypeArrayDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -35,7 +34,6 @@ TEST(ParserSection6, Sec6_7_2_NettypeArrayDecl) {
               "endmodule\n"));
 }
 
-// §6.7.2: Resolved nettype (with resolution function) used in declaration.
 TEST(ParserSection6, Sec6_7_2_ResolvedNettypeDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -49,7 +47,6 @@ TEST(ParserSection6, Sec6_7_2_ResolvedNettypeDecl) {
               "endmodule\n"));
 }
 
-// §6.7.2: Multiple instances of a user-defined nettype.
 TEST(ParserSection6, Sec6_7_2_MultipleNettypeInstances) {
   auto r = Parse(
       "module m;\n"
@@ -59,14 +56,13 @@ TEST(ParserSection6, Sec6_7_2_MultipleNettypeInstances) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto& items = r.cu->modules[0]->items;
-  // nettype decl + 3 variable decls
+
   ASSERT_GE(items.size(), 4u);
   EXPECT_EQ(items[1]->name, "a");
   EXPECT_EQ(items[2]->name, "b");
   EXPECT_EQ(items[3]->name, "c");
 }
 
-// §6.7.2: Unresolved nettype (no resolution function).
 TEST(ParserSection6, Sec6_7_2_UnresolvedNettypeDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -76,7 +72,6 @@ TEST(ParserSection6, Sec6_7_2_UnresolvedNettypeDecl) {
               "endmodule\n"));
 }
 
-// §6.7.2: Nettype alias (nettype of nettype).
 TEST(ParserSection6, Sec6_7_2_NettypeAlias) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -90,4 +85,4 @@ TEST(ParserSection6, Sec6_7_2_NettypeAlias) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

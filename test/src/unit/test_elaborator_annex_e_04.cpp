@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §E.4: delay_mode_distributed propagates to elaborated module.
 TEST(Elaborator, DelayModeDistributed_PropagatedToModule) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -18,7 +17,6 @@ TEST(Elaborator, DelayModeDistributed_PropagatedToModule) {
             DelayModeDirective::kDistributed);
 }
 
-// §E.4: no directive means kNone.
 TEST(Elaborator, DelayMode_DefaultIsNone) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -30,7 +28,6 @@ TEST(Elaborator, DelayMode_DefaultIsNone) {
   EXPECT_EQ(design->top_modules[0]->delay_mode, DelayModeDirective::kNone);
 }
 
-// §E.4: delay_mode_distributed with other Annex E directives.
 TEST(Elaborator, DelayModeDistributed_WithOtherDirectives) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -46,4 +43,4 @@ TEST(Elaborator, DelayModeDistributed_WithOtherDirectives) {
             DelayModeDirective::kDistributed);
 }
 
-}  // namespace
+}

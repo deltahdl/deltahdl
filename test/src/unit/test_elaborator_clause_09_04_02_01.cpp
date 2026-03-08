@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.1: OR-separated sensitivity list elaborates.
 TEST(ElabClause09_04_02_01, OrSeparatedSensitivityElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -17,7 +16,6 @@ TEST(ElabClause09_04_02_01, OrSeparatedSensitivityElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.2.1: Comma-separated sensitivity list elaborates (synonym for OR).
 TEST(ElabClause09_04_02_01, CommaSeparatedSensitivityElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -30,7 +28,6 @@ TEST(ElabClause09_04_02_01, CommaSeparatedSensitivityElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.2.1: Mixed OR and comma in sensitivity list.
 TEST(ElabClause09_04_02_01, MixedOrAndCommaElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -43,7 +40,6 @@ TEST(ElabClause09_04_02_01, MixedOrAndCommaElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.2.1: Edge events with OR.
 TEST(ElabClause09_04_02_01, EdgeEventsWithOrElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -56,7 +52,6 @@ TEST(ElabClause09_04_02_01, EdgeEventsWithOrElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.2.1: Sensitivity list preserved in RTLIR.
 TEST(ElabClause09_04_02_01, SensitivityListPreservedInRtlir) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -77,4 +72,4 @@ TEST(ElabClause09_04_02_01, SensitivityListPreservedInRtlir) {
   }
 }
 
-}  // namespace
+}

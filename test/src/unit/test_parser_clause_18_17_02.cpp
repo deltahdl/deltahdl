@@ -49,4 +49,4 @@ TEST(ParserA612, RsIfElse) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

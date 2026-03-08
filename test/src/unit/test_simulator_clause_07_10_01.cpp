@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §7.10.1: Queue indexing returns correct element.
 TEST(QueueOps, IndexReturnsElement) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
@@ -16,7 +15,6 @@ TEST(QueueOps, IndexReturnsElement) {
   EXPECT_EQ(result.ToUint64(), 20u);
 }
 
-// §7.10.1: Out-of-bounds index returns x.
 TEST(QueueOps, OutOfBoundsReturnsX) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20});
@@ -24,11 +22,10 @@ TEST(QueueOps, OutOfBoundsReturnsX) {
   EXPECT_FALSE(result.IsKnown());
 }
 
-// §7.10.1: Empty queue is valid.
 TEST(QueueOps, EmptyQueueSizeZero) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32);
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-}  // namespace
+}

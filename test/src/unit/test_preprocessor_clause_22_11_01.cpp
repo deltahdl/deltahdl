@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include <gtest/gtest.h>
 
@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- §22.11.1: `pragma reset resets named pragmas ---
 TEST(Preprocessor, Pragma_Reset_NoError) {
   PreprocFixture f;
   Preprocess("`pragma reset my_pragma\n", f);
@@ -21,4 +20,4 @@ TEST(Preprocessor, Pragma_Reset_MultipleNames_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

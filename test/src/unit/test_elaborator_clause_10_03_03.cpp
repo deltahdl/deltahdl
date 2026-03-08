@@ -50,8 +50,6 @@ TEST(ElabClause1003, ContAssignDelayThreeValues) {
   EXPECT_NE(mod->assigns[0].delay_decay, nullptr);
 }
 
-// §10.3.3: Nettype nets shall only have a single delay.
-
 TEST(ElabClause100303, NettypeMultiDelay_Error) {
   ElabFixture f;
   Elaborate(
@@ -88,8 +86,6 @@ TEST(ElabClause100303, NettypeThreeDelay_Error) {
       f);
   EXPECT_TRUE(f.has_errors);
 }
-
-// §10.3.3: Delay values are preserved through elaboration.
 
 TEST(ElabClause100303, SingleDelayValue) {
   ElabFixture f;
@@ -142,8 +138,6 @@ TEST(ElabClause100303, ThreeDelayValues) {
   EXPECT_EQ(mod->assigns[0].delay_decay->int_val, 15u);
 }
 
-// §10.3.3: No delay — fields are null.
-
 TEST(ElabClause100303, NoDelay) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -160,4 +154,4 @@ TEST(ElabClause100303, NoDelay) {
   EXPECT_EQ(mod->assigns[0].delay_decay, nullptr);
 }
 
-}  // namespace
+}

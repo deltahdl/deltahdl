@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.26.8: Interface class method with default argument values.
 TEST(ParserSection8, InterfaceMethodDefaultArgs) {
   EXPECT_TRUE(
       ParseOk("interface class IC;\n"
@@ -12,7 +11,6 @@ TEST(ParserSection8, InterfaceMethodDefaultArgs) {
               "endclass\n"));
 }
 
-// §8.26.8: Interface class method with multiple default args.
 TEST(ParserSection8, InterfaceMethodMultipleDefaultArgs) {
   EXPECT_TRUE(
       ParseOk("interface class IC;\n"
@@ -20,4 +18,4 @@ TEST(ParserSection8, InterfaceMethodMultipleDefaultArgs) {
               "endclass\n"));
 }
 
-}  // namespace
+}

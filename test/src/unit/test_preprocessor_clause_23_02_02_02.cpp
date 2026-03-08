@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -112,4 +112,4 @@ TEST(ParserA212, InputVariablePortTypeVar) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
 }
 
-}  // namespace
+}

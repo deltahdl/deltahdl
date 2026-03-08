@@ -32,4 +32,4 @@ TEST(ParserSection21, WritemembCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

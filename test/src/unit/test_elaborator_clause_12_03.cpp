@@ -31,4 +31,4 @@ TEST(SimA604, NullStatementNoEffect) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-}  // namespace
+}

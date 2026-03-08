@@ -18,4 +18,4 @@ TEST(ParserSection7, QueuePopBack) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.3.4: Named sequential block elaborates correctly.
 TEST(ElabClause09_03_04, NamedSeqBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,7 +21,6 @@ TEST(ElabClause09_03_04, NamedSeqBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.4: Named fork block elaborates correctly.
 TEST(ElabClause09_03_04, NamedForkBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -40,4 +38,4 @@ TEST(ElabClause09_03_04, NamedForkBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

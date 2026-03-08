@@ -40,4 +40,4 @@ TEST(Constraint, UniqueConstraint) {
   EXPECT_NE(v0, v2);
 }
 
-}  // namespace
+}

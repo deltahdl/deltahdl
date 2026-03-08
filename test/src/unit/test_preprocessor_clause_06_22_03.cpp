@@ -26,4 +26,4 @@ TEST(ParserSection6, AssignCompatibleIntToReal) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

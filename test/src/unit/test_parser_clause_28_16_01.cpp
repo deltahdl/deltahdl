@@ -24,4 +24,4 @@ TEST(ParserA301, GateInst_DelayWithMinTypMax) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

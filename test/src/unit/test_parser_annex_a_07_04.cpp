@@ -47,4 +47,4 @@ TEST(ParserA704, ListOfPathDelayExpr3) {
   ASSERT_EQ(si->path.delays.size(), 3u);
 }
 
-}  // namespace
+}

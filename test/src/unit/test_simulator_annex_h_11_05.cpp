@@ -47,4 +47,4 @@ TEST(SvDpi, PutPartSelectBit) {
   EXPECT_EQ(dst, 0xF0u);
 }
 
-}  // namespace
+}

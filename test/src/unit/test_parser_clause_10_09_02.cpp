@@ -350,4 +350,4 @@ TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
               "endmodule"));
 }
 
-}  // namespace
+}

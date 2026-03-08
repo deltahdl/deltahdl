@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -81,7 +81,6 @@ TEST(ParserSection8, EmptyClassDecl) {
   EXPECT_TRUE(r.cu->classes[0]->members.empty());
 }
 
-// --- §8.3 implements clause ---
 TEST(ParserClause08_03, ImplementsSingleInterface) {
   auto r = Parse(
       "class C implements IFace;\n"
@@ -93,7 +92,6 @@ TEST(ParserClause08_03, ImplementsSingleInterface) {
   EXPECT_EQ(cls->implements_types[0], "IFace");
 }
 
-// --- §8.3 extends with constructor arguments ---
 TEST(ParserClause08_03, ExtendsWithArgs) {
   auto r = Parse(
       "class D extends Base(5);\n"
@@ -105,7 +103,6 @@ TEST(ParserClause08_03, ExtendsWithArgs) {
   ASSERT_EQ(cls->extends_args.size(), 1u);
 }
 
-// --- §8.3 class_constructor_arg: default keyword ---
 TEST(ParserClause08_03, ConstructorDefaultArg) {
   auto r = Parse(
       "class C extends Base;\n"
@@ -120,7 +117,6 @@ TEST(ParserClause08_03, ConstructorDefaultArg) {
   EXPECT_TRUE(members[0]->method->func_args[0].is_default);
 }
 
-// --- §8.3 dynamic_override_specifiers on methods ---
 TEST(ParserClause08_03, MethodInitialSpecifier) {
   auto r = Parse(
       "class C;\n"
@@ -129,7 +125,6 @@ TEST(ParserClause08_03, MethodInitialSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
-// --- §8.3 footnote 9: default at most once in constructor arg list ---
 TEST(ParserClause08_03, ErrorDuplicateDefaultInConstructorArgs) {
   auto r = Parse(
       "class C extends Base;\n"
@@ -139,7 +134,6 @@ TEST(ParserClause08_03, ErrorDuplicateDefaultInConstructorArgs) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// --- §8.3 footnote 10: qualifier conflict errors ---
 TEST(ParserClause08_03, ErrorBothLocalAndProtected) {
   auto r = Parse(
       "class C;\n"
@@ -156,4 +150,4 @@ TEST(ParserClause08_03, ErrorDuplicateStatic) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

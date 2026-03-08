@@ -56,4 +56,4 @@ TEST(ParserA81, StreamExprWithMinusRange) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

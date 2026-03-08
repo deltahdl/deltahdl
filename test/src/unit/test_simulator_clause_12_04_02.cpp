@@ -103,7 +103,6 @@ TEST(SimA606, PriorityIfFirstMatch) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.4.2: unique if no match without else → violation.
 TEST(SimA606, UniqueIfNoMatchNoElseWarning) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -127,7 +126,6 @@ TEST(SimA606, UniqueIfNoMatchNoElseWarning) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.4.2: unique if with else, no match → no violation.
 TEST(SimA606, UniqueIfNoMatchWithElseNoWarning) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -151,7 +149,6 @@ TEST(SimA606, UniqueIfNoMatchWithElseNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.4.2: unique0 if no match, no else → NO violation.
 TEST(SimA606, Unique0IfNoMatchNoElseNoWarning) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -175,7 +172,6 @@ TEST(SimA606, Unique0IfNoMatchNoElseNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.4.2: unique if with overlapping conditions → violation.
 TEST(SimA606, UniqueIfOverlapWarning) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -194,13 +190,12 @@ TEST(SimA606, UniqueIfOverlapWarning) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // Executes first true branch even with overlap
+
   EXPECT_EQ(var->value.ToUint64(), 10u);
-  // Overlap detected → violation
+
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.4.2: unique0 if with overlapping conditions → violation.
 TEST(SimA606, Unique0IfOverlapWarning) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -219,11 +214,10 @@ TEST(SimA606, Unique0IfOverlapWarning) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
-  // Overlap detected → violation
+
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.4.2: unique if single condition, no overlap possible → no warning.
 TEST(SimA606, UniqueIfSingleConditionNoOverlap) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -245,4 +239,4 @@ TEST(SimA606, UniqueIfSingleConditionNoOverlap) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-}  // namespace
+}

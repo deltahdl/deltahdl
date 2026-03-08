@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §4.4: Sensitivity and region-related elaboration ---
-
 TEST(ElabCh44, AlwaysCombInfersSensitivityFromBody) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -172,7 +170,7 @@ TEST(ElabCh44, AlwaysCombDoesNotIncludeWrittenVarsInSensitivity) {
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->processes.size(), 1u);
-  // Sensitivity should include 'a' but not 'b'.
+
   ASSERT_FALSE(mod->processes[0].sensitivity.empty());
   EXPECT_EQ(mod->processes[0].sensitivity.size(), 1u);
 }
@@ -209,4 +207,4 @@ TEST(ElabCh44, PlainAlwaysWithStarSensitivity) {
   EXPECT_FALSE(mod->processes[0].sensitivity.empty());
 }
 
-}  // namespace
+}

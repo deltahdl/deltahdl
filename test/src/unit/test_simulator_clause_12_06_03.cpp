@@ -1,4 +1,4 @@
-// §12.6.3: Pattern matching in conditional expressions.
+
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §12.6.3: matches in ternary predicate — match selects consequent.
 TEST(SimA60703, TernaryMatchesTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,7 +28,6 @@ TEST(SimA60703, TernaryMatchesTrue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §12.6.3: matches mismatch in ternary — alternative selected.
 TEST(SimA60703, TernaryMatchesFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -50,7 +48,6 @@ TEST(SimA60703, TernaryMatchesFalse) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §12.6.3: matches with wildcard pattern in ternary.
 TEST(SimA60703, TernaryMatchesWildcard) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -72,7 +69,6 @@ TEST(SimA60703, TernaryMatchesWildcard) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.6.3: matches with &&& guard in ternary — both true.
 TEST(SimA60703, TernaryMatchesGuardTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -95,7 +91,6 @@ TEST(SimA60703, TernaryMatchesGuardTrue) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.6.3: matches with &&& guard false in ternary — alternative selected.
 TEST(SimA60703, TernaryMatchesGuardFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -118,7 +113,6 @@ TEST(SimA60703, TernaryMatchesGuardFalse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §12.6.3: Ternary with matches used in assignment expression context.
 TEST(SimA60703, TernaryMatchesInAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -140,4 +134,4 @@ TEST(SimA60703, TernaryMatchesInAssignment) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}  // namespace
+}

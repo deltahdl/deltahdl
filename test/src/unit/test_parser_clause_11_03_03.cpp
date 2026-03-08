@@ -23,4 +23,4 @@ TEST(ParserA83, ExprPrimary) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-}  // namespace
+}

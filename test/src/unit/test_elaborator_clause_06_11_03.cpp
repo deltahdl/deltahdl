@@ -52,7 +52,6 @@ TEST(SimCh6b, TypeOpByteIsSigned) {
   EXPECT_EQ(var->value.width, 8u);
 }
 
-// §6.11.3: int is signed by default, int unsigned overrides.
 TEST(SimCh6b, IntDefaultSignedVsUnsignedOverride) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -74,4 +73,4 @@ TEST(SimCh6b, IntDefaultSignedVsUnsignedOverride) {
   EXPECT_FALSE(vu->is_signed) << "int unsigned is unsigned";
 }
 
-}  // namespace
+}

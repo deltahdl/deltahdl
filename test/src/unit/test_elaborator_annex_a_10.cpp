@@ -4,10 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §A.10 clarification 2: ref port shall be variable type;
-// inout port shall not be variable type;
-// illegal to initialize non-variable-output port
-
 TEST(ElabA10, RefPortOnModule) {
   EXPECT_TRUE(
       ElabOk("module m(ref int x);\n"
@@ -19,9 +15,6 @@ TEST(ElabA10, InoutPortOnModule) {
       ElabOk("module m(inout wire a);\n"
              "endmodule\n"));
 }
-
-// §A.10 clarification 3: timeunits_declaration in non_port item
-// must repeat/match previous
 
 TEST(ElabA10, TimeunitDeclOk) {
   EXPECT_TRUE(
@@ -45,8 +38,6 @@ TEST(ElabA10, TimeunitAndPrecisionOk) {
              "endmodule\n"));
 }
 
-// §A.10 clarification 7: parameter in class is synonym for localparam
-
 TEST(ElabA10, ParameterInClassIsLocalparam) {
   EXPECT_TRUE(
       ElabOk("class c;\n"
@@ -54,9 +45,6 @@ TEST(ElabA10, ParameterInClassIsLocalparam) {
              "endclass\n"
              "module m; endmodule\n"));
 }
-
-// §A.10 clarification 14: automatic illegal outside procedural context;
-// must have explicit data_type unless var keyword used
 
 TEST(ElabA10, AutomaticInInitialBlockOk) {
   EXPECT_TRUE(
@@ -77,8 +65,6 @@ TEST(ElabA10, AutomaticInModuleScopeError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §A.10 clarification 15: illegal to have import directly within class scope
-
 TEST(ElabA10, ImportInClassScopeError) {
   ElabFixture f;
   ElaborateSrc(
@@ -92,9 +78,6 @@ TEST(ElabA10, ImportInClassScopeError) {
       f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// §A.10 clarification 16: charge strength only with trireg;
-// vectored/scalared requires packed dimension
 
 TEST(ElabA10, VectoredRequiresPackedDim) {
   EXPECT_TRUE(
@@ -110,9 +93,6 @@ TEST(ElabA10, ScalaredRequiresPackedDim) {
              "endmodule\n"));
 }
 
-// §A.10 clarification 17: packed keyword required with struct
-// when packed dimensions are used
-
 TEST(ElabA10, StructPackedWithDimOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -123,9 +103,6 @@ TEST(ElabA10, StructPackedWithDimOk) {
              "  my_t data;\n"
              "endmodule\n"));
 }
-
-// §A.10 clarification 18: type_reference in net decl preceded by net type
-// keyword
 
 TEST(ElabA10, TypeRefWithWireOk) {
   EXPECT_TRUE(
@@ -143,8 +120,6 @@ TEST(ElabA10, TypeRefWithVarOk) {
              "endmodule\n"));
 }
 
-// §A.10 clarification 34: .* at most once in port connections
-
 TEST(ElabA10, DotStarOk) {
   EXPECT_TRUE(
       ElabOk("module sub(input a, output b);\n"
@@ -156,9 +131,6 @@ TEST(ElabA10, DotStarOk) {
              "endmodule\n"));
 }
 
-// §A.10 clarification 39: multiplier in multiple_concatenation
-// shall be constant_expression unless string type
-
 TEST(ElabA10, ReplicationWithConstantOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -167,8 +139,6 @@ TEST(ElabA10, ReplicationWithConstantOk) {
              "endmodule\n"));
 }
 
-// §A.10 clarification 40: {} is empty unpacked array concatenation
-
 TEST(ElabA10, EmptyUnpackedArrayConcatOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -176,8 +146,6 @@ TEST(ElabA10, EmptyUnpackedArrayConcatOk) {
              "  initial q = {};\n"
              "endmodule\n"));
 }
-
-// §A.10 clarification 46: this only in class scope
 
 TEST(ElabA10, ThisInClassMethodOk) {
   EXPECT_TRUE(
@@ -190,8 +158,6 @@ TEST(ElabA10, ThisInClassMethodOk) {
              "module m; endmodule\n"));
 }
 
-// §A.10 clarification 47: $ primary only in queue select
-
 TEST(ElabA10, DollarInQueueSelectOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -200,4 +166,4 @@ TEST(ElabA10, DollarInQueueSelectOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

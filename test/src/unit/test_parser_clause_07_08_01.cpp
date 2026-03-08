@@ -40,4 +40,4 @@ TEST(ParserSection7, AssociativeArrayWildcardIndex) {
   EXPECT_EQ(item->name, "aa");
 }
 
-}  // namespace
+}

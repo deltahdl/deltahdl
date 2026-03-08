@@ -4,8 +4,6 @@
 
 using namespace delta;
 
-// --- §22.5.3: `undefineall ---
-
 TEST(Preprocessor, Clause22_5_3_UndefineAllUndefinedAllMacros) {
   PreprocFixture f;
   auto result = Preprocess(

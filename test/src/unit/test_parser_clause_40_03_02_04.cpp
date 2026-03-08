@@ -13,4 +13,4 @@ TEST(ParserSection40, CoverageMergeSystemCall) {
   )"));
 }
 
-}  // namespace
+}

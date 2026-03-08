@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §6.25: Virtual class with type and value parameters defining typedefs.
 TEST(ParserSection6, ParameterizedDataType_VirtualClassDef) {
   auto r = Parse(
       "virtual class C #(parameter type T = logic, parameter SIZE = 1);\n"
@@ -25,7 +24,6 @@ TEST(ParserSection6, ParameterizedDataType_VirtualClassDef) {
   EXPECT_EQ(cls->params[1].first, "SIZE");
 }
 
-// §6.25: Specialization via scope resolution operator (::).
 TEST(ParserSection6, ParameterizedDataType_ScopeResolution) {
   EXPECT_TRUE(ParseOk(
       "virtual class C #(parameter type T = logic, parameter SIZE = 1);\n"
@@ -37,7 +35,6 @@ TEST(ParserSection6, ParameterizedDataType_ScopeResolution) {
       "endmodule\n"));
 }
 
-// §6.25: Multiple specializations of the same parameterized class.
 TEST(ParserSection6, ParameterizedDataType_MultipleSpecializations) {
   EXPECT_TRUE(ParseOk(
       "virtual class C #(parameter type T = logic, parameter SIZE = 1);\n"
@@ -54,7 +51,6 @@ TEST(ParserSection6, ParameterizedDataType_MultipleSpecializations) {
       "endmodule\n"));
 }
 
-// §6.25: Parameterized class with single type parameter, default used.
 TEST(ParserSection6, ParameterizedDataType_DefaultTypeParam) {
   EXPECT_TRUE(
       ParseOk("class container #(type T = int);\n"
@@ -65,7 +61,6 @@ TEST(ParserSection6, ParameterizedDataType_DefaultTypeParam) {
               "endmodule\n"));
 }
 
-// §6.25: Class with only value parameters for data type definition.
 TEST(ParserSection6, ParameterizedDataType_ValueParamOnly) {
   EXPECT_TRUE(
       ParseOk("virtual class bus_def #(parameter WIDTH = 8);\n"
@@ -77,4 +72,4 @@ TEST(ParserSection6, ParameterizedDataType_ValueParamOnly) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

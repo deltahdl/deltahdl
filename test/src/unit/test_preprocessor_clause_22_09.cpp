@@ -11,8 +11,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
   return pp.Preprocess(fid);
 }
 
-// --- §22.9: `unconnected_drive pull0 ---
-
 TEST(Preprocessor, UnconnectedDrive_Pull0) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -21,8 +19,6 @@ TEST(Preprocessor, UnconnectedDrive_Pull0) {
   EXPECT_EQ(pp.UnconnectedDrive(), NetType::kTri0);
 }
 
-// --- §22.9: `unconnected_drive pull1 ---
-
 TEST(Preprocessor, UnconnectedDrive_Pull1) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -30,8 +26,6 @@ TEST(Preprocessor, UnconnectedDrive_Pull1) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(pp.UnconnectedDrive(), NetType::kTri1);
 }
-
-// --- §22.9: `nounconnected_drive resets to default ---
 
 TEST(Preprocessor, NounconnectedDrive_Reset) {
   PreprocFixture f;
@@ -42,8 +36,6 @@ TEST(Preprocessor, NounconnectedDrive_Reset) {
   EXPECT_EQ(pp.UnconnectedDrive(), NetType::kWire);
 }
 
-// --- §22.9: `nounconnected_drive without prior `unconnected_drive (no-op) ---
-
 TEST(Preprocessor, NounconnectedDrive_WithoutPrior_NoError) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -52,8 +44,6 @@ TEST(Preprocessor, NounconnectedDrive_WithoutPrior_NoError) {
   EXPECT_EQ(pp.UnconnectedDrive(), NetType::kWire);
 }
 
-// --- §22.9: Invalid argument ---
-
 TEST(Preprocessor, UnconnectedDrive_InvalidArg) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -61,16 +51,12 @@ TEST(Preprocessor, UnconnectedDrive_InvalidArg) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §22.9: Missing argument ---
-
 TEST(Preprocessor, UnconnectedDrive_MissingArg) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`unconnected_drive\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §22.9: Most recent occurrence wins ---
 
 TEST(Preprocessor, UnconnectedDrive_MostRecentWins) {
   PreprocFixture f;
@@ -80,8 +66,6 @@ TEST(Preprocessor, UnconnectedDrive_MostRecentWins) {
   PreprocessWithPP("`unconnected_drive pull1\n", f, pp);
   EXPECT_EQ(pp.UnconnectedDrive(), NetType::kTri1);
 }
-
-// --- §22.9: Directive shall be outside design element declarations ---
 
 TEST(Preprocessor, UnconnectedDrive_InsideModule_Error) {
   PreprocFixture f;
@@ -112,8 +96,6 @@ TEST(Preprocessor, UnconnectedDrive_InsideProgram_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §22.9: Directive produces no output ---
-
 TEST(Preprocessor, UnconnectedDrive_NoOutput) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -134,8 +116,6 @@ TEST(Preprocessor, NounconnectedDrive_NoOutput) {
   EXPECT_TRUE(trimmed.empty());
 }
 
-// --- §22.9: Trailing content on same line passes through ---
-
 TEST(Preprocessor, NounconnectedDrive_TrailingContent) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -143,8 +123,6 @@ TEST(Preprocessor, NounconnectedDrive_TrailingContent) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(out.find("wire x;"), std::string::npos);
 }
-
-// --- §22.9: resetall includes effects of nounconnected_drive ---
 
 TEST(Preprocessor, UnconnectedDrive_ResetallResetsToDefault) {
   PreprocFixture f;

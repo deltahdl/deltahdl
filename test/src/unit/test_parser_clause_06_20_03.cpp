@@ -75,18 +75,16 @@ TEST(ParserSection6, TypeParameterDefaultShortint) {
                "endmodule\n"));
 }
 
-// §6.20.3: Type parameter with forward_type restriction (enum).
 TEST(ParserSection6, TypeParamWithForwardType) {
   EXPECT_TRUE(
       ParseOk6("module m #(type enum T = logic);\n"
                "endmodule\n"));
 }
 
-// §6.20.3: Type parameter with struct restriction.
 TEST(ParserSection6, TypeParamWithStructRestriction) {
   EXPECT_TRUE(
       ParseOk6("module m #(type struct T);\n"
                "endmodule\n"));
 }
 
-}  // namespace
+}

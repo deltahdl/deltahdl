@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.3: Dynamic types and chandle types can only be used in tagged unions.
 TEST(Elaboration, ChandleInUnpackedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -35,7 +34,6 @@ TEST(Elaboration, ChandleInTaggedUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.3: Anonymous union within a struct.
 TEST(Elaboration, AnonymousUnionInStruct_OK) {
   ElabFixture f;
   ElaborateSrc(
@@ -49,7 +47,6 @@ TEST(Elaboration, AnonymousUnionInStruct_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.3: Basic unpacked union.
 TEST(Elaboration, UnpackedUnionBasic_OK) {
   ElabFixture f;
   ElaborateSrc(
@@ -60,4 +57,4 @@ TEST(Elaboration, UnpackedUnionBasic_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

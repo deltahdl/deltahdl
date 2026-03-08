@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.16: Subclass-to-superclass assignment elaborates OK.
 TEST(ElabA816, SubclassToSuperclassAssignOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -23,7 +22,6 @@ TEST(ElabA816, SubclassToSuperclassAssignOk) {
              "endmodule\n"));
 }
 
-// §8.16: $cast from superclass to subclass elaborates OK.
 TEST(ElabA816, CastSuperToSubclassOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -43,7 +41,6 @@ TEST(ElabA816, CastSuperToSubclassOk) {
              "endmodule\n"));
 }
 
-// §8.16: $cast as function (return value used) elaborates OK.
 TEST(ElabA816, CastAsFunctionOk) {
   EXPECT_TRUE(
       ElabOk("class Base; int x; endclass\n"
@@ -60,7 +57,6 @@ TEST(ElabA816, CastAsFunctionOk) {
              "endmodule\n"));
 }
 
-// §8.16: $cast with null source elaborates OK.
 TEST(ElabA816, CastWithNullOk) {
   EXPECT_TRUE(
       ElabOk("class Base; endclass\n"
@@ -73,4 +69,4 @@ TEST(ElabA816, CastWithNullOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

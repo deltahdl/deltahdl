@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §E.1: all six directives followed by a module — parser sees clean output.
 TEST(ParserAnnexE2, AnnexEAllDirectivesCombined) {
   auto r = ParseWithPreprocessor(
       "`default_decay_time 10\n"
@@ -22,4 +21,4 @@ TEST(ParserAnnexE2, AnnexEAllDirectivesCombined) {
   }
 }
 
-}  // namespace
+}

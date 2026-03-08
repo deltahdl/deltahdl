@@ -29,4 +29,4 @@ TEST(Lowerer, AlwaysLoopWithDelay) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-}  // namespace
+}

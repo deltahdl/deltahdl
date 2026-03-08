@@ -66,7 +66,6 @@ TEST(ParserSection8, ClassExtendsDerived) {
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
 
-// §8.13: Subclass inherits base class members and adds its own.
 TEST(ParserA813, SubclassInheritsAndAddsMembers) {
   auto r = Parse(
       "class Packet;\n"
@@ -90,7 +89,6 @@ TEST(ParserA813, SubclassInheritsAndAddsMembers) {
   EXPECT_GE(lp->members.size(), 2u);
 }
 
-// §8.13: Final class with extends.
 TEST(ParserA813, FinalClassWithExtends) {
   auto r = Parse(
       "class Base;\n"
@@ -104,7 +102,6 @@ TEST(ParserA813, FinalClassWithExtends) {
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
 
-// §8.13: Extends with constructor arguments.
 TEST(ParserA813, ExtendsWithConstructorArgs) {
   auto r = Parse(
       "class Base;\n"
@@ -120,7 +117,6 @@ TEST(ParserA813, ExtendsWithConstructorArgs) {
   ASSERT_GE(cls->extends_args.size(), 1u);
 }
 
-// §8.13: Extends with default argument.
 TEST(ParserA813, ExtendsWithDefault) {
   auto r = Parse(
       "class Base;\n"
@@ -132,7 +128,6 @@ TEST(ParserA813, ExtendsWithDefault) {
   EXPECT_TRUE(r.cu->classes[1]->extends_has_default);
 }
 
-// §8.13: Single inheritance — only one base class.
 TEST(ParserA813, SingleInheritanceChain) {
   auto r = Parse(
       "class A;\n"
@@ -149,4 +144,4 @@ TEST(ParserA813, SingleInheritanceChain) {
   EXPECT_EQ(r.cu->classes[2]->base_class, "B");
 }
 
-}  // namespace
+}

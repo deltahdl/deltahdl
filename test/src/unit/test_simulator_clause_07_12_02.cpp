@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §7.12.2: sort() sorts ascending.
 TEST(ArrayOrdering, SortAscending) {
   SimFixture f;
   MakeDynArray(f, "arr", {40, 10, 30, 20});
@@ -20,7 +19,6 @@ TEST(ArrayOrdering, SortAscending) {
   EXPECT_EQ(q->elements[3].ToUint64(), 40u);
 }
 
-// §7.12.2: rsort() sorts descending.
 TEST(ArrayOrdering, RsortDescending) {
   SimFixture f;
   MakeDynArray(f, "arr", {40, 10, 30, 20});
@@ -34,7 +32,6 @@ TEST(ArrayOrdering, RsortDescending) {
   EXPECT_EQ(q->elements[3].ToUint64(), 10u);
 }
 
-// §7.12.2: reverse() reverses order.
 TEST(ArrayOrdering, ReverseOrder) {
   SimFixture f;
   MakeDynArray(f, "arr", {10, 20, 30});
@@ -47,7 +44,6 @@ TEST(ArrayOrdering, ReverseOrder) {
   EXPECT_EQ(q->elements[2].ToUint64(), 10u);
 }
 
-// §7.12.2: shuffle() changes order (may not be identical to original).
 TEST(ArrayOrdering, ShuffleChangesOrder) {
   SimFixtureSeeded f;
   auto* q = f.ctx.CreateQueue("arr", 32);
@@ -61,10 +57,10 @@ TEST(ArrayOrdering, ShuffleChangesOrder) {
   f.ctx.RegisterArray("arr", info);
   TryExecArrayPropertyStmt("arr", "shuffle", f.ctx, f.arena);
   EXPECT_EQ(q->elements.size(), 5u);
-  // Verify same elements exist (sum should be preserved).
+
   uint64_t sum = 0;
   for (auto& e : q->elements) sum += e.ToUint64();
   EXPECT_EQ(sum, 150u);
 }
 
-}  // namespace
+}

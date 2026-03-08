@@ -38,4 +38,4 @@ TEST(ParserA25, AscendingUnpackedRange) {
   EXPECT_FALSE(mod->variables[0].is_descending);
 }
 
-}  // namespace
+}

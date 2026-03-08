@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.23: Class scope resolution of typedef in module — OK.
 TEST(ElabA823, ScopeResolutionTypedefOk) {
   EXPECT_TRUE(
       ElabOk("class Cfg;\n"
@@ -15,7 +14,6 @@ TEST(ElabA823, ScopeResolutionTypedefOk) {
              "endmodule\n"));
 }
 
-// §8.23: Class scope resolution of static method call — OK.
 TEST(ElabA823, ScopeResolutionStaticMethodOk) {
   EXPECT_TRUE(
       ElabOk("class Utils;\n"
@@ -27,7 +25,6 @@ TEST(ElabA823, ScopeResolutionStaticMethodOk) {
              "endmodule\n"));
 }
 
-// §8.23: Class scope resolution of parameter — OK.
 TEST(ElabA823, ScopeResolutionParameterOk) {
   EXPECT_TRUE(
       ElabOk("class Cfg;\n"
@@ -38,7 +35,6 @@ TEST(ElabA823, ScopeResolutionParameterOk) {
              "endmodule\n"));
 }
 
-// §8.23: Nested class declaration in class — OK.
 TEST(ElabA823, NestedClassDeclOk) {
   EXPECT_TRUE(
       ElabOk("class Outer;\n"
@@ -50,7 +46,6 @@ TEST(ElabA823, NestedClassDeclOk) {
              "endmodule\n"));
 }
 
-// §8.23: Superclass scope access from derived — OK.
 TEST(ElabA823, SuperclassScopeAccessOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -66,4 +61,4 @@ TEST(ElabA823, SuperclassScopeAccessOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

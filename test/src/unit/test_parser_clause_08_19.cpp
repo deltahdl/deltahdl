@@ -46,7 +46,6 @@ TEST(SourceText, ClassConstProperty) {
   EXPECT_TRUE(members[1]->is_static);
 }
 
-// §8.19: Global constant (const with initializer) parses.
 TEST(ParserA819, GlobalConstantWithInitializer) {
   auto r = Parse(
       "class Jumbo_Packet;\n"
@@ -59,7 +58,6 @@ TEST(ParserA819, GlobalConstantWithInitializer) {
   EXPECT_NE(m->init_expr, nullptr);
 }
 
-// §8.19: Instance constant (const without initializer) parses.
 TEST(ParserA819, InstanceConstantNoInitializer) {
   auto r = Parse(
       "class Big_Packet;\n"
@@ -75,7 +73,6 @@ TEST(ParserA819, InstanceConstantNoInitializer) {
   EXPECT_EQ(m->init_expr, nullptr);
 }
 
-// §8.19: static const (global constant) parses.
 TEST(ParserA819, StaticConstGlobalConstant) {
   auto r = Parse(
       "class Config;\n"
@@ -88,4 +85,4 @@ TEST(ParserA819, StaticConstGlobalConstant) {
   EXPECT_NE(m->init_expr, nullptr);
 }
 
-}  // namespace
+}

@@ -36,4 +36,4 @@ TEST(ParserA610, DeferredAssertHash0ActionBlock) {
   ASSERT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-}  // namespace
+}

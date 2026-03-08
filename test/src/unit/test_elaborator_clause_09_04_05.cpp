@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.5: Blocking intra-assignment delay elaborates.
 TEST(ElabClause09_04_05, BlockingIntraDelayElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -17,7 +16,6 @@ TEST(ElabClause09_04_05, BlockingIntraDelayElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.5: Nonblocking intra-assignment delay elaborates.
 TEST(ElabClause09_04_05, NonblockingIntraDelayElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -30,7 +28,6 @@ TEST(ElabClause09_04_05, NonblockingIntraDelayElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.5: Blocking intra-assignment event control elaborates.
 TEST(ElabClause09_04_05, BlockingIntraEventElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -43,7 +40,6 @@ TEST(ElabClause09_04_05, BlockingIntraEventElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.5: Nonblocking intra-assignment event control elaborates.
 TEST(ElabClause09_04_05, NonblockingIntraEventElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -56,7 +52,6 @@ TEST(ElabClause09_04_05, NonblockingIntraEventElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.5: Repeat event control in blocking assignment elaborates.
 TEST(ElabClause09_04_05, RepeatEventBlockingElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -69,7 +64,6 @@ TEST(ElabClause09_04_05, RepeatEventBlockingElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.5: Repeat event control in nonblocking assignment elaborates.
 TEST(ElabClause09_04_05, RepeatEventNonblockingElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -82,4 +76,4 @@ TEST(ElabClause09_04_05, RepeatEventNonblockingElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

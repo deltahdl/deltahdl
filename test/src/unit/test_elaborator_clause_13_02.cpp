@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §13.2: Function body shall not contain time-controlling statements.
-
 TEST(Elab1302, DelayInFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -96,8 +94,6 @@ TEST(Elab1302, FunctionWithNoTimeControlIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.2: A function cannot enable a task.
-
 TEST(Elab1302, FunctionEnablesTaskIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -151,8 +147,6 @@ TEST(Elab1302, TaskEnablesFunctionIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.2: A task or void function shall not return a value.
-
 TEST(Elab1302, TaskReturnsValueIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -192,8 +186,6 @@ TEST(Elab1302, TaskNoReturnIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.2: Time-controlling statements are legal in tasks.
-
 TEST(Elab1302, TaskWithDelayIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -221,4 +213,4 @@ TEST(Elab1302, TaskWithEventControlIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

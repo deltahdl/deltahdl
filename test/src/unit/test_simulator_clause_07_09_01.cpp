@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §7.9.1: num() returns number of entries.
 TEST(AssocMethods, NumReturnsCount) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -20,7 +19,6 @@ TEST(AssocMethods, NumReturnsCount) {
   EXPECT_EQ(out.ToUint64(), 3u);
 }
 
-// §7.9.1: size() returns number of entries.
 TEST(AssocMethods, SizeReturnsCount) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
@@ -33,7 +31,6 @@ TEST(AssocMethods, SizeReturnsCount) {
   EXPECT_EQ(out.ToUint64(), 2u);
 }
 
-// §7.9.1: num()/size() returns 0 for empty array.
 TEST(AssocMethods, NumReturnsZeroForEmpty) {
   SimFixture f;
   f.ctx.CreateAssocArray("aa", 32, false);
@@ -44,4 +41,4 @@ TEST(AssocMethods, NumReturnsZeroForEmpty) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-}  // namespace
+}

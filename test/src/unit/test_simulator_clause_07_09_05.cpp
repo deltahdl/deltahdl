@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §7.9.5: last() assigns largest index and returns 1.
 TEST(AssocTraversal, LastReturnsLargestKey) {
   SimFixture f;
   auto [aa, ref] = MakeAssocWith3Entries(f);
@@ -18,7 +17,6 @@ TEST(AssocTraversal, LastReturnsLargestKey) {
   EXPECT_EQ(ref->value.ToUint64(), 30u);
 }
 
-// §7.9.5: last() returns 0 on empty array.
 TEST(AssocTraversal, LastReturnsZeroOnEmpty) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -32,4 +30,4 @@ TEST(AssocTraversal, LastReturnsZeroOnEmpty) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-}  // namespace
+}

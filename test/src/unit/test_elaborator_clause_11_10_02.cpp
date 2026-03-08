@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §11.10.2: String literal to wider vector elaborates.
 TEST(Elaboration, StringPaddingWiderVectorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -17,7 +16,6 @@ TEST(Elaboration, StringPaddingWiderVectorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.10.2: Padded concat comparison elaborates.
 TEST(Elaboration, PaddedConcatCompareElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -35,4 +33,4 @@ TEST(Elaboration, PaddedConcatCompareElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

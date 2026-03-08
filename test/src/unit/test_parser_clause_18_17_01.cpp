@@ -83,4 +83,4 @@ TEST(ParserA612, RsWeightWithCodeBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

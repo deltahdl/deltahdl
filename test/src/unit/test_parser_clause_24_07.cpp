@@ -17,4 +17,4 @@ TEST_F(ProgramTestParse, ProgramWithExitCall) {
   EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-}  // namespace
+}

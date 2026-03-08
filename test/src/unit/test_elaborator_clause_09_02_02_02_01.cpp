@@ -1,6 +1,7 @@
-// Non-LRM tests
 
-#include <unordered_set>
+
+#include <initializer_list>
+#include <string_view>
 
 #include "builders_sensitivity.h"
 #include "common/types.h"
@@ -12,6 +13,21 @@
 using namespace delta;
 
 namespace {
+
+void ExpectSensitivityContains(
+    const RtlirProcess& proc,
+    std::initializer_list<std::string_view> expected) {
+  for (const auto& name : expected) {
+    bool found = false;
+    for (const auto& ev : proc.sensitivity) {
+      if (ev.signal && ev.signal->text == name) {
+        found = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(found) << "missing sensitivity signal: " << name;
+  }
+}
 
 TEST(Elaborator, AlwaysCombSensitivityInferred) {
   ElabFixture f;
@@ -154,8 +170,6 @@ TEST(SimCh9b, AlwaysCombSensitivityRegistered) {
   EXPECT_FALSE(procs.empty());
 }
 
-// §9.2.2.2.1: Variables also written in the block are excluded from
-// sensitivity.
 TEST(ElabClause09_02_02_02_01, WrittenVarsExcludedFromSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -181,7 +195,6 @@ TEST(ElabClause09_02_02_02_01, WrittenVarsExcludedFromSensitivity) {
   EXPECT_FALSE(found_temp);
 }
 
-// §9.2.2.2.1: Block-local variables excluded from sensitivity.
 TEST(ElabClause09_02_02_02_01, BlockLocalVarsExcludedFromSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -207,7 +220,6 @@ TEST(ElabClause09_02_02_02_01, BlockLocalVarsExcludedFromSensitivity) {
   EXPECT_FALSE(found_local);
 }
 
-// §9.2.2.2.1: Multiple read signals all appear in sensitivity.
 TEST(ElabClause09_02_02_02_01, MultipleReadsInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -230,7 +242,6 @@ TEST(ElabClause09_02_02_02_01, MultipleReadsInSensitivity) {
   EXPECT_TRUE(found_c);
 }
 
-// §9.2.2.2.1: LHS output variable not in sensitivity when only written.
 TEST(ElabClause09_02_02_02_01, OutputOnlyVarNotInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -249,7 +260,6 @@ TEST(ElabClause09_02_02_02_01, OutputOnlyVarNotInSensitivity) {
   EXPECT_FALSE(found_y);
 }
 
-// §9.2.2.2.1: Sensitivity uses longest static prefix for array access.
 TEST(ElabClause09_02_02_02_01, ArrayAccessLongestStaticPrefix) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -272,7 +282,6 @@ TEST(ElabClause09_02_02_02_01, ArrayAccessLongestStaticPrefix) {
   EXPECT_TRUE(found_addr);
 }
 
-// §9.2.2.2.1: If condition and both branches contribute to sensitivity.
 TEST(ElabClause09_02_02_02_01, IfConditionInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -285,19 +294,10 @@ TEST(ElabClause09_02_02_02_01, IfConditionInSensitivity) {
       f);
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(design->top_modules.empty());
-  auto& proc = design->top_modules[0]->processes[0];
-  bool found_sel = false, found_a = false, found_b = false;
-  for (const auto& ev : proc.sensitivity) {
-    if (ev.signal && ev.signal->text == "sel") found_sel = true;
-    if (ev.signal && ev.signal->text == "a") found_a = true;
-    if (ev.signal && ev.signal->text == "b") found_b = true;
-  }
-  EXPECT_TRUE(found_sel);
-  EXPECT_TRUE(found_a);
-  EXPECT_TRUE(found_b);
+  ExpectSensitivityContains(design->top_modules[0]->processes[0],
+                            {"sel", "a", "b"});
 }
 
-// §9.2.2.2.1: Sensitivity edges are all kNone (level-sensitive).
 TEST(ElabClause09_02_02_02_01, SensitivityEdgesAreNone) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -314,7 +314,6 @@ TEST(ElabClause09_02_02_02_01, SensitivityEdgesAreNone) {
   }
 }
 
-// §9.2.2.2.2: Variables read inside case branches are in sensitivity.
 TEST(AlwaysCombCaseSensitivity, CaseBodyReadsInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -332,19 +331,10 @@ TEST(AlwaysCombCaseSensitivity, CaseBodyReadsInSensitivity) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_FALSE(design->top_modules.empty());
-  auto& proc = design->top_modules[0]->processes[0];
-  bool found_sel = false, found_a = false, found_b = false;
-  for (const auto& ev : proc.sensitivity) {
-    if (ev.signal && ev.signal->text == "sel") found_sel = true;
-    if (ev.signal && ev.signal->text == "a") found_a = true;
-    if (ev.signal && ev.signal->text == "b") found_b = true;
-  }
-  EXPECT_TRUE(found_sel);
-  EXPECT_TRUE(found_a);
-  EXPECT_TRUE(found_b);
+  ExpectSensitivityContains(design->top_modules[0]->processes[0],
+                            {"sel", "a", "b"});
 }
 
-// §9.2.2.2.2: Immediate assertion expression contributes to sensitivity.
 TEST(AssertExprInSensitivity, AssertExprInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -366,7 +356,6 @@ TEST(AssertExprInSensitivity, AssertExprInSensitivity) {
   EXPECT_TRUE(found_c);
 }
 
-// §9.2.2.2.2: Case with variable reads in branches triggers on those inputs.
 TEST(CaseBranchSensitivity, CaseBranchSensitivity) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -396,4 +385,4 @@ TEST(CaseBranchSensitivity, CaseBranchSensitivity) {
   EXPECT_EQ(y->value.ToUint64(), 20u);
 }
 
-}  // namespace
+}

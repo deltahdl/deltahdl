@@ -16,4 +16,4 @@ TEST(ParserA60701, PatternParenthesized) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

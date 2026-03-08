@@ -32,7 +32,6 @@ TEST(ParserSection8, ShallowCopy) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §8.12: Handle assignment — two names for one object.
 TEST(ParserA812, HandleAssignment) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
@@ -47,7 +46,6 @@ TEST(ParserA812, HandleAssignment) {
               "endmodule\n"));
 }
 
-// §8.12: Shallow copy with new <identifier>.
 TEST(ParserA812, ShallowCopyNewIdentifier) {
   auto r = Parse(
       "class C;\n"
@@ -64,7 +62,6 @@ TEST(ParserA812, ShallowCopyNewIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §8.12: Chained member access through objects.
 TEST(ParserA812, ChainedMemberAccess) {
   EXPECT_TRUE(
       ParseOk("class A;\n"
@@ -84,7 +81,6 @@ TEST(ParserA812, ChainedMemberAccess) {
               "endmodule\n"));
 }
 
-// §8.12: Property initialization in class body.
 TEST(ParserA812, PropertyInitInClassBody) {
   auto r = Parse(
       "class baseA;\n"
@@ -95,7 +91,6 @@ TEST(ParserA812, PropertyInitInClassBody) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// §8.12: Class containing another class as property.
 TEST(ParserA812, ClassContainingClassProperty) {
   EXPECT_TRUE(
       ParseOk("class baseA;\n"
@@ -107,4 +102,4 @@ TEST(ParserA812, ClassContainingClassProperty) {
               "endclass\n"));
 }
 
-}  // namespace
+}

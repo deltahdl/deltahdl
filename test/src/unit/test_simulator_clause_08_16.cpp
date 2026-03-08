@@ -44,7 +44,6 @@ TEST(ClassSim, IsAUnrelated) {
   EXPECT_FALSE(type_b->IsA(type_a));
 }
 
-// §8.16: Subclass-to-superclass assignment is always legal (IsA check).
 TEST(ClassSim, CastSubclassToSuperclassAlwaysLegal) {
   SimFixture f;
   auto* base = MakeClassType(f, "Packet", {"i"});
@@ -55,7 +54,6 @@ TEST(ClassSim, CastSubclassToSuperclassAlwaysLegal) {
   EXPECT_TRUE(obj->type->IsA(base));
 }
 
-// §8.16: Superclass object is NOT a subclass (direct assignment illegal).
 TEST(ClassSim, CastSuperclassToSubclassIllegal) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {});
@@ -66,7 +64,6 @@ TEST(ClassSim, CastSuperclassToSubclassIllegal) {
   EXPECT_FALSE(obj->type->IsA(derived));
 }
 
-// §8.16: $cast succeeds when actual object type is derived from dest type.
 TEST(ClassSim, CastSucceedsWhenObjectIsDerived) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {"x"});
@@ -78,7 +75,6 @@ TEST(ClassSim, CastSucceedsWhenObjectIsDerived) {
   EXPECT_TRUE(obj->type->IsA(base));
 }
 
-// §8.16: $cast fails when source object type is unrelated to dest type.
 TEST(ClassSim, CastFailsUnrelatedTypes) {
   SimFixture f;
   auto* type_a = MakeClassType(f, "TypeA", {});
@@ -88,13 +84,11 @@ TEST(ClassSim, CastFailsUnrelatedTypes) {
   EXPECT_FALSE(obj->type->IsA(type_b));
 }
 
-// §8.16: Null handle returns nullptr from GetClassObject.
 TEST(ClassSim, CastNullHandleIsZero) {
   SimFixture f;
   EXPECT_EQ(f.ctx.GetClassObject(kNullClassHandle), nullptr);
 }
 
-// §8.16: $cast through deep hierarchy.
 TEST(ClassSim, CastDeepHierarchySucceeds) {
   SimFixture f;
   auto* grand = MakeClassType(f, "Grand", {});
@@ -111,4 +105,4 @@ TEST(ClassSim, CastDeepHierarchySucceeds) {
   EXPECT_FALSE(obj2->type->IsA(leaf));
 }
 
-}  // namespace
+}

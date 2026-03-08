@@ -359,7 +359,6 @@ TEST(ParserSection6, ShortrealWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-// §6.8: var byte my_byte — equivalent to "byte my_byte".
 TEST(ParserSection6, Sec6_8_VarByteDecl) {
   auto r = Parse(
       "module t;\n"
@@ -374,7 +373,6 @@ TEST(ParserSection6, Sec6_8_VarByteDecl) {
   EXPECT_EQ(item->name, "my_byte");
 }
 
-// §6.8: var [15:0] vw — equivalent to "var logic [15:0] vw".
 TEST(ParserSection6, Sec6_8_VarImplicitLogicWithRange) {
   auto r = Parse(
       "module t;\n"
@@ -390,7 +388,6 @@ TEST(ParserSection6, Sec6_8_VarImplicitLogicWithRange) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 15u);
 }
 
-// §6.8: shortint s1, s2[0:9] — mixed scalar and array.
 TEST(ParserSection6, Sec6_8_MixedScalarAndArrayDecl) {
   auto r = Parse(
       "module t;\n"
@@ -406,7 +403,6 @@ TEST(ParserSection6, Sec6_8_MixedScalarAndArrayDecl) {
   EXPECT_FALSE(items[1]->unpacked_dims.empty());
 }
 
-// §6.8: const variable declaration.
 TEST(ParserSection6, Sec6_8_ConstVarDecl) {
   auto r = Parse(
       "module t;\n"
@@ -423,7 +419,6 @@ TEST(ParserSection6, Sec6_8_ConstVarDecl) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-// §6.8: Variable with initializer — int i = 0.
 TEST(ParserSection6, Sec6_8_IntInitZero) {
   auto r = Parse(
       "module t;\n"
@@ -439,7 +434,6 @@ TEST(ParserSection6, Sec6_8_IntInitZero) {
   EXPECT_EQ(item->init_expr->int_val, 0u);
 }
 
-// §6.8: input var logic port declaration.
 TEST(ParserSection6, Sec6_8_InputVarLogicPort) {
   auto r = Parse(
       "module t(input var logic data_in);\n"
@@ -468,4 +462,4 @@ TEST(ImplicitDataType, ImplicitDataTypeSigned) {
   EXPECT_TRUE(port.data_type.is_signed);
 }
 
-}  // namespace
+}

@@ -39,7 +39,6 @@ TEST(SourceText, ClassConstructorSuperNew) {
   EXPECT_EQ(r.cu->classes[1]->members[0]->method->name, "new");
 }
 
-// §8.15: super.member access in derived class method.
 TEST(ParserA815, SuperMemberAccess) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
@@ -56,7 +55,6 @@ TEST(ParserA815, SuperMemberAccess) {
               "endclass\n"));
 }
 
-// §8.15: super.new call in constructor.
 TEST(ParserA815, SuperNewInConstructor) {
   EXPECT_TRUE(
       ParseOk("class Base;\n"
@@ -70,7 +68,6 @@ TEST(ParserA815, SuperNewInConstructor) {
               "endclass\n"));
 }
 
-// §8.15: super.super is not allowed.
 TEST(ParserA815, SuperSuperError) {
   auto r = Parse(
       "class A;\n"
@@ -86,7 +83,6 @@ TEST(ParserA815, SuperSuperError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §8.15: super.method() call parses correctly.
 TEST(ParserA815, SuperMethodCall) {
   auto r = Parse(
       "class Base;\n"
@@ -103,7 +99,6 @@ TEST(ParserA815, SuperMethodCall) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §8.15: super.new with arguments.
 TEST(ParserA815, SuperNewWithArgs) {
   auto r = Parse(
       "class Base;\n"
@@ -123,4 +118,4 @@ TEST(ParserA815, SuperNewWithArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

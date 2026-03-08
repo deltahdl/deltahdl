@@ -7,11 +7,10 @@ using namespace delta;
 
 namespace {
 
-// §7.12.5: map transforms each element via with-clause expression.
 TEST(ArrayMap, MapDoubleElements) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 10, 15});
-  // with (item + item) — doubles each element.
+
   auto* with_expr =
       MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "item"),
                  MakeId(f.arena, "item"));
@@ -26,11 +25,10 @@ TEST(ArrayMap, MapDoubleElements) {
   EXPECT_EQ(out[2].ToUint64(), 30u);
 }
 
-// §7.12.5: map with item.index produces index-based result.
 TEST(ArrayMap, MapWithIndex) {
   SimFixture f;
   MakeDynArray(f, "arr", {100, 200, 300});
-  // with (item.index) — returns indices as values.
+
   auto* with_expr = MakeId(f.arena, "item.index");
   auto* call = MakeMethodCall(f.arena, "arr", "map", {});
   call->with_expr = with_expr;
@@ -43,4 +41,4 @@ TEST(ArrayMap, MapWithIndex) {
   EXPECT_EQ(out[2].ToUint64(), 2u);
 }
 
-}  // namespace
+}

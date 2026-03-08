@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §11.8.1: Decimal numbers are signed.
 TEST(ExprType, DecimalLiteralIsSigned) {
   SimFixture f;
   auto* lit = MakeInt(f.arena, 42);
@@ -16,7 +15,6 @@ TEST(ExprType, DecimalLiteralIsSigned) {
   EXPECT_TRUE(result.is_signed);
 }
 
-// §11.8.1: Based numbers are unsigned (no 's' specifier).
 TEST(ExprType, BasedLiteralIsUnsigned) {
   SimFixture f;
   auto* lit = MakeInt(f.arena, 0xA);
@@ -26,7 +24,6 @@ TEST(ExprType, BasedLiteralIsUnsigned) {
   EXPECT_FALSE(result.is_signed);
 }
 
-// §11.8.1: Based numbers with 's' specifier are signed.
 TEST(ExprType, SignedBasedLiteralIsSigned) {
   SimFixture f;
   auto* lit = MakeInt(f.arena, 0xA);
@@ -35,7 +32,6 @@ TEST(ExprType, SignedBasedLiteralIsSigned) {
   EXPECT_TRUE(result.is_signed);
 }
 
-// §11.8.1: If any operand is unsigned, result is unsigned.
 TEST(ExprType, MixedSignednessYieldsUnsigned) {
   SimFixture f;
   MakeSignedVarAdv(f, "s", 8, 5);
@@ -47,7 +43,6 @@ TEST(ExprType, MixedSignednessYieldsUnsigned) {
   EXPECT_FALSE(result.is_signed);
 }
 
-// §11.8.1: If all operands are signed, result is signed.
 TEST(ExprType, AllSignedYieldsSigned) {
   SimFixture f;
   MakeSignedVarAdv(f, "a", 8, 5);
@@ -59,7 +54,6 @@ TEST(ExprType, AllSignedYieldsSigned) {
   EXPECT_TRUE(result.is_signed);
 }
 
-// §11.8.1: Bit-select results are unsigned regardless of operand.
 TEST(ExprType, BitSelectAlwaysUnsigned) {
   SimFixture f;
   MakeSignedVarAdv(f, "sv", 8, 0xFF);
@@ -71,7 +65,6 @@ TEST(ExprType, BitSelectAlwaysUnsigned) {
   EXPECT_FALSE(result.is_signed);
 }
 
-// §11.8.1: Concatenation results are unsigned regardless of operands.
 TEST(ExprType, ConcatAlwaysUnsigned) {
   SimFixture f;
   MakeSignedVarAdv(f, "x", 4, 0xF);
@@ -84,7 +77,6 @@ TEST(ExprType, ConcatAlwaysUnsigned) {
   EXPECT_FALSE(result.is_signed);
 }
 
-// §11.8.1: Comparison results are unsigned.
 TEST(ExprType, ComparisonAlwaysUnsigned) {
   SimFixture f;
   MakeSignedVarAdv(f, "p", 8, 10);
@@ -96,7 +88,6 @@ TEST(ExprType, ComparisonAlwaysUnsigned) {
   EXPECT_FALSE(result.is_signed);
 }
 
-// §11.8.1: Reduction operator results are unsigned.
 TEST(ExprType, ReductionAlwaysUnsigned) {
   SimFixture f;
   MakeSignedVarAdv(f, "r", 8, 0xFF);
@@ -107,4 +98,4 @@ TEST(ExprType, ReductionAlwaysUnsigned) {
   EXPECT_FALSE(result.is_signed);
 }
 
-}  // namespace
+}

@@ -31,4 +31,4 @@ TEST(ParserA211, HierarchicalBtfIdentifier_Dotted) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

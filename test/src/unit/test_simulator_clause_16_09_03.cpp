@@ -44,4 +44,4 @@ TEST(Assertion, ChangedStable) {
   EXPECT_EQ(r1, AssertionResult::kFail);
 }
 
-}  // namespace
+}

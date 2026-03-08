@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §13.8: Parameterized static function returns correct value.
 TEST(Sim1380, ParameterizedStaticFunctionReturnsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -23,7 +22,6 @@ TEST(Sim1380, ParameterizedStaticFunctionReturnsValue) {
   LowerRunAndCheck(f, design, {{"result", 42u}});
 }
 
-// §13.8: Different specializations produce different-width results.
 TEST(Sim1380, DifferentSpecializationsWork) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -45,7 +43,6 @@ TEST(Sim1380, DifferentSpecializationsWork) {
   LowerRunAndCheck(f, design, {{"a", 0xABu}, {"b", 0xCDu}});
 }
 
-// §13.8: Parameter used in for-loop bound at runtime.
 TEST(Sim1380, ParamUsedInForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -65,11 +62,10 @@ TEST(Sim1380, ParamUsedInForLoop) {
       "  initial result = Popcount#(8)::count_ones(8'b1010_0101);\n"
       "endmodule\n",
       f);
-  // 8'b1010_0101 has 4 ones
+
   LowerRunAndCheck(f, design, {{"result", 4u}});
 }
 
-// §13.8: Multiple static methods in same parameterized class.
 TEST(Sim1380, MultipleMethodsSameClass) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -94,4 +90,4 @@ TEST(Sim1380, MultipleMethodsSameClass) {
   LowerRunAndCheck(f, design, {{"a", 11u}, {"b", 9u}});
 }
 
-}  // namespace
+}

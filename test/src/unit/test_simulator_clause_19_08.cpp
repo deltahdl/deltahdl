@@ -53,4 +53,4 @@ TEST(Coverage, GetInstCoverageMatchesGetCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetInstCoverage(g), CoverageDB::GetCoverage(g));
 }
 
-}  // namespace
+}

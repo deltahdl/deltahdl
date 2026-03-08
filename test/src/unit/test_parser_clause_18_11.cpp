@@ -26,4 +26,4 @@ TEST(ParserA82, VariableIdentifierList) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-}  // namespace
+}

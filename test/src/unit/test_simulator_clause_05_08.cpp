@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.8: time literal simulation values ---
-
 TEST(SimClause05, Cl5_8_IntegerNs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 10ns;\nendmodule\n", "r");
@@ -54,8 +52,6 @@ TEST(SimClause05, Cl5_8_FixedPointUs) {
   EXPECT_DOUBLE_EQ(v, 2500.0);
 }
 
-// --- §5.8: LRM examples ---
-
 TEST(SimClause05, Cl5_8_LrmExample2p1ns) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 2.1ns;\nendmodule\n", "r");
@@ -68,4 +64,4 @@ TEST(SimClause05, Cl5_8_LrmExample40ps) {
   EXPECT_DOUBLE_EQ(v, 0.04);
 }
 
-}  // namespace
+}

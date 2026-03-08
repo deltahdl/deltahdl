@@ -32,4 +32,4 @@ TEST(DpiRuntime, OpenArrayEmptyHandle) {
   EXPECT_EQ(DpiRuntime::SvSize(h), 0u);
 }
 
-}  // namespace
+}

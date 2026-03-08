@@ -1,4 +1,4 @@
-// §12.6.1: Pattern matching in case statements.
+
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §12.6.1: Constant expression pattern — match selects the item.
 TEST(SimA60701, CaseMatchesConstantMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -34,7 +33,6 @@ TEST(SimA60701, CaseMatchesConstantMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.6.1: No match → default item is executed.
 TEST(SimA60701, CaseMatchesDefaultFallthrough) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -59,7 +57,6 @@ TEST(SimA60701, CaseMatchesDefaultFallthrough) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §12.6.1: Linear search — first matching item wins.
 TEST(SimA60701, CaseMatchesFirstMatchWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -84,7 +81,6 @@ TEST(SimA60701, CaseMatchesFirstMatchWins) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.6.1: Pattern with &&& guard — pattern matches and guard is true.
 TEST(SimA60701, CaseMatchesGuardTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -110,7 +106,6 @@ TEST(SimA60701, CaseMatchesGuardTrue) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.6.1: Pattern matches but guard is false — item not selected.
 TEST(SimA60701, CaseMatchesGuardFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -133,11 +128,10 @@ TEST(SimA60701, CaseMatchesGuardFalse) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // Guard false → falls through to default.
+
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §12.6.1: Guard false on first item, second item matches.
 TEST(SimA60701, CaseMatchesGuardFalseSecondMatches) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -159,11 +153,10 @@ TEST(SimA60701, CaseMatchesGuardFalseSecondMatches) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // First item: pattern matches but guard false → skip. Second matches.
+
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.6.1: casez with matches — z bits in pattern are wildcards.
 TEST(SimA60701, CasezMatchesWildcard) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -189,7 +182,6 @@ TEST(SimA60701, CasezMatchesWildcard) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.6.1: priority case matches — no match → violation.
 TEST(SimA60701, PriorityCaseMatchesNoMatchViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -212,7 +204,6 @@ TEST(SimA60701, PriorityCaseMatchesNoMatchViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.6.1: unique case matches — overlap detection.
 TEST(SimA60701, UniqueCaseMatchesOverlapViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -237,7 +228,6 @@ TEST(SimA60701, UniqueCaseMatchesOverlapViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.6.1: No match, no default — no statement executed.
 TEST(SimA60701, CaseMatchesNoMatchNoDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -259,8 +249,8 @@ TEST(SimA60701, CaseMatchesNoMatchNoDefault) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // x retains its initial value.
+
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

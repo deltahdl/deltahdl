@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.6.3: system task/function calls ---
-
 TEST(ParserClause05, Cl5_6_3_SystemTaskDisplay) {
   auto r = Parse(
       "module m;\n"
@@ -76,8 +74,6 @@ TEST(ParserClause05, Cl5_6_3_SystemDeposit) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- §5.6.3: system function in expression ---
-
 TEST(ParserClause05, Cl5_6_3_SystemFunctionInExpression) {
   auto r = Parse(
       "module m;\n"
@@ -87,4 +83,4 @@ TEST(ParserClause05, Cl5_6_3_SystemFunctionInExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

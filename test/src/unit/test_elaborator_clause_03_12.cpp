@@ -2,8 +2,6 @@
 
 namespace {
 
-// §3.12: Elaboration expands instantiations and computes parameter values.
-
 TEST(ElabClause03, Cl3_12_ParameterizedModuleElaborates) {
   EXPECT_TRUE(
       ElabOk("module sub #(parameter W = 8) (\n"
@@ -15,8 +13,6 @@ TEST(ElabClause03, Cl3_12_ParameterizedModuleElaborates) {
              "  sub #(16) u0 (.a(x), .y(y));\n"
              "endmodule\n"));
 }
-
-// §3.12: Elaboration resolves hierarchical names and establishes connectivity.
 
 TEST(ElabClause03, Cl3_12_InstantiationWithPortsElaborates) {
   ElabFixture f;
@@ -34,9 +30,6 @@ TEST(ElabClause03, Cl3_12_InstantiationWithPortsElaborates) {
   ASSERT_FALSE(design->top_modules.empty());
   EXPECT_FALSE(design->top_modules[0]->children.empty());
 }
-
-// §3.12: Elaboration binds all component types (module, program, interface,
-// checker, primitive instances).
 
 TEST(ElabClause03, Cl3_12_ProgramElaborates) {
   ElabFixture f;
@@ -60,8 +53,6 @@ TEST(ElabClause03, Cl3_12_InterfaceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §3.12: Package compilation precedes references.
-
 TEST(ElabClause03, Cl3_12_PackageImportElaborates) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -73,4 +64,4 @@ TEST(ElabClause03, Cl3_12_PackageImportElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

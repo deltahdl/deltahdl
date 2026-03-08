@@ -153,7 +153,6 @@ TEST(ParserSection6, TypesMatchNamedDifferent) {
   EXPECT_FALSE(TypesMatch(a, b));
 }
 
-// §6.22.1: Matching types — event types match each other.
 TEST(ParserSection6, TypesMatchEventToEvent) {
   DataType a;
   a.kind = DataTypeKind::kEvent;
@@ -162,7 +161,6 @@ TEST(ParserSection6, TypesMatchEventToEvent) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-// §6.22.1: Matching types — string types match each other.
 TEST(ParserSection6, TypesMatchStringToString) {
   DataType a;
   a.kind = DataTypeKind::kString;
@@ -171,7 +169,6 @@ TEST(ParserSection6, TypesMatchStringToString) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-// §6.22.1: Matching types — chandle types match each other.
 TEST(ParserSection6, TypesMatchChandleToHandle) {
   DataType a;
   a.kind = DataTypeKind::kChandle;
@@ -180,4 +177,4 @@ TEST(ParserSection6, TypesMatchChandleToHandle) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-}  // namespace
+}

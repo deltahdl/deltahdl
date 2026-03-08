@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §13.3.2: Automatic task local variable in nonblocking assignment is an error.
 TEST(Elab13032, AutoTaskLocalInNonblockingAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -18,8 +17,6 @@ TEST(Elab13032, AutoTaskLocalInNonblockingAssignError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.3.2: Module-level variable in nonblocking assignment inside auto task is
-// ok.
 TEST(Elab13032, AutoTaskModuleVarNonblockingOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -34,7 +31,6 @@ TEST(Elab13032, AutoTaskModuleVarNonblockingOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3.2: Static task local variable in nonblocking assignment is ok.
 TEST(Elab13032, StaticTaskLocalInNonblockingOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -49,8 +45,6 @@ TEST(Elab13032, StaticTaskLocalInNonblockingOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3.2: Default task (static) local variable in nonblocking assignment is
-// ok.
 TEST(Elab13032, DefaultTaskLocalInNonblockingOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -65,7 +59,6 @@ TEST(Elab13032, DefaultTaskLocalInNonblockingOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3.2: Automatic task arg in nonblocking assignment is an error.
 TEST(Elab13032, AutoTaskArgInNonblockingAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -78,7 +71,6 @@ TEST(Elab13032, AutoTaskArgInNonblockingAssignError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.3.2: Automatic task — blocking assignment to local is ok.
 TEST(Elab13032, AutoTaskLocalBlockingAssignOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -93,4 +85,4 @@ TEST(Elab13032, AutoTaskLocalBlockingAssignOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

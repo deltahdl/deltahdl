@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.4: line comments start with // and end with newline ---
-
 TEST(LexerClause05, Cl5_4_BasicLineComment) {
   auto tokens = Lex("a // this is a comment\nb");
   ASSERT_EQ(tokens.size(), 3u);
@@ -51,8 +49,6 @@ TEST(LexerClause05, Cl5_4_LineCommentWithSpecialChars) {
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
-
-// --- §5.4: block comments start with /* and end with */ ---
 
 TEST(LexerClause05, Cl5_4_BasicBlockComment) {
   auto tokens = Lex("a /* comment */ b");
@@ -130,10 +126,8 @@ TEST(LexerClause05, Cl5_4_BlockCommentContainingNewlines) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-// --- §5.4: block comments shall not be nested ---
-
 TEST(LexerClause05, Cl5_4_BlockCommentsDoNotNest) {
-  // /* outer /* inner */ closes at first */, leaving "b" as a token
+
   auto tokens = Lex("a /* outer /* inner */ b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -141,7 +135,7 @@ TEST(LexerClause05, Cl5_4_BlockCommentsDoNotNest) {
 }
 
 TEST(LexerClause05, Cl5_4_NestedBlockCommentLeavesDangling) {
-  // First */ closes the block comment; "z */" remains as tokens
+
   auto tokens = Lex("a /* x /* y */ z */");
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "z");
@@ -149,16 +143,12 @@ TEST(LexerClause05, Cl5_4_NestedBlockCommentLeavesDangling) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kSlash);
 }
 
-// --- §5.4: // has no special meaning inside block comment ---
-
 TEST(LexerClause05, Cl5_4_LineCommentTokenInsideBlockComment) {
   auto tokens = Lex("a /* // not special */ b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
-
-// --- §5.4: /* and */ have no special meaning inside line comment ---
 
 TEST(LexerClause05, Cl5_4_BlockCommentTokensInsideLineComment) {
   auto tokens = Lex("a // /* not a block comment */ still line comment\nb");
@@ -174,8 +164,6 @@ TEST(LexerClause05, Cl5_4_BlockOpenInsideLineCommentDoesNotStartBlock) {
   EXPECT_EQ(tokens[1].text, "b");
   EXPECT_EQ(tokens[2].text, "c");
 }
-
-// --- §5.4: error conditions ---
 
 TEST(LexerClause05, Cl5_4_UnterminatedBlockCommentError) {
   auto [tokens, errors] = LexWithDiag("/* no end");
@@ -193,12 +181,10 @@ TEST(LexerClause05, Cl5_4_UnterminatedBlockCommentWithStars) {
 }
 
 TEST(LexerClause05, Cl5_4_SlashStarSlashIsUnterminated) {
-  // /*/ is NOT a valid block comment (no closing */)
+
   auto [tokens, errors] = LexWithDiag("/*/");
   EXPECT_TRUE(errors);
 }
-
-// --- §5.4: mixed comment forms ---
 
 TEST(LexerClause05, Cl5_4_LineCommentFollowedByBlockComment) {
   auto tokens = Lex("a // line\n/* block */ b");
@@ -230,8 +216,6 @@ TEST(LexerClause05, Cl5_4_CommentOnlyInputMultipleTypes) {
   ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
-
-// --- §5.4: comments as token separators ---
 
 TEST(LexerClause05, Cl5_4_SingleSlashIsDivide) {
   auto tokens = Lex("a / b");
@@ -273,8 +257,6 @@ TEST(LexerClause05, Cl5_4_MinimalBlockComment) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-// --- §5.4: source location tracking through comments ---
-
 TEST(LexerClause05, Cl5_4_LineCommentAdvancesLineNumber) {
   auto [tokens, errors] = LexWithDiag("a\n// comment\nb");
   EXPECT_FALSE(errors);
@@ -310,4 +292,4 @@ TEST(LexerClause05, Cl5_4_NoErrorsForValidComments) {
   EXPECT_FALSE(errors);
 }
 
-}  // namespace
+}

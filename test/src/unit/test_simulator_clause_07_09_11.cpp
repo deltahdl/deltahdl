@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §7.9.11: Assoc array literal stores key-value entries (int-keyed).
 TEST(AssocMethods, LiteralInitIntKeys) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -16,7 +15,6 @@ TEST(AssocMethods, LiteralInitIntKeys) {
   EXPECT_EQ(aa->int_data[2].ToUint64(), 20u);
 }
 
-// §7.9.11: Assoc array with default value.
 TEST(AssocMethods, LiteralInitWithDefault) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -28,7 +26,6 @@ TEST(AssocMethods, LiteralInitWithDefault) {
   EXPECT_EQ(aa->default_value.ToUint64(), 99u);
 }
 
-// §7.9.11: String-keyed assoc array literal.
 TEST(AssocMethods, LiteralInitStringKeys) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
@@ -42,4 +39,4 @@ TEST(AssocMethods, LiteralInitStringKeys) {
   EXPECT_TRUE(aa->has_default);
 }
 
-}  // namespace
+}

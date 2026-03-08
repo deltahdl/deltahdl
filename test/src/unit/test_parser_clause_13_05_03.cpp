@@ -138,4 +138,4 @@ TEST(ParserSection13, DefaultArgNoDefault) {
   EXPECT_EQ(fn->func_args[1].default_value, nullptr);
 }
 
-}  // namespace
+}

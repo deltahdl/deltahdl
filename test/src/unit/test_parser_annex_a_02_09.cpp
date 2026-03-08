@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.2.9 modport_declaration ::= modport modport_item { , modport_item } ;
-
 TEST(ParserA29, ModportSingleItem) {
   auto r = Parse(
       "interface ifc;\n"
@@ -33,8 +31,6 @@ TEST(ParserA29, ModportMultipleItems) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
   EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
 }
-
-// §A.2.9 modport_simple_ports_declaration
 
 TEST(ParserA29, ModportSimplePortsInput) {
   auto r = Parse(
@@ -91,8 +87,6 @@ TEST(ParserA29, ModportSimplePortsRef) {
   EXPECT_EQ(mp->ports[0].direction, Direction::kRef);
 }
 
-// §A.2.9 modport_simple_port ::= . port_identifier ( [ expression ] )
-
 TEST(ParserA29, ModportSimplePortExplicitExpr) {
   auto r = Parse(
       "interface ifc;\n"
@@ -121,8 +115,6 @@ TEST(ParserA29, ModportSimplePortEmptyExpr) {
   EXPECT_EQ(mp->ports[0].expr, nullptr);
 }
 
-// §A.2.9 modport_tf_ports_declaration (import/export)
-
 TEST(ParserA29, ModportTfPortsImportIdentifier) {
   auto r = Parse(
       "interface ifc;\n"
@@ -146,8 +138,6 @@ TEST(ParserA29, ModportTfPortsExportIdentifier) {
   ASSERT_GE(mp->ports.size(), 1u);
   VerifyImportExportPort(mp->ports[0], false, true, "my_task");
 }
-
-// §A.2.9 modport_tf_port ::= method_prototype
 
 TEST(ParserA29, ModportImportFunctionPrototype) {
   auto r = Parse(
@@ -178,8 +168,6 @@ TEST(ParserA29, ModportImportTaskPrototype) {
   EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kTaskDecl);
 }
 
-// §A.2.9 modport_clocking_declaration ::= clocking clocking_identifier
-
 TEST(ParserA29, ModportClockingDecl) {
   auto r = Parse(
       "interface ifc;\n"
@@ -194,8 +182,6 @@ TEST(ParserA29, ModportClockingDecl) {
   EXPECT_TRUE(mp->ports[0].is_clocking);
   EXPECT_EQ(mp->ports[0].name, "cb");
 }
-
-// Mixed port directions in a modport
 
 TEST(ParserA29, ModportMixedDirections) {
   auto r = Parse(
@@ -217,8 +203,6 @@ TEST(ParserA29, ModportMixedDirections) {
   EXPECT_EQ(mp->ports[3].name, "data_in");
 }
 
-// Multiple modport declarations in one interface
-
 TEST(ParserA29, MultipleModportDecls) {
   auto r = Parse(
       "interface ifc;\n"
@@ -233,4 +217,4 @@ TEST(ParserA29, MultipleModportDecls) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "mp2");
 }
 
-}  // namespace
+}

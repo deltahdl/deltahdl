@@ -30,11 +30,10 @@ TEST(ParserA84, ConstantPrimaryTypeReference) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §11.2.1: $bits is a constant system function even with type argument.
 TEST(ConstExpr, BitsIsConstantSysFunc) {
   EvalFixture f;
   auto* e = ParseExprFrom("$bits(32'd0)", f);
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-}  // namespace
+}

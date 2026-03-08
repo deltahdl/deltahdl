@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.2 — procedural blocks and assignments
-
 TEST(ParserA602, InitialConstruct) {
   auto r = Parse(
       "module m;\n"
@@ -201,4 +199,4 @@ TEST(ParserA602, DecExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

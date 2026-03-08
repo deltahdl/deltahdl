@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.11: array literal elaboration ---
-
 TEST(ElabClause05, Cl5_11_SimpleArrayOk) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -29,8 +27,6 @@ TEST(ElabClause05, Cl5_11_DefaultKeyOk) {
              "endmodule\n"));
 }
 
-// --- §5.11: error conditions ---
-
 TEST(ElabClause05, Cl5_11_SizeMismatchError) {
   ElabFixture f;
   ElaborateSrc(
@@ -42,7 +38,7 @@ TEST(ElabClause05, Cl5_11_SizeMismatchError) {
 }
 
 TEST(ElabClause05, Cl5_11_FlatInitIllegal) {
-  // C-like flat initialization is not allowed for array of structs
+
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -53,4 +49,4 @@ TEST(ElabClause05, Cl5_11_FlatInitIllegal) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

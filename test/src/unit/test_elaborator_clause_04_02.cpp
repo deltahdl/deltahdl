@@ -4,11 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §4.2: SystemVerilog simulation reference model ---
-
-// The simulation model is built from a hierarchy of module instances rooted
-// at the designated top-level module.
-
 TEST(ElabCh42, SingleModuleDesignHasOneTopModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -135,8 +130,7 @@ TEST(ElabCh42, UnresolvedModuleNameProducesError) {
       "  nonexistent n1();\n"
       "endmodule\n",
       f);
-  // Either design is null or has_errors is true when referencing
-  // a module that does not exist in the compilation unit.
+
   if (design != nullptr) {
     EXPECT_TRUE(f.has_errors);
   }
@@ -246,4 +240,4 @@ TEST(ElabCh42, TwoIndependentTopModules) {
   EXPECT_EQ(design->all_modules.count("b"), 1u);
 }
 
-}  // namespace
+}

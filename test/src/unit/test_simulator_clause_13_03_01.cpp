@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §13.3.1: Static task variables persist between calls.
 TEST(Sim13031, StaticTaskVarsPersist) {
   auto val = RunAndGet(
       "module t;\n"
@@ -27,7 +26,6 @@ TEST(Sim13031, StaticTaskVarsPersist) {
   EXPECT_EQ(val, 3u);
 }
 
-// §13.3.1: Automatic task variables are fresh each call.
 TEST(Sim13031, AutomaticTaskVarsFresh) {
   auto val = RunAndGet(
       "module t;\n"
@@ -44,11 +42,10 @@ TEST(Sim13031, AutomaticTaskVarsFresh) {
       "  end\n"
       "endmodule\n",
       "result");
-  // cnt starts at 0 each call (automatic), so always 1.
+
   EXPECT_EQ(val, 1u);
 }
 
-// §13.3.1: Default task (no qualifier) in a module is static.
 TEST(Sim13031, DefaultTaskIsStatic) {
   auto val = RunAndGet(
       "module t;\n"
@@ -64,11 +61,10 @@ TEST(Sim13031, DefaultTaskIsStatic) {
       "  end\n"
       "endmodule\n",
       "result");
-  // Default is static: cnt persists, should be 2 after two calls.
+
   EXPECT_EQ(val, 2u);
 }
 
-// §13.3.1: Static task with input args still works.
 TEST(Sim13031, StaticTaskWithInputArgs) {
   auto val = RunAndGet(
       "module t;\n"
@@ -85,11 +81,10 @@ TEST(Sim13031, StaticTaskWithInputArgs) {
       "  end\n"
       "endmodule\n",
       "result");
-  // acc persists: 10 after first call, 30 after second.
+
   EXPECT_EQ(val, 30u);
 }
 
-// §13.3.1: SetupTaskCall returns null for function, not task.
 TEST(Sim13031, SetupReturnsTaskItem) {
   SimFixture f;
   auto* task = f.arena.Create<ModuleItem>();
@@ -109,4 +104,4 @@ TEST(Sim13031, SetupReturnsTaskItem) {
   TeardownTaskCall(result, call, f.ctx);
 }
 
-}  // namespace
+}

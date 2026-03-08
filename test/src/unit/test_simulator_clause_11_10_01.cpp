@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §11.10.1: Copy — assign string literal to a bit vector.
 TEST(SimA11101, StringLiteralCopyToVector) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -21,11 +20,10 @@ TEST(SimA11101, StringLiteralCopyToVector) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("s");
   ASSERT_NE(var, nullptr);
-  // "Hello" = 0x48656c6c6f
+
   EXPECT_EQ(var->value.ToUint64(), 0x48656c6c6fULL);
 }
 
-// §11.10.1: Copy — string assigned to wider vector is left-padded with zeros.
 TEST(SimA11101, StringLiteralCopyPaddedWithZeros) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -40,11 +38,10 @@ TEST(SimA11101, StringLiteralCopyPaddedWithZeros) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("s");
   ASSERT_NE(var, nullptr);
-  // "Hi" = 0x4869, zero-padded in 64-bit vector.
+
   EXPECT_EQ(var->value.ToUint64(), 0x4869ULL);
 }
 
-// §11.10.1: Concatenate — concatenation of string-valued vectors.
 TEST(SimA11101, StringLiteralConcatenate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -62,14 +59,10 @@ TEST(SimA11101, StringLiteralConcatenate) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("stringvar");
   ASSERT_NE(var, nullptr);
-  // After concat and truncation to 14*8=112 bits:
-  // "Hello world" is 11 chars, "!!!" is 3 chars = 14 chars total.
-  // "Hello world!!!" = 0x48656c6c6f20776f726c64212121
-  // Check last byte is '!' = 0x21.
+
   EXPECT_EQ(var->value.words[0].aval & 0xFF, 0x21u);
 }
 
-// §11.10.1: Compare — equality of string literal values in vectors.
 TEST(SimA11101, StringLiteralCompareEqual) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -92,7 +85,6 @@ TEST(SimA11101, StringLiteralCompareEqual) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §11.10.1: Compare — inequality of different string literal values.
 TEST(SimA11101, StringLiteralCompareNotEqual) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -115,7 +107,6 @@ TEST(SimA11101, StringLiteralCompareNotEqual) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §11.10.1: Single-character string literal.
 TEST(SimA11101, SingleCharStringLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -133,4 +124,4 @@ TEST(SimA11101, SingleCharStringLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 0x41u);
 }
 
-}  // namespace
+}

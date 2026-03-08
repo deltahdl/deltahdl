@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §8.23: Static property lookup via class scope resolution.
 TEST(ClassSim, ScopeResolutionStaticLookup) {
   SimFixture f;
   auto* type = MakeClassType(f, "MyClass", {});
@@ -17,7 +16,6 @@ TEST(ClassSim, ScopeResolutionStaticLookup) {
   EXPECT_EQ(it->second.ToUint64(), 256u);
 }
 
-// §8.23: Static method lookup via class scope resolution.
 TEST(ClassSim, ScopeResolutionMethodLookup) {
   SimFixture f;
   auto* type = MakeClassType(f, "Utils", {});
@@ -34,7 +32,6 @@ TEST(ClassSim, ScopeResolutionMethodLookup) {
   EXPECT_EQ(it->second->name, "compute");
 }
 
-// §8.23: Multiple static properties on one class type.
 TEST(ClassSim, ScopeResolutionMultipleStaticProps) {
   SimFixture f;
   auto* type = MakeClassType(f, "Config", {});
@@ -45,7 +42,6 @@ TEST(ClassSim, ScopeResolutionMultipleStaticProps) {
   EXPECT_EQ(type->static_properties["DEPTH"].ToUint64(), 16u);
 }
 
-// §8.23: Accessing non-existent static property returns no entry.
 TEST(ClassSim, ScopeResolutionMissingProperty) {
   SimFixture f;
   auto* type = MakeClassType(f, "Empty", {});
@@ -53,7 +49,6 @@ TEST(ClassSim, ScopeResolutionMissingProperty) {
   EXPECT_EQ(it, type->static_properties.end());
 }
 
-// §8.23: Class scope resolution disambiguates — class member vs local var.
 TEST(ClassSim, ScopeResolutionDisambiguates) {
   SimFixture f;
   auto* type = MakeClassType(f, "Base", {});
@@ -68,7 +63,6 @@ TEST(ClassSim, ScopeResolutionDisambiguates) {
   EXPECT_EQ(local->value.ToUint64(), 123u);
 }
 
-// §8.23: Derived class can access base class static property via ::
 TEST(ClassSim, ScopeResolutionBaseClassStatic) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {});
@@ -82,4 +76,4 @@ TEST(ClassSim, ScopeResolutionBaseClassStatic) {
   EXPECT_EQ(found->static_properties["count"].ToUint64(), 7u);
 }
 
-}  // namespace
+}

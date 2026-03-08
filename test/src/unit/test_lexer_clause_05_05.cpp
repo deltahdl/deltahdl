@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.5: single-character operators ---
-
 TEST(LexerClause05, Cl5_5_SingleCharPlus) {
   auto r = LexOne("+");
   EXPECT_EQ(r.token.kind, TokenKind::kPlus);
@@ -27,7 +25,7 @@ TEST(LexerClause05, Cl5_5_SingleCharStar) {
 }
 
 TEST(LexerClause05, Cl5_5_SingleCharSlash) {
-  // Must not be followed by / or * (those start comments)
+
   auto tokens = Lex("a / b");
   EXPECT_EQ(tokens[1].kind, TokenKind::kSlash);
   EXPECT_EQ(tokens[1].text.size(), 1u);
@@ -82,8 +80,6 @@ TEST(LexerClause05, Cl5_5_SingleCharEq) {
   auto r = LexOne("= ");
   EXPECT_EQ(r.token.kind, TokenKind::kEq);
 }
-
-// --- §5.5: double-character operators ---
 
 TEST(LexerClause05, Cl5_5_DoubleCharPower) {
   auto r = LexOne("**");
@@ -236,8 +232,6 @@ TEST(LexerClause05, Cl5_5_DoubleCharDotStar) {
   EXPECT_EQ(r.token.kind, TokenKind::kDotStar);
 }
 
-// --- §5.5: triple-character operators ---
-
 TEST(LexerClause05, Cl5_5_TripleCharEqEqEq) {
   auto r = LexOne("===");
   EXPECT_EQ(r.token.kind, TokenKind::kEqEqEq);
@@ -324,7 +318,6 @@ TEST(LexerClause05, Cl5_5_TripleCharPlusPercentMinus) {
   EXPECT_EQ(r.token.kind, TokenKind::kPlusPercentMinus);
 }
 
-// Quad-character operators
 TEST(LexerClause05, Cl5_5_QuadCharLtLtLtEq) {
   auto r = LexOne("<<<=");
   EXPECT_EQ(r.token.kind, TokenKind::kLtLtLtEq);
@@ -334,8 +327,6 @@ TEST(LexerClause05, Cl5_5_QuadCharGtGtGtEq) {
   auto r = LexOne(">>>=");
   EXPECT_EQ(r.token.kind, TokenKind::kGtGtGtEq);
 }
-
-// --- §5.5: operators used in expressions ---
 
 TEST(LexerClause05, Cl5_5_OperatorsAdjacentToIdentifiers) {
   auto tokens = Lex("a+b*c-d");
@@ -350,7 +341,7 @@ TEST(LexerClause05, Cl5_5_OperatorsAdjacentToIdentifiers) {
 }
 
 TEST(LexerClause05, Cl5_5_MaximalMunchForOperators) {
-  // The lexer should greedily match the longest operator
+
   auto tokens = Lex("a===b");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -359,10 +350,10 @@ TEST(LexerClause05, Cl5_5_MaximalMunchForOperators) {
 }
 
 TEST(LexerClause05, Cl5_5_DoubleNotTriple) {
-  // "== b" should be == not ===
+
   auto tokens = Lex("a == b");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[1].kind, TokenKind::kEqEq);
 }
 
-}  // namespace
+}

@@ -346,7 +346,6 @@ TEST(ParserSection6, ShortrealCast) {
               "endmodule\n"));
 }
 
-// §6.24.1: Size cast — positive integral constant as casting type.
 TEST(ParserSection6, SizeCastLiteral) {
   auto r = Parse(
       "module m;\n"
@@ -358,7 +357,6 @@ TEST(ParserSection6, SizeCastLiteral) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.24.1: Size cast — parameter as casting type.
 TEST(ParserSection6, SizeCastParameter) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -373,7 +371,6 @@ TEST(ParserSection6, SizeCastParameter) {
               "endmodule\n"));
 }
 
-// §6.24.1: Cast real expression to int.
 TEST(ParserSection6, CastRealExprToInt) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -382,7 +379,6 @@ TEST(ParserSection6, CastRealExprToInt) {
               "endmodule\n"));
 }
 
-// §6.24.1: Cast concat expression with shortint.
 TEST(ParserSection6, CastConcatShortint) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -391,7 +387,6 @@ TEST(ParserSection6, CastConcatShortint) {
               "endmodule\n"));
 }
 
-// §6.24.1: Unsigned cast expression.
 TEST(ParserSection6, UnsignedCast) {
   auto r = Parse(
       "module m;\n"
@@ -406,4 +401,4 @@ TEST(ParserSection6, UnsignedCast) {
   EXPECT_EQ(stmt->rhs->text, "unsigned");
 }
 
-}  // namespace
+}

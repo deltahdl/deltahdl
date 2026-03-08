@@ -49,4 +49,4 @@ TEST(DpiRuntime, SvLogicVecValLayout) {
   EXPECT_TRUE(v.bval == 0);
 }
 
-}  // namespace
+}

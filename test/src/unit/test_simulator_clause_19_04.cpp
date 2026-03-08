@@ -21,4 +21,4 @@ TEST(Coverage, CoverGroupAsClassMember) {
   EXPECT_EQ(obj.cg->name, "cg_in_class");
 }
 
-}  // namespace
+}

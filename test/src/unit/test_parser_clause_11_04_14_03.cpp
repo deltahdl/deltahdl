@@ -4,7 +4,6 @@
 using namespace delta;
 namespace {
 
-// §11.4.14.3: Streaming concatenation as assignment target (right-shift).
 TEST(ParserA85, StreamingConcatAsLhsRightShift) {
   auto r = Parse(
       "module m; logic [31:0] a, b;\n"
@@ -20,7 +19,6 @@ TEST(ParserA85, StreamingConcatAsLhsRightShift) {
   EXPECT_EQ(stmt->lhs->elements.size(), 2u);
 }
 
-// §11.4.14.3: Streaming concatenation as assignment target (left-shift).
 TEST(ParserA85, StreamingConcatAsLhsLeftShift) {
   auto r = Parse(
       "module m; logic [7:0] a, b;\n"
@@ -33,10 +31,9 @@ TEST(ParserA85, StreamingConcatAsLhsLeftShift) {
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
   EXPECT_EQ(stmt->lhs->op, TokenKind::kLtLt);
-  ASSERT_NE(stmt->lhs->lhs, nullptr);  // slice_size present
+  ASSERT_NE(stmt->lhs->lhs, nullptr);
 }
 
-// §11.4.14.3: Streaming concat as LHS with numeric slice size.
 TEST(ParserA85, StreamingConcatAsLhsWithSliceSize) {
   auto r = Parse(
       "module m; logic [31:0] a, b;\n"
@@ -50,7 +47,6 @@ TEST(ParserA85, StreamingConcatAsLhsWithSliceSize) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
 }
 
-// §11.4.14.3: Streaming concat as LHS of nonblocking assignment.
 TEST(ParserA85, StreamingConcatAsLhsNonblocking) {
   auto r = Parse(
       "module m; logic [7:0] x;\n"
@@ -64,7 +60,6 @@ TEST(ParserA85, StreamingConcatAsLhsNonblocking) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
 }
 
-// §11.4.14.3: Streaming concat as LHS with single element.
 TEST(ParserA85, StreamingConcatAsLhsSingleElement) {
   auto r = Parse(
       "module m; logic [15:0] v;\n"
@@ -79,7 +74,6 @@ TEST(ParserA85, StreamingConcatAsLhsSingleElement) {
   EXPECT_EQ(stmt->lhs->elements.size(), 1u);
 }
 
-// §11.4.14.3: Source is another streaming concatenation.
 TEST(ParserA85, StreamingConcatAsLhsFromStreamingRhs) {
   auto r = Parse(
       "module m; logic [7:0] a, b, c, d;\n"
@@ -93,4 +87,4 @@ TEST(ParserA85, StreamingConcatAsLhsFromStreamingRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
 }
 
-}  // namespace
+}

@@ -34,7 +34,6 @@ TEST(Elaboration, HardPackedUnion_DifferentWidth_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.3.1: Packed unions shall only contain members of integral data types.
 TEST(Elaboration, PackedUnionRealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -85,4 +84,4 @@ TEST(Elaboration, PackedUnionChandleMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

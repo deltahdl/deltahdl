@@ -87,8 +87,6 @@ TEST(ParserSection6, DefaultNettypeNone) {
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
 }
 
-// --- §22.8: illegal inside a design element ---
-
 TEST(Preprocessor, DefaultNettype_IllegalInsideDesignElement) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -96,16 +94,12 @@ TEST(Preprocessor, DefaultNettype_IllegalInsideDesignElement) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// --- §22.8: invalid net type name ---
-
 TEST(Preprocessor, DefaultNettype_InvalidType) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`default_nettype bogus\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §22.8: latest directive wins at preprocessor level ---
 
 TEST(Preprocessor, DefaultNettype_LatestDirectiveWins) {
   PreprocFixture f;
@@ -115,16 +109,12 @@ TEST(Preprocessor, DefaultNettype_LatestDirectiveWins) {
   EXPECT_EQ(pp.DefaultNetType(), NetType::kTri);
 }
 
-// --- §22.8: default is wire when no directive ---
-
 TEST(Preprocessor, DefaultNettype_DefaultIsWire) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("// no directives\n", f, pp);
   EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
 }
-
-// --- §22.8: all valid net types at preprocessor level ---
 
 TEST(Preprocessor, DefaultNettype_Wand) {
   PreprocFixture f;
@@ -190,16 +180,12 @@ TEST(Preprocessor, DefaultNettype_Trireg) {
   EXPECT_EQ(pp.DefaultNetType(), NetType::kTrireg);
 }
 
-// --- §22.8: missing argument ---
-
 TEST(Preprocessor, DefaultNettype_MissingArgument) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`default_nettype\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// --- §22.8: resetall restores wire default ---
 
 TEST(Preprocessor, DefaultNettype_ResetallRestoresWire) {
   PreprocFixture f;
@@ -211,8 +197,6 @@ TEST(Preprocessor, DefaultNettype_ResetallRestoresWire) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
 }
-
-// --- §22.8: supply0/supply1 are NOT valid default net types ---
 
 TEST(Preprocessor, DefaultNettype_Supply0Invalid) {
   PreprocFixture f;

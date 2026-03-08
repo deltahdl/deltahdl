@@ -53,7 +53,6 @@ TEST(Elaborator, TypedefChain) {
   EXPECT_TRUE(found);
 }
 
-// §6.18: Typedef resolves 4-state property through chain.
 TEST(Elaborator, TypedefChain4State) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -72,7 +71,6 @@ TEST(Elaborator, TypedefChain4State) {
   }
 }
 
-// §6.18: Typedef resolves signedness through chain.
 TEST(Elaborator, TypedefChainSigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -91,7 +89,6 @@ TEST(Elaborator, TypedefChainSigned) {
   }
 }
 
-// §6.18: Typedef of struct resolves width.
 TEST(Elaborator, TypedefStructWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -109,7 +106,6 @@ TEST(Elaborator, TypedefStructWidth) {
   }
 }
 
-// §6.18: Forward typedef followed by definition elaborates correctly.
 TEST(Elaborator, ForwardTypedefThenDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -123,4 +119,4 @@ TEST(Elaborator, ForwardTypedefThenDefinition) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

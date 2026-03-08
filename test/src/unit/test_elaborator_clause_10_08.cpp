@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §10.8: Continuous assignment is an assignment-like context (truncation).
 TEST(SimCh10f, ContAssignTruncatesInAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -25,7 +24,6 @@ TEST(SimCh10f, ContAssignTruncatesInAssignLikeContext) {
   EXPECT_EQ(out->value.ToUint64(), 0xBu);
 }
 
-// §10.8: Procedural assignment is an assignment-like context (extension).
 TEST(SimCh10f, ProceduralAssignExtendsInAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -45,7 +43,6 @@ TEST(SimCh10f, ProceduralAssignExtendsInAssignLikeContext) {
   EXPECT_EQ(wide->value.ToUint64(), 0x000Au);
 }
 
-// §10.8: Return statement in a function is an assignment-like context.
 TEST(SimCh10f, ReturnStatementAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -66,7 +63,6 @@ TEST(SimCh10f, ReturnStatementAssignLikeContext) {
   EXPECT_EQ(result->value.ToUint64(), 0xCDu);
 }
 
-// §10.8: Subroutine argument passing is an assignment-like context.
 TEST(SimCh10f, SubroutineArgAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -84,11 +80,10 @@ TEST(SimCh10f, SubroutineArgAssignLikeContext) {
   f.scheduler.Run();
   auto* result = f.ctx.FindVariable("result");
   ASSERT_NE(result, nullptr);
-  // 16'hCAFE truncated to 8 bits at the argument boundary = 8'hFE.
+
   EXPECT_EQ(result->value.ToUint64(), 0xFEu);
 }
 
-// §10.8: Output port connection is an assignment-like context.
 TEST(SimCh10f, OutputPortAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -104,14 +99,13 @@ TEST(SimCh10f, OutputPortAssignLikeContext) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // Output port value assigned into wider variable — extension applies.
+
   auto* wide = f.ctx.FindVariable("wide");
   if (wide) {
     EXPECT_EQ(wide->value.ToUint64() & 0xF, 0xAu);
   }
 }
 
-// §10.8: Conditional expression propagates assignment-like context.
 TEST(SimCh10f, ConditionalExprInAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -127,11 +121,10 @@ TEST(SimCh10f, ConditionalExprInAssignLikeContext) {
   f.scheduler.Run();
   auto* result = f.ctx.FindVariable("result");
   ASSERT_NE(result, nullptr);
-  // 16'hCAFE truncated to 8 bits in assignment-like context = 8'hFE.
+
   EXPECT_EQ(result->value.ToUint64(), 0xFEu);
 }
 
-// §10.8: Parenthesized expression propagates assignment-like context.
 TEST(SimCh10f, ParenExprInAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -149,7 +142,6 @@ TEST(SimCh10f, ParenExprInAssignLikeContext) {
   EXPECT_EQ(a->value.ToUint64(), 0xADu);
 }
 
-// §10.8: Nonblocking assignment is an assignment-like context.
 TEST(SimCh10f, NBAAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -167,4 +159,4 @@ TEST(SimCh10f, NBAAssignLikeContext) {
   EXPECT_EQ(narrow->value.ToUint64(), 0xFu);
 }
 
-}  // namespace
+}

@@ -76,4 +76,4 @@ TEST_F(VerifyParseTest, CheckerWithFinalProcedure) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}  // namespace
+}

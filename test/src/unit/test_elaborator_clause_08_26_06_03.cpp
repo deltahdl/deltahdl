@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.26.6.3: Diamond inheritance — single copy of base interface's symbols.
 TEST(ElabA82663, DiamondInheritanceOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfBase;\n"
@@ -22,7 +21,6 @@ TEST(ElabA82663, DiamondInheritanceOk) {
              "endmodule\n"));
 }
 
-// §8.26.6.3: Class implements diamond — OK with all methods implemented.
 TEST(ElabA82663, ClassImplementsDiamondOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfBase;\n"
@@ -49,4 +47,4 @@ TEST(ElabA82663, ClassImplementsDiamondOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

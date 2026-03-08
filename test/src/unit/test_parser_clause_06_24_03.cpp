@@ -54,7 +54,6 @@ TEST(ParserSection6, BitStreamCastFromStruct) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// §6.24.3: Bitstream cast — struct to struct with same total width.
 TEST(ParserSection6, BitstreamCastStructToStruct) {
   EXPECT_TRUE(ParseOk(
       "module t;\n"
@@ -69,7 +68,6 @@ TEST(ParserSection6, BitstreamCastStructToStruct) {
       "endmodule\n"));
 }
 
-// §6.24.3: Bitstream types include strings.
 TEST(ParserSection6, BitstreamCastStringType) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -80,4 +78,4 @@ TEST(ParserSection6, BitstreamCastStringType) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

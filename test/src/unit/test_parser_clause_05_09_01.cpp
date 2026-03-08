@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.9.1: strings with escape sequences parse correctly ---
-
 TEST(ParserClause05, Cl5_9_1_StringWithNewlineEscape) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -41,4 +39,4 @@ TEST(ParserClause05, Cl5_9_1_StringWithHexEscape) {
               "endmodule"));
 }
 
-}  // namespace
+}

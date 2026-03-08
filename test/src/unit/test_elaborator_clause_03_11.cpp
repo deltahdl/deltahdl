@@ -2,8 +2,6 @@
 
 namespace {
 
-// §3.11: Hierarchy is created by instantiation.
-
 TEST(ElabClause03, Cl3_11_TwoLevelHierarchyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -63,4 +61,4 @@ TEST(ElabClause03, Cl3_11_PortCommunicationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

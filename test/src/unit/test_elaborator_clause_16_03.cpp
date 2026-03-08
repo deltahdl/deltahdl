@@ -52,4 +52,4 @@ TEST(ElabA610, MixedAssertionsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

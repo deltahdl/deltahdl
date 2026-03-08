@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §7.10.5: Bounded queue push_back respects max size.
 TEST(BoundedQueue, PushBackRespectsMax) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32, 3);
@@ -15,14 +14,12 @@ TEST(BoundedQueue, PushBackRespectsMax) {
   q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 30));
   q->AssignFreshIds();
 
-  // Queue is at max (3 elements). push_back should be silently ignored.
   auto* call =
       MakeMethodCall(f.arena, "q", "push_back", {MakeInt(f.arena, 40)});
   TryExecQueueMethodStmt(call, f.ctx, f.arena);
   EXPECT_EQ(q->elements.size(), 3u);
 }
 
-// §7.10.5: Bounded queue push_front respects max size.
 TEST(BoundedQueue, PushFrontRespectsMax) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32, 3);
@@ -37,7 +34,6 @@ TEST(BoundedQueue, PushFrontRespectsMax) {
   EXPECT_EQ(q->elements.size(), 3u);
 }
 
-// §7.10.5: Bounded queue allows push after delete.
 TEST(BoundedQueue, AllowsPushAfterDelete) {
   SimFixture f;
   auto* q = f.ctx.CreateQueue("q", 32, 3);
@@ -46,7 +42,6 @@ TEST(BoundedQueue, AllowsPushAfterDelete) {
   q->elements.push_back(MakeLogic4VecVal(f.arena, 32, 30));
   q->AssignFreshIds();
 
-  // Delete one, then push should work.
   auto* del = MakeMethodCall(f.arena, "q", "delete", {MakeInt(f.arena, 0)});
   TryExecQueueMethodStmt(del, f.ctx, f.arena);
   EXPECT_EQ(q->elements.size(), 2u);
@@ -58,10 +53,9 @@ TEST(BoundedQueue, AllowsPushAfterDelete) {
   EXPECT_EQ(q->elements[2].ToUint64(), 40u);
 }
 
-// §7.10.5: Unbounded queue has no push limit.
 TEST(BoundedQueue, UnboundedHasNoLimit) {
   SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32);  // max_size = -1 (unbounded)
+  auto* q = f.ctx.CreateQueue("q", 32);
   for (int i = 0; i < 100; ++i) {
     auto* call = MakeMethodCall(f.arena, "q", "push_back",
                                 {MakeInt(f.arena, static_cast<uint64_t>(i))});
@@ -70,4 +64,4 @@ TEST(BoundedQueue, UnboundedHasNoLimit) {
   EXPECT_EQ(q->elements.size(), 100u);
 }
 
-}  // namespace
+}

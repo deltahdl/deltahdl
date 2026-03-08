@@ -1,4 +1,4 @@
-// §23.2.2.4
+
 
 #include "fixture_parser.h"
 
@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// ansi_port_declaration with default value
 TEST(ModuleParamsA13, AnsiPortWithDefault) {
   auto r = Parse(
       "module m(\n"
@@ -19,4 +18,4 @@ TEST(ModuleParamsA13, AnsiPortWithDefault) {
   EXPECT_NE(r.cu->modules[0]->ports[1].default_value, nullptr);
 }
 
-}  // namespace
+}

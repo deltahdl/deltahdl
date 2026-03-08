@@ -4,8 +4,6 @@
 
 using namespace delta;
 
-// --- §22.5.2: `undef ---
-
 TEST(Preprocessor, Clause22_5_2_UndefPreviouslyDefinedMacro) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -26,14 +24,14 @@ TEST(Preprocessor, Clause22_5_2_UndefinedMacroHasNoValue) {
       "`undef FOO\n"
       "int x = `FOO;\n",
       f);
-  // `FOO should remain unexpanded after undef.
+
   EXPECT_NE(result.find("`FOO"), std::string::npos);
 }
 
 TEST(Preprocessor, Clause22_5_2_UndefUndefinedMacroNoError) {
   PreprocFixture f;
   Preprocess("`undef NEVER_DEFINED\n", f);
-  // Undefining a macro that was never defined should not be an error.
+
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
@@ -59,7 +57,7 @@ TEST(Preprocessor, Clause22_5_2_UndefInInactiveConditionalSkipped) {
       "int x = `KEEP;\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  // `undef inside inactive branch should not take effect.
+
   EXPECT_NE(result.find("42"), std::string::npos);
 }
 

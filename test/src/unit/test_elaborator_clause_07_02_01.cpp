@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.2.1: Signing of unpacked structures is not allowed.
 TEST(Elaboration, UnpackedStructSigned_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -45,8 +44,6 @@ TEST(Elaboration, PackedStructUnsigned_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2.1: Only packed data types and integer data types allowed in packed
-// structs.
 TEST(Elaboration, PackedStructRealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -127,4 +124,4 @@ TEST(Elaboration, PackedStructShortrealMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

@@ -53,4 +53,4 @@ TEST(ParserSection10, ContinuousAssignDelay) {
   }
 }
 
-}  // namespace
+}

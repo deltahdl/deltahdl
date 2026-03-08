@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -17,7 +17,6 @@ TEST(ParserSection6, TriregChargeStrengthLarge) {
   EXPECT_EQ(item->data_type.charge_strength, 4);
 }
 
-// §6.3.2.1: trireg with charge strength and delay.
 TEST(ParserSection6, TriregChargeStrengthWithDelay) {
   auto r = Parse(
       "module t;\n"
@@ -33,7 +32,6 @@ TEST(ParserSection6, TriregChargeStrengthWithDelay) {
   EXPECT_NE(item->net_delay_decay, nullptr);
 }
 
-// §6.3.2.1: trireg without explicit charge strength (parser stores 0).
 TEST(ParserSection6, TriregNoChargeStrengthParserDefault) {
   auto r = Parse(
       "module t;\n"
@@ -47,4 +45,4 @@ TEST(ParserSection6, TriregNoChargeStrengthParserDefault) {
   EXPECT_EQ(item->data_type.charge_strength, 0);
 }
 
-}  // namespace
+}

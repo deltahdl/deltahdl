@@ -47,7 +47,6 @@ TEST(SimA608, DoWhileIterates) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §12.7.5: do-while with break.
 TEST(SimA608, DoWhileBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -71,7 +70,6 @@ TEST(SimA608, DoWhileBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §12.7.5: do-while with continue — skips to condition test.
 TEST(SimA608, DoWhileContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -94,11 +92,10 @@ TEST(SimA608, DoWhileContinue) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("sum");
   ASSERT_NE(var, nullptr);
-  // sum = 1 + 3 + 4 = 8 (skip 2)
+
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-// §12.7.5: do-while with block body counting iterations.
 TEST(SimA608, DoWhileBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -123,4 +120,4 @@ TEST(SimA608, DoWhileBlock) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-}  // namespace
+}

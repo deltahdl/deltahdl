@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.11: positional array literals ---
-
 TEST(SimClause05, Cl5_11_PositionalAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -40,8 +38,6 @@ TEST(SimClause05, Cl5_11_PositionalVarInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0x22);
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x33);
 }
-
-// --- §5.11: replication operator ---
 
 TEST(SimClause05, Cl5_11_ReplicationAssignment) {
   SimFixture f;
@@ -76,8 +72,6 @@ TEST(SimClause05, Cl5_11_ReplicationVarInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
 }
 
-// --- §5.11: default value ---
-
 TEST(SimClause05, Cl5_11_DefaultAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -110,8 +104,6 @@ TEST(SimClause05, Cl5_11_DefaultVarInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0x99);
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x99);
 }
-
-// --- §5.11: index key with default ---
 
 TEST(SimClause05, Cl5_11_IndexKeyWithDefault) {
   SimFixture f;
@@ -146,8 +138,6 @@ TEST(SimClause05, Cl5_11_IndexKeyVarInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xCC);
 }
 
-// --- §5.11: descending range ---
-
 TEST(SimClause05, Cl5_11_DescendingRange) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -163,8 +153,6 @@ TEST(SimClause05, Cl5_11_DescendingRange) {
   EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0xBB);
   EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0xCC);
 }
-
-// --- §5.11: type from assignment context ---
 
 TEST(SimClause05, Cl5_11_TypeFromContext) {
   SimFixture f;
@@ -182,4 +170,4 @@ TEST(SimClause05, Cl5_11_TypeFromContext) {
   EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0xAD);
 }
 
-}  // namespace
+}

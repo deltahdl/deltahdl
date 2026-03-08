@@ -17,4 +17,4 @@ TEST(SynthLower, RejectInitialBlock) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

@@ -51,4 +51,4 @@ TEST(ParserA210, AssertionVariableDecl_MultipleVars) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

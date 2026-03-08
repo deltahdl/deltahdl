@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.17: super.new() as first statement in constructor is OK.
 TEST(ElabA817, SuperNewFirstStatementOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -21,7 +20,6 @@ TEST(ElabA817, SuperNewFirstStatementOk) {
              "endmodule\n"));
 }
 
-// §8.17: super.new() NOT first statement is an error.
 TEST(ElabA817, SuperNewNotFirstStatementError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
@@ -40,7 +38,6 @@ TEST(ElabA817, SuperNewNotFirstStatementError) {
              "endmodule\n"));
 }
 
-// §8.17: extends with args + super.new() in constructor is an error.
 TEST(ElabA817, ExtendsArgsAndSuperNewError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
@@ -57,7 +54,6 @@ TEST(ElabA817, ExtendsArgsAndSuperNewError) {
              "endmodule\n"));
 }
 
-// §8.17: extends with args and no super.new() is OK.
 TEST(ElabA817, ExtendsArgsNoSuperNewOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -71,7 +67,6 @@ TEST(ElabA817, ExtendsArgsNoSuperNewOk) {
              "endmodule\n"));
 }
 
-// §8.17: No constructor in subclass (implicit chaining) is OK.
 TEST(ElabA817, ImplicitChainingOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -86,4 +81,4 @@ TEST(ElabA817, ImplicitChainingOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

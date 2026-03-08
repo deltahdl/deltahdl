@@ -16,7 +16,6 @@ TEST(ElabA82, ConstantFunctionCallInParam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.3: Constant function with only input args is valid.
 TEST(Elab1343, ConstantFunctionInputOnlyOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -29,7 +28,6 @@ TEST(Elab1343, ConstantFunctionInputOnlyOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.3: Constant function with output arg is error.
 TEST(Elab1343, ConstantFunctionOutputArgError) {
   ElabFixture f;
   ElaborateSrc(
@@ -44,7 +42,6 @@ TEST(Elab1343, ConstantFunctionOutputArgError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4.3: Constant function with inout arg is error.
 TEST(Elab1343, ConstantFunctionInoutArgError) {
   ElabFixture f;
   ElaborateSrc(
@@ -58,7 +55,6 @@ TEST(Elab1343, ConstantFunctionInoutArgError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4.3: Constant function with ref arg is error.
 TEST(Elab1343, ConstantFunctionRefArgError) {
   ElabFixture f;
   ElaborateSrc(
@@ -72,7 +68,6 @@ TEST(Elab1343, ConstantFunctionRefArgError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4.3: Constant function using $clog2 system function is OK.
 TEST(Elab1343, ConstantFunctionWithSysFuncOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -85,7 +80,6 @@ TEST(Elab1343, ConstantFunctionWithSysFuncOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.3: Constant function with fork is error.
 TEST(Elab1343, ConstantFunctionForkError) {
   ElabFixture f;
   ElaborateSrc(
@@ -101,7 +95,6 @@ TEST(Elab1343, ConstantFunctionForkError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4.3: Normal (non-constant-context) function with output arg is fine.
 TEST(Elab1343, NonConstantContextOutputArgOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -116,4 +109,4 @@ TEST(Elab1343, NonConstantContextOutputArgOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

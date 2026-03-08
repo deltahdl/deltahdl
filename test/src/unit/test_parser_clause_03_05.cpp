@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §3.5: Interfaces are enclosed between interface...endinterface.
-
 TEST(ParserClause03, Cl3_5_InterfaceEnclosedByKeywords) {
   auto r = Parse("interface ifc; endinterface");
   ASSERT_NE(r.cu, nullptr);
@@ -15,8 +13,6 @@ TEST(ParserClause03, Cl3_5_InterfaceEnclosedByKeywords) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
   EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
 }
-
-// --- Interface can have parameters, constants, variables ---
 
 TEST(ParserClause03, Cl3_5_InterfaceWithParameters) {
   auto r = Parse(
@@ -66,8 +62,6 @@ TEST(ParserClause03, Cl3_5_InterfaceWithNets) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kNetDecl));
 }
 
-// --- Interface can have functions and tasks ---
-
 TEST(ParserClause03, Cl3_5_InterfaceWithFunction) {
   auto r = Parse(
       "interface ifc;\n"
@@ -92,8 +86,6 @@ TEST(ParserClause03, Cl3_5_InterfaceWithTask) {
   EXPECT_TRUE(
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kTaskDecl));
 }
-
-// --- Interface can contain processes and continuous assignments ---
 
 TEST(ParserClause03, Cl3_5_InterfaceWithInitialBlock) {
   auto r = Parse(
@@ -128,8 +120,6 @@ TEST(ParserClause03, Cl3_5_InterfaceWithContAssign) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kContAssign));
 }
 
-// --- Modport construct ---
-
 TEST(ParserClause03, Cl3_5_InterfaceWithModport) {
   auto r = Parse(
       "interface ifc;\n"
@@ -159,8 +149,6 @@ TEST(ParserClause03, Cl3_5_ModportWithDirectionalPorts) {
   EXPECT_EQ(mp->ports[2].direction, Direction::kOutput);
 }
 
-// --- Interface ports ---
-
 TEST(ParserClause03, Cl3_5_InterfaceWithPorts) {
   auto r = Parse(
       "interface ifc(input logic clk);\n"
@@ -170,8 +158,6 @@ TEST(ParserClause03, Cl3_5_InterfaceWithPorts) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
 }
-
-// --- LRM §3.5 simple_bus example ---
 
 TEST(ParserClause03, Cl3_5_SimpleBusExample) {
   auto r = Parse(
@@ -214,8 +200,6 @@ TEST(ParserClause03, Cl3_5_InterfaceInstantiationInModule) {
               "endmodule\n"));
 }
 
-// --- Mixed contents ---
-
 TEST(ParserClause03, Cl3_5_InterfaceWithMixedContents) {
   EXPECT_TRUE(
       ParseOk("interface ifc #(parameter int W = 8) (input logic clk);\n"
@@ -230,4 +214,4 @@ TEST(ParserClause03, Cl3_5_InterfaceWithMixedContents) {
               "endinterface\n"));
 }
 
-}  // namespace
+}

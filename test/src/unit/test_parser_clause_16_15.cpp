@@ -32,4 +32,4 @@ TEST(SourceText, DefaultDisableIff) {
   EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
 }
 
-}  // namespace
+}

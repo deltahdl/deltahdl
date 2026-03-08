@@ -161,8 +161,7 @@ TEST(Preprocessor, IfdefExprComplex) {
       f, std::move(cfg));
   EXPECT_NE(result.find("complex_true"), std::string::npos);
 }
-// §22.6: implication operator -> in ifdef expression.
-// A -> B is equivalent to !A || B.
+
 TEST(Preprocessor, IfdefExprImplication) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -175,7 +174,6 @@ TEST(Preprocessor, IfdefExprImplication) {
   EXPECT_NE(result.find("impl_true"), std::string::npos);
 }
 
-// §22.6: A -> B when A is true and B is false should be false.
 TEST(Preprocessor, IfdefExprImplicationFalse) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -188,7 +186,6 @@ TEST(Preprocessor, IfdefExprImplicationFalse) {
   EXPECT_EQ(result.find("impl_true"), std::string::npos);
 }
 
-// §22.6: A -> B when A is false should be true (vacuously).
 TEST(Preprocessor, IfdefExprImplicationVacuous) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -199,8 +196,6 @@ TEST(Preprocessor, IfdefExprImplicationVacuous) {
   EXPECT_NE(result.find("vacuous"), std::string::npos);
 }
 
-// §22.6: equivalence operator <-> in ifdef expression.
-// A <-> B is true when both are defined or both are undefined.
 TEST(Preprocessor, IfdefExprEquivalence) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -213,7 +208,6 @@ TEST(Preprocessor, IfdefExprEquivalence) {
   EXPECT_NE(result.find("equiv_true"), std::string::npos);
 }
 
-// §22.6: A <-> B when only A is defined should be false.
 TEST(Preprocessor, IfdefExprEquivalenceFalse) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -226,7 +220,6 @@ TEST(Preprocessor, IfdefExprEquivalenceFalse) {
   EXPECT_EQ(result.find("equiv_true"), std::string::npos);
 }
 
-// §22.6: A <-> B when both are undefined should be true.
 TEST(Preprocessor, IfdefExprEquivalenceBothUndef) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -237,7 +230,6 @@ TEST(Preprocessor, IfdefExprEquivalenceBothUndef) {
   EXPECT_NE(result.find("equiv_true"), std::string::npos);
 }
 
-// §22.6: `ifndef (expr) is treated as `ifdef (!(expr)).
 TEST(Preprocessor, IfndefExprForm) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -250,7 +242,6 @@ TEST(Preprocessor, IfndefExprForm) {
   EXPECT_NE(result.find("ifndef_expr"), std::string::npos);
 }
 
-// §22.6: `ifndef (expr) when expr is true should exclude block.
 TEST(Preprocessor, IfndefExprFormTrue) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -263,7 +254,6 @@ TEST(Preprocessor, IfndefExprFormTrue) {
   EXPECT_EQ(result.find("ifndef_expr"), std::string::npos);
 }
 
-// §22.6: compiler directive names are not considered defined by `ifdef.
 TEST(Preprocessor, IfdefDirectiveNameNotDefined) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -274,7 +264,6 @@ TEST(Preprocessor, IfdefDirectiveNameNotDefined) {
   EXPECT_EQ(result.find("should_not_appear"), std::string::npos);
 }
 
-// §22.6: `elsif with expression form.
 TEST(Preprocessor, ElsifExprForm) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -289,7 +278,6 @@ TEST(Preprocessor, ElsifExprForm) {
   EXPECT_NE(result.find("line_bc"), std::string::npos);
 }
 
-// §22.6: nested ifdef in skipped branch does not affect outer.
 TEST(Preprocessor, NestedIfdefInSkippedBranch) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -307,7 +295,6 @@ TEST(Preprocessor, NestedIfdefInSkippedBranch) {
   EXPECT_NE(result.find("outer_else"), std::string::npos);
 }
 
-// §22.6: `ifdef with `define inside a taken branch.
 TEST(Preprocessor, IfdefDefineInTakenBranch) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -323,7 +310,6 @@ TEST(Preprocessor, IfdefDefineInTakenBranch) {
   EXPECT_NE(result.find("inner_visible"), std::string::npos);
 }
 
-// §22.6: `define inside a skipped branch should not be defined.
 TEST(Preprocessor, DefineInSkippedBranchNotDefined) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -336,8 +322,6 @@ TEST(Preprocessor, DefineInSkippedBranchNotDefined) {
       f);
   EXPECT_EQ(result.find("skip_visible"), std::string::npos);
 }
-
-// --- §22.6: Inline `ifdef (Example 4) ---
 
 TEST(Preprocessor, InlineIfdefTrue) {
   PreprocFixture f;
@@ -395,8 +379,6 @@ TEST(Preprocessor, InlineIfdefNested) {
   EXPECT_NE(result.find("1"), std::string::npos);
 }
 
-// --- §22.6: Deep nesting (Example 2) ---
-
 TEST(Preprocessor, DeeplyNestedIfdef) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -425,8 +407,6 @@ TEST(Preprocessor, DeeplyNestedIfdef) {
   EXPECT_EQ(result.find("nest_one_undef"), std::string::npos);
   EXPECT_EQ(result.find("wow_undef"), std::string::npos);
 }
-
-// --- §22.6: Chained `ifdef/`elsif/`ifndef (Example 3) ---
 
 TEST(Preprocessor, ChainedElsifWithNested) {
   PreprocFixture f;
@@ -466,32 +446,26 @@ TEST(Preprocessor, ChainedElsifWithNestedIfndef) {
   EXPECT_EQ(result.find("not_first"), std::string::npos);
 }
 
-// --- §22.6: Error cases ---
-
 TEST(Preprocessor, EndifWithoutIfdef) {
   PreprocFixture f;
   Preprocess("`endif\n", f);
-  // Orphan `endif — should not crash (existing code handles gracefully).
-  // No error required by LRM, but should not crash.
+
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(Preprocessor, ElseWithoutIfdef) {
   PreprocFixture f;
   Preprocess("`else\ntext\n`endif\n", f);
-  // Orphan `else — should not crash.
+
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(Preprocessor, IfdefWithoutEndif) {
   PreprocFixture f;
   Preprocess("`ifdef SOMETHING\ntext\n", f);
-  // Unterminated `ifdef — should not crash.
-  // Text in active branch is processed; cond_stack is non-empty at EOF.
+
   EXPECT_FALSE(f.diag.HasErrors());
 }
-
-// --- §22.6: Empty blocks ---
 
 TEST(Preprocessor, IfdefEmptyBlocks) {
   PreprocFixture f;
@@ -517,8 +491,6 @@ TEST(Preprocessor, IfdefAllEmptyBlocks) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// --- §22.6: `ifndef with simple identifier ---
-
 TEST(Preprocessor, IfndefSimpleUndefined) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -540,8 +512,6 @@ TEST(Preprocessor, IfndefSimpleDefined) {
       f, std::move(cfg));
   EXPECT_EQ(result.find("visible"), std::string::npos);
 }
-
-// --- §22.6: Macro defined to 0 or empty is still "defined" ---
 
 TEST(Preprocessor, IfdefMacroDefinedToZero) {
   PreprocFixture f;

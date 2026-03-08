@@ -40,7 +40,6 @@ TEST(ParserSection11, ConditionalTernary) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
-// §11.2.1: ConstEvalReal — ternary on reals.
 TEST(ConstEvalReal, TernaryOnReals) {
   EvalFixture f;
   auto* e = ParseExprFrom("1 ? 2.5 : 3.5", f);
@@ -49,7 +48,6 @@ TEST(ConstEvalReal, TernaryOnReals) {
   EXPECT_DOUBLE_EQ(*val, 2.5);
 }
 
-// §11.2.1: Constant expression with nested ternary.
 TEST(ConstExpr, NestedTernaryIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("1 ? (0 ? 3 : 4) : 5", f);
@@ -57,4 +55,4 @@ TEST(ConstExpr, NestedTernaryIsConstant) {
   EXPECT_EQ(ConstEvalInt(e), 4);
 }
 
-}  // namespace
+}

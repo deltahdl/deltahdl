@@ -119,8 +119,6 @@ TEST(ParserCh512, TopLevel_TrailingSemicolonAfterEndmodule) {
   EXPECT_TRUE(ParseOk("module m; endmodule;"));
 }
 
-// §A.1.3 Module parameters and ports
-// parameter_port_list ::= # ( list_of_param_assignments { , ... } )
 TEST(ParserAnnexA, A1ModuleWithParams) {
   auto r = Parse(
       "module m #(parameter W = 8, parameter D = 4)(\n"
@@ -132,7 +130,6 @@ TEST(ParserAnnexA, A1ModuleWithParams) {
   EXPECT_EQ(r.cu->modules[0]->ports.size(), 1u);
 }
 
-// parameter_port_list ::= #( )
 TEST(ModuleParamsA13, EmptyParamPortList) {
   auto r = Parse("module m #(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -141,7 +138,6 @@ TEST(ModuleParamsA13, EmptyParamPortList) {
   EXPECT_TRUE(r.cu->modules[0]->params.empty());
 }
 
-// parameter_port_declaration with local_parameter_declaration
 TEST(ModuleParamsA13, LocalparamInParamPortList) {
   auto r = Parse(
       "module m #(parameter W = 8, localparam D = W*2)(\n"
@@ -172,4 +168,4 @@ TEST(ModuleEmptyPortList, AnsiHeaderEmptyParenPorts) {
   EXPECT_TRUE(r.cu->modules[0]->ports.empty());
 }
 
-}  // namespace
+}

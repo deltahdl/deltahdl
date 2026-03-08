@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -168,4 +168,4 @@ TEST_F(SpecifyTest, MixedSpecifyBlockItems) {
   EXPECT_EQ(spec->specify_items[4]->kind, SpecifyItemKind::kTimingCheck);
 }
 
-}  // namespace
+}

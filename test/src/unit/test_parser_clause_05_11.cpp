@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.11: positional array literals ---
-
 TEST(ParserClause05, Cl5_11_PositionalArrayLiteral) {
   auto r = Parse(
       "module m;\n"
@@ -22,10 +20,8 @@ TEST(ParserClause05, Cl5_11_PositionalArrayLiteral) {
   EXPECT_TRUE(item->init_expr->pattern_keys.empty());
 }
 
-// --- §5.11: nested braces follow dimensions ---
-
 TEST(ParserClause05, Cl5_11_NestedMultidimensional) {
-  // int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};
+
   auto r = Parse(
       "module m;\n"
       "  int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};\n"
@@ -41,10 +37,8 @@ TEST(ParserClause05, Cl5_11_NestedMultidimensional) {
   EXPECT_EQ(item->init_expr->elements[1]->kind, ExprKind::kAssignmentPattern);
 }
 
-// --- §5.11: replication operator ---
-
 TEST(ParserClause05, Cl5_11_ReplicationSingleElement) {
-  // '{3{1}} — replication with single element
+
   auto r = Parse(
       "module m;\n"
       "  int arr [0:2];\n"
@@ -62,7 +56,7 @@ TEST(ParserClause05, Cl5_11_ReplicationSingleElement) {
 }
 
 TEST(ParserClause05, Cl5_11_ReplicationMultiElement) {
-  // '{2{a, b}} — replication with multiple elements
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int a, b;\n"
@@ -72,17 +66,15 @@ TEST(ParserClause05, Cl5_11_ReplicationMultiElement) {
 }
 
 TEST(ParserClause05, Cl5_11_NestedReplication) {
-  // int n[1:2][1:6] = '{2{'{3{4, 5}}}};
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
               "endmodule\n"));
 }
 
-// --- §5.11: type-prefixed array literal ---
-
 TEST(ParserClause05, Cl5_11_TypePrefixed) {
-  // triple'{0,1,2} — explicit type prefix
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef int triple [1:3];\n"
@@ -90,10 +82,8 @@ TEST(ParserClause05, Cl5_11_TypePrefixed) {
               "endmodule\n"));
 }
 
-// --- §5.11: index key and default value ---
-
 TEST(ParserClause05, Cl5_11_IndexKeyWithDefault) {
-  // triple b = '{1:1, default:0};
+
   auto r = Parse(
       "module m;\n"
       "  typedef int triple [1:3];\n"
@@ -115,8 +105,6 @@ TEST(ParserClause05, Cl5_11_DefaultOnlyArray) {
               "endmodule\n"));
 }
 
-// --- §5.11: array literal in assignment ---
-
 TEST(ParserClause05, Cl5_11_ArrayLiteralAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -131,4 +119,4 @@ TEST(ParserClause05, Cl5_11_ArrayLiteralAssignment) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-}  // namespace
+}

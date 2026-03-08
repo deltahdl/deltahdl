@@ -34,7 +34,6 @@ TEST(ParserSection6, ImplicitNetInModuleInst) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §6.10: `default_nettype none forbids implicit nets at parser level.
 TEST(ParserSection6, DefaultNettypeNoneRejectsImplicit) {
   auto r = ParseWithPreprocessor(
       "`default_nettype none\n"
@@ -42,8 +41,8 @@ TEST(ParserSection6, DefaultNettypeNoneRejectsImplicit) {
       "  assign w = 1'b1;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // Parser accepts the syntax; the error is deferred to elaboration.
+
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

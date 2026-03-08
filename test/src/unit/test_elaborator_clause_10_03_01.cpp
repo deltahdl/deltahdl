@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §10.3.1: Net declaration assignment creates an implicit continuous
-// assignment.
-
 TEST(ElabClause100301, NetDeclAssign_CreatesContAssign) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -70,9 +67,6 @@ TEST(ElabClause100301, NetDeclAssign_DriveStrength) {
   EXPECT_NE(mod->assigns[0].drive_strength1, 0);
 }
 
-// §10.3.1: Only one net declaration assignment per net (since a net is declared
-// once). A net without an initializer should not generate a continuous assign.
-
 TEST(ElabClause100301, NetDeclNoInit_NoContAssign) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -86,8 +80,6 @@ TEST(ElabClause100301, NetDeclNoInit_NoContAssign) {
   EXPECT_EQ(mod->assigns.size(), 0u);
 }
 
-// §10.3.1: Multiple nets in one declaration, each with initializer.
-
 TEST(ElabClause100301, MultiNetDeclAssign) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -100,8 +92,6 @@ TEST(ElabClause100301, MultiNetDeclAssign) {
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->assigns.size(), 2u);
 }
-
-// §10.3.1: An interconnect net shall not have a net declaration assignment.
 
 TEST(ElabClause100301, InterconnectWithInit_Error) {
   ElabFixture f;
@@ -124,9 +114,6 @@ TEST(ElabClause100301, InterconnectNoInit_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Net decl assignment tracks in cont_assign_targets_ and prevents
-// mixed continuous/procedural.
-
 TEST(ElabClause100301, NetDeclAssignConflictsWithProcAssign) {
   ElabFixture f;
   Elaborate(
@@ -138,7 +125,6 @@ TEST(ElabClause100301, NetDeclAssignConflictsWithProcAssign) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §6.3.2.2: Drive strength on net declaration with assignment is valid.
 TEST(Elaborator, DriveStrengthOnNetDeclWithAssignIsValid) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -150,4 +136,4 @@ TEST(Elaborator, DriveStrengthOnNetDeclWithAssignIsValid) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

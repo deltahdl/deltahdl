@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §8.24: Extern method body registered separately in class methods map.
 TEST(ClassSim, ExternMethodRegisteredSeparately) {
   SimFixture f;
   auto* type = MakeClassType(f, "MyClass", {"val"});
@@ -27,19 +26,16 @@ TEST(ClassSim, ExternMethodRegisteredSeparately) {
   EXPECT_EQ(resolved->name, "get_val");
 }
 
-// §8.24: Out-of-block body replaces prototype in methods map.
 TEST(ClassSim, OutOfBlockBodyReplacesPrototype) {
   SimFixture f;
   auto* type = MakeClassType(f, "Packet", {});
 
-  // Prototype (extern, no body).
   auto* proto = f.arena.Create<ModuleItem>();
   proto->kind = ModuleItemKind::kFunctionDecl;
   proto->name = "send";
   proto->is_extern = true;
   type->methods["send"] = proto;
 
-  // Out-of-block body replaces prototype.
   auto* body = f.arena.Create<ModuleItem>();
   body->kind = ModuleItemKind::kFunctionDecl;
   body->name = "send";
@@ -53,7 +49,6 @@ TEST(ClassSim, OutOfBlockBodyReplacesPrototype) {
   EXPECT_FALSE(resolved->func_body_stmts.empty());
 }
 
-// §8.24: Out-of-block method resolves via ResolveMethod.
 TEST(ClassSim, OutOfBlockMethodResolvedViaResolveMethod) {
   SimFixture f;
   auto* type = MakeClassType(f, "C", {"x"});
@@ -69,7 +64,6 @@ TEST(ClassSim, OutOfBlockMethodResolvedViaResolveMethod) {
   EXPECT_EQ(resolved, method);
 }
 
-// §8.24: Out-of-block constructor registered as "new" method.
 TEST(ClassSim, OutOfBlockConstructor) {
   SimFixture f;
   auto* type = MakeClassType(f, "C", {});
@@ -85,4 +79,4 @@ TEST(ClassSim, OutOfBlockConstructor) {
   EXPECT_EQ(it->second->method_class, "C");
 }
 
-}  // namespace
+}

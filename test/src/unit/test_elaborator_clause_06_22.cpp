@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §6.22.3: Assignment compatible — int to logic vector.
 TEST(Elaboration, AssignIntToLogicVector) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -18,7 +17,6 @@ TEST(Elaboration, AssignIntToLogicVector) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.3: Assignment compatible — real to int.
 TEST(Elaboration, AssignRealToInt) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +30,6 @@ TEST(Elaboration, AssignRealToInt) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.1: Matching types — same typedef used for two variables.
 TEST(Elaboration, MatchingTypesSameTypedef) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -47,7 +44,6 @@ TEST(Elaboration, MatchingTypesSameTypedef) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.5: Type incompatible — string assigned to int should error.
 TEST(Elaboration, TypeIncompatibleStringToInt) {
   ElabFixture f;
   ElaborateSrc(
@@ -60,4 +56,4 @@ TEST(Elaboration, TypeIncompatibleStringToInt) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

@@ -28,4 +28,4 @@ TEST(ParserSection8, RandcQualifier) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_randc);
 }
 
-}  // namespace
+}

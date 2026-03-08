@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.5: Class with properties elaborates without errors.
 TEST(ElabA85, ClassWithPropertiesElaborates) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -16,7 +15,6 @@ TEST(ElabA85, ClassWithPropertiesElaborates) {
              "endmodule\n"));
 }
 
-// §8.5: Property access on class instance elaborates.
 TEST(ElabA85, PropertyAccessElaborates) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -30,7 +28,6 @@ TEST(ElabA85, PropertyAccessElaborates) {
              "endmodule\n"));
 }
 
-// §8.5: No restrictions on data type of class property.
 TEST(ElabA85, VariousPropertyTypes) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -45,7 +42,6 @@ TEST(ElabA85, VariousPropertyTypes) {
              "endmodule\n"));
 }
 
-// §8.5: Multiple properties with different access patterns.
 TEST(ElabA85, MultiplePropertyAccess) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -65,7 +61,6 @@ TEST(ElabA85, MultiplePropertyAccess) {
              "endmodule\n"));
 }
 
-// §8.5: Parameterized class value parameter access.
 TEST(ElabA85, ParameterizedClassElaborates) {
   EXPECT_TRUE(
       ElabOk("class vector #(parameter width = 7);\n"
@@ -76,4 +71,4 @@ TEST(ElabA85, ParameterizedClassElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

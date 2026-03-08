@@ -109,4 +109,4 @@ TEST(SvaEngine, SequenceAttemptDelayCountdown) {
   EXPECT_EQ(sa.delay_remaining, 0u);
 }
 
-}  // namespace
+}

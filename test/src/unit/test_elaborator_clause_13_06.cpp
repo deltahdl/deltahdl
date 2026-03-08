@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §13.6: DPI import function declaration elaborates.
 TEST(Elab1360, DpiImportFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -18,7 +17,6 @@ TEST(Elab1360, DpiImportFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.6: DPI import task declaration elaborates.
 TEST(Elab1360, DpiImportTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -31,7 +29,6 @@ TEST(Elab1360, DpiImportTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.6: DPI export function declaration elaborates.
 TEST(Elab1360, DpiExportFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -44,7 +41,6 @@ TEST(Elab1360, DpiExportFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.6: DPI import with context qualifier elaborates.
 TEST(Elab1360, DpiImportContextElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -56,7 +52,6 @@ TEST(Elab1360, DpiImportContextElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.6: DPI import with pure qualifier elaborates.
 TEST(Elab1360, DpiImportPureElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -68,7 +63,6 @@ TEST(Elab1360, DpiImportPureElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.6: DPI import with C identifier alias elaborates.
 TEST(Elab1360, DpiImportWithCNameElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -80,4 +74,4 @@ TEST(Elab1360, DpiImportWithCNameElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

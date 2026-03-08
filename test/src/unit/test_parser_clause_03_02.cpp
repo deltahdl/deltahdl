@@ -4,11 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §3.2: A design element is a module, program, interface, checker, package,
-// primitive, or configuration.
-
-// --- Keyword-to-design-element mapping ("respectively") ---
-
 TEST(ParserClause03, Cl3_2_ModuleKeywordIntroducesModule) {
   auto r = Parse("module m; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -79,8 +74,6 @@ TEST(ParserClause03, Cl3_2_ConfigKeywordIntroducesConfig) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-// --- Design elements are containers ---
-
 TEST(ParserClause03, Cl3_2_ModuleContainsDeclarationsAndCode) {
   auto r = Parse(
       "module m;\n"
@@ -137,8 +130,6 @@ TEST(ParserClause03, Cl3_2_PackageContainsDeclarations) {
   EXPECT_FALSE(r.cu->packages[0]->items.empty());
 }
 
-// --- Non-design-element constructs are excluded ---
-
 TEST(ParserClause03, Cl3_2_TopLevelClassIsNotDesignElement) {
   auto r = Parse(
       "class C;\n"
@@ -179,8 +170,6 @@ TEST(ParserClause03, Cl3_2_CuScopeParamIsNotDesignElement) {
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
-// --- Error conditions ---
-
 TEST(ParserClause03, Cl3_2_UnrecognizedTopLevelTokenIsError) {
   EXPECT_FALSE(ParseOk("always_comb begin end"));
 }
@@ -188,8 +177,6 @@ TEST(ParserClause03, Cl3_2_UnrecognizedTopLevelTokenIsError) {
 TEST(ParserClause03, Cl3_2_BareStatementAtTopLevelIsError) {
   EXPECT_FALSE(ParseOk("assign x = 1;"));
 }
-
-// --- Mixed design elements ---
 
 TEST(ParserClause03, Cl3_2_AllSevenDesignElementsCoexist) {
   auto r = Parse(
@@ -227,4 +214,4 @@ TEST(ParserClause03, Cl3_2_DesignElementsInterleaveWithNonDesignElements) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
-}  // namespace
+}

@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.12: attributes do not affect simulation behavior ---
-
 TEST(SimClause05, Cl5_12_AttrOnVarDecl) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -173,4 +171,4 @@ TEST(SimClause05, Cl5_12_AttrWithStringValue) {
   EXPECT_EQ(f.ctx.FindVariable("g")->value.ToUint64(), 0x99);
 }
 
-}  // namespace
+}

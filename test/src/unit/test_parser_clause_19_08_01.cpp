@@ -48,4 +48,4 @@ TEST(ParserA211, CoverGroup_SampleFunctionASTVerification) {
   EXPECT_EQ(item->name, "sampled_cg");
 }
 
-}  // namespace
+}

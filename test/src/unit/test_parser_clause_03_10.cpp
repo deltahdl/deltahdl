@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §3.10: Configurations specify binding of module instances to source code.
-
 TEST(ParserClause03, Cl3_10_ConfigEnclosedByKeywords) {
   auto r = Parse(
       "module m; endmodule\n"
@@ -38,8 +36,6 @@ TEST(ParserClause03, Cl3_10_ConfigWithDefaultRule) {
               "endconfig\n"));
 }
 
-// §3.10: Configurations utilize libraries.
-
 TEST(ParserClause03, Cl3_10_LibraryDeclaration) {
   auto r = ParseLibrary("library work \"*.sv\";\n");
   ASSERT_NE(r.cu, nullptr);
@@ -61,4 +57,4 @@ TEST(ParserClause03, Cl3_10_ConfigAndModuleCoexist) {
   EXPECT_EQ(r.cu->configs.size(), 1u);
 }
 
-}  // namespace
+}

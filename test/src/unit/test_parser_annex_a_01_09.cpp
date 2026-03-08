@@ -4,9 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §A.1.9 Class items
-
-// class_item ::= { attribute_instance } class_property
 TEST(ClassItemsA19, ClassProperty) {
   auto r = Parse(
       "class C;\n"
@@ -19,7 +16,6 @@ TEST(ClassItemsA19, ClassProperty) {
   EXPECT_EQ(r.cu->classes[0]->members[0]->kind, ClassMemberKind::kProperty);
 }
 
-// class_property ::= { property_qualifier } data_declaration
 TEST(ClassItemsA19, RandProperty) {
   auto r = Parse(
       "class C;\n"
@@ -70,8 +66,6 @@ TEST(ClassItemsA19, LocalProperty) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_local);
 }
 
-// class_property ::= const { class_item_qualifier } data_type const_id
-//                    [ = constant_expression ] ;
 TEST(ClassItemsA19, ConstProperty) {
   auto r = Parse(
       "class C;\n"
@@ -82,7 +76,6 @@ TEST(ClassItemsA19, ConstProperty) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_const);
 }
 
-// class_item ::= { attribute_instance } class_method
 TEST(ClassItemsA19, ClassMethodFunction) {
   auto r = Parse(
       "class C;\n"
@@ -107,7 +100,6 @@ TEST(ClassItemsA19, ClassMethodTask) {
   EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
 }
 
-// class_method ::= pure virtual { class_item_qualifier } method_prototype ;
 TEST(ClassItemsA19, PureVirtualMethod) {
   auto r = Parse(
       "class C;\n"
@@ -119,7 +111,6 @@ TEST(ClassItemsA19, PureVirtualMethod) {
   EXPECT_TRUE(m->is_virtual);
 }
 
-// class_method ::= extern { method_qualifier } method_prototype ;
 TEST(ClassItemsA19, ExternMethod) {
   auto r = Parse(
       "class C;\n"
@@ -129,7 +120,6 @@ TEST(ClassItemsA19, ExternMethod) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class_method ::= virtual method
 TEST(ClassItemsA19, VirtualMethod) {
   auto r = Parse(
       "class C;\n"
@@ -141,7 +131,6 @@ TEST(ClassItemsA19, VirtualMethod) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_virtual);
 }
 
-// class_method ::= static method
 TEST(ClassItemsA19, StaticMethod) {
   auto r = Parse(
       "class C;\n"
@@ -154,7 +143,6 @@ TEST(ClassItemsA19, StaticMethod) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_static);
 }
 
-// class_method ::= class_constructor_declaration
 TEST(ClassItemsA19, Constructor) {
   auto r = Parse(
       "class C;\n"
@@ -175,7 +163,6 @@ TEST(ClassItemsA19, ConstructorWithArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class_item ::= class_constraint (constraint_prototype)
 TEST(ClassItemsA19, ConstraintPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -185,7 +172,6 @@ TEST(ClassItemsA19, ConstraintPrototype) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class_item ::= class_constraint (constraint_declaration)
 TEST(ClassItemsA19, ConstraintDeclaration) {
   auto r = Parse(
       "class C;\n"
@@ -196,7 +182,6 @@ TEST(ClassItemsA19, ConstraintDeclaration) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class_item ::= class_declaration (nested)
 TEST(ClassItemsA19, NestedClass) {
   auto r = Parse(
       "class Outer;\n"
@@ -208,7 +193,6 @@ TEST(ClassItemsA19, NestedClass) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class_item ::= covergroup_declaration
 TEST(ClassItemsA19, ClassCovergroup) {
   auto r = Parse(
       "class C;\n"
@@ -220,7 +204,6 @@ TEST(ClassItemsA19, ClassCovergroup) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class_item ::= local_parameter_declaration ;
 TEST(ClassItemsA19, ClassLocalparam) {
   auto r = Parse(
       "class C;\n"
@@ -230,7 +213,6 @@ TEST(ClassItemsA19, ClassLocalparam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class_item ::= parameter_declaration ;
 TEST(ClassItemsA19, ClassParameter) {
   auto r = Parse(
       "class C;\n"
@@ -240,7 +222,6 @@ TEST(ClassItemsA19, ClassParameter) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class_item ::= ;  (null item)
 TEST(ClassItemsA19, ClassNullItem) {
   auto r = Parse(
       "class C;\n"
@@ -250,7 +231,6 @@ TEST(ClassItemsA19, ClassNullItem) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class with attributes on members
 TEST(ClassItemsA19, ClassPropertyWithAttr) {
   auto r = Parse(
       "class C;\n"
@@ -260,7 +240,6 @@ TEST(ClassItemsA19, ClassPropertyWithAttr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// interface_class_declaration items
 TEST(ClassItemsA19, InterfaceClassItems) {
   auto r = Parse(
       "interface class IFace;\n"
@@ -275,7 +254,6 @@ TEST(ClassItemsA19, InterfaceClassItems) {
   EXPECT_TRUE(r.cu->classes[0]->is_interface);
 }
 
-// class_declaration with extends and arg list
 TEST(ClassItemsA19, ClassExtendsWithArgs) {
   auto r = Parse(
       "class Derived extends Base(1, 2);\n"
@@ -284,7 +262,6 @@ TEST(ClassItemsA19, ClassExtendsWithArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class with end label
 TEST(ClassItemsA19, ClassEndLabel) {
   auto r = Parse(
       "class C;\n"
@@ -293,7 +270,6 @@ TEST(ClassItemsA19, ClassEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class :final
 TEST(ClassItemsA19, ClassFinal) {
   auto r = Parse(
       "class C :final;\n"
@@ -303,4 +279,4 @@ TEST(ClassItemsA19, ClassFinal) {
   EXPECT_TRUE(r.cu->classes[0]->is_final);
 }
 
-}  // namespace
+}

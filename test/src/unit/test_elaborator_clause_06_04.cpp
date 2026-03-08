@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.4: Singular types — all types except unpacked struct, unpacked union,
-// unpacked array.
-
 TEST(SingularAggregateTypes, LogicIsSingular) {
   DataType dt;
   dt.kind = DataTypeKind::kLogic;
@@ -95,8 +92,6 @@ TEST(SingularAggregateTypes, RealtimeIsSingular) {
   EXPECT_FALSE(IsAggregateType(dt));
 }
 
-// §6.4: string is singular even though it can be indexed like an unpacked
-// array of bytes.
 TEST(SingularAggregateTypes, StringIsSingular) {
   DataType dt;
   dt.kind = DataTypeKind::kString;
@@ -132,7 +127,6 @@ TEST(SingularAggregateTypes, EnumIsSingular) {
   EXPECT_FALSE(IsAggregateType(dt));
 }
 
-// §6.4: Packed struct is singular.
 TEST(SingularAggregateTypes, PackedStructIsSingular) {
   DataType dt;
   dt.kind = DataTypeKind::kStruct;
@@ -141,7 +135,6 @@ TEST(SingularAggregateTypes, PackedStructIsSingular) {
   EXPECT_FALSE(IsAggregateType(dt));
 }
 
-// §6.4: Packed union is singular.
 TEST(SingularAggregateTypes, PackedUnionIsSingular) {
   DataType dt;
   dt.kind = DataTypeKind::kUnion;
@@ -150,7 +143,6 @@ TEST(SingularAggregateTypes, PackedUnionIsSingular) {
   EXPECT_FALSE(IsAggregateType(dt));
 }
 
-// §6.4: Unpacked struct is aggregate.
 TEST(SingularAggregateTypes, UnpackedStructIsAggregate) {
   DataType dt;
   dt.kind = DataTypeKind::kStruct;
@@ -159,7 +151,6 @@ TEST(SingularAggregateTypes, UnpackedStructIsAggregate) {
   EXPECT_TRUE(IsAggregateType(dt));
 }
 
-// §6.4: Unpacked union is aggregate.
 TEST(SingularAggregateTypes, UnpackedUnionIsAggregate) {
   DataType dt;
   dt.kind = DataTypeKind::kUnion;
@@ -168,7 +159,6 @@ TEST(SingularAggregateTypes, UnpackedUnionIsAggregate) {
   EXPECT_TRUE(IsAggregateType(dt));
 }
 
-// §6.4: Net types are singular.
 TEST(SingularAggregateTypes, WireIsSingular) {
   DataType dt;
   dt.kind = DataTypeKind::kWire;
@@ -187,8 +177,6 @@ TEST(SingularAggregateTypes, TriregIsSingular) {
   EXPECT_TRUE(IsSingularType(dt));
 }
 
-// §6.4: Integral types (§6.11.1) are always singular even though they can be
-// sliced into multiple singular values.
 TEST(SingularAggregateTypes, LogicVectorIsSingular) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -204,8 +192,6 @@ TEST(SingularAggregateTypes, LogicVectorIsSingular) {
   EXPECT_EQ(mod->variables[0].unpacked_size, 0u);
 }
 
-// §6.4: Unpacked array makes a type aggregate — the variable has
-// unpacked_size > 0.
 TEST(SingularAggregateTypes, UnpackedArrayIsAggregate) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -220,7 +206,6 @@ TEST(SingularAggregateTypes, UnpackedArrayIsAggregate) {
   EXPECT_GT(mod->variables[0].unpacked_size, 0u);
 }
 
-// §6.4: Implicit type is singular.
 TEST(SingularAggregateTypes, ImplicitIsSingular) {
   DataType dt;
   dt.kind = DataTypeKind::kImplicit;
@@ -228,7 +213,6 @@ TEST(SingularAggregateTypes, ImplicitIsSingular) {
   EXPECT_FALSE(IsAggregateType(dt));
 }
 
-// §6.4: VirtualInterface is singular (handle-like).
 TEST(SingularAggregateTypes, VirtualInterfaceIsSingular) {
   DataType dt;
   dt.kind = DataTypeKind::kVirtualInterface;
@@ -236,4 +220,4 @@ TEST(SingularAggregateTypes, VirtualInterfaceIsSingular) {
   EXPECT_FALSE(IsAggregateType(dt));
 }
 
-}  // namespace
+}

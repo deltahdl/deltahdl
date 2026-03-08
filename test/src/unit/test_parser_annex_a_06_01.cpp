@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.1 — continuous_assign
-
 TEST(ParserA601, ContinuousAssignBasic) {
   auto r = Parse(
       "module m;\n"
@@ -147,4 +145,4 @@ TEST(ParserA601, ContinuousAssignConcatLhs) {
   EXPECT_EQ(item->assign_lhs->kind, ExprKind::kConcatenation);
 }
 
-}  // namespace
+}

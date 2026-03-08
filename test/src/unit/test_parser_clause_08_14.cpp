@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.14: Subclass overriding a property.
 TEST(ParserA814, SubclassOverridesProperty) {
   auto r = Parse(
       "class Packet;\n"
@@ -25,7 +24,6 @@ TEST(ParserA814, SubclassOverridesProperty) {
   EXPECT_EQ(r.cu->classes[1]->base_class, "Packet");
 }
 
-// §8.14: Subclass handle assigned to base class variable.
 TEST(ParserA814, SubclassAssignedToBaseVariable) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
@@ -44,7 +42,6 @@ TEST(ParserA814, SubclassAssignedToBaseVariable) {
               "endmodule\n"));
 }
 
-// §8.14: Access through base class variable.
 TEST(ParserA814, AccessThroughBaseClassVariable) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
@@ -72,7 +69,6 @@ TEST(ParserA814, AccessThroughBaseClassVariable) {
               "endmodule\n"));
 }
 
-// §8.14: Subclass with additional members.
 TEST(ParserA814, SubclassAdditionalMembers) {
   auto r = Parse(
       "class Base;\n"
@@ -89,4 +85,4 @@ TEST(ParserA814, SubclassAdditionalMembers) {
   EXPECT_GE(derived->members.size(), 2u);
 }
 
-}  // namespace
+}

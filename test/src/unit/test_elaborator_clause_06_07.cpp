@@ -78,4 +78,4 @@ TEST(NetDecl, ChargeStrengthOnWandIsError) {
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-}  // namespace
+}

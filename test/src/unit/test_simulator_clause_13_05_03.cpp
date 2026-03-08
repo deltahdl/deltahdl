@@ -75,7 +75,6 @@ TEST(SimA609, FunctionDefaultArg) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-// §13.5.3: Default arg with explicit override in full integration.
 TEST(Sim1353, DefaultArgOverride) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -103,4 +102,4 @@ TEST(Sim1353, DefaultArgOverride) {
   EXPECT_EQ(yv->value.ToUint64(), 15u);
 }
 
-}  // namespace
+}

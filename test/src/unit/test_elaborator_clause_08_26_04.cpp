@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.26.4: Interface class declared before use — OK.
 TEST(ElabA8264, InterfaceDeclaredBeforeUseOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
@@ -18,7 +17,6 @@ TEST(ElabA8264, InterfaceDeclaredBeforeUseOk) {
              "endmodule\n"));
 }
 
-// §8.26.4: Interface class with parameterized type — OK.
 TEST(ElabA8264, ParameterizedInterfaceOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC #(type T = int);\n"
@@ -28,4 +26,4 @@ TEST(ElabA8264, ParameterizedInterfaceOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

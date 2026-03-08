@@ -56,4 +56,4 @@ TEST(StrengthModel, Highz0StrongIsLegal) {
       ValidateStrengthPair(StrengthLevel::kHighz, StrengthLevel::kStrong));
 }
 
-}  // namespace
+}

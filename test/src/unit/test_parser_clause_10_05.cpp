@@ -52,7 +52,6 @@ TEST(ParserCh90301, BlockVarDecl_WithInit) {
   EXPECT_NE(blk->stmts[0]->var_init, nullptr);
 }
 
-// §10.5: Variable init with expression referencing other variables.
 TEST(ParserSection10, Sec10_5_VarInitWithExpr) {
   auto r = Parse(
       "module m;\n"
@@ -70,7 +69,6 @@ TEST(ParserSection10, Sec10_5_VarInitWithExpr) {
   EXPECT_EQ(v->init_expr->kind, ExprKind::kBinary);
 }
 
-// §10.5: Multiple variables with mixed initialization in one statement.
 TEST(ParserSection10, Sec10_5_MixedInitInOneStmt) {
   auto r = Parse(
       "module m;\n"
@@ -85,7 +83,6 @@ TEST(ParserSection10, Sec10_5_MixedInitInOneStmt) {
   EXPECT_NE(items[2]->init_expr, nullptr);
 }
 
-// §10.5: Block-local variable with expression initializer.
 TEST(ParserSection10, Sec10_5_BlockLocalWithExprInit) {
   auto r = Parse(
       "module m;\n"
@@ -102,4 +99,4 @@ TEST(ParserSection10, Sec10_5_BlockLocalWithExprInit) {
   EXPECT_NE(blk->stmts[0]->var_init, nullptr);
 }
 
-}  // namespace
+}

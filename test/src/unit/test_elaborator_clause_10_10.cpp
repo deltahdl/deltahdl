@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §10.10: Empty unpacked array concatenation elaborates without errors.
 TEST(ElabCh10j, EmptyUnpackedArrayConcatElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +19,6 @@ TEST(ElabCh10j, EmptyUnpackedArrayConcatElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10: Basic unpacked array concatenation elaborates.
 TEST(UnpackedArrayConcatElaborates, UnpackedArrayConcatElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +30,6 @@ TEST(UnpackedArrayConcatElaborates, UnpackedArrayConcatElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-// §10.10: Array item expansion in unpacked array concatenation.
 TEST(UnpackedArrayConcatArrayExpansion, UnpackedArrayConcatArrayExpansion) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -63,4 +60,4 @@ TEST(UnpackedArrayConcatArrayExpansion, UnpackedArrayConcatArrayExpansion) {
   EXPECT_EQ(c3->value.ToUint64(), 40u);
 }
 
-}  // namespace
+}

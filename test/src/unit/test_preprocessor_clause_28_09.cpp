@@ -28,4 +28,4 @@ TEST(Parser, GateCmos) {
   EXPECT_EQ(item->gate_terminals.size(), 4);
 }
 
-}  // namespace
+}

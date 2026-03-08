@@ -2,8 +2,6 @@
 
 namespace {
 
-// §3.6: Checkers are verification blocks with assertions and modeling code.
-
 TEST(ElabClause03, Cl3_6_EmptyCheckerElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc("checker chk; endchecker\n", f, "chk");
@@ -35,4 +33,4 @@ TEST(ElabClause03, Cl3_6_CheckerWithPortsElaborates) {
   EXPECT_GE(design->top_modules[0]->ports.size(), 2u);
 }
 
-}  // namespace
+}

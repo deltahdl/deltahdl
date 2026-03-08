@@ -1,4 +1,4 @@
-// §8.26.6
+
 
 #include "fixture_elaborator.h"
 
@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §8.26.6.2: Interface extends two interfaces with different typedefs — OK
-// if subclass resolves the conflict.
 TEST(ElabA82662, InterfaceExtendsMultipleWithTypedefOk) {
   EXPECT_TRUE(
       ElabOk("interface class PutImp;\n"
@@ -23,4 +21,4 @@ TEST(ElabA82662, InterfaceExtendsMultipleWithTypedefOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

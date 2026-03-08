@@ -28,4 +28,4 @@ TEST(ParserSection28, Sec28_12_MultipleTimingChecksInSpecifyBlock) {
             TimingCheckKind::kRecovery);
 }
 
-}  // namespace
+}

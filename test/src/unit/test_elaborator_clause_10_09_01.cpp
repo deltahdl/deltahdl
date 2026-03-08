@@ -165,7 +165,6 @@ TEST(ElabA60701, PatternDefaultKeyElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-// §10.9.1: Specifying the same index more than once is an error.
 TEST(ElabCh511, ArrayInitPattern_DuplicateIndex) {
   ElabFixture f;
   ElaborateSrc(
@@ -176,7 +175,6 @@ TEST(ElabCh511, ArrayInitPattern_DuplicateIndex) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §10.9.1: Positional array assignment pattern initializes elements in order.
 TEST(SimCh10i, ArrayPositionalPatternInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -197,7 +195,6 @@ TEST(SimCh10i, ArrayPositionalPatternInit) {
   EXPECT_EQ(e1->value.ToUint64(), 20u);
 }
 
-// §10.9.1: Default key fills all array elements with the same value.
 TEST(SimCh10i, ArrayDefaultKeyFillsAllElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -218,7 +215,6 @@ TEST(SimCh10i, ArrayDefaultKeyFillsAllElements) {
   }
 }
 
-// §10.9.1: Replication form fills array elements by repeating the value.
 TEST(SimCh10i, ArrayReplicationPatternFills) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -239,7 +235,6 @@ TEST(SimCh10i, ArrayReplicationPatternFills) {
   }
 }
 
-// §10.9.1: Index key assigns specific elements; default fills the rest.
 TEST(SimCh10i, ArrayIndexKeyWithDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -263,7 +258,6 @@ TEST(SimCh10i, ArrayIndexKeyWithDefault) {
   EXPECT_EQ(e2->value.ToUint64(), 200u);
 }
 
-// §10.9.1: Descending-range array with positional pattern.
 TEST(SimCh10i, ArrayDescendingRangePositional) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -284,7 +278,6 @@ TEST(SimCh10i, ArrayDescendingRangePositional) {
   EXPECT_EQ(e0->value.ToUint64(), 40u);
 }
 
-// §10.9.1: Variable declaration with array assignment pattern init.
 TEST(SimCh10i, ArrayVarDeclPatternInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -305,4 +298,4 @@ TEST(SimCh10i, ArrayVarDeclPatternInit) {
   EXPECT_EQ(e2->value.ToUint64(), 15u);
 }
 
-}  // namespace
+}

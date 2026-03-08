@@ -26,4 +26,4 @@ TEST(SimA702, EdgeSensitivePathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-}  // namespace
+}

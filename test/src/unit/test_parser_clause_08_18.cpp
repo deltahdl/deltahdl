@@ -20,7 +20,6 @@ TEST(ParserSection8, ClassWithQualifiersLocalProtected) {
   EXPECT_TRUE(cls->members[1]->is_protected);
 }
 
-// §8.18: local method declaration parses.
 TEST(ParserA818, LocalMethodParses) {
   auto r = Parse(
       "class Packet;\n"
@@ -34,7 +33,6 @@ TEST(ParserA818, LocalMethodParses) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_local);
 }
 
-// §8.18: protected property declaration parses.
 TEST(ParserA818, ProtectedPropertyParses) {
   auto r = Parse(
       "class Packet;\n"
@@ -46,7 +44,6 @@ TEST(ParserA818, ProtectedPropertyParses) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_protected);
 }
 
-// §8.18: Combining local and protected is an error.
 TEST(ParserA818, LocalAndProtectedError) {
   EXPECT_FALSE(
       ParseOk("class Packet;\n"
@@ -54,7 +51,6 @@ TEST(ParserA818, LocalAndProtectedError) {
               "endclass\n"));
 }
 
-// §8.18: Duplicate local qualifier is an error.
 TEST(ParserA818, DuplicateLocalError) {
   EXPECT_FALSE(
       ParseOk("class Packet;\n"
@@ -62,7 +58,6 @@ TEST(ParserA818, DuplicateLocalError) {
               "endclass\n"));
 }
 
-// §8.18: Duplicate protected qualifier is an error.
 TEST(ParserA818, DuplicateProtectedError) {
   EXPECT_FALSE(
       ParseOk("class Packet;\n"
@@ -70,7 +65,6 @@ TEST(ParserA818, DuplicateProtectedError) {
               "endclass\n"));
 }
 
-// §8.18: Local member accessed within same class method (legal).
 TEST(ParserA818, LocalAccessSameClassParses) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
@@ -81,7 +75,6 @@ TEST(ParserA818, LocalAccessSameClassParses) {
               "endclass\n"));
 }
 
-// §8.18: Protected method in derived class parses.
 TEST(ParserA818, ProtectedMethodInDerived) {
   EXPECT_TRUE(
       ParseOk("class Base;\n"
@@ -96,7 +89,6 @@ TEST(ParserA818, ProtectedMethodInDerived) {
               "endclass\n"));
 }
 
-// §8.18: Unqualified members are public (default).
 TEST(ParserA818, UnqualifiedMembersPublic) {
   auto r = Parse(
       "class Packet;\n"
@@ -136,4 +128,4 @@ TEST(ParserClause08_03, ErrorDuplicateVirtual) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

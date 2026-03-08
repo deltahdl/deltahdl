@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §7.9.2: delete(key) removes one entry.
 TEST(AssocMethods, DeleteByKeyRemovesEntry) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -18,7 +17,6 @@ TEST(AssocMethods, DeleteByKeyRemovesEntry) {
   EXPECT_EQ(aa->int_data.count(20), 1u);
 }
 
-// §7.9.2: delete() with no args clears all entries.
 TEST(AssocMethods, DeleteNoArgClearsAll) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
@@ -29,7 +27,6 @@ TEST(AssocMethods, DeleteNoArgClearsAll) {
   EXPECT_EQ(aa->str_data.size(), 0u);
 }
 
-// §7.9.2: delete(key) on nonexistent key is a no-op.
 TEST(AssocMethods, DeleteNonexistentKeyIsNoop) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -40,4 +37,4 @@ TEST(AssocMethods, DeleteNonexistentKeyIsNoop) {
   EXPECT_EQ(aa->int_data.count(10), 1u);
 }
 
-}  // namespace
+}

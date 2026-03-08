@@ -30,4 +30,4 @@ TEST(ParserSection6, AllBuiltinNetTypes) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 11u);
 }
 
-}  // namespace
+}

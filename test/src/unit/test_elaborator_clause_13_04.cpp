@@ -35,7 +35,6 @@ TEST(ElabA603, ForkJoinIllegalInFunction) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4: Function with output args elaborates.
 TEST(Elab1304, FunctionWithOutputArgsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -49,7 +48,6 @@ TEST(Elab1304, FunctionWithOutputArgsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4: Function with ref arg elaborates.
 TEST(Elab1304, FunctionWithRefArgElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -63,7 +61,6 @@ TEST(Elab1304, FunctionWithRefArgElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4: Function with empty body elaborates.
 TEST(Elab1304, FunctionEmptyBodyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -76,7 +73,6 @@ TEST(Elab1304, FunctionEmptyBodyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4(a): Time-controlling statements in function body are errors.
 TEST(Elab1304, FunctionWithDelayError) {
   ElabFixture f;
   ElaborateSrc(
@@ -89,7 +85,6 @@ TEST(Elab1304, FunctionWithDelayError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4(b): Function cannot enable a task.
 TEST(Elab1304, FunctionEnablesTaskError) {
   ElabFixture f;
   ElaborateSrc(
@@ -103,7 +98,6 @@ TEST(Elab1304, FunctionEnablesTaskError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4: fork/join_none is allowed in function body.
 TEST(Elab1304, ForkJoinNoneInFunctionOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -119,4 +113,4 @@ TEST(Elab1304, ForkJoinNoneInFunctionOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -38,4 +38,4 @@ TEST(ClockingSim, MultipleClockingBlocks) {
   EXPECT_EQ(cmgr.Find("cb_slow")->clock_edge, Edge::kNegedge);
 }
 
-}  // namespace
+}

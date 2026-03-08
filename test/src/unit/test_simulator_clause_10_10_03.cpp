@@ -1,4 +1,4 @@
-// §10.10.3
+
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §10.10.3: Typed assignment pattern element in unpacked array concat
-// produces correct values.
 TEST(SimCh10j, TypedAssignPatternInArrayConcat) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -31,8 +29,6 @@ TEST(SimCh10j, TypedAssignPatternInArrayConcat) {
   }
 }
 
-// §10.10.3: Unpacked array concat as item in assignment pattern
-// builds a correct 2D array.
 TEST(SimCh10j, UnpackedArrayConcatInAssignPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -59,8 +55,6 @@ TEST(SimCh10j, UnpackedArrayConcatInAssignPattern) {
   EXPECT_EQ(c11->value.ToUint64(), 4u);
 }
 
-// §10.10.3: Scalar and array items mixed in unpacked array concat
-// all have self-determined types and evaluate correctly.
 TEST(SimCh10j, MixedSelfDeterminedItems) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -88,4 +82,4 @@ TEST(SimCh10j, MixedSelfDeterminedItems) {
   EXPECT_EQ(b3->value.ToUint64(), 40u);
 }
 
-}  // namespace
+}

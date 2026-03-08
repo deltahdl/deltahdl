@@ -38,4 +38,4 @@ TEST(SvaEngine, NonConsecutiveRepetition) {
   EXPECT_FALSE(MatchNonConsecutiveRepetition(seq, {1, 0, 0}));
 }
 
-}  // namespace
+}

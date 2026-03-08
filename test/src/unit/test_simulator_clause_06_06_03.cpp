@@ -103,4 +103,4 @@ TEST(NetResolution, ResolveWorNet) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-}  // namespace
+}

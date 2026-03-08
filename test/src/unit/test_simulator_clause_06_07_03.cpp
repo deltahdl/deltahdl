@@ -64,7 +64,6 @@ TEST(NetDecl, UserDefinedNettypeDefaultIsDataTypeDefault) {
   EXPECT_EQ(ValOf(*var), kValX);
 }
 
-// §6.7.3: Resolution function receives driver array.
 TEST(NetDecl, UserDefinedResolutionReceivesDrivers) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -87,7 +86,6 @@ TEST(NetDecl, UserDefinedResolutionReceivesDrivers) {
   EXPECT_EQ(driver_count, 2u);
 }
 
-// §6.7.3: Unresolved nettype (no resolution function) uses data type default.
 TEST(NetDecl, UnresolvedNettypeNoResolutionFunction) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -97,10 +95,10 @@ TEST(NetDecl, UnresolvedNettypeNoResolutionFunction) {
   net.resolved = var;
 
   UserNettype nt;
-  // No resolution function set.
+
   ActivateResolutionAtTimeZero(net, nt, arena);
-  // Value unchanged — still default x from MakeLogic4Vec.
+
   EXPECT_EQ(ValOf(*var), kValX);
 }
 
-}  // namespace
+}

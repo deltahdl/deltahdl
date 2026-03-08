@@ -36,4 +36,4 @@ TEST(ParserA612, RsProductionListRandJoinWithExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

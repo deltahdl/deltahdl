@@ -26,7 +26,6 @@ TEST(Process, ProcessKindEnum) {
   }
 }
 
-// §9.2: Initial, always_comb, and final coexist and execute correctly.
 TEST(SimClause09_02, AllProcedureTypesCoexist) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -49,7 +48,6 @@ TEST(SimClause09_02, AllProcedureTypesCoexist) {
   EXPECT_EQ(sum->value.ToUint64(), 30u);
 }
 
-// §9.2: Multiple initial procedures all execute (no implied ordering).
 TEST(SimClause09_02, MultipleInitialsAllExecute) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -75,4 +73,4 @@ TEST(SimClause09_02, MultipleInitialsAllExecute) {
   EXPECT_EQ(vc->value.ToUint64(), 3u);
 }
 
-}  // namespace
+}

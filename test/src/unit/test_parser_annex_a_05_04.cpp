@@ -5,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.5.4 udp_instantiation ::=
-//   udp_identifier [ drive_strength ] [ delay2 ]
-//   udp_instance { , udp_instance } ;
-
 TEST(ParserA54, UdpInstBasic) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -26,8 +22,6 @@ TEST(ParserA54, UdpInstBasic) {
   EXPECT_EQ(insts[0]->gate_inst_name, "u1");
   EXPECT_EQ(insts[0]->gate_terminals.size(), 2u);
 }
-
-// §A.5.4 udp_instance ::= [ name_of_instance ] ( output, input {, input} )
 
 TEST(ParserA54, UdpInstUnnamed) {
   auto r = Parse(
@@ -67,8 +61,6 @@ TEST(ParserA54, UdpInstMultipleInputs) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 4u);
 }
 
-// Multiple instances in one statement
-
 TEST(ParserA54, UdpInstMultipleInstances) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -85,8 +77,6 @@ TEST(ParserA54, UdpInstMultipleInstances) {
   EXPECT_EQ(insts[0]->gate_inst_name, "u1");
   EXPECT_EQ(insts[1]->gate_inst_name, "u2");
 }
-
-// §A.5.4 [ drive_strength ]
 
 TEST(ParserA54, UdpInstWithDriveStrength) {
   auto r = Parse(
@@ -105,8 +95,6 @@ TEST(ParserA54, UdpInstWithDriveStrength) {
   EXPECT_EQ(insts[0]->drive_strength1, 2u);
 }
 
-// §A.5.4 [ delay2 ] — single delay value
-
 TEST(ParserA54, UdpInstWithDelaySingle) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -124,8 +112,6 @@ TEST(ParserA54, UdpInstWithDelaySingle) {
   EXPECT_EQ(insts[0]->gate_delay->int_val, 5u);
   EXPECT_EQ(insts[0]->gate_delay_fall, nullptr);
 }
-
-// §A.5.4 [ delay2 ] — two delay values (rise, fall)
 
 TEST(ParserA54, UdpInstWithDelayTwo) {
   auto r = Parse(
@@ -146,8 +132,6 @@ TEST(ParserA54, UdpInstWithDelayTwo) {
   EXPECT_EQ(insts[0]->gate_delay_fall->int_val, 7u);
 }
 
-// Both drive_strength and delay2
-
 TEST(ParserA54, UdpInstStrengthAndDelay) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -167,8 +151,6 @@ TEST(ParserA54, UdpInstStrengthAndDelay) {
   EXPECT_EQ(insts[0]->gate_delay->int_val, 10u);
 }
 
-// name_of_instance with unpacked dimension (instance array)
-
 TEST(ParserA54, UdpInstWithInstanceArray) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -186,8 +168,6 @@ TEST(ParserA54, UdpInstWithInstanceArray) {
   EXPECT_NE(insts[0]->inst_range_left, nullptr);
   EXPECT_NE(insts[0]->inst_range_right, nullptr);
 }
-
-// No drive_strength, no delay — defaults
 
 TEST(ParserA54, UdpInstNoStrengthNoDelay) {
   auto r = Parse(
@@ -208,8 +188,6 @@ TEST(ParserA54, UdpInstNoStrengthNoDelay) {
   EXPECT_EQ(insts[0]->gate_delay_fall, nullptr);
 }
 
-// Strength shared across multiple instances
-
 TEST(ParserA54, UdpInstStrengthSharedAcrossInstances) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -228,8 +206,6 @@ TEST(ParserA54, UdpInstStrengthSharedAcrossInstances) {
   EXPECT_EQ(insts[1]->drive_strength0, 5u);
   EXPECT_EQ(insts[1]->drive_strength1, 5u);
 }
-
-// Sequential UDP instantiation
 
 TEST(ParserA54, UdpInstSequential) {
   auto r = Parse(
@@ -251,4 +227,4 @@ TEST(ParserA54, UdpInstSequential) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 3u);
 }
 
-}  // namespace
+}

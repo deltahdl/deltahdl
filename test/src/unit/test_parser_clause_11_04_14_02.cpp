@@ -58,4 +58,4 @@ TEST(ParserSection11, StreamingWithTypedSlice) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.8.5: real as assoc index type is illegal.
 TEST(Elaboration, AssocArrayRealIndex_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -15,7 +14,6 @@ TEST(Elaboration, AssocArrayRealIndex_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.8.5: shortreal as assoc index type is illegal.
 TEST(Elaboration, AssocArrayShortrealIndex_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -26,7 +24,6 @@ TEST(Elaboration, AssocArrayShortrealIndex_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.8.5: Typedef as assoc index type is OK.
 TEST(Elaboration, AssocArrayTypedefIndex_Allowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -48,7 +45,6 @@ TEST(Elaboration, AssocArrayTypedefIndex_Allowed) {
   EXPECT_TRUE(found);
 }
 
-// §7.8.4: int as assoc index type is OK (sanity check).
 TEST(Elaboration, AssocArrayIntIndex_Allowed) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
@@ -56,4 +52,4 @@ TEST(Elaboration, AssocArrayIntIndex_Allowed) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

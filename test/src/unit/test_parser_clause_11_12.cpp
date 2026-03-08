@@ -654,4 +654,4 @@ TEST(ParserA210, AssertionItemDecl_LetDecl) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

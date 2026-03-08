@@ -174,7 +174,6 @@ TEST(SimA82, VoidCastFunctionCall) {
   LowerRunAndCheck(f, design, {{"x", 55u}});
 }
 
-// §13.4.1: Return value via assignment to function-name variable.
 TEST(Sim1341, FunctionNameAssignReturnsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -192,7 +191,6 @@ TEST(Sim1341, FunctionNameAssignReturnsValue) {
   LowerRunAndCheck(f, design, {{"x", 14u}});
 }
 
-// §13.4.1: return statement overrides value assigned to function name.
 TEST(Sim1341, ReturnOverridesFunctionNameAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -210,7 +208,6 @@ TEST(Sim1341, ReturnOverridesFunctionNameAssign) {
   LowerRunAndCheck(f, design, {{"x", 42u}});
 }
 
-// §13.4.1: Function with no return or function-name assignment returns 0.
 TEST(Sim1341, EmptyFunctionReturnsZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -226,7 +223,6 @@ TEST(Sim1341, EmptyFunctionReturnsZero) {
   LowerRunAndCheck(f, design, {{"x", 0u}});
 }
 
-// §13.4.1: Function-name assignment used conditionally.
 TEST(Sim1341, FunctionNameAssignConditional) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -246,7 +242,6 @@ TEST(Sim1341, FunctionNameAssignConditional) {
   LowerRunAndCheck(f, design, {{"x", 7u}});
 }
 
-// §13.4.1: Void function call used as statement (no return value).
 TEST(Sim1341, VoidFunctionCallAsStatement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -285,4 +280,4 @@ TEST(Functions, VoidFunctionSideEffect) {
   EXPECT_EQ(g_var->value.ToUint64(), 99u);
 }
 
-}  // namespace
+}

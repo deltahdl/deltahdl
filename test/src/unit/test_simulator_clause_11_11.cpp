@@ -50,4 +50,4 @@ TEST(MinTypMaxDelays, SelectTyp) {
   EXPECT_EQ(SelectMinTypMax(mtm, 1), 10u);
 }
 
-}  // namespace
+}

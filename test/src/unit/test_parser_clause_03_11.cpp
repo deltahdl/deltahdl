@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §3.11: Hierarchy is created by one building block instantiating another.
-
 TEST(ParserClause03, Cl3_11_ModuleInstantiatesModule) {
   auto r = Parse(
       "module sub; endmodule\n"
@@ -35,8 +33,6 @@ TEST(ParserClause03, Cl3_11_ModuleInstantiatesInterface) {
               "endmodule\n"));
 }
 
-// §3.11: Communication through ports.
-
 TEST(ParserClause03, Cl3_11_PortConnections) {
   auto r = Parse(
       "module sub(input logic a, output logic b);\n"
@@ -53,8 +49,6 @@ TEST(ParserClause03, Cl3_11_PortConnections) {
   ASSERT_NE(inst, nullptr);
   EXPECT_FALSE(inst->inst_ports.empty());
 }
-
-// §3.11: LRM example — top instantiates mux2to1 (gate-level).
 
 TEST(ParserClause03, Cl3_11_TopMux2to1Example) {
   auto r = Parse(
@@ -78,16 +72,12 @@ TEST(ParserClause03, Cl3_11_TopMux2to1Example) {
       HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
 }
 
-// §3.11: Multiple levels of hierarchy.
-
 TEST(ParserClause03, Cl3_11_MultipleLevelsOfHierarchy) {
   EXPECT_TRUE(
       ParseOk("module leaf; endmodule\n"
               "module mid; leaf u0(); endmodule\n"
               "module top; mid u0(); endmodule\n"));
 }
-
-// §3.11: Multiple top-level blocks.
 
 TEST(ParserClause03, Cl3_11_MultipleTopLevelModules) {
   auto r = Parse(
@@ -98,4 +88,4 @@ TEST(ParserClause03, Cl3_11_MultipleTopLevelModules) {
   EXPECT_EQ(r.cu->modules.size(), 2u);
 }
 
-}  // namespace
+}

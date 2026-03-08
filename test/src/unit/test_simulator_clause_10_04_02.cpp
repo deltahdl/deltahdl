@@ -25,7 +25,6 @@ TEST(SimA85, VarLvalueNonblocking) {
   EXPECT_EQ(var->value.ToUint64(), 0x99u);
 }
 
-// §10.4.2: NBA with intra-assignment delay schedules at current_time + delay.
 TEST(SimA85, NbaIntraAssignDelay) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -46,7 +45,6 @@ TEST(SimA85, NbaIntraAssignDelay) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §10.4.2: NBA with intra-assignment delay does not block procedural flow.
 TEST(SimA85, NbaIntraAssignDelayNonBlocking) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -67,12 +65,11 @@ TEST(SimA85, NbaIntraAssignDelayNonBlocking) {
   auto* c = f.ctx.FindVariable("c");
   ASSERT_NE(a, nullptr);
   ASSERT_NE(c, nullptr);
-  // a gets NBA-scheduled value; c gets immediate blocking value.
+
   EXPECT_EQ(a->value.ToUint64(), 10u);
   EXPECT_EQ(c->value.ToUint64(), 99u);
 }
 
-// §10.4.2: NBA intra-assignment delay captures RHS at evaluation time.
 TEST(SimA85, NbaIntraAssignDelayCapturesRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -93,7 +90,7 @@ TEST(SimA85, NbaIntraAssignDelayCapturesRHS) {
   f.scheduler.Run();
   auto* a = f.ctx.FindVariable("a");
   ASSERT_NE(a, nullptr);
-  // a should get the value of b at time 0 (10), not time 2 (99).
+
   EXPECT_EQ(a->value.ToUint64(), 10u);
 }
 
@@ -118,4 +115,4 @@ TEST(StmtExec, NonblockingAssignBitSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0x20u);
 }
 
-}  // namespace
+}

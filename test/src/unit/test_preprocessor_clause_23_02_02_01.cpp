@@ -106,4 +106,4 @@ TEST(ParserA23, ListOfPortIdentifiersSingle) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInout);
 }
 
-}  // namespace
+}

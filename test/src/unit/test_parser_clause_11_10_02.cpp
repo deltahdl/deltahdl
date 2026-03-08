@@ -3,7 +3,6 @@
 using namespace delta;
 namespace {
 
-// §11.10.2: String literal assigned to wider vector parses correctly.
 TEST(ParserSection1110_2, StringLiteralToWiderVector) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -12,7 +11,6 @@ TEST(ParserSection1110_2, StringLiteralToWiderVector) {
               "endmodule\n"));
 }
 
-// §11.10.2: Concatenation of padded vectors compared with string literal.
 TEST(ParserSection1110_2, PaddedConcatCompareParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -26,4 +24,4 @@ TEST(ParserSection1110_2, PaddedConcatCompareParses) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

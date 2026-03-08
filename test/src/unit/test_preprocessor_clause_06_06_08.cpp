@@ -17,4 +17,4 @@ TEST(ParserSection6, InterconnectDeclFlag) {
   EXPECT_EQ(item->name, "ibus");
 }
 
-}  // namespace
+}

@@ -144,4 +144,4 @@ TEST(ParserA610, AssumePropertyModule) {
   ASSERT_NE(item, nullptr);
 }
 
-}  // namespace
+}

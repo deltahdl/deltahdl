@@ -1,4 +1,4 @@
-// §6.11.1
+
 
 #include "elaborator/type_eval.h"
 #include "fixture_simulator.h"
@@ -10,7 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §6.11.1: All basic integer data types are integral.
 TEST(TypeEval, IntegerTypesAreIntegral) {
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kBit));
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kLogic));
@@ -23,12 +22,10 @@ TEST(TypeEval, IntegerTypesAreIntegral) {
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kTime));
 }
 
-// §6.11.1: Enum is integral.
 TEST(TypeEval, EnumIsIntegral) {
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kEnum));
 }
 
-// §6.11.1: Non-integral types.
 TEST(TypeEval, NonIntegralTypes) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kReal));
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kShortreal));
@@ -39,7 +36,6 @@ TEST(TypeEval, NonIntegralTypes) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kEvent));
 }
 
-// §6.11.1: Built-in type widths per Table 6-8.
 TEST(TypeEval, IntegerTypeWidths) {
   DataType dt;
   dt.kind = DataTypeKind::kByte;
@@ -56,4 +52,4 @@ TEST(TypeEval, IntegerTypeWidths) {
   EXPECT_EQ(EvalTypeWidth(dt), 64u);
 }
 
-}  // namespace
+}

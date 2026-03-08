@@ -46,4 +46,4 @@ TEST(IpcSync, MailboxBoundedGetFreesSpace) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-}  // namespace
+}

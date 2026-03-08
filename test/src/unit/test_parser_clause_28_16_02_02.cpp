@@ -47,4 +47,4 @@ TEST(ParserSection6, TriregThreeDelay_FallAndDecay) {
   EXPECT_EQ(item->net_delay_decay->int_val, 50u);
 }
 
-}  // namespace
+}

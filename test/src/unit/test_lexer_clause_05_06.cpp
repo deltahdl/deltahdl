@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.6: simple identifiers contain letters, digits, dollar, underscore ---
-
 TEST(LexerClause05, Cl5_6_SimpleIdentLetters) {
   auto r = LexOne("abc ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
@@ -39,8 +37,6 @@ TEST(LexerClause05, Cl5_6_SimpleIdentMixed) {
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "abc_123$xyz");
 }
-
-// --- §5.6: LRM example identifiers ---
 
 TEST(LexerClause05, Cl5_6_LrmExampleShiftreg) {
   auto r = LexOne("shiftreg_a ");
@@ -72,11 +68,9 @@ TEST(LexerClause05, Cl5_6_LrmExampleData0) {
   EXPECT_EQ(r.token.text, "_data_3_");
 }
 
-// --- §5.6: first character cannot be digit or $ ---
-
 TEST(LexerClause05, Cl5_6_DigitStartIsNumber) {
   auto r = LexOne("42abc ");
-  // A digit-start lexes as a number token, not an identifier
+
   EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
 }
 
@@ -90,8 +84,6 @@ TEST(LexerClause05, Cl5_6_BareDollarIsDollarToken) {
   EXPECT_EQ(r.token.kind, TokenKind::kDollar);
 }
 
-// --- §5.6: case sensitivity ---
-
 TEST(LexerClause05, Cl5_6_CaseSensitive) {
   auto tokens = Lex("ABC abc Abc");
   ASSERT_GE(tokens.size(), 4u);
@@ -99,8 +91,6 @@ TEST(LexerClause05, Cl5_6_CaseSensitive) {
   EXPECT_EQ(tokens[1].text, "abc");
   EXPECT_EQ(tokens[2].text, "Abc");
 }
-
-// --- §5.6: keywords recognized ---
 
 TEST(LexerClause05, Cl5_6_KeywordRecognized) {
   auto r = LexOne("module ");
@@ -112,8 +102,6 @@ TEST(LexerClause05, Cl5_6_UppercaseNotKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "Module");
 }
-
-// --- §5.6: max identifier length (1024 characters) ---
 
 TEST(LexerClause05, Cl5_6_MaxLength1024Ok) {
   std::string id(1024, 'a');
@@ -137,8 +125,6 @@ TEST(LexerClause05, Cl5_6_EscapedMaxLength1025Error) {
   EXPECT_TRUE(errors);
 }
 
-// --- §5.6: simple and escaped identifiers in same stream ---
-
 TEST(LexerClause05, Cl5_6_SimpleAndEscapedInStream) {
   auto tokens = Lex("abc \\def ghi");
   ASSERT_GE(tokens.size(), 4u);
@@ -150,4 +136,4 @@ TEST(LexerClause05, Cl5_6_SimpleAndEscapedInStream) {
   EXPECT_EQ(tokens[2].text, "ghi");
 }
 
-}  // namespace
+}

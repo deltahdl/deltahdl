@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §11.10.1: Copy — string literal assignment to vector elaborates successfully.
 TEST(Elaboration, StringLiteralCopyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -17,7 +16,6 @@ TEST(Elaboration, StringLiteralCopyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.10.1: Concatenate — concatenation of string vectors elaborates.
 TEST(Elaboration, StringLiteralConcatElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -33,7 +31,6 @@ TEST(Elaboration, StringLiteralConcatElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.10.1: Compare — equality of string vectors elaborates.
 TEST(Elaboration, StringLiteralCompareElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,7 +48,6 @@ TEST(Elaboration, StringLiteralCompareElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.10.1: String literal to wider vector (zero-padding) elaborates.
 TEST(Elaboration, StringLiteralWiderVectorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -64,4 +60,4 @@ TEST(Elaboration, StringLiteralWiderVectorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

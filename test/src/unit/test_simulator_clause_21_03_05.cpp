@@ -105,4 +105,4 @@ TEST(Section21, Rewind) {
   std::remove(tmp_path.c_str());
 }
 
-}  // namespace
+}

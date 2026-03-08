@@ -11,4 +11,4 @@ TEST(ParserSection21, DumpportslimitCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

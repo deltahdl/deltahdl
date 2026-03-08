@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.18: Public member access from module scope is OK.
 TEST(ElabA818, PublicMemberAccessOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -19,7 +18,6 @@ TEST(ElabA818, PublicMemberAccessOk) {
              "endmodule\n"));
 }
 
-// §8.18: local member access from module scope is an error.
 TEST(ElabA818, LocalMemberAccessError) {
   EXPECT_FALSE(
       ElabOk("class Packet;\n"
@@ -34,7 +32,6 @@ TEST(ElabA818, LocalMemberAccessError) {
              "endmodule\n"));
 }
 
-// §8.18: protected member access from module scope is an error.
 TEST(ElabA818, ProtectedMemberAccessError) {
   EXPECT_FALSE(
       ElabOk("class Packet;\n"
@@ -49,7 +46,6 @@ TEST(ElabA818, ProtectedMemberAccessError) {
              "endmodule\n"));
 }
 
-// §8.18: local method access from module scope is an error.
 TEST(ElabA818, LocalMethodAccessError) {
   EXPECT_FALSE(
       ElabOk("class Packet;\n"
@@ -66,7 +62,6 @@ TEST(ElabA818, LocalMethodAccessError) {
              "endmodule\n"));
 }
 
-// §8.18: Unqualified (public) method access is OK.
 TEST(ElabA818, PublicMethodAccessOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -81,4 +76,4 @@ TEST(ElabA818, PublicMethodAccessOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -115,4 +115,4 @@ TEST(ParserSection25, ModportMixedDirectionAndExprSecond) {
   EXPECT_NE(mp->ports[1].expr, nullptr);
 }
 
-}  // namespace
+}

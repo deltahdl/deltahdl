@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §7.2, footnote 20: void struct_union_member only in tagged unions.
 TEST(Elaboration, VoidMemberInUnpackedStruct_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -55,7 +54,6 @@ TEST(Elaboration, VoidMemberInPackedUnion_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §7.2, footnote 20: random_qualifier only in unpacked structures.
 TEST(Elaboration, RandInPackedStruct_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -106,4 +104,4 @@ TEST(Elaboration, RandInUnion_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

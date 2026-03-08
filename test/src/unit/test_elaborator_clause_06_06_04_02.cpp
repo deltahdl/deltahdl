@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §6.6.4.2: Trireg with explicit three-delay spec extracts decay_ticks.
 TEST(Elaborator, Sec6_6_4_2_ExplicitDecayTime) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -25,7 +24,6 @@ TEST(Elaborator, Sec6_6_4_2_ExplicitDecayTime) {
   EXPECT_TRUE(found);
 }
 
-// §6.6.4.2: Trireg without decay spec has decay_ticks = 0 (ideal capacitive).
 TEST(Elaborator, Sec6_6_4_2_NoDecaySpecMeansIdeal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -46,7 +44,6 @@ TEST(Elaborator, Sec6_6_4_2_NoDecaySpecMeansIdeal) {
   EXPECT_TRUE(found);
 }
 
-// §6.6.4.2: Trireg with two delays (rise, fall) but no decay — ideal.
 TEST(Elaborator, Sec6_6_4_2_TwoDelayNoDecayIdeal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -67,7 +64,6 @@ TEST(Elaborator, Sec6_6_4_2_TwoDelayNoDecayIdeal) {
   EXPECT_TRUE(found);
 }
 
-// §6.6.4.2: Decay time of zero means no decay (ideal capacitive).
 TEST(Elaborator, Sec6_6_4_2_DecayTimeZeroIsIdeal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -88,4 +84,4 @@ TEST(Elaborator, Sec6_6_4_2_DecayTimeZeroIsIdeal) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

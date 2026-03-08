@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 
@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.2: Aggregate expressions can be compared with equality.
 TEST(AggregateExpr, StructEqualityComparison) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -21,7 +20,6 @@ TEST(AggregateExpr, StructEqualityComparison) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.2.2: Aggregate expressions can be compared with inequality.
 TEST(AggregateExpr, StructInequalityComparison) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,7 +34,6 @@ TEST(AggregateExpr, StructInequalityComparison) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.2.2: Aggregate expressions can be passed as subroutine arguments.
 TEST(AggregateExpr, StructPassedToFunction) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -54,7 +51,6 @@ TEST(AggregateExpr, StructPassedToFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.2.2: Unpacked array equality comparison.
 TEST(AggregateExpr, ArrayEqualityComparison) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -69,7 +65,6 @@ TEST(AggregateExpr, ArrayEqualityComparison) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.2.2: Aggregate comparison of non-equivalent types shall be an error.
 TEST(AggregateExpr, NonEquivalentTypeComparisonError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -86,4 +81,4 @@ TEST(AggregateExpr, NonEquivalentTypeComparisonError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

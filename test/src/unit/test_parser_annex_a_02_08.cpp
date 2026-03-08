@@ -5,12 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.2.8 block_item_declaration ::=
-//   { attribute_instance } data_declaration
-//   | { attribute_instance } local_parameter_declaration ;
-//   | { attribute_instance } parameter_declaration ;
-//   | { attribute_instance } let_declaration
-
 TEST(ParserA28, BlockItemDataDecl) {
   auto r = Parse(
       "module m;\n"
@@ -127,8 +121,6 @@ TEST(ParserA28, BlockItemImportDecl) {
   EXPECT_EQ(stmt->decl_item->kind, ModuleItemKind::kImportDecl);
 }
 
-// §A.2.8 [const] qualifier on data_declaration
-
 TEST(ParserA28, BlockItemConstDataDecl) {
   auto r = Parse(
       "module m;\n"
@@ -143,8 +135,6 @@ TEST(ParserA28, BlockItemConstDataDecl) {
   EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(stmt->var_is_const);
 }
-
-// Lifetime qualifiers inside blocks
 
 TEST(ParserA28, BlockItemAutomaticLifetime) {
   auto r = Parse(
@@ -178,8 +168,6 @@ TEST(ParserA28, BlockItemStaticLifetime) {
   EXPECT_TRUE(stmt->var_is_static);
 }
 
-// Block items in task body
-
 TEST(ParserA28, TaskBodyBlockItem) {
   auto r = Parse(
       "module m;\n"
@@ -195,8 +183,6 @@ TEST(ParserA28, TaskBodyBlockItem) {
   EXPECT_GE(item->func_body_stmts.size(), 1u);
 }
 
-// Block items in fork-join
-
 TEST(ParserA28, ForkJoinBlockItem) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -206,8 +192,6 @@ TEST(ParserA28, ForkJoinBlockItem) {
               "  join\n"
               "endmodule\n"));
 }
-
-// Multiple block-level declarations in sequence
 
 TEST(ParserA28, MultipleBlockItemDecls) {
   auto r = Parse(
@@ -228,4 +212,4 @@ TEST(ParserA28, MultipleBlockItemDecls) {
   EXPECT_EQ(stmts[2]->kind, StmtKind::kVarDecl);
 }
 
-}  // namespace
+}

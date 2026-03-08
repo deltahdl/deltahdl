@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.3.4 cmos_switchtype ::= cmos | rcmos
-
 TEST(ParserA34, CmosSwitchType_Cmos) {
   auto r = Parse(
       "module m;\n"
@@ -28,8 +26,6 @@ TEST(ParserA34, CmosSwitchType_Rcmos) {
   ASSERT_NE(g, nullptr);
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
-
-// §A.3.4 enable_gatetype ::= bufif0 | bufif1 | notif0 | notif1
 
 TEST(ParserA34, EnableGateType_Bufif0) {
   auto r = Parse(
@@ -75,8 +71,6 @@ TEST(ParserA34, EnableGateType_Notif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-// §A.3.4 mos_switchtype ::= nmos | pmos | rnmos | rpmos
-
 TEST(ParserA34, MosSwitchType_Nmos) {
   auto r = Parse(
       "module m;\n"
@@ -120,8 +114,6 @@ TEST(ParserA34, MosSwitchType_Rpmos) {
   ASSERT_NE(g, nullptr);
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
-
-// §A.3.4 n_input_gatetype ::= and | nand | or | nor | xor | xnor
 
 TEST(ParserA34, NInputGateType_And) {
   auto r = Parse(
@@ -184,8 +176,6 @@ TEST(ParserA34, NInputGateType_Xnor) {
   ASSERT_NE(g, nullptr);
 }
 
-// §A.3.4 n_output_gatetype ::= buf | not
-
 TEST(ParserA34, NOutputGateType_Buf) {
   auto r = Parse(
       "module m;\n"
@@ -207,8 +197,6 @@ TEST(ParserA34, NOutputGateType_Not) {
   ASSERT_NE(g, nullptr);
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
-
-// §A.3.4 pass_en_switchtype ::= tranif0 | tranif1 | rtranif1 | rtranif0
 
 TEST(ParserA34, PassEnSwitchType_Tranif0) {
   auto r = Parse(
@@ -251,8 +239,6 @@ TEST(ParserA34, PassEnSwitchType_Rtranif1) {
   ASSERT_NE(g, nullptr);
 }
 
-// §A.3.4 pass_switchtype ::= tran | rtran
-
 TEST(ParserA34, PassSwitchType_Tran) {
   auto r = Parse(
       "module m;\n"
@@ -275,9 +261,6 @@ TEST(ParserA34, PassSwitchType_Rtran) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-// §A.3.4 pullup / pulldown (not listed in §A.3.4 as a category, but part of
-// gate_instantiation in §A.3.1)
-
 TEST(ParserA34, PullGate_Pullup) {
   auto r = Parse(
       "module m;\n"
@@ -299,8 +282,6 @@ TEST(ParserA34, PullGate_Pulldown) {
   ASSERT_NE(g, nullptr);
   EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
-
-// Verify all gate types parse with named instances
 
 TEST(ParserA34, AllGateTypesWithNamedInstances) {
   auto r = Parse(
@@ -342,4 +323,4 @@ TEST(ParserA34, AllGateTypesWithNamedInstances) {
   EXPECT_EQ(gates[25]->gate_kind, GateKind::kPulldown);
 }
 
-}  // namespace
+}

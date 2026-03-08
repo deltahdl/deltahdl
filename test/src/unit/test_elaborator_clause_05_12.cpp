@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.12: default attribute value is 1 ---
-
 TEST(ElabClause05, Cl5_12_DefaultValueBitOne) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,8 +22,6 @@ TEST(ElabClause05, Cl5_12_DefaultValueBitOne) {
   ASSERT_NE(mod->variables[0].attrs[0].resolved_value, std::nullopt);
   EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 1);
 }
-
-// --- §5.12: attribute value from constant expression ---
 
 TEST(ElabClause05, Cl5_12_AttrValueFromLiteral) {
   ElabFixture f;
@@ -70,8 +66,6 @@ TEST(ElabClause05, Cl5_12_AttrValueZero) {
   EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 0);
 }
 
-// --- §5.12: string-valued attributes ---
-
 TEST(ElabClause05, Cl5_12_AttrValueString) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -85,8 +79,6 @@ TEST(ElabClause05, Cl5_12_AttrValueString) {
   EXPECT_EQ(mod->variables[0].attrs[0].name, "tool_purpose");
   EXPECT_EQ(mod->variables[0].attrs[0].string_value, "synthesis");
 }
-
-// --- §5.12: duplicate attribute — last value wins, warning issued ---
 
 TEST(ElabClause05, Cl5_12_DuplicateAttrLastWins) {
   ElabFixture f;
@@ -140,8 +132,6 @@ TEST(ElabClause05, Cl5_12_DuplicateAttrAcrossInstances) {
   EXPECT_EQ(depth_count, 1);
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
-
-// --- §5.12: attributes on various declaration types ---
 
 TEST(ElabClause05, Cl5_12_AttrOnVarDecl) {
   ElabFixture f;
@@ -216,8 +206,6 @@ TEST(ElabClause05, Cl5_12_AttrOnModuleDefinition) {
   EXPECT_EQ(mod->attrs[0].name, "optimize_power");
 }
 
-// --- §5.12: attributes on process/always block ---
-
 TEST(ElabClause05, Cl5_12_AttrOnProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -234,8 +222,6 @@ TEST(ElabClause05, Cl5_12_AttrOnProcess) {
   EXPECT_EQ(mod->processes[0].attrs[0].name, "synthesis");
 }
 
-// --- §5.12: multiple distinct attrs preserved ---
-
 TEST(ElabClause05, Cl5_12_MultipleDistinctAttrs) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -250,4 +236,4 @@ TEST(ElabClause05, Cl5_12_MultipleDistinctAttrs) {
   EXPECT_EQ(mod->variables[0].attrs[1].name, "optimize");
 }
 
-}  // namespace
+}

@@ -41,7 +41,6 @@ TEST(Elaboration, EnumUnassignedAfterXZ_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19: Duplicate enum values are an error.
 TEST(Elaboration, EnumDuplicateValue_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -52,7 +51,6 @@ TEST(Elaboration, EnumDuplicateValue_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19: Enum variable gets correct width (default int = 32).
 TEST(Elaboration, EnumDefaultWidthInt) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -69,7 +67,6 @@ TEST(Elaboration, EnumDefaultWidthInt) {
   }
 }
 
-// §6.19: Enum members are elaborated as constants.
 TEST(Elaboration, EnumMembersAsConstants) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -82,7 +79,6 @@ TEST(Elaboration, EnumMembersAsConstants) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19: Enum with explicit base type width.
 TEST(Elaboration, EnumExplicitBaseWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -94,4 +90,4 @@ TEST(Elaboration, EnumExplicitBaseWidth) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

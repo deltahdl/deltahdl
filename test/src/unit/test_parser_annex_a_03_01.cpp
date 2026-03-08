@@ -28,4 +28,4 @@ TEST(ParserA303, OutputTerminal_PullGate) {
   EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
 
-}  // namespace
+}

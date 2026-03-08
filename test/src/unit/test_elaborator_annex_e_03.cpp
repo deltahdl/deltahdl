@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §E.3: trireg net gets default_trireg_strength when no explicit charge.
 TEST(Elaborator, DefaultTriregStrength_AppliesToTrireg) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -26,7 +25,6 @@ TEST(Elaborator, DefaultTriregStrength_AppliesToTrireg) {
   EXPECT_TRUE(found);
 }
 
-// §E.3: trireg with explicit charge strength ignores default.
 TEST(Elaborator, DefaultTriregStrength_ExplicitOverridesDefault) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -48,7 +46,6 @@ TEST(Elaborator, DefaultTriregStrength_ExplicitOverridesDefault) {
   EXPECT_TRUE(found);
 }
 
-// §E.3: no directive means no capacitance override.
 TEST(Elaborator, DefaultTriregStrength_NoDirective) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -69,7 +66,6 @@ TEST(Elaborator, DefaultTriregStrength_NoDirective) {
   EXPECT_TRUE(found);
 }
 
-// §E.3: default_trireg_strength does not affect non-trireg nets.
 TEST(Elaborator, DefaultTriregStrength_DoesNotAffectWire) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -91,7 +87,6 @@ TEST(Elaborator, DefaultTriregStrength_DoesNotAffectWire) {
   EXPECT_TRUE(found);
 }
 
-// §E.3: later directive overrides earlier at elaborator level.
 TEST(Elaborator, DefaultTriregStrength_LaterOverrides) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -114,7 +109,6 @@ TEST(Elaborator, DefaultTriregStrength_LaterOverrides) {
   EXPECT_TRUE(found);
 }
 
-// §E.3: multiple trireg nets all get the default.
 TEST(Elaborator, DefaultTriregStrength_AppliesToAllTriregNets) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -137,7 +131,6 @@ TEST(Elaborator, DefaultTriregStrength_AppliesToAllTriregNets) {
   EXPECT_EQ(count, 2);
 }
 
-// §E.3: value zero is valid.
 TEST(Elaborator, DefaultTriregStrength_ZeroValue) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -159,4 +152,4 @@ TEST(Elaborator, DefaultTriregStrength_ZeroValue) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

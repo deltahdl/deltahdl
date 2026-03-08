@@ -17,7 +17,6 @@ TEST(ParserA27, ElabTaskDeclInModule) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §13.3: Task with output args elaborates.
 TEST(Elab1303, TaskWithOutputArgsElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -31,7 +30,6 @@ TEST(Elab1303, TaskWithOutputArgsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3: Task with inout args elaborates.
 TEST(Elab1303, TaskWithInoutArgElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -45,7 +43,6 @@ TEST(Elab1303, TaskWithInoutArgElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3: Task with empty body elaborates.
 TEST(Elab1303, TaskEmptyBodyElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -58,7 +55,6 @@ TEST(Elab1303, TaskEmptyBodyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3: Task calling another task elaborates.
 TEST(Elab1303, TaskEnablesTaskElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -74,4 +70,4 @@ TEST(Elab1303, TaskEnablesTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

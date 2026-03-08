@@ -1,4 +1,4 @@
-// §11.4.3.1
+
 
 #include "fixture_parser.h"
 #include "fixture_simulator.h"
@@ -74,7 +74,6 @@ TEST(Eval, Addition) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-// §11.2.1: ConstEvalReal — unary minus on real.
 TEST(ConstEvalReal, UnaryMinusOnReal) {
   EvalFixture f;
   auto* e = ParseExprFrom("-3.14", f);
@@ -83,7 +82,6 @@ TEST(ConstEvalReal, UnaryMinusOnReal) {
   EXPECT_NEAR(*val, -3.14, 1e-6);
 }
 
-// §11.2.1: ConstEvalReal — binary add on reals.
 TEST(ConstEvalReal, BinaryAddReals) {
   EvalFixture f;
   auto* e = ParseExprFrom("1.5 + 2.5", f);
@@ -92,7 +90,6 @@ TEST(ConstEvalReal, BinaryAddReals) {
   EXPECT_DOUBLE_EQ(*val, 4.0);
 }
 
-// §11.2.1: ConstEvalReal — binary multiply on reals.
 TEST(ConstEvalReal, BinaryMulReals) {
   EvalFixture f;
   auto* e = ParseExprFrom("2.0 * 3.0", f);
@@ -101,4 +98,4 @@ TEST(ConstEvalReal, BinaryMulReals) {
   EXPECT_DOUBLE_EQ(*val, 6.0);
 }
 
-}  // namespace
+}

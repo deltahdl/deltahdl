@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.6: simple identifiers in declarations ---
-
 TEST(ParserClause05, Cl5_6_IdentAllLegalChars) {
   auto r = Parse("module m; logic abc_123$xyz; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -35,8 +33,6 @@ TEST(ParserClause05, Cl5_6_IdentWithDollarSign) {
   EXPECT_TRUE(ParseOk("module m; logic n$657; endmodule"));
 }
 
-// --- §5.6: case sensitivity ---
-
 TEST(ParserClause05, Cl5_6_CaseSensitive) {
   auto r = Parse(
       "module m;\n"
@@ -48,8 +44,6 @@ TEST(ParserClause05, Cl5_6_CaseSensitive) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "X");
   EXPECT_EQ(r.cu->modules[0]->items[1]->name, "x");
 }
-
-// --- §5.6: digit-started token is a number, not identifier ---
 
 TEST(ParserClause05, Cl5_6_NumberFollowedByIdentifier) {
   auto r = Parse(
@@ -69,8 +63,6 @@ TEST(ParserClause05, Cl5_6_NumberFollowedByIdentifier) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kIdentifier);
 }
 
-// --- §5.6: underscore-prefixed let declaration ---
-
 TEST(ParserClause05, Cl5_6_LetIdentUnderscore) {
   auto r = Parse(
       "module m;\n"
@@ -83,8 +75,6 @@ TEST(ParserClause05, Cl5_6_LetIdentUnderscore) {
   EXPECT_EQ(item->name, "_my_let_123");
 }
 
-// --- §5.6: identifier with underscore in wire ---
-
 TEST(ParserClause05, Cl5_6_SimpleWithUnderscore) {
   auto r = Parse("module m; logic _bus3; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -93,4 +83,4 @@ TEST(ParserClause05, Cl5_6_SimpleWithUnderscore) {
   EXPECT_EQ(item->name, "_bus3");
 }
 
-}  // namespace
+}

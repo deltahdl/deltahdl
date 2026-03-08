@@ -125,14 +125,12 @@ TEST(Preprocessor, ResetAll_DoesNotAffectLineDirective) {
   EXPECT_TRUE(pp.HasLineOverride());
 }
 
-// §22.3: `begin_keywords/`end_keywords not affected by `resetall.
-
 TEST(Preprocessor, ResetAll_DoesNotAffectBeginKeywordsStack) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`begin_keywords \"1800-2023\"\n", f, pp);
   PreprocessWithPP("`resetall\n", f, pp);
-  // `end_keywords should still match the earlier `begin_keywords.
+
   PreprocessWithPP("`end_keywords\n", f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
 }
@@ -142,11 +140,9 @@ TEST(Preprocessor, ResetAll_EndKeywordsWithoutBeginAfterResetallErrors) {
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`resetall\n", f, pp);
   PreprocessWithPP("`end_keywords\n", f, pp);
-  // No `begin_keywords was pushed, so `end_keywords should error.
+
   EXPECT_TRUE(f.diag.HasErrors());
 }
-
-// §22.3: Conditional compilation state not affected by `resetall.
 
 TEST(Preprocessor, ResetAll_DoesNotAffectConditionalStack) {
   PreprocFixture f;
@@ -160,8 +156,6 @@ TEST(Preprocessor, ResetAll_DoesNotAffectConditionalStack) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
-
-// §22.3: Annex E directives are reset by `resetall.
 
 TEST(Preprocessor, ResetAll_ResetsDefaultDecayTime) {
   PreprocFixture f;
@@ -192,8 +186,6 @@ TEST(Preprocessor, ResetAll_ResetsDelayModeDirective) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kNone);
 }
 
-// §22.3: Nested design elements — error in inner element.
-
 TEST(Preprocessor, ResetAll_IllegalInsideNestedDesignElement) {
   PreprocFixture f;
   Preprocess(
@@ -206,15 +198,11 @@ TEST(Preprocessor, ResetAll_IllegalInsideNestedDesignElement) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §22.3: Multiple consecutive resetalls are legal.
-
 TEST(Preprocessor, ResetAll_MultipleConsecutiveLegal) {
   PreprocFixture f;
   Preprocess("`resetall\n`resetall\n`resetall\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
-
-// §22.3: Resetall between design elements is legal.
 
 TEST(Preprocessor, ResetAll_BetweenDesignElementsLegal) {
   PreprocFixture f;
@@ -226,18 +214,16 @@ TEST(Preprocessor, ResetAll_BetweenDesignElementsLegal) {
                            "module m2; endmodule\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
-  // After resetall, default_nettype should be back to wire.
+
   EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
 }
-// --- §22.11.1: `pragma resetall resets all pragmas ---
+
 TEST(Preprocessor, Pragma_Resetall_NoError) {
   PreprocFixture f;
   Preprocess("`pragma resetall\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// --- §22.11: Pragma does not affect `resetall behavior ---
-// `resetall does not reset pragma state per §22.3.
 TEST(Preprocessor, Pragma_ResetallDoesNotAffectPragma) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});

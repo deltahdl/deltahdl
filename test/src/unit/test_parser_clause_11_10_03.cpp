@@ -4,7 +4,6 @@
 using namespace delta;
 namespace {
 
-// §11.10.3: Empty string literal parses as string literal expression.
 TEST(ParserSection1110_3, EmptyStringLiteralParses) {
   auto r = Parse(
       "module t;\n"
@@ -18,7 +17,6 @@ TEST(ParserSection1110_3, EmptyStringLiteralParses) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-// §11.10.3: Empty string compared with "0" parses.
 TEST(ParserSection1110_3, EmptyStringComparedWithZeroParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -27,4 +25,4 @@ TEST(ParserSection1110_3, EmptyStringComparedWithZeroParses) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

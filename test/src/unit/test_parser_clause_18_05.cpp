@@ -97,4 +97,4 @@ TEST(ParserSection8, ClassWithConstraint) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

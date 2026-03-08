@@ -22,7 +22,6 @@ TEST(Elaboration, EnumStrictTypeCheck_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19.3: Assigning enum member to enum variable is ok.
 TEST(Elaboration, EnumMemberAssign_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -38,4 +37,4 @@ TEST(Elaboration, EnumMemberAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

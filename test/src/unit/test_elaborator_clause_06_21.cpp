@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §6.21: Module-level variable has static lifetime (elaborates ok).
 TEST(Elaboration, ModuleLevelVarStaticLifetime) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -17,7 +16,6 @@ TEST(Elaboration, ModuleLevelVarStaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.21: Static variable in initial block.
 TEST(Elaboration, StaticVarInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +30,6 @@ TEST(Elaboration, StaticVarInInitialBlock) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.21: Automatic variable in initial block.
 TEST(Elaboration, AutomaticVarInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -46,7 +43,6 @@ TEST(Elaboration, AutomaticVarInInitialBlock) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.21: Static variable in automatic function.
 TEST(Elaboration, StaticVarInAutoFunc) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -62,7 +58,6 @@ TEST(Elaboration, StaticVarInAutoFunc) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.21: Automatic variable in static function.
 TEST(Elaboration, AutoVarInStaticFunc) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -77,7 +72,6 @@ TEST(Elaboration, AutoVarInStaticFunc) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.21: Module with automatic lifetime qualifier.
 TEST(Elaboration, ModuleAutomaticLifetime) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -91,4 +85,4 @@ TEST(Elaboration, ModuleAutomaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -307,7 +307,6 @@ TEST(ParserSection9b, BlockingAssignConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-// §10.4.1: Blocking assignment in task body.
 TEST(ParserSection10, Sec10_4_1_InTaskBody) {
   auto r = Parse(
       "module m;\n"
@@ -326,7 +325,6 @@ TEST(ParserSection10, Sec10_4_1_InTaskBody) {
   EXPECT_EQ(assign->kind, StmtKind::kBlockingAssign);
 }
 
-// §10.4.1: Blocking assignment in function body.
 TEST(ParserSection10, Sec10_4_1_InFunctionBody) {
   auto r = Parse(
       "module m;\n"
@@ -346,4 +344,4 @@ TEST(ParserSection10, Sec10_4_1_InFunctionBody) {
   EXPECT_EQ(assign->lhs->text, "tmp");
 }
 
-}  // namespace
+}

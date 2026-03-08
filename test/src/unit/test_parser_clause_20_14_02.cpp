@@ -65,4 +65,4 @@ TEST(ParserAnnexN, AnnexNDistChiSquare) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

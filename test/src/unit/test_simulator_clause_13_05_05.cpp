@@ -29,7 +29,6 @@ TEST(SimA609, TaskCallNoParens) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// §13.5.5: Task call with empty parens.
 TEST(Sim1355, TaskCallEmptyParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -53,7 +52,6 @@ TEST(Sim1355, TaskCallEmptyParens) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §13.5.5: Void function call without parens.
 TEST(Sim1355, VoidFunctionNoParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -77,4 +75,4 @@ TEST(Sim1355, VoidFunctionNoParens) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-}  // namespace
+}

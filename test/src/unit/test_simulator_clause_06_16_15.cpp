@@ -21,4 +21,4 @@ TEST(StringMethods, Realtoa) {
   EXPECT_NE(result.find("2.5"), std::string::npos);
 }
 
-}  // namespace
+}

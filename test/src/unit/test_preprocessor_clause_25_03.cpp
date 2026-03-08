@@ -22,4 +22,4 @@ TEST(ParserClause03, Cl3_5_LrmExample) {
   EXPECT_GE(r.cu->interfaces[0]->items.size(), 5u);
 }
 
-}  // namespace
+}

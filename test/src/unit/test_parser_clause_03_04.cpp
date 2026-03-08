@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §3.4: Programs are enclosed between program...endprogram.
-
 TEST(ParserClause03, Cl3_4_ProgramEnclosedByKeywords) {
   auto r = Parse("program p; endprogram");
   ASSERT_NE(r.cu, nullptr);
@@ -15,8 +13,6 @@ TEST(ParserClause03, Cl3_4_ProgramEnclosedByKeywords) {
   EXPECT_EQ(r.cu->programs[0]->name, "p");
   EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
-
-// --- Allowed constructs ---
 
 TEST(ParserClause03, Cl3_4_ProgramWithDataDeclarations) {
   auto r = Parse(
@@ -105,8 +101,6 @@ TEST(ParserClause03, Cl3_4_ProgramWithMultipleInitials) {
       2u);
 }
 
-// --- Disallowed constructs ---
-
 TEST(ParserClause03, Cl3_4_ProgramCannotContainAlways) {
   auto r = Parse(
       "program p;\n"
@@ -173,8 +167,6 @@ TEST(ParserClause03, Cl3_4_ProgramCannotContainUdpInst) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// --- Ports ---
-
 TEST(ParserClause03, Cl3_4_ProgramWithPorts) {
   auto r = Parse(
       "program p(input clk, input [16:1] addr, inout [7:0] data);\n"
@@ -183,8 +175,6 @@ TEST(ParserClause03, Cl3_4_ProgramWithPorts) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->programs[0]->ports.size(), 3u);
 }
-
-// --- LRM §3.4 sample program ---
 
 TEST(ParserClause03, Cl3_4_SampleProgramDeclaration) {
   auto r = Parse(
@@ -201,4 +191,4 @@ TEST(ParserClause03, Cl3_4_SampleProgramDeclaration) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-}  // namespace
+}

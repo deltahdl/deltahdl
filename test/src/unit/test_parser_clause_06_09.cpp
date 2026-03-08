@@ -1,4 +1,4 @@
-// §6.9
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §6.9: Scalar — no range specification, 1-bit wide.
 TEST(ParserSection6, Sec6_9_ScalarNoRange) {
   auto r = Parse(
       "module t;\n"
@@ -22,4 +21,4 @@ TEST(ParserSection6, Sec6_9_ScalarNoRange) {
   EXPECT_EQ(item->data_type.packed_dim_right, nullptr);
 }
 
-}  // namespace
+}

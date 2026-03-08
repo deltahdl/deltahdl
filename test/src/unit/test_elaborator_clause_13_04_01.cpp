@@ -86,7 +86,6 @@ TEST(ElabA82, NestedCallsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.1: Variable with same name as function inside function scope is error.
 TEST(Elab1341, VarSameNameAsFunctionInsideBody) {
   ElabFixture f;
   ElaborateSrc(
@@ -101,7 +100,6 @@ TEST(Elab1341, VarSameNameAsFunctionInsideBody) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4.1: Function-name assignment in non-void function elaborates OK.
 TEST(Elab1341, FunctionNameAssignElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -115,7 +113,6 @@ TEST(Elab1341, FunctionNameAssignElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.1: Nonvoid function return with expression is OK.
 TEST(Elab1341, NonVoidReturnWithExpr) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -151,4 +148,4 @@ TEST(Lowerer, FunctionCallReturnsValue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

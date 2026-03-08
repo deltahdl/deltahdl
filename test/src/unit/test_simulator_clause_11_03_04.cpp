@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §11.3.4: 2-state + 2-state → 2-state result.
 TEST(StateOps, TwoStatePlusTwoState) {
   SimFixture f;
   MakeVar(f, "a", 8, 3);
@@ -17,7 +16,6 @@ TEST(StateOps, TwoStatePlusTwoState) {
   EXPECT_EQ(result.ToUint64(), 8u);
 }
 
-// §11.3.4: Division by zero in 2-state produces x.
 TEST(StateOps, TwoStateDivByZeroProducesX) {
   SimFixture f;
   MakeVar(f, "a", 8, 10);
@@ -28,7 +26,6 @@ TEST(StateOps, TwoStateDivByZeroProducesX) {
   EXPECT_FALSE(result.IsKnown());
 }
 
-// §11.3.4: Modulus by zero produces x.
 TEST(StateOps, ModByZeroProducesX) {
   SimFixture f;
   MakeVar(f, "a", 8, 10);
@@ -39,4 +36,4 @@ TEST(StateOps, ModByZeroProducesX) {
   EXPECT_FALSE(result.IsKnown());
 }
 
-}  // namespace
+}

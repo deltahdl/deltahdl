@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_parser.h"
 #include "fixture_program.h"
@@ -106,7 +106,6 @@ TEST(ParserA705, SystemTimingCheckSetup) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetup);
 }
 
-// §A.7.5.1 — system timing check commands
 TEST(SetupTimingCheck, SetupBasic) {
   auto r = Parse(
       "module m;\n"
@@ -124,4 +123,4 @@ TEST(SetupTimingCheck, SetupBasic) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-}  // namespace
+}

@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.10: positional structure literals ---
-
 TEST(SimClause05, Cl5_10_PositionalTwoFields) {
   auto v = RunAndGet(
       "module t;\n"
@@ -33,8 +31,6 @@ TEST(SimClause05, Cl5_10_PositionalThreeFields) {
   EXPECT_EQ(v, 0x112233u);
 }
 
-// --- §5.10: named member form ---
-
 TEST(SimClause05, Cl5_10_MemberNameAndValue) {
   auto v = RunAndGet(
       "module t;\n"
@@ -56,8 +52,6 @@ TEST(SimClause05, Cl5_10_MemberNameReverseOrder) {
       "c");
   EXPECT_EQ(v, 0x1122u);
 }
-
-// --- §5.10: default value form ---
 
 TEST(SimClause05, Cl5_10_DefaultAllOnes) {
   auto v = RunAndGet(
@@ -92,8 +86,6 @@ TEST(SimClause05, Cl5_10_DefaultDifferentFieldWidths) {
   EXPECT_EQ(v, 0xFFFu);
 }
 
-// --- §5.10: structure literal in variable initialization ---
-
 TEST(SimClause05, Cl5_10_VarInitPositional) {
   auto v = RunAndGet(
       "module t;\n"
@@ -113,8 +105,6 @@ TEST(SimClause05, Cl5_10_VarInitNamed) {
       "p");
   EXPECT_EQ(v, 0xAABBu);
 }
-
-// --- §5.10: field access after struct literal assignment ---
 
 TEST(SimClause05, Cl5_10_FieldAccessAfterAssign) {
   SimFixture f;
@@ -144,4 +134,4 @@ TEST(SimClause05, Cl5_10_FieldAccessAfterAssign) {
   EXPECT_EQ(vry->value.ToUint64(), 0xADu);
 }
 
-}  // namespace
+}

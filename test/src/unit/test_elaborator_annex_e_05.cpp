@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §E.5: delay_mode_path propagates to elaborated module.
 TEST(Elaborator, DelayModePath_PropagatedToModule) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -17,7 +16,6 @@ TEST(Elaborator, DelayModePath_PropagatedToModule) {
   EXPECT_EQ(design->top_modules[0]->delay_mode, DelayModeDirective::kPath);
 }
 
-// §E.5: last delay mode directive wins.
 TEST(Elaborator, DelayModePath_OverridesDistributed) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -31,4 +29,4 @@ TEST(Elaborator, DelayModePath_OverridesDistributed) {
   EXPECT_EQ(design->top_modules[0]->delay_mode, DelayModeDirective::kPath);
 }
 
-}  // namespace
+}

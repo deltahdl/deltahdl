@@ -87,4 +87,4 @@ TEST(ParserA611, ClockvarExpression) {
   ASSERT_NE(stmt->lhs, nullptr);
 }
 
-}  // namespace
+}

@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §22.9: Module parses between unconnected_drive directives ---
-
 TEST(ParserSection22, UnconnectedDrivePull1) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`unconnected_drive pull1\n"
@@ -22,9 +20,6 @@ TEST(ParserSection22, UnconnectedDrivePull0) {
                               "`nounconnected_drive\n"));
 }
 
-// --- §22.9: Directive without `nounconnected_drive (independent directives)
-// ---
-
 TEST(ParserSection22, UnconnectedDrive_NoPairing) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`unconnected_drive pull1\n"
@@ -32,16 +27,12 @@ TEST(ParserSection22, UnconnectedDrive_NoPairing) {
                               "endmodule\n"));
 }
 
-// --- §22.9: `nounconnected_drive standalone ---
-
 TEST(ParserSection22, NounconnectedDrive_Standalone) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`nounconnected_drive\n"
                               "module t;\n"
                               "endmodule\n"));
 }
-
-// --- §22.9: Multiple modules between directives ---
 
 TEST(ParserSection22, UnconnectedDrive_MultipleModules) {
   EXPECT_TRUE(
@@ -53,8 +44,6 @@ TEST(ParserSection22, UnconnectedDrive_MultipleModules) {
                               "`nounconnected_drive\n"));
 }
 
-// --- §22.9: Most recent directive supersedes ---
-
 TEST(ParserSection22, UnconnectedDrive_Supersede) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`unconnected_drive pull0\n"
@@ -65,8 +54,6 @@ TEST(ParserSection22, UnconnectedDrive_Supersede) {
                               "endmodule\n"
                               "`nounconnected_drive\n"));
 }
-
-// --- §22.9: Inside design element produces error ---
 
 TEST(ParserSection22, UnconnectedDrive_InsideModule_Error) {
   EXPECT_FALSE(
@@ -82,4 +69,4 @@ TEST(ParserSection22, NounconnectedDrive_InsideModule_Error) {
                               "endmodule\n"));
 }
 
-}  // namespace
+}

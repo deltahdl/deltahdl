@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.3.5: Statement label on assignment elaborates.
 TEST(ElabClause09_03_05, LabeledAssignmentElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,7 +21,6 @@ TEST(ElabClause09_03_05, LabeledAssignmentElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.5: Statement label on begin block (equivalent to block name).
 TEST(ElabClause09_03_05, LabelOnBeginBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -39,7 +37,6 @@ TEST(ElabClause09_03_05, LabelOnBeginBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.5: Statement label on fork block (equivalent to block name).
 TEST(ElabClause09_03_05, LabelOnForkBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -57,7 +54,6 @@ TEST(ElabClause09_03_05, LabelOnForkBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.5: Label on if statement elaborates.
 TEST(ElabClause09_03_05, LabelOnIfElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -72,7 +68,6 @@ TEST(ElabClause09_03_05, LabelOnIfElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.5: Label on for loop elaborates.
 TEST(ElabClause09_03_05, LabelOnForLoopElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -88,4 +83,4 @@ TEST(ElabClause09_03_05, LabelOnForLoopElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

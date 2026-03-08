@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.7.1: unsized decimal numbers ---
-
 TEST(ParserClause05, Cl5_7_1_UnsizedDecimal) {
   auto r = Parse(
       "module m;\n"
@@ -27,8 +25,6 @@ TEST(ParserClause05, Cl5_7_1_DecimalZero) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
   EXPECT_EQ(rhs->int_val, 0u);
 }
-
-// --- §5.7.1: sized based literals ---
 
 TEST(ParserClause05, Cl5_7_1_SizedBinary) {
   auto r = Parse(
@@ -62,8 +58,6 @@ TEST(ParserClause05, Cl5_7_1_SizedDecimal) {
   EXPECT_TRUE(ParseOk("module m; initial x = 5'D3; endmodule"));
 }
 
-// --- §5.7.1: unsized based literals ---
-
 TEST(ParserClause05, Cl5_7_1_UnsizedHex) {
   EXPECT_TRUE(ParseOk("module m; initial x = 'h837FF; endmodule"));
 }
@@ -76,8 +70,6 @@ TEST(ParserClause05, Cl5_7_1_LargeUnsizedHex) {
               "endmodule"));
 }
 
-// --- §5.7.1: signed specifier ---
-
 TEST(ParserClause05, Cl5_7_1_SignedLiteral) {
   EXPECT_TRUE(ParseOk("module m; initial x = 4'shf; endmodule"));
 }
@@ -86,13 +78,9 @@ TEST(ParserClause05, Cl5_7_1_SignedDecimalQuestion) {
   EXPECT_TRUE(ParseOk("module m; initial x = 16'sd?; endmodule"));
 }
 
-// --- §5.7.1: negative prefix (unary minus) ---
-
 TEST(ParserClause05, Cl5_7_1_NegativeUnsized) {
   EXPECT_TRUE(ParseOk("module m; initial x = -8'd6; endmodule"));
 }
-
-// --- §5.7.1: x, z, ? values ---
 
 TEST(ParserClause05, Cl5_7_1_XValue) {
   EXPECT_TRUE(ParseOk("module m; initial x = 12'hx; endmodule"));
@@ -124,8 +112,6 @@ TEST(ParserClause05, Cl5_7_1_DecimalZDigit) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// --- §5.7.1: underscore in numbers ---
-
 TEST(ParserClause05, Cl5_7_1_UnderscoreInBinary) {
   EXPECT_TRUE(
       ParseOk("module m; initial x = 16'b0011_0101_0001_1111; endmodule"));
@@ -142,8 +128,6 @@ TEST(ParserClause05, Cl5_7_1_UnderscoreInDecimal) {
 TEST(ParserClause05, Cl5_7_1_SpaceBetweenBaseAndDigits) {
   EXPECT_TRUE(ParseOk("module m; initial x = 32 'h 12ab_f001; endmodule"));
 }
-
-// --- §5.7.1: base format case insensitive ---
 
 TEST(ParserClause05, Cl5_7_1_DecimalBaseLower) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'd99; endmodule\n");
@@ -209,8 +193,6 @@ TEST(ParserClause05, Cl5_7_1_HexBaseUpper) {
   EXPECT_EQ(rhs->int_val, 0xABu);
 }
 
-// --- §5.7.1: signed base specifiers ---
-
 TEST(ParserClause05, Cl5_7_1_SignedDecimalLower) {
   auto r = Parse("module m; logic [7:0] x; initial x = 8'sd99; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -275,8 +257,6 @@ TEST(ParserClause05, Cl5_7_1_SignedHexUpper) {
   EXPECT_EQ(rhs->int_val, 0xABu);
 }
 
-// --- §5.7.1: hex digit values ---
-
 TEST(ParserClause05, Cl5_7_1_HexDigitLowercase) {
   auto r =
       Parse("module m; logic [23:0] x; initial x = 24'habcdef; endmodule\n");
@@ -294,8 +274,6 @@ TEST(ParserClause05, Cl5_7_1_HexDigitUppercase) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->int_val, 0xABCDEFu);
 }
-
-// --- §5.7.1: octal, binary digit values ---
 
 TEST(ParserClause05, Cl5_7_1_OctalDigitAll) {
   auto r =
@@ -321,8 +299,6 @@ TEST(ParserClause05, Cl5_7_1_DecimalDigitAll) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->int_val, 1234567890u);
 }
-
-// --- §5.7.1: unbased unsized values ---
 
 TEST(ParserClause05, Cl5_7_1_UnbasedUnsizedZero) {
   auto r = Parse("module m; logic x; initial x = '0; endmodule\n");
@@ -368,8 +344,6 @@ TEST(ParserClause05, Cl5_7_1_UnbasedUnsizedInAssign) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-// --- §5.7.1: value underscores ---
-
 TEST(ParserClause05, Cl5_7_1_BinaryValueWithUnderscores) {
   auto r =
       Parse("module m; logic [7:0] x; initial x = 8'b1010_1010; endmodule\n");
@@ -397,8 +371,6 @@ TEST(ParserClause05, Cl5_7_1_HexValueWithUnderscores) {
   EXPECT_EQ(rhs->int_val, 0xABCDu);
 }
 
-// --- §5.7.1: sizes ---
-
 TEST(ParserClause05, Cl5_7_1_Size1Bit) {
   auto r = Parse("module m; logic x; initial x = 1'b1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -415,8 +387,6 @@ TEST(ParserClause05, Cl5_7_1_Size32Bit) {
   EXPECT_EQ(rhs->int_val, 100u);
 }
 
-// --- §5.7.1: constant primary context ---
-
 TEST(ParserClause05, Cl5_7_1_ConstantPrimaryInteger) {
   auto r = Parse("module m; parameter int P = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -424,8 +394,6 @@ TEST(ParserClause05, Cl5_7_1_ConstantPrimaryInteger) {
   ASSERT_NE(param->init_expr, nullptr);
   EXPECT_EQ(param->init_expr->kind, ExprKind::kIntegerLiteral);
 }
-
-// --- §5.7.1: multiple literals in begin/end ---
 
 TEST(ParserClause05, Cl5_7_1_MultipleLiterals) {
   auto r = Parse(
@@ -435,8 +403,6 @@ TEST(ParserClause05, Cl5_7_1_MultipleLiterals) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// --- §5.7.1: overflow warnings ---
 
 struct ParseDiag50701 {
   SourceManager mgr;
@@ -491,4 +457,4 @@ TEST(ParserClause05, Cl5_7_1_SizedOneBitOverflow) {
   delete r.diag;
 }
 
-}  // namespace
+}

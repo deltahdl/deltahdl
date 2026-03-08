@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.1.2 source_text ::= [ timeunits_declaration ] { description }
-
 TEST(SourceText, DescriptionPackageItem) {
   auto r = Parse("function int add(int a, int b); return a + b; endfunction\n");
   ASSERT_NE(r.cu, nullptr);
@@ -175,9 +173,6 @@ TEST(ParserCh501, Sec5_1_EmptyCuCompletelyEmpty) {
   EXPECT_TRUE(r.cu->modules.empty());
 }
 
-// --- Additional §A.1.2 coverage ---
-
-// module_keyword ::= module | macromodule
 TEST(SourceText, MacromoduleKeyword) {
   auto r = Parse("macromodule m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -186,7 +181,6 @@ TEST(SourceText, MacromoduleKeyword) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-// module_declaration with (.*)
 TEST(SourceText, ModuleWildcardPorts) {
   auto r = Parse("module m(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -195,7 +189,6 @@ TEST(SourceText, ModuleWildcardPorts) {
   EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
 }
 
-// extern module_nonansi_header / extern module_ansi_header
 TEST(SourceText, ExternModuleDecl) {
   auto r = Parse("extern module m(input a, output b);\n");
   ASSERT_NE(r.cu, nullptr);
@@ -204,7 +197,6 @@ TEST(SourceText, ExternModuleDecl) {
   EXPECT_TRUE(r.cu->modules[0]->is_extern);
 }
 
-// interface_declaration with (.*)
 TEST(SourceText, InterfaceWildcardPorts) {
   auto r = Parse("interface ifc(.*); endinterface\n");
   ASSERT_NE(r.cu, nullptr);
@@ -213,7 +205,6 @@ TEST(SourceText, InterfaceWildcardPorts) {
   EXPECT_TRUE(r.cu->interfaces[0]->has_wildcard_ports);
 }
 
-// extern interface
 TEST(SourceText, ExternInterfaceDecl) {
   auto r = Parse("extern interface ifc(input logic clk);\n");
   ASSERT_NE(r.cu, nullptr);
@@ -222,7 +213,6 @@ TEST(SourceText, ExternInterfaceDecl) {
   EXPECT_TRUE(r.cu->interfaces[0]->is_extern);
 }
 
-// program_declaration with (.*)
 TEST(SourceText, ProgramWildcardPorts) {
   auto r = Parse("program prg(.*); endprogram\n");
   ASSERT_NE(r.cu, nullptr);
@@ -231,7 +221,6 @@ TEST(SourceText, ProgramWildcardPorts) {
   EXPECT_TRUE(r.cu->programs[0]->has_wildcard_ports);
 }
 
-// extern program
 TEST(SourceText, ExternProgramDecl) {
   auto r = Parse("extern program prg(input logic clk);\n");
   ASSERT_NE(r.cu, nullptr);
@@ -240,7 +229,6 @@ TEST(SourceText, ExternProgramDecl) {
   EXPECT_TRUE(r.cu->programs[0]->is_extern);
 }
 
-// checker_declaration
 TEST(SourceText, CheckerDecl) {
   auto r = Parse(
       "checker my_chk(input clk, input rst);\n"
@@ -264,7 +252,6 @@ TEST(SourceText, CheckerDeclEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// class_declaration — virtual, extends, implements
 TEST(SourceText, VirtualClass) {
   auto r = Parse("virtual class base; endclass\n");
   ASSERT_NE(r.cu, nullptr);
@@ -293,7 +280,6 @@ TEST(SourceText, ClassWithParameterPortList) {
   EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
 }
 
-// interface_class_declaration
 TEST(SourceText, InterfaceClassDecl) {
   auto r = Parse(
       "interface class iface_cls;\n"
@@ -305,7 +291,6 @@ TEST(SourceText, InterfaceClassDecl) {
   EXPECT_TRUE(r.cu->classes[0]->is_interface);
 }
 
-// package_declaration
 TEST(SourceText, PackageDecl) {
   auto r = Parse(
       "package my_pkg;\n"
@@ -323,7 +308,6 @@ TEST(SourceText, PackageDeclEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// timeunits_declaration
 TEST(SourceText, TimeunitsDeclaration) {
   auto r = Parse(
       "timeunit 1ns;\n"
@@ -342,7 +326,6 @@ TEST(SourceText, TimeunitWithPrecisionSlash) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// description ::= { attribute_instance } bind_directive
 TEST(SourceText, BindDirectiveWithAttributes) {
   auto r = Parse(
       "module m; endmodule\n"
@@ -353,7 +336,6 @@ TEST(SourceText, BindDirectiveWithAttributes) {
   EXPECT_EQ(r.cu->bind_directives.size(), 1u);
 }
 
-// module with lifetime
 TEST(SourceText, ModuleWithLifetime) {
   auto r = Parse("module automatic m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -361,4 +343,4 @@ TEST(SourceText, ModuleWithLifetime) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

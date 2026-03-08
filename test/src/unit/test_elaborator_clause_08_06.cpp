@@ -15,7 +15,6 @@ TEST(ElabA609, MethodCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §8.6: Class with methods elaborates successfully.
 TEST(ElabA86, ClassWithMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -29,7 +28,6 @@ TEST(ElabA86, ClassWithMethodElaborates) {
              "endmodule\n"));
 }
 
-// §8.6: Method call on class instance elaborates.
 TEST(ElabA86, MethodCallOnInstanceElaborates) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -46,4 +44,4 @@ TEST(ElabA86, MethodCallOnInstanceElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

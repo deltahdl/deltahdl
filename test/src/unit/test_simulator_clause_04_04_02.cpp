@@ -28,7 +28,7 @@ constexpr Region kPLIRegions[] = {
 
 constexpr size_t kPLIRegionCount = 8;
 
-}  // namespace
+}
 
 TEST(SimCh442, SimulationRegionCountIs9) {
   EXPECT_EQ(kSimulationRegionCount, 9u);

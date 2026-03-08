@@ -118,7 +118,7 @@ TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolutionExpr) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  // Verify $unit::b parsed as scope-qualified identifier.
+
   ASSERT_EQ(r.cu->modules.size(), 1u);
   auto* mod = r.cu->modules[0];
   ASSERT_FALSE(mod->items.empty());
@@ -154,4 +154,4 @@ TEST(ParserClause03, Cl3_12_1_MultipleCuScopeItems) {
   EXPECT_EQ(r.cu->cu_items[2]->kind, ModuleItemKind::kFunctionDecl);
 }
 
-}  // namespace
+}

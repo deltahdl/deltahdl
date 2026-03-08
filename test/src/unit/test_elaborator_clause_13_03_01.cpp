@@ -17,7 +17,6 @@ TEST(ParserA27, ElabTaskAutomaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §13.3.1: Static task elaborates.
 TEST(Elab13031, StaticTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +31,6 @@ TEST(Elab13031, StaticTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3.1: Static var in automatic task elaborates.
 TEST(Elab13031, StaticVarInAutoTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -47,7 +45,6 @@ TEST(Elab13031, StaticVarInAutoTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3.1: Automatic var in static task elaborates.
 TEST(Elab13031, AutoVarInStaticTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -62,4 +59,4 @@ TEST(Elab13031, AutoVarInStaticTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

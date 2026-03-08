@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.9.1 — attribute_instance: (* attr_spec { , attr_spec } *)
-
 TEST(ParserA91, SingleAttrNoValue) {
   auto r = Parse(
       "(* synthesis *)\n"
@@ -154,4 +152,4 @@ TEST(ParserA91, AttrValueStringLiteral) {
   EXPECT_TRUE(ParseOk("(* tool = \"synplify\" *) module m; endmodule\n"));
 }
 
-}  // namespace
+}

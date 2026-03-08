@@ -4,7 +4,6 @@
 using namespace delta;
 namespace {
 
-// §6.15: A class variable holds a handle to a class object.
 TEST(ParserSection6, ClassVariableDecl) {
   auto r = Parse(
       "class Packet;\n"
@@ -28,7 +27,6 @@ TEST(ParserSection6, ClassVariableDecl) {
   EXPECT_EQ(var_item->data_type.type_name, "Packet");
 }
 
-// §6.15: Class variable initialized to null by default.
 TEST(ParserSection6, ClassVariableNullCheck) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
@@ -41,7 +39,6 @@ TEST(ParserSection6, ClassVariableNullCheck) {
               "endmodule\n"));
 }
 
-// §6.15: Class variable can be assigned via new.
 TEST(ParserSection6, ClassVariableNew) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
@@ -53,7 +50,6 @@ TEST(ParserSection6, ClassVariableNew) {
               "endmodule\n"));
 }
 
-// §6.15: Class handle assignment between variables.
 TEST(ParserSection6, ClassHandleAssignment) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
@@ -68,7 +64,6 @@ TEST(ParserSection6, ClassHandleAssignment) {
               "endmodule\n"));
 }
 
-// §6.15: Class variable elaborates ok.
 TEST(Elaboration, ClassVariableElaboratesOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -83,4 +78,4 @@ TEST(Elaboration, ClassVariableElaboratesOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

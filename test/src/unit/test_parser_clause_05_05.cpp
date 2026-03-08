@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.5: double-character operators in expressions ---
-
 TEST(ParserClause05, Cl5_5_TwoCharOperators) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -41,8 +39,6 @@ TEST(ParserClause05, Cl5_5_TwoCharOperatorTokenKinds) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEq);
 }
 
-// --- §5.5: triple-character operators in expressions ---
-
 TEST(ParserClause05, Cl5_5_ThreeCharOperators) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -56,8 +52,6 @@ TEST(ParserClause05, Cl5_5_ThreeCharOperators) {
               "  end\n"
               "endmodule\n"));
 }
-
-// --- §5.5: unary operators appear to the left of their operand ---
 
 TEST(ParserClause05, Cl5_5_UnaryOperatorsLeftOfOperand) {
   auto r = Parse(
@@ -92,8 +86,6 @@ TEST(ParserClause05, Cl5_5_UnaryPrefixIncDec) {
               "  end\n"
               "endmodule\n"));
 }
-
-// --- §5.5: binary operators appear between their operands ---
 
 TEST(ParserClause05, Cl5_5_BinaryOperatorBetweenOperands) {
   auto r = Parse(
@@ -152,9 +144,6 @@ TEST(ParserClause05, Cl5_5_ShiftOperators) {
               "endmodule\n"));
 }
 
-// --- §5.5: conditional operator has two characters separating three operands
-// ---
-
 TEST(ParserClause05, Cl5_5_ConditionalOperatorThreeOperands) {
   auto r = Parse(
       "module m;\n"
@@ -181,8 +170,6 @@ TEST(ParserClause05, Cl5_5_NestedConditionalOperator) {
               "endmodule\n"));
 }
 
-// --- §5.5: compound assignment operators ---
-
 TEST(ParserClause05, Cl5_5_CompoundAssignmentOperators) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -203,8 +190,6 @@ TEST(ParserClause05, Cl5_5_CompoundAssignmentOperators) {
               "endmodule\n"));
 }
 
-// --- §5.5: single-character operators in expressions ---
-
 TEST(ParserClause05, Cl5_5_SingleCharOperatorsInExpressions) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -223,4 +208,4 @@ TEST(ParserClause05, Cl5_5_SingleCharOperatorsInExpressions) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

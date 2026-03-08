@@ -65,4 +65,4 @@ TEST(AssignmentPattern, SizedLiterals) {
   EXPECT_EQ(result.ToUint64(), expected);
 }
 
-}  // namespace
+}

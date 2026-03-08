@@ -19,7 +19,6 @@ TEST(Elaboration, SpecparamInParam_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.20.5: Specparam declared in module body is ok.
 TEST(Elaboration, SpecparamInModuleBody_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -31,4 +30,4 @@ TEST(Elaboration, SpecparamInModuleBody_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

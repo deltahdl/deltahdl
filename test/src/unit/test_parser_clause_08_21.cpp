@@ -4,14 +4,12 @@
 using namespace delta;
 namespace {
 
-// §8.21: Parse virtual class declaration.
 TEST(Parser, VirtualClass) {
   auto r = Parse("virtual class base; endclass");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(r.cu->classes[0]->is_virtual);
 }
 
-// §8.21: Parse pure virtual function — is_pure_virtual flag.
 TEST(ParserSection8, PureVirtualFunction) {
   auto r = Parse(
       "virtual class Base;\n"
@@ -26,7 +24,6 @@ TEST(ParserSection8, PureVirtualFunction) {
   EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
 }
 
-// §8.21: Parse pure virtual function with arguments.
 TEST(ParserA26, FuncPrototypePureVirtual) {
   auto r = Parse(
       "class C;\n"
@@ -38,7 +35,6 @@ TEST(ParserA26, FuncPrototypePureVirtual) {
   EXPECT_TRUE(m->is_pure_virtual);
 }
 
-// §8.21: Parse pure virtual task.
 TEST(ParserA27, TaskPrototypePureVirtual) {
   auto r = Parse(
       "class C;\n"
@@ -50,7 +46,6 @@ TEST(ParserA27, TaskPrototypePureVirtual) {
   EXPECT_TRUE(m->is_pure_virtual);
 }
 
-// §8.21: Non-pure virtual method should not have is_pure_virtual set.
 TEST(ParserSection8_21, NonPureVirtualNotFlagged) {
   auto r = Parse(
       "class Base;\n"
@@ -62,7 +57,6 @@ TEST(ParserSection8_21, NonPureVirtualNotFlagged) {
   EXPECT_FALSE(m->is_pure_virtual);
 }
 
-// §8.21: Abstract class extending another abstract class with pure virtual.
 TEST(ParserSection8_21, AbstractExtendsAbstract) {
   auto r = Parse(
       "virtual class Shape;\n"
@@ -78,7 +72,6 @@ TEST(ParserSection8_21, AbstractExtendsAbstract) {
   EXPECT_TRUE(r.cu->classes[1]->members[0]->is_pure_virtual);
 }
 
-// §8.21: Concrete class overriding pure virtual with body.
 TEST(ParserSection8_21, ConcreteOverridesPureVirtual) {
   auto r = Parse(
       "virtual class Base;\n"
@@ -116,4 +109,4 @@ TEST(SourceText, ClassPureVirtualAndExtern) {
   EXPECT_TRUE(members[3]->is_static);
 }
 
-}  // namespace
+}

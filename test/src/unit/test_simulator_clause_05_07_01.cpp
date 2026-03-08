@@ -616,4 +616,4 @@ TEST(SimCh50701, SignedBasedLiteral) {
   EXPECT_EQ(result & mask, mask);
 }
 
-}  // namespace
+}

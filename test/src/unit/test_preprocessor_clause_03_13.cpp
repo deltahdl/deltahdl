@@ -127,4 +127,4 @@ TEST(ParserClause03, Cl3_13_AllEightNameSpaces) {
   EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "keep"));
 }
 
-}  // namespace
+}

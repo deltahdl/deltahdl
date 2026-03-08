@@ -217,4 +217,4 @@ TEST(TimingControl, NoEdgeDetectedXToZ) {
   EXPECT_FALSE(IsEdge(Logic4::kX, Logic4::kZ));
 }
 
-}  // namespace
+}

@@ -36,4 +36,4 @@ TEST(ParserSection28, ElaboratePulldownGate) {
   EXPECT_EQ(mod->assigns[0].rhs->int_val, 0);
 }
 
-}  // namespace
+}

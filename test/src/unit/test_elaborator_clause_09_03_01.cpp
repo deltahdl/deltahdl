@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §9.3.1: Sequential block elaborates within an initial process.
 TEST(ElabClause09_03_01, SeqBlockInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -28,7 +27,6 @@ TEST(ElabClause09_03_01, SeqBlockInInitialElaborates) {
   EXPECT_TRUE(found);
 }
 
-// §9.3.1: Nested sequential blocks elaborate without errors.
 TEST(ElabClause09_03_01, NestedSeqBlocksElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -47,7 +45,6 @@ TEST(ElabClause09_03_01, NestedSeqBlocksElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.1: Sequential block with variable declarations elaborates.
 TEST(ElabClause09_03_01, SeqBlockWithVarDeclElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -64,7 +61,6 @@ TEST(ElabClause09_03_01, SeqBlockWithVarDeclElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.1: Sequential block in always_comb elaborates correctly.
 TEST(ElabClause09_03_01, SeqBlockInAlwaysComb) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -80,7 +76,6 @@ TEST(ElabClause09_03_01, SeqBlockInAlwaysComb) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.1: Simulator verifies sequential execution order.
 TEST(SimCh10, BlockingAssignBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -106,4 +101,4 @@ TEST(SimCh10, BlockingAssignBeginEnd) {
   EXPECT_EQ(c->value.ToUint64(), 30u);
 }
 
-}  // namespace
+}

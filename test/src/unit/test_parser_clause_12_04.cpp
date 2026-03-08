@@ -409,7 +409,6 @@ TEST(ParserSection9, Sec9_3_1_BlockWithIfElse) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-// §12.4 Syntax 12-2: cond_predicate with &&& operator.
 TEST(ParserA606, CondPredicateTripleAnd) {
   auto r = Parse(
       "module m;\n"
@@ -427,7 +426,6 @@ TEST(ParserA606, CondPredicateTripleAnd) {
   EXPECT_EQ(stmt->condition->op, TokenKind::kAmpAmpAmp);
 }
 
-// §12.4 Syntax 12-2: chained &&& in cond_predicate.
 TEST(ParserA606, CondPredicateChainedTripleAnd) {
   auto r = Parse(
       "module m;\n"
@@ -465,4 +463,4 @@ TEST(ParserSection10, Sec10_4_1_InIfElseBranches) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

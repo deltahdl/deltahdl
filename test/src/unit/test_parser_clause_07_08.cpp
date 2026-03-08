@@ -17,4 +17,4 @@ TEST(ParserSection7, AssocArrayIntIndex_DimExpr) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "int");
 }
 
-}  // namespace
+}

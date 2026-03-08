@@ -5,23 +5,21 @@ using namespace delta;
 
 namespace {
 
-// §11.6: ContextWidth returns max of self-determined and context.
 TEST(Elaboration, ContextWidthMaxOfSelfAndContext) {
   TypedefMap typedefs;
   Expr a;
   a.kind = ExprKind::kIntegerLiteral;
   a.int_val = 0;
-  // Self-determined width of integer literal is 32.
+
   EXPECT_EQ(InferExprWidth(&a, typedefs), 32u);
-  // Context width < self: returns self.
+
   EXPECT_EQ(ContextWidth(&a, 16, typedefs), 32u);
-  // Context width > self: returns context.
+
   EXPECT_EQ(ContextWidth(&a, 64, typedefs), 64u);
-  // Context width == self: returns either.
+
   EXPECT_EQ(ContextWidth(&a, 32, typedefs), 32u);
 }
 
-// §11.6: Binary addition self-determined width is max of operand widths.
 TEST(Elaboration, ExprBitLengthBinaryAddition) {
   TypedefMap typedefs;
   Expr lhs;
@@ -35,11 +33,10 @@ TEST(Elaboration, ExprBitLengthBinaryAddition) {
   add.op = TokenKind::kPlus;
   add.lhs = &lhs;
   add.rhs = &rhs;
-  // Both operands are 32-bit integer literals → max = 32.
+
   EXPECT_EQ(InferExprWidth(&add, typedefs), 32u);
 }
 
-// §11.6: Elaboration succeeds for assignment with wider LHS.
 TEST(Elaboration, AssignmentWiderLhsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -53,7 +50,6 @@ TEST(Elaboration, AssignmentWiderLhsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.6: Elaboration succeeds for narrower LHS (truncation).
 TEST(Elaboration, AssignmentNarrowerLhsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -67,7 +63,6 @@ TEST(Elaboration, AssignmentNarrowerLhsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.6: Ternary expression width is max of true/false branch widths.
 TEST(Elaboration, TernaryExprBitLength) {
   TypedefMap typedefs;
   Expr cond;
@@ -84,8 +79,8 @@ TEST(Elaboration, TernaryExprBitLength) {
   tern.condition = &cond;
   tern.true_expr = &true_e;
   tern.false_expr = &false_e;
-  // Both branches are 32-bit integer literals → max = 32.
+
   EXPECT_EQ(InferExprWidth(&tern, typedefs), 32u);
 }
 
-}  // namespace
+}

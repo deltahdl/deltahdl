@@ -32,7 +32,6 @@ TEST(ElabA84, PrimaryFunctionCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.5: Output arg must be a valid LHS expression.
 TEST(Elab1350, OutputArgLiteralError) {
   ElabFixture f;
   ElaborateSrc(
@@ -46,7 +45,6 @@ TEST(Elab1350, OutputArgLiteralError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.5: Inout arg must be a valid LHS expression.
 TEST(Elab1350, InoutArgLiteralError) {
   ElabFixture f;
   ElaborateSrc(
@@ -60,7 +58,6 @@ TEST(Elab1350, InoutArgLiteralError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.5: Output arg with a variable identifier is valid.
 TEST(Elab1350, OutputArgVariableOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -76,7 +73,6 @@ TEST(Elab1350, OutputArgVariableOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.5: Too many positional arguments is an error.
 TEST(Elab1350, TooManyArgsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -89,4 +85,4 @@ TEST(Elab1350, TooManyArgsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

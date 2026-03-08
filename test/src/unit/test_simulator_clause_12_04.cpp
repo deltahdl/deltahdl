@@ -231,7 +231,6 @@ TEST(SimA606, SequentialIfStatements) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §12.4: if condition with z value is treated as false.
 TEST(SimA606, IfConditionZIsFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -251,10 +250,9 @@ TEST(SimA606, IfConditionZIsFalse) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);  // z is false, x unchanged
+  EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.4: if condition with x value is treated as false.
 TEST(SimA606, IfConditionXIsFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -274,10 +272,9 @@ TEST(SimA606, IfConditionXIsFalse) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);  // x is false, x unchanged
+  EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.4: if condition with z takes else branch.
 TEST(SimA606, IfConditionZTakesElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -297,10 +294,9 @@ TEST(SimA606, IfConditionZTakesElse) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 99u);  // z is false, takes else
+  EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §12.4: multi-bit value with some known-1 bits is still true.
 TEST(SimA606, IfConditionPartiallyKnownNonzeroIsTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -320,7 +316,7 @@ TEST(SimA606, IfConditionPartiallyKnownNonzeroIsTrue) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // Bit 1 is known 1, so value is definitely nonzero → true
+
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
@@ -330,4 +326,4 @@ TEST(TimingControl, WaitConditionNonzeroIsTrue) {
   EXPECT_TRUE(EvaluateWaitCondition(42));
 }
 
-}  // namespace
+}

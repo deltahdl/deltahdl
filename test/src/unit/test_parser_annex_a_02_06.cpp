@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.2.6 function_declaration
-
 TEST(ParserA26, FunctionDeclBasic) {
   auto r = Parse(
       "module m;\n"
@@ -61,8 +59,6 @@ TEST(ParserA26, FunctionDeclVoidReturn) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-// §A.2.6 function_body_declaration old-style ports
-
 TEST(ParserA26, FunctionOldStylePorts) {
   auto r = Parse(
       "module m;\n"
@@ -80,16 +76,12 @@ TEST(ParserA26, FunctionOldStylePorts) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
 }
 
-// §A.2.6 function_body_declaration with end label
-
 TEST(ParserA26, FunctionEndLabel) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function int f(); return 0; endfunction : f\n"
               "endmodule\n"));
 }
-
-// §A.2.6 function_data_type_or_implicit
 
 TEST(ParserA26, FunctionImplicitReturnType) {
   auto r = Parse(
@@ -103,8 +95,6 @@ TEST(ParserA26, FunctionImplicitReturnType) {
   EXPECT_NE(item->return_type.packed_dim_left, nullptr);
   EXPECT_NE(item->return_type.packed_dim_right, nullptr);
 }
-
-// §A.2.6 dynamic_override_specifiers
 
 TEST(ParserA26, FunctionDynOverrideInitial) {
   EXPECT_TRUE(
@@ -126,8 +116,6 @@ TEST(ParserA26, FunctionDynOverrideExtends) {
               "  virtual function :extends void f(); endfunction\n"
               "endclass\n"));
 }
-
-// §A.2.6 dpi_import_export
 
 TEST(ParserA26, DpiImportFunction) {
   auto r = Parse(
@@ -237,16 +225,12 @@ TEST(ParserA26, DpiExportWithCIdentifier) {
   EXPECT_EQ(item->dpi_c_name, "c_alias");
 }
 
-// §A.2.6 dpi_spec_string
-
 TEST(ParserA26, DpiSpecStringDPI) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  import \"DPI\" function void f();\n"
               "endmodule\n"));
 }
-
-// §A.2.6 function_prototype (used in extern declarations)
 
 TEST(ParserA26, FunctionPrototypeNoArgs) {
   EXPECT_TRUE(
@@ -261,8 +245,6 @@ TEST(ParserA26, FunctionPrototypeEmptyParens) {
               "  import \"DPI-C\" function void empty_args();\n"
               "endmodule\n"));
 }
-
-// §A.2.6 function with body containing block_item_declaration
 
 TEST(ParserA26, FunctionBodyWithBlockItem) {
   auto r = Parse(
@@ -280,4 +262,4 @@ TEST(ParserA26, FunctionBodyWithBlockItem) {
   EXPECT_GE(item->func_body_stmts.size(), 2u);
 }
 
-}  // namespace
+}

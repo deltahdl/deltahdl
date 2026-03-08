@@ -8,13 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §4.1: Event-based simulation scheduling semantics —
-// Verify that the scheduler provides discrete event execution with
-// time-ordered, region-stratified processing across all five areas
-// described in the clause 4 overview.
-
-// --- Area 1: Event-based simulation scheduling semantics ---
-
 TEST(SimCh41, EventBasedSchedulingEndToEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -62,8 +55,6 @@ TEST(SimCh41, EmptySchedulerTerminatesImmediately) {
   EXPECT_EQ(sched.CurrentTime().ticks, 0u);
 }
 
-// --- Area 2: Stratified event scheduling algorithm ---
-
 TEST(SimCh41, AllSeventeenRegionsPresent) { EXPECT_EQ(kRegionCount, 17u); }
 
 TEST(SimCh41, StratifiedRegionsExecuteInOrder) {
@@ -108,8 +99,6 @@ TEST(SimCh41, PostponedIsLastRegionInTimeSlot) {
   ASSERT_EQ(order.size(), 3u);
   EXPECT_EQ(order[2], "postponed");
 }
-
-// --- Area 3: Determinism of event ordering ---
 
 TEST(SimCh41, BeginEndBlockSequentialExecution) {
   auto result = RunAndGet(
@@ -159,8 +148,6 @@ TEST(SimCh41, DeterministicSequentialWithinProcess) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 30u);
 }
 
-// --- Area 4: Race conditions ---
-
 TEST(SimCh41, ConcurrentWriteSameTimeSlotLastWriteWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -199,11 +186,8 @@ TEST(SimCh41, ActiveRegionInterleavingIsPossible) {
               (order[0] == 2 && order[1] == 1));
 }
 
-// --- Area 5: PLI callback control points ---
-
 TEST(SimCh41, PLIRegionsExistInEnum) {
-  // PLI regions: PreActive, PreNBA, PostNBA, PreObserved,
-  // PostObserved, PreReNBA, PostReNBA, PrePostponed
+
   EXPECT_LT(static_cast<int>(Region::kPreActive),
             static_cast<int>(Region::kActive));
   EXPECT_LT(static_cast<int>(Region::kPreNBA), static_cast<int>(Region::kNBA));
@@ -234,8 +218,6 @@ TEST(SimCh41, PLIPostNBAAfterNBABeforePreObserved) {
   VerifyThreeRegionOrder({Region::kNBA, "nba"}, {Region::kPostNBA, "post_nba"},
                          {Region::kPreObserved, "pre_observed"});
 }
-
-// --- Integration: all five areas combined ---
 
 TEST(SimCh41, FullPipelineIntegration) {
   SimFixture f;
@@ -282,4 +264,4 @@ TEST(SimCh41, MultiTimeSlotWithRegionOrdering) {
   EXPECT_EQ(order[3], "t5_nba");
 }
 
-}  // namespace
+}

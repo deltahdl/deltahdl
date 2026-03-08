@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.12: attribute token recognition ---
-
 TEST(LexerClause05, Cl5_12_AttrStartEndTokens) {
   auto tokens = Lex("(* foo *)");
   ASSERT_GE(tokens.size(), 3u);
@@ -42,7 +40,7 @@ TEST(LexerClause05, Cl5_12_DisambiguatesFromMultiply) {
 }
 
 TEST(LexerClause05, Cl5_12_DisambiguatesCloseFromMultiplyParen) {
-  // *) outside attribute context is kStar + kRParen
+
   auto tokens = Lex("a * b)");
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kStar);
@@ -58,4 +56,4 @@ TEST(LexerClause05, Cl5_12_AttrWithStringValue) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kAttrEnd);
 }
 
-}  // namespace
+}

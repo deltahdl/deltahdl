@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §6.6.1: wire net elaborates to NetType::kWire.
 TEST(Elaboration, WireNetType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -23,7 +22,6 @@ TEST(Elaboration, WireNetType) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kWire);
 }
 
-// §6.6.1: tri net elaborates to NetType::kTri.
 TEST(Elaboration, TriNetType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -41,7 +39,6 @@ TEST(Elaboration, TriNetType) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kTri);
 }
 
-// §6.6.1: wire and tri both produce nets (not variables) in RTLIR.
 TEST(Elaboration, WireAndTriAreNets) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -60,7 +57,6 @@ TEST(Elaboration, WireAndTriAreNets) {
   EXPECT_TRUE(mod->variables.empty());
 }
 
-// §6.6.1: wire vector width is elaborated correctly.
 TEST(Elaboration, WireVectorWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -77,7 +73,6 @@ TEST(Elaboration, WireVectorWidth) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kWire);
 }
 
-// §6.6.1: tri vector width is elaborated correctly.
 TEST(Elaboration, TriVectorWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -94,7 +89,6 @@ TEST(Elaboration, TriVectorWidth) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kTri);
 }
 
-// §6.6.1: redeclaring a wire with the same name is an error.
 TEST(Elaboration, WireRedeclarationError) {
   ElabFixture f;
   ElaborateSrc(
@@ -106,4 +100,4 @@ TEST(Elaboration, WireRedeclarationError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

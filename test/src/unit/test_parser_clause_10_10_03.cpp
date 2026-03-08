@@ -1,4 +1,4 @@
-// §10.10.3
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -6,7 +6,6 @@
 using namespace delta;
 namespace {
 
-// §10.10.3: Nested braces inside concatenation parse as inner concatenation.
 TEST(ParserSection1010_3, NestedConcatInsideConcat) {
   auto r = Parse(
       "module m;\n"
@@ -23,7 +22,6 @@ TEST(ParserSection1010_3, NestedConcatInsideConcat) {
   EXPECT_EQ(rhs->elements[1]->kind, ExprKind::kConcatenation);
 }
 
-// §10.10.3: String concatenation inside outer concatenation parses.
 TEST(ParserSection1010_3, StringConcatInsideConcat) {
   auto r = Parse(
       "module m;\n"
@@ -40,7 +38,6 @@ TEST(ParserSection1010_3, StringConcatInsideConcat) {
   EXPECT_EQ(rhs->elements[1]->kind, ExprKind::kConcatenation);
 }
 
-// §10.10.3: Typed assignment pattern as element of concatenation parses.
 TEST(ParserSection1010_3, TypedAssignPatternInConcat) {
   auto r = Parse(
       "module m;\n"
@@ -53,7 +50,6 @@ TEST(ParserSection1010_3, TypedAssignPatternInConcat) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §10.10.3: Unpacked array concatenation as item in assignment pattern parses.
 TEST(ParserSection1010_3, UnpackedArrayConcatInAssignPattern) {
   auto r = Parse(
       "module m;\n"
@@ -65,4 +61,4 @@ TEST(ParserSection1010_3, UnpackedArrayConcatInAssignPattern) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -26,4 +26,4 @@ TEST(ElabA82, SystemTaskDisplayElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

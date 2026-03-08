@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §11.4.14.3: Streaming concat as LHS elaborates without error.
 TEST(ElabA81, StreamingConcatAsLhsRightShiftElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(ElabA81, StreamingConcatAsLhsRightShiftElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.14.3: Left-shift streaming concat as LHS elaborates without error.
 TEST(ElabA81, StreamingConcatAsLhsLeftShiftElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +30,6 @@ TEST(ElabA81, StreamingConcatAsLhsLeftShiftElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.14.3: Streaming concat as LHS with numeric slice size.
 TEST(ElabA81, StreamingConcatAsLhsWithSliceSizeElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -45,7 +42,6 @@ TEST(ElabA81, StreamingConcatAsLhsWithSliceSizeElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.14.3: Source is another streaming_concatenation.
 TEST(ElabA81, StreamingConcatAsLhsFromStreamingRhsElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -58,7 +54,6 @@ TEST(ElabA81, StreamingConcatAsLhsFromStreamingRhsElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.14.3: Right-shift unpack distributes MSB-first (end-to-end sim).
 TEST(SimA81, StreamingUnpackRightShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -79,7 +74,6 @@ TEST(SimA81, StreamingUnpackRightShift) {
   EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
 }
 
-// §11.4.14.3: Left-shift unpack reverses byte slices (end-to-end sim).
 TEST(SimA81, StreamingUnpackLeftShiftByte) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -100,7 +94,6 @@ TEST(SimA81, StreamingUnpackLeftShiftByte) {
   EXPECT_EQ(vb->value.ToUint64(), 0xABu);
 }
 
-// §11.4.14.3: Single-element unpack is identity for right-shift.
 TEST(SimA81, StreamingUnpackSingleElement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -118,4 +111,4 @@ TEST(SimA81, StreamingUnpackSingleElement) {
   EXPECT_EQ(var->value.ToUint64(), 0xBEEFu);
 }
 
-}  // namespace
+}

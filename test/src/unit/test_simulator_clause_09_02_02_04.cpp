@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §9.2.2.4: always_ff triggers on posedge clock.
 TEST(SimClause09_02_02_04, TriggersOnPosedgeClock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,7 +31,6 @@ TEST(SimClause09_02_02_04, TriggersOnPosedgeClock) {
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
-// §9.2.2.4: always_ff with async reset pattern.
 TEST(SimClause09_02_02_04, AsyncResetPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -63,7 +61,6 @@ TEST(SimClause09_02_02_04, AsyncResetPattern) {
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
-// §9.2.2.4: always_ff uses nonblocking assignment semantics.
 TEST(SimClause09_02_02_04, NonblockingAssignSemantics) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -97,4 +94,4 @@ TEST(SimClause09_02_02_04, NonblockingAssignSemantics) {
   EXPECT_EQ(b->value.ToUint64(), 0x11u);
 }
 
-}  // namespace
+}

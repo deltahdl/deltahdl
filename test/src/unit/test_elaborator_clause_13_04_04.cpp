@@ -33,7 +33,6 @@ TEST(ElabA603, ForkJoinAnyIllegalInFunction) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4.4: fork/join is not allowed inside a function.
 TEST(Elab1344, ForkJoinNotAllowedInFunction) {
   ElabFixture f;
   ElaborateSrc(
@@ -48,7 +47,6 @@ TEST(Elab1344, ForkJoinNotAllowedInFunction) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4.4: Nonblocking assignment is allowed inside a function.
 TEST(Elab1344, NonblockingAssignAllowedInFunction) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -63,7 +61,6 @@ TEST(Elab1344, NonblockingAssignAllowedInFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.4: Event trigger is allowed inside a function.
 TEST(Elab1344, EventTriggerAllowedInFunction) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -78,7 +75,6 @@ TEST(Elab1344, EventTriggerAllowedInFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.4: fork/join_none with task-legal statements inside a function is OK.
 TEST(Elab1344, ForkJoinNoneWithDelayInFunction) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -94,4 +90,4 @@ TEST(Elab1344, ForkJoinNoneWithDelayInFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

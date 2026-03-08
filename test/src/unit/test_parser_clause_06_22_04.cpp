@@ -30,7 +30,6 @@ TEST(ParserSection6, CastCompatibleIntToEnum) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-// §6.22.4: Cast compatible — real to real through assignment compatibility.
 TEST(ParserSection6, CastCompatibleRealToShortreal) {
   DataType a;
   a.kind = DataTypeKind::kReal;
@@ -39,7 +38,6 @@ TEST(ParserSection6, CastCompatibleRealToShortreal) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-// §6.22.4: String is not cast compatible with integral types.
 TEST(ParserSection6, NotCastCompatibleStringToInt) {
   DataType a;
   a.kind = DataTypeKind::kString;
@@ -48,4 +46,4 @@ TEST(ParserSection6, NotCastCompatibleStringToInt) {
   EXPECT_FALSE(IsCastCompatible(a, b));
 }
 
-}  // namespace
+}

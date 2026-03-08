@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.7: process variable declaration elaborates.
 TEST(ElabClause09_07, ProcessVarDeclElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -19,7 +18,6 @@ TEST(ElabClause09_07, ProcessVarDeclElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.7: process::self() call elaborates.
 TEST(ElabClause09_07, ProcessSelfElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -33,7 +31,6 @@ TEST(ElabClause09_07, ProcessSelfElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.7: process method calls (status, kill, await, suspend, resume) elaborate.
 TEST(ElabClause09_07, ProcessMethodCallsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -52,7 +49,6 @@ TEST(ElabClause09_07, ProcessMethodCallsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.7: process::state_e scope resolution elaborates.
 TEST(ElabClause09_07, ProcessStateEnumElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -69,7 +65,6 @@ TEST(ElabClause09_07, ProcessStateEnumElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.7: process variable in fork/join_none elaborates.
 TEST(ElabClause09_07, ProcessInForkElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -88,4 +83,4 @@ TEST(ElabClause09_07, ProcessInForkElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

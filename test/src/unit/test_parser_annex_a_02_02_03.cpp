@@ -147,4 +147,4 @@ TEST(ParserA223, DelayValueTimeLiteral) {
   EXPECT_EQ(item->net_delay->kind, ExprKind::kTimeLiteral);
 }
 
-}  // namespace
+}

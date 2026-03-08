@@ -63,4 +63,4 @@ TEST(Section20, Clog2NonPowerOf2) {
   EXPECT_EQ(result.ToUint64(), 9u);
 }
 
-}  // namespace
+}

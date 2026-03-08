@@ -101,4 +101,4 @@ TEST(ParserSection11, Sec11_1_ExprAsFunctionArgument) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

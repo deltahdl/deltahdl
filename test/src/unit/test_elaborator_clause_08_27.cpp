@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.27: Forward typedef class followed by class definition — OK.
 TEST(ElabA827, ForwardTypedefClassOk) {
   EXPECT_TRUE(
       ElabOk("typedef class C2;\n"
@@ -18,7 +17,6 @@ TEST(ElabA827, ForwardTypedefClassOk) {
              "endmodule\n"));
 }
 
-// §8.27: Single class with no forward typedef — OK.
 TEST(ElabA827, ClassWithoutForwardTypedefOk) {
   EXPECT_TRUE(
       ElabOk("class MyClass;\n"
@@ -28,7 +26,6 @@ TEST(ElabA827, ClassWithoutForwardTypedefOk) {
              "endmodule\n"));
 }
 
-// §8.27: Forward typedef interface class — OK.
 TEST(ElabA827, ForwardTypedefInterfaceClassOk) {
   EXPECT_TRUE(
       ElabOk("typedef interface class IC;\n"
@@ -39,4 +36,4 @@ TEST(ElabA827, ForwardTypedefInterfaceClassOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

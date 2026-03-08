@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include <gtest/gtest.h>
 
@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.3.2.2: Drive strength on net declaration without assignment is error.
 TEST(Elaborator, DriveStrengthOnNetDeclWithoutAssignIsError) {
   ElabFixture f;
   Elaborate(
@@ -19,4 +18,4 @@ TEST(Elaborator, DriveStrengthOnNetDeclWithoutAssignIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

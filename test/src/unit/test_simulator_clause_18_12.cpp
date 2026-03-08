@@ -33,4 +33,4 @@ TEST(Constraint, StdRandomizeStandalone) {
   EXPECT_LE(val, 200);
 }
 
-}  // namespace
+}

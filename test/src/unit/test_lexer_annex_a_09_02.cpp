@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §A.9.2 — one_line_comment: // comment_text \n
-
 TEST(LexerA92, OneLineCommentStripped) {
   auto tokens = Lex("a // comment\nb");
   ASSERT_EQ(tokens.size(), 3u);
@@ -49,8 +47,6 @@ TEST(LexerA92, OneLineCommentWithSpecialChars) {
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
-
-// §A.9.2 — block_comment: /* comment_text */
 
 TEST(LexerA92, BlockCommentStripped) {
   auto tokens = Lex("a /* comment */ b");
@@ -93,8 +89,6 @@ TEST(LexerA92, SlashesInsideBlockComment) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-// §A.9.2 — block comments do not nest
-
 TEST(LexerA92, BlockCommentsDoNotNest) {
   auto tokens = Lex("a /* outer /* inner */ b");
   ASSERT_EQ(tokens.size(), 3u);
@@ -102,15 +96,10 @@ TEST(LexerA92, BlockCommentsDoNotNest) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-// §A.9.2 — unterminated block comment is an error
-
 TEST(LexerA92, UnterminatedBlockCommentError) {
   auto [tokens, errors] = LexWithDiag("a /* unterminated");
   EXPECT_TRUE(errors);
 }
-
-// §A.9.2 — // has no special meaning in block comment, /* */ has none in line
-// comment
 
 TEST(LexerA92, LineCommentTokenInsideBlockComment) {
   auto tokens = Lex("a /* // still block */ b");
@@ -126,8 +115,6 @@ TEST(LexerA92, BlockCommentTokensInsideLineComment) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-// §A.9.2 — comment as token separator
-
 TEST(LexerA92, BlockCommentSeparatesKeywords) {
   auto tokens = Lex("module /* sep */ m;");
   ASSERT_GE(tokens.size(), 4u);
@@ -142,8 +129,6 @@ TEST(LexerA92, LineCommentSeparatesKeywords) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
 }
-
-// §A.9.2 — line tracking through comments
 
 TEST(LexerA92, LineCommentAdvancesLineNumber) {
   auto [tokens, errors] = LexWithDiag("a\n// comment\nb");
@@ -161,4 +146,4 @@ TEST(LexerA92, MultiLineBlockCommentAdvancesLineNumber) {
   EXPECT_EQ(tokens[1].loc.line, 5u);
 }
 
-}  // namespace
+}

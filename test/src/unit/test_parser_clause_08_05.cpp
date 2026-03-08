@@ -21,7 +21,6 @@ TEST(ParserSection8, ClassWithProperties) {
   }
 }
 
-// §8.5: Property access via dot notation.
 TEST(ParserA85, PropertyAccessDotNotation) {
   auto r = Parse(
       "class Packet;\n"
@@ -41,7 +40,7 @@ TEST(ParserA85, PropertyAccessDotNotation) {
   ASSERT_NE(r.cu, nullptr);
   auto* mod = r.cu->modules.back();
   ASSERT_NE(mod, nullptr);
-  // Verify the class has the expected properties.
+
   ASSERT_EQ(r.cu->classes.size(), 1u);
   auto* cls = r.cu->classes[0];
   EXPECT_EQ(cls->name, "Packet");
@@ -50,7 +49,6 @@ TEST(ParserA85, PropertyAccessDotNotation) {
   EXPECT_EQ(cls->members[1]->name, "address");
 }
 
-// §8.5: No restrictions on data type of class property.
 TEST(ParserA85, VariousPropertyDataTypes) {
   ParseOk(
       "class C;\n"
@@ -69,7 +67,6 @@ TEST(ParserA85, VariousPropertyDataTypes) {
       "endclass\n");
 }
 
-// §8.5: Parameterized class with value parameters.
 TEST(ParserA85, ParameterizedClassWithValueParam) {
   auto r = Parse(
       "class vector #(parameter width = 7);\n"
@@ -83,7 +80,6 @@ TEST(ParserA85, ParameterizedClassWithValueParam) {
   EXPECT_EQ(cls->params[0].first, "width");
 }
 
-// §8.5: Parameter access via scope resolution is legal.
 TEST(ParserA85, ParameterAccessViaScope) {
   ParseOk(
       "class vector #(parameter width = 7, type T = int);\n"
@@ -142,4 +138,4 @@ TEST(Parser, ClassWithProperty) {
   EXPECT_EQ(cls->members[0]->data_type.kind, DataTypeKind::kInt);
 }
 
-}  // namespace
+}

@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.8 — looping statements
-
 TEST(ParserA608, ForeverLoop) {
   auto r = Parse(
       "module m;\n"
@@ -187,4 +185,4 @@ TEST(ParserA608, RepeatWithBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

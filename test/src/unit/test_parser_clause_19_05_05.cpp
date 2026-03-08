@@ -15,4 +15,4 @@ TEST(ParserA211, BinsKeyword_IgnoreBins) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -26,7 +26,6 @@ TEST(Elaboration, ParameterizedType_Basic) {
   EXPECT_EQ(mod->variables[0].width, 1);
 }
 
-// §6.25: Parameterized class with value parameter affecting width.
 TEST(Elaboration, ParameterizedType_ValueParam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -45,7 +44,6 @@ TEST(Elaboration, ParameterizedType_ValueParam) {
   EXPECT_EQ(mod->variables[0].width, 16);
 }
 
-// §6.25: Parameterized class — default type parameter used.
 TEST(Elaboration, ParameterizedType_DefaultType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -64,7 +62,6 @@ TEST(Elaboration, ParameterizedType_DefaultType) {
   EXPECT_EQ(mod->variables[0].width, 32);
 }
 
-// §6.25: Multiple specializations of same class yield different widths.
 TEST(Elaboration, ParameterizedType_MultipleWidths) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -84,4 +81,4 @@ TEST(Elaboration, ParameterizedType_MultipleWidths) {
   EXPECT_EQ(mod->variables[1].width, 32);
 }
 
-}  // namespace
+}

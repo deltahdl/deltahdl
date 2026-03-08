@@ -285,7 +285,6 @@ TEST(StmtExec, ForceReleaseThenAssign) {
   EXPECT_EQ(var->value.ToUint64(), 75u);
 }
 
-// §10.6.2: End-to-end force overrides procedural assignment.
 TEST(SimCh10d, ForceOverridesBlockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -307,7 +306,6 @@ TEST(SimCh10d, ForceOverridesBlockingAssign) {
   EXPECT_TRUE(x->is_forced);
 }
 
-// §10.6.2: Release variable, value holds until next procedural assign.
 TEST(SimCh10d, ReleaseVariableHoldsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -326,11 +324,10 @@ TEST(SimCh10d, ReleaseVariableHoldsValue) {
   auto* x = f.ctx.FindVariable("x");
   ASSERT_NE(x, nullptr);
   EXPECT_FALSE(x->is_forced);
-  // After release with no continuous driver, value holds.
+
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-// §10.6.2: Force then release then procedural assign works.
 TEST(SimCh10d, ForceReleaseThenAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -353,7 +350,6 @@ TEST(SimCh10d, ForceReleaseThenAssign) {
   EXPECT_EQ(x->value.ToUint64(), 75u);
 }
 
-// §10.6.2: Force overrides assign (procedural continuous).
 TEST(SimCh10d, ForceOverridesAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -374,7 +370,6 @@ TEST(SimCh10d, ForceOverridesAssign) {
   EXPECT_EQ(x->value.ToUint64(), 99u);
 }
 
-// §10.6.2: Force prevents blocking assign from changing value.
 TEST(SimCh10d, ForcePreventsBlockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -393,11 +388,10 @@ TEST(SimCh10d, ForcePreventsBlockingAssign) {
   auto* x = f.ctx.FindVariable("x");
   ASSERT_NE(x, nullptr);
   EXPECT_TRUE(x->is_forced);
-  // Value should remain at forced value 50, not change to 100.
+
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-// §10.6.2: Force with expression RHS.
 TEST(SimCh10d, ForceExpressionRhs) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -418,4 +412,4 @@ TEST(SimCh10d, ForceExpressionRhs) {
   EXPECT_EQ(b->value.ToUint64(), 0xFFu);
 }
 
-}  // namespace
+}

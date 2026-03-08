@@ -19,4 +19,4 @@ TEST(ParserSection7, QueueInsertMethod) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-}  // namespace
+}

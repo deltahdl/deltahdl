@@ -1,4 +1,4 @@
-// §6.9
+
 
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.9.1: Scalar (no range) has width 1.
 TEST(ElabSection6, Sec6_9_1_ScalarWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic a; endmodule\n", f);
@@ -19,4 +18,4 @@ TEST(ElabSection6, Sec6_9_1_ScalarWidth) {
   EXPECT_EQ(mod->variables[0].width, 1u);
 }
 
-}  // namespace
+}

@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.25: Parameterized class with value parameter — elaborates OK.
 TEST(ElabA825, ValueParamClassOk) {
   EXPECT_TRUE(
       ElabOk("class stack #(parameter int DEPTH = 8);\n"
@@ -15,7 +14,6 @@ TEST(ElabA825, ValueParamClassOk) {
              "endmodule\n"));
 }
 
-// §8.25: Parameterized class with type parameter — elaborates OK.
 TEST(ElabA825, TypeParamClassOk) {
   EXPECT_TRUE(
       ElabOk("class container #(type T = int);\n"
@@ -26,7 +24,6 @@ TEST(ElabA825, TypeParamClassOk) {
              "endmodule\n"));
 }
 
-// §8.25: Parameterized class with multiple parameters — elaborates OK.
 TEST(ElabA825, MultipleParamsOk) {
   EXPECT_TRUE(ElabOk(
       "class fifo #(parameter int WIDTH = 8, parameter int DEPTH = 16);\n"
@@ -37,7 +34,6 @@ TEST(ElabA825, MultipleParamsOk) {
       "endmodule\n"));
 }
 
-// §8.25: Parameterized class with explicit specialization — elaborates OK.
 TEST(ElabA825, ExplicitSpecializationOk) {
   EXPECT_TRUE(
       ElabOk("class vector #(int size = 1);\n"
@@ -48,7 +44,6 @@ TEST(ElabA825, ExplicitSpecializationOk) {
              "endmodule\n"));
 }
 
-// §8.25: Parameterized class extending non-parameterized base — OK.
 TEST(ElabA825, ParamClassExtendsBaseOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -62,7 +57,6 @@ TEST(ElabA825, ParamClassExtendsBaseOk) {
              "endmodule\n"));
 }
 
-// §8.25: Parameterized class extending parameterized base — OK.
 TEST(ElabA825, ParamClassExtendsParamBaseOk) {
   EXPECT_TRUE(
       ElabOk("class C #(type T = int);\n"
@@ -76,7 +70,6 @@ TEST(ElabA825, ParamClassExtendsParamBaseOk) {
              "endmodule\n"));
 }
 
-// §8.25: Default specialization uses default parameters.
 TEST(ElabA825, DefaultSpecializationOk) {
   EXPECT_TRUE(
       ElabOk("class stack #(type T = int);\n"
@@ -87,4 +80,4 @@ TEST(ElabA825, DefaultSpecializationOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

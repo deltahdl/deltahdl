@@ -5,10 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §3.8: Two forms of subroutines — tasks and functions.
-
-// --- Tasks ---
-
 TEST(ParserClause03, Cl3_8_TaskDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -37,8 +33,6 @@ TEST(ParserClause03, Cl3_8_TaskCalledAsStatement) {
               "  initial greet();\n"
               "endmodule\n"));
 }
-
-// --- Functions ---
 
 TEST(ParserClause03, Cl3_8_FunctionWithReturnValue) {
   auto r = Parse(
@@ -90,8 +84,6 @@ TEST(ParserClause03, Cl3_8_FunctionWithAllArgDirections) {
               "endmodule\n"));
 }
 
-// --- Both subroutine forms in same module ---
-
 TEST(ParserClause03, Cl3_8_TaskAndFunctionCoexist) {
   auto r = Parse(
       "module m;\n"
@@ -106,4 +98,4 @@ TEST(ParserClause03, Cl3_8_TaskAndFunctionCoexist) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kTaskDecl));
 }
 
-}  // namespace
+}

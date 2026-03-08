@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §7.9.4: first() returns 0 on empty array.
 TEST(AssocTraversal, FirstReturnsZeroOnEmpty) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -20,7 +19,6 @@ TEST(AssocTraversal, FirstReturnsZeroOnEmpty) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-// §7.9.4: first() assigns smallest index and returns 1.
 TEST(AssocTraversal, FirstReturnsOneWhenWidthSufficient) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -36,7 +34,6 @@ TEST(AssocTraversal, FirstReturnsOneWhenWidthSufficient) {
   EXPECT_EQ(ref->value.ToUint64(), 42u);
 }
 
-// §7.9.4: first() picks smallest key among multiple entries.
 TEST(AssocTraversal, FirstReturnsSmallestKey) {
   SimFixture f;
   auto [aa, ref] = MakeAssocWith3Entries(f);
@@ -48,7 +45,6 @@ TEST(AssocTraversal, FirstReturnsSmallestKey) {
   EXPECT_EQ(ref->value.ToUint64(), 10u);
 }
 
-// §7.9.4: first() with byte index width and byte ref returns 1.
 TEST(AssocTraversal, ByteIndexFirstReturnsOneForByteRef) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -64,7 +60,6 @@ TEST(AssocTraversal, ByteIndexFirstReturnsOneForByteRef) {
   EXPECT_EQ(ref->value.ToUint64(), 200u);
 }
 
-// §7.9.4: first() on string-keyed array assigns alphabetically first key.
 TEST(AssocTraversal, FirstStringKeyReturnsFirst) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
@@ -80,7 +75,6 @@ TEST(AssocTraversal, FirstStringKeyReturnsFirst) {
   EXPECT_EQ(out.ToUint64(), 1u);
 }
 
-// §7.9.4: first() on empty string-keyed array returns 0.
 TEST(AssocTraversal, FirstStringKeyEmptyReturnsZero) {
   SimFixture f;
   f.ctx.CreateAssocArray("aa", 32, true);
@@ -93,7 +87,6 @@ TEST(AssocTraversal, FirstStringKeyEmptyReturnsZero) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-// §7.9.4: first() with no ref argument returns 0.
 TEST(AssocTraversal, FirstNoRefArgReturnsZero) {
   SimFixture f;
   f.ctx.CreateAssocArray("aa", 32, false);
@@ -104,4 +97,4 @@ TEST(AssocTraversal, FirstNoRefArgReturnsZero) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-}  // namespace
+}

@@ -133,4 +133,4 @@ TEST(ParserSection39, AssertionControlSequence) {
   )"));
 }
 
-}  // namespace
+}

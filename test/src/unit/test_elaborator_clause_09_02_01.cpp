@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.2.1: Initial procedure elaborates to RtlirProcessKind::kInitial.
 TEST(ElabClause09_02_01, InitialElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,7 +21,6 @@ TEST(ElabClause09_02_01, InitialElaboratesToCorrectKind) {
   EXPECT_NE(procs[0].body, nullptr);
 }
 
-// §9.2.1: Initial procedure has no sensitivity list.
 TEST(ElabClause09_02_01, InitialHasNoSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -40,7 +38,6 @@ TEST(ElabClause09_02_01, InitialHasNoSensitivity) {
   EXPECT_TRUE(procs[0].sensitivity.empty());
 }
 
-// §9.2.1: Multiple initial procedures all elaborate.
 TEST(ElabClause09_02_01, MultipleInitialsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -82,4 +79,4 @@ TEST(InitialProcedure, TimeZeroSemantics) {
   EXPECT_EQ(vb->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

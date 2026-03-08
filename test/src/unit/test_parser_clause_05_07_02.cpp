@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.7.2: fixed-point notation ---
-
 TEST(ParserClause05, Cl5_7_2_DecimalNotation) {
   auto r = Parse(
       "module m;\n"
@@ -41,8 +39,6 @@ TEST(ParserClause05, Cl5_7_2_PointFive) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
-
-// --- §5.7.2: scientific notation ---
 
 TEST(ParserClause05, Cl5_7_2_ScientificNotation) {
   auto r = Parse(
@@ -88,8 +84,6 @@ TEST(ParserClause05, Cl5_7_2_ScientificFull) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-// --- §5.7.2: exp case insensitive (e or E) ---
-
 TEST(ParserClause05, Cl5_7_2_ExpLowercase) {
   auto r = Parse("module m; real x; initial x = 2.5e2; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -106,16 +100,12 @@ TEST(ParserClause05, Cl5_7_2_ExpUppercase) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-// --- §5.7.2: underscores in real numbers ---
-
 TEST(ParserClause05, Cl5_7_2_UnderscoresInValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 1_000.000_1;\n"
               "endmodule\n"));
 }
-
-// --- §5.7.2: real literal with exponent and decimal ---
 
 TEST(ParserClause05, Cl5_7_2_WithExponent) {
   auto r = Parse(
@@ -127,8 +117,6 @@ TEST(ParserClause05, Cl5_7_2_WithExponent) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- §5.7.2: constant primary context ---
-
 TEST(ParserClause05, Cl5_7_2_ConstantPrimaryReal) {
   auto r = Parse("module m; parameter real R = 3.14; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -136,8 +124,6 @@ TEST(ParserClause05, Cl5_7_2_ConstantPrimaryReal) {
   ASSERT_NE(param->init_expr, nullptr);
   EXPECT_EQ(param->init_expr->kind, ExprKind::kRealLiteral);
 }
-
-// --- §5.7.2: real literal as initial value ---
 
 TEST(ParserClause05, Cl5_7_2_RealDeclarationInit) {
   EXPECT_TRUE(
@@ -160,7 +146,6 @@ TEST(ParserClause05, Cl5_7_2_RealPositiveExponent) {
               "endmodule\n"));
 }
 
-// §11.2.1: ConstEvalReal — real literal evaluates to double.
 TEST(ConstEvalReal, RealLiteralEval) {
   EvalFixture f;
   auto* e = ParseExprFrom("3.14", f);
@@ -183,4 +168,4 @@ TEST(ParserSection11, RealLiteralAddition) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kRealLiteral);
 }
 
-}  // namespace
+}

@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -41,7 +41,6 @@ TEST(ParserSection6, Sec6_5_LogicPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-// §6.9.1: Little-endian range [0:7].
 TEST(ParserSection6, Sec6_9_1_LittleEndianRange) {
   auto r = Parse(
       "module t;\n"
@@ -57,7 +56,6 @@ TEST(ParserSection6, Sec6_9_1_LittleEndianRange) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 7u);
 }
 
-// §6.9.1: Negative range [-1:4] — 6-bit vector.
 TEST(ParserSection6, Sec6_9_1_NegativeRange) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -65,7 +63,6 @@ TEST(ParserSection6, Sec6_9_1_NegativeRange) {
               "endmodule\n"));
 }
 
-// §6.9.1: Multiple vector declarations with shared range.
 TEST(ParserSection6, Sec6_9_1_MultipleVectors) {
   auto r = Parse(
       "module t;\n"
@@ -83,7 +80,6 @@ TEST(ParserSection6, Sec6_9_1_MultipleVectors) {
   }
 }
 
-// §6.9.1: Vector of reg is treated as unsigned by default.
 TEST(ParserSection6, Sec6_9_1_RegVectorUnsignedDefault) {
   auto r = Parse(
       "module t;\n"
@@ -97,7 +93,6 @@ TEST(ParserSection6, Sec6_9_1_RegVectorUnsignedDefault) {
   EXPECT_FALSE(item->data_type.is_signed);
 }
 
-// §6.9.1: Vector explicitly declared signed.
 TEST(ParserSection6, Sec6_9_1_LogicSignedVector) {
   auto r = Parse(
       "module t;\n"
@@ -112,7 +107,6 @@ TEST(ParserSection6, Sec6_9_1_LogicSignedVector) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 3u);
 }
 
-// §6.9: LRM examples — wand w, tri [15:0] busa, etc.
 TEST(ParserSection6, Sec6_9_LrmExamplesScalarAndVector) {
   auto r = Parse(
       "module t;\n"
@@ -127,4 +121,4 @@ TEST(ParserSection6, Sec6_9_LrmExamplesScalarAndVector) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

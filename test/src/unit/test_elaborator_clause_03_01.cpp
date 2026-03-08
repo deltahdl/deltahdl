@@ -2,9 +2,6 @@
 
 namespace {
 
-// §3.1: Design elements are containers for declarations and procedural code.
-// The elaborator must accept each design element kind as a valid container.
-
 TEST(ElabClause03, Cl3_1_ModuleAsContainer) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -42,8 +39,6 @@ TEST(ElabClause03, Cl3_1_EmptyModuleElaborates) {
   EXPECT_TRUE(ElabOk("module m; endmodule\n"));
 }
 
-// §3.1: Programs are design element containers (§3.4).
-
 TEST(ElabClause03, Cl3_1_EmptyProgramElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc("program p; endprogram\n", f, "p");
@@ -73,8 +68,6 @@ TEST(ElabClause03, Cl3_1_ProgramWithPorts) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// §3.1: Interfaces are design element containers (§3.5).
 
 TEST(ElabClause03, Cl3_1_EmptyInterfaceElaborates) {
   ElabFixture f;
@@ -106,8 +99,6 @@ TEST(ElabClause03, Cl3_1_InterfaceWithPorts) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §3.1: Checkers are design element containers (§3.6).
-
 TEST(ElabClause03, Cl3_1_EmptyCheckerElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc("checker chk; endchecker\n", f, "chk");
@@ -126,8 +117,6 @@ TEST(ElabClause03, Cl3_1_CheckerAsContainer) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §3.1: The elaborator rejects an unknown top-level name.
-
 TEST(ElabClause03, Cl3_1_UnknownTopIsError) {
   ElabFixture f;
   auto* design = ElaborateSrc("module m; endmodule\n", f, "nonexistent");
@@ -135,4 +124,4 @@ TEST(ElabClause03, Cl3_1_UnknownTopIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

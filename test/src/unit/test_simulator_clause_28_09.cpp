@@ -15,4 +15,4 @@ TEST(CmosSwitches, CmosMaxThreeDelays) {
   EXPECT_EQ(MaxSwitchDelays(SwitchType::kRcmos), 3u);
 }
 
-}  // namespace
+}

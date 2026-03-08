@@ -96,4 +96,4 @@ TEST(SimCh4, ThreeAbstractionLevels) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 7u);
 }
 
-}  // namespace
+}

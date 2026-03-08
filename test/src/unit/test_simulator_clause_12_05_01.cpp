@@ -172,7 +172,6 @@ TEST(StmtExec, CasezWithZInSelector) {
   EXPECT_EQ(result_var->value.ToUint64(), 55u);
 }
 
-// §12.5.1: casez treats z/? as don't-care — instruction decode pattern.
 TEST(SimA60701, CasezQuestionMarkDontCare) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -195,11 +194,10 @@ TEST(SimA60701, CasezQuestionMarkDontCare) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // MSB is 1, matches first item.
+
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.5.1: casez second item matches when first does not.
 TEST(SimA60701, CasezSecondItemMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -225,7 +223,6 @@ TEST(SimA60701, CasezSecondItemMatch) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §12.5.1: casex treats both x and z as don't-care in case_expression.
 TEST(SimA60701, CasexXInSelectorTreatedAsDontCare) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -245,13 +242,12 @@ TEST(SimA60701, CasexXInSelectorTreatedAsDontCare) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // XOR with x bits produces x bits in result; casex ignores those positions.
+
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // The result matches one of the patterns with x positions ignored.
+
 }
 
-// §12.5.1: casez with z in selector — z positions treated as don't-care.
 TEST(SimA60701, CasezZInSelectorIsDontCare) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -274,14 +270,10 @@ TEST(SimA60701, CasezZInSelectorIsDontCare) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // sel=z1z0: z positions in selector are don't-care, so bits 1,0 = 1,0.
-  // Pattern 0100: bit3=0(dc),bit2=1(match),bit1=0(dc),bit0=0(!=0) → no match.
-  // Pattern 1100: bit3=1(dc),bit2=1(match),bit1=0(dc),bit0=0(!=0) → no match.
-  // Falls to default.
+
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §12.5.1: casez don't-care in pattern — ? bits ignored regardless of selector.
 TEST(SimA60701, CasezDontCareInPatternOnly) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -304,8 +296,8 @@ TEST(SimA60701, CasezDontCareInPatternOnly) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  // First item: 1??0 matches 1010 (middle bits don't care).
+
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

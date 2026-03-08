@@ -90,4 +90,4 @@ TEST(ParserSection19, ClockingBlockEvent_InitialBlock) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §10.2 Table 10-1: Procedural assignment LHS must be a variable, not a net.
-
 TEST(ElabClause1002, ProceduralAssignToNet_Blocking_Error) {
   ElabFixture f;
   Elaborate(
@@ -88,8 +86,6 @@ TEST(ElabClause1002, ProceduralAssignToIntVariable_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.2 Table 10-1: Continuous assignment LHS can be a net or variable.
-
 TEST(ElabClause1002, ContinuousAssignToNet_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -113,8 +109,6 @@ TEST(ElabClause1002, ContinuousAssignToVariable_Ok) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// §10.2 Table 10-1: Continuous assignment LHS selects must be constant.
 
 TEST(ElabClause1002, ContAssignConstBitSelect_Ok) {
   ElabFixture f;
@@ -164,8 +158,6 @@ TEST(ElabClause1002, ContAssignNonConstPartSelect_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §10.2 Table 10-1: Continuous assignment LHS concatenation is allowed.
-
 TEST(ElabClause1002, ContAssignConcatenation_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -177,8 +169,6 @@ TEST(ElabClause1002, ContAssignConcatenation_Ok) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// §10.2 Table 10-1: Procedural assignment LHS allows non-constant bit-select.
 
 TEST(ElabClause1002, ProceduralNonConstBitSelect_Ok) {
   ElabFixture f;
@@ -196,8 +186,6 @@ TEST(ElabClause1002, ProceduralNonConstBitSelect_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.2 Table 10-1: Procedural assignment LHS allows non-constant part-select.
-
 TEST(ElabClause1002, ProceduralNonConstPartSelect_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -213,8 +201,6 @@ TEST(ElabClause1002, ProceduralNonConstPartSelect_Ok) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
-
-// §10.2: Multiple net types in procedural context should all error.
 
 TEST(ElabClause1002, ProceduralAssignToTriNet_Error) {
   ElabFixture f;
@@ -249,4 +235,4 @@ TEST(ElabClause1002, ProceduralAssignToWorNet_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

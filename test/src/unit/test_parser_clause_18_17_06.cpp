@@ -33,4 +33,4 @@ TEST(ParserA612, ReturnInRandsequence) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

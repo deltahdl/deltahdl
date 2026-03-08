@@ -367,4 +367,4 @@ TEST(ParserSection10, Sec10_4_1_SystemCallRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-}  // namespace
+}

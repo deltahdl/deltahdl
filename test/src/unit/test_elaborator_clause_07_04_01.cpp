@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §7.4.1: Integer types with predefined widths shall not have packed array
-// dimensions.
 TEST(Elaboration, PackedDimOnByte_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -69,7 +67,6 @@ TEST(Elaboration, PackedDimOnTime_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// Packed dims on single-bit types are fine.
 TEST(Elaboration, PackedDimOnLogic_Allowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -165,4 +162,4 @@ TEST(ElabA83, GenvarExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

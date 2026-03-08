@@ -2,8 +2,6 @@
 
 namespace {
 
-// §3.3: Modules are containers for declarations and procedural code.
-
 TEST(ElabClause03, Cl3_3_Mux2to1ExampleElaborates) {
   EXPECT_TRUE(
       ElabOk("module mux2to1 (input wire a, b, sel,\n"
@@ -77,4 +75,4 @@ TEST(ElabClause03, Cl3_3_ModuleWithGenerateElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

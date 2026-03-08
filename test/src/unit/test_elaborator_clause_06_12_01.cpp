@@ -79,7 +79,6 @@ TEST(SimCh6, CastRealToInt_Truncate) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §6.12.1 LRM examples: 35.7 and 35.5 both become 36, 35.2 becomes 35.
 TEST(SimCh6, CastRealToInt_LrmExamples) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -102,7 +101,6 @@ TEST(SimCh6, CastRealToInt_LrmExamples) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 35u);
 }
 
-// §6.12.1 LRM example: 1.5 to integer yields 2.
 TEST(SimCh6, CastRealToInt_PosHalfRoundsAway) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -122,4 +120,4 @@ TEST(SimCh6, CastRealToInt_PosHalfRoundsAway) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

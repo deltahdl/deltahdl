@@ -74,4 +74,4 @@ TEST(SourceText, DescriptionUdp) {
   EXPECT_EQ(r.cu->udps[0]->name, "my_udp");
 }
 
-}  // namespace
+}

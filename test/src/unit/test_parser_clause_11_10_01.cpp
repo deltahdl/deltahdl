@@ -4,7 +4,6 @@
 using namespace delta;
 namespace {
 
-// §11.10.1: Copy — string literal assigned to a vector via simple assignment.
 TEST(ParserSection1110_1, StringLiteralCopyToVector) {
   auto r = Parse(
       "module t;\n"
@@ -18,8 +17,6 @@ TEST(ParserSection1110_1, StringLiteralCopyToVector) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-// §11.10.1: Concatenate — string literals concatenated via concatenation
-// operator.
 TEST(ParserSection1110_1, StringLiteralConcatInVector) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -31,7 +28,6 @@ TEST(ParserSection1110_1, StringLiteralConcatInVector) {
               "endmodule\n"));
 }
 
-// §11.10.1: Compare — string literal values compared with equality operators.
 TEST(ParserSection1110_1, StringLiteralCompare) {
   auto r = Parse(
       "module t;\n"
@@ -47,7 +43,6 @@ TEST(ParserSection1110_1, StringLiteralCompare) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §11.10.1: Vectors should be at least 8*n bits to preserve ASCII encoding.
 TEST(ParserSection1110_1, StringLiteralWideVector) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -56,4 +51,4 @@ TEST(ParserSection1110_1, StringLiteralWideVector) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

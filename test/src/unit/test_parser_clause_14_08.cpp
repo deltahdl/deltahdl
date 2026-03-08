@@ -26,4 +26,4 @@ TEST(ParserSection19, ClockingBlockScope_ProgramAccess) {
               "endprogram\n"));
 }
 
-}  // namespace
+}

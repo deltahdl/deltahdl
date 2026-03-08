@@ -5,10 +5,8 @@ using namespace delta;
 
 namespace {
 
-// --- §5.10: positional structure literal ---
-
 TEST(ParserClause05, Cl5_10_PositionalStructLiteral) {
-  // '{0, 0.0} — type from assignment context
+
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int a; shortreal b;} ab;\n"
@@ -25,10 +23,8 @@ TEST(ParserClause05, Cl5_10_PositionalStructLiteral) {
   EXPECT_TRUE(stmt->rhs->pattern_keys.empty());
 }
 
-// --- §5.10: nested braces reflect structure ---
-
 TEST(ParserClause05, Cl5_10_NestedBracesArrayOfStructs) {
-  // '{'{1, 1.0}, '{2, 2.0}} — nested braces for array of structs
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -54,10 +50,8 @@ TEST(ParserClause05, Cl5_10_NestedBracesElements) {
   EXPECT_EQ(stmt->rhs->elements[1]->kind, ExprKind::kAssignmentPattern);
 }
 
-// --- §5.10: named member form ---
-
 TEST(ParserClause05, Cl5_10_MemberNameAndValue) {
-  // '{a:0, b:0.0} — member name and value
+
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int a; shortreal b;} ab;\n"
@@ -75,10 +69,8 @@ TEST(ParserClause05, Cl5_10_MemberNameAndValue) {
   EXPECT_EQ(stmt->rhs->pattern_keys[1], "b");
 }
 
-// --- §5.10: default value form ---
-
 TEST(ParserClause05, Cl5_10_DefaultValue) {
-  // '{default:0} — all elements set to 0
+
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int a; int b;} ab;\n"
@@ -95,10 +87,8 @@ TEST(ParserClause05, Cl5_10_DefaultValue) {
   EXPECT_EQ(stmt->rhs->pattern_keys[0], "default");
 }
 
-// --- §5.10: type-prefixed form ---
-
 TEST(ParserClause05, Cl5_10_TypePrefixedPattern) {
-  // ab'{int:1, shortreal:1.0} — type prefix with type keys
+
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -107,10 +97,8 @@ TEST(ParserClause05, Cl5_10_TypePrefixedPattern) {
               "endmodule\n"));
 }
 
-// --- §5.10: replication in structure literal ---
-
 TEST(ParserClause05, Cl5_10_ReplicationPattern) {
-  // '{3{1}} — replication sets all members
+
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int X; int Y; int Z;} xyz_t;\n"
@@ -125,8 +113,6 @@ TEST(ParserClause05, Cl5_10_ReplicationPattern) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
 }
 
-// --- §5.10: struct literal in variable declaration ---
-
 TEST(ParserClause05, Cl5_10_StructLiteralInVarDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -134,8 +120,6 @@ TEST(ParserClause05, Cl5_10_StructLiteralInVarDecl) {
               "  ab c = '{0, 1};\n"
               "endmodule\n"));
 }
-
-// --- §5.10: mixed named with default ---
 
 TEST(ParserClause05, Cl5_10_MemberNameWithDefault) {
   auto r = Parse(
@@ -153,8 +137,6 @@ TEST(ParserClause05, Cl5_10_MemberNameWithDefault) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-// --- §5.10: nested replication ---
-
 TEST(ParserClause05, Cl5_10_NestedReplication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -164,8 +146,6 @@ TEST(ParserClause05, Cl5_10_NestedReplication) {
               "  initial v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
               "endmodule\n"));
 }
-
-// --- §5.10: empty assignment pattern ---
 
 TEST(ParserClause05, Cl5_10_EmptyAssignmentPattern) {
   auto r = Parse(
@@ -182,4 +162,4 @@ TEST(ParserClause05, Cl5_10_EmptyAssignmentPattern) {
   EXPECT_EQ(rhs->elements.size(), 0u);
 }
 
-}  // namespace
+}

@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §8.18: PropertyInfo tracks local visibility.
 TEST(ClassSim, PropertyInfoLocal) {
   SimFixture f;
   auto* info = f.arena.Create<ClassTypeInfo>();
@@ -18,7 +17,6 @@ TEST(ClassSim, PropertyInfoLocal) {
   EXPECT_FALSE(info->properties[0].is_protected);
 }
 
-// §8.18: PropertyInfo tracks protected visibility.
 TEST(ClassSim, PropertyInfoProtected) {
   SimFixture f;
   auto* info = f.arena.Create<ClassTypeInfo>();
@@ -30,7 +28,6 @@ TEST(ClassSim, PropertyInfoProtected) {
   EXPECT_TRUE(info->properties[0].is_protected);
 }
 
-// §8.18: Default properties are public (not local, not protected).
 TEST(ClassSim, PropertyInfoPublicDefault) {
   SimFixture f;
   auto* type = MakeClassType(f, "Packet", {"x"});
@@ -38,7 +35,6 @@ TEST(ClassSim, PropertyInfoPublicDefault) {
   EXPECT_FALSE(type->properties[0].is_protected);
 }
 
-// §8.18: Local member on object is still accessible at runtime (within class).
 TEST(ClassSim, LocalPropertyAccessibleAtRuntime) {
   SimFixture f;
   auto* info = f.arena.Create<ClassTypeInfo>();
@@ -52,7 +48,6 @@ TEST(ClassSim, LocalPropertyAccessibleAtRuntime) {
   EXPECT_EQ(obj->GetProperty("secret", f.arena).ToUint64(), 42u);
 }
 
-// §8.18: Protected member inherited — visible in derived type info.
 TEST(ClassSim, ProtectedMemberInherited) {
   SimFixture f;
   auto* base = f.arena.Create<ClassTypeInfo>();
@@ -65,11 +60,10 @@ TEST(ClassSim, ProtectedMemberInherited) {
   derived->parent = base;
   f.ctx.RegisterClassType("Derived", derived);
 
-  // Derived object can access inherited protected property via GetProperty.
   auto* obj = f.arena.Create<ClassObject>();
   obj->type = derived;
   obj->properties["hidden"] = MakeLogic4VecVal(f.arena, 32, 99);
   EXPECT_EQ(obj->GetProperty("hidden", f.arena).ToUint64(), 99u);
 }
 
-}  // namespace
+}

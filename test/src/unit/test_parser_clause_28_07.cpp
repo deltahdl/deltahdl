@@ -130,4 +130,4 @@ TEST(ParserA304, MosSwitchtype_Rpmos) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-}  // namespace
+}

@@ -127,7 +127,6 @@ TEST(Eval, NestedFunctionOutputArgs) {
   EXPECT_EQ(result_var->value.ToUint64(), 105u);
 }
 
-// §13.5.1: Changes to input arg inside function don't affect caller.
 TEST(Sim1351, PassByValueIsolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -146,7 +145,6 @@ TEST(Sim1351, PassByValueIsolation) {
   LowerRunAndCheck(f, design, {{"x", 5u}, {"y", 15u}});
 }
 
-// §13.5.1: Inout arg copies in on call, copies out on return.
 TEST(Sim1351, InoutCopyInOut) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -164,4 +162,4 @@ TEST(Sim1351, InoutCopyInOut) {
   LowerRunAndCheck(f, design, {{"x", 11u}});
 }
 
-}  // namespace
+}

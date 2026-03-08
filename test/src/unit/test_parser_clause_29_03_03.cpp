@@ -285,4 +285,4 @@ TEST(ParserSection29, SequentialUdpInitial) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-}  // namespace
+}

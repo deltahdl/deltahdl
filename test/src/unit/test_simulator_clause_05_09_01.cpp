@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.9.1: named escape sequences at simulation ---
-
 TEST(SimClause05, Cl5_9_1_EscapeNewline) {
   auto v = RunAndGet(
       "module t;\n  byte c;\n  initial c = \"\\n\";\nendmodule\n", "c");
@@ -48,8 +46,6 @@ TEST(SimClause05, Cl5_9_1_EscapeBell) {
   EXPECT_EQ(v, 0x07u);
 }
 
-// --- §5.9.1: octal escape sequences at simulation ---
-
 TEST(SimClause05, Cl5_9_1_OctalThreeDigit) {
   auto v = RunAndGet(
       "module t;\n  byte c;\n  initial c = \"\\101\";\nendmodule\n", "c");
@@ -61,8 +57,6 @@ TEST(SimClause05, Cl5_9_1_OctalOneDigit) {
       "module t;\n  byte c;\n  initial c = \"\\7\";\nendmodule\n", "c");
   EXPECT_EQ(v, 0x07u);
 }
-
-// --- §5.9.1: hex escape sequences at simulation ---
 
 TEST(SimClause05, Cl5_9_1_HexTwoDigit) {
   auto v = RunAndGet(
@@ -76,8 +70,6 @@ TEST(SimClause05, Cl5_9_1_HexOneDigit) {
   EXPECT_EQ(v, 0x0Au);
 }
 
-// --- §5.9.1: unknown escape and multiple escapes ---
-
 TEST(SimClause05, Cl5_9_1_UnknownEscapeDropsBackslash) {
   auto v = RunAndGet(
       "module t;\n  byte c;\n  initial c = \"\\b\";\nendmodule\n", "c");
@@ -90,4 +82,4 @@ TEST(SimClause05, Cl5_9_1_MultipleEscapes) {
   EXPECT_EQ(v, 0x410A42u);
 }
 
-}  // namespace
+}

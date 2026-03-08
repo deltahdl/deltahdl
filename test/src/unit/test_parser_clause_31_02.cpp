@@ -75,4 +75,4 @@ TEST(AllTwelveTimingCheckKinds, AllTwelveTimingCheckKinds) {
             TimingCheckKind::kNochange);
 }
 
-}  // namespace
+}

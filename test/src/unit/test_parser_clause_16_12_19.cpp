@@ -13,4 +13,4 @@ TEST(ParserA210, PropertyPortItem_LocalInput) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

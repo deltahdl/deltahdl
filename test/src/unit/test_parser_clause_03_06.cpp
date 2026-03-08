@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §3.6: Checkers are enclosed between checker...endchecker.
-
 TEST(ParserClause03, Cl3_6_CheckerEnclosedByKeywords) {
   auto r = Parse("checker chk; endchecker");
   ASSERT_NE(r.cu, nullptr);
@@ -15,8 +13,6 @@ TEST(ParserClause03, Cl3_6_CheckerEnclosedByKeywords) {
   EXPECT_EQ(r.cu->checkers[0]->name, "chk");
   EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
 }
-
-// §3.6: Checkers encapsulate assertions along with modeling code.
 
 TEST(ParserClause03, Cl3_6_CheckerWithAssertion) {
   auto r = Parse(
@@ -62,4 +58,4 @@ TEST(ParserClause03, Cl3_6_CheckerWithMixedContent) {
               "endchecker\n"));
 }
 
-}  // namespace
+}

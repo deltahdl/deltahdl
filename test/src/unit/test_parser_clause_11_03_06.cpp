@@ -22,4 +22,4 @@ TEST(ParserSection11, CompoundAssignInExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

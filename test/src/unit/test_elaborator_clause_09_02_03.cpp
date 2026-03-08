@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.2.3: final procedure with delay produces an error.
 TEST(ElabClause09_02_03, DelayInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -16,7 +15,6 @@ TEST(ElabClause09_02_03, DelayInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.3: final procedure with event control produces an error.
 TEST(ElabClause09_02_03, EventControlInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -28,7 +26,6 @@ TEST(ElabClause09_02_03, EventControlInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.3: final procedure with wait produces an error.
 TEST(ElabClause09_02_03, WaitInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -40,7 +37,6 @@ TEST(ElabClause09_02_03, WaitInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.3: final procedure with fork-join produces an error.
 TEST(ElabClause09_02_03, ForkJoinInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -57,7 +53,6 @@ TEST(ElabClause09_02_03, ForkJoinInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.2.3: Valid final procedure with simple assignment, no errors.
 TEST(ElabClause09_02_03, ValidFinalNoErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -70,7 +65,6 @@ TEST(ElabClause09_02_03, ValidFinalNoErrors) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.2.3: Valid final procedure with begin-end block, no errors.
 TEST(ElabClause09_02_03, ValidFinalBlockNoErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -86,7 +80,6 @@ TEST(ElabClause09_02_03, ValidFinalBlockNoErrors) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.2.3: final elaborates to kFinal process kind.
 TEST(ElabClause09_02_03, ElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -105,7 +98,6 @@ TEST(ElabClause09_02_03, ElaboratesToCorrectKind) {
   EXPECT_TRUE(found);
 }
 
-// §9.2.3: Multiple final procedures coexist.
 TEST(ElabClause09_02_03, MultipleFinalProcedures) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -125,7 +117,6 @@ TEST(ElabClause09_02_03, MultipleFinalProcedures) {
   EXPECT_EQ(count, 2);
 }
 
-// §9.2.3: final and initial coexist without errors.
 TEST(ElabClause09_02_03, FinalAndInitialCoexist) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -147,7 +138,6 @@ TEST(ElabClause09_02_03, FinalAndInitialCoexist) {
   EXPECT_TRUE(has_final);
 }
 
-// §9.3.2: fork/join in final is an error.
 TEST(ElabClause09_03_02, ForkInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -164,7 +154,6 @@ TEST(ElabClause09_03_02, ForkInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §9.6.1: Wait fork is a timing control, error in final.
 TEST(ElabClause09_06_01, WaitForkInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -179,4 +168,4 @@ TEST(ElabClause09_06_01, WaitForkInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

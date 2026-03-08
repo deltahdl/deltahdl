@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §8.26.1: ClassTypeInfo with is_interface flag.
 TEST(ClassSim, InterfaceClassTypeInfoFlag) {
   SimFixture f;
 
@@ -26,7 +25,6 @@ TEST(ClassSim, InterfaceClassTypeInfoFlag) {
   EXPECT_TRUE(found->is_interface);
 }
 
-// §8.26.1: Interface class with pure virtual methods in vtable.
 TEST(ClassSim, InterfaceClassVtableEntries) {
   SimFixture f;
 
@@ -39,7 +37,6 @@ TEST(ClassSim, InterfaceClassVtableEntries) {
   info->decl = decl;
   info->is_interface = true;
 
-  // Pure virtual method — nullptr body in vtable.
   info->vtable.push_back({"do_thing", nullptr, info});
 
   f.ctx.RegisterClassType("IC", info);
@@ -51,4 +48,4 @@ TEST(ClassSim, InterfaceClassVtableEntries) {
   EXPECT_EQ(found->vtable[0].method, nullptr);
 }
 
-}  // namespace
+}

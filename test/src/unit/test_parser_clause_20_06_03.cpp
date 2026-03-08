@@ -30,4 +30,4 @@ TEST(ParserSection20, IsUnboundedWithBoundedParam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

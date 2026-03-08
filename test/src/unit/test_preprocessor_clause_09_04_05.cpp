@@ -127,4 +127,4 @@ TEST(ParserSection10, NonblockingIntraAssignEventEdge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
 }
 
-}  // namespace
+}

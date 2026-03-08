@@ -39,4 +39,4 @@ TEST(ParserSection7, QueuePushBack) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-}  // namespace
+}

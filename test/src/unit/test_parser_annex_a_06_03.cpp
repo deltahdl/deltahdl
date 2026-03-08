@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.3 — parallel and sequential blocks
-
 TEST(ParserA603, SeqBlockBasic) {
   auto r = Parse(
       "module m;\n"
@@ -191,4 +189,4 @@ TEST(ParserA603, ActionBlockPassAndFail) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-}  // namespace
+}

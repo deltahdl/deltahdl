@@ -2,8 +2,6 @@
 
 namespace {
 
-// §3.5: Interfaces encapsulate communication between design blocks.
-
 TEST(ElabClause03, Cl3_5_EmptyInterfaceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc("interface ifc; endinterface\n", f, "ifc");
@@ -75,4 +73,4 @@ TEST(ElabClause03, Cl3_5_InterfaceWithSubroutinesElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

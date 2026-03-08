@@ -49,7 +49,6 @@ TEST(Elaboration, ImplicitNetOnInstancePort) {
   EXPECT_TRUE(found_y) << "implicit net 'y' not created";
 }
 
-// §6.10: Implicit nets on instance ports are scalar (width 1).
 TEST(Elaboration, ImplicitNetOnInstancePortIsScalar) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -69,7 +68,6 @@ TEST(Elaboration, ImplicitNetOnInstancePortIsScalar) {
   }
 }
 
-// §6.10: Implicit net uses default_nettype (tri instead of wire).
 TEST(Elaboration, ImplicitNetUsesDefaultNettype) {
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>",
@@ -95,7 +93,6 @@ TEST(Elaboration, ImplicitNetUsesDefaultNettype) {
   EXPECT_TRUE(found) << "implicit net 'w' not created";
 }
 
-// §6.10: Existing declared net is not duplicated by implicit declaration.
 TEST(Elaboration, ExplicitNetNotDuplicatedByImplicit) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -129,4 +126,4 @@ TEST(Elaboration, ImplicitNetNone_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

@@ -19,4 +19,4 @@ TEST(ParserA611, CycleDelayIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

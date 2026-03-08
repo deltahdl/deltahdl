@@ -208,4 +208,4 @@ TEST_F(ConfigParseTest, ConfigWithEndLabel) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-}  // namespace
+}

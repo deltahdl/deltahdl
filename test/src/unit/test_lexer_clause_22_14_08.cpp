@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §22.14.8 — IEEE Std 1800-2012 keywords (Table 22-6)
-
 TEST(Lexer, KeywordVersion_1800_2012_NewKeywordsPresent) {
   EXPECT_EQ(LookupKeyword("implements", KeywordVersion::kVer18002012),
             std::optional(TokenKind::kKwImplements));
@@ -31,17 +29,17 @@ TEST(Lexer, KeywordVersion_1800_2012_NewKeywordsNotIn1800_2009) {
 }
 
 TEST(Lexer, KeywordVersion_1800_2012_IncludesAllPriorVersions) {
-  // Spot-check keywords from each prior version table.
+
   EXPECT_TRUE(LookupKeyword("module", KeywordVersion::kVer18002012)
-                  .has_value());  // 1364-1995
+                  .has_value());
   EXPECT_TRUE(LookupKeyword("automatic", KeywordVersion::kVer18002012)
-                  .has_value());  // 1364-2001
+                  .has_value());
   EXPECT_TRUE(LookupKeyword("uwire", KeywordVersion::kVer18002012)
-                  .has_value());  // 1364-2005
+                  .has_value());
   EXPECT_TRUE(LookupKeyword("logic", KeywordVersion::kVer18002012)
-                  .has_value());  // 1800-2005
+                  .has_value());
   EXPECT_TRUE(LookupKeyword("checker", KeywordVersion::kVer18002012)
-                  .has_value());  // 1800-2009
+                  .has_value());
 }
 
-}  // namespace
+}

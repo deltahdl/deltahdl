@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.29: Class object created with new — elaborates OK.
 TEST(ElabA829, DynamicAllocationOk) {
   EXPECT_TRUE(
       ElabOk("class MyClass;\n"
@@ -14,7 +13,6 @@ TEST(ElabA829, DynamicAllocationOk) {
              "endmodule\n"));
 }
 
-// §8.29: Multiple class types coexist — elaborates OK.
 TEST(ElabA829, MultipleClassTypesOk) {
   EXPECT_TRUE(
       ElabOk("class A;\n"
@@ -27,7 +25,6 @@ TEST(ElabA829, MultipleClassTypesOk) {
              "endmodule\n"));
 }
 
-// §8.29: Assign null to release reference — elaborates OK.
 TEST(ElabA829, NullAssignmentOk) {
   EXPECT_TRUE(
       ElabOk("class MyClass;\n"
@@ -41,4 +38,4 @@ TEST(ElabA829, NullAssignmentOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

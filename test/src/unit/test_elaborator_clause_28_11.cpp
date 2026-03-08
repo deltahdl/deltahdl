@@ -1,4 +1,4 @@
-// §28.11
+
 
 #include <gtest/gtest.h>
 
@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.3.2.2: Drive strength (highz0, highz1) is illegal.
 TEST(Elaborator, DriveStrengthHighz0Highz1IsError) {
   ElabFixture f;
   Elaborate(
@@ -20,4 +19,4 @@ TEST(Elaborator, DriveStrengthHighz0Highz1IsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

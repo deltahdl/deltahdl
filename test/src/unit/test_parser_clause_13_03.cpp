@@ -311,7 +311,6 @@ TEST(ParserSection6, VoidTaskReturnType) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
 }
 
-// §13.3: Default direction is input when no direction specified.
 TEST(ParserSection13, TaskDefaultDirectionInput) {
   auto r = Parse(
       "module m;\n"
@@ -326,7 +325,6 @@ TEST(ParserSection13, TaskDefaultDirectionInput) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kInput);
 }
 
-// §13.3: Task with empty body is legal.
 TEST(ParserSection13, TaskEmptyBody) {
   auto r = Parse(
       "module m;\n"
@@ -340,7 +338,6 @@ TEST(ParserSection13, TaskEmptyBody) {
   EXPECT_TRUE(item->func_body_stmts.empty());
 }
 
-// §13.3: Direction stickiness — output sticks to subsequent args.
 TEST(ParserSection13, TaskDirectionStickyOutput) {
   auto r = Parse(
       "module m;\n"
@@ -355,7 +352,6 @@ TEST(ParserSection13, TaskDirectionStickyOutput) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
-// §13.3: Task with multiple statements.
 TEST(ParserSection13, TaskMultipleStatements) {
   auto r = Parse(
       "module m;\n"
@@ -370,7 +366,6 @@ TEST(ParserSection13, TaskMultipleStatements) {
   ASSERT_GE(item->func_body_stmts.size(), 2u);
 }
 
-// §13.3: Task with return statement (early exit).
 TEST(ParserSection13, TaskReturnStatement) {
   auto r = Parse(
       "module m;\n"
@@ -383,4 +378,4 @@ TEST(ParserSection13, TaskReturnStatement) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

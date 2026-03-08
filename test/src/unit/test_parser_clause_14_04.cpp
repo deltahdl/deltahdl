@@ -336,4 +336,4 @@ TEST(ParserSection14, CombinedInputOutputSkew) {
   }
 }
 
-}  // namespace
+}

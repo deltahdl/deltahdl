@@ -24,4 +24,4 @@ TEST(ParserA602, ProceduralContinuous_AllForms) {
   EXPECT_EQ(stmts[3]->kind, StmtKind::kRelease);
 }
 
-}  // namespace
+}

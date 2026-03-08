@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.9.1: Little-endian range [0:7] has width 8.
 TEST(ElabSection6, Sec6_9_1_LittleEndianWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [0:7] x; endmodule\n", f);
@@ -19,7 +18,6 @@ TEST(ElabSection6, Sec6_9_1_LittleEndianWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// §6.9.1: 32-bit vector width.
 TEST(ElabSection6, Sec6_9_1_32BitVectorWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [31:0] w; endmodule\n", f);
@@ -29,7 +27,6 @@ TEST(ElabSection6, Sec6_9_1_32BitVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 32u);
 }
 
-// §6.9.1: Net vector width matches variable vector width.
 TEST(ElabSection6, Sec6_9_1_NetAndVarSameWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -47,7 +44,6 @@ TEST(ElabSection6, Sec6_9_1_NetAndVarSameWidth) {
   EXPECT_EQ(mod->variables[0].width, 16u);
 }
 
-// §6.9.1: Vectors of logic/reg/bit default to unsigned.
 TEST(ElabSection6, Sec6_9_1_VectorDefaultUnsigned) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [7:0] data; endmodule\n", f);
@@ -57,7 +53,6 @@ TEST(ElabSection6, Sec6_9_1_VectorDefaultUnsigned) {
   EXPECT_FALSE(mod->variables[0].is_signed);
 }
 
-// §6.9.1: Explicitly signed vector.
 TEST(ElabSection6, Sec6_9_1_ExplicitlySigned) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic signed [7:0] sv; endmodule\n", f);
@@ -67,4 +62,4 @@ TEST(ElabSection6, Sec6_9_1_ExplicitlySigned) {
   EXPECT_TRUE(mod->variables[0].is_signed);
 }
 
-}  // namespace
+}

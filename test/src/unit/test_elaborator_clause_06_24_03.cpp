@@ -58,7 +58,6 @@ TEST(SimCh6, BitStreamShortArrayToInt) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEu);
 }
 
-// §6.24.3: Bitstream cast — packed struct round-trip preserves bits.
 TEST(SimCh6, BitStreamStructRoundTrip) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -85,4 +84,4 @@ TEST(SimCh6, BitStreamStructRoundTrip) {
   EXPECT_EQ(p2->value.ToUint64(), 0xCAFEu);
 }
 
-}  // namespace
+}

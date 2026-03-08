@@ -15,7 +15,6 @@ TEST(StringMethods, Substr) {
   EXPECT_EQ(VecToString(result), "world");
 }
 
-// §6.16.8: substr with out-of-bounds returns empty string.
 TEST(StringMethods, SubstrOutOfBounds) {
   StringFixture f;
   f.CreateStringVar("s", "hello");
@@ -25,4 +24,4 @@ TEST(StringMethods, SubstrOutOfBounds) {
   EXPECT_EQ(VecToString(result), "");
 }
 
-}  // namespace
+}

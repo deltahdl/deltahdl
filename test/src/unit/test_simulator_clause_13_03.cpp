@@ -53,7 +53,6 @@ TEST(TaskCall, SetupReturnsNullForUnknown) {
   EXPECT_EQ(result, nullptr);
 }
 
-// §13.3: Task with input args passes values at call time.
 TEST(Sim1303, TaskInputArg) {
   auto val = RunAndGet(
       "module t;\n"
@@ -70,7 +69,6 @@ TEST(Sim1303, TaskInputArg) {
   EXPECT_EQ(val, 99u);
 }
 
-// §13.3: Task with inout arg copies in and out.
 TEST(Sim1303, TaskInoutArg) {
   auto val = RunAndGet(
       "module t;\n"
@@ -87,7 +85,6 @@ TEST(Sim1303, TaskInoutArg) {
   EXPECT_EQ(val, 14u);
 }
 
-// §13.3: Task with multiple output args.
 TEST(Sim1303, TaskMultipleOutputArgs) {
   auto val = RunAndGet(
       "module t;\n"
@@ -104,7 +101,6 @@ TEST(Sim1303, TaskMultipleOutputArgs) {
   EXPECT_EQ(val, 7u);
 }
 
-// §13.3: Task calling another task.
 TEST(Sim1303, TaskCallsTask) {
   auto val = RunAndGet(
       "module t;\n"
@@ -124,7 +120,6 @@ TEST(Sim1303, TaskCallsTask) {
   EXPECT_EQ(val, 42u);
 }
 
-// §13.3: Task with empty body is legal.
 TEST(Sim1303, TaskEmptyBody) {
   auto val = RunAndGet(
       "module t;\n"
@@ -141,4 +136,4 @@ TEST(Sim1303, TaskEmptyBody) {
   EXPECT_EQ(val, 2u);
 }
 
-}  // namespace
+}

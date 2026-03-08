@@ -15,4 +15,4 @@ TEST(Lexer, KeywordVersion_Noconfig_ExcludesConfigKeywords) {
   EXPECT_TRUE(gen.has_value());
 }
 
-}  // namespace
+}

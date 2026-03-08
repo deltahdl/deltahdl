@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.11: 'this' in module-level initial block is illegal.
 TEST(ElabA811, ThisInModuleInitialBlockError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -15,7 +14,6 @@ TEST(ElabA811, ThisInModuleInitialBlockError) {
              "endmodule\n"));
 }
 
-// §8.11: 'this' in module-level always block is illegal.
 TEST(ElabA811, ThisInModuleAlwaysBlockError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -27,7 +25,6 @@ TEST(ElabA811, ThisInModuleAlwaysBlockError) {
              "endmodule\n"));
 }
 
-// §8.11: 'this' in module-level function is illegal.
 TEST(ElabA811, ThisInModuleFunctionError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -37,7 +34,6 @@ TEST(ElabA811, ThisInModuleFunctionError) {
              "endmodule\n"));
 }
 
-// §8.11: 'this' in non-static class method is legal.
 TEST(ElabA811, ThisInNonStaticClassMethodOk) {
   EXPECT_TRUE(
       ElabOk("class Demo;\n"
@@ -51,7 +47,6 @@ TEST(ElabA811, ThisInNonStaticClassMethodOk) {
              "endmodule\n"));
 }
 
-// §8.11: 'this' in non-static regular method is legal.
 TEST(ElabA811, ThisInRegularMethodOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -65,7 +60,6 @@ TEST(ElabA811, ThisInRegularMethodOk) {
              "endmodule\n"));
 }
 
-// §8.11: Module with no 'this' references elaborates fine.
 TEST(ElabA811, NoThisReferencesOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -76,4 +70,4 @@ TEST(ElabA811, NoThisReferencesOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -5,7 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §E.3: `default_trireg_strength before module.
 TEST(ParserAnnexE2, AnnexEDefaultTriregStrength) {
   auto r = ParseWithPreprocessor(
       "`default_trireg_strength 50\n"
@@ -17,7 +16,6 @@ TEST(ParserAnnexE2, AnnexEDefaultTriregStrength) {
   }
 }
 
-// §E.3: CU propagates default_trireg_strength value.
 TEST(ParserAnnexE2, AnnexEDefaultTriregStrength_CUValue) {
   auto r = ParseWithPreprocessor(
       "`default_trireg_strength 150\n"
@@ -28,7 +26,6 @@ TEST(ParserAnnexE2, AnnexEDefaultTriregStrength_CUValue) {
   EXPECT_EQ(r.cu->default_trireg_strength, 150u);
 }
 
-// §E.3: no directive means has_default_trireg_strength is false.
 TEST(ParserAnnexE2, AnnexEDefaultTriregStrength_NoDirective) {
   auto r = ParseWithPreprocessor("module m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -36,4 +33,4 @@ TEST(ParserAnnexE2, AnnexEDefaultTriregStrength_NoDirective) {
   EXPECT_FALSE(r.cu->has_default_trireg_strength);
 }
 
-}  // namespace
+}

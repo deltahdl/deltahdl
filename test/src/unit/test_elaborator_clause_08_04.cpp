@@ -18,7 +18,6 @@ TEST(ElabA84, PrimaryNullElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §8.4: Class handle assignment of null is legal.
 TEST(ElabA84, ClassHandleAssignNull) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
@@ -28,7 +27,6 @@ TEST(ElabA84, ClassHandleAssignNull) {
              "endmodule\n"));
 }
 
-// §8.4: Class handle assignment from another handle is legal.
 TEST(ElabA84, ClassHandleAssignHandle) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
@@ -38,7 +36,6 @@ TEST(ElabA84, ClassHandleAssignHandle) {
              "endmodule\n"));
 }
 
-// §8.4: Equality comparison (==) on class handles is legal.
 TEST(ElabA84, ClassHandleEqualityAllowed) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
@@ -51,7 +48,6 @@ TEST(ElabA84, ClassHandleEqualityAllowed) {
              "endmodule\n"));
 }
 
-// §8.4: Case equality (===) on class handles is legal.
 TEST(ElabA84, ClassHandleCaseEqualityAllowed) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
@@ -64,7 +60,6 @@ TEST(ElabA84, ClassHandleCaseEqualityAllowed) {
              "endmodule\n"));
 }
 
-// §8.4: Inequality (!=) on class handles is legal.
 TEST(ElabA84, ClassHandleInequalityAllowed) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
@@ -77,7 +72,6 @@ TEST(ElabA84, ClassHandleInequalityAllowed) {
              "endmodule\n"));
 }
 
-// §8.4: Conditional operator on class handle is legal.
 TEST(ElabA84, ClassHandleConditionalAllowed) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
@@ -90,7 +84,6 @@ TEST(ElabA84, ClassHandleConditionalAllowed) {
              "endmodule\n"));
 }
 
-// §8.4: Arithmetic on class handle is illegal.
 TEST(ElabA84, ClassHandleArithmeticError) {
   ElabFixture f;
   ElaborateSrc(
@@ -106,7 +99,6 @@ TEST(ElabA84, ClassHandleArithmeticError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §8.4: Relational comparison on class handle is illegal.
 TEST(ElabA84, ClassHandleRelationalError) {
   ElabFixture f;
   ElaborateSrc(
@@ -122,7 +114,6 @@ TEST(ElabA84, ClassHandleRelationalError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §8.4: Bitwise operation on class handle is illegal.
 TEST(ElabA84, ClassHandleBitwiseError) {
   ElabFixture f;
   ElaborateSrc(
@@ -138,7 +129,6 @@ TEST(ElabA84, ClassHandleBitwiseError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §8.4: Logical negation on class handle is illegal.
 TEST(ElabA84, ClassHandleLogicalNegationError) {
   ElabFixture f;
   ElaborateSrc(
@@ -154,7 +144,6 @@ TEST(ElabA84, ClassHandleLogicalNegationError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §8.4: Increment on class handle is illegal.
 TEST(ElabA84, ClassHandleIncrementError) {
   ElabFixture f;
   ElaborateSrc(
@@ -167,7 +156,6 @@ TEST(ElabA84, ClassHandleIncrementError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §8.4: Shift on class handle is illegal.
 TEST(ElabA84, ClassHandleShiftError) {
   ElabFixture f;
   ElaborateSrc(
@@ -183,7 +171,6 @@ TEST(ElabA84, ClassHandleShiftError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §8.4: Compound assignment (+=) on class handle is illegal.
 TEST(ElabA84, ClassHandleCompoundAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -196,7 +183,6 @@ TEST(ElabA84, ClassHandleCompoundAssignError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §8.4: Bit-select on class handle is illegal.
 TEST(ElabA84, ClassHandleBitSelectError) {
   ElabFixture f;
   ElaborateSrc(
@@ -212,7 +198,6 @@ TEST(ElabA84, ClassHandleBitSelectError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §8.4: Class handle in continuous assignment is illegal.
 TEST(ElabA84, ClassHandleContAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -225,4 +210,4 @@ TEST(ElabA84, ClassHandleContAssignError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

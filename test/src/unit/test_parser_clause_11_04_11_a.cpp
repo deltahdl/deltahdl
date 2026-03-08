@@ -716,4 +716,4 @@ TEST(ParserSection11, Sec11_1_TernaryConditionalFields) {
   VerifyTernaryFieldsAllIdentifier(rhs);
 }
 
-}  // namespace
+}

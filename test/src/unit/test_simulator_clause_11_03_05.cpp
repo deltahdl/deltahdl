@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Helper: build a ternary (condition ? true_expr : false_expr).
 inline Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kTernary;
@@ -16,8 +15,6 @@ inline Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
   return e;
 }
 
-// §11.3.5: Logical AND short-circuits when LHS is 0.
-// When a == 0, b is not needed to determine result is 0.
 TEST(ShortCircuit, LogicalAndShortCircuitsOnFalseLhs) {
   SimFixture f;
   MakeVar(f, "a", 8, 0);
@@ -28,7 +25,6 @@ TEST(ShortCircuit, LogicalAndShortCircuitsOnFalseLhs) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-// §11.3.5: Logical AND evaluates RHS when LHS is nonzero.
 TEST(ShortCircuit, LogicalAndEvaluatesRhsWhenLhsTrue) {
   SimFixture f;
   MakeVar(f, "a", 8, 1);
@@ -39,7 +35,6 @@ TEST(ShortCircuit, LogicalAndEvaluatesRhsWhenLhsTrue) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// §11.3.5: Logical OR short-circuits when LHS is nonzero.
 TEST(ShortCircuit, LogicalOrShortCircuitsOnTrueLhs) {
   SimFixture f;
   MakeVar(f, "a", 8, 5);
@@ -50,7 +45,6 @@ TEST(ShortCircuit, LogicalOrShortCircuitsOnTrueLhs) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// §11.3.5: Logical OR evaluates RHS when LHS is 0.
 TEST(ShortCircuit, LogicalOrEvaluatesRhsWhenLhsFalse) {
   SimFixture f;
   MakeVar(f, "a", 8, 0);
@@ -61,8 +55,6 @@ TEST(ShortCircuit, LogicalOrEvaluatesRhsWhenLhsFalse) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-// §11.3.5: Implication short-circuits when LHS is false.
-// false -> anything = true, without evaluating RHS.
 TEST(ShortCircuit, ImplicationShortCircuitsOnFalseLhs) {
   SimFixture f;
   MakeVar(f, "a", 8, 0);
@@ -73,7 +65,6 @@ TEST(ShortCircuit, ImplicationShortCircuitsOnFalseLhs) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// §11.3.5: Ternary evaluates only the true branch when condition is true.
 TEST(ShortCircuit, TernaryEvaluatesTrueBranchOnly) {
   SimFixture f;
   MakeVar(f, "c", 8, 1);
@@ -86,7 +77,6 @@ TEST(ShortCircuit, TernaryEvaluatesTrueBranchOnly) {
   EXPECT_EQ(result.ToUint64(), 10u);
 }
 
-// §11.3.5: Ternary evaluates only the false branch when condition is false.
 TEST(ShortCircuit, TernaryEvaluatesFalseBranchOnly) {
   SimFixture f;
   MakeVar(f, "c", 8, 0);
@@ -99,7 +89,6 @@ TEST(ShortCircuit, TernaryEvaluatesFalseBranchOnly) {
   EXPECT_EQ(result.ToUint64(), 20u);
 }
 
-// §11.3.5: Bitwise AND does NOT short-circuit — both operands always evaluated.
 TEST(ShortCircuit, BitwiseAndAlwaysEvaluatesBothOperands) {
   SimFixture f;
   MakeVar(f, "a", 8, 0);
@@ -110,4 +99,4 @@ TEST(ShortCircuit, BitwiseAndAlwaysEvaluatesBothOperands) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+}

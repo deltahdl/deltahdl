@@ -23,7 +23,6 @@ TEST(Elaboration, EnumArithNoCast_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §6.19.4: Enum value used in integer expression is auto-cast.
 TEST(Elaboration, EnumToIntAutocast_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,7 +36,6 @@ TEST(Elaboration, EnumToIntAutocast_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19.4: Enum assigned to integer variable is ok (auto-cast).
 TEST(Elaboration, EnumAssignToInt_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,7 +49,6 @@ TEST(Elaboration, EnumAssignToInt_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19.4: Integer comparison with enum is ok.
 TEST(Elaboration, EnumIntComparison_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -66,4 +63,4 @@ TEST(Elaboration, EnumIntComparison_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

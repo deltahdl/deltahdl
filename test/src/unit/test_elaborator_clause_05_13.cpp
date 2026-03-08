@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.13: built-in method elaboration ---
-
 TEST(ElabClause05, Cl5_13_ArraySizeMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -69,4 +67,4 @@ TEST(ElabClause05, Cl5_13_ReductionMethodElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

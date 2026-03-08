@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.10: structure literal elaboration ---
-
 TEST(ElabClause05, Cl5_10_PositionalStructLiteral) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -50,8 +48,6 @@ TEST(ElabClause05, Cl5_10_StructLiteralVarInit) {
              "endmodule\n"));
 }
 
-// --- §5.10: error conditions ---
-
 TEST(ElabClause05, Cl5_10_InvalidMemberName) {
   ElabFixture f;
   ElaborateSrc(
@@ -74,4 +70,4 @@ TEST(ElabClause05, Cl5_10_DuplicateMemberKey) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

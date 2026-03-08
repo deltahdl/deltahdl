@@ -20,7 +20,6 @@ TEST(ParserA26, ElabFunctionAutomaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §13.4.2: Static function elaborates without error.
 TEST(Elab1342, StaticFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,7 +35,6 @@ TEST(Elab1342, StaticFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.2: Static var in automatic function elaborates.
 TEST(Elab1342, StaticVarInAutoFuncElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -52,7 +50,6 @@ TEST(Elab1342, StaticVarInAutoFuncElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.2: Automatic var in static function elaborates.
 TEST(Elab1342, AutoVarInStaticFuncElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -67,7 +64,6 @@ TEST(Elab1342, AutoVarInStaticFuncElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.2: Default lifetime function (no qualifier) elaborates.
 TEST(Elab1342, DefaultLifetimeFuncElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -81,4 +77,4 @@ TEST(Elab1342, DefaultLifetimeFuncElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

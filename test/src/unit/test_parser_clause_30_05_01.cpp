@@ -300,4 +300,4 @@ TEST(ParserA704, SixDelaysEdgeSensitive) {
   ASSERT_EQ(si->path.delays.size(), 6u);
 }
 
-}  // namespace
+}

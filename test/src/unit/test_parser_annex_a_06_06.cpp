@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.6 — conditional statements
-
 TEST(ParserA606, IfBasic) {
   auto r = Parse(
       "module m;\n"
@@ -141,4 +139,4 @@ TEST(ParserA606, IfWithBlock) {
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

@@ -88,4 +88,4 @@ TEST(ParserSection16, SequenceMatchedMethod) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

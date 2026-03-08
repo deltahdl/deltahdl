@@ -4,7 +4,6 @@
 using namespace delta;
 namespace {
 
-// §9.2.2: Four forms of always procedures with distinct ModuleItemKind.
 TEST(ParserA602, AlwaysKeyword_AllFourVariants) {
   auto r = Parse(
       "module m;\n"
@@ -22,7 +21,6 @@ TEST(ParserA602, AlwaysKeyword_AllFourVariants) {
   EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysFFBlock));
 }
 
-// §9.2.2: Each always variant preserves AlwaysKind.
 TEST(ParserClause09_02_02, AlwaysKindPreserved) {
   auto r = Parse(
       "module m;\n"
@@ -48,7 +46,6 @@ TEST(ParserClause09_02_02, AlwaysKindPreserved) {
   EXPECT_EQ(af->always_kind, AlwaysKind::kAlwaysFF);
 }
 
-// §9.2.2: All always forms have a non-null body statement.
 TEST(ParserClause09_02_02, AlwaysFormsHaveBodies) {
   auto r = Parse(
       "module m;\n"
@@ -69,4 +66,4 @@ TEST(ParserClause09_02_02, AlwaysFormsHaveBodies) {
   }
 }
 
-}  // namespace
+}

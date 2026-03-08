@@ -107,4 +107,4 @@ TEST(ParserSection16, PropertyInstanceWithArgs) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

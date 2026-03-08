@@ -6,7 +6,6 @@
 
 using namespace delta;
 
-// Build arr.method with (predicate) expression.
 static Expr* MakeLocatorExpr(Arena& arena, std::string_view var,
                              std::string_view method, Expr* with_expr) {
   auto* call = MakeMethodCall(arena, var, method, {});
@@ -16,7 +15,6 @@ static Expr* MakeLocatorExpr(Arena& arena, std::string_view var,
 
 namespace {
 
-// §7.12.1: unique returns distinct elements.
 TEST(ArrayLocator, UniqueReturnsDistinct) {
   SimFixture f;
   MakeDynArray(f, "arr", {10, 20, 10, 30, 20});
@@ -27,7 +25,6 @@ TEST(ArrayLocator, UniqueReturnsDistinct) {
   EXPECT_EQ(out.size(), 3u);
 }
 
-// §7.12.1: unique_index returns indices of first occurrences.
 TEST(ArrayLocator, UniqueIndexReturnsFirstIndices) {
   SimFixture f;
   MakeDynArray(f, "arr", {10, 20, 10, 30, 20});
@@ -41,11 +38,10 @@ TEST(ArrayLocator, UniqueIndexReturnsFirstIndices) {
   EXPECT_EQ(out[2].ToUint64(), 3u);
 }
 
-// §7.12.1: find with predicate returns matching elements.
 TEST(ArrayLocator, FindWithPredicate) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 15, 25, 35});
-  // with (item > 10)
+
   auto* pred = MakeBinary(f.arena, TokenKind::kGt, MakeId(f.arena, "item"),
                           MakeInt(f.arena, 10));
   auto* expr = MakeLocatorExpr(f.arena, "arr", "find", pred);
@@ -58,7 +54,6 @@ TEST(ArrayLocator, FindWithPredicate) {
   EXPECT_EQ(out[2].ToUint64(), 35u);
 }
 
-// §7.12.1: find_first returns only first match.
 TEST(ArrayLocator, FindFirstReturnsSingleMatch) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 15, 25});
@@ -72,7 +67,6 @@ TEST(ArrayLocator, FindFirstReturnsSingleMatch) {
   EXPECT_EQ(out[0].ToUint64(), 15u);
 }
 
-// §7.12.1: find_last returns last match.
 TEST(ArrayLocator, FindLastReturnsLastMatch) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 15, 25});
@@ -86,7 +80,6 @@ TEST(ArrayLocator, FindLastReturnsLastMatch) {
   EXPECT_EQ(out[0].ToUint64(), 25u);
 }
 
-// §7.12.1: find_index returns indices of all matches.
 TEST(ArrayLocator, FindIndexReturnsMatchingIndices) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 15, 25, 35});
@@ -102,7 +95,6 @@ TEST(ArrayLocator, FindIndexReturnsMatchingIndices) {
   EXPECT_EQ(out[2].ToUint64(), 3u);
 }
 
-// §7.12.1: find_last_index returns index of last match.
 TEST(ArrayLocator, FindLastIndexReturnsLastMatchIndex) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 15, 25, 35});
@@ -116,7 +108,6 @@ TEST(ArrayLocator, FindLastIndexReturnsLastMatchIndex) {
   EXPECT_EQ(out[0].ToUint64(), 3u);
 }
 
-// §7.12.1: find with no matches returns empty.
 TEST(ArrayLocator, FindNoMatchReturnsEmpty) {
   SimFixture f;
   MakeDynArray(f, "arr", {1, 2, 3});
@@ -129,4 +120,4 @@ TEST(ArrayLocator, FindNoMatchReturnsEmpty) {
   EXPECT_EQ(out.size(), 0u);
 }
 
-}  // namespace
+}

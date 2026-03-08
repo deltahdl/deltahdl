@@ -59,7 +59,6 @@ TEST(SimCh6, CastEnumFailure) {
   EXPECT_EQ(c->value.ToUint64(), 0u);
 }
 
-// §6.24.2: $cast as task — valid value succeeds silently.
 TEST(SimCh6, CastEnumTaskValid) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -82,7 +81,6 @@ TEST(SimCh6, CastEnumTaskValid) {
   EXPECT_EQ(c->value.ToUint64(), 2u);
 }
 
-// §6.24.2: $cast in if-condition — returns 0 on failure.
 TEST(SimCh6, CastEnumInCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -108,4 +106,4 @@ TEST(SimCh6, CastEnumInCondition) {
   EXPECT_EQ(flag->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

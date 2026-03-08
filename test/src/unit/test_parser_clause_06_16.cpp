@@ -6,19 +6,16 @@
 using namespace delta;
 namespace {
 
-// §6.16: string type has dynamic width (0 at compile time).
 TEST(TypeEval, StringTypeWidthZero) {
   DataType dt;
   dt.kind = DataTypeKind::kString;
   EXPECT_EQ(EvalTypeWidth(dt), 0u);
 }
 
-// §6.16: string is not integral.
 TEST(TypeEval, StringNotIntegral) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kString));
 }
 
-// §6.16: string is not 4-state.
 TEST(TypeEval, StringNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kString));
 }
@@ -240,4 +237,4 @@ TEST(ParserSection6, MultipleStringDecls) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-}  // namespace
+}

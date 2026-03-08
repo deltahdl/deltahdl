@@ -109,4 +109,4 @@ TEST(Clocking, ScheduleOutputDrive) {
   EXPECT_EQ(data_out->value.ToUint64(), 0x55u);
 }
 
-}  // namespace
+}

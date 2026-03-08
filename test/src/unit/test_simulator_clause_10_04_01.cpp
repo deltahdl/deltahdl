@@ -153,7 +153,6 @@ TEST(StmtExec, BlockingAssignMemberAccess) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §10.4.1: Blocking intra-assignment delay evaluates RHS first, then delays.
 TEST(SimCh10a, BlockingIntraAssignDelay) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -174,7 +173,6 @@ TEST(SimCh10a, BlockingIntraAssignDelay) {
   EXPECT_EQ(a->value.ToUint64(), 42u);
 }
 
-// §10.4.1: Blocking intra-assignment delay blocks procedural flow.
 TEST(SimCh10a, BlockingIntraAssignDelayBlocksFlow) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -199,7 +197,6 @@ TEST(SimCh10a, BlockingIntraAssignDelayBlocksFlow) {
   EXPECT_EQ(c->value.ToUint64(), 99u);
 }
 
-// §10.4.1: Blocking intra-assignment delay captures RHS before delay.
 TEST(SimCh10a, BlockingIntraAssignDelayCapturesRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -220,8 +217,8 @@ TEST(SimCh10a, BlockingIntraAssignDelayCapturesRHS) {
   f.scheduler.Run();
   auto* a = f.ctx.FindVariable("a");
   ASSERT_NE(a, nullptr);
-  // a should get the value of b at time 0 (10), not time 2 (99).
+
   EXPECT_EQ(a->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

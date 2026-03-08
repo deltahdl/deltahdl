@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §E.2: trireg net gets default_decay_time when no explicit decay.
 TEST(Elaborator, DefaultDecayTime_AppliesToTrireg) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -26,7 +25,6 @@ TEST(Elaborator, DefaultDecayTime_AppliesToTrireg) {
   EXPECT_TRUE(found);
 }
 
-// §E.2: trireg with explicit decay ignores default.
 TEST(Elaborator, DefaultDecayTime_ExplicitOverridesDefault) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -48,7 +46,6 @@ TEST(Elaborator, DefaultDecayTime_ExplicitOverridesDefault) {
   EXPECT_TRUE(found);
 }
 
-// §E.2: `default_decay_time infinite means no decay (decay_ticks stays 0).
 TEST(Elaborator, DefaultDecayTime_InfiniteNoDecay) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -70,7 +67,6 @@ TEST(Elaborator, DefaultDecayTime_InfiniteNoDecay) {
   EXPECT_TRUE(found);
 }
 
-// §E.2: no directive means infinite (default) — decay_ticks = 0.
 TEST(Elaborator, DefaultDecayTime_NoDirectiveMeansInfinite) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -91,7 +87,6 @@ TEST(Elaborator, DefaultDecayTime_NoDirectiveMeansInfinite) {
   EXPECT_TRUE(found);
 }
 
-// §E.2: default_decay_time does not affect non-trireg nets.
 TEST(Elaborator, DefaultDecayTime_DoesNotAffectWire) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -113,7 +108,6 @@ TEST(Elaborator, DefaultDecayTime_DoesNotAffectWire) {
   EXPECT_TRUE(found);
 }
 
-// §E.2: later directive overrides earlier at elaborator level.
 TEST(Elaborator, DefaultDecayTime_LaterOverridesAtElabLevel) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -136,7 +130,6 @@ TEST(Elaborator, DefaultDecayTime_LaterOverridesAtElabLevel) {
   EXPECT_TRUE(found);
 }
 
-// §E.2: multiple trireg nets all get the default.
 TEST(Elaborator, DefaultDecayTime_AppliesToAllTriregNets) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -159,4 +152,4 @@ TEST(Elaborator, DefaultDecayTime_AppliesToAllTriregNets) {
   EXPECT_EQ(count, 2);
 }
 
-}  // namespace
+}

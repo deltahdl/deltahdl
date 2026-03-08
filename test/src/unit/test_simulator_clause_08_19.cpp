@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §8.19: PropertyInfo tracks const flag.
 TEST(ClassSim, PropertyInfoConst) {
   SimFixture f;
   auto* info = f.arena.Create<ClassTypeInfo>();
@@ -17,14 +16,12 @@ TEST(ClassSim, PropertyInfoConst) {
   EXPECT_TRUE(info->properties[0].is_const);
 }
 
-// §8.19: Default properties are not const.
 TEST(ClassSim, PropertyInfoNotConstByDefault) {
   SimFixture f;
   auto* type = MakeClassType(f, "Packet", {"x"});
   EXPECT_FALSE(type->properties[0].is_const);
 }
 
-// §8.19: Global constant property value is accessible.
 TEST(ClassSim, GlobalConstantValue) {
   SimFixture f;
   auto* info = f.arena.Create<ClassTypeInfo>();
@@ -38,7 +35,6 @@ TEST(ClassSim, GlobalConstantValue) {
   EXPECT_TRUE(info->properties[0].is_static);
 }
 
-// §8.19: Instance constant property can be set on object.
 TEST(ClassSim, InstanceConstantSetOnObject) {
   SimFixture f;
   auto* info = f.arena.Create<ClassTypeInfo>();
@@ -53,4 +49,4 @@ TEST(ClassSim, InstanceConstantSetOnObject) {
   EXPECT_EQ(obj->GetProperty("size", f.arena).ToUint64(), 4096u);
 }
 
-}  // namespace
+}

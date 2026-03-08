@@ -20,4 +20,4 @@ TEST(ParserSection15, MailboxNewThenPutGet) {
   ASSERT_NE(stmt, nullptr);
 }
 
-}  // namespace
+}

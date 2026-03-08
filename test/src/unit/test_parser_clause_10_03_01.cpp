@@ -85,4 +85,4 @@ TEST(ParserSection6, Sec6_7_1_WireWithInitializer) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-}  // namespace
+}

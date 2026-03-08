@@ -4,8 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §A.2.5 unpacked_dimension ::= [ constant_range ] | [ constant_expression ]
-
 TEST(ParserA25, UnpackedDimensionConstantRange) {
   auto r = Parse("module m; logic x [7:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -36,8 +34,6 @@ TEST(ParserA25, MultipleUnpackedDimensions) {
   EXPECT_EQ(item->unpacked_dims.size(), 2u);
 }
 
-// §A.2.5 packed_dimension ::= [ constant_range ] | unsized_dimension
-
 TEST(ParserA25, PackedDimensionConstantRange) {
   auto r = Parse("module m; logic [15:0] x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -56,8 +52,6 @@ TEST(ParserA25, PackedDimensionMultiple) {
   EXPECT_GE(item->data_type.extra_packed_dims.size(), 1u);
 }
 
-// §A.2.5 unsized_dimension ::= [ ]
-
 TEST(ParserA25, UnsizedDimension) {
   auto r = Parse("module m; logic x []; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -66,8 +60,6 @@ TEST(ParserA25, UnsizedDimension) {
   ASSERT_GE(item->unpacked_dims.size(), 1u);
   EXPECT_EQ(item->unpacked_dims[0], nullptr);
 }
-
-// §A.2.5 associative_dimension ::= [ data_type ] | [ * ]
 
 TEST(ParserA25, AssociativeDimensionWildcard) {
   auto r = Parse("module m; int x [*]; endmodule\n");
@@ -99,8 +91,6 @@ TEST(ParserA25, AssociativeDimensionWithIntType) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "int");
 }
 
-// §A.2.5 queue_dimension ::= [ $ [ : constant_expression ] ]
-
 TEST(ParserA25, QueueDimensionUnbounded) {
   auto r = Parse("module m; int x [$]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -123,8 +113,6 @@ TEST(ParserA25, QueueDimensionBounded) {
   ASSERT_NE(item->unpacked_dims[0]->rhs, nullptr);
   EXPECT_EQ(item->unpacked_dims[0]->rhs->int_val, 255u);
 }
-
-// §A.2.5 variable_dimension covers all four forms
 
 TEST(ParserA25, VariableDimensionOnFuncArg) {
   auto r = Parse(
@@ -157,4 +145,4 @@ TEST(ParserA25, ParamWithUnpackedDims) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
-}  // namespace
+}

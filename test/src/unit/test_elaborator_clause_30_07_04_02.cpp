@@ -18,4 +18,4 @@ TEST(ElabA701, SpecifyBlockWithShowcancelledElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

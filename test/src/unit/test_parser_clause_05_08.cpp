@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.8: time literals in delay statements ---
-
 TEST(ParserClause05, Cl5_8_IntegerNs) {
   auto r = Parse(
       "module m;\n"
@@ -47,8 +45,6 @@ TEST(ParserClause05, Cl5_8_FixedPointUs) {
   EXPECT_TRUE(ParseOk("module m; initial #1.5ns; endmodule"));
 }
 
-// --- §5.8: time literal in wire delay ---
-
 TEST(ParserClause05, Cl5_8_AllUnitsInWireDelay) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -60,8 +56,6 @@ TEST(ParserClause05, Cl5_8_AllUnitsInWireDelay) {
               "  wire #6s w6;\n"
               "endmodule"));
 }
-
-// --- §5.8: timeunit declaration with all six units ---
 
 TEST(ParserClause05, Cl5_8_TimeunitAllSixUnits) {
   EXPECT_EQ(ParseTimescale31402("module m; timeunit 1s; endmodule")
@@ -90,4 +84,4 @@ TEST(ParserClause05, Cl5_8_TimeunitAllSixUnits) {
             TimeUnit::kFs);
 }
 
-}  // namespace
+}

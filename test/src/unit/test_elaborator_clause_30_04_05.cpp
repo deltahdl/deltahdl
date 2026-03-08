@@ -17,4 +17,4 @@ TEST(ElabA702, SimpleFullPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

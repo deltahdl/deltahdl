@@ -2,8 +2,6 @@
 
 namespace {
 
-// §3.4: Programs are containers for testbench code.
-
 TEST(ElabClause03, Cl3_4_ProgramWithDataAndInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -73,4 +71,4 @@ TEST(ElabClause03, Cl3_4_SampleProgramElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

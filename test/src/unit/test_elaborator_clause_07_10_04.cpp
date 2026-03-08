@@ -1,4 +1,4 @@
-// §7.10.4
+
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §10.10: Empty concatenation clears a queue.
 TEST(SimCh10j, EmptyConcatClearsQueue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -28,7 +27,6 @@ TEST(SimCh10j, EmptyConcatClearsQueue) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-// §10.10: Queue target with unpacked array concatenation.
 TEST(ElabCh10j, QueueConcatElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -40,4 +38,4 @@ TEST(ElabCh10j, QueueConcatElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}  // namespace
+}

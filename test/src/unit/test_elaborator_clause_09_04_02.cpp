@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -9,7 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2: Posedge event control elaborates.
 TEST(ElabClause09_04_02, PosedgeEventControlElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -22,7 +21,6 @@ TEST(ElabClause09_04_02, PosedgeEventControlElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.2: Negedge event control elaborates.
 TEST(ElabClause09_04_02, NegedgeEventControlElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -35,7 +33,6 @@ TEST(ElabClause09_04_02, NegedgeEventControlElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.2: Any-change event control (@r) elaborates.
 TEST(ElabClause09_04_02, AnyChangeEventControlElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -48,7 +45,6 @@ TEST(ElabClause09_04_02, AnyChangeEventControlElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.2: Edge detection on LSB — posedge 0→1, negedge 1→0.
 TEST(ElabClause09_04_02, EdgeSensitivityPreservedInRtlir) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -71,7 +67,6 @@ TEST(ElabClause09_04_02, EdgeSensitivityPreservedInRtlir) {
   }
 }
 
-// §9.4.2: Simulator verifies posedge wakeup.
 TEST(Lowerer, PosedgeWakeup) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -99,4 +94,4 @@ TEST(Lowerer, PosedgeWakeup) {
   EXPECT_EQ(count->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

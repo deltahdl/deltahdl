@@ -21,4 +21,4 @@ TEST(AdvSim, AssocArrayExistsAndErase) {
   EXPECT_EQ(arr.Size(), 0u);
 }
 
-}  // namespace
+}

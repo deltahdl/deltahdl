@@ -45,4 +45,4 @@ TEST(SourceText, BindMixedWithOtherDescriptions) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
-}  // namespace
+}

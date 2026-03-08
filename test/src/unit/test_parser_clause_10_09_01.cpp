@@ -181,4 +181,4 @@ TEST(ParserCh511, ArrayLiteral_DefaultValue) {
               "endmodule"));
 }
 
-}  // namespace
+}

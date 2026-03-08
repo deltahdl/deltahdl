@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.12: Class variable declaration with null initial value elaborates.
 TEST(ElabA812, ClassVariableDeclarationOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -15,7 +14,6 @@ TEST(ElabA812, ClassVariableDeclarationOk) {
              "endmodule\n"));
 }
 
-// §8.12: Handle assignment between class variables elaborates.
 TEST(ElabA812, HandleAssignmentOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -30,7 +28,6 @@ TEST(ElabA812, HandleAssignmentOk) {
              "endmodule\n"));
 }
 
-// §8.12: Shallow copy (new <identifier>) elaborates.
 TEST(ElabA812, ShallowCopyOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -45,7 +42,6 @@ TEST(ElabA812, ShallowCopyOk) {
              "endmodule\n"));
 }
 
-// §8.12: Chained member access through class objects elaborates.
 TEST(ElabA812, ChainedMemberAccessOk) {
   EXPECT_TRUE(
       ElabOk("class A;\n"
@@ -64,4 +60,4 @@ TEST(ElabA812, ChainedMemberAccessOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

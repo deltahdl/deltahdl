@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §9.5: Each initial procedure creates a process thread.
 TEST(ElabClause09_05, InitialCreatesProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -20,7 +19,6 @@ TEST(ElabClause09_05, InitialCreatesProcess) {
             RtlirProcessKind::kInitial);
 }
 
-// §9.5: Each final procedure creates a process thread.
 TEST(ElabClause09_05, FinalCreatesProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,7 +34,6 @@ TEST(ElabClause09_05, FinalCreatesProcess) {
             RtlirProcessKind::kFinal);
 }
 
-// §9.5: Each always procedure creates a process thread.
 TEST(ElabClause09_05, AlwaysCreatesProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -52,7 +49,6 @@ TEST(ElabClause09_05, AlwaysCreatesProcess) {
             RtlirProcessKind::kAlways);
 }
 
-// §9.5: Each always_comb creates a process thread.
 TEST(ElabClause09_05, AlwaysCombCreatesProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -68,7 +64,6 @@ TEST(ElabClause09_05, AlwaysCombCreatesProcess) {
             RtlirProcessKind::kAlwaysComb);
 }
 
-// §9.5: Each always_latch creates a process thread.
 TEST(ElabClause09_05, AlwaysLatchCreatesProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -84,7 +79,6 @@ TEST(ElabClause09_05, AlwaysLatchCreatesProcess) {
             RtlirProcessKind::kAlwaysLatch);
 }
 
-// §9.5: Each always_ff creates a process thread.
 TEST(ElabClause09_05, AlwaysFFCreatesProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -100,7 +94,6 @@ TEST(ElabClause09_05, AlwaysFFCreatesProcess) {
             RtlirProcessKind::kAlwaysFF);
 }
 
-// §9.5: Multiple procedures each create their own process thread.
 TEST(ElabClause09_05, MultipleProceduresCreateMultipleProcesses) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -117,7 +110,6 @@ TEST(ElabClause09_05, MultipleProceduresCreateMultipleProcesses) {
   EXPECT_EQ(design->top_modules[0]->processes.size(), 4u);
 }
 
-// §9.5: Continuous assignments are separate from process threads.
 TEST(ElabClause09_05, ContAssignSeparateFromProcesses) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -133,4 +125,4 @@ TEST(ElabClause09_05, ContAssignSeparateFromProcesses) {
   EXPECT_GE(design->top_modules[0]->assigns.size(), 1u);
 }
 
-}  // namespace
+}

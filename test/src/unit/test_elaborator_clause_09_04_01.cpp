@@ -1,4 +1,4 @@
-// Non-LRM tests
+
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -9,7 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.1: Delay control in initial block elaborates.
 TEST(ElabClause09_04_01, DelayControlInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -24,7 +23,6 @@ TEST(ElabClause09_04_01, DelayControlInInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.1: Expression delay elaborates.
 TEST(ElabClause09_04_01, ExpressionDelayElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -39,7 +37,6 @@ TEST(ElabClause09_04_01, ExpressionDelayElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.1: Delay in always block elaborates (general purpose always).
 TEST(ElabClause09_04_01, DelayInAlwaysElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -52,7 +49,6 @@ TEST(ElabClause09_04_01, DelayInAlwaysElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.1: Simulator verifies delay advances time.
 TEST(Lowerer, DelayBasic) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -76,4 +72,4 @@ TEST(Lowerer, DelayBasic) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

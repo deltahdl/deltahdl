@@ -6,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §7.9.7: prev() finds largest index smaller than given.
 TEST(AssocTraversal, PrevFindsPredecessor) {
   SimFixture f;
   auto [aa, ref] = MakeAssocWith3Entries(f);
@@ -19,7 +18,6 @@ TEST(AssocTraversal, PrevFindsPredecessor) {
   EXPECT_EQ(ref->value.ToUint64(), 20u);
 }
 
-// §7.9.7: prev() returns 0 when at first element.
 TEST(AssocTraversal, PrevReturnsZeroAtBegin) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -35,4 +33,4 @@ TEST(AssocTraversal, PrevReturnsZeroAtBegin) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-}  // namespace
+}

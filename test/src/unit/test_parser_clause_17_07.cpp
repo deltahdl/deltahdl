@@ -41,4 +41,4 @@ TEST_F(VerifyParseTest, CheckerWithRandConstVariable) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}  // namespace
+}

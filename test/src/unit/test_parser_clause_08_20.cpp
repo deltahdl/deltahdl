@@ -116,7 +116,6 @@ TEST(ParserSection8, ClassWithVirtualMethod) {
   EXPECT_TRUE(found);
 }
 
-// §8.20: :initial specifier is stored on method.
 TEST(ParserA820, InitialSpecifierStored) {
   auto r = Parse(
       "class C;\n"
@@ -130,7 +129,6 @@ TEST(ParserA820, InitialSpecifierStored) {
   EXPECT_FALSE(m->is_method_final);
 }
 
-// §8.20: :extends specifier is stored on method.
 TEST(ParserA820, ExtendsSpecifierStored) {
   auto r = Parse(
       "class C;\n"
@@ -143,7 +141,6 @@ TEST(ParserA820, ExtendsSpecifierStored) {
   EXPECT_TRUE(m->is_method_extends);
 }
 
-// §8.20: :final specifier is stored on method.
 TEST(ParserA820, FinalSpecifierStored) {
   auto r = Parse(
       "class C;\n"
@@ -155,7 +152,6 @@ TEST(ParserA820, FinalSpecifierStored) {
   EXPECT_TRUE(m->is_method_final);
 }
 
-// §8.20: :initial :final combined specifiers.
 TEST(ParserA820, InitialFinalCombined) {
   auto r = Parse(
       "class C;\n"
@@ -169,7 +165,6 @@ TEST(ParserA820, InitialFinalCombined) {
   EXPECT_TRUE(m->is_method_final);
 }
 
-// §8.20: :extends :final combined specifiers.
 TEST(ParserA820, ExtendsFinalCombined) {
   auto r = Parse(
       "class C;\n"
@@ -183,7 +178,6 @@ TEST(ParserA820, ExtendsFinalCombined) {
   EXPECT_TRUE(m->is_method_final);
 }
 
-// §8.20: Derived override without virtual keyword parses.
 TEST(ParserA820, DerivedOverrideWithoutVirtual) {
   EXPECT_TRUE(
       ParseOk("class Base;\n"
@@ -194,7 +188,6 @@ TEST(ParserA820, DerivedOverrideWithoutVirtual) {
               "endclass\n"));
 }
 
-// §8.20: task with :initial specifier stores it.
 TEST(ParserA820, TaskInitialSpecifier) {
   auto r = Parse(
       "class C;\n"
@@ -238,4 +231,4 @@ TEST(ParserClause08_03, TaskDynamicOverrideSpecifiers) {
   ASSERT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

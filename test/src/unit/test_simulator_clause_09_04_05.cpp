@@ -37,4 +37,4 @@ TEST(TimingControl, RepeatCountNegativeUnsignedExecutes) {
   EXPECT_GT(result, 0u);
 }
 
-}  // namespace
+}

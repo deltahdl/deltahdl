@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §13.3.2: Static task variables retain values between invocations.
 TEST(Sim13032, StaticTaskRetainsValues) {
   auto val = RunAndGet(
       "module t;\n"
@@ -21,11 +20,10 @@ TEST(Sim13032, StaticTaskRetainsValues) {
       "  end\n"
       "endmodule\n",
       "result");
-  // sum persists: 10 → 30 → 60
+
   EXPECT_EQ(val, 60u);
 }
 
-// §13.3.2: Automatic task variables are fresh each invocation.
 TEST(Sim13032, AutomaticTaskFreshVars) {
   auto val = RunAndGet(
       "module t;\n"
@@ -42,11 +40,10 @@ TEST(Sim13032, AutomaticTaskFreshVars) {
       "  end\n"
       "endmodule\n",
       "result");
-  // sum starts at 0 each call (automatic): 0+30 = 30
+
   EXPECT_EQ(val, 30u);
 }
 
-// §13.3.2: Static task input/output/inout args also retain values.
 TEST(Sim13032, StaticTaskArgsRetainValues) {
   auto val = RunAndGet(
       "module t;\n"
@@ -65,7 +62,6 @@ TEST(Sim13032, StaticTaskArgsRetainValues) {
   EXPECT_EQ(val, 3u);
 }
 
-// §13.3.2: Automatic task output args initialized from caller.
 TEST(Sim13032, AutomaticTaskInputFromCaller) {
   auto val = RunAndGet(
       "module t;\n"
@@ -82,4 +78,4 @@ TEST(Sim13032, AutomaticTaskInputFromCaller) {
   EXPECT_EQ(val, 42u);
 }
 
-}  // namespace
+}

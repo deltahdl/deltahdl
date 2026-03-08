@@ -54,4 +54,4 @@ TEST(ParserSection7, StructMemberAccess) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-}  // namespace
+}

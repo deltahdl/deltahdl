@@ -43,4 +43,4 @@ TEST(ParserSection8, ClassWithQualifiersStaticRand) {
   EXPECT_TRUE(cls->members[3]->is_rand);
 }
 
-}  // namespace
+}

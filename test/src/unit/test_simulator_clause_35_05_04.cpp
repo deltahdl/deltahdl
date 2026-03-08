@@ -30,4 +30,4 @@ TEST(DpiRuntime, RegisterImportAndCall) {
   EXPECT_EQ(result.AsInt(), 30);
 }
 
-}  // namespace
+}

@@ -46,4 +46,4 @@ TEST(ParserSection19, ClockingBlockEvent_DotAccess) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

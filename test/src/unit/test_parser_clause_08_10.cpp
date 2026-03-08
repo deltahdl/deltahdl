@@ -42,7 +42,6 @@ TEST(ParserSection13, Sec13_8_MultiArgParameterizedWidth) {
               "endclass\n"));
 }
 
-// §8.10: Static function declaration parses correctly.
 TEST(ParserA810, StaticFunctionDeclaration) {
   auto r = Parse(
       "class id;\n"
@@ -61,7 +60,6 @@ TEST(ParserA810, StaticFunctionDeclaration) {
   EXPECT_EQ(m->method->name, "next_id");
 }
 
-// §8.10: Static task declaration parses correctly.
 TEST(ParserA810, StaticTaskDeclaration) {
   auto r = Parse(
       "class Logger;\n"
@@ -76,7 +74,6 @@ TEST(ParserA810, StaticTaskDeclaration) {
   EXPECT_TRUE(cls->members[0]->is_static);
 }
 
-// §8.10: Static methods cannot be virtual.
 TEST(ParserA810, StaticVirtualFunctionError) {
   auto r = Parse(
       "class C;\n"
@@ -87,7 +84,6 @@ TEST(ParserA810, StaticVirtualFunctionError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §8.10: Static virtual task is also illegal.
 TEST(ParserA810, StaticVirtualTaskError) {
   auto r = Parse(
       "class C;\n"
@@ -97,7 +93,6 @@ TEST(ParserA810, StaticVirtualTaskError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §8.10: Static method called via class scope resolution.
 TEST(ParserA810, StaticMethodClassScopeCall) {
   ParseOk(
       "class id;\n"
@@ -113,7 +108,6 @@ TEST(ParserA810, StaticMethodClassScopeCall) {
       "endmodule\n");
 }
 
-// §8.10: Static method called via instance dot notation.
 TEST(ParserA810, StaticMethodInstanceDotCall) {
   ParseOk(
       "class C;\n"
@@ -130,7 +124,6 @@ TEST(ParserA810, StaticMethodInstanceDotCall) {
       "endmodule\n");
 }
 
-// §8.10: Static method is distinct from static lifetime on task.
 TEST(ParserA810, StaticMethodVsStaticLifetime) {
   auto r = Parse(
       "class TwoTasks;\n"
@@ -141,8 +134,8 @@ TEST(ParserA810, StaticMethodVsStaticLifetime) {
   EXPECT_FALSE(r.has_errors);
   auto* cls = r.cu->classes[0];
   ASSERT_GE(cls->members.size(), 1u);
-  // The 'static' is the class qualifier, not lifetime.
+
   EXPECT_TRUE(cls->members[0]->is_static);
 }
 
-}  // namespace
+}

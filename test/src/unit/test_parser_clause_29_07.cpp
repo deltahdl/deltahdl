@@ -38,4 +38,4 @@ TEST(ParserAnnexA053, InitStmt_Parsed) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
-}  // namespace
+}

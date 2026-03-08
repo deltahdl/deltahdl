@@ -16,4 +16,4 @@ TEST(ParserA25, QueueDimElaboratesBounded) {
   EXPECT_EQ(mod->variables[0].queue_max_size, 256);
 }
 
-}  // namespace
+}

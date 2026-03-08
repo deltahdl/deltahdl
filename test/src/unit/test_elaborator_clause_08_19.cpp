@@ -4,7 +4,6 @@ using namespace delta;
 
 namespace {
 
-// §8.19: Global constant (const with initializer) is OK.
 TEST(ElabA819, GlobalConstantOk) {
   EXPECT_TRUE(
       ElabOk("class Jumbo_Packet;\n"
@@ -15,7 +14,6 @@ TEST(ElabA819, GlobalConstantOk) {
              "endmodule\n"));
 }
 
-// §8.19: Static const with initializer (global constant) is OK.
 TEST(ElabA819, StaticConstGlobalOk) {
   EXPECT_TRUE(
       ElabOk("class Config;\n"
@@ -26,7 +24,6 @@ TEST(ElabA819, StaticConstGlobalOk) {
              "endmodule\n"));
 }
 
-// §8.19: Instance constant (const without initializer) is OK.
 TEST(ElabA819, InstanceConstantOk) {
   EXPECT_TRUE(
       ElabOk("class Big_Packet;\n"
@@ -40,7 +37,6 @@ TEST(ElabA819, InstanceConstantOk) {
              "endmodule\n"));
 }
 
-// §8.19: Instance constant (no init) declared static is an error.
 TEST(ElabA819, InstanceConstStaticError) {
   EXPECT_FALSE(
       ElabOk("class Bad;\n"
@@ -51,4 +47,4 @@ TEST(ElabA819, InstanceConstStaticError) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

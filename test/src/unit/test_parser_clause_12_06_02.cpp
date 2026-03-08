@@ -88,4 +88,4 @@ TEST(ParserA60701, MatchesWithTripleAndInIf) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

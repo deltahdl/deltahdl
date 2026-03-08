@@ -265,4 +265,4 @@ TEST(ParserSection10, Sec10_4_1_Concatenation) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-}  // namespace
+}

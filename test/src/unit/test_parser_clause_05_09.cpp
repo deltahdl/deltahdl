@@ -5,8 +5,6 @@ using namespace delta;
 
 namespace {
 
-// --- §5.9: string literal in primary expression ---
-
 TEST(ParserClause05, Cl5_9_PrimaryStringLiteral) {
   auto r = Parse("module m; initial x = \"hello\"; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -25,8 +23,6 @@ TEST(ParserClause05, Cl5_9_ConstantPrimaryStringLiteral) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kStringLiteral);
 }
 
-// --- §5.9: string literal in system call ---
-
 TEST(ParserClause05, Cl5_9_StringInSystemCall) {
   auto r = Parse(
       "module m;\n"
@@ -40,8 +36,6 @@ TEST(ParserClause05, Cl5_9_StringInSystemCall) {
   ASSERT_GE(stmt->expr->args.size(), 1u);
   EXPECT_EQ(stmt->expr->args[0]->kind, ExprKind::kStringLiteral);
 }
-
-// --- §5.9: string literal assignment ---
 
 TEST(ParserClause05, Cl5_9_StringAssignment) {
   EXPECT_TRUE(
@@ -58,16 +52,12 @@ TEST(ParserClause05, Cl5_9_StringPackedArray) {
               "endmodule"));
 }
 
-// --- §5.9: string in concatenation ---
-
 TEST(ParserClause05, Cl5_9_StringInConcatenation) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial $display({\"A\", \"B\"});\n"
               "endmodule"));
 }
-
-// --- §5.9: string literal with escaped content ---
 
 TEST(ParserClause05, Cl5_9_StringWithWorld) {
   auto r = Parse("module m; initial x = \"world\"; endmodule\n");
@@ -78,4 +68,4 @@ TEST(ParserClause05, Cl5_9_StringWithWorld) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-}  // namespace
+}

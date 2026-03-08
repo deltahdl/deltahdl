@@ -7,11 +7,10 @@ using namespace delta;
 
 namespace {
 
-// §7.12.4: item.index in with-clause provides the element index.
 TEST(ArrayIterator, ItemIndexInFindIndex) {
   SimFixture f;
   MakeDynArray(f, "arr", {100, 200, 300});
-  // with (item.index > 0) — selects indices 1 and 2.
+
   auto* pred = MakeBinary(f.arena, TokenKind::kGt,
                           MakeId(f.arena, "item.index"), MakeInt(f.arena, 0));
   auto* call = MakeMethodCall(f.arena, "arr", "find_index", {});
@@ -24,11 +23,10 @@ TEST(ArrayIterator, ItemIndexInFindIndex) {
   EXPECT_EQ(out[1].ToUint64(), 2u);
 }
 
-// §7.12.4: item.index used in find returns elements at matching indices.
 TEST(ArrayIterator, ItemIndexInFind) {
   SimFixture f;
   MakeDynArray(f, "arr", {10, 20, 30, 40});
-  // with (item.index < 2) — selects elements at indices 0 and 1.
+
   auto* pred = MakeBinary(f.arena, TokenKind::kLt,
                           MakeId(f.arena, "item.index"), MakeInt(f.arena, 2));
   auto* call = MakeMethodCall(f.arena, "arr", "find", {});
@@ -41,4 +39,4 @@ TEST(ArrayIterator, ItemIndexInFind) {
   EXPECT_EQ(out[1].ToUint64(), 20u);
 }
 
-}  // namespace
+}

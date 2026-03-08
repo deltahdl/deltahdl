@@ -80,4 +80,4 @@ TEST(TimingControl, ImplicitSensitivityMixedRoles) {
   EXPECT_EQ(result.size(), 3u);
 }
 
-}  // namespace
+}

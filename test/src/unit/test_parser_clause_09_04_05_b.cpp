@@ -188,7 +188,6 @@ TEST(ParserA602, BlockingAssignment_WithIntraDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-// §10.4.1: Blocking with intra-assignment event control.
 TEST(ParserSection10, Sec10_4_1_IntraAssignEventControl) {
   auto r = Parse(
       "module m;\n"
@@ -205,4 +204,4 @@ TEST(ParserSection10, Sec10_4_1_IntraAssignEventControl) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-}  // namespace
+}
