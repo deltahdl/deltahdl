@@ -221,7 +221,7 @@ def test_file_without_tests_exits_zero(tmp_path):
     env = _base_env(tmp_path, fake)
     _write_test_file(tmp_path, "#include <gtest/gtest.h>\n")
     result = _invoke(
-        *_all_flags(tmp_path),
+        *_all_flags(tmp_path), "--no-commit",
         cwd=str(tmp_path), env=env,
     )
     assert result.returncode == 0
@@ -233,7 +233,7 @@ def test_file_without_tests_deletes_file(tmp_path):
     env = _base_env(tmp_path, fake)
     f = _write_test_file(tmp_path, "#include <gtest/gtest.h>\n")
     _invoke(
-        *_all_flags(tmp_path),
+        *_all_flags(tmp_path), "--no-commit",
         cwd=str(tmp_path), env=env,
     )
     assert not f.exists()
