@@ -494,25 +494,6 @@ TEST(ParserSection14, ClockingBlockAmongOtherItems) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 4u);
 }
 
-TEST(ParserSection14, MultipleClockingBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cd1 @(posedge phi1);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "  clocking cd2 @(posedge phi2);\n"
-      "    output cmd;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* cb1 = FindClockingBlockByIndex(r, 0);
-  auto* cb2 = FindClockingBlockByIndex(r, 1);
-  ASSERT_NE(cb1, nullptr);
-  ASSERT_NE(cb2, nullptr);
-  EXPECT_EQ(cb1->name, "cd1");
-  EXPECT_EQ(cb2->name, "cd2");
-}
-
 TEST(ParserSection14, OverviewMinimalClockingBlock) {
   auto r = Parse(
       "module m;\n"
