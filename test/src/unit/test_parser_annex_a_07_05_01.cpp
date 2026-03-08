@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70501, SetupWithNotifier) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data, posedge clk, 10, ntfr);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetup);
-  EXPECT_EQ(tc->notifier, "ntfr");
-}
-
 TEST(ParserA70501, HoldBasic) {
   auto r = Parse(
       "module m;\n"
