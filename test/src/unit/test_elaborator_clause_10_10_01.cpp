@@ -74,4 +74,16 @@ TEST(UnpackedArrayConcatElaborates, UnpackedArrayConcatElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
+// §10.10: Array items in unpacked array concatenation elaborate.
+TEST(ArrayItemExpansionElaborates, ArrayItemExpansionElaborates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int A[2], B[2], C[4];\n"
+      "  initial C = {A, B};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+}
+
 }  // namespace
