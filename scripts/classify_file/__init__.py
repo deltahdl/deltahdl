@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from classify_test._git import commit_and_push
+from lib.python.git import commit_and_push
 from classify_test._github import fetch_issue_body, update_issue_body
 from lib.python.github import close_issue
 from lib.python.classify import (

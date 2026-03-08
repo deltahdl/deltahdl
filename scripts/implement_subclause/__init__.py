@@ -12,6 +12,7 @@ from pathlib import Path
 
 from classify_test import clause_to_filename
 from classify_test._patterns import STAGE_TO_PREFIX
+from lib.python.git import commit_and_push, run_git
 
 
 # ---------------------------------------------------------------------------
@@ -186,6 +187,31 @@ def invoke_claude(
         sys.exit(1)
 
 
+def get_dirty_files():
+    """Return (changed, deleted) file lists from git status --porcelain."""
+    result = run_git(["git", "status", "--porcelain"])
+    changed = []
+    deleted = []
+    for line in result.stdout.splitlines():
+        if not line:
+            continue
+        status = line[:2]
+        path = line[3:]
+        if status.strip() == "D":
+            deleted.append(path)
+        else:
+            changed.append(path)
+    return changed, deleted
+
+
+def commit_implementation(subclause):
+    """Commit and push all dirty files after implementation."""
+    changed, deleted = get_dirty_files()
+    trailer = "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+    message = f"Implement §{subclause}\n\n{trailer}\n"
+    commit_and_push(changed, deleted, message)
+
+
 def run_prompt(build_fn, args: argparse.Namespace) -> None:
     """Build a prompt via *build_fn* and invoke Claude."""
     prompt = build_fn(args.subclause, str(args.lrm), issue=args.issue)
@@ -266,3 +292,4 @@ def main(argv=None):
     )
 
     run_prompt(build_prompt, args)
+    commit_implementation(args.subclause)
