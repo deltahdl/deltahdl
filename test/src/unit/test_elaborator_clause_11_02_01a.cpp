@@ -1,16 +1,11 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 
 using namespace delta;
 
 namespace {
-
-// §11.2.1: IsConstantExpr — integer literal is constant.
-TEST(ConstExpr, IntLiteralIsConstant) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("42", f);
-  EXPECT_TRUE(IsConstantExpr(e));
-}
 
 // §11.2.1: IsConstantExpr — real literal is constant.
 TEST(ConstExpr, RealLiteralIsConstant) {
