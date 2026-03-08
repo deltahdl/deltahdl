@@ -107,4 +107,15 @@ TEST(ParserSection28, SpecifyBlockWithSpecparam) {
   EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kPathDecl));
 }
 
+TEST(ParserA701, SpecparamMultipleDecls) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    specparam tRISE = 100, tFALL = 200;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
