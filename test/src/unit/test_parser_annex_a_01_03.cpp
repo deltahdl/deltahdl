@@ -1,22 +1,10 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
-
-// §A.1.3 Module parameters and ports
-
-// parameter_port_list ::= # ( list_of_param_assignments { , ... } )
-TEST(ParserAnnexA, A1ModuleWithParams) {
-  auto r = Parse(
-      "module m #(parameter W = 8, parameter D = 4)(\n"
-      "  input logic [W-1:0] data\n"
-      ");\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->params.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 1u);
-}
 
 // parameter_port_list ::= #( )
 TEST(ModuleParamsA13, EmptyParamPortList) {
