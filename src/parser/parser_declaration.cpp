@@ -1,0 +1,501 @@
+#include <optional>
+
+#include "parser/parser.h"
+
+namespace delta {
+
+// --- Defparam parsing ---
+
+ModuleItem* Parser::ParseDefparam() {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kDefparam;
+  item->loc = CurrentLoc();
+  Expect(TokenKind::kKwDefparam);
+
+  do {
+    Expr* path = ParseExpr();
+    Expect(TokenKind::kEq);
+    Expr* value = ParseMinTypMaxExpr();
+    item->defparam_assigns.emplace_back(path, value);
+  } while (Match(TokenKind::kComma));
+  Expect(TokenKind::kSemicolon);
+  return item;
+}
+
+// --- Enum type parsing ---
+
+DataType Parser::ParseEnumType() {
+  DataType dtype;
+  dtype.kind = DataTypeKind::kEnum;
+  Expect(TokenKind::kKwEnum);
+
+  // Optional base type (e.g. enum logic [7:0] { ... }).
+  auto base = ParseDataType();
+  if (base.kind != DataTypeKind::kImplicit) {
+    dtype.is_signed = base.is_signed;
+    dtype.packed_dim_left = base.packed_dim_left;
+    dtype.packed_dim_right = base.packed_dim_right;
+  }
+
+  dtype = ParseEnumBody(dtype);
+
+  return dtype;
+}
+
+// --- Enum body with range syntax (§6.19.2) ---
+
+DataType Parser::ParseEnumBody(const DataType& base) {
+  DataType dtype = base;
+  Expect(TokenKind::kLBrace);
+  do {
+    EnumMember member;
+    member.name = Expect(TokenKind::kIdentifier).text;
+    // Optional range: name[N] or name[N:M] (§6.19.2)
+    if (Match(TokenKind::kLBracket)) {
+      member.range_start = ParseExpr();
+      if (Match(TokenKind::kColon)) {
+        member.range_end = ParseExpr();
+      }
+      Expect(TokenKind::kRBracket);
+    }
+    if (Match(TokenKind::kEq)) {
+      member.value = ParseExpr();
+    }
+    dtype.enum_members.push_back(member);
+  } while (Match(TokenKind::kComma));
+  Expect(TokenKind::kRBrace);
+  return dtype;
+}
+
+// --- Struct/union type parsing ---
+
+DataType Parser::ParseStructOrUnionType() {
+  DataType dtype;
+  dtype.kind = Check(TokenKind::kKwStruct) ? DataTypeKind::kStruct
+                                           : DataTypeKind::kUnion;
+  Consume();  // struct or union
+
+  // Union qualifiers: tagged, soft (§7.3)
+  if (dtype.kind == DataTypeKind::kUnion) {
+    if (Match(TokenKind::kKwTagged)) dtype.is_tagged = true;
+    if (Match(TokenKind::kKwSoft)) dtype.is_soft = true;
+  }
+
+  if (Match(TokenKind::kKwPacked)) {
+    dtype.is_packed = true;
+    if (Match(TokenKind::kKwSigned)) {
+      dtype.is_signed = true;
+    } else {
+      Match(TokenKind::kKwUnsigned);
+    }
+  }
+
+  ParseStructMembers(dtype);
+  return dtype;
+}
+
+DataType Parser::ParseStructOrUnionBody(TokenKind kw) {
+  DataType dtype;
+  dtype.kind = (kw == TokenKind::kKwStruct) ? DataTypeKind::kStruct
+                                            : DataTypeKind::kUnion;
+  ParseStructMembers(dtype);
+  return dtype;
+}
+
+void Parser::ParseStructMembers(DataType& dtype) {
+  Expect(TokenKind::kLBrace);
+  while (!Check(TokenKind::kRBrace) && !AtEnd()) {
+    // A.2.2.1: {attribute_instance} [random_qualifier] data_type_or_void ...
+    auto member_attrs = ParseAttributes();
+    bool is_rand = Match(TokenKind::kKwRand);
+    bool is_randc = !is_rand && Match(TokenKind::kKwRandc);
+
+    DataType member_type;
+    if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+      member_type = ParseStructOrUnionType();
+    } else {
+      member_type = ParseDataType();
+    }
+    if (member_type.kind == DataTypeKind::kImplicit && !CheckIdentifier()) {
+      Synchronize();
+      continue;
+    }
+    do {
+      StructMember member;
+      member.type_kind = member_type.kind;
+      member.is_signed = member_type.is_signed;
+      member.is_rand = is_rand;
+      member.is_randc = is_randc;
+      member.attrs = member_attrs;
+      member.packed_dim_left = member_type.packed_dim_left;
+      member.packed_dim_right = member_type.packed_dim_right;
+      member.extra_packed_dims = member_type.extra_packed_dims;
+      member.name = Expect(TokenKind::kIdentifier).text;
+      ParseUnpackedDims(member.unpacked_dims);
+      if (Match(TokenKind::kEq)) {
+        member.init_expr = ParseExpr();
+      }
+      dtype.struct_members.push_back(member);
+    } while (Match(TokenKind::kComma));
+    Expect(TokenKind::kSemicolon);
+  }
+  Expect(TokenKind::kRBrace);
+}
+
+// --- Typedef parsing ---
+
+ModuleItem* Parser::ParseTypedef() {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kTypedef;
+  item->loc = CurrentLoc();
+  Expect(TokenKind::kKwTypedef);
+
+  // A.2.1.3 forward_type: typedef [enum|struct|union|class|interface class] id
+  // ;
+  if (Check(TokenKind::kKwClass) || Check(TokenKind::kKwInterface)) {
+    Consume();
+    if (Check(TokenKind::kKwClass)) Consume();  // "interface class"
+    item->name = Expect(TokenKind::kIdentifier).text;
+    known_types_.insert(item->name);
+    Expect(TokenKind::kSemicolon);
+    return item;
+  }
+  // Forward typedef for enum/struct/union: typedef enum|struct|union IDENT ;
+  if (Check(TokenKind::kKwEnum) || Check(TokenKind::kKwStruct) ||
+      Check(TokenKind::kKwUnion)) {
+    auto saved = lexer_.SavePos();
+    Consume();  // enum/struct/union
+    if (CheckIdentifier()) {
+      auto id_saved = lexer_.SavePos();
+      auto id_tok = Consume();
+      if (Check(TokenKind::kSemicolon)) {
+        // Forward declaration: typedef enum/struct/union IDENT ;
+        item->name = id_tok.text;
+        known_types_.insert(item->name);
+        Expect(TokenKind::kSemicolon);
+        return item;
+      }
+      lexer_.RestorePos(id_saved);
+    }
+    lexer_.RestorePos(saved);
+  }
+  if (Check(TokenKind::kKwEnum)) {
+    item->typedef_type = ParseEnumType();
+  } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+    item->typedef_type = ParseStructOrUnionType();
+  } else {
+    item->typedef_type = ParseDataType();
+  }
+
+  item->name = Expect(TokenKind::kIdentifier).text;
+  ParseUnpackedDims(item->unpacked_dims);
+  known_types_.insert(item->name);
+  Expect(TokenKind::kSemicolon);
+  return item;
+}
+
+ModuleItem* Parser::ParseNettypeDecl() {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kNettypeDecl;
+  item->loc = CurrentLoc();
+  Expect(TokenKind::kKwNettype);
+  item->typedef_type = ParseDataType();
+  item->name = Expect(TokenKind::kIdentifier).text;
+  // A.2.1.3: with [ package_scope | class_scope ] tf_identifier
+  if (Check(TokenKind::kKwWith)) {
+    Consume();
+    auto func_name = Expect(TokenKind::kIdentifier).text;
+    if (Match(TokenKind::kColonColon)) {
+      // Scoped: pkg::func or class::func — store the function name
+      item->nettype_resolve_func = Expect(TokenKind::kIdentifier).text;
+    } else {
+      item->nettype_resolve_func = func_name;
+    }
+  }
+  known_types_.insert(item->name);
+  Expect(TokenKind::kSemicolon);
+  return item;
+}
+
+std::vector<FunctionArg> Parser::ParseFunctionArgs() {
+  std::vector<FunctionArg> args;
+  Expect(TokenKind::kLParen);
+  if (Check(TokenKind::kRParen)) {
+    Consume();
+    return args;
+  }
+  Direction sticky_dir = Direction::kNone;
+  bool seen_default = false;
+  do {
+    FunctionArg arg;
+    // §8.3: class_constructor_arg ::= tf_port_item | default
+    if (Check(TokenKind::kKwDefault)) {
+      if (seen_default) {
+        diag_.Error(CurrentLoc(),
+                    "'default' keyword shall appear at most once "
+                    "in a class constructor argument list");
+      }
+      seen_default = true;
+      arg.is_default = true;
+      Consume();
+      args.push_back(arg);
+      continue;
+    }
+    // A.2.7 tf_port_direction: [const] ref [static]
+    if (Match(TokenKind::kKwConst)) {
+      arg.is_const = true;
+    }
+    if (Check(TokenKind::kKwInput)) {
+      arg.direction = Direction::kInput;
+      sticky_dir = Direction::kInput;
+      Consume();
+    } else if (Check(TokenKind::kKwOutput)) {
+      arg.direction = Direction::kOutput;
+      sticky_dir = Direction::kOutput;
+      Consume();
+    } else if (Check(TokenKind::kKwInout)) {
+      arg.direction = Direction::kInout;
+      sticky_dir = Direction::kInout;
+      Consume();
+    } else if (Check(TokenKind::kKwRef)) {
+      arg.direction = Direction::kRef;
+      sticky_dir = Direction::kRef;
+      Consume();
+      Match(TokenKind::kKwStatic);  // A.2.7: ref [static]
+    } else {
+      arg.direction = sticky_dir;
+    }
+    Match(TokenKind::kKwVar);  // A.2.7 tf_port_item: [var]
+    arg.data_type = ParseDataType();
+    // A.2.7 clarification 28: name optional in prototypes
+    if (CheckIdentifier()) {
+      arg.name = Consume().text;
+    }
+    // Unpacked dimensions on argument (§13.4)
+    ParseUnpackedDims(arg.unpacked_dims);
+    // Default value (§13.5.3)
+    if (Match(TokenKind::kEq)) {
+      arg.default_value = ParseExpr();
+    }
+    args.push_back(arg);
+  } while (Match(TokenKind::kComma));
+  Expect(TokenKind::kRParen);
+  return args;
+}
+
+DataType Parser::ParseFunctionReturnType() {
+  if (Check(TokenKind::kKwVoid)) {
+    DataType dt;
+    dt.kind = DataTypeKind::kVoid;
+    Consume();
+    return dt;
+  }
+  if (Check(TokenKind::kLBracket)) {
+    DataType dt;
+    Consume();
+    dt.packed_dim_left = ParseExpr();
+    Expect(TokenKind::kColon);
+    dt.packed_dim_right = ParseExpr();
+    Expect(TokenKind::kRBracket);
+    return dt;
+  }
+  return ParseDataType();
+}
+
+// A.2.6: dynamic_override_specifiers
+void Parser::ParseDynamicOverrideSpecifiers(ModuleItem* item) {
+  if (Match(TokenKind::kColon)) {
+    if (Match(TokenKind::kKwInitial)) {
+      if (item) item->is_method_initial = true;
+    } else if (Match(TokenKind::kKwExtends)) {
+      if (item) item->is_method_extends = true;
+    } else if (Match(TokenKind::kKwFinal)) {
+      if (item) item->is_method_final = true;
+    }
+  }
+  if (Match(TokenKind::kColon)) {
+    if (Match(TokenKind::kKwFinal)) {
+      if (item) item->is_method_final = true;
+    }
+  }
+}
+
+// Parse function/task name with optional class_scope and 'new' for ctors.
+void Parser::ParseFuncName(ModuleItem* item) {
+  item->return_type = ParseFunctionReturnType();
+  // A.1.11: function [class_scope] new — if the return type was parsed as a
+  // named type but :: follows, the "type" was actually a class scope prefix.
+  if (item->return_type.kind == DataTypeKind::kNamed &&
+      Check(TokenKind::kColonColon)) {
+    // §8.24: The "type" is actually the class scope prefix.
+    item->method_class = item->return_type.type_name;
+    item->return_type = DataType{};
+    Consume();  // ::
+    item->name =
+        Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
+  } else {
+    item->name =
+        Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
+  }
+  // §8.24 out-of-block methods: class_name::method_name
+  while (Match(TokenKind::kColonColon)) {
+    item->method_class = item->name;
+    item->name =
+        Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
+  }
+}
+
+// Parse function body: old-style ports, statements, endfunction label.
+void Parser::ParseFuncBody(ModuleItem* item) {
+  ParseOldStylePortDecls(item, TokenKind::kKwEndfunction);
+  while (!Check(TokenKind::kKwEndfunction) && !AtEnd()) {
+    if (IsBlockVarDeclStart()) {
+      ParseBlockVarDecls(item->func_body_stmts);
+    } else {
+      item->func_body_stmts.push_back(ParseStmt());
+    }
+  }
+  Expect(TokenKind::kKwEndfunction);
+  if (Match(TokenKind::kColon)) {
+    if (!Match(TokenKind::kKwNew)) ExpectIdentifier();
+  }
+}
+
+ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kFunctionDecl;
+  item->loc = CurrentLoc();
+  Expect(TokenKind::kKwFunction);
+
+  ParseDynamicOverrideSpecifiers(item);
+
+  item->is_automatic = Match(TokenKind::kKwAutomatic);
+  if (!item->is_automatic) item->is_static = Match(TokenKind::kKwStatic);
+
+  ParseFuncName(item);
+
+  if (Check(TokenKind::kLParen)) {
+    item->func_args = ParseFunctionArgs();
+  }
+  Expect(TokenKind::kSemicolon);
+
+  if (!prototype_only) ParseFuncBody(item);
+  return item;
+}
+
+ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
+  auto* item = arena_.Create<ModuleItem>();
+  item->kind = ModuleItemKind::kTaskDecl;
+  item->loc = CurrentLoc();
+  Expect(TokenKind::kKwTask);
+
+  ParseDynamicOverrideSpecifiers(item);
+
+  if (Match(TokenKind::kKwAutomatic)) {
+    item->is_automatic = true;
+  } else if (Match(TokenKind::kKwStatic)) {
+    item->is_static = true;
+  }
+
+  item->name = Expect(TokenKind::kIdentifier).text;
+  // A.2.7: interface_identifier . task_identifier
+  if (Match(TokenKind::kDot)) {
+    item->name = Expect(TokenKind::kIdentifier).text;
+  }
+  // §8.24 out-of-block methods: class_name::method_name
+  while (Match(TokenKind::kColonColon)) {
+    item->method_class = item->name;
+    item->name = Expect(TokenKind::kIdentifier).text;
+  }
+
+  if (Check(TokenKind::kLParen)) {
+    item->func_args = ParseFunctionArgs();
+  }
+  Expect(TokenKind::kSemicolon);
+
+  // Pure virtual / extern prototypes have no body (§8.21, §8.24)
+  if (prototype_only) return item;
+
+  // Old-style port declarations (§13.3)
+  ParseOldStylePortDecls(item, TokenKind::kKwEndtask);
+
+  while (!Check(TokenKind::kKwEndtask) && !AtEnd()) {
+    if (IsBlockVarDeclStart()) {
+      ParseBlockVarDecls(item->func_body_stmts);
+    } else {
+      item->func_body_stmts.push_back(ParseStmt());
+    }
+  }
+  Expect(TokenKind::kKwEndtask);
+  // Optional end label: ": name"
+  if (Match(TokenKind::kColon)) {
+    ExpectIdentifier();
+  }
+  return item;
+}
+
+std::vector<EventExpr> Parser::ParseEventList() {
+  std::vector<EventExpr> events;
+  events.push_back(ParseSingleEvent());
+  while (Match(TokenKind::kKwOr) || Match(TokenKind::kComma)) {
+    events.push_back(ParseSingleEvent());
+  }
+  return events;
+}
+
+EventExpr Parser::ParseSingleEvent() {
+  EventExpr ev;
+  if (Match(TokenKind::kKwPosedge)) {
+    ev.edge = Edge::kPosedge;
+  } else if (Match(TokenKind::kKwNegedge)) {
+    ev.edge = Edge::kNegedge;
+  } else if (Match(TokenKind::kKwEdge)) {
+    ev.edge = Edge::kEdge;
+  }
+  ev.signal = ParseExpr();
+  // iff guard (§9.4.2)
+  if (Match(TokenKind::kKwIff)) {
+    ev.iff_condition = ParseExpr();
+  }
+  return ev;
+}
+
+// --- Old-style port declarations (§13.3 / A.2.7) ---
+
+void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
+  while (Check(TokenKind::kKwInput) || Check(TokenKind::kKwOutput) ||
+         Check(TokenKind::kKwInout) || Check(TokenKind::kKwRef) ||
+         Check(TokenKind::kKwConst)) {
+    Direction dir = Direction::kNone;
+    bool is_const = Match(TokenKind::kKwConst);  // A.2.7: [const] ref
+    if (Check(TokenKind::kKwInput)) {
+      dir = Direction::kInput;
+    } else if (Check(TokenKind::kKwOutput)) {
+      dir = Direction::kOutput;
+    } else if (Check(TokenKind::kKwInout)) {
+      dir = Direction::kInout;
+    } else {
+      dir = Direction::kRef;
+    }
+    Consume();
+    Match(TokenKind::kKwVar);  // A.2.7 tf_port_declaration: [var]
+    DataType dt = ParseDataType();
+    // list_of_tf_variable_identifiers: comma-separated port names
+    do {
+      FunctionArg arg;
+      arg.is_const = is_const;
+      arg.direction = dir;
+      arg.data_type = dt;
+      arg.name = Expect(TokenKind::kIdentifier).text;
+      ParseUnpackedDims(arg.unpacked_dims);
+      if (Match(TokenKind::kEq)) {
+        arg.default_value = ParseExpr();
+      }
+      item->func_args.push_back(arg);
+    } while (Match(TokenKind::kComma));
+    Expect(TokenKind::kSemicolon);
+  }
+  (void)end_kw;
+}
+
+}  // namespace delta
