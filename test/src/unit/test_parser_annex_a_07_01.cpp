@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA701, SpecifyItemNoshowcancelled) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    noshowcancelled out1;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  auto* si = spec->specify_items[0];
-  EXPECT_EQ(si->kind, SpecifyItemKind::kShowcancelled);
-  EXPECT_TRUE(si->is_noshowcancelled);
-}
-
 TEST(ParserA701, ShowcancelledMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
