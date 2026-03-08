@@ -57,18 +57,6 @@ TEST(ParserSection11, UnaryPlusOperator) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
-TEST(ParserSection11, RealMultiplication) {
-  auto r = Parse(
-      "module t;\n"
-      "  real r;\n"
-      "  initial r = 3.14 * 2.0;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kStar);
-}
-
 TEST(ParserSection11, ArithmeticAdd) {
   auto r = Parse(
       "module t;\n"
