@@ -188,4 +188,21 @@ TEST(ParserA602, BlockingAssignment_WithIntraDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
+// §10.4.1: Blocking with intra-assignment event control.
+TEST(ParserSection10, Sec10_4_1_IntraAssignEventControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_FALSE(stmt->events.empty());
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
 }  // namespace
