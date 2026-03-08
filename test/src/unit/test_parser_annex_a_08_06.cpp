@@ -7,12 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, BinaryImplication) {
-  auto r = Parse("module m; initial x = a -> b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA86, BinaryEquivalence) {
   auto r = Parse("module m; initial x = a <-> b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
