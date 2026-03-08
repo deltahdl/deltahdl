@@ -1,22 +1,10 @@
 #include "fixture_simulator.h"
+#include "helpers_queue.h"
 #include "parser/ast.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 
 using namespace delta;
-
-static void MakeDynArray(SimFixture& f, std::string_view name,
-                         const std::vector<uint64_t>& vals) {
-  auto* q = f.ctx.CreateQueue(name, 32);
-  for (auto v : vals) {
-    q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
-  }
-  ArrayInfo info;
-  info.is_dynamic = true;
-  info.elem_width = 32;
-  info.size = static_cast<uint32_t>(vals.size());
-  f.ctx.RegisterArray(name, info);
-}
 
 namespace {
 

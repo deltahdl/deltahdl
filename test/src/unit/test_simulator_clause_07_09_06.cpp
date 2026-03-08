@@ -9,12 +9,7 @@ namespace {
 // §7.9.6: next() finds smallest index greater than given.
 TEST(AssocTraversal, NextFindsSuccessor) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->index_width = 32;
-  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 1);
-  aa->int_data[20] = MakeLogic4VecVal(f.arena, 32, 2);
-  aa->int_data[30] = MakeLogic4VecVal(f.arena, 32, 3);
-  auto* ref = f.ctx.CreateVariable("k", 32);
+  auto [aa, ref] = MakeAssocWith3Entries(f);
   ref->value = MakeLogic4VecVal(f.arena, 32, 10);
   Logic4Vec out{};
   auto* call = MkAssocCall(f.arena, "aa", "next", "k");

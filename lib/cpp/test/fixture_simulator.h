@@ -68,6 +68,12 @@ inline Expr* ParseExprFrom(const std::string& src, SimFixture& f) {
   return item->body->rhs;
 }
 
+inline void LowerAndRun(const RtlirDesign* design, SimFixture& f) {
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+}
+
 inline Variable* MakeVar(SimFixture& f, std::string_view name, uint32_t width,
                          uint64_t val) {
   auto* var = f.ctx.CreateVariable(name, width);

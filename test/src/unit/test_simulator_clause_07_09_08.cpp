@@ -6,14 +6,20 @@ using namespace delta;
 
 namespace {
 
+// Create assoc array with 32-bit index and an 8-bit ref variable "k".
+std::pair<AssocArrayObject*, Variable*> MakeNarrowRefAssoc(SimFixture& f) {
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  aa->index_width = 32;
+  auto* ref = f.ctx.CreateVariable("k", 8);
+  ref->value = MakeLogic4VecVal(f.arena, 8, 0);
+  return {aa, ref};
+}
+
 // §7.9.8: first() returns -1 when ref is narrower than index.
 TEST(AssocTraversalArgs, FirstReturnsTruncationFlag) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->index_width = 32;
+  auto [aa, ref] = MakeNarrowRefAssoc(f);
   aa->int_data[1000] = MakeLogic4VecVal(f.arena, 32, 42);
-  auto* ref = f.ctx.CreateVariable("k", 8);
-  ref->value = MakeLogic4VecVal(f.arena, 8, 0);
   Logic4Vec out{};
   auto* call = MkAssocCall(f.arena, "aa", "first", "k");
   bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
@@ -125,12 +131,9 @@ TEST(AssocTraversalArgs, FirstTruncatesTo16Bit) {
 // §7.9.8: No truncation when key fits in narrower ref.
 TEST(AssocTraversalArgs, NoTruncationWhenKeyFitsInNarrowRef) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->index_width = 32;
+  auto [aa, ref] = MakeNarrowRefAssoc(f);
   // Key 5 fits in 8 bits, but index_width (32) > ref width (8) → still -1.
   aa->int_data[5] = MakeLogic4VecVal(f.arena, 32, 99);
-  auto* ref = f.ctx.CreateVariable("k", 8);
-  ref->value = MakeLogic4VecVal(f.arena, 8, 0);
   Logic4Vec out{};
   auto* call = MkAssocCall(f.arena, "aa", "first", "k");
   bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);

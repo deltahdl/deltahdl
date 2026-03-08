@@ -18,6 +18,19 @@ inline QueueObject* MakeQueue(SimFixture& f, std::string_view name,
   return q;
 }
 
+inline void MakeDynArray(SimFixture& f, std::string_view name,
+                         const std::vector<uint64_t>& vals) {
+  auto* q = f.ctx.CreateQueue(name, 32);
+  for (auto v : vals) {
+    q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
+  }
+  ArrayInfo info;
+  info.is_dynamic = true;
+  info.elem_width = 32;
+  info.size = static_cast<uint32_t>(vals.size());
+  f.ctx.RegisterArray(name, info);
+}
+
 inline void RegAutoFunc(SimFixture& f, std::string_view name,
                         std::vector<FunctionArg> args,
                         std::vector<Stmt*> body) {

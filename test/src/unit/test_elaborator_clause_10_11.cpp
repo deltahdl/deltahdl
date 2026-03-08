@@ -5,6 +5,18 @@ using namespace delta;
 
 namespace {
 
+void ExpectThreeNetsAllEqual(SimFixture& f, uint64_t expected) {
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  auto* vc = f.ctx.FindVariable("c");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  ASSERT_NE(vc, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), expected);
+  EXPECT_EQ(vb->value.ToUint64(), expected);
+  EXPECT_EQ(vc->value.ToUint64(), expected);
+}
+
 // §10.11: Basic two-net alias elaborates without errors.
 TEST(ElabCh10k, AliasTwoNetsElaborates) {
   ElabFixture f;
@@ -110,9 +122,7 @@ TEST(AliasNetsShareValue, AliasNetsShareValue) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* va = f.ctx.FindVariable("a");
   auto* vb = f.ctx.FindVariable("b");
   ASSERT_NE(va, nullptr);
@@ -132,18 +142,8 @@ TEST(AliasThreeNetsShareValue, AliasThreeNetsShareValue) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  auto* vc = f.ctx.FindVariable("c");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  ASSERT_NE(vc, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 1u);
-  EXPECT_EQ(vb->value.ToUint64(), 1u);
-  EXPECT_EQ(vc->value.ToUint64(), 1u);
+  LowerAndRun(design, f);
+  ExpectThreeNetsAllEqual(f, 1u);
 }
 
 // §10.11: Multi-bit aliased nets share the full value.
@@ -157,9 +157,7 @@ TEST(AliasMultiBitNetsShareValue, AliasMultiBitNetsShareValue) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* vx = f.ctx.FindVariable("x");
   auto* vy = f.ctx.FindVariable("y");
   ASSERT_NE(vx, nullptr);
@@ -180,18 +178,8 @@ TEST(CumulativeAliases, CumulativeAliases) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  auto* vc = f.ctx.FindVariable("c");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  ASSERT_NE(vc, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 1u);
-  EXPECT_EQ(vb->value.ToUint64(), 1u);
-  EXPECT_EQ(vc->value.ToUint64(), 1u);
+  LowerAndRun(design, f);
+  ExpectThreeNetsAllEqual(f, 1u);
 }
 
 }  // namespace

@@ -1,8 +1,4 @@
 #include "fixture_simulator.h"
-#include "simulator/lowerer.h"
-#include "simulator/scheduler.h"
-#include "simulator/sim_context.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -29,9 +25,7 @@ TEST(SimA60701, PositionalPatternPacksMSBFirst) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
 
@@ -49,9 +43,7 @@ TEST(SimA60701, SingleElementPositionalPattern) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
@@ -68,9 +60,7 @@ TEST(SimA60701, FourElementPositionalPattern) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
 
@@ -89,9 +79,7 @@ TEST(SimA60701, PatternInConditionalBranch) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
 
@@ -115,9 +103,7 @@ TEST(SimA60701, PatternInCaseItemBody) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
 
@@ -138,9 +124,7 @@ TEST(SimA60701, PatternInForLoop) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
 
@@ -204,9 +188,7 @@ TEST(SimCh10i, ArrayPositionalPatternInit) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* e0 = f.ctx.FindVariable("arr[0]");
   auto* e1 = f.ctx.FindVariable("arr[1]");
   ASSERT_NE(e0, nullptr);
@@ -227,9 +209,7 @@ TEST(SimCh10i, ArrayDefaultKeyFillsAllElements) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   for (int i = 0; i < 4; ++i) {
     auto name = "arr[" + std::to_string(i) + "]";
     auto* elem = f.ctx.FindVariable(name);
@@ -250,9 +230,7 @@ TEST(SimCh10i, ArrayReplicationPatternFills) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   for (int i = 0; i < 4; ++i) {
     auto name = "arr[" + std::to_string(i) + "]";
     auto* elem = f.ctx.FindVariable(name);
@@ -273,9 +251,7 @@ TEST(SimCh10i, ArrayIndexKeyWithDefault) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* e0 = f.ctx.FindVariable("arr[0]");
   auto* e1 = f.ctx.FindVariable("arr[1]");
   auto* e2 = f.ctx.FindVariable("arr[2]");
@@ -299,9 +275,7 @@ TEST(SimCh10i, ArrayDescendingRangePositional) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* e0 = f.ctx.FindVariable("arr[0]");
   auto* e1 = f.ctx.FindVariable("arr[1]");
   ASSERT_NE(e0, nullptr);
@@ -319,9 +293,7 @@ TEST(SimCh10i, ArrayVarDeclPatternInit) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   auto* e0 = f.ctx.FindVariable("arr[0]");
   auto* e1 = f.ctx.FindVariable("arr[1]");
   auto* e2 = f.ctx.FindVariable("arr[2]");
