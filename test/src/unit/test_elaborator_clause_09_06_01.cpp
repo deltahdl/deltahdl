@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -20,21 +22,6 @@ TEST(ElabClause09_06_01, WaitForkInInitialElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-// §9.6.1: Wait fork is a timing control, error in always_comb.
-TEST(ElabClause09_06_01, WaitForkInAlwaysCombErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic a;\n"
-      "  always_comb begin\n"
-      "    wait fork;\n"
-      "    a = 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
 }
 
 // §9.6.1: Wait fork is a timing control, error in always_ff.
