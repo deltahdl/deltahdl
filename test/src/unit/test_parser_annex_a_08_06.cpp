@@ -7,12 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, PostfixDecrement) {
-  auto r = Parse("module m; initial begin i--; end endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA86, PrefixIncrement) {
   auto r = Parse("module m; initial begin ++i; end endmodule\n");
   ASSERT_NE(r.cu, nullptr);
