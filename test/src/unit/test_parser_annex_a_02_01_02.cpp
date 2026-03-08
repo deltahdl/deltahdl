@@ -38,4 +38,13 @@ TEST(OutputUnpackedDim, OutputUnpackedDim) {
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
 
+TEST(InputUnpackedDim, InputUnpackedDim) {
+  auto r = Parse("module m(input logic d [3:0]); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_EQ(port.direction, Direction::kInput);
+  EXPECT_FALSE(port.unpacked_dims.empty());
+}
+
 }  // namespace
