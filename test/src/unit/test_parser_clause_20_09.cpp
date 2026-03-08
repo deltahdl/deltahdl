@@ -72,4 +72,11 @@ TEST(ConstExpr, CountonesConstantArg) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
+// §11.2.1: $onehot with constant arg is constant.
+TEST(ConstExpr, OnehotConstantArg) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("$onehot(8'h04)", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
 }  // namespace
