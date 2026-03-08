@@ -538,4 +538,16 @@ TEST(ParserClause09_03_04, EndLabelWithoutStartLabelOk) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §9.3.4: Named block without end label is OK.
+TEST(ParserClause09_03_04, NamedBlockWithoutEndLabelOk) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : myblk\n"
+      "    $display(\"hello\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
