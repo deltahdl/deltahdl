@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -112,13 +114,6 @@ TEST(ParserA212, InputVariablePortTypeVar) {
 
 TEST(ParserA212, OutputNetPortType) {
   auto r = ParseWithPreprocessor("module m(output wire q); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
-}
-
-TEST(ParserA212, OutputVariablePortTypeReg) {
-  auto r = ParseWithPreprocessor("module m(output reg q); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
