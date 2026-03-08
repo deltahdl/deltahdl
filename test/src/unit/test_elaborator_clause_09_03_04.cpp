@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
 
@@ -36,18 +38,6 @@ TEST(ElabClause09_03_04, NamedForkBlockElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-// §9.3.4: Matching end label on begin-end is OK.
-TEST(ParserClause09_03_04, MatchingEndLabelBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : myblk\n"
-      "    $display(\"hello\");\n"
-      "  end : myblk\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 // §9.3.4: Mismatched end label on begin-end is an error.

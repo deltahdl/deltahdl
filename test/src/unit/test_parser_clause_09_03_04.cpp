@@ -475,4 +475,16 @@ TEST(ParserSection9, ParallelBlockNamedForkJoin) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
 }
 
+// §9.3.4: Matching end label on begin-end is OK.
+TEST(ParserClause09_03_04, MatchingEndLabelBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : myblk\n"
+      "    $display(\"hello\");\n"
+      "  end : myblk\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
