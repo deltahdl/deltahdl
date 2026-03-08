@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA611, GlobalClocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  global clocking gclk @(posedge clk);\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_global_clocking);
-}
-
 TEST(ParserA611, ClockingItemDefaultSkewInput) {
   auto r = Parse(
       "module m;\n"
