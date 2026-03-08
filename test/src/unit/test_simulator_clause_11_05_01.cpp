@@ -277,3 +277,22 @@ TEST(SimA85, VarLvalueIndexedPartSelectMinus) {
 }
 
 }
+TEST(BlockingAssignBitSelect, BlockingAssignBitSelect) {
+  StmtFixture f;
+  auto* var = f.ctx.CreateVariable("bs", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0);
+
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "bs");
+  sel->index = MakeInt(f.arena, 3);
+
+  auto* stmt = f.arena.Create<Stmt>();
+  stmt->kind = StmtKind::kBlockingAssign;
+  stmt->lhs = sel;
+  stmt->rhs = MakeInt(f.arena, 1);
+
+  RunStmt(stmt, f.ctx, f.arena);
+  EXPECT_EQ(var->value.ToUint64(), 0x08u);
+}
+
