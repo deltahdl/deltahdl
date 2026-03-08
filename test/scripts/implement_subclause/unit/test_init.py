@@ -1,7 +1,7 @@
 """Unit tests for implement_subclause (arg parsing and dispatch)."""
 
 import runpy
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -132,13 +132,24 @@ def test_parse_args_continue_default_false(isc, tmp_path):
 # ---- main ------------------------------------------------------------------
 
 
+@patch("implement_subclause.commit_implementation")
 @patch("implement_subclause.run_prompt")
-def test_main_dispatches_depth_1(mock_run, isc, tmp_path):
+def test_main_dispatches_depth_1(mock_run, _mock_commit, isc, tmp_path):
     """main() passes args namespace to run_prompt."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     isc.main(["--lrm", str(lrm), "--subclause", "4", "--issue", "6", "--model", "opus"])
     assert mock_run.call_args[0][1].model == "opus"
+
+
+@patch("implement_subclause.commit_implementation")
+@patch("implement_subclause.run_prompt")
+def test_main_calls_commit_implementation(_mock_run, mock_commit, isc, tmp_path):
+    """main() calls commit_implementation with the subclause."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
+    assert mock_commit.call_args[0][0] == "6.6.1"
 
 
 def test_parse_args_rejects_figures_flag(isc, tmp_path):
@@ -161,6 +172,95 @@ def test_parse_args_rejects_tables_flag(isc, tmp_path):
             "--lrm", str(lrm), "--subclause", "4", "--issue", "6",
             "--tables", "4_1=tbl.md",
         ])
+
+
+# ---- get_unstaged_files -----------------------------------------------------
+
+
+def test_get_unstaged_files_modified(monkeypatch, isc):
+    """Modified files appear in changed list."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = " M src/foo.cpp\n"
+    mock_result.stderr = ""
+    monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
+    changed, deleted = isc.get_unstaged_files()
+    assert "src/foo.cpp" in changed
+
+
+def test_get_unstaged_files_untracked(monkeypatch, isc):
+    """Untracked files appear in changed list."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "?? src/new.cpp\n"
+    mock_result.stderr = ""
+    monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
+    changed, deleted = isc.get_unstaged_files()
+    assert "src/new.cpp" in changed
+
+
+def test_get_unstaged_files_deleted(monkeypatch, isc):
+    """Deleted files appear in deleted list."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = " D src/old.cpp\n"
+    mock_result.stderr = ""
+    monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
+    changed, deleted = isc.get_unstaged_files()
+    assert "src/old.cpp" in deleted
+
+
+def test_get_unstaged_files_empty(monkeypatch, isc):
+    """Empty status returns empty lists."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = ""
+    mock_result.stderr = ""
+    monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
+    changed, deleted = isc.get_unstaged_files()
+    assert changed == []
+    assert deleted == []
+
+
+def test_get_unstaged_files_skips_blank_lines(monkeypatch, isc):
+    """Blank lines in status output are skipped."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = " M a.cpp\n\n M b.cpp\n"
+    mock_result.stderr = ""
+    monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
+    changed, _ = isc.get_unstaged_files()
+    assert len(changed) == 2
+
+
+# ---- commit_implementation -------------------------------------------------
+
+
+@patch("implement_subclause.commit_and_push")
+@patch("implement_subclause.get_unstaged_files")
+def test_commit_implementation_calls_commit_and_push(mock_files, mock_cap, isc):
+    """commit_implementation passes files and message to commit_and_push."""
+    mock_files.return_value = (["a.cpp"], [])
+    isc.commit_implementation("6.6.1")
+    assert mock_cap.called
+
+
+@patch("implement_subclause.commit_and_push")
+@patch("implement_subclause.get_unstaged_files")
+def test_commit_implementation_message_has_subclause(mock_files, mock_cap, isc):
+    """Commit message contains the subclause."""
+    mock_files.return_value = (["a.cpp"], [])
+    isc.commit_implementation("6.6.1")
+    assert "§6.6.1" in mock_cap.call_args[0][2]
+
+
+@patch("implement_subclause.commit_and_push")
+@patch("implement_subclause.get_unstaged_files")
+def test_commit_implementation_message_has_co_authored_by(mock_files, mock_cap, isc):
+    """Commit message contains Co-Authored-By trailer."""
+    mock_files.return_value = (["a.cpp"], [])
+    isc.commit_implementation("6.6.1")
+    assert "Co-Authored-By:" in mock_cap.call_args[0][2]
 
 
 # ---- __main__ guard --------------------------------------------------------

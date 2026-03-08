@@ -83,7 +83,7 @@ jobs:
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console lib/python/ test/scripts/ test/lib/python/
   test-classify-file:
-    needs: test-lib-classify
+    needs: [test-lib-classify, test-lib-git]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -147,7 +147,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/classify_files/e2e/ -v
   test-classify-test:
-    needs: [test-lib-classify, test-lib-github]
+    needs: [test-lib-classify, test-lib-git, test-lib-github]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -211,7 +211,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/implement_clause/e2e/ -v
   test-implement-subclause:
-    needs: [test-lib-github]
+    needs: [test-lib-git, test-lib-github]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -262,6 +262,29 @@ jobs:
         run: >-
           python3 -m pytest test/lib/python/classify/unit/ -v
           --cov=lib.python.classify
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  test-lib-git:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-lib-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/python/git/unit/ -v
+          --cov=lib.python.git
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100

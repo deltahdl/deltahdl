@@ -187,7 +187,7 @@ def invoke_claude(
         sys.exit(1)
 
 
-def get_dirty_files():
+def get_unstaged_files():
     """Return (changed, deleted) file lists from git status --porcelain."""
     result = run_git(["git", "status", "--porcelain"])
     changed = []
@@ -206,7 +206,7 @@ def get_dirty_files():
 
 def commit_implementation(subclause):
     """Commit and push all dirty files after implementation."""
-    changed, deleted = get_dirty_files()
+    changed, deleted = get_unstaged_files()
     trailer = "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
     message = f"Implement §{subclause}\n\n{trailer}\n"
     commit_and_push(changed, deleted, message)
