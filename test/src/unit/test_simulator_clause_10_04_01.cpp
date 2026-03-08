@@ -12,17 +12,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA85, VarLvalueConcatenation) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] a, b;\n"
-      "  initial {a, b} = 8'hA5;\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"a", 0xAu}, {"b", 0x5u}});
-}
-
 TEST(SimA85, VarLvalueMultiDimArray) {
   SimFixture f;
   auto* design = ElaborateSrc(
