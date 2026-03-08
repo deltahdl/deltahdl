@@ -193,4 +193,12 @@ TEST(ConstExpr, Clog2NonConstantArgNotConstant) {
   EXPECT_FALSE(IsConstantExpr(e));
 }
 
+// §11.2.1: ConstEvalReal — non-constant returns nullopt.
+TEST(ConstEvalReal, NonConstantReturnsNullopt) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("x", f);
+  auto val = ConstEvalReal(e);
+  EXPECT_FALSE(val.has_value());
+}
+
 }  // namespace
