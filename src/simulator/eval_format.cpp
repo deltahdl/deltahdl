@@ -5,7 +5,7 @@
 
 #include "common/types.h"
 #include "parser/ast.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 
 namespace delta {
 

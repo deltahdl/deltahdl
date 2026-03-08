@@ -2,7 +2,7 @@
 #include "helpers_class_object.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 
 using namespace delta;
 

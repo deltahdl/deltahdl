@@ -12,11 +12,11 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
-#include "simulator/stmt_assign.h"
+#include "simulator/statement_assign.h"
 
 namespace delta {
 

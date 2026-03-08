@@ -5,7 +5,7 @@
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
 #include "parser/ast.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;

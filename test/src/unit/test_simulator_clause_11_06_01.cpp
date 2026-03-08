@@ -3,7 +3,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 
 using namespace delta;
 

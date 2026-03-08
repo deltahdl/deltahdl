@@ -3,9 +3,9 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
-#include "simulator/stmt_assign.h"
+#include "simulator/statement_assign.h"
 
 using namespace delta;
 

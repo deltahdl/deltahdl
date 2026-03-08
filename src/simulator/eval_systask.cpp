@@ -12,7 +12,7 @@
 #include "common/arena.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
 namespace delta {

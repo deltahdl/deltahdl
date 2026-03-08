@@ -13,7 +13,7 @@
 #include "common/types.h"
 #include "helpers_method_call.h"
 #include "parser/ast.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 

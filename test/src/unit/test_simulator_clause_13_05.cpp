@@ -1,6 +1,6 @@
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 

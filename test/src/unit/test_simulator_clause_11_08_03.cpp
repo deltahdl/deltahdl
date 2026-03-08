@@ -1,5 +1,5 @@
 #include "fixture_simulator.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;

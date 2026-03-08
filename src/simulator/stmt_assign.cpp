@@ -1,4 +1,4 @@
-#include "simulator/stmt_assign.h"
+#include "simulator/statement_assign.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -12,7 +12,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 #include "simulator/eval_array.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"

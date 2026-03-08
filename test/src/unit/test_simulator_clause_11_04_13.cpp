@@ -3,7 +3,7 @@
 #include "helpers_eval_op.h"
 #include "parser/ast.h"
 #include "simulator/adv_sim.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
 

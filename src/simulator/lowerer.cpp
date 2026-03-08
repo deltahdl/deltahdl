@@ -13,7 +13,7 @@
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
 #include "simulator/class_object.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"

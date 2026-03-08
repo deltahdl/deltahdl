@@ -8,7 +8,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "parser/ast.h"
-#include "simulator/eval.h"
+#include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 
