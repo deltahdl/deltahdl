@@ -1,27 +1,11 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(ParserClause05, Cl5_10_PositionalStructLiteral) {
-
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct {int a; shortreal b;} ab;\n"
-      "  ab c;\n"
-      "  initial c = '{0, 0.0};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
-  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
-  EXPECT_TRUE(stmt->rhs->pattern_keys.empty());
-}
 
 TEST(ParserClause05, Cl5_10_NestedBracesArrayOfStructs) {
 
@@ -162,4 +146,4 @@ TEST(ParserClause05, Cl5_10_EmptyAssignmentPattern) {
   EXPECT_EQ(rhs->elements.size(), 0u);
 }
 
-}
+}  // namespace

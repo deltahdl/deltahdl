@@ -351,3 +351,21 @@ TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
 }
 
 }
+TEST(PositionalStructAssignmentPattern, Cl5_10_PositionalStructLiteral) {
+
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct {int a; shortreal b;} ab;\n"
+      "  ab c;\n"
+      "  initial c = '{0, 0.0};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
+  EXPECT_EQ(stmt->rhs->elements.size(), 2u);
+  EXPECT_TRUE(stmt->rhs->pattern_keys.empty());
+}
+
