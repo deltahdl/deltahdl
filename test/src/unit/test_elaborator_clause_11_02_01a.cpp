@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.1: IsConstantExpr — ternary on constants is constant.
-TEST(ConstExpr, TernaryOnConstantsIsConstant) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("1 ? 10 : 20", f);
-  EXPECT_TRUE(IsConstantExpr(e));
-}
-
 // §11.2.1: IsConstantExpr — concatenation of constants is constant.
 TEST(ConstExpr, ConcatenationOfConstantsIsConstant) {
   EvalFixture f;

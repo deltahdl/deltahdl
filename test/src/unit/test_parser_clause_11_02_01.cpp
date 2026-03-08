@@ -157,4 +157,11 @@ TEST(ConstExpr, BinaryWithNonConstantNotConstant) {
   EXPECT_FALSE(IsConstantExpr(e));
 }
 
+// §11.2.1: IsConstantExpr — ternary on constants is constant.
+TEST(ConstExpr, TernaryOnConstantsIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("1 ? 10 : 20", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
 }  // namespace
