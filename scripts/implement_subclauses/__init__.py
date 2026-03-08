@@ -55,6 +55,7 @@ def parse_subclauses(raw: str) -> list[str]:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments for batch subclause implementation."""
     parser = argparse.ArgumentParser(
+        prog="implement_subclauses",
         description="Invoke implement_subclause for multiple subclauses.",
     )
     add_lrm_arg(parser)
