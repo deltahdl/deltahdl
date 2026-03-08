@@ -8,14 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, OutputUnpackedDim) {
-  auto r = Parse("module m(output logic q [1:0]); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_FALSE(port.unpacked_dims.empty());
-}
-
 TEST(ParserA212, InputUnpackedDim) {
   auto r = Parse("module m(input logic d [3:0]); endmodule");
   ASSERT_NE(r.cu, nullptr);

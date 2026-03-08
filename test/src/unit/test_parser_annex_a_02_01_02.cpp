@@ -30,4 +30,12 @@ TEST(InoutUnpackedDim, InoutUnpackedDim) {
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
 
+TEST(OutputUnpackedDim, OutputUnpackedDim) {
+  auto r = Parse("module m(output logic q [1:0]); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_FALSE(port.unpacked_dims.empty());
+}
+
 }  // namespace
