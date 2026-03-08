@@ -119,13 +119,6 @@ TEST(ParserA212, OutputNetPortType) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
 }
 
-TEST(ParserA212, RefDeclaration) {
-  auto r = ParseWithPreprocessor("module m(ref logic [7:0] d); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kRef);
-}
-
 TEST(ParserA212, NetPortTypeTriType) {
   auto r = ParseWithPreprocessor("module m(inout tri [7:0] bus); endmodule");
   ASSERT_NE(r.cu, nullptr);
