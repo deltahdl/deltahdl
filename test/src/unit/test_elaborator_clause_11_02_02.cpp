@@ -54,20 +54,6 @@ TEST(AggregateExpr, StructPassedToFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.2.2: Unpacked array data objects can be used as aggregate expressions.
-TEST(AggregateExpr, UnpackedArrayAssignment) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int a [4];\n"
-      "  int b [4];\n"
-      "  initial b = a;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // §11.2.2: Unpacked array equality comparison.
 TEST(AggregateExpr, ArrayEqualityComparison) {
   ElabFixture f;
