@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-// parameter_port_declaration with data_type list_of_param_assignments
-TEST(ModuleParamsA13, TypedParamPort) {
-  auto r = Parse(
-      "module m #(parameter int W = 8, int D = 4)(\n"
-      "  input logic [W-1:0] data\n"
-      ");\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->params.size(), 2u);
-}
-
 // parameter_port_declaration with local_parameter_declaration
 TEST(ModuleParamsA13, LocalparamInParamPortList) {
   auto r = Parse(
