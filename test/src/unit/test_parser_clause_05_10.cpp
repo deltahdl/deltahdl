@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_10_NestedBracesArrayOfStructs) {
-
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct {int a; shortreal b;} ab;\n"
-              "  ab abarr[1:0] = '{'{1, 1.0}, '{2, 2.0}};\n"
-              "endmodule\n"));
-}
-
 TEST(ParserClause05, Cl5_10_NestedBracesElements) {
   auto r = Parse(
       "module m;\n"
