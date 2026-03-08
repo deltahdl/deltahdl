@@ -675,4 +675,24 @@ TEST(AlwaysCombCaseDecode, AlwaysCombCaseDecode) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
+TEST(AlwaysCombZeroAssignTime, AlwaysCombZeroAssignTime0) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] y;\n"
+      "  always_comb y = 0;\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 0u);
+}
+
 }  // namespace
