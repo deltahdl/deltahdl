@@ -181,3 +181,17 @@ TEST(DefaultClocking, DefaultClocking) {
   EXPECT_FALSE(item->is_global_clocking);
 }
 
+TEST(UnnamedDefaultClocking, UnnamedDefaultClocking) {
+  auto r = Parse(
+      "module m;\n"
+      "  default clocking @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_default_clocking);
+  EXPECT_TRUE(item->name.empty());
+}
+
