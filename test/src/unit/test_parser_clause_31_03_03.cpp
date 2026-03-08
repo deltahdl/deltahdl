@@ -139,4 +139,20 @@ TEST(SetupholdTimingCheck, SetupholdBasic) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
+TEST(SetupholdWithAllOptionals, SetupholdWithAllOptionals) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK, dD);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetuphold);
+  EXPECT_EQ(tc->notifier, "ntfr");
+  EXPECT_EQ(tc->delayed_ref, "dCLK");
+  EXPECT_EQ(tc->delayed_data, "dD");
+}
+
 }  // namespace
