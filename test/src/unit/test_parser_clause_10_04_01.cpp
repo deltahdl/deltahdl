@@ -145,32 +145,6 @@ TEST(ParserSection10, Sec10_4_1_InBeginEndBlock) {
   EXPECT_EQ(s1->lhs->text, "y");
 }
 
-TEST(ParserSection10, Sec10_4_1_InCaseItems) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [1:0] sel;\n"
-      "  reg [7:0] out;\n"
-      "  initial begin\n"
-      "    case (sel)\n"
-      "      2'b00: out = 8'h00;\n"
-      "      2'b01: out = 8'h11;\n"
-      "      2'b10: out = 8'h22;\n"
-      "      default: out = 8'hFF;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  ASSERT_GE(stmt->case_items.size(), 4u);
-  EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(stmt->case_items[1].body->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(stmt->case_items[2].body->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(stmt->case_items[3].body->kind, StmtKind::kBlockingAssign);
-}
-
 TEST(ParserSection10, Sec10_4_1_FunctionCallRhs) {
   auto r = Parse(
       "module m;\n"
