@@ -352,3 +352,20 @@ TEST(ClockingSkewEdgeWithDelay, ClockingSkewEdgeWithDelay) {
   EXPECT_NE(item->clocking_signals[0].skew_delay, nullptr);
 }
 
+TEST(ClockingInputSkew, InputSamplingMultipleSignals) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(negedge clk);\n"
+      "    input #1 a, b, c;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 3u);
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(item->clocking_signals[i].direction, Direction::kInput)
+        << "signal " << i;
+    ASSERT_NE(item->clocking_signals[i].skew_delay, nullptr) << "signal " << i;
+  }
+}
+

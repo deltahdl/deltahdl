@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -170,23 +172,6 @@ TEST(ParserSection14, InputSamplingInoutSignal) {
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
   EXPECT_EQ(item->clocking_signals[0].name, "data");
-}
-
-TEST(ParserSection14, InputSamplingMultipleSignals) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(negedge clk);\n"
-      "    input #1 a, b, c;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ModuleItem* item = nullptr;
-  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
-  ASSERT_EQ(item->clocking_signals.size(), 3u);
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(item->clocking_signals[i].direction, Direction::kInput)
-        << "signal " << i;
-    ASSERT_NE(item->clocking_signals[i].skew_delay, nullptr) << "signal " << i;
-  }
 }
 
 TEST(ParserSection19, ClockingBlock_BasicDecl) {
@@ -805,3 +790,4 @@ TEST(ClockingEndLabel, ClockingEndLabel) {
               "endmodule\n"));
 }
 
+}  // namespace
