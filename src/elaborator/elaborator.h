@@ -258,6 +258,10 @@ class Elaborator {
   /// §8.26: Validate interface class rules.
   void ValidateInterfaceClassRules();
 
+  /// §10.10.3: Validate nesting of unpacked array concatenations.
+  void ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl);
+  void WalkStmtsForArrayConcatNesting(const Stmt* s);
+
   /// §11.2.2: Validate aggregate expression comparison type equivalence.
   void ValidateAggregateComparisons(const ModuleDecl* decl);
   void WalkExprForAggregateCompare(const Expr* expr);

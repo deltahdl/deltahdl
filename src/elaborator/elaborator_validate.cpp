@@ -700,6 +700,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateEnumAssignments(decl);
   ValidateConstAssignments(decl);
   ValidateArrayAssignments(decl);
+  ValidateUnpackedArrayConcatNesting(decl);
   ValidateClassHandleOps(decl);
   ValidateAggregateComparisons(decl);
   ValidateRealOperatorRestrictions(decl);
@@ -2072,6 +2073,47 @@ void Elaborator::ValidateAlias(const ModuleItem* item) {
                   std::format("'{}' is a variable, not a net; "
                               "variables cannot appear in alias statements",
                               name));
+    }
+  }
+}
+
+// §10.10.3: Validate nesting of unpacked array concatenations.
+void Elaborator::WalkStmtsForArrayConcatNesting(const Stmt* s) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    if (s->lhs && s->rhs && s->lhs->kind == ExprKind::kIdentifier &&
+        s->rhs->kind == ExprKind::kConcatenation) {
+      auto it = var_array_info_.find(s->lhs->text);
+      if (it != var_array_info_.end() &&
+          it->second.elem_type != DataTypeKind::kString) {
+        for (auto* elem : s->rhs->elements) {
+          if (elem->kind == ExprKind::kConcatenation) {
+            diag_.Error(elem->range.start,
+                        "nested concatenation in unpacked array "
+                        "concatenation is not self-determined");
+          }
+        }
+      }
+    }
+  }
+  for (auto* sub : s->stmts) WalkStmtsForArrayConcatNesting(sub);
+  WalkStmtsForArrayConcatNesting(s->then_branch);
+  WalkStmtsForArrayConcatNesting(s->else_branch);
+  WalkStmtsForArrayConcatNesting(s->body);
+  WalkStmtsForArrayConcatNesting(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForArrayConcatNesting(ci.body);
+}
+
+void Elaborator::ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kFinalBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      WalkStmtsForArrayConcatNesting(item->body);
     }
   }
 }
