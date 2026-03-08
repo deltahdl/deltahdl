@@ -210,6 +210,38 @@ jobs:
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/implement_clause/e2e/ -v
+  test-implement-subclauses:
+    needs: [test-lib-git, test-lib-github]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-script-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-script-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/implement_subclauses/unit/ -v
+          --cov=implement_subclauses
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+      - name: Run integration tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/implement_subclauses/integration/ -v
+      - name: Run e2e tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/implement_subclauses/e2e/ -v
   test-implement-subclause:
     needs: [test-lib-git, test-lib-github]
     runs-on: ubuntu-24.04
