@@ -210,15 +210,25 @@ def test_get_unstaged_files_deleted(monkeypatch, isc):
     assert "src/old.cpp" in deleted
 
 
-def test_get_unstaged_files_empty(monkeypatch, isc):
-    """Empty status returns empty lists."""
+def test_get_unstaged_files_empty_changed(monkeypatch, isc):
+    """Empty status returns empty changed list."""
     mock_result = MagicMock()
     mock_result.returncode = 0
     mock_result.stdout = ""
     mock_result.stderr = ""
     monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
-    changed, deleted = isc.get_unstaged_files()
+    changed, _ = isc.get_unstaged_files()
     assert changed == []
+
+
+def test_get_unstaged_files_empty_deleted(monkeypatch, isc):
+    """Empty status returns empty deleted list."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = ""
+    mock_result.stderr = ""
+    monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
+    _, deleted = isc.get_unstaged_files()
     assert deleted == []
 
 

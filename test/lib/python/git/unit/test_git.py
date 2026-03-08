@@ -33,9 +33,13 @@ def test_run_git_exits_on_failure(monkeypatch):
 
 def test_run_git_prints_error_on_failure(monkeypatch, capsys):
     """Prints an error message when the git command fails."""
-    stub_subprocess_failure(monkeypatch)
-    with pytest.raises(SystemExit):
-        run_git(["git", "status"])
+    mock_result = MagicMock()
+    mock_result.returncode = 1
+    mock_result.stdout = ""
+    mock_result.stderr = "error"
+    monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
+    monkeypatch.setattr("lib.python.git.sys.exit", lambda _: None)
+    run_git(["git", "status"])
     assert "ERROR" in capsys.readouterr().err
 
 
