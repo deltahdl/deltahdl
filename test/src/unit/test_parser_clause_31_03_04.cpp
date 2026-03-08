@@ -51,4 +51,17 @@ TEST(ParserA705, SystemTimingCheckRemoval) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kRemoval);
 }
 
+TEST(RemovalBasic, RemovalBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $removal(posedge rst, posedge clk, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kRemoval);
+}
+
 }  // namespace
