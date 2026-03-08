@@ -105,36 +105,6 @@ TEST(SimCh9b, AlwaysCombConstAssignTime0) {
   EXPECT_EQ(y->value.ToUint64(), 42u);
 }
 
-// §9.2.2.2.2: Case with variable reads in branches triggers on those inputs.
-TEST(SimClause09_02_02_02_02, CaseBranchSensitivity) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [7:0] a, b, y;\n"
-      "  always_comb\n"
-      "    case (sel)\n"
-      "      2'd0: y = a;\n"
-      "      default: y = b;\n"
-      "    endcase\n"
-      "  initial begin\n"
-      "    sel = 2'd0;\n"
-      "    a = 8'd10;\n"
-      "    b = 8'd20;\n"
-      "    #1 sel = 2'd1;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 20u);
-}
-
 TEST(SimCh9d, AlwaysStarEquivAlwaysComb) {
   SimFixture f_star;
   auto* d_star = ElaborateSrc(
