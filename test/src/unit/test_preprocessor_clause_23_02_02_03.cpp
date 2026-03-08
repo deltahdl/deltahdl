@@ -46,4 +46,11 @@ TEST(ParserA212, VarDataTypeExplicit) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
 }
 
+TEST(ParserA212, VarDataTypeInt) {
+  auto r = ParseWithPreprocessor("module m(input int count); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
+}
+
 }  // namespace
