@@ -113,4 +113,11 @@ TEST(ConstExpr, RealLiteralIsConstant) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
+// §11.2.1: IsConstantExpr — string literal is constant.
+TEST(ConstExpr, StringLiteralIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("\"hello\"", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
 }  // namespace
