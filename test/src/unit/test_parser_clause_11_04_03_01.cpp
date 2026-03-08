@@ -31,4 +31,14 @@ TEST(ParserA86, BinaryMul) {
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
 
+TEST(ParserSection11, ArithmeticDiv) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a / b;\n"
+      "endmodule\n");
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kSlash);
+}
+
 }  // namespace
