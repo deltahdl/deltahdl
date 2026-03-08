@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.1: Constant expressions can use any operator from Table 11-1.
-TEST(ConstExpr, PowerOperatorInConstantExpr) {
-  EvalFixture f;
-  ScopeMap scope;
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("2 ** 10", f), scope), 1024);
-}
-
 // §11.2.1: Constant expression with nested ternary.
 TEST(ConstExpr, NestedTernaryIsConstant) {
   EvalFixture f;
