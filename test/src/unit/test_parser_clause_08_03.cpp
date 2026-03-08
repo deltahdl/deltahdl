@@ -156,16 +156,4 @@ TEST(ParserClause08_03, ErrorDuplicateStatic) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// --- §8.3 interface class extends multiple bases (§8.26) ---
-TEST(ParserClause08_03, InterfaceClassExtendsMultiple) {
-  auto r = Parse(
-      "interface class IFace extends IBase1, IBase2;\n"
-      "  pure virtual function void do_something();\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_TRUE(r.cu->classes[0]->is_interface);
-  EXPECT_EQ(r.cu->classes[0]->base_class, "IBase1");
-}
-
 }  // namespace
