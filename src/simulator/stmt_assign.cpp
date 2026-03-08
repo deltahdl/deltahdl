@@ -582,19 +582,28 @@ static const Expr* UnwrapTypedPattern(const Expr* expr) {
   return expr;
 }
 
+// §11.6: Determine the context width from the LHS of an assignment.
+static uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx) {
+  if (!lhs) return 0;
+  auto* var = ResolveLhsVariable(lhs, ctx);
+  return var ? var->value.width : 0;
+}
+
 // Execute a blocking assignment with full LHS support.
 // §10.9.2: Evaluate RHS as named struct pattern if applicable.
 static Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                           Arena& arena) {
+  // §11.6: LHS width determines context for RHS expression evaluation.
+  uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx);
   if (!stmt->rhs || stmt->lhs->kind != ExprKind::kIdentifier) {
-    return EvalExpr(stmt->rhs, ctx, arena);
+    return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
   }
   auto* inner = UnwrapTypedPattern(stmt->rhs);
   bool named = inner->kind == ExprKind::kAssignmentPattern &&
                !inner->pattern_keys.empty();
-  if (!named) return EvalExpr(stmt->rhs, ctx, arena);
+  if (!named) return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
   auto* sinfo = ctx.GetVariableStructType(stmt->lhs->text);
-  if (!sinfo) return EvalExpr(stmt->rhs, ctx, arena);
+  if (!sinfo) return EvalExpr(stmt->rhs, ctx, arena, ctx_width);
   return EvalStructPattern(inner, sinfo, ctx, arena);
 }
 
