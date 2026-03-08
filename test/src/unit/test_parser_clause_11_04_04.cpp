@@ -94,4 +94,10 @@ TEST(Eval, Comparison) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
+TEST(ParserA86, BinaryLessEq) {
+  auto r = Parse("module m; initial x = a <= b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

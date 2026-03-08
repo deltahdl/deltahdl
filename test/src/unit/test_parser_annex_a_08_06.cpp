@@ -7,12 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, BinaryLessEq) {
-  auto r = Parse("module m; initial x = a <= b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA86, BinaryGreaterThan) {
   auto r = Parse("module m; initial x = a > b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
