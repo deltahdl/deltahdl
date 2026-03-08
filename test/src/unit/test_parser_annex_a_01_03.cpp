@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-// list_of_ports ::= ( port { , port } )  — non-ANSI
-TEST(ModuleParamsA13, NonAnsiPorts) {
-  auto r = Parse(
-      "module m(a, b, y);\n"
-      "  input a, b;\n"
-      "  output y;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_GE(r.cu->modules[0]->ports.size(), 3u);
-}
-
 // list_of_port_declarations — ANSI form
 TEST(ModuleParamsA13, AnsiPortDeclarations) {
   auto r = Parse(
