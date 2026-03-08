@@ -153,7 +153,7 @@ def test_invoke_builds_correct_command(iscs, monkeypatch):
     mock_run = MagicMock(
         return_value=subprocess.CompletedProcess(args=[], returncode=0),
     )
-    monkeypatch.setattr(iscs.subprocess, "run", mock_run)
+    monkeypatch.setattr("lib.python.cli.subprocess.run", mock_run)
     iscs.invoke_implement_subclause(
         "/path/lrm.pdf", "6.1", 8, "opus", False,
     )
@@ -171,7 +171,7 @@ def test_invoke_passes_continue(iscs, monkeypatch):
     mock_run = MagicMock(
         return_value=subprocess.CompletedProcess(args=[], returncode=0),
     )
-    monkeypatch.setattr(iscs.subprocess, "run", mock_run)
+    monkeypatch.setattr("lib.python.cli.subprocess.run", mock_run)
     iscs.invoke_implement_subclause(
         "/path/lrm.pdf", "6.1", 8, "opus", True,
     )
@@ -183,7 +183,7 @@ def test_invoke_no_continue_by_default(iscs, monkeypatch):
     mock_run = MagicMock(
         return_value=subprocess.CompletedProcess(args=[], returncode=0),
     )
-    monkeypatch.setattr(iscs.subprocess, "run", mock_run)
+    monkeypatch.setattr("lib.python.cli.subprocess.run", mock_run)
     iscs.invoke_implement_subclause(
         "/path/lrm.pdf", "6.1", 8, "opus", False,
     )
@@ -195,7 +195,7 @@ def test_invoke_exits_on_failure(iscs, monkeypatch):
     mock_run = MagicMock(
         return_value=subprocess.CompletedProcess(args=[], returncode=1),
     )
-    monkeypatch.setattr(iscs.subprocess, "run", mock_run)
+    monkeypatch.setattr("lib.python.cli.subprocess.run", mock_run)
     with pytest.raises(SystemExit):
         iscs.invoke_implement_subclause(
             "/path/lrm.pdf", "6.1", 8, "opus", False,
@@ -205,17 +205,12 @@ def test_invoke_exits_on_failure(iscs, monkeypatch):
 # ---- main -------------------------------------------------------------------
 
 
-def _patch_main(monkeypatch, iscs, *, all_complete=False):
+def _patch_main(monkeypatch, iscs, patch_completion, *, all_complete=False):
     """Patch dependencies for main() and return mocks."""
     mock_invoke = MagicMock()
     monkeypatch.setattr(iscs, "invoke_implement_subclause", mock_invoke)
 
-    if all_complete:
-        monkeypatch.setattr(iscs, "fetch_issue_body", lambda *_a: "- [x] done\n")
-        monkeypatch.setattr(iscs, "next_unchecked", lambda _b: None)
-    else:
-        monkeypatch.setattr(iscs, "fetch_issue_body", lambda *_a: "- [ ] 6.3\n")
-        monkeypatch.setattr(iscs, "next_unchecked", lambda _b: "6.3")
+    patch_completion(monkeypatch, iscs, all_complete=all_complete)
 
     mock_close = MagicMock()
     monkeypatch.setattr(iscs, "close_issue", mock_close)
@@ -226,62 +221,84 @@ def _patch_main(monkeypatch, iscs, *, all_complete=False):
     return mock_invoke, mock_close, mock_mark
 
 
-def test_main_invokes_each_subclause(iscs, monkeypatch, base_argv):
+def test_main_invokes_each_subclause(
+    iscs, monkeypatch, base_argv, patch_completion,
+):
     """main() invokes implement_subclause for each subclause."""
-    mock_invoke, _, __ = _patch_main(monkeypatch, iscs)
+    mock_invoke, _, __ = _patch_main(monkeypatch, iscs, patch_completion)
     iscs.main(base_argv)
     assert mock_invoke.call_count == 2
 
 
-def test_main_first_subclause_no_continue(iscs, monkeypatch, base_argv):
+def test_main_first_subclause_no_continue(
+    iscs, monkeypatch, base_argv, patch_completion,
+):
     """First subclause does not pass continue_session=True."""
-    mock_invoke, _, __ = _patch_main(monkeypatch, iscs)
+    mock_invoke, _, __ = _patch_main(monkeypatch, iscs, patch_completion)
     iscs.main(base_argv)
     assert mock_invoke.call_args_list[0][0][4] is False
 
 
-def test_main_second_subclause_uses_continue(iscs, monkeypatch, base_argv):
+def test_main_second_subclause_uses_continue(
+    iscs, monkeypatch, base_argv, patch_completion,
+):
     """Second subclause passes continue_session=True."""
-    mock_invoke, _, __ = _patch_main(monkeypatch, iscs)
+    mock_invoke, _, __ = _patch_main(monkeypatch, iscs, patch_completion)
     iscs.main(base_argv)
     assert mock_invoke.call_args_list[1][0][4] is True
 
 
-def test_main_continue_flag_on_first(iscs, monkeypatch, base_argv):
+def test_main_continue_flag_on_first(
+    iscs, monkeypatch, base_argv, patch_completion,
+):
     """--continue flag makes the first subclause use continue_session=True."""
-    mock_invoke, _, __ = _patch_main(monkeypatch, iscs)
+    mock_invoke, _, __ = _patch_main(monkeypatch, iscs, patch_completion)
     iscs.main(base_argv + ["--continue"])
     assert mock_invoke.call_args_list[0][0][4] is True
 
 
-def test_main_closes_issue_when_all_complete(iscs, monkeypatch, base_argv):
+def test_main_closes_issue_when_all_complete(
+    iscs, monkeypatch, base_argv, patch_completion,
+):
     """Clause issue is closed when all subclauses are complete."""
-    _, mock_close, __ = _patch_main(monkeypatch, iscs, all_complete=True)
+    _, mock_close, __ = _patch_main(
+        monkeypatch, iscs, patch_completion, all_complete=True,
+    )
     iscs.main(base_argv)
     assert mock_close.call_args == (
         ("o", "r", 8, "all subclauses are implemented"),
     )
 
 
-def test_main_marks_master_when_all_complete(iscs, monkeypatch, base_argv):
+def test_main_marks_master_when_all_complete(
+    iscs, monkeypatch, base_argv, patch_completion,
+):
     """Master issue is marked complete when clause issue is done."""
-    _, __, mock_mark = _patch_main(monkeypatch, iscs, all_complete=True)
+    _, __, mock_mark = _patch_main(
+        monkeypatch, iscs, patch_completion, all_complete=True,
+    )
     iscs.main(base_argv)
     assert mock_mark.call_args == (("o", "r", 1, 8),)
 
 
-def test_main_does_not_close_when_incomplete(iscs, monkeypatch, base_argv):
+def test_main_does_not_close_when_incomplete(
+    iscs, monkeypatch, base_argv, patch_completion,
+):
     """Clause issue is not closed when subclauses remain."""
-    _, mock_close, __ = _patch_main(monkeypatch, iscs, all_complete=False)
+    _, mock_close, __ = _patch_main(
+        monkeypatch, iscs, patch_completion, all_complete=False,
+    )
     iscs.main(base_argv)
     assert not mock_close.called
 
 
 def test_main_does_not_mark_master_when_incomplete(
-    iscs, monkeypatch, base_argv,
+    iscs, monkeypatch, base_argv, patch_completion,
 ):
     """Master issue is not marked when subclauses remain."""
-    _, __, mock_mark = _patch_main(monkeypatch, iscs, all_complete=False)
+    _, __, mock_mark = _patch_main(
+        monkeypatch, iscs, patch_completion, all_complete=False,
+    )
     iscs.main(base_argv)
     assert not mock_mark.called
 

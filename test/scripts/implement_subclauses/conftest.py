@@ -13,3 +13,20 @@ def base_argv(tmp_path):
         "--clause-issue", "8", "--master-issue", "1",
         "--organization", "o", "--repo", "r",
     ]
+
+
+@pytest.fixture()
+def patch_completion():
+    """Return a helper that patches fetch_issue_body and next_unchecked."""
+    def _apply(monkeypatch, iscs, *, all_complete):
+        if all_complete:
+            monkeypatch.setattr(
+                iscs, "fetch_issue_body", lambda *_a: "- [x] done\n",
+            )
+            monkeypatch.setattr(iscs, "next_unchecked", lambda _b: None)
+        else:
+            monkeypatch.setattr(
+                iscs, "fetch_issue_body", lambda *_a: "- [ ] 6.3\n",
+            )
+            monkeypatch.setattr(iscs, "next_unchecked", lambda _b: "6.3")
+    return _apply

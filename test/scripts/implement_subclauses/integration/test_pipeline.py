@@ -14,7 +14,7 @@ def _load(module_loader):
     )
 
 
-def _patch_externals(monkeypatch, iscs, *, all_complete=True):
+def _patch_externals(monkeypatch, iscs, patch_completion, *, all_complete=True):
     """Patch subprocess and GitHub calls, return call trackers."""
     calls = []
 
@@ -23,12 +23,7 @@ def _patch_externals(monkeypatch, iscs, *, all_complete=True):
 
     monkeypatch.setattr(iscs, "invoke_implement_subclause", fake_invoke)
 
-    if all_complete:
-        monkeypatch.setattr(iscs, "fetch_issue_body", lambda *_a: "- [x] done\n")
-        monkeypatch.setattr(iscs, "next_unchecked", lambda _b: None)
-    else:
-        monkeypatch.setattr(iscs, "fetch_issue_body", lambda *_a: "- [ ] 6.3\n")
-        monkeypatch.setattr(iscs, "next_unchecked", lambda _b: "6.3")
+    patch_completion(monkeypatch, iscs, all_complete=all_complete)
 
     close_calls = []
     monkeypatch.setattr(
@@ -46,68 +41,72 @@ def _patch_externals(monkeypatch, iscs, *, all_complete=True):
 
 
 def test_pipeline_invokes_then_closes(
-    module_loader, monkeypatch, base_argv,
+    module_loader, monkeypatch, base_argv, patch_completion,
 ):
     """Full pipeline: parses args, invokes subclauses, closes issue."""
     iscs = _load(module_loader)
-    calls, _, __ = _patch_externals(monkeypatch, iscs, all_complete=True)
+    calls, _, __ = _patch_externals(
+        monkeypatch, iscs, patch_completion, all_complete=True,
+    )
     iscs.main(base_argv)
     assert [c[1] for c in calls] == ["6.1", "6.2"]
 
 
 def test_pipeline_continue_session_progression(
-    module_loader, monkeypatch, base_argv,
+    module_loader, monkeypatch, base_argv, patch_completion,
 ):
     """First subclause has continue=False, second has continue=True."""
     iscs = _load(module_loader)
-    calls, _, __ = _patch_externals(monkeypatch, iscs, all_complete=True)
+    calls, _, __ = _patch_externals(
+        monkeypatch, iscs, patch_completion, all_complete=True,
+    )
     iscs.main(base_argv)
     assert [c[2] for c in calls] == [False, True]
 
 
 def test_pipeline_closes_when_all_complete(
-    module_loader, monkeypatch, base_argv,
+    module_loader, monkeypatch, base_argv, patch_completion,
 ):
     """Issue is closed when all subclauses are complete."""
     iscs = _load(module_loader)
     _, close_calls, __ = _patch_externals(
-        monkeypatch, iscs, all_complete=True,
+        monkeypatch, iscs, patch_completion, all_complete=True,
     )
     iscs.main(base_argv)
     assert len(close_calls) == 1
 
 
 def test_pipeline_marks_master_when_all_complete(
-    module_loader, monkeypatch, base_argv,
+    module_loader, monkeypatch, base_argv, patch_completion,
 ):
     """Master issue is marked when all subclauses are complete."""
     iscs = _load(module_loader)
     _, __, mark_calls = _patch_externals(
-        monkeypatch, iscs, all_complete=True,
+        monkeypatch, iscs, patch_completion, all_complete=True,
     )
     iscs.main(base_argv)
     assert len(mark_calls) == 1
 
 
 def test_pipeline_skips_close_when_incomplete(
-    module_loader, monkeypatch, base_argv,
+    module_loader, monkeypatch, base_argv, patch_completion,
 ):
     """Issue is not closed when subclauses remain."""
     iscs = _load(module_loader)
     _, close_calls, __ = _patch_externals(
-        monkeypatch, iscs, all_complete=False,
+        monkeypatch, iscs, patch_completion, all_complete=False,
     )
     iscs.main(base_argv)
     assert not close_calls
 
 
 def test_pipeline_skips_mark_when_incomplete(
-    module_loader, monkeypatch, base_argv,
+    module_loader, monkeypatch, base_argv, patch_completion,
 ):
     """Master issue is not marked when subclauses remain."""
     iscs = _load(module_loader)
     _, __, mark_calls = _patch_externals(
-        monkeypatch, iscs, all_complete=False,
+        monkeypatch, iscs, patch_completion, all_complete=False,
     )
     iscs.main(base_argv)
     assert not mark_calls

@@ -20,12 +20,12 @@ def clause_argv(tmp_path: Path) -> list[str]:
 
 
 @pytest.fixture()
-def invoke_subprocess_ok(ic, monkeypatch):
-    """Patch subprocess.run to return success; return mock_run."""
+def invoke_subprocess_ok(monkeypatch):
+    """Patch lib.python.cli subprocess.run to return success; return mock."""
     mock_run = MagicMock(
         return_value=subprocess.CompletedProcess(args=[], returncode=0),
     )
-    monkeypatch.setattr(ic.subprocess, "run", mock_run)
+    monkeypatch.setattr("lib.python.cli.subprocess.run", mock_run)
     return mock_run
 
 
