@@ -637,10 +637,16 @@ static void ComputeUnpackedDims(
   auto* dim = dims[0];
   if (TryParseQueueDim(dim, var)) return;
   if (TryParseAssocDim(dim, var)) return;
-  // §7.8.5: User-defined type (struct, class, enum) as assoc array index.
+  // §7.8.3/§7.8.5: User-defined type (class, struct, enum) as assoc index.
   if (dim->kind == ExprKind::kIdentifier &&
       IsUserDefinedType(dim->text, typedefs, class_names)) {
     var.is_assoc = true;
+    // §7.8.3: Mark class-indexed associative arrays.
+    if (class_names.count(dim->text) > 0) {
+      var.is_class_index = true;
+      var.assoc_index_class_name = dim->text;
+      var.assoc_index_width = 64;  // Class handles are 64-bit.
+    }
     return;
   }
   if (TryParseRangeDim(dim, var)) return;
