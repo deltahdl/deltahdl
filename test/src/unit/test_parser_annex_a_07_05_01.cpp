@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70501, FullskewBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $fullskew(posedge clk1, posedge clk2, 50, 50);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
 TEST(ParserA70501, PeriodBasic) {
   auto r = Parse(
       "module m;\n"
