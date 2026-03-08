@@ -431,3 +431,14 @@ TEST(ClockingDefaultSkewTimeUnits, DefaultSkew_InputOutputTimeUnits) {
   ASSERT_GE(item->clocking_signals.size(), 3u);
 }
 
+TEST(DefaultSkew_InputOnly, DefaultSkew_InputOnly) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    default input #5;\n"
+              "    input a;\n"
+              "    output b;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
