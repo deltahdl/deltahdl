@@ -125,4 +125,18 @@ TEST(ParserA705, SystemTimingCheckSetuphold) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetuphold);
 }
 
+TEST(SetupholdTimingCheck, SetupholdBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setuphold(posedge clk, data, 10, 5);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetuphold);
+  ASSERT_GE(tc->limits.size(), 2u);
+}
+
 }  // namespace
