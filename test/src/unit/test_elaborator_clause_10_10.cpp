@@ -139,4 +139,31 @@ TEST(SimCh10j, UnpackedArrayConcatArrayExpansion) {
   EXPECT_EQ(c3->value.ToUint64(), 40u);
 }
 
+// §10.10: Mixed scalar and array items in unpacked array concatenation.
+TEST(SimCh10j, UnpackedArrayConcatMixed) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int A [0:1] = '{1, 2};\n"
+      "  int B [0:2];\n"
+      "  initial begin\n"
+      "    B = {A, 3};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* b0 = f.ctx.FindVariable("B[0]");
+  auto* b1 = f.ctx.FindVariable("B[1]");
+  auto* b2 = f.ctx.FindVariable("B[2]");
+  ASSERT_NE(b0, nullptr);
+  ASSERT_NE(b1, nullptr);
+  ASSERT_NE(b2, nullptr);
+  EXPECT_EQ(b0->value.ToUint64(), 1u);
+  EXPECT_EQ(b1->value.ToUint64(), 2u);
+  EXPECT_EQ(b2->value.ToUint64(), 3u);
+}
+
 }  // namespace
