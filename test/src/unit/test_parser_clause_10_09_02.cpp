@@ -432,3 +432,11 @@ TEST(ReplicationPattern, Cl5_10_ReplicationPattern) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
 }
 
+TEST(StructAssignmentPattern, Cl5_10_StructLiteralInVarDecl) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef struct {int a; int b;} ab;\n"
+              "  ab c = '{0, 1};\n"
+              "endmodule\n"));
+}
+

@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_10_StructLiteralInVarDecl) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct {int a; int b;} ab;\n"
-              "  ab c = '{0, 1};\n"
-              "endmodule\n"));
-}
-
 TEST(ParserClause05, Cl5_10_MemberNameWithDefault) {
   auto r = Parse(
       "module m;\n"
