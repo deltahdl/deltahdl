@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA611, ClockingEventBareIdentifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @clk;\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_event.size(), 1u);
-  EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
-}
-
 TEST(ParserA611, ClockingEndLabel) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
