@@ -379,4 +379,26 @@ TEST(ElabClause09_04_01, DelayInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(AlwaysCombProcessInteraction, ProcessInteractionMultipleTimeSteps) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, doubled;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    #5 a = 8'd4;\n"
+      "    #5 a = 8'd8;\n"
+      "  end\n"
+      "  always_comb doubled = a * 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("doubled");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 16u);
+}
+
 }  // namespace
