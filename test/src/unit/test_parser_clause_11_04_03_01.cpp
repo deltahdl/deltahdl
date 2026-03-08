@@ -41,4 +41,16 @@ TEST(ParserSection11, ArithmeticDiv) {
   EXPECT_EQ(rhs->op, TokenKind::kSlash);
 }
 
+TEST(ParserSection6, RealInExpression) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  real a, b, c;\n"
+              "  initial begin\n"
+              "    a = 1.5;\n"
+              "    b = 2.5;\n"
+              "    c = a + b;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

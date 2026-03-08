@@ -186,18 +186,6 @@ TEST(ParserSection11, Sec11_1_BinaryPowerOperator) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserSection6, RealInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real a, b, c;\n"
-              "  initial begin\n"
-              "    a = 1.5;\n"
-              "    b = 2.5;\n"
-              "    c = a + b;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(ParserCh505, Operator_BinaryAdd) {
   auto r = Parse(
       "module m;\n"
