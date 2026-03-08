@@ -184,7 +184,7 @@ def test_get_unstaged_files_modified(monkeypatch, isc):
     mock_result.stdout = " M src/foo.cpp\n"
     mock_result.stderr = ""
     monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
-    changed, deleted = isc.get_unstaged_files()
+    changed, _deleted = isc.get_unstaged_files()
     assert "src/foo.cpp" in changed
 
 
@@ -195,7 +195,7 @@ def test_get_unstaged_files_untracked(monkeypatch, isc):
     mock_result.stdout = "?? src/new.cpp\n"
     mock_result.stderr = ""
     monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
-    changed, deleted = isc.get_unstaged_files()
+    changed, _deleted = isc.get_unstaged_files()
     assert "src/new.cpp" in changed
 
 
@@ -206,7 +206,7 @@ def test_get_unstaged_files_deleted(monkeypatch, isc):
     mock_result.stdout = " D src/old.cpp\n"
     mock_result.stderr = ""
     monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
-    changed, deleted = isc.get_unstaged_files()
+    _changed, deleted = isc.get_unstaged_files()
     assert "src/old.cpp" in deleted
 
 

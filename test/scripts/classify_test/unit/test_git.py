@@ -1,9 +1,6 @@
 """Unit tests for git integration functions in classify_test."""
 
-from pathlib import Path
 from types import SimpleNamespace
-
-from unittest.mock import MagicMock
 
 
 # ---- build_commit_message --------------------------------------------------

@@ -49,7 +49,7 @@ def test_run_git_passes_kwargs(monkeypatch):
     mock_result = MagicMock()
     mock_result.returncode = 0
 
-    def spy(cmd, **kwargs):
+    def spy(_cmd, **kwargs):
         received.update(kwargs)
         return mock_result
 
