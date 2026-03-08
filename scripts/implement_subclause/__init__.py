@@ -10,8 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from classify_test import clause_to_filename
-from classify_test._patterns import STAGE_TO_PREFIX
+from lib.python.classify import STAGE_TO_PREFIX, clause_to_filename
 from lib.python.cli import add_continue_arg, add_lrm_arg, add_model_arg, validate_lrm
 from lib.python.git import commit_and_push, run_git
 

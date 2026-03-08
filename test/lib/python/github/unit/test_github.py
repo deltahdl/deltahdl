@@ -13,6 +13,7 @@ from lib.python.github import (
     fetch_issue_title,
     mark_master_complete,
     next_unchecked,
+    remove_test_row,
     sync_checklist,
     update_issue_body,
 )
@@ -326,3 +327,30 @@ def test_mark_master_complete_warns_when_not_found(
     )
     mark_master_complete("o", "r", 1, 999)
     assert "WARNING" in capsys.readouterr().err
+
+
+# --- remove_test_row ---
+
+
+_TABLE_BODY = (
+    "| Test | Status | Action |\n"
+    "|------|--------|--------|\n"
+    "| FooTest | Reviewed | Kept |\n"
+    "| BarTest | Unreviewed | |\n"
+)
+
+
+def test_remove_test_row_removes_matching() -> None:
+    """Removes the row matching the test name."""
+    assert "FooTest" not in remove_test_row(_TABLE_BODY, "FooTest")
+
+
+def test_remove_test_row_preserves_other_rows() -> None:
+    """Other rows are preserved after removal."""
+    assert "BarTest" in remove_test_row(_TABLE_BODY, "FooTest")
+
+
+def test_remove_test_row_not_found() -> None:
+    """Raises ValueError when test name not in body."""
+    with pytest.raises(ValueError, match="NoSuchTest"):
+        remove_test_row(_TABLE_BODY, "NoSuchTest")

@@ -33,20 +33,6 @@ def update_test_status(body, test_name, status, *, remark=""):
     return body[:match.start()] + new_row + body[match.end():]
 
 
-def remove_test_row(body, test_name):
-    """Remove the table row for test_name from body."""
-    row_re = re.compile(
-        r"^\| " + re.escape(test_name) + r" \|[^|]*\|[^|]*\|\n?",
-        re.MULTILINE,
-    )
-    match = row_re.search(body)
-    if not match:
-        raise ValueError(
-            f"Row for {test_name!r} not found in issue body",
-        )
-    return body[:match.start()] + body[match.end():]
-
-
 def maybe_update_issue_status(
     args, tests, *, source_is_target, target_filenames=None,
 ):

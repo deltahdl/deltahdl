@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from classify_test._github import fetch_issue_body, update_issue_body
+from lib.python.github import fetch_issue_body, update_issue_body
 from lib.python.classify import (
     add_github_args,
     add_output_args,

@@ -83,7 +83,7 @@ jobs:
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console lib/python/ test/scripts/ test/lib/python/
   test-classify-file:
-    needs: [test-lib-classify, test-lib-git, test-lib-github, test-classify-test]
+    needs: [test-classify-test]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -115,7 +115,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/classify_file/e2e/ -v
   test-classify-files:
-    needs: [test-lib-classify, test-lib-github, test-classify-file, test-classify-test]
+    needs: [test-classify-file]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -179,7 +179,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/classify_test/e2e/ -v
   test-implement-clause:
-    needs: [test-lib-cli, test-lib-github, test-implement-subclause]
+    needs: [test-implement-subclause, test-lib-github]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -211,7 +211,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/implement_clause/e2e/ -v
   test-implement-subclause:
-    needs: [test-lib-cli, test-lib-git, test-lib-github, test-classify-test]
+    needs: [test-lib-classify, test-lib-cli, test-lib-git]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -243,7 +243,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/implement_subclause/e2e/ -v
   test-implement-subclauses:
-    needs: [test-lib-cli, test-lib-git, test-lib-github, test-implement-subclause]
+    needs: [test-implement-subclause, test-lib-github]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

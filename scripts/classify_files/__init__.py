@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from classify_test._github import (
+from lib.python.github import (
     fetch_issue_body,
     remove_test_row,
     update_issue_body,

@@ -3,10 +3,12 @@
 import argparse
 
 from lib.python.classify import (
+    STAGE_TO_PREFIX,
     add_github_args,
     add_output_args,
     add_run_mode_args,
     append_classify_cmd_flags,
+    clause_to_filename,
 )
 
 
@@ -169,3 +171,47 @@ def test_append_classify_cmd_flags_no_commit_omitted() -> None:
     cmd: list[str] = []
     append_classify_cmd_flags(cmd, _STUB_ARGS)
     assert "--no-commit" not in cmd
+
+
+# --- STAGE_TO_PREFIX ---
+
+
+def test_stage_to_prefix_has_all_stages() -> None:
+    """Contains all six pipeline stages."""
+    assert set(STAGE_TO_PREFIX) == {
+        "preprocessor", "lexer", "parser",
+        "elaborator", "simulator", "synthesizer",
+    }
+
+
+def test_stage_to_prefix_values_are_test_prefixes() -> None:
+    """Every value starts with test_ and ends with _."""
+    assert all(v.startswith("test_") and v.endswith("_") for v in STAGE_TO_PREFIX.values())
+
+
+# --- clause_to_filename ---
+
+
+def test_clause_to_filename_regular() -> None:
+    """Regular clause becomes padded clause filename."""
+    assert clause_to_filename("test_parser_", "6.1") == "test_parser_clause_06_01"
+
+
+def test_clause_to_filename_non_lrm_with_topic() -> None:
+    """Non-LRM with topic uses the topic."""
+    assert clause_to_filename("test_non_lrm_", "non-lrm:aig") == "test_non_lrm_aig"
+
+
+def test_clause_to_filename_non_lrm_no_topic() -> None:
+    """Non-LRM without topic defaults to misc."""
+    assert clause_to_filename("test_non_lrm_", "non-lrm") == "test_non_lrm_misc"
+
+
+def test_clause_to_filename_bare_annex() -> None:
+    """Single letter becomes bare annex filename."""
+    assert clause_to_filename("test_parser_", "A") == "test_parser_annex_a"
+
+
+def test_clause_to_filename_annex_subclause() -> None:
+    """Annex subclause becomes padded annex filename."""
+    assert clause_to_filename("test_parser_", "A.1.3") == "test_parser_annex_a_01_03"

@@ -18,15 +18,6 @@ PREFIX_PATTERNS: list[tuple[str, str]] = [
     ("SimContext", "test_simulator_"),
 ]
 
-STAGE_TO_PREFIX: dict[str, str] = {
-    "preprocessor": "test_preprocessor_",
-    "lexer": "test_lexer_",
-    "parser": "test_parser_",
-    "elaborator": "test_elaborator_",
-    "simulator": "test_simulator_",
-    "synthesizer": "test_synthesizer_",
-}
-
 CLAUSE_PROMPT_TEMPLATE = """What IEEE 1800-2023 clause does this test exercise?
 
 Return exactly one clause — the single most relevant subclause.

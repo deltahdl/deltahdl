@@ -19,7 +19,13 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from lib.python.classify import add_github_args, add_output_args, add_run_mode_args
+from lib.python.classify import (
+    STAGE_TO_PREFIX,
+    add_github_args,
+    add_output_args,
+    add_run_mode_args,
+    clause_to_filename,
+)
 from ._github import (
     _validate_issue_args,
     fetch_issue_body,
@@ -29,7 +35,7 @@ from ._github import (
 from ._git import commit_classification
 from ._patterns import (
     CLAUSE_PROMPT_TEMPLATE, CLAUSE_SCHEMA, PREFIX_PATTERNS,
-    PREFIX_PROMPT_TEMPLATE, PREFIX_SCHEMA, STAGE_TO_PREFIX,
+    PREFIX_PROMPT_TEMPLATE, PREFIX_SCHEMA,
     TOPIC_PROMPT_TEMPLATE, TOPIC_SCHEMA,
 )
 from ._output import print_classification_table
@@ -600,25 +606,6 @@ def find_existing_tests(target_base, test_dir, exclude_path=None):
 # ---------------------------------------------------------------------------
 # Stage 4: Resolve filenames
 # ---------------------------------------------------------------------------
-
-def clause_to_filename(prefix, clause):
-    """Convert prefix + clause to a target filename (without .cpp)."""
-    if clause.startswith("non-lrm"):
-        topic = clause.split(":", 1)[1] if ":" in clause else "misc"
-        return f"test_non_lrm_{topic}"
-    prefix = prefix.rstrip("_")
-    if re.match(r"^[A-Z]$", clause):
-        return f"{prefix}_annex_{clause.lower()}"
-    annex_match = re.match(r"^([A-Z])\.(.+)$", clause)
-    if annex_match:
-        letter = annex_match.group(1).lower()
-        parts = annex_match.group(2).split(".")
-        padded = "_".join(p.zfill(2) for p in parts)
-        return f"{prefix}_annex_{letter}_{padded}"
-    parts = clause.split(".")
-    padded = "_".join(p.zfill(2) for p in parts)
-    return f"{prefix}_clause_{padded}"
-
 
 def find_merge_target(target_base, test_dir, exclude_path=None):
     """Find an existing file to merge tests into."""

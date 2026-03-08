@@ -109,6 +109,20 @@ def next_unchecked(body: str) -> str | None:
     return m.group(1) if m else None
 
 
+def remove_test_row(body: str, test_name: str) -> str:
+    """Remove the table row for *test_name* from *body*."""
+    row_re = re.compile(
+        r"^\| " + re.escape(test_name) + r" \|[^|]*\|[^|]*\|\n?",
+        re.MULTILINE,
+    )
+    match = row_re.search(body)
+    if not match:
+        raise ValueError(
+            f"Row for {test_name!r} not found in issue body",
+        )
+    return body[:match.start()] + body[match.end():]
+
+
 def mark_master_complete(
     organization: str, repo: str, master_issue: int,
     sub_issue: int,

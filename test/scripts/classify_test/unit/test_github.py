@@ -132,36 +132,6 @@ def test_update_test_status_with_remark(ct_github):
     ) in result
 
 
-# ---- remove_test_row ------------------------------------------------------
-
-
-def test_remove_test_row_removes_unreviewed(ct_github):
-    """Removes an Unreviewed row."""
-    body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
-    assert ct_github.remove_test_row(body, "Alpha") == "| Beta | Unreviewed | |\n"
-
-
-def test_remove_test_row_removes_reviewed(ct_github):
-    """Removes a reviewed row."""
-    body = "| Alpha | Reviewed | Kept in the same file |\n| Beta | Unreviewed | |\n"
-    assert ct_github.remove_test_row(body, "Alpha") == "| Beta | Unreviewed | |\n"
-
-
-def test_remove_test_row_preserves_others(ct_github):
-    """Other rows are untouched after removal."""
-    body = ("| Alpha | Unreviewed | |\n"
-            "| Beta | Unreviewed | |\n"
-            "| Gamma | Unreviewed | |\n")
-    result = ct_github.remove_test_row(body, "Alpha")
-    assert "| Beta | Unreviewed | |\n| Gamma | Unreviewed | |" in result
-
-
-def test_remove_test_row_not_found_raises(ct_github):
-    """Raises ValueError when test name is not found in any row."""
-    with pytest.raises(ValueError, match="not found"):
-        ct_github.remove_test_row("| Other | Unreviewed | |\n", "Missing")
-
-
 # ---- fetch_issue_body ------------------------------------------------------
 
 
