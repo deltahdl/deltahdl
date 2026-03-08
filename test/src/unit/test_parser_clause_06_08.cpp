@@ -460,4 +460,12 @@ TEST(ImplicitDataType, ImplicitDataType) {
   EXPECT_NE(port.data_type.packed_dim_left, nullptr);
 }
 
+TEST(ImplicitDataType, ImplicitDataTypeSigned) {
+  auto r = Parse("module m(input signed [7:0] d); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_TRUE(port.data_type.is_signed);
+}
+
 }  // namespace
