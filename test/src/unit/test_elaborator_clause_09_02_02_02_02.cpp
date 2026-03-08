@@ -105,25 +105,6 @@ TEST(SimCh9b, AlwaysCombConstAssignTime0) {
   EXPECT_EQ(y->value.ToUint64(), 42u);
 }
 
-// §9.2.2.2.2: always_comb auto-executes at time zero, result is set.
-TEST(SimClause09_02_02_02_02, AlwaysCombTimeZeroExecution) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] y;\n"
-      "  always_comb y = 8'd77;\n"
-      "  initial #1 $finish;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 77u);
-}
-
 // §9.2.2.2.2: Case with variable reads in branches triggers on those inputs.
 TEST(SimClause09_02_02_02_02, CaseBranchSensitivity) {
   SimFixture f;

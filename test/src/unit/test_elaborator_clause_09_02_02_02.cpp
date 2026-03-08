@@ -715,4 +715,23 @@ TEST(AlwaysCombOutputAfterRun, AlwaysCombOutputAfterRun) {
   EXPECT_EQ(result->value.ToUint64(), 100u);
 }
 
+// §9.2.2.2.2: always_comb auto-executes at time zero, result is set.
+TEST(AlwaysCombTimeZeroExecution, AlwaysCombTimeZeroExecution) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] y;\n"
+      "  always_comb y = 8'd77;\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 77u);
+}
+
 }  // namespace
