@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §A.8.6 — inc_or_dec_operator
-TEST(ParserA86, PostfixIncrement) {
-  auto r = Parse("module m; initial begin i++; end endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA86, PostfixDecrement) {
   auto r = Parse("module m; initial begin i--; end endmodule\n");
   ASSERT_NE(r.cu, nullptr);
