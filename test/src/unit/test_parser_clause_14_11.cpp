@@ -20,3 +20,14 @@ TEST(ParserA611, CycleDelayIdentifier) {
 }
 
 }
+TEST(CycleDelayIntegralNumber, CycleDelayIntegralNumber) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ##5;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
