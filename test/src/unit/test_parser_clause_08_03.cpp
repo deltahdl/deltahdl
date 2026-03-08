@@ -148,14 +148,6 @@ TEST(ParserClause08_03, ErrorBothLocalAndProtected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause08_03, ErrorBothRandAndRandc) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand randc int x;\n"
-      "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(ParserClause08_03, ErrorDuplicateStatic) {
   auto r = Parse(
       "class C;\n"

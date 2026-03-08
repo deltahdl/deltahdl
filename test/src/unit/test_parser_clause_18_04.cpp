@@ -42,4 +42,12 @@ TEST(Parser, ClassPropertyQualifiers) {
   EXPECT_TRUE(cls->members[1]->is_local);
 }
 
+TEST(ParserClause08_03, ErrorBothRandAndRandc) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand randc int x;\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
