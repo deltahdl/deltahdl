@@ -498,4 +498,18 @@ TEST(ParserClause09_03_04, MismatchedEndLabelBeginEndErrors) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §9.3.4: Matching end label on fork-join is OK.
+TEST(ParserClause09_03_04, MatchingEndLabelForkJoin) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : par_blk\n"
+      "      $display(\"a\");\n"
+      "    join : par_blk\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
