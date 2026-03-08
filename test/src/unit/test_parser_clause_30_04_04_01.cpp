@@ -59,4 +59,16 @@ TEST(ParserA86, BinaryModulePathXnorAlt) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §A.8.6 — binary_module_path_operator
+TEST(ParserA86, BinaryModulePathEq) {
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    if (a == b) (a => y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
