@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA611, ClockingEndLabel) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    input data;\n"
-              "  endclocking : cb\n"
-              "endmodule\n"));
-}
-
 TEST(ParserA611, ClockingDriveStatement) {
   auto r = Parse(
       "module m;\n"

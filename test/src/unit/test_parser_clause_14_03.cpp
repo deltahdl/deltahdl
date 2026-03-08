@@ -796,3 +796,12 @@ TEST(ClockingDirectionInputOutput, ClockingDirectionInputOutput) {
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
 }
 
+TEST(ClockingEndLabel, ClockingEndLabel) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "  endclocking : cb\n"
+              "endmodule\n"));
+}
+
