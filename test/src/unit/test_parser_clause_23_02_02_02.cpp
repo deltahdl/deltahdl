@@ -175,4 +175,14 @@ TEST(ModuleParamsA13, AllPortDirections) {
   EXPECT_EQ(ports[3].direction, Direction::kRef);
 }
 
+// ansi_port_declaration with unpacked dimensions
+TEST(ModuleParamsA13, AnsiPortUnpackedDim) {
+  auto r = Parse(
+      "module m(\n"
+      "  input logic [7:0] data [4]\n"
+      ");\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
