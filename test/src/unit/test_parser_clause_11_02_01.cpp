@@ -120,4 +120,13 @@ TEST(ConstExpr, StringLiteralIsConstant) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
+// §11.2.1: IsConstantExpr — parameter identifier is constant
+// when resolved in scope.
+TEST(ConstExpr, ParameterIdentifierIsConstant) {
+  EvalFixture f;
+  ScopeMap scope = {{"WIDTH", 8}};
+  auto* e = ParseExprFrom("WIDTH", f);
+  EXPECT_TRUE(IsConstantExpr(e, scope));
+}
+
 }  // namespace

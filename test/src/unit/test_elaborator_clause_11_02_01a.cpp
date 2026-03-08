@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.1: IsConstantExpr — parameter identifier is constant
-// when resolved in scope.
-TEST(ConstExpr, ParameterIdentifierIsConstant) {
-  EvalFixture f;
-  ScopeMap scope = {{"WIDTH", 8}};
-  auto* e = ParseExprFrom("WIDTH", f);
-  EXPECT_TRUE(IsConstantExpr(e, scope));
-}
-
 // §11.2.1: IsConstantExpr — unresolved identifier is not constant.
 TEST(ConstExpr, UnresolvedIdentifierNotConstant) {
   EvalFixture f;
