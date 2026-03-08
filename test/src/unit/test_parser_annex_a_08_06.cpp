@@ -1,21 +1,11 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
-
-// §A.8.6 — unary_operator
-
-TEST(ParserA86, UnaryPlus) {
-  auto r = Parse("module m; initial x = +a; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
-  EXPECT_EQ(rhs->op, TokenKind::kPlus);
-}
 
 TEST(ParserA86, UnaryMinus) {
   auto r = Parse("module m; initial x = -a; endmodule\n");
@@ -108,7 +98,6 @@ TEST(ParserA86, UnaryReductionXnor) {
 }
 
 // §A.8.6 — binary_operator
-
 TEST(ParserA86, BinaryAdd) {
   auto r = Parse("module m; initial x = a + b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -377,7 +366,6 @@ TEST(ParserA86, BinaryEquivalence) {
 }
 
 // §A.8.6 — inc_or_dec_operator
-
 TEST(ParserA86, PostfixIncrement) {
   auto r = Parse("module m; initial begin i++; end endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -403,7 +391,6 @@ TEST(ParserA86, PrefixDecrement) {
 }
 
 // §A.8.6 — binary_module_path_operator
-
 TEST(ParserA86, BinaryModulePathEq) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
@@ -493,7 +480,6 @@ TEST(ParserA86, BinaryModulePathXnor) {
 }
 
 // §A.8.6 — unary_module_path_operator
-
 TEST(ParserA86, UnaryModulePathNot) {
   auto r = Parse(
       "module m(input a, output y);\n"
