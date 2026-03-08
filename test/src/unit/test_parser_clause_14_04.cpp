@@ -514,3 +514,15 @@ TEST(OutputSkewEdge, OutputSkewEdge) {
   EXPECT_EQ(sig.skew_edge, Edge::kNegedge);
 }
 
+TEST(ClockingItemDefaultSkewBoth, ClockingItemDefaultSkewBoth) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default input #1 output #2;\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
