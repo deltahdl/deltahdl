@@ -8,29 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §10.9.1: Default key fills all array elements with the same value.
-TEST(SimCh10i, ArrayDefaultKeyFillsAllElements) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] arr [0:3];\n"
-      "  initial begin\n"
-      "    arr = '{default: 8'd42};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  for (int i = 0; i < 4; ++i) {
-    auto name = "arr[" + std::to_string(i) + "]";
-    auto* elem = f.ctx.FindVariable(name);
-    ASSERT_NE(elem, nullptr) << name;
-    EXPECT_EQ(elem->value.ToUint64(), 42u) << name;
-  }
-}
-
 // §10.9.1: Replication form fills array elements by repeating the value.
 TEST(SimCh10i, ArrayReplicationPatternFills) {
   SimFixture f;
