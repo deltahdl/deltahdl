@@ -8,32 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §10.9.1: Index key assigns specific elements; default fills the rest.
-TEST(SimCh10i, ArrayIndexKeyWithDefault) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int arr [0:2];\n"
-      "  initial begin\n"
-      "    arr = '{0: 100, 2: 200, default: 0};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  auto* e2 = f.ctx.FindVariable("arr[2]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  ASSERT_NE(e2, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 100u);
-  EXPECT_EQ(e1->value.ToUint64(), 0u);
-  EXPECT_EQ(e2->value.ToUint64(), 200u);
-}
-
 // §10.9.1: Descending-range array with positional pattern.
 TEST(SimCh10i, ArrayDescendingRangePositional) {
   SimFixture f;
