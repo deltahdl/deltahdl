@@ -77,7 +77,8 @@ def test_validate_lrm_file_exists(tmp_path) -> None:
     lrm.touch()
     parser = argparse.ArgumentParser()
     args = argparse.Namespace(lrm=lrm)
-    assert validate_lrm(parser, args) is None
+    validate_lrm(parser, args)
+    assert args.lrm == lrm
 
 
 def test_validate_lrm_file_missing() -> None:
