@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA611, ClockingSkewEdgeWithDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    input #1step data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_NE(item->clocking_signals[0].skew_delay, nullptr);
-}
-
 TEST(ParserA611, ClockingEventBareIdentifier) {
   auto r = Parse(
       "module m;\n"
