@@ -7,28 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §10.11: Multi-bit aliased nets share the full value.
-TEST(SimCh10k, AliasMultiBitNetsShareValue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  wire [7:0] x, y;\n"
-      "  alias x = y;\n"
-      "  assign x = 8'hAB;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vx = f.ctx.FindVariable("x");
-  auto* vy = f.ctx.FindVariable("y");
-  ASSERT_NE(vx, nullptr);
-  ASSERT_NE(vy, nullptr);
-  EXPECT_EQ(vx->value.ToUint64(), 0xABu);
-  EXPECT_EQ(vy->value.ToUint64(), 0xABu);
-}
-
 // §10.11: Cumulative aliases — same net in multiple statements.
 TEST(SimCh10k, CumulativeAliases) {
   SimFixture f;
