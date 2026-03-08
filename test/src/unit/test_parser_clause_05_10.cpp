@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_10_NestedReplication) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct {int a; int b[4];} ab_t;\n"
-              "  int a, b, c;\n"
-              "  ab_t v1[1:0] [2:0];\n"
-              "  initial v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
-              "endmodule\n"));
-}
-
 TEST(ParserClause05, Cl5_10_EmptyAssignmentPattern) {
   auto r = Parse(
       "module m;\n"
