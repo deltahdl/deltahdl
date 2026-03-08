@@ -1,8 +1,8 @@
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "parser/ast.h"
-#include "simulator/evaluation.h"
 #include "simulator/eval_array.h"
+#include "simulator/evaluation.h"
 
 using namespace delta;
 

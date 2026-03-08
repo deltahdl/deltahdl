@@ -1,5 +1,3 @@
-#include "elaborator/elaborator.h"
-
 #include <algorithm>
 #include <cstdlib>
 #include <format>
@@ -9,6 +7,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -504,6 +503,5 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
 
   gen_prefix_ = saved_prefix;
 }
-
 
 }  // namespace delta

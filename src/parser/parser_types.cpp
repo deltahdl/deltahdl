@@ -537,5 +537,4 @@ bool Parser::TryParseTypeRef(std::vector<ModuleItem*>& items) {
   return true;
 }
 
-
 }  // namespace delta

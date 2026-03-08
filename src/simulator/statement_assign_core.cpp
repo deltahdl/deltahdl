@@ -1,5 +1,3 @@
-#include "simulator/statement_assign.h"
-
 #include <algorithm>
 #include <cstdint>
 #include <string>
@@ -12,10 +10,11 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
-#include "simulator/evaluation.h"
 #include "simulator/eval_array.h"
+#include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 
 namespace delta {
 
@@ -537,6 +536,5 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx) {
   var->is_forced = false;
   return StmtResult::kDone;
 }
-
 
 }  // namespace delta

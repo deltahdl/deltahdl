@@ -1,5 +1,3 @@
-#include "simulator/evaluation.h"
-
 #include <cmath>
 #include <cstring>
 #include <string>
@@ -9,6 +7,7 @@
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
+#include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
 namespace delta {

@@ -11,8 +11,8 @@
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/dpi.h"
-#include "simulator/evaluation.h"
 #include "simulator/eval_array.h"
+#include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/vcd_writer.h"
 

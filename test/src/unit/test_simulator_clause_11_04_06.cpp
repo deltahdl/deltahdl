@@ -1,8 +1,8 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
-#include "simulator/evaluation.h"
 #include "simulator/eval_array.h"
+#include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;

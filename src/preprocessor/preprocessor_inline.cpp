@@ -1,9 +1,9 @@
-#include "preprocessor/preprocessor.h"
-
 #include <algorithm>
 #include <cctype>
 #include <fstream>
 #include <sstream>
+
+#include "preprocessor/preprocessor.h"
 
 namespace delta {
 
@@ -627,6 +627,5 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
 
 // Ifdef evaluator and macro helpers in preprocessor_macros.cpp.
 // Directive handlers in preprocessor_directives.cpp.
-
 
 }  // namespace delta

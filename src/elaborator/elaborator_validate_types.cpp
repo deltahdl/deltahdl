@@ -11,7 +11,6 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
-
 namespace delta {
 
 void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {

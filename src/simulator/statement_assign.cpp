@@ -12,8 +12,8 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
-#include "simulator/evaluation.h"
 #include "simulator/eval_array.h"
+#include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 

@@ -490,5 +490,4 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   return member;
 }
 
-
 }  // namespace delta

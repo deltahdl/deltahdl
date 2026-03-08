@@ -11,7 +11,6 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
-
 namespace delta {
 
 // §7.6: Validate array assignment compatibility in continuous assignments.
@@ -978,6 +977,5 @@ void Elaborator::ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl) {
     }
   }
 }
-
 
 }  // namespace delta
