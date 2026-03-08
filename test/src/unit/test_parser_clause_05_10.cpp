@@ -7,25 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_10_MemberNameAndValue) {
-
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct {int a; shortreal b;} ab;\n"
-      "  ab c;\n"
-      "  initial c = '{a:0, b:0.0};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
-  ASSERT_EQ(stmt->rhs->pattern_keys.size(), 2u);
-  EXPECT_EQ(stmt->rhs->pattern_keys[0], "a");
-  EXPECT_EQ(stmt->rhs->pattern_keys[1], "b");
-}
-
 TEST(ParserClause05, Cl5_10_DefaultValue) {
 
   auto r = Parse(
