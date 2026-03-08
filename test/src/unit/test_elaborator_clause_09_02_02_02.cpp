@@ -578,4 +578,19 @@ TEST(AlwaysCombIfElseFalseBranch, AlwaysCombIfElseFalseBranch) {
   EXPECT_EQ(y->value.ToUint64(), 0xBBu);
 }
 
+// §9.2.2.2.2: always_comb elaborates to kAlwaysComb.
+TEST(AlwaysCombIsAlwaysCombKind, AlwaysCombIsAlwaysCombKind) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, y;\n"
+      "  always_comb y = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  EXPECT_EQ(proc.kind, RtlirProcessKind::kAlwaysComb);
+}
+
 }  // namespace

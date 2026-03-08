@@ -9,21 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §9.2.2.2.2: always_comb elaborates to kAlwaysComb.
-TEST(ElabClause09_02_02_02_02, AlwaysCombIsAlwaysCombKind) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic a, y;\n"
-      "  always_comb y = a;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  ASSERT_FALSE(design->top_modules.empty());
-  auto& proc = design->top_modules[0]->processes[0];
-  EXPECT_EQ(proc.kind, RtlirProcessKind::kAlwaysComb);
-}
-
 // §9.2.2.2.2: always @* elaborates as kAlways, not kAlwaysComb.
 TEST(ElabClause09_02_02_02_02, AlwaysStarIsAlwaysKind) {
   ElabFixture f;
