@@ -65,7 +65,6 @@ class TestBlock:
     prefix: str | None = None
     clause: str | None = None
     rationale: str | None = None
-    new_suite_name: str | None = None
 
 
 @dataclass

@@ -829,18 +829,18 @@ def test_classify_tests_propagates_validation_error(ct, ct_helpers, monkeypatch,
 
 def test_clause_schema_has_suite_name(ct):
     """CLAUSE_SCHEMA includes a suite_name property."""
-    schema = json.loads(ct._CLAUSE_SCHEMA)
+    schema = json.loads(getattr(ct, "_CLAUSE_SCHEMA"))
     assert "suite_name" in schema["properties"]
 
 
 def test_clause_prompt_mentions_suite_name(ct):
     """CLAUSE_PROMPT_TEMPLATE instructs Claude to return a suite name."""
-    assert "suite_name" in ct._CLAUSE_PROMPT_TEMPLATE
+    assert "suite_name" in getattr(ct, "_CLAUSE_PROMPT_TEMPLATE")
 
 
 def test_topic_schema_has_suite_name(ct):
     """TOPIC_SCHEMA includes a suite_name property."""
-    schema = json.loads(ct._TOPIC_SCHEMA)
+    schema = json.loads(getattr(ct, "_TOPIC_SCHEMA"))
     assert "suite_name" in schema["properties"]
 
 
@@ -880,34 +880,30 @@ def test_validate_suite_name_has_spaces(ct):
 # ---- _apply_classification: suite_name -------------------------------------
 
 
-def test_apply_classification_stores_suite_name(ct, ct_helpers):
-    """Stores new_suite_name from clause response."""
+def _apply_with_suite_name(ct, ct_helpers):
+    """Apply a clause response with suite_name and return the test block."""
     _tb = ct_helpers.make_test_block
     _apply = getattr(ct, "_apply_classification")
     t = _tb("MyTest", body=["  auto r = Parse(src);"])
     resp = {"clause": "6.1", "rationale": "r", "suite_name": "BinaryOps"}
     _apply(t, resp, lrm_path="/tmp/lrm.txt")
-    assert t.new_suite_name == "BinaryOps"
+    return t
+
+
+def test_apply_classification_stores_suite_name(ct, ct_helpers):
+    """Stores new_suite_name from clause response."""
+    assert _apply_with_suite_name(ct, ct_helpers).new_suite_name == "BinaryOps"
 
 
 def test_apply_classification_renames_test_line(ct, ct_helpers):
     """Renames suite in TEST() line to new suite name."""
-    _tb = ct_helpers.make_test_block
-    _apply = getattr(ct, "_apply_classification")
-    t = _tb("MyTest", body=["  auto r = Parse(src);"])
-    resp = {"clause": "6.1", "rationale": "r", "suite_name": "BinaryOps"}
-    _apply(t, resp, lrm_path="/tmp/lrm.txt")
+    t = _apply_with_suite_name(ct, ct_helpers)
     assert t.lines[0] == "TEST(BinaryOps, MyTest) {"
 
 
 def test_apply_classification_updates_suite_name_attr(ct, ct_helpers):
     """Updates test.suite_name to the new suite name."""
-    _tb = ct_helpers.make_test_block
-    _apply = getattr(ct, "_apply_classification")
-    t = _tb("MyTest", body=["  auto r = Parse(src);"])
-    resp = {"clause": "6.1", "rationale": "r", "suite_name": "BinaryOps"}
-    _apply(t, resp, lrm_path="/tmp/lrm.txt")
-    assert t.suite_name == "BinaryOps"
+    assert _apply_with_suite_name(ct, ct_helpers).suite_name == "BinaryOps"
 
 
 def test_apply_classification_no_suite_name_preserves_original(ct, ct_helpers):
@@ -918,7 +914,7 @@ def test_apply_classification_no_suite_name_preserves_original(ct, ct_helpers):
     resp = {"clause": "6.1", "rationale": "r"}
     _apply(t, resp, lrm_path="/tmp/lrm.txt")
     assert t.suite_name == "S"
-    assert t.new_suite_name is None
+    assert not hasattr(t, "new_suite_name")
 
 
 def test_apply_classification_invalid_suite_name_preserves_original(ct, ct_helpers):
@@ -929,4 +925,4 @@ def test_apply_classification_invalid_suite_name_preserves_original(ct, ct_helpe
     resp = {"clause": "6.1", "rationale": "r", "suite_name": "3Bad"}
     _apply(t, resp, lrm_path="/tmp/lrm.txt")
     assert t.suite_name == "S"
-    assert t.new_suite_name is None
+    assert not hasattr(t, "new_suite_name")
