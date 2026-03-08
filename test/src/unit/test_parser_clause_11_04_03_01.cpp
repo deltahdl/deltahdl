@@ -67,4 +67,11 @@ TEST(ParserCh505, Operator_BinaryAdd) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
+TEST(Eval, Addition) {
+  ExprFixture f;
+  auto* expr = ParseExprFrom("10 + 32", f);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+}
+
 }  // namespace

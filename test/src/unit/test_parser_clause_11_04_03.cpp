@@ -190,13 +190,6 @@ TEST(ParserCh505, Operator_Power) {
   EXPECT_TRUE(ParseOk("module m; initial x = 2 ** 10; endmodule"));
 }
 
-TEST(Eval, Addition) {
-  ExprFixture f;
-  auto* expr = ParseExprFrom("10 + 32", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-}
-
 TEST(ParserSection10, Sec10_4_1_ExprAddition) {
   auto r = Parse(
       "module m;\n"
