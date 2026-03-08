@@ -49,4 +49,12 @@ TEST(ConstEvalReal, TernaryOnReals) {
   EXPECT_DOUBLE_EQ(*val, 2.5);
 }
 
+// §11.2.1: Constant expression with nested ternary.
+TEST(ConstExpr, NestedTernaryIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("1 ? (0 ? 3 : 4) : 5", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_EQ(ConstEvalInt(e), 4);
+}
+
 }  // namespace
