@@ -4,6 +4,7 @@ add_library(deltahdl_lib STATIC
     common/source_mgr.cpp
     preprocessor/macro_table.cpp
     preprocessor/preprocessor.cpp
+    preprocessor/preprocessor_inline.cpp
     preprocessor/preprocessor_directives.cpp
     preprocessor/preprocessor_macros.cpp
     lexer/keywords.cpp
