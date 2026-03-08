@@ -353,30 +353,6 @@ static bool MayInferLatch(const Stmt* stmt) {
   }
 }
 
-// §9.2.2.2: Collect LHS variable names assigned in a statement.
-static void CollectLhsNames(const Stmt* stmt,
-                            std::unordered_set<std::string>& out) {
-  if (!stmt) return;
-  if (stmt->kind == StmtKind::kBlockingAssign ||
-      stmt->kind == StmtKind::kNonblockingAssign) {
-    if (stmt->lhs) {
-      const Expr* e = stmt->lhs;
-      while (e->kind == ExprKind::kSelect && e->base) e = e->base;
-      if (e->kind == ExprKind::kIdentifier && !e->text.empty())
-        out.insert(std::string(e->text));
-    }
-  }
-  for (const auto* s : stmt->stmts) CollectLhsNames(s, out);
-  CollectLhsNames(stmt->then_branch, out);
-  CollectLhsNames(stmt->else_branch, out);
-  CollectLhsNames(stmt->body, out);
-  CollectLhsNames(stmt->for_body, out);
-  CollectLhsNames(stmt->for_init, out);
-  CollectLhsNames(stmt->for_step, out);
-  for (const auto& ci : stmt->case_items) CollectLhsNames(ci.body, out);
-  for (const auto* s : stmt->fork_stmts) CollectLhsNames(s, out);
-}
-
 // §9.2.2.1: Check if a statement contains any timing control.
 static bool StmtHasTimingControl(const Stmt* stmt) {
   if (!stmt) return false;
@@ -521,7 +497,7 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
       ProcInfo info;
       info.loc = item->loc;
       info.kind = item->kind;
-      CollectLhsNames(item->body, info.lhs);
+      CollectWrittenNames(item->body, info.lhs);
       procs.push_back(std::move(info));
     }
     if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {

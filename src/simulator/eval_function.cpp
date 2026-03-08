@@ -677,30 +677,48 @@ static void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
   }
 }
 
-// §8.23: Dispatch a non-parameterized class scope call — Class::method(args).
-static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
-                                  Arena& arena, Logic4Vec& out) {
+struct ClassScopeInfo {
+  const Expr* access;
+  ClassTypeInfo* cls;
+  ModuleItem* method;
+  bool is_void;
+};
+
+static bool ResolveClassScope(const Expr* expr, SimContext& ctx,
+                              ClassScopeInfo& info) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
-  auto* access = expr->lhs;
-  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier) return false;
-  // Skip parameterized forms — handled by TryEvalParameterizedScopeCall.
-  if (!access->lhs->elements.empty()) return false;
-  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
+  info.access = expr->lhs;
+  if (!info.access->lhs || info.access->lhs->kind != ExprKind::kIdentifier)
+    return false;
+  if (!info.access->rhs || info.access->rhs->kind != ExprKind::kIdentifier)
+    return false;
+  info.cls = ctx.FindClassType(info.access->lhs->text);
+  if (!info.cls) return false;
+  auto it = info.cls->methods.find(std::string(info.access->rhs->text));
+  if (it == info.cls->methods.end()) return false;
+  info.method = it->second;
+  info.is_void = (info.method->return_type.kind == DataTypeKind::kVoid);
+  return true;
+}
 
-  auto* cls = ctx.FindClassType(access->lhs->text);
-  if (!cls) return false;
-  auto it = cls->methods.find(std::string(access->rhs->text));
-  if (it == cls->methods.end()) return false;
-  auto* method = it->second;
-  bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
-
-  ctx.PushScope();
+static void ExecClassMethod(ModuleItem* method, bool is_void, const Expr* expr,
+                            SimContext& ctx, Arena& arena, Logic4Vec& out) {
   BindFunctionArgs(method, expr, ctx, arena);
   Variable dummy_ret;
   Variable* ret_var = &dummy_ret;
   if (!is_void) ret_var = ctx.CreateLocalVariable(method->name, 32);
   ExecFunctionBody(method, ret_var, ctx, arena);
   out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
+}
+
+// §8.23: Dispatch a non-parameterized class scope call — Class::method(args).
+static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out) {
+  ClassScopeInfo info;
+  if (!ResolveClassScope(expr, ctx, info)) return false;
+  if (!info.access->lhs->elements.empty()) return false;
+  ctx.PushScope();
+  ExecClassMethod(info.method, info.is_void, expr, ctx, arena, out);
   ctx.PopScope();
   return true;
 }
@@ -708,27 +726,12 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
 // §13.8: Dispatch a parameterized class scope call — C#(N)::method(args).
 static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
                                           Arena& arena, Logic4Vec& out) {
-  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
-  auto* access = expr->lhs;
-  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier) return false;
-  if (access->lhs->elements.empty()) return false;
-  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
-
-  auto* cls = ctx.FindClassType(access->lhs->text);
-  if (!cls) return false;
-  auto it = cls->methods.find(std::string(access->rhs->text));
-  if (it == cls->methods.end()) return false;
-  auto* method = it->second;
-  bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
-
+  ClassScopeInfo info;
+  if (!ResolveClassScope(expr, ctx, info)) return false;
+  if (info.access->lhs->elements.empty()) return false;
   ctx.PushScope();
-  BindClassParams(cls, access->lhs, ctx, arena);
-  BindFunctionArgs(method, expr, ctx, arena);
-  Variable dummy_ret;
-  Variable* ret_var = &dummy_ret;
-  if (!is_void) ret_var = ctx.CreateLocalVariable(method->name, 32);
-  ExecFunctionBody(method, ret_var, ctx, arena);
-  out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
+  BindClassParams(info.cls, info.access->lhs, ctx, arena);
+  ExecClassMethod(info.method, info.is_void, expr, ctx, arena, out);
   ctx.PopScope();
   return true;
 }

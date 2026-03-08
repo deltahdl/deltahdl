@@ -75,7 +75,7 @@ std::vector<std::string> CollectReadSignals(const Stmt* body) {
 }
 
 // §9.2.2.2.1(b): Collect LHS variable names written in the statement tree.
-static void CollectWrittenNames(const Stmt* stmt,
+void CollectWrittenNames(const Stmt* stmt,
                                 std::unordered_set<std::string>& out) {
   if (!stmt) return;
   if (stmt->kind == StmtKind::kBlockingAssign ||
