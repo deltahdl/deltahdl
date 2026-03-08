@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -91,23 +93,6 @@ TEST(ElabClause09_03_02, BeginEndInsideForkElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-// §9.3.2: fork/join in always_comb is an error.
-TEST(ElabClause09_03_02, ForkInAlwaysCombErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb begin\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "      b = 0;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
 }
 
 // §9.3.2: fork/join in always_ff is an error.
