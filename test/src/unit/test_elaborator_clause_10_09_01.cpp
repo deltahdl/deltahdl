@@ -287,4 +287,27 @@ TEST(SimCh10i, ArrayIndexKeyWithDefault) {
   EXPECT_EQ(e2->value.ToUint64(), 200u);
 }
 
+// §10.9.1: Descending-range array with positional pattern.
+TEST(SimCh10i, ArrayDescendingRangePositional) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr [1:0];\n"
+      "  initial begin\n"
+      "    arr = '{30, 40};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* e0 = f.ctx.FindVariable("arr[0]");
+  auto* e1 = f.ctx.FindVariable("arr[1]");
+  ASSERT_NE(e0, nullptr);
+  ASSERT_NE(e1, nullptr);
+  EXPECT_EQ(e1->value.ToUint64(), 30u);
+  EXPECT_EQ(e0->value.ToUint64(), 40u);
+}
+
 }  // namespace
