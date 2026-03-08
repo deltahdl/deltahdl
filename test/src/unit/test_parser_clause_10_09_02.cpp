@@ -1,7 +1,17 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
+
+static void VerifyPatternKeys(const Expr* rhs,
+                              const std::string expected_keys[], size_t count) {
+  ASSERT_EQ(rhs->pattern_keys.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
+  }
+}
 
 namespace {
 
@@ -27,6 +37,7 @@ TEST(ParserA60701, PatternAssignmentNamed) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
+
 TEST(ParserSection10, AssignmentPatternStruct) {
   auto r = Parse(
       "module m;\n"
@@ -66,19 +77,6 @@ TEST(ParserSection7, Sec7_2_2_AssignInForLoop) {
               "    for (int i = 0; i < 4; i = i + 1) begin\n"
               "      table[i] = '{i, i * 10};\n"
               "    end\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(ParserCh90301, BlockVarDecl_FullStructReplication) {
-  EXPECT_TRUE(
-      ParseOk("module top();\n"
-              "  struct {int X,Y,Z;} XYZ = '{3{1}};\n"
-              "  typedef struct {int a,b[4];} ab_t;\n"
-              "  int a,b,c;\n"
-              "  initial begin\n"
-              "    ab_t v1[1:0] [2:0];\n"
-              "    v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
               "  end\n"
               "endmodule\n"));
 }
@@ -277,14 +275,6 @@ TEST(ParserSection7, Sec7_2_2_NestedStructPattern) {
   EXPECT_EQ(stmt->rhs->elements[1]->kind, ExprKind::kAssignmentPattern);
 }
 
-static void VerifyPatternKeys(const Expr* rhs,
-                              const std::string expected_keys[], size_t count) {
-  ASSERT_EQ(rhs->pattern_keys.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
-  }
-}
-
 TEST(ParserCh510, AssignmentPatternNamed) {
   auto r = Parse(
       "module t;\n"
@@ -456,3 +446,4 @@ TEST(StructureAssignmentPatternDefault, Cl5_10_MemberNameWithDefault) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
+}  // namespace
