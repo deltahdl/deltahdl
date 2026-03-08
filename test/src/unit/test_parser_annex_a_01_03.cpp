@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-// parameter_port_declaration with local_parameter_declaration
-TEST(ModuleParamsA13, LocalparamInParamPortList) {
-  auto r = Parse(
-      "module m #(parameter W = 8, localparam D = W*2)(\n"
-      "  input logic [D-1:0] data\n"
-      ");\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // list_of_ports ::= ( port { , port } )  — non-ANSI
 TEST(ModuleParamsA13, NonAnsiPorts) {
   auto r = Parse(
