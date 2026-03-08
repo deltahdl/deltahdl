@@ -367,4 +367,16 @@ TEST(ElabClause09_03_02, ForkInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §9.4.1: Delay in always_comb is an error.
+TEST(ElabClause09_04_01, DelayInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb #5 a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace
