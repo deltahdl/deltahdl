@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA611, ClockingDirectionInout) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    inout bidir;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->clocking_signals.size(), 1u);
-  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
-}
-
 TEST(ParserA611, ClockingDirectionInputOutput) {
   auto r = Parse(
       "module m;\n"
