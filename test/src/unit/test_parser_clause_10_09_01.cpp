@@ -191,3 +191,21 @@ TEST(NestedBracesArrayOfStructs, Cl5_10_NestedBracesArrayOfStructs) {
               "endmodule\n"));
 }
 
+TEST(NestedBracesElements, Cl5_10_NestedBracesElements) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct {int a; int b;} ab;\n"
+      "  ab arr[1:0];\n"
+      "  initial arr = '{'{1, 2}, '{3, 4}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
+  ASSERT_EQ(stmt->rhs->elements.size(), 2u);
+  EXPECT_EQ(stmt->rhs->elements[0]->kind, ExprKind::kAssignmentPattern);
+  EXPECT_EQ(stmt->rhs->elements[1]->kind, ExprKind::kAssignmentPattern);
+}
+
