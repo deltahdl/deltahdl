@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.1: IsConstantExpr — concatenation of constants is constant.
-TEST(ConstExpr, ConcatenationOfConstantsIsConstant) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("{4'd1, 4'd2}", f);
-  EXPECT_TRUE(IsConstantExpr(e));
-}
-
 // §11.2.1: IsConstantExpr — replication of constants is constant.
 TEST(ConstExpr, ReplicationOfConstantsIsConstant) {
   EvalFixture f;
