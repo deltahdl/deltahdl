@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70501, HoldBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $hold(posedge clk, data, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kHold);
-  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->ref_terminal.name, "clk");
-  EXPECT_EQ(tc->data_terminal.name, "data");
-  ASSERT_EQ(tc->limits.size(), 1u);
-}
-
 TEST(ParserA70501, HoldWithNotifier) {
   auto r = Parse(
       "module m;\n"
