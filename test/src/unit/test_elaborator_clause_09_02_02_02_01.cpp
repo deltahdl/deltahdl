@@ -343,4 +343,26 @@ TEST(AlwaysCombCaseSensitivity, CaseBodyReadsInSensitivity) {
   EXPECT_TRUE(found_b);
 }
 
+// §9.2.2.2.2: Immediate assertion expression contributes to sensitivity.
+TEST(AssertExprInSensitivity, AssertExprInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b, c, y;\n"
+      "  always_comb begin\n"
+      "    y = a & b;\n"
+      "    assert (c);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  bool found_c = false;
+  for (const auto& ev : proc.sensitivity) {
+    if (ev.signal && ev.signal->text == "c") found_c = true;
+  }
+  EXPECT_TRUE(found_c);
+}
+
 }  // namespace
