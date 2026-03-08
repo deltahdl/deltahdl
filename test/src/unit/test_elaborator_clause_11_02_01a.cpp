@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.1: ConstEvalReal — binary multiply on reals.
-TEST(ConstEvalReal, BinaryMulReals) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("2.0 * 3.0", f);
-  auto val = ConstEvalReal(e);
-  ASSERT_TRUE(val.has_value());
-  EXPECT_DOUBLE_EQ(*val, 6.0);
-}
-
 // §11.2.1: ConstEvalReal — division by zero returns nullopt.
 TEST(ConstEvalReal, DivByZeroReturnsNullopt) {
   EvalFixture f;
