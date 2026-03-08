@@ -128,4 +128,12 @@ TEST(SourceText, ClassQualifierCombinations) {
   EXPECT_TRUE(members[2]->is_virtual);
 }
 
+TEST(ParserClause08_03, ErrorDuplicateVirtual) {
+  auto r = Parse(
+      "class C;\n"
+      "  virtual virtual function void f(); endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

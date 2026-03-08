@@ -156,14 +156,6 @@ TEST(ParserClause08_03, ErrorDuplicateStatic) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause08_03, ErrorDuplicateVirtual) {
-  auto r = Parse(
-      "class C;\n"
-      "  virtual virtual function void f(); endfunction\n"
-      "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 // --- §8.3 interface class extends multiple bases (§8.26) ---
 TEST(ParserClause08_03, InterfaceClassExtendsMultiple) {
   auto r = Parse(
