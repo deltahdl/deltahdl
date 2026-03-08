@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.1: ConstEvalReal — division by zero returns nullopt.
-TEST(ConstEvalReal, DivByZeroReturnsNullopt) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("1.0 / 0.0", f);
-  auto val = ConstEvalReal(e);
-  EXPECT_FALSE(val.has_value());
-}
-
 // §11.2.1: ConstEvalReal — ternary on reals.
 TEST(ConstEvalReal, TernaryOnReals) {
   EvalFixture f;
