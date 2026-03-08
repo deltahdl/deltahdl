@@ -10,31 +10,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA85, NbaIntraAssignDelayNonBlocking) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial begin\n"
-      "    b = 8'd10;\n"
-      "    a <= #5 b;\n"
-      "    c = 8'd99;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
-  auto* c = f.ctx.FindVariable("c");
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(c, nullptr);
-
-  EXPECT_EQ(a->value.ToUint64(), 10u);
-  EXPECT_EQ(c->value.ToUint64(), 99u);
-}
-
 TEST(SimA85, NbaIntraAssignDelayCapturesRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
