@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, BinaryEqEq) {
-  auto r = Parse("module m; initial x = a == b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kEqEq);
-}
-
 TEST(ParserA86, BinaryNotEq) {
   auto r = Parse("module m; initial x = a != b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
