@@ -274,4 +274,23 @@ TEST(ParserSection9, Sec9_3_2_AutomaticVarInForkBlock) {
   EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_TRUE(stmt->fork_stmts[0]->var_is_automatic);
 }
+// §10.4.1: Blocking does not prevent execution in parallel block (§9.3.2).
+TEST(ParserSection10, Sec10_4_1_InForkJoinBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial fork\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "  join\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  ASSERT_GE(stmt->stmts.size(), 2u);
+  EXPECT_EQ(stmt->stmts[0]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->stmts[1]->kind, StmtKind::kBlockingAssign);
+}
+
 }  // namespace
