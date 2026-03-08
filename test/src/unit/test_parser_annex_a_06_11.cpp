@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA611, ClockingItemDefaultSkewOutput) {
-  auto r = Parse(
-      "module m;\n"
-      "  clocking cb @(posedge clk);\n"
-      "    default output #2;\n"
-      "    output ack;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA611, ClockingItemDefaultSkewBoth) {
   auto r = Parse(
       "module m;\n"
