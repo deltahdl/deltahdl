@@ -593,4 +593,32 @@ TEST(AlwaysCombIsAlwaysCombKind, AlwaysCombIsAlwaysCombKind) {
   EXPECT_EQ(proc.kind, RtlirProcessKind::kAlwaysComb);
 }
 
+TEST(AlwaysCombMuxIfElse, AlwaysCombMuxIfElse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic sel;\n"
+      "  logic [7:0] a, b, result;\n"
+      "  initial begin\n"
+      "    sel = 1;\n"
+      "    a = 8'd10;\n"
+      "    b = 8'd20;\n"
+      "  end\n"
+      "  always_comb begin\n"
+      "    if (sel)\n"
+      "      result = a;\n"
+      "    else\n"
+      "      result = b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
 }  // namespace
