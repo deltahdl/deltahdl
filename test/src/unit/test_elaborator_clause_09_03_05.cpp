@@ -88,21 +88,4 @@ TEST(ElabClause09_03_05, LabelOnForLoopElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.5: Parser stores label on statement.
-TEST(ParserClause09_03_05, LabelStoredOnStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    lbl: $display(\"hello\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_NE(item->body, nullptr);
-  ASSERT_EQ(item->body->kind, StmtKind::kBlock);
-  ASSERT_GE(item->body->stmts.size(), 1u);
-  EXPECT_EQ(item->body->stmts[0]->label, "lbl");
-}
-
 }  // namespace
