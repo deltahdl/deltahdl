@@ -293,4 +293,13 @@ TEST(ConstEvalReal, UnaryMinusOnReal) {
   EXPECT_NEAR(*val, -3.14, 1e-6);
 }
 
+// §11.2.1: ConstEvalReal — binary add on reals.
+TEST(ConstEvalReal, BinaryAddReals) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("1.5 + 2.5", f);
+  auto val = ConstEvalReal(e);
+  ASSERT_TRUE(val.has_value());
+  EXPECT_DOUBLE_EQ(*val, 4.0);
+}
+
 }  // namespace
