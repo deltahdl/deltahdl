@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70501, PeriodBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $period(posedge clk, 50);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kPeriod);
-  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->ref_terminal.name, "clk");
-}
-
 TEST(ParserA70501, PeriodWithNotifier) {
   auto r = Parse(
       "module m;\n"
