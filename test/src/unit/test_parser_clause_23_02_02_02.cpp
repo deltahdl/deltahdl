@@ -143,4 +143,17 @@ TEST(ParserSection23, AnsiHeaderEmptyParenPorts) {
   EXPECT_TRUE(r.cu->modules[0]->ports.empty());
 }
 
+// list_of_port_declarations — ANSI form
+TEST(ModuleParamsA13, AnsiPortDeclarations) {
+  auto r = Parse(
+      "module m(\n"
+      "  input  logic       clk,\n"
+      "  input  logic       rst,\n"
+      "  output logic [7:0] data\n"
+      ");\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports.size(), 3u);
+}
+
 }  // namespace

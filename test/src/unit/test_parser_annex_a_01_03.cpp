@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-// list_of_port_declarations — ANSI form
-TEST(ModuleParamsA13, AnsiPortDeclarations) {
-  auto r = Parse(
-      "module m(\n"
-      "  input  logic       clk,\n"
-      "  input  logic       rst,\n"
-      "  output logic [7:0] data\n"
-      ");\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 3u);
-}
-
 // port_declaration with all four directions
 TEST(ModuleParamsA13, AllPortDirections) {
   auto r = Parse(
