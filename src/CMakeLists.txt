@@ -45,7 +45,8 @@ add_library(deltahdl_lib STATIC
     simulator/variable.cpp
     simulator/sim_context.cpp
     simulator/class_object.cpp
-    simulator/eval.cpp
+    simulator/evaluation.cpp
+    simulator/evaluation_literal.cpp
     simulator/eval_function.cpp
     simulator/eval_systask.cpp
     simulator/eval_expr.cpp
