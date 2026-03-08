@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -5,29 +7,6 @@
 using namespace delta;
 
 namespace {
-
-// §10.9.1: Positional array assignment pattern initializes elements in order.
-TEST(SimCh10i, ArrayPositionalPatternInit) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int arr [0:1];\n"
-      "  initial begin\n"
-      "    arr = '{10, 20};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 10u);
-  EXPECT_EQ(e1->value.ToUint64(), 20u);
-}
 
 // §10.9.1: Default key fills all array elements with the same value.
 TEST(SimCh10i, ArrayDefaultKeyFillsAllElements) {
