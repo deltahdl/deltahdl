@@ -151,4 +151,11 @@ TEST(ModuleParamsA13, LocalparamInParamPortList) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ModuleEmptyPortList, ModuleEmptyPortList) {
+  auto r = Parse("module m(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  EXPECT_TRUE(r.cu->modules[0]->ports.empty());
+}
+
 }  // namespace
