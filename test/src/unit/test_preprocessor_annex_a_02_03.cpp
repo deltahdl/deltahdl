@@ -32,4 +32,11 @@ TEST(ParserA212, OutputDefaultValue) {
   EXPECT_NE(port.default_value, nullptr);
 }
 
+TEST(ParserA23, ListOfPortIdentifiersWithUnpackedDim) {
+  auto r = ParseWithPreprocessor("module m(inout logic a [3:0]); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->modules[0]->ports[0].unpacked_dims.empty());
+}
+
 }  // namespace

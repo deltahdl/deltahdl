@@ -126,13 +126,6 @@ TEST(ParserA212, NetPortTypeTriType) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].name, "bus");
 }
 
-TEST(ParserA23, ListOfPortIdentifiersWithUnpackedDim) {
-  auto r = ParseWithPreprocessor("module m(inout logic a [3:0]); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_FALSE(r.cu->modules[0]->ports[0].unpacked_dims.empty());
-}
-
 TEST(ParserA23, ListOfVariableIdentifiersMultipleAnsi) {
   auto r = ParseWithPreprocessor(
       "module m(input logic a, input logic b, input logic c); endmodule\n");
