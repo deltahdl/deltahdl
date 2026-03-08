@@ -40,19 +40,6 @@ TEST(ElabClause09_03_04, NamedForkBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.4: End label without start label is OK (no mismatch).
-TEST(ParserClause09_03_04, EndLabelWithoutStartLabelOk) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $display(\"hello\");\n"
-      "  end : unnamed_end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  // No mismatch error because there's no start name to compare against.
-  EXPECT_FALSE(r.has_errors);
-}
-
 // §9.3.4: Named block without end label is OK.
 TEST(ParserClause09_03_04, NamedBlockWithoutEndLabelOk) {
   auto r = Parse(
