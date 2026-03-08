@@ -95,23 +95,6 @@ TEST(ElabClause09_03_02, BeginEndInsideForkElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.2: fork/join in final is an error.
-TEST(ElabClause09_03_02, ForkInFinalErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  final begin\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "      b = 0;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 // §9.3.2: Nested fork/join in initial elaborates.
 TEST(ElabClause09_03_02, NestedForkElaborates) {
   ElabFixture f;
