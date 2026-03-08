@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -6,15 +8,6 @@
 using namespace delta;
 
 namespace {
-
-TEST(ParserA23, ListOfSpecparamAssignmentsSingle) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 100; endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
 
 TEST(ParserA705, TimingCheckMixedWithPaths) {
   auto r = Parse(

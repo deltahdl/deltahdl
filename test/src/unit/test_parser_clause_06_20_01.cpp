@@ -104,4 +104,13 @@ TEST(ModuleParamsA13, TypedParamPort) {
   EXPECT_EQ(r.cu->modules[0]->params.size(), 2u);
 }
 
+TEST(ParserA23, ListOfSpecparamAssignmentsSingle) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify specparam tRISE = 100; endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
