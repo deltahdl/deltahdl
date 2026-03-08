@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70501, RecoveryBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $recovery(posedge rst, posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecovery);
-}
-
 TEST(ParserA70501, RemovalBasic) {
   auto r = Parse(
       "module m;\n"

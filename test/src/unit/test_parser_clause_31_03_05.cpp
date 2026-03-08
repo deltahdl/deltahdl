@@ -50,4 +50,17 @@ TEST(ParserA705, SystemTimingCheckRecovery) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecovery);
 }
 
+TEST(RecoveryTimingCheck, RecoveryBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $recovery(posedge rst, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecovery);
+}
+
 }  // namespace
