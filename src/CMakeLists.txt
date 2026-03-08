@@ -56,7 +56,8 @@ add_library(deltahdl_lib STATIC
     simulator/eval_fileio.cpp
     simulator/eval_format.cpp
     simulator/stmt_exec.cpp
-    simulator/stmt_assign.cpp
+    simulator/statement_assign.cpp
+    simulator/statement_assign_core.cpp
     simulator/lowerer.cpp
     simulator/vcd_writer.cpp
     simulator/adv_sim.cpp
