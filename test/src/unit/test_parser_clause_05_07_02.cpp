@@ -160,4 +160,13 @@ TEST(ParserClause05, Cl5_7_2_RealPositiveExponent) {
               "endmodule\n"));
 }
 
+// §11.2.1: ConstEvalReal — real literal evaluates to double.
+TEST(ConstEvalReal, RealLiteralEval) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("3.14", f);
+  auto val = ConstEvalReal(e);
+  ASSERT_TRUE(val.has_value());
+  EXPECT_NEAR(*val, 3.14, 1e-6);
+}
+
 }  // namespace

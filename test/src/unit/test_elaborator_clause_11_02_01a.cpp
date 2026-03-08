@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.1: ConstEvalReal — real literal evaluates to double.
-TEST(ConstEvalReal, RealLiteralEval) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("3.14", f);
-  auto val = ConstEvalReal(e);
-  ASSERT_TRUE(val.has_value());
-  EXPECT_NEAR(*val, 3.14, 1e-6);
-}
-
 // §11.2.1: ConstEvalReal — integer literal promotes to real.
 TEST(ConstEvalReal, IntLiteralPromotesToReal) {
   EvalFixture f;
