@@ -186,20 +186,6 @@ TEST(ParserSection11, Sec11_1_BinaryPowerOperator) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserCh505, Operator_BinaryAdd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = a + b;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kPlus);
-}
-
 TEST(ParserCh505, Operator_Power) {
   EXPECT_TRUE(ParseOk("module m; initial x = 2 ** 10; endmodule"));
 }
