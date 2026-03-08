@@ -21,7 +21,8 @@ void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out);
 void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out);
 
 /// Collect LHS variable names written in a statement tree.
-void CollectWrittenNames(const Stmt* stmt, std::unordered_set<std::string>& out);
+void CollectWrittenNames(const Stmt* stmt,
+                         std::unordered_set<std::string>& out);
 
 /// Return the set of signal names read by a statement body.
 std::vector<std::string> CollectReadSignals(const Stmt* body);
