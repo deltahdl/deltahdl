@@ -27,18 +27,6 @@ TEST(ParserA705, TimingCheckMixedWithPaths) {
   EXPECT_EQ(spec->specify_items[2]->kind, SpecifyItemKind::kPathDecl);
 }
 
-TEST(ParserAnnexA, A7SpecparamInSpecify) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tRISE = 100;\n"
-      "    (a => b) = tRISE;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParserA701, SpecifyBlockEmpty) {
   auto r = Parse("module m; specify endspecify endmodule\n");
   ASSERT_NE(r.cu, nullptr);

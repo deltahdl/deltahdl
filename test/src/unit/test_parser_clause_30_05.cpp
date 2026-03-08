@@ -51,4 +51,16 @@ TEST(ParserA704, PathDelayWithSpecparam) {
   ASSERT_EQ(path_item->path.delays.size(), 1u);
 }
 
+TEST(ParserAnnexA, A7SpecparamInSpecify) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    specparam tRISE = 100;\n"
+      "    (a => b) = tRISE;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
