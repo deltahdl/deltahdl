@@ -79,4 +79,11 @@ TEST(ConstExpr, OnehotConstantArg) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
+// §11.2.1: $onehot0 with constant arg is constant.
+TEST(ConstExpr, Onehot0ConstantArg) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("$onehot0(8'h00)", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
 }  // namespace

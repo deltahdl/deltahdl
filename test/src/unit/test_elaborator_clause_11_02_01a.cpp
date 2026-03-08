@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.1: $onehot0 with constant arg is constant.
-TEST(ConstExpr, Onehot0ConstantArg) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("$onehot0(8'h00)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
-}
-
 // §11.2.1: ConstEvalReal — real literal evaluates to double.
 TEST(ConstEvalReal, RealLiteralEval) {
   EvalFixture f;
