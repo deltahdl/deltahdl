@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §10.10.1
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
