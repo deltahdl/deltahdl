@@ -201,4 +201,11 @@ TEST(ConstEvalReal, NonConstantReturnsNullopt) {
   EXPECT_FALSE(val.has_value());
 }
 
+// §11.2.1: Unbased unsized literal is a constant expression.
+TEST(ConstExpr, UnbasedUnsizedLiteralIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("'1", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
 }  // namespace
