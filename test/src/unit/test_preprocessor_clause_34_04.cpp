@@ -28,4 +28,11 @@ TEST_F(ProtectedTest, PragmaProtectConsumed) {
   EXPECT_EQ(result.find("pragma"), std::string::npos);
 }
 
+// --- §22.11.1: `pragma protect is recognized (Clause 34) ---
+TEST(Preprocessor, Pragma_Protect_NoError) {
+  PreprocFixture f;
+  Preprocess("`pragma protect begin\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
