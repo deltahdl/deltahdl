@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -44,18 +46,6 @@ TEST(ElabClause09_04_02, AnyChangeEventControlElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-// §9.4.2: Event control in always_comb is an error.
-TEST(ElabClause09_04_02, EventControlInAlwaysCombErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic clk, a;\n"
-      "  always_comb @(posedge clk) a = 1;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
 }
 
 // §9.4.2: Edge detection on LSB — posedge 0→1, negedge 1→0.

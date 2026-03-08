@@ -477,4 +477,16 @@ TEST(SimCh9d, AlwaysStarEquivAlwaysComb) {
   EXPECT_EQ(y_star->value.ToUint64(), y_comb->value.ToUint64());
 }
 
+// §9.4.2: Event control in always_comb is an error.
+TEST(ElabClause09_04_02, EventControlInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  always_comb @(posedge clk) a = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace
