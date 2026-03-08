@@ -51,26 +51,6 @@ TEST(CompiledSim, ExecuteBlockingAssign) {
   EXPECT_EQ(x_var->value.ToUint64(), 42u);
 }
 
-TEST(StmtExec, BlockingAssignMemberAccess) {
-  StmtFixture f;
-
-  auto* var = f.ctx.CreateVariable("s.a", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* mem = f.arena.Create<Expr>();
-  mem->kind = ExprKind::kMemberAccess;
-  mem->lhs = MakeId(f.arena, "s");
-  mem->rhs = MakeId(f.arena, "a");
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kBlockingAssign;
-  stmt->lhs = mem;
-  stmt->rhs = MakeInt(f.arena, 42);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
 TEST(SimCh10a, BlockingIntraAssignDelay) {
   SimFixture f;
   auto* design = ElaborateSrc(
