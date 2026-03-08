@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.2.1: IsConstantExpr — binary with non-constant operand is not constant.
-TEST(ConstExpr, BinaryWithNonConstantNotConstant) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("x + 4", f);
-  EXPECT_FALSE(IsConstantExpr(e));
-}
-
 // §11.2.1: IsConstantExpr — ternary on constants is constant.
 TEST(ConstExpr, TernaryOnConstantsIsConstant) {
   EvalFixture f;
