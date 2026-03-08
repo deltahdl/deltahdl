@@ -752,3 +752,20 @@ TEST(ParserSection14, OverviewMinimalClockingBlock) {
 }
 
 }
+TEST(ClockingBlockDeclaration, ClockingDeclBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kClockingBlock);
+  EXPECT_EQ(item->name, "cb");
+  EXPECT_FALSE(item->is_default_clocking);
+  EXPECT_FALSE(item->is_global_clocking);
+}
+
