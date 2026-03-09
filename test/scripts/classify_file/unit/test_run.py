@@ -217,126 +217,108 @@ def test_parse_args_no_test_flag(monkeypatch, cf):
 
 
 def test_build_command_basic(cf):
-    """Command starts with python -m classify_test."""
-    cmd = getattr(cf, "_build_command")(_make_args(), "T")
-    assert cmd[:3] == [sys.executable, "-m", "classify_test"]
+    """Command starts with python -m classify_tests."""
+    cmd = getattr(cf, "_build_command")(_make_args(), ["T"])
+    assert cmd[:3] == [sys.executable, "-m", "classify_tests"]
 
 
 def test_build_command_file_flag(cf):
     """Command includes --file with correct value."""
-    cmd = getattr(cf, "_build_command")(_make_args(file="/a/b.cpp"), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(file="/a/b.cpp"), ["T"])
     assert cmd[cmd.index("--file") + 1] == "/a/b.cpp"
 
 
 def test_build_command_output_dir_flag(cf):
     """Command includes --output-dir with correct value."""
-    cmd = getattr(cf, "_build_command")(_make_args(output_dir="/out"), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(output_dir="/out"), ["T"])
     assert cmd[cmd.index("--output-dir") + 1] == "/out"
 
 
 def test_build_command_lrm_flag(cf):
     """Command includes --lrm with correct value."""
-    cmd = getattr(cf, "_build_command")(_make_args(lrm="/lrm.txt"), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(lrm="/lrm.txt"), ["T"])
     assert cmd[cmd.index("--lrm") + 1] == "/lrm.txt"
 
 
-def test_build_command_test_flag(cf):
-    """Command includes --test with the given test name."""
-    cmd = getattr(cf, "_build_command")(_make_args(), "FooBar")
-    assert cmd[cmd.index("--test") + 1] == "FooBar"
+def test_build_command_tests_flag(cf):
+    """Command includes --tests with comma-joined names."""
+    cmd = getattr(cf, "_build_command")(_make_args(), ["A", "B", "C"])
+    assert cmd[cmd.index("--tests") + 1] == "A,B,C"
 
 
 def test_build_command_issue_included(cf):
     """Command includes --issue with correct value."""
-    cmd = getattr(cf, "_build_command")(_make_args(issue=42), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(issue=42), ["T"])
     assert cmd[cmd.index("--issue") + 1] == "42"
 
 
 def test_build_command_organization_included(cf):
     """Command includes --organization."""
-    cmd = getattr(cf, "_build_command")(_make_args(), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(), ["T"])
     assert cmd[cmd.index("--organization") + 1] == "testorg"
 
 
 def test_build_command_repo_included(cf):
     """Command includes --repo."""
-    cmd = getattr(cf, "_build_command")(_make_args(), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(), ["T"])
     assert cmd[cmd.index("--repo") + 1] == "testrepo"
 
 
 def test_build_command_dry_run_included(cf):
     """Command includes --dry-run when set."""
-    cmd = getattr(cf, "_build_command")(_make_args(dry_run=True), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(dry_run=True), ["T"])
     assert "--dry-run" in cmd
 
 
 def test_build_command_dry_run_omitted(cf):
     """Command omits --dry-run when not set."""
-    cmd = getattr(cf, "_build_command")(_make_args(), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(), ["T"])
     assert "--dry-run" not in cmd
 
 
 def test_build_command_no_commit_included(cf):
     """Command includes --no-commit when set."""
-    cmd = getattr(cf, "_build_command")(_make_args(no_commit=True), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(no_commit=True), ["T"])
     assert "--no-commit" in cmd
 
 
 def test_build_command_no_commit_omitted(cf):
     """Command omits --no-commit when not set."""
-    cmd = getattr(cf, "_build_command")(_make_args(), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(), ["T"])
     assert "--no-commit" not in cmd
 
 
 def test_build_command_max_lines_included(cf):
     """Command includes --max-lines."""
-    cmd = getattr(cf, "_build_command")(_make_args(), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(), ["T"])
     assert cmd[cmd.index("--max-lines") + 1] == "1000"
 
 
 def test_build_command_max_lines_value(cf):
     """Command passes --max-lines with correct string value."""
-    cmd = getattr(cf, "_build_command")(_make_args(max_lines=500), "T")
+    cmd = getattr(cf, "_build_command")(_make_args(max_lines=500), ["T"])
     assert cmd[cmd.index("--max-lines") + 1] == "500"
 
 
-# ---- run_classify_test -----------------------------------------------------
+# ---- run_classify_tests ----------------------------------------------------
 
 
-def test_run_classify_test_returns_true_on_success(monkeypatch, cf, cf_helpers):
+def test_run_classify_tests_returns_true_on_success(monkeypatch, cf, cf_helpers):
     """Returns True when subprocess exits with 0."""
     cf_helpers.stub_subprocess_success(monkeypatch)
-    assert cf.run_classify_test(
-        _make_args(), "T", 1, 1,
-    ) is True
+    assert cf.run_classify_tests(_make_args(), ["T"]) is True
 
 
-def test_run_classify_test_returns_false_on_failure(monkeypatch, cf, cf_helpers):
+def test_run_classify_tests_returns_false_on_failure(monkeypatch, cf, cf_helpers):
     """Returns False when subprocess exits with non-zero."""
     cf_helpers.stub_subprocess_failure(monkeypatch)
-    assert cf.run_classify_test(
-        _make_args(), "T", 1, 1,
-    ) is False
+    assert cf.run_classify_tests(_make_args(), ["T"]) is False
 
 
-def test_run_classify_test_prints_progress(monkeypatch, cf, cf_helpers, capsys):
-    """Prints progress line with index and name."""
-    cf_helpers.stub_subprocess_success(monkeypatch)
-    cf.run_classify_test(_make_args(), "Alpha", 3, 10)
-    assert "Processing test 3/10: Alpha\n" in capsys.readouterr().out
-
-
-def test_run_classify_test_passes_test_name(monkeypatch, cf, cf_helpers):
-    """Subprocess receives --test with the correct name."""
-    captured = cf_helpers.stub_subprocess_success(monkeypatch)
-    cf.run_classify_test(_make_args(), "FooBar", 1, 1)
-    assert captured[0][captured[0].index("--test") + 1] == "FooBar"
-
-
-def test_run_classify_test_does_not_capture_output(monkeypatch, cf):
+def test_run_classify_tests_does_not_capture_output(monkeypatch, cf):
     """Subprocess inherits stdout/stderr (no capture_output)."""
     kwargs_log = spy_subprocess_run(monkeypatch)
-    cf.run_classify_test(_make_args(), "T", 1, 1)
+    cf.run_classify_tests(_make_args(), ["T"])
     assert "capture_output" not in kwargs_log[0]
 
 
@@ -593,41 +575,40 @@ def test_run_all_succeed(tmp_path, monkeypatch, cf, cf_helpers):
     captured = cf_helpers.stub_subprocess_success(monkeypatch)
     cf_helpers.stub_close_issue(monkeypatch)
     getattr(cf, "_run")(_make_run_args(tmp_path))
-    assert len(captured) == 2
+    assert len(captured) == 1
 
 
-def test_run_some_fail_exits(tmp_path, monkeypatch, cf, cf_helpers):
-    """Exits when any test fails."""
+def test_run_fail_exits(tmp_path, monkeypatch, cf, cf_helpers):
+    """Exits when classify_tests fails."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     cf_helpers.make_test_file(tmp_path, body)
     cf_helpers.stub_sync_issue_rows(monkeypatch)
-    cf_helpers.stub_subprocess_mixed(monkeypatch, {"B"})
+    cf_helpers.stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
         getattr(cf, "_run")(_make_run_args(tmp_path))
 
 
-def test_run_stops_after_failure(tmp_path, monkeypatch, cf, cf_helpers):
-    """Stops immediately when a test fails."""
-    body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\nTEST(S, C) {\n}\n"
-    cf_helpers.make_test_file(tmp_path, body)
-    cf_helpers.stub_sync_issue_rows(monkeypatch)
-    captured = cf_helpers.stub_subprocess_mixed(monkeypatch, {"A"})
-    try:
-        getattr(cf, "_run")(_make_run_args(tmp_path))
-    except SystemExit:
-        pass
-    assert len(captured) == 1
-
-
-def test_run_invokes_per_test(tmp_path, monkeypatch, cf, cf_helpers):
-    """Invokes classify_test once per test name."""
+def test_run_invokes_classify_tests_once(tmp_path, monkeypatch, cf, cf_helpers):
+    """Invokes classify_tests once with all test names."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\nTEST(S, C) {\n}\n"
     cf_helpers.make_test_file(tmp_path, body)
     cf_helpers.stub_sync_issue_rows(monkeypatch)
     captured = cf_helpers.stub_subprocess_success(monkeypatch)
     cf_helpers.stub_close_issue(monkeypatch)
     getattr(cf, "_run")(_make_run_args(tmp_path))
-    assert len(captured) == 3
+    assert len(captured) == 1
+
+
+def test_run_passes_tests_flag(tmp_path, monkeypatch, cf, cf_helpers):
+    """Passes --tests with comma-joined names."""
+    body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
+    cf_helpers.make_test_file(tmp_path, body)
+    cf_helpers.stub_sync_issue_rows(monkeypatch)
+    captured = cf_helpers.stub_subprocess_success(monkeypatch)
+    cf_helpers.stub_close_issue(monkeypatch)
+    getattr(cf, "_run")(_make_run_args(tmp_path))
+    cmd = captured[0]
+    assert cmd[cmd.index("--tests") + 1] == "A,B"
 
 
 def test_run_closes_issue_on_success(tmp_path, monkeypatch, cf, cf_helpers):
@@ -933,7 +914,7 @@ def _run_with_one_reviewed(tmp_path, monkeypatch, cf, cf_helpers):
 def test_run_skips_reviewed_tests_count(
     tmp_path, monkeypatch, cf, cf_helpers,
 ):
-    """Only invokes classify_test for unreviewed tests."""
+    """Only invokes classify_tests for unreviewed tests."""
     captured = _run_with_one_reviewed(
         tmp_path, monkeypatch, cf, cf_helpers,
     )
@@ -943,7 +924,7 @@ def test_run_skips_reviewed_tests_count(
 def test_run_skips_reviewed_tests_name(
     tmp_path, monkeypatch, cf, cf_helpers,
 ):
-    """Invokes classify_test for the unreviewed test only."""
+    """Invokes classify_tests for the unreviewed test only."""
     captured = _run_with_one_reviewed(
         tmp_path, monkeypatch, cf, cf_helpers,
     )
@@ -953,7 +934,7 @@ def test_run_skips_reviewed_tests_name(
 def test_run_all_reviewed_skips_classify(
     tmp_path, monkeypatch, cf, cf_helpers,
 ):
-    """Does not invoke classify_test when all tests are reviewed."""
+    """Does not invoke classify_tests when all tests are reviewed."""
     captured, _ = _run_with_all_reviewed(
         tmp_path, monkeypatch, cf, cf_helpers,
     )

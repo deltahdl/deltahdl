@@ -102,32 +102,27 @@ def sync_issue_rows(
 
 def _build_command(
     args: argparse.Namespace,
-    test_name: str,
+    test_names: list[str],
 ) -> list[str]:
-    """Build the subprocess command list for classify_test."""
+    """Build the subprocess command list for classify_tests."""
     cmd = [
-        sys.executable, "-m", "classify_test",
+        sys.executable, "-m", "classify_tests",
         "--file", args.file,
-        "--test", test_name,
+        "--tests", ",".join(test_names),
         "--issue", str(args.issue),
     ]
     append_classify_cmd_flags(cmd, args)
     return cmd
 
 
-def run_classify_test(
+def run_classify_tests(
     args: argparse.Namespace,
-    test_name: str,
-    index: int,
-    total: int,
+    test_names: list[str],
 ) -> bool:
-    """Invoke classify_test for a single test. Returns True on success."""
-    print(f"Processing test {index}/{total}: {test_name}")
-    cmd = _build_command(args, test_name)
+    """Invoke classify_tests for a list of tests. Returns True on success."""
+    cmd = _build_command(args, test_names)
     result = subprocess.run(cmd, check=False)
-    if result.returncode != 0:
-        return False
-    return True
+    return result.returncode == 0
 
 
 
@@ -197,10 +192,8 @@ def _run(args: argparse.Namespace) -> None:
                 "all tests have been classified",
             )
         return
-    total = len(pending)
-    for i, name in enumerate(pending, 1):
-        if not run_classify_test(args, name, i, total):
-            sys.exit(1)
+    if not run_classify_tests(args, pending):
+        sys.exit(1)
     if not args.dry_run:
         close_issue(
             args.organization, args.repo, args.issue,

@@ -19,7 +19,6 @@ __all__ = [
     "stub_create_issue",
     "stub_sync_issue_rows",
     "stub_subprocess_failure",
-    "stub_subprocess_mixed",
     "stub_subprocess_success",
 ]
 
@@ -29,26 +28,6 @@ def make_test_file(tmp_path: Path, body: str) -> Path:
     f = tmp_path / "test_input.cpp"
     f.write_text(body, encoding="utf-8")
     return f
-
-
-def stub_subprocess_mixed(
-    monkeypatch: pytest.MonkeyPatch, fail_names: set[str],
-) -> list[list[str]]:
-    """Stub subprocess.run to fail for specific test names."""
-    captured: list[list[str]] = []
-
-    def mixed_run(cmd, **_kwargs):
-        captured.append(list(cmd))
-        mock_result = MagicMock()
-        mock_result.stdout = ""
-        mock_result.stderr = ""
-        test_idx = cmd.index("--test")
-        name = cmd[test_idx + 1]
-        mock_result.returncode = 1 if name in fail_names else 0
-        return mock_result
-
-    monkeypatch.setattr(subprocess, "run", mixed_run)
-    return captured
 
 
 def stub_close_issue(
