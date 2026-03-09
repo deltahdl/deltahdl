@@ -663,3 +663,13 @@ TEST(IntegerLiteralConstants, SizedHexLiteralValue) {
   EXPECT_EQ(result, 0x837FFu);
 }
 
+TEST(IntegerLiteralConstants, SizeConstantNonzero) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 1'b1;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 1u);
+}
+

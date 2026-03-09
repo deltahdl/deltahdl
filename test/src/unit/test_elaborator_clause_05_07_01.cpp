@@ -678,7 +678,7 @@ TEST(IntegerLiteralConstants, WhitespaceBetweenSizeAndBase) {
   EXPECT_EQ(result, 3u);
 }
 
-TEST(SimClause05, Cl5_7_1_SizeConstantNonzero) {
+TEST(IntegerLiteralConstants, SizeConstantNonzero) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
