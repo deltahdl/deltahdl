@@ -1,8 +1,6 @@
 
 
 #include "fixture_parser.h"
-#include "fixture_program.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -128,6 +126,47 @@ TEST(ModuleParamsA13, InterfacePortHeader) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParserSection23, ModuleWithPortsAndAssign) {
+  auto r = Parse(
+      "module mux(input logic a, input logic b, input logic sel, output logic "
+      "y);\n"
+      "  assign y = sel ? b : a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  struct Expected {
+    Direction dir;
+    const char* name;
+  };
+  Expected expected[] = {
+      {Direction::kInput, "a"},
+      {Direction::kInput, "b"},
+      {Direction::kInput, "sel"},
+      {Direction::kOutput, "y"},
+  };
+  ASSERT_EQ(mod->ports.size(), std::size(expected));
+  for (size_t i = 0; i < std::size(expected); ++i) {
+    EXPECT_EQ(mod->ports[i].direction, expected[i].dir) << "port " << i;
+    EXPECT_EQ(mod->ports[i].name, expected[i].name) << "port " << i;
+  }
+}
+
+TEST(ParserSection23, VariablePortHeader) {
+  auto r = Parse("module m(input logic [3:0] sel); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "sel");
+}
+
+TEST(ParserSection23, InputVariablePortTypeVar) {
+  auto r = Parse("module m(input var logic d); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
 }
 
 }  // namespace
