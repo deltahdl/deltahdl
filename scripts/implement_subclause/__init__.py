@@ -99,6 +99,14 @@ def format_prompt(
     )
 
     lines.append(
+        "If any pre-existing tests have unintuitive suite or test names"
+        " (e.g., names containing clause numbers like Cl5_7_1_),"
+        " rename them to PascalCase names that intuitively describe"
+        " what the test exercises."
+        " Do NOT include clause or annex numbers in test names.",
+    )
+
+    lines.append(
         "Use strict test-driven development:"
         f" for each requirement in §{subclause},"
         " write a failing unit test, then implement."

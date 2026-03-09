@@ -21,6 +21,8 @@ def _check_common_structure(prompt, subclause, issue):
         missing.append(f"subclause '§{subclause}'")
     if "LRM prose" not in prompt:
         missing.append("copyright constraint")
+    if "unintuitive" not in prompt:
+        missing.append("rename unintuitive names")
     return missing
 
 
