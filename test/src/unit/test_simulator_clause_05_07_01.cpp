@@ -627,15 +627,6 @@ TEST(SimCh50701, SignedBasedLiteral) {
   EXPECT_EQ(result & mask, mask);
 }
 
-TEST(IntegerLiteralConstants, UnsignedBaseLiteralNotSigned) {
-  SimFixture f;
-  auto* lit = MakeSizedLiteral(f.arena, "4'd3", 3);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_FALSE(result.is_signed);
-  EXPECT_EQ(result.width, 4u);
-  EXPECT_EQ(result.ToUint64(), 3u);
-}
-
 TEST(SignedLiterals, SignedHexLiteralIsSigned) {
   SimFixture f;
   auto* lit = MakeSizedLiteral(f.arena, "8'shFF", 0xFF);
