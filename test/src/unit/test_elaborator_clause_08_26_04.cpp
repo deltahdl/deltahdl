@@ -26,4 +26,4 @@ TEST(ElabA8264, ParameterizedInterfaceOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

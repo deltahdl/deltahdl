@@ -274,4 +274,4 @@ TEST(ParserSection11, PostfixDecrementOp) {
   EXPECT_EQ(stmt->expr->op, TokenKind::kMinusMinus);
 }
 
-}
+}  // namespace

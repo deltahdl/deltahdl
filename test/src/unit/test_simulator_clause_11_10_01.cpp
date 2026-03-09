@@ -124,4 +124,4 @@ TEST(SimA11101, SingleCharStringLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 0x41u);
 }
 
-}
+}  // namespace

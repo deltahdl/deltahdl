@@ -119,4 +119,4 @@ TEST(Elaborator, ForwardTypedefThenDefinition) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

@@ -84,4 +84,4 @@ TEST(ClassSim, ConcreteClassNotAbstract) {
   EXPECT_FALSE(type->is_abstract);
 }
 
-}
+}  // namespace

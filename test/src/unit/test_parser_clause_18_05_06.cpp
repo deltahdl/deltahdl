@@ -38,4 +38,4 @@ TEST(SourceText, ConstraintSet) {
   EXPECT_EQ(r.cu->classes[0]->members[2]->name, "cs");
 }
 
-}
+}  // namespace

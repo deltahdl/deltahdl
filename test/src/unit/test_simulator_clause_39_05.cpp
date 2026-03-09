@@ -54,4 +54,4 @@ TEST(SvVpiUser, RegisterAssertionCbReturnsNull) {
   EXPECT_EQ(result, nullptr);
 }
 
-}
+}  // namespace

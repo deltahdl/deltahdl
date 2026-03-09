@@ -25,7 +25,6 @@ TEST(LexerClause05, Cl5_5_SingleCharStar) {
 }
 
 TEST(LexerClause05, Cl5_5_SingleCharSlash) {
-
   auto tokens = Lex("a / b");
   EXPECT_EQ(tokens[1].kind, TokenKind::kSlash);
   EXPECT_EQ(tokens[1].text.size(), 1u);
@@ -341,7 +340,6 @@ TEST(LexerClause05, Cl5_5_OperatorsAdjacentToIdentifiers) {
 }
 
 TEST(LexerClause05, Cl5_5_MaximalMunchForOperators) {
-
   auto tokens = Lex("a===b");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -350,10 +348,9 @@ TEST(LexerClause05, Cl5_5_MaximalMunchForOperators) {
 }
 
 TEST(LexerClause05, Cl5_5_DoubleNotTriple) {
-
   auto tokens = Lex("a == b");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[1].kind, TokenKind::kEqEq);
 }
 
-}
+}  // namespace

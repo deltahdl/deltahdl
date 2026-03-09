@@ -88,10 +88,9 @@ TEST(LexerClause05, Cl5_8_SpaceSeparatesNumberAndUnit) {
 }
 
 TEST(LexerClause05, Cl5_8_NotTimeLiteralIfMoreChars) {
-
   auto r = LexOne("1nsec ");
 
   EXPECT_NE(r.token.kind, TokenKind::kTimeLiteral);
 }
 
-}
+}  // namespace

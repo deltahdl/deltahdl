@@ -31,4 +31,4 @@ TEST(ParserA210, SequenceLvarPortDirection_Output) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

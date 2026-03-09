@@ -58,4 +58,4 @@ TEST(ElabA82662, NoConflictNoOverlapOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

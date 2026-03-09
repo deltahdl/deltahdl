@@ -105,4 +105,4 @@ TEST(ParserSection6, WireAndTriIdenticalSyntax) {
   EXPECT_TRUE(ParseOk("module t; tri a = 1'b0; endmodule\n"));
 }
 
-}
+}  // namespace

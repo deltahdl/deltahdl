@@ -567,4 +567,4 @@ TEST(ParserSection6, TypeRefSimpleExprNoHier) {
   EXPECT_EQ(j_item->data_type.type_ref_expr->kind, ExprKind::kBinary);
 }
 
-}
+}  // namespace

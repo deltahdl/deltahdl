@@ -178,4 +178,4 @@ TEST(Elaborator, DriveStrengthHighz0Strong1Valid) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 4u);
 }
 
-}
+}  // namespace

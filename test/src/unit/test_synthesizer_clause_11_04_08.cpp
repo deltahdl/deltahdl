@@ -24,4 +24,4 @@ TEST(SynthLower, MultiBitAndGate) {
   EXPECT_EQ(aig->outputs.size(), 2);
 }
 
-}
+}  // namespace

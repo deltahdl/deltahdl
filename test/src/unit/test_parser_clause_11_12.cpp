@@ -654,7 +654,7 @@ TEST(ParserA210, AssertionItemDecl_LetDecl) {
               "endmodule\n"));
 }
 
-}
+}  // namespace
 TEST(ClockingItemLetDecl, ClockingItemLetDecl) {
   auto r = Parse(
       "module m;\n"
@@ -669,4 +669,3 @@ TEST(ClockingItemLetDecl, ClockingItemLetDecl) {
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->clocking_signals.size(), 1u);
 }
-

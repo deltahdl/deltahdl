@@ -17,4 +17,4 @@ TEST(ParserSection7, QueuePopFront) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-}
+}  // namespace

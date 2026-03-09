@@ -36,4 +36,4 @@ TEST(SourceText, ConstraintFootnote11StaticWithOverride) {
   ASSERT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

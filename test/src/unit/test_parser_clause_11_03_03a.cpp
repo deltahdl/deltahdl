@@ -77,4 +77,4 @@ TEST(IntLiterals, OctalLiteral) {
   EXPECT_EQ(rhs->int_val, 077u);
 }
 
-}
+}  // namespace

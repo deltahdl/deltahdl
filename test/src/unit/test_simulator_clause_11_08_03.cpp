@@ -63,4 +63,4 @@ TEST(AssignEval, WideRhsTruncated) {
   EXPECT_EQ(var->value.ToUint64(), 0xBu);
 }
 
-}
+}  // namespace

@@ -210,7 +210,6 @@ TEST(Preprocessor, Timescale_InvalidPrecisionUnit) {
 }
 
 TEST(Preprocessor, Timescale_PrecisionSameUnitLargerMagnitudeError) {
-
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 1ns / 10ns\n", f, pp);
@@ -218,7 +217,6 @@ TEST(Preprocessor, Timescale_PrecisionSameUnitLargerMagnitudeError) {
 }
 
 TEST(Preprocessor, Timescale_PrecisionSameUnitSmallerMagnitudeOk) {
-
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 10ns / 1ns\n", f, pp);
@@ -233,7 +231,6 @@ TEST(Preprocessor, Timescale_100nsUnit10nsPrecisionOk) {
 }
 
 TEST(Preprocessor, Timescale_10nsUnit100nsError) {
-
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`timescale 10ns / 100ns\n", f, pp);
@@ -241,7 +238,6 @@ TEST(Preprocessor, Timescale_10nsUnit100nsError) {
 }
 
 TEST(Preprocessor, Timescale_GlobalPrecisionWithMagnitude) {
-
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP(
@@ -277,4 +273,4 @@ TEST(Preprocessor, Timescale_ResetallClearsTimescale) {
   EXPECT_FALSE(pp.HasTimescale());
 }
 
-}
+}  // namespace

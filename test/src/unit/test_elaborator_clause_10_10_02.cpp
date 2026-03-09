@@ -22,4 +22,4 @@ TEST(ElabCh10j, ConcatBracesDisambiguateByTarget) {
   ASSERT_NE(design, nullptr);
 }
 
-}
+}  // namespace

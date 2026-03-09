@@ -205,4 +205,4 @@ TEST(ParserCh512, Attribute_OnPortConnection) {
               "endmodule"));
 }
 
-}
+}  // namespace

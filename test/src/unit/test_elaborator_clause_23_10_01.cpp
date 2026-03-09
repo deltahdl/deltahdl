@@ -56,4 +56,4 @@ TEST(Elaboration, Defparam_NotFoundWarns) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-}
+}  // namespace

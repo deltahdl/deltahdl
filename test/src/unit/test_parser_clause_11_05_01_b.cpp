@@ -204,4 +204,4 @@ TEST(ParserSection11, Sec11_4_1_BitSelectOnLhsBlocking) {
   EXPECT_EQ(lhs->index_end, nullptr);
 }
 
-}
+}  // namespace

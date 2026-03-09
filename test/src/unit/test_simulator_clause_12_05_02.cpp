@@ -169,4 +169,4 @@ TEST(SimA607, ConstCaseExprFallsToDefault) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

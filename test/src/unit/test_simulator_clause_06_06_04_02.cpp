@@ -152,4 +152,4 @@ TEST(ChargeDecay, IdealCapacitiveRetainsValue) {
   EXPECT_FALSE(sched.HasEvents());
 }
 
-}
+}  // namespace

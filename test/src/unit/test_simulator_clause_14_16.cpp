@@ -33,4 +33,4 @@ TEST(SimA611, OutputDrivingWithSkew) {
   EXPECT_EQ(out->value.ToUint64(), 0x55u);
 }
 
-}
+}  // namespace

@@ -177,4 +177,4 @@ TEST(ParserSection6, TypesMatchChandleToHandle) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-}
+}  // namespace

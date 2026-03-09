@@ -187,7 +187,6 @@ TEST(SimCh41, ActiveRegionInterleavingIsPossible) {
 }
 
 TEST(SimCh41, PLIRegionsExistInEnum) {
-
   EXPECT_LT(static_cast<int>(Region::kPreActive),
             static_cast<int>(Region::kActive));
   EXPECT_LT(static_cast<int>(Region::kPreNBA), static_cast<int>(Region::kNBA));
@@ -264,4 +263,4 @@ TEST(SimCh41, MultiTimeSlotWithRegionOrdering) {
   EXPECT_EQ(order[3], "t5_nba");
 }
 
-}
+}  // namespace

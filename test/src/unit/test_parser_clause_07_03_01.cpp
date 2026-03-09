@@ -48,4 +48,4 @@ TEST(ParserSection7, UnionPacked) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
-}
+}  // namespace

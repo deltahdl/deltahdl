@@ -99,4 +99,4 @@ TEST(ClassSim, InheritedMethodNotOverridden) {
   EXPECT_EQ(resolved, base_method);
 }
 
-}
+}  // namespace

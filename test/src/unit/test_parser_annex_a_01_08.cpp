@@ -202,4 +202,4 @@ TEST(CheckerItemsA18, CheckerEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

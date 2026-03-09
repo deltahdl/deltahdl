@@ -29,4 +29,4 @@ TEST(Elaborator, DelayModeUnit_OverridesPath) {
   EXPECT_EQ(design->top_modules[0]->delay_mode, DelayModeDirective::kUnit);
 }
 
-}
+}  // namespace

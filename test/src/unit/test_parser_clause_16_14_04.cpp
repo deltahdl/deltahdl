@@ -60,4 +60,4 @@ TEST(ParserA610, RestrictPropertyModule) {
   ASSERT_NE(item, nullptr);
 }
 
-}
+}  // namespace

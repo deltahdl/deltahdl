@@ -134,4 +134,4 @@ TEST(ParserClause05, Cl5_3_TabCharactersInDeclarations) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

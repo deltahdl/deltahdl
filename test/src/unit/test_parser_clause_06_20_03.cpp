@@ -87,4 +87,4 @@ TEST(ParserSection6, TypeParamWithStructRestriction) {
                "endmodule\n"));
 }
 
-}
+}  // namespace

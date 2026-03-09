@@ -51,4 +51,4 @@ TEST(ParserSection1110_1, StringLiteralWideVector) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

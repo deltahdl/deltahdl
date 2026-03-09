@@ -71,4 +71,4 @@ TEST(ParserA222, DriveStrengthOnTri) {
   EXPECT_EQ(item->drive_strength1, 3u);
 }
 
-}
+}  // namespace

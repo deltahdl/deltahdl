@@ -77,4 +77,4 @@ TEST(ParserAnnexA053, EdgeIndicator_SimParen01) {
   EXPECT_EQ(eval.EvaluateWithEdge({'0', '1'}, 1, '0'), '0');
 }
 
-}
+}  // namespace

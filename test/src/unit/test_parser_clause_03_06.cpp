@@ -58,4 +58,4 @@ TEST(ParserClause03, Cl3_6_CheckerWithMixedContent) {
               "endchecker\n"));
 }
 
-}
+}  // namespace

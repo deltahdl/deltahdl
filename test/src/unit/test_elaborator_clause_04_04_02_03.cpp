@@ -29,4 +29,4 @@ TEST(Lowerer, DelayZero) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

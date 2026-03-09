@@ -53,4 +53,4 @@ TEST(SourceText, ProgramElabSeverityTask) {
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kElabSystemTask));
 }
 
-}
+}  // namespace

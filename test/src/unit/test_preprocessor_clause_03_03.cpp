@@ -74,4 +74,4 @@ TEST(ParserClause03, Cl3_3_SubroutinesAndProceduralBlocks) {
       HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysComb));
 }
 
-}
+}  // namespace

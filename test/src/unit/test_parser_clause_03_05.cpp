@@ -214,4 +214,4 @@ TEST(ParserClause03, Cl3_5_InterfaceWithMixedContents) {
               "endinterface\n"));
 }
 
-}
+}  // namespace

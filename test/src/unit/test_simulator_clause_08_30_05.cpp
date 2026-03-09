@@ -42,4 +42,4 @@ TEST(ClassSim, WeakRefGetIdSameObjectSameId) {
   EXPECT_EQ(WeakReference::GetId(handle), WeakReference::GetId(handle));
 }
 
-}
+}  // namespace

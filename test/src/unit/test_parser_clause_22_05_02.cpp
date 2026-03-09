@@ -12,4 +12,4 @@ TEST(ParserSection22, DefineAndUndef) {
                               "`undef FOO\n"));
 }
 
-}
+}  // namespace

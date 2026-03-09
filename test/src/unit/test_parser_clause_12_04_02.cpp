@@ -186,4 +186,4 @@ TEST(ParserSection9, Sec9_2_2_UniqueIf) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-}
+}  // namespace

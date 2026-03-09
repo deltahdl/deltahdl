@@ -17,4 +17,4 @@ TEST(ParserSection21, FtellFseek) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -38,4 +38,4 @@ TEST(ParserA702, StateDependentIfSimpleParallel) {
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
 }
 
-}
+}  // namespace

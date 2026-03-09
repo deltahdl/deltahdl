@@ -101,4 +101,4 @@ TEST(ParserSection9c, AlwaysCombWithFunctionCall) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -55,4 +55,4 @@ TEST(ParserSection16, PropertyNegationStrong) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

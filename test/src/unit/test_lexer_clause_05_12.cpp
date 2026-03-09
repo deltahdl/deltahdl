@@ -40,7 +40,6 @@ TEST(LexerClause05, Cl5_12_DisambiguatesFromMultiply) {
 }
 
 TEST(LexerClause05, Cl5_12_DisambiguatesCloseFromMultiplyParen) {
-
   auto tokens = Lex("a * b)");
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kStar);
@@ -56,4 +55,4 @@ TEST(LexerClause05, Cl5_12_AttrWithStringValue) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kAttrEnd);
 }
 
-}
+}  // namespace

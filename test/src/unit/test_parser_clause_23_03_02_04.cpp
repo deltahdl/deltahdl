@@ -130,4 +130,4 @@ TEST(ParserSection23, WildcardWithEmptyPort) {
   EXPECT_EQ(item->inst_ports[0].second, nullptr);
 }
 
-}
+}  // namespace

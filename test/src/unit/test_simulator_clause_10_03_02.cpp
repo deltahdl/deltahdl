@@ -61,4 +61,4 @@ TEST(SimCh4, ContinuousAssignChain) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 7u);
 }
 
-}
+}  // namespace

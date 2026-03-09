@@ -64,4 +64,4 @@ TEST(ElabA813, ExtendFinalInChainError) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

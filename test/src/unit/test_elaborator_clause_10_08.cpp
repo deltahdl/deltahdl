@@ -159,4 +159,4 @@ TEST(SimCh10f, NBAAssignLikeContext) {
   EXPECT_EQ(narrow->value.ToUint64(), 0xFu);
 }
 
-}
+}  // namespace

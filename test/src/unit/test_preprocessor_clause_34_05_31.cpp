@@ -36,4 +36,4 @@ TEST_F(ProtectedTest, ResetDirective) {
   EXPECT_NE(result.find("module m;"), std::string::npos);
 }
 
-}
+}  // namespace

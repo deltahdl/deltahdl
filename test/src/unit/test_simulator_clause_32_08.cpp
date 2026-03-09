@@ -61,4 +61,4 @@ TEST(SdfParser, MtmSelectMaximum) {
   EXPECT_EQ(expanded[0], 15u);
 }
 
-}
+}  // namespace

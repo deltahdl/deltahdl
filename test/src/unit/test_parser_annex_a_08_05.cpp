@@ -233,4 +233,4 @@ TEST(ParserA85, NonrangeVarLvalueMemberAccess) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-}
+}  // namespace

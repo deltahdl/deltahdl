@@ -94,4 +94,4 @@ TEST(ParserA610, DeferredCoverFinal) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-}
+}  // namespace

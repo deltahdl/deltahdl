@@ -92,4 +92,4 @@ TEST(PeriodWithNotifier, PeriodWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-}
+}  // namespace

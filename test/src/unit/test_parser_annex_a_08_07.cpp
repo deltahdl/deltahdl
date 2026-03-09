@@ -266,4 +266,4 @@ TEST(ParserA87, UnbasedUnsizedZ) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-}
+}  // namespace

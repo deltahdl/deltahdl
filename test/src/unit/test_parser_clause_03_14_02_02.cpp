@@ -360,4 +360,4 @@ TEST(ParserClause03, Cl3_14_2_3_CUTimeunitSlashSyntax) {
   EXPECT_EQ(r.cu->cu_time_prec, TimeUnit::kFs);
 }
 
-}
+}  // namespace

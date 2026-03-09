@@ -84,4 +84,4 @@ TEST(Elaborator, Sec6_6_4_2_DecayTimeZeroIsIdeal) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

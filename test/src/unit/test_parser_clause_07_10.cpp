@@ -108,4 +108,4 @@ TEST(ParserSection7c, QueueDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

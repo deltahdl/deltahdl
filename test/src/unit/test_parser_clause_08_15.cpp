@@ -118,4 +118,4 @@ TEST(ParserA815, SuperNewWithArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

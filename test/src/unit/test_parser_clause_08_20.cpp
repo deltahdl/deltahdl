@@ -231,4 +231,4 @@ TEST(ParserClause08_03, TaskDynamicOverrideSpecifiers) {
   ASSERT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

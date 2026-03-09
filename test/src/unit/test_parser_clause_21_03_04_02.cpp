@@ -16,4 +16,4 @@ TEST(ParserSection21, FgetsCall) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -36,4 +36,4 @@ TEST(ElabA827, ForwardTypedefInterfaceClassOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

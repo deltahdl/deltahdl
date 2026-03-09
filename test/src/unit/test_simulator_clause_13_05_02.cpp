@@ -88,4 +88,4 @@ TEST(Sim1352, RefImmediateVisibility) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-}
+}  // namespace

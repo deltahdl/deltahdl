@@ -63,4 +63,4 @@ TEST(ArrayOrdering, ShuffleChangesOrder) {
   EXPECT_EQ(sum, 150u);
 }
 
-}
+}  // namespace

@@ -404,4 +404,4 @@ TEST(ParserSection29, TableEdgeNotationParenthesized) {
               "endprimitive\n"));
 }
 
-}
+}  // namespace

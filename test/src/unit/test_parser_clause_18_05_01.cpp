@@ -88,4 +88,4 @@ TEST(ParserSection8, ExternConstraintDecl) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

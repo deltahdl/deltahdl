@@ -28,4 +28,4 @@ TEST(StmtExec, WaitOrderImmediateReturnsKDone) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-}
+}  // namespace

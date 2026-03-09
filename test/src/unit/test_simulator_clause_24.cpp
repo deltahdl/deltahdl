@@ -15,4 +15,4 @@ TEST(Process, ProcessReactiveFlag) {
   EXPECT_TRUE(p.is_reactive);
 }
 
-}
+}  // namespace

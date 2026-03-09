@@ -73,4 +73,4 @@ TEST(ElabClause03, Cl3_5_InterfaceWithSubroutinesElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

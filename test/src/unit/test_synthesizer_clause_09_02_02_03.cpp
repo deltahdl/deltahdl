@@ -24,4 +24,4 @@ TEST(SynthLower, AlwaysLatchCreatesLatch) {
   EXPECT_FALSE(aig->latches.empty());
 }
 
-}
+}  // namespace

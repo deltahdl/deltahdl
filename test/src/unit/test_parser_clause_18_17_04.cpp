@@ -33,4 +33,4 @@ TEST(ParserA612, RsRepeat) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

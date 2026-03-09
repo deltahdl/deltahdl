@@ -277,4 +277,4 @@ TEST(ParserClause03, Cl3_14_SimTimeOperations) {
   EXPECT_EQ(t3.ticks, 1000u);
 }
 
-}
+}  // namespace

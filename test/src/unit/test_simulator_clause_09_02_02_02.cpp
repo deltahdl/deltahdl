@@ -212,4 +212,4 @@ TEST(SimClause09_02_02_02, AlwaysCombMuxPattern) {
   EXPECT_EQ(y->value.ToUint64(), 22u);
 }
 
-}
+}  // namespace

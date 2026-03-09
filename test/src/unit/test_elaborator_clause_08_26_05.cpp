@@ -26,4 +26,4 @@ TEST(ElabA8265, InterfaceClassIsAbstract) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

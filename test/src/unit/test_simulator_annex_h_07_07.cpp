@@ -9,4 +9,4 @@ namespace {
 
 TEST(DpiRuntime, SvBitVecValSize) { EXPECT_EQ(sizeof(SvBitVecVal), 4u); }
 
-}
+}  // namespace

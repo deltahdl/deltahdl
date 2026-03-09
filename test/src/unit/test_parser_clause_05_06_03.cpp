@@ -83,4 +83,4 @@ TEST(ParserClause05, Cl5_6_3_SystemFunctionInExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

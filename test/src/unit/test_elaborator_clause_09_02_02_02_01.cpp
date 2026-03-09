@@ -385,4 +385,4 @@ TEST(CaseBranchSensitivity, CaseBranchSensitivity) {
   EXPECT_EQ(y->value.ToUint64(), 20u);
 }
 
-}
+}  // namespace

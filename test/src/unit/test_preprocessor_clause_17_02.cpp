@@ -44,4 +44,4 @@ TEST(ParserClause03, Cl3_6_ModelingCodeInChecker) {
   EXPECT_GE(r.cu->checkers[0]->items.size(), 3u);
 }
 
-}
+}  // namespace

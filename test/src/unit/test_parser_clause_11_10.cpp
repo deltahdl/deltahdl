@@ -15,4 +15,4 @@ TEST(ParserSection11, Sec11_1_StringLiteralAsExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-}
+}  // namespace

@@ -20,4 +20,4 @@ TEST(SourceText, NestedModuleDeclaration) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->nested_module_decl->name, "inner");
 }
 
-}
+}  // namespace

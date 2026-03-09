@@ -59,4 +59,4 @@ TEST(ParserSection16, InferredClockAndDisableTogether) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

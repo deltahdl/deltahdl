@@ -123,4 +123,4 @@ TEST(SetupTimingCheck, SetupBasic) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-}
+}  // namespace

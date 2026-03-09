@@ -51,4 +51,4 @@ TEST(SimCh10, VerifyWidthAndToUint64_32bit) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
-}
+}  // namespace

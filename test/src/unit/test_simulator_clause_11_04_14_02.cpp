@@ -39,4 +39,4 @@ TEST(EvalOp, StreamingRightShift) {
   EXPECT_EQ(result.ToUint64(), 0xABu);
 }
 
-}
+}  // namespace

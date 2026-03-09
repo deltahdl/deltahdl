@@ -49,4 +49,4 @@ TEST(ParserA703, MixedOutputTerminalsFullPath) {
   EXPECT_EQ(si->path.dst_ports[2].range_kind, SpecifyRangeKind::kPartSelect);
 }
 
-}
+}  // namespace

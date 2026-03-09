@@ -22,4 +22,4 @@ TEST(SimA70501, RecremDualLimitsStored) {
   EXPECT_EQ(stored.limit2, 3u);
 }
 
-}
+}  // namespace

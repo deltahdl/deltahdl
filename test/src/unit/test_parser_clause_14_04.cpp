@@ -336,7 +336,7 @@ TEST(ParserSection14, CombinedInputOutputSkew) {
   }
 }
 
-}
+}  // namespace
 TEST(ClockingSkewEdgeWithDelay, ClockingSkewEdgeWithDelay) {
   auto r = Parse(
       "module m;\n"
@@ -525,4 +525,3 @@ TEST(ClockingItemDefaultSkewBoth, ClockingItemDefaultSkewBoth) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-

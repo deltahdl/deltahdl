@@ -327,7 +327,6 @@ TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
 
 }
 TEST(PositionalStructAssignmentPattern, Cl5_10_PositionalStructLiteral) {
-
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int a; shortreal b;} ab;\n"
@@ -345,7 +344,6 @@ TEST(PositionalStructAssignmentPattern, Cl5_10_PositionalStructLiteral) {
 }
 
 TEST(StructureAssignmentPatternMemberKey, Cl5_10_MemberNameAndValue) {
-
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int a; shortreal b;} ab;\n"
@@ -364,7 +362,6 @@ TEST(StructureAssignmentPatternMemberKey, Cl5_10_MemberNameAndValue) {
 }
 
 TEST(StructureAssignmentPatternDefault, Cl5_10_DefaultValue) {
-
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int a; int b;} ab;\n"
@@ -382,7 +379,6 @@ TEST(StructureAssignmentPatternDefault, Cl5_10_DefaultValue) {
 }
 
 TEST(TypePrefixedPattern, Cl5_10_TypePrefixedPattern) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -392,7 +388,6 @@ TEST(TypePrefixedPattern, Cl5_10_TypePrefixedPattern) {
 }
 
 TEST(ReplicationPattern, Cl5_10_ReplicationPattern) {
-
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int X; int Y; int Z;} xyz_t;\n"

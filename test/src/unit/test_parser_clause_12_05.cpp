@@ -356,4 +356,4 @@ TEST(ParserSection10, Sec10_4_1_InCaseItems) {
   EXPECT_EQ(stmt->case_items[3].body->kind, StmtKind::kBlockingAssign);
 }
 
-}
+}  // namespace

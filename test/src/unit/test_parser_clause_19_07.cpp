@@ -70,4 +70,4 @@ TEST_F(VerifyParseTest, CovergroupWithOption) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}
+}  // namespace

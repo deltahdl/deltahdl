@@ -805,4 +805,4 @@ TEST(SimCh9e, IffAlwaysBlockNba) {
   EXPECT_EQ(var->value.ToUint64(), 123u);
 }
 
-}
+}  // namespace

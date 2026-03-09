@@ -176,4 +176,4 @@ TEST(ParserSection11, ReplicationOperator) {
   EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
 }
 
-}
+}  // namespace

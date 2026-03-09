@@ -36,4 +36,4 @@ TEST(ElabClause09_04_02_04, SequenceDeclarationAndUsage) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -39,7 +39,6 @@ TEST(Lowerer, EventVariableDefaultNotNull) {
   auto* var = f.ctx.FindVariable("ev");
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->is_event);
-
 }
 
 TEST(Simulator, EventTriggeredStatePersistsInTimestep) {
@@ -78,4 +77,4 @@ TEST(Lowerer, EventAssignNull) {
   EXPECT_TRUE(var->is_event);
 }
 
-}
+}  // namespace

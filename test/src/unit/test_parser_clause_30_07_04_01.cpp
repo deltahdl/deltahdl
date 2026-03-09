@@ -210,4 +210,4 @@ TEST(ParserA701, PulsestyleMultipleOutputs) {
   EXPECT_EQ(spec->specify_items[0]->signal_list.size(), 3u);
 }
 
-}
+}  // namespace

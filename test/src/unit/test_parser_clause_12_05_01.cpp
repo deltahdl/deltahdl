@@ -216,4 +216,4 @@ TEST(ParserSection9, Sec9_2_2_CasezStatement) {
   ASSERT_EQ(stmt->case_items.size(), 5u);
 }
 
-}
+}  // namespace

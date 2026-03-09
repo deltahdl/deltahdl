@@ -372,4 +372,4 @@ TEST(ParserAnnexA052, SimStandaloneRegSequential) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-}
+}  // namespace

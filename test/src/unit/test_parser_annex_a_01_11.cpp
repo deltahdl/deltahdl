@@ -221,4 +221,4 @@ TEST(PackageItemsA111, MixedPackageItems) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 3u);
 }
 
-}
+}  // namespace

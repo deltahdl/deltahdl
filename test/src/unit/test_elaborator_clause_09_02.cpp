@@ -95,7 +95,7 @@ TEST(ElabClause09_02, ProcessBodiesNotNull) {
   }
 }
 
-}
+}  // namespace
 TEST(StructuredProcedures, AllProcedureTypesCoexist) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -117,4 +117,3 @@ TEST(StructuredProcedures, AllProcedureTypesCoexist) {
   ASSERT_NE(sum, nullptr);
   EXPECT_EQ(sum->value.ToUint64(), 30u);
 }
-

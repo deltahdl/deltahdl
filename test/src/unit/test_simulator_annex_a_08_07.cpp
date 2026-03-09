@@ -94,4 +94,4 @@ TEST(SimA87, BinaryXDigit) {
   EXPECT_NE(bval & 0x2u, 0u);
 }
 
-}
+}  // namespace

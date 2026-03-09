@@ -72,4 +72,4 @@ TEST(ParserSection6, ParameterizedDataType_ValueParamOnly) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -28,4 +28,4 @@ TEST(ParserSection28, GateArrayWithDelay) {
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
-}
+}  // namespace

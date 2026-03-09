@@ -74,4 +74,4 @@ TEST(Elab1360, DpiImportWithCNameElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

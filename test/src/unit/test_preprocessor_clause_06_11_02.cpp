@@ -17,4 +17,4 @@ TEST(ParserSection6, ValueSet_2StateBitDecl) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kBit));
 }
 
-}
+}  // namespace

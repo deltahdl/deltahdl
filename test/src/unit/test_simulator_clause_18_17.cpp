@@ -103,4 +103,4 @@ TEST(SimA612, NoProductionNameUsesFirst) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}
+}  // namespace

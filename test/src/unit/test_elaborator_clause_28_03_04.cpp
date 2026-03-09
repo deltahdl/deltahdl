@@ -21,4 +21,4 @@ TEST(GateDecl, ArrayWithNameIsValid) {
   EXPECT_TRUE(ValidateGateDecl(info));
 }
 
-}
+}  // namespace

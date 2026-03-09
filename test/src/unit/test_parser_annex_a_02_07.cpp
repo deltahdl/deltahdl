@@ -61,4 +61,4 @@ TEST(ParserA27, TfPortItemVar) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-}
+}  // namespace

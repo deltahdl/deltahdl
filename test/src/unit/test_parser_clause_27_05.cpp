@@ -554,4 +554,4 @@ TEST(ParserSection23, ConditionalGenerateCase) {
   ASSERT_EQ(gen->gen_case_items.size(), 3u);
 }
 
-}
+}  // namespace

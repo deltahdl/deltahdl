@@ -155,4 +155,4 @@ TEST(ParserSection7, ArrayMethodUniqueIndex) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-}
+}  // namespace

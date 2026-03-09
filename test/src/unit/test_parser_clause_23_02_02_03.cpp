@@ -158,4 +158,4 @@ TEST(ParserSection6, ShortrealInPort) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -157,7 +157,6 @@ TEST(PreprocSection22_14, ResetallDoesNotAffectKeywordVersion) {
       "`end_keywords\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-
 }
 
 TEST(PreprocSection22_14, ErrorBeginKeywordsInsideDesignElement) {
@@ -312,4 +311,4 @@ TEST(PreprocSection22_14, MarkerFormatCorrect) {
   EXPECT_EQ(out[pos + 2], '\n');
 }
 
-}
+}  // namespace

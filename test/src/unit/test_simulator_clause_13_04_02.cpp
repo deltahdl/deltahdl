@@ -186,4 +186,4 @@ TEST(Sim1342, RecursiveAutoFunction) {
   EXPECT_EQ(val, 120u);
 }
 
-}
+}  // namespace

@@ -457,4 +457,4 @@ TEST(ParserClause05, Cl5_7_1_SizedOneBitOverflow) {
   delete r.diag;
 }
 
-}
+}  // namespace

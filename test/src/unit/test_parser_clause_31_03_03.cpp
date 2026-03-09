@@ -155,4 +155,4 @@ TEST(SetupholdWithAllOptionals, SetupholdWithAllOptionals) {
   EXPECT_EQ(tc->delayed_data, "dD");
 }
 
-}
+}  // namespace

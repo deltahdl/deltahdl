@@ -71,4 +71,4 @@ TEST(ElabClause03, Cl3_4_SampleProgramElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

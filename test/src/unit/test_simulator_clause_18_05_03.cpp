@@ -56,4 +56,4 @@ TEST(Constraint, InsideSetSingleValue) {
   EXPECT_EQ(solver.GetValue("x"), 77);
 }
 
-}
+}  // namespace

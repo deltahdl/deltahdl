@@ -18,4 +18,4 @@ TEST(ParserSection8, InterfaceMethodMultipleDefaultArgs) {
               "endclass\n"));
 }
 
-}
+}  // namespace

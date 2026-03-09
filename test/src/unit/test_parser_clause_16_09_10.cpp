@@ -30,4 +30,4 @@ TEST(ParserAnnexF, AnnexFWithin) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-}
+}  // namespace

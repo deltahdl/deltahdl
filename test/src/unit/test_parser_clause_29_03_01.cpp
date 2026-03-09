@@ -92,4 +92,4 @@ TEST(ParserAnnexA052, NonAnsiPortList_FiveInputs) {
   EXPECT_EQ(udp->input_names[4], "e");
 }
 
-}
+}  // namespace

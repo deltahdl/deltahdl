@@ -91,7 +91,6 @@ TEST(ParserClause05, Cl5_4_BlockCommentStartInsideLineComment) {
 }
 
 TEST(ParserClause05, Cl5_4_NestedBlockCommentClosesAtFirstEnd) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic /* outer /* inner */ a;\n"
@@ -108,4 +107,4 @@ TEST(ParserClause05, Cl5_4_EmptyCuCommentsOnly) {
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
-}
+}  // namespace

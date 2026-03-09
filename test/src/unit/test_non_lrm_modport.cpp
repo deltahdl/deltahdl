@@ -16,4 +16,4 @@ TEST(ParserA29, EmptyModport) {
   EXPECT_EQ(mp->name, "empty");
 }
 
-}
+}  // namespace

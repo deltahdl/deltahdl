@@ -120,4 +120,4 @@ TEST(ParserSection21, WritebHexOctal) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -63,4 +63,4 @@ TEST(ParserSection6, Sec6_7_1_TriorDecl) {
   EXPECT_TRUE(item->data_type.is_net);
 }
 
-}
+}  // namespace

@@ -441,4 +441,4 @@ TEST(ParserA93, SystemCallClog2) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

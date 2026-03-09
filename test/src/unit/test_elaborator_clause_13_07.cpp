@@ -70,4 +70,4 @@ TEST(Elab1370, MutuallyRecursiveFunctions) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

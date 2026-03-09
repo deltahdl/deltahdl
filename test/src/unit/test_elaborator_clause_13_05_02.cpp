@@ -34,7 +34,6 @@ TEST(QueueRef, AcceptRefInAutoFunc) {
 }
 
 TEST(Elab1352, RefArgAutoFunctionOk) {
-
   SimFixture f;
 
   auto* func = f.arena.Create<ModuleItem>();
@@ -60,4 +59,4 @@ TEST(Elab1352, ConstRefArgAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

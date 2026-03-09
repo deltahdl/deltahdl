@@ -32,4 +32,4 @@ TEST(ParserSection7, QueueConcatAssign) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
 }
 
-}
+}  // namespace

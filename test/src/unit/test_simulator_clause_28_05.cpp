@@ -18,4 +18,4 @@ TEST(LogicGates, NotGateTruthTable) {
   EXPECT_EQ(EvalNOutputGate(GateKind::kNot, Val4::kZ), Val4::kX);
 }
 
-}
+}  // namespace

@@ -212,4 +212,4 @@ TEST(ParserA28, MultipleBlockItemDecls) {
   EXPECT_EQ(stmts[2]->kind, StmtKind::kVarDecl);
 }
 
-}
+}  // namespace

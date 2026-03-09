@@ -48,4 +48,4 @@ TEST(Elab1353, AllDefaultsNoArgsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

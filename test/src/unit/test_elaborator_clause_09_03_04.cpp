@@ -38,4 +38,4 @@ TEST(ElabClause09_03_04, NamedForkBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

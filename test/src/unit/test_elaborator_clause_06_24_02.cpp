@@ -106,4 +106,4 @@ TEST(SimCh6, CastEnumInCondition) {
   EXPECT_EQ(flag->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

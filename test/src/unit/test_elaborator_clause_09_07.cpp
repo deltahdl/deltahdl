@@ -83,4 +83,4 @@ TEST(ElabClause09_07, ProcessInForkElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

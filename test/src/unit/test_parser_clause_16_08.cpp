@@ -154,4 +154,4 @@ TEST(ParserSection16, SequenceWithFormalArgsDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

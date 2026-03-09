@@ -20,4 +20,4 @@ TEST(ParserA609, TfCallEmptyParens) {
   EXPECT_TRUE(expr->args.empty());
 }
 
-}
+}  // namespace

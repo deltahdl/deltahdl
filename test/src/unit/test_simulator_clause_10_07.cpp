@@ -181,4 +181,4 @@ TEST(SimCh10e, SameWidthNoChange) {
   EXPECT_EQ(a->value.ToUint64(), 0xCAu);
 }
 
-}
+}  // namespace

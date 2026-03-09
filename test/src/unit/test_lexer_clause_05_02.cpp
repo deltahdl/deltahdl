@@ -112,20 +112,17 @@ TEST(LexerClause05, Cl5_2_EscapedIdentifierTerminatedByTab) {
 }
 
 TEST(LexerClause05, Cl5_2_EscapedIdentifierIncludesSpecialChars) {
-
   auto r = LexOne("\\a+b*c ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
 }
 
 TEST(LexerClause05, Cl5_2_WhitespaceCategory) {
-
   auto tokens = Lex("   ");
   ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
 TEST(LexerClause05, Cl5_2_CommentCategory) {
-
   auto tokens = Lex("a // line comment\nb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -158,7 +155,6 @@ TEST(LexerClause05, Cl5_2_KeywordCategory) {
 }
 
 TEST(LexerClause05, Cl5_2_AllSevenCategoriesInOneStream) {
-
   auto tokens = Lex("module /* comment */ m; logic x = 42 + \"s\"; endmodule");
   bool has_operator = false;
   bool has_number = false;
@@ -182,7 +178,6 @@ TEST(LexerClause05, Cl5_2_AllSevenCategoriesInOneStream) {
 }
 
 TEST(LexerClause05, Cl5_2_AdjacentOperatorsWithoutWhitespace) {
-
   auto tokens = Lex("a+b-c");
   ASSERT_EQ(tokens.size(), 6u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -202,11 +197,10 @@ TEST(LexerClause05, Cl5_2_TokensAdjacentToPunctuation) {
 }
 
 TEST(LexerClause05, Cl5_2_FormfeedIsWhitespace) {
-
   auto tokens = Lex("a\fb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-}
+}  // namespace

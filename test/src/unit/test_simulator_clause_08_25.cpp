@@ -90,4 +90,4 @@ TEST(ClassSim, ParameterizedClassStaticMethod) {
   EXPECT_TRUE(it->second->is_static);
 }
 
-}
+}  // namespace

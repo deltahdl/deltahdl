@@ -71,4 +71,4 @@ TEST(ElabA85, ParameterizedClassElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

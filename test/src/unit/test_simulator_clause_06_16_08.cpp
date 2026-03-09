@@ -24,4 +24,4 @@ TEST(StringMethods, SubstrOutOfBounds) {
   EXPECT_EQ(VecToString(result), "");
 }
 
-}
+}  // namespace

@@ -31,4 +31,4 @@ TEST(SimA612, CaseProduction) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}
+}  // namespace

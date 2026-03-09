@@ -154,4 +154,4 @@ TEST(ProgramItemsA17, ProgramClocking) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

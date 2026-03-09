@@ -60,4 +60,4 @@ TEST(ParserSection16, ChangedFunctionInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

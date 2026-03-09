@@ -15,4 +15,4 @@ TEST(CheckerElab, ElaborateCheckerWithPorts) {
   EXPECT_EQ(mod->ports[1].name, "rst");
 }
 
-}
+}  // namespace

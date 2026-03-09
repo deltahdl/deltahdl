@@ -93,4 +93,4 @@ TEST(SvVpiUser, AttemptInfoStruct) {
   EXPECT_EQ(info.attempt_start_time.low, 100u);
 }
 
-}
+}  // namespace

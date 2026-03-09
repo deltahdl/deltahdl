@@ -90,4 +90,4 @@ TEST(ParserSection6, LocalparamDerivedFromParam) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

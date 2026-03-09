@@ -17,4 +17,4 @@ TEST(ParserAnnexD2, AnnexDInput) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-}
+}  // namespace

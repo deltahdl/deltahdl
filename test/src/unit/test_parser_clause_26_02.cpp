@@ -289,4 +289,4 @@ TEST(ParserCh5, ModuleBody_NullItem) {
   EXPECT_TRUE(ParseOk5("module m; ; endmodule"));
 }
 
-}
+}  // namespace

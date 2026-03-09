@@ -64,4 +64,4 @@ TEST(BoundedQueue, UnboundedHasNoLimit) {
   EXPECT_EQ(q->elements.size(), 100u);
 }
 
-}
+}  // namespace

@@ -85,4 +85,4 @@ TEST(ParserSection15, TriggeredMethodWithBodyStmt) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-}
+}  // namespace

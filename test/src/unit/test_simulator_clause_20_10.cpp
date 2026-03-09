@@ -35,4 +35,4 @@ TEST(SvaEngine, SeverityDefaultIsError) {
   EXPECT_EQ(SeverityToString(sev), "ERROR");
 }
 
-}
+}  // namespace

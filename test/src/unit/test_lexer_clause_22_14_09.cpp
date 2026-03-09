@@ -8,7 +8,6 @@ using namespace delta;
 namespace {
 
 TEST(Lexer, KeywordVersion_1800_2017_SameAs1800_2012) {
-
   EXPECT_TRUE(
       LookupKeyword("implements", KeywordVersion::kVer18002017).has_value());
   EXPECT_TRUE(
@@ -22,7 +21,6 @@ TEST(Lexer, KeywordVersion_1800_2017_SameAs1800_2012) {
 }
 
 TEST(Lexer, KeywordVersion_1800_2023_SameAs1800_2017) {
-
   EXPECT_TRUE(
       LookupKeyword("implements", KeywordVersion::kVer18002023).has_value());
   EXPECT_TRUE(
@@ -38,11 +36,10 @@ TEST(Lexer, KeywordVersion_1800_2023_SameAs1800_2017) {
 }
 
 TEST(Lexer, KeywordVersion_1800_2017_And_2023_NoNewKeywords) {
-
   EXPECT_FALSE(
       LookupKeyword("foobar", KeywordVersion::kVer18002017).has_value());
   EXPECT_FALSE(
       LookupKeyword("foobar", KeywordVersion::kVer18002023).has_value());
 }
 
-}
+}  // namespace

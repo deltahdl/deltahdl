@@ -104,4 +104,4 @@ TEST(Sim13031, SetupReturnsTaskItem) {
   TeardownTaskCall(result, call, f.ctx);
 }
 
-}
+}  // namespace

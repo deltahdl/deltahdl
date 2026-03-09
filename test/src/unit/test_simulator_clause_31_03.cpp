@@ -31,4 +31,4 @@ TEST_F(SpecifyTest, RuntimeTimingCheckHoldViolation) {
   EXPECT_FALSE(mgr.CheckHoldViolation("clk", 100, "data", 110));
 }
 
-}
+}  // namespace

@@ -14,4 +14,4 @@ TEST(ParserAnnexD, AnnexDList) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-}
+}  // namespace

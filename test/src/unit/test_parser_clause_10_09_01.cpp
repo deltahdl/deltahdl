@@ -181,9 +181,8 @@ TEST(ParserCh511, ArrayLiteral_DefaultValue) {
               "endmodule"));
 }
 
-}
+}  // namespace
 TEST(NestedBracesArrayOfStructs, Cl5_10_NestedBracesArrayOfStructs) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -269,4 +268,3 @@ TEST(AssignmentPatternDefault, AssignmentPatternDefault) {
   std::string expected_keys[] = {"default"};
   VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
 }
-

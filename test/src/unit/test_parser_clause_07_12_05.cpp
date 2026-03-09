@@ -17,4 +17,4 @@ TEST(ParserSection7, ArrayMapMethod) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-}
+}  // namespace

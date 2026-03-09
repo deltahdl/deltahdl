@@ -574,4 +574,4 @@ TEST(ParserSection9b, BlockingAssignCompound) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-}
+}  // namespace

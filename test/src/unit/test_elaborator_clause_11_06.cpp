@@ -83,4 +83,4 @@ TEST(Elaboration, TernaryExprBitLength) {
   EXPECT_EQ(InferExprWidth(&tern, typedefs), 32u);
 }
 
-}
+}  // namespace

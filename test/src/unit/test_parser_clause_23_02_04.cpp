@@ -49,4 +49,4 @@ TEST(ParserSection9c, MixedProcedureTypes) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kFinalBlock));
 }
 
-}
+}  // namespace

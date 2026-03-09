@@ -85,4 +85,4 @@ TEST(Elab1350, TooManyArgsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

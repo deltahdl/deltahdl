@@ -59,4 +59,4 @@ TEST(ElabClause09_04_04, WaitTriggeredWithActionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

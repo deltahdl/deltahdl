@@ -14,4 +14,4 @@ TEST(ParserClause03, Cl3_13_HierarchicalReferenceSyntax) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

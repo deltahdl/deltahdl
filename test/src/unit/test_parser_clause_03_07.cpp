@@ -133,4 +133,4 @@ TEST(ParserClause03, Cl3_7_BuiltInAndUdpCoexist) {
   EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
 }
 
-}
+}  // namespace

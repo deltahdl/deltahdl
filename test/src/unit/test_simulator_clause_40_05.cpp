@@ -18,4 +18,4 @@ TEST(SvVpiUser, CoverageTypeConstants) {
   EXPECT_EQ(vpiCovered, 765);
 }
 
-}
+}  // namespace

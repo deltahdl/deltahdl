@@ -90,4 +90,4 @@ TEST(Elab1344, ForkJoinNoneWithDelayInFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

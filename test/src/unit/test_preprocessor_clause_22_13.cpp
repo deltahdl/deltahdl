@@ -80,7 +80,6 @@ TEST(Preprocessor, LineDirective_AffectsFileMacro) {
 }
 
 TEST(Preprocessor, Include_ChangesFileAndLine) {
-
   std::string tmp_dir = "/tmp/deltahdl_test_22_13";
   std::string inc_path = tmp_dir + "/inc.svh";
   system(("mkdir -p " + tmp_dir).c_str());

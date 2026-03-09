@@ -38,4 +38,4 @@ TEST(Elaboration, InterconnectDecl_OK) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

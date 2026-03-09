@@ -16,4 +16,4 @@ TEST(ParserSection7, AssocArrayDeleteMethod) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-}
+}  // namespace

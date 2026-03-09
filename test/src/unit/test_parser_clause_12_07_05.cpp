@@ -96,4 +96,4 @@ TEST(ParserSection12, DoWhileLoopWithBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-}
+}  // namespace

@@ -33,4 +33,4 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportStringReturn) {
   EXPECT_TRUE(items[0]->dpi_is_pure);
 }
 
-}
+}  // namespace

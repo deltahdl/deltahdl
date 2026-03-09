@@ -12,7 +12,6 @@ TEST(LexerClause05, Cl5_10_ApostropheLBraceToken) {
 }
 
 TEST(LexerClause05, Cl5_10_PositionalStructLiteralTokens) {
-
   auto tokens = Lex("'{0, 0.0}");
   ASSERT_GE(tokens.size(), 5u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
@@ -23,7 +22,6 @@ TEST(LexerClause05, Cl5_10_PositionalStructLiteralTokens) {
 }
 
 TEST(LexerClause05, Cl5_10_NamedMemberTokens) {
-
   auto tokens = Lex("'{a:0, b:1}");
   ASSERT_GE(tokens.size(), 9u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
@@ -34,7 +32,6 @@ TEST(LexerClause05, Cl5_10_NamedMemberTokens) {
 }
 
 TEST(LexerClause05, Cl5_10_DefaultKeyTokens) {
-
   auto tokens = Lex("'{default:0}");
   ASSERT_GE(tokens.size(), 5u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
@@ -45,7 +42,6 @@ TEST(LexerClause05, Cl5_10_DefaultKeyTokens) {
 }
 
 TEST(LexerClause05, Cl5_10_NestedBraces) {
-
   auto tokens = Lex("'{'{1, 1.0}, '{2, 2.0}}");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
@@ -53,7 +49,6 @@ TEST(LexerClause05, Cl5_10_NestedBraces) {
 }
 
 TEST(LexerClause05, Cl5_10_TypePrefixedTokens) {
-
   auto tokens = Lex("ab'{int:1, shortreal:1.0}");
   ASSERT_GE(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -61,4 +56,4 @@ TEST(LexerClause05, Cl5_10_TypePrefixedTokens) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kKwInt);
 }
 
-}
+}  // namespace

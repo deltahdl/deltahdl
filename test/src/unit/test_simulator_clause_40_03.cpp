@@ -45,4 +45,4 @@ TEST(Api, CoverageDbAccess) {
   EXPECT_DOUBLE_EQ(cov.GetValue("nonexistent"), 0.0);
 }
 
-}
+}  // namespace

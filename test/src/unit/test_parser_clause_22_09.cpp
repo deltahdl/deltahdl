@@ -69,4 +69,4 @@ TEST(ParserSection22, NounconnectedDrive_InsideModule_Error) {
                               "endmodule\n"));
 }
 
-}
+}  // namespace

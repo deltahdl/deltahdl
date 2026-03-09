@@ -89,4 +89,4 @@ TEST(ClassSim, ShallowCopySharesNestedHandles) {
   EXPECT_EQ(copy->GetProperty("ref", f.arena).ToUint64(), inner_handle);
 }
 
-}
+}  // namespace

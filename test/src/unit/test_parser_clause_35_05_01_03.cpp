@@ -20,4 +20,4 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportContext) {
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
-}
+}  // namespace

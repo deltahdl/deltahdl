@@ -85,4 +85,4 @@ TEST(Elaboration, ModuleAutomaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

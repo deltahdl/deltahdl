@@ -32,4 +32,4 @@ TEST(ParserSection6, CastUnsigned) {
   EXPECT_EQ(rhs->text, "unsigned");
 }
 
-}
+}  // namespace

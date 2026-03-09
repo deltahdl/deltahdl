@@ -104,4 +104,4 @@ TEST(Elaboration, RandInUnion_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

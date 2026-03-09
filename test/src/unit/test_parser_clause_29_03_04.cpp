@@ -167,4 +167,4 @@ TEST(ParserSection29, SequentialUdp) {
   VerifySeqUdpTable(udp, expected, std::size(expected));
 }
 
-}
+}  // namespace

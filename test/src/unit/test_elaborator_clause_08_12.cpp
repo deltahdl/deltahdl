@@ -60,4 +60,4 @@ TEST(ElabA812, ChainedMemberAccessOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -40,4 +40,4 @@ TEST_F(ConfigTest, LocalparamInConfig) {
   EXPECT_NE(cfg->local_params[0].second, nullptr);
 }
 
-}
+}  // namespace

@@ -13,4 +13,4 @@ TEST(ParserSection22, BeginKeywords1364_1995) {
                               "`end_keywords\n"));
 }
 
-}
+}  // namespace

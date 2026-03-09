@@ -151,4 +151,4 @@ TEST(SysTask, FreadReadsBinary) {
   std::remove(tmp.c_str());
 }
 
-}
+}  // namespace

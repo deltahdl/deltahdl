@@ -59,4 +59,4 @@ TEST(Elab13031, AutoVarInStaticTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

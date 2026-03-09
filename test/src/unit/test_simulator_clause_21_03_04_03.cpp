@@ -20,4 +20,4 @@ TEST(Section21, SscanfDecimal) {
   EXPECT_EQ(dest->value.ToUint64(), 42u);
 }
 
-}
+}  // namespace

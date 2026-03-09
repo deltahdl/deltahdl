@@ -65,4 +65,4 @@ TEST(ElabClause09_02_02, MultipleAlwaysCombElaborate) {
   EXPECT_EQ(comb_count, 2);
 }
 
-}
+}  // namespace

@@ -125,4 +125,4 @@ TEST(SvaEngine, FlushClearsQueue) {
   EXPECT_EQ(f.engine.DeferredQueueSize(), 0u);
 }
 
-}
+}  // namespace

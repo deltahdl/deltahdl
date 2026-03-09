@@ -75,4 +75,4 @@ TEST(ClassSim, MultipleObjectsSameType) {
   EXPECT_EQ(o2->GetProperty("value", f.arena).ToUint64(), 200u);
 }
 
-}
+}  // namespace

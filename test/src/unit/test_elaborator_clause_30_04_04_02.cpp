@@ -30,4 +30,4 @@ TEST(ElabA86, ModulePathOperatorsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

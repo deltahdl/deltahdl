@@ -76,7 +76,6 @@ TEST(LexerClause05, Cl5_3_WhitespaceNotEmittedAsToken) {
 }
 
 TEST(LexerClause05, Cl5_3_WhitespaceOnlySeparatesTokens) {
-
   auto no_ws = Lex("modulem");
   ASSERT_EQ(no_ws.size(), 2u);
   EXPECT_EQ(no_ws[0].kind, TokenKind::kIdentifier);
@@ -187,4 +186,4 @@ TEST(LexerClause05, Cl5_3_OperatorsDoNotNeedWhitespaceSeparation) {
   EXPECT_EQ(tokens[2].text, "b");
 }
 
-}
+}  // namespace

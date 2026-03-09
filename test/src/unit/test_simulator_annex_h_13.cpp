@@ -18,4 +18,4 @@ TEST(SvDpi, TimeConstants) {
   EXPECT_EQ(sv_sim_time, vpiSimTime);
 }
 
-}
+}  // namespace

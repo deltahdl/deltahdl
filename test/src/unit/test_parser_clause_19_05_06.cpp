@@ -15,4 +15,4 @@ TEST(ParserA211, BinsKeyword_IllegalBins) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

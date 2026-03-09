@@ -25,4 +25,4 @@ TEST(ParserA81, StreamConcatMultipleElements) {
   EXPECT_EQ(stmt->rhs->elements.size(), 3u);
 }
 
-}
+}  // namespace

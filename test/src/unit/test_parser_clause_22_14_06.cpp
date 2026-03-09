@@ -6,7 +6,6 @@ using namespace delta;
 namespace {
 
 TEST(ParserSection22, BeginKeywords1800_2005_LogicIsKeyword) {
-
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`begin_keywords \"1800-2005\"\n"
                               "module t;\n"
@@ -16,7 +15,6 @@ TEST(ParserSection22, BeginKeywords1800_2005_LogicIsKeyword) {
 }
 
 TEST(ParserSection22, BeginKeywords1800_2005_InterfaceIsKeyword) {
-
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`begin_keywords \"1800-2005\"\n"
                               "interface if1;\n"
@@ -24,4 +22,4 @@ TEST(ParserSection22, BeginKeywords1800_2005_InterfaceIsKeyword) {
                               "`end_keywords\n"));
 }
 
-}
+}  // namespace

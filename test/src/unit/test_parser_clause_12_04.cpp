@@ -463,4 +463,4 @@ TEST(ParserSection10, Sec10_4_1_InIfElseBranches) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
-}
+}  // namespace

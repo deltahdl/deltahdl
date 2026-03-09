@@ -170,4 +170,4 @@ TEST_F(VerifyParseTest, CheckerNestedWithClocking) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}
+}  // namespace

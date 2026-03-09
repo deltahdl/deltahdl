@@ -158,4 +158,4 @@ TEST(InterfaceItemsA16, InterfaceAssertProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

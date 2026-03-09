@@ -165,7 +165,7 @@ TEST(ParserSection19, DefaultClocking_InInterface) {
               "endinterface\n"));
 }
 
-}
+}  // namespace
 TEST(DefaultClocking, DefaultClocking) {
   auto r = Parse(
       "module m;\n"
@@ -194,4 +194,3 @@ TEST(UnnamedDefaultClocking, UnnamedDefaultClocking) {
   EXPECT_TRUE(item->is_default_clocking);
   EXPECT_TRUE(item->name.empty());
 }
-

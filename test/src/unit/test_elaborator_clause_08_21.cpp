@@ -114,4 +114,4 @@ TEST(ElabA821, EmptyBodyMethodNotPureVirtual) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

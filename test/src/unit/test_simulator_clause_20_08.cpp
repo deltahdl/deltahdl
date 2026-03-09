@@ -33,4 +33,4 @@ TEST(RealTypes, MathLnReal) {
   EXPECT_NEAR(VecToDouble(result), 0.0, 1e-10);
 }
 
-}
+}  // namespace

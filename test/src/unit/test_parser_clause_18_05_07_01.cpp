@@ -31,4 +31,4 @@ TEST(ParserSection18, RandArrayInClassWithConstraint) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}
+}  // namespace

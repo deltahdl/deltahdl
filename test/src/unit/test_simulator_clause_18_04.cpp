@@ -86,4 +86,4 @@ TEST(Constraint, RandcCycleResets) {
   EXPECT_EQ(cycle2.size(), 2u);
 }
 
-}
+}  // namespace

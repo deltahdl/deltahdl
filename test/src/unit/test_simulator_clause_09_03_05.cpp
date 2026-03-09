@@ -25,4 +25,4 @@ TEST(SimA604, LabeledStatementExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}
+}  // namespace

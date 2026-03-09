@@ -82,4 +82,4 @@ TEST(SimClause05, Cl5_9_1_MultipleEscapes) {
   EXPECT_EQ(v, 0x410A42u);
 }
 
-}
+}  // namespace

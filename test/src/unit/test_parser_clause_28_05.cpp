@@ -95,4 +95,4 @@ TEST(ParserA304, NOutputGatetype_Not) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-}
+}  // namespace

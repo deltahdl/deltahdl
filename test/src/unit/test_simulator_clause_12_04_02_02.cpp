@@ -107,4 +107,4 @@ TEST(SimA604222, TwoProcessesNoMatchBothReport) {
   EXPECT_GE(f.diag.WarningCount(), 2u);
 }
 
-}
+}  // namespace

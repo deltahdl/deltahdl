@@ -67,4 +67,4 @@ TEST(ParserSection7, TaggedUnionVoidMember) {
   EXPECT_EQ(item->typedef_type.struct_members[0].name, "Invalid");
 }
 
-}
+}  // namespace

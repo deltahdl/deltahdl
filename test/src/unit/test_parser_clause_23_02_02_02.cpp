@@ -130,4 +130,4 @@ TEST(ModuleParamsA13, InterfacePortHeader) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

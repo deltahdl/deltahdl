@@ -92,7 +92,6 @@ TEST(LexerClause05, Cl5_1_UnbasedUnsizedLiteralRecognized) {
 }
 
 TEST(LexerClause05, Cl5_1_ArrayStructLiteralTokenRecognized) {
-
   auto r = LexOne("'{");
   EXPECT_EQ(r.token.kind, TokenKind::kApostropheLBrace);
 }
@@ -119,7 +118,6 @@ TEST(LexerClause05, Cl5_1_SystemIdentifierPreservesDollarPrefix) {
 }
 
 TEST(LexerClause05, Cl5_1_DotTokenForBuiltinMethodCalls) {
-
   auto tokens = Lex("arr.size");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -133,7 +131,6 @@ TEST(LexerClause05, Cl5_1_AttributeStartTokenRecognized) {
 }
 
 TEST(LexerClause05, Cl5_1_AttributeEndTokenRecognized) {
-
   auto tokens = Lex("(* foo *)");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
@@ -189,4 +186,4 @@ TEST(LexerClause05, Cl5_1_UnterminatedStringIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

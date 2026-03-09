@@ -26,7 +26,7 @@ TEST(ParserSection19, ClockingBlockScope_ProgramAccess) {
               "endprogram\n"));
 }
 
-}
+}  // namespace
 TEST(MultipleClockingBlocks, MultipleClockingBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -45,4 +45,3 @@ TEST(MultipleClockingBlocks, MultipleClockingBlocks) {
   EXPECT_EQ(cb1->name, "cd1");
   EXPECT_EQ(cb2->name, "cd2");
 }
-

@@ -141,4 +141,4 @@ TEST(ParserClause03, Cl3_1_UnclosedDesignElementIsError) {
   EXPECT_FALSE(ParseOk("module m;"));
 }
 
-}
+}  // namespace

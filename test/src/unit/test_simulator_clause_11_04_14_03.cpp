@@ -218,4 +218,4 @@ TEST(EvalAdv, StreamingUnpackRoundTripLeftShift) {
   EXPECT_EQ(f.ctx.FindVariable("s2")->value.ToUint64(), 0xBBu);
 }
 
-}
+}  // namespace

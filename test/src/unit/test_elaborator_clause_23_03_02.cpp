@@ -22,4 +22,4 @@ TEST(Elaboration, PortBinding_UnknownModule) {
   EXPECT_EQ(mod->children[0].resolved, nullptr);
 }
 
-}
+}  // namespace

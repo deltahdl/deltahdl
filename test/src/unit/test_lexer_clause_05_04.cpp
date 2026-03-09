@@ -127,7 +127,6 @@ TEST(LexerClause05, Cl5_4_BlockCommentContainingNewlines) {
 }
 
 TEST(LexerClause05, Cl5_4_BlockCommentsDoNotNest) {
-
   auto tokens = Lex("a /* outer /* inner */ b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
@@ -135,7 +134,6 @@ TEST(LexerClause05, Cl5_4_BlockCommentsDoNotNest) {
 }
 
 TEST(LexerClause05, Cl5_4_NestedBlockCommentLeavesDangling) {
-
   auto tokens = Lex("a /* x /* y */ z */");
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "z");
@@ -181,7 +179,6 @@ TEST(LexerClause05, Cl5_4_UnterminatedBlockCommentWithStars) {
 }
 
 TEST(LexerClause05, Cl5_4_SlashStarSlashIsUnterminated) {
-
   auto [tokens, errors] = LexWithDiag("/*/");
   EXPECT_TRUE(errors);
 }
@@ -292,4 +289,4 @@ TEST(LexerClause05, Cl5_4_NoErrorsForValidComments) {
   EXPECT_FALSE(errors);
 }
 
-}
+}  // namespace

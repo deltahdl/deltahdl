@@ -147,4 +147,4 @@ TEST(ConfigA15, MultipleRules) {
   EXPECT_EQ(r.cu->configs[0]->rules.size(), 3u);
 }
 
-}
+}  // namespace

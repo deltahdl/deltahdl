@@ -13,4 +13,4 @@ TEST(ParserAnnexD, AnnexDScope) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

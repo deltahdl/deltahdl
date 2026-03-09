@@ -146,4 +146,4 @@ TEST(LexerA92, MultiLineBlockCommentAdvancesLineNumber) {
   EXPECT_EQ(tokens[1].loc.line, 5u);
 }
 
-}
+}  // namespace

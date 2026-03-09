@@ -298,4 +298,4 @@ TEST(SimCh10i, ArrayVarDeclPatternInit) {
   EXPECT_EQ(e2->value.ToUint64(), 15u);
 }
 
-}
+}  // namespace

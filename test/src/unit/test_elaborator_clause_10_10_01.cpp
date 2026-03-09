@@ -128,4 +128,4 @@ TEST(MixedScalarArrayConcatenation, MixedScalarArrayElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}
+}  // namespace

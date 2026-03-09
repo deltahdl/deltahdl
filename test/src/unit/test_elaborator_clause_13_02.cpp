@@ -213,4 +213,4 @@ TEST(Elab1302, TaskWithEventControlIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

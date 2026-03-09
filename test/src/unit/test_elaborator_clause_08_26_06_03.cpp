@@ -47,4 +47,4 @@ TEST(ElabA82663, ClassImplementsDiamondOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

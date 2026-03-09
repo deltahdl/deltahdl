@@ -616,7 +616,7 @@ TEST(SimCh50701, SignedBasedLiteral) {
   EXPECT_EQ(result & mask, mask);
 }
 
-}
+}  // namespace
 static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
                               uint64_t val) {
   auto* e = arena.Create<Expr>();
@@ -672,4 +672,3 @@ TEST(IntegerLiteralConstants, SizeConstantNonzero) {
       "x");
   EXPECT_EQ(result, 1u);
 }
-

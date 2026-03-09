@@ -245,7 +245,6 @@ TEST(SimA60701, CasexXInSelectorTreatedAsDontCare) {
 
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-
 }
 
 TEST(SimA60701, CasezZInSelectorIsDontCare) {
@@ -300,4 +299,4 @@ TEST(SimA60701, CasezDontCareInPatternOnly) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}
+}  // namespace

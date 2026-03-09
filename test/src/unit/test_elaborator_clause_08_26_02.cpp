@@ -149,4 +149,4 @@ TEST(ElabA8269, InterfaceClassPureVirtualOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

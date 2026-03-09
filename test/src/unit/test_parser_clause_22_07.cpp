@@ -62,4 +62,4 @@ TEST(ParserSection22, TimescaleWithDelays) {
                               "endmodule\n"));
 }
 
-}
+}  // namespace

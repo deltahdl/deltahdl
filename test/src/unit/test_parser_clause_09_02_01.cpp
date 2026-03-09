@@ -118,4 +118,4 @@ TEST(ParserClause09_02_01, InitialNullStatement) {
   ASSERT_NE(item, nullptr);
 }
 
-}
+}  // namespace

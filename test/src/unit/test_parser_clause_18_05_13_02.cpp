@@ -20,4 +20,4 @@ TEST(SourceText, ConstraintImplicationDisableSoft) {
   EXPECT_EQ(r.cu->classes[0]->members[2]->name, "ic");
 }
 
-}
+}  // namespace

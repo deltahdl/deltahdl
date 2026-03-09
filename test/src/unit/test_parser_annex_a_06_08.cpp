@@ -185,4 +185,4 @@ TEST(ParserA608, RepeatWithBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-}
+}  // namespace

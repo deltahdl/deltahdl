@@ -38,7 +38,6 @@ TEST(ElabClause05, Cl5_11_SizeMismatchError) {
 }
 
 TEST(ElabClause05, Cl5_11_FlatInitIllegal) {
-
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -49,4 +48,4 @@ TEST(ElabClause05, Cl5_11_FlatInitIllegal) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

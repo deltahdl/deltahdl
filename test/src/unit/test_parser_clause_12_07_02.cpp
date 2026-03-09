@@ -47,4 +47,4 @@ TEST(ParserA608, RepeatNullStmt) {
   EXPECT_EQ(stmt->kind, StmtKind::kRepeat);
 }
 
-}
+}  // namespace

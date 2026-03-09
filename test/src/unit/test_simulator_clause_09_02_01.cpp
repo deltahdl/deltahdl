@@ -123,4 +123,4 @@ TEST(SimCh4, FiveParallelInitialBlocks) {
                    {{"a", 1u}, {"b", 2u}, {"c", 3u}, {"d", 4u}, {"e", 5u}});
 }
 
-}
+}  // namespace

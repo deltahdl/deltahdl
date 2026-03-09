@@ -20,7 +20,6 @@ TEST(ParserClause05, Cl5_2_FreeFormatMultiline) {
 }
 
 TEST(ParserClause05, Cl5_2_FreeFormatMaximallyCompact) {
-
   EXPECT_TRUE(ParseOk("module t;logic a;endmodule"));
 }
 
@@ -52,7 +51,6 @@ TEST(ParserClause05, Cl5_2_AllTokenCategoriesParsed) {
 }
 
 TEST(ParserClause05, Cl5_2_EscapedIdentifierPreservesWhitespaceRule) {
-
   auto r = Parse(
       "module t;\n"
       "  logic \\my+sig ;\n"
@@ -63,7 +61,6 @@ TEST(ParserClause05, Cl5_2_EscapedIdentifierPreservesWhitespaceRule) {
 }
 
 TEST(ParserClause05, Cl5_2_EscapedKeywordAsIdentifier) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic \\module ;\n"
@@ -78,4 +75,4 @@ TEST(ParserClause05, Cl5_2_EmptyModuleBody) {
   EXPECT_TRUE(ParseOk("module t; endmodule"));
 }
 
-}
+}  // namespace

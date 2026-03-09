@@ -224,4 +224,4 @@ TEST(DataTypesAndObjects, DifferentNetTypesAreDataObjects) {
   EXPECT_TRUE(found_wo);
 }
 
-}
+}  // namespace

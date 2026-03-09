@@ -15,4 +15,4 @@ TEST(ParserA211, BinsOrOptions_WildcardBins) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

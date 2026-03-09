@@ -82,4 +82,4 @@ TEST(RecremBasic, RecremBasic) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-}
+}  // namespace

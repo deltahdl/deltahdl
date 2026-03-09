@@ -201,4 +201,4 @@ TEST(ParserSection27, GenerateRegionWithMultipleKinds) {
   EXPECT_TRUE(found_if);
 }
 
-}
+}  // namespace

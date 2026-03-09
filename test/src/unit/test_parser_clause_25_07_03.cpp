@@ -99,4 +99,4 @@ TEST(ParserA29, ImportMultiplePrototypes) {
   EXPECT_EQ(mp->ports[1].prototype->name, "Write");
 }
 
-}
+}  // namespace

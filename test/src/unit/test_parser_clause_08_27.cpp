@@ -54,4 +54,4 @@ TEST(ParserSection8, TypedefInterfaceClass) {
   EXPECT_TRUE(r.cu->classes[0]->is_interface);
 }
 
-}
+}  // namespace

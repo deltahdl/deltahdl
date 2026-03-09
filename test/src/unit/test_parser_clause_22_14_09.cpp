@@ -23,4 +23,4 @@ TEST(ParserSection22, BeginKeywordsWithModuleContent) {
                               "`end_keywords\n"));
 }
 
-}
+}  // namespace

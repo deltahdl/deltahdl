@@ -32,4 +32,4 @@ TEST(ParserA211, CrossSetExpression) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

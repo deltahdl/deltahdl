@@ -148,7 +148,7 @@ TEST(SimCh10, BlockingAssignConcatRHS) {
   EXPECT_EQ(c->value.ToUint64(), 0xCAFEu);
 }
 
-}
+}  // namespace
 TEST(VarLvalueConcatenation, VarLvalueConcatenation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -159,4 +159,3 @@ TEST(VarLvalueConcatenation, VarLvalueConcatenation) {
       f);
   LowerRunAndCheck(f, design, {{"a", 0xAu}, {"b", 0x5u}});
 }
-

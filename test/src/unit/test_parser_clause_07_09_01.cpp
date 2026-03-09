@@ -18,4 +18,4 @@ TEST(ParserSection7, AssocArrayNumMethod) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-}
+}  // namespace

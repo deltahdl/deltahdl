@@ -214,4 +214,4 @@ TEST(ElabCh49, MultipleAssignStatementsInInitialBlock) {
   EXPECT_EQ(mod->assigns.size(), 0u);
 }
 
-}
+}  // namespace

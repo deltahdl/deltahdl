@@ -41,4 +41,4 @@ TEST(ArrayMap, MapWithIndex) {
   EXPECT_EQ(out[2].ToUint64(), 2u);
 }
 
-}
+}  // namespace

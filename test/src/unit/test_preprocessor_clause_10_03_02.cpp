@@ -60,4 +60,4 @@ TEST(ParserSection10, ContinuousAssignBasic) {
   ASSERT_NE(ca->assign_rhs, nullptr);
 }
 
-}
+}  // namespace

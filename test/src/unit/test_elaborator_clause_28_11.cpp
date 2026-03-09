@@ -19,4 +19,4 @@ TEST(Elaborator, DriveStrengthHighz0Highz1IsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

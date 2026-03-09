@@ -15,4 +15,4 @@ TEST(ElabA8269, InterfaceClassNoConstraintsOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

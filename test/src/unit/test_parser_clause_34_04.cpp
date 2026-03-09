@@ -17,4 +17,4 @@ TEST_F(AnnexHParseTest, AnnexOPragmaProtect) {
   EXPECT_EQ(items[0]->name, "x");
 }
 
-}
+}  // namespace

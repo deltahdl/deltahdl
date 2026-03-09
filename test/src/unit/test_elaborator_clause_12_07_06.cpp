@@ -21,4 +21,4 @@ TEST(ElabA608, ForeverLoop) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

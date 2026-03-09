@@ -27,4 +27,4 @@ TEST(SimA70503, ConditionBothEventsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-}
+}  // namespace

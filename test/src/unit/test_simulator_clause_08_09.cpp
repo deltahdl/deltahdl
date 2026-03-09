@@ -50,4 +50,4 @@ TEST(ClassSim, StaticPropertyWithoutInstance) {
   EXPECT_EQ(found->static_properties.at("shared").ToUint64(), 7u);
 }
 
-}
+}  // namespace

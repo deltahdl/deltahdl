@@ -61,4 +61,4 @@ TEST(ParserAnnexA053, SeqInputList_LevelOnly) {
   }
 }
 
-}
+}  // namespace

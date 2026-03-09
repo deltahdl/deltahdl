@@ -259,4 +259,4 @@ TEST(ParserA302, PullupStrength_AllStrength1Values) {
   EXPECT_TRUE(ParseOk("module m; pullup (supply1) (out); endmodule"));
 }
 
-}
+}  // namespace

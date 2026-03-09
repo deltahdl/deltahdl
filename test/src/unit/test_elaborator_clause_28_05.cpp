@@ -35,4 +35,4 @@ TEST(ParserSection28, ElaborateNotGate) {
   EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kTilde);
 }
 
-}
+}  // namespace

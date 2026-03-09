@@ -718,4 +718,4 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarParenEquivalent) {
   EXPECT_TRUE(item->sensitivity.empty());
 }
 
-}
+}  // namespace

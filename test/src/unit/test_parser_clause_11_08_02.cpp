@@ -15,4 +15,4 @@ TEST(ConstEvalReal, IntLiteralPromotesToReal) {
   EXPECT_DOUBLE_EQ(*val, 42.0);
 }
 
-}
+}  // namespace

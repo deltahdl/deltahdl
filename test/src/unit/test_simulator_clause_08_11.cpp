@@ -72,4 +72,4 @@ TEST(ClassSim, ThisCorrectObjectInNestedCalls) {
   f.ctx.PopThis();
 }
 
-}
+}  // namespace

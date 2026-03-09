@@ -69,4 +69,4 @@ TEST(Sensitivity, NestedSelectUsesLSP) {
   EXPECT_FALSE(reads.count("a"));
 }
 
-}
+}  // namespace

@@ -46,7 +46,6 @@ TEST(ElabClause05, Cl5_1_ModuleWithUnbasedUnsizedLiteralElaborates) {
 }
 
 TEST(ElabClause05, Cl5_1_ModuleWithArrayLiteralElaborates) {
-
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  int arr [0:1];\n"
@@ -55,7 +54,6 @@ TEST(ElabClause05, Cl5_1_ModuleWithArrayLiteralElaborates) {
 }
 
 TEST(ElabClause05, Cl5_1_ModuleWithStructureLiteralElaborates) {
-
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct { int a; int b; } ab_t;\n"
@@ -65,7 +63,6 @@ TEST(ElabClause05, Cl5_1_ModuleWithStructureLiteralElaborates) {
 }
 
 TEST(ElabClause05, Cl5_1_ModuleWithBuiltinMethodElaborates) {
-
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  int q[$];\n"
@@ -99,4 +96,4 @@ TEST(ElabClause05, Cl5_1_CommentsDoNotAffectElaboration) {
              "endmodule /* end */\n"));
 }
 
-}
+}  // namespace

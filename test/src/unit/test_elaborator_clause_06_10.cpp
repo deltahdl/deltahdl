@@ -126,4 +126,4 @@ TEST(Elaboration, ImplicitNetNone_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

@@ -69,7 +69,6 @@ TEST(ParserClause05, Cl5_1_UnbasedUnsizedLiteralInExpression) {
 }
 
 TEST(ParserClause05, Cl5_1_ArrayLiteralParses) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int arr [0:1];\n"
@@ -78,7 +77,6 @@ TEST(ParserClause05, Cl5_1_ArrayLiteralParses) {
 }
 
 TEST(ParserClause05, Cl5_1_StructureLiteralParses) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; int b; } ab_t;\n"
@@ -138,7 +136,6 @@ TEST(ParserClause05, Cl5_1_SystemFunctionInExpression) {
 }
 
 TEST(ParserClause05, Cl5_1_BuiltinMethodCallParses) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int q[$];\n"
@@ -148,7 +145,6 @@ TEST(ParserClause05, Cl5_1_BuiltinMethodCallParses) {
 }
 
 TEST(ParserClause05, Cl5_1_BuiltinMethodCallWithoutParensParses) {
-
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int q[$];\n"
@@ -209,4 +205,4 @@ TEST(ParserClause05, Cl5_1_EmptyAttributeIsError) {
   EXPECT_FALSE(ParseOk("(* *) module t; endmodule"));
 }
 
-}
+}  // namespace

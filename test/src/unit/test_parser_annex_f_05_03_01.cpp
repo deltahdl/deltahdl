@@ -22,4 +22,4 @@ TEST(ParserAnnexF, AnnexFAssertPropertySimple) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

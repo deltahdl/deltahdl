@@ -30,4 +30,4 @@ TEST(ElabA70502, TimecheckCondMinTypMaxElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

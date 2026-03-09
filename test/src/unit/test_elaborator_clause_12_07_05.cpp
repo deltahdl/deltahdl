@@ -18,4 +18,4 @@ TEST(ElabA608, DoWhileLoop) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

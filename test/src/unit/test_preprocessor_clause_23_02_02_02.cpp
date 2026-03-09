@@ -112,4 +112,4 @@ TEST(ParserA212, InputVariablePortTypeVar) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
 }
 
-}
+}  // namespace

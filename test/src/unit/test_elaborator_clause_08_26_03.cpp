@@ -32,4 +32,4 @@ TEST(ElabA8263, ImplementingClassScopeResOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

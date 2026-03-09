@@ -252,4 +252,4 @@ TEST(ParserA223, Delay2NInputGateTwoValues) {
   EXPECT_EQ(item->gate_delay_fall->int_val, 5u);
 }
 
-}
+}  // namespace

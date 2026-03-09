@@ -46,4 +46,4 @@ TEST(ParserSection6, NotCastCompatibleStringToInt) {
   EXPECT_FALSE(IsCastCompatible(a, b));
 }
 
-}
+}  // namespace

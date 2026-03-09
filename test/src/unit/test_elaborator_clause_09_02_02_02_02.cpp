@@ -167,4 +167,4 @@ TEST(ElabClause09_04_03, WaitInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

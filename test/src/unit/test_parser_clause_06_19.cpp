@@ -132,4 +132,4 @@ TEST(ParserSection6, Enum4StateBaseXZ) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

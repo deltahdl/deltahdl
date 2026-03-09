@@ -15,4 +15,4 @@ TEST(ParserSection19, ClockingBlockScope_InInterface) {
               "endinterface\n"));
 }
 
-}
+}  // namespace

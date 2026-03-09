@@ -85,4 +85,4 @@ TEST(ParserA819, StaticConstGlobalConstant) {
   EXPECT_NE(m->init_expr, nullptr);
 }
 
-}
+}  // namespace

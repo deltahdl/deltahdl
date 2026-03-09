@@ -28,4 +28,4 @@ TEST(SimCh6, TypeParameterDefault) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFu);
 }
 
-}
+}  // namespace

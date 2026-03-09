@@ -154,4 +154,4 @@ TEST(VarDecl, MultipleVarsInOneStatement) {
   EXPECT_EQ(mod->variables[2].name, "t.c");
 }
 
-}
+}  // namespace

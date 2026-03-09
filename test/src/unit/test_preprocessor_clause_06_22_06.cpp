@@ -27,4 +27,4 @@ TEST(ParserSection6, MatchingNettypesWireAndTri) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

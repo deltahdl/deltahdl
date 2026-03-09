@@ -125,4 +125,4 @@ TEST(ClassSim, DerivedMethodOverridesBase) {
   EXPECT_EQ(resolved, derived_method);
 }
 
-}
+}  // namespace

@@ -23,7 +23,6 @@ TEST(Lexer, KeywordVersion_1364_2005_LogicIsNotKeyword) {
 }
 
 TEST(Lexer, KeywordVersion_1364_2005_Includes1364_2001Keywords) {
-
   EXPECT_TRUE(
       LookupKeyword("automatic", KeywordVersion::kVer13642005).has_value());
   EXPECT_TRUE(
@@ -37,7 +36,6 @@ TEST(Lexer, KeywordVersion_1364_2005_Includes1364_2001Keywords) {
 }
 
 TEST(Lexer, KeywordVersion_1364_2005_Includes1364_1995Keywords) {
-
   EXPECT_TRUE(
       LookupKeyword("module", KeywordVersion::kVer13642005).has_value());
   EXPECT_TRUE(LookupKeyword("wire", KeywordVersion::kVer13642005).has_value());
@@ -45,9 +43,8 @@ TEST(Lexer, KeywordVersion_1364_2005_Includes1364_1995Keywords) {
 }
 
 TEST(Lexer, KeywordVersion_1364_2005_InterfaceIsNotKeyword) {
-
   auto kw = LookupKeyword("interface", KeywordVersion::kVer13642005);
   EXPECT_FALSE(kw.has_value());
 }
 
-}
+}  // namespace

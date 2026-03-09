@@ -105,4 +105,4 @@ TEST(ParserA82, ListOfArgsNamedEmptyExpr) {
   ASSERT_NE(expr->args[1], nullptr);
 }
 
-}
+}  // namespace

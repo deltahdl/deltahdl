@@ -19,4 +19,4 @@ TEST_F(AnnexHParseTest, AnnexGRandomizeCall) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-}
+}  // namespace

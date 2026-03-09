@@ -142,4 +142,4 @@ TEST(Elaboration, AssocArrayClassIndex_MixedTypeAssignError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

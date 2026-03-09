@@ -21,7 +21,6 @@ TEST(ParserClause05, Cl5_11_PositionalArrayLiteral) {
 }
 
 TEST(ParserClause05, Cl5_11_NestedMultidimensional) {
-
   auto r = Parse(
       "module m;\n"
       "  int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};\n"
@@ -38,7 +37,6 @@ TEST(ParserClause05, Cl5_11_NestedMultidimensional) {
 }
 
 TEST(ParserClause05, Cl5_11_ReplicationSingleElement) {
-
   auto r = Parse(
       "module m;\n"
       "  int arr [0:2];\n"
@@ -56,7 +54,6 @@ TEST(ParserClause05, Cl5_11_ReplicationSingleElement) {
 }
 
 TEST(ParserClause05, Cl5_11_ReplicationMultiElement) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int a, b;\n"
@@ -66,7 +63,6 @@ TEST(ParserClause05, Cl5_11_ReplicationMultiElement) {
 }
 
 TEST(ParserClause05, Cl5_11_NestedReplication) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
@@ -74,7 +70,6 @@ TEST(ParserClause05, Cl5_11_NestedReplication) {
 }
 
 TEST(ParserClause05, Cl5_11_TypePrefixed) {
-
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef int triple [1:3];\n"
@@ -83,7 +78,6 @@ TEST(ParserClause05, Cl5_11_TypePrefixed) {
 }
 
 TEST(ParserClause05, Cl5_11_IndexKeyWithDefault) {
-
   auto r = Parse(
       "module m;\n"
       "  typedef int triple [1:3];\n"
@@ -119,4 +113,4 @@ TEST(ParserClause05, Cl5_11_ArrayLiteralAssignment) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-}
+}  // namespace

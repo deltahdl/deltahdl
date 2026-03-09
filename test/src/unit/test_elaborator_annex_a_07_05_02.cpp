@@ -56,4 +56,4 @@ TEST(ElabA70502, RemainActiveFlagMinTypMaxElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

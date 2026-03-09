@@ -15,4 +15,4 @@ TEST(ParserSection23, ModuleHeaderMultipleImportsSecond) {
   EXPECT_EQ(mod->items[1]->import_item.item_name, "foo");
 }
 
-}
+}  // namespace

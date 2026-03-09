@@ -35,4 +35,4 @@ TEST(SvaEngine, SequenceOperatorAnd) {
   EXPECT_FALSE(EvalSequenceAnd(false, false));
 }
 
-}
+}  // namespace

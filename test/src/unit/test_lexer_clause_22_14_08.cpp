@@ -29,17 +29,14 @@ TEST(Lexer, KeywordVersion_1800_2012_NewKeywordsNotIn1800_2009) {
 }
 
 TEST(Lexer, KeywordVersion_1800_2012_IncludesAllPriorVersions) {
-
-  EXPECT_TRUE(LookupKeyword("module", KeywordVersion::kVer18002012)
-                  .has_value());
-  EXPECT_TRUE(LookupKeyword("automatic", KeywordVersion::kVer18002012)
-                  .has_value());
-  EXPECT_TRUE(LookupKeyword("uwire", KeywordVersion::kVer18002012)
-                  .has_value());
-  EXPECT_TRUE(LookupKeyword("logic", KeywordVersion::kVer18002012)
-                  .has_value());
-  EXPECT_TRUE(LookupKeyword("checker", KeywordVersion::kVer18002012)
-                  .has_value());
+  EXPECT_TRUE(
+      LookupKeyword("module", KeywordVersion::kVer18002012).has_value());
+  EXPECT_TRUE(
+      LookupKeyword("automatic", KeywordVersion::kVer18002012).has_value());
+  EXPECT_TRUE(LookupKeyword("uwire", KeywordVersion::kVer18002012).has_value());
+  EXPECT_TRUE(LookupKeyword("logic", KeywordVersion::kVer18002012).has_value());
+  EXPECT_TRUE(
+      LookupKeyword("checker", KeywordVersion::kVer18002012).has_value());
 }
 
-}
+}  // namespace

@@ -26,4 +26,4 @@ TEST(ParserSection21, UngetcCall) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

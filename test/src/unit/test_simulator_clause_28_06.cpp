@@ -166,4 +166,4 @@ TEST(TristateGates, DelayToLOrHSameAsX) {
   EXPECT_EQ(ComputeTristateDelay(10, 12, 11, Val4Ext::kV0, Val4Ext::kH), 10u);
 }
 
-}
+}  // namespace

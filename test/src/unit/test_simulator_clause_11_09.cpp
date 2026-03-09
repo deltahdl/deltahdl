@@ -102,4 +102,4 @@ TEST(TaggedUnion, SetAndGetTag) {
   EXPECT_EQ(f.ctx.GetVariableTag("u"), "field_a");
 }
 
-}
+}  // namespace

@@ -24,4 +24,4 @@ TEST(NetStrengths, Tri1DefaultStrengthIsPull) {
   EXPECT_EQ(info.strength, StrengthLevel::kPull);
 }
 
-}
+}  // namespace

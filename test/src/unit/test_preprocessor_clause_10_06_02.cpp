@@ -82,4 +82,4 @@ TEST(ParserSection10, ForceThenRelease) {
   EXPECT_EQ(s1->kind, StmtKind::kRelease);
 }
 
-}
+}  // namespace

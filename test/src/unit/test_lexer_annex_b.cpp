@@ -393,4 +393,4 @@ TEST(LexerAnnexB, NoDuplicateTokenKinds) {
   EXPECT_EQ(seen.size(), kTableB1Count);
 }
 
-}
+}  // namespace

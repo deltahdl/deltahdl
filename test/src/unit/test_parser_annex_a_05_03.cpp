@@ -355,4 +355,4 @@ TEST(ParserAnnexA053, EdgeSymbol_SimR) {
   EXPECT_EQ(eval.EvaluateWithEdge({'1', '1'}, 1, '0'), '1');
 }
 
-}
+}  // namespace

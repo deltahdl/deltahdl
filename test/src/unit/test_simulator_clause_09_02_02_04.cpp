@@ -94,4 +94,4 @@ TEST(SimClause09_02_02_04, NonblockingAssignSemantics) {
   EXPECT_EQ(b->value.ToUint64(), 0x11u);
 }
 
-}
+}  // namespace

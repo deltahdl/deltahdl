@@ -69,4 +69,4 @@ TEST(ElabA704, SixDelayMinTypMaxElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -28,4 +28,4 @@ TEST(ParserSection16, Sec16_5_1_MultipleConcurrentAssertions) {
       1u);
 }
 
-}
+}  // namespace

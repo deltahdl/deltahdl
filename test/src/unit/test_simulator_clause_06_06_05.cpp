@@ -43,4 +43,4 @@ TEST(NetResolution, Tri1ResolvesToOne) {
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
 }
 
-}
+}  // namespace

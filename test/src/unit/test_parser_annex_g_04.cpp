@@ -23,4 +23,4 @@ TEST_F(AnnexHParseTest, AnnexGMailboxAllMethods) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-}
+}  // namespace

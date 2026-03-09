@@ -39,4 +39,4 @@ TEST(ClassSim, MemMgmtPropertiesPersist) {
   EXPECT_EQ(retrieved->GetProperty("data", f.arena).ToUint64(), 42u);
 }
 
-}
+}  // namespace

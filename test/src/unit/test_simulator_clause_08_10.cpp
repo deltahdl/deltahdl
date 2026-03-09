@@ -60,4 +60,4 @@ TEST(ClassSim, StaticMethodAccessesStaticProperty) {
   EXPECT_EQ(type->static_properties["current"].ToUint64(), 42u);
 }
 
-}
+}  // namespace

@@ -91,4 +91,4 @@ TEST(ElabA84, PrimaryStreamingConcatElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

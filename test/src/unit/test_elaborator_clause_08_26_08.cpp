@@ -17,4 +17,4 @@ TEST(ElabA8268, InterfaceMethodDefaultArgsOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -219,4 +219,4 @@ TEST(ElabCh43, ModuleWithOnlyContinuousAssignsHasNoProcesses) {
   EXPECT_GE(mod->assigns.size(), 2u);
 }
 
-}
+}  // namespace

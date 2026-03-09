@@ -152,4 +152,4 @@ TEST(ParserA91, AttrValueStringLiteral) {
   EXPECT_TRUE(ParseOk("(* tool = \"synplify\" *) module m; endmodule\n"));
 }
 
-}
+}  // namespace

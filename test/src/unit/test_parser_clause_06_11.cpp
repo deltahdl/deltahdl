@@ -95,4 +95,4 @@ TEST(ParserA221, IntegerAtomTypes) {
   EXPECT_EQ(r.cu->modules[0]->items[5]->data_type.kind, DataTypeKind::kTime);
 }
 
-}
+}  // namespace

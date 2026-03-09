@@ -180,4 +180,4 @@ TEST(ParserA608, ForeachBlockBody) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-}
+}  // namespace

@@ -109,4 +109,4 @@ TEST(SourceText, ClassPureVirtualAndExtern) {
   EXPECT_TRUE(members[3]->is_static);
 }
 
-}
+}  // namespace

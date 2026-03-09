@@ -202,4 +202,4 @@ TEST(Clocking, OutputSkew) {
   EXPECT_EQ(skew.ticks, 3u);
 }
 
-}
+}  // namespace

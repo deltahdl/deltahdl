@@ -56,4 +56,4 @@ TEST(LexerClause03, Cl3_12_1_DollarUnitWithWhitespace) {
   EXPECT_EQ(t3.text, "name");
 }
 
-}
+}  // namespace

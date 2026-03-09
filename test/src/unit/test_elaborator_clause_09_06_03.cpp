@@ -71,4 +71,4 @@ TEST(ElabClause09_06_03, DisableForkInTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

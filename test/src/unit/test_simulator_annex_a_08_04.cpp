@@ -107,4 +107,4 @@ TEST(SimA84, PrimaryOctalLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 63u);
 }
 
-}
+}  // namespace

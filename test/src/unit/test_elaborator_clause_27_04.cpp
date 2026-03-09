@@ -136,4 +136,4 @@ TEST(ParserAnnexA042, ElaborationGenerateForModuleInst) {
   EXPECT_GE(mod->children.size(), 2u);
 }
 
-}
+}  // namespace

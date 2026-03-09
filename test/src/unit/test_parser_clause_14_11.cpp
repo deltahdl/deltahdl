@@ -19,7 +19,7 @@ TEST(ParserA611, CycleDelayIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace
 TEST(CycleDelayIntegralNumber, CycleDelayIntegralNumber) {
   auto r = Parse(
       "module m;\n"
@@ -30,4 +30,3 @@ TEST(CycleDelayIntegralNumber, CycleDelayIntegralNumber) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-

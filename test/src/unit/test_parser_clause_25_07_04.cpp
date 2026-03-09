@@ -21,4 +21,4 @@ TEST(SourceText, ExternForkjoinTaskPrototype) {
   EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
 }
 
-}
+}  // namespace

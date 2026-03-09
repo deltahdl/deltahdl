@@ -73,4 +73,4 @@ TEST(ParserClause03, Cl3_12_OrderOfDesignElements) {
   EXPECT_EQ(r.cu->modules[1]->name, "b");
 }
 
-}
+}  // namespace

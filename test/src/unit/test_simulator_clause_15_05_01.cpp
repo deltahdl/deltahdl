@@ -24,4 +24,4 @@ TEST(IpcSync, EventVariableCreation) {
   EXPECT_TRUE(found->is_event);
 }
 
-}
+}  // namespace

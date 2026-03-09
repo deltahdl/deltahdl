@@ -36,4 +36,4 @@ TEST(StateOps, ModByZeroProducesX) {
   EXPECT_FALSE(result.IsKnown());
 }
 
-}
+}  // namespace

@@ -14,4 +14,4 @@ TEST(StringMethods, Itoa) {
   EXPECT_EQ(VecToString(var->value), "123");
 }
 
-}
+}  // namespace
