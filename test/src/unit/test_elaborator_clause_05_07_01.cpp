@@ -401,7 +401,7 @@ TEST(IntegerLiteralConstants, XDigitInBinaryLiteral) {
   EXPECT_EQ(var->value.words[0].bval & 0x7, 0b001u);
 }
 
-TEST(SimClause05, Cl5_7_1_QuestionMarkAsZ) {
+TEST(IntegerLiteralConstants, QuestionMarkAsZDigit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
