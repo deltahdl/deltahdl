@@ -289,4 +289,4 @@ TEST(LexerClause05, Cl5_4_NoErrorsForValidComments) {
   EXPECT_FALSE(errors);
 }
 
-}
+}  // namespace

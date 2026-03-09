@@ -82,5 +82,6 @@ TEST_F(VpiClause3836Test, CbValueChangeWithWatcherFires) {
   EXPECT_TRUE(fired);
 }
 
-}
-} delta
+}  // namespace
+}  // namespace delta
+delta

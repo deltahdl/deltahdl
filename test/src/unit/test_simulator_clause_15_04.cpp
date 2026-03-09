@@ -98,4 +98,4 @@ TEST(IpcSync, MultipleMailboxesInContext) {
   EXPECT_EQ(msg, 200u);
 }
 
-}
+}  // namespace

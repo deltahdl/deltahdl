@@ -66,4 +66,4 @@ TEST(ParserClause09_02_02, AlwaysFormsHaveBodies) {
   }
 }
 
-}
+}  // namespace

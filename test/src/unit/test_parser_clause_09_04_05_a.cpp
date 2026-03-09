@@ -677,4 +677,4 @@ TEST(ParserSection4, Sec4_5_BlockingIntraAssignDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-}
+}  // namespace

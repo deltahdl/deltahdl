@@ -18,4 +18,4 @@ TEST(SourceText, UniquenessConstraint) {
   EXPECT_EQ(r.cu->classes[0]->members[3]->name, "uc");
 }
 
-}
+}  // namespace

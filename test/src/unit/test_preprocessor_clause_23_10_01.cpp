@@ -81,4 +81,4 @@ TEST(ParserA24, DefparamAssignmentHierarchical) {
   EXPECT_NE(item->defparam_assigns[0].second, nullptr);
 }
 
-}
+}  // namespace

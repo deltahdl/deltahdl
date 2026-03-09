@@ -115,4 +115,4 @@ TEST(ParserAnnexA0411, ElaborationInstanceArray) {
   EXPECT_NE(inst->inst_range_right, nullptr);
 }
 
-}
+}  // namespace

@@ -26,7 +26,7 @@ TEST(ParserSection19, ClockingBlockScope_ProgramAccess) {
               "endprogram\n"));
 }
 
-}
+}  // namespace
 TEST(MultipleClockingBlocks, MultipleClockingBlocks) {
   auto r = Parse(
       "module m;\n"

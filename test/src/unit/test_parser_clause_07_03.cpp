@@ -19,4 +19,4 @@ TEST(ParserSection7, UnionBasic) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
-}
+}  // namespace

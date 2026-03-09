@@ -77,4 +77,4 @@ TEST(ParserAnnexA042, GenerateItemInInterface) {
   EXPECT_TRUE(found_if);
 }
 
-}
+}  // namespace

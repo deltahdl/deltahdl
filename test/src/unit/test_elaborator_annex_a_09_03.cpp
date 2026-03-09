@@ -233,4 +233,4 @@ TEST(ElabA93, MixedIdentifierForms) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

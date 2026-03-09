@@ -139,4 +139,4 @@ TEST(DriverUpdatePool, AcquireAfterPartialRelease) {
   (void)du3;
 }
 
-}
+}  // namespace

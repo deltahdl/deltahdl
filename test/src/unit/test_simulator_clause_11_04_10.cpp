@@ -135,4 +135,4 @@ TEST(SimA86, BinaryArithRightShift) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-}
+}  // namespace

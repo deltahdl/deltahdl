@@ -39,5 +39,6 @@ TEST_F(VpiClause3802Test, ChkErrorNullDoesNotCrash) {
   EXPECT_EQ(result, 0);
 }
 
-}
-} delta
+}  // namespace
+}  // namespace delta
+delta

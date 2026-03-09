@@ -93,4 +93,4 @@ TEST(LexerClause05, Cl5_8_NotTimeLiteralIfMoreChars) {
   EXPECT_NE(r.token.kind, TokenKind::kTimeLiteral);
 }
 
-}
+}  // namespace

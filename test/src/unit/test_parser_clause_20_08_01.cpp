@@ -45,4 +45,4 @@ TEST(ParserA84, PrimarySystemCall) {
   EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
 }
 
-}
+}  // namespace

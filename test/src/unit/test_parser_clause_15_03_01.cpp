@@ -17,4 +17,4 @@ TEST(ParserSection15, SemaphoreVarDecl) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}
+}  // namespace

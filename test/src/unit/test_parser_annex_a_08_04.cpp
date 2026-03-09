@@ -190,4 +190,4 @@ TEST(ParserA84, PrimaryConcatenationWithRange) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

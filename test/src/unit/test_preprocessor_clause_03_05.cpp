@@ -17,4 +17,4 @@ TEST(ParserClause03, Cl3_5_ParametersConstantsVariables) {
   EXPECT_GE(r.cu->interfaces[0]->items.size(), 2u);
 }
 
-}
+}  // namespace

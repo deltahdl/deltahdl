@@ -113,4 +113,4 @@ TEST(Elab1304, ForkJoinNoneInFunctionOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

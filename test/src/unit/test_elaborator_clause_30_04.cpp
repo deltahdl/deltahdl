@@ -21,4 +21,4 @@ TEST(ElabA702, AllPathTypesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -16,4 +16,4 @@ TEST(ParserSection16, MulticlockSequenceDeclTwo) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

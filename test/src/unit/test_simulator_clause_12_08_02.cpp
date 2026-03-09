@@ -32,4 +32,4 @@ TEST(SimA608, WhileContinue) {
   EXPECT_EQ(count->value.ToUint64(), 5u);
 }
 
-}
+}  // namespace

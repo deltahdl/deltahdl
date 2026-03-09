@@ -36,4 +36,4 @@ TEST(Lexical, AssignmentPattern_DefaultZero) {
   ASSERT_EQ(r.cu->modules.size(), 1);
 }
 
-}
+}  // namespace

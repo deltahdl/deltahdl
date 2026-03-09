@@ -213,4 +213,4 @@ TEST(ParserA29, TaskPrototype_HasArgs) {
   EXPECT_FALSE(mp->ports[0].prototype->func_args.empty());
 }
 
-}
+}  // namespace

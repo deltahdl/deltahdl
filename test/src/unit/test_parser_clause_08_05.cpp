@@ -138,4 +138,4 @@ TEST(Parser, ClassWithProperty) {
   EXPECT_EQ(cls->members[0]->data_type.kind, DataTypeKind::kInt);
 }
 
-}
+}  // namespace

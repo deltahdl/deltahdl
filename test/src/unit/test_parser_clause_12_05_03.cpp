@@ -453,4 +453,4 @@ TEST(ParserSection12, UniqueCasexQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-}
+}  // namespace

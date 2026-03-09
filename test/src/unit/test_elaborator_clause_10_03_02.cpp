@@ -141,4 +141,4 @@ TEST(Elaborator, DriveStrengthOnContAssign) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 2u);
 }
 
-}
+}  // namespace

@@ -94,4 +94,4 @@ TEST(ParserA304, CmosSwitchtype_Rcmos) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-}
+}  // namespace

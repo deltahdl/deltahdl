@@ -227,4 +227,4 @@ TEST(ParserA54, UdpInstSequential) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 3u);
 }
 
-}
+}  // namespace

@@ -240,4 +240,4 @@ TEST(ParserA610, CoverPropertyPassAction) {
   ASSERT_NE(item->assert_pass_stmt, nullptr);
 }
 
-}
+}  // namespace

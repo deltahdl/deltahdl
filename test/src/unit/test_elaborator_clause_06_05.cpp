@@ -195,4 +195,4 @@ TEST(NetsAndVariables, RedeclarationOfNetError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

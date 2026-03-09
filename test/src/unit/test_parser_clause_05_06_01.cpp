@@ -49,4 +49,4 @@ TEST(ParserClause05, Cl5_6_1_EscapedIdentInLetDecl) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

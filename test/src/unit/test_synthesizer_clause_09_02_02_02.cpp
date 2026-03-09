@@ -26,4 +26,4 @@ TEST(SynthLower, AlwaysCombIfElse) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
-}
+}  // namespace

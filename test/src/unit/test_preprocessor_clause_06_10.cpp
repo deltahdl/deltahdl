@@ -45,4 +45,4 @@ TEST(ParserSection6, DefaultNettypeNoneRejectsImplicit) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

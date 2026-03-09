@@ -74,4 +74,4 @@ TEST(ParserCh501, Sec5_1_SingleCharOperators) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

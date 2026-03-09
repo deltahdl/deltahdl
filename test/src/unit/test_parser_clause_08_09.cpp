@@ -78,4 +78,4 @@ TEST(ParserA89, StaticPropertyAccessViaScope) {
       "endmodule\n");
 }
 
-}
+}  // namespace

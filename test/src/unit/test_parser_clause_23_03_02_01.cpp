@@ -117,4 +117,4 @@ TEST(ParserSection23, PositionalPortWithExpression) {
   EXPECT_NE(item->inst_ports[1].second, nullptr);
 }
 
-}
+}  // namespace

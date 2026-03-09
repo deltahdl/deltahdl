@@ -382,4 +382,4 @@ TEST(ModuleItemsA14, GenvarDeclaration) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

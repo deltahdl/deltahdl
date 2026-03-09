@@ -37,4 +37,4 @@ TEST(ParserA60703, MatchesWildcardInTernary) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

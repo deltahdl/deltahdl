@@ -25,4 +25,4 @@ TEST(ParserSection1110_3, EmptyStringComparedWithZeroParses) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

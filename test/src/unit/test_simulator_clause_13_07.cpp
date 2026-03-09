@@ -53,4 +53,4 @@ TEST(Sim1370, FunctionCallsForwardFunction) {
   LowerRunAndCheck(f, design, {{"x", 31u}});
 }
 
-}
+}  // namespace

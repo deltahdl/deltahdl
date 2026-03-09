@@ -412,4 +412,4 @@ TEST(ParserSection6, Sec6_11_2_RegWithPackedDims) {
   EXPECT_EQ(item->name, "wide_reg");
 }
 
-}
+}  // namespace

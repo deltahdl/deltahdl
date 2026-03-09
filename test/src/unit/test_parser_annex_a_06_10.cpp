@@ -199,4 +199,4 @@ TEST(ParserA610, AssertWithBeginEnd) {
   EXPECT_EQ(stmt->assert_pass_stmt->kind, StmtKind::kBlock);
 }
 
-}
+}  // namespace

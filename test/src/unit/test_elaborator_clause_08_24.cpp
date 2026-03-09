@@ -83,4 +83,4 @@ TEST(ElabA824, NoExternNoOutOfBlockOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

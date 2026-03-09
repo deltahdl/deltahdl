@@ -32,4 +32,4 @@ TEST(ParserSection6, DollarConstant_ParamAssign) {
                "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -48,5 +48,6 @@ TEST_F(VcdClause21070203Test, RegistersSignal) {
   EXPECT_NE(content.find("clk"), std::string::npos);
 }
 
-}
-} delta
+}  // namespace
+}  // namespace delta
+delta

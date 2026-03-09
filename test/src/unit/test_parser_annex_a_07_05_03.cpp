@@ -192,4 +192,4 @@ TEST(TimingCheckEventNoEdge, TimingCheckEventNoEdge) {
   EXPECT_EQ(tc->data_terminal.name, "clk");
 }
 
-}
+}  // namespace

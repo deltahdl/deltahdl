@@ -83,4 +83,4 @@ TEST(ElabA70503, TimingCheckEventNoEdgeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -114,4 +114,4 @@ TEST(ParserA816, CastInConditional) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

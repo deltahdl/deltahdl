@@ -286,4 +286,4 @@ TEST(Parser, MultipleModules) {
   EXPECT_EQ(r.cu->modules[2]->name, "c");
 }
 
-}
+}  // namespace

@@ -21,4 +21,4 @@ TEST(ParserSection6, Sec6_9_ScalarNoRange) {
   EXPECT_EQ(item->data_type.packed_dim_right, nullptr);
 }
 
-}
+}  // namespace

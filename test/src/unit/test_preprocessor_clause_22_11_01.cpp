@@ -20,4 +20,4 @@ TEST(Preprocessor, Pragma_Reset_MultipleNames_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

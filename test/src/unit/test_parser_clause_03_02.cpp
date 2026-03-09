@@ -214,4 +214,4 @@ TEST(ParserClause03, Cl3_2_DesignElementsInterleaveWithNonDesignElements) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
-}
+}  // namespace

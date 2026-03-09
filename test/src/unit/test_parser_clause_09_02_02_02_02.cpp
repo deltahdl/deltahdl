@@ -114,4 +114,4 @@ TEST(ParserSection9, Sec9_2_2_2_SideBySideBodiesExist) {
   EXPECT_EQ(second->body->kind, StmtKind::kBlockingAssign);
 }
 
-}
+}  // namespace

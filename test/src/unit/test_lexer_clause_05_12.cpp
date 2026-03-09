@@ -55,4 +55,4 @@ TEST(LexerClause05, Cl5_12_AttrWithStringValue) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kAttrEnd);
 }
 
-}
+}  // namespace

@@ -67,4 +67,4 @@ TEST(ElabClause05, Cl5_13_ReductionMethodElaborates) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

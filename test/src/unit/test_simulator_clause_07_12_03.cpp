@@ -51,4 +51,4 @@ TEST(ArrayReduction, XorAllElements) {
   EXPECT_EQ(out.ToUint64(), 0x00u);
 }
 
-}
+}  // namespace

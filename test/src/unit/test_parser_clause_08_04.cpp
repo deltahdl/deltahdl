@@ -57,4 +57,4 @@ TEST(ParserSection6, ClassVarDecl_ClassParsed) {
   ASSERT_FALSE(r.cu->modules.empty());
 }
 
-}
+}  // namespace

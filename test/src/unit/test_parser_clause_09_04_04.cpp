@@ -64,4 +64,4 @@ TEST(ParserSection9c, WaitTriggeredInLoop) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

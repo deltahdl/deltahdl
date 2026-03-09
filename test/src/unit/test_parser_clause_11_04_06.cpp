@@ -85,4 +85,4 @@ TEST(ParserA86, BinaryWildcardNotEq) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
 }
 
-}
+}  // namespace

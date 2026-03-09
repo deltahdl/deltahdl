@@ -184,4 +184,4 @@ TEST(ParserA607, CaseWithBeginEnd) {
   EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kBlock);
 }
 
-}
+}  // namespace

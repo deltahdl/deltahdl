@@ -102,4 +102,4 @@ TEST(Sim1353, DefaultArgOverride) {
   EXPECT_EQ(yv->value.ToUint64(), 15u);
 }
 
-}
+}  // namespace

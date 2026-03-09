@@ -28,4 +28,4 @@ TEST(ElabA705, AllTwelveCheckTypesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

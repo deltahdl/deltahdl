@@ -37,4 +37,4 @@ TEST(Elaboration, EnumMemberAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

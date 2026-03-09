@@ -34,4 +34,4 @@ TEST(ParserSection6, Sec6_7_1_UwireDecl) {
   EXPECT_EQ(item->name, "uw");
 }
 
-}
+}  // namespace

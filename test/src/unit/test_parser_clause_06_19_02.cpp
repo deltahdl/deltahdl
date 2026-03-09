@@ -40,4 +40,4 @@ TEST(ParserSection6, EnumRangeNM) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

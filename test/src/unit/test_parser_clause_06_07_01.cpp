@@ -956,4 +956,4 @@ TEST(ParserSection6, Sec6_7_1_VectoredWithExplicitType) {
   EXPECT_EQ(item->name, "v");
 }
 
-}
+}  // namespace

@@ -324,4 +324,4 @@ TEST(EvalOp, ReductionAndZero) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}
+}  // namespace

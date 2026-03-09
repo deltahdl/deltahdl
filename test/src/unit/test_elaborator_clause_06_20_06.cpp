@@ -62,4 +62,4 @@ TEST(Elaboration, ConstStringWithInit_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

@@ -28,4 +28,4 @@ TEST(SvaEngine, RepetitionZeroMin) {
   EXPECT_TRUE(MatchRepetition(seq, {1, 1}));
 }
 
-}
+}  // namespace

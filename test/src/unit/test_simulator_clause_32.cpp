@@ -11,4 +11,4 @@ TEST_F(SpecifyTest, SdfAnnotateModel) {
   EXPECT_EQ(mgr.GetSdfAnnotations()[0].scope, "top.dut");
 }
 
-}
+}  // namespace

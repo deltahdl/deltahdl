@@ -22,4 +22,4 @@ TEST(QueueAccess, OutOfBoundsReturnsX) {
   EXPECT_FALSE(oob_result.IsKnown());
 }
 
-}
+}  // namespace

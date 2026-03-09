@@ -64,4 +64,4 @@ TEST(SimClause05, Cl5_8_LrmExample40ps) {
   EXPECT_DOUBLE_EQ(v, 0.04);
 }
 
-}
+}  // namespace

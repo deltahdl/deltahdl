@@ -161,4 +161,4 @@ TEST(ParserA212, LetFormalType_MixedUntypedAndTyped) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

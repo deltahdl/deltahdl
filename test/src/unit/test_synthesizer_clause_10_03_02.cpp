@@ -49,4 +49,4 @@ TEST(SynthLower, AssignConstantZero) {
   EXPECT_EQ(aig->outputs[0], AigGraph::kConstFalse);
 }
 
-}
+}  // namespace

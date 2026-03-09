@@ -742,4 +742,4 @@ TEST(ParserSection6, BlockLevelLocalparam) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}
+}  // namespace

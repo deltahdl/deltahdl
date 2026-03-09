@@ -52,4 +52,4 @@ TEST(ElabA8267, VirtualClassNoImplOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

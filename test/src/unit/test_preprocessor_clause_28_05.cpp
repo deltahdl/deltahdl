@@ -38,4 +38,4 @@ TEST(Parser, GateBufMultiOutput) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
-}
+}  // namespace

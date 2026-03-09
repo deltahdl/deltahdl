@@ -160,4 +160,4 @@ TEST(LexerA10, EmptyInputHasEof) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-}
+}  // namespace

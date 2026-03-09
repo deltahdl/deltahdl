@@ -76,4 +76,4 @@ TEST(SimA611, EdgeCallbackPosedge) {
   TestEdgeCallbackPosedge(f);
 }
 
-}
+}  // namespace

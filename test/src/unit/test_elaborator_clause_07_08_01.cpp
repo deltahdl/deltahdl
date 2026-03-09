@@ -15,4 +15,4 @@ TEST(ParserA25, AssocDimElaboratesWildcard) {
   EXPECT_TRUE(mod->variables[0].is_assoc);
 }
 
-}
+}  // namespace

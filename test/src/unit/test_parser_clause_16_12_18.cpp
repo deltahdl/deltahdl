@@ -31,4 +31,4 @@ TEST(ParserA210, PropertyFormalType_Implicit) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

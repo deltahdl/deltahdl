@@ -178,4 +178,4 @@ TEST(AdvSynth, RetimeBackwardPreservesOutputs) {
   EXPECT_EQ(g.outputs.size(), output_count);
 }
 
-}
+}  // namespace

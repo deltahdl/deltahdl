@@ -50,4 +50,4 @@ TEST(Coverage, IffGuardAllowsSampling) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
 }
 
-}
+}  // namespace

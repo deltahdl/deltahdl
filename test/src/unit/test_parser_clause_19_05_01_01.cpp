@@ -37,4 +37,4 @@ TEST(ParserA211, CoverGroup_BinsWithCoverPointRef) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

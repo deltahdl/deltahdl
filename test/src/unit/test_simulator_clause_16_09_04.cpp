@@ -49,4 +49,4 @@ TEST(SvaEngine, GotoRepetitionEndsAtMatch) {
   EXPECT_FALSE(MatchGotoRepetition(seq, {0, 1, 0}));
 }
 
-}
+}  // namespace

@@ -67,4 +67,4 @@ TEST(ParserSection7, AssocArrayClassIndex_DifferentElemTypes) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

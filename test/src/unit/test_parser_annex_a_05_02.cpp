@@ -164,4 +164,4 @@ TEST(ParserAnnexA052, AttrOnRegDecl) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
-}
+}  // namespace

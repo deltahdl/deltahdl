@@ -184,4 +184,4 @@ TEST(SimCh10d, AssignExpressionRhs) {
   EXPECT_EQ(c->value.ToUint64(), 42u);
 }
 
-}
+}  // namespace

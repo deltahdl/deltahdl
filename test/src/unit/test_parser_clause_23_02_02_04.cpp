@@ -18,4 +18,4 @@ TEST(ModuleParamsA13, AnsiPortWithDefault) {
   EXPECT_NE(r.cu->modules[0]->ports[1].default_value, nullptr);
 }
 
-}
+}  // namespace

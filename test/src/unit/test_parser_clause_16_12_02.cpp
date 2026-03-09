@@ -59,4 +59,4 @@ TEST(ParserSection16, WeakSequenceProperty) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

@@ -113,4 +113,4 @@ TEST(ParserClause05, Cl5_11_ArrayLiteralAssignment) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-}
+}  // namespace

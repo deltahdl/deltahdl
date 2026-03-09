@@ -31,4 +31,4 @@ TEST(ParserAnnexA0413, ProgramInstEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-}
+}  // namespace

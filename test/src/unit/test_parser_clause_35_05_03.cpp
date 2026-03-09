@@ -73,4 +73,4 @@ TEST(ParserSection13, DpiImportContextTask) {
   EXPECT_TRUE(dpi->dpi_is_task);
 }
 
-}
+}  // namespace

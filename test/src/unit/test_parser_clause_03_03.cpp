@@ -292,4 +292,4 @@ TEST(ParserClause03, Cl3_3_ModuleWithMixedContents) {
       "endmodule\n"));
 }
 
-}
+}  // namespace

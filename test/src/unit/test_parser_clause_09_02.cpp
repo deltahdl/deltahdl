@@ -134,4 +134,4 @@ TEST(ParserClause09_02, AlwaysKeywordVariants) {
   EXPECT_TRUE(HasAlwaysOfKind(items, AlwaysKind::kAlwaysFF));
 }
 
-}
+}  // namespace

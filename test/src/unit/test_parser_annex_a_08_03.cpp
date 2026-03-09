@@ -122,4 +122,4 @@ TEST(ParserA83, NestedTernary) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
-}
+}  // namespace

@@ -51,4 +51,4 @@ TEST(ParserSection23, ModuleInstNamedParamOverride) {
   EXPECT_EQ(item->inst_module, "sub");
 }
 
-}
+}  // namespace

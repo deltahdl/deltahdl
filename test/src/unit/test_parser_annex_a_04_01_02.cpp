@@ -42,4 +42,4 @@ TEST(ParserAnnexA0412, InterfaceInstInsideInterface) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-}
+}  // namespace

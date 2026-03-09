@@ -99,4 +99,4 @@ TEST(ParserA221, DataTypeClassType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

@@ -31,4 +31,4 @@ TEST(SimA705, RuntimeAllTwelveKinds) {
   }
 }
 
-}
+}  // namespace

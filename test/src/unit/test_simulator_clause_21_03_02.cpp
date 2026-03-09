@@ -37,4 +37,4 @@ TEST(Section21, FdisplayToFile) {
   std::remove(tmp_path.c_str());
 }
 
-}
+}  // namespace

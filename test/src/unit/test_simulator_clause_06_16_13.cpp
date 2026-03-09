@@ -14,4 +14,4 @@ TEST(StringMethods, Octtoa) {
   EXPECT_EQ(VecToString(var->value), "10");
 }
 
-}
+}  // namespace

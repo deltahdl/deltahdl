@@ -151,4 +151,4 @@ TEST(SourceText, ConstraintExpressionOrDist) {
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "dist_c");
 }
 
-}
+}  // namespace

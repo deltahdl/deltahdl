@@ -29,4 +29,4 @@ TEST(SimA705, MultipleTimingChecksSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

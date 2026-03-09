@@ -37,4 +37,4 @@ TEST(NetDecl, ScalaredNetElaboratesOk) {
   EXPECT_EQ(mod->nets[0].width, 64u);
 }
 
-}
+}  // namespace

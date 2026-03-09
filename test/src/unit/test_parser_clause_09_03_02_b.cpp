@@ -293,4 +293,4 @@ TEST(ParserSection10, Sec10_4_1_InForkJoinBlock) {
   EXPECT_EQ(stmt->stmts[1]->kind, StmtKind::kBlockingAssign);
 }
 
-}
+}  // namespace

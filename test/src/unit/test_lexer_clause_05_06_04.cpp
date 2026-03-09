@@ -17,4 +17,4 @@ TEST(LexerClause05, Cl5_6_4_BacktickIsUnexpectedInLexer) {
   EXPECT_TRUE(diag.HasErrors());
 }
 
-}
+}  // namespace

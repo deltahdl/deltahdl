@@ -60,4 +60,4 @@ TEST(ParserSection22, NestedIfdef) {
                               "`endif\n"));
 }
 
-}
+}  // namespace

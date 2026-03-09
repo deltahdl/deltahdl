@@ -278,4 +278,4 @@ TEST(ParserSection29, UdpInstance) {
   EXPECT_EQ(insts[0]->gate_inst_name, "u1");
 }
 
-}
+}  // namespace

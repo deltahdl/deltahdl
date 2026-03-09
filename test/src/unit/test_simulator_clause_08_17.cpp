@@ -83,4 +83,4 @@ TEST(ClassSim, BaseConstructorResolvable) {
   EXPECT_EQ(resolved, ctor);
 }
 
-}
+}  // namespace

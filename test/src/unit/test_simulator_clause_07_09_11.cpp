@@ -39,4 +39,4 @@ TEST(AssocMethods, LiteralInitStringKeys) {
   EXPECT_TRUE(aa->has_default);
 }
 
-}
+}  // namespace

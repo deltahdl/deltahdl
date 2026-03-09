@@ -378,4 +378,4 @@ TEST(ParserSection13, TaskReturnStatement) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

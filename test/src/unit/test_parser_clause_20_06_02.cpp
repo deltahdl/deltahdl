@@ -36,4 +36,4 @@ TEST(ConstExpr, BitsIsConstantSysFunc) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-}
+}  // namespace

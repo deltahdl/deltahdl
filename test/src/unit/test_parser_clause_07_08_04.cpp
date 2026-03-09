@@ -74,4 +74,4 @@ TEST(ParserSection7, AssociativeArrayIntIndex) {
   EXPECT_EQ(item->name, "names");
 }
 
-}
+}  // namespace

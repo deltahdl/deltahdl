@@ -120,4 +120,4 @@ TEST(Lowerer, FinalBlockMultipleAssignments) {
   EXPECT_EQ(b->value.ToUint64(), 22u);
 }
 
-}
+}  // namespace

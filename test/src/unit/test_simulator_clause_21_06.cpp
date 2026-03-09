@@ -56,4 +56,4 @@ TEST(Section20, ValuePlusargsNotFound) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}
+}  // namespace

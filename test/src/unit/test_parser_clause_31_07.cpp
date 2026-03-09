@@ -196,4 +196,4 @@ TEST(ParserA70503, TerminalSimpleIdentifier) {
   EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kNone);
 }
 
-}
+}  // namespace

@@ -60,4 +60,4 @@ TEST(UnpackedArrayConcatArrayExpansion, UnpackedArrayConcatArrayExpansion) {
   EXPECT_EQ(c3->value.ToUint64(), 40u);
 }
 
-}
+}  // namespace

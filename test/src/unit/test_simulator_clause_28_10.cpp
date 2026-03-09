@@ -60,4 +60,4 @@ TEST(PullGates, PulldownIgnoresStrength1) {
 
 TEST(PullGates, NoDelaySpecs) { EXPECT_FALSE(PullSourceAcceptsDelaySpec()); }
 
-}
+}  // namespace

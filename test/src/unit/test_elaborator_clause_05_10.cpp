@@ -70,4 +70,4 @@ TEST(ElabClause05, Cl5_10_DuplicateMemberKey) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

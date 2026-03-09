@@ -156,5 +156,6 @@ TEST_F(VpiClause3815Test, GetValueTimeFormat) {
   EXPECT_EQ(val.value.integer, 500);
 }
 
-}
-} delta
+}  // namespace
+}  // namespace delta
+delta

@@ -25,4 +25,4 @@ TEST(ElabA60701, CaseMatchesElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}
+}  // namespace

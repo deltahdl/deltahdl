@@ -107,4 +107,4 @@ TEST(ParserClause05, Cl5_13_DynArraySize) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

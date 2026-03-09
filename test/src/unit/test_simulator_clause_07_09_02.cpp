@@ -37,4 +37,4 @@ TEST(AssocMethods, DeleteNonexistentKeyIsNoop) {
   EXPECT_EQ(aa->int_data.count(10), 1u);
 }
 
-}
+}  // namespace

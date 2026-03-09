@@ -188,4 +188,4 @@ TEST(ParserA10, CovergroupInClass) {
               "endclass\n"));
 }
 
-}
+}  // namespace

@@ -253,4 +253,4 @@ TEST(ParserSection6, TypedefEnum) {
   EXPECT_EQ(var->data_type.type_name, "my_enum");
 }
 
-}
+}  // namespace

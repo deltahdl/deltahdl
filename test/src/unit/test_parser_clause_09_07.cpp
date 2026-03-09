@@ -86,4 +86,4 @@ TEST(ParserSection9c, ProcessStatusCheck) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

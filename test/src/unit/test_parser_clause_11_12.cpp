@@ -654,7 +654,7 @@ TEST(ParserA210, AssertionItemDecl_LetDecl) {
               "endmodule\n"));
 }
 
-}
+}  // namespace
 TEST(ClockingItemLetDecl, ClockingItemLetDecl) {
   auto r = Parse(
       "module m;\n"

@@ -78,4 +78,4 @@ TEST(SimCh10, BlockingAssignForLoop) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-}
+}  // namespace

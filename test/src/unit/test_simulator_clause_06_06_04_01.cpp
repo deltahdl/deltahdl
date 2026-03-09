@@ -152,4 +152,4 @@ TEST(CapacitiveNetwork, MultiWordVectorPropagation) {
   EXPECT_EQ(var_a->value.ToUint64(), 0xDEADu);
 }
 
-}
+}  // namespace

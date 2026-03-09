@@ -39,4 +39,4 @@ TEST(ParserClause05, Cl5_9_1_StringWithHexEscape) {
               "endmodule"));
 }
 
-}
+}  // namespace

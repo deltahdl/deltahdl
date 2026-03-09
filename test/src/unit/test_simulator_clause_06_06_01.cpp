@@ -265,4 +265,4 @@ TEST(WireTriResolution, ThreeDriverWireResolution) {
   EXPECT_TRUE((w.bval & 8u) == 0);
 }
 
-}
+}  // namespace

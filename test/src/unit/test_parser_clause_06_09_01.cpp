@@ -121,4 +121,4 @@ TEST(ParserSection6, Sec6_9_LrmExamplesScalarAndVector) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

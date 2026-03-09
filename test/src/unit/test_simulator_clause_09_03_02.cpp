@@ -159,4 +159,4 @@ TEST(SimA603, EmptyForkJoin) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}
+}  // namespace

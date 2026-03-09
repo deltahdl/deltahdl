@@ -47,4 +47,4 @@ TEST(ParserSection22, Celldefine_InsideModule) {
                               "`endcelldefine\n"));
 }
 
-}
+}  // namespace

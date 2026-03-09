@@ -59,4 +59,4 @@ TEST(Elab1352, ConstRefArgAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

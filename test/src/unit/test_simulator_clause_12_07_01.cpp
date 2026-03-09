@@ -198,4 +198,4 @@ TEST(SimA608, ForDecrement) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

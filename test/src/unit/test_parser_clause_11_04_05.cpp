@@ -177,4 +177,4 @@ TEST(ParserA86, BinaryCaseNotEq) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEqEq);
 }
 
-}
+}  // namespace

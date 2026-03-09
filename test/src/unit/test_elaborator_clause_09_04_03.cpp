@@ -68,4 +68,4 @@ TEST(ElabClause09_04_03, WaitNegatedExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

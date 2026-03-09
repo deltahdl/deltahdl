@@ -47,4 +47,4 @@ TEST(ParserA612, RsProductionItemWithArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

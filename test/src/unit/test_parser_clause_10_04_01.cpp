@@ -344,4 +344,4 @@ TEST(ParserSection10, Sec10_4_1_InFunctionBody) {
   EXPECT_EQ(assign->lhs->text, "tmp");
 }
 
-}
+}  // namespace

@@ -116,4 +116,4 @@ TEST(ParserA304, EnableGatetype_Notif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-}
+}  // namespace

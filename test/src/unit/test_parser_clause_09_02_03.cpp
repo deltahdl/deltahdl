@@ -186,4 +186,4 @@ TEST(ParserSection9, FinalBlock) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

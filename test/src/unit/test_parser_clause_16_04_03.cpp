@@ -69,4 +69,4 @@ TEST(ParserA610, DeferredAssertFinalModule) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

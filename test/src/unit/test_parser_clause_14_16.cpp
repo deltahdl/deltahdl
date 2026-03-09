@@ -87,7 +87,7 @@ TEST(ParserA611, ClockvarExpression) {
   ASSERT_NE(stmt->lhs, nullptr);
 }
 
-}
+}  // namespace
 TEST(ClockingDriveStatement, ClockingDriveStatement) {
   auto r = Parse(
       "module m;\n"

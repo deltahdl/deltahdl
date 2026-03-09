@@ -51,4 +51,4 @@ TEST(ParserSection21, MonitorbHexOctal) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

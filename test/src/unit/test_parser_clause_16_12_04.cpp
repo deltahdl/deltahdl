@@ -60,4 +60,4 @@ TEST(ParserSection16, PropertyDisjunctionAndConjunctionCombined) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

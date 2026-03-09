@@ -111,5 +111,6 @@ TEST_F(VpiClause3834Test, PutValueScalarFormat) {
   EXPECT_EQ(var->value.words[0].bval & 1, 0u);
 }
 
-}
-} delta
+}  // namespace
+}  // namespace delta
+delta

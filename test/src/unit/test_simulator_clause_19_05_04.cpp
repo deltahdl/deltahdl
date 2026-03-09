@@ -25,4 +25,4 @@ TEST(Coverage, TransitionBinNotMatchedByScalar) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u);
 }
 
-}
+}  // namespace

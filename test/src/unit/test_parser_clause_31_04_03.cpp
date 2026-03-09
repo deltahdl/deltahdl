@@ -67,4 +67,4 @@ TEST(FullskewTimingCheck, FullskewBasic) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-}
+}  // namespace

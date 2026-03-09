@@ -75,4 +75,4 @@ TEST(Sim1355, VoidFunctionNoParens) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-}
+}  // namespace

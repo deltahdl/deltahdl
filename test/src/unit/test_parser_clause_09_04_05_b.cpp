@@ -204,4 +204,4 @@ TEST(ParserSection10, Sec10_4_1_IntraAssignEventControl) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-}
+}  // namespace

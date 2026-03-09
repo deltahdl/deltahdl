@@ -59,4 +59,4 @@ TEST(TimingControl, WaitConditionFalseBlocks) {
   EXPECT_FALSE(EvaluateWaitCondition(0));
 }
 
-}
+}  // namespace

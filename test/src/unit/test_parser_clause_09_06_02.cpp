@@ -221,4 +221,4 @@ TEST(ParserSection4, Sec4_5_DisableStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
 }
 
-}
+}  // namespace

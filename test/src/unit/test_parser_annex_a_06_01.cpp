@@ -145,4 +145,4 @@ TEST(ParserA601, ContinuousAssignConcatLhs) {
   EXPECT_EQ(item->assign_lhs->kind, ExprKind::kConcatenation);
 }
 
-}
+}  // namespace

@@ -61,4 +61,4 @@ TEST(ElabClause03, Cl3_11_PortCommunicationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

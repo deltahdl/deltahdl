@@ -54,4 +54,4 @@ TEST(SvaEngine, PropertyPendingResolvesFail) {
   EXPECT_EQ(resolved, PropertyResult::kFail);
 }
 
-}
+}  // namespace

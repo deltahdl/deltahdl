@@ -139,4 +139,4 @@ TEST(SimCh10, BlockingAssignCase) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-}
+}  // namespace

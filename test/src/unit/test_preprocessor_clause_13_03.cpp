@@ -34,4 +34,4 @@ TEST(ParserClause03, Cl3_8_TaskAllDirectionsAndBlocking) {
   EXPECT_GE(task->func_body_stmts.size(), 1u);
 }
 
-}
+}  // namespace

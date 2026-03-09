@@ -94,4 +94,4 @@ TEST(ElabA84, RealParameter) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

@@ -24,4 +24,4 @@ TEST(TaggedUnion, TagDefaultEmpty) {
   EXPECT_TRUE(f.ctx.GetVariableTag("nonexistent").empty());
 }
 
-}
+}  // namespace

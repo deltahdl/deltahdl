@@ -45,5 +45,6 @@ TEST_F(VpiClause3804Test, ControlUnknownOpReturnsZero) {
   EXPECT_EQ(result, 0);
 }
 
-}
-} delta
+}  // namespace
+}  // namespace delta
+delta

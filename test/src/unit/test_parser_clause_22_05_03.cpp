@@ -13,4 +13,4 @@ TEST(ParserSection22, UndefineallDirective) {
                               "endmodule\n"));
 }
 
-}
+}  // namespace

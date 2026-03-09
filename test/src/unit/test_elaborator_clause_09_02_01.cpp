@@ -79,7 +79,7 @@ TEST(InitialProcedure, TimeZeroSemantics) {
   EXPECT_EQ(vb->value.ToUint64(), 2u);
 }
 
-}
+}  // namespace
 TEST(InitialProcedures, MultipleInitialsAllExecute) {
   SimFixture f;
   auto* design = ElaborateSrc(

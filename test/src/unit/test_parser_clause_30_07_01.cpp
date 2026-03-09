@@ -57,4 +57,4 @@ TEST(ParserA24, LimitValueMintypmax) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

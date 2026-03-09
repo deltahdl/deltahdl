@@ -23,4 +23,4 @@ TEST_F(ProgramTestParse, ProgramInstantiatedInModule) {
   EXPECT_EQ(inst->inst_name, "tp");
 }
 
-}
+}  // namespace

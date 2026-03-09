@@ -16,4 +16,4 @@ TEST(ParserSection21, DumpportsOffOnFlush) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

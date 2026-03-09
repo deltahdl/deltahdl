@@ -135,4 +135,4 @@ TEST(SimA116, SubtractionContextWidthPreservesBorrow) {
   EXPECT_EQ(r2.width, 16u);
 }
 
-}
+}  // namespace

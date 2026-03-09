@@ -140,4 +140,4 @@ TEST(ParserSection23, ModuleInstanceEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-}
+}  // namespace

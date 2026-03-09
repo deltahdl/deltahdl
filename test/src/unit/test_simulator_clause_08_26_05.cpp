@@ -23,4 +23,4 @@ TEST(ClassSim, InterfaceClassIsACheck) {
   EXPECT_FALSE(iface_type->IsA(impl_type));
 }
 
-}
+}  // namespace

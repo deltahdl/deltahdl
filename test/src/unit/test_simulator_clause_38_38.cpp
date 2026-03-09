@@ -29,5 +29,6 @@ TEST_F(VpiClause3838Test, FreeObjectReturnsZero) {
   EXPECT_EQ(result, 0);
 }
 
-}
-} delta
+}  // namespace
+}  // namespace delta
+delta

@@ -307,4 +307,4 @@ TEST(ParserClause03, Cl3_14_2_3_NestedOverridesInheritance) {
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kFs);
 }
 
-}
+}  // namespace

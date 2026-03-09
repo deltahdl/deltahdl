@@ -61,4 +61,4 @@ TEST(SimCh4, SequentialWithinBeginEnd) {
   EXPECT_EQ(result, 3u);
 }
 
-}
+}  // namespace

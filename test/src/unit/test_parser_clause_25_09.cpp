@@ -93,4 +93,4 @@ TEST(ParserSection25, VirtualInterfaceMultipleDecls) {
   EXPECT_EQ(mod->items[1]->name, "b_if");
 }
 
-}
+}  // namespace

@@ -109,4 +109,4 @@ TEST(Elab1343, NonConstantContextOutputArgOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

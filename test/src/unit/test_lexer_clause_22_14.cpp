@@ -52,4 +52,4 @@ TEST(Lexer, ParseKeywordVersion_Invalid) {
   EXPECT_FALSE(ParseKeywordVersion("").has_value());
 }
 
-}
+}  // namespace

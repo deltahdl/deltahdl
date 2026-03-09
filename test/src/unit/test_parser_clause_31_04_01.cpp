@@ -68,4 +68,4 @@ TEST(SkewBasic, SkewBasic) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kSkew);
 }
 
-}
+}  // namespace

@@ -157,4 +157,4 @@ TEST(Types, Logic2Vec_BasicOperations) {
   EXPECT_EQ(vec.ToUint64(), 0xFF);
 }
 
-}
+}  // namespace

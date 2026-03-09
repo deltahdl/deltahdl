@@ -70,4 +70,4 @@ TEST(ParserSection6, DynamicCastAssignResult) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

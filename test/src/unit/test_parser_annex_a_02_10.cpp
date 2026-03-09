@@ -44,4 +44,4 @@ TEST(ParserA210, SequenceActualArg_EventExpr) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

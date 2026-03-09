@@ -39,4 +39,4 @@ TEST(Lexer, KeywordVersion_1800_2012_IncludesAllPriorVersions) {
       LookupKeyword("checker", KeywordVersion::kVer18002012).has_value());
 }
 
-}
+}  // namespace

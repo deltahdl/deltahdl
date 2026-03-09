@@ -44,4 +44,4 @@ TEST(AssocMethods, AssocArgCopiesDefault) {
   EXPECT_EQ(dst->int_data.size(), 1u);
 }
 
-}
+}  // namespace

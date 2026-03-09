@@ -89,4 +89,4 @@ TEST(ParserSection16, PropertyIfElseInDecl) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}
+}  // namespace

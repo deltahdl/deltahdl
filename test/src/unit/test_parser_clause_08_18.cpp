@@ -128,4 +128,4 @@ TEST(ParserClause08_03, ErrorDuplicateVirtual) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}
+}  // namespace

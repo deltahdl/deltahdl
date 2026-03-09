@@ -146,4 +146,4 @@ TEST(Constraint, PostRandomizeFailureNoCallback) {
   EXPECT_FALSE(post_called);
 }
 
-}
+}  // namespace

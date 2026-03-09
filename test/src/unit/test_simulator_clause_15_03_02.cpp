@@ -37,4 +37,4 @@ TEST(IpcSync, SemaphorePutWakesWaiters) {
   (void)woken;
 }
 
-}
+}  // namespace

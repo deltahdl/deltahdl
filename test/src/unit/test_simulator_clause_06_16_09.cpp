@@ -38,4 +38,4 @@ TEST(StringMethods, Atobin) {
   EXPECT_EQ(result.ToUint64(), 0b1010u);
 }
 
-}
+}  // namespace

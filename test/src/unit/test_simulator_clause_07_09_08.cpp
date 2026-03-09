@@ -121,4 +121,4 @@ TEST(AssocTraversalArgs, TruncationPreservesLSBsLRMExample) {
   EXPECT_EQ(ref->value.ToUint64(), 232u);
 }
 
-}
+}  // namespace

@@ -18,4 +18,4 @@ TEST(ElabSection6, Sec6_9_1_ScalarWidth) {
   EXPECT_EQ(mod->variables[0].width, 1u);
 }
 
-}
+}  // namespace

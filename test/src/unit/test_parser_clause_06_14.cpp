@@ -111,4 +111,4 @@ TEST(ParserSection6, ChandleEqualityWithNull) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

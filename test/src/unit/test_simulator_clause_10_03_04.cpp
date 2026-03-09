@@ -111,4 +111,4 @@ TEST(SimClause100304, NetDeclWithStrength) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

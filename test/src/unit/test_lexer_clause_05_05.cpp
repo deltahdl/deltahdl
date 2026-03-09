@@ -353,4 +353,4 @@ TEST(LexerClause05, Cl5_5_DoubleNotTriple) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kEqEq);
 }
 
-}
+}  // namespace

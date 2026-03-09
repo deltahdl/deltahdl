@@ -41,4 +41,4 @@ TEST(ParserAnnexA0414, CheckerInstNamedPortNoParens) {
   EXPECT_EQ(item->inst_ports[1].first, "rst");
 }
 
-}
+}  // namespace

@@ -28,4 +28,4 @@ TEST_F(AnnexHParseTest, AnnexHDpiImportOutputArgs) {
   EXPECT_EQ(items[0]->func_args[2].name, "status");
 }
 
-}
+}  // namespace

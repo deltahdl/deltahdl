@@ -33,4 +33,4 @@ TEST(ParserSection15, WaitForEventHierarchical) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
-}
+}  // namespace

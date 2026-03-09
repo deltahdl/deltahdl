@@ -44,5 +44,6 @@ TEST_F(VpiClause3819Test, HandleByIndexOutOfRangeReturnsNullptr) {
   EXPECT_EQ(result, nullptr);
 }
 
-}
-} delta
+}  // namespace
+}  // namespace delta
+delta

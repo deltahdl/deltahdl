@@ -208,4 +208,4 @@ TEST(ParserClause05, Cl5_5_SingleCharOperatorsInExpressions) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

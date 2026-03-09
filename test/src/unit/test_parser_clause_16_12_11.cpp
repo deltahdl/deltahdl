@@ -25,4 +25,4 @@ TEST(ParserA210, PropertyExpr_SAlways) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

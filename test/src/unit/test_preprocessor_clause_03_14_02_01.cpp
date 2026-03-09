@@ -132,4 +132,4 @@ TEST(ParserClause03, Cl3_14_2_1_LrmExampleThreeModules) {
   EXPECT_FALSE(r.cu->modules[2]->has_timeunit);
 }
 
-}
+}  // namespace

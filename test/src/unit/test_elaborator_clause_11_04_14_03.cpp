@@ -111,4 +111,4 @@ TEST(SimA81, StreamingUnpackSingleElement) {
   EXPECT_EQ(var->value.ToUint64(), 0xBEEFu);
 }
 
-}
+}  // namespace

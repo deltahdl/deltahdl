@@ -22,4 +22,4 @@ TEST(ParserClause03, Cl3_14_2_BothMechanismsMagnitudes) {
       ParseTimescale31402("module m; timeunit 100ns; endmodule\n").has_errors);
 }
 
-}
+}  // namespace

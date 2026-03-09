@@ -27,4 +27,4 @@ TEST(GateDecl, NoRangeSingleInstance) {
   EXPECT_TRUE(ValidateGateDecl(info));
 }
 
-}
+}  // namespace

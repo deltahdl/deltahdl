@@ -184,4 +184,4 @@ TEST(SvaEngine, KillClearsPendingAssertions) {
   EXPECT_EQ(count, 0);
 }
 
-}
+}  // namespace

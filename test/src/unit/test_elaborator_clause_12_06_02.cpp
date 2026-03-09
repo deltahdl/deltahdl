@@ -23,4 +23,4 @@ TEST(ElabA60701, MatchesInIfElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}
+}  // namespace

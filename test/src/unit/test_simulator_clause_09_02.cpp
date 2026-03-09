@@ -25,4 +25,4 @@ TEST(Process, ProcessKindEnum) {
   }
 }
 
-}
+}  // namespace

@@ -17,4 +17,4 @@ TEST(ParserSection6, VectorSignedBitType) {
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
-}
+}  // namespace

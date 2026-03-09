@@ -44,5 +44,6 @@ TEST_F(VcdClause21070202Test, DumpChangedValuesOnlyEmitsChanged) {
   EXPECT_NE(content.find("1\""), std::string::npos);
 }
 
-}
-} delta
+}  // namespace
+}  // namespace delta
+delta

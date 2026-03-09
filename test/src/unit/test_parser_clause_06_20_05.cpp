@@ -133,4 +133,4 @@ TEST(ParserA701, SpecifyItemSpecparamDecl) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kSpecparam);
 }
 
-}
+}  // namespace

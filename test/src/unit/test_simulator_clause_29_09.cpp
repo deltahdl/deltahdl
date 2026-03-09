@@ -28,4 +28,4 @@ TEST(UdpMixed, EdgeOnlyNoLevelOverride) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-}
+}  // namespace

@@ -40,4 +40,4 @@ TEST(ClassSim, WeakRefClearDoesNotAffectReferent) {
   EXPECT_EQ(referent->GetProperty("x", f.arena).ToUint64(), 99u);
 }
 
-}
+}  // namespace

@@ -168,4 +168,4 @@ TEST(ElabClause09_06_01, WaitForkInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}
+}  // namespace

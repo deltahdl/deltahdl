@@ -27,4 +27,4 @@ TEST(StmtExec, DisableReturnsKDone) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-}
+}  // namespace

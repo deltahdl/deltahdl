@@ -71,4 +71,4 @@ TEST(ParserSection23, ModuleInstanceWithParameters) {
   ASSERT_EQ(item->inst_params.size(), 2);
 }
 
-}
+}  // namespace

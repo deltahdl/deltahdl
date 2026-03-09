@@ -66,4 +66,4 @@ TEST(ParserA81, EmptyUnpackedArrayConcatenation) {
   EXPECT_TRUE(stmt->rhs->elements.empty());
 }
 
-}
+}  // namespace

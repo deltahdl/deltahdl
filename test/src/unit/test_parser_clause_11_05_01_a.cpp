@@ -707,4 +707,4 @@ TEST(ParserSection11, Sec11_4_1_SelectOnSystemFuncResult) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

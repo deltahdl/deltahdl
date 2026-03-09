@@ -105,4 +105,4 @@ TEST(ClassSim, CastDeepHierarchySucceeds) {
   EXPECT_FALSE(obj2->type->IsA(leaf));
 }
 
-}
+}  // namespace

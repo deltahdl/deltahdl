@@ -64,4 +64,4 @@ TEST(ElabA815, SuperNewInConstructorOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

@@ -21,4 +21,4 @@ TEST(ParserClause03, Cl3_14_2_EquivalentSpecifications) {
   EXPECT_EQ(pp.timescale.precision, pr.cu->modules[0]->time_prec);
 }
 
-}
+}  // namespace

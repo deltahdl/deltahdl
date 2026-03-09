@@ -47,4 +47,4 @@ TEST(ElabA819, InstanceConstStaticError) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

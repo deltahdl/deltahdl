@@ -21,4 +21,4 @@ TEST(ElabA82662, InterfaceExtendsMultipleWithTypedefOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

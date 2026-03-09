@@ -198,4 +198,4 @@ TEST(ParserA612, NestedRandsequence) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

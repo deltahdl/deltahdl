@@ -104,4 +104,4 @@ TEST(ParserA604, StatementWithLabelAndAttribute) {
   EXPECT_EQ(stmt->attrs[0].name, "mark");
 }
 
-}
+}  // namespace

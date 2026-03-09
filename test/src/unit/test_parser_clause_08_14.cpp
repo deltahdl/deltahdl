@@ -85,4 +85,4 @@ TEST(ParserA814, SubclassAdditionalMembers) {
   EXPECT_GE(derived->members.size(), 2u);
 }
 
-}
+}  // namespace

@@ -136,4 +136,4 @@ TEST(Sim1303, TaskEmptyBody) {
   EXPECT_EQ(val, 2u);
 }
 
-}
+}  // namespace

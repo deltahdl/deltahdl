@@ -234,4 +234,4 @@ TEST(SimCh6, CastByteTruncate) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-}
+}  // namespace

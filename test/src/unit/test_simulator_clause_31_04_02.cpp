@@ -47,4 +47,4 @@ TEST(SimA70502, RemainActiveFlagMinTypMaxSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-}
+}  // namespace

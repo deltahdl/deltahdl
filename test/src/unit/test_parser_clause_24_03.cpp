@@ -598,4 +598,4 @@ TEST(SourceText, ProgramWildcardPorts) {
   EXPECT_TRUE(r.cu->programs[0]->has_wildcard_ports);
 }
 
-}
+}  // namespace

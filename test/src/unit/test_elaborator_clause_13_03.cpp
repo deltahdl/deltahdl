@@ -70,4 +70,4 @@ TEST(Elab1303, TaskEnablesTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

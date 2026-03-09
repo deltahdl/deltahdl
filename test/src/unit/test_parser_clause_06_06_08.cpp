@@ -43,4 +43,4 @@ TEST(ParserSection6, Interconnect_Basic) {
                "endmodule\n"));
 }
 
-}
+}  // namespace

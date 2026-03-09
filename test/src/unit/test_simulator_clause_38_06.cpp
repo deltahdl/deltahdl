@@ -64,5 +64,6 @@ TEST_F(VpiClause3806Test, GetReturnsZeroForNullHandle) {
   EXPECT_EQ(vpi_get(vpiType, nullptr), 0);
 }
 
-}
-} delta
+}  // namespace
+}  // namespace delta
+delta

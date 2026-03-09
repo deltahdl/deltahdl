@@ -48,4 +48,4 @@ TEST(ElabClause05, Cl5_11_FlatInitIllegal) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}
+}  // namespace

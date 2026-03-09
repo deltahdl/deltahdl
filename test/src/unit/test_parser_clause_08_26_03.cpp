@@ -15,4 +15,4 @@ TEST(ParserSection8, InterfaceClassWithTypedef) {
   EXPECT_EQ(r.cu->classes[0]->name, "ihello");
 }
 
-}
+}  // namespace

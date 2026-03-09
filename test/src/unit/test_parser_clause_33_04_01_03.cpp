@@ -64,4 +64,4 @@ TEST_F(ConfigParseTest, ConfigWithInstanceClause) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
-}
+}  // namespace

@@ -76,4 +76,4 @@ TEST(SimA11103, EmptyStringAssignedToVector) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-}
+}  // namespace

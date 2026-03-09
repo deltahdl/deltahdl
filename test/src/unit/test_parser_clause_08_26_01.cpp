@@ -59,4 +59,4 @@ TEST(ParserClause08_03, InterfaceClassExtendsMultiple) {
   EXPECT_EQ(r.cu->classes[0]->base_class, "IBase1");
 }
 
-}
+}  // namespace

@@ -17,4 +17,4 @@ TEST(ElabA70501, FullskewWithFlagsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

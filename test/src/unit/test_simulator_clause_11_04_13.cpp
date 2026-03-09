@@ -191,4 +191,4 @@ TEST(EvalAdv, InsideDollarUpperBound) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-}
+}  // namespace

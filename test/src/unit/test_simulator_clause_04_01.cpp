@@ -263,4 +263,4 @@ TEST(SimCh41, MultiTimeSlotWithRegionOrdering) {
   EXPECT_EQ(order[3], "t5_nba");
 }
 
-}
+}  // namespace

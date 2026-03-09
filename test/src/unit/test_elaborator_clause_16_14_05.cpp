@@ -15,4 +15,4 @@ TEST(ElabA610, AssertPropertyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}
+}  // namespace

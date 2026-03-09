@@ -61,4 +61,4 @@ TEST(TimingCheckLimitExpression, TimingCheckLimitExpression) {
   EXPECT_NE(tc->limits[0], nullptr);
 }
 
-}
+}  // namespace

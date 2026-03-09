@@ -57,5 +57,6 @@ TEST_F(VpiClause3823Test, ScanNullIteratorReturnsNull) {
   EXPECT_EQ(vpi_scan(nullptr), nullptr);
 }
 
-}
-} delta
+}  // namespace
+}  // namespace delta
+delta

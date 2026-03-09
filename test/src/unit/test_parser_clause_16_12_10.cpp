@@ -32,4 +32,4 @@ TEST(ParserA210, PropertyExpr_SNexttimeWithCount) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

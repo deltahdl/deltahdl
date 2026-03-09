@@ -117,4 +117,4 @@ TEST(SimA11102, PaddedStringSelfCompare) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

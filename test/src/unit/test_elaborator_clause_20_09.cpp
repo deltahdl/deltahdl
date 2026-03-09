@@ -33,4 +33,4 @@ TEST(ConstEval, Onehot0) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$onehot0(8'b00010010)", f)), 0);
 }
 
-}
+}  // namespace

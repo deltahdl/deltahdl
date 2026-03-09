@@ -131,4 +131,4 @@ TEST_F(VerifyParseTest, CovergroupWithCross) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-}
+}  // namespace

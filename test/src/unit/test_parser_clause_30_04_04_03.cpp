@@ -20,4 +20,4 @@ TEST(ParserA702, StateDependentIfEdgeSensitive) {
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
 }
 
-}
+}  // namespace

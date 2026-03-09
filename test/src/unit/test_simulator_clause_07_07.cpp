@@ -68,4 +68,4 @@ TEST(ArrayArgPassing, CopySemantics) {
   EXPECT_EQ(orig->value.ToUint64(), 10u);
 }
 
-}
+}  // namespace

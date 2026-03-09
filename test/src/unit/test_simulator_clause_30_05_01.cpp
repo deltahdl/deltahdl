@@ -125,4 +125,4 @@ TEST(SimA704, RuntimePathDelaySingleDelay) {
   EXPECT_EQ(mgr.GetPathDelay("a", "b"), 10u);
 }
 
-}
+}  // namespace

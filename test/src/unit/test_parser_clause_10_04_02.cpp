@@ -697,4 +697,4 @@ TEST(ParserSection9b, NonblockingAssignMultiple) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
-}
+}  // namespace

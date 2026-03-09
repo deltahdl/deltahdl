@@ -80,4 +80,4 @@ TEST(ParserAnnexA0414, ElaborationCheckerInsideChecker) {
   EXPECT_NE(outer->children[0].resolved, nullptr);
 }
 
-}
+}  // namespace

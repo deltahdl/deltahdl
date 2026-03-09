@@ -61,4 +61,4 @@ TEST(ElabA823, SuperclassScopeAccessOk) {
              "endmodule\n"));
 }
 
-}
+}  // namespace

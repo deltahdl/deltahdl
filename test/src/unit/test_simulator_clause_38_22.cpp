@@ -40,5 +40,6 @@ TEST_F(VpiClause3822Test, HandleMultiBothNullReturnsNull) {
   EXPECT_EQ(h, nullptr);
 }
 
-}
-} delta
+}  // namespace
+}  // namespace delta
+delta

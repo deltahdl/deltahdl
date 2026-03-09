@@ -41,4 +41,4 @@ TEST(ParserA27, TaskPrototypeExternNoPorts) {
   EXPECT_TRUE(item->func_args.empty());
 }
 
-}
+}  // namespace

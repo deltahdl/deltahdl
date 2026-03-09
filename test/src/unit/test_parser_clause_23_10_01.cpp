@@ -26,4 +26,4 @@ TEST(ParserAnnexA, A9DefparamDecl) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

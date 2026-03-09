@@ -24,4 +24,4 @@ TEST(ParserSection1110_2, PaddedConcatCompareParses) {
               "endmodule\n"));
 }
 
-}
+}  // namespace

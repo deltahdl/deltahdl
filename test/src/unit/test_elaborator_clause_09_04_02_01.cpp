@@ -72,4 +72,4 @@ TEST(ElabClause09_04_02_01, SensitivityListPreservedInRtlir) {
   }
 }
 
-}
+}  // namespace

@@ -249,4 +249,4 @@ TEST(ParserAnnexF, AnnexFAssertActionBlocks) {
   EXPECT_TRUE(found);
 }
 
-}
+}  // namespace

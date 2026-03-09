@@ -158,4 +158,4 @@ TEST(ParserSection4, Sec4_5_ContinuousAssignWithDelay) {
   EXPECT_NE(ca->assign_rhs, nullptr);
 }
 
-}
+}  // namespace

@@ -85,4 +85,4 @@ TEST(ParserClause03, Cl3_14_1_ExactIntegerPassThrough) {
   EXPECT_EQ(RealDelayToTicks(3.0, ts, TimeUnit::kPs), 3000u);
 }
 
-}
+}  // namespace

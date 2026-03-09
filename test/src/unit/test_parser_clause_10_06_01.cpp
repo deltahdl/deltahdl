@@ -696,4 +696,4 @@ TEST(ParserSection10, Sec10_6_1_AssignToVector) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-}
+}  // namespace

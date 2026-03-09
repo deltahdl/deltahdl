@@ -37,4 +37,4 @@ TEST_F(ProtectedTest, ProtectedRegionWithEncoding) {
   EXPECT_NE(result.find("encrypted_data_here"), std::string::npos);
 }
 
-}
+}  // namespace

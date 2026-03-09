@@ -114,4 +114,4 @@ TEST(ParserSection6, ConstIntDecl) {
   EXPECT_TRUE(item->data_type.is_const);
 }
 
-}
+}  // namespace

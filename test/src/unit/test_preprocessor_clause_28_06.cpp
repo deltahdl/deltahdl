@@ -61,4 +61,4 @@ TEST(ParserA223, Delay3GateThreeValues) {
   EXPECT_EQ(item->gate_delay_decay->int_val, 30u);
 }
 
-}
+}  // namespace

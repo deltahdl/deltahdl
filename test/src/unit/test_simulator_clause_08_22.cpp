@@ -120,4 +120,4 @@ TEST(ClassSim, PolymorphicUnknownMethodReturnsNull) {
   EXPECT_EQ(obj->ResolveMethod("nonexistent"), nullptr);
 }
 
-}
+}  // namespace

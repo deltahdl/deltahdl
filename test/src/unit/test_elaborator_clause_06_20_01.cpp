@@ -19,4 +19,4 @@ TEST(ConstExprElab, NonConstantParamDefaultWarns) {
   EXPECT_FALSE(design->top_modules[0]->params[0].is_resolved);
 }
 
-}
+}  // namespace

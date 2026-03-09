@@ -101,4 +101,4 @@ TEST(LexerClause05, Cl5_9_MultipleStrings) {
   EXPECT_EQ(tokens[1].text, "\"def\"");
 }
 
-}
+}  // namespace

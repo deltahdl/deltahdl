@@ -32,4 +32,4 @@ TEST(SimCh10, BlockingAssignIfElse) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-}
+}  // namespace

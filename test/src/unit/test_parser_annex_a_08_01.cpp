@@ -115,4 +115,4 @@ TEST(ParserA81, StreamExpressionWithRange) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}
+}  // namespace

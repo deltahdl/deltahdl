@@ -33,4 +33,4 @@ TEST(StringMethods, PutcZeroByte) {
   EXPECT_EQ(VecToString(var->value), "abc");
 }
 
-}
+}  // namespace
