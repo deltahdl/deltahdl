@@ -138,7 +138,7 @@ TEST(DecimalLiteralConstants, DecimalZDigitElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause05, Cl5_7_1_SignedDecimalElaborates) {
+TEST(IntegerLiteralConstants, SignedDecimalElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
