@@ -1,3 +1,5 @@
+// §9.4.5
+
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -76,7 +78,6 @@ TEST(ElabClause09_04_05, RepeatEventNonblockingElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
 TEST(BlockingIntraAssignDelay, BlockingIntraAssignDelay) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -97,7 +98,7 @@ TEST(BlockingIntraAssignDelay, BlockingIntraAssignDelay) {
   EXPECT_EQ(a->value.ToUint64(), 42u);
 }
 
-TEST(BlockingIntraAssignDelay, BlockingIntraAssignDelayBlocksFlow) {
+TEST(BlockingIntraAssignDelay, DelayBlocksSubsequentStatements) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -213,3 +214,5 @@ TEST(NbaIntraAssignDelayCapturesRHS, NbaIntraAssignDelayCapturesRHS) {
 
   EXPECT_EQ(a->value.ToUint64(), 10u);
 }
+
+}  // namespace
