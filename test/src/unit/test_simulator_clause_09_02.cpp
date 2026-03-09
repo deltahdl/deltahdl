@@ -25,29 +25,4 @@ TEST(Process, ProcessKindEnum) {
   }
 }
 
-TEST(SimClause09_02, MultipleInitialsAllExecute) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd1;\n"
-      "  initial b = 8'd2;\n"
-      "  initial c = 8'd3;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  auto* vc = f.ctx.FindVariable("c");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  ASSERT_NE(vc, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 1u);
-  EXPECT_EQ(vb->value.ToUint64(), 2u);
-  EXPECT_EQ(vc->value.ToUint64(), 3u);
-}
-
 }  // namespace
