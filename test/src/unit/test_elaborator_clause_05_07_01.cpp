@@ -484,7 +484,7 @@ TEST(IntegerLiteralConstants, UnsizedHexXFillsAllBits) {
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
-TEST(SimClause05, Cl5_7_1_LeftPadWithZ) {
+TEST(UnsizedLiteralFill, HexZFillsAllBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
