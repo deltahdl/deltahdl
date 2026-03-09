@@ -255,15 +255,7 @@ TEST(StructAssignmentPatterns, NestedStructPattern) {
       "  rect_t r1;\n"
       "  initial r1 = '{'{0, 0}, '{10, 20}};\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
-  ASSERT_EQ(stmt->rhs->elements.size(), 2u);
-  EXPECT_EQ(stmt->rhs->elements[0]->kind, ExprKind::kAssignmentPattern);
-  EXPECT_EQ(stmt->rhs->elements[1]->kind, ExprKind::kAssignmentPattern);
+  VerifyNestedPatternElements(r, 2u);
 }
 
 TEST(ParserCh510, AssignmentPatternNamed) {

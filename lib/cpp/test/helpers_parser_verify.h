@@ -756,3 +756,17 @@ inline void VerifyPatternKeys(const Expr* rhs,
     EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
   }
 }
+
+template <typename T>
+inline void VerifyNestedPatternElements(T& r, size_t count) {
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
+  ASSERT_EQ(stmt->rhs->elements.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(stmt->rhs->elements[i]->kind, ExprKind::kAssignmentPattern);
+  }
+}
