@@ -1,13 +1,12 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/process.h"
 #include "simulator/variable.h"
 
 using namespace delta;
-
-SimCoroutine MakeTestCoroutine() { co_return; }
 
 namespace {
 
@@ -24,28 +23,6 @@ TEST(Process, ProcessKindEnum) {
   for (const auto& c : kCases) {
     EXPECT_EQ(static_cast<uint8_t>(c.kind), c.expected);
   }
-}
-
-TEST(SimClause09_02, AllProcedureTypesCoexist) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a, b, sum;\n"
-      "  initial begin\n"
-      "    a = 8'd10;\n"
-      "    b = 8'd20;\n"
-      "  end\n"
-      "  always_comb sum = a + b;\n"
-      "  final $display(\"done\");\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* sum = f.ctx.FindVariable("sum");
-  ASSERT_NE(sum, nullptr);
-  EXPECT_EQ(sum->value.ToUint64(), 30u);
 }
 
 TEST(SimClause09_02, MultipleInitialsAllExecute) {
@@ -73,4 +50,4 @@ TEST(SimClause09_02, MultipleInitialsAllExecute) {
   EXPECT_EQ(vc->value.ToUint64(), 3u);
 }
 
-}
+}  // namespace

@@ -96,3 +96,25 @@ TEST(ElabClause09_02, ProcessBodiesNotNull) {
 }
 
 }
+TEST(StructuredProcedures, AllProcedureTypesCoexist) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b, sum;\n"
+      "  initial begin\n"
+      "    a = 8'd10;\n"
+      "    b = 8'd20;\n"
+      "  end\n"
+      "  always_comb sum = a + b;\n"
+      "  final $display(\"done\");\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* sum = f.ctx.FindVariable("sum");
+  ASSERT_NE(sum, nullptr);
+  EXPECT_EQ(sum->value.ToUint64(), 30u);
+}
+
