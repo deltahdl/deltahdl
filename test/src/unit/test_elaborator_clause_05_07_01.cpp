@@ -280,7 +280,7 @@ TEST(OctalLiterals, UnderscoreSeparatorInValue) {
   EXPECT_EQ(var->value.ToUint64(), 07777u);
 }
 
-TEST(SimClause05, Cl5_7_1_HexValueUnderscores) {
+TEST(IntegerLiteralConstants, HexValueUnderscoreSeparator) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
