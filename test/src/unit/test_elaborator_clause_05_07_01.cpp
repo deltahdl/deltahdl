@@ -78,7 +78,7 @@ TEST(IntegerLiteralConstants, BinaryNumberElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause05, Cl5_7_1_OctalNumberElaborates) {
+TEST(IntegerLiteralConstants, OctalNumberElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
