@@ -43,9 +43,9 @@ def maybe_update_issue_status(
         args.organization, args.repo, args.issue,
     )
     for t in tests:
-        lookup_name = t.original_test_name or t.test_name
-        renamed = (t.original_test_name
-                   and t.original_test_name != t.test_name)
+        orig = getattr(t, "original_test_name", None)
+        lookup_name = orig or t.test_name
+        renamed = orig is not None and orig != t.test_name
         parts = []
         if source_is_target:
             parts.append("Kept in the same file")

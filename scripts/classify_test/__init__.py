@@ -61,7 +61,7 @@ from ._split import (
 # Data structures
 # ---------------------------------------------------------------------------
 @dataclass
-class TestBlock:  # pylint: disable=too-many-instance-attributes
+class TestBlock:
     """A single TEST/TEST_F/TEST_P block with classification metadata."""
 
     suite_name: str
@@ -71,7 +71,6 @@ class TestBlock:  # pylint: disable=too-many-instance-attributes
     prefix: str | None = None
     clause: str | None = None
     rationale: str | None = None
-    original_test_name: str | None = None
 
 
 @dataclass
@@ -525,7 +524,7 @@ def _validate_topic_response(response, test_name):
 
 def _rename_test_macro(test, new_suite, new_name):
     """Rename both args in a test block's TEST()/TEST_F()/TEST_P() line."""
-    if test.original_test_name is None:
+    if not hasattr(test, "original_test_name"):
         test.original_test_name = test.test_name
     test.lines[0] = re.sub(
         r'^(TEST(?:_[FP])?)\(' + re.escape(test.suite_name)
