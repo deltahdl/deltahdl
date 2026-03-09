@@ -297,7 +297,7 @@ TEST(IntegerLiteralConstants, HexValueUnderscoreSeparator) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
-TEST(SimClause05, Cl5_7_1_HexDigitsCaseInsensitive) {
+TEST(IntegerLiteralConstants, HexDigitsCaseInsensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
