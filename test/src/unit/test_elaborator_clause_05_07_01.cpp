@@ -439,7 +439,7 @@ TEST(UnbasedUnsizedLiterals, ZeroAndOnesFillAllBits) {
   EXPECT_EQ(vb->value.ToUint64(), 0xFFFFu);
 }
 
-TEST(SimClause05, Cl5_7_1_UnbasedUnsizedLiteralXZ) {
+TEST(UnbasedUnsizedLiterals, XAndZFillAllBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
