@@ -2,7 +2,14 @@
 
 from pathlib import Path
 
-from lib.python.test_utils import build_base_env, install_fake_script, invoke_module
+import pytest
+
+from lib.python.test_utils import (
+    build_base_env,
+    e2e_base_flags,
+    install_fake_script,
+    invoke_module,
+)
 
 _SCRIPTS_DIR = str(
     Path(__file__).resolve().parents[4] / "scripts",
@@ -96,11 +103,7 @@ def _all_flags(tmp_path):
     return [
         "--files", "a.cpp,b.cpp",
         "--issue", "1",
-        "--output-dir", str(tmp_path),
-        "--lrm", str(tmp_path / "lrm.txt"),
-        "--organization", "org",
-        "--repo", "repo",
-        "--max-lines", "500",
+        *e2e_base_flags(tmp_path),
     ]
 
 
@@ -109,21 +112,20 @@ def _all_flags_sub_issues(tmp_path):
     return [
         "--sub-issues", "1,2",
         "--issue", "1",
-        "--output-dir", str(tmp_path),
-        "--lrm", str(tmp_path / "lrm.txt"),
-        "--organization", "org",
-        "--repo", "repo",
-        "--max-lines", "500",
+        *e2e_base_flags(tmp_path),
     ]
+
+
+def _fresh_env(tmp_path, exit_code=0):
+    """Install fakes and return a subprocess env."""
+    return _base_env(tmp_path, _install_fakes(tmp_path, exit_code=exit_code))
 
 
 def _run_batch(tmp_path, exit_code=0):
     """Install fake classify_file and invoke classify_files."""
-    fake = _install_fakes(tmp_path, exit_code=exit_code)
-    env = _base_env(tmp_path, fake)
     return _invoke(
         *_all_flags(tmp_path),
-        cwd=str(tmp_path), env=env,
+        cwd=str(tmp_path), env=_fresh_env(tmp_path, exit_code),
     )
 
 
@@ -132,32 +134,24 @@ def _run_batch(tmp_path, exit_code=0):
 
 def test_no_args_prints_usage(tmp_path):
     """Running with no arguments prints usage to stderr."""
-    fake = _install_fakes(tmp_path)
-    env = _base_env(tmp_path, fake)
-    assert "usage:" in _invoke(cwd=str(tmp_path), env=env).stderr
+    assert "usage:" in _invoke(
+        cwd=str(tmp_path), env=_fresh_env(tmp_path),
+    ).stderr
 
 
 def test_usage_shows_classify_files(tmp_path):
     """Usage line shows classify_files as program name."""
-    fake = _install_fakes(tmp_path)
-    env = _base_env(tmp_path, fake)
     assert "classify_files" in _invoke(
-        cwd=str(tmp_path), env=env,
+        cwd=str(tmp_path), env=_fresh_env(tmp_path),
     ).stderr
 
 
 def test_missing_files_flag_reported(tmp_path):
     """Omitting --files reports the missing argument."""
-    fake = _install_fakes(tmp_path)
-    env = _base_env(tmp_path, fake)
     assert "--files" in _invoke(
         "--issue", "1",
-        "--output-dir", str(tmp_path),
-        "--lrm", "lrm.txt",
-        "--organization", "org",
-        "--repo", "repo",
-        "--max-lines", "500",
-        cwd=str(tmp_path), env=env,
+        *e2e_base_flags(tmp_path),
+        cwd=str(tmp_path), env=_fresh_env(tmp_path),
     ).stderr
 
 
@@ -204,41 +198,26 @@ def test_sub_issues_batch_exits_zero(tmp_path):
     assert result.returncode == 0
 
 
-def test_dry_run_exits_zero(tmp_path):
-    """--dry-run flag accepted and exits 0."""
-    fake = _install_fakes(tmp_path)
-    env = _base_env(tmp_path, fake)
+@pytest.mark.parametrize("extra", [
+    ["--dry-run"],
+    ["--no-commit"],
+], ids=["dry-run", "no-commit"])
+def test_optional_flag_accepted(tmp_path, extra):
+    """Optional flags are accepted and exit 0."""
     result = _invoke(
-        *_all_flags(tmp_path), "--dry-run",
-        cwd=str(tmp_path), env=env,
-    )
-    assert result.returncode == 0
-
-
-def test_no_commit_exits_zero(tmp_path):
-    """--no-commit flag accepted and exits 0."""
-    fake = _install_fakes(tmp_path)
-    env = _base_env(tmp_path, fake)
-    result = _invoke(
-        *_all_flags(tmp_path), "--no-commit",
-        cwd=str(tmp_path), env=env,
+        *_all_flags(tmp_path), *extra,
+        cwd=str(tmp_path), env=_fresh_env(tmp_path),
     )
     assert result.returncode == 0
 
 
 def test_both_flags_rejects(tmp_path):
     """--files and --sub-issues together are rejected."""
-    fake = _install_fakes(tmp_path)
-    env = _base_env(tmp_path, fake)
     result = _invoke(
         "--files", "a.cpp",
         "--sub-issues", "1",
         "--issue", "1",
-        "--output-dir", str(tmp_path),
-        "--lrm", "lrm.txt",
-        "--organization", "org",
-        "--repo", "repo",
-        "--max-lines", "500",
-        cwd=str(tmp_path), env=env,
+        *e2e_base_flags(tmp_path),
+        cwd=str(tmp_path), env=_fresh_env(tmp_path),
     )
     assert result.returncode != 0

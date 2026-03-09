@@ -4,6 +4,7 @@ from pathlib import Path
 
 from lib.python.test_utils import (
     build_base_env,
+    e2e_base_flags,
     install_fake_gh,
     install_fake_package,
     invoke_module,
@@ -90,12 +91,8 @@ def _all_flags(tmp_path):
     """Return the full set of required CLI flags."""
     return [
         "--file", str(tmp_path / "test_input.cpp"),
-        "--output-dir", str(tmp_path),
-        "--lrm", str(tmp_path / "lrm.txt"),
         "--issue", "1",
-        "--organization", "org",
-        "--repo", "repo",
-        "--max-lines", "500",
+        *e2e_base_flags(tmp_path),
     ]
 
 
@@ -103,12 +100,8 @@ def _all_flags_create(tmp_path):
     """Return CLI flags with --create-issue instead of --issue."""
     return [
         "--file", str(tmp_path / "test_input.cpp"),
-        "--output-dir", str(tmp_path),
-        "--lrm", str(tmp_path / "lrm.txt"),
         "--create-issue",
-        "--organization", "org",
-        "--repo", "repo",
-        "--max-lines", "500",
+        *e2e_base_flags(tmp_path),
     ]
 
 

@@ -1,11 +1,11 @@
 """Integration tests for the classify_tests pipeline."""
 
 import subprocess
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
+from lib.python.test_fixtures import make_classify_args
 from lib.python.test_fixtures.subprocess_stubs import (
     stub_subprocess_failure,
     stub_subprocess_success,
@@ -17,20 +17,9 @@ from lib.python.test_fixtures.subprocess_stubs import (
 
 def _pipeline_args(**overrides):
     """Build args for _run."""
-    defaults = {
-        "file": "/path/to/test.cpp",
-        "tests": "A,B,C",
-        "output_dir": "/out",
-        "lrm": "/lrm.txt",
-        "issue": None,
-        "organization": "testorg",
-        "repo": "testrepo",
-        "dry_run": False,
-        "no_commit": False,
-        "max_lines": 1000,
-    }
+    defaults = {"tests": "A,B,C", "issue": None}
     defaults.update(overrides)
-    return SimpleNamespace(**defaults)
+    return make_classify_args(**defaults)
 
 
 # ---- Batch processing ------------------------------------------------------

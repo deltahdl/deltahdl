@@ -96,6 +96,17 @@ def install_fake_package(tmp_path, name, exit_code=0):
     return str(fake_scripts)
 
 
+def e2e_base_flags(tmp_path):
+    """Return the shared CLI flags common to all classify e2e tests."""
+    return [
+        "--output-dir", str(tmp_path),
+        "--lrm", str(tmp_path / "lrm.txt"),
+        "--organization", "org",
+        "--repo", "repo",
+        "--max-lines", "500",
+    ]
+
+
 def invoke_module(module_name, *args, cwd=None, env=None):
     """Run *module_name* in a child process via ``python -m``."""
     run_env = (env or os.environ).copy()
