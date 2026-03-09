@@ -263,7 +263,7 @@ TEST(DecimalLiterals, XDigitSetsAllBitsUnknown) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-TEST(SimClause05, Cl5_7_1_OctalValueUnderscores) {
+TEST(OctalLiterals, UnderscoreSeparatorInValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
