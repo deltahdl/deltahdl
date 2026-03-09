@@ -520,7 +520,7 @@ TEST(IntegerLiteralConstants, SignedDesignatorSameBitPattern) {
   EXPECT_EQ(va->value.words[0].aval & 0xF, 0xFu);
 }
 
-TEST(SimClause05, Cl5_7_1_XZCaseInsensitive) {
+TEST(IntegerLiteralConstants, XZCaseInsensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
