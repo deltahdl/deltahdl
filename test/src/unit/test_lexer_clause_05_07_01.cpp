@@ -193,3 +193,13 @@ TEST(LexerClause05, Cl5_7_1_LargeUnsizedHex) {
 }
 
 }
+TEST(IntegerLiteralConstants, WhitespaceBetweenSizeAndBase) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 5 'd 3;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 3u);
+}
+
