@@ -320,7 +320,7 @@ TEST(IntegerLiteralConstants, HexDigitsCaseInsensitive) {
   EXPECT_EQ(va->value.ToUint64(), 0xABCDu);
 }
 
-TEST(SimClause05, Cl5_7_1_UnderscoreInNumber) {
+TEST(IntegerLiteralConstants, UnderscoreSeparator) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
