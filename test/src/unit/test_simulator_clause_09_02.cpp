@@ -1,4 +1,3 @@
-// Non-LRM tests
 
 #include <gtest/gtest.h>
 

@@ -74,8 +74,6 @@ TEST(LexerClause05, Cl5_9_UnterminatedTripleQuotedError) {
   EXPECT_TRUE(errors);
 }
 
-// --- §5.9: triple-quoted escaped newline (line continuation) ---
-
 TEST(LexerClause05, Cl5_9_TripleQuotedLineContinuation) {
   std::string src = "\"\"\"AB\\\nCD\"\"\"";
   auto tokens = Lex(src);

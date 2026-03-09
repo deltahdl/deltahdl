@@ -1,4 +1,3 @@
-// Non-LRM tests
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"

@@ -1,4 +1,3 @@
-// Non-LRM tests
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"

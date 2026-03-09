@@ -1,4 +1,3 @@
-// §10.9.1
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"

@@ -1,4 +1,3 @@
-// §11.5.3
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"

@@ -1,4 +1,3 @@
-// Non-LRM tests
 
 #include "fixture_simulator.h"
 #include "helpers_assoc.h"
