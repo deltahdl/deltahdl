@@ -4,14 +4,6 @@
 
 using namespace delta;
 
-static void VerifyPatternKeys(const Expr* rhs,
-                              const std::string expected_keys[], size_t count) {
-  ASSERT_EQ(rhs->pattern_keys.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
-  }
-}
-
 namespace {
 
 TEST(ParserSection7, Sec7_2_2_ArrayOfStructsPattern) {
