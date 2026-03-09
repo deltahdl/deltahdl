@@ -516,7 +516,7 @@ def test_run_live_merge_writes_test(tmp_path, monkeypatch, ct, ct_helpers):
     )
     args = _setup_live_run(ct, ct_helpers, tmp_path, monkeypatch)
     _run(args)
-    assert "TEST(S, T)" in \
+    assert "TEST(Parsing, T)" in \
         (tmp_path / "test_parser_clause_06_01.cpp").read_text()
 
 

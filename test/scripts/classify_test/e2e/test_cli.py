@@ -104,7 +104,8 @@ def _run_dry(tmp_path):
     _bootstrap_repo(tmp_path)
     _write_test_file(tmp_path, "TEST(S, DryT) {\n  auto r = Parse(src);\n}")
     lrm = _create_ref_files(tmp_path)
-    resp = {"clause": "6.1", "rationale": "r"}
+    resp = {"clause": "6.1", "rationale": "r",
+            "suite_name": "S", "test_name": "DryT"}
     env = _env_with_fakes(tmp_path, resp)
     return _invoke(
         "--file", str(tmp_path / "test_input.cpp"),
@@ -126,7 +127,8 @@ def _setup_pipeline(tmp_path):
         "TEST(S, Alpha) {\n  auto r = Parse(src);\n}",
     )
     lrm = _create_ref_files(tmp_path)
-    resp = {"clause": "6.1", "rationale": "r"}
+    resp = {"clause": "6.1", "rationale": "r",
+            "suite_name": "S", "test_name": "Alpha"}
     return _env_with_fakes(tmp_path, resp), lrm
 
 
@@ -301,7 +303,8 @@ def _setup_named_ns_pipeline(tmp_path):
         encoding="utf-8",
     )
     lrm = _create_ref_files(tmp_path)
-    resp = {"clause": "6.1", "rationale": "r"}
+    resp = {"clause": "6.1", "rationale": "r",
+            "suite_name": "S", "test_name": "Alpha"}
     return _env_with_fakes(tmp_path, resp), lrm
 
 

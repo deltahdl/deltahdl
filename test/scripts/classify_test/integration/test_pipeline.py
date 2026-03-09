@@ -24,8 +24,10 @@ def _make_classifier(*triples):
     def classifier(prompt, _schema=None):
         for name, clause in lookup.items():
             if name in prompt:
-                return {"clause": clause, "rationale": "r"}
-        return {"clause": "non-lrm", "rationale": "fallback"}
+                return {"clause": clause, "rationale": "r",
+                        "suite_name": "S", "test_name": name}
+        return {"clause": "non-lrm", "rationale": "fallback",
+                "suite_name": "S", "test_name": "Unknown"}
 
     return classifier
 
@@ -34,8 +36,10 @@ def _make_classifier_with_topic(_name, clause, topic):
     """Build per-test classifier that returns clause then topic."""
     def classifier(_prompt, schema=None):
         if schema and "non_lrm_topic" in schema:
-            return {"non_lrm_topic": topic, "rationale": "r"}
-        return {"clause": clause, "rationale": "r"}
+            return {"non_lrm_topic": topic, "rationale": "r",
+                    "suite_name": "S", "test_name": _name}
+        return {"clause": clause, "rationale": "r",
+                "suite_name": "S", "test_name": _name}
 
     return classifier
 
@@ -187,7 +191,7 @@ def test_merge_preserves_old_test(ct, tmp_path, monkeypatch):
 def test_dedup_reports_duplicate(ct, tmp_path, monkeypatch, capsys):
     """Tests already in the target file are reported as removed."""
     (tmp_path / "test_parser_clause_06_01.cpp").write_text(
-        "TEST(S, Dup) {\n}\n", encoding="utf-8",
+        "TEST(S, Dup) {\n  auto r = Parse(src);\n}\n", encoding="utf-8",
     )
     _write_input(tmp_path, "TEST(S, Dup) {\n  auto r = Parse(src);\n}\n\n")
     _stub_externals(ct, monkeypatch, tmp_path, _make_classifier(
@@ -355,7 +359,7 @@ def test_named_ns_creates_output(ct, tmp_path, monkeypatch):
 def test_named_ns_output_contains_test(ct, tmp_path, monkeypatch):
     """Output file contains the test from inside the named namespace."""
     d = _do_named_ns(ct, tmp_path, monkeypatch)
-    assert "TEST(NonLrmVpi, DefaultCtx)" in (
+    assert "TEST(S, DefaultCtx)" in (
         d / "test_non_lrm_vpi.cpp"
     ).read_text()
 
@@ -369,8 +373,10 @@ def _make_classifier_with_prefix(name, clause, stage):
         if "pipeline stage" in prompt.lower():
             return {"pipeline_stage": stage, "rationale": "r"}
         if name in prompt:
-            return {"clause": clause, "rationale": "r"}
-        return {"clause": "non-lrm", "rationale": "fallback"}
+            return {"clause": clause, "rationale": "r",
+                    "suite_name": "S", "test_name": name}
+        return {"clause": "non-lrm", "rationale": "fallback",
+                "suite_name": "S", "test_name": "Unknown"}
 
     return classifier
 
