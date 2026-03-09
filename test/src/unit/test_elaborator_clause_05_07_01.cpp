@@ -503,7 +503,7 @@ TEST(UnsizedLiteralFill, HexZFillsAllBits) {
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
-TEST(SimClause05, Cl5_7_1_SignedDesignatorBitPattern) {
+TEST(IntegerLiteralConstants, SignedDesignatorSameBitPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
