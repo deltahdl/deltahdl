@@ -192,6 +192,16 @@ TEST(LexerClause05, Cl5_7_1_LargeUnsizedHex) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
+TEST(IntegerLiteralConstants, SizedHexLiteralValue) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 20'h837FF;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0x837FFu);
+}
+
 }  // namespace
 TEST(IntegerLiteralConstants, WhitespaceBetweenSizeAndBase) {
   auto result = RunAndGet(

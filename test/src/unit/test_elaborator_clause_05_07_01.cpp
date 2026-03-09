@@ -1,4 +1,4 @@
-
+// Non-LRM tests
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -635,16 +635,6 @@ TEST(SignedLiterals, SignedHexLiteralIsSigned) {
   EXPECT_TRUE(result.is_signed);
   EXPECT_EQ(result.width, 8u);
   EXPECT_EQ(result.ToUint64(), 0xFFu);
-}
-
-TEST(IntegerLiteralConstants, SizedHexLiteralValue) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 20'h837FF;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 0x837FFu);
 }
 
 TEST(IntegerLiteralConstants, LeftPadWithZeros) {
