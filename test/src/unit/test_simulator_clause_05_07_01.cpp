@@ -1,3 +1,5 @@
+// Non-LRM tests
+
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
 #include "helpers_scheduler.h"
@@ -5,6 +7,15 @@
 #include "simulator/variable.h"
 
 using namespace delta;
+
+static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
+                              uint64_t val) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->text = text;
+  e->int_val = val;
+  return e;
+}
 
 namespace {
 
@@ -616,25 +627,6 @@ TEST(SimCh50701, SignedBasedLiteral) {
   EXPECT_EQ(result & mask, mask);
 }
 
-}  // namespace
-static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
-                              uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->text = text;
-  e->int_val = val;
-  return e;
-}
-
-TEST(IntegerLiteralConstants, SignedBaseLiteralIsSigned) {
-  SimFixture f;
-  auto* lit = MakeSizedLiteral(f.arena, "4'sd3", 3);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_signed);
-  EXPECT_EQ(result.width, 4u);
-  EXPECT_EQ(result.ToUint64(), 3u);
-}
-
 TEST(IntegerLiteralConstants, UnsignedBaseLiteralNotSigned) {
   SimFixture f;
   auto* lit = MakeSizedLiteral(f.arena, "4'd3", 3);
@@ -672,3 +664,5 @@ TEST(IntegerLiteralConstants, SizeConstantNonzero) {
       "x");
   EXPECT_EQ(result, 1u);
 }
+
+}  // namespace
