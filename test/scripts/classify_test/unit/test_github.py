@@ -394,21 +394,7 @@ def test_maybe_update_same_name_no_rename_remark(
     monkeypatch, ct_github, ct_helpers,
 ):
     """No rename remark when original_test_name equals test_name."""
-    _tb = ct_helpers.make_test_block
-    updated = []
-    monkeypatch.setattr(
-        ct_github, "fetch_issue_body",
-        lambda org, repo, issue: "| T | Unreviewed | |\n",
-    )
-    monkeypatch.setattr(
-        ct_github, "update_issue_body",
-        lambda org, repo, issue, body: updated.append(body),
-    )
-    t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = "r"
-    t.original_test_name = "T"
-    args = _issue_args(issue=42, organization="org", repo="repo")
-    ct_github.maybe_update_issue_status(
-        args, [t], source_is_target=True,
+    updated = _setup_maybe_update(
+        monkeypatch, ct_github, ct_helpers, source_is_target=True,
     )
     assert "renamed" not in updated[0]
