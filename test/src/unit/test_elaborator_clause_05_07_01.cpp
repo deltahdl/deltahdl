@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §5.7.1
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -658,7 +658,7 @@ TEST(IntegerLiteralConstants, SizedHexLiteralValue) {
   EXPECT_EQ(result, 0x837FFu);
 }
 
-TEST(SimClause05, Cl5_7_1_LeftPadWithZeros) {
+TEST(IntegerLiteralConstants, LeftPadWithZeros) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
