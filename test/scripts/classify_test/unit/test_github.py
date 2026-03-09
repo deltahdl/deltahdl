@@ -258,6 +258,16 @@ def _setup_maybe_update(
     return updated
 
 
+def test_maybe_update_skips_when_no_issue(ct_github):
+    """Skips update entirely when args.issue is None."""
+    args = _issue_args(issue=None, organization=None, repo=None)
+    # Should return without calling fetch_issue_body or update_issue_body.
+    # If it tried, it would fail because those functions are not stubbed.
+    ct_github.maybe_update_issue_status(
+        args, [], source_is_target=False,
+    )
+
+
 def test_maybe_update_kept(monkeypatch, ct_github, ct_helpers):
     """Sets status to 'Reviewed' and action to 'Kept in the same file'."""
     updated = _setup_maybe_update(
