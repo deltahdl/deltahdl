@@ -72,7 +72,10 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarAlwaysKind) {
 static ModuleItem* NthAlwaysItem(ParseResult& r, size_t n) {
   size_t count = 0;
   for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock) {
+    if (item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
       if (count == n) return item;
       ++count;
     }

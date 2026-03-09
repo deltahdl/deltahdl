@@ -230,7 +230,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryInAlwaysComb) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysCombItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(item->body->rhs, nullptr);

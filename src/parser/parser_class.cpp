@@ -339,7 +339,6 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
                                  "duplicate 'virtual' qualifier"))
       continue;
     if (Match(TokenKind::kKwPure)) {
-      m->is_virtual = true;
       m->is_pure_virtual = true;
       proto = true;
       continue;

@@ -82,7 +82,7 @@ TEST(Preprocessor, LineDirective_AffectsFileMacro) {
 TEST(Preprocessor, Include_ChangesFileAndLine) {
   std::string tmp_dir = "/tmp/deltahdl_test_22_13";
   std::string inc_path = tmp_dir + "/inc.svh";
-  system(("mkdir -p " + tmp_dir).c_str());
+  (void)system(("mkdir -p " + tmp_dir).c_str());
   {
     std::ofstream ofs(inc_path);
     ofs << "`__FILE__\n`__LINE__\n";
@@ -106,7 +106,7 @@ TEST(Preprocessor, Include_ChangesFileAndLine) {
 TEST(Preprocessor, Include_RevertsAfterInclude) {
   std::string tmp_dir = "/tmp/deltahdl_test_22_13_revert";
   std::string inc_path = tmp_dir + "/empty.svh";
-  system(("mkdir -p " + tmp_dir).c_str());
+  (void)system(("mkdir -p " + tmp_dir).c_str());
   {
     std::ofstream ofs(inc_path);
     ofs << "// included\n";
@@ -132,7 +132,7 @@ TEST(Preprocessor, Include_RevertsAfterInclude) {
 TEST(Preprocessor, Include_LineIncrementsAfter) {
   std::string tmp_dir = "/tmp/deltahdl_test_22_13_inc";
   std::string inc_path = tmp_dir + "/stub.svh";
-  system(("mkdir -p " + tmp_dir).c_str());
+  (void)system(("mkdir -p " + tmp_dir).c_str());
   {
     std::ofstream ofs(inc_path);
     ofs << "// stub\n";

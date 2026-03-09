@@ -21,7 +21,7 @@ TEST(ParserClause03, Cl3_3_Mux2to1LrmExample) {
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 4u);
   EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
   EXPECT_EQ(r.cu->modules[0]->ports[3].name, "y");
-  auto* blk = FindItemByKind(r, ModuleItemKind::kAlwaysBlock);
+  auto* blk = FindItemByKind(r, ModuleItemKind::kAlwaysCombBlock);
   ASSERT_NE(blk, nullptr);
   EXPECT_EQ(blk->always_kind, AlwaysKind::kAlwaysComb);
 }

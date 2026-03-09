@@ -58,7 +58,7 @@ TEST(ParserSection9, Sec9_2_2_ImplicitSensitivity) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysComb(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
 
   EXPECT_TRUE(item->sensitivity.empty());
   ASSERT_NE(item->body, nullptr);

@@ -50,7 +50,7 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFF) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
   ASSERT_EQ(item->sensitivity.size(), 2u);
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
@@ -184,7 +184,7 @@ TEST(ParserSection9, Sec9_4_2_4_IffGuardAlwaysFFSingleEdge) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
+  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysFFBlock);
   ASSERT_EQ(item->sensitivity.size(), 1u);
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);

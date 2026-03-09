@@ -214,7 +214,7 @@ TEST(ParserA602, Integration_AlwaysCombWithOperatorAssign) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysCombBlock);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
   ASSERT_NE(item->body, nullptr);
