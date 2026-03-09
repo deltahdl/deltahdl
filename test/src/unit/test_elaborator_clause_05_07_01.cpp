@@ -465,7 +465,7 @@ TEST(UnbasedUnsizedLiterals, XAndZFillAllBits) {
   EXPECT_EQ(vb->value.words[0].bval & mask, mask);
 }
 
-TEST(SimClause05, Cl5_7_1_LeftPadWithX) {
+TEST(IntegerLiteralConstants, UnsizedHexXFillsAllBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
