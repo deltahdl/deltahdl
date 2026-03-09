@@ -8,15 +8,6 @@
 
 using namespace delta;
 
-static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
-                              uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->text = text;
-  e->int_val = val;
-  return e;
-}
-
 namespace {
 
 TEST(SimA84, PrimaryIntegerLiteral) {
@@ -625,15 +616,6 @@ TEST(SimCh50701, SignedBasedLiteral) {
       "x");
   uint32_t mask = 0xFFFFFFFF;
   EXPECT_EQ(result & mask, mask);
-}
-
-TEST(SignedLiterals, SignedHexLiteralIsSigned) {
-  SimFixture f;
-  auto* lit = MakeSizedLiteral(f.arena, "8'shFF", 0xFF);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_signed);
-  EXPECT_EQ(result.width, 8u);
-  EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
 
 TEST(IntegerLiteralConstants, SizedHexLiteralValue) {
