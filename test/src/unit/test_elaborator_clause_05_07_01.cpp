@@ -1,4 +1,4 @@
-// §5.7.1
+// Non-LRM tests
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -621,7 +621,7 @@ TEST(DecimalLiteralConstants, SingleDigitXFillsAllBits) {
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
-TEST(SimClause05, Cl5_7_1_SignedBaseLiteralIsSigned) {
+TEST(IntegerLiteralConstants, SignedBaseLiteralIsSigned) {
   SimFixture f;
   auto* lit = MakeSizedLiteral(f.arena, "4'sd3", 3);
   auto result = EvalExpr(lit, f.ctx, f.arena);

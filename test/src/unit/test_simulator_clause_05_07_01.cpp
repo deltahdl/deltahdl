@@ -617,3 +617,21 @@ TEST(SimCh50701, SignedBasedLiteral) {
 }
 
 }
+static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
+                              uint64_t val) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->text = text;
+  e->int_val = val;
+  return e;
+}
+
+TEST(IntegerLiteralConstants, SignedBaseLiteralIsSigned) {
+  SimFixture f;
+  auto* lit = MakeSizedLiteral(f.arena, "4'sd3", 3);
+  auto result = EvalExpr(lit, f.ctx, f.arena);
+  EXPECT_TRUE(result.is_signed);
+  EXPECT_EQ(result.width, 4u);
+  EXPECT_EQ(result.ToUint64(), 3u);
+}
+
