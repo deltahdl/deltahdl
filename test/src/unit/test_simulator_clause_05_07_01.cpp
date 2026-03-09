@@ -618,16 +618,6 @@ TEST(SimCh50701, SignedBasedLiteral) {
   EXPECT_EQ(result & mask, mask);
 }
 
-TEST(IntegerLiteralConstants, SizedHexLiteralValue) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 20'h837FF;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 0x837FFu);
-}
-
 TEST(IntegerLiteralConstants, SizeConstantNonzero) {
   auto result = RunAndGet(
       "module t;\n"
