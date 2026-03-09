@@ -1,4 +1,6 @@
 #include "fixture_elaborator.h"
+#include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -90,17 +92,5 @@ TEST(InitialProcedures, MultipleInitialsAllExecute) {
       "  initial c = 8'd3;\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  auto* vc = f.ctx.FindVariable("c");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  ASSERT_NE(vc, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 1u);
-  EXPECT_EQ(vb->value.ToUint64(), 2u);
-  EXPECT_EQ(vc->value.ToUint64(), 3u);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
 }
