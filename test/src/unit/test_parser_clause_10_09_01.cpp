@@ -247,3 +247,26 @@ TEST(AssignmentPatternReplication, BlockVarDecl_FullStructReplication) {
               "endmodule\n"));
 }
 
+static void VerifyPatternKeys(const Expr* rhs,
+                              const std::string expected_keys[], size_t count) {
+  ASSERT_EQ(rhs->pattern_keys.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
+  }
+}
+
+TEST(AssignmentPatternDefault, AssignmentPatternDefault) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = '{default: 0};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
+  std::string expected_keys[] = {"default"};
+  VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
+}
+
