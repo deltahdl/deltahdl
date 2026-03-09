@@ -416,7 +416,7 @@ TEST(IntegerLiteralConstants, QuestionMarkAsZDigit) {
   LowerRunAndCompareBitPatterns(f, design, 0xF);
 }
 
-TEST(SimClause05, Cl5_7_1_UnbasedUnsizedLiteral01) {
+TEST(UnbasedUnsizedLiterals, ZeroAndOnesFillAllBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
