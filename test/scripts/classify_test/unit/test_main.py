@@ -826,17 +826,17 @@ def test_run_rename_in_place_removes_old_name(tmp_path, monkeypatch, ct,
     assert "TEST(S, T)" not in src
 
 
-def test_run_rename_in_place_commits(tmp_path, monkeypatch, ct, ct_helpers):
+def test_run_rename_in_place_commits(tmp_path, monkeypatch, ct):
     """Rename-in-place calls commit_classification."""
     monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
     monkeypatch.setattr(
         ct, "maybe_update_issue_status",
-        lambda args, tests, **kw: None,
+        lambda _args, _tests, **_kw: None,
     )
     committed = []
     monkeypatch.setattr(
         ct, "commit_classification",
-        lambda ctx: committed.append(ctx),
+        committed.append,
     )
     _run_live_non_lrm(ct, tmp_path, monkeypatch,
                       src_body="#include <gtest/gtest.h>\n\n"

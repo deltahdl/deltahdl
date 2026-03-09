@@ -32,6 +32,7 @@ from ._github import (
     maybe_update_issue_status,
     update_issue_body,
 )
+from ._generate import _filter_preamble, _preamble_name, generate_file
 from ._git import commit_classification
 from ._patterns import (
     CLAUSE_PROMPT_TEMPLATE, CLAUSE_SCHEMA, PREFIX_PATTERNS,
@@ -634,97 +635,8 @@ def find_merge_target(target_base, test_dir, exclude_path=None):
 
 
 # ---------------------------------------------------------------------------
-# Stage 5: Generate files
+# Stage 5: Generate files (in _generate.py, imported at top of module)
 # ---------------------------------------------------------------------------
-
-
-def _preamble_name(item):
-    """Extract the identifier (struct/class/enum/function name) from a item."""
-    for line in item.lines:
-        stripped = line.strip()
-        if stripped.startswith("//"):
-            continue
-        m = re.match(
-            r"(?:struct|class|enum)\s+(\w+)\s*\{", stripped,
-        )
-        if m:
-            return m.group(1)
-        m = re.match(
-            r"(?:[\w*&:]+\s+)*(\w+)\s*\(", stripped,
-        )
-        if m:
-            return m.group(1)
-        return None
-    return None
-
-
-def _filter_preamble(items, tests):
-    """Return only preamble items referenced (directly or transitively)."""
-    names = {}
-    for item in items:
-        name = _preamble_name(item)
-        if name:
-            names[name] = item
-    text_pool = "\n".join(
-        line for t in tests for line in t.lines
-    )
-    kept = set()
-    for name, item in names.items():
-        if re.search(r'\b' + re.escape(name) + r'\b', text_pool):
-            kept.add(id(item))
-    changed = True
-    while changed:
-        changed = False
-        for name, item in names.items():
-            if id(item) in kept:
-                continue
-            for _, other in names.items():
-                if id(other) in kept and re.search(
-                    r'\b' + re.escape(name) + r'\b',
-                    "\n".join(other.lines),
-                ):
-                    kept.add(id(item))
-                    changed = True
-                    break
-    return [
-        item for item in items
-        if _preamble_name(item) is None or id(item) in kept
-    ]
-
-
-def generate_file(clause, title, parsed, tests):
-    """Generate the content of a split test file."""
-    out = []
-    if clause == "non-lrm":
-        out.append("// Non-LRM tests")
-    elif re.match(r"^[A-Z]\.", clause):
-        hdr = f"// Annex {clause}: {title}" if title else f"// Annex {clause}"
-        out.append(hdr)
-    else:
-        hdr = f"// §{clause}: {title}" if title else f"// §{clause}"
-        out.append(hdr)
-    out.append("")
-    for inc in parsed.includes:
-        out.append(inc)
-    out.append("")
-    if parsed.using_line:
-        out.append(parsed.using_line)
-        out.append("")
-    all_preamble = _filter_preamble(
-        parsed.global_preamble + parsed.section_preamble, tests,
-    )
-    for item in all_preamble:
-        for line in item.lines:
-            cleaned = strip_lrm_quotes(line)
-            if cleaned or cleaned == "":  # pragma: no branch
-                out.append(cleaned)
-        out.append("")
-    out.append("namespace {")
-    out.append("")
-    out.extend(_render_tests(tests))
-    out.append("}  // namespace")
-    out.append("")
-    return "\n".join(out)
 
 
 # ---------------------------------------------------------------------------
@@ -919,6 +831,33 @@ def _update_source(filepath, parsed, ctx):
     return 0
 
 
+def _apply_rename_in_place(args, filepath, parsed, target):
+    """Rewrite the source file when a test is renamed but stays in place.
+
+    Returns True if a rename was applied (caller should return),
+    False if there was nothing to rename (caller should return too).
+    """
+    has_renames = any(
+        getattr(t, "original_test_name", None) is not None
+        and t.original_test_name != t.test_name
+        for t in target
+    )
+    if not has_renames:
+        return False
+    content = generate_file(
+        target[0].clause, "", parsed, parsed.all_tests,
+    )
+    filepath.write_text(content, encoding="utf-8")
+    if not getattr(args, "no_commit", False):
+        commit_classification({
+            "filepath": filepath, "target": target,
+            "to_merge": [], "new_names": [],
+            "test_dir": Path(args.output_dir).resolve(),
+            "cmake_path": CMAKE_PATH,
+        })
+    return True
+
+
 def _run(args):
     """Execute the split operation."""
     _validate_issue_args(args)
@@ -957,25 +896,8 @@ def _run(args):
                   f" number of lines to more than {args.max_lines} lines")
     if args.dry_run:
         return
-    has_renames = any(
-        getattr(t, "original_test_name", None) is not None
-        and t.original_test_name != t.test_name
-        for t in target
-    )
     if not to_create and not to_merge and source_is_target and n_removed == 0:
-        if not has_renames:
-            return
-        content = generate_file(
-            target[0].clause, "", parsed, parsed.all_tests,
-        )
-        filepath.write_text(content, encoding="utf-8")
-        if not getattr(args, "no_commit", False):
-            commit_classification({
-                "filepath": filepath, "target": target,
-                "to_merge": [], "new_names": [],
-                "test_dir": Path(args.output_dir).resolve(),
-                "cmake_path": CMAKE_PATH,
-            })
+        _apply_rename_in_place(args, filepath, parsed, target)
         return
     new_names = _write_files(to_create, to_merge, parsed, {
         "test_dir": Path(args.output_dir).resolve(),
