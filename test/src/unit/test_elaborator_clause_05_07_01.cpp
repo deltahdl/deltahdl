@@ -603,7 +603,7 @@ TEST(IntegerLiteralConstants, LeftPadKnownHexWithXDigit) {
   EXPECT_EQ(var->value.words[0].bval & 0xF00, 0x000u);
 }
 
-TEST(SimClause05, Cl5_7_1_DecimalSingleDigitX) {
+TEST(DecimalLiteralConstants, SingleDigitXFillsAllBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
