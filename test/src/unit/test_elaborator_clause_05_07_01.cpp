@@ -55,7 +55,7 @@ TEST(IntegerLiteralConstants, UnsizedDecimalAssignElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause05, Cl5_7_1_DecimalUnsizedElaborates) {
+TEST(IntegerLiteralConstants, UnsizedDecimalElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
