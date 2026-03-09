@@ -644,3 +644,12 @@ TEST(IntegerLiteralConstants, UnsignedBaseLiteralNotSigned) {
   EXPECT_EQ(result.ToUint64(), 3u);
 }
 
+TEST(SignedLiterals, SignedHexLiteralIsSigned) {
+  SimFixture f;
+  auto* lit = MakeSizedLiteral(f.arena, "8'shFF", 0xFF);
+  auto result = EvalExpr(lit, f.ctx, f.arena);
+  EXPECT_TRUE(result.is_signed);
+  EXPECT_EQ(result.width, 8u);
+  EXPECT_EQ(result.ToUint64(), 0xFFu);
+}
+
