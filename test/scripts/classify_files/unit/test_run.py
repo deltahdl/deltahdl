@@ -1,7 +1,6 @@
 """Unit tests for the classify_files module."""
 
 import sys
-from types import SimpleNamespace
 
 import pytest
 
@@ -13,7 +12,11 @@ from classify_files.test_helpers import (
     stub_subprocess_success,
     stub_remove_file_checkbox,
 )
-from lib.python.test_fixtures import capture_help_output
+from lib.python.test_fixtures import (
+    CLASSIFY_BASE_ARGV,
+    capture_help_output,
+    make_classify_args,
+)
 from lib.python.test_fixtures.subprocess_stubs import spy_subprocess_run
 
 _parse_args = getattr(classify_files, "_parse_args")
@@ -32,41 +35,26 @@ _BASE_ARGV = [
     "prog",
     "--files", "a.cpp,b.cpp",
     "--issue", "61",
-    "--output-dir", "/out",
-    "--lrm", "/lrm.txt",
-    "--organization", "testorg",
-    "--repo", "testrepo",
-    "--max-lines", "1000",
+    *CLASSIFY_BASE_ARGV,
 ]
 
 _SUB_ISSUES_ARGV = [
     "prog",
     "--sub-issues", "76,77",
     "--issue", "61",
-    "--output-dir", "/out",
-    "--lrm", "/lrm.txt",
-    "--organization", "testorg",
-    "--repo", "testrepo",
-    "--max-lines", "1000",
+    *CLASSIFY_BASE_ARGV,
 ]
 
 
 def _make_args(**overrides):
-    """Build a SimpleNamespace with all required args."""
+    """Build args with classify_files-specific defaults."""
     defaults = {
         "files": "a.cpp,b.cpp",
         "sub_issues": None,
         "issue": 61,
-        "output_dir": "/out",
-        "lrm": "/lrm.txt",
-        "organization": "testorg",
-        "repo": "testrepo",
-        "max_lines": 1000,
-        "dry_run": False,
-        "no_commit": False,
     }
     defaults.update(overrides)
-    return SimpleNamespace(**defaults)
+    return make_classify_args(**defaults)
 
 
 # ---- _parse_args -----------------------------------------------------------
@@ -456,11 +444,7 @@ def test_parse_args_files_and_sub_issues_rejects(monkeypatch):
         "--files", "a.cpp",
         "--sub-issues", "76",
         "--issue", "61",
-        "--output-dir", "/out",
-        "--lrm", "/lrm.txt",
-        "--organization", "testorg",
-        "--repo", "testrepo",
-        "--max-lines", "1000",
+        *CLASSIFY_BASE_ARGV,
     ])
     with pytest.raises(SystemExit):
         _parse_args()
@@ -471,11 +455,7 @@ def test_parse_args_neither_rejects(monkeypatch):
     monkeypatch.setattr(sys, "argv", [
         "prog",
         "--issue", "61",
-        "--output-dir", "/out",
-        "--lrm", "/lrm.txt",
-        "--organization", "testorg",
-        "--repo", "testrepo",
-        "--max-lines", "1000",
+        *CLASSIFY_BASE_ARGV,
     ])
     with pytest.raises(SystemExit):
         _parse_args()

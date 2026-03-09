@@ -2,11 +2,16 @@
 
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
-from lib.python.test_fixtures import capture_help_output
+from lib.python.test_fixtures import (
+    CLASSIFY_BASE_ARGV,
+    argv_without_flag,
+    assert_main_enables_line_buffering,
+    capture_help_output,
+    make_classify_args,
+)
 from lib.python.test_fixtures.subprocess_stubs import spy_subprocess_run
 
 
@@ -15,31 +20,16 @@ from lib.python.test_fixtures.subprocess_stubs import spy_subprocess_run
 
 _BASE_ARGV = [
     "prog", "--file", "f.cpp",
-    "--output-dir", "/out",
-    "--lrm", "/lrm.txt",
     "--issue", "99",
-    "--organization", "testorg",
-    "--repo", "testrepo",
-    "--max-lines", "1000",
+    *CLASSIFY_BASE_ARGV,
 ]
 
 
 def _make_args(**overrides):
-    """Build a SimpleNamespace with all required args."""
-    defaults = {
-        "file": "/path/to/test.cpp",
-        "output_dir": "/out",
-        "lrm": "/lrm.txt",
-        "issue": 99,
-        "create_issue": False,
-        "organization": "testorg",
-        "repo": "testrepo",
-        "dry_run": False,
-        "no_commit": False,
-        "max_lines": 1000,
-    }
+    """Build args with classify_file-specific defaults."""
+    defaults = {"issue": 99, "create_issue": False}
     defaults.update(overrides)
-    return SimpleNamespace(**defaults)
+    return make_classify_args(**defaults)
 
 
 def _make_run_args(tmp_path, **overrides):
@@ -50,14 +40,9 @@ def _make_run_args(tmp_path, **overrides):
         "lrm": str(tmp_path / "lrm.txt"),
         "issue": 99,
         "create_issue": False,
-        "organization": "testorg",
-        "repo": "testrepo",
-        "dry_run": False,
-        "no_commit": False,
-        "max_lines": 1000,
     }
     defaults.update(overrides)
-    return SimpleNamespace(**defaults)
+    return make_classify_args(**defaults)
 
 
 # ---- _parse_args -----------------------------------------------------------
@@ -189,16 +174,10 @@ def test_parse_args_max_lines(monkeypatch, cf):
     assert getattr(cf, "_parse_args")().max_lines == 500
 
 
-def _argv_without_flag(base, flag):
-    """Return *base* with *flag* and its value removed."""
-    return [v for i, v in enumerate(base)
-            if flag not in (base[max(0, i - 1)], v)]
-
-
 def test_parse_args_max_lines_required(monkeypatch, cf):
     """Rejects missing --max-lines flag."""
     monkeypatch.setattr(
-        sys, "argv", _argv_without_flag(_BASE_ARGV, "--max-lines"),
+        sys, "argv", argv_without_flag(_BASE_ARGV, "--max-lines"),
     )
     with pytest.raises(SystemExit):
         getattr(cf, "_parse_args")()
@@ -747,18 +726,7 @@ def test_main_calls_run(monkeypatch, cf):
 
 def test_main_enables_line_buffering(monkeypatch, cf):
     """Reconfigures stdout to line-buffered mode."""
-    configured = []
-    original = sys.stdout.reconfigure
-
-    def mock_reconfigure(**kwargs):
-        configured.append(kwargs)
-        return original(**kwargs)
-
-    monkeypatch.setattr(sys.stdout, "reconfigure", mock_reconfigure)
-    monkeypatch.setattr(cf, "_run", lambda _: None)
-    monkeypatch.setattr(cf, "_parse_args", _make_args)
-    cf.main()
-    assert any(k.get("line_buffering") for k in configured)
+    assert_main_enables_line_buffering(monkeypatch, cf, _make_args)
 
 
 # ---- sync_issue_rows -------------------------------------------------------

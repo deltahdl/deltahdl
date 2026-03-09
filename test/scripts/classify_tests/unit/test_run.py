@@ -1,12 +1,22 @@
 """Unit tests for classify_tests."""
 
+import subprocess
 import sys
 from types import SimpleNamespace
 
 import pytest
 
-from lib.python.test_fixtures import capture_help_output
-from lib.python.test_fixtures.subprocess_stubs import spy_subprocess_run
+from lib.python.test_fixtures import (
+    CLASSIFY_BASE_ARGV,
+    argv_without_flag,
+    assert_main_enables_line_buffering,
+    capture_help_output,
+    make_classify_args,
+)
+from lib.python.test_fixtures.subprocess_stubs import (
+    stub_subprocess_failure,
+    stub_subprocess_success,
+)
 
 
 # ---- Shared helpers --------------------------------------------------------
@@ -15,59 +25,15 @@ from lib.python.test_fixtures.subprocess_stubs import spy_subprocess_run
 _BASE_ARGV = [
     "prog", "--file", "f.cpp",
     "--tests", "A,B",
-    "--output-dir", "/out",
-    "--lrm", "/lrm.txt",
-    "--organization", "testorg",
-    "--repo", "testrepo",
-    "--max-lines", "1000",
+    *CLASSIFY_BASE_ARGV,
 ]
 
 
 def _make_args(**overrides):
-    """Build a SimpleNamespace with all required args."""
-    defaults = {
-        "file": "/path/to/test.cpp",
-        "tests": "A,B,C",
-        "issue": None,
-        "output_dir": "/out",
-        "lrm": "/lrm.txt",
-        "organization": "testorg",
-        "repo": "testrepo",
-        "dry_run": False,
-        "no_commit": False,
-        "max_lines": 1000,
-    }
+    """Build args with classify_tests-specific defaults."""
+    defaults = {"tests": "A,B,C", "issue": None}
     defaults.update(overrides)
-    return SimpleNamespace(**defaults)
-
-
-def _stub_subprocess_success(monkeypatch):
-    """Stub subprocess.run to always succeed. Returns captured commands."""
-    import subprocess
-    captured = []
-
-    def fake_run(cmd, **kwargs):
-        captured.append(cmd)
-        return SimpleNamespace(returncode=0)
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    return captured
-
-
-def _stub_subprocess_failure(monkeypatch):
-    """Stub subprocess.run to always fail."""
-    import subprocess
-
-    def fake_run(cmd, **kwargs):
-        return SimpleNamespace(returncode=1)
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-
-
-def _argv_without_flag(base, flag):
-    """Return *base* with *flag* and its value removed."""
-    return [v for i, v in enumerate(base)
-            if flag not in (base[max(0, i - 1)], v)]
+    return make_classify_args(**defaults)
 
 
 # ---- _parse_args -----------------------------------------------------------
@@ -109,7 +75,7 @@ def test_parse_args_prog_name(monkeypatch, cts, capsys):
 def test_parse_args_file_required(monkeypatch, cts):
     """Rejects missing --file flag."""
     monkeypatch.setattr(
-        sys, "argv", _argv_without_flag(_BASE_ARGV, "--file"),
+        sys, "argv", argv_without_flag(_BASE_ARGV, "--file"),
     )
     with pytest.raises(SystemExit):
         getattr(cts, "_parse_args")()
@@ -118,7 +84,7 @@ def test_parse_args_file_required(monkeypatch, cts):
 def test_parse_args_tests_required(monkeypatch, cts):
     """Rejects missing --tests flag."""
     monkeypatch.setattr(
-        sys, "argv", _argv_without_flag(_BASE_ARGV, "--tests"),
+        sys, "argv", argv_without_flag(_BASE_ARGV, "--tests"),
     )
     with pytest.raises(SystemExit):
         getattr(cts, "_parse_args")()
@@ -216,19 +182,19 @@ def test_build_command_no_commit_omitted(cts):
 
 def test_run_classify_test_returns_true_on_success(monkeypatch, cts):
     """Returns True when subprocess exits with 0."""
-    _stub_subprocess_success(monkeypatch)
+    stub_subprocess_success(monkeypatch)
     assert cts.run_classify_test(_make_args(), "T", 1, 1) is True
 
 
 def test_run_classify_test_returns_false_on_failure(monkeypatch, cts):
     """Returns False when subprocess exits with non-zero."""
-    _stub_subprocess_failure(monkeypatch)
+    stub_subprocess_failure(monkeypatch)
     assert cts.run_classify_test(_make_args(), "T", 1, 1) is False
 
 
 def test_run_classify_test_prints_progress(monkeypatch, cts, capsys):
     """Prints progress line with index and name."""
-    _stub_subprocess_success(monkeypatch)
+    stub_subprocess_success(monkeypatch)
     cts.run_classify_test(_make_args(), "Alpha", 3, 10)
     assert "Processing test 3/10: Alpha\n" in capsys.readouterr().out
 
@@ -238,28 +204,27 @@ def test_run_classify_test_prints_progress(monkeypatch, cts, capsys):
 
 def test_run_loops_all_tests(monkeypatch, cts):
     """Invokes classify_test once per comma-separated name."""
-    captured = _stub_subprocess_success(monkeypatch)
+    captured = stub_subprocess_success(monkeypatch)
     getattr(cts, "_run")(_make_args(tests="A,B,C"))
     assert len(captured) == 3
 
 
 def test_run_exits_on_failure(monkeypatch, cts):
     """Exits when a test fails."""
-    _stub_subprocess_failure(monkeypatch)
+    stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
         getattr(cts, "_run")(_make_args(tests="A,B"))
 
 
 def test_run_stops_after_failure(monkeypatch, cts):
     """Does not invoke further tests after failure."""
-    import subprocess
     captured = []
 
-    def fake_run(cmd, **kwargs):
+    def failing_run(cmd, **_kw):
         captured.append(cmd)
         return SimpleNamespace(returncode=1)
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(subprocess, "run", failing_run)
     try:
         getattr(cts, "_run")(_make_args(tests="A,B,C"))
     except SystemExit:
@@ -281,15 +246,4 @@ def test_main_calls_run(monkeypatch, cts):
 
 def test_main_enables_line_buffering(monkeypatch, cts):
     """Reconfigures stdout to line-buffered mode."""
-    configured = []
-    original = sys.stdout.reconfigure
-
-    def mock_reconfigure(**kwargs):
-        configured.append(kwargs)
-        return original(**kwargs)
-
-    monkeypatch.setattr(sys.stdout, "reconfigure", mock_reconfigure)
-    monkeypatch.setattr(cts, "_run", lambda _: None)
-    monkeypatch.setattr(cts, "_parse_args", _make_args)
-    cts.main()
-    assert any(k.get("line_buffering") for k in configured)
+    assert_main_enables_line_buffering(monkeypatch, cts, _make_args)
