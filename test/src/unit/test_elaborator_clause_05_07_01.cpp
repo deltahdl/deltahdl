@@ -630,7 +630,7 @@ TEST(IntegerLiteralConstants, SignedBaseLiteralIsSigned) {
   EXPECT_EQ(result.ToUint64(), 3u);
 }
 
-TEST(SimClause05, Cl5_7_1_UnsignedBaseLiteralNotSigned) {
+TEST(IntegerLiteralConstants, UnsignedBaseLiteralNotSigned) {
   SimFixture f;
   auto* lit = MakeSizedLiteral(f.arena, "4'd3", 3);
   auto result = EvalExpr(lit, f.ctx, f.arena);
