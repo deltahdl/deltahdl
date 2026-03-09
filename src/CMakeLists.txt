@@ -19,6 +19,7 @@ add_library(deltahdl_lib STATIC
     parser/parser_toplevel.cpp
     parser/expr_parser.cpp
     parser/expr_parser_aux.cpp
+    parser/expr_parser_patterns.cpp
     parser/parser_stmt.cpp
     parser/parser_assert.cpp
     parser/parser_clocking.cpp
@@ -34,6 +35,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_gates.cpp
     elaborator/elaborator_validate.cpp
     elaborator/elaborator_validate_classes.cpp
+    elaborator/elaborator_validate_operations.cpp
     elaborator/elaborator_validate_types.cpp
     elaborator/type_eval.cpp
     elaborator/const_eval.cpp
