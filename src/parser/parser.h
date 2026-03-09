@@ -87,8 +87,7 @@ class Parser {
                                   ClassMember* member, bool proto);
   bool ParseClassQualifiers(ClassMember* member);
   bool TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
-                                bool ClassMember::*flag,
-                                const char* dup_msg);
+                                bool ClassMember::* flag, const char* dup_msg);
   bool TryConsumeAccessQualifier(ClassMember* m);
   bool TryConsumeRandQualifier(ClassMember* m);
   void ValidateClassMethod(ClassMember* member);

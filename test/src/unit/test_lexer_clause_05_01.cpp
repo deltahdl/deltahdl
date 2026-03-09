@@ -1,6 +1,6 @@
-#include <set>
-
 #include <gtest/gtest.h>
+
+#include <set>
 
 #include "fixture_lexer.h"
 

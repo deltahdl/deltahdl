@@ -56,7 +56,8 @@ TEST(QueueRef, BasicRefWriteback) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(f, "set_val", {{Direction::kRef, false, false, {}, "v", nullptr, {}}},
+  RegAutoFunc(f, "set_val",
+              {{Direction::kRef, false, false, {}, "v", nullptr, {}}},
               {MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
 
   auto* call = MakeCall(f.arena, "set_val", {MakeSelect(f.arena, "q", 1)});
@@ -69,7 +70,8 @@ TEST(QueueRef, SurvivesPushFront) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(f, "test_fn", {{Direction::kRef, false, false, {}, "v", nullptr, {}}},
+  RegAutoFunc(f, "test_fn",
+              {{Direction::kRef, false, false, {}, "v", nullptr, {}}},
               {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_front",
                                                     {MakeInt(f.arena, 5)})),
                MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});

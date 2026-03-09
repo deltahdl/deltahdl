@@ -12,7 +12,8 @@ TEST(QueueRef, OutdatedByDelete) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(f, "test_fn", {{Direction::kRef, false, false, {}, "v", nullptr, {}}},
+  RegAutoFunc(f, "test_fn",
+              {{Direction::kRef, false, false, {}, "v", nullptr, {}}},
               {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "delete",
                                                     {MakeInt(f.arena, 1)})),
                MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});
@@ -46,7 +47,8 @@ TEST(QueueRef, SurvivesPushBack) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
 
-  RegAutoFunc(f, "test_fn", {{Direction::kRef, false, false, {}, "v", nullptr, {}}},
+  RegAutoFunc(f, "test_fn",
+              {{Direction::kRef, false, false, {}, "v", nullptr, {}}},
               {MakeExprStmt(f.arena, MakeMethodCall(f.arena, "q", "push_back",
                                                     {MakeInt(f.arena, 40)})),
                MakeAssign(f.arena, "v", MakeInt(f.arena, 99))});

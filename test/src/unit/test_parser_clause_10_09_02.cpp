@@ -308,7 +308,7 @@ TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
               "endmodule"));
 }
 
-}
+}  // namespace
 TEST(PositionalStructAssignmentPattern, Cl5_10_PositionalStructLiteral) {
   auto r = Parse(
       "module m;\n"

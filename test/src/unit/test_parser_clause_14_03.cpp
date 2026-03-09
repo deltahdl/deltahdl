@@ -511,7 +511,7 @@ TEST(ParserSection14, OverviewMinimalClockingBlock) {
   EXPECT_EQ(item->clocking_signals[0].name, "addr");
 }
 
-}
+}  // namespace
 TEST(ClockingBlockDeclaration, ClockingDeclBasic) {
   auto r = Parse(
       "module m;\n"

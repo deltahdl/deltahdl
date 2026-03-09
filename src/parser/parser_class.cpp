@@ -268,7 +268,7 @@ ClassDecl* Parser::ParseClassDecl() {
 // --- Class member qualifier parsing ---
 
 bool Parser::TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
-                                      bool ClassMember::*flag,
+                                      bool ClassMember::* flag,
                                       const char* dup_msg) {
   if (!Check(kw)) return false;
   if (m->*flag) diag_.Error(CurrentLoc(), dup_msg);
@@ -305,8 +305,7 @@ bool Parser::TryConsumeRandQualifier(ClassMember* m) {
   // §8.3 fn 10: only one of rand or randc
   if (Check(TokenKind::kKwRand)) {
     if (m->is_randc)
-      diag_.Error(CurrentLoc(),
-                  "cannot combine 'rand' and 'randc' qualifiers");
+      diag_.Error(CurrentLoc(), "cannot combine 'rand' and 'randc' qualifiers");
     if (m->is_rand) diag_.Error(CurrentLoc(), "duplicate 'rand' qualifier");
     m->is_rand = true;
     Consume();
@@ -314,8 +313,7 @@ bool Parser::TryConsumeRandQualifier(ClassMember* m) {
   }
   if (Check(TokenKind::kKwRandc)) {
     if (m->is_rand)
-      diag_.Error(CurrentLoc(),
-                  "cannot combine 'rand' and 'randc' qualifiers");
+      diag_.Error(CurrentLoc(), "cannot combine 'rand' and 'randc' qualifiers");
     if (m->is_randc) diag_.Error(CurrentLoc(), "duplicate 'randc' qualifier");
     m->is_randc = true;
     Consume();
