@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §10.9.2
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -256,7 +256,7 @@ TEST(ParserSection7, Sec7_2_2_AssignInInitialBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserSection7, Sec7_2_2_NestedStructPattern) {
+TEST(StructAssignmentPatterns, NestedStructPattern) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int x; int y; } point_t;\n"
