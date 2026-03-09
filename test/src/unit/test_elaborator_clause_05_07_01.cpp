@@ -648,7 +648,7 @@ TEST(SignedLiterals, SignedHexLiteralIsSigned) {
   EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
 
-TEST(SimClause05, Cl5_7_1_SizedHexLiteral) {
+TEST(IntegerLiteralConstants, SizedHexLiteralValue) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
