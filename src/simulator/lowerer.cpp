@@ -452,22 +452,26 @@ void Lowerer::RegisterEnumTypes(const RtlirModule* mod) {
   }
 }
 
+// §8.22: Add or update a single vtable entry for a virtual method.
+static void AddOrUpdateVTableEntry(ClassTypeInfo* info,
+                                   const ClassMember* member) {
+  int idx = info->FindVTableIndex(member->method->name);
+  auto* method_ptr = member->is_pure_virtual ? nullptr : member->method;
+  if (idx >= 0) {
+    info->vtable[static_cast<size_t>(idx)].method = method_ptr;
+    info->vtable[static_cast<size_t>(idx)].owner = info;
+  } else {
+    info->vtable.push_back({member->method->name, method_ptr, info});
+  }
+}
+
 // §8.22: Build vtable for polymorphic dispatch from class members.
 static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
   if (info->parent) info->vtable = info->parent->vtable;
   for (auto* member : cls->members) {
     if (member->kind != ClassMemberKind::kMethod || !member->method) continue;
     if (!member->is_virtual) continue;
-    int idx = info->FindVTableIndex(member->method->name);
-    if (idx >= 0) {
-      info->vtable[static_cast<size_t>(idx)].method =
-          member->is_pure_virtual ? nullptr : member->method;
-      info->vtable[static_cast<size_t>(idx)].owner = info;
-    } else {
-      info->vtable.push_back(
-          {member->method->name,
-           member->is_pure_virtual ? nullptr : member->method, info});
-    }
+    AddOrUpdateVTableEntry(info, member);
   }
 }
 
@@ -521,10 +525,9 @@ void Lowerer::LowerProcesses(const std::vector<RtlirProcess>& procs) {
   }
 }
 
-void Lowerer::LowerModule(const RtlirModule* mod) {
-  // Create variables for resolved parameters (§6.20).
+// §6.20: Create variables for resolved parameters.
+void Lowerer::LowerParams(const RtlirModule* mod) {
   for (const auto& p : mod->params) {
-    // §6.20.7: track unbounded parameters for $isunbounded().
     if (p.is_unbounded) {
       ctx_.RegisterUnboundedParam(p.name);
       ctx_.CreateVariable(p.name, 32);
@@ -535,32 +538,10 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
     var->value =
         MakeLogic4VecVal(arena_, 32, static_cast<uint64_t>(p.resolved_value));
   }
-  // Create Net objects for all declared nets (with resolution support).
-  for (const auto& net : mod->nets) {
-    ctx_.CreateNet(net.name, net.net_type, net.width, net.charge_strength,
-                   net.decay_ticks);
-  }
-  // §6.24.2: Register enum types before variables so $cast can look them up.
-  RegisterEnumTypes(mod);
-  for (const auto& var : mod->variables) LowerVar(var);
-  // Create variables for output ports.
-  for (const auto& port : mod->ports) {
-    if (!ctx_.FindVariable(port.name)) {
-      ctx_.CreateVariable(port.name, port.width);
-    }
-  }
+}
 
-  // Register function declarations.
-  for (auto* func : mod->function_decls) {
-    ctx_.RegisterFunction(func->name, func);
-  }
-
-  // §8: Register class type declarations.
-  for (auto* cls : mod->class_decls) {
-    LowerClassDecl(cls);
-  }
-
-  // §10.11: Lower net aliases — map aliased names to the same variable.
+// §10.11: Lower net aliases.
+void Lowerer::LowerAliases(const RtlirModule* mod) {
   for (const auto& alias : mod->aliases) {
     if (alias.nets.size() < 2) continue;
     std::string_view primary;
@@ -573,12 +554,29 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
       }
     }
   }
+}
 
-  // §9.4.2: Always blocks first so they register sensitivity before
-  // initial blocks trigger events.
+void Lowerer::LowerModule(const RtlirModule* mod) {
+  LowerParams(mod);
+  for (const auto& net : mod->nets) {
+    ctx_.CreateNet(net.name, net.net_type, net.width, net.charge_strength,
+                   net.decay_ticks);
+  }
+  RegisterEnumTypes(mod);
+  for (const auto& var : mod->variables) LowerVar(var);
+  for (const auto& port : mod->ports) {
+    if (!ctx_.FindVariable(port.name)) {
+      ctx_.CreateVariable(port.name, port.width);
+    }
+  }
+  for (auto* func : mod->function_decls) {
+    ctx_.RegisterFunction(func->name, func);
+  }
+  for (auto* cls : mod->class_decls) {
+    LowerClassDecl(cls);
+  }
+  LowerAliases(mod);
   LowerProcesses(mod->processes);
-
-  // Lower continuous assignments.
   for (const auto& ca : mod->assigns) {
     LowerContAssign(ca);
   }

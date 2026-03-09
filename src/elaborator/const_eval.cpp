@@ -380,6 +380,23 @@ static bool IsConstantSysFunc(std::string_view name) {
   return kConstSysFuncs.count(name) > 0;
 }
 
+// Check that all elements in a vector are constant expressions.
+static bool AllElementsConstant(const std::vector<Expr*>& elems,
+                                const ScopeMap& scope) {
+  for (auto* elem : elems) {
+    if (!IsConstantExpr(elem, scope)) return false;
+  }
+  return true;
+}
+
+// Check that a system call with constant arguments is a constant expression.
+static bool IsConstantSysCallExpr(const Expr* expr, const ScopeMap& scope) {
+  if (!IsConstantSysFunc(expr->callee)) return false;
+  // §20.6: $bits is constant even with non-constant type arguments.
+  if (expr->callee == "$bits") return true;
+  return AllElementsConstant(expr->args, scope);
+}
+
 bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return false;
 
@@ -402,24 +419,12 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
              IsConstantExpr(expr->true_expr, scope) &&
              IsConstantExpr(expr->false_expr, scope);
     case ExprKind::kConcatenation:
-      for (auto* elem : expr->elements) {
-        if (!IsConstantExpr(elem, scope)) return false;
-      }
-      return true;
+      return AllElementsConstant(expr->elements, scope);
     case ExprKind::kReplicate:
-      if (!IsConstantExpr(expr->repeat_count, scope)) return false;
-      for (auto* elem : expr->elements) {
-        if (!IsConstantExpr(elem, scope)) return false;
-      }
-      return true;
+      return IsConstantExpr(expr->repeat_count, scope) &&
+             AllElementsConstant(expr->elements, scope);
     case ExprKind::kSystemCall:
-      if (!IsConstantSysFunc(expr->callee)) return false;
-      // §20.6: $bits is constant even with non-constant type arguments.
-      if (expr->callee == "$bits") return true;
-      for (auto* arg : expr->args) {
-        if (!IsConstantExpr(arg, scope)) return false;
-      }
-      return true;
+      return IsConstantSysCallExpr(expr, scope);
     case ExprKind::kCast:
       return IsConstantExpr(expr->lhs, scope);
     default:

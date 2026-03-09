@@ -128,4 +128,9 @@ std::string FormatArg(const Logic4Vec& val, char spec);
 std::string FormatValueAsString(const Logic4Vec& val);
 std::string ExtractFormatString(const Expr* first_arg);
 
+// §5.7/§5.9: Literal evaluation (evaluation_literal.cpp).
+Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena);
+Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena);
+Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena);
+
 }  // namespace delta

@@ -13,49 +13,74 @@
 
 namespace delta {
 
+using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
+
+static bool IsCompoundAssignOp(TokenKind op) {
+  switch (op) {
+    case TokenKind::kPlusEq:
+    case TokenKind::kMinusEq:
+    case TokenKind::kStarEq:
+    case TokenKind::kSlashEq:
+    case TokenKind::kPercentEq:
+    case TokenKind::kAmpEq:
+    case TokenKind::kPipeEq:
+    case TokenKind::kCaretEq:
+    case TokenKind::kLtLtEq:
+    case TokenKind::kGtGtEq:
+    case TokenKind::kLtLtLtEq:
+    case TokenKind::kGtGtGtEq:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §7.6: Check a single continuous assignment for array compatibility.
+void Elaborator::ValidateOneArrayAssignment(const ModuleItem* item) {
+  if (!item->assign_lhs || !item->assign_rhs) return;
+  if (item->assign_lhs->kind != ExprKind::kIdentifier) return;
+  if (item->assign_rhs->kind != ExprKind::kIdentifier) return;
+  auto lhs_it = var_array_info_.find(item->assign_lhs->text);
+  auto rhs_it = var_array_info_.find(item->assign_rhs->text);
+  if (lhs_it == var_array_info_.end() || rhs_it == var_array_info_.end())
+    return;
+  const auto& lhs = lhs_it->second;
+  const auto& rhs = rhs_it->second;
+  // §7.9.9
+  if (lhs.is_assoc != rhs.is_assoc) {
+    diag_.Error(item->loc,
+                "associative array cannot be assigned to or from a "
+                "non-associative array");
+    return;
+  }
+  if (lhs.is_assoc && rhs.is_assoc &&
+      lhs.assoc_index_type != rhs.assoc_index_type) {
+    diag_.Error(item->loc,
+                "associative array index type mismatch in assignment");
+    return;
+  }
+  if (lhs.elem_type != rhs.elem_type) {
+    diag_.Error(item->loc,
+                std::format("array element type mismatch in assignment "
+                            "('{}' vs '{}')",
+                            item->assign_lhs->text, item->assign_rhs->text));
+    return;
+  }
+  if (lhs.unpacked_size > 0 && !lhs.is_dynamic && rhs.unpacked_size > 0 &&
+      !rhs.is_dynamic && lhs.unpacked_size != rhs.unpacked_size) {
+    diag_.Error(item->loc,
+                std::format("array size mismatch: '{}' has {} elements but "
+                            "'{}' has {}",
+                            item->assign_lhs->text, lhs.unpacked_size,
+                            item->assign_rhs->text, rhs.unpacked_size));
+  }
+}
+
 // §7.6: Validate array assignment compatibility in continuous assignments.
 void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kContAssign) continue;
-    if (!item->assign_lhs || !item->assign_rhs) continue;
-    if (item->assign_lhs->kind != ExprKind::kIdentifier) continue;
-    if (item->assign_rhs->kind != ExprKind::kIdentifier) continue;
-    auto lhs_it = var_array_info_.find(item->assign_lhs->text);
-    auto rhs_it = var_array_info_.find(item->assign_rhs->text);
-    if (lhs_it == var_array_info_.end() || rhs_it == var_array_info_.end())
-      continue;
-    const auto& lhs = lhs_it->second;
-    const auto& rhs = rhs_it->second;
-    // §7.9.9: Associative arrays can only be assigned to/from matching assoc.
-    if (lhs.is_assoc != rhs.is_assoc) {
-      diag_.Error(item->loc,
-                  "associative array cannot be assigned to or from a "
-                  "non-associative array");
-      continue;
-    }
-    if (lhs.is_assoc && rhs.is_assoc &&
-        lhs.assoc_index_type != rhs.assoc_index_type) {
-      diag_.Error(item->loc,
-                  "associative array index type mismatch in assignment");
-      continue;
-    }
-    // Element types must be equivalent.
-    if (lhs.elem_type != rhs.elem_type) {
-      diag_.Error(item->loc,
-                  std::format("array element type mismatch in assignment "
-                              "('{}' vs '{}')",
-                              item->assign_lhs->text, item->assign_rhs->text));
-      continue;
-    }
-    // Fixed-size target: source must have the same number of elements.
-    if (lhs.unpacked_size > 0 && !lhs.is_dynamic && rhs.unpacked_size > 0 &&
-        !rhs.is_dynamic && lhs.unpacked_size != rhs.unpacked_size) {
-      diag_.Error(item->loc,
-                  std::format("array size mismatch: '{}' has {} elements but "
-                              "'{}' has {}",
-                              item->assign_lhs->text, lhs.unpacked_size,
-                              item->assign_rhs->text, rhs.unpacked_size));
-    }
+    ValidateOneArrayAssignment(item);
   }
 }
 
@@ -214,56 +239,59 @@ static bool StmtRefsThisOrSuper(const Stmt* s) {
   return false;
 }
 
-void Elaborator::ValidateStaticMethodBodies(const ModuleDecl* decl) {
-  auto check_class = [&](const ClassDecl* cls) {
-    for (const auto* m : cls->members) {
-      if (m->kind != ClassMemberKind::kMethod || !m->is_static) continue;
-      if (!m->method) continue;
-      for (const auto* s : m->method->func_body_stmts) {
-        if (StmtRefsThisOrSuper(s)) {
-          diag_.Error(m->method->loc,
-                      "'this' and 'super' shall not be used in "
-                      "a static method");
-          break;
-        }
+// §8.10: Check a single class for static methods referencing this/super.
+void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kMethod || !m->is_static) continue;
+    if (!m->method) continue;
+    for (const auto* s : m->method->func_body_stmts) {
+      if (StmtRefsThisOrSuper(s)) {
+        diag_.Error(m->method->loc,
+                    "'this' and 'super' shall not be used in "
+                    "a static method");
+        break;
       }
     }
-  };
-  // Check CU-level classes.
-  for (const auto* cls : unit_->classes) {
-    check_class(cls);
   }
-  // Check module-level class declarations.
+}
+
+void Elaborator::ValidateStaticMethodBodies(const ModuleDecl* decl) {
+  for (const auto* cls : unit_->classes) {
+    ValidateOneClassStaticMethods(cls);
+  }
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
-      check_class(item->class_decl);
+      ValidateOneClassStaticMethods(item->class_decl);
+    }
+  }
+}
+
+// §8.11: Check a single module item for illegal 'this' usage.
+void Elaborator::ValidateThisInItem(const ModuleItem* item) {
+  bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                 item->kind == ModuleItemKind::kInitialBlock;
+  if (is_proc && item->body && StmtRefsThisOrSuper(item->body)) {
+    diag_.Error(item->loc,
+                "'this' shall only be used within non-static class methods");
+    return;
+  }
+  bool is_func_or_task = item->kind == ModuleItemKind::kFunctionDecl ||
+                         item->kind == ModuleItemKind::kTaskDecl;
+  if (!is_func_or_task || item->func_body_stmts.empty()) return;
+  for (const auto* s : item->func_body_stmts) {
+    if (StmtRefsThisOrSuper(s)) {
+      diag_.Error(item->loc,
+                  "'this' shall only be used within non-static "
+                  "class methods");
+      return;
     }
   }
 }
 
 // §8.11: 'this' shall only be used within non-static class methods.
-// Check module-level procedural blocks for illegal 'this' usage.
 void Elaborator::ValidateThisUsage(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
-    if (is_proc && item->body && StmtRefsThisOrSuper(item->body)) {
-      diag_.Error(item->loc,
-                  "'this' shall only be used within non-static class methods");
-    }
-    // Also check function/task bodies declared at module scope.
-    if ((item->kind == ModuleItemKind::kFunctionDecl ||
-         item->kind == ModuleItemKind::kTaskDecl) &&
-        !item->func_body_stmts.empty()) {
-      for (const auto* s : item->func_body_stmts) {
-        if (StmtRefsThisOrSuper(s)) {
-          diag_.Error(item->loc,
-                      "'this' shall only be used within non-static "
-                      "class methods");
-          break;
-        }
-      }
-    }
+    ValidateThisInItem(item);
   }
 }
 
@@ -271,7 +299,6 @@ void Elaborator::ValidateThisUsage(const ModuleDecl* decl) {
 void Elaborator::ValidateFinalClassExtension() {
   auto check = [&](const ClassDecl* cls) {
     if (cls->base_class.empty()) return;
-    // Look up the base class in CU-level classes.
     const auto* base = FindClassDecl(cls->base_class, unit_);
     if (base && base->is_final) {
       diag_.Error(cls->range.start, "cannot extend a class declared ':final'");
@@ -297,42 +324,41 @@ static bool IsSuperNewCall(const Stmt* s) {
   return lhs_is_super && rhs_is_new;
 }
 
+// §8.17: Validate chaining constructor rules for a single class.
+void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
+  if (cls->base_class.empty()) return;
+  const ClassMember* ctor = nullptr;
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod && m->method &&
+        m->method->name == "new") {
+      ctor = m;
+      break;
+    }
+  }
+  if (!ctor || !ctor->method) return;
+  bool has_super_new = false;
+  const auto& stmts = ctor->method->func_body_stmts;
+  for (size_t i = 0; i < stmts.size(); ++i) {
+    if (!IsSuperNewCall(stmts[i])) continue;
+    has_super_new = true;
+    if (i != 0) {
+      diag_.Error(stmts[i]->range.start,
+                  "super.new() shall be the first executable statement "
+                  "in the constructor");
+    }
+    break;
+  }
+  if (has_super_new && !cls->extends_args.empty()) {
+    diag_.Error(ctor->method->loc,
+                "constructor shall not contain super.new() when extends "
+                "specifier has arguments");
+  }
+}
+
 // §8.17: Validate chaining constructor rules.
 void Elaborator::ValidateChainingConstructors() {
-  auto check = [&](const ClassDecl* cls) {
-    if (cls->base_class.empty()) return;
-    const ClassMember* ctor = nullptr;
-    for (const auto* m : cls->members) {
-      if (m->kind == ClassMemberKind::kMethod && m->method &&
-          m->method->name == "new") {
-        ctor = m;
-        break;
-      }
-    }
-    if (!ctor || !ctor->method) return;
-    bool has_super_new = false;
-    const auto& stmts = ctor->method->func_body_stmts;
-    for (size_t i = 0; i < stmts.size(); ++i) {
-      if (IsSuperNewCall(stmts[i])) {
-        has_super_new = true;
-        // §8.17: super.new() shall be the first executable statement.
-        if (i != 0) {
-          diag_.Error(stmts[i]->range.start,
-                      "super.new() shall be the first executable statement "
-                      "in the constructor");
-        }
-        break;
-      }
-    }
-    // §8.17: If extends has args, constructor shall not contain super.new().
-    if (has_super_new && !cls->extends_args.empty()) {
-      diag_.Error(ctor->method->loc,
-                  "constructor shall not contain super.new() when extends "
-                  "specifier has arguments");
-    }
-  };
   for (const auto* cls : unit_->classes) {
-    check(cls);
+    ValidateOneClassChainingCtor(cls);
   }
 }
 
@@ -350,6 +376,28 @@ static const ClassMember* FindMemberInClass(const ClassDecl* cls,
   return nullptr;
 }
 
+// §8.18: Check a single obj.member access for visibility violations.
+static void CheckMemberAccessVisibility(
+    const Expr* e,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (e->lhs->kind != ExprKind::kIdentifier) return;
+  auto it = var_types.find(e->lhs->text);
+  if (it == var_types.end()) return;
+  if (e->rhs->kind != ExprKind::kIdentifier) return;
+  const auto* cls = FindClassDecl(it->second, unit);
+  if (!cls) return;
+  const auto* m = FindMemberInClass(cls, e->rhs->text, unit);
+  if (m && m->is_local) {
+    diag.Error(e->rhs->range.start,
+               "cannot access local member from outside its class");
+  } else if (m && m->is_protected) {
+    diag.Error(e->rhs->range.start,
+               "cannot access protected member from outside "
+               "its class hierarchy");
+  }
+}
+
 // §8.18: Check expressions for local/protected member access from outside
 // class.
 static void CheckVisibilityExpr(
@@ -358,24 +406,7 @@ static void CheckVisibilityExpr(
     const CompilationUnit* unit, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->lhs && e->rhs) {
-    // Check obj.member pattern where obj is a class variable.
-    if (e->lhs->kind == ExprKind::kIdentifier) {
-      auto it = var_types.find(e->lhs->text);
-      if (it != var_types.end() && e->rhs->kind == ExprKind::kIdentifier) {
-        const auto* cls = FindClassDecl(it->second, unit);
-        if (cls) {
-          const auto* m = FindMemberInClass(cls, e->rhs->text, unit);
-          if (m && m->is_local) {
-            diag.Error(e->rhs->range.start,
-                       "cannot access local member from outside its class");
-          } else if (m && m->is_protected) {
-            diag.Error(e->rhs->range.start,
-                       "cannot access protected member from outside "
-                       "its class hierarchy");
-          }
-        }
-      }
-    }
+    CheckMemberAccessVisibility(e, var_types, unit, diag);
   }
   CheckVisibilityExpr(e->lhs, var_types, unit, diag);
   CheckVisibilityExpr(e->rhs, var_types, unit, diag);
@@ -424,7 +455,6 @@ void Elaborator::ValidateConstClassProperties() {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kProperty || !m->is_const) continue;
-      // §8.19: Instance constant (no initializer) cannot be static.
       if (!m->init_expr && m->is_static) {
         diag_.Error(m->loc, "instance constant cannot be declared static");
       }
@@ -450,37 +480,38 @@ static const ClassMember* FindBaseVirtualMethod(const ClassDecl* cls,
   return nullptr;
 }
 
+// §8.20: Validate a single method's override rules within a class.
+void Elaborator::ValidateOneMethodOverride(const ClassDecl* cls,
+                                           const ClassMember* m) {
+  auto* method = m->method;
+  if (method->is_method_initial && method->is_method_extends) {
+    diag_.Error(method->loc,
+                "':initial' and ':extends' are mutually exclusive");
+    return;
+  }
+  const auto* base_virtual = FindBaseVirtualMethod(cls, method->name, unit_);
+  if (method->is_method_initial && base_virtual) {
+    diag_.Error(method->loc,
+                "method with ':initial' shall not override a virtual "
+                "base class method");
+  }
+  if (method->is_method_extends && !base_virtual) {
+    diag_.Error(method->loc,
+                "method with ':extends' does not override a virtual "
+                "base class method");
+  }
+  if (base_virtual && base_virtual->method &&
+      base_virtual->method->is_method_final) {
+    diag_.Error(method->loc, "cannot override a method declared ':final'");
+  }
+}
+
 // §8.20: Validate virtual method override rules.
 void Elaborator::ValidateVirtualMethodOverrides() {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-      auto* method = m->method;
-      // §8.20: :initial and :extends are mutually exclusive.
-      if (method->is_method_initial && method->is_method_extends) {
-        diag_.Error(method->loc,
-                    "':initial' and ':extends' are mutually exclusive");
-        continue;
-      }
-      const auto* base_virtual =
-          FindBaseVirtualMethod(cls, method->name, unit_);
-      // §8.20: :initial — shall not override a virtual base class method.
-      if (method->is_method_initial && base_virtual) {
-        diag_.Error(method->loc,
-                    "method with ':initial' shall not override a virtual "
-                    "base class method");
-      }
-      // §8.20: :extends — shall override a virtual base class method.
-      if (method->is_method_extends && !base_virtual) {
-        diag_.Error(method->loc,
-                    "method with ':extends' does not override a virtual "
-                    "base class method");
-      }
-      // §8.20: Cannot override a method declared :final.
-      if (base_virtual && base_virtual->method &&
-          base_virtual->method->is_method_final) {
-        diag_.Error(method->loc, "cannot override a method declared ':final'");
-      }
+      ValidateOneMethodOverride(cls, m);
     }
   }
 }
@@ -490,27 +521,36 @@ static void CollectPureVirtualMethods(
     const ClassDecl* cls, const CompilationUnit* unit,
     std::vector<std::string_view>& pure_names) {
   if (!cls) return;
-  // Walk up to base first.
   if (!cls->base_class.empty()) {
     const auto* base = FindClassDecl(cls->base_class, unit);
     CollectPureVirtualMethods(base, unit, pure_names);
   }
-  // Remove any pure virtuals that this class overrides with a concrete method.
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
     if (m->is_pure_virtual) {
       pure_names.push_back(m->method->name);
     } else if (m->is_virtual) {
-      // Concrete virtual override — remove from unimplemented list.
       std::erase(pure_names, m->method->name);
     }
+  }
+}
+
+// §8.21: Check that a non-abstract class implements all pure virtual methods.
+void Elaborator::ValidateAbstractClassUnimplemented(const ClassDecl* cls) {
+  if (cls->is_virtual || cls->base_class.empty()) return;
+  std::vector<std::string_view> unimpl;
+  CollectPureVirtualMethods(cls, unit_, unimpl);
+  for (auto name : unimpl) {
+    diag_.Error(cls->range.start,
+                std::format("non-abstract class '{}' does not implement "
+                            "pure virtual method '{}'",
+                            cls->name, name));
   }
 }
 
 // §8.21: Validate abstract class and pure virtual method rules.
 void Elaborator::ValidateAbstractClassRules() {
   for (const auto* cls : unit_->classes) {
-    // §8.21: :final on a pure virtual method is illegal.
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
       if (m->is_pure_virtual && m->method->is_method_final) {
@@ -518,31 +558,18 @@ void Elaborator::ValidateAbstractClassRules() {
                     "':final' shall not be specified on a pure virtual method");
       }
     }
-    // §8.21: Non-abstract class extending abstract must implement all pure
-    // virtual methods.
-    if (!cls->is_virtual && !cls->base_class.empty()) {
-      std::vector<std::string_view> unimpl;
-      CollectPureVirtualMethods(cls, unit_, unimpl);
-      for (auto name : unimpl) {
-        diag_.Error(cls->range.start,
-                    std::format("non-abstract class '{}' does not implement "
-                                "pure virtual method '{}'",
-                                cls->name, name));
-      }
-    }
+    ValidateAbstractClassUnimplemented(cls);
   }
 }
 
 // §8.24: Validate out-of-block method declarations.
 void Elaborator::ValidateOutOfBlockDeclarations() {
-  // Track which extern methods have been linked to avoid duplicates.
   std::unordered_set<std::string> linked;
   for (auto* item : unit_->cu_items) {
     if (item->method_class.empty()) continue;
     bool is_func = (item->kind == ModuleItemKind::kFunctionDecl);
     bool is_task = (item->kind == ModuleItemKind::kTaskDecl);
     if (!is_func && !is_task) continue;
-    // Find the class.
     const auto* cls = FindClassDecl(item->method_class, unit_);
     if (!cls) {
       diag_.Error(item->loc,
@@ -550,7 +577,6 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
                               item->method_class));
       continue;
     }
-    // Find matching extern prototype in the class.
     bool found_proto = false;
     for (auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
@@ -567,7 +593,6 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
                       item->method_class, item->name, item->method_class));
       continue;
     }
-    // Check for duplicate out-of-block declarations.
     auto key = std::string(item->method_class) + "::" + std::string(item->name);
     if (linked.count(key)) {
       diag_.Error(item->loc,
@@ -579,142 +604,140 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
   }
 }
 
+// §8.26.1: Validate members of an interface class.
+void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod && !m->is_pure_virtual) {
+      diag_.Error(m->method ? m->method->loc : cls->range.start,
+                  std::format("interface class '{}' shall only contain "
+                              "pure virtual methods",
+                              cls->name));
+    } else if (m->kind == ClassMemberKind::kProperty && !m->is_const) {
+      diag_.Error(cls->range.start,
+                  std::format("interface class '{}' shall not contain "
+                              "data members",
+                              cls->name));
+    } else if (m->kind == ClassMemberKind::kConstraint) {
+      diag_.Error(cls->range.start,
+                  std::format("interface class '{}' shall not contain "
+                              "constraint blocks",
+                              cls->name));
+    }
+  }
+}
+
+// §8.26.2: Validate inheritance rules for an interface class.
+void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
+  if (!cls->implements_types.empty()) {
+    diag_.Error(cls->range.start,
+                std::format("interface class '{}' shall not use "
+                            "'implements'",
+                            cls->name));
+  }
+  if (cls->base_class.empty()) return;
+  const auto* base = FindClassDecl(cls->base_class, unit_);
+  if (base && !base->is_interface) {
+    diag_.Error(cls->range.start,
+                std::format("interface class '{}' cannot extend "
+                            "non-interface class '{}'",
+                            cls->name, cls->base_class));
+  }
+}
+
+// §8.26.2: Validate that a regular class does not extend an interface class.
+void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
+  if (cls->base_class.empty()) return;
+  const auto* base = FindClassDecl(cls->base_class, unit_);
+  if (base && base->is_interface) {
+    diag_.Error(cls->range.start,
+                std::format("class '{}' cannot extend interface class "
+                            "'{}'; use 'implements' instead",
+                            cls->name, cls->base_class));
+  }
+}
+
+// §8.26: Check whether a class hierarchy has a concrete virtual method.
+static bool HasConcreteVirtualMethodInHierarchy(const ClassDecl* cls,
+                                                std::string_view method_name,
+                                                const CompilationUnit* unit) {
+  for (const auto* cm : cls->members) {
+    if (cm->kind == ClassMemberKind::kMethod && cm->method &&
+        cm->method->name == method_name && cm->is_virtual) {
+      return true;
+    }
+  }
+  if (cls->base_class.empty()) return false;
+  const auto* walk = FindClassDecl(cls->base_class, unit);
+  while (walk) {
+    for (const auto* bm : walk->members) {
+      if (bm->kind == ClassMemberKind::kMethod && bm->method &&
+          bm->method->name == method_name && bm->is_virtual &&
+          !bm->is_pure_virtual) {
+        return true;
+      }
+    }
+    walk = walk->base_class.empty() ? nullptr
+                                    : FindClassDecl(walk->base_class, unit);
+  }
+  return false;
+}
+
+// §8.26: Validate that a non-abstract class implements all interface methods.
+void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
+  if (cls->is_virtual || cls->implements_types.empty()) return;
+  for (auto iface_name : cls->implements_types) {
+    const auto* iface = FindClassDecl(iface_name, unit_);
+    if (!iface) continue;
+    for (const auto* im : iface->members) {
+      if (im->kind != ClassMemberKind::kMethod || !im->is_pure_virtual)
+        continue;
+      if (!im->method) continue;
+      if (!HasConcreteVirtualMethodInHierarchy(cls, im->method->name, unit_)) {
+        diag_.Error(cls->range.start,
+                    std::format("class '{}' does not implement pure virtual "
+                                "method '{}' from interface '{}'",
+                                cls->name, im->method->name, iface_name));
+      }
+    }
+  }
+}
+
 // §8.26: Validate interface class rules.
 void Elaborator::ValidateInterfaceClassRules() {
   for (const auto* cls : unit_->classes) {
     if (cls->is_interface) {
-      // §8.26.1: Interface class members must be pure virtual methods,
-      // type declarations, or parameter declarations.
-      for (const auto* m : cls->members) {
-        if (m->kind == ClassMemberKind::kMethod) {
-          if (!m->is_pure_virtual) {
-            diag_.Error(m->method ? m->method->loc : cls->range.start,
-                        std::format("interface class '{}' shall only contain "
-                                    "pure virtual methods",
-                                    cls->name));
-          }
-        } else if (m->kind == ClassMemberKind::kTypedef) {
-          // OK — type declarations allowed.
-        } else if (m->kind == ClassMemberKind::kProperty) {
-          // Only parameter/localparam declarations are allowed.
-          if (!m->is_const) {
-            diag_.Error(cls->range.start,
-                        std::format("interface class '{}' shall not contain "
-                                    "data members",
-                                    cls->name));
-          }
-        } else if (m->kind == ClassMemberKind::kConstraint) {
-          // §8.26.1/§8.26.9: Constraint blocks not allowed.
-          diag_.Error(cls->range.start,
-                      std::format("interface class '{}' shall not contain "
-                                  "constraint blocks",
-                                  cls->name));
-        }
-      }
-
-      // §8.26.2: Interface class cannot implement.
-      if (!cls->implements_types.empty()) {
-        diag_.Error(cls->range.start,
-                    std::format("interface class '{}' shall not use "
-                                "'implements'",
-                                cls->name));
-      }
-
-      // §8.26.2: Interface class may only extend interface classes.
-      if (!cls->base_class.empty()) {
-        const auto* base = FindClassDecl(cls->base_class, unit_);
-        if (base && !base->is_interface) {
-          diag_.Error(cls->range.start,
-                      std::format("interface class '{}' cannot extend "
-                                  "non-interface class '{}'",
-                                  cls->name, cls->base_class));
-        }
-      }
+      ValidateInterfaceClassMembers(cls);
+      ValidateInterfaceClassInheritance(cls);
     } else {
-      // §8.26.2: Regular/virtual class cannot extend an interface class.
-      if (!cls->base_class.empty()) {
-        const auto* base = FindClassDecl(cls->base_class, unit_);
-        if (base && base->is_interface) {
-          diag_.Error(cls->range.start,
-                      std::format("class '{}' cannot extend interface class "
-                                  "'{}'; use 'implements' instead",
-                                  cls->name, cls->base_class));
-        }
-      }
-
-      // §8.26: Non-abstract class implementing interfaces must provide
-      // all pure virtual method implementations.
-      if (!cls->is_virtual && !cls->implements_types.empty()) {
-        for (auto iface_name : cls->implements_types) {
-          const auto* iface = FindClassDecl(iface_name, unit_);
-          if (!iface) continue;
-          for (const auto* im : iface->members) {
-            if (im->kind != ClassMemberKind::kMethod || !im->is_pure_virtual)
-              continue;
-            if (!im->method) continue;
-            // Check that the implementing class has a matching virtual method.
-            bool found = false;
-            // Check own members.
-            for (const auto* cm : cls->members) {
-              if (cm->kind == ClassMemberKind::kMethod && cm->method &&
-                  cm->method->name == im->method->name && cm->is_virtual) {
-                found = true;
-                break;
-              }
-            }
-            // Check inherited methods from base class chain.
-            if (!found && !cls->base_class.empty()) {
-              const auto* walk = FindClassDecl(cls->base_class, unit_);
-              while (walk && !found) {
-                for (const auto* bm : walk->members) {
-                  if (bm->kind == ClassMemberKind::kMethod && bm->method &&
-                      bm->method->name == im->method->name && bm->is_virtual &&
-                      !bm->is_pure_virtual) {
-                    found = true;
-                    break;
-                  }
-                }
-                walk = walk->base_class.empty()
-                           ? nullptr
-                           : FindClassDecl(walk->base_class, unit_);
-              }
-            }
-            if (!found) {
-              diag_.Error(
-                  cls->range.start,
-                  std::format("class '{}' does not implement pure virtual "
-                              "method '{}' from interface '{}'",
-                              cls->name, im->method->name, iface_name));
-            }
-          }
-        }
-      }
+      ValidateRegularClassInheritance(cls);
+      ValidateImplementsInterfaceMethods(cls);
     }
   }
 }
 
 // --- §11.2.2: Aggregate expression comparison validation ---
 
+// §11.2.2: Check a single binary expression for aggregate type mismatch.
+void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
+  if (!expr->lhs || !expr->rhs) return;
+  if (expr->lhs->kind != ExprKind::kIdentifier) return;
+  if (expr->rhs->kind != ExprKind::kIdentifier) return;
+  auto lit = var_named_types_.find(expr->lhs->text);
+  auto rit = var_named_types_.find(expr->rhs->text);
+  if (lit == var_named_types_.end() || rit == var_named_types_.end()) return;
+  if (lit->second == rit->second) return;
+  diag_.Error(expr->range.start,
+              std::format("comparison of non-equivalent aggregate "
+                          "types '{}' and '{}'",
+                          lit->second, rit->second));
+}
+
 void Elaborator::WalkExprForAggregateCompare(const Expr* expr) {
   if (!expr) return;
-  // Check binary equality/inequality on named-type operands.
   if (expr->kind == ExprKind::kBinary &&
       (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq)) {
-    if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
-        expr->rhs->kind == ExprKind::kIdentifier) {
-      auto lit = var_named_types_.find(expr->lhs->text);
-      auto rit = var_named_types_.find(expr->rhs->text);
-      if (lit != var_named_types_.end() && rit != var_named_types_.end()) {
-        if (lit->second != rit->second) {
-          diag_.Error(expr->range.start,
-                      std::format("comparison of non-equivalent aggregate "
-                                  "types '{}' and '{}'",
-                                  lit->second, rit->second));
-        }
-      }
-    }
+    CheckAggregateCompareOp(expr);
   }
-  // Recurse into sub-expressions.
   WalkExprForAggregateCompare(expr->lhs);
   WalkExprForAggregateCompare(expr->rhs);
   WalkExprForAggregateCompare(expr->condition);
@@ -894,13 +917,11 @@ void Elaborator::WalkStmtsForAssignInExpr(const Stmt* s) {
 
 void Elaborator::ValidateAssignInExprRestrictions(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    // §11.3.6: Assignment operators in event expressions are illegal.
     if (item->kind == ModuleItemKind::kAlwaysBlock) {
       for (const auto& ev : item->sensitivity) {
         WalkExprForAssignInExpr(ev.signal, true);
       }
     }
-    // §11.3.6: Assignment operators in continuous assignment RHS are illegal.
     if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
       WalkExprForAssignInExpr(item->assign_rhs, true);
     }
@@ -915,7 +936,6 @@ static std::string_view AliasNetIdent(const Expr* e) {
 }
 
 void Elaborator::ValidateAlias(const ModuleItem* item) {
-  // Check for self-alias.
   std::unordered_set<std::string_view> seen;
   for (auto* net : item->alias_nets) {
     auto name = AliasNetIdent(net);
@@ -924,7 +944,6 @@ void Elaborator::ValidateAlias(const ModuleItem* item) {
       diag_.Error(item->loc, std::format("net '{}' aliased to itself", name));
     }
   }
-  // Check that alias operands are nets, not variables.
   for (auto* net : item->alias_nets) {
     auto name = AliasNetIdent(net);
     if (name.empty()) continue;
@@ -937,25 +956,30 @@ void Elaborator::ValidateAlias(const ModuleItem* item) {
   }
 }
 
+// §10.10.3: Check a single assignment for nested concatenation in unpacked
+// array context.
+void Elaborator::CheckArrayConcatNestingInAssign(const Stmt* s) {
+  if (!s->lhs || !s->rhs) return;
+  if (s->lhs->kind != ExprKind::kIdentifier) return;
+  if (s->rhs->kind != ExprKind::kConcatenation) return;
+  auto it = var_array_info_.find(s->lhs->text);
+  if (it == var_array_info_.end()) return;
+  if (it->second.elem_type == DataTypeKind::kString) return;
+  for (auto* elem : s->rhs->elements) {
+    if (elem->kind == ExprKind::kConcatenation) {
+      diag_.Error(elem->range.start,
+                  "nested concatenation in unpacked array "
+                  "concatenation is not self-determined");
+    }
+  }
+}
+
 // §10.10.3: Validate nesting of unpacked array concatenations.
 void Elaborator::WalkStmtsForArrayConcatNesting(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
-    if (s->lhs && s->rhs && s->lhs->kind == ExprKind::kIdentifier &&
-        s->rhs->kind == ExprKind::kConcatenation) {
-      auto it = var_array_info_.find(s->lhs->text);
-      if (it != var_array_info_.end() &&
-          it->second.elem_type != DataTypeKind::kString) {
-        for (auto* elem : s->rhs->elements) {
-          if (elem->kind == ExprKind::kConcatenation) {
-            diag_.Error(elem->range.start,
-                        "nested concatenation in unpacked array "
-                        "concatenation is not self-determined");
-          }
-        }
-      }
-    }
+    CheckArrayConcatNestingInAssign(s);
   }
   for (auto* sub : s->stmts) WalkStmtsForArrayConcatNesting(sub);
   WalkStmtsForArrayConcatNesting(s->then_branch);

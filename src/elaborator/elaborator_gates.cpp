@@ -1,11 +1,9 @@
 #include "common/arena.h"
+#include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
 namespace delta {
-
-// Defined in elaborator.cpp.
-uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
 
 /// Build a binary expression tree from left-folding the given operand over
 /// all inputs with the given operator.

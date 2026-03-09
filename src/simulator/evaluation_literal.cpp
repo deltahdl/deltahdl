@@ -26,7 +26,7 @@ static uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   }
   return (val > UINT32_MAX) ? 64 : 32;
 }
-static Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena) {
+Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena) {
   // §5.7.1: '0, '1, 'x, 'z — return 64-bit fill pattern for ResizeToWidth.
   auto text = expr->text;
   if (text.size() >= 2 && text[0] == '\'') {
@@ -141,7 +141,7 @@ static bool IsSignedLiteral(std::string_view text) {
   char c = text[tick + 1];
   return c == 's' || c == 'S';
 }
-static Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena) {
+Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena) {
   uint32_t width = LiteralWidth(expr->text, expr->int_val);
   bool is_signed = IsSignedLiteral(expr->text);
   if (TextHasXZ(expr->text)) {
@@ -228,7 +228,7 @@ static std::vector<uint8_t> DecodeStringBody(std::string_view text) {
   }
   return bytes;
 }
-static Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena) {
+Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena) {
   auto text = expr->text;
   if (text.size() >= 6 && text.substr(0, 3) == "\"\"\"")
     text = text.substr(3, text.size() - 6);

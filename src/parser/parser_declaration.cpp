@@ -217,6 +217,33 @@ ModuleItem* Parser::ParseNettypeDecl() {
   return item;
 }
 
+// A.2.7: Parse port direction and update sticky direction state.
+Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir) {
+  if (Check(TokenKind::kKwInput)) {
+    arg.direction = Direction::kInput;
+    Consume();
+    return Direction::kInput;
+  }
+  if (Check(TokenKind::kKwOutput)) {
+    arg.direction = Direction::kOutput;
+    Consume();
+    return Direction::kOutput;
+  }
+  if (Check(TokenKind::kKwInout)) {
+    arg.direction = Direction::kInout;
+    Consume();
+    return Direction::kInout;
+  }
+  if (Check(TokenKind::kKwRef)) {
+    arg.direction = Direction::kRef;
+    Consume();
+    Match(TokenKind::kKwStatic);  // A.2.7: ref [static]
+    return Direction::kRef;
+  }
+  arg.direction = sticky_dir;
+  return sticky_dir;
+}
+
 std::vector<FunctionArg> Parser::ParseFunctionArgs() {
   std::vector<FunctionArg> args;
   Expect(TokenKind::kLParen);
@@ -241,39 +268,16 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs() {
       args.push_back(arg);
       continue;
     }
-    // A.2.7 tf_port_direction: [const] ref [static]
     if (Match(TokenKind::kKwConst)) {
       arg.is_const = true;
     }
-    if (Check(TokenKind::kKwInput)) {
-      arg.direction = Direction::kInput;
-      sticky_dir = Direction::kInput;
-      Consume();
-    } else if (Check(TokenKind::kKwOutput)) {
-      arg.direction = Direction::kOutput;
-      sticky_dir = Direction::kOutput;
-      Consume();
-    } else if (Check(TokenKind::kKwInout)) {
-      arg.direction = Direction::kInout;
-      sticky_dir = Direction::kInout;
-      Consume();
-    } else if (Check(TokenKind::kKwRef)) {
-      arg.direction = Direction::kRef;
-      sticky_dir = Direction::kRef;
-      Consume();
-      Match(TokenKind::kKwStatic);  // A.2.7: ref [static]
-    } else {
-      arg.direction = sticky_dir;
-    }
+    sticky_dir = ParseArgDirection(arg, sticky_dir);
     Match(TokenKind::kKwVar);  // A.2.7 tf_port_item: [var]
     arg.data_type = ParseDataType();
-    // A.2.7 clarification 28: name optional in prototypes
     if (CheckIdentifier()) {
       arg.name = Consume().text;
     }
-    // Unpacked dimensions on argument (§13.4)
     ParseUnpackedDims(arg.unpacked_dims);
-    // Default value (§13.5.3)
     if (Match(TokenKind::kEq)) {
       arg.default_value = ParseExpr();
     }
@@ -302,16 +306,21 @@ DataType Parser::ParseFunctionReturnType() {
   return ParseDataType();
 }
 
+// A.2.6: Parse a single colon-prefixed specifier pair.
+void Parser::ParseOneOverrideSpecifier(ModuleItem* item) {
+  if (Match(TokenKind::kKwInitial)) {
+    if (item) item->is_method_initial = true;
+  } else if (Match(TokenKind::kKwExtends)) {
+    if (item) item->is_method_extends = true;
+  } else if (Match(TokenKind::kKwFinal)) {
+    if (item) item->is_method_final = true;
+  }
+}
+
 // A.2.6: dynamic_override_specifiers
 void Parser::ParseDynamicOverrideSpecifiers(ModuleItem* item) {
   if (Match(TokenKind::kColon)) {
-    if (Match(TokenKind::kKwInitial)) {
-      if (item) item->is_method_initial = true;
-    } else if (Match(TokenKind::kKwExtends)) {
-      if (item) item->is_method_extends = true;
-    } else if (Match(TokenKind::kKwFinal)) {
-      if (item) item->is_method_final = true;
-    }
+    ParseOneOverrideSpecifier(item);
   }
   if (Match(TokenKind::kColon)) {
     if (Match(TokenKind::kKwFinal)) {

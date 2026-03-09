@@ -9,6 +9,7 @@
 
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
@@ -59,6 +60,9 @@ class Elaborator {
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
   void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
+  void ValidateContAssignIdentLhs(ModuleItem* item, RtlirModule* mod);
+  void ValidateContAssignNettypeAndDelay(ModuleItem* item);
+  void ValidateContAssignDriveStrength(ModuleItem* item, RtlirModule* mod);
   void ElaborateSpecparam(ModuleItem* item, RtlirModule* mod);
 
   /// Elaborate a typedef item (e.g. enum constants).
@@ -153,6 +157,7 @@ class Elaborator {
 
   /// §7.6: Array assignment compatibility checks.
   void ValidateArrayAssignments(const ModuleDecl* decl);
+  void ValidateOneArrayAssignment(const ModuleItem* item);
 
   /// §7.8.5: real/shortreal as associative array index type is illegal.
   void ValidateAssocIndexType(const ModuleItem* item);
@@ -230,15 +235,18 @@ class Elaborator {
 
   /// §8.10: Static method bodies shall not reference 'this' or 'super'.
   void ValidateStaticMethodBodies(const ModuleDecl* decl);
+  void ValidateOneClassStaticMethods(const ClassDecl* cls);
 
   /// §8.11: 'this' shall only be used within non-static class methods.
   void ValidateThisUsage(const ModuleDecl* decl);
+  void ValidateThisInItem(const ModuleItem* item);
 
   /// §8.13: A class declared :final shall not be extended.
   void ValidateFinalClassExtension();
 
   /// §8.17: Validate chaining constructor rules.
   void ValidateChainingConstructors();
+  void ValidateOneClassChainingCtor(const ClassDecl* cls);
 
   /// §8.18: Validate local/protected access from module-level code.
   void ValidateLocalProtectedAccess(const ModuleDecl* decl);
@@ -248,23 +256,31 @@ class Elaborator {
 
   /// §8.20: Validate virtual method override rules.
   void ValidateVirtualMethodOverrides();
+  void ValidateOneMethodOverride(const ClassDecl* cls, const ClassMember* m);
 
   /// §8.21: Validate abstract class and pure virtual method rules.
   void ValidateAbstractClassRules();
+  void ValidateAbstractClassUnimplemented(const ClassDecl* cls);
 
   /// §8.24: Validate out-of-block method declarations.
   void ValidateOutOfBlockDeclarations();
 
   /// §8.26: Validate interface class rules.
   void ValidateInterfaceClassRules();
+  void ValidateInterfaceClassMembers(const ClassDecl* cls);
+  void ValidateInterfaceClassInheritance(const ClassDecl* cls);
+  void ValidateRegularClassInheritance(const ClassDecl* cls);
+  void ValidateImplementsInterfaceMethods(const ClassDecl* cls);
 
   /// §10.10.3: Validate nesting of unpacked array concatenations.
   void ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl);
   void WalkStmtsForArrayConcatNesting(const Stmt* s);
+  void CheckArrayConcatNestingInAssign(const Stmt* s);
 
   /// §11.2.2: Validate aggregate expression comparison type equivalence.
   void ValidateAggregateComparisons(const ModuleDecl* decl);
   void WalkExprForAggregateCompare(const Expr* expr);
+  void CheckAggregateCompareOp(const Expr* expr);
   void WalkStmtsForAggregateCompare(const Stmt* s);
 
   /// §11.3.1: Validate operators not permitted on real operands.
@@ -321,5 +337,24 @@ class Elaborator {
   std::unordered_map<std::string_view, std::string_view>
       var_named_types_;  // §11.2.2: var name → named type for aggregate checks
 };
+
+// Free functions shared across elaborator translation units.
+struct ResolvedAttribute;
+enum class RtlirProcessKind : uint8_t;
+
+std::vector<ResolvedAttribute> ResolveAttributes(
+    const std::vector<Attribute>& attrs, DiagEngine& diag);
+uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
+RtlirProcessKind MapAlwaysKind(AlwaysKind ak);
+void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
+                Arena& arena, DiagEngine& diag);
+
+void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
+
+// Shared validation helpers.
+std::string_view ExprIdent(const Expr* e);
+const ClassDecl* FindClassDecl(std::string_view name,
+                               const CompilationUnit* unit);
+bool IsRealType(DataTypeKind k);
 
 }  // namespace delta

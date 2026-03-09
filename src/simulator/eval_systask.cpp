@@ -383,6 +383,52 @@ static Logic4Vec EvalIsunbounded(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §6.24.2: Assign src_val to dest variable and return success.
+static Logic4Vec CastAssignSuccess(std::string_view dest_name, uint64_t src_val,
+                                   SimContext& ctx, Arena& arena) {
+  auto* var = ctx.FindVariable(dest_name);
+  if (var) var->value = MakeLogic4VecVal(arena, var->value.width, src_val);
+  return MakeLogic4VecVal(arena, 32, 1);
+}
+
+// §6.24.2: Try enum cast — check if source value is a valid enum member.
+static bool TryCastEnum(std::string_view dest_name, uint64_t src_val,
+                        SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  auto* enum_info = ctx.GetVariableEnumType(dest_name);
+  if (!enum_info) return false;
+  for (const auto& m : enum_info->members) {
+    if (m.value == src_val) {
+      out = CastAssignSuccess(dest_name, src_val, ctx, arena);
+      return true;
+    }
+  }
+  out = MakeLogic4VecVal(arena, 32, 0);
+  return true;
+}
+
+// §8.16: Try class handle cast.
+static bool TryCastClassHandle(std::string_view dest_name, uint64_t src_val,
+                               SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  auto dest_class = ctx.GetVariableClassType(dest_name);
+  if (dest_class.empty()) return false;
+  auto* dest_type = ctx.FindClassType(dest_class);
+  if (!dest_type) {
+    out = MakeLogic4VecVal(arena, 32, 0);
+    return true;
+  }
+  if (src_val == kNullClassHandle) {
+    out = CastAssignSuccess(dest_name, 0, ctx, arena);
+    return true;
+  }
+  auto* src_obj = ctx.GetClassObject(src_val);
+  if (!src_obj || !src_obj->type || !src_obj->type->IsA(dest_type)) {
+    out = MakeLogic4VecVal(arena, 32, 0);
+    return true;
+  }
+  out = CastAssignSuccess(dest_name, src_val, ctx, arena);
+  return true;
+}
+
 // §6.24.2/§8.16: $cast(dest, source) — dynamic cast, returns 1 on success.
 static Logic4Vec EvalCastSysFunc(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
@@ -396,43 +442,10 @@ static Logic4Vec EvalCastSysFunc(const Expr* expr, SimContext& ctx,
     return MakeLogic4VecVal(arena, 32, 0);
   }
   auto dest_name = dest_expr->text;
-  // §6.24.2 enum cast: check if source value is a valid enum member.
-  auto* enum_info = ctx.GetVariableEnumType(dest_name);
-  if (enum_info) {
-    for (const auto& m : enum_info->members) {
-      if (m.value != src_val) continue;
-      auto* var = ctx.FindVariable(dest_name);
-      if (var) var->value = MakeLogic4VecVal(arena, var->value.width, src_val);
-      return MakeLogic4VecVal(arena, 32, 1);
-    }
-    return MakeLogic4VecVal(arena, 32, 0);
-  }
-  // §8.16: Class handle cast.
-  auto dest_class = ctx.GetVariableClassType(dest_name);
-  if (!dest_class.empty()) {
-    auto* dest_type = ctx.FindClassType(dest_class);
-    if (!dest_type) return MakeLogic4VecVal(arena, 32, 0);
-    // §8.16 case 3: null source always succeeds.
-    if (src_val == kNullClassHandle) {
-      auto* var = ctx.FindVariable(dest_name);
-      if (var) var->value = MakeLogic4VecVal(arena, var->value.width, 0);
-      return MakeLogic4VecVal(arena, 32, 1);
-    }
-    auto* src_obj = ctx.GetClassObject(src_val);
-    if (!src_obj || !src_obj->type) return MakeLogic4VecVal(arena, 32, 0);
-    // §8.16 cases 1 & 2: source object's type must be same as or derived from
-    // dest type (i.e., the actual object must be assignment compatible).
-    if (!src_obj->type->IsA(dest_type)) {
-      return MakeLogic4VecVal(arena, 32, 0);
-    }
-    auto* var = ctx.FindVariable(dest_name);
-    if (var) var->value = MakeLogic4VecVal(arena, var->value.width, src_val);
-    return MakeLogic4VecVal(arena, 32, 1);
-  }
-  // Non-enum, non-class: simple assignment (always succeeds).
-  auto* var = ctx.FindVariable(dest_name);
-  if (var) var->value = MakeLogic4VecVal(arena, var->value.width, src_val);
-  return MakeLogic4VecVal(arena, 32, 1);
+  Logic4Vec out;
+  if (TryCastEnum(dest_name, src_val, ctx, arena, out)) return out;
+  if (TryCastClassHandle(dest_name, src_val, ctx, arena, out)) return out;
+  return CastAssignSuccess(dest_name, src_val, ctx, arena);
 }
 
 Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,

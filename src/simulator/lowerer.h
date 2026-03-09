@@ -26,6 +26,8 @@ class Lowerer {
 
  private:
   void LowerModule(const RtlirModule* mod);
+  void LowerParams(const RtlirModule* mod);
+  void LowerAliases(const RtlirModule* mod);
   void LowerVar(const RtlirVariable& var);
   void LowerVarInit(const RtlirVariable& var, Variable* v, uint32_t width);
   void LowerVarAggregate(const RtlirVariable& var);

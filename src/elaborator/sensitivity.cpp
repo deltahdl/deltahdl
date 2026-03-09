@@ -74,18 +74,23 @@ std::vector<std::string> CollectReadSignals(const Stmt* body) {
   return {set.begin(), set.end()};
 }
 
+// §9.2.2.2.1(b): Extract the base identifier name from an assignment LHS.
+static void CollectAssignLhsName(const Expr* lhs,
+                                 std::unordered_set<std::string>& out) {
+  if (!lhs) return;
+  const Expr* e = lhs;
+  while (e->kind == ExprKind::kSelect && e->base) e = e->base;
+  if (e->kind == ExprKind::kIdentifier && !e->text.empty())
+    out.insert(std::string(e->text));
+}
+
 // §9.2.2.2.1(b): Collect LHS variable names written in the statement tree.
 void CollectWrittenNames(const Stmt* stmt,
                          std::unordered_set<std::string>& out) {
   if (!stmt) return;
   if (stmt->kind == StmtKind::kBlockingAssign ||
       stmt->kind == StmtKind::kNonblockingAssign) {
-    if (stmt->lhs) {
-      const Expr* e = stmt->lhs;
-      while (e->kind == ExprKind::kSelect && e->base) e = e->base;
-      if (e->kind == ExprKind::kIdentifier && !e->text.empty())
-        out.insert(std::string(e->text));
-    }
+    CollectAssignLhsName(stmt->lhs, out);
   }
   for (const auto* s : stmt->stmts) CollectWrittenNames(s, out);
   CollectWrittenNames(stmt->then_branch, out);

@@ -213,58 +213,64 @@ static ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 // --- If with unique/priority qualifiers ---
 
-// §12.4.2: Check for uniqueness violations in if-else-if chains.
-// Walks the chain, evaluates all conditions, detects overlap and no-match.
+struct UniqueIfResult {
+  const Stmt* first_match = nullptr;
+  int match_count = 0;
+  bool has_final_else = false;
+};
+
+static UniqueIfResult EvalUniqueIfChain(const Stmt* stmt, SimContext& ctx,
+                                        Arena& arena) {
+  UniqueIfResult result;
+  for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
+       cur = cur->else_branch) {
+    auto cond = EvalExpr(cur->condition, ctx, arena);
+    if (cond.IsTruthy()) {
+      result.match_count++;
+      if (!result.first_match) result.first_match = cur;
+    }
+    if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
+      result.has_final_else = true;
+    }
+  }
+  return result;
+}
+
+static const Stmt* FindFinalElse(const Stmt* stmt) {
+  const Stmt* cur = stmt;
+  while (cur->else_branch && cur->else_branch->kind == StmtKind::kIf) {
+    cur = cur->else_branch;
+  }
+  return cur->else_branch;
+}
+
+static ExecTask ExecUniqueIf(const Stmt* stmt, CaseQualifier qual,
+                             SimContext& ctx, Arena& arena) {
+  auto info = EvalUniqueIfChain(stmt, ctx, arena);
+
+  if (info.match_count > 1) {
+    ctx.AddPendingViolation("unique if: multiple conditions matched");
+  }
+  if (info.first_match) {
+    co_return co_await ExecStmt(info.first_match->then_branch, ctx, arena);
+  }
+  if (info.has_final_else) {
+    const Stmt* final_else = FindFinalElse(stmt);
+    if (final_else) co_return co_await ExecStmt(final_else, ctx, arena);
+  }
+  if (!info.has_final_else && qual == CaseQualifier::kUnique) {
+    ctx.AddPendingViolation("unique if: no condition matched");
+  }
+  co_return StmtResult::kDone;
+}
+
 static ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto qual = stmt->qualifier;
 
   if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
-    // Walk the if-else-if chain, evaluate ALL conditions to detect overlap.
-    const Stmt* first_match = nullptr;
-    int match_count = 0;
-    bool has_final_else = false;
-
-    for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
-         cur = cur->else_branch) {
-      auto cond = EvalExpr(cur->condition, ctx, arena);
-      if (cond.IsTruthy()) {
-        match_count++;
-        if (!first_match) first_match = cur;
-      }
-      // Check if the else_branch is a final else (not another if).
-      if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
-        has_final_else = true;
-      }
-    }
-
-    if (match_count > 1) {
-      ctx.AddPendingViolation("unique if: multiple conditions matched");
-    }
-
-    if (first_match) {
-      co_return co_await ExecStmt(first_match->then_branch, ctx, arena);
-    }
-
-    // No match: execute final else if present.
-    if (has_final_else) {
-      // Find the final else statement.
-      const Stmt* cur = stmt;
-      while (cur->else_branch && cur->else_branch->kind == StmtKind::kIf) {
-        cur = cur->else_branch;
-      }
-      if (cur->else_branch) {
-        co_return co_await ExecStmt(cur->else_branch, ctx, arena);
-      }
-    }
-
-    // No match, no else: unique → violation, unique0 → no violation.
-    if (!has_final_else && qual == CaseQualifier::kUnique) {
-      ctx.AddPendingViolation("unique if: no condition matched");
-    }
-    co_return StmtResult::kDone;
+    co_return co_await ExecUniqueIf(stmt, qual, ctx, arena);
   }
 
-  // Standard if or priority-if: evaluate conditions in order.
   auto cond = EvalExpr(stmt->condition, ctx, arena);
   if (cond.IsTruthy()) {
     co_return co_await ExecStmt(stmt->then_branch, ctx, arena);
@@ -411,84 +417,96 @@ static bool CaseItemMatches(const Logic4Vec& sel, const Logic4Vec& pat,
 
 // --- Case with casex/casez/inside and qualifiers ---
 
-static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  auto qual = stmt->qualifier;
-  auto sel = EvalExpr(stmt->condition, ctx, arena);
+static bool CasePatternMatch(const Logic4Vec& sel, const Expr* pat,
+                             const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (stmt->case_inside) return CaseInsidePatternMatch(sel, pat, ctx, arena);
+  if (stmt->case_matches)
+    return CaseMatchesPatternMatch(sel, pat, ctx, arena, stmt->case_kind);
+  return CaseItemMatches(sel, EvalExpr(pat, ctx, arena), stmt->case_kind);
+}
 
-  // §12.5.3: unique/unique0 must scan all items to detect overlap.
-  if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
-    const Stmt* first_match_body = nullptr;
-    int match_count = 0;
-    bool has_default = false;
-
-    for (const auto& item : stmt->case_items) {
-      if (item.is_default) {
-        has_default = true;
-        continue;
-      }
-      for (auto* pat : item.patterns) {
-        bool matched;
-        if (stmt->case_inside)
-          matched = CaseInsidePatternMatch(sel, pat, ctx, arena);
-        else if (stmt->case_matches)
-          matched =
-              CaseMatchesPatternMatch(sel, pat, ctx, arena, stmt->case_kind);
-        else
-          matched =
-              CaseItemMatches(sel, EvalExpr(pat, ctx, arena), stmt->case_kind);
-        if (matched) {
-          match_count++;
-          if (!first_match_body) first_match_body = item.body;
-          break;  // One match per case_item is enough.
-        }
-      }
-    }
-
-    if (match_count > 1) {
-      ctx.AddPendingViolation("unique case: multiple items matched");
-    }
-
-    if (first_match_body) {
-      co_return co_await ExecStmt(first_match_body, ctx, arena);
-    }
-
-    // No match — fall through to default.
-    for (const auto& item : stmt->case_items) {
-      if (item.is_default) co_return co_await ExecStmt(item.body, ctx, arena);
-    }
-
-    if (!has_default && qual == CaseQualifier::kUnique) {
-      ctx.AddPendingViolation("unique case: no matching item found");
-    }
-    co_return StmtResult::kDone;
+static bool CaseItemHasMatch(const Logic4Vec& sel, const CaseItem& item,
+                             const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  for (auto* pat : item.patterns) {
+    if (CasePatternMatch(sel, pat, stmt, ctx, arena)) return true;
   }
+  return false;
+}
 
-  // Standard case or priority-case: linear search, first match wins.
+static const Stmt* FindCaseDefault(const Stmt* stmt) {
+  for (const auto& item : stmt->case_items) {
+    if (item.is_default) return item.body;
+  }
+  return nullptr;
+}
+
+struct UniqueCaseResult {
+  const Stmt* first_match_body = nullptr;
+  int match_count = 0;
+  bool has_default = false;
+};
+
+static UniqueCaseResult ScanUniqueCaseItems(const Logic4Vec& sel,
+                                            const Stmt* stmt, SimContext& ctx,
+                                            Arena& arena) {
+  UniqueCaseResult result;
+  for (const auto& item : stmt->case_items) {
+    if (item.is_default) {
+      result.has_default = true;
+      continue;
+    }
+    if (CaseItemHasMatch(sel, item, stmt, ctx, arena)) {
+      result.match_count++;
+      if (!result.first_match_body) result.first_match_body = item.body;
+    }
+  }
+  return result;
+}
+
+static ExecTask ExecUniqueCase(const Stmt* stmt, const Logic4Vec& sel,
+                               CaseQualifier qual, SimContext& ctx,
+                               Arena& arena) {
+  auto info = ScanUniqueCaseItems(sel, stmt, ctx, arena);
+
+  if (info.match_count > 1) {
+    ctx.AddPendingViolation("unique case: multiple items matched");
+  }
+  if (info.first_match_body) {
+    co_return co_await ExecStmt(info.first_match_body, ctx, arena);
+  }
+  auto* default_body = FindCaseDefault(stmt);
+  if (default_body) co_return co_await ExecStmt(default_body, ctx, arena);
+  if (!info.has_default && qual == CaseQualifier::kUnique) {
+    ctx.AddPendingViolation("unique case: no matching item found");
+  }
+  co_return StmtResult::kDone;
+}
+
+static ExecTask ExecStandardCase(const Stmt* stmt, const Logic4Vec& sel,
+                                 CaseQualifier qual, SimContext& ctx,
+                                 Arena& arena) {
   for (const auto& item : stmt->case_items) {
     if (item.is_default) continue;
-    for (auto* pat : item.patterns) {
-      bool matched;
-      if (stmt->case_inside)
-        matched = CaseInsidePatternMatch(sel, pat, ctx, arena);
-      else if (stmt->case_matches)
-        matched =
-            CaseMatchesPatternMatch(sel, pat, ctx, arena, stmt->case_kind);
-      else
-        matched =
-            CaseItemMatches(sel, EvalExpr(pat, ctx, arena), stmt->case_kind);
-      if (matched) {
-        co_return co_await ExecStmt(item.body, ctx, arena);
-      }
+    if (CaseItemHasMatch(sel, item, stmt, ctx, arena)) {
+      co_return co_await ExecStmt(item.body, ctx, arena);
     }
   }
-  // Fall through to default.
-  for (const auto& item : stmt->case_items) {
-    if (item.is_default) co_return co_await ExecStmt(item.body, ctx, arena);
-  }
+  auto* default_body = FindCaseDefault(stmt);
+  if (default_body) co_return co_await ExecStmt(default_body, ctx, arena);
   if (qual == CaseQualifier::kPriority) {
     ctx.AddPendingViolation("priority case: no matching item found");
   }
   co_return StmtResult::kDone;
+}
+
+static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  auto qual = stmt->qualifier;
+  auto sel = EvalExpr(stmt->condition, ctx, arena);
+
+  if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
+    co_return co_await ExecUniqueCase(stmt, sel, qual, ctx, arena);
+  }
+  co_return co_await ExecStandardCase(stmt, sel, qual, ctx, arena);
 }
 
 // --- Loops ---

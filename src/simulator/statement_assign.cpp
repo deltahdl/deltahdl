@@ -22,7 +22,7 @@ namespace delta {
 // --- LHS resolution helpers ---
 
 // Build a dotted name from a MemberAccess expression tree (e.g., "s.a.b").
-static void BuildLhsName(const Expr* expr, std::string& out) {
+void BuildLhsName(const Expr* expr, std::string& out) {
   if (expr->kind == ExprKind::kIdentifier) {
     out += expr->text;
     return;
@@ -36,7 +36,7 @@ static void BuildLhsName(const Expr* expr, std::string& out) {
 
 // §7.4: Try to resolve an array element variable (e.g. "A[0]").
 // Returns the element variable if found, null otherwise.
-static Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx) {
+Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx) {
   if (lhs->kind != ExprKind::kSelect || !lhs->base || !lhs->index)
     return nullptr;
   if (lhs->base->kind != ExprKind::kIdentifier) return nullptr;
@@ -48,8 +48,8 @@ static Variable* TryResolveArrayElement(const Expr* lhs, SimContext& ctx) {
 }
 
 // §7.4: Build a compound name from chained selects (e.g., mem[i][j]).
-static bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx,
-                                 Arena& arena, std::string& name) {
+bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx, Arena& arena,
+                          std::string& name) {
   if (expr->kind == ExprKind::kIdentifier) {
     name = expr->text;
     return true;
@@ -62,8 +62,8 @@ static bool BuildCompoundLhsName(const Expr* expr, SimContext& ctx,
 }
 
 // §7.4: Multi-dim array element write — create element lazily.
-static Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
-                                           Arena& arena) {
+Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
+                                    Arena& arena) {
   if (lhs->kind != ExprKind::kSelect || !lhs->base) return nullptr;
   if (lhs->base->kind != ExprKind::kSelect) return nullptr;
   if (lhs->index_end) return nullptr;
@@ -76,7 +76,7 @@ static Variable* TryResolveCompoundElement(const Expr* lhs, SimContext& ctx,
 }
 
 // Find the target variable for a compound LHS expression.
-static Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
+Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
   if (lhs->kind == ExprKind::kIdentifier) return ctx.FindVariable(lhs->text);
   if (lhs->kind == ExprKind::kMemberAccess) {
     std::string name;
@@ -90,8 +90,8 @@ static Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
 }
 
 // §7.2: Write to a packed struct/union field by name.
-static bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
-                             SimContext& ctx, Arena& arena) {
+bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
+                      SimContext& ctx, Arena& arena) {
   std::string name;
   BuildLhsName(lhs, name);
   auto dot = name.find('.');
@@ -135,9 +135,8 @@ static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,
 }
 
 // Write rhs_val to var at the bit position(s) indicated by a Select LHS.
-static void WriteBitSelect(Variable* var, const Expr* lhs,
-                           const Logic4Vec& rhs_val, SimContext& ctx,
-                           Arena& arena) {
+void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
+                    SimContext& ctx, Arena& arena) {
   auto idx = static_cast<uint32_t>(EvalExpr(lhs->index, ctx, arena).ToUint64());
   if (!lhs->index_end) {
     uint64_t old_val = var->value.ToUint64();
@@ -168,8 +167,7 @@ static void WriteBitSelect(Variable* var, const Expr* lhs,
 }
 
 // §11.8.2: Resize value to target width, sign-extending when signed.
-static Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width,
-                               Arena& arena) {
+Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
   if (val.width == target_width || target_width == 0) return val;
   // Check for x/z bits that need preserving.
   bool has_xz = false;
@@ -326,8 +324,7 @@ static void DistributeConcatToArray(std::string_view arr_name,
 }
 
 // §7.4/§7.6: Try array-level blocking assignment (pattern, concat, or copy).
-static bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx,
-                                   Arena& arena) {
+bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
   if (stmt->rhs && stmt->rhs->kind == ExprKind::kAssignmentPattern) {
     auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
@@ -356,8 +353,8 @@ static bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx,
 }
 
 // §7.8: Associative array indexed write (aa[key] = val).
-static bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
-                                 SimContext& ctx, Arena& arena) {
+bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
+                          SimContext& ctx, Arena& arena) {
   if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
   auto* aa = ctx.FindAssocArray(lhs->base->text);
   if (!aa || !lhs->index) return false;
@@ -382,8 +379,8 @@ static bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
 }
 
 // §7.10: Queue indexed write (q[i] = val).
-static bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
-                                 SimContext& ctx, Arena& /*arena*/) {
+bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
+                          SimContext& ctx, Arena& /*arena*/) {
   if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
   auto* q = ctx.FindQueue(lhs->base->text);
   if (!q || !lhs->index) return false;
@@ -495,8 +492,7 @@ static void CopyNewInit(const Expr* rhs, QueueObject* q, SimContext& ctx,
 }
 
 // §7.10.4: Queue assignment from concatenation, slice, or literal.
-static bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx,
-                                   Arena& arena) {
+bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
   auto* q = ctx.FindQueue(stmt->lhs->text);
   if (!q) return false;

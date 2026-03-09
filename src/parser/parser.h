@@ -80,6 +80,8 @@ class Parser {
   bool IsAtClassDecl();
   ClassDecl* ParseClassDecl();
   void ParseClassExtendsClause(ClassDecl* decl, bool is_implements);
+  void ParseExtendsArgList(ClassDecl* decl);
+  void ValidateConstructorQualifiers(ClassMember* member);
   void ParseClassMembers(std::vector<ClassMember*>& members);
   bool TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                                   ClassMember* member, bool proto);
@@ -186,6 +188,8 @@ class Parser {
   void ParseStructMembers(DataType& dtype);
   DataType ParseFunctionReturnType();
   void ParseDynamicOverrideSpecifiers(ModuleItem* item);
+  void ParseOneOverrideSpecifier(ModuleItem* item);
+  Direction ParseArgDirection(FunctionArg& arg, Direction sticky_dir);
   void ParseFuncName(ModuleItem* item);
   void ParseFuncBody(ModuleItem* item);
   ModuleItem* ParseFunctionDecl(bool prototype_only = false);
@@ -225,6 +229,7 @@ class Parser {
 
   // Statements (parser_stmt.cpp)
   Stmt* ParseStmt();
+  std::string_view TryParseStmtLabel();
   Stmt* ParseStmtBody();
   Stmt* ParseBlockStmt();
   Stmt* ParseIfStmt();
@@ -290,6 +295,7 @@ class Parser {
   Expr* TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp);
   Expr* ParsePrefixExpr();
   Expr* ParsePrimaryExpr();
+  Expr* ParseThisOrSuperExpr();
   Expr* ParseCastOrTypedPattern();
   Expr* MakeLiteral(ExprKind kind, const Token& tok);
   void WarnSizedOverflow(const Token& tok);

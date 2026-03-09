@@ -1,4 +1,5 @@
 #include "builders_sensitivity.h"
+#include "elaborator/sensitivity.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"

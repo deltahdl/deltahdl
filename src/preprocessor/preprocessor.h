@@ -76,12 +76,23 @@ class Preprocessor {
                           uint32_t file_id, uint32_t line_num);
   bool TryExpandMacro(std::string_view trimmed, std::string& output,
                       uint32_t file_id, uint32_t line_num, int depth);
+  bool IsRecursiveExpansion(std::string_view name, SourceLoc loc) const;
+  bool ExpandFunctionLikeMacro(const MacroDef& def, std::string_view name,
+                               std::string_view macro_name, SourceLoc loc,
+                               std::string& expanded, std::string_view& rest);
   std::string ExpandInlineConditionals(std::string_view line);
   std::string ExpandInlineMacros(std::string_view line, uint32_t file_id,
                                  uint32_t line_num);
   size_t ExpandSingleInlineMacro(std::string_view line, size_t pos,
                                  uint32_t file_id, uint32_t line_num,
                                  std::string& result);
+  bool TryExpandInlinePredefined(std::string_view name, uint32_t file_id,
+                                 uint32_t line_num, std::string& result);
+  size_t ExpandInlineFunctionMacro(const MacroDef& def, std::string_view line,
+                                   size_t name_end, std::string_view name,
+                                   SourceLoc loc, std::string& result);
+  void ResolveAndReadInclude(std::string_view fn, SourceLoc loc, int depth,
+                             std::string& output, bool angle_bracket);
   std::string ExpandMacro(const MacroDef& macro, std::string_view args_text);
   bool ValidateMacroArgCount(const MacroDef& def, std::string_view args_text,
                              SourceLoc loc, std::string_view name);
@@ -89,6 +100,27 @@ class Preprocessor {
                              const std::string& src_dir);
   void DefinePredefined(std::string name, std::string body);
   void TrackDesignElement(std::string_view trimmed);
+  void ExpandAndAppendLine(std::string_view line, uint32_t file_id,
+                           uint32_t line_num, std::string& output);
+  bool ProcessBlockCommentLine(std::string_view line, uint32_t file_id,
+                               uint32_t line_num, int depth,
+                               std::string& output);
+  bool RejectInsideDesignElement(std::string_view directive_name,
+                                 SourceLoc loc);
+  void ResetDirectiveState();
+  bool ProcessDelayModeDirective(std::string_view line, SourceLoc loc);
+  bool ProcessSimpleStateDirective(std::string_view line, SourceLoc loc,
+                                   uint32_t file_id, uint32_t line_num,
+                                   std::string& output);
+  bool ProcessExpandedStateDirective(std::string_view line, SourceLoc loc,
+                                     uint32_t file_id, uint32_t line_num,
+                                     std::string& output);
+  void ProcessIncludeDirective(std::string_view line, SourceLoc loc,
+                               uint32_t file_id, uint32_t line_num, int depth,
+                               std::string& output);
+  bool ProcessKeywordsDirective(std::string_view line, SourceLoc loc,
+                                uint32_t file_id, uint32_t line_num,
+                                std::string& output);
 
   static std::vector<std::string> ParseMacroParams(
       std::string_view params, std::vector<std::string>& defaults);
@@ -149,5 +181,10 @@ class Preprocessor {
   bool has_default_trireg_strength_ = false;
   enum DelayModeDirective delay_mode_directive_ = DelayModeDirective::kNone;
 };
+
+// §22.5.1: Free-function helpers used across preprocessor translation units.
+bool IsCompilerDirective(std::string_view name);
+bool HasUnterminatedString(std::string_view body);
+bool IsIdentChar(char c);
 
 }  // namespace delta

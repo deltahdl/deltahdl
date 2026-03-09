@@ -182,6 +182,19 @@ ModuleDecl* Parser::ParseProgramDecl() {
 
 // --- Class declaration ---
 
+// Parse the extends argument list: ( [list_of_arguments | default] )
+void Parser::ParseExtendsArgList(ClassDecl* decl) {
+  Consume();
+  if (Match(TokenKind::kKwDefault)) {
+    decl->extends_has_default = true;
+  } else if (!Check(TokenKind::kRParen)) {
+    do {
+      decl->extends_args.push_back(ParseExpr());
+    } while (Match(TokenKind::kComma));
+  }
+  Expect(TokenKind::kRParen);
+}
+
 void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
   // §8.26: interface classes may extend multiple base classes
   // (comma-separated).
@@ -195,7 +208,6 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
     } else if (decl->base_class.empty()) {
       decl->base_class = name;
     }
-    // Skip parameter value assignment: #(type_or_expr, ...)
     if (Check(TokenKind::kHash)) {
       Consume();
       ParseTypeParamList();
@@ -206,15 +218,7 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
         std::vector<Expr*> discard;
         ParseParenList(discard);
       } else {
-        Consume();
-        if (Match(TokenKind::kKwDefault)) {
-          decl->extends_has_default = true;
-        } else if (!Check(TokenKind::kRParen)) {
-          do {
-            decl->extends_args.push_back(ParseExpr());
-          } while (Match(TokenKind::kComma));
-        }
-        Expect(TokenKind::kRParen);
+        ParseExtendsArgList(decl);
       }
     }
   } while (Match(TokenKind::kComma));
@@ -369,6 +373,19 @@ void Parser::ValidateClassMethod(ClassMember* member) {
   if (member->is_static) member->method->is_static = true;
 }
 
+// §8.7: Validate constructor-specific constraints.
+void Parser::ValidateConstructorQualifiers(ClassMember* member) {
+  if (member->method->name != "new") return;
+  if (member->is_static) {
+    diag_.Error(member->method->loc,
+                "constructor shall not be declared static");
+  }
+  if (member->is_virtual) {
+    diag_.Error(member->method->loc,
+                "constructor shall not be declared virtual");
+  }
+}
+
 // Parse keyword-introduced class members (methods, constraints, typedefs,
 // parameters, nested classes, covergroups). Returns true if handled.
 bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
@@ -377,18 +394,7 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseFunctionDecl(proto);
     ValidateClassMethod(member);
-    // §8.7: Constructor shall not be declared static or virtual.
-    if (member->method->name == "new") {
-      if (member->is_static) {
-        diag_.Error(member->method->loc,
-                    "constructor shall not be declared static");
-      }
-      if (member->is_virtual) {
-        diag_.Error(member->method->loc,
-                    "constructor shall not be declared virtual");
-      }
-    }
-    // §8.24: Mark extern method prototypes.
+    ValidateConstructorQualifiers(member);
     if (proto && !member->is_pure_virtual) member->method->is_extern = true;
     members.push_back(member);
     return true;
@@ -397,7 +403,6 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseTaskDecl(proto);
     ValidateClassMethod(member);
-    // §8.24: Mark extern task prototypes.
     if (proto && !member->is_pure_virtual) member->method->is_extern = true;
     members.push_back(member);
     return true;

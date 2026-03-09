@@ -355,6 +355,26 @@ Expr* Parser::ParseTaggedExpr() {
   return expr;
 }
 
+// §8.11/§8.15: Parse 'this' or 'super' primary expression.
+Expr* Parser::ParseThisOrSuperExpr() {
+  auto super_tok = Consume();
+  Expr* result = ParseMemberAccessChain(super_tok);
+  // §8.15: super.super is not allowed.
+  if (super_tok.kind == TokenKind::kKwSuper) {
+    for (auto* e = result; e && e->kind == ExprKind::kMemberAccess;
+         e = e->lhs) {
+      if (e->rhs && e->rhs->kind == ExprKind::kIdentifier &&
+          e->rhs->text == "super") {
+        diag_.Error(e->rhs->range.start, "'super.super' is not allowed");
+        break;
+      }
+    }
+  }
+  if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
+  if (Check(TokenKind::kLBracket)) result = ParseSelectExpr(result);
+  return ParseWithClause(result);
+}
+
 Expr* Parser::ParsePrimaryExpr() {
   auto tok = CurrentToken();
 
@@ -386,24 +406,8 @@ Expr* Parser::ParsePrimaryExpr() {
     case TokenKind::kKwNull:  // §8.4
       return MakeLiteral(ExprKind::kIdentifier, tok);
     case TokenKind::kKwThis:
-    case TokenKind::kKwSuper: {  // §8.11/§8.15
-      auto super_tok = Consume();
-      Expr* result = ParseMemberAccessChain(super_tok);
-      // §8.15: super.super is not allowed.
-      if (super_tok.kind == TokenKind::kKwSuper) {
-        for (auto* e = result; e && e->kind == ExprKind::kMemberAccess;
-             e = e->lhs) {
-          if (e->rhs && e->rhs->kind == ExprKind::kIdentifier &&
-              e->rhs->text == "super") {
-            diag_.Error(e->rhs->range.start, "'super.super' is not allowed");
-            break;
-          }
-        }
-      }
-      if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
-      if (Check(TokenKind::kLBracket)) result = ParseSelectExpr(result);
-      return ParseWithClause(result);
-    }
+    case TokenKind::kKwSuper:  // §8.11/§8.15
+      return ParseThisOrSuperExpr();
     case TokenKind::kKwTagged:  // §11.9
       return ParseTaggedExpr();
     case TokenKind::kKwNew:  // §8.7

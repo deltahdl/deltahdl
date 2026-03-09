@@ -4,8 +4,8 @@
 
 namespace delta {
 
-static bool IsIdentChar(char c) {
-  return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
+bool IsIdentChar(char c) {
+  return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '$';
 }
 
 // --- Ifdef expression evaluator (IEEE 1800-2023 §22.6) ---
@@ -162,35 +162,50 @@ std::string_view Preprocessor::ExtractBalancedArgs(std::string_view text) {
   return {};
 }
 
-// §22.5.1: Split macro arguments respecting balanced (), [], {}, and "".
-std::vector<std::string_view> Preprocessor::SplitMacroArgs(
-    std::string_view args_text) {
-  std::vector<std::string_view> args;
+// Track balanced delimiters: parentheses, brackets, braces, and strings.
+struct DelimiterTracker {
   int paren_depth = 0;
   int bracket_depth = 0;
   int brace_depth = 0;
   bool in_string = false;
+
+  // Update state for a character. Returns true if inside a nested context.
+  bool Update(char c, char prev) {
+    if (c == '"' && prev != '\\') {
+      in_string = !in_string;
+      return true;
+    }
+    if (in_string) return true;
+    if (c == '(')
+      ++paren_depth;
+    else if (c == ')')
+      --paren_depth;
+    else if (c == '[')
+      ++bracket_depth;
+    else if (c == ']')
+      --bracket_depth;
+    else if (c == '{')
+      ++brace_depth;
+    else if (c == '}')
+      --brace_depth;
+    return false;
+  }
+
+  bool AtTopLevel() const {
+    return paren_depth == 0 && bracket_depth == 0 && brace_depth == 0;
+  }
+};
+
+// §22.5.1: Split macro arguments respecting balanced (), [], {}, and "".
+std::vector<std::string_view> Preprocessor::SplitMacroArgs(
+    std::string_view args_text) {
+  std::vector<std::string_view> args;
+  DelimiterTracker tracker;
   size_t start = 0;
   for (size_t i = 0; i < args_text.size(); ++i) {
-    if (args_text[i] == '"' && (i == 0 || args_text[i - 1] != '\\')) {
-      in_string = !in_string;
-      continue;
-    }
-    if (in_string) continue;
-    if (args_text[i] == '(')
-      ++paren_depth;
-    else if (args_text[i] == ')')
-      --paren_depth;
-    else if (args_text[i] == '[')
-      ++bracket_depth;
-    else if (args_text[i] == ']')
-      --bracket_depth;
-    else if (args_text[i] == '{')
-      ++brace_depth;
-    else if (args_text[i] == '}')
-      --brace_depth;
-    if (args_text[i] == ',' && paren_depth == 0 && bracket_depth == 0 &&
-        brace_depth == 0) {
+    char prev = (i == 0) ? '\0' : args_text[i - 1];
+    if (tracker.Update(args_text[i], prev)) continue;
+    if (args_text[i] == ',' && tracker.AtTopLevel()) {
       args.push_back(Trim(args_text.substr(start, i - start)));
       start = i + 1;
     }

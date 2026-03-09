@@ -520,6 +520,53 @@ static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
   return false;
 }
 
+// §13.4.2: Create or reinitialize a local variable with given width and init.
+static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
+                                    const Expr* init, SimContext& ctx,
+                                    Arena& arena) {
+  uint32_t w = EvalTypeWidth(type);
+  if (w == 0) w = 32;
+  auto* v = ctx.CreateLocalVariable(name, w);
+  if (init) v->value = EvalExpr(init, ctx, arena);
+  return v;
+}
+
+// §13.4.2: Handle automatic var in static function.
+static void ExecFuncVarDeclAutomatic(const Stmt* stmt, SimContext& ctx,
+                                     Arena& arena) {
+  CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type, stmt->var_init, ctx,
+                     arena);
+}
+
+// §13.4.2: Handle static var in automatic function.
+static void ExecFuncVarDeclStatic(const Stmt* stmt, std::string_view func_name,
+                                  SimContext& ctx, Arena& arena) {
+  auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
+  if (existing) {
+    ctx.AliasLocalVariable(stmt->var_name, existing);
+    return;
+  }
+  auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,
+                               stmt->var_init, ctx, arena);
+  ctx.SaveStaticFuncVar(func_name, stmt->var_name, v);
+}
+
+// §13.3.1/§13.4.2: Handle var declaration inside function body.
+static void ExecFuncVarDecl(const Stmt* stmt, std::string_view func_name,
+                            SimContext& ctx, Arena& arena) {
+  if (stmt->var_is_automatic) {
+    ExecFuncVarDeclAutomatic(stmt, ctx, arena);
+    return;
+  }
+  if (stmt->var_is_static) {
+    ExecFuncVarDeclStatic(stmt, func_name, ctx, arena);
+    return;
+  }
+  if (ctx.FindLocalVariable(stmt->var_name)) return;
+  CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type, stmt->var_init, ctx,
+                     arena);
+}
+
 // Execute a single statement in a function body; returns true on 'return'.
 static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
                          std::string_view func_name, SimContext& ctx,
@@ -535,37 +582,9 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
     case StmtKind::kExprStmt:
       EvalExpr(stmt->expr, ctx, arena);
       return false;
-    case StmtKind::kVarDecl: {
-      // §13.4.2: Automatic var in static function — reinitialize each call.
-      if (stmt->var_is_automatic) {
-        uint32_t w = EvalTypeWidth(stmt->var_decl_type);
-        if (w == 0) w = 32;
-        auto* v = ctx.CreateLocalVariable(stmt->var_name, w);
-        if (stmt->var_init) v->value = EvalExpr(stmt->var_init, ctx, arena);
-        return false;
-      }
-      // §13.4.2: Static var in automatic function — persist across calls.
-      if (stmt->var_is_static) {
-        auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
-        if (existing) {
-          ctx.AliasLocalVariable(stmt->var_name, existing);
-          return false;
-        }
-        uint32_t w = EvalTypeWidth(stmt->var_decl_type);
-        if (w == 0) w = 32;
-        auto* v = ctx.CreateLocalVariable(stmt->var_name, w);
-        if (stmt->var_init) v->value = EvalExpr(stmt->var_init, ctx, arena);
-        ctx.SaveStaticFuncVar(func_name, stmt->var_name, v);
-        return false;
-      }
-      // §13.3.1: Static variables persist across calls — skip re-init.
-      if (ctx.FindLocalVariable(stmt->var_name)) return false;
-      uint32_t w = EvalTypeWidth(stmt->var_decl_type);
-      if (w == 0) w = 32;
-      auto* v = ctx.CreateLocalVariable(stmt->var_name, w);
-      if (stmt->var_init) v->value = EvalExpr(stmt->var_init, ctx, arena);
+    case StmtKind::kVarDecl:
+      ExecFuncVarDecl(stmt, func_name, ctx, arena);
       return false;
-    }
     case StmtKind::kIf:
       return ExecFuncIf(stmt, ret_var, func_name, ctx, arena);
     case StmtKind::kBlock:
@@ -623,37 +642,54 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, result);
 }
 
-// §8: Dispatch a method call on a class object instance.
-static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
-                                   Arena& arena, Logic4Vec& out) {
-  MethodCallParts parts;
-  if (!ExtractMethodCallParts(expr, parts)) return false;
+// Forward declaration for use in ExecInstanceMethodCall.
+static void ExecClassMethod(ModuleItem* method, bool is_void, const Expr* expr,
+                            SimContext& ctx, Arena& arena, Logic4Vec& out);
+
+struct InstanceMethodInfo {
+  ClassObject* obj = nullptr;
+  ModuleItem* method = nullptr;
+};
+
+// §8.22: Resolve a class instance and its method by name.
+static bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
+                                  InstanceMethodInfo& info) {
   auto class_type = ctx.GetVariableClassType(parts.var_name);
   if (class_type.empty()) return false;
   auto* var = ctx.FindVariable(parts.var_name);
   if (!var) return false;
   auto handle = var->value.ToUint64();
   if (handle == kNullClassHandle) return false;
-  auto* obj = ctx.GetClassObject(handle);
-  if (!obj) return false;
-  // §8.22: Try virtual dispatch first (polymorphic), then static resolution.
-  auto* method = obj->ResolveVirtualMethod(parts.method_name);
-  if (!method) method = obj->ResolveMethod(parts.method_name);
-  if (!method) return false;
+  info.obj = ctx.GetClassObject(handle);
+  if (!info.obj) return false;
+  info.method = info.obj->ResolveVirtualMethod(parts.method_name);
+  if (!info.method) info.method = info.obj->ResolveMethod(parts.method_name);
+  return info.method != nullptr;
+}
+
+// §8: Execute a resolved instance method call.
+static void ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
+                                   const Expr* expr, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
   bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
   ctx.PushScope();
   ctx.PushThis(obj);
   ctx.PushQueueRefFrame();
-  BindFunctionArgs(method, expr, ctx, arena);
-  Variable dummy_ret;
-  Variable* ret_var = &dummy_ret;
-  if (!is_void) ret_var = ctx.CreateLocalVariable(method->name, 32);
-  ExecFunctionBody(method, ret_var, ctx, arena);
+  ExecClassMethod(method, is_void, expr, ctx, arena, out);
   WritebackOutputArgs(method, expr, ctx);
   WritebackQueueRefs(ctx);
-  out = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
   ctx.PopThis();
   ctx.PopScope();
+}
+
+// §8: Dispatch a method call on a class object instance.
+static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
+  InstanceMethodInfo info;
+  if (!ResolveInstanceMethod(parts, ctx, info)) return false;
+  ExecInstanceMethodCall(info.method, info.obj, expr, ctx, arena, out);
   return true;
 }
 

@@ -58,29 +58,28 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   return true;
 }
 
-void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
-  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
-    auto name = item->assign_lhs->text;
-    MaybeCreateImplicitNet(name, item->loc, mod);
-    // §10.3.2: Variables can only have one continuous assignment.
-    if (!cont_assign_targets_.emplace(name, item->loc).second) {
-      if (net_names_.count(name) == 0) {
-        diag_.Error(
-            item->loc,
-            std::format("multiple continuous assignments to '{}'", name));
-      }
-    }
-    // §10.3.2: Variable driven by continuous assignment shall not have
-    // an initializer in the declaration.
-    if (var_init_names_.count(name) != 0) {
+// §10.3.2: Validate identifier-based continuous assignment targets.
+void Elaborator::ValidateContAssignIdentLhs(ModuleItem* item,
+                                            RtlirModule* mod) {
+  auto name = item->assign_lhs->text;
+  MaybeCreateImplicitNet(name, item->loc, mod);
+  if (!cont_assign_targets_.emplace(name, item->loc).second) {
+    if (net_names_.count(name) == 0) {
       diag_.Error(item->loc,
-                  std::format("variable '{}' has both an initializer and a "
-                              "continuous assignment",
-                              name));
+                  std::format("multiple continuous assignments to '{}'", name));
     }
   }
-  // §10.3.2: Nettype LHS shall not contain indexing or select.
-  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kSelect) {
+  if (var_init_names_.count(name) != 0) {
+    diag_.Error(item->loc,
+                std::format("variable '{}' has both an initializer and a "
+                            "continuous assignment",
+                            name));
+  }
+}
+
+// §10.3.2/§10.3.3: Validate nettype constraints on continuous assignment.
+void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
+  if (item->assign_lhs->kind == ExprKind::kSelect) {
     auto* base = item->assign_lhs->base;
     if (base && base->kind == ExprKind::kIdentifier &&
         nettype_net_names_.count(base->text) != 0) {
@@ -89,8 +88,7 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
                   "indexing or select");
     }
   }
-  // §10.3.3: Nettype nets shall only have a single delay.
-  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier &&
+  if (item->assign_lhs->kind == ExprKind::kIdentifier &&
       nettype_net_names_.count(item->assign_lhs->text) != 0) {
     if (item->assign_delay_fall || item->assign_delay_decay) {
       diag_.Error(item->loc,
@@ -98,26 +96,39 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
                   "a single delay");
     }
   }
-  // §10.3.4: Drive strength applies only to scalar nets, except
-  // supply0/supply1.
-  if ((item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
-      item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
-    uint32_t lhs_width = LookupLhsWidth(item->assign_lhs, mod);
-    if (lhs_width > 1) {
-      bool is_supply = false;
-      for (const auto& n : mod->nets) {
-        if (n.name == item->assign_lhs->text) {
-          is_supply = (n.net_type == NetType::kSupply0 ||
-                       n.net_type == NetType::kSupply1);
-          break;
-        }
-      }
-      if (!is_supply) {
-        diag_.Error(item->loc,
-                    "drive strength on continuous assignment applies only to "
-                    "scalar nets");
-      }
+}
+
+// §10.3.4: Validate drive strength on continuous assignment.
+void Elaborator::ValidateContAssignDriveStrength(ModuleItem* item,
+                                                 RtlirModule* mod) {
+  if (item->assign_lhs->kind != ExprKind::kIdentifier) return;
+  uint32_t lhs_width = LookupLhsWidth(item->assign_lhs, mod);
+  if (lhs_width <= 1) return;
+  bool is_supply = false;
+  for (const auto& n : mod->nets) {
+    if (n.name == item->assign_lhs->text) {
+      is_supply =
+          (n.net_type == NetType::kSupply0 || n.net_type == NetType::kSupply1);
+      break;
     }
+  }
+  if (!is_supply) {
+    diag_.Error(item->loc,
+                "drive strength on continuous assignment applies only to "
+                "scalar nets");
+  }
+}
+
+void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
+  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
+    ValidateContAssignIdentLhs(item, mod);
+  }
+  if (item->assign_lhs) {
+    ValidateContAssignNettypeAndDelay(item);
+  }
+  if ((item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
+      item->assign_lhs) {
+    ValidateContAssignDriveStrength(item, mod);
   }
   RtlirContAssign ca;
   ca.lhs = item->assign_lhs;
@@ -202,9 +213,6 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateNettypeDecl(item, mod);
       break;
     case ModuleItemKind::kFunctionDecl:
-      ValidateFunctionBody(item);
-      mod->function_decls.push_back(item);
-      break;
     case ModuleItemKind::kTaskDecl:
       ValidateFunctionBody(item);
       mod->function_decls.push_back(item);

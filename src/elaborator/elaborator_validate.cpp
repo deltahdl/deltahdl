@@ -131,7 +131,7 @@ void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
 
 // --- §6 validation helpers ---
 
-static std::string_view ExprIdent(const Expr* e) {
+std::string_view ExprIdent(const Expr* e) {
   if (!e) return {};
   if (e->kind == ExprKind::kIdentifier) return e->text;
   return {};
@@ -153,7 +153,7 @@ static void CollectProcTargets(
   for (auto& ci : s->case_items) CollectProcTargets(ci.body, out);
 }
 
-static bool IsRealType(DataTypeKind k) {
+bool IsRealType(DataTypeKind k) {
   return k == DataTypeKind::kReal || k == DataTypeKind::kShortreal ||
          k == DataTypeKind::kRealtime;
 }
@@ -548,51 +548,37 @@ static bool IsValidOutputArg(const Expr* e) {
          e->kind == ExprKind::kMemberAccess;
 }
 
-// §13.5: Validate a single call expression against its declaration.
-static void CheckCallArgs(
-    const Expr* expr,
-    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
-    DiagEngine& diag) {
-  if (!expr || expr->kind != ExprKind::kCall || expr->callee.empty()) return;
-  auto it = func_decls.find(expr->callee);
-  if (it == func_decls.end()) return;
-  const auto* func = it->second;
-  size_t param_count = func->func_args.size();
-  size_t positional_count = expr->args.size() - expr->arg_names.size();
-  // §13.5: Too many positional args.
-  if (positional_count > param_count) {
-    diag.Error(expr->range.start,
-               std::format("too many arguments to '{}': expected {}, got {}",
-                           func->name, param_count, positional_count));
-    return;
+// §13.5: Check whether parameter i is provided by the call expression.
+static bool IsArgProvided(const Expr* expr, size_t i, std::string_view name,
+                          size_t positional_count) {
+  if (expr->arg_names.empty()) return (i < expr->args.size());
+  if (i < positional_count) return true;
+  for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+    if (expr->arg_names[j] == name) return true;
   }
-  // §13.5.3: Check that required args (no default) are provided.
-  for (size_t i = 0; i < param_count; ++i) {
-    bool provided = false;
-    if (expr->arg_names.empty()) {
-      provided = (i < expr->args.size());
-    } else {
-      if (i < positional_count) {
-        provided = true;
-      } else {
-        for (size_t j = 0; j < expr->arg_names.size(); ++j) {
-          if (expr->arg_names[j] == func->func_args[i].name) {
-            provided = true;
-            break;
-          }
-        }
-      }
-    }
+  return false;
+}
+
+// §13.5.3: Check that required args (no default) are provided.
+static void CheckRequiredArgs(const Expr* expr, const ModuleItem* func,
+                              size_t positional_count, DiagEngine& diag) {
+  for (size_t i = 0; i < func->func_args.size(); ++i) {
+    bool provided =
+        IsArgProvided(expr, i, func->func_args[i].name, positional_count);
     if (!provided && !func->func_args[i].default_value) {
       diag.Error(expr->range.start,
                  std::format("missing argument '{}' in call to '{}'",
                              func->func_args[i].name, func->name));
     }
   }
-  // §13.5.4: Check that named args reference valid parameter names.
+}
+
+// §13.5.4: Check that named args reference valid parameter names.
+static void CheckNamedArgs(const Expr* expr, const ModuleItem* func,
+                           DiagEngine& diag) {
   for (size_t j = 0; j < expr->arg_names.size(); ++j) {
     bool found = false;
-    for (size_t i = 0; i < param_count; ++i) {
+    for (size_t i = 0; i < func->func_args.size(); ++i) {
       if (func->func_args[i].name == expr->arg_names[j]) {
         found = true;
         break;
@@ -604,26 +590,31 @@ static void CheckCallArgs(
                              func->name));
     }
   }
-  // §13.5: Check output/inout args are valid LHS.
-  for (size_t i = 0; i < param_count; ++i) {
+}
+
+// §13.5: Find the call-site arg index for a named/positional parameter.
+static int ResolveCallArgIndex(const Expr* expr, size_t i,
+                               std::string_view name, size_t positional_count) {
+  if (expr->arg_names.empty()) {
+    return (i < expr->args.size()) ? static_cast<int>(i) : -1;
+  }
+  if (i < positional_count) return static_cast<int>(i);
+  for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+    if (expr->arg_names[j] == name) {
+      return static_cast<int>(positional_count + j);
+    }
+  }
+  return -1;
+}
+
+// §13.5: Check output/inout args are valid LHS.
+static void CheckOutputArgs(const Expr* expr, const ModuleItem* func,
+                            size_t positional_count, DiagEngine& diag) {
+  for (size_t i = 0; i < func->func_args.size(); ++i) {
     auto dir = func->func_args[i].direction;
     if (dir != Direction::kOutput && dir != Direction::kInout) continue;
-    // Find corresponding call-site arg.
-    int ai = -1;
-    if (expr->arg_names.empty()) {
-      ai = (i < expr->args.size()) ? static_cast<int>(i) : -1;
-    } else {
-      if (i < positional_count) {
-        ai = static_cast<int>(i);
-      } else {
-        for (size_t j = 0; j < expr->arg_names.size(); ++j) {
-          if (expr->arg_names[j] == func->func_args[i].name) {
-            ai = static_cast<int>(positional_count + j);
-            break;
-          }
-        }
-      }
-    }
+    int ai =
+        ResolveCallArgIndex(expr, i, func->func_args[i].name, positional_count);
     if (ai < 0) continue;
     auto* arg = expr->args[static_cast<size_t>(ai)];
     if (arg && !IsValidOutputArg(arg)) {
@@ -633,6 +624,28 @@ static void CheckCallArgs(
                              func->func_args[i].name));
     }
   }
+}
+
+// §13.5: Validate a single call expression against its declaration.
+static void CheckCallArgs(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  if (!expr || expr->kind != ExprKind::kCall || expr->callee.empty()) return;
+  auto it = func_decls.find(expr->callee);
+  if (it == func_decls.end()) return;
+  const auto* func = it->second;
+  size_t param_count = func->func_args.size();
+  size_t positional_count = expr->args.size() - expr->arg_names.size();
+  if (positional_count > param_count) {
+    diag.Error(expr->range.start,
+               std::format("too many arguments to '{}': expected {}, got {}",
+                           func->name, param_count, positional_count));
+    return;
+  }
+  CheckRequiredArgs(expr, func, positional_count, diag);
+  CheckNamedArgs(expr, func, diag);
+  CheckOutputArgs(expr, func, positional_count, diag);
 }
 
 // §13.5: Walk expression tree for call validation.

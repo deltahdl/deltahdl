@@ -259,8 +259,8 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
 }
 
 // §6.25: Find a ClassDecl by name in the compilation unit.
-static const ClassDecl* FindClassDecl(std::string_view name,
-                                      const CompilationUnit* unit) {
+const ClassDecl* FindClassDecl(std::string_view name,
+                               const CompilationUnit* unit) {
   for (const auto* cls : unit->classes) {
     if (cls->name == name) return cls;
   }

@@ -39,20 +39,21 @@ static bool IsDataTypeKeyword(TokenKind tk) {
   }
 }
 
-Stmt* Parser::ParseStmt() {
-  // §9.3.5: statement label — identifier ':' before statement
-  std::string_view prefix_label;
-  if (CheckIdentifier()) {
-    auto saved = lexer_.SavePos();
-    auto id_tok = Consume();
-    if (Check(TokenKind::kColon)) {
-      Consume();
-      prefix_label = id_tok.text;
-    } else {
-      lexer_.RestorePos(saved);
-    }
+// §9.3.5: Try to parse a statement label (identifier ':').
+std::string_view Parser::TryParseStmtLabel() {
+  if (!CheckIdentifier()) return {};
+  auto saved = lexer_.SavePos();
+  auto id_tok = Consume();
+  if (Check(TokenKind::kColon)) {
+    Consume();
+    return id_tok.text;
   }
+  lexer_.RestorePos(saved);
+  return {};
+}
 
+Stmt* Parser::ParseStmt() {
+  auto prefix_label = TryParseStmtLabel();
   auto attrs = ParseAttributes();
 
   if (Match(TokenKind::kSemicolon)) {
@@ -62,7 +63,6 @@ Stmt* Parser::ParseStmt() {
     return stmt;
   }
 
-  // unique/unique0/priority qualifiers for case/if (LRM section 12.4.2, 12.5)
   auto qual = TokenToCaseQualifier(CurrentToken().kind);
   if (qual != CaseQualifier::kNone) {
     Consume();
@@ -70,11 +70,9 @@ Stmt* Parser::ParseStmt() {
 
   Stmt* stmt = ParseStmtBody();
   if (stmt != nullptr) {
-    // §9.3.5: Label before begin/fork is equivalent to block name.
     if (!prefix_label.empty() && stmt->label.empty()) {
       stmt->label = prefix_label;
     } else if (!prefix_label.empty() && !stmt->label.empty()) {
-      // §9.3.5: Illegal to have both a label and a block name.
       diag_.Error(stmt->range.start,
                   "cannot have both a statement label and a block name");
     }

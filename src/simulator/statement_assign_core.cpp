@@ -218,99 +218,122 @@ static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 }
 
+// §11.4.14.3: Parse a digit-string identifier as an integer.
+static uint32_t ParseDigitIdentifier(std::string_view text) {
+  uint32_t n = 0;
+  for (char c : text) {
+    if (c >= '0' && c <= '9') n = n * 10 + (c - '0');
+  }
+  return n > 0 ? n : 1;
+}
+
+// §11.4.14.3: Map a type name to its bit width for streaming slicing.
+static uint32_t TypeNameToSliceWidth(std::string_view t) {
+  if (t == "byte") return 8;
+  if (t == "shortint") return 16;
+  if (t == "int" || t == "integer") return 32;
+  if (t == "longint") return 64;
+  if (t == "real" || t == "realtime") return 64;
+  if (t == "shortreal") return 32;
+  if (t == "bit" || t == "logic" || t == "reg") return 1;
+  return 32;
+}
+
 // §11.4.14.3: Determine streaming slice size from optional type/expression.
 static uint32_t StreamSliceSizeForUnpack(const Expr* size_expr, SimContext& ctx,
                                          Arena& arena) {
   if (!size_expr) return 1;
   if (size_expr->kind == ExprKind::kIdentifier) {
-    // Check for digit string first.
     if (!size_expr->text.empty() && size_expr->text[0] >= '0' &&
         size_expr->text[0] <= '9') {
-      uint32_t n = 0;
-      for (char c : size_expr->text) {
-        if (c >= '0' && c <= '9') n = n * 10 + (c - '0');
-      }
-      return n > 0 ? n : 1;
+      return ParseDigitIdentifier(size_expr->text);
     }
-    // Type-based slice size.
-    auto t = size_expr->text;
-    if (t == "byte") return 8;
-    if (t == "shortint") return 16;
-    if (t == "int" || t == "integer") return 32;
-    if (t == "longint") return 64;
-    if (t == "real" || t == "realtime") return 64;
-    if (t == "shortreal") return 32;
-    if (t == "bit" || t == "logic" || t == "reg") return 1;
-    return 32;
+    return TypeNameToSliceWidth(size_expr->text);
   }
   auto val = EvalExpr(size_expr, ctx, arena).ToUint64();
   return (val == 0) ? 1 : static_cast<uint32_t>(val);
 }
 
-// §11.4.14.3: Streaming concatenation as LHS — unpack RHS into elements.
-static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
-                                     SimContext& ctx, Arena& arena) {
-  // Compute total target width from LHS elements.
+// §11.4.14.3: Element info for streaming unpack.
+struct StreamElemInfo {
+  const Expr* expr;
+  uint32_t width;
+};
+
+// §11.4.14.3: Collect LHS elements and compute total width.
+static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
+                                      std::vector<StreamElemInfo>& elems) {
   uint32_t total_width = 0;
-  struct ElemInfo {
-    const Expr* expr;
-    uint32_t width;
-  };
-  std::vector<ElemInfo> elems;
   for (auto* elem : lhs->elements) {
     auto* var = ResolveLhsVariable(elem, ctx);
     if (!var) continue;
     elems.push_back({elem, var->value.width});
     total_width += var->value.width;
   }
+  return total_width;
+}
+
+// §11.4.14.3: Reverse slice order for left-shift streaming (<<).
+static Logic4Vec ReverseStreamSlices(const Logic4Vec& stream,
+                                     uint32_t total_width, uint32_t ss,
+                                     Arena& arena) {
+  uint32_t nslices = (total_width + ss - 1) / ss;
+  auto reordered = MakeLogic4Vec(arena, total_width);
+  for (uint32_t i = 0; i < nslices; ++i) {
+    uint32_t src_start = i * ss;
+    uint32_t dst_start = (nslices - 1 - i) * ss;
+    uint32_t bits_to_copy = ss;
+    if (src_start + bits_to_copy > total_width)
+      bits_to_copy = total_width - src_start;
+    for (uint32_t b = 0; b < bits_to_copy; ++b) {
+      uint32_t sbit = src_start + b;
+      uint32_t dbit = dst_start + b;
+      if (dbit >= total_width) break;
+      uint32_t sw = sbit / 64, sb = sbit % 64;
+      uint32_t dw = dbit / 64, db = dbit % 64;
+      if (sw < stream.nwords && (stream.words[sw].aval >> sb) & 1)
+        reordered.words[dw].aval |= uint64_t{1} << db;
+    }
+  }
+  return reordered;
+}
+
+// §11.4.14.3: Extract a bit-field from the stream and assign to a variable.
+static void DistributeStreamBits(const StreamElemInfo& ei, uint32_t bit_offset,
+                                 uint32_t total_width, const Logic4Vec& stream,
+                                 SimContext& ctx, Arena& arena) {
+  auto* var = ResolveLhsVariable(ei.expr, ctx);
+  if (!var) return;
+  uint64_t val = 0;
+  for (uint32_t b = 0; b < ei.width && b < 64; ++b) {
+    uint32_t sbit = bit_offset + b;
+    if (sbit >= total_width) break;
+    uint32_t w = sbit / 64, bi = sbit % 64;
+    if (w < stream.nwords && (stream.words[w].aval >> bi) & 1)
+      val |= uint64_t{1} << b;
+  }
+  var->value = MakeLogic4VecVal(arena, ei.width, val);
+  var->NotifyWatchers();
+}
+
+// §11.4.14.3: Streaming concatenation as LHS — unpack RHS into elements.
+static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
+                                     SimContext& ctx, Arena& arena) {
+  std::vector<StreamElemInfo> elems;
+  uint32_t total_width = CollectStreamElements(lhs, ctx, elems);
   if (total_width == 0 || elems.empty()) return;
 
-  // Start with the RHS value, resized to target width.
-  // §11.4.14.3: If source has more bits, consume from MSB end.
   auto stream = ResizeToWidth(rhs_val, total_width, arena);
 
-  // For left-shift streaming (<<), reverse slice order before distributing.
   if (lhs->op == TokenKind::kLtLt) {
     uint32_t ss = StreamSliceSizeForUnpack(lhs->lhs, ctx, arena);
-    uint32_t nslices = (total_width + ss - 1) / ss;
-    auto reordered = MakeLogic4Vec(arena, total_width);
-    for (uint32_t i = 0; i < nslices; ++i) {
-      uint32_t src_start = i * ss;
-      uint32_t dst_start = (nslices - 1 - i) * ss;
-      // Extract bits from source.
-      uint32_t bits_to_copy = ss;
-      if (src_start + bits_to_copy > total_width)
-        bits_to_copy = total_width - src_start;
-      for (uint32_t b = 0; b < bits_to_copy; ++b) {
-        uint32_t sbit = src_start + b;
-        uint32_t dbit = dst_start + b;
-        if (dbit >= total_width) break;
-        uint32_t sw = sbit / 64, sb = sbit % 64;
-        uint32_t dw = dbit / 64, db = dbit % 64;
-        if (sw < stream.nwords && (stream.words[sw].aval >> sb) & 1)
-          reordered.words[dw].aval |= uint64_t{1} << db;
-      }
-    }
-    stream = reordered;
+    stream = ReverseStreamSlices(stream, total_width, ss, arena);
   }
 
-  // Distribute bits MSB-first (left-to-right) into elements.
   uint32_t bit_offset = total_width;
   for (auto& ei : elems) {
     bit_offset -= ei.width;
-    auto* var = ResolveLhsVariable(ei.expr, ctx);
-    if (!var) continue;
-    // Extract ei.width bits starting at bit_offset from the stream.
-    uint64_t val = 0;
-    for (uint32_t b = 0; b < ei.width && b < 64; ++b) {
-      uint32_t sbit = bit_offset + b;
-      if (sbit >= total_width) break;
-      uint32_t w = sbit / 64, bi = sbit % 64;
-      if (w < stream.nwords && (stream.words[w].aval >> bi) & 1)
-        val |= uint64_t{1} << b;
-    }
-    var->value = MakeLogic4VecVal(arena, ei.width, val);
-    var->NotifyWatchers();
+    DistributeStreamBits(ei, bit_offset, total_width, stream, ctx, arena);
   }
 }
 
@@ -407,6 +430,32 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 }
 
+// §10.4.2: Create a bit-select NBA callback.
+static void SetupBitSelectNbaCallback(Event* event, Variable* var,
+                                      const Expr* lhs, const Logic4Vec& rhs_val,
+                                      SimContext& ctx, Arena& arena) {
+  event->callback = [var, lhs, rhs_val, &ctx, &arena]() {
+    WriteBitSelect(var, lhs, rhs_val, ctx, arena);
+    var->NotifyWatchers();
+  };
+}
+
+// §10.4.2: Create a whole-variable NBA callback.
+static void SetupWholeVarNbaCallback(Event* event, Variable* var,
+                                     const Logic4Vec& rhs_val) {
+  var->pending_nba = rhs_val;
+  var->has_pending_nba = true;
+  event->callback = [var]() {
+    if (var->has_pending_nba) {
+      if (!var->is_forced) {
+        var->value = var->pending_nba;
+        var->NotifyWatchers();
+      }
+      var->has_pending_nba = false;
+    }
+  };
+}
+
 // §10.4.2: Schedule an NBA event at current_time + delay_ticks.
 void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
                                uint64_t delay_ticks, SimContext& ctx,
@@ -419,24 +468,9 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
 
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
   if (is_select && !elem) {
-    const Expr* lhs_copy = stmt->lhs;
-    event->callback = [var, lhs_copy, rhs_val, &ctx, &arena]() {
-      WriteBitSelect(var, lhs_copy, rhs_val, ctx, arena);
-      var->NotifyWatchers();
-    };
+    SetupBitSelectNbaCallback(event, var, stmt->lhs, rhs_val, ctx, arena);
   } else {
-    var->pending_nba = rhs_val;
-    var->has_pending_nba = true;
-    event->callback = [var]() {
-      if (var->has_pending_nba) {
-        // §10.6.2: While forced, NBA does not change the value.
-        if (!var->is_forced) {
-          var->value = var->pending_nba;
-          var->NotifyWatchers();
-        }
-        var->has_pending_nba = false;
-      }
-    };
+    SetupWholeVarNbaCallback(event, var, rhs_val);
   }
   auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
   auto schedule_time = ctx.CurrentTime() + SimTime{delay_ticks};

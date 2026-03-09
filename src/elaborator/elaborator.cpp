@@ -71,7 +71,7 @@ static ResolvedAttribute EvalAttribute(const Attribute& attr) {
 
 // §5.12: Resolve AST attributes into RTLIR ResolvedAttributes.
 // Deduplicates (last wins) and evaluates constant expressions.
-static std::vector<ResolvedAttribute> ResolveAttributes(
+std::vector<ResolvedAttribute> ResolveAttributes(
     const std::vector<Attribute>& attrs, DiagEngine& diag) {
   std::vector<ResolvedAttribute> result;
   for (const auto& attr : attrs) {
@@ -295,7 +295,7 @@ uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod) {
   return 0;
 }
 
-static RtlirProcessKind MapAlwaysKind(AlwaysKind ak) {
+RtlirProcessKind MapAlwaysKind(AlwaysKind ak) {
   switch (ak) {
     case AlwaysKind::kAlways:
       return RtlirProcessKind::kAlways;
@@ -386,8 +386,8 @@ static bool StmtHasTimingControl(const Stmt* stmt) {
   }
 }
 
-static void AddProcess(RtlirProcessKind kind, ModuleItem* item,
-                       RtlirModule* mod, Arena& arena, DiagEngine& diag) {
+void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
+                Arena& arena, DiagEngine& diag) {
   RtlirProcess proc;
   proc.kind = kind;
   proc.body = item->body;
@@ -508,7 +508,7 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
     }
   }
 
-  auto KindLabel = [](ModuleItemKind k) -> const char* {
+  auto kind_label = [](ModuleItemKind k) -> const char* {
     switch (k) {
       case ModuleItemKind::kAlwaysFFBlock:
         return "always_ff";
@@ -525,7 +525,7 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
       if (cont_assign_lhs.count(var)) {
         diag_.Error(procs[i].loc, std::format("variable '{}' driven by {} and "
                                               "continuous assignment",
-                                              var, KindLabel(procs[i].kind)));
+                                              var, kind_label(procs[i].kind)));
       }
       // Check against other processes.
       for (size_t j = i + 1; j < procs.size(); ++j) {
