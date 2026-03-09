@@ -26,8 +26,7 @@ Read the LRM to verify — do not guess from titles.
 If no LRM clause applies, respond with "non-lrm".
 
 Also return a suite_name and test_name: PascalCase names that intuitively
-describe what the test exercises. Both must be valid C++ identifiers matching
-the regex ^[A-Za-z_]\\w*$. The suite_name groups related tests (e.g.,
+describe what the test exercises. Both must be valid C++ identifiers. The suite_name groups related tests (e.g.,
 BinaryOperators, SpecifyBlocks, AlwaysCombLatch). The test_name describes
 what this specific test case verifies (e.g., AdditionOverflow,
 EmptyPattern, NestedReplication). Do NOT include clause or annex numbers.
@@ -43,8 +42,7 @@ TOPIC_PROMPT_TEMPLATE = """What non-LRM topic does this test belong to?
 Return a short snake_case topic name (e.g., "aig", "arena", "dpi_helpers").
 
 Also return a suite_name and test_name: PascalCase names that intuitively
-describe what the test exercises. Both must be valid C++ identifiers matching
-the regex ^[A-Za-z_]\\w*$. The suite_name groups related tests (e.g.,
+describe what the test exercises. Both must be valid C++ identifiers. The suite_name groups related tests (e.g.,
 AigGraph, ArenaAllocator, DpiHelpers). The test_name describes what this
 specific test case verifies. Do NOT include clause or annex numbers.
 

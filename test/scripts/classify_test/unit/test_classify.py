@@ -861,11 +861,6 @@ def test_clause_prompt_mentions_suite_name(ct):
     assert "suite_name" in getattr(ct, "_CLAUSE_PROMPT_TEMPLATE")
 
 
-def test_clause_prompt_mentions_regex(ct):
-    """CLAUSE_PROMPT_TEMPLATE includes the identifier regex."""
-    assert r"^[A-Za-z_]\w*$" in getattr(ct, "_CLAUSE_PROMPT_TEMPLATE")
-
-
 def test_topic_schema_has_suite_name(ct):
     """TOPIC_SCHEMA includes a suite_name property."""
     schema = json.loads(getattr(ct, "_TOPIC_SCHEMA"))
