@@ -876,7 +876,7 @@ def test_topic_schema_has_test_name(ct):
 # ---- _apply_classification: renaming ---------------------------------------
 
 
-def _apply_with_names(ct, ct_helpers, *, macro="TEST"):
+def _apply_with_names(ct, *, macro="TEST"):
     """Apply a clause response with suite_name+test_name, return test block."""
     _apply = getattr(ct, "_apply_classification")
     body = ["  auto r = Parse(src);"]
@@ -895,29 +895,29 @@ def _apply_with_names(ct, ct_helpers, *, macro="TEST"):
     return t
 
 
-def test_apply_classification_renames_suite(ct, ct_helpers):
+def test_apply_classification_renames_suite(ct):
     """Updates test.suite_name to the new suite name."""
-    assert _apply_with_names(ct, ct_helpers).suite_name == "BinaryOps"
+    assert _apply_with_names(ct).suite_name == "BinaryOps"
 
 
-def test_apply_classification_renames_test_name(ct, ct_helpers):
+def test_apply_classification_renames_test_name(ct):
     """Updates test.test_name to the new test name."""
-    assert _apply_with_names(ct, ct_helpers).test_name == "ParseAddition"
+    assert _apply_with_names(ct).test_name == "ParseAddition"
 
 
-def test_apply_classification_renames_test_line(ct, ct_helpers):
+def test_apply_classification_renames_test_line(ct):
     """Renames both args in TEST() line."""
-    t = _apply_with_names(ct, ct_helpers)
+    t = _apply_with_names(ct)
     assert t.lines[0] == "TEST(BinaryOps, ParseAddition) {"
 
 
-def test_apply_classification_renames_test_f(ct, ct_helpers):
+def test_apply_classification_renames_test_f(ct):
     """Renames both args in TEST_F() line."""
-    t = _apply_with_names(ct, ct_helpers, macro="TEST_F")
+    t = _apply_with_names(ct, macro="TEST_F")
     assert t.lines[0] == "TEST_F(BinaryOps, ParseAddition) {"
 
 
-def test_apply_classification_renames_test_p(ct, ct_helpers):
+def test_apply_classification_renames_test_p(ct):
     """Renames both args in TEST_P() line."""
-    t = _apply_with_names(ct, ct_helpers, macro="TEST_P")
+    t = _apply_with_names(ct, macro="TEST_P")
     assert t.lines[0] == "TEST_P(BinaryOps, ParseAddition) {"
