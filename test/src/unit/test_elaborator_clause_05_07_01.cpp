@@ -535,7 +535,7 @@ TEST(IntegerLiteralConstants, XZCaseInsensitive) {
   LowerRunAndCompareBitPatterns(f, design, 0xF);
 }
 
-TEST(SimClause05, Cl5_7_1_XInOctalLiteral) {
+TEST(OctalLiteralXZ, XDigitFillsThreeBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
