@@ -246,7 +246,7 @@ TEST(IntegerLiteralConstants, UnderscoredDecimalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimClause05, Cl5_7_1_DecimalXDigitAllBits) {
+TEST(DecimalLiterals, XDigitSetsAllBitsUnknown) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
