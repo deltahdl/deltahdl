@@ -643,7 +643,7 @@ static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 // Forward declaration for use in ExecInstanceMethodCall.
-static void ExecClassMethod(ModuleItem* method, bool is_void, const Expr* expr,
+static void ExecClassMethod(ModuleItem* method, const Expr* expr,
                             SimContext& ctx, Arena& arena, Logic4Vec& out);
 
 struct InstanceMethodInfo {
@@ -668,18 +668,19 @@ static bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
 }
 
 // §8: Execute a resolved instance method call.
-static void ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
-                                   const Expr* expr, SimContext& ctx,
-                                   Arena& arena, Logic4Vec& out) {
-  bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
+static Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
+                                        const Expr* expr, SimContext& ctx,
+                                        Arena& arena) {
+  Logic4Vec out;
   ctx.PushScope();
   ctx.PushThis(obj);
   ctx.PushQueueRefFrame();
-  ExecClassMethod(method, is_void, expr, ctx, arena, out);
+  ExecClassMethod(method, expr, ctx, arena, out);
   WritebackOutputArgs(method, expr, ctx);
   WritebackQueueRefs(ctx);
   ctx.PopThis();
   ctx.PopScope();
+  return out;
 }
 
 // §8: Dispatch a method call on a class object instance.
@@ -689,7 +690,7 @@ static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
   if (!ExtractMethodCallParts(expr, parts)) return false;
   InstanceMethodInfo info;
   if (!ResolveInstanceMethod(parts, ctx, info)) return false;
-  ExecInstanceMethodCall(info.method, info.obj, expr, ctx, arena, out);
+  out = ExecInstanceMethodCall(info.method, info.obj, expr, ctx, arena);
   return true;
 }
 
@@ -737,8 +738,9 @@ static bool ResolveClassScope(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-static void ExecClassMethod(ModuleItem* method, bool is_void, const Expr* expr,
+static void ExecClassMethod(ModuleItem* method, const Expr* expr,
                             SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
   BindFunctionArgs(method, expr, ctx, arena);
   Variable dummy_ret;
   Variable* ret_var = &dummy_ret;
@@ -754,7 +756,7 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
   if (!ResolveClassScope(expr, ctx, info)) return false;
   if (!info.access->lhs->elements.empty()) return false;
   ctx.PushScope();
-  ExecClassMethod(info.method, info.is_void, expr, ctx, arena, out);
+  ExecClassMethod(info.method, expr, ctx, arena, out);
   ctx.PopScope();
   return true;
 }
@@ -767,7 +769,7 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
   if (info.access->lhs->elements.empty()) return false;
   ctx.PushScope();
   BindClassParams(info.cls, info.access->lhs, ctx, arena);
-  ExecClassMethod(info.method, info.is_void, expr, ctx, arena, out);
+  ExecClassMethod(info.method, expr, ctx, arena, out);
   ctx.PopScope();
   return true;
 }

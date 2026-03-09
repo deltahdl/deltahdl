@@ -650,10 +650,9 @@ static size_t FindUndefNameEnd(std::string_view text) {
 
 // Handle the `include directive: expand macros in the argument and delegate.
 void Preprocessor::ProcessIncludeDirective(std::string_view line, SourceLoc loc,
-                                           uint32_t file_id, uint32_t line_num,
                                            int depth, std::string& output) {
   auto inc_arg = AfterDirective(line, "include");
-  auto expanded_arg = ExpandInlineMacros(inc_arg, file_id, line_num);
+  auto expanded_arg = ExpandInlineMacros(inc_arg, loc.file_id, loc.line);
   auto trimmed_arg = Trim(std::string_view(expanded_arg));
   bool angle_bracket = !trimmed_arg.empty() && trimmed_arg.front() == '<';
   HandleInclude(expanded_arg, loc, depth, output, angle_bracket);
@@ -679,6 +678,22 @@ bool Preprocessor::ProcessKeywordsDirective(std::string_view line,
     return true;
   }
   return false;
+}
+
+bool Preprocessor::ProcessActiveOnlyDirective(std::string_view line,
+                                              SourceLoc loc, int depth,
+                                              std::string& output) {
+  uint32_t file_id = loc.file_id;
+  uint32_t line_num = loc.line;
+  if (StartsWithDirective(line, "include")) {
+    ProcessIncludeDirective(line, loc, depth, output);
+    return true;
+  }
+  if (ProcessKeywordsDirective(line, loc, file_id, line_num, output))
+    return true;
+  if (ProcessStateDirective(line, loc, file_id, line_num, output)) return true;
+  auto trimmed = Trim(line);
+  return TryExpandMacro(trimmed, output, file_id, line_num, depth);
 }
 
 bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
@@ -708,16 +723,7 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     return true;
   }
   if (ProcessConditionalDirective(line, file_id, line_num, output)) return true;
-  if (StartsWithDirective(line, "include") && IsActive()) {
-    ProcessIncludeDirective(line, loc, file_id, line_num, depth, output);
-    return true;
-  }
-  if (IsActive() &&
-      ProcessKeywordsDirective(line, loc, file_id, line_num, output))
-    return true;
-  if (IsActive() && ProcessStateDirective(line, loc, file_id, line_num, output))
-    return true;
-  if (IsActive() && TryExpandMacro(trimmed, output, file_id, line_num, depth))
+  if (IsActive() && ProcessActiveOnlyDirective(line, loc, depth, output))
     return true;
   return false;
 }

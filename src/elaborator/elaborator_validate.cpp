@@ -75,6 +75,20 @@ void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
   }
 }
 
+static void CheckPatternCoverage(const ModuleItem* item,
+                                 const std::vector<StructMember>& members,
+                                 const std::unordered_set<std::string_view>& seen,
+                                 DiagEngine& diag) {
+  for (const auto& m : members) {
+    if (!seen.count(m.name)) {
+      diag.Error(item->loc,
+                 std::format("member '{}' not covered by assignment pattern",
+                             m.name));
+      break;
+    }
+  }
+}
+
 static void CheckPatternKeys(const ModuleItem* item,
                              const std::vector<StructMember>& members,
                              DiagEngine& diag) {
@@ -103,14 +117,7 @@ static void CheckPatternKeys(const ModuleItem* item,
   }
   // §10.9.2: Every member shall be covered by member, type, or default key.
   if (!has_default && !has_type_key) {
-    for (const auto& m : members) {
-      if (!seen.count(m.name)) {
-        diag.Error(item->loc,
-                   std::format("member '{}' not covered by assignment pattern",
-                               m.name));
-        break;
-      }
-    }
+    CheckPatternCoverage(item, members, seen, diag);
   }
 }
 
@@ -294,17 +301,19 @@ void Elaborator::ValidateProceduralNetAssign() {
   }
 }
 
+static bool IsConstantBitSelect(const Expr* e) {
+  if (e->is_part_select_plus || e->is_part_select_minus) return false;
+  if (e->index && e->index_end) return true;
+  if (e->index && !e->index_end) {
+    return ConstEvalInt(e->index).has_value();
+  }
+  return true;
+}
+
 static bool IsConstantSelect(const Expr* e) {
   if (!e) return true;
   if (e->kind == ExprKind::kIdentifier) return true;
-  if (e->kind == ExprKind::kSelect) {
-    if (e->is_part_select_plus || e->is_part_select_minus) return false;
-    if (e->index && e->index_end) return true;  // [const:const] part-select
-    if (e->index && !e->index_end) {
-      return ConstEvalInt(e->index).has_value();
-    }
-    return true;
-  }
+  if (e->kind == ExprKind::kSelect) return IsConstantBitSelect(e);
   if (e->kind == ExprKind::kConcatenation) {
     for (const auto* elem : e->elements) {
       if (!IsConstantSelect(elem)) return false;

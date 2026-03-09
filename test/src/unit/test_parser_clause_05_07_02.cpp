@@ -152,7 +152,7 @@ TEST(ConstEvalReal, RealLiteralEval) {
   auto* e = ParseExprFrom("3.14", f);
   auto val = ConstEvalReal(e);
   ASSERT_TRUE(val.has_value());
-  EXPECT_NEAR(*val, 3.14, 1e-6);
+  EXPECT_NEAR(val.value_or(0.0), 3.14, 1e-6);
 }
 
 TEST(ParserSection11, RealLiteralAddition) {

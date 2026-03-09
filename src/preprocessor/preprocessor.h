@@ -77,7 +77,7 @@ class Preprocessor {
   bool TryExpandMacro(std::string_view trimmed, std::string& output,
                       uint32_t file_id, uint32_t line_num, int depth);
   bool IsRecursiveExpansion(std::string_view name, SourceLoc loc) const;
-  bool ExpandFunctionLikeMacro(const MacroDef& def, std::string_view name,
+  bool ExpandFunctionLikeMacro(const MacroDef& def,
                                std::string_view macro_name, SourceLoc loc,
                                std::string& expanded, std::string_view& rest);
   std::string ExpandInlineConditionals(std::string_view line);
@@ -89,8 +89,8 @@ class Preprocessor {
   bool TryExpandInlinePredefined(std::string_view name, uint32_t file_id,
                                  uint32_t line_num, std::string& result);
   size_t ExpandInlineFunctionMacro(const MacroDef& def, std::string_view line,
-                                   size_t name_end, std::string_view name,
-                                   SourceLoc loc, std::string& result);
+                                   size_t name_end, SourceLoc loc,
+                                   std::string& result);
   void ResolveAndReadInclude(std::string_view fn, SourceLoc loc, int depth,
                              std::string& output, bool angle_bracket);
   std::string ExpandMacro(const MacroDef& macro, std::string_view args_text);
@@ -115,9 +115,10 @@ class Preprocessor {
   bool ProcessExpandedStateDirective(std::string_view line, SourceLoc loc,
                                      uint32_t file_id, uint32_t line_num,
                                      std::string& output);
-  void ProcessIncludeDirective(std::string_view line, SourceLoc loc,
-                               uint32_t file_id, uint32_t line_num, int depth,
+  void ProcessIncludeDirective(std::string_view line, SourceLoc loc, int depth,
                                std::string& output);
+  bool ProcessActiveOnlyDirective(std::string_view line, SourceLoc loc,
+                                  int depth, std::string& output);
   bool ProcessKeywordsDirective(std::string_view line, SourceLoc loc,
                                 uint32_t file_id, uint32_t line_num,
                                 std::string& output);

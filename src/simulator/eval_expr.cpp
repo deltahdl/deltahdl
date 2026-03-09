@@ -183,24 +183,6 @@ static bool TryCollectionAccess(std::string_view base, std::string_view field,
   return false;
 }
 
-// §7.2/§11.9: Try struct/union field access on base variable.
-static bool TryStructFieldAccess(Variable* base_var,
-                                 const StructTypeInfo* sinfo,
-                                 std::string_view base_name,
-                                 std::string_view field_name, SimContext& ctx,
-                                 Arena& arena, Logic4Vec& out) {
-  if (!base_var || !sinfo) return false;
-  if (sinfo->is_union) {
-    auto tag = ctx.GetVariableTag(base_name);
-    if (!tag.empty() && tag != field_name) {
-      out = MakeAllX(arena, sinfo->total_width);
-      return true;
-    }
-  }
-  out = ExtractStructField(base_var, sinfo, field_name, arena);
-  return true;
-}
-
 // §8: Try class object property access.
 static bool TryClassPropertyAccess(Variable* base_var,
                                    std::string_view field_name, SimContext& ctx,
@@ -231,9 +213,15 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   auto* base_var = ctx.FindVariable(base_name);
   auto* sinfo = ctx.GetVariableStructType(base_name);
   Logic4Vec out;
-  if (TryStructFieldAccess(base_var, sinfo, base_name, field_name, ctx, arena,
-                           out))
-    return out;
+  // §7.2/§11.9: Struct/union field access.
+  if (base_var && sinfo) {
+    if (sinfo->is_union) {
+      auto tag = ctx.GetVariableTag(base_name);
+      if (!tag.empty() && tag != field_name)
+        return MakeAllX(arena, sinfo->total_width);
+    }
+    return ExtractStructField(base_var, sinfo, field_name, arena);
+  }
   if (TryClassPropertyAccess(base_var, field_name, ctx, arena, out)) return out;
   if (TryCollectionAccess(base_name, field_name, ctx, arena, out)) return out;
   if (TryStaticMemberAccess(base_name, field_name, ctx, out)) return out;

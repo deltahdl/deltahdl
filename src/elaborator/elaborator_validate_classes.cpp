@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <format>
 #include <optional>
@@ -562,6 +563,14 @@ void Elaborator::ValidateAbstractClassRules() {
   }
 }
 
+static bool HasExternPrototype(const ClassDecl* cls, std::string_view name) {
+  return std::any_of(cls->members.begin(), cls->members.end(),
+                     [name](const auto* m) {
+                       return m->kind == ClassMemberKind::kMethod && m->method &&
+                              m->method->name == name && m->method->is_extern;
+                     });
+}
+
 // §8.24: Validate out-of-block method declarations.
 void Elaborator::ValidateOutOfBlockDeclarations() {
   std::unordered_set<std::string> linked;
@@ -577,14 +586,7 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
                               item->method_class));
       continue;
     }
-    bool found_proto = false;
-    for (auto* m : cls->members) {
-      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-      if (m->method->name != item->name) continue;
-      if (!m->method->is_extern) continue;
-      found_proto = true;
-      break;
-    }
+    bool found_proto = HasExternPrototype(cls, item->name);
     if (!found_proto) {
       diag_.Error(
           item->loc,
@@ -682,23 +684,29 @@ static bool HasConcreteVirtualMethodInHierarchy(const ClassDecl* cls,
   return false;
 }
 
+static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
+                                  std::string_view iface_name,
+                                  const CompilationUnit* unit,
+                                  DiagEngine& diag) {
+  for (const auto* im : iface->members) {
+    if (im->kind != ClassMemberKind::kMethod || !im->is_pure_virtual) continue;
+    if (!im->method) continue;
+    if (!HasConcreteVirtualMethodInHierarchy(cls, im->method->name, unit)) {
+      diag.Error(cls->range.start,
+                 std::format("class '{}' does not implement pure virtual "
+                             "method '{}' from interface '{}'",
+                             cls->name, im->method->name, iface_name));
+    }
+  }
+}
+
 // §8.26: Validate that a non-abstract class implements all interface methods.
 void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
   if (cls->is_virtual || cls->implements_types.empty()) return;
   for (auto iface_name : cls->implements_types) {
     const auto* iface = FindClassDecl(iface_name, unit_);
     if (!iface) continue;
-    for (const auto* im : iface->members) {
-      if (im->kind != ClassMemberKind::kMethod || !im->is_pure_virtual)
-        continue;
-      if (!im->method) continue;
-      if (!HasConcreteVirtualMethodInHierarchy(cls, im->method->name, unit_)) {
-        diag_.Error(cls->range.start,
-                    std::format("class '{}' does not implement pure virtual "
-                                "method '{}' from interface '{}'",
-                                cls->name, im->method->name, iface_name));
-      }
-    }
+    CheckInterfaceMethods(cls, iface, iface_name, unit_, diag_);
   }
 }
 

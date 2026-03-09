@@ -80,10 +80,10 @@ bool Preprocessor::IsRecursiveExpansion(std::string_view name,
 
 // Expand a function-like macro invocation. Returns false if extraction fails.
 bool Preprocessor::ExpandFunctionLikeMacro(const MacroDef& def,
-                                           std::string_view name,
                                            std::string_view macro_name,
                                            SourceLoc loc, std::string& expanded,
                                            std::string_view& rest) {
+  auto name = ExtractMacroName(macro_name);
   auto after_name = macro_name.substr(name.size());
   auto balanced = ExtractBalancedArgs(after_name);
   if (balanced.empty()) return false;
@@ -123,7 +123,7 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
   std::string expanded;
   std::string_view rest;
   if (def->is_function_like) {
-    if (!ExpandFunctionLikeMacro(*def, name, macro_name, loc, expanded, rest))
+    if (!ExpandFunctionLikeMacro(*def, macro_name, loc, expanded, rest))
       return false;
   } else {
     expanded = ExpandMacro(*def, {});
@@ -203,17 +203,17 @@ bool Preprocessor::TryExpandInlinePredefined(std::string_view name,
 // Handle a function-like macro during inline expansion.
 // Returns the updated scan position, or 0 on failure (caller appends literal).
 size_t Preprocessor::ExpandInlineFunctionMacro(
-    const MacroDef& def, std::string_view line, size_t name_end,
-    std::string_view name, SourceLoc loc, std::string& result) {
+    const MacroDef& def, std::string_view line, size_t name_end, SourceLoc loc,
+    std::string& result) {
   auto rest = line.substr(name_end);
   auto balanced = ExtractBalancedArgs(rest);
   if (balanced.empty()) return 0;
   auto args_text = balanced.substr(1, balanced.size() - 2);
-  if (!ValidateMacroArgCount(def, args_text, loc, name)) return 0;
+  if (!ValidateMacroArgCount(def, args_text, loc, def.name)) return 0;
   size_t advance =
       name_end +
       static_cast<size_t>(balanced.data() + balanced.size() - rest.data());
-  expansion_stack_.emplace_back(name);
+  expansion_stack_.emplace_back(def.name);
   result += ExpandMacro(def, args_text);
   expansion_stack_.pop_back();
   return advance;
@@ -251,7 +251,7 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
 
   if (def->is_function_like) {
     size_t advance =
-        ExpandInlineFunctionMacro(*def, line, i, name, loc, result);
+        ExpandInlineFunctionMacro(*def, line, i, loc, result);
     if (advance == 0) {
       result.append(line.substr(pos, i - pos));
       return i;
@@ -314,23 +314,27 @@ static size_t SkipWhitespace(const std::string& s, size_t pos) {
   return pos;
 }
 
+// Parse a parenthesized expression, returning the position after the closing
+// ')'. If unmatched, returns result.size().
+static size_t ParseParenthesizedCondition(const std::string& result,
+                                          size_t start) {
+  int pdepth = 0;
+  for (size_t i = start; i < result.size(); ++i) {
+    if (result[i] == '(') ++pdepth;
+    if (result[i] == ')') {
+      --pdepth;
+      if (pdepth == 0) return i + 1;
+    }
+  }
+  return result.size();
+}
+
 // Parse the condition after `ifdef/`ifndef. Returns the end position of
 // the condition text. Sets has_expr to true if the condition is parenthesized.
 static size_t ParseInlineCondition(const std::string& result, size_t cond_start,
                                    bool& has_expr) {
   has_expr = (cond_start < result.size() && result[cond_start] == '(');
-  if (has_expr) {
-    int pdepth = 0;
-    size_t cond_end = cond_start;
-    for (; cond_end < result.size(); ++cond_end) {
-      if (result[cond_end] == '(') ++pdepth;
-      if (result[cond_end] == ')') {
-        --pdepth;
-        if (pdepth == 0) return cond_end + 1;
-      }
-    }
-    return cond_end;
-  }
+  if (has_expr) return ParseParenthesizedCondition(result, cond_start);
   size_t cond_end = cond_start;
   while (cond_end < result.size() && IsIdentChar(result[cond_end])) ++cond_end;
   return cond_end;
@@ -410,8 +414,8 @@ std::string Preprocessor::ExpandInlineConditionals(std::string_view line) {
         result, cond_result, cond_end, bounds.else_pos, bounds.endif_pos);
 
     size_t span_end = bounds.endif_pos + 6;
-    result =
-        result.substr(0, ifdef_pos) + replacement + result.substr(span_end);
+    result.erase(ifdef_pos, span_end - ifdef_pos);
+    result.insert(ifdef_pos, replacement);
   }
 
   return result;
@@ -467,6 +471,16 @@ void Preprocessor::TrackDesignElement(std::string_view trimmed) {
   }
 }
 
+// Skip past a block comment starting at body[i] == '/', body[i+1] == '*'.
+// Advances i to the position after the closing "*/".
+static void SkipBlockComment(std::string_view body, size_t& i) {
+  i += 2;
+  while (i + 1 < body.size() && (body[i] != '*' || body[i + 1] != '/')) {
+    ++i;
+  }
+  if (i + 1 < body.size()) i += 2;
+}
+
 // Process a single character in the macro body for comment stripping.
 // Returns true if the character was handled (caller should continue).
 // Returns false if the main loop should break (line comment found).
@@ -492,11 +506,7 @@ static bool ProcessMacroBodyChar(std::string_view body, size_t& i,
   }
 
   if (i + 1 < body.size() && body[i] == '/' && body[i + 1] == '*') {
-    i += 2;
-    while (i + 1 < body.size() && !(body[i] == '*' && body[i + 1] == '/')) {
-      ++i;
-    }
-    if (i + 1 < body.size()) i += 2;
+    SkipBlockComment(body, i);
     return true;
   }
 

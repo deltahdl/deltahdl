@@ -46,7 +46,7 @@ TEST(ConstEvalReal, TernaryOnReals) {
   auto* e = ParseExprFrom("1 ? 2.5 : 3.5", f);
   auto val = ConstEvalReal(e);
   ASSERT_TRUE(val.has_value());
-  EXPECT_DOUBLE_EQ(*val, 2.5);
+  EXPECT_DOUBLE_EQ(val.value_or(0.0), 2.5);
 }
 
 TEST(ConstExpr, NestedTernaryIsConstant) {

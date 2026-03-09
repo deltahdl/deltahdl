@@ -80,7 +80,7 @@ TEST(ConstEvalReal, UnaryMinusOnReal) {
   auto* e = ParseExprFrom("-3.14", f);
   auto val = ConstEvalReal(e);
   ASSERT_TRUE(val.has_value());
-  EXPECT_NEAR(*val, -3.14, 1e-6);
+  EXPECT_NEAR(val.value_or(0.0), -3.14, 1e-6);
 }
 
 TEST(ConstEvalReal, BinaryAddReals) {
@@ -88,7 +88,7 @@ TEST(ConstEvalReal, BinaryAddReals) {
   auto* e = ParseExprFrom("1.5 + 2.5", f);
   auto val = ConstEvalReal(e);
   ASSERT_TRUE(val.has_value());
-  EXPECT_DOUBLE_EQ(*val, 4.0);
+  EXPECT_DOUBLE_EQ(val.value_or(0.0), 4.0);
 }
 
 TEST(ConstEvalReal, BinaryMulReals) {
@@ -96,7 +96,7 @@ TEST(ConstEvalReal, BinaryMulReals) {
   auto* e = ParseExprFrom("2.0 * 3.0", f);
   auto val = ConstEvalReal(e);
   ASSERT_TRUE(val.has_value());
-  EXPECT_DOUBLE_EQ(*val, 6.0);
+  EXPECT_DOUBLE_EQ(val.value_or(0.0), 6.0);
 }
 
 }  // namespace

@@ -12,7 +12,7 @@ TEST(ConstEvalReal, IntLiteralPromotesToReal) {
   auto* e = ParseExprFrom("42", f);
   auto val = ConstEvalReal(e);
   ASSERT_TRUE(val.has_value());
-  EXPECT_DOUBLE_EQ(val.value(), 42.0);
+  EXPECT_DOUBLE_EQ(val.value_or(0.0), 42.0);
 }
 
 }  // namespace

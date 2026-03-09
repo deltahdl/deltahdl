@@ -325,6 +325,21 @@ static bool StmtHasForkJoin(const Stmt* stmt) {
 }
 
 // §9.2.2.2: Detect incomplete if/case that may infer latched behavior.
+static bool MayInferLatch(const Stmt* stmt);
+
+static bool MayInferLatchCase(const Stmt* stmt) {
+  bool has_default = false;
+  for (const auto& ci : stmt->case_items)
+    if (ci.is_default) {
+      has_default = true;
+      break;
+    }
+  if (!has_default) return true;
+  for (const auto& ci : stmt->case_items)
+    if (MayInferLatch(ci.body)) return true;
+  return false;
+}
+
 static bool MayInferLatch(const Stmt* stmt) {
   if (!stmt) return false;
   switch (stmt->kind) {
@@ -332,18 +347,8 @@ static bool MayInferLatch(const Stmt* stmt) {
       if (!stmt->else_branch) return true;
       return MayInferLatch(stmt->then_branch) ||
              MayInferLatch(stmt->else_branch);
-    case StmtKind::kCase: {
-      bool has_default = false;
-      for (const auto& ci : stmt->case_items)
-        if (ci.is_default) {
-          has_default = true;
-          break;
-        }
-      if (!has_default) return true;
-      for (const auto& ci : stmt->case_items)
-        if (MayInferLatch(ci.body)) return true;
-      return false;
-    }
+    case StmtKind::kCase:
+      return MayInferLatchCase(stmt);
     case StmtKind::kBlock:
       for (const auto* s : stmt->stmts)
         if (MayInferLatch(s)) return true;
@@ -386,6 +391,75 @@ static bool StmtHasTimingControl(const Stmt* stmt) {
   }
 }
 
+static void ValidateCombLatchProcess(ModuleItem* item,
+                                     const RtlirProcess& proc,
+                                     RtlirProcessKind kind, DiagEngine& diag) {
+  if (kind != RtlirProcessKind::kAlwaysComb &&
+      kind != RtlirProcessKind::kAlwaysLatch)
+    return;
+  if (StmtHasTimingControl(proc.body)) {
+    const char* kw =
+        (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb" : "always_latch";
+    diag.Error(item->loc,
+               std::format("{} shall not contain timing controls", kw));
+  }
+  if (StmtHasForkJoin(proc.body)) {
+    const char* kw =
+        (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb" : "always_latch";
+    diag.Error(item->loc,
+               std::format("{} shall not contain fork-join statements", kw));
+  }
+  if (kind == RtlirProcessKind::kAlwaysComb && MayInferLatch(proc.body)) {
+    diag.Warning(item->loc,
+                 "always_comb may infer latched behavior; "
+                 "ensure all paths assign all outputs");
+  }
+  if (kind == RtlirProcessKind::kAlwaysLatch && !MayInferLatch(proc.body)) {
+    diag.Warning(item->loc,
+                 "always_latch does not infer latched behavior; "
+                 "ensure incomplete assignments create intended latches");
+  }
+}
+
+static void ValidateAlwaysFFProcess(ModuleItem* item,
+                                    const RtlirProcess& proc,
+                                    DiagEngine& diag) {
+  if (item->sensitivity.empty()) {
+    diag.Error(item->loc, "always_ff requires an event control");
+  }
+  if (StmtHasTimingControl(proc.body)) {
+    diag.Error(item->loc,
+               "always_ff shall not contain blocking timing controls");
+  }
+  if (StmtHasForkJoin(proc.body)) {
+    diag.Error(item->loc, "always_ff shall not contain fork-join statements");
+  }
+  bool has_edge = false;
+  for (const auto& ev : item->sensitivity) {
+    if (ev.edge == Edge::kPosedge || ev.edge == Edge::kNegedge) {
+      has_edge = true;
+      break;
+    }
+  }
+  if (!item->sensitivity.empty() && !has_edge) {
+    diag.Warning(item->loc,
+                 "always_ff has no edge-sensitive event; "
+                 "may not represent sequential logic");
+  }
+}
+
+static void ValidateFinalProcess(ModuleItem* item, const RtlirProcess& proc,
+                                 DiagEngine& diag) {
+  if (StmtHasTimingControl(proc.body)) {
+    diag.Error(item->loc,
+               "final procedure shall not contain timing controls");
+  }
+  if (StmtHasForkJoin(proc.body)) {
+    diag.Error(item->loc,
+               "final procedure shall not contain fork-join statements");
+  }
+}
+
 void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
                 Arena& arena, DiagEngine& diag) {
   RtlirProcess proc;
@@ -404,92 +478,38 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
                  "always block has no timing control; may cause "
                  "a zero-delay loop");
   }
-  // §9.2.2.2: always_comb and always_latch shall not contain timing controls.
-  if ((kind == RtlirProcessKind::kAlwaysComb ||
-       kind == RtlirProcessKind::kAlwaysLatch) &&
-      StmtHasTimingControl(proc.body)) {
-    const char* kw = (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb"
-                                                             : "always_latch";
-    diag.Error(item->loc,
-               std::format("{} shall not contain timing controls", kw));
-  }
-  // §9.2.2.2: always_comb and always_latch shall not contain fork-join.
-  if ((kind == RtlirProcessKind::kAlwaysComb ||
-       kind == RtlirProcessKind::kAlwaysLatch) &&
-      StmtHasForkJoin(proc.body)) {
-    const char* kw = (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb"
-                                                             : "always_latch";
-    diag.Error(item->loc,
-               std::format("{} shall not contain fork-join statements", kw));
-  }
-  // §9.2.2.2: Warn if always_comb may infer latched behavior.
-  if (kind == RtlirProcessKind::kAlwaysComb && MayInferLatch(proc.body)) {
-    diag.Warning(item->loc,
-                 "always_comb may infer latched behavior; "
-                 "ensure all paths assign all outputs");
-  }
-  // §9.2.2.3: Warn if always_latch does not infer latched behavior.
-  if (kind == RtlirProcessKind::kAlwaysLatch && !MayInferLatch(proc.body)) {
-    diag.Warning(item->loc,
-                 "always_latch does not infer latched behavior; "
-                 "ensure incomplete assignments create intended latches");
-  }
-  // §9.2.2.4: always_ff shall contain one and only one event control.
+  ValidateCombLatchProcess(item, proc, kind, diag);
   if (kind == RtlirProcessKind::kAlwaysFF) {
-    if (item->sensitivity.empty()) {
-      diag.Error(item->loc, "always_ff requires an event control");
-    }
-    if (StmtHasTimingControl(proc.body)) {
-      diag.Error(item->loc,
-                 "always_ff shall not contain blocking timing controls");
-    }
-    if (StmtHasForkJoin(proc.body)) {
-      diag.Error(item->loc, "always_ff shall not contain fork-join statements");
-    }
+    ValidateAlwaysFFProcess(item, proc, diag);
   }
-  // §9.2.2.4: Warn if always_ff does not represent sequential logic.
-  if (kind == RtlirProcessKind::kAlwaysFF) {
-    bool has_edge = false;
-    for (const auto& ev : item->sensitivity) {
-      if (ev.edge == Edge::kPosedge || ev.edge == Edge::kNegedge) {
-        has_edge = true;
-        break;
-      }
-    }
-    if (!item->sensitivity.empty() && !has_edge) {
-      diag.Warning(item->loc,
-                   "always_ff has no edge-sensitive event; "
-                   "may not represent sequential logic");
-    }
-  }
-  // §9.2.3: final procedures shall not contain delays or timing controls.
   if (kind == RtlirProcessKind::kFinal) {
-    if (StmtHasTimingControl(proc.body)) {
-      diag.Error(item->loc,
-                 "final procedure shall not contain timing controls");
-    }
-    if (StmtHasForkJoin(proc.body)) {
-      diag.Error(item->loc,
-                 "final procedure shall not contain fork-join statements");
-    }
+    ValidateFinalProcess(item, proc, diag);
   }
   // §5.12: Resolve attributes.
   proc.attrs = ResolveAttributes(item->attrs, diag);
   mod->processes.push_back(proc);
 }
 
-// §9.2.2.2, §9.2.2.4: Check that always_comb/always_latch/always_ff LHS
-// variables are not driven by other processes or continuous assignments.
-void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
-                                            RtlirModule* /*mod*/) {
-  struct ProcInfo {
-    SourceLoc loc;
-    std::unordered_set<std::string> lhs;
-    ModuleItemKind kind;
-  };
-  std::vector<ProcInfo> procs;
-  std::unordered_set<std::string> cont_assign_lhs;
+struct ProcInfo {
+  SourceLoc loc;
+  std::unordered_set<std::string> lhs;
+  ModuleItemKind kind;
+};
 
+static const char* ProcessKindLabel(ModuleItemKind k) {
+  switch (k) {
+    case ModuleItemKind::kAlwaysFFBlock:
+      return "always_ff";
+    case ModuleItemKind::kAlwaysLatchBlock:
+      return "always_latch";
+    default:
+      return "always_comb";
+  }
+}
+
+static void CollectProcessLhsInfo(
+    const ModuleDecl* decl, std::vector<ProcInfo>& procs,
+    std::unordered_set<std::string>& cont_assign_lhs) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
@@ -507,38 +527,41 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
         cont_assign_lhs.insert(std::string(e->text));
     }
   }
+}
 
-  auto kind_label = [](ModuleItemKind k) -> const char* {
-    switch (k) {
-      case ModuleItemKind::kAlwaysFFBlock:
-        return "always_ff";
-      case ModuleItemKind::kAlwaysLatchBlock:
-        return "always_latch";
-      default:
-        return "always_comb";
-    }
-  };
-
+static void CheckDriverConflicts(
+    const std::vector<ProcInfo>& procs,
+    const std::unordered_set<std::string>& cont_assign_lhs,
+    DiagEngine& diag) {
   for (size_t i = 0; i < procs.size(); ++i) {
     for (const auto& var : procs[i].lhs) {
-      // Check against continuous assignments.
       if (cont_assign_lhs.count(var)) {
-        diag_.Error(procs[i].loc, std::format("variable '{}' driven by {} and "
-                                              "continuous assignment",
-                                              var, kind_label(procs[i].kind)));
+        diag.Error(procs[i].loc,
+                   std::format("variable '{}' driven by {} and "
+                               "continuous assignment",
+                               var, ProcessKindLabel(procs[i].kind)));
       }
-      // Check against other processes.
       for (size_t j = i + 1; j < procs.size(); ++j) {
         if (procs[j].lhs.count(var)) {
-          diag_.Error(procs[j].loc,
-                      std::format("variable '{}' driven by multiple "
-                                  "always_comb/always_latch/always_ff "
-                                  "processes",
-                                  var));
+          diag.Error(procs[j].loc,
+                     std::format("variable '{}' driven by multiple "
+                                 "always_comb/always_latch/always_ff "
+                                 "processes",
+                                 var));
         }
       }
     }
   }
+}
+
+// §9.2.2.2, §9.2.2.4: Check that always_comb/always_latch/always_ff LHS
+// variables are not driven by other processes or continuous assignments.
+void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
+                                            RtlirModule* /*mod*/) {
+  std::vector<ProcInfo> procs;
+  std::unordered_set<std::string> cont_assign_lhs;
+  CollectProcessLhsInfo(decl, procs, cont_assign_lhs);
+  CheckDriverConflicts(procs, cont_assign_lhs, diag_);
 }
 
 // §7.5: Check for dynamic array [] with init to infer size from elements.
@@ -747,6 +770,30 @@ void Elaborator::SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var) {
   var.dtype = arena_.Create<DataType>(td->second);
 }
 
+void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
+  // §8.4: Track class-typed variables for operator restriction checks.
+  if (item->data_type.kind == DataTypeKind::kNamed &&
+      class_names_.count(item->data_type.type_name)) {
+    class_var_names_.insert(item->name);
+    class_var_types_[item->name] = item->data_type.type_name;
+  }
+  if (item->data_type.kind == DataTypeKind::kEnum) {
+    ValidateEnumDecl(item->data_type, item->loc);
+  }
+  if (item->data_type.kind == DataTypeKind::kStruct ||
+      item->data_type.kind == DataTypeKind::kUnion) {
+    ValidatePackedStructDefaults(item->data_type, item->loc);
+    ValidateUnpackedStructWithUnionDefaults(item->data_type, item->loc);
+    ValidateVoidMembers(item->data_type, item->loc);
+    ValidateRandQualifiers(item->data_type, item->loc);
+    ValidatePackedStructMemberTypes(item->data_type, item->loc);
+    ValidateChandleInUnion(item->data_type, item->loc);
+    ValidatePackedUnion(item->data_type, item->loc);
+  }
+  ValidatePackedDimOnPredefinedType(item->data_type, item->loc);
+  ValidateAssocIndexType(item);
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item, mod);
   // §6.25: Resolve parameterized class scope types (cls#(T)::member).
@@ -823,27 +870,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ValidateArrayInitPattern(item);
   ValidateStructInitPattern(item);
   TrackEnumVariable(item);
-  // §8.4: Track class-typed variables for operator restriction checks.
-  if (item->data_type.kind == DataTypeKind::kNamed &&
-      class_names_.count(item->data_type.type_name)) {
-    class_var_names_.insert(item->name);
-    class_var_types_[item->name] = item->data_type.type_name;
-  }
-  if (item->data_type.kind == DataTypeKind::kEnum) {
-    ValidateEnumDecl(item->data_type, item->loc);
-  }
-  if (item->data_type.kind == DataTypeKind::kStruct ||
-      item->data_type.kind == DataTypeKind::kUnion) {
-    ValidatePackedStructDefaults(item->data_type, item->loc);
-    ValidateUnpackedStructWithUnionDefaults(item->data_type, item->loc);
-    ValidateVoidMembers(item->data_type, item->loc);
-    ValidateRandQualifiers(item->data_type, item->loc);
-    ValidatePackedStructMemberTypes(item->data_type, item->loc);
-    ValidateChandleInUnion(item->data_type, item->loc);
-    ValidatePackedUnion(item->data_type, item->loc);
-  }
-  ValidatePackedDimOnPredefinedType(item->data_type, item->loc);
-  ValidateAssocIndexType(item);
+  ValidateVarDeclTypes(item);
 }
 
 }  // namespace delta

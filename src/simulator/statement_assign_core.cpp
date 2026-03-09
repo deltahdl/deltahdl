@@ -298,24 +298,6 @@ static Logic4Vec ReverseStreamSlices(const Logic4Vec& stream,
   return reordered;
 }
 
-// §11.4.14.3: Extract a bit-field from the stream and assign to a variable.
-static void DistributeStreamBits(const StreamElemInfo& ei, uint32_t bit_offset,
-                                 uint32_t total_width, const Logic4Vec& stream,
-                                 SimContext& ctx, Arena& arena) {
-  auto* var = ResolveLhsVariable(ei.expr, ctx);
-  if (!var) return;
-  uint64_t val = 0;
-  for (uint32_t b = 0; b < ei.width && b < 64; ++b) {
-    uint32_t sbit = bit_offset + b;
-    if (sbit >= total_width) break;
-    uint32_t w = sbit / 64, bi = sbit % 64;
-    if (w < stream.nwords && (stream.words[w].aval >> bi) & 1)
-      val |= uint64_t{1} << b;
-  }
-  var->value = MakeLogic4VecVal(arena, ei.width, val);
-  var->NotifyWatchers();
-}
-
 // §11.4.14.3: Streaming concatenation as LHS — unpack RHS into elements.
 static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                                      SimContext& ctx, Arena& arena) {
@@ -333,7 +315,19 @@ static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   uint32_t bit_offset = total_width;
   for (auto& ei : elems) {
     bit_offset -= ei.width;
-    DistributeStreamBits(ei, bit_offset, total_width, stream, ctx, arena);
+    // §11.4.14.3: Extract a bit-field from the stream and assign to a variable.
+    auto* var = ResolveLhsVariable(ei.expr, ctx);
+    if (!var) continue;
+    uint64_t val = 0;
+    for (uint32_t b = 0; b < ei.width && b < 64; ++b) {
+      uint32_t sbit = bit_offset + b;
+      if (sbit >= total_width) break;
+      uint32_t w = sbit / 64, bi = sbit % 64;
+      if (w < stream.nwords && (stream.words[w].aval >> bi) & 1)
+        val |= uint64_t{1} << b;
+    }
+    var->value = MakeLogic4VecVal(arena, ei.width, val);
+    var->NotifyWatchers();
   }
 }
 
@@ -430,16 +424,6 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 }
 
-// §10.4.2: Create a bit-select NBA callback.
-static void SetupBitSelectNbaCallback(Event* event, Variable* var,
-                                      const Expr* lhs, const Logic4Vec& rhs_val,
-                                      SimContext& ctx, Arena& arena) {
-  event->callback = [var, lhs, rhs_val, &ctx, &arena]() {
-    WriteBitSelect(var, lhs, rhs_val, ctx, arena);
-    var->NotifyWatchers();
-  };
-}
-
 // §10.4.2: Create a whole-variable NBA callback.
 static void SetupWholeVarNbaCallback(Event* event, Variable* var,
                                      const Logic4Vec& rhs_val) {
@@ -468,7 +452,12 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
 
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
   if (is_select && !elem) {
-    SetupBitSelectNbaCallback(event, var, stmt->lhs, rhs_val, ctx, arena);
+    // §10.4.2: Bit-select NBA callback.
+    const Expr* lhs = stmt->lhs;
+    event->callback = [var, lhs, rhs_val, &ctx, &arena]() {
+      WriteBitSelect(var, lhs, rhs_val, ctx, arena);
+      var->NotifyWatchers();
+    };
   } else {
     SetupWholeVarNbaCallback(event, var, rhs_val);
   }
