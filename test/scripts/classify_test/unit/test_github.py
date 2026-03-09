@@ -367,26 +367,27 @@ def test_maybe_update_renamed_uses_original_name(
     assert "| OldName |" in updated[0]
 
 
-def test_maybe_update_renamed_includes_rename_remark(
+def test_maybe_update_renamed_kept_uses_but(
     monkeypatch, ct_github, ct_helpers,
 ):
-    """Remark includes 'Renamed to NewName'."""
+    """Remark uses 'but' when kept and renamed."""
     updated = _setup_renamed_update(
         monkeypatch, ct_github, ct_helpers, source_is_target=True,
     )
-    assert "Renamed to NewName" in updated[0]
+    assert "Kept in the same file but renamed to NewName" in updated[0]
 
 
-def test_maybe_update_renamed_and_moved(
+def test_maybe_update_renamed_and_moved_uses_and(
     monkeypatch, ct_github, ct_helpers,
 ):
-    """Remark includes both 'Moved to' and 'Renamed to' when both apply."""
+    """Remark uses 'and' when moved and renamed."""
     updated = _setup_renamed_update(
         monkeypatch, ct_github, ct_helpers, source_is_target=False,
         target_filenames={"NewName": "test_parser_clause_06_01.cpp"},
     )
-    assert "Moved to test_parser_clause_06_01.cpp" in updated[0]
-    assert "Renamed to NewName" in updated[0]
+    expected = ("Moved to test_parser_clause_06_01.cpp"
+                " and renamed to NewName")
+    assert expected in updated[0]
 
 
 def test_maybe_update_same_name_no_rename_remark(
@@ -410,4 +411,4 @@ def test_maybe_update_same_name_no_rename_remark(
     ct_github.maybe_update_issue_status(
         args, [t], source_is_target=True,
     )
-    assert "Renamed" not in updated[0]
+    assert "renamed" not in updated[0]

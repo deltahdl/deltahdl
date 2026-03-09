@@ -54,8 +54,14 @@ def maybe_update_issue_status(
             if fname:
                 parts.append(f"Moved to {fname}")
         if renamed:
-            parts.append(f"Renamed to {t.test_name}")
-        remark = "; ".join(parts)
+            parts.append(f"renamed to {t.test_name}")
+        if len(parts) == 2:
+            joiner = " but " if source_is_target else " and "
+            remark = parts[0] + joiner + parts[1]
+        elif parts:
+            remark = parts[0]
+        else:
+            remark = ""
         body = update_test_status(
             body, lookup_name, status, remark=remark,
         )
