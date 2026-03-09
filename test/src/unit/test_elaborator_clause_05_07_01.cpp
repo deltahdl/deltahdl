@@ -584,7 +584,7 @@ TEST(IntegerLiterals, BaseFormatCaseInsensitive) {
   EXPECT_EQ(vd->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimClause05, Cl5_7_1_LeftPadKnownHex) {
+TEST(IntegerLiteralConstants, LeftPadKnownHexWithXDigit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
