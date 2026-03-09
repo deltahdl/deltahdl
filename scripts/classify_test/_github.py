@@ -43,15 +43,21 @@ def maybe_update_issue_status(
         args.organization, args.repo, args.issue,
     )
     for t in tests:
+        lookup_name = t.original_test_name or t.test_name
+        renamed = (t.original_test_name
+                   and t.original_test_name != t.test_name)
+        parts = []
         if source_is_target:
-            remark = "Kept in the same file"
+            parts.append("Kept in the same file")
         elif target_filenames:
             fname = target_filenames.get(t.test_name, "")
-            remark = f"Moved to {fname}" if fname else ""
-        else:
-            remark = ""
+            if fname:
+                parts.append(f"Moved to {fname}")
+        if renamed:
+            parts.append(f"Renamed to {t.test_name}")
+        remark = "; ".join(parts)
         body = update_test_status(
-            body, t.test_name, status, remark=remark,
+            body, lookup_name, status, remark=remark,
         )
     print(f"Updating status to '{status}' for issue #{args.issue}...")
     update_issue_body(

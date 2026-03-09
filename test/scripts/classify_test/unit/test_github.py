@@ -325,3 +325,89 @@ def test_maybe_update_passes_correct_issue(monkeypatch, ct_github, ct_helpers):
     args = _issue_args(issue=99, organization="org", repo="repo")
     ct_github.maybe_update_issue_status(args, [t], source_is_target=True)
     assert all(i == 99 for i in issues)
+
+
+# ---- maybe_update_issue_status: renamed tests ------------------------------
+
+
+def _setup_renamed_update(
+    monkeypatch, ct_github, ct_helpers, *,
+    source_is_target, target_filenames=None,
+):
+    """Run maybe_update with a renamed test and return captured body."""
+    _tb = ct_helpers.make_test_block
+    updated = []
+    monkeypatch.setattr(
+        ct_github, "fetch_issue_body",
+        lambda org, repo, issue: "| OldName | Unreviewed | |\n",
+    )
+    monkeypatch.setattr(
+        ct_github, "update_issue_body",
+        lambda org, repo, issue, body: updated.append(body),
+    )
+    t = _tb("NewName", prefix="test_parser_", clause="6.1")
+    t.rationale = "r"
+    t.original_test_name = "OldName"
+    args = _issue_args(issue=42, organization="org", repo="repo")
+    ct_github.maybe_update_issue_status(
+        args, [t],
+        source_is_target=source_is_target,
+        target_filenames=target_filenames,
+    )
+    return updated
+
+
+def test_maybe_update_renamed_uses_original_name(
+    monkeypatch, ct_github, ct_helpers,
+):
+    """Looks up the row by original_test_name, not the renamed name."""
+    updated = _setup_renamed_update(
+        monkeypatch, ct_github, ct_helpers, source_is_target=True,
+    )
+    assert "| OldName |" in updated[0]
+
+
+def test_maybe_update_renamed_includes_rename_remark(
+    monkeypatch, ct_github, ct_helpers,
+):
+    """Remark includes 'Renamed to NewName'."""
+    updated = _setup_renamed_update(
+        monkeypatch, ct_github, ct_helpers, source_is_target=True,
+    )
+    assert "Renamed to NewName" in updated[0]
+
+
+def test_maybe_update_renamed_and_moved(
+    monkeypatch, ct_github, ct_helpers,
+):
+    """Remark includes both 'Moved to' and 'Renamed to' when both apply."""
+    updated = _setup_renamed_update(
+        monkeypatch, ct_github, ct_helpers, source_is_target=False,
+        target_filenames={"NewName": "test_parser_clause_06_01.cpp"},
+    )
+    assert "Moved to test_parser_clause_06_01.cpp" in updated[0]
+    assert "Renamed to NewName" in updated[0]
+
+
+def test_maybe_update_same_name_no_rename_remark(
+    monkeypatch, ct_github, ct_helpers,
+):
+    """No rename remark when original_test_name equals test_name."""
+    _tb = ct_helpers.make_test_block
+    updated = []
+    monkeypatch.setattr(
+        ct_github, "fetch_issue_body",
+        lambda org, repo, issue: "| T | Unreviewed | |\n",
+    )
+    monkeypatch.setattr(
+        ct_github, "update_issue_body",
+        lambda org, repo, issue, body: updated.append(body),
+    )
+    t = _tb("T", prefix="test_parser_", clause="6.1")
+    t.rationale = "r"
+    t.original_test_name = "T"
+    args = _issue_args(issue=42, organization="org", repo="repo")
+    ct_github.maybe_update_issue_status(
+        args, [t], source_is_target=True,
+    )
+    assert "Renamed" not in updated[0]

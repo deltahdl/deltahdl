@@ -71,6 +71,7 @@ class TestBlock:
     prefix: str | None = None
     clause: str | None = None
     rationale: str | None = None
+    original_test_name: str | None = None
 
 
 @dataclass
@@ -524,6 +525,8 @@ def _validate_topic_response(response, test_name):
 
 def _rename_test_macro(test, new_suite, new_name):
     """Rename both args in a test block's TEST()/TEST_F()/TEST_P() line."""
+    if test.original_test_name is None:
+        test.original_test_name = test.test_name
     test.lines[0] = re.sub(
         r'^(TEST(?:_[FP])?)\(' + re.escape(test.suite_name)
         + r',\s*' + re.escape(test.test_name) + r'\)',
