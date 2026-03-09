@@ -150,7 +150,7 @@ TEST(IntegerLiteralConstants, SignedDecimalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause05, Cl5_7_1_SignedBinaryElaborates) {
+TEST(IntegerLiteralConstants, SignedBinaryElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
