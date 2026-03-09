@@ -7,7 +7,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lib.python.test_fixtures.subprocess_stubs import stub_subprocess_success
+from lib.python.test_fixtures.subprocess_stubs import (
+    stub_subprocess_failure,
+    stub_subprocess_success,
+)
 
 
 # ---- Helpers ---------------------------------------------------------------
@@ -37,19 +40,6 @@ def _write_and_args(tmp_path: Path, body: str, **overrides: object) -> SimpleNam
         body, encoding="utf-8",
     )
     return _pipeline_args(tmp_path, **overrides)
-
-
-def _mock_run_selective(monkeypatch: pytest.MonkeyPatch, fail_set: set[str]) -> None:
-    """Stub subprocess.run to fail only for names in *fail_set*."""
-
-    def sel_run(cmd: list[str], **_kw: object) -> MagicMock:
-        m = MagicMock()
-        m.stdout, m.stderr = "", ""
-        name = cmd[cmd.index("--test") + 1]
-        m.returncode = 1 if name in fail_set else 0
-        return m
-
-    monkeypatch.setattr(subprocess, "run", sel_run)
 
 
 def _stub_close(monkeypatch: pytest.MonkeyPatch, cf) -> list[bool]:
@@ -86,11 +76,11 @@ def _stub_ensure(monkeypatch: pytest.MonkeyPatch, cf) -> list[bool]:
     return called
 
 
-# ---- Multi-test batch processing -------------------------------------------
+# ---- Batch processing via classify_tests ----------------------------------
 
 
-def test_processes_all_three_tests(tmp_path, monkeypatch, cf):
-    """Pipeline invokes classify_test for each of three tests."""
+def test_invokes_classify_tests_once(tmp_path, monkeypatch, cf):
+    """Pipeline invokes classify_tests exactly once for all tests."""
     body = (
         "TEST(S, Alpha) {\n}\n"
         "TEST(S, Beta) {\n}\n"
@@ -100,11 +90,11 @@ def test_processes_all_three_tests(tmp_path, monkeypatch, cf):
     log = stub_subprocess_success(monkeypatch)
     _stub_close(monkeypatch, cf)
     getattr(cf, "_run")(_write_and_args(tmp_path, body))
-    assert len(log) == 3
+    assert len(log) == 1
 
 
-def test_each_call_has_distinct_test_name(tmp_path, monkeypatch, cf):
-    """Each subprocess call targets a different test name."""
+def test_tests_flag_contains_all_names(tmp_path, monkeypatch, cf):
+    """The --tests flag includes all test names comma-separated."""
     body = (
         "TEST(S, Alpha) {\n}\n"
         "TEST(S, Beta) {\n}\n"
@@ -113,12 +103,11 @@ def test_each_call_has_distinct_test_name(tmp_path, monkeypatch, cf):
     log = stub_subprocess_success(monkeypatch)
     _stub_close(monkeypatch, cf)
     getattr(cf, "_run")(_write_and_args(tmp_path, body))
-    names = [c[c.index("--test") + 1] for c in log]
-    assert names == ["Alpha", "Beta"]
+    assert log[0][log[0].index("--tests") + 1] == "Alpha,Beta"
 
 
 def test_flags_propagated_to_subprocess(tmp_path, monkeypatch, cf):
-    """Optional flags are forwarded to classify_test calls."""
+    """Optional flags are forwarded to classify_tests call."""
     _stub_ensure(monkeypatch, cf)
     log = stub_subprocess_success(monkeypatch)
     getattr(cf, "_run")(
@@ -127,21 +116,14 @@ def test_flags_propagated_to_subprocess(tmp_path, monkeypatch, cf):
     assert "--dry-run" in log[0]
 
 
-def test_stops_after_first_failure(
-    tmp_path, monkeypatch, cf, capsys,
-):
-    """Pipeline stops immediately when first test fails."""
-    body = (
-        "TEST(S, Fail1) {\n}\n"
-        "TEST(S, Pass1) {\n}\n"
-    )
+def test_exits_on_classify_tests_failure(tmp_path, monkeypatch, cf):
+    """Pipeline exits when classify_tests returns non-zero."""
     _stub_ensure(monkeypatch, cf)
-    _mock_run_selective(monkeypatch, {"Fail1"})
-    try:
-        getattr(cf, "_run")(_write_and_args(tmp_path, body))
-    except SystemExit:
-        pass
-    assert "Pass1" not in capsys.readouterr().out
+    stub_subprocess_failure(monkeypatch)
+    with pytest.raises(SystemExit):
+        getattr(cf, "_run")(
+            _write_and_args(tmp_path, "TEST(S, A) {\n}\n"),
+        )
 
 
 def test_single_test_file(tmp_path, monkeypatch, cf):
@@ -156,7 +138,7 @@ def test_single_test_file(tmp_path, monkeypatch, cf):
 
 
 def test_closes_issue_after_all_pass(tmp_path, monkeypatch, cf):
-    """Pipeline closes the issue after all tests succeed."""
+    """Pipeline closes the issue after classify_tests succeeds."""
     _stub_ensure(monkeypatch, cf)
     stub_subprocess_success(monkeypatch)
     log = _stub_close(monkeypatch, cf)
@@ -169,7 +151,7 @@ def test_closes_issue_after_all_pass(tmp_path, monkeypatch, cf):
 
 
 def test_create_issue_then_process(tmp_path, monkeypatch, cf):
-    """Pipeline creates issue then processes all tests."""
+    """Pipeline creates issue then invokes classify_tests once."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     log = stub_subprocess_success(monkeypatch)
     _stub_close(monkeypatch, cf)
@@ -177,7 +159,7 @@ def test_create_issue_then_process(tmp_path, monkeypatch, cf):
     getattr(cf, "_run")(_write_and_args(
         tmp_path, body, issue=None, create_issue=True,
     ))
-    assert len(log) == 2
+    assert len(log) == 1
 
 
 # ---- sync_issue_rows integration ------------------------------------------
