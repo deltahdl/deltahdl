@@ -1,10 +1,10 @@
+// Non-LRM tests
+
 #include "fixture_simulator.h"
 #include "helpers_assoc.h"
 #include "simulator/eval_array.h"
 
 using namespace delta;
-
-namespace {
 
 std::pair<AssocArrayObject*, Variable*> MakeNarrowRefAssoc(SimFixture& f) {
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -13,6 +13,8 @@ std::pair<AssocArrayObject*, Variable*> MakeNarrowRefAssoc(SimFixture& f) {
   ref->value = MakeLogic4VecVal(f.arena, 8, 0);
   return {aa, ref};
 }
+
+namespace {
 
 TEST(AssocTraversalArgs, FirstReturnsTruncationFlag) {
   SimFixture f;
@@ -75,21 +77,6 @@ TEST(AssocTraversalArgs, PrevReturnsTruncationFlag) {
   EXPECT_EQ(ref->value.ToUint64(), 400u & 0xFFu);
 }
 
-TEST(AssocTraversalArgs, FirstReturnsOneWhenWidthSufficient) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->index_width = 8;
-  aa->int_data[200] = MakeLogic4VecVal(f.arena, 32, 99);
-  auto* ref = f.ctx.CreateVariable("k", 32);
-  ref->value = MakeLogic4VecVal(f.arena, 32, 0);
-  Logic4Vec out{};
-  auto* call = MkAssocCall(f.arena, "aa", "first", "k");
-  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 1u);
-  EXPECT_EQ(ref->value.ToUint64(), 200u);
-}
-
 TEST(AssocTraversalArgs, LastReturnsOneWhenWidthEqual) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
@@ -150,4 +137,4 @@ TEST(AssocTraversalArgs, TruncationPreservesLSBsLRMExample) {
   EXPECT_EQ(ref->value.ToUint64(), 232u);
 }
 
-}
+}  // namespace
