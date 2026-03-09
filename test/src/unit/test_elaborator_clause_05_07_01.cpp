@@ -347,7 +347,7 @@ TEST(IntegerLiteralConstants, UnderscoreSeparator) {
   EXPECT_EQ(vc->value.ToUint64(), 0x12ABF001u);
 }
 
-TEST(SimClause05, Cl5_7_1_XValueInHexLiteral) {
+TEST(HexLiteralXValue, AllBitsUnknownWhenXDigit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
