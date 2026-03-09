@@ -202,9 +202,10 @@ bool Preprocessor::TryExpandInlinePredefined(std::string_view name,
 
 // Handle a function-like macro during inline expansion.
 // Returns the updated scan position, or 0 on failure (caller appends literal).
-size_t Preprocessor::ExpandInlineFunctionMacro(
-    const MacroDef& def, std::string_view line, size_t name_end, SourceLoc loc,
-    std::string& result) {
+size_t Preprocessor::ExpandInlineFunctionMacro(const MacroDef& def,
+                                               std::string_view line,
+                                               size_t name_end, SourceLoc loc,
+                                               std::string& result) {
   auto rest = line.substr(name_end);
   auto balanced = ExtractBalancedArgs(rest);
   if (balanced.empty()) return 0;
@@ -250,8 +251,7 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
   }
 
   if (def->is_function_like) {
-    size_t advance =
-        ExpandInlineFunctionMacro(*def, line, i, loc, result);
+    size_t advance = ExpandInlineFunctionMacro(*def, line, i, loc, result);
     if (advance == 0) {
       result.append(line.substr(pos, i - pos));
       return i;

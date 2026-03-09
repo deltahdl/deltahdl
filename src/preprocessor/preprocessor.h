@@ -77,9 +77,9 @@ class Preprocessor {
   bool TryExpandMacro(std::string_view trimmed, std::string& output,
                       uint32_t file_id, uint32_t line_num, int depth);
   bool IsRecursiveExpansion(std::string_view name, SourceLoc loc) const;
-  bool ExpandFunctionLikeMacro(const MacroDef& def,
-                               std::string_view macro_name, SourceLoc loc,
-                               std::string& expanded, std::string_view& rest);
+  bool ExpandFunctionLikeMacro(const MacroDef& def, std::string_view macro_name,
+                               SourceLoc loc, std::string& expanded,
+                               std::string_view& rest);
   std::string ExpandInlineConditionals(std::string_view line);
   std::string ExpandInlineMacros(std::string_view line, uint32_t file_id,
                                  uint32_t line_num);

@@ -564,11 +564,11 @@ void Elaborator::ValidateAbstractClassRules() {
 }
 
 static bool HasExternPrototype(const ClassDecl* cls, std::string_view name) {
-  return std::any_of(cls->members.begin(), cls->members.end(),
-                     [name](const auto* m) {
-                       return m->kind == ClassMemberKind::kMethod && m->method &&
-                              m->method->name == name && m->method->is_extern;
-                     });
+  return std::any_of(
+      cls->members.begin(), cls->members.end(), [name](const auto* m) {
+        return m->kind == ClassMemberKind::kMethod && m->method &&
+               m->method->name == name && m->method->is_extern;
+      });
 }
 
 // §8.24: Validate out-of-block method declarations.

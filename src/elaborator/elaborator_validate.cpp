@@ -75,15 +75,14 @@ void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
   }
 }
 
-static void CheckPatternCoverage(const ModuleItem* item,
-                                 const std::vector<StructMember>& members,
-                                 const std::unordered_set<std::string_view>& seen,
-                                 DiagEngine& diag) {
+static void CheckPatternCoverage(
+    const ModuleItem* item, const std::vector<StructMember>& members,
+    const std::unordered_set<std::string_view>& seen, DiagEngine& diag) {
   for (const auto& m : members) {
     if (!seen.count(m.name)) {
-      diag.Error(item->loc,
-                 std::format("member '{}' not covered by assignment pattern",
-                             m.name));
+      diag.Error(
+          item->loc,
+          std::format("member '{}' not covered by assignment pattern", m.name));
       break;
     }
   }

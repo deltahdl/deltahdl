@@ -391,21 +391,20 @@ static bool StmtHasTimingControl(const Stmt* stmt) {
   }
 }
 
-static void ValidateCombLatchProcess(ModuleItem* item,
-                                     const RtlirProcess& proc,
+static void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,
                                      RtlirProcessKind kind, DiagEngine& diag) {
   if (kind != RtlirProcessKind::kAlwaysComb &&
       kind != RtlirProcessKind::kAlwaysLatch)
     return;
   if (StmtHasTimingControl(proc.body)) {
-    const char* kw =
-        (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb" : "always_latch";
+    const char* kw = (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb"
+                                                             : "always_latch";
     diag.Error(item->loc,
                std::format("{} shall not contain timing controls", kw));
   }
   if (StmtHasForkJoin(proc.body)) {
-    const char* kw =
-        (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb" : "always_latch";
+    const char* kw = (kind == RtlirProcessKind::kAlwaysComb) ? "always_comb"
+                                                             : "always_latch";
     diag.Error(item->loc,
                std::format("{} shall not contain fork-join statements", kw));
   }
@@ -421,8 +420,7 @@ static void ValidateCombLatchProcess(ModuleItem* item,
   }
 }
 
-static void ValidateAlwaysFFProcess(ModuleItem* item,
-                                    const RtlirProcess& proc,
+static void ValidateAlwaysFFProcess(ModuleItem* item, const RtlirProcess& proc,
                                     DiagEngine& diag) {
   if (item->sensitivity.empty()) {
     diag.Error(item->loc, "always_ff requires an event control");
@@ -451,8 +449,7 @@ static void ValidateAlwaysFFProcess(ModuleItem* item,
 static void ValidateFinalProcess(ModuleItem* item, const RtlirProcess& proc,
                                  DiagEngine& diag) {
   if (StmtHasTimingControl(proc.body)) {
-    diag.Error(item->loc,
-               "final procedure shall not contain timing controls");
+    diag.Error(item->loc, "final procedure shall not contain timing controls");
   }
   if (StmtHasForkJoin(proc.body)) {
     diag.Error(item->loc,
@@ -531,8 +528,7 @@ static void CollectProcessLhsInfo(
 
 static void CheckDriverConflicts(
     const std::vector<ProcInfo>& procs,
-    const std::unordered_set<std::string>& cont_assign_lhs,
-    DiagEngine& diag) {
+    const std::unordered_set<std::string>& cont_assign_lhs, DiagEngine& diag) {
   for (size_t i = 0; i < procs.size(); ++i) {
     for (const auto& var : procs[i].lhs) {
       if (cont_assign_lhs.count(var)) {
