@@ -553,7 +553,7 @@ TEST(OctalLiteralXZ, XDigitFillsThreeBits) {
   EXPECT_EQ(var->value.words[0].bval & 0x07, 0x07u);
 }
 
-TEST(SimClause05, Cl5_7_1_BaseFormatCaseInsensitive) {
+TEST(IntegerLiterals, BaseFormatCaseInsensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
