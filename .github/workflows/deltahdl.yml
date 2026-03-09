@@ -969,7 +969,7 @@ jobs:
           --minimum-tokens 100
           --language cpp
           --dir test/src/
-          --dir lib/cpp/test/
+          --dir lib/cpp/
   unit-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
@@ -1136,7 +1136,7 @@ on:
       - CMakeLists.txt
       - etc/**
       - lib/python/run_tests_common/**
-      - lib/cpp/test/**
+      - lib/cpp/**
       - scripts/run_sim_tests/**
       - scripts/run_sv_tests/**
       - src/**
@@ -1152,7 +1152,7 @@ on:
       - CMakeLists.txt
       - etc/**
       - lib/python/run_tests_common/**
-      - lib/cpp/test/**
+      - lib/cpp/**
       - scripts/run_sim_tests/**
       - scripts/run_sv_tests/**
       - src/**
