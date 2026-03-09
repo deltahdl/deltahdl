@@ -234,7 +234,7 @@ TEST(UnbasedUnsizedLiterals, ZLiteralElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause05, Cl5_7_1_UnderscoredDecimalElaborates) {
+TEST(IntegerLiteralConstants, UnderscoredDecimalElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
