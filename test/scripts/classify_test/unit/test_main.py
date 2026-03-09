@@ -844,6 +844,31 @@ def test_run_rename_in_place_commits(tmp_path, monkeypatch, ct):
     assert len(committed) == 1
 
 
+def test_run_rename_in_place_no_commit(tmp_path, monkeypatch, ct):
+    """Rename-in-place with no_commit=True skips commit_classification."""
+    monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
+    monkeypatch.setattr(
+        ct, "maybe_update_issue_status",
+        lambda _args, _tests, **_kw: None,
+    )
+    committed = []
+    monkeypatch.setattr(
+        ct, "commit_classification",
+        committed.append,
+    )
+    src = tmp_path / "test_non_lrm_aig.cpp"
+    src.write_text("#include <gtest/gtest.h>\n\n"
+                   "TEST(S, T) {\n  auto r = Parse(src);\n}\n",
+                   encoding="utf-8")
+    cmake = tmp_path / "CMakeLists.txt"
+    cmake.write_text(f"# header\nadd_unit_test({src.stem})\n",
+                     encoding="utf-8")
+    monkeypatch.setattr(ct, "CMAKE_PATH", cmake)
+    args = _run_args(tmp_path, file=str(src), no_commit=True)
+    getattr(ct, "_run")(args)
+    assert not committed
+
+
 # ---- main ------------------------------------------------------------------
 
 
