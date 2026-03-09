@@ -66,7 +66,7 @@ TEST(IntegerLiteralConstants, UnsizedDecimalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause05, Cl5_7_1_BinaryNumberElaborates) {
+TEST(IntegerLiteralConstants, BinaryNumberElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
