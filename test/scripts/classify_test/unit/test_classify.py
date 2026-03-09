@@ -921,3 +921,15 @@ def test_apply_classification_renames_test_p(ct):
     """Renames both args in TEST_P() line."""
     t = _apply_with_names(ct, macro="TEST_P")
     assert t.lines[0] == "TEST_P(BinaryOps, ParseAddition) {"
+
+
+def test_rename_preserves_original_test_name(ct):
+    """Second rename keeps the original_test_name from the first rename."""
+    _rename = getattr(ct, "_rename_test_macro")
+    t = ct.TestBlock(
+        suite_name="S", test_name="First",
+        lines=["TEST(S, First) {"], preceding_comments=[],
+    )
+    _rename(t, "A", "Second")
+    _rename(t, "B", "Third")
+    assert t.original_test_name == "First"

@@ -289,6 +289,15 @@ def test_maybe_update_moved_no_filenames(monkeypatch, ct_github, ct_helpers):
     assert "| T | Reviewed | |" in updated[0]
 
 
+def test_maybe_update_moved_empty_fname(monkeypatch, ct_github, ct_helpers):
+    """Sets empty action when target_filenames maps to empty string."""
+    updated = _setup_maybe_update(
+        monkeypatch, ct_github, ct_helpers,
+        source_is_target=False, target_filenames={"T": ""},
+    )
+    assert "| T | Reviewed | |" in updated[0]
+
+
 def test_maybe_update_passes_correct_org(monkeypatch, ct_github, ct_helpers):
     """Passes organization to fetch and update."""
     _tb = ct_helpers.make_test_block

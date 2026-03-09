@@ -701,6 +701,46 @@ def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch,
     assert "Keep" in src
 
 
+# ---- _rewrite_source / _update_source --------------------------------------
+
+
+def _rewrite_source_fixture(ct, ct_helpers, tmp_path):
+    """Create parsed file, groups, and temp file for rewrite tests."""
+    t = ct_helpers.make_test_block(
+        "T", prefix="test_parser_", clause="6.1",
+    )
+    parsed = ct.ParsedFile(
+        includes=["#include <gtest/gtest.h>"],
+        using_line=None, has_namespace_wrapper=True,
+        global_preamble=[], section_preamble=[],
+        all_tests=[t],
+    )
+    groups = {("test_parser_", "6.1"): [t]}
+    f = tmp_path / "test_parser_clause_06_01.cpp"
+    f.write_text("old", encoding="utf-8")
+    return parsed, groups, f
+
+
+def test_rewrite_source_writes_file(tmp_path, ct, ct_helpers):
+    """_rewrite_source writes the file with staying tests."""
+    parsed, groups, f = _rewrite_source_fixture(ct, ct_helpers, tmp_path)
+    getattr(ct, "_rewrite_source")(
+        f, groups, parsed, {}, "test_parser_clause_06_01",
+    )
+    assert "TEST" in f.read_text()
+
+
+def test_update_source_calls_rewrite(tmp_path, ct, ct_helpers):
+    """_update_source delegates to _rewrite_source when source_is_target."""
+    parsed, groups, f = _rewrite_source_fixture(ct, ct_helpers, tmp_path)
+    result = getattr(ct, "_update_source")(f, parsed, {
+        "test": "T", "groups": groups,
+        "titles": {}, "stem": "test_parser_clause_06_01",
+        "source_is_target": True,
+    })
+    assert result == 1
+
+
 # ---- _run with --issue -----------------------------------------------------
 
 
