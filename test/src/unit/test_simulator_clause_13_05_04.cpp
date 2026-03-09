@@ -26,8 +26,8 @@ TEST(Functions, NamedArguments) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "sub";
   func->func_args = {
-      {Direction::kInput, false, {}, "x", nullptr, {}},
-      {Direction::kInput, false, {}, "y", nullptr, {}},
+      {Direction::kInput, false, false, {}, "x", nullptr, {}},
+      {Direction::kInput, false, false, {}, "y", nullptr, {}},
   };
   auto* body_expr = MakeBinary(f.arena, TokenKind::kMinus, MakeId(f.arena, "x"),
                                MakeId(f.arena, "y"));
@@ -46,8 +46,8 @@ TEST(Functions, NamedArgsWithDefaults) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "weighted";
   func->func_args = {
-      {Direction::kInput, false, {}, "a", nullptr, {}},
-      {Direction::kInput, false, {}, "w", MakeInt(f.arena, 2), {}},
+      {Direction::kInput, false, false, {}, "a", nullptr, {}},
+      {Direction::kInput, false, false, {}, "w", MakeInt(f.arena, 2), {}},
   };
   auto* body_expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "a"),
                                MakeId(f.arena, "w"));
@@ -69,8 +69,8 @@ TEST(Functions, NamedArgsReorderedWithRef) {
   func->name = "swap_add";
   func->return_type.kind = DataTypeKind::kVoid;
   func->func_args = {
-      {Direction::kRef, false, {}, "target", nullptr, {}},
-      {Direction::kInput, false, {}, "amount", nullptr, {}},
+      {Direction::kRef, false, false, {}, "target", nullptr, {}},
+      {Direction::kInput, false, false, {}, "amount", nullptr, {}},
   };
   auto* rhs = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "target"),
                          MakeId(f.arena, "amount"));
@@ -92,8 +92,8 @@ TEST(Functions, DefaultsAndNamedArgsCombined) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "scale";
   func->func_args = {
-      {Direction::kInput, false, {}, "val", nullptr, {}},
-      {Direction::kInput, false, {}, "factor", MakeInt(f.arena, 3), {}},
+      {Direction::kInput, false, false, {}, "val", nullptr, {}},
+      {Direction::kInput, false, false, {}, "factor", MakeInt(f.arena, 3), {}},
   };
   auto* body = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "val"),
                           MakeId(f.arena, "factor"));

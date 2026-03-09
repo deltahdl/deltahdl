@@ -42,4 +42,3 @@ TEST_F(AnnexHParseTest, AnnexMSvVpiCalls) {
 
 }  // namespace
 }  // namespace delta
-delta

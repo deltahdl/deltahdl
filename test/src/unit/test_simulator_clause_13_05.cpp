@@ -149,8 +149,8 @@ TEST(Eval, FunctionOutputArgWriteback) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "compute";
   func->func_args = {
-      {Direction::kInput, false, {}, "a", nullptr, {}},
-      {Direction::kOutput, false, {}, "b", nullptr, {}},
+      {Direction::kInput, false, false, {}, "a", nullptr, {}},
+      {Direction::kOutput, false, false, {}, "b", nullptr, {}},
   };
 
   auto* lhs = f.arena.Create<Expr>();
@@ -206,7 +206,7 @@ TEST(Eval, FunctionInoutArgWriteback) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "increment";
-  func->func_args = {{Direction::kInout, false, {}, "v", nullptr, {}}};
+  func->func_args = {{Direction::kInout, false, false, {}, "v", nullptr, {}}};
 
   auto* lhs = f.arena.Create<Expr>();
   lhs->kind = ExprKind::kIdentifier;

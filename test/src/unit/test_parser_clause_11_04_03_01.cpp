@@ -1,5 +1,6 @@
 
 
+#include "fixture_evaluator.h"
 #include "fixture_parser.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"

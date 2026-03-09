@@ -18,7 +18,7 @@ TEST(Functions, PassByRef) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "add_ten";
   func->return_type.kind = DataTypeKind::kVoid;
-  func->func_args = {{Direction::kRef, false, {}, "r", nullptr, {}}};
+  func->func_args = {{Direction::kRef, false, false, {}, "r", nullptr, {}}};
   auto* rhs = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "r"),
                          MakeInt(f.arena, 10));
   func->func_body_stmts.push_back(MakeAssign(f.arena, "r", rhs));
@@ -39,7 +39,7 @@ TEST(Functions, PassByRefReadsCaller) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "read_ref";
-  func->func_args = {{Direction::kRef, false, {}, "r", nullptr, {}}};
+  func->func_args = {{Direction::kRef, false, false, {}, "r", nullptr, {}}};
   auto* body_expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "r"),
                                MakeInt(f.arena, 3));
   func->func_body_stmts.push_back(MakeReturn(f.arena, body_expr));
@@ -57,7 +57,7 @@ TEST(QueueRef, RefReadsCurrentValue) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "read_ref";
   func->is_automatic = true;
-  func->func_args = {{Direction::kRef, false, {}, "v", nullptr, {}}};
+  func->func_args = {{Direction::kRef, false, false, {}, "v", nullptr, {}}};
   func->func_body_stmts = {MakeReturn(f.arena, MakeId(f.arena, "v"))};
   f.ctx.RegisterFunction("read_ref", func);
 
@@ -74,7 +74,7 @@ TEST(Sim1352, RefImmediateVisibility) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "write_and_read";
-  func->func_args = {{Direction::kRef, false, {}, "r", nullptr, {}}};
+  func->func_args = {{Direction::kRef, false, false, {}, "r", nullptr, {}}};
 
   func->func_body_stmts.push_back(
       MakeAssign(f.arena, "r", MakeInt(f.arena, 42)));

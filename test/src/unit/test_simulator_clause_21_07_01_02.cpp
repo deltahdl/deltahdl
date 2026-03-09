@@ -40,4 +40,3 @@ TEST_F(VcdClause21070102Test, VectorValueChange) {
 
 }  // namespace
 }  // namespace delta
-delta

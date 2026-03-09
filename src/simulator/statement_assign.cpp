@@ -282,11 +282,10 @@ static void CollectFixedArrayElements(std::string_view name,
                                       const ArrayInfo& ai, SimContext& ctx,
                                       std::vector<Logic4Vec>& out);
 
-// §10.10: Distribute unpacked array concatenation elements to array variables.
-// Flattens array items (each contributing multiple elements) and scalar items.
-static void DistributeConcatToArray(std::string_view arr_name,
-                                    const ArrayInfo& info, const Expr* rhs,
-                                    SimContext& ctx, Arena& arena) {
+// §10.10: Collect flattened elements from an unpacked array concatenation.
+static std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs,
+                                                    SimContext& ctx,
+                                                    Arena& arena) {
   std::vector<Logic4Vec> elems;
   for (auto* item : rhs->elements) {
     if (item->kind == ExprKind::kIdentifier) {
@@ -303,6 +302,14 @@ static void DistributeConcatToArray(std::string_view arr_name,
     }
     elems.push_back(EvalExpr(item, ctx, arena));
   }
+  return elems;
+}
+
+// §10.10: Distribute unpacked array concatenation elements to array variables.
+static void DistributeConcatToArray(std::string_view arr_name,
+                                    const ArrayInfo& info, const Expr* rhs,
+                                    SimContext& ctx, Arena& arena) {
+  auto elems = CollectConcatElements(rhs, ctx, arena);
   for (uint32_t i = 0; i < info.size; ++i) {
     uint32_t idx =
         info.is_descending ? (info.lo + info.size - 1 - i) : (info.lo + i);

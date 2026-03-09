@@ -116,7 +116,7 @@ TEST(Preprocessor, Pragma_InsideModule_NoError) {
 TEST(Preprocessor, Pragma_MacroExpansionInName) {
   PreprocFixture f;
 
-  auto out = Preprocess("`define MY_VAL 42\n`pragma my_pragma `MY_VAL\n", f);
+  Preprocess("`define MY_VAL 42\n`pragma my_pragma `MY_VAL\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 

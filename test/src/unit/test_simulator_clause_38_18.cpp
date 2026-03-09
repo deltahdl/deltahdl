@@ -46,4 +46,3 @@ TEST_F(VpiClause3818Test, HandleReturnsNullptrForNoMatch) {
 
 }  // namespace
 }  // namespace delta
-delta

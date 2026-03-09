@@ -41,7 +41,7 @@ TEST(IntLiterals, NegativeUnsizedIsTwosComplement) {
   EvalFixture f;
   auto val = ConstEvalInt(ParseExprFrom("-12 / 3", f));
   ASSERT_TRUE(val.has_value());
-  EXPECT_EQ(*val, -4);
+  EXPECT_EQ(val.value(), -4);
 }
 
 TEST(IntLiterals, HexLiteral) {

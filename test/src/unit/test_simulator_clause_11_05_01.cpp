@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
+#include "helpers_stmt_exec.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"

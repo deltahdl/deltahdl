@@ -46,4 +46,3 @@ TEST_F(VcdClause21070202Test, DumpChangedValuesOnlyEmitsChanged) {
 
 }  // namespace
 }  // namespace delta
-delta

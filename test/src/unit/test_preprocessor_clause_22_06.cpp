@@ -365,7 +365,7 @@ TEST(Preprocessor, InlineIfdefExprForm) {
   auto result = Preprocess("int x = `ifdef (A && B) 1 `else 0 `endif;\n", f,
                            std::move(cfg));
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("1"), std::string::npos);
+  EXPECT_NE(result.find('1'), std::string::npos);
 }
 
 TEST(Preprocessor, InlineIfdefNested) {
@@ -376,7 +376,7 @@ TEST(Preprocessor, InlineIfdefNested) {
       Preprocess("int x = `ifdef A `ifdef B 2 `else 1 `endif `else 0 `endif;\n",
                  f, std::move(cfg));
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("1"), std::string::npos);
+  EXPECT_NE(result.find('1'), std::string::npos);
 }
 
 TEST(Preprocessor, DeeplyNestedIfdef) {
@@ -482,7 +482,7 @@ TEST(Preprocessor, IfdefEmptyBlocks) {
 
 TEST(Preprocessor, IfdefAllEmptyBlocks) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`ifdef UNDEF\n"
       "`elsif ALSO_UNDEF\n"
       "`else\n"
@@ -566,6 +566,6 @@ TEST(ParserSection22, IfndefSelectsElseBranch) {
 }
 TEST(Preprocessor, Pragma_InsideIfdef_Inactive) {
   PreprocFixture f;
-  auto out = Preprocess("`ifdef UNDEF_FLAG\n`pragma some_pragma\n`endif\n", f);
+  Preprocess("`ifdef UNDEF_FLAG\n`pragma some_pragma\n`endif\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }

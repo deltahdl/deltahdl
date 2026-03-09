@@ -408,4 +408,3 @@ TEST(StructureAssignmentPatternDefault, Cl5_10_MemberNameWithDefault) {
   EXPECT_EQ(stmt->rhs->pattern_keys.size(), 2u);
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
-}

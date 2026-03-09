@@ -39,4 +39,3 @@ TEST_F(VpiClause3817Test, GetVlogInfoNullDoesNotCrash) {
 
 }  // namespace
 }  // namespace delta
-delta

@@ -41,4 +41,3 @@ TEST_F(VpiClause3802Test, ChkErrorNullDoesNotCrash) {
 
 }  // namespace
 }  // namespace delta
-delta

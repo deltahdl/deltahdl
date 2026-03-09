@@ -552,4 +552,3 @@ TEST(ClockingEndLabel, ClockingEndLabel) {
               "  endclocking : cb\n"
               "endmodule\n"));
 }
-}

@@ -127,7 +127,7 @@ TEST(Preprocessor, Clause22_1_FileRecognized) {
 
 TEST(Preprocessor, Clause22_1_LineeMacroRecognized) {
   PreprocFixture f;
-  auto result = Preprocess("int x = `__LINE__;\n", f);
+  Preprocess("int x = `__LINE__;\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 

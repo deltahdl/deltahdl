@@ -113,4 +113,3 @@ TEST_F(VpiClause3834Test, PutValueScalarFormat) {
 
 }  // namespace
 }  // namespace delta
-delta

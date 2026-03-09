@@ -84,4 +84,3 @@ TEST_F(VpiClause3836Test, CbValueChangeWithWatcherFires) {
 
 }  // namespace
 }  // namespace delta
-delta

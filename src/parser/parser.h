@@ -23,6 +23,7 @@ class Parser {
   void ParseExternTopLevel(CompilationUnit* unit);
   bool TryParseSecondaryTopLevel(CompilationUnit* unit);
   bool TryParseCuScopeDataDecl(CompilationUnit* unit);
+  bool TryParseCuScopeItem(CompilationUnit* unit);
   void ParseOutOfBlockConstraint(CompilationUnit* unit);
 
   // Module/package parsing
@@ -85,6 +86,12 @@ class Parser {
   bool TryParseKeywordClassMember(std::vector<ClassMember*>& members,
                                   ClassMember* member, bool proto);
   bool ParseClassQualifiers(ClassMember* member);
+  bool TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
+                                bool ClassMember::*flag,
+                                const char* dup_msg);
+  bool TryConsumeAccessQualifier(ClassMember* m);
+  bool TryConsumeRandQualifier(ClassMember* m);
+  void ValidateClassMethod(ClassMember* member);
   void ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
                                const ClassMember* first, const DataType& dtype);
   ClassMember* ParseConstraintStub(ClassMember* member);

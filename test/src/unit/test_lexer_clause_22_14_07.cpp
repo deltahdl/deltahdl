@@ -8,7 +8,7 @@ using namespace delta;
 namespace {
 
 TEST(Lexer, KeywordVersion_1800_2009_NewKeywordsPresent) {
-  const char* kNewKeywords[] = {
+  const char* const kNewKeywords[] = {
       "accept_on",      "checker",        "endchecker",   "eventually",
       "global",         "implies",        "let",          "nexttime",
       "reject_on",      "restrict",       "s_always",     "s_eventually",
@@ -24,7 +24,7 @@ TEST(Lexer, KeywordVersion_1800_2009_NewKeywordsPresent) {
 }
 
 TEST(Lexer, KeywordVersion_1800_2009_NewKeywordsNotIn1800_2005) {
-  const char* kNewKeywords[] = {
+  const char* const kNewKeywords[] = {
       "accept_on", "checker", "endchecker", "eventually", "global",
       "implies",   "let",     "nexttime",   "reject_on",  "restrict",
   };

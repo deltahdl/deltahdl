@@ -158,4 +158,3 @@ TEST_F(VpiClause3815Test, GetValueTimeFormat) {
 
 }  // namespace
 }  // namespace delta
-delta

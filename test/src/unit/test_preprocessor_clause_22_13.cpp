@@ -24,19 +24,19 @@ TEST(Preprocessor, File_UsesToolOpenedPath) {
 TEST(Preprocessor, Line_ExpandsToDecimalNumber) {
   PreprocFixture f;
   auto result = Preprocess("`__LINE__\n", f);
-  EXPECT_NE(result.find("1"), std::string::npos);
+  EXPECT_NE(result.find('1'), std::string::npos);
 }
 
 TEST(Preprocessor, Line_ExpandsOnSecondLine) {
   PreprocFixture f;
   auto result = Preprocess("line1\n`__LINE__\n", f);
-  EXPECT_NE(result.find("2"), std::string::npos);
+  EXPECT_NE(result.find('2'), std::string::npos);
 }
 
 TEST(Preprocessor, Line_ExpandsOnFifthLine) {
   PreprocFixture f;
   auto result = Preprocess("a\nb\nc\nd\n`__LINE__\n", f);
-  EXPECT_NE(result.find("5"), std::string::npos);
+  EXPECT_NE(result.find('5'), std::string::npos);
 }
 
 TEST(Preprocessor, File_InlineInExpression) {
@@ -55,15 +55,15 @@ TEST(Preprocessor, FileAndLine_SameLine) {
   PreprocFixture f;
   auto result = Preprocess("$display(`__FILE__, `__LINE__);\n", f);
   EXPECT_NE(result.find("\"<test>\""), std::string::npos);
-  EXPECT_NE(result.find("1"), std::string::npos);
+  EXPECT_NE(result.find('1'), std::string::npos);
 }
 
 TEST(Preprocessor, Line_DifferentValuesOnDifferentLines) {
   PreprocFixture f;
   auto result = Preprocess("`__LINE__\n`__LINE__\n`__LINE__\n", f);
-  EXPECT_NE(result.find("1"), std::string::npos);
-  EXPECT_NE(result.find("2"), std::string::npos);
-  EXPECT_NE(result.find("3"), std::string::npos);
+  EXPECT_NE(result.find('1'), std::string::npos);
+  EXPECT_NE(result.find('2'), std::string::npos);
+  EXPECT_NE(result.find('3'), std::string::npos);
 }
 
 TEST(Preprocessor, LineDirective_AffectsLineMacro) {
@@ -96,8 +96,8 @@ TEST(Preprocessor, Include_ChangesFileAndLine) {
 
   EXPECT_NE(result.find("inc.svh"), std::string::npos);
 
-  EXPECT_NE(result.find("1"), std::string::npos);
-  EXPECT_NE(result.find("2"), std::string::npos);
+  EXPECT_NE(result.find('1'), std::string::npos);
+  EXPECT_NE(result.find('2'), std::string::npos);
 
   std::remove(inc_path.c_str());
   std::remove(tmp_dir.c_str());
@@ -144,7 +144,7 @@ TEST(Preprocessor, Include_LineIncrementsAfter) {
 
   auto result = Preprocess("`include \"stub.svh\"\n`__LINE__\n", f, cfg);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("2"), std::string::npos);
+  EXPECT_NE(result.find('2'), std::string::npos);
 
   std::remove(inc_path.c_str());
   std::remove(tmp_dir.c_str());
@@ -169,7 +169,7 @@ TEST(Preprocessor, FileAndLine_InsideIfdef) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("\"<test>\""), std::string::npos);
 
-  EXPECT_NE(result.find("4"), std::string::npos);
+  EXPECT_NE(result.find('4'), std::string::npos);
 }
 
 TEST(Preprocessor, FileAndLine_InsideInactiveIfdef) {
@@ -186,7 +186,7 @@ TEST(Preprocessor, File_CannotRedefine) {
 
   auto result = Preprocess("`__FILE__\n", f);
 
-  EXPECT_NE(result.find("\""), std::string::npos);
+  EXPECT_NE(result.find('"'), std::string::npos);
 }
 
 TEST(Preprocessor, File_MultipleOnSameLine) {

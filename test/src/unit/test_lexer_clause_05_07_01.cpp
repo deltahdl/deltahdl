@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 

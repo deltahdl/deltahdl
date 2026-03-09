@@ -163,7 +163,7 @@ TEST(Preprocessor, Clause22_2_DirectiveInConditionalBlock) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.defines = {{"USE_TIMESCALE", "1"}};
-  auto result = Preprocess(
+  Preprocess(
       "`ifdef USE_TIMESCALE\n"
       "`timescale 1ns / 1ps\n"
       "`endif\n",
@@ -391,7 +391,7 @@ TEST(Preprocessor, Clause22_2_MultilineBlockCommentEndFollowedByDirective) {
 
 TEST(Preprocessor, Clause22_2_EscapedBacktickInStringNotDirective) {
   PreprocFixture f;
-  auto result = Preprocess("string s = \"value is \\`FOO\";\n", f);
+  Preprocess("string s = \"value is \\`FOO\";\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 

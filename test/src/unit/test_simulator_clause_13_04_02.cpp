@@ -58,7 +58,7 @@ TEST(Functions, StaticFunctionWithArgs) {
   func->name = "accum";
   func->is_static = true;
   func->is_automatic = false;
-  func->func_args = {{Direction::kInput, false, {}, "v", nullptr, {}}};
+  func->func_args = {{Direction::kInput, false, false, {}, "v", nullptr, {}}};
   auto* rhs = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "accum"),
                          MakeId(f.arena, "v"));
   func->func_body_stmts.push_back(MakeAssign(f.arena, "accum", rhs));

@@ -350,34 +350,39 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     return;
   }
   if (TryParseSecondaryTopLevel(unit)) return;
+  if (TryParseCuScopeItem(unit)) return;
+  diag_.Error(CurrentLoc(), "expected top-level declaration");
+  Consume();
+}
+
+bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
   // §3.12.1: CU-scope localparam/parameter declarations.
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
     std::vector<ModuleItem*> items;
     ParseParamDecl(items);
     for (auto* item : items) unit->cu_items.push_back(item);
-    return;
+    return true;
   }
   // §3.12.1: CU-scope import declarations.
   if (Check(TokenKind::kKwImport)) {
     std::vector<ModuleItem*> items;
     ParseImportDecl(items);
     for (auto* item : items) unit->cu_items.push_back(item);
-    return;
+    return true;
   }
   // §3.12.1: CU-scope data declarations (variables/nets).
-  if (TryParseCuScopeDataDecl(unit)) return;
+  if (TryParseCuScopeDataDecl(unit)) return true;
   // CU-scope timeunit/timeprecision (§3.14.2.3 rule c)
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
     ParseTimeunitDecl(nullptr, unit);
-    return;
+    return true;
   }
   // extern_constraint_declaration: static constraint ... (A.1.10)
   if (Check(TokenKind::kKwStatic)) {
     ParseOutOfBlockConstraint(unit);
-    return;
+    return true;
   }
-  diag_.Error(CurrentLoc(), "expected top-level declaration");
-  Consume();
+  return false;
 }
 
 // §3.12.1: Parse a data/net declaration at CU scope.
@@ -598,13 +603,9 @@ void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kSemicolon);
 }
 
-void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
-  bool is_unit = Check(TokenKind::kKwTimeunit);
-  Consume();
-  auto tok = Consume();
-  TimeUnit tu = TimeUnit::kNs;
-  TryParseTimeUnit(tok.text, tu);
-  if (mod != nullptr) {
+static void ApplyTimeUnit(ModuleDecl* mod, CompilationUnit* cu, bool is_unit,
+                          TimeUnit tu) {
+  if (mod) {
     if (is_unit) {
       mod->time_unit = tu;
       mod->has_timeunit = true;
@@ -613,7 +614,7 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
       mod->has_timeprecision = true;
     }
   }
-  if (cu != nullptr) {
+  if (cu) {
     if (is_unit) {
       cu->cu_time_unit = tu;
       cu->has_cu_timeunit = true;
@@ -622,6 +623,27 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
       cu->has_cu_timeprecision = true;
     }
   }
+}
+
+static void ApplyTimePrecision(ModuleDecl* mod, CompilationUnit* cu,
+                               TimeUnit prec) {
+  if (mod) {
+    mod->time_prec = prec;
+    mod->has_timeprecision = true;
+  }
+  if (cu) {
+    cu->cu_time_prec = prec;
+    cu->has_cu_timeprecision = true;
+  }
+}
+
+void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
+  bool is_unit = Check(TokenKind::kKwTimeunit);
+  Consume();
+  auto tok = Consume();
+  TimeUnit tu = TimeUnit::kNs;
+  TryParseTimeUnit(tok.text, tu);
+  ApplyTimeUnit(mod, cu, is_unit, tu);
   if (Match(TokenKind::kSlash)) {
     auto prec_tok = Consume();
     TimeUnit prec = TimeUnit::kNs;
@@ -631,14 +653,7 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu) {
       diag_.Error(prec_tok.loc,
                   "time precision is less precise than the time unit");
     }
-    if (mod != nullptr && is_unit) {
-      mod->time_prec = prec;
-      mod->has_timeprecision = true;
-    }
-    if (cu != nullptr && is_unit) {
-      cu->cu_time_prec = prec;
-      cu->has_cu_timeprecision = true;
-    }
+    if (is_unit) ApplyTimePrecision(mod, cu, prec);
   }
   Expect(TokenKind::kSemicolon);
 }

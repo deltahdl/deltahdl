@@ -64,8 +64,8 @@ TEST(Eval, NestedFunctionOutputArgs) {
   inner->kind = ModuleItemKind::kFunctionDecl;
   inner->name = "inner";
   inner->func_args = {
-      {Direction::kInput, false, {}, "a", nullptr, {}},
-      {Direction::kOutput, false, {}, "b", nullptr, {}},
+      {Direction::kInput, false, false, {}, "a", nullptr, {}},
+      {Direction::kOutput, false, false, {}, "b", nullptr, {}},
   };
   auto* inner_lhs = f.arena.Create<Expr>();
   inner_lhs->kind = ExprKind::kIdentifier;
@@ -92,8 +92,8 @@ TEST(Eval, NestedFunctionOutputArgs) {
   outer->kind = ModuleItemKind::kFunctionDecl;
   outer->name = "outer";
   outer->func_args = {
-      {Direction::kInput, false, {}, "x", nullptr, {}},
-      {Direction::kOutput, false, {}, "y", nullptr, {}},
+      {Direction::kInput, false, false, {}, "x", nullptr, {}},
+      {Direction::kOutput, false, false, {}, "y", nullptr, {}},
   };
   auto* call_arg0 = f.arena.Create<Expr>();
   call_arg0->kind = ExprKind::kIdentifier;

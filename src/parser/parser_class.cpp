@@ -201,19 +201,21 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
       ParseTypeParamList();
     }
     // §8.3: extends class_type [ ( [ list_of_arguments | default ] ) ]
-    if (!is_implements && Check(TokenKind::kLParen)) {
-      Consume();
-      if (Match(TokenKind::kKwDefault)) {
-        decl->extends_has_default = true;
-      } else if (!Check(TokenKind::kRParen)) {
-        do {
-          decl->extends_args.push_back(ParseExpr());
-        } while (Match(TokenKind::kComma));
+    if (Check(TokenKind::kLParen)) {
+      if (is_implements) {
+        std::vector<Expr*> discard;
+        ParseParenList(discard);
+      } else {
+        Consume();
+        if (Match(TokenKind::kKwDefault)) {
+          decl->extends_has_default = true;
+        } else if (!Check(TokenKind::kRParen)) {
+          do {
+            decl->extends_args.push_back(ParseExpr());
+          } while (Match(TokenKind::kComma));
+        }
+        Expect(TokenKind::kRParen);
       }
-      Expect(TokenKind::kRParen);
-    } else if (is_implements && Check(TokenKind::kLParen)) {
-      std::vector<Expr*> discard;
-      ParseParenList(discard);
     }
   } while (Match(TokenKind::kComma));
 }
@@ -265,65 +267,108 @@ ClassDecl* Parser::ParseClassDecl() {
 
 // --- Class member qualifier parsing ---
 
+bool Parser::TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
+                                      bool ClassMember::*flag,
+                                      const char* dup_msg) {
+  if (!Check(kw)) return false;
+  if (m->*flag) diag_.Error(CurrentLoc(), dup_msg);
+  m->*flag = true;
+  Consume();
+  return true;
+}
+
+bool Parser::TryConsumeAccessQualifier(ClassMember* m) {
+  // §8.3 fn 10: only one of protected or local
+  if (Check(TokenKind::kKwLocal)) {
+    if (m->is_protected)
+      diag_.Error(CurrentLoc(),
+                  "cannot combine 'local' and 'protected' qualifiers");
+    if (m->is_local) diag_.Error(CurrentLoc(), "duplicate 'local' qualifier");
+    m->is_local = true;
+    Consume();
+    return true;
+  }
+  if (Check(TokenKind::kKwProtected)) {
+    if (m->is_local)
+      diag_.Error(CurrentLoc(),
+                  "cannot combine 'local' and 'protected' qualifiers");
+    if (m->is_protected)
+      diag_.Error(CurrentLoc(), "duplicate 'protected' qualifier");
+    m->is_protected = true;
+    Consume();
+    return true;
+  }
+  return false;
+}
+
+bool Parser::TryConsumeRandQualifier(ClassMember* m) {
+  // §8.3 fn 10: only one of rand or randc
+  if (Check(TokenKind::kKwRand)) {
+    if (m->is_randc)
+      diag_.Error(CurrentLoc(),
+                  "cannot combine 'rand' and 'randc' qualifiers");
+    if (m->is_rand) diag_.Error(CurrentLoc(), "duplicate 'rand' qualifier");
+    m->is_rand = true;
+    Consume();
+    return true;
+  }
+  if (Check(TokenKind::kKwRandc)) {
+    if (m->is_rand)
+      diag_.Error(CurrentLoc(),
+                  "cannot combine 'rand' and 'randc' qualifiers");
+    if (m->is_randc) diag_.Error(CurrentLoc(), "duplicate 'randc' qualifier");
+    m->is_randc = true;
+    Consume();
+    return true;
+  }
+  return false;
+}
+
 bool Parser::ParseClassQualifiers(ClassMember* m) {
   bool proto = false;
   while (true) {
-    if (Check(TokenKind::kKwLocal)) {
-      // §8.3 fn 10: only one of protected or local
-      if (m->is_protected)
-        diag_.Error(CurrentLoc(),
-                    "cannot combine 'local' and 'protected' qualifiers");
-      if (m->is_local) diag_.Error(CurrentLoc(), "duplicate 'local' qualifier");
-      m->is_local = true;
-      Consume();
-    } else if (Check(TokenKind::kKwProtected)) {
-      if (m->is_local)
-        diag_.Error(CurrentLoc(),
-                    "cannot combine 'local' and 'protected' qualifiers");
-      if (m->is_protected)
-        diag_.Error(CurrentLoc(), "duplicate 'protected' qualifier");
-      m->is_protected = true;
-      Consume();
-    } else if (Check(TokenKind::kKwStatic)) {
-      // §8.3 fn 10: static can appear only once
-      if (m->is_static)
-        diag_.Error(CurrentLoc(), "duplicate 'static' qualifier");
-      m->is_static = true;
-      Consume();
-    } else if (Check(TokenKind::kKwVirtual)) {
-      // §8.3 fn 10: virtual can appear only once
-      if (m->is_virtual)
-        diag_.Error(CurrentLoc(), "duplicate 'virtual' qualifier");
-      m->is_virtual = true;
-      Consume();
-    } else if (Match(TokenKind::kKwPure)) {
+    if (TryConsumeAccessQualifier(m)) continue;
+    if (TryConsumeClassQualifier(m, TokenKind::kKwStatic,
+                                 &ClassMember::is_static,
+                                 "duplicate 'static' qualifier"))
+      continue;
+    if (TryConsumeClassQualifier(m, TokenKind::kKwVirtual,
+                                 &ClassMember::is_virtual,
+                                 "duplicate 'virtual' qualifier"))
+      continue;
+    if (Match(TokenKind::kKwPure)) {
       m->is_virtual = true;
       m->is_pure_virtual = true;
       proto = true;
-    } else if (Check(TokenKind::kKwRand)) {
-      // §8.3 fn 10: only one of rand or randc
-      if (m->is_randc)
-        diag_.Error(CurrentLoc(),
-                    "cannot combine 'rand' and 'randc' qualifiers");
-      if (m->is_rand) diag_.Error(CurrentLoc(), "duplicate 'rand' qualifier");
-      m->is_rand = true;
-      Consume();
-    } else if (Check(TokenKind::kKwRandc)) {
-      if (m->is_rand)
-        diag_.Error(CurrentLoc(),
-                    "cannot combine 'rand' and 'randc' qualifiers");
-      if (m->is_randc) diag_.Error(CurrentLoc(), "duplicate 'randc' qualifier");
-      m->is_randc = true;
-      Consume();
-    } else if (Match(TokenKind::kKwConst)) {
-      m->is_const = true;
-    } else if (Match(TokenKind::kKwExtern)) {
-      proto = true;
-    } else {
-      break;
+      continue;
     }
+    if (TryConsumeRandQualifier(m)) continue;
+    if (Match(TokenKind::kKwConst)) {
+      m->is_const = true;
+      continue;
+    }
+    if (Match(TokenKind::kKwExtern)) {
+      proto = true;
+      continue;
+    }
+    break;
   }
   return proto;
+}
+
+void Parser::ValidateClassMethod(ClassMember* member) {
+  // §8.6: Static lifetime on class methods is illegal.
+  if (member->method->is_static) {
+    diag_.Error(member->method->loc,
+                "class method shall not have static lifetime");
+  }
+  // §8.10: Static methods cannot be virtual.
+  if (member->is_static && member->is_virtual &&
+      member->method->name != "new") {
+    diag_.Error(member->method->loc,
+                "static method shall not be declared virtual");
+  }
+  if (member->is_static) member->method->is_static = true;
 }
 
 // Parse keyword-introduced class members (methods, constraints, typedefs,
@@ -333,11 +378,7 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
   if (Check(TokenKind::kKwFunction)) {
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseFunctionDecl(proto);
-    // §8.6: Static lifetime on class methods is illegal.
-    if (member->method->is_static) {
-      diag_.Error(member->method->loc,
-                  "class method shall not have static lifetime");
-    }
+    ValidateClassMethod(member);
     // §8.7: Constructor shall not be declared static or virtual.
     if (member->method->name == "new") {
       if (member->is_static) {
@@ -349,13 +390,6 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                     "constructor shall not be declared virtual");
       }
     }
-    // §8.10: Static methods cannot be virtual.
-    if (member->is_static && member->is_virtual &&
-        member->method->name != "new") {
-      diag_.Error(member->method->loc,
-                  "static method shall not be declared virtual");
-    }
-    if (member->is_static) member->method->is_static = true;
     // §8.24: Mark extern method prototypes.
     if (proto && !member->is_pure_virtual) member->method->is_extern = true;
     members.push_back(member);
@@ -364,17 +398,7 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
   if (Check(TokenKind::kKwTask)) {
     member->kind = ClassMemberKind::kMethod;
     member->method = ParseTaskDecl(proto);
-    // §8.6: Static lifetime on class methods is illegal.
-    if (member->method->is_static) {
-      diag_.Error(member->method->loc,
-                  "class method shall not have static lifetime");
-    }
-    // §8.10: Static methods cannot be virtual.
-    if (member->is_static && member->is_virtual) {
-      diag_.Error(member->method->loc,
-                  "static method shall not be declared virtual");
-    }
-    if (member->is_static) member->method->is_static = true;
+    ValidateClassMethod(member);
     // §8.24: Mark extern task prototypes.
     if (proto && !member->is_pure_virtual) member->method->is_extern = true;
     members.push_back(member);

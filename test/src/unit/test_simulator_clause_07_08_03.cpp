@@ -12,7 +12,7 @@ namespace {
 TEST(AssocArray, ClassIndex_NullKeyValid) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 64);
-  int64_t null_key = static_cast<int64_t>(kNullClassHandle);
+  auto null_key = static_cast<int64_t>(kNullClassHandle);
   aa->int_data[null_key] = MakeLogic4VecVal(f.arena, 32, 99);
   EXPECT_EQ(aa->int_data.size(), 1u);
   EXPECT_EQ(aa->int_data[null_key].ToUint64(), 99u);
@@ -41,7 +41,7 @@ TEST(AssocArray, ClassIndex_NullAndObjectCoexist) {
   auto [h1, _1] = MakeObj(f, type);
 
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 64);
-  int64_t null_key = static_cast<int64_t>(kNullClassHandle);
+  auto null_key = static_cast<int64_t>(kNullClassHandle);
   auto obj_key = static_cast<int64_t>(h1);
   aa->int_data[null_key] = MakeLogic4VecVal(f.arena, 32, 100);
   aa->int_data[obj_key] = MakeLogic4VecVal(f.arena, 32, 200);
@@ -83,6 +83,7 @@ TEST(AssocArray, ClassIndex_DeterministicOrdering) {
   aa->int_data[k1] = MakeLogic4VecVal(f.arena, 32, 1);
 
   std::vector<int64_t> keys;
+  keys.reserve(aa->int_data.size());
   for (auto& [k, _] : aa->int_data) {
     keys.push_back(k);
   }

@@ -13,7 +13,7 @@ TEST(Functions, ConstantFunctionEvalAtElaboration) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "double_val";
-  func->func_args = {{Direction::kInput, false, {}, "x", nullptr, {}}};
+  func->func_args = {{Direction::kInput, false, false, {}, "x", nullptr, {}}};
   auto* body = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "x"),
                           MakeInt(f.arena, 2));
   func->func_body_stmts.push_back(MakeReturn(f.arena, body));

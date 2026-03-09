@@ -136,7 +136,7 @@ TEST(PreprocSection22_14, NestedBeginKeywords) {
 
 TEST(PreprocSection22_14, DoubleNestedBeginKeywords) {
   PreprocFixture f;
-  auto out = Preprocess(
+  Preprocess(
       "`begin_keywords \"1800-2012\"\n"
       "`begin_keywords \"1800-2005\"\n"
       "`begin_keywords \"1364-2001\"\n"
@@ -150,7 +150,7 @@ TEST(PreprocSection22_14, DoubleNestedBeginKeywords) {
 
 TEST(PreprocSection22_14, ResetallDoesNotAffectKeywordVersion) {
   PreprocFixture f;
-  auto out = Preprocess(
+  Preprocess(
       "`begin_keywords \"1364-1995\"\n"
       "`resetall\n"
       "x\n"

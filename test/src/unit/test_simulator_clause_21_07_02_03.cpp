@@ -50,4 +50,3 @@ TEST_F(VcdClause21070203Test, RegistersSignal) {
 
 }  // namespace
 }  // namespace delta
-delta

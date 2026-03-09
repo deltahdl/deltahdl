@@ -90,79 +90,97 @@ static bool IsAllHighZ(const Logic4Vec& v) {
   return v.nwords > 0;
 }
 
+// §10.3.3: Evaluated delay values for a continuous assignment.
+struct ContAssignDelays {
+  uint64_t rise = 0;
+  uint64_t fall = 0;
+  uint64_t decay = 0;
+  bool has_fall = false;
+  bool has_decay = false;
+};
+
+// §10.3.3: Delay expression AST nodes for a continuous assignment.
+struct ContAssignDelayExprs {
+  const Expr* rise = nullptr;
+  const Expr* fall = nullptr;
+  const Expr* decay = nullptr;
+};
+
+// §10.3.3: Grouped parameters for a continuous assignment coroutine.
+struct ContAssignParams {
+  const Expr* lhs;
+  const Expr* rhs;
+  DriverStrength ds;
+  ContAssignDelayExprs delays;
+};
+
 // §10.3.3: Select the appropriate delay for a continuous assignment based on
 // the transition from old_val to new_val.
 static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
-                                      const Logic4Vec& new_val, uint64_t d_rise,
-                                      uint64_t d_fall, uint64_t d_decay,
-                                      bool has_fall, bool has_decay) {
-  if (!has_fall) return d_rise;  // Single delay for all transitions.
+                                      const Logic4Vec& new_val,
+                                      const ContAssignDelays& d) {
+  if (!d.has_fall) return d.rise;  // Single delay for all transitions.
   uint64_t new_bits = new_val.ToUint64();
   bool new_has_x = HasUnknownBits(new_val);
   bool new_is_z = IsAllHighZ(new_val);
   uint64_t old_bits = old_val.ToUint64();
   bool old_has_x = HasUnknownBits(old_val);
-  if (new_is_z && has_decay) return d_decay;
+  if (new_is_z && d.has_decay) return d.decay;
   if (new_has_x) {
-    // Transition to x: use minimum of all available delays.
-    uint64_t m = std::min(d_rise, d_fall);
-    if (has_decay) m = std::min(m, d_decay);
+    uint64_t m = std::min(d.rise, d.fall);
+    if (d.has_decay) m = std::min(m, d.decay);
     return m;
   }
   if (old_has_x || IsAllHighZ(old_val)) {
-    // From unknown/z to known: use minimum of rise and fall.
-    return std::min(d_rise, d_fall);
+    return std::min(d.rise, d.fall);
   }
-  if (new_bits > old_bits) return d_rise;
-  if (new_bits < old_bits) return d_fall;
-  return d_rise;  // No change — use rise as default.
+  if (new_bits > old_bits) return d.rise;
+  if (new_bits < old_bits) return d.fall;
+  return d.rise;  // No change — use rise as default.
 }
 
-static SimCoroutine MakeContAssignCoroutine(const Expr* lhs, const Expr* rhs,
-                                            DriverStrength ds,
-                                            const Expr* delay_expr,
-                                            const Expr* delay_fall_expr,
-                                            const Expr* delay_decay_expr,
+static SimCoroutine MakeContAssignCoroutine(const ContAssignParams& params,
                                             SimContext& ctx, Arena& arena) {
-  auto val = EvalExpr(rhs, ctx, arena);
-  if (!lhs || lhs->kind != ExprKind::kIdentifier) co_return;
+  auto val = EvalExpr(params.rhs, ctx, arena);
+  if (!params.lhs || params.lhs->kind != ExprKind::kIdentifier) co_return;
 
   // §10.3.3: Apply continuous assignment delay if specified.
-  if (delay_expr) {
-    uint64_t d_rise = EvalExpr(delay_expr, ctx, arena).ToUint64();
-    uint64_t d_fall =
-        delay_fall_expr ? EvalExpr(delay_fall_expr, ctx, arena).ToUint64() : 0;
-    uint64_t d_decay = delay_decay_expr
-                           ? EvalExpr(delay_decay_expr, ctx, arena).ToUint64()
-                           : 0;
-    bool has_fall = delay_fall_expr != nullptr;
-    bool has_decay = delay_decay_expr != nullptr;
+  if (params.delays.rise) {
+    ContAssignDelays d;
+    d.rise = EvalExpr(params.delays.rise, ctx, arena).ToUint64();
+    d.fall = params.delays.fall
+                 ? EvalExpr(params.delays.fall, ctx, arena).ToUint64()
+                 : 0;
+    d.decay = params.delays.decay
+                  ? EvalExpr(params.delays.decay, ctx, arena).ToUint64()
+                  : 0;
+    d.has_fall = params.delays.fall != nullptr;
+    d.has_decay = params.delays.decay != nullptr;
 
     // Get old value for transition detection.
-    Logic4Vec old_val = MakeLogic4VecVal(arena, 1, 0);  // Default x-ish.
-    auto* var = ctx.FindVariable(lhs->text);
-    auto* net = ctx.FindNet(lhs->text);
+    Logic4Vec old_val = MakeLogic4VecVal(arena, 1, 0);
+    auto* var = ctx.FindVariable(params.lhs->text);
+    auto* net = ctx.FindNet(params.lhs->text);
     if (var)
       old_val = var->value;
     else if (net && net->resolved)
       old_val = net->resolved->value;
 
-    uint64_t ticks = SelectContAssignDelay(old_val, val, d_rise, d_fall,
-                                           d_decay, has_fall, has_decay);
+    uint64_t ticks = SelectContAssignDelay(old_val, val, d);
     if (ticks > 0) {
       co_await DelayAwaiter{ctx, ticks};
     }
   }
 
   // §10.3.4: If target is a net, add as a strength-aware driver.
-  auto* net = ctx.FindNet(lhs->text);
+  auto* net = ctx.FindNet(params.lhs->text);
   if (net) {
     net->drivers.push_back(val);
-    net->driver_strengths.push_back(ds);
+    net->driver_strengths.push_back(params.ds);
     net->Resolve(arena);
     co_return;
   }
-  auto* var = ctx.FindVariable(lhs->text);
+  auto* var = ctx.FindVariable(params.lhs->text);
   if (var) {
     var->value = val;
     var->NotifyWatchers();
@@ -434,6 +452,35 @@ void Lowerer::RegisterEnumTypes(const RtlirModule* mod) {
   }
 }
 
+// §8.22: Build vtable for polymorphic dispatch from class members.
+static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
+  if (info->parent) info->vtable = info->parent->vtable;
+  for (auto* member : cls->members) {
+    if (member->kind != ClassMemberKind::kMethod || !member->method) continue;
+    if (!member->is_virtual) continue;
+    int idx = info->FindVTableIndex(member->method->name);
+    if (idx >= 0) {
+      info->vtable[static_cast<size_t>(idx)].method =
+          member->is_pure_virtual ? nullptr : member->method;
+      info->vtable[static_cast<size_t>(idx)].owner = info;
+    } else {
+      info->vtable.push_back(
+          {member->method->name,
+           member->is_pure_virtual ? nullptr : member->method, info});
+    }
+  }
+}
+
+// §8.9: Initialize static properties on the class type.
+static void InitStaticProperties(ClassTypeInfo* info, Arena& arena) {
+  for (const auto& p : info->properties) {
+    if (p.is_static) {
+      info->static_properties[std::string(p.name)] =
+          MakeLogic4VecVal(arena, p.width, 0);
+    }
+  }
+}
+
 // §8: Create ClassTypeInfo from a ClassDecl AST node.
 void Lowerer::LowerClassDecl(const ClassDecl* cls) {
   auto* info = arena_.Create<ClassTypeInfo>();
@@ -456,35 +503,8 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
       info->methods[name] = member->method;
     }
   }
-  // §8.22: Build vtable for polymorphic dispatch.
-  // Inherit parent vtable entries.
-  if (info->parent) {
-    info->vtable = info->parent->vtable;
-  }
-  // Override or add virtual method entries.
-  for (auto* member : cls->members) {
-    if (member->kind != ClassMemberKind::kMethod || !member->method) continue;
-    if (!member->is_virtual) continue;
-    int idx = info->FindVTableIndex(member->method->name);
-    if (idx >= 0) {
-      // Override existing entry.
-      info->vtable[static_cast<size_t>(idx)].method =
-          member->is_pure_virtual ? nullptr : member->method;
-      info->vtable[static_cast<size_t>(idx)].owner = info;
-    } else {
-      // New virtual method.
-      info->vtable.push_back(
-          {member->method->name,
-           member->is_pure_virtual ? nullptr : member->method, info});
-    }
-  }
-  // §8.9: Initialize static properties on the class type.
-  for (const auto& p : info->properties) {
-    if (p.is_static) {
-      info->static_properties[std::string(p.name)] =
-          MakeLogic4VecVal(arena_, p.width, 0);
-    }
-  }
+  BuildVTable(info, cls);
+  InitStaticProperties(info, arena_);
   // §8.5: Register class parameters as properties.
   for (const auto& [pname, pexpr] : cls->params) {
     info->properties.push_back({pname, 32, false});
@@ -621,11 +641,13 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca) {
   p->kind = ProcessKind::kContAssign;
   p->id = next_id_++;
   p->home_region = Region::kActive;
-  DriverStrength ds{ParserStrToStrength(ca.drive_strength0),
-                    ParserStrToStrength(ca.drive_strength1)};
-  p->coro = MakeContAssignCoroutine(ca.lhs, ca.rhs, ds, ca.delay, ca.delay_fall,
-                                    ca.delay_decay, ctx_, arena_)
-                .Release();
+  ContAssignParams cap;
+  cap.lhs = ca.lhs;
+  cap.rhs = ca.rhs;
+  cap.ds = {ParserStrToStrength(ca.drive_strength0),
+            ParserStrToStrength(ca.drive_strength1)};
+  cap.delays = {ca.delay, ca.delay_fall, ca.delay_decay};
+  p->coro = MakeContAssignCoroutine(cap, ctx_, arena_).Release();
 
   ScheduleProcess(p, ctx_.GetScheduler());
 }

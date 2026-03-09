@@ -44,7 +44,7 @@ TEST(Preprocessor, Clause22_5_2_UndefThenRedefine) {
       "int x = `VAL;\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("2"), std::string::npos);
+  EXPECT_NE(result.find('2'), std::string::npos);
 }
 
 TEST(Preprocessor, Clause22_5_2_UndefInInactiveConditionalSkipped) {
@@ -70,7 +70,7 @@ TEST(Preprocessor, Clause22_5_2_UndefDoesNotAffectOtherMacros) {
       "int x = `B;\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("2"), std::string::npos);
+  EXPECT_NE(result.find('2'), std::string::npos);
 }
 
 TEST(Preprocessor, Clause22_5_2_UndefFunctionLikeMacro) {

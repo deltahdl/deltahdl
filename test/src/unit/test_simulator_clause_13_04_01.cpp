@@ -15,7 +15,7 @@ TEST(Functions, VoidFunctionReturnsZero) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "set_val";
   func->return_type.kind = DataTypeKind::kVoid;
-  func->func_args = {{Direction::kInput, false, {}, "a", nullptr, {}}};
+  func->func_args = {{Direction::kInput, false, false, {}, "a", nullptr, {}}};
   f.ctx.RegisterFunction("set_val", func);
 
   auto* call = MakeCall(f.arena, "set_val", {MakeInt(f.arena, 42)});
@@ -269,7 +269,7 @@ TEST(Functions, VoidFunctionSideEffect) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "store";
   func->return_type.kind = DataTypeKind::kVoid;
-  func->func_args = {{Direction::kOutput, false, {}, "out", nullptr, {}}};
+  func->func_args = {{Direction::kOutput, false, false, {}, "out", nullptr, {}}};
   func->func_body_stmts.push_back(
       MakeAssign(f.arena, "out", MakeInt(f.arena, 99)));
   f.ctx.RegisterFunction("store", func);

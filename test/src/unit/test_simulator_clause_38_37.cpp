@@ -50,4 +50,3 @@ TEST_F(VpiClause3837Test, RegisterSystfNullptrDoesNotCrash) {
 
 }  // namespace
 }  // namespace delta
-delta

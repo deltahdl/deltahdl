@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "fixture_simulator.h"
 
 using namespace delta;
 

@@ -1,3 +1,5 @@
+#include <set>
+
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
@@ -146,34 +148,19 @@ TEST(LexerClause05, Cl5_1_AllFourAreasInOneStream) {
           "  initial $display(\"msg\");\n"
           "endmodule\n");
 
-  bool has_attr_start = false;
-  bool has_keyword = false;
-  bool has_operator = false;
-  bool has_int_literal = false;
-  bool has_real_literal = false;
-  bool has_string_literal = false;
-  bool has_system_id = false;
-  bool has_identifier = false;
-
+  std::set<TokenKind> kinds;
   for (const auto& tok : tokens) {
-    if (tok.kind == TokenKind::kAttrStart) has_attr_start = true;
-    if (tok.kind == TokenKind::kKwModule) has_keyword = true;
-    if (tok.kind == TokenKind::kPlus) has_operator = true;
-    if (tok.kind == TokenKind::kIntLiteral) has_int_literal = true;
-    if (tok.kind == TokenKind::kRealLiteral) has_real_literal = true;
-    if (tok.kind == TokenKind::kStringLiteral) has_string_literal = true;
-    if (tok.kind == TokenKind::kSystemIdentifier) has_system_id = true;
-    if (tok.kind == TokenKind::kIdentifier) has_identifier = true;
+    kinds.insert(tok.kind);
   }
 
-  EXPECT_TRUE(has_attr_start);
-  EXPECT_TRUE(has_keyword);
-  EXPECT_TRUE(has_operator);
-  EXPECT_TRUE(has_int_literal);
-  EXPECT_TRUE(has_real_literal);
-  EXPECT_TRUE(has_string_literal);
-  EXPECT_TRUE(has_system_id);
-  EXPECT_TRUE(has_identifier);
+  EXPECT_TRUE(kinds.count(TokenKind::kAttrStart));
+  EXPECT_TRUE(kinds.count(TokenKind::kKwModule));
+  EXPECT_TRUE(kinds.count(TokenKind::kPlus));
+  EXPECT_TRUE(kinds.count(TokenKind::kIntLiteral));
+  EXPECT_TRUE(kinds.count(TokenKind::kRealLiteral));
+  EXPECT_TRUE(kinds.count(TokenKind::kStringLiteral));
+  EXPECT_TRUE(kinds.count(TokenKind::kSystemIdentifier));
+  EXPECT_TRUE(kinds.count(TokenKind::kIdentifier));
 }
 
 TEST(LexerClause05, Cl5_1_UnterminatedBlockCommentIsError) {

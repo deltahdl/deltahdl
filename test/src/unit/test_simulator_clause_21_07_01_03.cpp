@@ -36,4 +36,3 @@ TEST_F(VcdClause21070103Test, ReEnableAfterDisable) {
 
 }  // namespace
 }  // namespace delta
-delta

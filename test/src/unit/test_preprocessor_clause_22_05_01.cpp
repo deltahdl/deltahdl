@@ -11,7 +11,7 @@ TEST(Preprocessor, Clause22_5_1_SimpleDefineAndSubstitute) {
       "logic [1:`WORDSIZE] data;\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("8"), std::string::npos);
+  EXPECT_NE(result.find('8'), std::string::npos);
 }
 
 TEST(Preprocessor, Clause22_5_1_EmptyMacroBody) {
@@ -33,7 +33,7 @@ TEST(Preprocessor, Clause22_5_1_MacroRedefineLatestPrevails) {
       "int x = `VAL;\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("2"), std::string::npos);
+  EXPECT_NE(result.find('2'), std::string::npos);
 }
 
 TEST(Preprocessor, Clause22_5_1_RedefineCompilerDirectiveError) {
@@ -76,7 +76,7 @@ TEST(Preprocessor, Clause22_5_1_MultiLineBackslashContinuation) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("a +"), std::string::npos);
   EXPECT_NE(result.find("b +"), std::string::npos);
-  EXPECT_NE(result.find("c"), std::string::npos);
+  EXPECT_NE(result.find('c'), std::string::npos);
 }
 
 TEST(Preprocessor, Clause22_5_1_UnterminatedStringInBody) {
@@ -395,7 +395,7 @@ TEST(Preprocessor, Clause22_5_1_DefineInsideModule) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("7"), std::string::npos);
+  EXPECT_NE(result.find('7'), std::string::npos);
 }
 
 TEST(Preprocessor, Clause22_5_1_DefineOutsideModule) {
@@ -407,7 +407,7 @@ TEST(Preprocessor, Clause22_5_1_DefineOutsideModule) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("8"), std::string::npos);
+  EXPECT_NE(result.find('8'), std::string::npos);
 }
 
 TEST(Preprocessor, Clause22_5_1_ResetallDoesNotAffectMacros) {

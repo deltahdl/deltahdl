@@ -51,7 +51,7 @@ TEST(Preprocessor, Clause22_5_3_UndefineAllTakesNoArguments) {
 
 TEST(Preprocessor, Clause22_5_3_UndefineAllCanAppearAnywhere) {
   PreprocFixture f;
-  auto result = Preprocess(
+  Preprocess(
       "`define FOO 1\n"
       "module m;\n"
       "`undefineall\n"

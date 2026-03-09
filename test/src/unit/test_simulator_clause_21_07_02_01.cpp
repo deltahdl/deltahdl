@@ -38,4 +38,3 @@ TEST_F(VcdClause21070201Test, IdentifierWrapsAround) {
 
 }  // namespace
 }  // namespace delta
-delta
