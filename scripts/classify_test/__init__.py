@@ -957,7 +957,25 @@ def _run(args):
                   f" number of lines to more than {args.max_lines} lines")
     if args.dry_run:
         return
+    has_renames = any(
+        getattr(t, "original_test_name", None) is not None
+        and t.original_test_name != t.test_name
+        for t in target
+    )
     if not to_create and not to_merge and source_is_target and n_removed == 0:
+        if not has_renames:
+            return
+        content = generate_file(
+            target[0].clause, "", parsed, parsed.all_tests,
+        )
+        filepath.write_text(content, encoding="utf-8")
+        if not getattr(args, "no_commit", False):
+            commit_classification({
+                "filepath": filepath, "target": target,
+                "to_merge": [], "new_names": [],
+                "test_dir": Path(args.output_dir).resolve(),
+                "cmake_path": CMAKE_PATH,
+            })
         return
     new_names = _write_files(to_create, to_merge, parsed, {
         "test_dir": Path(args.output_dir).resolve(),

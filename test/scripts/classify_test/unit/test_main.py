@@ -790,6 +790,60 @@ def test_run_no_commit_skips_commit(tmp_path, monkeypatch, ct, ct_helpers):
     assert not called
 
 
+# ---- rename in place -------------------------------------------------------
+
+
+def _rename_classifier(_prompt, schema=None):
+    """Classify single test as non-lrm:aig and rename to Renamed."""
+    if schema and "non_lrm_topic" in schema:
+        return {"non_lrm_topic": "aig", "rationale": "r",
+                "suite_name": "AigGraph", "test_name": "Renamed"}
+    return {"clause": "non-lrm", "rationale": "r",
+            "suite_name": "AigGraph", "test_name": "Renamed"}
+
+
+def test_run_rename_in_place_rewrites_file(tmp_path, monkeypatch, ct,
+                                            ct_helpers):
+    """Rename-in-place rewrites the source file with the new test name."""
+    monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
+    _run_live_non_lrm(ct, tmp_path, monkeypatch,
+                      src_body="#include <gtest/gtest.h>\n\n"
+                      "TEST(S, T) {\n  auto r = Parse(src);\n}\n")
+    src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
+    assert "TEST(AigGraph, Renamed)" in src
+
+
+def test_run_rename_in_place_removes_old_name(tmp_path, monkeypatch, ct,
+                                               ct_helpers):
+    """Rename-in-place removes the old TEST macro name from the file."""
+    monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
+    _run_live_non_lrm(ct, tmp_path, monkeypatch,
+                      src_body="#include <gtest/gtest.h>\n\n"
+                      "TEST(S, T) {\n  auto r = Parse(src);\n}\n")
+    src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
+    assert "TEST(S, T)" not in src
+
+
+def test_run_rename_in_place_commits(tmp_path, monkeypatch, ct, ct_helpers):
+    """Rename-in-place calls commit_classification."""
+    monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
+    monkeypatch.setattr(
+        ct, "maybe_update_issue_status",
+        lambda args, tests, **kw: None,
+    )
+    committed = []
+    monkeypatch.setattr(
+        ct, "commit_classification",
+        lambda ctx: committed.append(ctx),
+    )
+    _run_live_non_lrm(ct, tmp_path, monkeypatch,
+                      src_body="#include <gtest/gtest.h>\n\n"
+                      "TEST(S, T) {\n  auto r = Parse(src);\n}\n")
+    assert len(committed) == 1
+
+
 # ---- main ------------------------------------------------------------------
 
 
