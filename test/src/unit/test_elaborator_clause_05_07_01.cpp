@@ -364,7 +364,7 @@ TEST(HexLiteralXValue, AllBitsUnknownWhenXDigit) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-TEST(SimClause05, Cl5_7_1_ZValueInHexLiteral) {
+TEST(HexLiteralZValue, AllBitsHighImpedanceWhenZDigit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
