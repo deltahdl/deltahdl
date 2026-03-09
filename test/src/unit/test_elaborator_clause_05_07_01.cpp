@@ -162,7 +162,7 @@ TEST(IntegerLiteralConstants, SignedBinaryElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause05, Cl5_7_1_SignedOctalElaborates) {
+TEST(IntegerLiteralConstants, SignedOctalElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
