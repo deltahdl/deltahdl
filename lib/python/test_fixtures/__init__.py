@@ -10,8 +10,8 @@ def argv_without_flag(base, flag):
             if flag not in (base[max(0, i - 1)], v)]
 
 
-def assert_main_enables_line_buffering(monkeypatch, module, make_args_fn):
-    """Assert that *module*.main() reconfigures stdout for line buffering."""
+def main_enables_line_buffering(monkeypatch, module, make_args_fn):
+    """Return whether *module*.main() reconfigures stdout for line buffering."""
     configured = []
     original = sys.stdout.reconfigure
 
@@ -23,7 +23,7 @@ def assert_main_enables_line_buffering(monkeypatch, module, make_args_fn):
     monkeypatch.setattr(module, "_run", lambda _: None)
     monkeypatch.setattr(module, "_parse_args", make_args_fn)
     module.main()
-    assert any(k.get("line_buffering") for k in configured)
+    return any(k.get("line_buffering") for k in configured)
 
 
 def capture_help_output(parse_func, monkeypatch, capsys):

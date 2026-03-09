@@ -9,7 +9,7 @@ import pytest
 from lib.python.test_fixtures import (
     CLASSIFY_BASE_ARGV,
     argv_without_flag,
-    assert_main_enables_line_buffering,
+    main_enables_line_buffering,
     capture_help_output,
     make_classify_args,
 )
@@ -246,4 +246,4 @@ def test_main_calls_run(monkeypatch, cts):
 
 def test_main_enables_line_buffering(monkeypatch, cts):
     """Reconfigures stdout to line-buffered mode."""
-    assert_main_enables_line_buffering(monkeypatch, cts, _make_args)
+    assert main_enables_line_buffering(monkeypatch, cts, _make_args)
