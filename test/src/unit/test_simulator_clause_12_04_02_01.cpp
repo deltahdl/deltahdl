@@ -118,4 +118,4 @@ TEST(SimA60421, FlushAfterPartialAccumulation) {
   f.ctx.SetCurrentProcess(nullptr);
 }
 
-}  // namespace
+}

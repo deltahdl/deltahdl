@@ -26,4 +26,4 @@ TEST(StmtExec, DisableForkReturnsKDone) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-}  // namespace
+}

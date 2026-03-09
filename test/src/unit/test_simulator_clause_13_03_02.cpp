@@ -78,4 +78,4 @@ TEST(Sim13032, AutomaticTaskInputFromCaller) {
   EXPECT_EQ(val, 42u);
 }
 
-}  // namespace
+}

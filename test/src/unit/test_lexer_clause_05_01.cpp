@@ -186,4 +186,4 @@ TEST(LexerClause05, Cl5_1_UnterminatedStringIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -107,4 +107,4 @@ TEST(ParserA607, ValueRangeBracket) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

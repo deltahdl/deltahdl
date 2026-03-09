@@ -23,4 +23,4 @@ TEST(ParserClause03, Cl3_5_ProcessesAndContinuousAssign) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kContAssign));
 }
 
-}  // namespace
+}

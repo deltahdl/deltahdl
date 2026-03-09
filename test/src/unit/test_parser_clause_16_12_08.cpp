@@ -18,4 +18,4 @@ TEST(ParserA210, PropertyExpr_Iff) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

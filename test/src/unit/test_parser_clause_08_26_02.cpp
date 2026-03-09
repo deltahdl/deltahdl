@@ -99,4 +99,4 @@ TEST(ParserClause08_03, ImplementsWithParamAssignment) {
   EXPECT_EQ(r.cu->classes[0]->implements_types[0], "IFace");
 }
 
-}  // namespace
+}

@@ -49,4 +49,4 @@ TEST(ClockingSim, CycleDelayWaitsNEdges) {
   EXPECT_GE(edge_count, 3u);
 }
 
-}  // namespace
+}

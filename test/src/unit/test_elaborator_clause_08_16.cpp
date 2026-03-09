@@ -69,4 +69,4 @@ TEST(ElabA816, CastWithNullOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

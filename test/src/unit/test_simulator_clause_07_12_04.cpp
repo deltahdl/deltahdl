@@ -39,4 +39,4 @@ TEST(ArrayIterator, ItemIndexInFind) {
   EXPECT_EQ(out[1].ToUint64(), 20u);
 }
 
-}  // namespace
+}

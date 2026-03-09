@@ -39,4 +39,4 @@ TEST(ParserClause03, Cl3_12_CompilationAndElaboration) {
   EXPECT_EQ(inst->inst_ports.size(), 3u);
 }
 
-}  // namespace
+}

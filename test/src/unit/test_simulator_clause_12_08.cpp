@@ -368,4 +368,4 @@ TEST(SimA608, NestedLoopInnerContinue) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-}  // namespace
+}

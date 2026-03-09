@@ -49,4 +49,4 @@ TEST(ParserSection7c, QueueWithMaxSize) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

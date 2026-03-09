@@ -688,4 +688,4 @@ TEST(IntegerLiteralConstants, SizeConstantNonzero) {
   EXPECT_EQ(result, 1u);
 }
 
-}  // namespace
+}

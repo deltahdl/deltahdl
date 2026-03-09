@@ -55,4 +55,4 @@ TEST(ConstExpr, NestedTernaryIsConstant) {
   EXPECT_EQ(ConstEvalInt(e), 4);
 }
 
-}  // namespace
+}

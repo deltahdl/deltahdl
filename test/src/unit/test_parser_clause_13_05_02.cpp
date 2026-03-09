@@ -208,4 +208,4 @@ TEST(ParserSection13, RefArgOnFunction) {
   EXPECT_EQ(fn->func_args[1].direction, Direction::kRef);
 }
 
-}  // namespace
+}

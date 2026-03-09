@@ -38,4 +38,4 @@ TEST(ElabA829, NullAssignmentOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

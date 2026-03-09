@@ -43,4 +43,4 @@ TEST(ParserClause03, AllSevenDesignElements) {
               "module m; import p::*; endmodule\n"));
 }
 
-}  // namespace
+}

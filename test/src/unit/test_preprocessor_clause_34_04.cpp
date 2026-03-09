@@ -34,4 +34,4 @@ TEST(Preprocessor, Pragma_Protect_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

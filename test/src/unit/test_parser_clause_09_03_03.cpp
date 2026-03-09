@@ -29,4 +29,4 @@ TEST(ParserA603, NestedForkInSeqBlock) {
   EXPECT_EQ(inner_block->stmts[0]->kind, StmtKind::kFork);
 }
 
-}  // namespace
+}

@@ -41,4 +41,4 @@ TEST(ElabA8251, ValueParamScopeOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

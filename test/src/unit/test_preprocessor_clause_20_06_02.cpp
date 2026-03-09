@@ -17,4 +17,4 @@ TEST(ParserSection6, TypeRefInBitsCast) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

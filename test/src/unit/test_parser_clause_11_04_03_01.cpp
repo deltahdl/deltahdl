@@ -98,4 +98,4 @@ TEST(ConstEvalReal, BinaryMulReals) {
   EXPECT_DOUBLE_EQ(*val, 6.0);
 }
 
-}  // namespace
+}

@@ -203,4 +203,4 @@ TEST(ElabClause09_06_01, WaitForkInAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

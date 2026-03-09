@@ -62,4 +62,4 @@ TEST(ElabA8263, InterfaceClassWithParamOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -104,4 +104,4 @@ TEST(Precedence, EqualityLowerThanRelational) {
   EXPECT_EQ(rhs->rhs->op, TokenKind::kLt);
 }
 
-}  // namespace
+}

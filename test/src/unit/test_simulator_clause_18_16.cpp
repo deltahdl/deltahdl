@@ -82,4 +82,4 @@ TEST(StmtExec, RandcaseRespectsWeights) {
   }
 }
 
-}  // namespace
+}

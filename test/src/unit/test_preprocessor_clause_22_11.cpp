@@ -132,4 +132,4 @@ TEST(Preprocessor, Pragma_NoTrailingNewline_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

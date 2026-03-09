@@ -39,4 +39,4 @@ TEST(ParserSection6, Sec6_11_RegPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-}  // namespace
+}

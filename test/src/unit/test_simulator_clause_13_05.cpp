@@ -248,4 +248,4 @@ TEST(Eval, FunctionInoutArgWriteback) {
   EXPECT_EQ(x_var->value.ToUint64(), 11u);
 }
 
-}  // namespace
+}

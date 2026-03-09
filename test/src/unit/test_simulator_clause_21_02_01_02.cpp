@@ -47,4 +47,4 @@ TEST(FormatArg, BinaryReturnsToString) {
   EXPECT_EQ(FormatArg(val, 'b'), "1010");
 }
 
-}  // namespace
+}

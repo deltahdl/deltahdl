@@ -122,4 +122,4 @@ TEST(ParserA60701, CondPatternMatches) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

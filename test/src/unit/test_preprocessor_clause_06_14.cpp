@@ -17,4 +17,4 @@ TEST(ParserSection6, ChandleInClass) {
             DataTypeKind::kChandle);
 }
 
-}  // namespace
+}

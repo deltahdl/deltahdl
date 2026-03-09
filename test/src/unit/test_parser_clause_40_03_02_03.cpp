@@ -16,4 +16,4 @@ TEST(ParserSection40, CoverageGetSystemCall) {
   )"));
 }
 
-}  // namespace
+}

@@ -79,4 +79,4 @@ TEST(ClassSim, OutOfBlockConstructor) {
   EXPECT_EQ(it->second->method_class, "C");
 }
 
-}  // namespace
+}

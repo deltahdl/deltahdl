@@ -155,4 +155,4 @@ TEST(ParserSection9, WaitExprStillWorks) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-}  // namespace
+}

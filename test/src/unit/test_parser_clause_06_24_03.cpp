@@ -78,4 +78,4 @@ TEST(ParserSection6, BitstreamCastStringType) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

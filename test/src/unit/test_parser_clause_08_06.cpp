@@ -184,4 +184,4 @@ TEST(ParserA86, StaticQualifierAutoLifetimeLegal) {
       "endclass\n");
 }
 
-}  // namespace
+}

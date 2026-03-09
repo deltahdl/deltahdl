@@ -25,4 +25,4 @@ TEST(ParserClause05, Cl5_6_2_EscapedKeywordAsIdentifier) {
   EXPECT_TRUE(ParseOk("module m; logic \\begin ; endmodule"));
 }
 
-}  // namespace
+}

@@ -40,5 +40,5 @@ TEST_F(AnnexHParseTest, AnnexMSvVpiCalls) {
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-}  // namespace
-}  // namespace delta
+}
+} delta

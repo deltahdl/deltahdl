@@ -422,4 +422,4 @@ TEST(ParserSection9, EventControlNegedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
 }
 
-}  // namespace
+}

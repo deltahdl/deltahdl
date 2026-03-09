@@ -39,4 +39,4 @@ TEST(StrengthCombine, EqualStrengthOppositeValueProducesX) {
   EXPECT_EQ(result.value, Val4::kX);
 }
 
-}  // namespace
+}

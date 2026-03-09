@@ -49,4 +49,4 @@ TEST(ClassSim, InstanceConstantSetOnObject) {
   EXPECT_EQ(obj->GetProperty("size", f.arena).ToUint64(), 4096u);
 }
 
-}  // namespace
+}

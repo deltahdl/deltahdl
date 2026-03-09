@@ -315,4 +315,4 @@ TEST(ParserSection7, Sec7_2_2_ContinuousAssign) {
   ASSERT_NE(item->assign_rhs, nullptr);
 }
 
-}  // namespace
+}

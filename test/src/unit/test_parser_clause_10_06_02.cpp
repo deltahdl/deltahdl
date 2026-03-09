@@ -176,4 +176,4 @@ TEST(ParserA85, VarLvalueRelease) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

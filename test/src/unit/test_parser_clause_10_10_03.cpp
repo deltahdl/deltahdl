@@ -61,4 +61,4 @@ TEST(ParserSection1010_3, UnpackedArrayConcatInAssignPattern) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

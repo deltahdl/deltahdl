@@ -55,4 +55,4 @@ TEST(ParserSection7, AssocArrayFirstReturnAssigned) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

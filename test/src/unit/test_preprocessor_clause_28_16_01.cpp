@@ -17,4 +17,4 @@ TEST(ParserSection28, GateMinTypMaxDelay) {
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
-}  // namespace
+}

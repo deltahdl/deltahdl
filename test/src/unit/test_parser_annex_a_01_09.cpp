@@ -279,4 +279,4 @@ TEST(ClassItemsA19, ClassFinal) {
   EXPECT_TRUE(r.cu->classes[0]->is_final);
 }
 
-}  // namespace
+}

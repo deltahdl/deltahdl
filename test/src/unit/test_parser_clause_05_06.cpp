@@ -83,4 +83,4 @@ TEST(ParserClause05, Cl5_6_SimpleWithUnderscore) {
   EXPECT_EQ(item->name, "_bus3");
 }
 
-}  // namespace
+}

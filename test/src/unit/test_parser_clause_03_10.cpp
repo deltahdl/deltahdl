@@ -57,4 +57,4 @@ TEST(ParserClause03, Cl3_10_ConfigAndModuleCoexist) {
   EXPECT_EQ(r.cu->configs.size(), 1u);
 }
 
-}  // namespace
+}

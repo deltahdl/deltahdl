@@ -77,4 +77,4 @@ TEST(NetDecl, TriregDefaultsToXLarge) {
   EXPECT_EQ(ValOf(*var), kValX);
 }
 
-}  // namespace
+}

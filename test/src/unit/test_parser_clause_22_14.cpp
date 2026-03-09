@@ -31,4 +31,4 @@ TEST(ParserSection22, BeginKeywordsMultipleModules) {
                               "`end_keywords\n"));
 }
 
-}  // namespace
+}

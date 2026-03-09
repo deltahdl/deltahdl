@@ -46,4 +46,4 @@ TEST(Elaboration, AssocArrayIntIndexWidth) {
   EXPECT_EQ(vars[0].assoc_index_width, 32u);
 }
 
-}  // namespace
+}

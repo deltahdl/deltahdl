@@ -62,4 +62,4 @@ TEST(ProgramElab, ProgramInstantiatedFromModule) {
   EXPECT_EQ(mod->children[0].resolved->name, "sub_prog");
 }
 
-}  // namespace
+}

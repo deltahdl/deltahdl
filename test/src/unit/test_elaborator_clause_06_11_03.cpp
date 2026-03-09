@@ -73,4 +73,4 @@ TEST(SimCh6b, IntDefaultSignedVsUnsignedOverride) {
   EXPECT_FALSE(vu->is_signed) << "int unsigned is unsigned";
 }
 
-}  // namespace
+}

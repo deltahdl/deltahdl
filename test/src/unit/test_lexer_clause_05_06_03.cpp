@@ -70,4 +70,4 @@ TEST(LexerClause05, Cl5_6_3_MultipleInStream) {
   EXPECT_EQ(tokens[2].text, "$time");
 }
 
-}  // namespace
+}

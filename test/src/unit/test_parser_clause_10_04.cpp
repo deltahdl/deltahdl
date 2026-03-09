@@ -49,4 +49,4 @@ TEST(ParserSection4, Sec4_5_MixBlockingNonblocking) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
-}  // namespace
+}

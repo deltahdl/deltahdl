@@ -471,4 +471,4 @@ TEST(EvalOp, PowerOneExponent) {
   EXPECT_EQ(result.ToUint64(), 7u);
 }
 
-}  // namespace
+}

@@ -235,4 +235,4 @@ TEST(ElabClause1002, ProceduralAssignToWorNet_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

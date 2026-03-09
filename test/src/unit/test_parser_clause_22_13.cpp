@@ -42,4 +42,4 @@ TEST(ParserSection22, LineDirectiveInDisplay) {
                               "endmodule\n"));
 }
 
-}  // namespace
+}

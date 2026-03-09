@@ -32,4 +32,4 @@ TEST(Process, ProcessWithCoroutine) {
   EXPECT_TRUE(p.Done());
 }
 
-}  // namespace
+}

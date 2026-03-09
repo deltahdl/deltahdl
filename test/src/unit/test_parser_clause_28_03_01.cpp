@@ -19,4 +19,4 @@ TEST(ParserA301, GateInst_EnableWithStrengthAndDelay) {
   EXPECT_NE(g->gate_delay, nullptr);
 }
 
-}  // namespace
+}

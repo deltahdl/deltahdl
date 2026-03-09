@@ -462,4 +462,4 @@ TEST(ImplicitDataType, ImplicitDataTypeSigned) {
   EXPECT_TRUE(port.data_type.is_signed);
 }
 
-}  // namespace
+}

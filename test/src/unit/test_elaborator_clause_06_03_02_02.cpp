@@ -18,4 +18,4 @@ TEST(Elaborator, DriveStrengthOnNetDeclWithoutAssignIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

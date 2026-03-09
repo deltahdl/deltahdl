@@ -70,4 +70,4 @@ TEST(ClassSim, PropertyOverwrite) {
   EXPECT_EQ(obj->GetProperty("x", f.arena).ToUint64(), 20u);
 }
 
-}  // namespace
+}

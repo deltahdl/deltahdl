@@ -25,4 +25,4 @@ TEST(ParserSection21, ValuePlusargsCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

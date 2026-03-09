@@ -41,4 +41,4 @@ TEST(LexerClause05, Cl5_13_MethodWithArgTokens) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kLParen);
 }
 
-}  // namespace
+}

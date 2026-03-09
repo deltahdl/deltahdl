@@ -17,4 +17,4 @@ TEST(ParserA24, DefparamAssignmentMintypmax) {
   ASSERT_EQ(item->defparam_assigns.size(), 1u);
 }
 
-}  // namespace
+}

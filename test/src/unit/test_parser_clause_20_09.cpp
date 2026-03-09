@@ -83,4 +83,4 @@ TEST(ConstExpr, Onehot0ConstantArg) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-}  // namespace
+}

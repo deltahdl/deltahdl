@@ -36,4 +36,4 @@ TEST(ParserA211, CoverGroup_ExtendsASTVerification) {
   EXPECT_EQ(item->name, "child_cg");
 }
 
-}  // namespace
+}

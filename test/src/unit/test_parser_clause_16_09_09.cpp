@@ -74,4 +74,4 @@ TEST(ParserSection16, SequenceThroughoutWithImplication) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

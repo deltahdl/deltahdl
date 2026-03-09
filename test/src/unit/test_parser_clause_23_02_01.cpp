@@ -168,4 +168,4 @@ TEST(ModuleEmptyPortList, AnsiHeaderEmptyParenPorts) {
   EXPECT_TRUE(r.cu->modules[0]->ports.empty());
 }
 
-}  // namespace
+}

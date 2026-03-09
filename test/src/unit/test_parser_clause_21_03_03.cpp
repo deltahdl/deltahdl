@@ -63,4 +63,4 @@ TEST(ParserSection21, SformatfUsedAsArgument) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

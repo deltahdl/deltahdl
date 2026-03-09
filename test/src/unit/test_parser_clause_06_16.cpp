@@ -237,4 +237,4 @@ TEST(ParserSection6, MultipleStringDecls) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-}  // namespace
+}

@@ -85,4 +85,4 @@ TEST(ParserSection6, NotAssignCompatibleChandleToInt) {
   EXPECT_FALSE(IsAssignmentCompatible(a, b));
 }
 
-}  // namespace
+}

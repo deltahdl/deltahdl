@@ -36,4 +36,4 @@ TEST(Elaborator, TriregDefaultChargeStrengthMedium) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

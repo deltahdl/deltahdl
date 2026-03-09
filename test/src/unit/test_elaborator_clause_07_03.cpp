@@ -57,4 +57,4 @@ TEST(Elaboration, UnpackedUnionBasic_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

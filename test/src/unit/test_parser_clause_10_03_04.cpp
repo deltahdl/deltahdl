@@ -116,4 +116,4 @@ TEST(ParserSection6, NetDeclDriveStrength) {
   EXPECT_EQ(item->drive_strength1, 4u);
 }
 
-}  // namespace
+}

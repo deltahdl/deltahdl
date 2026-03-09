@@ -51,4 +51,4 @@ TEST(Section21, ReadmembBasic) {
   std::remove(tmp_path.c_str());
 }
 
-}  // namespace
+}

@@ -113,4 +113,4 @@ TEST(ParserSection9, Sec9_2_3_NestedIfElse) {
   EXPECT_EQ(item->body->else_branch->kind, StmtKind::kIf);
 }
 
-}  // namespace
+}

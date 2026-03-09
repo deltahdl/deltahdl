@@ -97,4 +97,4 @@ TEST(ElabA81, ConstantMultipleConcatInParam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

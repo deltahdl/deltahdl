@@ -158,4 +158,4 @@ TEST(ParserA86, BinaryArithShiftLeft) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLtLt);
 }
 
-}  // namespace
+}

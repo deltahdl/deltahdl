@@ -12,4 +12,4 @@ TEST(ParserSection22, DefineSimpleMacro) {
                               "endmodule\n"));
 }
 
-}  // namespace
+}

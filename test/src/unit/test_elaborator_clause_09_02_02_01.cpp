@@ -72,4 +72,4 @@ TEST(ElabClause09_02_02_01, AlwaysElaboratesToKAlways) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

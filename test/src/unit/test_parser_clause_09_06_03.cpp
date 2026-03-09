@@ -96,4 +96,4 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenDisableFork) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kDisableFork);
 }
 
-}  // namespace
+}

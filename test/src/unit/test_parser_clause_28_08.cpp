@@ -263,4 +263,4 @@ TEST(ParserA304, PassSwitchtype_Rtran) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-}  // namespace
+}

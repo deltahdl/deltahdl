@@ -553,4 +553,4 @@ TEST(ClockingEndLabel, ClockingEndLabel) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

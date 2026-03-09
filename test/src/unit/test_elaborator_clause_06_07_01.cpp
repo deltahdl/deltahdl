@@ -194,4 +194,4 @@ TEST(NetDecl, ScalaredWithPackedDimensionOk) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
-}  // namespace
+}

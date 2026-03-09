@@ -59,4 +59,4 @@ TEST(SimCh6, NettypeWideNet) {
   EXPECT_TRUE(found_net) << "y should be elaborated as a net";
 }
 
-}  // namespace
+}

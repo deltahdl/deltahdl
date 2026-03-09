@@ -199,4 +199,4 @@ TEST(ParserA602, DecExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

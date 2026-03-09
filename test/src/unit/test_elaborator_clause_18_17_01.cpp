@@ -21,4 +21,4 @@ TEST(ElabA612, WeightedAlternativesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

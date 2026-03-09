@@ -34,4 +34,4 @@ TEST(ParserSection6, EnumMultipleVars) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

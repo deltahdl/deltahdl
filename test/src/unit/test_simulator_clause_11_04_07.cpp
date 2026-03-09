@@ -338,4 +338,4 @@ TEST(SimA86, BinaryEquivalence) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

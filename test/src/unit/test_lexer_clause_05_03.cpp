@@ -186,4 +186,4 @@ TEST(LexerClause05, Cl5_3_OperatorsDoNotNeedWhitespaceSeparation) {
   EXPECT_EQ(tokens[2].text, "b");
 }
 
-}  // namespace
+}

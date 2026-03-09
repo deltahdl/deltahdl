@@ -84,4 +84,4 @@ TEST(SimCh6, BitStreamStructRoundTrip) {
   EXPECT_EQ(p2->value.ToUint64(), 0xCAFEu);
 }
 
-}  // namespace
+}

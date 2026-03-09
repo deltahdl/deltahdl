@@ -23,4 +23,4 @@ TEST(ParserA701, PulsestyleAndShowcancelledTogether) {
   EXPECT_FALSE(spec->specify_items[1]->is_noshowcancelled);
 }
 
-}  // namespace
+}

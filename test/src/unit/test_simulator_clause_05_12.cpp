@@ -171,4 +171,4 @@ TEST(SimClause05, Cl5_12_AttrWithStringValue) {
   EXPECT_EQ(f.ctx.FindVariable("g")->value.ToUint64(), 0x99);
 }
 
-}  // namespace
+}

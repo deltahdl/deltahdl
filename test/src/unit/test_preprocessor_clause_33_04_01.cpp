@@ -49,4 +49,4 @@ TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
   EXPECT_EQ(r.cu->configs[0]->name, "my_cfg");
 }
 
-}  // namespace
+}

@@ -150,4 +150,4 @@ TEST(ParserClause08_03, ErrorDuplicateStatic) {
   EXPECT_TRUE(r.has_errors);
 }
 
-}  // namespace
+}

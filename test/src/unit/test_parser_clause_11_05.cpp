@@ -37,4 +37,4 @@ TEST(ParserSection11, Sec11_1_FunctionCallExpression) {
   EXPECT_EQ(rhs->args.size(), 2u);
 }
 
-}  // namespace
+}

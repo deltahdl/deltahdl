@@ -23,4 +23,4 @@ TEST(ParserSection23, MacromoduleDefinition) {
   EXPECT_EQ(r.cu->modules[0]->name, "top");
 }
 
-}  // namespace
+}

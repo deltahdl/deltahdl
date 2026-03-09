@@ -99,4 +99,4 @@ TEST(ElabClause03, Cl3_13_ModuleNameSpaceCoexist) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

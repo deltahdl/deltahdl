@@ -82,4 +82,4 @@ TEST(ParserSection10, ProceduralAssignThenDeassign) {
   EXPECT_EQ(s1->kind, StmtKind::kDeassign);
 }
 
-}  // namespace
+}

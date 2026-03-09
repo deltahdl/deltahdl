@@ -90,4 +90,4 @@ TEST(ElabClause09_06_02, DisableInAlwaysElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

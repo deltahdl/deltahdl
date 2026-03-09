@@ -112,4 +112,4 @@ TEST(Elab1380, ParamInForLoopBound) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

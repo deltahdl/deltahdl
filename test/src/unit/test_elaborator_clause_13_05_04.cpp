@@ -57,4 +57,4 @@ TEST(Elab1354, MixedPositionalNamedOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

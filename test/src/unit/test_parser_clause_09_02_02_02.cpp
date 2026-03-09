@@ -547,4 +547,4 @@ TEST(ParserSection4, Sec4_6_AlwaysCombCombinational) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

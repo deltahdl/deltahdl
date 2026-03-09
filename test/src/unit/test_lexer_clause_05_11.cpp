@@ -64,4 +64,4 @@ TEST(LexerClause05, Cl5_10_ReplicationTokens) {
   EXPECT_EQ(tokens[5].kind, TokenKind::kRBrace);
 }
 
-}  // namespace
+}

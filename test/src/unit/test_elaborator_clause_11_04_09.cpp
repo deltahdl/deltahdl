@@ -143,4 +143,4 @@ TEST(SimCh9b, AlwaysCombReductionOr) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

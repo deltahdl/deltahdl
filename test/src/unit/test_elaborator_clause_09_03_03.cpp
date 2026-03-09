@@ -101,4 +101,4 @@ TEST(ElabClause09_03_02, NestedForkElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -192,7 +192,7 @@ TEST(LexerClause05, Cl5_7_1_LargeUnsizedHex) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-}  // namespace
+}
 TEST(IntegerLiteralConstants, WhitespaceBetweenSizeAndBase) {
   auto result = RunAndGet(
       "module t;\n"

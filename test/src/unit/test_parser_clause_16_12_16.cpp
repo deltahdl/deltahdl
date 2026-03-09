@@ -96,4 +96,4 @@ TEST(ParserSection16, PropertyCaseInAssert) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-}  // namespace
+}

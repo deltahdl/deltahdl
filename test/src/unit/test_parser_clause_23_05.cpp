@@ -74,4 +74,4 @@ TEST(ParserSection23, ExternModuleFollowedByDefinition) {
   EXPECT_FALSE(r.cu->modules[1]->is_extern);
 }
 
-}  // namespace
+}

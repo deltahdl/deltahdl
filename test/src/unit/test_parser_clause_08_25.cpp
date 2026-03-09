@@ -226,4 +226,4 @@ TEST(ParserSection8, ClassWithParameter) {
   EXPECT_EQ(r.cu->classes[0]->name, "par_cls");
 }
 
-}  // namespace
+}

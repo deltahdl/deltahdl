@@ -81,4 +81,4 @@ TEST(ElabA817, ImplicitChainingOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

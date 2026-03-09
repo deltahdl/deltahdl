@@ -17,4 +17,4 @@ TEST(ElabA70502, NochangeMinTypMaxOffsetsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

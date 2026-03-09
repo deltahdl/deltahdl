@@ -134,4 +134,4 @@ TEST(SimA60703, TernaryMatchesInAssignment) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-}  // namespace
+}

@@ -42,4 +42,4 @@ TEST(ParserA213, GenvarDeclSingle) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
 }
 
-}  // namespace
+}

@@ -28,4 +28,4 @@ TEST(ElabA70501, AllTwelveCommandFormsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

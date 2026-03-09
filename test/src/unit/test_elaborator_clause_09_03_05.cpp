@@ -83,4 +83,4 @@ TEST(ElabClause09_03_05, LabelOnForLoopElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

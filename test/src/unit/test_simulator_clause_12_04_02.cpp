@@ -239,4 +239,4 @@ TEST(SimA606, UniqueIfSingleConditionNoOverlap) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-}  // namespace
+}

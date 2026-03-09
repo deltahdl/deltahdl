@@ -170,4 +170,4 @@ TEST(SimClause05, Cl5_11_TypeFromContext) {
   EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0xAD);
 }
 
-}  // namespace
+}

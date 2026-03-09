@@ -90,4 +90,4 @@ TEST(ElabClause09_03_02, BeginEndInsideForkElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

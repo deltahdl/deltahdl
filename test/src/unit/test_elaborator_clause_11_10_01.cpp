@@ -60,4 +60,4 @@ TEST(Elaboration, StringLiteralWiderVectorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

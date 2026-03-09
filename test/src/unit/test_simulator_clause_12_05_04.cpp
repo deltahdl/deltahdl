@@ -248,4 +248,4 @@ TEST(SimA607, CaseInsideLRMExample) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-}  // namespace
+}

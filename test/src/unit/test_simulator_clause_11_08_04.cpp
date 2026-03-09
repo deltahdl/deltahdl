@@ -63,4 +63,4 @@ TEST(SignedXZ, KnownSignedNormalExtension) {
   EXPECT_EQ(result.words[0].bval, 0u);
 }
 
-}  // namespace
+}

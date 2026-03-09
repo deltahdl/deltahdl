@@ -40,4 +40,4 @@ TEST(ElabClause03, Cl3_14_ModuleWithDelayElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

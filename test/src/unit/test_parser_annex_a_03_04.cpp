@@ -323,4 +323,4 @@ TEST(ParserA34, AllGateTypesWithNamedInstances) {
   EXPECT_EQ(gates[25]->gate_kind, GateKind::kPulldown);
 }
 
-}  // namespace
+}

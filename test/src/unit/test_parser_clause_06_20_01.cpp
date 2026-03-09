@@ -112,4 +112,4 @@ TEST(ParserA23, ListOfSpecparamAssignmentsSingle) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

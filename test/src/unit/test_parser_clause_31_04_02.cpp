@@ -110,4 +110,4 @@ TEST(TimeskewBasic, TimeskewBasic) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kTimeskew);
 }
 
-}  // namespace
+}

@@ -143,4 +143,4 @@ TEST(SimCh10, BlockingAssignBitwiseOps) {
                    {{"r_and", 48u}, {"r_or", 252u}, {"r_xor", 204u}});
 }
 
-}  // namespace
+}

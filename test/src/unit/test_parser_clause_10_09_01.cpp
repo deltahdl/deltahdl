@@ -269,4 +269,4 @@ TEST(AssignmentPatternDefault, AssignmentPatternDefault) {
   VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
 }
 
-}  // namespace
+}

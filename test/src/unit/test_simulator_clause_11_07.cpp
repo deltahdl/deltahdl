@@ -128,4 +128,4 @@ TEST(EvalAdv, SignedZFillsZ) {
   EXPECT_NE(result.words[0].bval & 0xF0u, 0u);
 }
 
-}  // namespace
+}

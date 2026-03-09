@@ -120,4 +120,4 @@ TEST(SimCh6, CastRealToInt_PosHalfRoundsAway) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

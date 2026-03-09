@@ -78,4 +78,4 @@ TEST(Elaboration, ClassVariableElaboratesOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

@@ -23,4 +23,4 @@ TEST(Functions, ConstantFunctionEvalAtElaboration) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 42u);
 }
 
-}  // namespace
+}

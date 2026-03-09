@@ -23,4 +23,4 @@ TEST(SimA83, PrecedenceMulBeforeAdd) {
   EXPECT_EQ(var->value.ToUint64(), 14u);
 }
 
-}  // namespace
+}

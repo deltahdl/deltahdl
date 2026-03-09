@@ -45,4 +45,4 @@ TEST(Coverage, IllegalBinsExcludedFromCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
 }
 
-}  // namespace
+}

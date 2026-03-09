@@ -29,4 +29,4 @@ TEST(SimA612, RepeatProduction) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-}  // namespace
+}

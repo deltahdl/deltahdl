@@ -147,4 +147,4 @@ TEST(ParserA86, UnaryModulePathReductionAnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

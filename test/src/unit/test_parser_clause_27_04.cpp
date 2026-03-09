@@ -662,4 +662,4 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInGenerateBlock) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

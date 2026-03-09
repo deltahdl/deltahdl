@@ -16,4 +16,4 @@ TEST_F(CheckerParseTest, CheckerWithVariables) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}  // namespace
+}

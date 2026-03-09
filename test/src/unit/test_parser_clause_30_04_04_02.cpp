@@ -131,4 +131,4 @@ TEST(ParserSection28, Sec28_12_ConditionalFullPath) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

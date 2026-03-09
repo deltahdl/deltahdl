@@ -68,4 +68,4 @@ TEST(EvalSteps, TernaryCondSelfDetermined) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-}  // namespace
+}

@@ -19,4 +19,4 @@ TEST(AdvSim, DynArrayDelete) {
   EXPECT_EQ(arr.Size(), 0u);
 }
 
-}  // namespace
+}

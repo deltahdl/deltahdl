@@ -26,4 +26,4 @@ TEST(ParserA82, RandomizeCallWithNull) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

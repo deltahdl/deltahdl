@@ -95,7 +95,7 @@ TEST(ElabClause09_02, ProcessBodiesNotNull) {
   }
 }
 
-}  // namespace
+}
 TEST(StructuredProcedures, AllProcedureTypesCoexist) {
   SimFixture f;
   auto* design = ElaborateSrc(

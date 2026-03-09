@@ -35,4 +35,4 @@ TEST(ParserClause03, Cl3_11_HierarchyAndInstantiation) {
       CountItemsByKind(r.cu->modules[1]->items, ModuleItemKind::kGateInst), 4);
 }
 
-}  // namespace
+}

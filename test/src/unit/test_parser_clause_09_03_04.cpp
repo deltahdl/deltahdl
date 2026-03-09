@@ -544,4 +544,4 @@ TEST(ParserClause09_03_04, NamedBlockWithoutEndLabelOk) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

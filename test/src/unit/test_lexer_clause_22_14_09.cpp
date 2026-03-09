@@ -42,4 +42,4 @@ TEST(Lexer, KeywordVersion_1800_2017_And_2023_NoNewKeywords) {
       LookupKeyword("foobar", KeywordVersion::kVer18002023).has_value());
 }
 
-}  // namespace
+}

@@ -208,4 +208,4 @@ TEST(ParserA86, BinaryXnor) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
 }
 
-}  // namespace
+}

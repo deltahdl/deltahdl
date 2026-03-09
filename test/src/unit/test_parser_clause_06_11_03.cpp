@@ -459,4 +459,4 @@ TEST(ParserSection6, UnsignedVector) {
   EXPECT_EQ(item->name, "uv");
 }
 
-}  // namespace
+}

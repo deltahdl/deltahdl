@@ -101,4 +101,4 @@ TEST(NetDecl, UnresolvedNettypeNoResolutionFunction) {
   EXPECT_EQ(ValOf(*var), kValX);
 }
 
-}  // namespace
+}

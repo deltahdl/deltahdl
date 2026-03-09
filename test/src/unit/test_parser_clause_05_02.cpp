@@ -75,4 +75,4 @@ TEST(ParserClause05, Cl5_2_EmptyModuleBody) {
   EXPECT_TRUE(ParseOk("module t; endmodule"));
 }
 
-}  // namespace
+}

@@ -28,4 +28,4 @@ TEST(IpcSync, MailboxTryGetEmpty) {
   EXPECT_EQ(mb.TryGet(msg), -1);
 }
 
-}  // namespace
+}

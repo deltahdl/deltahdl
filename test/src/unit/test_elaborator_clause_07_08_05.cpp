@@ -52,4 +52,4 @@ TEST(Elaboration, AssocArrayIntIndex_Allowed) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

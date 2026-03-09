@@ -189,4 +189,4 @@ TEST(ParserA603, ActionBlockPassAndFail) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-}  // namespace
+}

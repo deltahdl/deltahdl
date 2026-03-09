@@ -85,4 +85,4 @@ TEST(ParserSection6, Sec6_7_2_NettypeAlias) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

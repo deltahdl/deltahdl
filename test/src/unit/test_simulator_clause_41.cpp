@@ -106,4 +106,4 @@ TEST(Api, DataReadMissingVariableReturnsDefault) {
   EXPECT_EQ(result.format, DataReadFormat::kInt);
 }
 
-}  // namespace
+}

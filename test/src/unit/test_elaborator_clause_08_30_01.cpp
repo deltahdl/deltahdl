@@ -13,4 +13,4 @@ TEST(ElabA8301, WeakReferenceDeclOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

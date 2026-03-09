@@ -22,4 +22,4 @@ TEST(ParserSection12, UniqueIfChainNoElse) {
   EXPECT_EQ(stmt->else_branch->else_branch, nullptr);
 }
 
-}  // namespace
+}

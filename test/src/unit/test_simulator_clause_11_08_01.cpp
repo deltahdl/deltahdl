@@ -98,4 +98,4 @@ TEST(ExprType, ReductionAlwaysUnsigned) {
   EXPECT_FALSE(result.is_signed);
 }
 
-}  // namespace
+}

@@ -24,4 +24,4 @@ TEST(MinTypMaxDelays, NoRequiredOrdering) {
   EXPECT_EQ(SelectMinTypMax(mtm, 2), 10u);
 }
 
-}  // namespace
+}

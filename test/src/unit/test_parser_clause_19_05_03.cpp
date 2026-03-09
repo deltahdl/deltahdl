@@ -13,4 +13,4 @@ TEST(ParserA211, BinsOrEmpty_Semicolon) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

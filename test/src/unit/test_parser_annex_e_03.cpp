@@ -33,4 +33,4 @@ TEST(ParserAnnexE2, AnnexEDefaultTriregStrength_NoDirective) {
   EXPECT_FALSE(r.cu->has_default_trireg_strength);
 }
 
-}  // namespace
+}

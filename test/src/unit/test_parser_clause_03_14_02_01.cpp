@@ -48,4 +48,4 @@ TEST(ParserClause03, Cl3_14_TimeScaleTwoComponents) {
   EXPECT_NE(static_cast<int8_t>(ts.unit), static_cast<int8_t>(ts.precision));
 }
 
-}  // namespace
+}

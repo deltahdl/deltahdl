@@ -57,4 +57,4 @@ TEST(ParserSection19, ClockingBlockScope_InChecker) {
               "endchecker\n"));
 }
 
-}  // namespace
+}

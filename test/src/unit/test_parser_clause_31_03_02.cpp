@@ -95,4 +95,4 @@ TEST(HoldWithNotifier, HoldWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-}  // namespace
+}

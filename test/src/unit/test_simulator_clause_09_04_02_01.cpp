@@ -18,4 +18,4 @@ TEST(TimingControl, CommaSynonymousWithOr) {
   EXPECT_EQ(comma_result, or_result);
 }
 
-}  // namespace
+}

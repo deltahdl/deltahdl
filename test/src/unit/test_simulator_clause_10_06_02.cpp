@@ -412,4 +412,4 @@ TEST(SimCh10d, ForceExpressionRhs) {
   EXPECT_EQ(b->value.ToUint64(), 0xFFu);
 }
 
-}  // namespace
+}

@@ -76,4 +76,4 @@ TEST(ClassSim, ScopeResolutionBaseClassStatic) {
   EXPECT_EQ(found->static_properties["count"].ToUint64(), 7u);
 }
 
-}  // namespace
+}

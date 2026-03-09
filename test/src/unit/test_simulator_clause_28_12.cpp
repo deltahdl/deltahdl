@@ -124,4 +124,4 @@ TEST(StrengthResolution, MultiBitMixed) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-}  // namespace
+}

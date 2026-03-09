@@ -749,4 +749,4 @@ TEST(SimCh6b, TypeOpLogicVector) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-}  // namespace
+}

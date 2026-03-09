@@ -125,4 +125,4 @@ TEST(SimCh10c, VarInitBeforeAlwaysBlock) {
   EXPECT_EQ(result->value.ToUint64(), 5u);
 }
 
-}  // namespace
+}

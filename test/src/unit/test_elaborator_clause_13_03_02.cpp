@@ -85,4 +85,4 @@ TEST(Elab13032, AutoTaskLocalBlockingAssignOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -105,4 +105,4 @@ TEST(ParserClause03, Cl3_9_LocalScopesDoNotConflict) {
               "module b; logic x; endmodule\n"));
 }
 
-}  // namespace
+}

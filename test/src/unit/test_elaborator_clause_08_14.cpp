@@ -65,4 +65,4 @@ TEST(ElabA814, BaseClassMemberAccessOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

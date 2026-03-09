@@ -41,4 +41,4 @@ TEST(EvalAdv, AssignInExprTruncToLHSWidth) {
   EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
 
-}  // namespace
+}

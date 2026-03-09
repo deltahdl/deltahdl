@@ -84,4 +84,4 @@ TEST(ParserClause05, Cl5_8_TimeunitAllSixUnits) {
             TimeUnit::kFs);
 }
 
-}  // namespace
+}

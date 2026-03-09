@@ -115,4 +115,4 @@ TEST(ParserSection19, InterfaceClockingWithModport) {
               "endinterface\n"));
 }
 
-}  // namespace
+}

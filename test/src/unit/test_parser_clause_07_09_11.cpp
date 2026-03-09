@@ -21,4 +21,4 @@ TEST(ParserSection7, AssocArrayLiteralKeyValue) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

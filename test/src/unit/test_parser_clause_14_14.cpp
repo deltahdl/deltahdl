@@ -132,4 +132,4 @@ TEST(ParserSection14, GlobalClocking) {
   EXPECT_TRUE(item->clocking_signals.empty());
 }
 
-}  // namespace
+}

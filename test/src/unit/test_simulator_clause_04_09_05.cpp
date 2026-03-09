@@ -334,4 +334,4 @@ TEST(SwitchProcessing, UserDefinedNetXControlTreatedAsOff) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
-}  // namespace
+}

@@ -75,4 +75,4 @@ TEST(ElabClause03, Cl3_3_ModuleWithGenerateElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

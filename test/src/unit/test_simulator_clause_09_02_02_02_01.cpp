@@ -96,4 +96,4 @@ TEST(SimClause09_02_02_02_01, TernaryAllInputsSensitive) {
   EXPECT_EQ(y->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

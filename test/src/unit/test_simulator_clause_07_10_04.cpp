@@ -27,4 +27,4 @@ TEST(QueueAssign, AssignEmptyClears) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-}  // namespace
+}

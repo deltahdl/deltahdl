@@ -110,4 +110,4 @@ TEST(WidthWithNotifier, WidthWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-}  // namespace
+}

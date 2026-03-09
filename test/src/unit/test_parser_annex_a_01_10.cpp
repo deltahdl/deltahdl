@@ -163,4 +163,4 @@ TEST(ConstraintsA110, InsideConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

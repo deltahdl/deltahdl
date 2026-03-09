@@ -48,4 +48,4 @@ TEST(Lexer, KeywordVersion_1800_2009_ImplementsNotKeyword) {
   EXPECT_FALSE(kw.has_value());
 }
 
-}  // namespace
+}

@@ -12,4 +12,4 @@ TEST(ParserClause03, Cl3_14_DelayToTicksSameUnit) {
   EXPECT_EQ(DelayToTicks(42, ts, TimeUnit::kNs), 42u);
 }
 
-}  // namespace
+}

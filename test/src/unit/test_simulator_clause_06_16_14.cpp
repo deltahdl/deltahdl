@@ -14,4 +14,4 @@ TEST(StringMethods, Bintoa) {
   EXPECT_EQ(VecToString(var->value), "1010");
 }
 
-}  // namespace
+}

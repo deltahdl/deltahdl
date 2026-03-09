@@ -43,4 +43,4 @@ TEST(Elaborator, DelayModeDistributed_WithOtherDirectives) {
             DelayModeDirective::kDistributed);
 }
 
-}  // namespace
+}

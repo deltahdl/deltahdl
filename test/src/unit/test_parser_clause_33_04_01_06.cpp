@@ -133,4 +133,4 @@ TEST(ParserSection34, ConfigWithUseClause) {
   ASSERT_GE(r.cu->configs[0]->rules.size(), 1u);
 }
 
-}  // namespace
+}

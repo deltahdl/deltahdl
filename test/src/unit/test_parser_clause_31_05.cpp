@@ -120,4 +120,4 @@ TEST(ParserA70503, EdgeControlSpecifierOnRefEvent) {
   EXPECT_EQ(tc->ref_edge_descriptors[0].second, '1');
 }
 
-}  // namespace
+}

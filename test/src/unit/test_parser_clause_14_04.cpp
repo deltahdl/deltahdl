@@ -336,7 +336,7 @@ TEST(ParserSection14, CombinedInputOutputSkew) {
   }
 }
 
-}  // namespace
+}
 TEST(ClockingSkewEdgeWithDelay, ClockingSkewEdgeWithDelay) {
   auto r = Parse(
       "module m;\n"

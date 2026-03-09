@@ -77,4 +77,4 @@ TEST(Lowerer, EventAssignNull) {
   EXPECT_TRUE(var->is_event);
 }
 
-}  // namespace
+}

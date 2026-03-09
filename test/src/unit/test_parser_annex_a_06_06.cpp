@@ -139,4 +139,4 @@ TEST(ParserA606, IfWithBlock) {
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
 }
 
-}  // namespace
+}

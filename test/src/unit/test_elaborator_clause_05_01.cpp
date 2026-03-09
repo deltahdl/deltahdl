@@ -96,4 +96,4 @@ TEST(ElabClause05, Cl5_1_CommentsDoNotAffectElaboration) {
              "endmodule /* end */\n"));
 }
 
-}  // namespace
+}

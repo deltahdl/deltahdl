@@ -210,4 +210,4 @@ TEST(ElabA84, ClassHandleContAssignError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

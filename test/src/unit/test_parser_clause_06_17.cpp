@@ -92,4 +92,4 @@ TEST(ParserSection6, EventAssignNull) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-}  // namespace
+}

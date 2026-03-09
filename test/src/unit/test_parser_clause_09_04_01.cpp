@@ -296,4 +296,4 @@ TEST(ParserSection9, DelayControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-}  // namespace
+}

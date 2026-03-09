@@ -15,4 +15,4 @@ TEST(ElabA82, MethodCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

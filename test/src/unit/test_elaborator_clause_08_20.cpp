@@ -102,4 +102,4 @@ TEST(ElabA820, ExtendsFinalOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

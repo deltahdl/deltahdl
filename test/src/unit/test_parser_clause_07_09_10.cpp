@@ -23,4 +23,4 @@ TEST(ParserSection7, TaskWithAssocArrayInOut) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

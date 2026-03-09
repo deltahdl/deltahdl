@@ -183,4 +183,4 @@ TEST(SimA60701, NamedStructPatternOnlyDefault) {
   EXPECT_EQ(var->value.ToUint64(), 14135u);
 }
 
-}  // namespace
+}

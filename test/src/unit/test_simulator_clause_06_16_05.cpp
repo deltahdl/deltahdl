@@ -14,4 +14,4 @@ TEST(StringMethods, Tolower) {
   EXPECT_EQ(VecToString(result), "hello");
 }
 
-}  // namespace
+}

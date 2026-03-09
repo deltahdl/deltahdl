@@ -70,4 +70,4 @@ TEST(ElabA811, NoThisReferencesOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

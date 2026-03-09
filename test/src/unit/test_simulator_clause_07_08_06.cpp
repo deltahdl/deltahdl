@@ -45,4 +45,4 @@ TEST(AssocArray, ReadExistingKeyNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), before);
 }
 
-}  // namespace
+}

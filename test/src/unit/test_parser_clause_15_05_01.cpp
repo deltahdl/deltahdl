@@ -116,4 +116,4 @@ TEST(ParserSection12, EventTrigger) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-}  // namespace
+}

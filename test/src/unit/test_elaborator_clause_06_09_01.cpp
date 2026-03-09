@@ -62,4 +62,4 @@ TEST(ElabSection6, Sec6_9_1_ExplicitlySigned) {
   EXPECT_TRUE(mod->variables[0].is_signed);
 }
 
-}  // namespace
+}

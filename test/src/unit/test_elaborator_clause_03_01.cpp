@@ -124,4 +124,4 @@ TEST(ElabClause03, Cl3_1_UnknownTopIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

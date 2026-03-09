@@ -16,4 +16,4 @@ TEST(DpiRuntime, ArgValueBit) {
   EXPECT_EQ(v.AsBit(), 1);
 }
 
-}  // namespace
+}

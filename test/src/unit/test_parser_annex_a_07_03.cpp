@@ -228,4 +228,4 @@ TEST(ParserA70503, TerminalBitSelectOnDataSignal) {
   EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kBitSelect);
 }
 
-}  // namespace
+}

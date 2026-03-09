@@ -100,4 +100,4 @@ TEST(UdpSymbols, StarMatchesAnyChange) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-}  // namespace
+}

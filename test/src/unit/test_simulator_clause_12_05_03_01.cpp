@@ -132,4 +132,4 @@ TEST(SimA605301, Unique0CaseNoMatchNoDeferredViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-}  // namespace
+}

@@ -11,4 +11,4 @@ TEST(ParserAnnexE, AnnexEDelayModeZero) {
   EXPECT_EQ(r.cu->delay_mode_directive, DelayModeDirective::kZero);
 }
 
-}  // namespace
+}

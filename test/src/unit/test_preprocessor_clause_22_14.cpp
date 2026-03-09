@@ -311,4 +311,4 @@ TEST(PreprocSection22_14, MarkerFormatCorrect) {
   EXPECT_EQ(out[pos + 2], '\n');
 }
 
-}  // namespace
+}

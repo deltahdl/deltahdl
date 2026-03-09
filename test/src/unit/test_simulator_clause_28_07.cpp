@@ -46,4 +46,4 @@ TEST(MosSwitches, ZDataAlwaysZ) {
   EXPECT_EQ(EvalMosSwitch(SwitchType::kPmos, Val4::kZ, Val4::kV1), Val4Ext::kZ);
 }
 
-}  // namespace
+}

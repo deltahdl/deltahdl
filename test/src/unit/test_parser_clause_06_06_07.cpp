@@ -364,4 +364,4 @@ TEST(ParserSection6, Sec6_6_7_NettypeWithResolveAndNetDecl) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

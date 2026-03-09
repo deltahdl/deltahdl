@@ -78,4 +78,4 @@ TEST(Coverage, AutoBinSmallRange) {
   EXPECT_EQ(cp->bins[0].values[0], 0);
 }
 
-}  // namespace
+}

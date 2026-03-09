@@ -29,4 +29,4 @@ TEST(ParserAnnexD2, AnnexDScaleRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-}  // namespace
+}

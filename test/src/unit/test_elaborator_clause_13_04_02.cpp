@@ -77,4 +77,4 @@ TEST(Elab1342, DefaultLifetimeFuncElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

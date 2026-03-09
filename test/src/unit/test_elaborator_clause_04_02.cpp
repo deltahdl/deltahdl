@@ -240,4 +240,4 @@ TEST(ElabCh42, TwoIndependentTopModules) {
   EXPECT_EQ(design->all_modules.count("b"), 1u);
 }
 
-}  // namespace
+}

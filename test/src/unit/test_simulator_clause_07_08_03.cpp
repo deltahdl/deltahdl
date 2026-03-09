@@ -97,4 +97,4 @@ TEST(AssocArray, ClassIndex_EmptySize) {
   EXPECT_EQ(aa->Size(), 0u);
 }
 
-}  // namespace
+}

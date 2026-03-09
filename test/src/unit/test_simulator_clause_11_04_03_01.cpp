@@ -22,4 +22,4 @@ TEST(EvalAdv, UnsignedDivUnchanged) {
   EXPECT_EQ(result.ToUint64(), 124u);
 }
 
-}  // namespace
+}

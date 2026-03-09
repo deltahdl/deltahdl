@@ -74,4 +74,4 @@ TEST(ParserSection6, ParamDecl_UnpackedDims) {
                "endmodule\n"));
 }
 
-}  // namespace
+}

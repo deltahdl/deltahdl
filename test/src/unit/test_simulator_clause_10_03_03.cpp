@@ -124,4 +124,4 @@ TEST(SimClause100303, TwoDelayVectorUsesMinForXToKnown) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 5u);
 }
 
-}  // namespace
+}

@@ -15,4 +15,4 @@ TEST(ParserSection21, DisplayWithFormatSpecifiers) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -48,5 +48,5 @@ TEST_F(VpiClause3837Test, RegisterSystfNullptrDoesNotCrash) {
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
 }
 
-}  // namespace
-}  // namespace delta
+}
+} delta

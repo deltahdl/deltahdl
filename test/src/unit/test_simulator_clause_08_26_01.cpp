@@ -48,4 +48,4 @@ TEST(ClassSim, InterfaceClassVtableEntries) {
   EXPECT_EQ(found->vtable[0].method, nullptr);
 }
 
-}  // namespace
+}

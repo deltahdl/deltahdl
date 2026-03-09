@@ -47,4 +47,4 @@ TEST(ParserSection28, Sec28_12_TimingCheckWithNotifier) {
   EXPECT_EQ(sp.sole_item->timing_check.notifier, "notif_reg");
 }
 
-}  // namespace
+}

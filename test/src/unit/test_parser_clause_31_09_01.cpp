@@ -23,4 +23,4 @@ TEST_F(SpecifyTest, SetupholdWithDelayedSignals) {
   EXPECT_EQ(tc.delayed_data, "dD");
 }
 
-}  // namespace
+}

@@ -138,4 +138,4 @@ TEST(ParserA810, StaticMethodVsStaticLifetime) {
   EXPECT_TRUE(cls->members[0]->is_static);
 }
 
-}  // namespace
+}

@@ -24,4 +24,4 @@ TEST(SimA84, ConstantPrimaryIntegerLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

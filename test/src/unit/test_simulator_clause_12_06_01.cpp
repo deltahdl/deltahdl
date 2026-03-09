@@ -253,4 +253,4 @@ TEST(SimA60701, CaseMatchesNoMatchNoDefault) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

@@ -180,7 +180,7 @@ TEST(SimCh10, BlockingAssignSplitPacked) {
   EXPECT_EQ(lo->value.ToUint64(), 0xADu);
 }
 
-}  // namespace
+}
 TEST(VarLvaluePartSelect, VarLvaluePartSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(

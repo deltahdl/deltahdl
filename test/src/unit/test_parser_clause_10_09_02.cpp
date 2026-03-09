@@ -425,4 +425,4 @@ TEST(StructureAssignmentPatternDefault, Cl5_10_MemberNameWithDefault) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-}  // namespace
+}

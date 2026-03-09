@@ -120,4 +120,4 @@ TEST(LexA88, TwoConsecutiveStringLiterals) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kStringLiteral);
 }
 
-}  // namespace
+}

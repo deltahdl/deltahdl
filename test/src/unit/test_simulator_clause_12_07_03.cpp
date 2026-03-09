@@ -111,4 +111,4 @@ TEST(SimA608, ForeachIteratorValue) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-}  // namespace
+}

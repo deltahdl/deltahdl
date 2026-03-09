@@ -136,4 +136,4 @@ TEST(ParserSection20, ArrayUnpackedDimensionsFunction) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -37,4 +37,4 @@ TEST(SvDpi, ScopeGetSetRoundTrip) {
   svSetScope(old_scope);
 }
 
-}  // namespace
+}

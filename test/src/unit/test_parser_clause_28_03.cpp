@@ -171,4 +171,4 @@ TEST(ParserA304, AllGateAndSwitchTypes) {
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRtran), nullptr);
 }
 
-}  // namespace
+}

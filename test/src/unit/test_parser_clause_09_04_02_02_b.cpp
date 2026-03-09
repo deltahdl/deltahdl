@@ -193,4 +193,4 @@ TEST(ParserSection9, StarEventParenStmt) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-}  // namespace
+}

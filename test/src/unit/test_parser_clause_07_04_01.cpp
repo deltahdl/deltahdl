@@ -73,4 +73,4 @@ TEST(ParserA84, ConstantBitSelectPackedDim) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -102,4 +102,4 @@ TEST(ParserA812, ClassContainingClassProperty) {
               "endclass\n"));
 }
 
-}  // namespace
+}

@@ -165,7 +165,7 @@ TEST(ParserSection19, DefaultClocking_InInterface) {
               "endinterface\n"));
 }
 
-}  // namespace
+}
 TEST(DefaultClocking, DefaultClocking) {
   auto r = Parse(
       "module m;\n"

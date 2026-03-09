@@ -20,4 +20,4 @@ TEST(ParserClause03, Cl3_5_Modport) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
 }
 
-}  // namespace
+}

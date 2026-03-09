@@ -145,4 +145,4 @@ TEST(ClassSim, MethodFinalFlag) {
   EXPECT_TRUE(method->is_method_final);
 }
 
-}  // namespace
+}

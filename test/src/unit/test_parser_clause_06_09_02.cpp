@@ -109,4 +109,4 @@ TEST(ParserSection6, Sec6_9_2_ScalaredWithoutPackedDim) {
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-}  // namespace
+}

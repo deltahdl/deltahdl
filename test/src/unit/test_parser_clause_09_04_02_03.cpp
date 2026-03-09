@@ -692,4 +692,4 @@ TEST(ParserSection9, IffGuardStmtLevelEvent) {
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
 
-}  // namespace
+}

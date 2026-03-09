@@ -24,4 +24,4 @@ TEST(ParserA607, ConstExprCaseExpr) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-}  // namespace
+}

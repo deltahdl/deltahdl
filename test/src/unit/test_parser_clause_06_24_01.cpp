@@ -401,4 +401,4 @@ TEST(ParserSection6, UnsignedCast) {
   EXPECT_EQ(stmt->rhs->text, "unsigned");
 }
 
-}  // namespace
+}

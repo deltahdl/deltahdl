@@ -201,4 +201,4 @@ TEST(ParserSection16, SequenceWithRangeDelay) {
   EXPECT_TRUE(found);
 }
 
-}  // namespace
+}

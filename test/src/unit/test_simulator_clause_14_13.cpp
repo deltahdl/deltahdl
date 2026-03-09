@@ -171,4 +171,4 @@ TEST(Clocking, AttachSamplesOnClockEdge) {
   EXPECT_EQ(sampled, 0xAAu);
 }
 
-}  // namespace
+}

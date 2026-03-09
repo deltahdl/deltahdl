@@ -218,4 +218,4 @@ TEST(ParserCh5, StructMembers_Single) {
   EXPECT_TRUE(ParseOk5("module m; struct { int X; } s; endmodule"));
 }
 
-}  // namespace
+}

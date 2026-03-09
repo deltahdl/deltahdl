@@ -84,4 +84,4 @@ TEST(LexerClause03, Cl3_1_DesignElementKeywordsAreNotIdentifiers) {
   }
 }
 
-}  // namespace
+}

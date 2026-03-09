@@ -124,4 +124,4 @@ TEST(ParserA60701, EmptyAssignmentPattern) {
   EXPECT_EQ(rhs->elements.size(), 0u);
 }
 
-}  // namespace
+}

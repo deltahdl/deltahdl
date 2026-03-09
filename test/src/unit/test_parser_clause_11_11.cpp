@@ -74,4 +74,4 @@ TEST(ParserSection11, MinTypMaxInSpecparam) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

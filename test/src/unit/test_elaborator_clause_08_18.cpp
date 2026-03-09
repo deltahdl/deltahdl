@@ -76,4 +76,4 @@ TEST(ElabA818, PublicMethodAccessOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -47,4 +47,4 @@ TEST(SourceText, BindDirectiveHierarchical) {
   EXPECT_EQ(r.cu->bind_directives[0]->target, "top.dut.u1");
 }
 
-}  // namespace
+}

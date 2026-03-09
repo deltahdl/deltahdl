@@ -51,4 +51,4 @@ TEST(ArrayAssign, PatternDistribute) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 30u);
 }
 
-}  // namespace
+}

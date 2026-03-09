@@ -191,4 +191,4 @@ TEST(ConstExpr, UnbasedUnsizedLiteralIsConstant) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
-}  // namespace
+}

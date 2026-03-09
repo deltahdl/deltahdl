@@ -139,4 +139,4 @@ TEST(ParserSection8_23, SuperclassScopeAccess) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

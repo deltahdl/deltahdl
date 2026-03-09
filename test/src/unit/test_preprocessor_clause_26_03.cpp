@@ -17,4 +17,4 @@ TEST(ParserClause03, Cl3_9_ImportIntoModuleAndPackage) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-}  // namespace
+}

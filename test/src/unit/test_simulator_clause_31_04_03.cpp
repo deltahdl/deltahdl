@@ -24,4 +24,4 @@ TEST(SimA70501, FullskewDualLimitsStored) {
   EXPECT_EQ(stored.limit2, 6u);
 }
 
-}  // namespace
+}

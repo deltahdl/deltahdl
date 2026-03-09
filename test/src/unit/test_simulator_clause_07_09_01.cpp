@@ -41,4 +41,4 @@ TEST(AssocMethods, NumReturnsZeroForEmpty) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
-}  // namespace
+}

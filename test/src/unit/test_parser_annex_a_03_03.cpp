@@ -297,4 +297,4 @@ TEST(ParserA303, AllTerminalTypes) {
   EXPECT_EQ(gates.size(), 7u);
 }
 
-}  // namespace
+}

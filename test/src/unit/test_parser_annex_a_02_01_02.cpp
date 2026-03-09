@@ -47,4 +47,4 @@ TEST(InputUnpackedDim, InputUnpackedDim) {
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
 
-}  // namespace
+}

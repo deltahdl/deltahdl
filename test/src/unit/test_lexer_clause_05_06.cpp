@@ -136,4 +136,4 @@ TEST(LexerClause05, Cl5_6_SimpleAndEscapedInStream) {
   EXPECT_EQ(tokens[2].text, "ghi");
 }
 
-}  // namespace
+}

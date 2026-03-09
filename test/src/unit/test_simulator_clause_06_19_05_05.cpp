@@ -19,4 +19,4 @@ TEST(EnumMethods, NumReturnsCount) {
   EXPECT_EQ(result.ToUint64(), 3u);
 }
 
-}  // namespace
+}

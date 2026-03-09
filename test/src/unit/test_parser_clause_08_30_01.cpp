@@ -26,4 +26,4 @@ TEST(ParserSection8, WeakReferenceAsMember) {
               "endclass\n"));
 }
 
-}  // namespace
+}

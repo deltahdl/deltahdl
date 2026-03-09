@@ -73,4 +73,4 @@ TEST(NochangeBasic, NochangeBasic) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kNochange);
 }
 
-}  // namespace
+}

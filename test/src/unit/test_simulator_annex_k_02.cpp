@@ -84,4 +84,4 @@ TEST(VpiAnnexK2, VpiTimeDefaultInit) {
   EXPECT_DOUBLE_EQ(time.real, 0.0);
 }
 
-}  // namespace
+}

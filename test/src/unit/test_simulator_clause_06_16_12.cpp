@@ -14,4 +14,4 @@ TEST(StringMethods, Hextoa) {
   EXPECT_EQ(VecToString(var->value), "ff");
 }
 
-}  // namespace
+}

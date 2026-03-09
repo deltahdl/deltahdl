@@ -47,4 +47,4 @@ TEST(Elaboration, StringWithInit_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

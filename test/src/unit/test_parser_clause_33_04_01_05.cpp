@@ -76,4 +76,4 @@ TEST(ParserSection34, ConfigWithMultipleLibraries) {
   ASSERT_GE(cfg->design_cells.size(), 1u);
 }
 
-}  // namespace
+}

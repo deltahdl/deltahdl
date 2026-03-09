@@ -85,4 +85,4 @@ TEST(ParserAnnexA042, ElaborationGenerateCaseDefault) {
   EXPECT_TRUE(found_def);
 }
 
-}  // namespace
+}

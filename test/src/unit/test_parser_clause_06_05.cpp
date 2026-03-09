@@ -96,4 +96,4 @@ TEST(ParserSection6, Sec6_5_NetAndVarSameWidthVectors) {
   EXPECT_EQ(items[1]->data_type.packed_dim_left->int_val, 31u);
 }
 
-}  // namespace
+}

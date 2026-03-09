@@ -32,4 +32,4 @@ TEST(SimCh9, AlwaysCombStructAssign) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-}  // namespace
+}

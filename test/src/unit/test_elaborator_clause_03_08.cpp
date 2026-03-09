@@ -36,4 +36,4 @@ TEST(ElabClause03, Cl3_8_TaskAndFunctionCoexistElaborate) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

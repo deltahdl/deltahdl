@@ -37,4 +37,4 @@ TEST(ArraySlice, ReadSliceConcat) {
   EXPECT_EQ(result.ToUint64(), (30u << 8) | 20u);
 }
 
-}  // namespace
+}

@@ -21,4 +21,4 @@ TEST_F(VerifyParseTest, CheckerWithAssumeProperty) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
-}  // namespace
+}

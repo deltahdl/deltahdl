@@ -97,4 +97,4 @@ TEST(ElabCh10j, MultipleNestedConcatsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-}  // namespace
+}

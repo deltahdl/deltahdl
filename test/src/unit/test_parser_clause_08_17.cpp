@@ -157,4 +157,4 @@ TEST(ParserClause08_03, ConstructorDefaultBeforeArgs) {
   EXPECT_FALSE(args[1].is_default);
 }
 
-}  // namespace
+}

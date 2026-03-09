@@ -81,4 +81,4 @@ TEST(LexerClause05, Cl5_7_2_IntegerExponentE) {
   EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
 }
 
-}  // namespace
+}

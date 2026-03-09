@@ -45,4 +45,4 @@ TEST(ParserSection6, TriregNoChargeStrengthParserDefault) {
   EXPECT_EQ(item->data_type.charge_strength, 0);
 }
 
-}  // namespace
+}

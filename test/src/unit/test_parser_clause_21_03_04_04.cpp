@@ -28,4 +28,4 @@ TEST(ParserSection21, FreadWithStartCount) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

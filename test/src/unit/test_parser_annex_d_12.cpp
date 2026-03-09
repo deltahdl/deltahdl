@@ -17,4 +17,4 @@ TEST(ParserAnnexD2, AnnexDShowscopesArg) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-}  // namespace
+}

@@ -69,4 +69,4 @@ TEST(ParserSection11, TaggedUnionExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -192,4 +192,4 @@ TEST(ConstEvalReal, DivByZeroReturnsNullopt) {
   EXPECT_FALSE(val.has_value());
 }
 
-}  // namespace
+}

@@ -51,4 +51,4 @@ TEST(UdpLevelSeq, NoChange) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-}  // namespace
+}

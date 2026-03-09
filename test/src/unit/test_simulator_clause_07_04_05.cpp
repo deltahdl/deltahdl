@@ -27,4 +27,4 @@ TEST(ArrayAccess, OutOfBoundsReturnsX) {
   EXPECT_FALSE(oob_result.IsKnown());
 }
 
-}  // namespace
+}

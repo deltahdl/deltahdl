@@ -98,4 +98,4 @@ TEST(LexerClause05, Cl5_6_1_MultipleEscapedInSequence) {
   EXPECT_EQ(tokens[2].text, "\\ghi");
 }
 
-}  // namespace
+}

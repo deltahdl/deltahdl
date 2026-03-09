@@ -17,4 +17,4 @@ TEST(GateDecl, MaxDelaysByGateType) {
   }
 }
 
-}  // namespace
+}

@@ -99,4 +99,4 @@ TEST(ParserSection10, Sec10_5_BlockLocalWithExprInit) {
   EXPECT_NE(blk->stmts[0]->var_init, nullptr);
 }
 
-}  // namespace
+}

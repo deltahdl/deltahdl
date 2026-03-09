@@ -98,4 +98,4 @@ TEST(ParserSection6, EnumBasic) {
   EXPECT_EQ(item->typedef_type.enum_members.size(), 3u);
 }
 
-}  // namespace
+}

@@ -56,4 +56,4 @@ TEST(Elaboration, TypeIncompatibleStringToInt) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

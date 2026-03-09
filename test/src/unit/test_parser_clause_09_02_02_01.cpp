@@ -81,4 +81,4 @@ TEST(ParserClause09_02_02_01, AlwaysParameterizedDelay) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

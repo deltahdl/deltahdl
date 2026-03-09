@@ -105,4 +105,4 @@ TEST(ParserA811, ThisMethodCallChain) {
               "endclass\n"));
 }
 
-}  // namespace
+}

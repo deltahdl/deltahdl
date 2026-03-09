@@ -88,4 +88,4 @@ TEST(ParserClause03, Cl3_11_MultipleTopLevelModules) {
   EXPECT_EQ(r.cu->modules.size(), 2u);
 }
 
-}  // namespace
+}

@@ -16,4 +16,4 @@ TEST(ClassSim, WeakReferenceStoresReferent) {
   EXPECT_EQ(wr.Get(), 42u);
 }
 
-}  // namespace
+}

@@ -155,4 +155,4 @@ TEST(ParserClause08_03, ExternConstructorPrototype) {
   EXPECT_EQ(members[0]->method->name, "new");
 }
 
-}  // namespace
+}

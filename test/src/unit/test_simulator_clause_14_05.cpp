@@ -31,4 +31,4 @@ TEST(ClockingSim, HierarchicalAccess) {
   EXPECT_EQ(sampled, 0xCCu);
 }
 
-}  // namespace
+}

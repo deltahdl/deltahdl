@@ -66,4 +66,4 @@ TEST(ClassSim, ProtectedMemberInherited) {
   EXPECT_EQ(obj->GetProperty("hidden", f.arena).ToUint64(), 99u);
 }
 
-}  // namespace
+}

@@ -124,4 +124,4 @@ TEST(Elaboration, PackedStructShortrealMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

@@ -47,4 +47,4 @@ TEST(Lexer, KeywordVersion_1364_2005_InterfaceIsNotKeyword) {
   EXPECT_FALSE(kw.has_value());
 }
 
-}  // namespace
+}

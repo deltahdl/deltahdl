@@ -42,4 +42,4 @@ TEST(ParserSection21, FstrobeAndFmonitor) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

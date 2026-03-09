@@ -273,4 +273,4 @@ TEST(Preprocessor, Timescale_ResetallClearsTimescale) {
   EXPECT_FALSE(pp.HasTimescale());
 }
 
-}  // namespace
+}

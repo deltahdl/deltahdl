@@ -23,4 +23,4 @@ TEST(NetStrengths, TriregDefaultIsMedium) {
   EXPECT_EQ(GetTriregDefaultChargeStrength(), ChargeStrength::kMedium);
 }
 
-}  // namespace
+}

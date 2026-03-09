@@ -77,4 +77,4 @@ TEST(ParserSection6, ValueSet_2StateByteDecl) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kByte));
 }
 
-}  // namespace
+}

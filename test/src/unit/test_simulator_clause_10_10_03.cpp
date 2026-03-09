@@ -82,4 +82,4 @@ TEST(SimCh10j, MixedSelfDeterminedItems) {
   EXPECT_EQ(b3->value.ToUint64(), 40u);
 }
 
-}  // namespace
+}

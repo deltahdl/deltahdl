@@ -100,4 +100,4 @@ TEST(Elaboration, WireRedeclarationError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

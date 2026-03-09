@@ -728,4 +728,4 @@ TEST(SelectVarIdxUsesLSP, SelectVarIdxUsesLSP) {
   EXPECT_TRUE(reads.count("i"));
 }
 
-}  // namespace
+}

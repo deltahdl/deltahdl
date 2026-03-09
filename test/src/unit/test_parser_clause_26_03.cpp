@@ -370,4 +370,4 @@ TEST_F(ProgramParseTest, ProgramWithImportStatement) {
   EXPECT_TRUE(unit->programs[0]->items[0]->import_item.is_wildcard);
 }
 
-}  // namespace
+}

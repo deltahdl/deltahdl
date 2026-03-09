@@ -171,4 +171,4 @@ TEST(CumulativeAliases, CumulativeAliases) {
   ExpectThreeNetsAllEqual(f, 1u);
 }
 
-}  // namespace
+}

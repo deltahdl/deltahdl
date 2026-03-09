@@ -299,4 +299,4 @@ TEST(SimA60701, CasezDontCareInPatternOnly) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

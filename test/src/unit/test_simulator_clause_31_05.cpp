@@ -59,4 +59,4 @@ TEST(SimA70503, EdgeControlSpecifierSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-}  // namespace
+}

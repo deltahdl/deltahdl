@@ -190,4 +190,4 @@ TEST(SimClause05, Cl5_13_DynArraySize) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 2u);
 }
 
-}  // namespace
+}

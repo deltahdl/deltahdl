@@ -68,4 +68,4 @@ TEST(ParserSection7, FuncWithStringArrayArg) {
   EXPECT_FALSE(item->func_args[0].unpacked_dims.empty());
 }
 
-}  // namespace
+}

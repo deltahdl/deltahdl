@@ -84,4 +84,4 @@ TEST(ParserAnnexA051, EndLabelSequential) {
   EXPECT_TRUE(r.cu->udps[0]->is_sequential);
 }
 
-}  // namespace
+}

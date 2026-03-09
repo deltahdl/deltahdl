@@ -309,4 +309,4 @@ TEST(ParserSection13, AutoVarInStaticTask) {
   EXPECT_TRUE(t->func_body_stmts[0]->var_is_automatic);
 }
 
-}  // namespace
+}

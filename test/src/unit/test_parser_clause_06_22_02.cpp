@@ -82,4 +82,4 @@ TEST(ParserSection6, NotEquivalentStringToInt) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
-}  // namespace
+}

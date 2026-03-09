@@ -85,4 +85,4 @@ TEST(ParserSection22, MultipleDefaultNettypeDirectives) {
                               "endmodule\n"));
 }
 
-}  // namespace
+}

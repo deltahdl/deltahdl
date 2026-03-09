@@ -207,4 +207,4 @@ TEST(ElabCh44, PlainAlwaysWithStarSensitivity) {
   EXPECT_FALSE(mod->processes[0].sensitivity.empty());
 }
 
-}  // namespace
+}

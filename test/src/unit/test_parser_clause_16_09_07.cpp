@@ -11,4 +11,4 @@ TEST(ParserA210, SequenceExpr_Or) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

@@ -531,4 +531,4 @@ TEST(ParserSection4, Sec4_6_AlwaysLatchLatch) {
   ASSERT_NE(item->body, nullptr);
 }
 
-}  // namespace
+}

@@ -66,4 +66,4 @@ TEST(ParserA23, ListOfUdpPortIdentifiersSingle) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

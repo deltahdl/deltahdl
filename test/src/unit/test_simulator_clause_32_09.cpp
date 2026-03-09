@@ -28,4 +28,4 @@ TEST(SdfParser, ParseDesign) {
   EXPECT_EQ(file.design, "top");
 }
 
-}  // namespace
+}

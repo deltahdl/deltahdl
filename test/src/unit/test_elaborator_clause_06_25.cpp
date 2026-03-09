@@ -81,4 +81,4 @@ TEST(Elaboration, ParameterizedType_MultipleWidths) {
   EXPECT_EQ(mod->variables[1].width, 32);
 }
 
-}  // namespace
+}

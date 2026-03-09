@@ -30,4 +30,4 @@ TEST(ParserA301, GateInst_SharedDelayAcrossInstances) {
   EXPECT_NE(gates[1]->gate_delay, nullptr);
 }
 
-}  // namespace
+}

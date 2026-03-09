@@ -30,4 +30,4 @@ TEST(ParserA609, MethodCallChained) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-}  // namespace
+}

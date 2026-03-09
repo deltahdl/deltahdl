@@ -262,4 +262,4 @@ TEST(ParserA26, FunctionBodyWithBlockItem) {
   EXPECT_GE(item->func_body_stmts.size(), 2u);
 }
 
-}  // namespace
+}

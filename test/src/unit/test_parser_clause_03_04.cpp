@@ -191,4 +191,4 @@ TEST(ParserClause03, Cl3_4_SampleProgramDeclaration) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-}  // namespace
+}

@@ -24,4 +24,4 @@ TEST(StrengthReduction, NonresistivePassesHighz) {
   EXPECT_EQ(ReduceNonresistive(StrengthLevel::kHighz), StrengthLevel::kHighz);
 }
 
-}  // namespace
+}

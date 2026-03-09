@@ -170,4 +170,4 @@ TEST(ParserA82, ArrayMethodNameXor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -12,4 +12,4 @@ TEST(ParserA210, SequenceMatchItem_SubroutineCall) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

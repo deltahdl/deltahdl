@@ -269,4 +269,4 @@ TEST(ParserA605, RepeatEventControl) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
 }
 
-}  // namespace
+}

@@ -167,4 +167,4 @@ TEST(ParserSection11, ShortCircuitAnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

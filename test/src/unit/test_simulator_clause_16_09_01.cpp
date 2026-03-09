@@ -68,4 +68,4 @@ TEST(SvaEngine, DelaySequenceNoMatchAtEnd) {
   EXPECT_FALSE(MatchDelaySequence(seq, vals));
 }
 
-}  // namespace
+}

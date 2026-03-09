@@ -154,4 +154,4 @@ TEST(ParserClause03, Cl3_12_1_MultipleCuScopeItems) {
   EXPECT_EQ(r.cu->cu_items[2]->kind, ModuleItemKind::kFunctionDecl);
 }
 
-}  // namespace
+}

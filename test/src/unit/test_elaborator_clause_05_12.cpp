@@ -236,4 +236,4 @@ TEST(ElabClause05, Cl5_12_MultipleDistinctAttrs) {
   EXPECT_EQ(mod->variables[0].attrs[1].name, "optimize");
 }
 
-}  // namespace
+}

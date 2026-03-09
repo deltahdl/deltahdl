@@ -144,4 +144,4 @@ TEST(ParserA813, SingleInheritanceChain) {
   EXPECT_EQ(r.cu->classes[2]->base_class, "B");
 }
 
-}  // namespace
+}

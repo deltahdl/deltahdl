@@ -17,4 +17,4 @@ TEST(ParserSection7, QueuePushFront) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-}  // namespace
+}

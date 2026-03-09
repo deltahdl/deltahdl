@@ -38,4 +38,4 @@ TEST(UdpInit, InitialValueOne) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-}  // namespace
+}

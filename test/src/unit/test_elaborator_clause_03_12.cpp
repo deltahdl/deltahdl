@@ -64,4 +64,4 @@ TEST(ElabClause03, Cl3_12_PackageImportElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

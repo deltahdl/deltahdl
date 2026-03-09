@@ -695,4 +695,4 @@ TEST(ParserSection6, TaskAutomaticLifetime) {
   EXPECT_FALSE(item->is_static);
 }
 
-}  // namespace
+}

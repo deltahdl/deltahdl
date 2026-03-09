@@ -182,4 +182,4 @@ TEST(Assertion, LetWithSampledInBody) {
   EXPECT_EQ(result.ToUint64(), 99u);
 }
 
-}  // namespace
+}

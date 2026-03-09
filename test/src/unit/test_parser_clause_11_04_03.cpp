@@ -213,4 +213,4 @@ TEST(ConstExpr, PowerOperatorInConstantExpr) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("2 ** 10", f), scope), 1024);
 }
 
-}  // namespace
+}

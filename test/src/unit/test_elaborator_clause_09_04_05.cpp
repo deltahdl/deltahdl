@@ -76,7 +76,7 @@ TEST(ElabClause09_04_05, RepeatEventNonblockingElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}
 TEST(BlockingIntraAssignDelay, BlockingIntraAssignDelay) {
   SimFixture f;
   auto* design = ElaborateSrc(

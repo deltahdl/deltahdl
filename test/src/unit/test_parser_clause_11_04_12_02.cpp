@@ -40,4 +40,4 @@ TEST(ParserSection6, StringConcatOp) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

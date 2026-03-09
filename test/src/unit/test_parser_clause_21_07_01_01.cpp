@@ -18,4 +18,4 @@ TEST(ParserSection21, DumpfileDefaultName) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

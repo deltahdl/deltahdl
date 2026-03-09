@@ -19,4 +19,4 @@ TEST(EnumMethods, NumSingleMember) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-}  // namespace
+}

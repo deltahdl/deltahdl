@@ -38,4 +38,4 @@ TEST(ElabCh10j, QueueConcatElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-}  // namespace
+}

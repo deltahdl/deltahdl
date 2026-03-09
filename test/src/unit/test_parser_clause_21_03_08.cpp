@@ -18,4 +18,4 @@ TEST(ParserSection21, FeofFerror) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

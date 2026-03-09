@@ -136,4 +136,4 @@ TEST(ModuleParamsA13, NonAnsiPorts) {
   EXPECT_GE(r.cu->modules[0]->ports.size(), 3u);
 }
 
-}  // namespace
+}

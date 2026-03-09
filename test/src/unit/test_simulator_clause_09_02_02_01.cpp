@@ -66,4 +66,4 @@ TEST(SimClause09_02_02_01, AlwaysRepeatsContinuously) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

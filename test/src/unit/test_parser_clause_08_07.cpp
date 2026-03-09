@@ -254,4 +254,4 @@ TEST(ParserSection8, ConstructorEndLabel) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-}  // namespace
+}

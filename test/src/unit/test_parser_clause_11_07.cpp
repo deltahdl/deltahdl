@@ -30,4 +30,4 @@ TEST(ParserSection11, UnsignedSystemCall) {
   EXPECT_EQ(rhs->callee, "$unsigned");
 }
 
-}  // namespace
+}

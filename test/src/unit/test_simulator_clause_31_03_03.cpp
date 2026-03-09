@@ -45,4 +45,4 @@ TEST(SimA70501, SetupholdFullArgsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

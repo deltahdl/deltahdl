@@ -42,4 +42,4 @@ TEST(SysTask, FeofAtEnd) {
   std::remove(tmp.c_str());
 }
 
-}  // namespace
+}

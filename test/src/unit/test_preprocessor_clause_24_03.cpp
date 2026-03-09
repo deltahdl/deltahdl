@@ -66,4 +66,4 @@ TEST(ParserClause03, Cl3_4_RejectsDisallowedItems) {
                   .has_errors);
 }
 
-}  // namespace
+}

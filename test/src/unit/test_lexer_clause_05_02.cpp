@@ -203,4 +203,4 @@ TEST(LexerClause05, Cl5_2_FormfeedIsWhitespace) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-}  // namespace
+}

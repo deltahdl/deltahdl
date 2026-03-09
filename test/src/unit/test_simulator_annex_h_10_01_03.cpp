@@ -17,4 +17,4 @@ TEST(SvDpi, DpiVersionReturnsNonNull) {
   EXPECT_GT(strlen(ver), 0u);
 }
 
-}  // namespace
+}

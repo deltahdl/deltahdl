@@ -162,4 +162,4 @@ TEST(Sim1351, InoutCopyInOut) {
   LowerRunAndCheck(f, design, {{"x", 11u}});
 }
 
-}  // namespace
+}

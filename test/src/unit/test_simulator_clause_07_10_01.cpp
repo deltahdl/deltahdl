@@ -28,4 +28,4 @@ TEST(QueueOps, EmptyQueueSizeZero) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-}  // namespace
+}

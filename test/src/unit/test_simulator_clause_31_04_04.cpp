@@ -22,4 +22,4 @@ TEST(SimA70501, WidthThresholdAsLimit2) {
   EXPECT_EQ(stored.limit2, 1u);
 }
 
-}  // namespace
+}

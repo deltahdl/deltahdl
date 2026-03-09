@@ -56,4 +56,4 @@ TEST(LexerClause05, Cl5_10_TypePrefixedTokens) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kKwInt);
 }
 
-}  // namespace
+}

@@ -217,4 +217,4 @@ TEST(ParserA29, MultipleModportDecls) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "mp2");
 }
 
-}  // namespace
+}

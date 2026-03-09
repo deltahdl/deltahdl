@@ -14,4 +14,4 @@ TEST(SysTask, AsyncAndArrayReturnsZero) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-}  // namespace
+}

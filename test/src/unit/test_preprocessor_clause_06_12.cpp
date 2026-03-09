@@ -17,4 +17,4 @@ TEST(ParserSection6, ShortrealInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-}  // namespace
+}

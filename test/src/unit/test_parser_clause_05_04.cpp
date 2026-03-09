@@ -107,4 +107,4 @@ TEST(ParserClause05, Cl5_4_EmptyCuCommentsOnly) {
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
-}  // namespace
+}

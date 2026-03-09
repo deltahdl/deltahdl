@@ -76,4 +76,4 @@ TEST(SimClause05, Cl5_9_TripleQuotedLineContinuation) {
   EXPECT_EQ(v, 0x41424344u);
 }
 
-}  // namespace
+}

@@ -54,4 +54,4 @@ TEST(ClassSim, SuperParentAccessible) {
   EXPECT_EQ(leaf->parent->parent, base);
 }
 
-}  // namespace
+}

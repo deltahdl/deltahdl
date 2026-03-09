@@ -134,4 +134,4 @@ TEST(SimClause05, Cl5_10_FieldAccessAfterAssign) {
   EXPECT_EQ(vry->value.ToUint64(), 0xADu);
 }
 
-}  // namespace
+}

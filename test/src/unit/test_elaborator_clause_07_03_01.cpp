@@ -84,4 +84,4 @@ TEST(Elaboration, PackedUnionChandleMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

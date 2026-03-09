@@ -29,4 +29,4 @@ TEST(Coverage, CrossCoverageSampling) {
   EXPECT_EQ(g->crosses[0].bins[1].hit_count, 1u);
 }
 
-}  // namespace
+}

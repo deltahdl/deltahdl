@@ -87,4 +87,4 @@ TEST(ParserA85, StreamingConcatAsLhsFromStreamingRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
 }
 
-}  // namespace
+}

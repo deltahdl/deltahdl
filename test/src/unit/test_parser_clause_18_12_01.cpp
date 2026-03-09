@@ -39,4 +39,4 @@ TEST(ParserA82, StdRandomizeCall) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

@@ -82,4 +82,4 @@ TEST(ElabA702, SimpleParallelPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

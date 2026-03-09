@@ -154,4 +154,4 @@ TEST(ElabClause100303, NoDelay) {
   EXPECT_EQ(mod->assigns[0].delay_decay, nullptr);
 }
 
-}  // namespace
+}

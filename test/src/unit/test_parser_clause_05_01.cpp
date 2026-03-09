@@ -205,4 +205,4 @@ TEST(ParserClause05, Cl5_1_EmptyAttributeIsError) {
   EXPECT_FALSE(ParseOk("(* *) module t; endmodule"));
 }
 
-}  // namespace
+}

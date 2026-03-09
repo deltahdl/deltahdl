@@ -171,4 +171,4 @@ TEST(ParserA605, WaitOrderElseOnly) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-}  // namespace
+}

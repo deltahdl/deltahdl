@@ -130,4 +130,4 @@ TEST(LogicGates, TwoDelayRiseFallAndX) {
   EXPECT_EQ(ComputeGateDelay(10, 12, Val4::kV1, Val4::kX), 10u);
 }
 
-}  // namespace
+}

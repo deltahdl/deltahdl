@@ -89,4 +89,4 @@ TEST(LexerClause05, Cl5_9_1_MixedEscapeTypes) {
   EXPECT_EQ(InterpretStringEscapes(R"(\x41\101\n)"), "AA\n");
 }
 
-}  // namespace
+}

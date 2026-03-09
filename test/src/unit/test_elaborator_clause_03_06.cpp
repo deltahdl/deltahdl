@@ -33,4 +33,4 @@ TEST(ElabClause03, Cl3_6_CheckerWithPortsElaborates) {
   EXPECT_GE(design->top_modules[0]->ports.size(), 2u);
 }
 
-}  // namespace
+}

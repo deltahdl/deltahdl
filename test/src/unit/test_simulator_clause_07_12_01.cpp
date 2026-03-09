@@ -120,4 +120,4 @@ TEST(ArrayLocator, FindNoMatchReturnsEmpty) {
   EXPECT_EQ(out.size(), 0u);
 }
 
-}  // namespace
+}

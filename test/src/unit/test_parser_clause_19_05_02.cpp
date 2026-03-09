@@ -163,4 +163,4 @@ TEST(ParserA211, CoverGroup_TransitionBins) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

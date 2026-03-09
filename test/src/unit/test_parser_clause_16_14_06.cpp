@@ -23,4 +23,4 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyInAlwaysBlock) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

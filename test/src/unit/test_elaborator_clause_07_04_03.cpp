@@ -16,4 +16,4 @@ TEST(ParserA25, PackedAndUnpackedElaboration) {
   EXPECT_EQ(mod->variables[0].unpacked_size, 4u);
 }
 
-}  // namespace
+}

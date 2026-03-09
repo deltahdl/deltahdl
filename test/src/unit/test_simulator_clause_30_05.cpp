@@ -19,4 +19,4 @@ TEST_F(SpecifyTest, RuntimePathDelay) {
   EXPECT_EQ(mgr.PathDelayCount(), 1u);
 }
 
-}  // namespace
+}

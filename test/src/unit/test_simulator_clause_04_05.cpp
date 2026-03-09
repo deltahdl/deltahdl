@@ -174,4 +174,4 @@ TEST(Scheduler, InitialState) {
   EXPECT_EQ(sched.CurrentTime().ticks, 0);
 }
 
-}  // namespace
+}

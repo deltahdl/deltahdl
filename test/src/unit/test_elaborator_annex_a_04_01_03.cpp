@@ -41,4 +41,4 @@ TEST(ParserAnnexA0413, ElaborationProgramInstPortBindings) {
   EXPECT_EQ(top->children[0].port_bindings[0].port_name, "data");
 }
 
-}  // namespace
+}

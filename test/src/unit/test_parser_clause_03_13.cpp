@@ -137,4 +137,4 @@ TEST(ParserClause03, Cl3_13_MacroRedefinition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

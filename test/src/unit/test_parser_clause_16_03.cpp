@@ -434,4 +434,4 @@ TEST(ParserSection16, ImmediateCoverBasic) {
   EXPECT_NE(stmt->assert_expr, nullptr);
 }
 
-}  // namespace
+}

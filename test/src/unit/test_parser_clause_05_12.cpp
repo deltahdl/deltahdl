@@ -259,4 +259,4 @@ TEST(ParserClause05, Cl5_12_NonNestedConstExprOk) {
               "endmodule\n"));
 }
 
-}  // namespace
+}

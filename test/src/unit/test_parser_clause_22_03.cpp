@@ -20,4 +20,4 @@ TEST(ParserSection22, ResetallBeforeMultipleModules) {
                               "endmodule\n"));
 }
 
-}  // namespace
+}

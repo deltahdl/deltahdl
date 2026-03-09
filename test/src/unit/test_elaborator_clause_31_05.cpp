@@ -43,4 +43,4 @@ TEST(ElabA70503, TimingCheckEventEdgeKeywordElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

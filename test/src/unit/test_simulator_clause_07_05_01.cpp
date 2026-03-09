@@ -20,4 +20,4 @@ TEST(AdvSim, DynArrayPushAndAccess) {
   EXPECT_EQ(arr.At(1), 99u);
 }
 
-}  // namespace
+}

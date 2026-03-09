@@ -228,4 +228,4 @@ TEST(SimA60702, MatchesNoElse) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-}  // namespace
+}

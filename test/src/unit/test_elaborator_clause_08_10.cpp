@@ -70,4 +70,4 @@ TEST(ElabA810, StaticMethodNoThisSuperOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

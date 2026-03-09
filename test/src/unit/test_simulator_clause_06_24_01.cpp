@@ -23,4 +23,4 @@ TEST(SimA84, PrimaryCast) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-}  // namespace
+}

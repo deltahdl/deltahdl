@@ -80,4 +80,4 @@ TEST(ElabA825, DefaultSpecializationOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

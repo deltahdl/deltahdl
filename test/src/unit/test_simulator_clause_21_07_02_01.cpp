@@ -36,5 +36,5 @@ TEST_F(VcdClause21070201Test, IdentifierWrapsAround) {
   EXPECT_NE(content.find("$var wire 1 ! wrap $end"), std::string::npos);
 }
 
-}  // namespace
-}  // namespace delta
+}
+} delta

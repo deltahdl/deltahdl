@@ -44,5 +44,5 @@ TEST_F(VpiClause3818Test, HandleReturnsNullptrForNoMatch) {
   EXPECT_EQ(result, nullptr);
 }
 
-}  // namespace
-}  // namespace delta
+}
+} delta

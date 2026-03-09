@@ -52,4 +52,4 @@ TEST(ElabClause05, Cl5_7_2_NegativeExponentElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-}  // namespace
+}

@@ -44,4 +44,4 @@ TEST(ElabA86, MethodCallOnInstanceElaborates) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

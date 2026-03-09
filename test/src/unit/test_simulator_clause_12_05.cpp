@@ -361,4 +361,4 @@ TEST(SimA607, CaseLinearSearchFirstMatch) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-}  // namespace
+}

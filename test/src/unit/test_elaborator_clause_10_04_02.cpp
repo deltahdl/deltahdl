@@ -778,7 +778,7 @@ TEST(SimCh10b, NBAReplicationRHS) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-}  // namespace
+}
 TEST(NonblockingAssignment, VarLvalueNonblocking) {
   SimFixture f;
   auto* design = ElaborateSrc(

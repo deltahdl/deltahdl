@@ -50,4 +50,4 @@ TEST(CompiledSim, ExecuteBlockingAssign) {
   EXPECT_EQ(x_var->value.ToUint64(), 42u);
 }
 
-}  // namespace
+}

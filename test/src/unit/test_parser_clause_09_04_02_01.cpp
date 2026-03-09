@@ -163,4 +163,4 @@ TEST(ParserSection9, EventControlComma) {
   ASSERT_GE(stmt->events.size(), 2u);
 }
 
-}  // namespace
+}

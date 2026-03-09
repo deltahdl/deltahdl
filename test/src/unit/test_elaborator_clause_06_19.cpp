@@ -90,4 +90,4 @@ TEST(Elaboration, EnumExplicitBaseWidth) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-}  // namespace
+}

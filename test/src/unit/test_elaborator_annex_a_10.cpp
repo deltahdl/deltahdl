@@ -166,4 +166,4 @@ TEST(ElabA10, DollarInQueueSelectOk) {
              "endmodule\n"));
 }
 
-}  // namespace
+}

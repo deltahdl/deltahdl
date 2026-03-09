@@ -90,4 +90,4 @@ TEST(Sim1380, MultipleMethodsSameClass) {
   LowerRunAndCheck(f, design, {{"a", 11u}, {"b", 9u}});
 }
 
-}  // namespace
+}

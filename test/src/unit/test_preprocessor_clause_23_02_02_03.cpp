@@ -76,4 +76,4 @@ TEST(PortWithPackedDim, PortWithPackedDim) {
   ASSERT_NE(r.cu->modules[0]->ports[0].data_type.packed_dim_left, nullptr);
 }
 
-}  // namespace
+}

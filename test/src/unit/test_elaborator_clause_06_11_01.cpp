@@ -52,4 +52,4 @@ TEST(TypeEval, IntegerTypeWidths) {
   EXPECT_EQ(EvalTypeWidth(dt), 64u);
 }
 
-}  // namespace
+}

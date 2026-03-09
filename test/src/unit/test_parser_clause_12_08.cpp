@@ -368,4 +368,4 @@ TEST(ParserSection12, ContinueStatementInBody) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
 }
 
-}  // namespace
+}

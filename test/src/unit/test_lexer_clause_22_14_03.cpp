@@ -25,4 +25,4 @@ TEST(Lexer, KeywordVersionMarker_SwitchesVersion) {
   EXPECT_EQ(tokens[0].text, "logic");
 }
 
-}  // namespace
+}

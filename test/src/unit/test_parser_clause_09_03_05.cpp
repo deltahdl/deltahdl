@@ -209,4 +209,4 @@ TEST(ParserClause09_03_05, LabelStoredOnStmt) {
   EXPECT_EQ(item->body->stmts[0]->label, "lbl");
 }
 
-}  // namespace
+}

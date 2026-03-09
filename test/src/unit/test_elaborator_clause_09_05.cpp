@@ -125,4 +125,4 @@ TEST(ElabClause09_05, ContAssignSeparateFromProcesses) {
   EXPECT_GE(design->top_modules[0]->assigns.size(), 1u);
 }
 
-}  // namespace
+}

@@ -32,4 +32,4 @@ TEST(ClassSim, WeakRefGetDefaultNull) {
   EXPECT_EQ(wr.Get(), kNullClassHandle);
 }
 
-}  // namespace
+}

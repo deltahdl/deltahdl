@@ -45,4 +45,4 @@ TEST(ParserSection10, OperatorAssignStarEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-}  // namespace
+}

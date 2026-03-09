@@ -82,4 +82,4 @@ TEST(ParserSection11, ArrayThenPartSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-}  // namespace
+}

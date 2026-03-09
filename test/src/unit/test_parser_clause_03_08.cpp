@@ -98,4 +98,4 @@ TEST(ParserClause03, Cl3_8_TaskAndFunctionCoexist) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kTaskDecl));
 }
 
-}  // namespace
+}

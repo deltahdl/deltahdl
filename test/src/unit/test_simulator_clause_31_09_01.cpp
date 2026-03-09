@@ -26,4 +26,4 @@ TEST(SimA70502, DelayedDataBracketSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-}  // namespace
+}

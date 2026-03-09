@@ -37,4 +37,4 @@ TEST(ParserSection6, TypeIncompatibleStringChandle) {
   EXPECT_FALSE(IsCastCompatible(a, b));
 }
 
-}  // namespace
+}

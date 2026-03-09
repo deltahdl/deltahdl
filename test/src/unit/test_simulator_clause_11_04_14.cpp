@@ -110,4 +110,4 @@ TEST(EvalAdv, StreamingUnpackedArrayMissingElemGivesX) {
   EXPECT_EQ(result.ToUint64(), 0x110033u);
 }
 
-}  // namespace
+}

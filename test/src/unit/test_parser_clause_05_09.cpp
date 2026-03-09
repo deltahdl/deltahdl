@@ -68,4 +68,4 @@ TEST(ParserClause05, Cl5_9_StringWithWorld) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-}  // namespace
+}
