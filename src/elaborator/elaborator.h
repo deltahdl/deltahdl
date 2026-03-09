@@ -162,6 +162,9 @@ class Elaborator {
   /// §7.8.5: real/shortreal as associative array index type is illegal.
   void ValidateAssocIndexType(const ModuleItem* item);
 
+  /// §7.6/§7.9.9: Track array metadata for assignment compatibility.
+  void TrackVarArrayInfo(const ModuleItem* item, const RtlirVariable& var);
+
   /// §8.4/§6.19: Validate class tracking, enum, struct/union types on var decl.
   void ValidateVarDeclTypes(ModuleItem* item);
 

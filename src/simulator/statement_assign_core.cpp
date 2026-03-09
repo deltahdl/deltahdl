@@ -298,6 +298,20 @@ static Logic4Vec ReverseStreamSlices(const Logic4Vec& stream,
   return reordered;
 }
 
+// §11.4.14.3: Extract a bit-field from a stream vector.
+static uint64_t ExtractStreamBits(const Logic4Vec& stream, uint32_t bit_offset,
+                                  uint32_t width, uint32_t total_width) {
+  uint64_t val = 0;
+  for (uint32_t b = 0; b < width && b < 64; ++b) {
+    uint32_t sbit = bit_offset + b;
+    if (sbit >= total_width) break;
+    uint32_t w = sbit / 64, bi = sbit % 64;
+    if (w < stream.nwords && (stream.words[w].aval >> bi) & 1)
+      val |= uint64_t{1} << b;
+  }
+  return val;
+}
+
 // §11.4.14.3: Streaming concatenation as LHS — unpack RHS into elements.
 static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                                      SimContext& ctx, Arena& arena) {
@@ -315,17 +329,9 @@ static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   uint32_t bit_offset = total_width;
   for (auto& ei : elems) {
     bit_offset -= ei.width;
-    // §11.4.14.3: Extract a bit-field from the stream and assign to a variable.
     auto* var = ResolveLhsVariable(ei.expr, ctx);
     if (!var) continue;
-    uint64_t val = 0;
-    for (uint32_t b = 0; b < ei.width && b < 64; ++b) {
-      uint32_t sbit = bit_offset + b;
-      if (sbit >= total_width) break;
-      uint32_t w = sbit / 64, bi = sbit % 64;
-      if (w < stream.nwords && (stream.words[w].aval >> bi) & 1)
-        val |= uint64_t{1} << b;
-    }
+    uint64_t val = ExtractStreamBits(stream, bit_offset, ei.width, total_width);
     var->value = MakeLogic4VecVal(arena, ei.width, val);
     var->NotifyWatchers();
   }

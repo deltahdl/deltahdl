@@ -526,6 +526,19 @@ static void CollectProcessLhsInfo(
   }
 }
 
+static void CheckMultiProcDriver(const std::string& var, size_t i,
+                                 const std::vector<ProcInfo>& procs,
+                                 DiagEngine& diag) {
+  for (size_t j = i + 1; j < procs.size(); ++j) {
+    if (procs[j].lhs.count(var)) {
+      diag.Error(procs[j].loc, std::format("variable '{}' driven by multiple "
+                                           "always_comb/always_latch/always_ff "
+                                           "processes",
+                                           var));
+    }
+  }
+}
+
 static void CheckDriverConflicts(
     const std::vector<ProcInfo>& procs,
     const std::unordered_set<std::string>& cont_assign_lhs, DiagEngine& diag) {
@@ -537,15 +550,7 @@ static void CheckDriverConflicts(
                                "continuous assignment",
                                var, ProcessKindLabel(procs[i].kind)));
       }
-      for (size_t j = i + 1; j < procs.size(); ++j) {
-        if (procs[j].lhs.count(var)) {
-          diag.Error(procs[j].loc,
-                     std::format("variable '{}' driven by multiple "
-                                 "always_comb/always_latch/always_ff "
-                                 "processes",
-                                 var));
-        }
-      }
+      CheckMultiProcDriver(var, i, procs, diag);
     }
   }
 }
@@ -790,6 +795,21 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
   ValidateAssocIndexType(item);
 }
 
+void Elaborator::TrackVarArrayInfo(const ModuleItem* item,
+                                   const RtlirVariable& var) {
+  if (item->unpacked_dims.empty()) return;
+  VarArrayInfo info{item->data_type.kind,
+                    var.unpacked_size,
+                    var.is_dynamic,
+                    var.is_assoc,
+                    {}};
+  if (var.is_assoc && item->unpacked_dims[0] &&
+      item->unpacked_dims[0]->kind == ExprKind::kIdentifier) {
+    info.assoc_index_type = item->unpacked_dims[0]->text;
+  }
+  var_array_info_[item->name] = info;
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item, mod);
   // §6.25: Resolve parameterized class scope types (cls#(T)::member).
@@ -847,19 +867,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ComputeUnpackedDims(item->unpacked_dims, var, typedefs_, class_names_);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
   // §7.6/§7.9.9: Track array info for assignment compatibility.
-  if (!item->unpacked_dims.empty()) {
-    VarArrayInfo info{item->data_type.kind,
-                      var.unpacked_size,
-                      var.is_dynamic,
-                      var.is_assoc,
-                      {}};
-    if (var.is_assoc && !item->unpacked_dims.empty() &&
-        item->unpacked_dims[0] &&
-        item->unpacked_dims[0]->kind == ExprKind::kIdentifier) {
-      info.assoc_index_type = item->unpacked_dims[0]->text;
-    }
-    var_array_info_[item->name] = info;
-  }
+  TrackVarArrayInfo(item, var);
   // §5.12: Resolve attributes.
   var.attrs = ResolveAttributes(item->attrs, diag_);
   mod->variables.push_back(var);
