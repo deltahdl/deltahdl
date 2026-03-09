@@ -61,7 +61,7 @@ from ._split import (
 # Data structures
 # ---------------------------------------------------------------------------
 @dataclass
-class TestBlock:
+class TestBlock:  # pylint: disable=too-many-instance-attributes
     """A single TEST/TEST_F/TEST_P block with classification metadata."""
 
     suite_name: str
