@@ -1,3 +1,5 @@
+// §5.7.1
+
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -5,9 +7,31 @@
 
 using namespace delta;
 
+static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
+                                          uint32_t mask) {
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.words[0].aval & mask, vb->value.words[0].aval & mask);
+  EXPECT_EQ(va->value.words[0].bval & mask, vb->value.words[0].bval & mask);
+}
+
+static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
+                              uint64_t val) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kIntegerLiteral;
+  e->text = text;
+  e->int_val = val;
+  return e;
+}
+
 namespace {
 
-TEST(ElabClause05, Cl5_7_1_UnbasedUnsizedElaborates) {
+TEST(UnbasedUnsizedLiterals, AllOnesAssignElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -220,19 +244,6 @@ TEST(ElabClause05, Cl5_7_1_UnderscoredDecimalElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
-                                          uint32_t mask) {
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.words[0].aval & mask, vb->value.words[0].aval & mask);
-  EXPECT_EQ(va->value.words[0].bval & mask, vb->value.words[0].bval & mask);
 }
 
 TEST(SimClause05, Cl5_7_1_DecimalXDigitAllBits) {
@@ -610,15 +621,6 @@ TEST(SimClause05, Cl5_7_1_DecimalSingleDigitX) {
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
 }
 
-static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
-                              uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->text = text;
-  e->int_val = val;
-  return e;
-}
-
 TEST(SimClause05, Cl5_7_1_SignedBaseLiteralIsSigned) {
   SimFixture f;
   auto* lit = MakeSizedLiteral(f.arena, "4'sd3", 3);
@@ -686,4 +688,4 @@ TEST(SimClause05, Cl5_7_1_SizeConstantNonzero) {
   EXPECT_EQ(result, 1u);
 }
 
-}
+}  // namespace
