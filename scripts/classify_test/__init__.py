@@ -522,23 +522,16 @@ def _validate_topic_response(response, test_name):
         sys.exit(1)
 
 
-def _validate_suite_name(name):
-    """Return True if name is a valid C++ identifier."""
-    if not name:
-        return False
-    return bool(re.match(r'^[A-Za-z_]\w*$', name))
-
-
-def _rename_suite(test, new_name):
-    """Rename the suite in a test block's TEST() line."""
-    old = test.suite_name
+def _rename_test_macro(test, new_suite, new_name):
+    """Rename both args in a test block's TEST()/TEST_F()/TEST_P() line."""
     test.lines[0] = re.sub(
-        r'^(TEST(?:_[FP])?)\(' + re.escape(old) + r',',
-        rf'\1({new_name},',
+        r'^(TEST(?:_[FP])?)\(' + re.escape(test.suite_name)
+        + r',\s*' + re.escape(test.test_name) + r'\)',
+        rf'\1({new_suite}, {new_name})',
         test.lines[0],
     )
-    test.suite_name = new_name
-    test.new_suite_name = new_name
+    test.suite_name = new_suite
+    test.test_name = new_name
 
 
 def _apply_classification(test, clause_resp, topic_resp=None,
@@ -554,12 +547,10 @@ def _apply_classification(test, clause_resp, topic_resp=None,
     test.prefix = _detect_prefix(test, clause, lrm_path)
     test.clause = clause
     test.rationale = clause_resp.get("rationale", "")
-    suite = (topic_resp or clause_resp).get("suite_name", "")
-    if _validate_suite_name(suite):
-        _rename_suite(test, suite)
-    elif suite:
-        print(f"WARNING: Invalid suite_name {suite!r} for"
-              f" {test.test_name}, keeping original")
+    resp = topic_resp or clause_resp
+    suite = resp["suite_name"]
+    name = resp["test_name"]
+    _rename_test_macro(test, suite, name)
 
 
 def classify_tests(tests, test_dir, lrm_path):
@@ -584,9 +575,15 @@ def classify_tests(tests, test_dir, lrm_path):
 # Stage 3: Deduplicate
 # ---------------------------------------------------------------------------
 
+def normalize_test_body(test):
+    """Return a normalized string of the test body (excluding the TEST line)."""
+    body_lines = test.lines[1:]
+    return "\n".join(line.strip() for line in body_lines)
+
+
 def find_existing_tests(target_base, test_dir, exclude_path=None):
-    """Find TEST names in existing clause files matching target_base."""
-    existing_names = set()
+    """Find normalized test bodies in existing clause files."""
+    existing_bodies = set()
     patterns = [
         str(test_dir / f"{target_base}.cpp"),
         str(test_dir / f"{target_base}_[a-z].cpp"),
@@ -595,12 +592,21 @@ def find_existing_tests(target_base, test_dir, exclude_path=None):
         for fpath in glob.glob(pattern):
             if exclude_path and Path(fpath).resolve() == exclude_path.resolve():
                 continue
-            text = Path(fpath).read_text(encoding="utf-8")
-            for m in re.finditer(
-                r"TEST(?:_[FP])?\(\w+,\s*(\w+)\)", text,
-            ):
-                existing_names.add(m.group(1))
-    return existing_names
+            lines = Path(fpath).read_text(encoding="utf-8").splitlines(
+                keepends=True,
+            )
+            i = 0
+            while i < len(lines):
+                if re.match(
+                    r"\s*TEST(?:_[FP])?\(\w+,\s*\w+\)", lines[i],
+                ):
+                    blk, end = extract_brace_block(lines, i)
+                    body = "\n".join(ln.rstrip("\n").strip() for ln in blk[1:])
+                    existing_bodies.add(body)
+                    i = end + 1
+                else:
+                    i += 1
+    return existing_bodies
 
 
 # ---------------------------------------------------------------------------
@@ -779,12 +785,12 @@ def _group_tests(tests):
     return groups
 
 
-def _report_removals(tests, existing, target, dry_run):
+def _report_removals(tests, existing_bodies, target, dry_run):
     """Print removal messages for duplicate tests and return count."""
     verb = "Would have removed" if dry_run else "Removed"
     count = 0
     for t in tests:
-        if t.test_name in existing:
+        if normalize_test_body(t) in existing_bodies:
             count += 1
             print(f"  - {verb} {t.test_name}() because it"
                   f" belongs in {target}.cpp where it"
@@ -802,7 +808,8 @@ def _resolve_destinations(
     for (prefix, clause), tests in sorted(groups.items()):
         target = clause_to_filename(prefix, clause)
         existing = find_existing_tests(target, test_dir, exclude_path)
-        unique = [t for t in tests if t.test_name not in existing]
+        unique = [t for t in tests
+                  if normalize_test_body(t) not in existing]
         n_removed += _report_removals(tests, existing, target, dry_run)
         groups[(prefix, clause)] = unique
         if not unique:

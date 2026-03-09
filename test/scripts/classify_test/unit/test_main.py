@@ -19,7 +19,8 @@ def _make_input_file(tmp_path):
 
 def _parser_response():
     """Return a standard single-test clause response."""
-    return {"clause": "6.1", "rationale": "r"}
+    return {"clause": "6.1", "rationale": "r",
+            "suite_name": "Parsing", "test_name": "T"}
 
 
 def _run_args(tmp_path, **overrides):
@@ -551,9 +552,12 @@ def _mixed_classifier(prompt, schema=None):
     """Return different classifications based on which test is in prompt."""
     if "Stay" in prompt:
         if schema and "non_lrm_topic" in schema:
-            return {"non_lrm_topic": "aig", "rationale": "r"}
-        return {"clause": "non-lrm", "rationale": "r"}
-    return {"clause": "6.1", "rationale": "r"}
+            return {"non_lrm_topic": "aig", "rationale": "r",
+                    "suite_name": "AigGraph", "test_name": "Stay"}
+        return {"clause": "non-lrm", "rationale": "r",
+                "suite_name": "AigGraph", "test_name": "Stay"}
+    return {"clause": "6.1", "rationale": "r",
+            "suite_name": "Parsing", "test_name": "Move"}
 
 
 def _run_live_non_lrm(ct, tmp_path, monkeypatch, *, src_body, test="T"):
@@ -575,8 +579,10 @@ def _run_live_non_lrm(ct, tmp_path, monkeypatch, *, src_body, test="T"):
 def _self_named_classifier(_prompt, schema=None):
     """Classify single test as non-lrm with topic aig."""
     if schema and "non_lrm_topic" in schema:
-        return {"non_lrm_topic": "aig", "rationale": "r"}
-    return {"clause": "non-lrm", "rationale": "r"}
+        return {"non_lrm_topic": "aig", "rationale": "r",
+                "suite_name": "AigGraph", "test_name": "T"}
+    return {"clause": "non-lrm", "rationale": "r",
+            "suite_name": "AigGraph", "test_name": "T"}
 
 
 def test_run_live_self_named(tmp_path, monkeypatch, ct, ct_helpers):
@@ -664,7 +670,7 @@ def _run_live_dedup(ct, ct_helpers, tmp_path, monkeypatch, src_body):
     """Pre-create variant with Dup, stub externals, and run live pipeline."""
     variant = tmp_path / "test_non_lrm_aig_a.cpp"
     variant.write_text(
-        "#include <gtest/gtest.h>\n\nTEST(S, Dup) {\n}\n",
+        "#include <gtest/gtest.h>\n\nTEST(S, Dup) {\n  auto r = Parse(src);\n}\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(ct, "_call_claude", _self_named_classifier)

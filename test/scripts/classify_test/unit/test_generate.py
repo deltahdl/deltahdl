@@ -12,33 +12,67 @@ def test_find_existing_tests_empty(ct, tmp_path):
 
 
 def test_find_existing_tests_exact(ct, tmp_path):
-    """Finds tests in exact match file."""
+    """Finds test bodies in exact match file."""
     f = tmp_path / "test_parser_clause_06.cpp"
-    f.write_text("TEST(S, Existing) {\n}\n")
+    f.write_text("TEST(S, Existing) {\n  int x = 1;\n}\n")
     result = ct.find_existing_tests(
         "test_parser_clause_06", tmp_path,
     )
-    assert "Existing" in result
+    assert result  # returns non-empty set of body hashes
 
 
 def test_find_existing_tests_variant(ct, tmp_path):
-    """Finds tests in variant files (e.g., _a.cpp)."""
+    """Finds test bodies in variant files (e.g., _a.cpp)."""
     f = tmp_path / "test_parser_clause_06_a.cpp"
-    f.write_text("TEST_F(S, Found) {\n}\n")
+    f.write_text("TEST_F(S, Found) {\n  int x = 1;\n}\n")
     result = ct.find_existing_tests(
         "test_parser_clause_06", tmp_path,
     )
-    assert "Found" in result
+    assert result  # returns non-empty set of body hashes
 
 
 def test_find_existing_tests_excludes_source(ct, tmp_path):
     """Skips the source file when exclude_path is given."""
     f = tmp_path / "test_non_lrm_aig.cpp"
-    f.write_text("TEST(S, Self) {\n}\n")
+    f.write_text("TEST(S, Self) {\n  int x = 1;\n}\n")
     result = ct.find_existing_tests(
         "test_non_lrm_aig", tmp_path, exclude_path=f,
     )
-    assert "Self" not in result
+    assert not result  # excluded file's bodies not included
+
+
+def test_find_existing_tests_dedup_by_body(ct, tmp_path):
+    """Same body with different name is detected as existing."""
+    f = tmp_path / "test_parser_clause_06.cpp"
+    f.write_text("TEST(S, OldName) {\n  int x = 1;\n}\n")
+    existing = ct.find_existing_tests(
+        "test_parser_clause_06", tmp_path,
+    )
+    # A test block with different name but same body should match
+    t = ct.TestBlock(
+        suite_name="NewSuite", test_name="NewName",
+        lines=["TEST(NewSuite, NewName) {", "  int x = 1;", "}"],
+        preceding_comments=[],
+    )
+    body = ct.normalize_test_body(t)
+    assert body in existing
+
+
+def test_find_existing_tests_different_body(ct, tmp_path):
+    """Different body with same name is NOT detected as existing."""
+    f = tmp_path / "test_parser_clause_06.cpp"
+    f.write_text("TEST(S, SameName) {\n  int x = 1;\n}\n")
+    existing = ct.find_existing_tests(
+        "test_parser_clause_06", tmp_path,
+    )
+    # A test block with same name but different body should NOT match
+    t = ct.TestBlock(
+        suite_name="S", test_name="SameName",
+        lines=["TEST(S, SameName) {", "  int y = 2;", "}"],
+        preceding_comments=[],
+    )
+    body = ct.normalize_test_body(t)
+    assert body not in existing
 
 
 # ---- clause_to_filename ----------------------------------------------------

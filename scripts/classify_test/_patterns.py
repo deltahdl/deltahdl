@@ -25,11 +25,12 @@ Use the most specific subclause possible (e.g., 9.2.2.2.2 not 9.2).
 Read the LRM to verify — do not guess from titles.
 If no LRM clause applies, respond with "non-lrm".
 
-Also return a suite_name: a PascalCase name that intuitively describes what
-the test exercises. It must be a valid C++ identifier (alphanumeric and
-underscores only, must not start with a digit). Do NOT include clause or
-annex numbers in the name. Examples: BinaryOperators, SpecifyBlocks,
-AlwaysCombLatch, MacroExpansion, CaseStatement, NetResolution.
+Also return a suite_name and test_name: PascalCase names that intuitively
+describe what the test exercises. Both must be valid C++ identifiers matching
+the regex ^[A-Za-z_]\w*$. The suite_name groups related tests (e.g.,
+BinaryOperators, SpecifyBlocks, AlwaysCombLatch). The test_name describes
+what this specific test case verifies (e.g., AdditionOverflow,
+EmptyPattern, NestedReplication). Do NOT include clause or annex numbers.
 
 LRM: {lrm_path}
 
@@ -41,10 +42,11 @@ TOPIC_PROMPT_TEMPLATE = """What non-LRM topic does this test belong to?
 
 Return a short snake_case topic name (e.g., "aig", "arena", "dpi_helpers").
 
-Also return a suite_name: a PascalCase name that intuitively describes what
-the test exercises. It must be a valid C++ identifier (alphanumeric and
-underscores only, must not start with a digit). Do NOT include clause or
-annex numbers in the name. Examples: AigGraph, ArenaAllocator, DpiHelpers.
+Also return a suite_name and test_name: PascalCase names that intuitively
+describe what the test exercises. Both must be valid C++ identifiers matching
+the regex ^[A-Za-z_]\w*$. The suite_name groups related tests (e.g.,
+AigGraph, ArenaAllocator, DpiHelpers). The test_name describes what this
+specific test case verifies. Do NOT include clause or annex numbers.
 
 {topics}
 TEST({suite}, {test_name}):
@@ -57,8 +59,9 @@ CLAUSE_SCHEMA = json.dumps({
         "clause": {"type": "string"},
         "rationale": {"type": "string"},
         "suite_name": {"type": "string"},
+        "test_name": {"type": "string"},
     },
-    "required": ["clause", "rationale", "suite_name"],
+    "required": ["clause", "rationale", "suite_name", "test_name"],
     "additionalProperties": False,
 })
 
@@ -68,8 +71,9 @@ TOPIC_SCHEMA = json.dumps({
         "non_lrm_topic": {"type": "string"},
         "rationale": {"type": "string"},
         "suite_name": {"type": "string"},
+        "test_name": {"type": "string"},
     },
-    "required": ["non_lrm_topic", "rationale", "suite_name"],
+    "required": ["non_lrm_topic", "rationale", "suite_name", "test_name"],
     "additionalProperties": False,
 })
 
