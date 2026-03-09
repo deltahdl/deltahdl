@@ -37,6 +37,8 @@ def maybe_update_issue_status(
     args, tests, *, source_is_target, target_filenames=None,
 ):
     """Update status for classified tests in a GitHub issue."""
+    if args.issue is None:
+        return
     status = "Reviewed"
     print(f"Fetching issue #{args.issue}...")
     body = fetch_issue_body(

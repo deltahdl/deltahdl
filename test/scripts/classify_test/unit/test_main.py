@@ -105,6 +105,24 @@ def test_parse_args_max_lines_required(monkeypatch, ct):
     with pytest.raises(SystemExit):
         _parse_args()
 
+def test_parse_args_issue_optional(monkeypatch, ct):
+    """--issue is optional and defaults to None."""
+    _parse_args = getattr(ct, "_parse_args")
+    argv = [v for i, v in enumerate(_BASE_ARGV)
+            if _BASE_ARGV[max(0, i - 1)] != "--issue"
+            and v != "--issue"]
+    monkeypatch.setattr(sys, "argv", argv)
+    assert _parse_args().issue is None
+
+
+def test_parse_args_issue_with_value(monkeypatch, ct):
+    """--issue parses its integer value."""
+    _parse_args = getattr(ct, "_parse_args")
+    argv = [v if v != "1" or _BASE_ARGV[max(0, i - 1)] != "--issue"
+            else "42"
+            for i, v in enumerate(_BASE_ARGV)]
+    monkeypatch.setattr(sys, "argv", argv)
+    assert _parse_args().issue == 42
 
 
 # ---- _preamble_name / _filter_preamble ------------------------------------
@@ -768,12 +786,12 @@ def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
     assert len(called) == 1
 
 
-def test_run_without_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
+def test_run_without_issue_skips_maybe_tick(tmp_path, monkeypatch, ct,
                                             ct_helpers):
-    """_run without --issue still calls maybe_update_issue_status."""
+    """_run without --issue skips maybe_update_issue_status."""
     _run, called = _setup_maybe_update_test(ct, ct_helpers, tmp_path, monkeypatch)
     _run(_run_args(tmp_path, dry_run=True))
-    assert len(called) == 1
+    assert len(called) == 0
 
 
 def test_run_no_commit_skips_commit(tmp_path, monkeypatch, ct, ct_helpers):

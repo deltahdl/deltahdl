@@ -682,7 +682,7 @@ def _parse_args():
         "--test", required=True,
         help="Name of the single test to classify",
     )
-    parser.add_argument("--issue", type=int, required=True,
+    parser.add_argument("--issue", type=int,
                         help="GitHub issue number to update")
     add_github_args(parser)
     add_run_mode_args(parser)
@@ -877,11 +877,12 @@ def _run(args):
         t.test_name: clause_to_filename(t.prefix, t.clause) + ".cpp"
         for t in target
     }
-    maybe_update_issue_status(
-        args, target,
-        source_is_target=source_is_target,
-        target_filenames=target_filenames,
-    )
+    if args.issue is not None:
+        maybe_update_issue_status(
+            args, target,
+            source_is_target=source_is_target,
+            target_filenames=target_filenames,
+        )
     to_create, to_merge, n_removed = _resolve_destinations(
         groups, Path(args.output_dir).resolve(),
         exclude_path=filepath, dry_run=args.dry_run,

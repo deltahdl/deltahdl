@@ -24,8 +24,8 @@ def test_parse_args_issue(monkeypatch, ct):
     assert _parse_args().issue == 42
 
 
-def test_parse_args_issue_required(monkeypatch, ct):
-    """Exits when --issue is missing."""
+def test_parse_args_issue_defaults_to_none(monkeypatch, ct):
+    """--issue defaults to None when omitted."""
     _parse_args = getattr(ct, "_parse_args")
     monkeypatch.setattr(
         sys, "argv",
@@ -34,8 +34,7 @@ def test_parse_args_issue_required(monkeypatch, ct):
          "--organization", "myorg", "--repo", "myrepo",
          "--max-lines", "1000"],
     )
-    with pytest.raises(SystemExit):
-        _parse_args()
+    assert _parse_args().issue is None
 
 
 def test_parse_args_organization(monkeypatch, ct):
