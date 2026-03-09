@@ -174,7 +174,7 @@ TEST(IntegerLiteralConstants, SignedOctalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause05, Cl5_7_1_SignedHexElaborates) {
+TEST(SignedIntegerLiterals, SignedHexElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
