@@ -1,7 +1,17 @@
+// §10.9.1
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
+
+static void VerifyPatternKeys(const Expr* rhs,
+                              const std::string expected_keys[], size_t count) {
+  ASSERT_EQ(rhs->pattern_keys.size(), count);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
+  }
+}
 
 namespace {
 
@@ -181,7 +191,6 @@ TEST(ParserCh511, ArrayLiteral_DefaultValue) {
               "endmodule"));
 }
 
-}  // namespace
 TEST(NestedBracesArrayOfStructs, Cl5_10_NestedBracesArrayOfStructs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -190,7 +199,7 @@ TEST(NestedBracesArrayOfStructs, Cl5_10_NestedBracesArrayOfStructs) {
               "endmodule\n"));
 }
 
-TEST(NestedBracesElements, Cl5_10_NestedBracesElements) {
+TEST(ArrayAssignmentPatterns, NestedStructPatternElements) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int a; int b;} ab;\n"
@@ -246,14 +255,6 @@ TEST(AssignmentPatternReplication, BlockVarDecl_FullStructReplication) {
               "endmodule\n"));
 }
 
-static void VerifyPatternKeys(const Expr* rhs,
-                              const std::string expected_keys[], size_t count) {
-  ASSERT_EQ(rhs->pattern_keys.size(), count);
-  for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
-  }
-}
-
 TEST(AssignmentPatternDefault, AssignmentPatternDefault) {
   auto r = Parse(
       "module t;\n"
@@ -268,3 +269,5 @@ TEST(AssignmentPatternDefault, AssignmentPatternDefault) {
   std::string expected_keys[] = {"default"};
   VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
 }
+
+}  // namespace
