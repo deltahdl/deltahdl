@@ -1,6 +1,6 @@
 // §9.4.5
 
-#include "fixture_elaborator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -110,16 +110,7 @@ TEST(BlockingIntraAssignDelay, DelayBlocksSubsequentStatements) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
-  auto* c = f.ctx.FindVariable("c");
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(c, nullptr);
-  EXPECT_EQ(a->value.ToUint64(), 10u);
-  EXPECT_EQ(c->value.ToUint64(), 99u);
+  LowerRunAndCheck(f, design, {{"a", 10}, {"c", 99}});
 }
 
 TEST(BlockingIntraAssignDelayRHSCapture, BlockingIntraAssignDelayCapturesRHS) {
@@ -178,17 +169,7 @@ TEST(NbaIntraAssignDelay, NbaIntraAssignDelayNonBlocking) {
       "  end\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
-  auto* c = f.ctx.FindVariable("c");
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(c, nullptr);
-
-  EXPECT_EQ(a->value.ToUint64(), 10u);
-  EXPECT_EQ(c->value.ToUint64(), 99u);
+  LowerRunAndCheck(f, design, {{"a", 10}, {"c", 99}});
 }
 
 TEST(NbaIntraAssignDelayCapturesRHS, NbaIntraAssignDelayCapturesRHS) {
