@@ -64,12 +64,10 @@ struct EventAwaiter {
       var->prev_value = var->value;
       auto* ctx_ptr = &ctx;
       auto* arena_ptr = &arena;
-      var->AddWatcher(
-          [h, var, edge = ev.edge, iff_cond = ev.iff_condition, ctx_ptr,
-           arena_ptr]() mutable {
-            return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr,
-                                  *arena_ptr);
-          });
+      var->AddWatcher([h, var, edge = ev.edge, iff_cond = ev.iff_condition,
+                       ctx_ptr, arena_ptr]() mutable {
+        return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr, *arena_ptr);
+      });
     }
   }
 
