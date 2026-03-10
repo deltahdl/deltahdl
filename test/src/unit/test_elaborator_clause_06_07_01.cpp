@@ -96,7 +96,7 @@ TEST(NetDecl, UserDefinedNettypeCreatesNet) {
 
   bool found_net = false;
   for (auto& net : mod->nets) {
-    if (net.name == "t.x") found_net = true;
+    if (net.name == "x") found_net = true;
   }
   EXPECT_TRUE(found_net);
 }
