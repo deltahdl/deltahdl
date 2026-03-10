@@ -1,4 +1,4 @@
-
+// §8.26.2
 
 #include "fixture_elaborator.h"
 
@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA8262, InterfaceExtendsInterfaceOk) {
+TEST(InterfaceClassInheritance, InterfaceExtendsInterface) {
   EXPECT_TRUE(
       ElabOk("interface class A;\n"
              "  pure virtual function void fa();\n"
