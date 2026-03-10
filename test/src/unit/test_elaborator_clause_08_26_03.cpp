@@ -1,4 +1,4 @@
-
+// §8.26.3
 
 #include "fixture_elaborator.h"
 
@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA8263, TypesInheritedByExtendingInterfaceOk) {
+TEST(InterfaceClassInheritance, TypesInheritedByExtendingInterface) {
   EXPECT_TRUE(
       ElabOk("interface class IntfA;\n"
              "  typedef int my_t;\n"
