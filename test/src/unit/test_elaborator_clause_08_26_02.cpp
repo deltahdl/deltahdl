@@ -82,7 +82,7 @@ TEST(ExtendsAndImplements, ClassExtendsBaseImplementsInterface) {
              "endmodule\n"));
 }
 
-TEST(ElabA8262, ClassImplementsMultipleOk) {
+TEST(InterfaceClassImplements, ClassImplementsMultipleInterfaces) {
   EXPECT_TRUE(
       ElabOk("interface class A;\n"
              "  pure virtual function void fa();\n"
