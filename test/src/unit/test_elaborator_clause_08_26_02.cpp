@@ -18,7 +18,7 @@ TEST(InterfaceClassInheritance, InterfaceExtendsInterface) {
              "endmodule\n"));
 }
 
-TEST(ElabA8262, InterfaceImplementsError) {
+TEST(InterfaceClassImplements, InterfaceImplementsInterfaceError) {
   EXPECT_FALSE(
       ElabOk("interface class A;\n"
              "  pure virtual function void fa();\n"
