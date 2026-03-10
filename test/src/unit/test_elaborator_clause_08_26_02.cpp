@@ -54,7 +54,7 @@ TEST(ElabA8262, ClassExtendsInterfaceError) {
              "endmodule\n"));
 }
 
-TEST(ElabA8262, ClassImplementsInterfaceOk) {
+TEST(ClassImplementsInterface, ConcreteMethodSatisfiesPureVirtual) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
              "  pure virtual function void foo();\n"
