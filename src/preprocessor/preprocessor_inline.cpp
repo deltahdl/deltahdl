@@ -98,12 +98,10 @@ bool Preprocessor::ExpandFunctionLikeMacro(const MacroDef& def,
 
 bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
                                           std::string_view macro_name,
-                                          std::string& output, uint32_t file_id,
-                                          uint32_t line_num, int depth) {
+                                          std::string& output, SourceLoc loc,
+                                          int depth) {
   const auto* def = macros_.Lookup(name);
   if (def == nullptr) return false;
-
-  SourceLoc loc{file_id, line_num, 1};
 
   if (def->is_function_like) {
     auto after_name = Trim(macro_name.substr(name.size()));
@@ -128,11 +126,11 @@ bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
 
   expansion_stack_.emplace_back(name);
   if (!rest.empty()) {
-    expanded += ExpandInlineMacros(rest, file_id, line_num);
+    expanded += ExpandInlineMacros(rest, loc.file_id, loc.line);
   }
   auto exp_trimmed = Trim(std::string_view(expanded));
   if (!exp_trimmed.empty() && exp_trimmed[0] == '`') {
-    ProcessDirective(expanded, file_id, line_num, depth, output);
+    ProcessDirective(expanded, loc.file_id, loc.line, depth, output);
   } else {
     output.append(expanded);
   }
@@ -155,8 +153,8 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
     return true;
   }
 
-  return ExpandUserDefinedMacro(name, macro_name, output, file_id, line_num,
-                                depth);
+  SourceLoc loc{file_id, line_num, 1};
+  return ExpandUserDefinedMacro(name, macro_name, output, loc, depth);
 }
 
 // Find the next backtick outside a string literal, starting at pos.

@@ -63,10 +63,9 @@ struct EventAwaiter {
       }
       var->prev_value = var->value;
       auto* ctx_ptr = &ctx;
-      auto* arena_ptr = &arena;
       var->AddWatcher([h, var, edge = ev.edge, iff_cond = ev.iff_condition,
-                       ctx_ptr, arena_ptr]() mutable {
-        return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr, *arena_ptr);
+                       ctx_ptr]() mutable {
+        return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr);
       });
     }
   }
@@ -82,14 +81,14 @@ struct EventAwaiter {
   }
 
   static bool HandleEdgeEvent(std::coroutine_handle<>& h, Variable* var,
-                              Edge edge, const Expr* iff_cond, SimContext& ctx,
-                              Arena& arena) {
+                              Edge edge, const Expr* iff_cond,
+                              SimContext& ctx) {
     if (!CheckEdge(var, edge)) {
       var->prev_value = var->value;
       return false;
     }
     if (iff_cond) {
-      auto val = EvalExpr(iff_cond, ctx, arena);
+      auto val = EvalExpr(iff_cond, ctx, ctx.GetArena());
       if (val.ToUint64() == 0) {
         var->prev_value = var->value;
         return false;
