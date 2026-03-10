@@ -43,7 +43,7 @@ static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
                                             const std::vector<EventExpr>& sens,
                                             SimContext& ctx, Arena& arena) {
   while (!ctx.StopRequested()) {
-    co_await EventAwaiter{ctx, sens};
+    co_await EventAwaiter{ctx, sens, arena};
     // §12.4.2.1: Flush pending violation reports on process re-trigger.
     ctx.FlushPendingViolations();
     auto result = co_await ExecStmt(body, ctx, arena);
@@ -139,7 +139,7 @@ static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
   return d.rise;  // No change — use rise as default.
 }
 
-static SimCoroutine MakeContAssignCoroutine(const ContAssignParams& params,
+static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
   auto val = EvalExpr(params.rhs, ctx, arena);
   if (!params.lhs || params.lhs->kind != ExprKind::kIdentifier) co_return;
@@ -395,6 +395,8 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   uint32_t width = var.class_type_name.empty() ? var.width : 64;
   if (var.is_real && width < 64) width = 64;
   auto* v = ctx_.CreateVariable(var.name, width);
+  // §6.14: chandle defaults to null (0), not X.
+  if (var.is_chandle) v->value = MakeLogic4VecVal(arena_, width, 0);
   if (var.is_event) v->is_event = true;
   if (var.is_signed) v->is_signed = true;
   if (var.is_string) ctx_.RegisterStringVariable(var.name);

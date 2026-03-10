@@ -465,7 +465,8 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
       var->NotifyWatchers();
     };
   } else {
-    SetupWholeVarNbaCallback(event, var, rhs_val);
+    auto resized = ResizeToWidth(rhs_val, var->value.width, arena);
+    SetupWholeVarNbaCallback(event, var, resized);
   }
   auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
   auto schedule_time = ctx.CurrentTime() + SimTime{delay_ticks};
@@ -519,19 +520,31 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
+// §13.3.1: Create a variable in the appropriate scope.
+static Variable* CreateVarInScope(std::string_view name, uint32_t width,
+                                  SimContext& ctx) {
+  return ctx.HasLocalScope() ? ctx.CreateLocalVariable(name, width)
+                             : ctx.CreateVariable(name, width);
+}
+
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
+  // §13.3.1: Inside a task/function scope, local variables persist in static
+  // scopes — skip re-creation if the variable already exists locally.
+  if (ctx.HasLocalScope() && ctx.FindLocalVariable(stmt->var_name)) {
+    return StmtResult::kDone;
+  }
   uint32_t width = EvalTypeWidth(stmt->var_decl_type);
   bool is_real = (stmt->var_decl_type.kind == DataTypeKind::kReal ||
                   stmt->var_decl_type.kind == DataTypeKind::kShortreal ||
                   stmt->var_decl_type.kind == DataTypeKind::kRealtime);
   if (width == 0 && stmt->var_decl_type.kind == DataTypeKind::kString) {
-    ctx.CreateVariable(stmt->var_name, 0);
+    CreateVarInScope(stmt->var_name, 0, ctx);
     ctx.RegisterStringVariable(stmt->var_name);
   } else {
     if (width == 0) width = 32;
     if (is_real && width < 64) width = 64;
-    ctx.CreateVariable(stmt->var_name, width);
+    CreateVarInScope(stmt->var_name, width, ctx);
     if (is_real) ctx.RegisterRealVariable(stmt->var_name);
     CreateBlockArrayElements(stmt, width, ctx, arena);
   }

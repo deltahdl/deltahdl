@@ -843,6 +843,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.width = EvalTypeWidth(item->data_type, typedefs_);
   var.is_4state = Is4stateType(item->data_type, typedefs_);
   var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
+  var.is_chandle = (item->data_type.kind == DataTypeKind::kChandle);
   var.is_string = (item->data_type.kind == DataTypeKind::kString);
   var.is_real = (item->data_type.kind == DataTypeKind::kReal ||
                  item->data_type.kind == DataTypeKind::kShortreal ||

@@ -152,6 +152,7 @@ class SimContext {
   void PopScope();
   void PushStaticScope(std::string_view func_name);
   void PopStaticScope(std::string_view func_name);
+  bool HasLocalScope() const { return !scope_stack_.empty(); }
   Variable* FindLocalVariable(std::string_view name);
   Variable* CreateLocalVariable(std::string_view name, uint32_t width);
   // §13.4.2: Find a static variable in a function's persistent frame.

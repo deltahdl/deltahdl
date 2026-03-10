@@ -78,6 +78,7 @@ struct RtlirVariable {
   bool is_string = false;
   bool is_real = false;
   bool is_signed = false;
+  bool is_chandle = false;          // §6.14: chandle type (defaults to null).
   const Expr* init_expr = nullptr;  // Module-level variable initializer.
   const DataType* dtype = nullptr;  // Full type for struct/union layout.
   uint32_t unpacked_size = 0;       // §7.4: unpacked array element count.

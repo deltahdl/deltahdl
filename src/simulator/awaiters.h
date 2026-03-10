@@ -7,6 +7,7 @@
 
 #include "common/types.h"
 #include "parser/ast.h"
+#include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
@@ -44,6 +45,7 @@ struct DelayAwaiter {
 struct EventAwaiter {
   SimContext& ctx;
   const std::vector<EventExpr>& events;
+  Arena& arena;
 
   bool await_ready() const noexcept { return false; }
 
@@ -62,10 +64,21 @@ struct EventAwaiter {
       }
       var->prev_value = var->value;
       Edge edge = ev.edge;
-      var->AddWatcher([h, var, edge]() mutable {
+      const Expr* iff_cond = ev.iff_condition;
+      auto* ctx_ptr = &ctx;
+      auto* arena_ptr = &arena;
+      var->AddWatcher([h, var, edge, iff_cond, ctx_ptr, arena_ptr]() mutable {
         if (!CheckEdge(var, edge)) {
           var->prev_value = var->value;
           return false;  // Keep watcher; edge not detected.
+        }
+        // §9.4.2: iff guard — only resume if condition is true.
+        if (iff_cond) {
+          auto val = EvalExpr(iff_cond, *ctx_ptr, *arena_ptr);
+          if (val.ToUint64() == 0) {
+            var->prev_value = var->value;
+            return false;
+          }
         }
         h.resume();
         return true;

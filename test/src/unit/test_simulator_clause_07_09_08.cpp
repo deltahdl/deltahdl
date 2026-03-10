@@ -65,15 +65,15 @@ TEST(AssocTraversalArgs, PrevReturnsTruncationFlag) {
   aa->index_width = 32;
   aa->int_data[400] = MakeLogic4VecVal(f.arena, 32, 1);
   aa->int_data[500] = MakeLogic4VecVal(f.arena, 32, 2);
-  auto* ref = f.ctx.CreateVariable("k", 8);
-  ref->value = MakeLogic4VecVal(f.arena, 8, static_cast<uint64_t>(500 & 0xFF));
+  auto* ref = f.ctx.CreateVariable("k", 16);
+  ref->value = MakeLogic4VecVal(f.arena, 16, 500);
 
   Logic4Vec out{};
   auto* call = MkAssocCall(f.arena, "aa", "prev", "k");
   bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
   ASSERT_TRUE(ok);
   EXPECT_EQ(out.ToUint64(), static_cast<uint64_t>(static_cast<uint32_t>(-1)));
-  EXPECT_EQ(ref->value.ToUint64(), 400u & 0xFFu);
+  EXPECT_EQ(ref->value.ToUint64(), 400u);
 }
 
 TEST(AssocTraversalArgs, FirstTruncatesTo16Bit) {

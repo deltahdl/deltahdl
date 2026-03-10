@@ -45,7 +45,7 @@ bool Preprocessor::TryPredefinedMacro(std::string_view name,
   if (name == "__LINE__") {
     uint32_t effective_line = line_num;
     if (has_line_override_) {
-      effective_line = line_offset_ + (line_num - line_override_src_line_);
+      effective_line = line_offset_ + (line_num - line_override_src_line_ - 1);
     }
     output.append(std::to_string(effective_line));
     return true;
@@ -102,7 +102,13 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
   auto macro_name = trimmed.substr(1);
   auto name = ExtractMacroName(macro_name);
 
-  if (TryPredefinedMacro(name, output, file_id, line_num)) return true;
+  if (TryPredefinedMacro(name, output, file_id, line_num)) {
+    auto rest = macro_name.substr(name.size());
+    if (!rest.empty()) {
+      output.append(ExpandInlineMacros(rest, file_id, line_num));
+    }
+    return true;
+  }
 
   const auto* def = macros_.Lookup(name);
   if (def == nullptr) return false;
@@ -192,7 +198,7 @@ bool Preprocessor::TryExpandInlinePredefined(std::string_view name,
   if (name == "__LINE__") {
     uint32_t effective = line_num;
     if (has_line_override_) {
-      effective = line_offset_ + (line_num - line_override_src_line_);
+      effective = line_offset_ + (line_num - line_override_src_line_ - 1);
     }
     result += std::to_string(effective);
     return true;

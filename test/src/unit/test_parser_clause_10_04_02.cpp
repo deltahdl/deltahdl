@@ -132,7 +132,7 @@ TEST(ParserSection10, Sec10_4_2_InBeginEndBlock) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   ASSERT_EQ(body->stmts.size(), 1u);
@@ -442,7 +442,7 @@ TEST(ParserSection10, Sec10_4_2_NamedBlockNonblocking) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
+  auto* body = InitialBody(r);
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->kind, StmtKind::kBlock);
   EXPECT_EQ(body->label, "my_block");

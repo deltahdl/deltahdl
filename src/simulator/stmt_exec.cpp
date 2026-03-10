@@ -664,7 +664,7 @@ static ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx,
     if (IsNamedEvent(stmt, ctx)) {
       co_await NamedEventAwaiter{ctx, stmt->events[0].signal->text};
     } else {
-      co_await EventAwaiter{ctx, stmt->events};
+      co_await EventAwaiter{ctx, stmt->events, arena};
     }
   }
   if (stmt->body) {

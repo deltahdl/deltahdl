@@ -185,8 +185,11 @@ TEST(ParserSection9, Sec9_2_2_CasexStatement) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstAlwaysCombStmt(r);
-  ASSERT_NE(stmt, nullptr);
+  auto* body = FirstAlwaysCombStmt(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->kind, StmtKind::kBlock);
+  ASSERT_GE(body->stmts.size(), 1u);
+  auto* stmt = body->stmts[0];
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
   ASSERT_EQ(stmt->case_items.size(), 3u);
@@ -209,8 +212,11 @@ TEST(ParserSection9, Sec9_2_2_CasezStatement) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstAlwaysCombStmt(r);
-  ASSERT_NE(stmt, nullptr);
+  auto* body = FirstAlwaysCombStmt(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->kind, StmtKind::kBlock);
+  ASSERT_GE(body->stmts.size(), 1u);
+  auto* stmt = body->stmts[0];
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
   ASSERT_EQ(stmt->case_items.size(), 5u);
