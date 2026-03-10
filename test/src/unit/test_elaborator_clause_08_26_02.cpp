@@ -149,4 +149,17 @@ TEST(InterfaceClassImplements, AllPureVirtualMethodsImplemented) {
              "endmodule\n"));
 }
 
+TEST(InterfaceClassImplements, ImplementingClassScopeResOk) {
+  EXPECT_TRUE(
+      ElabOk("interface class IntfC;\n"
+             "  pure virtual function void funcC();\n"
+             "endclass\n"
+             "class ClassA implements IntfC;\n"
+             "  virtual function void funcC();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

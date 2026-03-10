@@ -1,4 +1,4 @@
-// §8.26.3
+// Non-LRM tests
 
 #include "fixture_elaborator.h"
 
@@ -14,19 +14,6 @@ TEST(InterfaceClassInheritance, TypesInheritedByExtendingInterface) {
              "endclass\n"
              "interface class IntfB extends IntfA;\n"
              "  pure virtual function void funcB();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
-TEST(ElabA8263, ImplementingClassScopeResOk) {
-  EXPECT_TRUE(
-      ElabOk("interface class IntfC;\n"
-             "  pure virtual function void funcC();\n"
-             "endclass\n"
-             "class ClassA implements IntfC;\n"
-             "  virtual function void funcC();\n"
-             "  endfunction\n"
              "endclass\n"
              "module m;\n"
              "endmodule\n"));
