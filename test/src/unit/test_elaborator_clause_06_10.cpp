@@ -63,8 +63,12 @@ TEST(Elaboration, ImplicitNetOnInstancePortIsScalar) {
   EXPECT_FALSE(f.diag.HasErrors());
   auto* mod = design->top_modules[0];
   for (const auto& n : mod->nets) {
-    if (n.name == "x") { EXPECT_EQ(n.width, 1u); }
-    if (n.name == "y") { EXPECT_EQ(n.width, 1u); }
+    if (n.name == "x") {
+      EXPECT_EQ(n.width, 1u);
+    }
+    if (n.name == "y") {
+      EXPECT_EQ(n.width, 1u);
+    }
   }
 }
 

@@ -13,7 +13,8 @@ TEST(ParserA602, AlwaysConstruct_AlwaysFF) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysFFBlock);
+  auto* item =
+      FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysFFBlock);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
 
@@ -37,7 +38,8 @@ TEST(ParserA602, Integration_AlwaysFFWithBlockingAndNonblocking) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysFFBlock);
+  auto* item =
+      FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysFFBlock);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
   EXPECT_EQ(item->sensitivity.size(), 2u);

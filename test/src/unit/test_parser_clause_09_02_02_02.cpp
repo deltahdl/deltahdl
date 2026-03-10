@@ -12,7 +12,8 @@ TEST(ParserA602, AlwaysConstruct_AlwaysComb) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysCombBlock);
+  auto* item =
+      FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysCombBlock);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
 }
