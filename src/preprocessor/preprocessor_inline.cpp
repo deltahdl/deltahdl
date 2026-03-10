@@ -96,20 +96,10 @@ bool Preprocessor::ExpandFunctionLikeMacro(const MacroDef& def,
   return true;
 }
 
-bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
-                                  uint32_t file_id, uint32_t line_num,
-                                  int depth) {
-  auto macro_name = trimmed.substr(1);
-  auto name = ExtractMacroName(macro_name);
-
-  if (TryPredefinedMacro(name, output, file_id, line_num)) {
-    auto rest = macro_name.substr(name.size());
-    if (!rest.empty()) {
-      output.append(ExpandInlineMacros(rest, file_id, line_num));
-    }
-    return true;
-  }
-
+bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
+                                          std::string_view macro_name,
+                                          std::string& output, uint32_t file_id,
+                                          uint32_t line_num, int depth) {
   const auto* def = macros_.Lookup(name);
   if (def == nullptr) return false;
 
@@ -149,6 +139,24 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
 
   expansion_stack_.pop_back();
   return true;
+}
+
+bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
+                                  uint32_t file_id, uint32_t line_num,
+                                  int depth) {
+  auto macro_name = trimmed.substr(1);
+  auto name = ExtractMacroName(macro_name);
+
+  if (TryPredefinedMacro(name, output, file_id, line_num)) {
+    auto rest = macro_name.substr(name.size());
+    if (!rest.empty()) {
+      output.append(ExpandInlineMacros(rest, file_id, line_num));
+    }
+    return true;
+  }
+
+  return ExpandUserDefinedMacro(name, macro_name, output, file_id, line_num,
+                                depth);
 }
 
 // Find the next backtick outside a string literal, starting at pos.

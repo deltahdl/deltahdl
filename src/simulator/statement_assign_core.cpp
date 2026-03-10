@@ -527,6 +527,20 @@ static Variable* CreateVarInScope(std::string_view name, uint32_t width,
                              : ctx.CreateVariable(name, width);
 }
 
+static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
+                               SimContext& ctx, Arena& arena) {
+  if (width == 0 && stmt->var_decl_type.kind == DataTypeKind::kString) {
+    CreateVarInScope(stmt->var_name, 0, ctx);
+    ctx.RegisterStringVariable(stmt->var_name);
+  } else {
+    if (width == 0) width = 32;
+    if (is_real && width < 64) width = 64;
+    CreateVarInScope(stmt->var_name, width, ctx);
+    if (is_real) ctx.RegisterRealVariable(stmt->var_name);
+    CreateBlockArrayElements(stmt, width, ctx, arena);
+  }
+}
+
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   // §13.3.1: Inside a task/function scope, local variables persist in static
@@ -538,16 +552,7 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool is_real = (stmt->var_decl_type.kind == DataTypeKind::kReal ||
                   stmt->var_decl_type.kind == DataTypeKind::kShortreal ||
                   stmt->var_decl_type.kind == DataTypeKind::kRealtime);
-  if (width == 0 && stmt->var_decl_type.kind == DataTypeKind::kString) {
-    CreateVarInScope(stmt->var_name, 0, ctx);
-    ctx.RegisterStringVariable(stmt->var_name);
-  } else {
-    if (width == 0) width = 32;
-    if (is_real && width < 64) width = 64;
-    CreateVarInScope(stmt->var_name, width, ctx);
-    if (is_real) ctx.RegisterRealVariable(stmt->var_name);
-    CreateBlockArrayElements(stmt, width, ctx, arena);
-  }
+  CreateDeclVariable(stmt, width, is_real, ctx, arena);
   if (stmt->var_init) {
     auto* var = ctx.FindVariable(stmt->var_name);
     if (var) var->value = EvalExpr(stmt->var_init, ctx, arena);

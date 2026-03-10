@@ -54,7 +54,6 @@ struct EventAwaiter {
       if (!ev.signal || ev.signal->kind != ExprKind::kIdentifier) continue;
       auto* var = ctx.FindVariable(ev.signal->text);
       if (!var) continue;
-      // Named events: resume unconditionally on trigger (no edge check).
       if (var->is_event) {
         var->AddWatcher([h]() mutable {
           h.resume();
@@ -63,26 +62,14 @@ struct EventAwaiter {
         continue;
       }
       var->prev_value = var->value;
-      Edge edge = ev.edge;
-      const Expr* iff_cond = ev.iff_condition;
       auto* ctx_ptr = &ctx;
       auto* arena_ptr = &arena;
-      var->AddWatcher([h, var, edge, iff_cond, ctx_ptr, arena_ptr]() mutable {
-        if (!CheckEdge(var, edge)) {
-          var->prev_value = var->value;
-          return false;  // Keep watcher; edge not detected.
-        }
-        // §9.4.2: iff guard — only resume if condition is true.
-        if (iff_cond) {
-          auto val = EvalExpr(iff_cond, *ctx_ptr, *arena_ptr);
-          if (val.ToUint64() == 0) {
-            var->prev_value = var->value;
-            return false;
-          }
-        }
-        h.resume();
-        return true;
-      });
+      var->AddWatcher(
+          [h, var, edge = ev.edge, iff_cond = ev.iff_condition, ctx_ptr,
+           arena_ptr]() mutable {
+            return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr,
+                                  *arena_ptr);
+          });
     }
   }
 
@@ -94,6 +81,24 @@ struct EventAwaiter {
     if (edge == Edge::kPosedge) return (prev & 1) == 0 && (cur & 1) == 1;
     if (edge == Edge::kNegedge) return (prev & 1) == 1 && (cur & 1) == 0;
     return prev != cur;  // any change
+  }
+
+  static bool HandleEdgeEvent(std::coroutine_handle<>& h, Variable* var,
+                              Edge edge, const Expr* iff_cond, SimContext& ctx,
+                              Arena& arena) {
+    if (!CheckEdge(var, edge)) {
+      var->prev_value = var->value;
+      return false;
+    }
+    if (iff_cond) {
+      auto val = EvalExpr(iff_cond, ctx, arena);
+      if (val.ToUint64() == 0) {
+        var->prev_value = var->value;
+        return false;
+      }
+    }
+    h.resume();
+    return true;
   }
 };
 
