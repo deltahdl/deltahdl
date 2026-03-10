@@ -131,7 +131,7 @@ TEST(ElabA82661, InheritedMethodSatisfiesInterfaceOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA8269, InterfaceClassPureVirtualOk) {
+TEST(InterfaceClassImplements, AllPureVirtualMethodsImplemented) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
              "  pure virtual function bit funcA();\n"
