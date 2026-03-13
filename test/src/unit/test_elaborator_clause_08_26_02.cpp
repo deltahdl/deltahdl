@@ -41,7 +41,7 @@ TEST(InterfaceClassInheritance, InterfaceExtendsClassError) {
              "endmodule\n"));
 }
 
-TEST(ElabA8262, ClassExtendsInterfaceError) {
+TEST(InterfaceClasses, ClassExtendsInterfaceClassError) {
   EXPECT_FALSE(
       ElabOk("interface class IC;\n"
              "  pure virtual function void foo();\n"
