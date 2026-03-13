@@ -504,8 +504,8 @@ def test_discover_subclauses_strips_preamble_before_fences(
     assert result == {"4.1": "General"}
 
 
-def _discover_subclauses_prompt(ic, monkeypatch):
-    """Helper: run discover_subclauses and return the prompt string."""
+def _discover_subclauses_cmd(ic, monkeypatch):
+    """Helper: run discover_subclauses and return the mock_run object."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=0,
         stdout='{"4.1": "General"}\n',
@@ -514,6 +514,12 @@ def _discover_subclauses_prompt(ic, monkeypatch):
     mock_run = MagicMock(return_value=cp)
     monkeypatch.setattr(ic.subprocess, "run", mock_run)
     ic.discover_subclauses(Path("/path/lrm.pdf"), "4")
+    return mock_run
+
+
+def _discover_subclauses_prompt(ic, monkeypatch):
+    """Helper: run discover_subclauses and return the prompt string."""
+    mock_run = _discover_subclauses_cmd(ic, monkeypatch)
     return mock_run.call_args[1]["input"]
 
 
@@ -573,14 +579,7 @@ def test_discover_subclauses_rationale_is_implementable(
 
 def test_discover_subclauses_default_model_is_opus(ic, monkeypatch) -> None:
     """discover_subclauses uses --model opus by default."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=0,
-        stdout='{"4.1": "General"}\n',
-        stderr="",
-    )
-    mock_run = MagicMock(return_value=cp)
-    monkeypatch.setattr(ic.subprocess, "run", mock_run)
-    ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    mock_run = _discover_subclauses_cmd(ic, monkeypatch)
     cmd = mock_run.call_args[0][0]
     idx = cmd.index("--model")
     assert cmd[idx + 1] == "opus"
@@ -588,14 +587,7 @@ def test_discover_subclauses_default_model_is_opus(ic, monkeypatch) -> None:
 
 def test_discover_subclauses_passes_effort_high(ic, monkeypatch) -> None:
     """discover_subclauses passes --effort high to Claude CLI."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=0,
-        stdout='{"4.1": "General"}\n',
-        stderr="",
-    )
-    mock_run = MagicMock(return_value=cp)
-    monkeypatch.setattr(ic.subprocess, "run", mock_run)
-    ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    mock_run = _discover_subclauses_cmd(ic, monkeypatch)
     cmd = mock_run.call_args[0][0]
     idx = cmd.index("--effort")
     assert cmd[idx + 1] == "high"
