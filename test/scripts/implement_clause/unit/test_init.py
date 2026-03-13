@@ -17,13 +17,9 @@ _STUB_ARGS = argparse.Namespace(
 def _patch_main_no_subclauses(monkeypatch, ic):
     """Patch dependencies for the no-subclauses main() path."""
     monkeypatch.setattr(ic, "discover_subclauses", lambda *_a: {})
-    mock_inv = MagicMock()
-    monkeypatch.setattr(ic, "invoke_implement_subclause", mock_inv)
-    mock_close = MagicMock()
-    monkeypatch.setattr(ic, "close_issue", mock_close)
-    mock_mark = MagicMock()
-    monkeypatch.setattr(ic, "mark_master_complete", mock_mark)
-    return mock_inv, mock_close, mock_mark
+    monkeypatch.setattr(ic, "invoke_implement_subclause", MagicMock())
+    monkeypatch.setattr(ic, "close_issue", MagicMock())
+    monkeypatch.setattr(ic, "mark_master_complete", MagicMock())
 
 
 def _patch_main_with_subclauses(
@@ -189,38 +185,21 @@ def test_parse_args_rejects_removed_flag(ic, tmp_path, flag, value) -> None:
 # --- main ---
 
 
-def test_main_no_subclauses(ic, monkeypatch, clause_argv) -> None:
-    """Clause without subclauses invokes implement_subclause directly."""
-    mock_inv, _, __ = _patch_main_no_subclauses(monkeypatch, ic)
-    ic.main(clause_argv)
-    assert mock_inv.call_args[0][1] == "4"
+def test_main_no_subclauses_exits(ic, monkeypatch, clause_argv) -> None:
+    """Empty discovery causes SystemExit(1)."""
+    _patch_main_no_subclauses(monkeypatch, ic)
+    with pytest.raises(SystemExit):
+        ic.main(clause_argv)
 
 
-def test_main_no_subclauses_prints_leaf(
+def test_main_no_subclauses_error_message(
     ic, monkeypatch, clause_argv, capsys,
 ) -> None:
-    """Prints that clause has no subclauses."""
+    """Empty discovery prints an error to stderr."""
     _patch_main_no_subclauses(monkeypatch, ic)
-    ic.main(clause_argv)
-    assert "No subclauses" in capsys.readouterr().out
-
-
-def test_no_subclauses_closes_sub_issue(
-    ic, monkeypatch, clause_argv,
-) -> None:
-    """No-subclauses path closes the sub-issue."""
-    _, mock_close, __ = _patch_main_no_subclauses(monkeypatch, ic)
-    ic.main(clause_argv)
-    assert mock_close.call_args == (
-        ("o", "r", 1, "all subclauses are implemented"),
-    )
-
-
-def test_no_subclauses_marks_master(ic, monkeypatch, clause_argv) -> None:
-    """No-subclauses path marks master issue complete."""
-    _, __, mock_mark = _patch_main_no_subclauses(monkeypatch, ic)
-    ic.main(clause_argv)
-    assert mock_mark.call_args == (("o", "r", 99, 1),)
+    with pytest.raises(SystemExit):
+        ic.main(clause_argv)
+    assert "no implementable subclauses" in capsys.readouterr().err.lower()
 
 
 def test_main_with_subclauses(ic, monkeypatch, clause_argv) -> None:
@@ -308,8 +287,12 @@ def test_main_annex(ic, monkeypatch, tmp_path) -> None:
         "--sub-issue", "1", "--master-issue", "99",
         "--organization", "o", "--repo", "r",
     ]
-    mock_ds = MagicMock(return_value={})
+    mock_ds = MagicMock(return_value={"A.1": "General"})
     monkeypatch.setattr(ic, "discover_subclauses", mock_ds)
+    monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: "")
+    monkeypatch.setattr(ic, "build_synced_body", lambda *_a: "body")
+    monkeypatch.setattr(ic, "update_issue_body", lambda *_a, **_kw: None)
+    monkeypatch.setattr(ic, "next_unchecked", MagicMock(return_value=None))
     monkeypatch.setattr(ic, "invoke_implement_subclause", MagicMock())
     monkeypatch.setattr(ic, "close_issue", MagicMock())
     monkeypatch.setattr(ic, "mark_master_complete", MagicMock())
@@ -584,6 +567,51 @@ def test_discover_subclauses_rationale_is_implementable(
     monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
     result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert "4.1" in result
+
+
+def test_discover_subclauses_default_model_is_opus(ic, monkeypatch) -> None:
+    """discover_subclauses uses --model opus by default."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='{"4.1": "General"}\n',
+        stderr="",
+    )
+    mock_run = MagicMock(return_value=cp)
+    monkeypatch.setattr(ic.subprocess, "run", mock_run)
+    ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    cmd = mock_run.call_args[0][0]
+    idx = cmd.index("--model")
+    assert cmd[idx + 1] == "opus"
+
+
+def test_discover_subclauses_passes_effort_high(ic, monkeypatch) -> None:
+    """discover_subclauses passes --effort high to Claude CLI."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='{"4.1": "General"}\n',
+        stderr="",
+    )
+    mock_run = MagicMock(return_value=cp)
+    monkeypatch.setattr(ic.subprocess, "run", mock_run)
+    ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    cmd = mock_run.call_args[0][0]
+    idx = cmd.index("--effort")
+    assert cmd[idx + 1] == "high"
+
+
+def test_discover_subclauses_excludes_parent_clause(
+    ic, monkeypatch,
+) -> None:
+    """discover_subclauses filters out the parent clause itself."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='{"15": "Processes", "15.1": "General"}\n',
+        stderr="",
+    )
+    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    result = ic.discover_subclauses(Path("/lrm.pdf"), "15")
+    assert "15" not in result
+    assert result == {"15.1": "General"}
 
 
 def test_discover_subclauses_bool_true_is_implementable(

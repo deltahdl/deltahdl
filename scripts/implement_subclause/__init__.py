@@ -156,7 +156,7 @@ def build_prompt(
 # ---------------------------------------------------------------------------
 
 def invoke_claude(
-    prompt: str, *, model: str = "sonnet", continue_session: bool = False,
+    prompt: str, *, model: str = "opus", continue_session: bool = False,
 ) -> None:
     """Launch Claude CLI in print mode with the implementation prompt.
 
@@ -168,6 +168,7 @@ def invoke_claude(
     cmd = [
         "claude", "-p",
         "--model", model,
+        "--effort", "high",
         "--verbose",
         "--output-format", "stream-json",
         "--dangerously-skip-permissions",

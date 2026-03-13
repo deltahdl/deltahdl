@@ -447,8 +447,8 @@ def _call_claude(prompt, schema=None):
     """Call Claude CLI and return parsed JSON response."""
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
-    cmd = ["claude", "-p", "--model", "sonnet", "--output-format", "json",
-           "--allowedTools", "Read"]
+    cmd = ["claude", "-p", "--model", "opus", "--effort", "high",
+           "--output-format", "json", "--allowedTools", "Read"]
     if schema:
         cmd.extend(["--json-schema", schema])
     delays = [5, 10]

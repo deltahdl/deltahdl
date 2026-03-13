@@ -24,7 +24,7 @@ from lib.python.github import (
 
 
 def discover_subclauses(
-    lrm_path: Path, clause: str, *, model: str = "sonnet",
+    lrm_path: Path, clause: str, *, model: str = "opus",
 ) -> dict[str, str]:
     """Discover implementable subclauses by asking Claude.
 
@@ -50,7 +50,7 @@ def discover_subclauses(
     env.pop("CLAUDECODE", None)
 
     result = subprocess.run(
-        ["claude", "-p", "--model", model],
+        ["claude", "-p", "--model", model, "--effort", "high"],
         input=prompt,
         capture_output=True,
         text=True,
@@ -78,6 +78,7 @@ def discover_subclauses(
         elif value is True:
             implementable[key] = key
 
+    implementable.pop(clause, None)
     print(f"Implementable: {list(implementable.keys())}")
     return implementable
 
@@ -180,17 +181,11 @@ def main(argv: list[str] | None = None) -> None:
     impl_items = discover_subclauses(lrm, clause)
 
     if not impl_items:
-        print(f"No subclauses for {clause}; invoking directly.")
-        invoke_implement_subclause(args, clause)
-        close_issue(
-            args.organization, args.repo, args.sub_issue,
-            "all subclauses are implemented",
+        print(
+            f"ERROR: discovery returned no implementable subclauses for {clause}.",
+            file=sys.stderr,
         )
-        mark_master_complete(
-            args.organization, args.repo,
-            args.master_issue, args.sub_issue,
-        )
-        return
+        sys.exit(1)
 
     print(f"Found {len(impl_items)} subclauses for {clause}.")
     _run_subclause_loop(args, impl_items)

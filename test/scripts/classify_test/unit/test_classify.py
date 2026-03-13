@@ -402,6 +402,20 @@ def _capture_claude_cmd(ct, monkeypatch, schema=None):
     return captured_cmd
 
 
+def test_call_claude_uses_opus(ct, monkeypatch):
+    """CLI command includes --model opus."""
+    cmd = _capture_claude_cmd(ct, monkeypatch)
+    idx = cmd.index("--model")
+    assert cmd[idx + 1] == "opus"
+
+
+def test_call_claude_passes_effort_high(ct, monkeypatch):
+    """CLI command includes --effort high."""
+    cmd = _capture_claude_cmd(ct, monkeypatch)
+    idx = cmd.index("--effort")
+    assert cmd[idx + 1] == "high"
+
+
 def test_call_claude_output_format_json(ct, monkeypatch):
     """CLI command includes --output-format json."""
     cmd = _capture_claude_cmd(ct, monkeypatch)

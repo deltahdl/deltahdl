@@ -251,7 +251,7 @@ def _run_prompt_and_capture(isc, tmp_path):
     build_fn = MagicMock(return_value="generated prompt")
     args = argparse.Namespace(
         lrm=lrm, subclause="4.1", issue=6,
-        model="sonnet", continue_session=False,
+        model="opus", continue_session=False,
     )
     with patch("implement_subclause.invoke_claude") as mock_invoke:
         isc.run_prompt(build_fn, args)
@@ -284,7 +284,15 @@ def test_run_prompt_passes_continue_session(mock_invoke, isc, tmp_path):
     build_fn = MagicMock(return_value="generated prompt")
     args = argparse.Namespace(
         lrm=lrm, subclause="4.1", issue=6,
-        model="sonnet", continue_session=True,
+        model="opus", continue_session=True,
     )
     isc.run_prompt(build_fn, args)
     assert mock_invoke.call_args[1]["continue_session"] is True
+
+
+def test_invoke_claude_passes_effort_high(isc, popen_ok):
+    """invoke_claude includes --effort high in the CLI command."""
+    isc.invoke_claude("test prompt", model="opus")
+    cmd = popen_ok.call_args[0][0]
+    idx = cmd.index("--effort")
+    assert cmd[idx + 1] == "high"
