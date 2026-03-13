@@ -21,10 +21,12 @@ struct SemaphoreObject {
   explicit SemaphoreObject(int32_t initial_keys = 0)
       : key_count(initial_keys) {}
 
-  // section 15.3.2: Add keys. Returns void; wakes waiters if possible.
-  void Put(int32_t count = 1) {
+  // §15.3.2: Return keys. Returns false if count is negative (error).
+  bool Put(int32_t count = 1) {
+    if (count < 0) return false;
     key_count += count;
     WakeWaiters();
+    return true;
   }
 
   // section 15.3.3: Non-blocking get. Returns 1 on success, 0 on failure.
