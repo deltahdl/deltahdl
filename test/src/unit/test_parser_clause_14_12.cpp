@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection14, DefaultClockingNegedge) {
+TEST(DefaultClockingParse, InlineWithNegedge) {
   auto r = Parse(
       "module m;\n"
       "  default clocking cb @(negedge clk);\n"
@@ -21,7 +21,7 @@ TEST(ParserSection14, DefaultClockingNegedge) {
   ASSERT_EQ(item->clocking_signals.size(), 2u);
 }
 
-TEST(ParserSection14, DefaultClockingEndLabel) {
+TEST(DefaultClockingParse, EndLabel) {
   auto r = Parse(
       "module m;\n"
       "  default clocking bus @(posedge clk);\n"
@@ -34,7 +34,7 @@ TEST(ParserSection14, DefaultClockingEndLabel) {
   EXPECT_EQ(item->name, "bus");
 }
 
-TEST(ParserSection14, DefaultClockingUnnamedMultipleSignals) {
+TEST(DefaultClockingParse, UnnamedWithMultipleSignals) {
   auto r = Parse(
       "module m;\n"
       "  default clocking @(posedge clk);\n"
@@ -49,7 +49,7 @@ TEST(ParserSection14, DefaultClockingUnnamedMultipleSignals) {
   ASSERT_EQ(item->clocking_signals.size(), 3u);
 }
 
-TEST(ParserA611, DefaultClockingReference) {
+TEST(DefaultClockingParse, ReferenceForm) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -59,9 +59,19 @@ TEST(ParserA611, DefaultClockingReference) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  bool found_ref = false;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kClockingBlock &&
+        item->is_default_clocking && item->clocking_event.empty()) {
+      EXPECT_EQ(item->name, "cb");
+      found_ref = true;
+    }
+  }
+  EXPECT_TRUE(found_ref);
 }
 
-TEST(SourceText, DefaultClockingAsModuleItem) {
+TEST(DefaultClockingParse, AsModuleItem) {
   auto r = Parse(
       "module m;\n"
       "  default clocking cb @(posedge clk);\n"
@@ -74,7 +84,7 @@ TEST(SourceText, DefaultClockingAsModuleItem) {
   EXPECT_TRUE(r.cu->modules[0]->items[0]->is_default_clocking);
 }
 
-TEST(ParserSection19, DefaultClocking_InlineDecl) {
+TEST(DefaultClockingParse, InlineInoutDirection) {
   auto r = Parse(
       "module t;\n"
       "  default clocking bus @(posedge clk);\n"
@@ -89,7 +99,7 @@ TEST(ParserSection19, DefaultClocking_InlineDecl) {
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
 }
 
-TEST(ParserSection19, DefaultClocking_Unnamed) {
+TEST(DefaultClockingParse, UnnamedInline) {
   auto r = Parse(
       "module t;\n"
       "  default clocking @(posedge clk);\n"
@@ -102,7 +112,7 @@ TEST(ParserSection19, DefaultClocking_Unnamed) {
   EXPECT_TRUE(item->name.empty());
 }
 
-TEST(ParserSection19, DefaultClocking_SeparateStatement) {
+TEST(DefaultClockingParse, SeparateReferenceStatement) {
   auto r = Parse(
       "module t;\n"
       "  clocking busA @(posedge clk1);\n"
@@ -111,7 +121,6 @@ TEST(ParserSection19, DefaultClocking_SeparateStatement) {
       "  default clocking busA;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-
   auto& items = r.cu->modules[0]->items;
   bool found_ref = false;
   for (auto* item : items) {
@@ -124,7 +133,7 @@ TEST(ParserSection19, DefaultClocking_SeparateStatement) {
   EXPECT_TRUE(found_ref);
 }
 
-TEST(ParserA611, ClockingDeclDefault) {
+TEST(DefaultClockingParse, NamedWithIsDefaultAndNotGlobal) {
   auto r = Parse(
       "module m;\n"
       "  default clocking cb @(posedge clk);\n"
@@ -140,22 +149,7 @@ TEST(ParserA611, ClockingDeclDefault) {
   EXPECT_EQ(item->name, "cb");
 }
 
-TEST(ParserA611, ClockingDeclUnnamed) {
-  auto r = Parse(
-      "module m;\n"
-      "  default clocking @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_default_clocking);
-  EXPECT_TRUE(item->name.empty());
-}
-
-TEST(ParserSection19, DefaultClocking_InInterface) {
+TEST(DefaultClockingParse, InInterface) {
   EXPECT_TRUE(
       ParseOk("interface my_if (input clk);\n"
               "  logic [7:0] data;\n"
@@ -165,32 +159,35 @@ TEST(ParserSection19, DefaultClocking_InInterface) {
               "endinterface\n"));
 }
 
-}  // namespace
-TEST(DefaultClocking, DefaultClocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
-      "    input data;\n"
-      "  endclocking\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_default_clocking);
-  EXPECT_FALSE(item->is_global_clocking);
+TEST(DefaultClockingParse, InProgram) {
+  EXPECT_TRUE(
+      ParseOk("program test(input logic clk);\n"
+              "  default clocking cb @(posedge clk);\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "endprogram\n"));
 }
 
-TEST(UnnamedDefaultClocking, UnnamedDefaultClocking) {
+TEST(DefaultClockingParse, DuplicateDefaultClockingParses) {
   auto r = Parse(
       "module m;\n"
-      "  default clocking @(posedge clk);\n"
-      "    input data;\n"
+      "  default clocking cb1 @(posedge clk1);\n"
+      "    input a;\n"
+      "  endclocking\n"
+      "  default clocking cb2 @(posedge clk2);\n"
+      "    input b;\n"
       "  endclocking\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FindClockingBlockByIndex(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_default_clocking);
-  EXPECT_TRUE(item->name.empty());
+  // Parser should accept it; elaborator rejects duplicates.
+  auto& items = r.cu->modules[0]->items;
+  size_t default_count = 0;
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kClockingBlock &&
+        item->is_default_clocking)
+      ++default_count;
+  }
+  EXPECT_EQ(default_count, 2u);
 }
+
+}  // namespace

@@ -851,4 +851,20 @@ void Elaborator::ValidateCycleDelayDefaultClocking(const ModuleDecl* decl) {
   }
 }
 
+// §14.12: At most one default clocking per module/interface/program/checker.
+void Elaborator::ValidateDuplicateDefaultClocking(const ModuleDecl* decl) {
+  const ModuleItem* first_default = nullptr;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kClockingBlock &&
+        item->is_default_clocking) {
+      if (first_default) {
+        diag_.Error(item->loc,
+                    "only one default clocking block is allowed per scope");
+        return;
+      }
+      first_default = item;
+    }
+  }
+}
+
 }  // namespace delta
