@@ -177,4 +177,19 @@ TEST(InterfaceClassExtends, MultipleBaseInterfaceClasses) {
              "endmodule\n"));
 }
 
+TEST(InterfaceClassMultipleExtends, DisjointMethodsOk) {
+  EXPECT_TRUE(
+      ElabOk("interface class A;\n"
+             "  pure virtual function void fa();\n"
+             "endclass\n"
+             "interface class B;\n"
+             "  pure virtual function void fb();\n"
+             "endclass\n"
+             "interface class C extends A, B;\n"
+             "  pure virtual function void fc();\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 }  // namespace
