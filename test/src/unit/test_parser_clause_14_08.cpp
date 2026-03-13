@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection19, ClockingBlockScope_ProgramAccess) {
+TEST(MultiBlockExampleParse, ProgramWithTwoClockingBlocks) {
   EXPECT_TRUE(
       ParseOk("program test_prog(\n"
               "  input phi1, input [15:0] data, output logic write,\n"
@@ -26,8 +26,7 @@ TEST(ParserSection19, ClockingBlockScope_ProgramAccess) {
               "endprogram\n"));
 }
 
-}  // namespace
-TEST(MultipleClockingBlocks, MultipleClockingBlocks) {
+TEST(MultiBlockExampleParse, TwoBlocksFoundByIndex) {
   auto r = Parse(
       "module m;\n"
       "  clocking cd1 @(posedge phi1);\n"
@@ -45,3 +44,33 @@ TEST(MultipleClockingBlocks, MultipleClockingBlocks) {
   EXPECT_EQ(cb1->name, "cd1");
   EXPECT_EQ(cb2->name, "cd2");
 }
+
+TEST(MultiBlockExampleParse, TopModuleWithDutInstantiation) {
+  EXPECT_TRUE(
+      ParseOk("module top;\n"
+              "  logic phi1, phi2;\n"
+              "  wire [8:1] cmd;\n"
+              "  logic [15:0] data;\n"
+              "endmodule\n"));
+}
+
+TEST(MultiBlockExampleParse, ProgramAssignStatement) {
+  EXPECT_TRUE(
+      ParseOk("program p(\n"
+              "  input phi1, input [15:0] data, output logic write,\n"
+              "  input phi2, inout [8:1] cmd, input enable\n"
+              ");\n"
+              "  reg [8:1] cmd_reg;\n"
+              "  clocking cd1 @(posedge phi1);\n"
+              "    input data;\n"
+              "    output write;\n"
+              "  endclocking\n"
+              "  clocking cd2 @(posedge phi2);\n"
+              "    input #2 output #4ps cmd;\n"
+              "    input enable;\n"
+              "  endclocking\n"
+              "  assign cmd = enable ? cmd_reg : 'x;\n"
+              "endprogram\n"));
+}
+
+}  // namespace
