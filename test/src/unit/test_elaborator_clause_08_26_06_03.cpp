@@ -23,7 +23,7 @@ TEST(InterfaceClassDiamondInheritance, DiamondInheritanceOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA82663, ClassImplementsDiamondOk) {
+TEST(InterfaceClassDiamond, ClassImplementsDiamondOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfBase;\n"
              "  pure virtual function bit funcBase();\n"
