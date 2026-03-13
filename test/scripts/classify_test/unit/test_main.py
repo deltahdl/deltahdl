@@ -639,6 +639,27 @@ def test_run_live_self_named(tmp_path, monkeypatch, ct, ct_helpers):
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
 
+def _no_rename_classifier(_prompt, schema=None):
+    """Classify single test as non-lrm/aig without renaming."""
+    if schema and "non_lrm_topic" in schema:
+        return {"non_lrm_topic": "aig", "rationale": "r",
+                "suite_name": "S", "test_name": "T"}
+    return {"clause": "non-lrm", "rationale": "r",
+            "suite_name": "S", "test_name": "T"}
+
+
+def test_run_live_self_named_no_rename(tmp_path, monkeypatch, ct, ct_helpers):
+    """Source-is-target with no rename leaves file intact."""
+    monkeypatch.setattr(ct, "_call_claude", _no_rename_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
+    _run_live_non_lrm(
+        ct, tmp_path, monkeypatch,
+        src_body="#include <gtest/gtest.h>\n\n"
+        "TEST(S, T) {\n  auto r = Parse(src);\n}\n",
+    )
+    assert (tmp_path / "test_non_lrm_aig.cpp").exists()
+
+
 _MIXED_BODY = (
     "#include <gtest/gtest.h>\n\n"
     "TEST(S, Stay) {\n  auto r = Parse(src);\n}\n"
