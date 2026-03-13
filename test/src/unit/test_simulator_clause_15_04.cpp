@@ -1,0 +1,101 @@
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string_view>
+
+#include "fixture_simulator.h"
+#include "simulator/awaiters.h"
+#include "simulator/exec_task.h"
+#include "simulator/process.h"
+#include "simulator/stmt_exec.h"
+#include "simulator/stmt_result.h"
+#include "simulator/sync_objects.h"
+
+namespace {
+
+TEST(IpcSync, MailboxTryGetFifoOrder) {
+  MailboxObject mb;
+  mb.TryPut(10);
+  mb.TryPut(20);
+  mb.TryPut(30);
+  uint64_t msg = 0;
+  mb.TryGet(msg);
+  EXPECT_EQ(msg, 10u);
+  mb.TryGet(msg);
+  EXPECT_EQ(msg, 20u);
+  mb.TryGet(msg);
+  EXPECT_EQ(msg, 30u);
+  EXPECT_EQ(mb.Num(), 0);
+}
+
+TEST(IpcSync, MailboxContextCreateFind) {
+  SyncFixture f;
+  auto* mb = f.ctx.CreateMailbox("mbox1", 10);
+  ASSERT_NE(mb, nullptr);
+  EXPECT_EQ(mb->bound, 10);
+
+  auto* found = f.ctx.FindMailbox("mbox1");
+  EXPECT_EQ(found, mb);
+
+  auto* not_found = f.ctx.FindMailbox("no_such_mbox");
+  EXPECT_EQ(not_found, nullptr);
+}
+
+TEST(IpcSync, MailboxMultipleGetPutCycles) {
+  MailboxObject mb;
+  for (uint64_t i = 0; i < 100; ++i) {
+    mb.TryPut(i);
+  }
+  EXPECT_EQ(mb.Num(), 100);
+  for (uint64_t i = 0; i < 100; ++i) {
+    uint64_t msg = 0;
+    EXPECT_EQ(mb.TryGet(msg), 0);
+    EXPECT_EQ(msg, i);
+  }
+  EXPECT_EQ(mb.Num(), 0);
+}
+
+TEST(IpcSync, MailboxIsFullBounded) {
+  MailboxObject mb(2);
+  EXPECT_FALSE(mb.IsFull());
+  mb.TryPut(1);
+  EXPECT_FALSE(mb.IsFull());
+  mb.TryPut(2);
+  EXPECT_TRUE(mb.IsFull());
+}
+
+TEST(IpcSync, MailboxIsFullUnbounded) {
+  MailboxObject mb;
+  EXPECT_FALSE(mb.IsFull());
+  for (int i = 0; i < 1000; ++i) {
+    mb.TryPut(static_cast<uint64_t>(i));
+  }
+  EXPECT_FALSE(mb.IsFull());
+}
+
+TEST(IpcSync, MailboxParameterizedTypeValues) {
+  MailboxObject mb;
+
+  mb.TryPut(0xDEADBEEF);
+  mb.TryPut(0xCAFEBABE);
+  uint64_t msg = 0;
+  mb.TryGet(msg);
+  EXPECT_EQ(msg, 0xDEADBEEFu);
+  mb.TryGet(msg);
+  EXPECT_EQ(msg, 0xCAFEBABEu);
+}
+
+TEST(IpcSync, MultipleMailboxesInContext) {
+  SyncFixture f;
+  auto* mb1 = f.ctx.CreateMailbox("m1", 0);
+  auto* mb2 = f.ctx.CreateMailbox("m2", 3);
+  mb1->TryPut(100);
+  mb2->TryPut(200);
+  uint64_t msg = 0;
+  mb1->TryGet(msg);
+  EXPECT_EQ(msg, 100u);
+  mb2->TryGet(msg);
+  EXPECT_EQ(msg, 200u);
+}
+
+}  // namespace
