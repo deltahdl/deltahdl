@@ -111,7 +111,7 @@ TEST(InterfaceClassImplements, MissingPureVirtualImplementation) {
              "endmodule\n"));
 }
 
-TEST(ElabA82661, InheritedMethodSatisfiesInterfaceOk) {
+TEST(InterfaceClassImplements, InheritedMethodSatisfiesInterfaceOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfClass;\n"
              "  pure virtual function bit funcBase();\n"
