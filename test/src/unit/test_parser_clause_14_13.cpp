@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection14, InputSamplingBasic) {
+TEST(InputSamplingParse, BasicInputSignal) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(negedge clk);\n"
@@ -20,7 +20,7 @@ TEST(ParserSection14, InputSamplingBasic) {
   EXPECT_EQ(item->clocking_signals[0].skew_delay, nullptr);
 }
 
-TEST(ParserSection14, InputSamplingExplicitZeroSkew) {
+TEST(InputSamplingParse, ExplicitZeroSkew) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -36,7 +36,7 @@ TEST(ParserSection14, InputSamplingExplicitZeroSkew) {
   EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserSection19, ClockingBlockEvent_DotAccess) {
+TEST(InputSamplingParse, ClockvarDotAccess) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking cb @(negedge clk);\n"
@@ -44,6 +44,52 @@ TEST(ParserSection19, ClockingBlockEvent_DotAccess) {
               "  endclocking\n"
               "  always @(cb) $display(cb.v);\n"
               "endmodule\n"));
+}
+
+TEST(InputSamplingParse, InoutSignalHasInputAspect) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    inout data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
+  EXPECT_EQ(item->clocking_signals[0].name, "data");
+}
+
+TEST(InputSamplingParse, MultipleInputSignals) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input a, b, c;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 3u);
+  EXPECT_EQ(item->clocking_signals[0].name, "a");
+  EXPECT_EQ(item->clocking_signals[1].name, "b");
+  EXPECT_EQ(item->clocking_signals[2].name, "c");
+  for (size_t i = 0; i < 3; ++i) {
+    EXPECT_EQ(item->clocking_signals[i].direction, Direction::kInput);
+  }
+}
+
+TEST(InputSamplingParse, ExplicitNonZeroInputSkew) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #2ns data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ModuleItem* item = nullptr;
+  ASSERT_NO_FATAL_FAILURE(GetClockingBlockChecked(r, item));
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
+  ASSERT_NE(item->clocking_signals[0].skew_delay, nullptr);
 }
 
 }  // namespace

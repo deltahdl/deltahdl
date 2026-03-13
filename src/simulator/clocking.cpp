@@ -57,14 +57,16 @@ static bool CheckClockEdge(Variable* clk_var, Edge edge) {
   return prev != cur;  // Edge::kNone means any change.
 }
 
-// Sample all input signals for a clocking block.
+// Sample input signals for a clocking block, optionally filtering by #0 skew.
 static void SampleBlockInputs(ClockingManager* mgr, const std::string& name,
                               const std::vector<ClockingSignal>& signals,
-                              SimContext& ctx) {
+                              SimContext& ctx, bool only_zero_skew) {
   for (const auto& sig : signals) {
     bool is_input = (sig.direction == ClockingDir::kInput ||
                      sig.direction == ClockingDir::kInout);
     if (!is_input) continue;
+    if (only_zero_skew && !sig.is_explicit_zero_skew) continue;
+    if (!only_zero_skew && sig.is_explicit_zero_skew) continue;
     auto* var = ctx.FindVariable(sig.signal_name);
     if (!var) continue;
     mgr->SampleInput(name, sig.signal_name, var->value.ToUint64());
@@ -85,11 +87,16 @@ static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
           if (blk) RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched);
           return true;
         }
-        SampleBlockInputs(mgr, block_name, signals, ctx);
-        // §14.10: Clocking block event fires in the Observed region.
+        // §14.13: Non-#0 inputs sampled in Active (Postponed of prior step).
+        SampleBlockInputs(mgr, block_name, signals, ctx,
+                          /*only_zero_skew=*/false);
+        // §14.10/§14.13: Observed region — sample #0 inputs, then fire event.
         auto* ev = sched.GetEventPool().Acquire();
         auto bn_copy = block_name;
-        ev->callback = [mgr, bn_copy]() {
+        auto sigs_copy = signals;
+        ev->callback = [mgr, bn_copy, sigs_copy, &ctx]() {
+          SampleBlockInputs(mgr, bn_copy, sigs_copy, ctx,
+                            /*only_zero_skew=*/true);
           mgr->NotifyBlockEvent(bn_copy);
           mgr->InvokeEdgeCallbacks(bn_copy);
         };

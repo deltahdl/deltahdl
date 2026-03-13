@@ -35,6 +35,7 @@ struct ClockingSignal {
   std::string_view signal_name;
   ClockingDir direction = ClockingDir::kInput;
   SimTime skew{0};
+  bool is_explicit_zero_skew = false;  // §14.13: explicit #0 input skew
 };
 
 // =============================================================================
