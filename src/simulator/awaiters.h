@@ -11,6 +11,7 @@
 #include "simulator/scheduler.h"
 #include "simulator/clocking.h"
 #include "simulator/sim_context.h"
+#include "simulator/sync_objects.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -210,6 +211,24 @@ struct CycleDelayAwaiter {
             h.resume();
           }
         });
+  }
+
+  void await_resume() const noexcept {}
+};
+
+// §15.3.3: Awaiter for semaphore get(). Suspends the coroutine when
+// insufficient keys are available; resumes when Put() adds enough keys.
+struct SemaphoreGetAwaiter {
+  SemaphoreObject& sem;
+  int32_t count;
+
+  bool await_ready() {
+    auto status = sem.Get(count);
+    return status != SemGetStatus::kBlock;
+  }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    sem.waiters.push_back({count, h});
   }
 
   void await_resume() const noexcept {}

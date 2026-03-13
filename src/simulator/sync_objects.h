@@ -14,6 +14,8 @@ namespace delta {
 // A counting semaphore for interprocess synchronization.
 // Processes block on get() when insufficient keys are available.
 
+enum class SemGetStatus : uint8_t { kAcquired, kBlock, kError };
+
 struct SemaphoreObject {
   int32_t key_count = 0;
   std::vector<std::pair<int32_t, std::coroutine_handle<>>> waiters;
@@ -29,7 +31,19 @@ struct SemaphoreObject {
     return true;
   }
 
-  // section 15.3.3: Non-blocking get. Returns 1 on success, 0 on failure.
+  // §15.3.3: Blocking get. Reduces key_count if enough keys are available.
+  // Returns kAcquired on success, kBlock if caller must suspend, kError
+  // if count is negative.
+  SemGetStatus Get(int32_t count = 1) {
+    if (count < 0) return SemGetStatus::kError;
+    if (key_count >= count) {
+      key_count -= count;
+      return SemGetStatus::kAcquired;
+    }
+    return SemGetStatus::kBlock;
+  }
+
+  // §15.3.4: Non-blocking get. Returns 1 on success, 0 on failure.
   int32_t TryGet(int32_t count = 1) {
     if (key_count >= count) {
       key_count -= count;
