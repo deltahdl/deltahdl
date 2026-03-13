@@ -5,41 +5,39 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection14, ClockingBlockEventAlwaysAt) {
+TEST(ClockingBlockEventParse, AlwaysAtBlockName) {
   auto r = Parse(
       "module foo(input phi1, input [7:0] data);\n"
       "  clocking dram @(posedge phi1);\n"
       "    input data;\n"
       "  endclocking\n"
       "  always @(dram)\n"
-      "    $display(\"clocking block event\");\n"
+      "    $display(\"triggered\");\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.cu->modules.empty());
   auto* item = FindClockingBlock(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "dram");
-
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-TEST(ParserSection14, ClockingBlockEventWithPosedgeAlways) {
+TEST(ClockingBlockEventParse, PosedgeAndBlockEventCoexist) {
   auto r = Parse(
       "module m;\n"
       "  clocking dram @(posedge phi1);\n"
       "    input data;\n"
       "  endclocking\n"
-      "  always @(posedge phi1) $display(\"clocking event\");\n"
-      "  always @(dram) $display(\"clocking block event\");\n"
+      "  always @(posedge phi1) $display(\"clock\");\n"
+      "  always @(dram) $display(\"block event\");\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* item = FindClockingBlock(r);
   ASSERT_NE(item, nullptr);
-
   EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-TEST(ParserSection14, ClockingBlockEventMultipleInputs) {
+TEST(ClockingBlockEventParse, BlockEventWithMultipleSignals) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -54,30 +52,7 @@ TEST(ParserSection14, ClockingBlockEventMultipleInputs) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-TEST(ParserSection19, ClockingBlockEvent_AlwaysAt) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking dram @(posedge phi1);\n"
-              "    input data;\n"
-              "  endclocking\n"
-              "  always @(dram)\n"
-              "    $display(\"clocking block event\");\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection19, ClockingBlockEvent_BothTriggers) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  clocking dram @(posedge phi1);\n"
-              "    input data;\n"
-              "    output negedge #1 address;\n"
-              "  endclocking\n"
-              "  always @(posedge phi1) $display(\"clocking event\");\n"
-              "  always @(dram) $display(\"clocking block event\");\n"
-              "endmodule\n"));
-}
-
-TEST(ParserSection19, ClockingBlockEvent_InitialBlock) {
+TEST(ClockingBlockEventParse, InitialBlockWaitsOnBlockEvent) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking cb @(posedge clk);\n"
@@ -87,6 +62,18 @@ TEST(ParserSection19, ClockingBlockEvent_InitialBlock) {
               "    @(cb);\n"
               "    $display(cb.v);\n"
               "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ClockingBlockEventParse, OutputNegedgeWithBlockEvent) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  clocking dram @(posedge phi1);\n"
+              "    input data;\n"
+              "    output negedge #1 address;\n"
+              "  endclocking\n"
+              "  always @(posedge phi1) $display(\"clock\");\n"
+              "  always @(dram) $display(\"block event\");\n"
               "endmodule\n"));
 }
 

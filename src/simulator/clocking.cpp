@@ -86,8 +86,14 @@ static void RegisterClockWatcher(ClockingManager* mgr, Variable* clk_var,
           return true;
         }
         SampleBlockInputs(mgr, block_name, signals, ctx);
-        mgr->NotifyBlockEvent(block_name);
-        mgr->InvokeEdgeCallbacks(block_name);
+        // §14.10: Clocking block event fires in the Observed region.
+        auto* ev = sched.GetEventPool().Acquire();
+        auto bn_copy = block_name;
+        ev->callback = [mgr, bn_copy]() {
+          mgr->NotifyBlockEvent(bn_copy);
+          mgr->InvokeEdgeCallbacks(bn_copy);
+        };
+        sched.ScheduleEvent(sched.CurrentTime(), Region::kObserved, ev);
         auto* blk = mgr->Find(block_name);
         if (blk) RegisterClockWatcher(mgr, clk_var, *blk, ctx, sched);
         return true;
