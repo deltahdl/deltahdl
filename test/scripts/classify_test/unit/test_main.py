@@ -647,7 +647,7 @@ def test_run_prints_action_kept(tmp_path, monkeypatch, capsys, ct, ct_helpers):
         src_body="#include <gtest/gtest.h>\n\n"
         "TEST(S, T) {\n  auto r = Parse(src);\n}\n",
     )
-    assert "Action: Kept in the same file without any changes" in capsys.readouterr().out
+    assert "Action: Kept in the same file but suite renamed to AigGraph" in capsys.readouterr().out
 
 
 def test_run_live_self_named(tmp_path, monkeypatch, ct, ct_helpers):

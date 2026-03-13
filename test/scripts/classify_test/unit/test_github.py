@@ -396,7 +396,7 @@ def test_maybe_update_renamed_kept_uses_but(
     updated = _setup_renamed_update(
         monkeypatch, ct_github, ct_helpers, source_is_target=True,
     )
-    assert "Kept in the same file without any changes but renamed to NewName" in updated[0]
+    assert "Kept in the same file but renamed to NewName" in updated[0]
 
 
 def test_maybe_update_renamed_and_moved_uses_and(
@@ -452,7 +452,7 @@ def test_build_action_remark_kept_and_renamed(ct_github, ct_helpers):
     result = ct_github.build_action_remark(
         t, source_is_target=True,
     )
-    assert result == "Kept in the same file without any changes but renamed to NewName"
+    assert result == "Kept in the same file but renamed to NewName"
 
 
 def test_build_action_remark_moved_and_renamed(ct_github, ct_helpers):
@@ -486,3 +486,70 @@ def test_build_action_remark_renamed_only(ct_github, ct_helpers):
         t, source_is_target=False,
     )
     assert result == "renamed to NewName"
+
+
+def test_build_action_remark_kept_suite_renamed(ct_github, ct_helpers):
+    """Returns 'Kept ... but suite renamed ...' when suite changed."""
+    t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
+    t.original_suite_name = "OldSuite"
+    t.suite_name = "NewSuite"
+    result = ct_github.build_action_remark(
+        t, source_is_target=True,
+    )
+    assert result == "Kept in the same file but suite renamed to NewSuite"
+
+
+def test_build_action_remark_kept_both_renamed(ct_github, ct_helpers):
+    """Returns 'Kept ... but suite renamed ..., renamed ...' for both."""
+    t = ct_helpers.make_test_block(
+        "NewName", prefix="test_parser_", clause="6.1",
+    )
+    t.original_test_name = "OldName"
+    t.original_suite_name = "OldSuite"
+    t.suite_name = "NewSuite"
+    result = ct_github.build_action_remark(
+        t, source_is_target=True,
+    )
+    assert result == (
+        "Kept in the same file but suite renamed to NewSuite,"
+        " renamed to NewName"
+    )
+
+
+def test_build_action_remark_moved_suite_renamed(ct_github, ct_helpers):
+    """Returns 'Moved ... and suite renamed ...' when moved + suite change."""
+    t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
+    t.original_suite_name = "OldSuite"
+    t.suite_name = "NewSuite"
+    result = ct_github.build_action_remark(
+        t, source_is_target=False, target_filename="foo.cpp",
+    )
+    assert result == "Moved to foo.cpp and suite renamed to NewSuite"
+
+
+def test_build_action_remark_moved_both_renamed(ct_github, ct_helpers):
+    """Returns 'Moved ... and suite renamed ..., renamed ...' for both."""
+    t = ct_helpers.make_test_block(
+        "NewName", prefix="test_parser_", clause="6.1",
+    )
+    t.original_test_name = "OldName"
+    t.original_suite_name = "OldSuite"
+    t.suite_name = "NewSuite"
+    result = ct_github.build_action_remark(
+        t, source_is_target=False, target_filename="foo.cpp",
+    )
+    assert result == (
+        "Moved to foo.cpp and suite renamed to NewSuite,"
+        " renamed to NewName"
+    )
+
+
+def test_build_action_remark_suite_renamed_only(ct_github, ct_helpers):
+    """Returns 'suite renamed ...' when only suite changed, no location."""
+    t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
+    t.original_suite_name = "OldSuite"
+    t.suite_name = "NewSuite"
+    result = ct_github.build_action_remark(
+        t, source_is_target=False,
+    )
+    assert result == "suite renamed to NewSuite"

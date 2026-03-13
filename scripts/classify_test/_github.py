@@ -35,20 +35,31 @@ def update_test_status(body, test_name, status, *, remark=""):
 
 def build_action_remark(test, *, source_is_target, target_filename=None):
     """Build a human-readable action remark for a classified test."""
-    orig = getattr(test, "original_test_name", None)
-    renamed = orig is not None and orig != test.test_name
-    parts = []
+    orig_test = getattr(test, "original_test_name", None)
+    test_renamed = orig_test is not None and orig_test != test.test_name
+    orig_suite = getattr(test, "original_suite_name", None)
+    suite_renamed = (
+        orig_suite is not None and orig_suite != test.suite_name
+    )
+    location = ""
     if source_is_target:
-        parts.append("Kept in the same file without any changes")
+        if not test_renamed and not suite_renamed:
+            return "Kept in the same file without any changes"
+        location = "Kept in the same file"
     elif target_filename:
-        parts.append(f"Moved to {target_filename}")
-    if renamed:
-        parts.append(f"renamed to {test.test_name}")
-    if len(parts) == 2:
+        location = f"Moved to {target_filename}"
+    changes = []
+    if suite_renamed:
+        changes.append(f"suite renamed to {test.suite_name}")
+    if test_renamed:
+        changes.append(f"renamed to {test.test_name}")
+    if location and changes:
         joiner = " but " if source_is_target else " and "
-        return parts[0] + joiner + parts[1]
-    if parts:
-        return parts[0]
+        return location + joiner + ", ".join(changes)
+    if location:
+        return location
+    if changes:
+        return ", ".join(changes)
     return ""
 
 
