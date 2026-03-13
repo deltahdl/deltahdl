@@ -21,20 +21,13 @@ struct SemaphoreObject {
   explicit SemaphoreObject(int32_t initial_keys = 0)
       : key_count(initial_keys) {}
 
-  // §15.3.2: Add keys and wake waiters.
+  // section 15.3.2: Add keys. Returns void; wakes waiters if possible.
   void Put(int32_t count = 1) {
     key_count += count;
     WakeWaiters();
   }
 
-  // §15.3.2: Validated put. Returns false if count is negative.
-  bool PutChecked(int32_t count) {
-    if (count < 0) return false;
-    Put(count);
-    return true;
-  }
-
-  // §15.3.4: Non-blocking get. Returns 1 on success, 0 on failure.
+  // section 15.3.3: Non-blocking get. Returns 1 on success, 0 on failure.
   int32_t TryGet(int32_t count = 1) {
     if (key_count >= count) {
       key_count -= count;
@@ -43,23 +36,18 @@ struct SemaphoreObject {
     return 0;
   }
 
-  // §15.3.3: Check if enough keys are available for a blocking get.
-  bool CanGet(int32_t count = 1) const {
-    return key_count >= count;
-  }
-
-  // §15.3.3: Register a waiter for blocking get (FIFO order).
-  void AddWaiter(int32_t count, std::coroutine_handle<> h) {
-    waiters.emplace_back(count, h);
-  }
-
-  // §15.3.3: Wake waiters in strict FIFO order.
+  // Wake waiters whose key requests can now be satisfied.
   void WakeWaiters() {
-    while (!waiters.empty() && key_count >= waiters.front().first) {
-      key_count -= waiters.front().first;
-      auto h = waiters.front().second;
-      waiters.erase(waiters.begin());
-      h.resume();
+    auto it = waiters.begin();
+    while (it != waiters.end()) {
+      if (key_count >= it->first) {
+        key_count -= it->first;
+        auto h = it->second;
+        it = waiters.erase(it);
+        h.resume();
+      } else {
+        ++it;
+      }
     }
   }
 };
@@ -76,59 +64,42 @@ struct MailboxObject {
 
   explicit MailboxObject(int32_t b = 0) : bound(b) {}
 
-  // §15.4.2: Number of messages.
+  // section 15.4.2: Number of messages.
   int32_t Num() const { return static_cast<int32_t>(messages.size()); }
 
-  // §15.4.4: Non-blocking put. Returns positive on success, 0 if full.
+  // section 15.4.3: Non-blocking put. Returns 0 on success, -1 if full.
   int32_t TryPut(uint64_t msg) {
-    if (bound > 0 && Num() >= bound) return 0;
+    if (bound > 0 && Num() >= bound) return -1;
     messages.push_back(msg);
     WakeGetWaiters();
-    return 1;
+    return 0;
   }
 
-  // §15.4.6: Non-blocking get. Returns positive on success, 0 if empty.
+  // section 15.4.4: Non-blocking get. Returns 0 on success, -1 if empty.
   int32_t TryGet(uint64_t& msg) {
-    if (messages.empty()) return 0;
+    if (messages.empty()) return -1;
     msg = messages.front();
     messages.pop_front();
     WakePutWaiters();
-    return 1;
+    return 0;
   }
 
-  // §15.4.8: Non-blocking peek. Returns positive on success, 0 if empty.
+  // section 15.4.5: Non-blocking peek. Returns 0 on success, -1 if empty.
   int32_t TryPeek(uint64_t& msg) {
-    if (messages.empty()) return 0;
+    if (messages.empty()) return -1;
     msg = messages.front();
-    return 1;
+    return 0;
   }
 
   bool IsFull() const { return bound > 0 && Num() >= bound; }
-  bool IsEmpty() const { return messages.empty(); }
 
-  // §15.4.3: Register a waiter for blocking put on full bounded queue.
-  void AddPutWaiter(std::coroutine_handle<> h) {
-    put_waiters.push_back(h);
-  }
-
-  // §15.4.5: Register a waiter for blocking get on empty queue.
-  void AddGetWaiter(std::coroutine_handle<> h) {
-    get_waiters.push_back(h);
-  }
-
-  // §15.4.7: Register a waiter for blocking peek on empty queue.
-  void AddPeekWaiter(std::coroutine_handle<> h) {
-    peek_waiters.push_back(h);
-  }
-
-  // §15.4.5: Wake get/peek waiters when a message arrives.
   void WakeGetWaiters() {
     if (messages.empty()) return;
-    // Wake all peek waiters first (they don't consume).
+    // Wake peek waiters first (they don't consume).
     auto peeks = std::move(peek_waiters);
     peek_waiters.clear();
     for (auto h : peeks) h.resume();
-    // Wake one get waiter (FIFO).
+    // Wake one get waiter.
     if (!get_waiters.empty() && !messages.empty()) {
       auto h = get_waiters.front();
       get_waiters.erase(get_waiters.begin());
@@ -136,7 +107,6 @@ struct MailboxObject {
     }
   }
 
-  // §15.4.3: Wake one put waiter when space becomes available.
   void WakePutWaiters() {
     if (IsFull()) return;
     if (!put_waiters.empty()) {
