@@ -709,6 +709,34 @@ static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
   return StmtResult::kDone;
 }
 
+// --- Nonblocking event trigger (->>ev, §15.5.1) ---
+
+static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
+  if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier) {
+    return StmtResult::kDone;
+  }
+  auto* var = ctx.FindVariable(stmt->expr->text);
+  if (!var) return StmtResult::kDone;
+  // §15.5.1: Schedule trigger in the NBA region.
+  auto event_name = stmt->expr->text;
+  auto& sched = ctx.GetScheduler();
+  auto* event = sched.GetEventPool().Acquire();
+  event->callback = [var, event_name, &ctx]() {
+    ctx.SetEventTriggered(event_name);
+    auto pending = std::move(var->watchers);
+    var->watchers.clear();
+    auto& s = ctx.GetScheduler();
+    for (auto& cb : pending) {
+      auto* ev = s.GetEventPool().Acquire();
+      ev->callback = std::move(cb);
+      s.ScheduleEvent(ctx.CurrentTime(), Region::kActive, ev);
+    }
+    return true;
+  };
+  sched.ScheduleEvent(ctx.CurrentTime(), Region::kNBA, event);
+  return StmtResult::kDone;
+}
+
 // --- Wait (IEEE §9.4.3) ---
 
 static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -860,6 +888,8 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return ExecWait(stmt, ctx, arena);
     case StmtKind::kEventTrigger:
       return ExecTask::Immediate(ExecEventTriggerImpl(stmt, ctx));
+    case StmtKind::kNbEventTrigger:
+      return ExecTask::Immediate(ExecNbEventTriggerImpl(stmt, ctx));
     case StmtKind::kTimingControl:
     case StmtKind::kDisable:
     case StmtKind::kDisableFork:
