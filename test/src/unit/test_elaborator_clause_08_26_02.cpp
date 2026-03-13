@@ -100,7 +100,7 @@ TEST(InterfaceClassImplements, ClassImplementsMultipleInterfaces) {
              "endmodule\n"));
 }
 
-TEST(ElabA8262, ClassMissingImplementationError) {
+TEST(InterfaceClassImplements, MissingPureVirtualImplementation) {
   EXPECT_FALSE(
       ElabOk("interface class IC;\n"
              "  pure virtual function void foo();\n"
