@@ -750,9 +750,21 @@ def _stub_github(monkeypatch, cf, body):
     return updates
 
 
+def _table(*rows):
+    """Build a full issue table body with header and data rows."""
+    header = (
+        "| Suite | Test | Status | Action |\n"
+        "|-------|------|--------|--------|\n"
+    )
+    return header + "\n".join(rows) + "\n"
+
+
 def test_sync_issue_rows_all_unreviewed_no_update(monkeypatch, cf):
-    """Does not call update when all rows are already Unreviewed."""
-    body = "| S | Alpha | Unreviewed | |\n| S | Beta | Unreviewed | |\n"
+    """Does not call update when all rows already match."""
+    body = _table(
+        "| S | Alpha | Unreviewed | |",
+        "| S | Beta | Unreviewed | |",
+    )
     updates = _stub_github(monkeypatch, cf, body)
     cf.sync_issue_rows(_make_args(), [("S", "Alpha"), ("S", "Beta")])
     assert len(updates) == 0
@@ -760,7 +772,10 @@ def test_sync_issue_rows_all_unreviewed_no_update(monkeypatch, cf):
 
 def test_sync_issue_rows_all_unreviewed_returns_empty(monkeypatch, cf):
     """Returns empty set when all rows are Unreviewed."""
-    body = "| S | Alpha | Unreviewed | |\n| S | Beta | Unreviewed | |\n"
+    body = _table(
+        "| S | Alpha | Unreviewed | |",
+        "| S | Beta | Unreviewed | |",
+    )
     _stub_github(monkeypatch, cf, body)
     assert cf.sync_issue_rows(
         _make_args(), [("S", "Alpha"), ("S", "Beta")],
@@ -768,8 +783,8 @@ def test_sync_issue_rows_all_unreviewed_returns_empty(monkeypatch, cf):
 
 
 def test_sync_issue_rows_adds_missing_row(monkeypatch, cf):
-    """Adds an Unreviewed row for a missing test."""
-    body = "| S | Alpha | Unreviewed | |\n"
+    """Rebuilds table with all tests when one is missing."""
+    body = _table("| S | Alpha | Unreviewed | |")
     updates = _stub_github(monkeypatch, cf, body)
     cf.sync_issue_rows(_make_args(), [("S", "Alpha"), ("S", "Beta")])
     assert "| S | Beta | Unreviewed | |" in updates[0]
@@ -777,29 +792,30 @@ def test_sync_issue_rows_adds_missing_row(monkeypatch, cf):
 
 def test_sync_issue_rows_missing_returns_empty(monkeypatch, cf):
     """Returns empty set when only missing tests are added."""
-    body = "| S | Alpha | Unreviewed | |\n"
+    body = _table("| S | Alpha | Unreviewed | |")
     _stub_github(monkeypatch, cf, body)
     assert cf.sync_issue_rows(
         _make_args(), [("S", "Alpha"), ("S", "Beta")],
     ) == set()
 
 
-def test_sync_issue_rows_preserves_other_reviewed(monkeypatch, cf):
-    """Leaves reviewed rows for tests not in test_pairs."""
-    body = (
-        "| S | Other | Reviewed | Kept |\n"
-        "| S | Alpha | Unreviewed | |\n"
+def test_sync_issue_rows_removes_stale_rows(monkeypatch, cf):
+    """Removes rows for tests not in test_pairs."""
+    body = _table(
+        "| S | Other | Reviewed | Kept |",
+        "| S | Alpha | Unreviewed | |",
     )
     updates = _stub_github(monkeypatch, cf, body)
     cf.sync_issue_rows(_make_args(), [("S", "Alpha")])
-    assert len(updates) == 0
+    assert len(updates) == 1
+    assert "Other" not in updates[0]
 
 
 def test_sync_issue_rows_returns_reviewed(monkeypatch, cf):
     """Returns reviewed test names."""
-    body = (
-        "| S | Alpha | Reviewed | Kept |\n"
-        "| S | Beta | Unreviewed | |\n"
+    body = _table(
+        "| S | Alpha | Reviewed | Kept |",
+        "| S | Beta | Unreviewed | |",
     )
     _stub_github(monkeypatch, cf, body)
     result = cf.sync_issue_rows(
@@ -808,11 +824,24 @@ def test_sync_issue_rows_returns_reviewed(monkeypatch, cf):
     assert result == {"Alpha"}
 
 
+def test_sync_issue_rows_preserves_reviewed_status(monkeypatch, cf):
+    """Carries over Reviewed status and action into the rebuilt table."""
+    body = _table(
+        "| S | Alpha | Reviewed | Kept |",
+        "| S | Beta | Unreviewed | |",
+    )
+    updates = _stub_github(monkeypatch, cf, body)
+    cf.sync_issue_rows(
+        _make_args(), [("S", "Alpha"), ("S", "Beta")],
+    )
+    assert len(updates) == 0
+
+
 def test_sync_issue_rows_returns_moved(monkeypatch, cf):
     """Returns moved test names."""
-    body = (
-        "| S | Alpha | Reviewed | Moved to target.cpp |\n"
-        "| S | Beta | Unreviewed | |\n"
+    body = _table(
+        "| S | Alpha | Reviewed | Moved to target.cpp |",
+        "| S | Beta | Unreviewed | |",
     )
     _stub_github(monkeypatch, cf, body)
     result = cf.sync_issue_rows(
@@ -823,7 +852,7 @@ def test_sync_issue_rows_returns_moved(monkeypatch, cf):
 
 def test_sync_issue_rows_mixed_returns_reviewed(monkeypatch, cf):
     """Returns reviewed names when mixed with missing tests."""
-    body = "| S | Alpha | Reviewed | Kept |\n"
+    body = _table("| S | Alpha | Reviewed | Kept |")
     _stub_github(monkeypatch, cf, body)
     result = cf.sync_issue_rows(
         _make_args(), [("S", "Alpha"), ("S", "Beta")],
@@ -833,7 +862,7 @@ def test_sync_issue_rows_mixed_returns_reviewed(monkeypatch, cf):
 
 def test_sync_issue_rows_mixed_adds_missing(monkeypatch, cf):
     """Adds missing test row when mixed with reviewed tests."""
-    body = "| S | Alpha | Reviewed | Kept |\n"
+    body = _table("| S | Alpha | Reviewed | Kept |")
     updates = _stub_github(monkeypatch, cf, body)
     cf.sync_issue_rows(_make_args(), [("S", "Alpha"), ("S", "Beta")])
     assert "| S | Beta | Unreviewed | |" in updates[0]

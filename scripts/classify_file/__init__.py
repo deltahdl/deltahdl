@@ -71,33 +71,53 @@ def create_issue(
     return issue_number
 
 
-def sync_issue_rows(
-    args: argparse.Namespace,
-    test_pairs: list[tuple[str, str]],
-) -> set[str]:
-    """Sync issue table rows, adding missing tests. Return reviewed names."""
-    body = fetch_issue_body(
-        args.organization, args.repo, args.issue,
-    )
-    reviewed: set[str] = set()
-    changed = False
-    for suite, name in test_pairs:
+def _parse_existing_rows(
+    body: str, test_pairs: list[tuple[str, str]],
+) -> dict[str, tuple[str, str]]:
+    """Extract status and action for each test in *test_pairs* from *body*."""
+    existing: dict[str, tuple[str, str]] = {}
+    for _suite, name in test_pairs:
         row_re = re.compile(
-            r"^\|[^|]*\| " + re.escape(name) + r" \|([^|]*)\|[^|]*\|$",
+            r"^\|[^|]*\| " + re.escape(name)
+            + r" \|([^|]*)\|([^|]*)\|$",
             re.MULTILINE,
         )
         match = row_re.search(body)
         if match:
-            status = match.group(1).strip()
+            existing[name] = (
+                match.group(1).strip(), match.group(2).strip(),
+            )
+    return existing
+
+
+def sync_issue_rows(
+    args: argparse.Namespace,
+    test_pairs: list[tuple[str, str]],
+) -> set[str]:
+    """Rebuild issue table to match *test_pairs*. Return reviewed names."""
+    body = fetch_issue_body(
+        args.organization, args.repo, args.issue,
+    )
+    existing = _parse_existing_rows(body, test_pairs)
+    reviewed: set[str] = set()
+    rows: list[str] = []
+    for suite, name in test_pairs:
+        if name in existing:
+            status, action = existing[name]
             if status != "Unreviewed":
                 reviewed.add(name)
+            action_cell = f" {action} " if action else " "
+            rows.append(
+                f"| {suite} | {name} | {status} |{action_cell}|",
+            )
         else:
-            body = (body.rstrip("\n")
-                    + f"\n| {suite} | {name} | Unreviewed | |\n")
-            changed = True
-    if changed:
+            rows.append(f"| {suite} | {name} | Unreviewed | |")
+    header = build_issue_body(test_pairs).split("\n", 2)
+    new_body = header[0] + "\n" + header[1] + "\n"
+    new_body += "\n".join(rows) + "\n"
+    if new_body != body:
         update_issue_body(
-            args.organization, args.repo, args.issue, body,
+            args.organization, args.repo, args.issue, new_body,
         )
     return reviewed
 
