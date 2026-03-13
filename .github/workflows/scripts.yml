@@ -211,7 +211,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/classify_tests/e2e/ -v
   test-implement-clause:
-    needs: [test-implement-subclauses, test-lib-github]
+    needs: [test-implement-subclauses]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
