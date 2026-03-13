@@ -189,4 +189,14 @@ const ClockingSignal* ClockingManager::FindSignal(
   return nullptr;
 }
 
+Variable* ClockingManager::ResolveClockingMember(
+    std::string_view block_name, std::string_view signal_name,
+    SimContext& ctx) const {
+  const auto* block = Find(block_name);
+  if (!block) return nullptr;
+  const auto* sig = FindSignal(*block, signal_name);
+  if (!sig) return nullptr;
+  return ctx.FindVariable(sig->signal_name);
+}
+
 }  // namespace delta

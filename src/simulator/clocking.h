@@ -93,6 +93,12 @@ class ClockingManager {
   void NotifyBlockEvent(std::string_view block_name);
   void InvokeEdgeCallbacks(std::string_view block_name);
 
+  // §14.15: Resolve a clocking block member (cb.signal) to the underlying
+  // variable.  Returns nullptr if the block or signal is not found.
+  Variable* ResolveClockingMember(std::string_view block_name,
+                                  std::string_view signal_name,
+                                  SimContext& ctx) const;
+
  private:
   using SampleKey = std::pair<std::string, std::string>;
   struct PairHash {
