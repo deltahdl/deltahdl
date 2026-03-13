@@ -21,7 +21,7 @@ def _validate_issue_args(args):
 def update_test_status(body, test_name, status, *, remark=""):
     """Update the Status column for test_name in the issue table."""
     row_re = re.compile(
-        r"^\| " + re.escape(test_name) + r" \|[^|]*\|[^|]*\|$",
+        r"^(\|[^|]*)\| " + re.escape(test_name) + r" \|[^|]*\|[^|]*\|$",
         re.MULTILINE,
     )
     match = row_re.search(body)
@@ -29,7 +29,7 @@ def update_test_status(body, test_name, status, *, remark=""):
         print(f"ERROR: Row for {test_name!r} not found in issue body")
         sys.exit(1)
     remark_cell = f" {remark} " if remark else " "
-    new_row = f"| {test_name} | {status} |{remark_cell}|"
+    new_row = f"{match.group(1)}| {test_name} | {status} |{remark_cell}|"
     return body[:match.start()] + new_row + body[match.end():]
 
 
@@ -39,7 +39,7 @@ def build_action_remark(test, *, source_is_target, target_filename=None):
     renamed = orig is not None and orig != test.test_name
     parts = []
     if source_is_target:
-        parts.append("Kept in the same file")
+        parts.append("Kept in the same file without any changes")
     elif target_filename:
         parts.append(f"Moved to {target_filename}")
     if renamed:

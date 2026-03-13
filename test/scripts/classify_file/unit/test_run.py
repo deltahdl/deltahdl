@@ -308,30 +308,32 @@ def test_run_classify_tests_does_not_capture_output(monkeypatch, cf):
 
 def test_build_issue_body_table_header(cf):
     """Body contains the table header row."""
-    assert "| Test | Status | Action |" in cf.build_issue_body(
-        ["A", "B", "C"],
+    assert "| Suite | Test | Status | Action |" in cf.build_issue_body(
+        [("S", "A"), ("S", "B"), ("S", "C")],
     )
 
 
 def test_build_issue_body_rows(cf):
-    """Body contains table rows for each test name."""
-    body = cf.build_issue_body(["Alpha", "Beta"])
-    assert "| Alpha | Unreviewed | |" in body
+    """Body contains table rows for each test pair."""
+    body = cf.build_issue_body([("X", "Alpha"), ("Y", "Beta")])
+    assert "| X | Alpha | Unreviewed | |" in body
 
 
 def test_build_issue_body_single_test(cf):
     """Body works correctly with a single test."""
-    assert "| Only | Unreviewed | |" in cf.build_issue_body(["Only"])
+    assert "| S | Only | Unreviewed | |" in cf.build_issue_body(
+        [("S", "Only")],
+    )
 
 
 def test_build_issue_body_no_summary_heading(cf):
     """Body does not contain Summary heading."""
-    assert "## Summary" not in cf.build_issue_body(["A"])
+    assert "## Summary" not in cf.build_issue_body([("S", "A")])
 
 
 def test_build_issue_body_no_tests_heading(cf):
     """Body does not contain Tests heading."""
-    assert "## Tests" not in cf.build_issue_body(["A"])
+    assert "## Tests" not in cf.build_issue_body([("S", "A")])
 
 
 # ---- create_issue ----------------------------------------------------------
@@ -341,7 +343,7 @@ def test_create_issue_calls_gh_api_post(monkeypatch, cf, cf_helpers):
     """Invokes gh api with POST method and correct endpoint."""
     captured = cf_helpers.stub_create_issue(monkeypatch, 42)
     cf.create_issue(
-        _make_args(file="/p/test_foo.cpp"), ["A"],
+        _make_args(file="/p/test_foo.cpp"), [("S", "A")],
     )
     assert "-X" in captured[0]["cmd"]
 
@@ -350,7 +352,7 @@ def test_create_issue_returns_number(monkeypatch, cf, cf_helpers):
     """Returns the issue number from the API response."""
     cf_helpers.stub_create_issue(monkeypatch, 77)
     result = cf.create_issue(
-        _make_args(file="/p/test_foo.cpp"), ["A"],
+        _make_args(file="/p/test_foo.cpp"), [("S", "A")],
     )
     assert result == 77
 
@@ -359,7 +361,7 @@ def test_create_issue_prints_confirmation(monkeypatch, cf, cf_helpers, capsys):
     """Prints confirmation with the created issue number."""
     cf_helpers.stub_create_issue(monkeypatch, 42)
     cf.create_issue(
-        _make_args(file="/p/test_foo.cpp"), ["A"],
+        _make_args(file="/p/test_foo.cpp"), [("S", "A")],
     )
     assert "Created issue #42" in capsys.readouterr().out
 
@@ -369,7 +371,7 @@ def test_create_issue_exits_on_failure(monkeypatch, cf, cf_helpers):
     cf_helpers.stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
         cf.create_issue(
-            _make_args(file="/p/test_foo.cpp"), ["A"],
+            _make_args(file="/p/test_foo.cpp"), [("S", "A")],
         )
 
 
@@ -750,83 +752,91 @@ def _stub_github(monkeypatch, cf, body):
 
 def test_sync_issue_rows_all_unreviewed_no_update(monkeypatch, cf):
     """Does not call update when all rows are already Unreviewed."""
-    body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
+    body = "| S | Alpha | Unreviewed | |\n| S | Beta | Unreviewed | |\n"
     updates = _stub_github(monkeypatch, cf, body)
-    cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
+    cf.sync_issue_rows(_make_args(), [("S", "Alpha"), ("S", "Beta")])
     assert len(updates) == 0
 
 
 def test_sync_issue_rows_all_unreviewed_returns_empty(monkeypatch, cf):
     """Returns empty set when all rows are Unreviewed."""
-    body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
+    body = "| S | Alpha | Unreviewed | |\n| S | Beta | Unreviewed | |\n"
     _stub_github(monkeypatch, cf, body)
-    assert cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"]) == set()
+    assert cf.sync_issue_rows(
+        _make_args(), [("S", "Alpha"), ("S", "Beta")],
+    ) == set()
 
 
 def test_sync_issue_rows_adds_missing_row(monkeypatch, cf):
     """Adds an Unreviewed row for a missing test."""
-    body = "| Alpha | Unreviewed | |\n"
+    body = "| S | Alpha | Unreviewed | |\n"
     updates = _stub_github(monkeypatch, cf, body)
-    cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
-    assert "| Beta | Unreviewed | |" in updates[0]
+    cf.sync_issue_rows(_make_args(), [("S", "Alpha"), ("S", "Beta")])
+    assert "| S | Beta | Unreviewed | |" in updates[0]
 
 
 def test_sync_issue_rows_missing_returns_empty(monkeypatch, cf):
     """Returns empty set when only missing tests are added."""
-    body = "| Alpha | Unreviewed | |\n"
+    body = "| S | Alpha | Unreviewed | |\n"
     _stub_github(monkeypatch, cf, body)
-    assert cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"]) == set()
+    assert cf.sync_issue_rows(
+        _make_args(), [("S", "Alpha"), ("S", "Beta")],
+    ) == set()
 
 
 def test_sync_issue_rows_preserves_other_reviewed(monkeypatch, cf):
-    """Leaves reviewed rows for tests not in test_names."""
+    """Leaves reviewed rows for tests not in test_pairs."""
     body = (
-        "| Other | Reviewed | Kept in the same file |\n"
-        "| Alpha | Unreviewed | |\n"
+        "| S | Other | Reviewed | Kept |\n"
+        "| S | Alpha | Unreviewed | |\n"
     )
     updates = _stub_github(monkeypatch, cf, body)
-    cf.sync_issue_rows(_make_args(), ["Alpha"])
+    cf.sync_issue_rows(_make_args(), [("S", "Alpha")])
     assert len(updates) == 0
 
 
 def test_sync_issue_rows_returns_reviewed(monkeypatch, cf):
     """Returns reviewed test names."""
     body = (
-        "| Alpha | Reviewed | Kept in the same file |\n"
-        "| Beta | Unreviewed | |\n"
+        "| S | Alpha | Reviewed | Kept |\n"
+        "| S | Beta | Unreviewed | |\n"
     )
     _stub_github(monkeypatch, cf, body)
-    result = cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
+    result = cf.sync_issue_rows(
+        _make_args(), [("S", "Alpha"), ("S", "Beta")],
+    )
     assert result == {"Alpha"}
 
 
 def test_sync_issue_rows_returns_moved(monkeypatch, cf):
     """Returns moved test names."""
     body = (
-        "| Alpha | Reviewed | Moved to target.cpp |\n"
-        "| Beta | Unreviewed | |\n"
+        "| S | Alpha | Reviewed | Moved to target.cpp |\n"
+        "| S | Beta | Unreviewed | |\n"
     )
     _stub_github(monkeypatch, cf, body)
-    result = cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
+    result = cf.sync_issue_rows(
+        _make_args(), [("S", "Alpha"), ("S", "Beta")],
+    )
     assert result == {"Alpha"}
 
 
 def test_sync_issue_rows_mixed_returns_reviewed(monkeypatch, cf):
     """Returns reviewed names when mixed with missing tests."""
-    body = "| Alpha | Reviewed | Kept in the same file |\n"
+    body = "| S | Alpha | Reviewed | Kept |\n"
     _stub_github(monkeypatch, cf, body)
     result = cf.sync_issue_rows(
-        _make_args(), ["Alpha", "Beta"],
+        _make_args(), [("S", "Alpha"), ("S", "Beta")],
     )
     assert result == {"Alpha"}
 
 
 def test_sync_issue_rows_mixed_adds_missing(monkeypatch, cf):
     """Adds missing test row when mixed with reviewed tests."""
-    body = "| Alpha | Reviewed | Kept in the same file |\n"
+    body = "| S | Alpha | Reviewed | Kept |\n"
     updates = _stub_github(monkeypatch, cf, body)
-    cf.sync_issue_rows(_make_args(), ["Alpha", "Beta"])
-    assert "| Beta | Unreviewed | |" in updates[0]
+    cf.sync_issue_rows(_make_args(), [("S", "Alpha"), ("S", "Beta")])
+    assert "| S | Beta | Unreviewed | |" in updates[0]
 
 
 # ---- _run + sync_issue_rows ------------------------------------------------

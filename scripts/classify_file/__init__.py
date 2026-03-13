@@ -30,26 +30,27 @@ def extract_tests(filepath: Path) -> list[tuple[str, str]]:
     return _TEST_RE.findall(text)
 
 
-def build_issue_body(test_names: list[str]) -> str:
+def build_issue_body(test_pairs: list[tuple[str, str]]) -> str:
     """Build the GitHub issue body with a status table for each test."""
     rows = "\n".join(
-        f"| {name} | Unreviewed | |" for name in test_names
+        f"| {suite} | {name} | Unreviewed | |"
+        for suite, name in test_pairs
     )
     return (
-        f"| Test | Status | Action |\n"
-        f"|------|--------|--------|\n"
+        f"| Suite | Test | Status | Action |\n"
+        f"|-------|------|--------|--------|\n"
         f"{rows}\n"
     )
 
 
 def create_issue(
     args: argparse.Namespace,
-    test_names: list[str],
+    test_pairs: list[tuple[str, str]],
 ) -> int:
     """Create a GitHub issue and return its number."""
     filename = Path(args.file).name
     title = f"Classify tests in {filename}"
-    body = build_issue_body(test_names)
+    body = build_issue_body(test_pairs)
     print(f"Creating issue for {filename}...")
     payload = json.dumps({"title": title, "body": body})
     result = subprocess.run(
@@ -72,7 +73,7 @@ def create_issue(
 
 def sync_issue_rows(
     args: argparse.Namespace,
-    test_names: list[str],
+    test_pairs: list[tuple[str, str]],
 ) -> set[str]:
     """Sync issue table rows, adding missing tests. Return reviewed names."""
     body = fetch_issue_body(
@@ -80,9 +81,9 @@ def sync_issue_rows(
     )
     reviewed: set[str] = set()
     changed = False
-    for name in test_names:
+    for suite, name in test_pairs:
         row_re = re.compile(
-            r"^\| " + re.escape(name) + r" \|([^|]*)\|[^|]*\|$",
+            r"^\|[^|]*\| " + re.escape(name) + r" \|([^|]*)\|[^|]*\|$",
             re.MULTILINE,
         )
         match = row_re.search(body)
@@ -91,7 +92,8 @@ def sync_issue_rows(
             if status != "Unreviewed":
                 reviewed.add(name)
         else:
-            body = body.rstrip("\n") + f"\n| {name} | Unreviewed | |\n"
+            body = (body.rstrip("\n")
+                    + f"\n| {suite} | {name} | Unreviewed | |\n")
             changed = True
     if changed:
         update_issue_body(
@@ -176,12 +178,11 @@ def _run(args: argparse.Namespace) -> None:
             commit_and_push([], [filepath], f"Delete empty {filepath.name}\n")
         _maybe_close(args, "the file has no tests")
         return
-    test_names = [name for _, name in test_pairs]
     if args.create_issue:
-        args.issue = create_issue(args, test_names)
+        args.issue = create_issue(args, test_pairs)
         reviewed: set[str] = set()
     else:
-        reviewed = sync_issue_rows(args, test_names)
+        reviewed = sync_issue_rows(args, test_pairs)
     pending = [(s, n) for s, n in test_pairs if n not in reviewed]
     if reviewed:
         print(f"Skipping {len(reviewed)} already-reviewed"

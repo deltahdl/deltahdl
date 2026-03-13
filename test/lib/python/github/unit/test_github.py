@@ -333,10 +333,10 @@ def test_mark_master_complete_warns_when_not_found(
 
 
 _TABLE_BODY = (
-    "| Test | Status | Action |\n"
-    "|------|--------|--------|\n"
-    "| FooTest | Reviewed | Kept |\n"
-    "| BarTest | Unreviewed | |\n"
+    "| Suite | Test | Status | Action |\n"
+    "|-------|------|--------|--------|\n"
+    "| S | FooTest | Reviewed | Kept |\n"
+    "| S | BarTest | Unreviewed | |\n"
 )
 
 

@@ -73,7 +73,7 @@ def _env_with_fakes(tmp_path, claude_response, test_names=None):
     names = test_names or ["Alpha", "DryT"]
     checkbox_file = tmp_path / "issue_body.txt"
     checkbox_file.write_text(
-        "\n".join(f"| {n} | Unreviewed | |" for n in names) + "\n",
+        "\n".join(f"| S | {n} | Unreviewed | |" for n in names) + "\n",
         encoding="utf-8",
     )
     _install_fake(

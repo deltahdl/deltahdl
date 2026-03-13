@@ -84,49 +84,49 @@ def test_parse_args_repo_required(monkeypatch, ct):
 
 def test_update_test_status_sets_status(ct_github):
     """Updates status from Unreviewed to reviewed."""
-    body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
+    body = "| S | Alpha | Unreviewed | |\n| S | Beta | Unreviewed | |\n"
     result = ct_github.update_test_status(
         body, "Alpha", "Reviewed",
     )
-    assert "| Alpha | Reviewed | |" in result
+    assert "| S | Alpha | Reviewed | |" in result
 
 
 def test_update_test_status_leaves_others(ct_github):
     """Does not change other rows."""
-    body = "| Alpha | Unreviewed | |\n| Beta | Unreviewed | |\n"
+    body = "| S | Alpha | Unreviewed | |\n| S | Beta | Unreviewed | |\n"
     result = ct_github.update_test_status(
         body, "Alpha", "Reviewed",
     )
-    assert "| Beta | Unreviewed | |" in result
+    assert "| S | Beta | Unreviewed | |" in result
 
 
 def test_update_test_status_already_set(ct_github):
     """Idempotent when same status is set again."""
-    body = "| Alpha | Reviewed | Kept in the same file |\n"
+    body = "| S | Alpha | Reviewed | Kept |\n"
     result = ct_github.update_test_status(
         body, "Alpha", "Reviewed",
     )
-    assert "| Alpha | Reviewed | |" in result
+    assert "| S | Alpha | Reviewed | |" in result
 
 
 def test_update_test_status_not_found_exits(ct_github):
     """Exits when test name is not found in any row."""
     with pytest.raises(SystemExit):
         ct_github.update_test_status(
-            "| Other | Unreviewed | |\n", "Missing",
+            "| S | Other | Unreviewed | |\n", "Missing",
             "Reviewed",
         )
 
 
 def test_update_test_status_with_remark(ct_github):
     """Sets remark in the Action column."""
-    body = "| Alpha | Unreviewed | |\n"
+    body = "| S | Alpha | Unreviewed | |\n"
     result = ct_github.update_test_status(
         body, "Alpha", "Reviewed",
         remark="Moved to target.cpp",
     )
     assert (
-        "| Alpha | Reviewed"
+        "| S | Alpha | Reviewed"
         " | Moved to target.cpp |"
     ) in result
 
@@ -241,7 +241,7 @@ def _setup_maybe_update(
     updated = []
     monkeypatch.setattr(
         ct_github, "fetch_issue_body",
-        lambda org, repo, issue: "| T | Unreviewed | |\n",
+        lambda org, repo, issue: "| S | T | Unreviewed | |\n",
     )
     monkeypatch.setattr(
         ct_github, "update_issue_body",
@@ -273,12 +273,12 @@ def test_maybe_update_skips_when_no_issue(monkeypatch, ct_github):
 
 
 def test_maybe_update_kept(monkeypatch, ct_github, ct_helpers):
-    """Sets status to 'Reviewed' and action to 'Kept in the same file'."""
+    """Sets status to 'Reviewed' and action to 'Kept in the same file without any changes'."""
     updated = _setup_maybe_update(
         monkeypatch, ct_github, ct_helpers, source_is_target=True,
         target_filenames={"T": "test_parser_clause_06_01.cpp"},
     )
-    assert "| T | Reviewed | Kept in the same file |" in updated[0]
+    assert "| S | T | Reviewed | Kept in the same file without any changes |" in updated[0]
 
 
 def test_maybe_update_moved(monkeypatch, ct_github, ct_helpers):
@@ -288,7 +288,7 @@ def test_maybe_update_moved(monkeypatch, ct_github, ct_helpers):
         target_filenames={"T": "test_parser_clause_06_01.cpp"},
     )
     assert (
-        "| T | Reviewed"
+        "| S | T | Reviewed"
         " | Moved to test_parser_clause_06_01.cpp |"
     ) in updated[0]
 
@@ -299,7 +299,7 @@ def test_maybe_update_moved_no_filenames(monkeypatch, ct_github, ct_helpers):
         monkeypatch, ct_github, ct_helpers,
         source_is_target=False, target_filenames=None,
     )
-    assert "| T | Reviewed | |" in updated[0]
+    assert "| S | T | Reviewed | |" in updated[0]
 
 
 def test_maybe_update_moved_empty_fname(monkeypatch, ct_github, ct_helpers):
@@ -308,7 +308,7 @@ def test_maybe_update_moved_empty_fname(monkeypatch, ct_github, ct_helpers):
         monkeypatch, ct_github, ct_helpers,
         source_is_target=False, target_filenames={"T": ""},
     )
-    assert "| T | Reviewed | |" in updated[0]
+    assert "| S | T | Reviewed | |" in updated[0]
 
 
 def test_maybe_update_passes_correct_org(monkeypatch, ct_github, ct_helpers):
@@ -317,7 +317,7 @@ def test_maybe_update_passes_correct_org(monkeypatch, ct_github, ct_helpers):
     orgs = []
     monkeypatch.setattr(
         ct_github, "fetch_issue_body",
-        lambda org, repo, issue: (orgs.append(org), "| T | Unreviewed | |\n")[1],
+        lambda org, repo, issue: (orgs.append(org), "| S | T | Unreviewed | |\n")[1],
     )
     monkeypatch.setattr(
         ct_github, "update_issue_body",
@@ -336,7 +336,7 @@ def test_maybe_update_passes_correct_issue(monkeypatch, ct_github, ct_helpers):
     issues = []
     monkeypatch.setattr(
         ct_github, "fetch_issue_body",
-        lambda org, repo, issue: (issues.append(issue), "| T | Unreviewed | |\n")[1],
+        lambda org, repo, issue: (issues.append(issue), "| S | T | Unreviewed | |\n")[1],
     )
     monkeypatch.setattr(
         ct_github, "update_issue_body",
@@ -361,7 +361,7 @@ def _setup_renamed_update(
     updated = []
     monkeypatch.setattr(
         ct_github, "fetch_issue_body",
-        lambda org, repo, issue: "| OldName | Unreviewed | |\n",
+        lambda org, repo, issue: "| S | OldName | Unreviewed | |\n",
     )
     monkeypatch.setattr(
         ct_github, "update_issue_body",
@@ -386,7 +386,7 @@ def test_maybe_update_renamed_uses_original_name(
     updated = _setup_renamed_update(
         monkeypatch, ct_github, ct_helpers, source_is_target=True,
     )
-    assert "| OldName |" in updated[0]
+    assert "| S | OldName |" in updated[0]
 
 
 def test_maybe_update_renamed_kept_uses_but(
@@ -396,7 +396,7 @@ def test_maybe_update_renamed_kept_uses_but(
     updated = _setup_renamed_update(
         monkeypatch, ct_github, ct_helpers, source_is_target=True,
     )
-    assert "Kept in the same file but renamed to NewName" in updated[0]
+    assert "Kept in the same file without any changes but renamed to NewName" in updated[0]
 
 
 def test_maybe_update_renamed_and_moved_uses_and(
@@ -426,12 +426,12 @@ def test_maybe_update_same_name_no_rename_remark(
 
 
 def test_build_action_remark_kept(ct_github, ct_helpers):
-    """Returns 'Kept in the same file' when source_is_target."""
+    """Returns 'Kept in the same file without any changes' when source_is_target."""
     t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
     result = ct_github.build_action_remark(
         t, source_is_target=True,
     )
-    assert result == "Kept in the same file"
+    assert result == "Kept in the same file without any changes"
 
 
 def test_build_action_remark_moved(ct_github, ct_helpers):
@@ -452,7 +452,7 @@ def test_build_action_remark_kept_and_renamed(ct_github, ct_helpers):
     result = ct_github.build_action_remark(
         t, source_is_target=True,
     )
-    assert result == "Kept in the same file but renamed to NewName"
+    assert result == "Kept in the same file without any changes but renamed to NewName"
 
 
 def test_build_action_remark_moved_and_renamed(ct_github, ct_helpers):

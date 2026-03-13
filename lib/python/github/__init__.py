@@ -112,7 +112,7 @@ def next_unchecked(body: str) -> str | None:
 def remove_test_row(body: str, test_name: str) -> str:
     """Remove the table row for *test_name* from *body*."""
     row_re = re.compile(
-        r"^\| " + re.escape(test_name) + r" \|[^|]*\|[^|]*\|\n?",
+        r"^\|[^|]*\| " + re.escape(test_name) + r" \|[^|]*\|[^|]*\|\n?",
         re.MULTILINE,
     )
     match = row_re.search(body)
