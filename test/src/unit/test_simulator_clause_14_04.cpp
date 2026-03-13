@@ -11,7 +11,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA611, PerSignalSkewOverride) {
+TEST(ClockingSkewSim, PerSignalSkewOverride) {
   ClockingManager cmgr;
   ClockingBlock block;
   block.name = "cb";
@@ -31,7 +31,7 @@ TEST(SimA611, PerSignalSkewOverride) {
   EXPECT_EQ(cmgr.GetInputSkew("cb", "other").ticks, 10u);
 }
 
-TEST(ClockingSim, InoutSignalDirection) {
+TEST(ClockingSkewSim, InoutSignalDirection) {
   ClockingManager cmgr;
   ClockingBlock block;
   block.name = "cb";
@@ -50,7 +50,7 @@ TEST(ClockingSim, InoutSignalDirection) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "bidir").ticks, 3u);
 }
 
-TEST(ClockingSim, InputSkewSamplesBeforeClockEdge) {
+TEST(ClockingSkewSim, InputSkewSamplesBeforeClockEdge) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -80,7 +80,7 @@ TEST(ClockingSim, InputSkewSamplesBeforeClockEdge) {
   EXPECT_EQ(sampled, 0xABu);
 }
 
-TEST(ClockingSim, OutputSkewDrivesAfterClockEdge) {
+TEST(ClockingSkewSim, OutputSkewDrivesAfterClockEdge) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -106,7 +106,7 @@ TEST(ClockingSim, OutputSkewDrivesAfterClockEdge) {
   EXPECT_EQ(data_out->value.ToUint64(), 0x55u);
 }
 
-TEST(ClockingSim, PerSignalInputSkewOverride) {
+TEST(ClockingSkewSim, PerSignalInputSkewOverride) {
   ClockingManager cmgr;
   ClockingBlock block;
   block.name = "cb";
@@ -126,7 +126,7 @@ TEST(ClockingSim, PerSignalInputSkewOverride) {
   EXPECT_EQ(cmgr.GetInputSkew("cb", "other").ticks, 5u);
 }
 
-TEST(ClockingSim, PerSignalOutputSkewOverride) {
+TEST(ClockingSkewSim, PerSignalOutputSkewOverride) {
   ClockingManager cmgr;
   ClockingBlock block;
   block.name = "cb";
@@ -146,7 +146,7 @@ TEST(ClockingSim, PerSignalOutputSkewOverride) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "other").ticks, 10u);
 }
 
-TEST(Clocking, PerSignalSkewOverridesDefault) {
+TEST(ClockingSkewSim, PerSignalSkewOverridesDefault) {
   ClockingManager mgr;
   ClockingBlock block;
   block.name = "cb";
@@ -167,6 +167,56 @@ TEST(Clocking, PerSignalSkewOverridesDefault) {
 
   auto default_skew = mgr.GetInputSkew("cb", "other_signal");
   EXPECT_EQ(default_skew.ticks, 5u);
+}
+
+// §14.4: Explicit #0 output skew drives in Re-NBA region.
+TEST(ClockingSkewSim, ZeroOutputSkewDrivesInReNbaRegion) {
+  ClockingSimFixture f;
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
+  auto* data_out = f.ctx.CreateVariable("data_out", 8);
+  data_out->value = MakeLogic4VecVal(f.arena, 8, 0);
+
+  ClockingManager cmgr;
+  SetupClockingBlock(f, cmgr,
+                     {"cb",
+                      Edge::kPosedge,
+                      {0},
+                      SimTime{0},
+                      "data_out",
+                      ClockingDir::kOutput});
+
+  // Schedule a drive at the same time as clock edge with #0 skew.
+  auto* ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [&cmgr, &f]() {
+    cmgr.ScheduleOutputDrive("cb", "data_out", 0x42, f.ctx, f.scheduler);
+  };
+  f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, ev);
+  f.scheduler.Run();
+
+  // Value should be driven (in Re-NBA region, same time step).
+  EXPECT_EQ(data_out->value.ToUint64(), 0x42u);
+}
+
+// §14.4: Default input skew is 1step, default output skew is 0.
+TEST(ClockingSkewSim, DefaultSkewValues) {
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  // Explicitly set defaults matching §14.4.
+  block.default_input_skew = SimTime{0};   // 1step represented as 0
+  block.default_output_skew = SimTime{0};  // #0
+
+  ClockingSignal sig;
+  sig.signal_name = "data";
+  sig.direction = ClockingDir::kInput;
+  block.signals.push_back(sig);
+  cmgr.Register(block);
+
+  EXPECT_EQ(cmgr.GetInputSkew("cb", "data").ticks, 0u);
+  EXPECT_EQ(cmgr.GetOutputSkew("cb", "data").ticks, 0u);
 }
 
 }  // namespace

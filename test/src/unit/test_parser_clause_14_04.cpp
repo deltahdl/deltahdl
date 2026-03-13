@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA223, DelayValue1step) {
+TEST(ClockingSkewParse, OneStepDelay) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  clocking cb @(posedge clk);\n"
@@ -14,7 +14,7 @@ TEST(ParserA223, DelayValue1step) {
               "endmodule"));
 }
 
-TEST(ParserA611, ClockingDirectionInputOutput) {
+TEST(ClockingSkewParse, CombinedInputOutputSkewDelays) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -33,7 +33,7 @@ TEST(ParserA611, ClockingDirectionInputOutput) {
   EXPECT_NE(sig.out_skew_delay, nullptr);
 }
 
-TEST(ParserSection14, OverviewInputOutputSkews) {
+TEST(ClockingSkewParse, InputAndOutputNumericSkews) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -50,7 +50,7 @@ TEST(ParserSection14, OverviewInputOutputSkews) {
   ASSERT_NE(item->clocking_signals[1].skew_delay, nullptr);
 }
 
-TEST(ParserClause03, Cl3_14_3_1StepParsedInClockingBlock) {
+TEST(ClockingSkewParse, OneStepInClockingBlock) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -71,7 +71,7 @@ TEST(ParserClause03, Cl3_14_3_1StepParsedInClockingBlock) {
   ASSERT_NE(clk_item, nullptr);
 }
 
-TEST(ParserSection14, ClockingBlockEventOutputNegedgeSkew) {
+TEST(ClockingSkewParse, OutputNegedgeWithDelay) {
   auto r = Parse(
       "module foo(input phi1, input [7:0] data);\n"
       "  clocking dram @(posedge phi1);\n"
@@ -89,7 +89,7 @@ TEST(ParserSection14, ClockingBlockEventOutputNegedgeSkew) {
   ASSERT_NE(out_sig.skew_delay, nullptr);
 }
 
-TEST(ParserA611, ClockingSkewEdgeOnly) {
+TEST(ClockingSkewParse, EdgeOnlyNoDelay) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -106,7 +106,7 @@ TEST(ParserA611, ClockingSkewEdgeOnly) {
   EXPECT_EQ(sig.skew_delay, nullptr);
 }
 
-TEST(ParserA611, ClockingSkewDelayOnly) {
+TEST(ClockingSkewParse, DelayOnlyNoEdge) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -124,7 +124,7 @@ TEST(ParserA611, ClockingSkewDelayOnly) {
   EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA611, ClockingSkewEdgeAndDelay) {
+TEST(ClockingSkewParse, EdgeAndDelayTogether) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -141,7 +141,7 @@ TEST(ParserA611, ClockingSkewEdgeAndDelay) {
   ASSERT_NE(sig.skew_delay, nullptr);
 }
 
-TEST(ParserA611, ClockingSkew1step) {
+TEST(ClockingSkewParse, OneStepDelayText) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -158,7 +158,7 @@ TEST(ParserA611, ClockingSkew1step) {
   EXPECT_EQ(sig.skew_delay->text, "1step");
 }
 
-TEST(ParserSection14, InputSamplingNonzeroSkew) {
+TEST(ClockingSkewParse, NonzeroInputSkew) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -175,7 +175,7 @@ TEST(ParserSection14, InputSamplingNonzeroSkew) {
   EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA611, InputWithSkewNoOutput) {
+TEST(ClockingSkewParse, InputEdgeAndDelayNoOutput) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -193,7 +193,7 @@ TEST(ParserA611, InputWithSkewNoOutput) {
   ASSERT_NE(sig.skew_delay, nullptr);
 }
 
-TEST(ParserSection19, InputOutputSkew_InputNumeric) {
+TEST(ClockingSkewParse, InputNumericSkewOnly) {
   auto r = Parse(
       "module t;\n"
       "  clocking cb @(posedge clk);\n"
@@ -210,7 +210,7 @@ TEST(ParserSection19, InputOutputSkew_InputNumeric) {
   EXPECT_EQ(sig.skew_delay->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserSection19, InputOutputSkew_OutputEdge) {
+TEST(ClockingSkewParse, OutputNegedgeEdgeOnly) {
   auto r = Parse(
       "module t;\n"
       "  clocking cb @(posedge clk);\n"
@@ -226,7 +226,7 @@ TEST(ParserSection19, InputOutputSkew_OutputEdge) {
   EXPECT_EQ(sig.skew_edge, Edge::kNegedge);
 }
 
-TEST(ParserSection19, InputOutputSkew_CombinedInputOutput) {
+TEST(ClockingSkewParse, CombinedInputOutputVerified) {
   auto r = Parse(
       "module t;\n"
       "  clocking cb @(posedge clk);\n"
@@ -243,7 +243,7 @@ TEST(ParserSection19, InputOutputSkew_CombinedInputOutput) {
   EXPECT_NE(sig.out_skew_delay, nullptr);
 }
 
-TEST(ParserSection19, InputOutputSkew_TimeUnitSuffix) {
+TEST(ClockingSkewParse, TimeUnitSuffix) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking dram @(clk);\n"
@@ -253,7 +253,7 @@ TEST(ParserSection19, InputOutputSkew_TimeUnitSuffix) {
               "endmodule\n"));
 }
 
-TEST(ParserSection19, InputOutputSkew_OneStep) {
+TEST(ClockingSkewParse, OneStepWithHierExpr) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking cd1 @(posedge phi1);\n"
@@ -262,7 +262,7 @@ TEST(ParserSection19, InputOutputSkew_OneStep) {
               "endmodule\n"));
 }
 
-TEST(ParserSection19, InputOutputSkew_OutputNegedgeWithDelay) {
+TEST(ClockingSkewParse, OutputNegedgeDelayAccepted) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking cb @(posedge clk);\n"
@@ -271,7 +271,7 @@ TEST(ParserSection19, InputOutputSkew_OutputNegedgeWithDelay) {
               "endmodule\n"));
 }
 
-TEST(ParserSection19, InputOutputSkew_ExplicitZero) {
+TEST(ClockingSkewParse, ExplicitZeroSkew) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking cb @(posedge clk);\n"
@@ -280,7 +280,7 @@ TEST(ParserSection19, InputOutputSkew_ExplicitZero) {
               "endmodule\n"));
 }
 
-TEST(ParserSection19, InputOutputSkew_MixedUnitSuffix) {
+TEST(ClockingSkewParse, MixedTimeUnitSuffix) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking cd2 @(posedge phi2);\n"
@@ -290,7 +290,7 @@ TEST(ParserSection19, InputOutputSkew_MixedUnitSuffix) {
               "endmodule\n"));
 }
 
-TEST(ParserSection14, InputSkewDelay) {
+TEST(ClockingSkewParse, InputSkewDelayFields) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -316,7 +316,7 @@ TEST(ParserSection14, InputSkewDelay) {
   }
 }
 
-TEST(ParserSection14, CombinedInputOutputSkew) {
+TEST(ClockingSkewParse, CombinedSkewBothPresent) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -336,8 +336,43 @@ TEST(ParserSection14, CombinedInputOutputSkew) {
   }
 }
 
+TEST(ClockingSkewParse, ExplicitZeroOutputSkew) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output #0 data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kOutput);
+  ASSERT_NE(item->clocking_signals[0].skew_delay, nullptr);
+}
+
+TEST(ClockingSkewParse, DramExampleFromSpec) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking dram @(clk);\n"
+      "    input #1ps address;\n"
+      "    input #5 output #6 data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 2u);
+  EXPECT_EQ(item->clocking_signals[0].name, "address");
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
+  EXPECT_EQ(item->clocking_signals[1].name, "data");
+  EXPECT_EQ(item->clocking_signals[1].direction, Direction::kInout);
+}
+
 }  // namespace
-TEST(ClockingSkewEdgeWithDelay, ClockingSkewEdgeWithDelay) {
+TEST(ClockingSkewParse, OneStepDelayStructure) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -352,7 +387,7 @@ TEST(ClockingSkewEdgeWithDelay, ClockingSkewEdgeWithDelay) {
   EXPECT_NE(item->clocking_signals[0].skew_delay, nullptr);
 }
 
-TEST(ClockingInputSkew, InputSamplingMultipleSignals) {
+TEST(ClockingSkewParse, InputSkewMultipleSignals) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(negedge clk);\n"
@@ -369,7 +404,7 @@ TEST(ClockingInputSkew, InputSamplingMultipleSignals) {
   }
 }
 
-TEST(ClockingItemDefaultSkewInput, ClockingItemDefaultSkewInput) {
+TEST(ClockingSkewParse, DefaultInputSkew) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -385,7 +420,7 @@ TEST(ClockingItemDefaultSkewInput, ClockingItemDefaultSkewInput) {
   EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
 
-TEST(ClockingItemDefaultSkewOutput, ClockingItemDefaultSkewOutput) {
+TEST(ClockingSkewParse, DefaultOutputSkew) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -401,7 +436,7 @@ TEST(ClockingItemDefaultSkewOutput, ClockingItemDefaultSkewOutput) {
   EXPECT_EQ(item->clocking_signals[0].name, "ack");
 }
 
-TEST(ClockingItemDefaultSkewInputOutput, ClockingItemDefaultSkewInputOutput) {
+TEST(ClockingSkewParse, DefaultInputOutputSkew) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -416,7 +451,7 @@ TEST(ClockingItemDefaultSkewInputOutput, ClockingItemDefaultSkewInputOutput) {
   ASSERT_GE(item->clocking_signals.size(), 1u);
 }
 
-TEST(ClockingDefaultSkewTimeUnits, DefaultSkew_InputOutputTimeUnits) {
+TEST(ClockingSkewParse, DefaultSkewWithTimeUnits) {
   auto r = Parse(
       "module t;\n"
       "  clocking bus @(posedge clock1);\n"
@@ -431,7 +466,7 @@ TEST(ClockingDefaultSkewTimeUnits, DefaultSkew_InputOutputTimeUnits) {
   ASSERT_GE(item->clocking_signals.size(), 3u);
 }
 
-TEST(DefaultSkew_InputOnly, DefaultSkew_InputOnly) {
+TEST(ClockingSkewParse, DefaultInputOnlyAccepted) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking cb @(posedge clk);\n"
@@ -442,7 +477,7 @@ TEST(DefaultSkew_InputOnly, DefaultSkew_InputOnly) {
               "endmodule\n"));
 }
 
-TEST(DefaultSkew_OutputOnly, DefaultSkew_OutputOnly) {
+TEST(ClockingSkewParse, DefaultOutputOnlyAccepted) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking cb @(posedge clk);\n"
@@ -453,7 +488,7 @@ TEST(DefaultSkew_OutputOnly, DefaultSkew_OutputOnly) {
               "endmodule\n"));
 }
 
-TEST(DefaultSkew_1StepInputNegedgeOutput, DefaultSkew_1StepInputNegedgeOutput) {
+TEST(ClockingSkewParse, DefaultOneStepInputNegedgeOutput) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking ck1 @(posedge clk);\n"
@@ -464,7 +499,7 @@ TEST(DefaultSkew_1StepInputNegedgeOutput, DefaultSkew_1StepInputNegedgeOutput) {
               "endmodule\n"));
 }
 
-TEST(DefaultSkew_PerSignalOverride, DefaultSkew_PerSignalOverride) {
+TEST(ClockingSkewParse, DefaultSkewWithPerSignalOverride) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking bus @(posedge clock1);\n"
@@ -476,7 +511,7 @@ TEST(DefaultSkew_PerSignalOverride, DefaultSkew_PerSignalOverride) {
               "endmodule\n"));
 }
 
-TEST(DefaultSkew, DefaultSkew_NoEdgeEvent) {
+TEST(ClockingSkewParse, DefaultSkewNoEdgeEvent) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking ck2 @(clk);\n"
@@ -487,7 +522,7 @@ TEST(DefaultSkew, DefaultSkew_NoEdgeEvent) {
               "endmodule\n"));
 }
 
-TEST(DefaultSkew_NumericLiterals, DefaultSkew_NumericLiterals) {
+TEST(ClockingSkewParse, DefaultSkewNumericLiterals) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking cb @(posedge clk);\n"
@@ -498,7 +533,7 @@ TEST(DefaultSkew_NumericLiterals, DefaultSkew_NumericLiterals) {
               "endmodule\n"));
 }
 
-TEST(OutputSkewEdge, OutputSkewEdge) {
+TEST(ClockingSkewParse, OutputNegedgeSkewEdgeVerified) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -514,7 +549,7 @@ TEST(OutputSkewEdge, OutputSkewEdge) {
   EXPECT_EQ(sig.skew_edge, Edge::kNegedge);
 }
 
-TEST(ClockingItemDefaultSkewBoth, ClockingItemDefaultSkewBoth) {
+TEST(ClockingSkewParse, DefaultInputOutputBothAccepted) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"

@@ -130,7 +130,9 @@ void ClockingManager::ScheduleOutputDrive(std::string_view block_name,
     var->value.words[0].aval = value;
     var->value.words[0].bval = 0;
   };
-  sched.ScheduleEvent(drive_time, Region::kNBA, ev);
+  // §14.4: Explicit #0 output skew drives in Re-NBA region.
+  auto region = (skew.ticks == 0) ? Region::kReNBA : Region::kNBA;
+  sched.ScheduleEvent(drive_time, region, ev);
 }
 
 // S14.8: Associate an event variable with a clocking block.
