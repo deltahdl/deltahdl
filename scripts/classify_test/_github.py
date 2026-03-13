@@ -48,19 +48,21 @@ def build_action_remark(test, *, source_is_target, target_filename=None):
         location = "Kept in the same file"
     elif target_filename:
         location = f"Moved to {target_filename}"
-    changes = []
-    if suite_renamed:
-        changes.append(f"suite renamed to {test.suite_name}")
-    if test_renamed:
-        changes.append(f"renamed to {test.test_name}")
-    if location and changes:
+    if suite_renamed and test_renamed:
+        rename_str = (f"rename suite to {test.suite_name}"
+                      f" and test to {test.test_name}")
+    elif suite_renamed:
+        rename_str = f"rename suite to {test.suite_name}"
+    elif test_renamed:
+        rename_str = f"rename test to {test.test_name}"
+    else:
+        rename_str = ""
+    if location and rename_str:
         joiner = " but " if source_is_target else " and "
-        return location + joiner + ", ".join(changes)
+        return location + joiner + rename_str
     if location:
         return location
-    if changes:
-        return ", ".join(changes)
-    return ""
+    return rename_str
 
 
 def maybe_update_issue_status(
