@@ -883,4 +883,27 @@ void Elaborator::ValidateDuplicateGlobalClocking(const ModuleDecl* decl) {
   }
 }
 
+// §14.16: Continuous assignment to a clocking output variable is illegal.
+void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
+  if (clocking_signals_.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kContAssign) continue;
+    if (!item->assign_lhs || item->assign_lhs->kind != ExprKind::kIdentifier)
+      continue;
+    auto target = item->assign_lhs->text;
+    for (const auto& [block_name, sigs] : clocking_signals_) {
+      auto it = sigs.find(target);
+      if (it != sigs.end() &&
+          (it->second.direction == Direction::kOutput ||
+           it->second.direction == Direction::kInout)) {
+        diag_.Error(item->loc,
+                    std::format("continuous assignment to clocking output "
+                                "variable '{}'",
+                                target));
+        break;
+      }
+    }
+  }
+}
+
 }  // namespace delta
