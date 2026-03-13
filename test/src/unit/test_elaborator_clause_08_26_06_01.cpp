@@ -23,7 +23,7 @@ TEST(InterfaceClassMethodConflict, SingleImplResolvesConflict) {
              "endmodule\n"));
 }
 
-TEST(ElabA82661, ExtendsAndImplementsConflictOk) {
+TEST(ExtendsImplementsConflict, ExtendsAndImplementsConflictOk) {
   EXPECT_TRUE(ElabOk(
       "interface class IntfBase1;\n"
       "  pure virtual function bit funcBase();\n"
