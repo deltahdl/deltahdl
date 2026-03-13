@@ -7,10 +7,13 @@ from pathlib import Path
 import pytest
 
 from lib.python.cli import (
+    add_clauses_arg,
     add_continue_arg,
     add_lrm_arg,
     add_model_arg,
+    invoke_implement_clause,
     invoke_implement_subclause,
+    parse_clause_issues,
     validate_lrm,
 )
 from lib.python.test_fixtures.subprocess_stubs import (
@@ -159,4 +162,114 @@ def test_invoke_implement_subclause_failure(monkeypatch) -> None:
             issue=42,
             model="opus",
             continue_session=False,
+        )
+
+
+# ---- parse_clause_issues ----------------------------------------------------
+
+
+def test_parse_clause_issues_single() -> None:
+    """Single pair returns a one-element dict."""
+    assert parse_clause_issues("15=17") == {"15": 17}
+
+
+def test_parse_clause_issues_multiple() -> None:
+    """Comma-separated pairs are split correctly."""
+    assert parse_clause_issues("15=17,16=18") == {"15": 17, "16": 18}
+
+
+def test_parse_clause_issues_strips_whitespace() -> None:
+    """Whitespace around pairs is stripped."""
+    assert parse_clause_issues(" 15 = 17 , 16 = 18 ") == {"15": 17, "16": 18}
+
+
+def test_parse_clause_issues_rejects_no_equals() -> None:
+    """Missing = sign raises ArgumentTypeError."""
+    with pytest.raises(argparse.ArgumentTypeError):
+        parse_clause_issues("15")
+
+
+def test_parse_clause_issues_rejects_non_int_issue() -> None:
+    """Non-integer issue number raises ArgumentTypeError."""
+    with pytest.raises(argparse.ArgumentTypeError):
+        parse_clause_issues("15=abc")
+
+
+def test_parse_clause_issues_rejects_invalid_clause() -> None:
+    """Invalid clause format raises ArgumentTypeError."""
+    with pytest.raises(argparse.ArgumentTypeError):
+        parse_clause_issues("bad=17")
+
+
+def test_add_clauses_arg() -> None:
+    """Adds --clauses as a required argument."""
+    parser = argparse.ArgumentParser()
+    add_clauses_arg(parser)
+    args = parser.parse_args(["--clauses", "15=17"])
+    assert args.clauses == {"15": 17}
+
+
+# ---- invoke_implement_clause ------------------------------------------------
+
+
+def _invoke_clause_and_capture(monkeypatch):
+    """Invoke with stubbed subprocess and return captured command."""
+    captured = stub_subprocess_success(monkeypatch)
+    invoke_implement_clause(
+        lrm="/tmp/lrm.pdf",
+        clause="15",
+        sub_issue=17,
+        master_issue=1,
+        organization="deltahdl",
+        repo="deltahdl",
+    )
+    return captured[0]
+
+
+def test_invoke_implement_clause_module(monkeypatch) -> None:
+    """Passes -m implement_clause."""
+    assert _invoke_clause_and_capture(monkeypatch)[1:3] == ["-m", "implement_clause"]
+
+
+def test_invoke_implement_clause_clause(monkeypatch) -> None:
+    """Passes --clause with correct value."""
+    cmd = _invoke_clause_and_capture(monkeypatch)
+    assert cmd[cmd.index("--clause") + 1] == "15"
+
+
+def test_invoke_implement_clause_sub_issue(monkeypatch) -> None:
+    """Passes --sub-issue as string."""
+    cmd = _invoke_clause_and_capture(monkeypatch)
+    assert cmd[cmd.index("--sub-issue") + 1] == "17"
+
+
+def test_invoke_implement_clause_master_issue(monkeypatch) -> None:
+    """Passes --master-issue as string."""
+    cmd = _invoke_clause_and_capture(monkeypatch)
+    assert cmd[cmd.index("--master-issue") + 1] == "1"
+
+
+def test_invoke_implement_clause_organization(monkeypatch) -> None:
+    """Passes --organization with correct value."""
+    cmd = _invoke_clause_and_capture(monkeypatch)
+    assert cmd[cmd.index("--organization") + 1] == "deltahdl"
+
+
+def test_invoke_implement_clause_repo(monkeypatch) -> None:
+    """Passes --repo with correct value."""
+    cmd = _invoke_clause_and_capture(monkeypatch)
+    assert cmd[cmd.index("--repo") + 1] == "deltahdl"
+
+
+def test_invoke_implement_clause_failure(monkeypatch) -> None:
+    """Calls sys.exit on nonzero returncode."""
+    stub_subprocess_failure(monkeypatch)
+    with pytest.raises(SystemExit):
+        invoke_implement_clause(
+            lrm="/tmp/lrm.pdf",
+            clause="15",
+            sub_issue=17,
+            master_issue=1,
+            organization="deltahdl",
+            repo="deltahdl",
         )
