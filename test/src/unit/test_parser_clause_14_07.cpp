@@ -1,12 +1,11 @@
-#include "builders_ast.h"
-#include "fixture_simulator.h"
+#include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(ParserSection19, ClockingBlock_InProgram) {
+TEST(ClockingScopeParse, InProgram) {
   EXPECT_TRUE(
       ParseOk("program test_prog(input clk, input [7:0] data);\n"
               "  clocking cb @(posedge clk);\n"
@@ -15,7 +14,7 @@ TEST(ParserSection19, ClockingBlock_InProgram) {
               "endprogram\n"));
 }
 
-TEST(ParserSection4, Sec4_6_ProgramWithClockingBlock) {
+TEST(ClockingScopeParse, ProgramWithClockingAndInitial) {
   EXPECT_TRUE(
       ParseOk("program p(input logic clk);\n"
               "  clocking cb @(posedge clk);\n"
@@ -29,7 +28,7 @@ TEST(ParserSection4, Sec4_6_ProgramWithClockingBlock) {
               "endprogram\n"));
 }
 
-TEST(ParserSection19, ClockingBlockScope_AmongOtherItems) {
+TEST(ClockingScopeParse, AmongOtherModuleItems) {
   auto r = Parse(
       "module t;\n"
       "  logic clk;\n"
@@ -48,13 +47,44 @@ TEST(ParserSection19, ClockingBlockScope_AmongOtherItems) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 4u);
 }
 
-TEST(ParserSection19, ClockingBlockScope_InChecker) {
+TEST(ClockingScopeParse, InChecker) {
   EXPECT_TRUE(
       ParseOk("checker my_check(input clk, input data);\n"
               "  clocking cb @(posedge clk);\n"
               "    input data;\n"
               "  endclocking\n"
               "endchecker\n"));
+}
+
+TEST(ClockingScopeParse, DotAccessToClockvar) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  clocking dom @(posedge clk);\n"
+              "    input sig;\n"
+              "  endclocking\n"
+              "  initial begin\n"
+              "    $display(dom.sig);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ClockingScopeParse, MultipleBlocksInModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb1 @(posedge clk);\n"
+      "    input a;\n"
+      "  endclocking\n"
+      "  clocking cb2 @(negedge clk);\n"
+      "    output b;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  int count = 0;
+  for (const auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kClockingBlock) ++count;
+  }
+  EXPECT_EQ(count, 2);
 }
 
 }  // namespace
