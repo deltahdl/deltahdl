@@ -172,6 +172,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
 // §3.12.1: Register CU-scope typedefs, classes, and imports so they are
 // visible during module elaboration.
 void Elaborator::RegisterCuScopeItems() {
+  // §15.3: semaphore is a built-in class type in the std package.
+  class_names_.insert("semaphore");
   for (auto* item : unit_->cu_items) {
     if (!item->name.empty()) cu_scope_names_.insert(item->name);
     if (item->kind == ModuleItemKind::kTypedef) {

@@ -64,4 +64,31 @@ TEST(IpcSync, MultipleSemaphoresInContext) {
   EXPECT_NE(f.ctx.FindSemaphore("s1"), f.ctx.FindSemaphore("s2"));
 }
 
+// §15.3: Semaphore as mutual exclusion — one key means only one
+// process can hold it at a time; others fail TryGet until Put.
+TEST(IpcSync, SemaphoreMutualExclusionPattern) {
+  SemaphoreObject sem(1);
+  // First process acquires the key.
+  EXPECT_EQ(sem.TryGet(1), 1);
+  EXPECT_EQ(sem.key_count, 0);
+  // Second process cannot acquire — bucket empty.
+  EXPECT_EQ(sem.TryGet(1), 0);
+  EXPECT_EQ(sem.key_count, 0);
+  // First process returns the key.
+  sem.Put(1);
+  EXPECT_EQ(sem.key_count, 1);
+  // Now the second process can acquire.
+  EXPECT_EQ(sem.TryGet(1), 1);
+  EXPECT_EQ(sem.key_count, 0);
+}
+
+// §15.3: Key count can increase beyond initial allocation via Put.
+TEST(IpcSync, SemaphoreKeyCountCanExceedInitial) {
+  SemaphoreObject sem(2);
+  sem.Put(3);
+  EXPECT_EQ(sem.key_count, 5);
+  EXPECT_EQ(sem.TryGet(5), 1);
+  EXPECT_EQ(sem.key_count, 0);
+}
+
 }  // namespace
