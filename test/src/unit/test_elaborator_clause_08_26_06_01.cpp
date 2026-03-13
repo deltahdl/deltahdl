@@ -1,4 +1,4 @@
-
+// §8.26.6.1
 
 #include "fixture_elaborator.h"
 
@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA82661, SingleImplResolvesConflictOk) {
+TEST(InterfaceClassMethodConflict, SingleImplResolvesConflict) {
   EXPECT_TRUE(
       ElabOk("interface class IntfBase1;\n"
              "  pure virtual function bit funcBase();\n"
