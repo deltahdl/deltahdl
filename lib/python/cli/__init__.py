@@ -165,6 +165,30 @@ def invoke_implement_subclause(
         sys.exit(result.returncode)
 
 
+def invoke_implement_subclauses(
+    params: ClauseParams,
+    subclauses: list[str],
+    clause_issue: int,
+    *,
+    model: str = "opus",
+) -> None:
+    """Shell out to ``python -m implement_subclauses``."""
+    print(f"Invoking implement_subclauses for {','.join(subclauses)}...")
+    cmd = [
+        sys.executable, "-m", "implement_subclauses",
+        "--lrm", params.lrm,
+        "--subclauses", ",".join(subclauses),
+        "--clause-issue", str(clause_issue),
+        "--master-issue", str(params.master_issue),
+        "--organization", params.organization,
+        "--repo", params.repo,
+        "--model", model,
+    ]
+    result = subprocess.run(cmd, check=False)
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+
+
 def invoke_implement_clause(
     params: ClauseParams, clause: str, sub_issue: int,
 ) -> None:

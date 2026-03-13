@@ -16,6 +16,7 @@ from lib.python.cli import (
     add_model_arg,
     invoke_implement_clause,
     invoke_implement_subclause,
+    invoke_implement_subclauses,
     parse_and_validate,
     parse_clause_issues,
     validate_lrm,
@@ -310,6 +311,76 @@ def test_invoke_implement_clause_failure(monkeypatch) -> None:
     stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
         invoke_implement_clause(_CL_PARAMS, "15", 17)
+
+
+# ---- invoke_implement_subclauses -------------------------------------------
+
+
+def _invoke_subclauses_and_capture(monkeypatch):
+    """Invoke with stubbed subprocess and return captured command."""
+    captured = stub_subprocess_success(monkeypatch)
+    invoke_implement_subclauses(_CL_PARAMS, ["6.1", "6.2"], 42)
+    return captured[0]
+
+
+def test_invoke_implement_subclauses_calls_python(monkeypatch) -> None:
+    """Invokes the current Python interpreter."""
+    assert _invoke_subclauses_and_capture(monkeypatch)[0] == sys.executable
+
+
+def test_invoke_implement_subclauses_module(monkeypatch) -> None:
+    """Passes -m implement_subclauses."""
+    cmd = _invoke_subclauses_and_capture(monkeypatch)
+    assert cmd[1:3] == ["-m", "implement_subclauses"]
+
+
+def test_invoke_implement_subclauses_lrm(monkeypatch) -> None:
+    """Passes --lrm with correct value."""
+    cmd = _invoke_subclauses_and_capture(monkeypatch)
+    assert cmd[cmd.index("--lrm") + 1] == "/tmp/lrm.pdf"
+
+
+def test_invoke_implement_subclauses_subclauses(monkeypatch) -> None:
+    """Passes --subclauses as comma-joined string."""
+    cmd = _invoke_subclauses_and_capture(monkeypatch)
+    assert cmd[cmd.index("--subclauses") + 1] == "6.1,6.2"
+
+
+def test_invoke_implement_subclauses_clause_issue(monkeypatch) -> None:
+    """Passes --clause-issue as string."""
+    cmd = _invoke_subclauses_and_capture(monkeypatch)
+    assert cmd[cmd.index("--clause-issue") + 1] == "42"
+
+
+def test_invoke_implement_subclauses_master_issue(monkeypatch) -> None:
+    """Passes --master-issue as string."""
+    cmd = _invoke_subclauses_and_capture(monkeypatch)
+    assert cmd[cmd.index("--master-issue") + 1] == "1"
+
+
+def test_invoke_implement_subclauses_organization(monkeypatch) -> None:
+    """Passes --organization with correct value."""
+    cmd = _invoke_subclauses_and_capture(monkeypatch)
+    assert cmd[cmd.index("--organization") + 1] == "deltahdl"
+
+
+def test_invoke_implement_subclauses_repo(monkeypatch) -> None:
+    """Passes --repo with correct value."""
+    cmd = _invoke_subclauses_and_capture(monkeypatch)
+    assert cmd[cmd.index("--repo") + 1] == "deltahdl"
+
+
+def test_invoke_implement_subclauses_model(monkeypatch) -> None:
+    """Passes --model with default opus."""
+    cmd = _invoke_subclauses_and_capture(monkeypatch)
+    assert cmd[cmd.index("--model") + 1] == "opus"
+
+
+def test_invoke_implement_subclauses_failure(monkeypatch) -> None:
+    """Calls sys.exit on nonzero returncode."""
+    stub_subprocess_failure(monkeypatch)
+    with pytest.raises(SystemExit):
+        invoke_implement_subclauses(_CL_PARAMS, ["6.1"], 42)
 
 
 # ---- parse_and_validate ----------------------------------------------------

@@ -85,7 +85,11 @@ def main(argv: list[str] | None = None) -> None:
 
     for i, subclause in enumerate(subclauses):
         continue_session = args.continue_session if i == 0 else True
-        invoke_implement_subclause(params, subclause, continue_session)
+        children = sorted(
+            s for s in subclauses if s.startswith(subclause + ".")
+        )
+        exclude = ",".join(children)
+        invoke_implement_subclause(params, subclause, continue_session, exclude)
 
     body = fetch_issue_body(
         args.organization, args.repo, args.clause_issue,

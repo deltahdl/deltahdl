@@ -18,7 +18,7 @@ def _patch_externals(monkeypatch, iscs, patch_completion, *, all_complete=True):
     """Patch subprocess and GitHub calls, return call trackers."""
     calls = []
 
-    def fake_invoke(_lrm, sub, _issue, _model, cont):
+    def fake_invoke(_params, sub, cont, _exclude=""):
         calls.append(("invoke", sub, cont))
 
     monkeypatch.setattr(iscs, "invoke_implement_subclause", fake_invoke)

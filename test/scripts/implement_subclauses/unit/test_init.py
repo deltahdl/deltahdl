@@ -300,6 +300,37 @@ def test_main_does_not_mark_master_when_incomplete(
     assert not mock_mark.called
 
 
+def _argv_with_subclauses(tmp_path, subclauses_csv):
+    """Build argv with a custom --subclauses value."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    return [
+        "--lrm", str(lrm), "--subclauses", subclauses_csv,
+        "--clause-issue", "8", "--master-issue", "1",
+        "--organization", "o", "--repo", "r",
+    ]
+
+
+def test_main_passes_children_as_exclude(
+    iscs, monkeypatch, tmp_path, patch_completion,
+):
+    """Parent subclause excludes its children."""
+    mock_invoke, _, __ = _patch_main(monkeypatch, iscs, patch_completion)
+    argv = _argv_with_subclauses(tmp_path, "4.2,4.2.1,4.2.2")
+    iscs.main(argv)
+    assert mock_invoke.call_args_list[0][0][3] == "4.2.1,4.2.2"
+
+
+def test_main_no_children_passes_empty_exclude(
+    iscs, monkeypatch, tmp_path, patch_completion,
+):
+    """Leaf subclause passes empty exclude."""
+    mock_invoke, _, __ = _patch_main(monkeypatch, iscs, patch_completion)
+    argv = _argv_with_subclauses(tmp_path, "4.2,4.2.1,4.2.2")
+    iscs.main(argv)
+    assert mock_invoke.call_args_list[1][0][3] == ""
+
+
 # ---- __main__ guard ---------------------------------------------------------
 
 
