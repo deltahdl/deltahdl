@@ -496,6 +496,17 @@ def test_run_dry_run_shows_target(tmp_path, monkeypatch, capsys, ct,
     assert "test_parser_clause_06_01.cpp" in capsys.readouterr().out
 
 
+def test_run_prints_action_moved(tmp_path, monkeypatch, capsys, ct,
+                                 ct_helpers):
+    """_run prints action line when test is moved."""
+    _run = getattr(ct, "_run")
+    _make_input_file(tmp_path)
+    ct_helpers.stub_classifier(monkeypatch, _parser_response())
+    args = _run_args(tmp_path, dry_run=True)
+    _run(args)
+    assert "Action: Moved to test_parser_clause_06_01.cpp" in capsys.readouterr().out
+
+
 def _setup_live_run(ct, ct_helpers, tmp_path, monkeypatch):
     """Create input file, cmake, and stub classifier for a live run."""
     _make_input_file(tmp_path)
@@ -625,6 +636,18 @@ def _self_named_classifier(_prompt, schema=None):
                 "suite_name": "AigGraph", "test_name": "T"}
     return {"clause": "non-lrm", "rationale": "r",
             "suite_name": "AigGraph", "test_name": "T"}
+
+
+def test_run_prints_action_kept(tmp_path, monkeypatch, capsys, ct, ct_helpers):
+    """_run prints action line when test is kept in the same file."""
+    monkeypatch.setattr(ct, "_call_claude", _self_named_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
+    _run_live_non_lrm(
+        ct, tmp_path, monkeypatch,
+        src_body="#include <gtest/gtest.h>\n\n"
+        "TEST(S, T) {\n  auto r = Parse(src);\n}\n",
+    )
+    assert "Action: Kept in the same file" in capsys.readouterr().out
 
 
 def test_run_live_self_named(tmp_path, monkeypatch, ct, ct_helpers):
@@ -905,6 +928,24 @@ def test_run_rename_in_place_commits(tmp_path, monkeypatch, ct):
                       src_body="#include <gtest/gtest.h>\n\n"
                       "TEST(S, T) {\n  auto r = Parse(src);\n}\n")
     assert len(committed) == 1
+
+
+def test_run_commit_includes_action(tmp_path, monkeypatch, ct):
+    """Commit message includes the action remark."""
+    monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
+    monkeypatch.setattr(
+        ct, "maybe_update_issue_status",
+        lambda _args, _tests, **_kw: None,
+    )
+    committed = []
+    monkeypatch.setattr(
+        ct, "commit_classification",
+        committed.append,
+    )
+    _run_live_non_lrm(ct, tmp_path, monkeypatch,
+                      src_body="#include <gtest/gtest.h>\n\n"
+                      "TEST(S, T) {\n  auto r = Parse(src);\n}\n")
+    assert "action" in committed[0]
 
 
 def test_run_rename_in_place_no_commit(tmp_path, monkeypatch, ct):

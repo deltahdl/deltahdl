@@ -28,6 +28,7 @@ from lib.python.classify import (
 )
 from ._github import (
     _validate_issue_args,
+    build_action_remark,
     fetch_issue_body,
     maybe_update_issue_status,
     update_issue_body,
@@ -842,7 +843,7 @@ def _update_source(filepath, parsed, ctx):
     return 0
 
 
-def _apply_rename_in_place(args, filepath, parsed, target):
+def _apply_rename_in_place(args, filepath, parsed, target, action=""):
     """Rewrite the source file when a test is renamed but stays in place.
 
     Returns True if a rename was applied (caller should return),
@@ -867,6 +868,7 @@ def _apply_rename_in_place(args, filepath, parsed, target):
             "to_merge": [], "new_names": [],
             "test_dir": Path(args.output_dir).resolve(),
             "cmake_path": CMAKE_PATH,
+            "action": action,
         })
     return True
 
@@ -890,6 +892,12 @@ def _run(args):
         t.test_name: clause_to_filename(t.prefix, t.clause) + ".cpp"
         for t in target
     }
+    action = build_action_remark(
+        target[0],
+        source_is_target=source_is_target,
+        target_filename=target_filenames.get(target[0].test_name, ""),
+    )
+    print(f"  Action: {action}")
     if args.issue is not None:
         maybe_update_issue_status(
             args, target,
@@ -911,7 +919,7 @@ def _run(args):
     if args.dry_run:
         return
     if not to_create and not to_merge and source_is_target and n_removed == 0:
-        _apply_rename_in_place(args, filepath, parsed, target)
+        _apply_rename_in_place(args, filepath, parsed, target, action)
         return
     new_names = _write_files(to_create, to_merge, parsed, {
         "test_dir": Path(args.output_dir).resolve(),
@@ -940,7 +948,8 @@ def _run(args):
             "filepath": filepath, "target": target,
             "to_merge": to_merge, "new_names": new_names,
             "test_dir": Path(args.output_dir).resolve(),
-            "cmake_path": CMAKE_PATH})
+            "cmake_path": CMAKE_PATH,
+            "action": action})
 
 
 def main():

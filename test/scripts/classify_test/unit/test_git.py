@@ -204,3 +204,34 @@ def test_commit_classification_message_has_test_name(monkeypatch, tmp_path, ct_g
     )])
     commit_classification(ctx)
     assert "FooBar" in captured["message"]
+
+
+# ---- build_commit_message with action --------------------------------------
+
+
+def test_build_commit_message_with_action(ct_git):
+    """Action text appears in message body."""
+    msg = ct_git.build_commit_message(
+        "T", "6.1", "rationale", action="Kept in the same file",
+    )
+    assert "Action: Kept in the same file" in msg
+
+
+def test_build_commit_message_without_action(ct_git):
+    """No 'Action:' line when action is empty."""
+    msg = ct_git.build_commit_message("T", "6.1", "rationale")
+    assert "Action:" not in msg
+
+
+# ---- commit_classification with action -------------------------------------
+
+
+def test_commit_classification_passes_action(monkeypatch, tmp_path, ct_git):
+    """Action from ctx appears in commit message."""
+    commit_classification = ct_git.commit_classification
+    captured = _stub_commit_push(monkeypatch, ct_git)
+    ctx = _make_ctx(
+        tmp_path, action="Moved to test_parser_clause_06_01.cpp",
+    )
+    commit_classification(ctx)
+    assert "Action: Moved to test_parser_clause_06_01.cpp" in captured["message"]

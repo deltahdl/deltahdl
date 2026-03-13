@@ -7,7 +7,7 @@ from lib.python.git import commit_and_push, run_git
 _run_git = run_git
 
 
-def build_commit_message(test_name, clause, rationale):
+def build_commit_message(test_name, clause, rationale, action=""):
     """Build a classify_test commit message.
 
     Format:
@@ -15,11 +15,16 @@ def build_commit_message(test_name, clause, rationale):
 
         <rationale>
 
+        Action: <action>
+
         Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
     """
     title = f"Classify {test_name} → {_format_clause(clause)} [skip ci]"
     trailer = "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-    return f"{title}\n\n{rationale}\n\n{trailer}\n"
+    body = rationale
+    if action:
+        body = f"{rationale}\n\nAction: {action}"
+    return f"{title}\n\n{body}\n\n{trailer}\n"
 
 
 def commit_classification(ctx):
@@ -38,5 +43,6 @@ def commit_classification(ctx):
     else:
         deleted.append(filepath)
     t = ctx["target"][0]
-    msg = build_commit_message(t.test_name, t.clause, t.rationale)
+    action = ctx.get("action", "")
+    msg = build_commit_message(t.test_name, t.clause, t.rationale, action)
     commit_and_push(changed, deleted, msg)

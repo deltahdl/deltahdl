@@ -420,3 +420,69 @@ def test_maybe_update_same_name_no_rename_remark(
         monkeypatch, ct_github, ct_helpers, source_is_target=True,
     )
     assert "renamed" not in updated[0]
+
+
+# ---- build_action_remark ---------------------------------------------------
+
+
+def test_build_action_remark_kept(ct_github, ct_helpers):
+    """Returns 'Kept in the same file' when source_is_target."""
+    t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
+    result = ct_github.build_action_remark(
+        t, source_is_target=True,
+    )
+    assert result == "Kept in the same file"
+
+
+def test_build_action_remark_moved(ct_github, ct_helpers):
+    """Returns 'Moved to ...' when target_filename is set."""
+    t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
+    result = ct_github.build_action_remark(
+        t, source_is_target=False, target_filename="foo.cpp",
+    )
+    assert result == "Moved to foo.cpp"
+
+
+def test_build_action_remark_kept_and_renamed(ct_github, ct_helpers):
+    """Returns 'Kept ... but renamed ...' when kept and renamed."""
+    t = ct_helpers.make_test_block(
+        "NewName", prefix="test_parser_", clause="6.1",
+    )
+    t.original_test_name = "OldName"
+    result = ct_github.build_action_remark(
+        t, source_is_target=True,
+    )
+    assert result == "Kept in the same file but renamed to NewName"
+
+
+def test_build_action_remark_moved_and_renamed(ct_github, ct_helpers):
+    """Returns 'Moved ... and renamed ...' when moved and renamed."""
+    t = ct_helpers.make_test_block(
+        "NewName", prefix="test_parser_", clause="6.1",
+    )
+    t.original_test_name = "OldName"
+    result = ct_github.build_action_remark(
+        t, source_is_target=False, target_filename="foo.cpp",
+    )
+    assert result == "Moved to foo.cpp and renamed to NewName"
+
+
+def test_build_action_remark_no_action(ct_github, ct_helpers):
+    """Returns empty string when not kept and no target filename."""
+    t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
+    result = ct_github.build_action_remark(
+        t, source_is_target=False,
+    )
+    assert result == ""
+
+
+def test_build_action_remark_renamed_only(ct_github, ct_helpers):
+    """Returns 'renamed to ...' when only renamed with no location info."""
+    t = ct_helpers.make_test_block(
+        "NewName", prefix="test_parser_", clause="6.1",
+    )
+    t.original_test_name = "OldName"
+    result = ct_github.build_action_remark(
+        t, source_is_target=False,
+    )
+    assert result == "renamed to NewName"
