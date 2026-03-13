@@ -30,7 +30,7 @@ TEST(InterfaceClassImplements, InterfaceImplementsInterfaceError) {
              "endmodule\n"));
 }
 
-TEST(ElabA8262, InterfaceExtendsClassError) {
+TEST(InterfaceClassInheritance, InterfaceExtendsClassError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "endclass\n"
