@@ -873,21 +873,8 @@ def _apply_rename_in_place(args, filepath, parsed, target, action=""):
     return True
 
 
-def _run(args):
-    """Execute the split operation."""
-    _validate_issue_args(args)
-    filepath = Path(args.file).resolve()
-    parsed, target = _validate_input(filepath, args.suite, args.test)
-    classify_tests(
-        target, Path(args.output_dir).resolve(),
-        Path(args.lrm).resolve(),
-    )
-    print_classification_table(target)
-    groups = _group_tests(target)
-    source_is_target = any(
-        clause_to_filename(p, c) == filepath.stem
-        for p, c in groups
-    )
+def _report_action(args, target, source_is_target):
+    """Print action, update issue if needed, and return the action string."""
     target_filenames = {
         t.test_name: clause_to_filename(t.prefix, t.clause) + ".cpp"
         for t in target
@@ -904,6 +891,25 @@ def _run(args):
             source_is_target=source_is_target,
             target_filenames=target_filenames,
         )
+    return action
+
+
+def _run(args):
+    """Execute the split operation."""
+    _validate_issue_args(args)
+    filepath = Path(args.file).resolve()
+    parsed, target = _validate_input(filepath, args.suite, args.test)
+    classify_tests(
+        target, Path(args.output_dir).resolve(),
+        Path(args.lrm).resolve(),
+    )
+    print_classification_table(target)
+    groups = _group_tests(target)
+    source_is_target = any(
+        clause_to_filename(p, c) == filepath.stem
+        for p, c in groups
+    )
+    action = _report_action(args, target, source_is_target)
     to_create, to_merge, n_removed = _resolve_destinations(
         groups, Path(args.output_dir).resolve(),
         exclude_path=filepath, dry_run=args.dry_run,

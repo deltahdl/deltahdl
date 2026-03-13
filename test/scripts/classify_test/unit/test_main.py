@@ -887,64 +887,54 @@ def _rename_classifier(_prompt, schema=None):
     return {"clause": "non-lrm", "rationale": "r",
             "suite_name": "AigGraph", "test_name": "Renamed"}
 
+_RENAME_BODY = ("#include <gtest/gtest.h>\n\n"
+                "TEST(S, T) {\n  auto r = Parse(src);\n}\n")
+
+
+def _run_rename(ct, ct_helpers, tmp_path, monkeypatch):
+    """Run live non-lrm pipeline with the rename classifier."""
+    monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
+    ct_helpers.stub_side_effects(monkeypatch)
+    _run_live_non_lrm(ct, tmp_path, monkeypatch, src_body=_RENAME_BODY)
+
 
 def test_run_rename_in_place_rewrites_file(tmp_path, monkeypatch, ct,
                                             ct_helpers):
     """Rename-in-place rewrites the source file with the new test name."""
-    monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
-    ct_helpers.stub_side_effects(monkeypatch)
-    _run_live_non_lrm(ct, tmp_path, monkeypatch,
-                      src_body="#include <gtest/gtest.h>\n\n"
-                      "TEST(S, T) {\n  auto r = Parse(src);\n}\n")
-    src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
-    assert "TEST(AigGraph, Renamed)" in src
+    _run_rename(ct, ct_helpers, tmp_path, monkeypatch)
+    assert "TEST(AigGraph, Renamed)" in \
+        (tmp_path / "test_non_lrm_aig.cpp").read_text()
 
 
 def test_run_rename_in_place_removes_old_name(tmp_path, monkeypatch, ct,
                                                ct_helpers):
     """Rename-in-place removes the old TEST macro name from the file."""
+    _run_rename(ct, ct_helpers, tmp_path, monkeypatch)
+    assert "TEST(S, T)" not in \
+        (tmp_path / "test_non_lrm_aig.cpp").read_text()
+
+
+def _run_rename_commit(ct, tmp_path, monkeypatch):
+    """Stub issue update, capture commits, run rename pipeline."""
     monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
-    ct_helpers.stub_side_effects(monkeypatch)
-    _run_live_non_lrm(ct, tmp_path, monkeypatch,
-                      src_body="#include <gtest/gtest.h>\n\n"
-                      "TEST(S, T) {\n  auto r = Parse(src);\n}\n")
-    src = (tmp_path / "test_non_lrm_aig.cpp").read_text()
-    assert "TEST(S, T)" not in src
+    monkeypatch.setattr(
+        ct, "maybe_update_issue_status",
+        lambda _args, _tests, **_kw: None,
+    )
+    committed = []
+    monkeypatch.setattr(ct, "commit_classification", committed.append)
+    _run_live_non_lrm(ct, tmp_path, monkeypatch, src_body=_RENAME_BODY)
+    return committed
 
 
 def test_run_rename_in_place_commits(tmp_path, monkeypatch, ct):
     """Rename-in-place calls commit_classification."""
-    monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
-    monkeypatch.setattr(
-        ct, "maybe_update_issue_status",
-        lambda _args, _tests, **_kw: None,
-    )
-    committed = []
-    monkeypatch.setattr(
-        ct, "commit_classification",
-        committed.append,
-    )
-    _run_live_non_lrm(ct, tmp_path, monkeypatch,
-                      src_body="#include <gtest/gtest.h>\n\n"
-                      "TEST(S, T) {\n  auto r = Parse(src);\n}\n")
-    assert len(committed) == 1
+    assert len(_run_rename_commit(ct, tmp_path, monkeypatch)) == 1
 
 
 def test_run_commit_includes_action(tmp_path, monkeypatch, ct):
     """Commit message includes the action remark."""
-    monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
-    monkeypatch.setattr(
-        ct, "maybe_update_issue_status",
-        lambda _args, _tests, **_kw: None,
-    )
-    committed = []
-    monkeypatch.setattr(
-        ct, "commit_classification",
-        committed.append,
-    )
-    _run_live_non_lrm(ct, tmp_path, monkeypatch,
-                      src_body="#include <gtest/gtest.h>\n\n"
-                      "TEST(S, T) {\n  auto r = Parse(src);\n}\n")
+    committed = _run_rename_commit(ct, tmp_path, monkeypatch)
     assert "action" in committed[0]
 
 
@@ -956,14 +946,9 @@ def test_run_rename_in_place_no_commit(tmp_path, monkeypatch, ct):
         lambda _args, _tests, **_kw: None,
     )
     committed = []
-    monkeypatch.setattr(
-        ct, "commit_classification",
-        committed.append,
-    )
+    monkeypatch.setattr(ct, "commit_classification", committed.append)
     src = tmp_path / "test_non_lrm_aig.cpp"
-    src.write_text("#include <gtest/gtest.h>\n\n"
-                   "TEST(S, T) {\n  auto r = Parse(src);\n}\n",
-                   encoding="utf-8")
+    src.write_text(_RENAME_BODY, encoding="utf-8")
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(f"# header\nadd_unit_test({src.stem})\n",
                      encoding="utf-8")
