@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA611, ClockingDeclAssignWithHierExpr) {
+TEST(ClockingHierExprParse, SimpleHierarchicalExpression) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -21,7 +21,7 @@ TEST(ParserA611, ClockingDeclAssignWithHierExpr) {
   EXPECT_NE(item->clocking_signals[0].hier_expr, nullptr);
 }
 
-TEST(ParserA611, ClockingDeclAssignMultipleMixed) {
+TEST(ClockingHierExprParse, MixedSignalsWithAndWithoutHierExpr) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -38,7 +38,7 @@ TEST(ParserA611, ClockingDeclAssignMultipleMixed) {
   EXPECT_EQ(item->clocking_signals[2].hier_expr, nullptr);
 }
 
-TEST(ParserSection19, ClockingBlock_HierarchicalExpr) {
+TEST(ClockingHierExprParse, DeepHierarchicalPath) {
   auto r = Parse(
       "module t;\n"
       "  clocking cb @(posedge clk);\n"
@@ -52,7 +52,7 @@ TEST(ParserSection19, ClockingBlock_HierarchicalExpr) {
   ASSERT_NE(item->clocking_signals[0].hier_expr, nullptr);
 }
 
-TEST(ParserSection14, HierarchicalExpression) {
+TEST(ClockingHierExprParse, HierExprWithFindHelper) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -65,6 +65,70 @@ TEST(ParserSection14, HierarchicalExpression) {
   ASSERT_EQ(item->clocking_signals.size(), 1u);
   EXPECT_EQ(item->clocking_signals[0].name, "enable");
   ASSERT_NE(item->clocking_signals[0].hier_expr, nullptr);
+}
+
+TEST(ClockingHierExprParse, ConcatenationExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking mem @(clock);\n"
+      "    input instruction = { opcode, regA, regB[3:1] };\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].name, "instruction");
+  EXPECT_NE(item->clocking_signals[0].hier_expr, nullptr);
+}
+
+TEST(ClockingHierExprParse, OutputWithHierExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output ack = top.dut.ack;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].name, "ack");
+  EXPECT_NE(item->clocking_signals[0].hier_expr, nullptr);
+}
+
+TEST(ClockingHierExprParse, InoutWithHierExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    inout data = top.dut.data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].name, "data");
+  EXPECT_NE(item->clocking_signals[0].hier_expr, nullptr);
+}
+
+TEST(ClockingHierExprParse, PartSelectExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input nibble = data[7:4];\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].name, "nibble");
+  EXPECT_NE(item->clocking_signals[0].hier_expr, nullptr);
 }
 
 }  // namespace
