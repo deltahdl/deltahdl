@@ -1,10 +1,12 @@
+// §8.26.6.3
+
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(ElabA82663, DiamondInheritanceOk) {
+TEST(InterfaceClassDiamondInheritance, DiamondInheritanceOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfBase;\n"
              "  pure virtual function bit funcBase();\n"
