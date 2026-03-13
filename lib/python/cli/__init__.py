@@ -46,6 +46,26 @@ def validate_lrm(parser: argparse.ArgumentParser, args: argparse.Namespace) -> N
         parser.error(f"LRM file not found: {args.lrm}")
 
 
+def add_github_args(parser: argparse.ArgumentParser) -> None:
+    """Add ``--master-issue``, ``--organization``, and ``--repo`` to *parser*."""
+    parser.add_argument(
+        "--master-issue",
+        type=int,
+        required=True,
+        help="GitHub master tracking issue number.",
+    )
+    parser.add_argument(
+        "--organization",
+        required=True,
+        help="GitHub organization.",
+    )
+    parser.add_argument(
+        "--repo",
+        required=True,
+        help="GitHub repository.",
+    )
+
+
 def parse_clause_issues(raw: str) -> dict[str, int]:
     """Parse comma-separated ``clause=issue`` pairs.
 
@@ -94,6 +114,7 @@ def invoke_implement_subclause(
     issue: int,
     model: str,
     continue_session: bool,
+    exclude: str = "",
 ) -> None:
     """Shell out to ``python -m implement_subclause``."""
     print(f"Invoking implement_subclause for {subclause}...")
@@ -106,6 +127,8 @@ def invoke_implement_subclause(
     ]
     if continue_session:
         cmd.append("--continue")
+    if exclude:
+        cmd.extend(["--exclude", exclude])
     result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
         sys.exit(result.returncode)

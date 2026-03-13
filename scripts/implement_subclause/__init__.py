@@ -67,6 +67,7 @@ def format_prompt(
     lrm: str,
     *,
     issue: int,
+    exclude: str = "",
 ) -> str:
     """Assemble the implementation prompt from structured inputs."""
     h = build_hierarchy(subclause)
@@ -119,6 +120,15 @@ def format_prompt(
         " Do not implement any other subclauses.",
     )
 
+    if exclude:
+        excluded = [f"§{s.strip()}" for s in exclude.split(",")]
+        lines.append(
+            f"{', '.join(excluded)} will be implemented separately."
+            " Do NOT implement their requirements."
+            " Do NOT place tests for them in your files."
+            f" Only implement requirements stated directly in §{subclause}.",
+        )
+
     examples = [
         clause_to_filename(prefix, subclause) + ".cpp"
         for _stage, prefix in sorted(STAGE_TO_PREFIX.items())
@@ -146,9 +156,10 @@ def build_prompt(
     lrm: str,
     *,
     issue: int,
+    exclude: str = "",
 ) -> str:
     """Build the implementation prompt for any clause depth."""
-    return format_prompt(clause, lrm, issue=issue)
+    return format_prompt(clause, lrm, issue=issue, exclude=exclude)
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +234,9 @@ def commit_implementation(subclause):
 
 def run_prompt(build_fn, args: argparse.Namespace) -> None:
     """Build a prompt via *build_fn* and invoke Claude."""
-    prompt = build_fn(args.subclause, str(args.lrm), issue=args.issue)
+    prompt = build_fn(
+        args.subclause, str(args.lrm), issue=args.issue, exclude=args.exclude,
+    )
     print(f"Built prompt ({len(prompt)} characters)")
     invoke_claude(
         prompt, model=args.model,
@@ -252,6 +265,12 @@ def parse_args(argv=None):
         type=int,
         required=True,
         help="GitHub Issue number to read and correct after implementation.",
+    )
+    parser.add_argument(
+        "--exclude",
+        type=str,
+        default="",
+        help="Comma-separated child subclauses to exclude (handled separately).",
     )
     add_model_arg(parser)
     add_continue_arg(parser)

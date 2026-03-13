@@ -9,6 +9,7 @@ import pytest
 from lib.python.cli import (
     add_clauses_arg,
     add_continue_arg,
+    add_github_args,
     add_lrm_arg,
     add_model_arg,
     invoke_implement_clause,
@@ -92,6 +93,33 @@ def test_validate_lrm_file_missing() -> None:
         validate_lrm(parser, args)
 
 
+# ---- add_github_args --------------------------------------------------------
+
+
+def test_add_github_args_master_issue() -> None:
+    """Adds --master-issue as required int."""
+    parser = argparse.ArgumentParser()
+    add_github_args(parser)
+    args = parser.parse_args(["--master-issue", "1", "--organization", "o", "--repo", "r"])
+    assert args.master_issue == 1
+
+
+def test_add_github_args_organization() -> None:
+    """Adds --organization as required string."""
+    parser = argparse.ArgumentParser()
+    add_github_args(parser)
+    args = parser.parse_args(["--master-issue", "1", "--organization", "myorg", "--repo", "r"])
+    assert args.organization == "myorg"
+
+
+def test_add_github_args_repo() -> None:
+    """Adds --repo as required string."""
+    parser = argparse.ArgumentParser()
+    add_github_args(parser)
+    args = parser.parse_args(["--master-issue", "1", "--organization", "o", "--repo", "myrepo"])
+    assert args.repo == "myrepo"
+
+
 # ---- invoke_implement_subclause ---------------------------------------------
 
 
@@ -150,6 +178,26 @@ def test_invoke_implement_subclause_no_continue(monkeypatch) -> None:
 def test_invoke_implement_subclause_with_continue(monkeypatch) -> None:
     """Appends --continue when continue_session is True."""
     assert "--continue" in _invoke_and_capture(monkeypatch, continue_session=True)
+
+
+def test_invoke_implement_subclause_no_exclude(monkeypatch) -> None:
+    """Omits --exclude when exclude is empty."""
+    assert "--exclude" not in _invoke_and_capture(monkeypatch)
+
+
+def test_invoke_implement_subclause_with_exclude(monkeypatch) -> None:
+    """Appends --exclude when exclude is non-empty."""
+    captured = stub_subprocess_success(monkeypatch)
+    invoke_implement_subclause(
+        lrm="/tmp/lrm.pdf",
+        subclause="6.1",
+        issue=42,
+        model="opus",
+        continue_session=False,
+        exclude="6.1.1,6.1.2",
+    )
+    cmd = captured[0]
+    assert cmd[cmd.index("--exclude") + 1] == "6.1.1,6.1.2"
 
 
 def test_invoke_implement_subclause_failure(monkeypatch) -> None:

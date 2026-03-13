@@ -7,6 +7,7 @@ import argparse
 
 from lib.python.cli import (
     add_clauses_arg,
+    add_github_args,
     add_lrm_arg,
     invoke_implement_clause,
     validate_lrm,
@@ -21,22 +22,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     add_lrm_arg(parser)
     add_clauses_arg(parser)
-    parser.add_argument(
-        "--master-issue",
-        type=int,
-        required=True,
-        help="GitHub master tracking issue number.",
-    )
-    parser.add_argument(
-        "--organization",
-        required=True,
-        help="GitHub organization.",
-    )
-    parser.add_argument(
-        "--repo",
-        required=True,
-        help="GitHub repository.",
-    )
+    add_github_args(parser)
     args = parser.parse_args(argv)
 
     validate_lrm(parser, args)

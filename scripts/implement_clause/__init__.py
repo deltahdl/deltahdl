@@ -106,11 +106,12 @@ def invoke_implement_subclause(
     subclause: str,
     *,
     continue_session: bool = False,
+    exclude: str = "",
 ) -> None:
     """Shell out to ``python -m implement_subclause``."""
     _invoke_subclause(
         args.lrm, subclause, args.sub_issue,
-        "opus", continue_session,
+        "opus", continue_session, exclude,
     )
 
 
@@ -142,6 +143,7 @@ def _run_subclause_loop(
     impl_items: dict[str, str],
 ) -> None:
     """Sync the issue checklist and implement subclauses one at a time."""
+    all_subclauses = list(impl_items.keys())
     first = True
     while True:
         body = fetch_issue_body(args.organization, args.repo, args.sub_issue)
@@ -164,9 +166,14 @@ def _run_subclause_loop(
             )
             return
 
+        children = sorted(
+            s for s in all_subclauses if s.startswith(subclause + ".")
+        )
+        exclude = ",".join(children)
+
         print(f"Next unchecked: {subclause}")
         invoke_implement_subclause(
-            args, subclause, continue_session=not first,
+            args, subclause, continue_session=not first, exclude=exclude,
         )
         commit_and_push(subclause)
         first = False

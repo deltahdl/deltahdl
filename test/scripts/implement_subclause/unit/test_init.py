@@ -129,6 +129,27 @@ def test_parse_args_continue_default_false(isc, tmp_path):
     assert args.continue_session is False
 
 
+def test_parse_args_exclude_default_empty(isc, tmp_path):
+    """--exclude defaults to empty string."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("")
+    args = isc.parse_args([
+        "--lrm", str(lrm), "--subclause", "4.1", "--issue", "8",
+    ])
+    assert args.exclude == ""
+
+
+def test_parse_args_exclude_value(isc, tmp_path):
+    """--exclude accepts a comma-separated string."""
+    lrm = tmp_path / "lrm.txt"
+    lrm.write_text("")
+    args = isc.parse_args([
+        "--lrm", str(lrm), "--subclause", "15.3", "--issue", "8",
+        "--exclude", "15.3.1,15.3.2",
+    ])
+    assert args.exclude == "15.3.1,15.3.2"
+
+
 # ---- main ------------------------------------------------------------------
 
 

@@ -180,6 +180,28 @@ def test_format_prompt_forbids_git_commits(isc):
     assert "Do not make git commits" in result
 
 
+def test_format_prompt_exclude_lists_subclauses(isc):
+    """Prompt lists excluded subclauses when exclude is non-empty."""
+    result = isc.format_prompt(
+        "15.3", "~/LRM.txt", issue=6, exclude="15.3.1,15.3.2",
+    )
+    assert "§15.3.1" in result
+
+
+def test_format_prompt_exclude_says_separately(isc):
+    """Prompt says excluded subclauses are implemented separately."""
+    result = isc.format_prompt(
+        "15.3", "~/LRM.txt", issue=6, exclude="15.3.1,15.3.2",
+    )
+    assert "separately" in result
+
+
+def test_format_prompt_exclude_empty_no_exclusion(isc):
+    """Prompt has no exclusion text when exclude is empty."""
+    result = isc.format_prompt("15.3", "~/LRM.txt", issue=6)
+    assert "implemented separately" not in result
+
+
 # ---- invoke_claude --------------------------------------------------------
 
 
@@ -244,14 +266,14 @@ def test_invoke_claude_failure_exits(mock_popen, mock_exit, isc):
 # ---- run_prompt -----------------------------------------------------------
 
 
-def _run_prompt_and_capture(isc, tmp_path):
+def _run_prompt_and_capture(isc, tmp_path, *, exclude=""):
     """Helper: invoke run_prompt with a mock build_fn and return (mock_invoke, build_fn)."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     build_fn = MagicMock(return_value="generated prompt")
     args = argparse.Namespace(
         lrm=lrm, subclause="4.1", issue=6,
-        model="opus", continue_session=False,
+        model="opus", continue_session=False, exclude=exclude,
     )
     with patch("implement_subclause.invoke_claude") as mock_invoke:
         isc.run_prompt(build_fn, args)
@@ -276,6 +298,12 @@ def test_run_prompt_passes_subclause(isc, tmp_path):
     assert build_fn.call_args[0][0] == "4.1"
 
 
+def test_run_prompt_passes_exclude(isc, tmp_path):
+    """run_prompt passes exclude to build_fn."""
+    _, build_fn = _run_prompt_and_capture(isc, tmp_path, exclude="4.1.1,4.1.2")
+    assert build_fn.call_args[1]["exclude"] == "4.1.1,4.1.2"
+
+
 @patch("implement_subclause.invoke_claude")
 def test_run_prompt_passes_continue_session(mock_invoke, isc, tmp_path):
     """run_prompt passes continue_session to invoke_claude."""
@@ -284,7 +312,7 @@ def test_run_prompt_passes_continue_session(mock_invoke, isc, tmp_path):
     build_fn = MagicMock(return_value="generated prompt")
     args = argparse.Namespace(
         lrm=lrm, subclause="4.1", issue=6,
-        model="opus", continue_session=True,
+        model="opus", continue_session=True, exclude="",
     )
     isc.run_prompt(build_fn, args)
     assert mock_invoke.call_args[1]["continue_session"] is True

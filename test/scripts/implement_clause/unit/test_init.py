@@ -349,6 +349,22 @@ def test_invoke_implement_subclause_no_tables_flag(
     assert "--tables" not in invoke_subprocess_ok.call_args[0][0]
 
 
+def test_invoke_implement_subclause_passes_exclude(
+    ic, invoke_subprocess_ok,
+) -> None:
+    """invoke_implement_subclause passes --exclude when non-empty."""
+    ic.invoke_implement_subclause(_STUB_ARGS, "4.2", exclude="4.2.1,4.2.2")
+    assert "--exclude" in invoke_subprocess_ok.call_args[0][0]
+
+
+def test_invoke_implement_subclause_no_exclude_by_default(
+    ic, invoke_subprocess_ok,
+) -> None:
+    """invoke_implement_subclause omits --exclude by default."""
+    ic.invoke_implement_subclause(_STUB_ARGS, "4.2")
+    assert "--exclude" not in invoke_subprocess_ok.call_args[0][0]
+
+
 # --- main loop ---
 
 
@@ -403,6 +419,32 @@ def test_main_commits_with_subclause_number(
     )
     ic.main(clause_argv)
     assert mock_cap.call_args[0][0] == "4.1"
+
+
+def test_main_passes_children_as_exclude(
+    ic, monkeypatch, clause_argv,
+) -> None:
+    """main() computes children and passes them as exclude."""
+    mock_inv, _, __, ___ = _patch_main_with_subclauses(
+        monkeypatch, ic,
+        subclauses={"4.1": "General", "4.2": "Exec", "4.2.1": "Sub", "4.2.2": "Sub2"},
+        next_sub=["4.2", None],
+    )
+    ic.main(clause_argv)
+    assert mock_inv.call_args[1]["exclude"] == "4.2.1,4.2.2"
+
+
+def test_main_no_children_passes_empty_exclude(
+    ic, monkeypatch, clause_argv,
+) -> None:
+    """main() passes empty exclude when subclause has no children."""
+    mock_inv, _, __, ___ = _patch_main_with_subclauses(
+        monkeypatch, ic,
+        subclauses={"4.1": "General", "4.2": "Exec"},
+        next_sub=["4.1", None],
+    )
+    ic.main(clause_argv)
+    assert mock_inv.call_args[1]["exclude"] == ""
 
 
 # --- commit_and_push ---
