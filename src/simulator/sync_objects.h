@@ -44,7 +44,9 @@ struct SemaphoreObject {
   }
 
   // §15.3.4: Non-blocking get. Returns 1 on success, 0 on failure.
+  // Negative keyCount returns 0 (error).
   int32_t TryGet(int32_t count = 1) {
+    if (count < 0) return 0;
     if (key_count >= count) {
       key_count -= count;
       return 1;
