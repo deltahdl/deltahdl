@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 
 from lib.python.cli import (
+    ClauseParams,
+    SubclauseParams,
     add_clauses_arg,
     add_continue_arg,
     add_github_args,
@@ -14,6 +16,7 @@ from lib.python.cli import (
     add_model_arg,
     invoke_implement_clause,
     invoke_implement_subclause,
+    parse_and_validate,
     parse_clause_issues,
     validate_lrm,
 )
@@ -123,16 +126,13 @@ def test_add_github_args_repo() -> None:
 # ---- invoke_implement_subclause ---------------------------------------------
 
 
+_SC_PARAMS = SubclauseParams(lrm="/tmp/lrm.pdf", issue=42, model="opus")
+
+
 def _invoke_and_capture(monkeypatch, *, continue_session=False):
     """Invoke with stubbed subprocess and return captured command."""
     captured = stub_subprocess_success(monkeypatch)
-    invoke_implement_subclause(
-        lrm="/tmp/lrm.pdf",
-        subclause="6.1",
-        issue=42,
-        model="opus",
-        continue_session=continue_session,
-    )
+    invoke_implement_subclause(_SC_PARAMS, "6.1", continue_session)
     return captured[0]
 
 
@@ -188,14 +188,7 @@ def test_invoke_implement_subclause_no_exclude(monkeypatch) -> None:
 def test_invoke_implement_subclause_with_exclude(monkeypatch) -> None:
     """Appends --exclude when exclude is non-empty."""
     captured = stub_subprocess_success(monkeypatch)
-    invoke_implement_subclause(
-        lrm="/tmp/lrm.pdf",
-        subclause="6.1",
-        issue=42,
-        model="opus",
-        continue_session=False,
-        exclude="6.1.1,6.1.2",
-    )
+    invoke_implement_subclause(_SC_PARAMS, "6.1", False, exclude="6.1.1,6.1.2")
     cmd = captured[0]
     assert cmd[cmd.index("--exclude") + 1] == "6.1.1,6.1.2"
 
@@ -204,13 +197,7 @@ def test_invoke_implement_subclause_failure(monkeypatch) -> None:
     """Calls sys.exit on nonzero returncode."""
     stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
-        invoke_implement_subclause(
-            lrm="/tmp/lrm.pdf",
-            subclause="6.1",
-            issue=42,
-            model="opus",
-            continue_session=False,
-        )
+        invoke_implement_subclause(_SC_PARAMS, "6.1", False)
 
 
 # ---- parse_clause_issues ----------------------------------------------------
@@ -243,6 +230,16 @@ def test_parse_clause_issues_rejects_non_int_issue() -> None:
         parse_clause_issues("15=abc")
 
 
+def test_parse_clause_issues_non_int_chains_cause() -> None:
+    """Non-integer issue number chains the original ValueError."""
+    cause = None
+    try:
+        parse_clause_issues("15=abc")
+    except argparse.ArgumentTypeError as exc:
+        cause = exc.__cause__
+    assert isinstance(cause, ValueError)
+
+
 def test_parse_clause_issues_rejects_invalid_clause() -> None:
     """Invalid clause format raises ArgumentTypeError."""
     with pytest.raises(argparse.ArgumentTypeError):
@@ -260,17 +257,16 @@ def test_add_clauses_arg() -> None:
 # ---- invoke_implement_clause ------------------------------------------------
 
 
+_CL_PARAMS = ClauseParams(
+    lrm="/tmp/lrm.pdf", master_issue=1,
+    organization="deltahdl", repo="deltahdl",
+)
+
+
 def _invoke_clause_and_capture(monkeypatch):
     """Invoke with stubbed subprocess and return captured command."""
     captured = stub_subprocess_success(monkeypatch)
-    invoke_implement_clause(
-        lrm="/tmp/lrm.pdf",
-        clause="15",
-        sub_issue=17,
-        master_issue=1,
-        organization="deltahdl",
-        repo="deltahdl",
-    )
+    invoke_implement_clause(_CL_PARAMS, "15", 17)
     return captured[0]
 
 
@@ -313,11 +309,24 @@ def test_invoke_implement_clause_failure(monkeypatch) -> None:
     """Calls sys.exit on nonzero returncode."""
     stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
-        invoke_implement_clause(
-            lrm="/tmp/lrm.pdf",
-            clause="15",
-            sub_issue=17,
-            master_issue=1,
-            organization="deltahdl",
-            repo="deltahdl",
-        )
+        invoke_implement_clause(_CL_PARAMS, "15", 17)
+
+
+# ---- parse_and_validate ----------------------------------------------------
+
+
+def test_parse_and_validate_returns_namespace(tmp_path) -> None:
+    """Returns a Namespace with parsed and validated args."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.touch()
+    parser = argparse.ArgumentParser()
+    add_lrm_arg(parser)
+    assert parse_and_validate(parser, ["--lrm", str(lrm)]).lrm == lrm
+
+
+def test_parse_and_validate_rejects_missing_lrm(tmp_path) -> None:
+    """Calls parser.error when LRM file does not exist."""
+    parser = argparse.ArgumentParser()
+    add_lrm_arg(parser)
+    with pytest.raises(SystemExit):
+        parse_and_validate(parser, ["--lrm", str(tmp_path / "no.pdf")])

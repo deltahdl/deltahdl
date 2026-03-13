@@ -42,7 +42,7 @@ def test_parse_args_rejects_missing_lrm(icls, tmp_path):
 def test_parse_args_rejects_bad_clauses(icls, tmp_path):
     """Invalid clause format exits."""
     lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
+    lrm.touch()
     with pytest.raises(SystemExit):
         icls.parse_args([
             "--lrm", str(lrm), "--clauses", "bad=17",
@@ -54,7 +54,7 @@ def test_parse_args_rejects_bad_clauses(icls, tmp_path):
 def test_parse_args_requires_clauses(icls, tmp_path):
     """--clauses is required."""
     lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
+    lrm.touch()
     with pytest.raises(SystemExit):
         icls.parse_args([
             "--lrm", str(lrm),
@@ -66,7 +66,7 @@ def test_parse_args_requires_clauses(icls, tmp_path):
 def test_parse_args_requires_master_issue(icls, tmp_path):
     """--master-issue is required."""
     lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
+    lrm.touch()
     with pytest.raises(SystemExit):
         icls.parse_args([
             "--lrm", str(lrm), "--clauses", "15=17",
@@ -111,21 +111,21 @@ def test_main_passes_master_issue(icls, monkeypatch, base_argv):
     """main() passes master_issue to invoke_implement_clause."""
     mock_invoke = _patch_main(monkeypatch, icls)
     icls.main(base_argv)
-    assert mock_invoke.call_args_list[0][0][3] == 1
+    assert mock_invoke.call_args_list[0][0][0].master_issue == 1
 
 
 def test_main_passes_organization(icls, monkeypatch, base_argv):
     """main() passes organization to invoke_implement_clause."""
     mock_invoke = _patch_main(monkeypatch, icls)
     icls.main(base_argv)
-    assert mock_invoke.call_args_list[0][0][4] == "o"
+    assert mock_invoke.call_args_list[0][0][0].organization == "o"
 
 
 def test_main_passes_repo(icls, monkeypatch, base_argv):
     """main() passes repo to invoke_implement_clause."""
     mock_invoke = _patch_main(monkeypatch, icls)
     icls.main(base_argv)
-    assert mock_invoke.call_args_list[0][0][5] == "r"
+    assert mock_invoke.call_args_list[0][0][0].repo == "r"
 
 
 # ---- __main__ guard ---------------------------------------------------------

@@ -18,8 +18,8 @@ def _patch_externals(monkeypatch, icls):
     """Patch invoke_implement_clause and return call tracker."""
     calls = []
 
-    def fake_invoke(lrm, clause, sub_issue, master, org, repo):
-        calls.append((clause, sub_issue, master, org, repo))
+    def fake_invoke(ctx, clause, sub_issue):
+        calls.append((clause, sub_issue, ctx.master_issue, ctx.organization, ctx.repo))
 
     monkeypatch.setattr(icls, "invoke_implement_clause", fake_invoke)
     return calls

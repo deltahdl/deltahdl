@@ -148,15 +148,18 @@ def test_parse_args_requires_master_issue(iscs, tmp_path):
 # ---- invoke_implement_subclause ---------------------------------------------
 
 
+def _sc_params(iscs):
+    """Build a SubclauseParams for testing."""
+    return iscs.SubclauseParams("/path/lrm.pdf", 8, "opus")
+
+
 def test_invoke_builds_correct_command(iscs, monkeypatch):
     """Correct command is passed to subprocess.run."""
     mock_run = MagicMock(
         return_value=subprocess.CompletedProcess(args=[], returncode=0),
     )
     monkeypatch.setattr("lib.python.cli.subprocess.run", mock_run)
-    iscs.invoke_implement_subclause(
-        "/path/lrm.pdf", "6.1", 8, "opus", False,
-    )
+    iscs.invoke_implement_subclause(_sc_params(iscs), "6.1", False)
     assert mock_run.call_args[0][0] == [
         sys.executable, "-m", "implement_subclause",
         "--lrm", "/path/lrm.pdf",
@@ -172,9 +175,7 @@ def test_invoke_passes_continue(iscs, monkeypatch):
         return_value=subprocess.CompletedProcess(args=[], returncode=0),
     )
     monkeypatch.setattr("lib.python.cli.subprocess.run", mock_run)
-    iscs.invoke_implement_subclause(
-        "/path/lrm.pdf", "6.1", 8, "opus", True,
-    )
+    iscs.invoke_implement_subclause(_sc_params(iscs), "6.1", True)
     assert "--continue" in mock_run.call_args[0][0]
 
 
@@ -184,9 +185,7 @@ def test_invoke_no_continue_by_default(iscs, monkeypatch):
         return_value=subprocess.CompletedProcess(args=[], returncode=0),
     )
     monkeypatch.setattr("lib.python.cli.subprocess.run", mock_run)
-    iscs.invoke_implement_subclause(
-        "/path/lrm.pdf", "6.1", 8, "opus", False,
-    )
+    iscs.invoke_implement_subclause(_sc_params(iscs), "6.1", False)
     assert "--continue" not in mock_run.call_args[0][0]
 
 
@@ -197,9 +196,7 @@ def test_invoke_exits_on_failure(iscs, monkeypatch):
     )
     monkeypatch.setattr("lib.python.cli.subprocess.run", mock_run)
     with pytest.raises(SystemExit):
-        iscs.invoke_implement_subclause(
-            "/path/lrm.pdf", "6.1", 8, "opus", False,
-        )
+        iscs.invoke_implement_subclause(_sc_params(iscs), "6.1", False)
 
 
 # ---- main -------------------------------------------------------------------
@@ -236,7 +233,7 @@ def test_main_first_subclause_no_continue(
     """First subclause does not pass continue_session=True."""
     mock_invoke, _, __ = _patch_main(monkeypatch, iscs, patch_completion)
     iscs.main(base_argv)
-    assert mock_invoke.call_args_list[0][0][4] is False
+    assert mock_invoke.call_args_list[0][0][2] is False
 
 
 def test_main_second_subclause_uses_continue(
@@ -245,7 +242,7 @@ def test_main_second_subclause_uses_continue(
     """Second subclause passes continue_session=True."""
     mock_invoke, _, __ = _patch_main(monkeypatch, iscs, patch_completion)
     iscs.main(base_argv)
-    assert mock_invoke.call_args_list[1][0][4] is True
+    assert mock_invoke.call_args_list[1][0][2] is True
 
 
 def test_main_continue_flag_on_first(
@@ -254,7 +251,7 @@ def test_main_continue_flag_on_first(
     """--continue flag makes the first subclause use continue_session=True."""
     mock_invoke, _, __ = _patch_main(monkeypatch, iscs, patch_completion)
     iscs.main(base_argv + ["--continue"])
-    assert mock_invoke.call_args_list[0][0][4] is True
+    assert mock_invoke.call_args_list[0][0][2] is True
 
 
 def test_main_closes_issue_when_all_complete(

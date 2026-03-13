@@ -1,6 +1,7 @@
 """Shared CLI argument helpers for implementation scripts."""
 
 import argparse
+import dataclasses
 import re
 import subprocess
 import sys
@@ -44,6 +45,38 @@ def validate_lrm(parser: argparse.ArgumentParser, args: argparse.Namespace) -> N
     """Error out if the LRM file does not exist."""
     if not args.lrm.is_file():
         parser.error(f"LRM file not found: {args.lrm}")
+
+
+def parse_and_validate(
+    parser: argparse.ArgumentParser, argv: list[str] | None = None,
+) -> argparse.Namespace:
+    """Parse *argv* and validate the LRM path."""
+    args = parser.parse_args(argv)
+    validate_lrm(parser, args)
+    return args
+
+
+# ---------------------------------------------------------------------------
+# Dataclasses for subprocess invocation
+# ---------------------------------------------------------------------------
+
+@dataclasses.dataclass(frozen=True)
+class SubclauseParams:
+    """Batch-constant parameters for ``invoke_implement_subclause``."""
+
+    lrm: str
+    issue: int
+    model: str
+
+
+@dataclasses.dataclass(frozen=True)
+class ClauseParams:
+    """Batch-constant parameters for ``invoke_implement_clause``."""
+
+    lrm: str
+    master_issue: int
+    organization: str
+    repo: str
 
 
 def add_github_args(parser: argparse.ArgumentParser) -> None:
@@ -90,11 +123,11 @@ def parse_clause_issues(raw: str) -> dict[str, int]:
             )
         try:
             result[key] = int(value)
-        except ValueError:
+        except ValueError as exc:
             raise argparse.ArgumentTypeError(
                 f"Invalid issue number '{value}' for clause '{key}'. "
                 "Expected an integer.",
-            )
+            ) from exc
     return result
 
 
@@ -109,10 +142,8 @@ def add_clauses_arg(parser: argparse.ArgumentParser) -> None:
 
 
 def invoke_implement_subclause(
-    lrm: str,
+    params: SubclauseParams,
     subclause: str,
-    issue: int,
-    model: str,
     continue_session: bool,
     exclude: str = "",
 ) -> None:
@@ -120,10 +151,10 @@ def invoke_implement_subclause(
     print(f"Invoking implement_subclause for {subclause}...")
     cmd = [
         sys.executable, "-m", "implement_subclause",
-        "--lrm", lrm,
+        "--lrm", params.lrm,
         "--subclause", subclause,
-        "--issue", str(issue),
-        "--model", model,
+        "--issue", str(params.issue),
+        "--model", params.model,
     ]
     if continue_session:
         cmd.append("--continue")
@@ -135,23 +166,18 @@ def invoke_implement_subclause(
 
 
 def invoke_implement_clause(
-    lrm: str,
-    clause: str,
-    sub_issue: int,
-    master_issue: int,
-    organization: str,
-    repo: str,
+    params: ClauseParams, clause: str, sub_issue: int,
 ) -> None:
     """Shell out to ``python -m implement_clause``."""
     print(f"Invoking implement_clause for clause {clause} (issue #{sub_issue})...")
     cmd = [
         sys.executable, "-m", "implement_clause",
-        "--lrm", lrm,
+        "--lrm", params.lrm,
         "--clause", clause,
         "--sub-issue", str(sub_issue),
-        "--master-issue", str(master_issue),
-        "--organization", organization,
-        "--repo", repo,
+        "--master-issue", str(params.master_issue),
+        "--organization", params.organization,
+        "--repo", params.repo,
     ]
     result = subprocess.run(cmd, check=False)
     if result.returncode != 0:

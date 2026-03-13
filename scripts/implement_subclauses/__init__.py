@@ -6,15 +6,16 @@ issue and marks it done on the master issue.
 """
 
 import argparse
-import re
 
 from lib.python.cli import (
+    CLAUSE_RE,
+    SubclauseParams,
     add_continue_arg,
     add_github_args,
     add_lrm_arg,
     add_model_arg,
     invoke_implement_subclause,
-    validate_lrm,
+    parse_and_validate,
 )
 from lib.python.github import (
     close_issue,
@@ -22,13 +23,6 @@ from lib.python.github import (
     mark_master_complete,
     next_unchecked,
 )
-
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
 
 
 # ---------------------------------------------------------------------------
@@ -75,11 +69,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     add_github_args(parser)
     add_model_arg(parser)
     add_continue_arg(parser)
-    args = parser.parse_args(argv)
-
-    validate_lrm(parser, args)
-
-    return args
+    return parse_and_validate(parser, argv)
 
 
 # ---------------------------------------------------------------------------
@@ -91,13 +81,11 @@ def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     lrm = str(args.lrm)
     subclauses = args.subclauses
+    params = SubclauseParams(lrm, args.clause_issue, args.model)
 
     for i, subclause in enumerate(subclauses):
         continue_session = args.continue_session if i == 0 else True
-        invoke_implement_subclause(
-            lrm, subclause, args.clause_issue,
-            args.model, continue_session,
-        )
+        invoke_implement_subclause(params, subclause, continue_session)
 
     body = fetch_issue_body(
         args.organization, args.repo, args.clause_issue,
