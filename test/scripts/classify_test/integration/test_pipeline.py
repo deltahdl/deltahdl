@@ -62,7 +62,7 @@ def _stub_externals(ct, monkeypatch, tmp_path, classifier):
         ct, "commit_classification", _noop)
 
 
-def _run_pipeline(ct, tmp_path, test, dry_run=False):
+def _run_pipeline(ct, tmp_path, test, suite="S", dry_run=False):
     """Execute _run on test_input.cpp in *tmp_path*."""
     _run = getattr(ct, "_run")
     _run(SimpleNamespace(
@@ -70,6 +70,7 @@ def _run_pipeline(ct, tmp_path, test, dry_run=False):
         output_dir=str(tmp_path),
         dry_run=dry_run,
         lrm=str(tmp_path / "lrm.txt"),
+        suite=suite,
         test=test,
         issue=1,
         organization="test-org",
@@ -231,7 +232,7 @@ def test_self_named_source_not_treated_as_duplicate(ct, tmp_path, monkeypatch):
     ))
     _run(SimpleNamespace(
         file=str(src), output_dir=str(tmp_path), dry_run=False,
-        lrm=str(tmp_path / "lrm.txt"), test="Keeper",
+        lrm=str(tmp_path / "lrm.txt"), suite="S", test="Keeper",
         issue=1, organization="test-org", repo="test-repo",
         no_commit=False, max_lines=1000,
     ))
@@ -346,7 +347,7 @@ def _do_named_ns(ct, tmp_path, monkeypatch):
     _stub_externals(ct, monkeypatch, tmp_path, _make_classifier_with_topic(
         "DefaultCtx", "non-lrm", "vpi",
     ))
-    _run_pipeline(ct, tmp_path, test="DefaultCtx")
+    _run_pipeline(ct, tmp_path, test="DefaultCtx", suite="NonLrmVpi")
     return tmp_path
 
 

@@ -29,7 +29,7 @@ def _run_args(tmp_path, **overrides):
         "file": str(tmp_path / "test_input.cpp"),
         "output_dir": str(tmp_path), "dry_run": False,
         "lrm": str(tmp_path / "lrm.txt"), "max_lines": 1000,
-        "test": "T", "issue": None, "organization": None,
+        "suite": "S", "test": "T", "issue": None, "organization": None,
         "repo": None, "no_commit": False,
     }
     defaults.update(overrides)
@@ -40,7 +40,7 @@ def _run_args(tmp_path, **overrides):
 
 
 _BASE_ARGV = ["prog", "--file", "f.cpp", "--output-dir", "/out",
-              "--lrm", "/lrm.txt", "--test", "T",
+              "--lrm", "/lrm.txt", "--suite", "S", "--test", "T",
               "--issue", "1", "--organization", "o", "--repo", "r",
               "--max-lines", "1000"]
 
@@ -66,7 +66,7 @@ def test_parse_args_lrm(monkeypatch, ct):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/my/LRM.txt", "--test", "T",
+         "--lrm", "/my/LRM.txt", "--suite", "S", "--test", "T",
          "--issue", "1", "--organization", "o", "--repo", "r",
          "--max-lines", "1000"],
     )
@@ -79,11 +79,35 @@ def test_parse_args_test_flag(monkeypatch, ct):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--test", "Foo",
+         "--lrm", "/lrm.txt", "--suite", "S", "--test", "Foo",
          "--issue", "1", "--organization", "o", "--repo", "r",
          "--max-lines", "1000"],
     )
     assert _parse_args().test == "Foo"
+
+
+def test_parse_args_suite_flag(monkeypatch, ct):
+    """Parses --suite flag."""
+    _parse_args = getattr(ct, "_parse_args")
+    monkeypatch.setattr(
+        sys, "argv",
+        ["prog", "--file", "f.cpp", "--output-dir", "/out",
+         "--lrm", "/lrm.txt", "--suite", "MySuite", "--test", "Foo",
+         "--issue", "1", "--organization", "o", "--repo", "r",
+         "--max-lines", "1000"],
+    )
+    assert _parse_args().suite == "MySuite"
+
+
+def test_parse_args_suite_required(monkeypatch, ct):
+    """--suite is required."""
+    _parse_args = getattr(ct, "_parse_args")
+    argv = [v for i, v in enumerate(_BASE_ARGV)
+            if _BASE_ARGV[max(0, i - 1)] != "--suite"
+            and v != "--suite"]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit):
+        _parse_args()
 
 
 def test_parse_args_max_lines(monkeypatch, ct):
@@ -752,7 +776,7 @@ def test_update_source_calls_rewrite(tmp_path, ct, ct_helpers):
     """_update_source delegates to _rewrite_source when source_is_target."""
     parsed, groups, f = _rewrite_source_fixture(ct, ct_helpers, tmp_path)
     result = getattr(ct, "_update_source")(f, parsed, {
-        "test": "T", "groups": groups,
+        "suite": "S", "test": "T", "groups": groups,
         "titles": {}, "stem": "test_parser_clause_06_01",
         "source_is_target": True,
     })

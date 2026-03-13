@@ -111,7 +111,7 @@ def _run_dry(tmp_path):
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
-        "--test", "DryT", "--dry-run",
+        "--suite", "S", "--test", "DryT", "--dry-run",
         *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=env,
     )
@@ -139,7 +139,7 @@ def _run_pipeline(tmp_path):
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
-        "--test", "Alpha",
+        "--suite", "S", "--test", "Alpha",
         *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=env,
     )
@@ -181,7 +181,7 @@ def test_nonexistent_file_reports_error(tmp_path):
         "--file", str(tmp_path / "missing.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
-        "--test", "T",
+        "--suite", "S", "--test", "T",
         *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=_base_env(tmp_path),
     ).stdout
@@ -199,7 +199,7 @@ def test_file_without_tests_reports_error(tmp_path):
         "--file", str(tmp_path / "empty.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
-        "--test", "T",
+        "--suite", "S", "--test", "T",
         *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=_base_env(tmp_path),
     ).stdout
@@ -214,7 +214,7 @@ def test_test_not_found_reports_error(tmp_path):
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
-        "--test", "NoSuchTest",
+        "--suite", "S", "--test", "NoSuchTest",
         *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=_base_env(tmp_path),
     ).stdout
@@ -315,7 +315,7 @@ def test_named_ns_pipeline_reports_done(tmp_path):
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
-        "--test", "Alpha",
+        "--suite", "S", "--test", "Alpha",
         *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=env,
     )
@@ -329,7 +329,7 @@ def _run_named_ns_pipeline(tmp_path):
         "--file", str(tmp_path / "test_input.cpp"),
         "--output-dir", str(tmp_path),
         "--lrm", lrm,
-        "--test", "Alpha",
+        "--suite", "S", "--test", "Alpha",
         *_ISSUE_FLAGS,
         cwd=str(tmp_path), env=env,
     )

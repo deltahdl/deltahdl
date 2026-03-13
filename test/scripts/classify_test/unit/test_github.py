@@ -12,7 +12,7 @@ import pytest
 
 
 _ALL_FLAGS = ["prog", "--file", "f.cpp", "--output-dir", "/out",
-              "--lrm", "/lrm.txt", "--test", "T",
+              "--lrm", "/lrm.txt", "--suite", "S", "--test", "T",
               "--issue", "42", "--organization", "myorg",
               "--repo", "myrepo", "--max-lines", "1000"]
 
@@ -30,7 +30,7 @@ def test_parse_args_issue_defaults_to_none(monkeypatch, ct):
     monkeypatch.setattr(
         sys, "argv",
         ["prog", "--file", "f.cpp", "--output-dir", "/out",
-         "--lrm", "/lrm.txt", "--test", "T",
+         "--lrm", "/lrm.txt", "--suite", "S", "--test", "T",
          "--organization", "myorg", "--repo", "myrepo",
          "--max-lines", "1000"],
     )

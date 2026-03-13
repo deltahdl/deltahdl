@@ -525,6 +525,8 @@ def _validate_topic_response(response, test_name):
 
 def _rename_test_macro(test, new_suite, new_name):
     """Rename both args in a test block's TEST()/TEST_F()/TEST_P() line."""
+    if not hasattr(test, "original_suite_name"):
+        test.original_suite_name = test.suite_name
     if not hasattr(test, "original_test_name"):
         test.original_test_name = test.test_name
     test.lines[0] = re.sub(
@@ -679,6 +681,10 @@ def _parse_args():
     )
     add_output_args(parser)
     parser.add_argument(
+        "--suite", required=True,
+        help="Name of the test suite (first arg of TEST macro)",
+    )
+    parser.add_argument(
         "--test", required=True,
         help="Name of the single test to classify",
     )
@@ -792,7 +798,7 @@ def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
     return len(staying)
 
 
-def _validate_input(filepath, test_name):
+def _validate_input(filepath, suite_name, test_name):
     """Parse and validate the input file, returning (parsed, target)."""
     if not filepath.exists():
         print(f"ERROR: {filepath} not found")
@@ -801,9 +807,11 @@ def _validate_input(filepath, test_name):
     if not parsed.all_tests:
         print("ERROR: No TEST blocks found")
         sys.exit(1)
-    matches = [t for t in parsed.all_tests if t.test_name == test_name]
+    matches = [t for t in parsed.all_tests
+               if t.suite_name == suite_name and t.test_name == test_name]
     if not matches:
-        print(f"ERROR: Test {test_name!r} not found in {filepath.name}")
+        print(f"ERROR: Test {suite_name}.{test_name!r} not found"
+              f" in {filepath.name}")
         sys.exit(1)
     return parsed, matches[:1]
 
@@ -811,7 +819,10 @@ def _validate_input(filepath, test_name):
 def _update_source(filepath, parsed, ctx):
     """Rewrite or remove the source file after moving a test."""
     others = [t for t in parsed.all_tests
-              if t.test_name != ctx["test"]]
+              if not (getattr(t, "original_suite_name", t.suite_name)
+                      == ctx["suite"]
+                      and getattr(t, "original_test_name", t.test_name)
+                      == ctx["test"])]
     source_is_target = ctx["source_is_target"]
     if source_is_target and others:
         content = generate_file("non-lrm", "", parsed, others)
@@ -838,8 +849,10 @@ def _apply_rename_in_place(args, filepath, parsed, target):
     False if there was nothing to rename (caller should return too).
     """
     has_renames = any(
-        getattr(t, "original_test_name", None) is not None
-        and t.original_test_name != t.test_name
+        (getattr(t, "original_test_name", None) is not None
+         and t.original_test_name != t.test_name)
+        or (getattr(t, "original_suite_name", None) is not None
+            and t.original_suite_name != t.suite_name)
         for t in target
     )
     if not has_renames:
@@ -862,7 +875,7 @@ def _run(args):
     """Execute the split operation."""
     _validate_issue_args(args)
     filepath = Path(args.file).resolve()
-    parsed, target = _validate_input(filepath, args.test)
+    parsed, target = _validate_input(filepath, args.suite, args.test)
     classify_tests(
         target, Path(args.output_dir).resolve(),
         Path(args.lrm).resolve(),
@@ -906,7 +919,7 @@ def _run(args):
         "max_lines": getattr(args, "max_lines", None),
     })
     _update_source(filepath, parsed, {
-        "test": args.test, "groups": groups,
+        "suite": args.suite, "test": args.test, "groups": groups,
         "titles": {}, "stem": filepath.stem,
         "source_is_target": source_is_target,
     })
@@ -914,7 +927,11 @@ def _run(args):
     update_cmake(
         filepath.stem, new_names,
         keep_old=source_is_target or any(
-            t.test_name != args.test for t in parsed.all_tests
+            not (getattr(t, "original_suite_name", t.suite_name)
+                 == args.suite
+                 and getattr(t, "original_test_name", t.test_name)
+                 == args.test)
+            for t in parsed.all_tests
         ),
     )
     print("Updated `CMakeLists.txt`")
