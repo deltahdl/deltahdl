@@ -49,12 +49,12 @@ def build_action_remark(test, *, source_is_target, target_filename=None):
     elif target_filename:
         location = f"Moved to {target_filename}"
     if suite_renamed and test_renamed:
-        rename_str = (f"rename suite to {test.suite_name}"
+        rename_str = (f"renamed suite to {test.suite_name}"
                       f" and test to {test.test_name}")
     elif suite_renamed:
-        rename_str = f"rename suite to {test.suite_name}"
+        rename_str = f"renamed suite to {test.suite_name}"
     elif test_renamed:
-        rename_str = f"rename test to {test.test_name}"
+        rename_str = f"renamed test to {test.test_name}"
     else:
         rename_str = ""
     if location and rename_str:
