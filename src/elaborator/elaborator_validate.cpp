@@ -867,4 +867,20 @@ void Elaborator::ValidateDuplicateDefaultClocking(const ModuleDecl* decl) {
   }
 }
 
+// §14.14: At most one global clocking per module/interface/program/checker.
+void Elaborator::ValidateDuplicateGlobalClocking(const ModuleDecl* decl) {
+  const ModuleItem* first_global = nullptr;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kClockingBlock &&
+        item->is_global_clocking) {
+      if (first_global) {
+        diag_.Error(item->loc,
+                    "only one global clocking block is allowed per scope");
+        return;
+      }
+      first_global = item;
+    }
+  }
+}
+
 }  // namespace delta

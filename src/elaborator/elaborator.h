@@ -285,6 +285,7 @@ class Elaborator {
   void ValidateClockvarAccess(const ModuleDecl* decl);
   void ValidateCycleDelayDefaultClocking(const ModuleDecl* decl);
   void ValidateDuplicateDefaultClocking(const ModuleDecl* decl);
+  void ValidateDuplicateGlobalClocking(const ModuleDecl* decl);
   void WalkStmtsForClockvarAccess(const Stmt* s);
   void CheckClockvarAccessExpr(const Expr* e, bool is_lvalue);
 
