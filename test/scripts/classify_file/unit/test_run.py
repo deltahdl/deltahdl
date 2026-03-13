@@ -799,8 +799,8 @@ def test_sync_issue_rows_missing_returns_empty(monkeypatch, cf):
     ) == set()
 
 
-def test_sync_issue_rows_removes_stale_rows(monkeypatch, cf):
-    """Removes rows for tests not in test_pairs."""
+def test_sync_issue_rows_removes_stale_updates(monkeypatch, cf):
+    """Calls update when stale rows exist."""
     body = _table(
         "| S | Other | Reviewed | Kept |",
         "| S | Alpha | Unreviewed | |",
@@ -808,6 +808,16 @@ def test_sync_issue_rows_removes_stale_rows(monkeypatch, cf):
     updates = _stub_github(monkeypatch, cf, body)
     cf.sync_issue_rows(_make_args(), [("S", "Alpha")])
     assert len(updates) == 1
+
+
+def test_sync_issue_rows_removes_stale_rows(monkeypatch, cf):
+    """Stale rows are absent from the updated body."""
+    body = _table(
+        "| S | Other | Reviewed | Kept |",
+        "| S | Alpha | Unreviewed | |",
+    )
+    updates = _stub_github(monkeypatch, cf, body)
+    cf.sync_issue_rows(_make_args(), [("S", "Alpha")])
     assert "Other" not in updates[0]
 
 
