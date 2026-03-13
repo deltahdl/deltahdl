@@ -715,4 +715,98 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
   }
 }
 
+// =============================================================================
+// §14.3 — Clocking block declaration validation
+// =============================================================================
+
+void Elaborator::ValidateClockingBlock(ModuleItem* item) {
+  // §14.3: Only default clocking blocks may be unnamed.
+  if (item->name.empty() && !item->is_default_clocking) {
+    diag_.Error(item->loc, "non-default clocking block must have a name");
+  }
+  // Register clocking signals for direction tracking.
+  if (!item->name.empty()) {
+    auto& sigs = clocking_signals_[item->name];
+    for (const auto& sig : item->clocking_signals) {
+      sigs[sig.name] = {sig.direction};
+    }
+  }
+}
+
+// §14.3: Check a single expression for clockvar access direction violations.
+void Elaborator::CheckClockvarAccessExpr(const Expr* e, bool is_lvalue) {
+  if (!e) return;
+  if (e->kind == ExprKind::kMemberAccess && e->lhs &&
+      e->lhs->kind == ExprKind::kIdentifier) {
+    auto block_it = clocking_signals_.find(e->lhs->text);
+    if (block_it != clocking_signals_.end()) {
+      // Determine the member name from rhs or text.
+      std::string_view member;
+      if (e->rhs && e->rhs->kind == ExprKind::kIdentifier) {
+        member = e->rhs->text;
+      } else if (!e->text.empty()) {
+        member = e->text;
+      }
+      if (!member.empty()) {
+        auto sig_it = block_it->second.find(member);
+        if (sig_it != block_it->second.end()) {
+          if (is_lvalue && sig_it->second.direction == Direction::kInput) {
+            diag_.Error(e->range.start,
+                        std::format("write to input clockvar '{}.{}'",
+                                    e->lhs->text, member));
+          }
+          if (!is_lvalue && sig_it->second.direction == Direction::kOutput) {
+            diag_.Error(e->range.start,
+                        std::format("read from output clockvar '{}.{}'",
+                                    e->lhs->text, member));
+          }
+        }
+      }
+    }
+  }
+  // Recurse into sub-expressions (rvalue context).
+  if (!is_lvalue) {
+    CheckClockvarAccessExpr(e->lhs, false);
+    CheckClockvarAccessExpr(e->rhs, false);
+    CheckClockvarAccessExpr(e->condition, false);
+    CheckClockvarAccessExpr(e->true_expr, false);
+    CheckClockvarAccessExpr(e->false_expr, false);
+    for (auto* arg : e->args) CheckClockvarAccessExpr(arg, false);
+    for (auto* elem : e->elements) CheckClockvarAccessExpr(elem, false);
+  }
+}
+
+void Elaborator::WalkStmtsForClockvarAccess(const Stmt* s) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    CheckClockvarAccessExpr(s->lhs, /*is_lvalue=*/true);
+    CheckClockvarAccessExpr(s->rhs, /*is_lvalue=*/false);
+  } else {
+    CheckClockvarAccessExpr(s->expr, false);
+    CheckClockvarAccessExpr(s->rhs, false);
+  }
+  for (auto* sub : s->stmts) WalkStmtsForClockvarAccess(sub);
+  WalkStmtsForClockvarAccess(s->then_branch);
+  WalkStmtsForClockvarAccess(s->else_branch);
+  WalkStmtsForClockvarAccess(s->body);
+  WalkStmtsForClockvarAccess(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForClockvarAccess(ci.body);
+}
+
+void Elaborator::ValidateClockvarAccess(const ModuleDecl* decl) {
+  if (clocking_signals_.empty()) return;
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForClockvarAccess(item->body);
+    }
+  }
+}
+
 }  // namespace delta

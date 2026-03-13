@@ -11,7 +11,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA611, RegisterClockingBlock) {
+TEST(ClockingBlockSim, RegisterBlock) {
   ClockingManager cmgr;
   ClockingBlock block;
   block.name = "cb";
@@ -27,7 +27,7 @@ TEST(SimA611, RegisterClockingBlock) {
   EXPECT_EQ(found->clock_edge, Edge::kPosedge);
 }
 
-TEST(SimA611, DefaultSkewApplied) {
+TEST(ClockingBlockSim, DefaultSkewApplied) {
   ClockingManager cmgr;
   ClockingBlock block;
   block.name = "cb";
@@ -46,7 +46,7 @@ TEST(SimA611, DefaultSkewApplied) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "other").ticks, 5u);
 }
 
-TEST(SimA611, InoutSignalSkew) {
+TEST(ClockingBlockSim, InoutSignalSkew) {
   ClockingManager cmgr;
   ClockingBlock block;
   block.name = "cb";
@@ -65,7 +65,7 @@ TEST(SimA611, InoutSignalSkew) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "bidir").ticks, 4u);
 }
 
-TEST(SimA611, MultipleClockingBlocks) {
+TEST(ClockingBlockSim, MultipleBlocks) {
   ClockingManager cmgr;
 
   ClockingBlock b1;
@@ -200,6 +200,42 @@ TEST(Clocking, OutputSkew) {
 
   auto skew = mgr.GetOutputSkew("cb", "data_out");
   EXPECT_EQ(skew.ticks, 3u);
+}
+
+TEST(ClockingBlockSim, InoutReadWriteSplit) {
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kPosedge;
+  block.default_input_skew = SimTime{2};
+  block.default_output_skew = SimTime{5};
+
+  ClockingSignal sig;
+  sig.signal_name = "bidir";
+  sig.direction = ClockingDir::kInout;
+  block.signals.push_back(sig);
+  cmgr.Register(block);
+
+  // §14.3: inout acts as two clockvars — reading uses input skew,
+  // writing uses output skew.
+  EXPECT_EQ(cmgr.GetInputSkew("cb", "bidir").ticks, 2u);
+  EXPECT_EQ(cmgr.GetOutputSkew("cb", "bidir").ticks, 5u);
+}
+
+TEST(ClockingBlockSim, EdgeClockEdgeRegistered) {
+  ClockingManager cmgr;
+  ClockingBlock block;
+  block.name = "cb";
+  block.clock_signal = "clk";
+  block.clock_edge = Edge::kEdge;
+  block.default_input_skew = SimTime{0};
+  block.default_output_skew = SimTime{0};
+  cmgr.Register(block);
+
+  const auto* found = cmgr.Find("cb");
+  ASSERT_NE(found, nullptr);
+  EXPECT_EQ(found->clock_edge, Edge::kEdge);
 }
 
 }  // namespace

@@ -244,6 +244,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kCoverSequence:
     case ModuleItemKind::kRestrictProperty:
     case ModuleItemKind::kClockingBlock:
+      ValidateClockingBlock(item);
+      break;
     case ModuleItemKind::kCovergroupDecl:
     case ModuleItemKind::kSpecifyBlock:
     case ModuleItemKind::kDpiImport:
@@ -317,6 +319,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   nettype_net_names_.clear();
   interconnect_names_.clear();
   var_named_types_.clear();
+  clocking_signals_.clear();
   task_names_.clear();
   func_decls_.clear();
   // §13.2: Collect task names so function body validation can detect task
@@ -336,6 +339,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   // §9.2.2.2: Check for multi-driver violations on always_comb LHS variables.
   CheckAlwaysCombMultiDriver(decl, mod);
   ValidateModuleConstraints(decl);
+  ValidateClockvarAccess(decl);
   ValidateConstantFunctionCalls(decl);
 }
 

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA611, ClockingDirectionOutput) {
+TEST(ClockingBlockParse, OutputDirection) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -22,7 +22,7 @@ TEST(ParserA611, ClockingDirectionOutput) {
   EXPECT_EQ(item->clocking_signals[0].name, "ack");
 }
 
-TEST(ParserSection14, OverviewMixedDirectionSignals) {
+TEST(ClockingBlockParse, MixedDirectionSignals) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -52,7 +52,7 @@ TEST(ParserSection14, OverviewMixedDirectionSignals) {
   }
 }
 
-TEST(ParserA611, ClockingDirectionInout) {
+TEST(ClockingBlockParse, InoutDirection) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -68,7 +68,7 @@ TEST(ParserA611, ClockingDirectionInout) {
   EXPECT_EQ(item->clocking_signals[0].name, "bidir");
 }
 
-TEST(ParserSection14, OverviewNegedgeClockEvent) {
+TEST(ClockingBlockParse, NegedgeClockEvent) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(negedge clk);\n"
@@ -81,7 +81,7 @@ TEST(ParserSection14, OverviewNegedgeClockEvent) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
 }
 
-TEST(ParserA611, ListOfClockingDeclAssignSingle) {
+TEST(ClockingBlockParse, SingleSignalDecl) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -96,7 +96,7 @@ TEST(ParserA611, ListOfClockingDeclAssignSingle) {
   EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
 
-TEST(ParserSection19, FullExample_BusClockingBlock) {
+TEST(ClockingBlockParse, BusExampleFullDecl) {
   auto r = Parse(
       "module t;\n"
       "  clocking bus @(posedge clock1);\n"
@@ -126,7 +126,7 @@ TEST(ParserSection19, FullExample_BusClockingBlock) {
   EXPECT_EQ(item->clocking_signals[4].direction, Direction::kInput);
 }
 
-TEST(ParserA611, ListOfClockingDeclAssignMultiple) {
+TEST(ClockingBlockParse, MultipleSignalDeclCommaSeparated) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -143,7 +143,7 @@ TEST(ParserA611, ListOfClockingDeclAssignMultiple) {
   EXPECT_EQ(item->clocking_signals[2].name, "c");
 }
 
-TEST(ParserA611, ClockingDeclAssignBare) {
+TEST(ClockingBlockParse, BareSignalNoHierExpr) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -159,7 +159,7 @@ TEST(ParserA611, ClockingDeclAssignBare) {
   EXPECT_EQ(item->clocking_signals[0].hier_expr, nullptr);
 }
 
-TEST(ParserSection14, InputSamplingInoutSignal) {
+TEST(ClockingBlockParse, InoutSignalParsed) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -173,7 +173,7 @@ TEST(ParserSection14, InputSamplingInoutSignal) {
   EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
 
-TEST(ParserSection19, ClockingBlock_BasicDecl) {
+TEST(ClockingBlockParse, BasicDeclWithInputOutput) {
   auto r = Parse(
       "module t;\n"
       "  clocking cb @(posedge clk);\n"
@@ -195,7 +195,7 @@ TEST(ParserSection19, ClockingBlock_BasicDecl) {
   EXPECT_EQ(item->clocking_signals[1].name, "b");
 }
 
-TEST(ParserA611, MultipleDirectionGroups) {
+TEST(ClockingBlockParse, MultipleDirectionGroups) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -216,7 +216,7 @@ TEST(ParserA611, MultipleDirectionGroups) {
   EXPECT_EQ(item->clocking_signals[3].direction, Direction::kInout);
 }
 
-TEST(ParserSection19, ClockingBlock_NegedgeEvent) {
+TEST(ClockingBlockParse, NegedgeEventExpr) {
   auto r = Parse(
       "module t;\n"
       "  clocking cb @(negedge clk);\n"
@@ -229,7 +229,7 @@ TEST(ParserSection19, ClockingBlock_NegedgeEvent) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNegedge);
 }
 
-TEST(ParserSection19, ClockingBlock_BareIdentifierEvent) {
+TEST(ClockingBlockParse, BareIdentifierEvent) {
   auto r = Parse(
       "module t;\n"
       "  clocking cb @(clk);\n"
@@ -242,7 +242,7 @@ TEST(ParserSection19, ClockingBlock_BareIdentifierEvent) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
 }
 
-TEST(ParserSection19, ClockingBlock_AllDirections) {
+TEST(ClockingBlockParse, AllThreeDirections) {
   auto r = Parse(
       "module t;\n"
       "  clocking cb @(posedge clk);\n"
@@ -261,7 +261,7 @@ TEST(ParserSection19, ClockingBlock_AllDirections) {
                                        });
 }
 
-TEST(ParserSection19, ClockingBlock_MultipleSignalsSameDirection) {
+TEST(ClockingBlockParse, MultipleSignalsSameDirectionList) {
   auto r = Parse(
       "module t;\n"
       "  clocking cb @(posedge clk);\n"
@@ -280,7 +280,7 @@ TEST(ParserSection19, ClockingBlock_MultipleSignalsSameDirection) {
   }
 }
 
-TEST(ParserA611, ClockingItemPropertyDecl) {
+TEST(ClockingBlockParse, PropertyDeclInsideBlock) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -297,7 +297,7 @@ TEST(ParserA611, ClockingItemPropertyDecl) {
   ASSERT_EQ(item->clocking_signals.size(), 1u);
 }
 
-TEST(ParserA611, ClockingDeclPlain) {
+TEST(ClockingBlockParse, PlainNamedDecl) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -314,7 +314,7 @@ TEST(ParserA611, ClockingDeclPlain) {
   EXPECT_FALSE(item->is_global_clocking);
 }
 
-TEST(ParserA611, ClockingDeclEndLabel) {
+TEST(ClockingBlockParse, EndLabelMatches) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -328,7 +328,7 @@ TEST(ParserA611, ClockingDeclEndLabel) {
   EXPECT_EQ(item->name, "cb");
 }
 
-TEST(ParserA611, ClockingEventBareIdentifier) {
+TEST(ClockingBlockParse, EventBareIdentifierNoEdge) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @clk;\n"
@@ -343,7 +343,7 @@ TEST(ParserA611, ClockingEventBareIdentifier) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kNone);
 }
 
-TEST(ParserA611, ClockingEventParenExpr) {
+TEST(ClockingBlockParse, EventParenthesizedPosedge) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -358,7 +358,7 @@ TEST(ParserA611, ClockingEventParenExpr) {
   EXPECT_EQ(item->clocking_event[0].edge, Edge::kPosedge);
 }
 
-TEST(ParserA611, ClockingDirectionInput) {
+TEST(ClockingBlockParse, InputDirection) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -374,7 +374,7 @@ TEST(ParserA611, ClockingDirectionInput) {
   EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
 
-TEST(ParserSection19, ClockingBlockScope_MultipleBlocks) {
+TEST(ClockingBlockParse, MultipleBlocksInModule) {
   auto r = Parse(
       "module t;\n"
       "  clocking cd1 @(posedge phi1);\n"
@@ -395,7 +395,7 @@ TEST(ParserSection19, ClockingBlockScope_MultipleBlocks) {
   EXPECT_EQ(cb2->name, "cd2");
 }
 
-TEST(ParserSection19, ClockingBlock_EndLabel) {
+TEST(ClockingBlockParse, EndLabelAccepted) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  clocking cb @(posedge clk);\n"
@@ -404,7 +404,7 @@ TEST(ParserSection19, ClockingBlock_EndLabel) {
               "endmodule\n"));
 }
 
-TEST(ParserSection14, BasicClockingBlock) {
+TEST(ClockingBlockParse, BasicNamedBlockAllFields) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -434,7 +434,7 @@ TEST(ParserSection14, BasicClockingBlock) {
   }
 }
 
-TEST(ParserSection14, SignalDirections) {
+TEST(ClockingBlockParse, SignalDirectionsVerified) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -453,7 +453,7 @@ TEST(ParserSection14, SignalDirections) {
                                        });
 }
 
-TEST(ParserSection14, MultipleSignalsSameDirection) {
+TEST(ClockingBlockParse, MultipleInputsSameDirection) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -473,7 +473,7 @@ TEST(ParserSection14, MultipleSignalsSameDirection) {
   }
 }
 
-TEST(ParserSection14, ClockingBlockAmongOtherItems) {
+TEST(ClockingBlockParse, BlockAmongOtherModuleItems) {
   auto r = Parse(
       "module m;\n"
       "  logic clk;\n"
@@ -493,7 +493,7 @@ TEST(ParserSection14, ClockingBlockAmongOtherItems) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 4u);
 }
 
-TEST(ParserSection14, OverviewMinimalClockingBlock) {
+TEST(ClockingBlockParse, MinimalSingleInput) {
   auto r = Parse(
       "module m;\n"
       "  clocking bus @(posedge clk);\n"
@@ -511,8 +511,43 @@ TEST(ParserSection14, OverviewMinimalClockingBlock) {
   EXPECT_EQ(item->clocking_signals[0].name, "addr");
 }
 
+TEST(ClockingBlockParse, EdgeKeywordAsSkewEdge) {
+  auto r = Parse(
+      "module m;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input edge data;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindClockingBlockByIndex(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->clocking_signals.size(), 1u);
+  EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInput);
+  EXPECT_EQ(item->clocking_signals[0].skew_edge, Edge::kEdge);
+  EXPECT_EQ(item->clocking_signals[0].name, "data");
+}
+
+TEST(ClockingBlockParse, DefaultSkewParsed) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    default input #10 output #2;\n"
+              "    input data;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
+TEST(ClockingBlockParse, EmptyBodyAccepted) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  clocking cb @(posedge clk);\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
 }  // namespace
-TEST(ClockingBlockDeclaration, ClockingDeclBasic) {
+TEST(ClockingBlockParse, NamedDeclNotDefaultNotGlobal) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -529,7 +564,7 @@ TEST(ClockingBlockDeclaration, ClockingDeclBasic) {
   EXPECT_FALSE(item->is_global_clocking);
 }
 
-TEST(ClockingDirectionInputOutput, ClockingDirectionInputOutput) {
+TEST(ClockingBlockParse, InputOutputCombinedDirection) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -544,7 +579,7 @@ TEST(ClockingDirectionInputOutput, ClockingDirectionInputOutput) {
   EXPECT_EQ(item->clocking_signals[0].direction, Direction::kInout);
 }
 
-TEST(ClockingEndLabel, ClockingEndLabel) {
+TEST(ClockingBlockParse, EndLabelSimple) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  clocking cb @(posedge clk);\n"

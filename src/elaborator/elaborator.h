@@ -278,6 +278,14 @@ class Elaborator {
   void ValidateRegularClassInheritance(const ClassDecl* cls);
   void ValidateImplementsInterfaceMethods(const ClassDecl* cls);
 
+  /// §14.3: Validate clocking block declaration constraints.
+  void ValidateClockingBlock(ModuleItem* item);
+
+  /// §14.3: Validate clockvar access direction rules.
+  void ValidateClockvarAccess(const ModuleDecl* decl);
+  void WalkStmtsForClockvarAccess(const Stmt* s);
+  void CheckClockvarAccessExpr(const Expr* e, bool is_lvalue);
+
   /// §10.10.3: Validate nesting of unpacked array concatenations.
   void ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl);
   void WalkStmtsForArrayConcatNesting(const Stmt* s);
@@ -342,6 +350,14 @@ class Elaborator {
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
   std::unordered_map<std::string_view, std::string_view>
       var_named_types_;  // §11.2.2: var name → named type for aggregate checks
+
+  // §14.3: Clocking block signal directions for clockvar access validation.
+  struct ClockingSignalInfo {
+    Direction direction;
+  };
+  std::unordered_map<std::string_view,
+                     std::unordered_map<std::string_view, ClockingSignalInfo>>
+      clocking_signals_;  // block_name → (signal_name → info)
 };
 
 // Free functions shared across elaborator translation units.

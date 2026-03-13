@@ -14,6 +14,8 @@ void Parser::ParseClockingSkew(Edge& edge, Expr*& delay) {
     edge = Edge::kPosedge;
   } else if (Match(TokenKind::kKwNegedge)) {
     edge = Edge::kNegedge;
+  } else if (Match(TokenKind::kKwEdge)) {
+    edge = Edge::kEdge;
   }
   if (Check(TokenKind::kHash)) {
     Consume();
