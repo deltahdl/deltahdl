@@ -340,6 +340,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   CheckAlwaysCombMultiDriver(decl, mod);
   ValidateModuleConstraints(decl);
   ValidateClockvarAccess(decl);
+  ValidateCycleDelayDefaultClocking(decl);
   ValidateConstantFunctionCalls(decl);
 }
 

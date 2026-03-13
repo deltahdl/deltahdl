@@ -105,6 +105,7 @@ bool ProcessCompiler::HasTimingControl(const Stmt* stmt) {
   switch (stmt->kind) {
     case StmtKind::kTimingControl:
     case StmtKind::kDelay:
+    case StmtKind::kCycleDelay:
     case StmtKind::kEventControl:
     case StmtKind::kWait:
       return true;

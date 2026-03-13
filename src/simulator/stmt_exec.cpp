@@ -634,6 +634,19 @@ static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 // --- Delay ---
 
+static ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx,
+                               Arena& arena) {
+  uint32_t cycles = 0;
+  if (stmt->cycle_delay) {
+    auto val = EvalExpr(stmt->cycle_delay, ctx, arena);
+    cycles = static_cast<uint32_t>(val.ToUint64());
+  }
+  if (cycles > 0) {
+    co_await CycleDelayAwaiter{ctx, cycles};
+  }
+  co_return StmtResult::kDone;
+}
+
 static ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   uint64_t ticks = 0;
   if (stmt->delay) {
@@ -837,6 +850,8 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return ExecInlineTaskCall(stmt, ctx, arena);
     case StmtKind::kDelay:
       return ExecDelay(stmt, ctx, arena);
+    case StmtKind::kCycleDelay:
+      return ExecCycleDelay(stmt, ctx, arena);
     case StmtKind::kEventControl:
       return ExecEventControl(stmt, ctx, arena);
     case StmtKind::kFork:

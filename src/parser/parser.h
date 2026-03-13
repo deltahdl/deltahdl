@@ -252,6 +252,7 @@ class Parser {
   Stmt* ParseNbEventTriggerStmt();
   Stmt* ParseAssignmentOrExprStmt();
   Stmt* ParseAssignmentOrExprNoSemi();
+  Stmt* ParseCycleDelayStmt();
   Stmt* ParseDelayStmt();
   Stmt* ParseEventControlStmt();
   void ParseIntraAssignTiming(Stmt* stmt);

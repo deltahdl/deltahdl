@@ -231,6 +231,7 @@ enum class StmtKind : uint8_t {
   kRandsequence,     // randsequence ... endsequence (§18.17)
   kVarDecl,          // Block-level variable declaration (§9.3.1)
   kBlockItemDecl,    // Block-level typedef/import/let (§A.2.8)
+  kCycleDelay,       // ##N cycle delay statement (§14.11)
 };
 
 enum class Edge : uint8_t {

@@ -9,6 +9,7 @@
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
+#include "simulator/clocking.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
@@ -159,6 +160,40 @@ struct ForkJoinAwaiter {
   bool await_ready() const noexcept { return state->remaining == 0; }
 
   void await_suspend(std::coroutine_handle<> h) noexcept { state->parent = h; }
+
+  void await_resume() const noexcept {}
+};
+
+// Awaiter for ##N cycle delay. Suspends the coroutine until N clocking
+// block events have occurred on the default clocking block.
+struct CycleDelayAwaiter {
+  SimContext& ctx;
+  uint32_t cycles;
+
+  bool await_ready() const noexcept { return cycles == 0; }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    auto* mgr = ctx.GetClockingManager();
+    if (!mgr) {
+      h.resume();
+      return;
+    }
+    auto block_name = mgr->GetDefaultClocking();
+    if (block_name.empty()) {
+      h.resume();
+      return;
+    }
+    auto* counter = new uint32_t(cycles);
+    mgr->RegisterEdgeCallback(
+        block_name, ctx, ctx.GetScheduler(),
+        [h, counter]() mutable {
+          if (*counter > 0) --(*counter);
+          if (*counter == 0) {
+            delete counter;
+            h.resume();
+          }
+        });
+  }
 
   void await_resume() const noexcept {}
 };

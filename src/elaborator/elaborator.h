@@ -283,6 +283,7 @@ class Elaborator {
 
   /// §14.3: Validate clockvar access direction rules.
   void ValidateClockvarAccess(const ModuleDecl* decl);
+  void ValidateCycleDelayDefaultClocking(const ModuleDecl* decl);
   void WalkStmtsForClockvarAccess(const Stmt* s);
   void CheckClockvarAccessExpr(const Expr* e, bool is_lvalue);
 

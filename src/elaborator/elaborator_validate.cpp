@@ -362,7 +362,8 @@ static void CheckFuncBodyStmt(
                "only fork/join_none is permitted inside a function");
   }
   // §13.2: Function shall not contain time-controlling statements.
-  if (s->kind == StmtKind::kDelay || s->kind == StmtKind::kEventControl ||
+  if (s->kind == StmtKind::kDelay || s->kind == StmtKind::kCycleDelay ||
+      s->kind == StmtKind::kEventControl ||
       s->kind == StmtKind::kTimingControl || s->kind == StmtKind::kWait ||
       s->kind == StmtKind::kWaitFork || s->kind == StmtKind::kWaitOrder) {
     diag.Error(s->range.start,
@@ -805,6 +806,47 @@ void Elaborator::ValidateClockvarAccess(const ModuleDecl* decl) {
                    item->kind == ModuleItemKind::kFinalBlock;
     if (is_proc && item->body) {
       WalkStmtsForClockvarAccess(item->body);
+    }
+  }
+}
+
+// §14.11: Check if any procedural statement uses ## cycle delay.
+static bool HasCycleDelay(const Stmt* s) {
+  if (!s) return false;
+  if (s->kind == StmtKind::kCycleDelay) return true;
+  for (auto* sub : s->stmts) {
+    if (HasCycleDelay(sub)) return true;
+  }
+  if (HasCycleDelay(s->then_branch)) return true;
+  if (HasCycleDelay(s->else_branch)) return true;
+  if (HasCycleDelay(s->body)) return true;
+  if (HasCycleDelay(s->for_body)) return true;
+  for (auto& ci : s->case_items) {
+    if (HasCycleDelay(ci.body)) return true;
+  }
+  return false;
+}
+
+void Elaborator::ValidateCycleDelayDefaultClocking(const ModuleDecl* decl) {
+  bool has_default = false;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kClockingBlock &&
+        item->is_default_clocking) {
+      has_default = true;
+      break;
+    }
+  }
+  if (has_default) return;
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body && HasCycleDelay(item->body)) {
+      diag_.Error(item->loc,
+                  "cycle delay (##) requires a default clocking block");
     }
   }
 }

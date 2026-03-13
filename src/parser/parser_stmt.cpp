@@ -118,6 +118,8 @@ Stmt* Parser::ParseStmtBody() {
       return ParseDisableStmt();
     case TokenKind::kHash:
       return ParseDelayStmt();
+    case TokenKind::kHashHash:
+      return ParseCycleDelayStmt();
     case TokenKind::kAt:
       return ParseEventControlStmt();
     case TokenKind::kArrow:
@@ -737,6 +739,22 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
 
 Stmt* Parser::ParseAssignmentOrExprStmt() {
   auto* stmt = ParseAssignmentOrExprNoSemi();
+  Expect(TokenKind::kSemicolon);
+  return stmt;
+}
+
+Stmt* Parser::ParseCycleDelayStmt() {
+  auto* stmt = arena_.Create<Stmt>();
+  stmt->kind = StmtKind::kCycleDelay;
+  stmt->range.start = CurrentLoc();
+  Expect(TokenKind::kHashHash);
+  if (Check(TokenKind::kLParen)) {
+    Consume();
+    stmt->cycle_delay = ParseExpr();
+    Expect(TokenKind::kRParen);
+  } else {
+    stmt->cycle_delay = ParsePrimaryExpr();
+  }
   Expect(TokenKind::kSemicolon);
   return stmt;
 }
