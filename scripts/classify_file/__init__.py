@@ -19,13 +19,13 @@ from lib.python.github import close_issue
 
 
 _TEST_RE = re.compile(
-    r"^\s*TEST(?:_[FP])?\(\s*\w+\s*,\s*(\w+)\s*\)",
+    r"^\s*TEST(?:_[FP])?\(\s*(\w+)\s*,\s*(\w+)\s*\)",
     re.MULTILINE,
 )
 
 
-def extract_test_names(filepath: Path) -> list[str]:
-    """Extract all test names from TEST/TEST_F/TEST_P blocks in a file."""
+def extract_tests(filepath: Path) -> list[tuple[str, str]]:
+    """Extract all (suite, test) pairs from TEST/TEST_F/TEST_P blocks."""
     text = filepath.read_text(encoding="utf-8")
     return _TEST_RE.findall(text)
 
@@ -102,13 +102,13 @@ def sync_issue_rows(
 
 def _build_command(
     args: argparse.Namespace,
-    test_names: list[str],
+    test_pairs: list[tuple[str, str]],
 ) -> list[str]:
     """Build the subprocess command list for classify_tests."""
     cmd = [
         sys.executable, "-m", "classify_tests",
         "--file", args.file,
-        "--tests", ",".join(test_names),
+        "--tests", ",".join(f"{s}.{n}" for s, n in test_pairs),
         "--issue", str(args.issue),
     ]
     append_classify_cmd_flags(cmd, args)
@@ -117,10 +117,10 @@ def _build_command(
 
 def run_classify_tests(
     args: argparse.Namespace,
-    test_names: list[str],
+    test_pairs: list[tuple[str, str]],
 ) -> bool:
     """Invoke classify_tests for a list of tests. Returns True on success."""
-    cmd = _build_command(args, test_names)
+    cmd = _build_command(args, test_pairs)
     result = subprocess.run(cmd, check=False)
     return result.returncode == 0
 
@@ -166,8 +166,8 @@ def _run(args: argparse.Namespace) -> None:
         print(f"Skipping: {filepath} not found")
         _maybe_close(args, "the source file no longer exists")
         return
-    test_names = extract_test_names(filepath)
-    if not test_names:
+    test_pairs = extract_tests(filepath)
+    if not test_pairs:
         print(f"Deleting {filepath.name} because it contains"
               " no tests...")
         filepath.unlink()
@@ -176,12 +176,13 @@ def _run(args: argparse.Namespace) -> None:
             commit_and_push([], [filepath], f"Delete empty {filepath.name}\n")
         _maybe_close(args, "the file has no tests")
         return
+    test_names = [name for _, name in test_pairs]
     if args.create_issue:
         args.issue = create_issue(args, test_names)
         reviewed: set[str] = set()
     else:
         reviewed = sync_issue_rows(args, test_names)
-    pending = [n for n in test_names if n not in reviewed]
+    pending = [(s, n) for s, n in test_pairs if n not in reviewed]
     if reviewed:
         print(f"Skipping {len(reviewed)} already-reviewed"
               f" test(s): {', '.join(reviewed)}")

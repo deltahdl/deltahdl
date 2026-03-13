@@ -241,7 +241,7 @@ def test_batch_progress_output(tmp_path):
         tmp_path,
         "TEST(S, Alpha) {\n}\nTEST(S, Beta) {\n}\n",
     )
-    assert "Processing test 1/2: Alpha" in result.stdout
+    assert "Processing test 1/2: S.Alpha" in result.stdout
 
 
 # ---- --create-issue --------------------------------------------------------

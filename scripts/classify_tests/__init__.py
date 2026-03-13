@@ -12,12 +12,14 @@ from lib.python.classify import (
 )
 
 
-def _build_command(args, test_name):
+def _build_command(args, test_entry):
     """Build the subprocess command list for classify_test."""
+    suite, test = test_entry.split(".", 1)
     cmd = [
         sys.executable, "-m", "classify_test",
         "--file", args.file,
-        "--test", test_name,
+        "--suite", suite,
+        "--test", test,
     ]
     if args.issue is not None:
         cmd += ["--issue", str(args.issue)]

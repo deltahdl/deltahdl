@@ -30,7 +30,7 @@ def _invoke(*args, cwd=None, env=None):
     return invoke_module("classify_tests", *args, cwd=cwd, env=env)
 
 
-def _all_flags(tmp_path, tests="A,B"):
+def _all_flags(tmp_path, tests="S.A,S.B"):
     """Return the full set of required CLI flags."""
     return [
         "--file", str(tmp_path / "test.cpp"),
@@ -39,7 +39,7 @@ def _all_flags(tmp_path, tests="A,B"):
     ]
 
 
-def _run_batch(tmp_path, tests="A,B", exit_code=0):
+def _run_batch(tmp_path, tests="S.A,S.B", exit_code=0):
     """Install fake classify_test and invoke classify_tests."""
     env = _fresh_env(tmp_path, exit_code=exit_code)
     return _invoke(
@@ -86,12 +86,12 @@ def test_missing_tests_flag_reported(tmp_path):
 
 def test_all_pass_exits_zero(tmp_path):
     """Exits 0 when all classify_test calls succeed."""
-    assert _run_batch(tmp_path, tests="A,B").returncode == 0
+    assert _run_batch(tmp_path, tests="S.A,S.B").returncode == 0
 
 
 def test_single_test_exits_zero(tmp_path):
     """Exits 0 with a single test."""
-    assert _run_batch(tmp_path, tests="Only").returncode == 0
+    assert _run_batch(tmp_path, tests="S.Only").returncode == 0
 
 
 # ---- Failure ---------------------------------------------------------------
@@ -99,7 +99,7 @@ def test_single_test_exits_zero(tmp_path):
 
 def test_failure_exits_nonzero(tmp_path):
     """Exits non-zero when classify_test fails."""
-    assert _run_batch(tmp_path, tests="A", exit_code=1).returncode != 0
+    assert _run_batch(tmp_path, tests="S.A", exit_code=1).returncode != 0
 
 
 # ---- Progress output -------------------------------------------------------
@@ -107,7 +107,7 @@ def test_failure_exits_nonzero(tmp_path):
 
 def test_progress_output_format(tmp_path):
     """Progress lines show test index and name."""
-    assert "Processing test 1/2: A" in _run_batch(tmp_path).stdout
+    assert "Processing test 1/2: S.A" in _run_batch(tmp_path).stdout
 
 
 # ---- Optional flags --------------------------------------------------------

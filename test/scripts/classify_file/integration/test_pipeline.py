@@ -103,7 +103,7 @@ def test_tests_flag_contains_all_names(tmp_path, monkeypatch, cf):
     log = stub_subprocess_success(monkeypatch)
     _stub_close(monkeypatch, cf)
     getattr(cf, "_run")(_write_and_args(tmp_path, body))
-    assert log[0][log[0].index("--tests") + 1] == "Alpha,Beta"
+    assert log[0][log[0].index("--tests") + 1] == "S.Alpha,S.Beta"
 
 
 def test_flags_propagated_to_subprocess(tmp_path, monkeypatch, cf):
