@@ -21,13 +21,20 @@ struct SemaphoreObject {
   explicit SemaphoreObject(int32_t initial_keys = 0)
       : key_count(initial_keys) {}
 
-  // section 15.3.2: Add keys. Returns void; wakes waiters if possible.
+  // §15.3.2: Add keys and wake waiters.
   void Put(int32_t count = 1) {
     key_count += count;
     WakeWaiters();
   }
 
-  // section 15.3.3: Non-blocking get. Returns 1 on success, 0 on failure.
+  // §15.3.2: Validated put. Returns false if count is negative.
+  bool PutChecked(int32_t count) {
+    if (count < 0) return false;
+    Put(count);
+    return true;
+  }
+
+  // §15.3.4: Non-blocking get. Returns 1 on success, 0 on failure.
   int32_t TryGet(int32_t count = 1) {
     if (key_count >= count) {
       key_count -= count;
@@ -36,18 +43,23 @@ struct SemaphoreObject {
     return 0;
   }
 
-  // Wake waiters whose key requests can now be satisfied.
+  // §15.3.3: Check if enough keys are available for a blocking get.
+  bool CanGet(int32_t count = 1) const {
+    return key_count >= count;
+  }
+
+  // §15.3.3: Register a waiter for blocking get (FIFO order).
+  void AddWaiter(int32_t count, std::coroutine_handle<> h) {
+    waiters.emplace_back(count, h);
+  }
+
+  // §15.3.3: Wake waiters in strict FIFO order.
   void WakeWaiters() {
-    auto it = waiters.begin();
-    while (it != waiters.end()) {
-      if (key_count >= it->first) {
-        key_count -= it->first;
-        auto h = it->second;
-        it = waiters.erase(it);
-        h.resume();
-      } else {
-        ++it;
-      }
+    while (!waiters.empty() && key_count >= waiters.front().first) {
+      key_count -= waiters.front().first;
+      auto h = waiters.front().second;
+      waiters.erase(waiters.begin());
+      h.resume();
     }
   }
 };
