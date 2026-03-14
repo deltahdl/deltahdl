@@ -13,14 +13,14 @@ import sys
 from pathlib import Path
 
 from lib.python.cli import (
-    ClauseParams,
     invoke_implement_subclauses,
     run_claude_cli,
     run_with_dots,
 )
 from lib.python.github import (
-    fetch_issue_body,
-    sync_subclause_table,
+    close_issue,
+    create_issue,
+    format_subclause_label,
     update_issue_body,
 )
 
@@ -80,8 +80,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--clause", help="Numeric clause (e.g. 4)")
     group.add_argument("--annex", help="Annex letter (e.g. A)")
-    parser.add_argument("--sub-issue", type=int, required=True)
-    parser.add_argument("--master-issue", type=int, required=True)
+    parser.add_argument("--issue", type=int, default=None,
+                        help="Existing clause issue number (created if absent)")
     parser.add_argument("--organization", required=True)
     parser.add_argument("--repo", required=True)
 
@@ -92,6 +92,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error(f"LRM file not found: {args.lrm}")
 
     return args
+
+
+def _issue_title(label: str) -> str:
+    """Build the issue title for a clause or subclause."""
+    return (
+        f"Ensure IEEE 1800-2023 {label}"
+        " functionalities and tests are implemented and properly named"
+    )
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -111,16 +119,34 @@ def main(argv: list[str] | None = None) -> None:
 
     print(f"Found {len(impl_items)} subclauses for {clause}.")
 
-    body = fetch_issue_body(args.organization, args.repo, args.sub_issue)
-    new_body = sync_subclause_table(body, impl_items)
-    print(f"Synced issue body:\n{new_body}")
+    clause_issue = args.issue
+    if clause_issue is None:
+        clause_label = format_subclause_label(clause)
+        clause_issue = create_issue(
+            args.organization, args.repo,
+            _issue_title(clause_label), "",
+        )
+
+    subclause_issues = []
+    for subclause in impl_items:
+        label = format_subclause_label(subclause)
+        issue_num = create_issue(
+            args.organization, args.repo,
+            _issue_title(label), "",
+        )
+        subclause_issues.append(issue_num)
+
+    body = "\n".join(f"- #{n}" for n in subclause_issues) + "\n"
     update_issue_body(
-        args.organization, args.repo, args.sub_issue, new_body,
+        args.organization, args.repo, clause_issue, body,
     )
 
-    params = ClauseParams(
-        str(lrm), args.master_issue, args.organization, args.repo,
-    )
     invoke_implement_subclauses(
-        params, list(impl_items.keys()), args.sub_issue,
+        str(lrm), subclause_issues,
+        organization=args.organization, repo=args.repo,
+    )
+
+    close_issue(
+        args.organization, args.repo, clause_issue,
+        "all subclauses implemented",
     )

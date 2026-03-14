@@ -10,20 +10,20 @@ import pytest
 def _patch_main_no_subclauses(monkeypatch, ic):
     """Patch dependencies for the no-subclauses main() path."""
     monkeypatch.setattr(ic, "discover_subclauses", lambda *_a: {})
-    monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
 
 
-def _patch_main_with_subclauses(
-    monkeypatch, ic, *, subclauses=None,
-    synced_body="body",
-):
+_ISSUE_COUNTER = iter(range(100, 200))
+
+
+def _patch_main_with_subclauses(monkeypatch, ic, *, subclauses=None):
     """Patch all dependencies for main() with subclauses."""
     if subclauses is None:
         subclauses = {"4.1": "General", "4.2": "Exec"}
 
     monkeypatch.setattr(ic, "discover_subclauses", lambda *_a: subclauses)
-    monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: "")
-    monkeypatch.setattr(ic, "sync_subclause_table", lambda *_a: synced_body)
+
+    mock_create = MagicMock(side_effect=lambda *_a, **_kw: next(_ISSUE_COUNTER))
+    monkeypatch.setattr(ic, "create_issue", mock_create)
 
     mock_update = MagicMock()
     monkeypatch.setattr(ic, "update_issue_body", mock_update)
@@ -31,7 +31,13 @@ def _patch_main_with_subclauses(
     mock_inv = MagicMock()
     monkeypatch.setattr(ic, "invoke_implement_subclauses", mock_inv)
 
-    return mock_inv, mock_update
+    mock_close = MagicMock()
+    monkeypatch.setattr(ic, "close_issue", mock_close)
+
+    return {
+        "create": mock_create, "update": mock_update,
+        "invoke": mock_inv, "close": mock_close,
+    }
 
 
 # --- parse_args ---
@@ -43,7 +49,7 @@ def test_parse_args_clause(ic, tmp_path) -> None:
     lrm.write_text("")
     args = ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
-        "--sub-issue", "1", "--master-issue", "99",
+        "--issue", "1",
         "--organization", "o", "--repo", "r",
     ])
     assert args.clause == "4"
@@ -55,7 +61,7 @@ def test_parse_args_annex(ic, tmp_path) -> None:
     lrm.write_text("")
     args = ic.parse_args([
         "--lrm", str(lrm), "--annex", "A",
-        "--sub-issue", "1", "--master-issue", "99",
+        "--issue", "1",
         "--organization", "o", "--repo", "r",
     ])
     assert args.annex == "A"
@@ -83,25 +89,27 @@ def test_parse_args_missing_lrm(ic) -> None:
         ])
 
 
-def _parse_issue_args(ic, tmp_path):
-    """Parse args with --sub-issue 42 --master-issue 1."""
+def test_parse_args_issue_is_int(ic, tmp_path) -> None:
+    """--issue is parsed as an integer."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
-    return ic.parse_args([
+    args = ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
-        "--sub-issue", "42", "--master-issue", "1",
+        "--issue", "42",
         "--organization", "o", "--repo", "r",
     ])
+    assert args.issue == 42
 
 
-def test_parse_args_sub_issue_is_int(ic, tmp_path) -> None:
-    """--sub-issue is parsed as an integer."""
-    assert _parse_issue_args(ic, tmp_path).sub_issue == 42
-
-
-def test_parse_args_master_issue_is_int(ic, tmp_path) -> None:
-    """--master-issue is parsed as an integer."""
-    assert _parse_issue_args(ic, tmp_path).master_issue == 1
+def test_parse_args_issue_is_optional(ic, tmp_path) -> None:
+    """--issue is optional (None when not provided)."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    args = ic.parse_args([
+        "--lrm", str(lrm), "--clause", "4",
+        "--organization", "o", "--repo", "r",
+    ])
+    assert args.issue is None
 
 
 def test_parse_args_no_clause_or_annex(ic, tmp_path) -> None:
@@ -164,44 +172,47 @@ def test_main_prints_subclauses_found(
     assert "Found 2 subclauses" in capsys.readouterr().out
 
 
-def test_main_prints_synced_body(
-    ic, monkeypatch, clause_argv, capsys,
+def test_main_creates_subclause_issues(ic, monkeypatch, clause_argv) -> None:
+    """main() creates an issue for each discovered subclause."""
+    mocks = _patch_main_with_subclauses(monkeypatch, ic)
+    ic.main(clause_argv)
+    assert mocks["create"].call_count == 2
+
+
+def test_main_sets_clause_issue_body(ic, monkeypatch, clause_argv) -> None:
+    """main() sets the clause issue body to a list of subclause issue refs."""
+    mocks = _patch_main_with_subclauses(monkeypatch, ic)
+    ic.main(clause_argv)
+    assert mocks["update"].called
+
+
+def test_main_invokes_implement_subclauses(ic, monkeypatch, clause_argv) -> None:
+    """main() calls invoke_implement_subclauses."""
+    mocks = _patch_main_with_subclauses(monkeypatch, ic)
+    ic.main(clause_argv)
+    assert mocks["invoke"].call_count == 1
+
+
+def test_main_closes_clause_issue(ic, monkeypatch, clause_argv) -> None:
+    """main() closes the clause issue after all subclauses."""
+    mocks = _patch_main_with_subclauses(monkeypatch, ic)
+    ic.main(clause_argv)
+    assert mocks["close"].called
+
+
+def test_main_creates_clause_issue_when_absent(
+    ic, monkeypatch, tmp_path,
 ) -> None:
-    """Prints the synced issue body."""
-    _patch_main_with_subclauses(
-        monkeypatch, ic,
-        synced_body="## Subclauses\n\n- [ ] 4.1 General\n",
-    )
-    ic.main(clause_argv)
-    assert "## Subclauses" in capsys.readouterr().out
-
-
-def test_main_syncs_issue_body(ic, monkeypatch, clause_argv) -> None:
-    """main() updates the issue body with synced checklist."""
-    _, mock_update = _patch_main_with_subclauses(monkeypatch, ic)
-    ic.main(clause_argv)
-    assert mock_update.call_count == 1
-
-
-def test_main_passes_all_subclauses(ic, monkeypatch, clause_argv) -> None:
-    """main() passes all discovered subclauses to invoke_implement_subclauses."""
-    mock_inv, _ = _patch_main_with_subclauses(monkeypatch, ic)
-    ic.main(clause_argv)
-    assert set(mock_inv.call_args[0][1]) == {"4.1", "4.2"}
-
-
-def test_main_passes_clause_issue(ic, monkeypatch, clause_argv) -> None:
-    """main() passes sub_issue as clause_issue."""
-    mock_inv, _ = _patch_main_with_subclauses(monkeypatch, ic)
-    ic.main(clause_argv)
-    assert mock_inv.call_args[0][2] == 1
-
-
-def test_main_with_subclauses(ic, monkeypatch, clause_argv) -> None:
-    """invoke_implement_subclauses is called once."""
-    mock_inv, _ = _patch_main_with_subclauses(monkeypatch, ic)
-    ic.main(clause_argv)
-    assert mock_inv.call_count == 1
+    """main() creates the clause issue when --issue is not provided."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    argv = [
+        "--lrm", str(lrm), "--clause", "4",
+        "--organization", "o", "--repo", "r",
+    ]
+    mocks = _patch_main_with_subclauses(monkeypatch, ic)
+    ic.main(argv)
+    assert mocks["create"].call_count >= 3  # 1 clause + 2 subclauses
 
 
 def test_main_annex(ic, monkeypatch, tmp_path) -> None:
@@ -210,15 +221,15 @@ def test_main_annex(ic, monkeypatch, tmp_path) -> None:
     lrm.write_text("")
     argv = [
         "--lrm", str(lrm), "--annex", "A",
-        "--sub-issue", "1", "--master-issue", "99",
+        "--issue", "1",
         "--organization", "o", "--repo", "r",
     ]
     mock_ds = MagicMock(return_value={"A.1": "General"})
     monkeypatch.setattr(ic, "discover_subclauses", mock_ds)
-    monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: "")
-    monkeypatch.setattr(ic, "sync_subclause_table", lambda *_a: "body")
-    monkeypatch.setattr(ic, "update_issue_body", lambda *_a, **_kw: None)
+    monkeypatch.setattr(ic, "create_issue", MagicMock(return_value=50))
+    monkeypatch.setattr(ic, "update_issue_body", MagicMock())
     monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
+    monkeypatch.setattr(ic, "close_issue", MagicMock())
     ic.main(argv)
     assert mock_ds.call_args[0][1] == "A"
 

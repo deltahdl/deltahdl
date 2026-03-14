@@ -208,22 +208,22 @@ def invoke_implement_subclause(
 
 
 def invoke_implement_subclauses(
-    params: ClauseParams,
-    subclauses: list[str],
-    clause_issue: int,
+    lrm: str,
+    issues: list[int],
     *,
+    organization: str,
+    repo: str,
     model: str = "opus",
 ) -> None:
     """Shell out to ``python -m implement_subclauses``."""
-    print(f"Invoking implement_subclauses for {','.join(subclauses)}...")
+    issues_str = ",".join(str(i) for i in issues)
+    print(f"Invoking implement_subclauses for issues {issues_str}...")
     cmd = [
         sys.executable, "-m", "implement_subclauses",
-        "--lrm", params.lrm,
-        "--subclauses", ",".join(subclauses),
-        "--clause-issue", str(clause_issue),
-        "--master-issue", str(params.master_issue),
-        "--organization", params.organization,
-        "--repo", params.repo,
+        "--lrm", lrm,
+        "--issues", issues_str,
+        "--organization", organization,
+        "--repo", repo,
         "--model", model,
     ]
     result = subprocess.run(cmd, check=False)

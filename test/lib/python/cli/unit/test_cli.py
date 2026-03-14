@@ -324,7 +324,10 @@ def test_invoke_implement_clause_failure(monkeypatch) -> None:
 def _invoke_subclauses_and_capture(monkeypatch):
     """Invoke with stubbed subprocess and return captured command."""
     captured = stub_subprocess_success(monkeypatch)
-    invoke_implement_subclauses(_CL_PARAMS, ["6.1", "6.2"], 42)
+    invoke_implement_subclauses(
+        "/tmp/lrm.pdf", [100, 101],
+        organization="deltahdl", repo="deltahdl",
+    )
     return captured[0]
 
 
@@ -345,22 +348,10 @@ def test_invoke_implement_subclauses_lrm(monkeypatch) -> None:
     assert cmd[cmd.index("--lrm") + 1] == "/tmp/lrm.pdf"
 
 
-def test_invoke_implement_subclauses_subclauses(monkeypatch) -> None:
-    """Passes --subclauses as comma-joined string."""
+def test_invoke_implement_subclauses_issues(monkeypatch) -> None:
+    """Passes --issues as comma-joined string."""
     cmd = _invoke_subclauses_and_capture(monkeypatch)
-    assert cmd[cmd.index("--subclauses") + 1] == "6.1,6.2"
-
-
-def test_invoke_implement_subclauses_clause_issue(monkeypatch) -> None:
-    """Passes --clause-issue as string."""
-    cmd = _invoke_subclauses_and_capture(monkeypatch)
-    assert cmd[cmd.index("--clause-issue") + 1] == "42"
-
-
-def test_invoke_implement_subclauses_master_issue(monkeypatch) -> None:
-    """Passes --master-issue as string."""
-    cmd = _invoke_subclauses_and_capture(monkeypatch)
-    assert cmd[cmd.index("--master-issue") + 1] == "1"
+    assert cmd[cmd.index("--issues") + 1] == "100,101"
 
 
 def test_invoke_implement_subclauses_organization(monkeypatch) -> None:
@@ -385,7 +376,10 @@ def test_invoke_implement_subclauses_failure(monkeypatch) -> None:
     """Calls sys.exit on nonzero returncode."""
     stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
-        invoke_implement_subclauses(_CL_PARAMS, ["6.1"], 42)
+        invoke_implement_subclauses(
+            "/tmp/lrm.pdf", [100],
+            organization="o", repo="r",
+        )
 
 
 # ---- parse_and_validate ----------------------------------------------------
