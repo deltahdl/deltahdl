@@ -4,7 +4,16 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_2_ModuleKeywordIntroducesModule) {
+TEST(ParserClause03, ModuleDeclKindDistinctValues) {
+  EXPECT_NE(ModuleDeclKind::kModule, ModuleDeclKind::kInterface);
+  EXPECT_NE(ModuleDeclKind::kModule, ModuleDeclKind::kProgram);
+  EXPECT_NE(ModuleDeclKind::kModule, ModuleDeclKind::kChecker);
+  EXPECT_NE(ModuleDeclKind::kInterface, ModuleDeclKind::kProgram);
+  EXPECT_NE(ModuleDeclKind::kInterface, ModuleDeclKind::kChecker);
+  EXPECT_NE(ModuleDeclKind::kProgram, ModuleDeclKind::kChecker);
+}
+
+TEST(ParserClause03, ModuleKeywordIntroducesModule) {
   auto r = Parse("module m; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -12,7 +21,7 @@ TEST(ParserClause03, Cl3_2_ModuleKeywordIntroducesModule) {
   EXPECT_EQ(r.cu->modules[0]->decl_kind, ModuleDeclKind::kModule);
 }
 
-TEST(ParserClause03, Cl3_2_MacromoduleKeywordIntroducesModule) {
+TEST(ParserClause03, MacromoduleKeywordIntroducesModule) {
   auto r = Parse("macromodule mm; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -21,7 +30,7 @@ TEST(ParserClause03, Cl3_2_MacromoduleKeywordIntroducesModule) {
   EXPECT_EQ(r.cu->modules[0]->name, "mm");
 }
 
-TEST(ParserClause03, Cl3_2_ProgramKeywordIntroducesProgram) {
+TEST(ParserClause03, ProgramKeywordIntroducesProgram) {
   auto r = Parse("program p; endprogram");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -29,7 +38,7 @@ TEST(ParserClause03, Cl3_2_ProgramKeywordIntroducesProgram) {
   EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
 
-TEST(ParserClause03, Cl3_2_InterfaceKeywordIntroducesInterface) {
+TEST(ParserClause03, InterfaceKeywordIntroducesInterface) {
   auto r = Parse("interface ifc; endinterface");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -37,7 +46,7 @@ TEST(ParserClause03, Cl3_2_InterfaceKeywordIntroducesInterface) {
   EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
 }
 
-TEST(ParserClause03, Cl3_2_CheckerKeywordIntroducesChecker) {
+TEST(ParserClause03, CheckerKeywordIntroducesChecker) {
   auto r = Parse("checker chk; endchecker");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -45,7 +54,7 @@ TEST(ParserClause03, Cl3_2_CheckerKeywordIntroducesChecker) {
   EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
 }
 
-TEST(ParserClause03, Cl3_2_PackageKeywordIntroducesPackage) {
+TEST(ParserClause03, PackageKeywordIntroducesPackage) {
   auto r = Parse("package pkg; endpackage");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -53,7 +62,7 @@ TEST(ParserClause03, Cl3_2_PackageKeywordIntroducesPackage) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
-TEST(ParserClause03, Cl3_2_PrimitiveKeywordIntroducesPrimitive) {
+TEST(ParserClause03, PrimitiveKeywordIntroducesPrimitive) {
   auto r = Parse(
       "primitive udp_buf (output out, input in);\n"
       "  table 0 : 0; 1 : 1; endtable\n"
@@ -64,7 +73,7 @@ TEST(ParserClause03, Cl3_2_PrimitiveKeywordIntroducesPrimitive) {
   EXPECT_EQ(r.cu->udps[0]->name, "udp_buf");
 }
 
-TEST(ParserClause03, Cl3_2_ConfigKeywordIntroducesConfig) {
+TEST(ParserClause03, ConfigKeywordIntroducesConfig) {
   auto r = Parse(
       "module m; endmodule\n"
       "config cfg; design m; endconfig\n");
@@ -74,7 +83,7 @@ TEST(ParserClause03, Cl3_2_ConfigKeywordIntroducesConfig) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-TEST(ParserClause03, Cl3_2_ModuleContainsDeclarationsAndCode) {
+TEST(ParserClause03, ModuleContainsDeclarationsAndCode) {
   auto r = Parse(
       "module m;\n"
       "  logic a;\n"
@@ -87,7 +96,7 @@ TEST(ParserClause03, Cl3_2_ModuleContainsDeclarationsAndCode) {
   EXPECT_FALSE(r.cu->modules[0]->items.empty());
 }
 
-TEST(ParserClause03, Cl3_2_ProgramContainsDeclarationsAndCode) {
+TEST(ParserClause03, ProgramContainsDeclarationsAndCode) {
   auto r = Parse(
       "program p;\n"
       "  logic a;\n"
@@ -98,7 +107,7 @@ TEST(ParserClause03, Cl3_2_ProgramContainsDeclarationsAndCode) {
   EXPECT_FALSE(r.cu->programs[0]->items.empty());
 }
 
-TEST(ParserClause03, Cl3_2_InterfaceContainsDeclarations) {
+TEST(ParserClause03, InterfaceContainsDeclarations) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic req, gnt;\n"
@@ -109,7 +118,7 @@ TEST(ParserClause03, Cl3_2_InterfaceContainsDeclarations) {
   EXPECT_FALSE(r.cu->interfaces[0]->items.empty());
 }
 
-TEST(ParserClause03, Cl3_2_CheckerContainsDeclarations) {
+TEST(ParserClause03, CheckerContainsDeclarations) {
   auto r = Parse(
       "checker chk;\n"
       "  logic flag;\n"
@@ -119,7 +128,7 @@ TEST(ParserClause03, Cl3_2_CheckerContainsDeclarations) {
   EXPECT_FALSE(r.cu->checkers[0]->items.empty());
 }
 
-TEST(ParserClause03, Cl3_2_PackageContainsDeclarations) {
+TEST(ParserClause03, PackageContainsDeclarations) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -130,7 +139,7 @@ TEST(ParserClause03, Cl3_2_PackageContainsDeclarations) {
   EXPECT_FALSE(r.cu->packages[0]->items.empty());
 }
 
-TEST(ParserClause03, Cl3_2_TopLevelClassIsNotDesignElement) {
+TEST(ParserClause03, TopLevelClassIsNotDesignElement) {
   auto r = Parse(
       "class C;\n"
       "  int x;\n"
@@ -148,7 +157,7 @@ TEST(ParserClause03, Cl3_2_TopLevelClassIsNotDesignElement) {
   EXPECT_TRUE(r.cu->configs.empty());
 }
 
-TEST(ParserClause03, Cl3_2_CuScopeTypedefIsNotDesignElement) {
+TEST(ParserClause03, CuScopeTypedefIsNotDesignElement) {
   auto r = Parse(
       "typedef int myint;\n"
       "module m; endmodule\n");
@@ -159,7 +168,7 @@ TEST(ParserClause03, Cl3_2_CuScopeTypedefIsNotDesignElement) {
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
-TEST(ParserClause03, Cl3_2_CuScopeParamIsNotDesignElement) {
+TEST(ParserClause03, CuScopeParamIsNotDesignElement) {
   auto r = Parse(
       "parameter int P = 42;\n"
       "module m; endmodule\n");
@@ -170,15 +179,15 @@ TEST(ParserClause03, Cl3_2_CuScopeParamIsNotDesignElement) {
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
-TEST(ParserClause03, Cl3_2_UnrecognizedTopLevelTokenIsError) {
+TEST(ParserClause03, UnrecognizedTopLevelTokenIsError) {
   EXPECT_FALSE(ParseOk("always_comb begin end"));
 }
 
-TEST(ParserClause03, Cl3_2_BareStatementAtTopLevelIsError) {
+TEST(ParserClause03, BareStatementAtTopLevelIsError) {
   EXPECT_FALSE(ParseOk("assign x = 1;"));
 }
 
-TEST(ParserClause03, Cl3_2_AllSevenDesignElementsCoexist) {
+TEST(ParserClause03, AllSevenDesignElementsCoexist) {
   auto r = Parse(
       "module m; endmodule\n"
       "program p; endprogram\n"
@@ -200,7 +209,7 @@ TEST(ParserClause03, Cl3_2_AllSevenDesignElementsCoexist) {
   EXPECT_EQ(r.cu->configs.size(), 1u);
 }
 
-TEST(ParserClause03, Cl3_2_DesignElementsInterleaveWithNonDesignElements) {
+TEST(ParserClause03, DesignElementsInterleaveWithNonDesignElements) {
   auto r = Parse(
       "typedef int myint;\n"
       "module m; endmodule\n"
