@@ -299,3 +299,14 @@ def test_get_remote_repo_https_no_dotgit(monkeypatch):
     mock_result.stderr = ""
     monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
     assert get_remote_repo() == ("myorg", "myrepo")
+
+
+def test_get_remote_repo_exits_on_unparseable_url(monkeypatch):
+    """Exits when the remote URL cannot be parsed."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "file:///local/repo\n"
+    mock_result.stderr = ""
+    monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
+    with pytest.raises(SystemExit):
+        get_remote_repo()
