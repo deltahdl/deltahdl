@@ -762,6 +762,85 @@ static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
+// --- wait_order (IEEE §15.5.4) ---
+
+// Awaiter that watches multiple event variables and reports which one
+// triggered first. A shared done flag prevents double-resume when stale
+// watchers on unconsumed events fire later.
+struct WaitOrderStepAwaiter {
+  SimContext& ctx;
+  const std::vector<std::string_view>& event_names;
+  std::string_view triggered_name;
+
+  bool await_ready() const noexcept { return false; }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    auto done = std::make_shared<bool>(false);
+    auto* out = &triggered_name;
+
+    for (auto name : event_names) {
+      auto* var = ctx.FindVariable(name);
+      if (!var) continue;
+      var->AddWatcher([h, name, out, done]() mutable {
+        if (*done) return true;
+        *done = true;
+        *out = name;
+        h.resume();
+        return true;
+      });
+    }
+  }
+
+  std::string_view await_resume() const noexcept { return triggered_name; }
+};
+
+static ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  auto& events = stmt->wait_order_events;
+  if (events.empty()) {
+    if (stmt->then_branch) {
+      co_return co_await ExecStmt(stmt->then_branch, ctx, arena);
+    }
+    co_return StmtResult::kDone;
+  }
+
+  bool failed = false;
+
+  for (size_t i = 0; i < events.size() && !failed; ++i) {
+    auto expected_name = events[i]->text;
+
+    // §15.5.4: Only the first event can use persistent triggered state.
+    if (i == 0 && ctx.IsEventTriggered(expected_name)) {
+      continue;
+    }
+
+    // Collect event names from this position onwards.
+    std::vector<std::string_view> remaining;
+    for (size_t j = i; j < events.size(); ++j) {
+      remaining.push_back(events[j]->text);
+    }
+
+    auto triggered = co_await WaitOrderStepAwaiter{ctx, remaining, {}};
+
+    if (triggered != expected_name) {
+      failed = true;
+    }
+  }
+
+  if (failed) {
+    if (stmt->else_branch) {
+      co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
+    }
+    // §15.5.4: No else clause — generate default runtime error.
+    ctx.GetDiag().Error({}, "wait_order failure: events triggered out of order");
+    co_return StmtResult::kDone;
+  }
+
+  if (stmt->then_branch) {
+    co_return co_await ExecStmt(stmt->then_branch, ctx, arena);
+  }
+  co_return StmtResult::kDone;
+}
+
 // --- Fork/join (IEEE §9.3.2) ---
 
 static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
@@ -897,11 +976,12 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return ExecTask::Immediate(ExecEventTriggerImpl(stmt, ctx));
     case StmtKind::kNbEventTrigger:
       return ExecTask::Immediate(ExecNbEventTriggerImpl(stmt, ctx, arena));
+    case StmtKind::kWaitOrder:
+      return ExecWaitOrder(stmt, ctx, arena);
     case StmtKind::kTimingControl:
     case StmtKind::kDisable:
     case StmtKind::kDisableFork:
     case StmtKind::kWaitFork:
-    case StmtKind::kWaitOrder:
       return ExecTask::Immediate(StmtResult::kDone);
     case StmtKind::kBreak:
       return ExecTask::Immediate(StmtResult::kBreak);
