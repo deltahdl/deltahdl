@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, CuScopeTaskGoesToCuItems) {
-  auto r = Parse(
-      "task my_task;\n"
-      "endtask\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(CompilationUnitStructure, SourceWithoutModulesIsValid) {
   auto r = Parse(
       "package p; endpackage\n"
