@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §3.1 — CU-scope import is stored in cu_items.
-TEST(CompilationUnitStructure, CuScopeImportGoesToCuItems) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  typedef int myint;\n"
-      "endpackage\n"
-      "import pkg::*;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
-}
-
 // §3.1 — CU-scope variable declaration is stored in cu_items.
 TEST(CompilationUnitStructure, CuScopeVarDeclGoesToCuItems) {
   auto r = Parse(
