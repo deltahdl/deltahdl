@@ -409,4 +409,21 @@ TEST(CompilationUnitStructure, MultipleUdpsAccumulate) {
   EXPECT_EQ(r.cu->udps[1]->name, "u2");
 }
 
+// §3.1 — Configs accumulate in the compilation unit.
+TEST(CompilationUnitStructure, MultipleConfigsAccumulate) {
+  auto r = Parse(
+      "module m; endmodule\n"
+      "config cfg1;\n"
+      "  design m;\n"
+      "endconfig\n"
+      "config cfg2;\n"
+      "  design m;\n"
+      "endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->configs.size(), 2u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg1");
+  EXPECT_EQ(r.cu->configs[1]->name, "cfg2");
+}
+
 }  // namespace
