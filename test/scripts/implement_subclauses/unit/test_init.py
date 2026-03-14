@@ -72,51 +72,37 @@ def test_parse_args_requires_issues(iscs, tmp_path):
 # ---- main -------------------------------------------------------------------
 
 
-def _patch_main(monkeypatch, iscs):
-    """Patch dependencies for main() and return mocks."""
-    monkeypatch.setattr(
-        iscs, "fetch_issue_title",
-        lambda _o, _r, n: (
-            f"Ensure IEEE 1800-2023 §6.{n - 99}"
-            " functionalities and tests are implemented"
-        ),
-    )
-    mock_invoke = MagicMock()
-    monkeypatch.setattr(iscs, "invoke_implement_subclause", mock_invoke)
-    return mock_invoke
-
-
-def test_main_invokes_each_subclause(iscs, monkeypatch, base_argv):
+def test_main_invokes_each_subclause(iscs, monkeypatch, base_argv, patch_main):
     """main() invokes implement_subclause for each issue."""
-    mock_invoke = _patch_main(monkeypatch, iscs)
+    mock_invoke = patch_main(monkeypatch, iscs)
     iscs.main(base_argv)
     assert mock_invoke.call_count == 2
 
 
-def test_main_passes_subclause(iscs, monkeypatch, base_argv):
+def test_main_passes_subclause(iscs, monkeypatch, base_argv, patch_main):
     """main() passes the extracted subclause number."""
-    mock_invoke = _patch_main(monkeypatch, iscs)
+    mock_invoke = patch_main(monkeypatch, iscs)
     iscs.main(base_argv)
     assert mock_invoke.call_args_list[0][0][1] == "6.1"
 
 
-def test_main_passes_issue_number(iscs, monkeypatch, base_argv):
+def test_main_passes_issue_number(iscs, monkeypatch, base_argv, patch_main):
     """main() passes the issue number."""
-    mock_invoke = _patch_main(monkeypatch, iscs)
+    mock_invoke = patch_main(monkeypatch, iscs)
     iscs.main(base_argv)
     assert mock_invoke.call_args_list[0][0][2] == 100
 
 
-def test_main_second_uses_continue(iscs, monkeypatch, base_argv):
+def test_main_second_uses_continue(iscs, monkeypatch, base_argv, patch_main):
     """Second subclause uses continue_session=True."""
-    mock_invoke = _patch_main(monkeypatch, iscs)
+    mock_invoke = patch_main(monkeypatch, iscs)
     iscs.main(base_argv)
     assert mock_invoke.call_args_list[1][1]["continue_session"] is True
 
 
-def test_main_first_no_continue(iscs, monkeypatch, base_argv):
+def test_main_first_no_continue(iscs, monkeypatch, base_argv, patch_main):
     """First subclause does not use continue_session."""
-    mock_invoke = _patch_main(monkeypatch, iscs)
+    mock_invoke = patch_main(monkeypatch, iscs)
     iscs.main(base_argv)
     assert mock_invoke.call_args_list[0][1]["continue_session"] is False
 
