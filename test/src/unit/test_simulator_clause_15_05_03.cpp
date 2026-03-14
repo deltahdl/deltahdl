@@ -1,72 +1,15 @@
 #include <gtest/gtest.h>
 
-#include <string_view>
-
+#include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_stmt_exec.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
-#include "simulator/process.h"
 #include "simulator/stmt_exec.h"
-#include "simulator/stmt_result.h"
 
 namespace {
 
-// --- Moved from test_simulator_clause_15_05_02.cpp ---
-
-TEST(IpcSync, EventTriggeredDefault) {
-  SyncFixture f;
-  EXPECT_FALSE(f.ctx.IsEventTriggered("ev1"));
-}
-
-TEST(IpcSync, EventTriggeredSetAndCheck) {
-  SyncFixture f;
-  f.ctx.SetEventTriggered("ev1");
-  EXPECT_TRUE(f.ctx.IsEventTriggered("ev1"));
-}
-
-TEST(IpcSync, EventTriggeredDifferentNames) {
-  SyncFixture f;
-  f.ctx.SetEventTriggered("ev1");
-  EXPECT_TRUE(f.ctx.IsEventTriggered("ev1"));
-  EXPECT_FALSE(f.ctx.IsEventTriggered("ev2"));
-}
-
-TEST(IpcSync, EventTriggerSetsTriggeredState) {
-  SyncFixture f;
-
-  auto* ev = f.ctx.CreateVariable("my_event", 1);
-  ev->is_event = true;
-  ev->value = MakeLogic4VecVal(f.arena, 1, 0);
-
-  auto* trigger_stmt = f.arena.Create<Stmt>();
-  trigger_stmt->kind = StmtKind::kEventTrigger;
-  trigger_stmt->expr = f.arena.Create<Expr>();
-  trigger_stmt->expr->kind = ExprKind::kIdentifier;
-  trigger_stmt->expr->text = "my_event";
-
-  auto driver = [](const Stmt* stmt, SimContext& ctx, Arena& arena,
-                   DriverResult* out) -> SimCoroutine {
-    out->value = co_await ExecStmt(stmt, ctx, arena);
-  };
-  DriverResult result;
-  auto coro = driver(trigger_stmt, f.ctx, f.arena, &result);
-  coro.Resume();
-
-  EXPECT_TRUE(f.ctx.IsEventTriggered("my_event"));
-}
-
-TEST(IpcSync, EventTriggeredStickyWithinTimeslot) {
-  SyncFixture f;
-  f.ctx.SetEventTriggered("ev1");
-
-  EXPECT_TRUE(f.ctx.IsEventTriggered("ev1"));
-  EXPECT_TRUE(f.ctx.IsEventTriggered("ev1"));
-
-  EXPECT_FALSE(f.ctx.IsEventTriggered("ev2"));
-}
-
-// --- Moved from test_simulator_clause_15_05_01.cpp ---
+// --- §15.5.3: Nonblocking trigger sets triggered state ---
 
 TEST(IpcSync, NonblockingTriggerSetsTriggeredState) {
   SyncFixture f;
@@ -89,7 +32,7 @@ TEST(IpcSync, NonblockingTriggerSetsTriggeredState) {
   EXPECT_TRUE(f.ctx.IsEventTriggered("my_event"));
 }
 
-// --- New §15.5.3 tests ---
+// --- §15.5.3 tests ---
 
 TEST(IpcSync, TriggeredMethodReturnsOneWhenTriggered) {
   SimFixture f;
