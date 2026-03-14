@@ -23,7 +23,7 @@ def _patch_main_with_subclauses(
 
     monkeypatch.setattr(ic, "discover_subclauses", lambda *_a: subclauses)
     monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: "")
-    monkeypatch.setattr(ic, "build_synced_body", lambda *_a: synced_body)
+    monkeypatch.setattr(ic, "sync_subclause_table", lambda *_a: synced_body)
 
     mock_update = MagicMock()
     monkeypatch.setattr(ic, "update_issue_body", mock_update)
@@ -152,7 +152,7 @@ def test_main_no_subclauses_error_message(
         ic.main(clause_argv)
     except SystemExit:
         pass
-    assert "no implementable subclauses" in capsys.readouterr().err.lower()
+    assert "no subclauses" in capsys.readouterr().err.lower()
 
 
 def test_main_prints_subclauses_found(
@@ -216,7 +216,7 @@ def test_main_annex(ic, monkeypatch, tmp_path) -> None:
     mock_ds = MagicMock(return_value={"A.1": "General"})
     monkeypatch.setattr(ic, "discover_subclauses", mock_ds)
     monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: "")
-    monkeypatch.setattr(ic, "build_synced_body", lambda *_a: "body")
+    monkeypatch.setattr(ic, "sync_subclause_table", lambda *_a: "body")
     monkeypatch.setattr(ic, "update_issue_body", lambda *_a, **_kw: None)
     monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
     ic.main(argv)
@@ -230,7 +230,7 @@ def test_discover_subclauses_parses_json(ic, monkeypatch) -> None:
     """discover_subclauses parses Claude's JSON response."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=0,
-        stdout='{"4.1": "General", "4.2": "Exec", "4.3": false}\n',
+        stdout='{"4.1": "General", "4.2": "Exec"}\n',
         stderr="",
     )
     monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
@@ -312,29 +312,15 @@ def test_discover_subclauses_exits_on_claude_failure(
 
 
 def test_discover_subclauses_empty_result(ic, monkeypatch) -> None:
-    """discover_subclauses returns empty dict when all false."""
+    """discover_subclauses returns empty dict when response is empty."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=0,
-        stdout='{"4.1": false, "4.2": false}\n',
+        stdout='{}\n',
         stderr="",
     )
     monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
     result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert result == {}
-
-
-def test_discover_subclauses_rationale_is_implementable(
-    ic, monkeypatch,
-) -> None:
-    """Subclauses with string rationale are treated as implementable."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=0,
-        stdout='{"4.1": "Defines syntax rules that must be parsed"}\n',
-        stderr="",
-    )
-    monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
-    result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
-    assert "4.1" in result
 
 
 def test_discover_subclauses_default_model_is_opus(ic, monkeypatch) -> None:
@@ -373,20 +359,6 @@ def test_discover_subclauses_excludes_parent_clause(
     monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
     result = ic.discover_subclauses(Path("/lrm.pdf"), "15")
     assert result == {"15.1": "General"}
-
-
-def test_discover_subclauses_bool_true_is_implementable(
-    ic, monkeypatch,
-) -> None:
-    """Subclauses with value true are treated as implementable."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=0,
-        stdout='{"4.2": true}\n',
-        stderr="",
-    )
-    monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
-    result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
-    assert result == {"4.2": "4.2"}
 
 
 def test_discover_subclauses_uses_run_with_dots(ic, monkeypatch):

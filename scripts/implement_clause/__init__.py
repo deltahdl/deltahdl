@@ -19,8 +19,8 @@ from lib.python.cli import (
     run_with_dots,
 )
 from lib.python.github import (
-    build_synced_body,
     fetch_issue_body,
+    sync_subclause_table,
     update_issue_body,
 )
 
@@ -35,16 +35,10 @@ def discover_subclauses(
     """
     prompt = (
         f"Read clause {clause} in the LRM at {lrm_path}. "
-        "List all direct and indirect subclauses. For each, determine "
-        "whether it describes functionality that can be implemented as "
-        "software (e.g., parsing, simulation, synthesis, elaboration, "
-        "scheduling).\n\n"
+        "List ALL direct and indirect subclauses with their titles.\n\n"
         "Return ONLY a JSON object where each key is a subclause "
-        "number and each value is one of:\n"
-        "- A string containing the subclause title if the subclause "
-        "is implementable\n"
-        "- false if it is not implementable\n\n"
-        'Example: {"4.1": "General", "4.2": "Overview", "4.3": false}'
+        "number and each value is the subclause title.\n\n"
+        'Example: {"4.1": "General", "4.2": "Overview", "4.3": "Event simulation"}'
     )
 
     env = os.environ.copy()
@@ -71,18 +65,10 @@ def discover_subclauses(
     fenced = re.search(r"```(?:json)?\s*\n(.*?)\n```", raw, re.DOTALL)
     if fenced:
         raw = fenced.group(1)
-    verdicts = json.loads(raw)
-
-    implementable: dict[str, str] = {}
-    for key, value in verdicts.items():
-        if isinstance(value, str):
-            implementable[key] = value
-        elif value is True:
-            implementable[key] = key
-
-    implementable.pop(clause, None)
-    print(f"Implementable: {list(implementable.keys())}")
-    return implementable
+    subclauses = json.loads(raw)
+    subclauses.pop(clause, None)
+    print(f"Subclauses: {list(subclauses.keys())}")
+    return subclauses
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -118,7 +104,7 @@ def main(argv: list[str] | None = None) -> None:
 
     if not impl_items:
         print(
-            f"ERROR: discovery returned no implementable subclauses for {clause}.",
+            f"ERROR: discovery returned no subclauses for {clause}.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -126,7 +112,7 @@ def main(argv: list[str] | None = None) -> None:
     print(f"Found {len(impl_items)} subclauses for {clause}.")
 
     body = fetch_issue_body(args.organization, args.repo, args.sub_issue)
-    new_body = build_synced_body(body, impl_items)
+    new_body = sync_subclause_table(body, impl_items)
     print(f"Synced issue body:\n{new_body}")
     update_issue_body(
         args.organization, args.repo, args.sub_issue, new_body,
