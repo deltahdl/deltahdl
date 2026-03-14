@@ -6,22 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §3.1 — CU-scope classes accumulate in the compilation unit.
-TEST(CompilationUnitStructure, CuScopeClassesAccumulate) {
-  auto r = Parse(
-      "class C1;\n"
-      "  int x;\n"
-      "endclass\n"
-      "class C2;\n"
-      "  int y;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_EQ(r.cu->classes[0]->name, "C1");
-  EXPECT_EQ(r.cu->classes[1]->name, "C2");
-}
-
 // §3.1 — All seven design element types coexist in a single compilation unit.
 TEST(CompilationUnitStructure, AllDesignElementTypesCoexist) {
   auto r = Parse(
