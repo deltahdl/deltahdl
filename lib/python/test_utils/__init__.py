@@ -50,13 +50,18 @@ def install_fake_script(tmp_path, name, content):
     return str(fake_bin)
 
 
-def install_fake_gh(tmp_path, issue_body="", handle_post=False):
+def install_fake_gh(
+    tmp_path, issue_body="", issue_title="", handle_post=False,
+):
     """Install a fake ``gh`` CLI that handles common API patterns.
 
-    Handles ``--jq .body`` (returns *issue_body*), PATCH (no-op success),
+    Handles ``--jq .body`` (returns *issue_body*),
+    ``--jq .title`` (returns *issue_title*),
+    PATCH (no-op success),
     and optionally POST (returns ``{"number": 999}``).
     """
-    escaped = issue_body.replace("'", "'\\''")
+    escaped_body = issue_body.replace("'", "'\\''")
+    escaped_title = issue_title.replace("'", "'\\''")
     lines = ['#!/bin/sh\n']
     if handle_post:
         lines.append(
@@ -70,7 +75,11 @@ def install_fake_gh(tmp_path, issue_body="", handle_post=False):
     lines.append(
         'for arg in "$@"; do\n'
         '  if [ "$arg" = ".body" ]; then\n'
-        f'    printf \'%s\' \'{escaped}\'\n'
+        f'    printf \'%s\' \'{escaped_body}\'\n'
+        '    exit 0\n'
+        '  fi\n'
+        '  if [ "$arg" = ".title" ]; then\n'
+        f'    printf \'%s\' \'{escaped_title}\'\n'
         '    exit 0\n'
         '  fi\n'
         'done\n'
