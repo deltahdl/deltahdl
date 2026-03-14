@@ -258,9 +258,6 @@ def invoke_claude(
 
     summary = _parse_action_summary(result.stdout)
     if not summary:
-        print(f"\nDEBUG: No ACTION_SUMMARY in initial response."
-              f"\nRaw stdout (last 1000 chars):\n{result.stdout[-1000:]}",
-              file=sys.stderr)
         print("Retrying for ACTION_SUMMARY...", file=sys.stderr)
         retry_cmd = ["claude", "-p", "--model", model,
                      "--effort", "high",
@@ -273,11 +270,6 @@ def invoke_claude(
         )
         if retry_result.returncode == 0:
             summary = _parse_action_summary(retry_result.stdout)
-        if not summary:
-            print(f"\nDEBUG: No ACTION_SUMMARY in retry response."
-                  f"\nRaw stdout (last 1000 chars):"
-                  f"\n{retry_result.stdout[-1000:]}",
-                  file=sys.stderr)
     if not summary:
         print("ERROR: Claude did not provide an ACTION_SUMMARY"
               " after retry.", file=sys.stderr)
