@@ -266,26 +266,29 @@ def invoke_claude(
     return summary
 
 
+def _build_commit_body(added, modified, deleted, action):
+    """Assemble the commit body from file changes and action rationale."""
+    parts = []
+    summary = build_file_change_summary(added, modified, deleted)
+    if summary:
+        parts.append(summary)
+    if action:
+        parts.append(action)
+    return "\n\n".join(parts)
+
+
 def commit_implementation(subclause, issue, *, action=""):
     """Commit, push, and mark the subclause complete on the issue."""
     added, modified, deleted = get_porcelain_changes()
-    changed = added + modified
     trailer = "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-    file_summary = build_file_change_summary(added, modified, deleted)
-
-    body_parts = []
-    if file_summary:
-        body_parts.append(file_summary)
-    if action:
-        body_parts.append(action)
-    body = "\n\n".join(body_parts)
-
+    body = _build_commit_body(added, modified, deleted, action)
     label = _format_subclause_label(subclause)
+
     if body:
         message = f"Implement {label}\n\n{body}\n\n{trailer}\n"
     else:
         message = f"Implement {label}\n\n{trailer}\n"
-    sha = commit_and_push(changed, deleted, message)
+    sha = commit_and_push(added + modified, deleted, message)
     if sha:
         organization, repo = get_remote_repo()
         mark_subclause_complete(organization, repo, issue, subclause, sha)
