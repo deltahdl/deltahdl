@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_3_ModuleWithPortDeclarations) {
+TEST(ParserClause03, ModuleWithPortDeclarations) {
   auto r = Parse(
       "module m(input wire a, b, sel, output logic y);\n"
       "endmodule\n");
@@ -14,7 +14,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithPortDeclarations) {
   EXPECT_FALSE(r.cu->modules[0]->ports.empty());
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithNetDecl) {
+TEST(ParserClause03, ModuleWithNetDecl) {
   auto r = Parse(
       "module m;\n"
       "  wire [7:0] bus;\n"
@@ -25,7 +25,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithNetDecl) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kNetDecl);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithVarDecl) {
+TEST(ParserClause03, ModuleWithVarDecl) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] data;\n"
@@ -36,7 +36,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithVarDecl) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kVarDecl);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithStructDecl) {
+TEST(ParserClause03, ModuleWithStructDecl) {
   auto r = Parse(
       "module m;\n"
       "  struct packed { logic [7:0] a; logic [7:0] b; } s;\n"
@@ -45,7 +45,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithStructDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithUnionDecl) {
+TEST(ParserClause03, ModuleWithUnionDecl) {
   auto r = Parse(
       "module m;\n"
       "  union packed { logic [7:0] a; logic [7:0] b; } u;\n"
@@ -54,7 +54,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithUnionDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithParamDecl) {
+TEST(ParserClause03, ModuleWithParamDecl) {
   auto r = Parse(
       "module m;\n"
       "  parameter int WIDTH = 8;\n"
@@ -69,7 +69,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithParamDecl) {
   EXPECT_EQ(param_count, 2);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithTypedef) {
+TEST(ParserClause03, ModuleWithTypedef) {
   auto r = Parse(
       "module m;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -80,7 +80,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithTypedef) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithClassDecl) {
+TEST(ParserClause03, ModuleWithClassDecl) {
   auto r = Parse(
       "module m;\n"
       "  class C;\n"
@@ -92,7 +92,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithClassDecl) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kClassDecl);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithImport) {
+TEST(ParserClause03, ModuleWithImport) {
   auto r = Parse(
       "package pkg; typedef int myint; endpackage\n"
       "module m;\n"
@@ -103,7 +103,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithImport) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kImportDecl);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithFunction) {
+TEST(ParserClause03, ModuleWithFunction) {
   auto r = Parse(
       "module m;\n"
       "  function int add(int a, int b);\n"
@@ -115,7 +115,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithFunction) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithTask) {
+TEST(ParserClause03, ModuleWithTask) {
   auto r = Parse(
       "module m;\n"
       "  task do_nothing;\n"
@@ -126,7 +126,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithTask) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithModuleInst) {
+TEST(ParserClause03, ModuleWithModuleInst) {
   auto r = Parse(
       "module sub; endmodule\n"
       "module m;\n"
@@ -137,7 +137,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithModuleInst) {
   EXPECT_EQ(r.cu->modules[1]->items[0]->kind, ModuleItemKind::kModuleInst);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithGateInst) {
+TEST(ParserClause03, ModuleWithGateInst) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, y;\n"
@@ -152,7 +152,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithGateInst) {
   EXPECT_TRUE(has_gate);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithContAssign) {
+TEST(ParserClause03, ModuleWithContAssign) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b;\n"
@@ -167,7 +167,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithContAssign) {
   EXPECT_TRUE(has_assign);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithInitialBlock) {
+TEST(ParserClause03, ModuleWithInitialBlock) {
   auto r = Parse(
       "module m;\n"
       "  logic a;\n"
@@ -178,7 +178,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithInitialBlock) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kInitialBlock);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithFinalBlock) {
+TEST(ParserClause03, ModuleWithFinalBlock) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"done\");\n"
@@ -188,7 +188,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithFinalBlock) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithAlwaysBlock) {
+TEST(ParserClause03, ModuleWithAlwaysBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic clk, q, d;\n"
@@ -196,7 +196,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithAlwaysBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithAlwaysComb) {
+TEST(ParserClause03, ModuleWithAlwaysComb) {
   auto r = Parse(
       "module m;\n"
       "  logic a, y;\n"
@@ -207,7 +207,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithAlwaysComb) {
   EXPECT_EQ(r.cu->modules[0]->items[2]->kind, ModuleItemKind::kAlwaysCombBlock);
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithAlwaysFF) {
+TEST(ParserClause03, ModuleWithAlwaysFF) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic clk, d, q;\n"
@@ -215,7 +215,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithAlwaysFF) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithAlwaysLatch) {
+TEST(ParserClause03, ModuleWithAlwaysLatch) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic en, d, q;\n"
@@ -223,7 +223,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithAlwaysLatch) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithGenerateFor) {
+TEST(ParserClause03, ModuleWithGenerateFor) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  genvar i;\n"
@@ -233,7 +233,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithGenerateFor) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithGenerateIf) {
+TEST(ParserClause03, ModuleWithGenerateIf) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  parameter int P = 1;\n"
@@ -243,7 +243,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithGenerateIf) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithSpecifyBlock) {
+TEST(ParserClause03, ModuleWithSpecifyBlock) {
   auto r = Parse(
       "module m(input a, output y);\n"
       "  assign y = a;\n"
@@ -260,7 +260,7 @@ TEST(ParserClause03, Cl3_3_ModuleWithSpecifyBlock) {
   EXPECT_TRUE(has_specify);
 }
 
-TEST(ParserClause03, Cl3_3_Mux2to1Example) {
+TEST(ParserClause03, Mux2to1Example) {
   auto r = Parse(
       "module mux2to1 (input wire a, b, sel,\n"
       "                output logic y);\n"
@@ -277,7 +277,7 @@ TEST(ParserClause03, Cl3_3_Mux2to1Example) {
   EXPECT_FALSE(r.cu->modules[0]->items.empty());
 }
 
-TEST(ParserClause03, Cl3_3_ModuleWithMixedContents) {
+TEST(ParserClause03, ModuleWithMixedContents) {
   EXPECT_TRUE(ParseOk(
       "module m #(parameter int W = 8) (input logic clk, output logic [W-1:0] "
       "q);\n"
@@ -290,6 +290,26 @@ TEST(ParserClause03, Cl3_3_ModuleWithMixedContents) {
       "  always_comb var = invert(q);\n"
       "  always_ff @(posedge clk) q <= net;\n"
       "endmodule\n"));
+}
+
+TEST(ParserClause03, MultipleModulesInOneCU) {
+  auto r = Parse(
+      "module a; endmodule\nmodule b; endmodule\n"
+      "module c; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 3u);
+  EXPECT_EQ(r.cu->modules[0]->name, "a");
+  EXPECT_EQ(r.cu->modules[1]->name, "b");
+  EXPECT_EQ(r.cu->modules[2]->name, "c");
+}
+
+TEST(ParserClause03, MismatchedEndKeywordIsError) {
+  EXPECT_FALSE(ParseOk("module m; endprogram"));
+}
+
+TEST(ParserClause03, UnclosedModuleIsError) {
+  EXPECT_FALSE(ParseOk("module m;"));
 }
 
 }  // namespace
