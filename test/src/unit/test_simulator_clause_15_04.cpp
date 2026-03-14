@@ -109,8 +109,8 @@ TEST(IpcSync, MailboxDefaultConstructorUnbounded) {
 // §15.4: Bounded mailbox rejects put when full.
 TEST(IpcSync, MailboxBoundedPutRejectedWhenFull) {
   MailboxObject mb(1);
-  EXPECT_EQ(mb.TryPut(42), 0);
-  EXPECT_EQ(mb.TryPut(99), -1);
+  EXPECT_EQ(mb.TryPut(42), 1);
+  EXPECT_EQ(mb.TryPut(99), 0);
   EXPECT_EQ(mb.Num(), 1);
 }
 

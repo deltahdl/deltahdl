@@ -36,9 +36,9 @@ TEST(IpcSync, MailboxNewNegativeBoundClampsToZero) {
 TEST(IpcSync, MailboxNewBoundOne) {
   MailboxObject mb(1);
   EXPECT_EQ(mb.bound, 1);
-  EXPECT_EQ(mb.TryPut(42), 0);
+  EXPECT_EQ(mb.TryPut(42), 1);
   EXPECT_TRUE(mb.IsFull());
-  EXPECT_EQ(mb.TryPut(99), -1);
+  EXPECT_EQ(mb.TryPut(99), 0);
 }
 
 // §15.4.1: CreateMailbox in context with bound 0 is unbounded.

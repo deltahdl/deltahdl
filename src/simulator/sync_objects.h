@@ -98,12 +98,12 @@ struct MailboxObject {
     return MbxPutStatus::kPlaced;
   }
 
-  // §15.4.4: Non-blocking put. Returns 0 on success, -1 if full.
+  // §15.4.4: Non-blocking put. Returns positive int on success, 0 if full.
   int32_t TryPut(uint64_t msg) {
-    if (bound > 0 && Num() >= bound) return -1;
+    if (IsFull()) return 0;
     messages.push_back(msg);
     WakeGetWaiters();
-    return 0;
+    return 1;
   }
 
   // section 15.4.4: Non-blocking get. Returns 0 on success, -1 if empty.

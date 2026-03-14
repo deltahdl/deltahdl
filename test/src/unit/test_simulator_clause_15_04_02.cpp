@@ -40,7 +40,7 @@ TEST(IpcSync, MailboxNumAtBound) {
   mb.TryPut(2);
   mb.TryPut(3);
   EXPECT_EQ(mb.Num(), 3);
-  EXPECT_EQ(mb.TryPut(4), -1);
+  EXPECT_EQ(mb.TryPut(4), 0);
   EXPECT_EQ(mb.Num(), 3);
 }
 
