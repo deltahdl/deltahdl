@@ -488,4 +488,14 @@ TEST(CompilationUnitStructure, CuScopeVarDeclGoesToCuItems) {
   EXPECT_GE(r.cu->cu_items.size(), 1u);
 }
 
+// §3.1 — CU-scope parameter declaration is stored in cu_items.
+TEST(CompilationUnitStructure, CuScopeParameterGoesToCuItems) {
+  auto r = Parse(
+      "parameter int WIDTH = 8;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_GE(r.cu->cu_items.size(), 1u);
+}
+
 }  // namespace
