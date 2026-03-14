@@ -248,4 +248,11 @@ TEST(CompilationUnitStructure, DefaultFieldValues) {
   EXPECT_TRUE(r.cu->bind_directives.empty());
 }
 
+TEST(CompilationUnitStructure, NullItemSemicolonAtTopLevel) {
+  auto r = Parse(";;;\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules.empty());
+}
+
 }  // namespace

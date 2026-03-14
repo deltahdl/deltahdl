@@ -6,13 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, NullItemSemicolonAtTopLevel) {
-  auto r = Parse(";;;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules.empty());
-}
-
 TEST(CompilationUnitStructure, NullItemsBetweenDesignElements) {
   auto r = Parse(
       ";\n"
