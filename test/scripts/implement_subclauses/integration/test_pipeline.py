@@ -39,12 +39,21 @@ def test_pipeline_invokes_each_issue(
     assert mock_invoke.call_count == 2
 
 
-def test_pipeline_continue_session_progression(
+def test_pipeline_first_no_continue(
     module_loader, monkeypatch, base_argv,
 ):
-    """First subclause has continue=False, second has continue=True."""
+    """First subclause has continue_session=False."""
     iscs = _load(module_loader)
     mock_invoke = _patch_externals(monkeypatch, iscs)
     iscs.main(base_argv)
     assert mock_invoke.call_args_list[0][1]["continue_session"] is False
+
+
+def test_pipeline_second_uses_continue(
+    module_loader, monkeypatch, base_argv,
+):
+    """Second subclause has continue_session=True."""
+    iscs = _load(module_loader)
+    mock_invoke = _patch_externals(monkeypatch, iscs)
+    iscs.main(base_argv)
     assert mock_invoke.call_args_list[1][1]["continue_session"] is True
