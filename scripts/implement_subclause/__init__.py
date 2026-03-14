@@ -119,9 +119,9 @@ def format_prompt(
     lines.append(
         "If any pre-existing tests have unintuitive suite or test names"
         " (e.g., names containing clause numbers like Cl5_7_1_),"
-        " rename them to PascalCase names that intuitively describe"
-        " what the test exercises."
-        " Do NOT include clause or annex numbers in test names.",
+        " rename BOTH the suite name AND the test name to PascalCase"
+        " names that intuitively describe what is being tested."
+        " Do NOT include clause or annex numbers in suite or test names.",
     )
 
     lines.append(
