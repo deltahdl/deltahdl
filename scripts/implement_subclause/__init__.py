@@ -250,11 +250,6 @@ def run_steps(steps, *, model="opus",
         if step_num == total:
             summary = _parse_action_summary(result.stdout)
             if not summary:
-                print(
-                    f"\nDEBUG: Raw stdout (last 1000 chars):"
-                    f"\n{result.stdout[-1000:]}",
-                    file=sys.stderr,
-                )
                 print("ERROR: Final step did not produce"
                       " an ACTION_SUMMARY.", file=sys.stderr)
                 sys.exit(1)
