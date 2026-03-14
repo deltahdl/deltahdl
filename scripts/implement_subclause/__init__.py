@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 from lib.python.classify import STAGE_TO_PREFIX, clause_to_filename
@@ -190,8 +191,12 @@ def _extract_action_summary(text: str) -> str:
 # Claude CLI invocation
 # ---------------------------------------------------------------------------
 
+_DOT_INTERVAL_SECONDS = 5
+
+
 def invoke_claude(
-    prompt: str, *, model: str = "opus", continue_session: bool = False,
+    prompt: str, *, subclause: str,
+    model: str = "opus", continue_session: bool = False,
 ) -> str:
     """Invoke Claude CLI and return the extracted action summary.
 
@@ -214,8 +219,21 @@ def invoke_claude(
     if continue_session:
         cmd.append("--continue")
 
-    print(f"Invoking Claude ({model})...")
+    prefix = f"Annex {subclause}" if subclause[0].isalpha() else f"§{subclause}"
+    print(f"Implementing {prefix} via Claude...", end="", flush=True)
+
+    stop = threading.Event()
+
+    def _print_dots():
+        while not stop.wait(_DOT_INTERVAL_SECONDS):
+            print(".", end="", flush=True)
+
+    dot_thread = threading.Thread(target=_print_dots, daemon=True)
+    dot_thread.start()
     result = run_claude_cli(cmd, prompt, env=env)
+    stop.set()
+    dot_thread.join()
+    print()  # newline after dots
 
     if result.returncode != 0:
         print(
@@ -273,7 +291,8 @@ def run_prompt(build_fn, args: argparse.Namespace) -> str:
     )
     print(f"Built prompt ({len(prompt)} characters)")
     return invoke_claude(
-        prompt, model=args.model,
+        prompt, subclause=args.subclause,
+        model=args.model,
         continue_session=args.continue_session,
     )
 

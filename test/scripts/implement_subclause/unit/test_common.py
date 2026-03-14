@@ -287,7 +287,33 @@ def test_invoke_claude_returns_action_summary(isc):
 @pytest.mark.usefixtures("run_ok")
 def test_invoke_claude_returns_empty_when_no_summary(isc):
     """invoke_claude returns empty string when no ACTION_SUMMARY block."""
-    assert isc.invoke_claude("test prompt", model="opus") == ""
+    assert isc.invoke_claude("test prompt", subclause="4.1", model="opus") == ""
+
+
+def test_invoke_claude_prints_implementing_numeric(isc, run_ok, capsys):
+    """invoke_claude prints Implementing with section sign for numeric subclauses."""
+    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
+    assert "Implementing §4.1 via Claude..." in capsys.readouterr().out
+
+
+def test_invoke_claude_prints_implementing_annex(isc, run_ok, capsys):
+    """invoke_claude prints Implementing Annex for annex subclauses."""
+    isc.invoke_claude("test prompt", subclause="A.8", model="opus")
+    assert "Implementing Annex A.8 via Claude..." in capsys.readouterr().out
+
+
+def test_invoke_claude_prints_progress_dots(isc, capsys):
+    """invoke_claude prints dots while waiting for Claude."""
+    import time
+
+    def slow_run(*_args, **_kwargs):
+        time.sleep(0.15)
+        return MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
+
+    with patch("implement_subclause.run_claude_cli", side_effect=slow_run), \
+         patch.object(isc, "_DOT_INTERVAL_SECONDS", 0.05):
+        isc.invoke_claude("prompt", subclause="4.1")
+    assert "." in capsys.readouterr().out
 
 
 # ---- run_prompt -----------------------------------------------------------
@@ -336,6 +362,12 @@ def test_run_prompt_returns_action_summary(isc, tmp_path):
     """run_prompt returns the action summary from invoke_claude."""
     _, _, result = _run_prompt_and_capture(isc, tmp_path)
     assert result == "- Did something"
+
+
+def test_run_prompt_passes_subclause_to_invoke(isc, tmp_path):
+    """run_prompt passes subclause to invoke_claude."""
+    mock_invoke, _, _ = _run_prompt_and_capture(isc, tmp_path)
+    assert mock_invoke.call_args[1]["subclause"] == "4.1"
 
 
 @patch("implement_subclause.invoke_claude")
