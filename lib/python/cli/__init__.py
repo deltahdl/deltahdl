@@ -5,6 +5,7 @@ import dataclasses
 import re
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
@@ -139,6 +140,30 @@ def add_clauses_arg(parser: argparse.ArgumentParser) -> None:
         required=True,
         help="Comma-separated clause=issue pairs (e.g. 15=17,16=18).",
     )
+
+
+_DOT_INTERVAL_SECONDS = 5
+
+
+def run_with_dots(func, *args, **kwargs):
+    """Run *func* while printing dots every few seconds.
+
+    Returns whatever *func* returns.
+    """
+    stop = threading.Event()
+
+    def _print_dots():
+        while not stop.wait(_DOT_INTERVAL_SECONDS):
+            print(".", end="", flush=True)
+
+    dot_thread = threading.Thread(target=_print_dots, daemon=True)
+    dot_thread.start()
+    try:
+        return func(*args, **kwargs)
+    finally:
+        stop.set()
+        dot_thread.join()
+        print()
 
 
 def run_claude_cli(cmd, prompt, *, env, timeout=None):

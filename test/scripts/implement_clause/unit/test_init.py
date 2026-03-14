@@ -233,7 +233,7 @@ def test_discover_subclauses_parses_json(ic, monkeypatch) -> None:
         stdout='{"4.1": "General", "4.2": "Exec", "4.3": false}\n',
         stderr="",
     )
-    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
     result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert result == {"4.1": "General", "4.2": "Exec"}
 
@@ -245,7 +245,7 @@ def test_discover_subclauses_strips_code_fences(ic, monkeypatch) -> None:
         stdout='```json\n{"4.1": "General"}\n```\n',
         stderr="",
     )
-    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
     result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert result == {"4.1": "General"}
 
@@ -259,7 +259,7 @@ def test_discover_subclauses_strips_preamble_before_fences(
         stdout='Here is the JSON:\n\n```json\n{"4.1": "General"}\n```\n',
         stderr="",
     )
-    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
     result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert result == {"4.1": "General"}
 
@@ -272,7 +272,7 @@ def _discover_subclauses_cmd(ic, monkeypatch):
         stderr="",
     )
     mock_run = MagicMock(return_value=cp)
-    monkeypatch.setattr(ic.subprocess, "run", mock_run)
+    monkeypatch.setattr(ic, "run_claude_cli", mock_run)
     ic.discover_subclauses(Path("/path/lrm.pdf"), "4")
     return mock_run
 
@@ -280,7 +280,7 @@ def _discover_subclauses_cmd(ic, monkeypatch):
 def _discover_subclauses_prompt(ic, monkeypatch):
     """Helper: run discover_subclauses and return the prompt string."""
     mock_run = _discover_subclauses_cmd(ic, monkeypatch)
-    return mock_run.call_args[1]["input"]
+    return mock_run.call_args[0][1]
 
 
 def test_discover_subclauses_prompt_contains_clause(
@@ -306,7 +306,7 @@ def test_discover_subclauses_exits_on_claude_failure(
     cp = subprocess.CompletedProcess(
         args=[], returncode=1, stdout="", stderr="error",
     )
-    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
     with pytest.raises(SystemExit):
         ic.discover_subclauses(Path("/lrm.pdf"), "4")
 
@@ -318,7 +318,7 @@ def test_discover_subclauses_empty_result(ic, monkeypatch) -> None:
         stdout='{"4.1": false, "4.2": false}\n',
         stderr="",
     )
-    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
     result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert result == {}
 
@@ -332,7 +332,7 @@ def test_discover_subclauses_rationale_is_implementable(
         stdout='{"4.1": "Defines syntax rules that must be parsed"}\n',
         stderr="",
     )
-    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
     result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert "4.1" in result
 
@@ -362,7 +362,7 @@ def test_discover_subclauses_excludes_parent_clause(
         stdout='{"15": "Processes", "15.1": "General"}\n',
         stderr="",
     )
-    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
     result = ic.discover_subclauses(Path("/lrm.pdf"), "15")
     assert result == {"15.1": "General"}
 
@@ -376,6 +376,19 @@ def test_discover_subclauses_bool_true_is_implementable(
         stdout='{"4.2": true}\n',
         stderr="",
     )
-    monkeypatch.setattr(ic.subprocess, "run", lambda *_a, **_kw: cp)
+    monkeypatch.setattr(ic, "run_claude_cli", lambda *_a, **_kw: cp)
     result = ic.discover_subclauses(Path("/lrm.pdf"), "4")
     assert result == {"4.2": "4.2"}
+
+
+def test_discover_subclauses_uses_run_with_dots(ic, monkeypatch):
+    """discover_subclauses calls run_with_dots for progress feedback."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='{"4.1": "General"}\n',
+        stderr="",
+    )
+    mock_rwd = MagicMock(return_value=cp)
+    monkeypatch.setattr(ic, "run_with_dots", mock_rwd)
+    ic.discover_subclauses(Path("/lrm.pdf"), "4")
+    assert mock_rwd.called

@@ -20,6 +20,7 @@ from lib.python.cli import (
     parse_and_validate,
     parse_clause_issues,
     run_claude_cli,
+    run_with_dots,
     validate_lrm,
 )
 from lib.python.test_fixtures.subprocess_stubs import (
@@ -427,3 +428,18 @@ def test_run_claude_cli_returns_completed_process(monkeypatch):
     stub_subprocess_success(monkeypatch)
     result = run_claude_cli(["true"], "", env={})
     assert result.returncode == 0
+
+
+# ---- run_with_dots --------------------------------------------------------
+
+
+def test_run_with_dots_returns_result():
+    """run_with_dots returns the function result."""
+    assert run_with_dots(lambda: 42) == 42
+
+
+def test_run_with_dots_calls_function():
+    """run_with_dots calls the provided function."""
+    calls = []
+    run_with_dots(lambda: calls.append(1))
+    assert len(calls) == 1

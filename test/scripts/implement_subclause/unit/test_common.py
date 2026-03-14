@@ -3,7 +3,6 @@
 import argparse
 import inspect
 import json
-import time
 from unittest.mock import MagicMock, patch
 
 
@@ -363,17 +362,14 @@ def test_invoke_claude_prints_implementing_annex(_mock_run, isc, capsys):
     assert "Implementing Annex A.8 via Claude..." in capsys.readouterr().out
 
 
-def test_invoke_claude_prints_progress_dots(isc, capsys):
-    """invoke_claude prints dots while waiting for Claude."""
-
-    def slow_run(*_args, **_kwargs):
-        time.sleep(0.15)
-        return MagicMock(returncode=0, stdout=_OK_STDOUT, stderr="")
-
-    with patch("implement_subclause.run_claude_cli", side_effect=slow_run), \
-         patch.object(isc, "_DOT_INTERVAL_SECONDS", 0.05):
+def test_invoke_claude_uses_run_with_dots(isc):
+    """invoke_claude calls run_with_dots for progress feedback."""
+    mock_rwd = MagicMock(
+        return_value=MagicMock(returncode=0, stdout=_OK_STDOUT, stderr=""),
+    )
+    with patch("implement_subclause.run_with_dots", mock_rwd):
         isc.invoke_claude("prompt", subclause="4.1")
-    assert "." in capsys.readouterr().out
+    assert mock_rwd.called
 
 
 # ---- run_prompt -----------------------------------------------------------

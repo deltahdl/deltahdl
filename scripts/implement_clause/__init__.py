@@ -15,6 +15,8 @@ from pathlib import Path
 from lib.python.cli import (
     ClauseParams,
     invoke_implement_subclauses,
+    run_claude_cli,
+    run_with_dots,
 )
 from lib.python.github import (
     build_synced_body,
@@ -31,7 +33,6 @@ def discover_subclauses(
     Returns a dict of ``{subclause_number: title}`` for subclauses
     that Claude determines are implementable as software.
     """
-    print(f"Discovering subclauses for clause {clause} via Claude ({model})...")
     prompt = (
         f"Read clause {clause} in the LRM at {lrm_path}. "
         "List all direct and indirect subclauses. For each, determine "
@@ -49,14 +50,14 @@ def discover_subclauses(
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
 
-    result = subprocess.run(
-        ["claude", "-p", "--model", model, "--effort", "high"],
-        input=prompt,
-        capture_output=True,
-        text=True,
-        check=False,
-        env=env,
+    print(
+        f"Discovering subclauses for clause {clause}"
+        f" via Claude ({model})...",
+        end="", flush=True,
     )
+
+    cmd = ["claude", "-p", "--model", model, "--effort", "high"]
+    result = run_with_dots(run_claude_cli, cmd, prompt, env=env)
     if result.returncode != 0:
         print(
             f"ERROR: Claude failed:\n{result.stderr}",

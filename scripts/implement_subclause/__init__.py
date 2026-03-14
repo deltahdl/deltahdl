@@ -9,7 +9,6 @@ import os
 import re
 import subprocess
 import sys
-import threading
 from pathlib import Path
 
 from lib.python.classify import STAGE_TO_PREFIX, clause_to_filename
@@ -18,6 +17,7 @@ from lib.python.cli import (
     add_lrm_arg,
     add_model_arg,
     run_claude_cli,
+    run_with_dots,
     validate_lrm,
 )
 from lib.python.git import (
@@ -210,9 +210,6 @@ def _parse_action_summary(stdout: str) -> str:
 # Claude CLI invocation
 # ---------------------------------------------------------------------------
 
-_DOT_INTERVAL_SECONDS = 5
-
-
 def _format_subclause_label(subclause):
     """Return display label: '§X.Y' for numeric, 'Annex X.Y' for annexes."""
     if subclause[0].isalpha():
@@ -248,18 +245,7 @@ def invoke_claude(
     label = _format_subclause_label(subclause)
     print(f"Implementing {label} via Claude...", end="", flush=True)
 
-    stop = threading.Event()
-
-    def _print_dots():
-        while not stop.wait(_DOT_INTERVAL_SECONDS):
-            print(".", end="", flush=True)
-
-    dot_thread = threading.Thread(target=_print_dots, daemon=True)
-    dot_thread.start()
-    result = run_claude_cli(cmd, prompt, env=env)
-    stop.set()
-    dot_thread.join()
-    print()  # newline after dots
+    result = run_with_dots(run_claude_cli, cmd, prompt, env=env)
 
     if result.returncode != 0:
         print(
