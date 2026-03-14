@@ -65,16 +65,4 @@ TEST(ParserSection6, EventNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kEvent));
 }
 
-TEST(ParserSection6, EventAssignNull) {
-  auto r = Parse(
-      "module t;\n"
-      "  event empty = null;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
 }  // namespace

@@ -141,6 +141,24 @@ def add_clauses_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def run_claude_cli(cmd, prompt, *, env, timeout=None):
+    """Run the Claude CLI and return the completed process.
+
+    Centralises the ``subprocess.run`` call so that callers do not
+    duplicate the same keyword arguments.
+    """
+    kwargs = {
+        "input": prompt,
+        "capture_output": True,
+        "text": True,
+        "env": env,
+        "check": False,
+    }
+    if timeout is not None:
+        kwargs["timeout"] = timeout
+    return subprocess.run(cmd, **kwargs)
+
+
 def invoke_implement_subclause(
     params: SubclauseParams,
     subclause: str,

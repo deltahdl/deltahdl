@@ -418,6 +418,12 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
 // §10.9.2: Evaluate variable initializer with struct pattern awareness.
 void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
                            uint32_t width) {
+  // §15.5.5.2: Event initialized to null breaks the synchronization queue.
+  if (var.is_event && var.init_expr->kind == ExprKind::kIdentifier &&
+      var.init_expr->text == "null") {
+    v->is_null_event = true;
+    return;
+  }
   // §15.5.5: Event initialization from another event shares the handle.
   if (var.is_event && var.init_expr->kind == ExprKind::kIdentifier) {
     auto* target = ctx_.FindVariable(var.init_expr->text);

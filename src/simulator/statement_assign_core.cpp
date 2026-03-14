@@ -361,6 +361,16 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (TryClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryAssocCopyAssign(stmt, ctx)) return StmtResult::kDone;
   if (TryQueueBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
+  // §15.5.5.2: Assigning null breaks the event synchronization association.
+  if (stmt->lhs->kind == ExprKind::kIdentifier &&
+      stmt->rhs && stmt->rhs->kind == ExprKind::kIdentifier &&
+      stmt->rhs->text == "null") {
+    auto* lhs_var = ctx.FindVariable(stmt->lhs->text);
+    if (lhs_var && lhs_var->is_event) {
+      ctx.NullifyEventVariable(stmt->lhs->text);
+      return StmtResult::kDone;
+    }
+  }
   // §15.5.5: Event-to-event assignment shares the synchronization queue.
   if (stmt->lhs->kind == ExprKind::kIdentifier &&
       stmt->rhs && stmt->rhs->kind == ExprKind::kIdentifier) {

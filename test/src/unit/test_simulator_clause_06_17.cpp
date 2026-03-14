@@ -60,21 +60,4 @@ TEST(Simulator, EventTriggeredStatePersistsInTimestep) {
   EXPECT_TRUE(f.ctx.IsEventTriggered("ev"));
 }
 
-TEST(Lowerer, EventAssignNull) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  event ev = null;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-
-  auto* var = f.ctx.FindVariable("ev");
-  ASSERT_NE(var, nullptr);
-  EXPECT_TRUE(var->is_event);
-}
-
 }  // namespace

@@ -26,6 +26,7 @@ from lib.python.classify import (
     add_run_mode_args,
     clause_to_filename,
 )
+from lib.python.cli import run_claude_cli
 from ._github import (
     _validate_issue_args,
     build_action_remark,
@@ -454,15 +455,7 @@ def _call_claude(prompt, schema=None):
     delays = [5, 10]
     for attempt in range(len(delays) + 1):  # pragma: no branch
         try:
-            result = subprocess.run(
-                cmd,
-                input=prompt,
-                capture_output=True,
-                text=True,
-                env=env,
-                check=False,
-                timeout=600,
-            )
+            result = run_claude_cli(cmd, prompt, env=env, timeout=600)
         except subprocess.TimeoutExpired:
             if attempt < len(delays):
                 print(f"WARNING: Claude CLI timed out (attempt"

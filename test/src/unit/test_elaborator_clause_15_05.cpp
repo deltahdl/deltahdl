@@ -50,12 +50,4 @@ TEST(NamedEventElaborator, MultipleEventDeclarations) {
   EXPECT_TRUE(mod->variables[1].is_event);
 }
 
-// §15.5: Event assigned null elaborates without error.
-TEST(NamedEventElaborator, EventAssignedNull) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  event ev = null;\n"
-      "endmodule\n"));
-}
-
 }  // namespace

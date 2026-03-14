@@ -117,6 +117,9 @@ class SimContext {
   // §10.11: Register an alias so that `alias_name` resolves to the same
   // Variable as `target_name`.
   void AliasVariable(std::string_view alias_name, std::string_view target_name);
+  // §15.5.5.2: Break the event association by replacing with an isolated null
+  // event variable.
+  void NullifyEventVariable(std::string_view name);
 
   Net* FindNet(std::string_view name);
   Net* CreateNet(std::string_view name, NetType type, uint32_t width,

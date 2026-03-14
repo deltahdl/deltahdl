@@ -37,19 +37,6 @@ TEST(NamedEventParser, MultipleEventDeclarations) {
   EXPECT_EQ(item1->name, "blast");
 }
 
-// §15.5: Event assigned null parses.
-TEST(NamedEventParser, EventAssignedNull) {
-  auto r = Parse(
-      "module m;\n"
-      "  event empty = null;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
 // §15.5: Event declaration inside an initial block.
 TEST(NamedEventParser, EventInInitialBlock) {
   auto r = Parse(

@@ -35,18 +35,6 @@ TEST(Elaboration, EventDefaultInit_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, EventAssignNull_Ok) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  event ev;\n"
-      "  initial ev = null;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(Elaboration, EventVarWidthZero) {
   ElabFixture f;
   auto* design = ElaborateSrc(

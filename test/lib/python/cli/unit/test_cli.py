@@ -19,6 +19,7 @@ from lib.python.cli import (
     invoke_implement_subclauses,
     parse_and_validate,
     parse_clause_issues,
+    run_claude_cli,
     validate_lrm,
 )
 from lib.python.test_fixtures.subprocess_stubs import (
@@ -401,3 +402,35 @@ def test_parse_and_validate_rejects_missing_lrm(tmp_path) -> None:
     add_lrm_arg(parser)
     with pytest.raises(SystemExit):
         parse_and_validate(parser, ["--lrm", str(tmp_path / "no.pdf")])
+
+
+# ---- run_claude_cli -------------------------------------------------------
+
+
+def test_run_claude_cli_calls_subprocess_run(monkeypatch):
+    """run_claude_cli delegates to subprocess.run."""
+    captured = stub_subprocess_success(monkeypatch)
+    run_claude_cli(["claude", "-p"], "hello", env={"K": "V"})
+    assert captured[0] == ["claude", "-p"]
+
+
+def test_run_claude_cli_passes_timeout(monkeypatch):
+    """run_claude_cli forwards the timeout parameter."""
+    import subprocess
+    calls = []
+    original_run = subprocess.run
+
+    def spy(*args, **kwargs):
+        calls.append(kwargs)
+        return original_run(*args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", spy)
+    run_claude_cli(["true"], "", env={}, timeout=600)
+    assert calls[0]["timeout"] == 600
+
+
+def test_run_claude_cli_returns_completed_process(monkeypatch):
+    """run_claude_cli returns the subprocess.CompletedProcess object."""
+    stub_subprocess_success(monkeypatch)
+    result = run_claude_cli(["true"], "", env={})
+    assert result.returncode == 0

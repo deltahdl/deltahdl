@@ -12,7 +12,13 @@ import sys
 from pathlib import Path
 
 from lib.python.classify import STAGE_TO_PREFIX, clause_to_filename
-from lib.python.cli import add_continue_arg, add_lrm_arg, add_model_arg, validate_lrm
+from lib.python.cli import (
+    add_continue_arg,
+    add_lrm_arg,
+    add_model_arg,
+    run_claude_cli,
+    validate_lrm,
+)
 from lib.python.git import commit_and_push, get_remote_repo, run_git
 from lib.python.github import mark_subclause_complete
 
@@ -209,14 +215,7 @@ def invoke_claude(
         cmd.append("--continue")
 
     print(f"Invoking Claude ({model})...")
-    result = subprocess.run(
-        cmd,
-        input=prompt,
-        capture_output=True,
-        text=True,
-        env=env,
-        check=False,
-    )
+    result = run_claude_cli(cmd, prompt, env=env)
 
     if result.returncode != 0:
         print(

@@ -19,8 +19,8 @@ def isc(module_loader):
 
 @pytest.fixture()
 def run_ok():
-    """Patch subprocess.run with a successful mock result."""
-    with patch("implement_subclause.subprocess.run") as mock_run:
+    """Patch run_claude_cli with a successful mock result."""
+    with patch("implement_subclause.run_claude_cli") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout='{"result":"done"}',

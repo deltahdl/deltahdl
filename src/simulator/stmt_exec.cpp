@@ -694,6 +694,8 @@ static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
   }
   auto* var = ctx.FindVariable(stmt->expr->text);
   if (!var) return StmtResult::kDone;
+  // §15.5.5.2: Triggering a null event shall have no effect.
+  if (var->is_null_event) return StmtResult::kDone;
   // §15.5.3: Set sticky triggered state for this timeslot.
   ctx.SetEventTriggered(stmt->expr->text);
   // §9.4.2: Schedule triggered processes in Active region rather than
@@ -718,6 +720,8 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
   }
   auto* var = ctx.FindVariable(stmt->expr->text);
   if (!var) return StmtResult::kDone;
+  // §15.5.5.2: Triggering a null event shall have no effect.
+  if (var->is_null_event) return StmtResult::kDone;
 
   uint64_t delay = 0;
   if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();

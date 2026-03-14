@@ -35,6 +35,14 @@ void SimContext::AliasVariable(std::string_view alias_name,
   if (target) variables_[alias_name] = target;
 }
 
+void SimContext::NullifyEventVariable(std::string_view name) {
+  auto* var = arena_.Create<Variable>();
+  var->value = MakeLogic4Vec(arena_, 1);
+  var->is_event = true;
+  var->is_null_event = true;
+  variables_[name] = var;
+}
+
 Net* SimContext::FindNet(std::string_view name) {
   auto it = nets_.find(name);
   return (it != nets_.end()) ? it->second : nullptr;
