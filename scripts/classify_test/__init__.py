@@ -300,8 +300,10 @@ def _parse_body(lines, start_idx):
             continue
         m = re.match(r"^TEST(?:_[FP])?\((\w+),\s*(\w+)\)", stripped)
         if not m and i + 1 < len(lines):
-            joined = stripped.rstrip() + " " + lines[i + 1].strip()
-            m = re.match(r"^TEST(?:_[FP])?\((\w+),\s*(\w+)\)", joined)
+            m = re.match(
+                r"^TEST(?:_[FP])?\((\w+),\s*(\w+)\)",
+                stripped.rstrip() + " " + lines[i + 1].strip(),
+            )
         if m:
             in_global = False
             blk, end = extract_brace_block(lines, i)
