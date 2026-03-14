@@ -150,6 +150,9 @@ def test_parse_args_exclude_value(isc, tmp_path):
     assert args.exclude == "15.3.1,15.3.2"
 
 
+_MOCK_PROMPT_RESULT = ("- Added foo.cpp", "Deemed not implementable")
+
+
 # ---- main ------------------------------------------------------------------
 
 
@@ -188,7 +191,7 @@ def test_main_calls_commit_implementation_issue(
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value=("- Added foo.cpp", "Deemed not implementable"))
+@patch("implement_subclause.run_prompt", return_value=_MOCK_PROMPT_RESULT)
 def test_main_passes_action_to_commit(
     _mock_run, mock_commit, isc, tmp_path,
 ):
@@ -200,7 +203,7 @@ def test_main_passes_action_to_commit(
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value=("- Added foo.cpp", "Deemed not implementable"))
+@patch("implement_subclause.run_prompt", return_value=_MOCK_PROMPT_RESULT)
 def test_main_passes_predefined_action_to_commit(
     _mock_run, mock_commit, isc, tmp_path,
 ):
@@ -212,7 +215,7 @@ def test_main_passes_predefined_action_to_commit(
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value=("- Added foo.cpp", "Deemed not implementable"))
+@patch("implement_subclause.run_prompt", return_value=_MOCK_PROMPT_RESULT)
 def test_main_prints_action_summary(
     _mock_run, _mock_commit, isc, tmp_path, capsys,
 ):
@@ -399,7 +402,7 @@ def test_commit_implementation_changed_includes_added_and_modified(isc):
        return_value=(["a.cpp"], [], []))
 def test_commit_implementation_updates_issue_with_predefined_action(
     _m_files, _m_cap, _m_repo, _m_mark, _m_fetch,
-    mock_update_status, mock_update_body, isc,
+    mock_update_status, _mock_update_body, isc,
 ):
     """commit_implementation updates the issue row with the predefined action."""
     isc.commit_implementation(
