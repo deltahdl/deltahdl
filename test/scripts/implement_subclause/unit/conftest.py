@@ -18,7 +18,10 @@ def isc(module_loader):
 
 
 _RUN_OK_STDOUT = (
-    '{"result":"ACTION_SUMMARY_START\\n- Done because needed\\nACTION_SUMMARY_END"}'
+    '{"result":"ACTION_SUMMARY_START\\n- Done because needed\\n'
+    'ACTION_SUMMARY_END\\n'
+    'ONE_LINE_PREDEFINED_ACTION: Implemented the functionality'
+    ' and its tests because both were missing"}'
 )
 
 

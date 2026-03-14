@@ -25,7 +25,13 @@ from lib.python.git import (
     get_porcelain_changes,
     get_remote_repo,
 )
-from lib.python.github import mark_subclause_complete
+from lib.python.github import (
+    fetch_issue_body,
+    format_subclause_label,
+    mark_subclause_complete,
+    update_issue_body,
+    update_subclause_status,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +171,23 @@ def format_prompt(
         "- Moved <TestName> from <file> because <why it was misplaced>\n"
         "- Deleted <file> because <why it was no longer needed>\n"
         "- Modified <file> because <what capability was missing>\n"
-        "ACTION_SUMMARY_END",
+        "ACTION_SUMMARY_END\n"
+        "Then pick EXACTLY ONE of these predefined actions:\n"
+        "- Added tests only because the functionality was already"
+        " implemented but its tests were missing\n"
+        "- Deemed not implementable\n"
+        "- Deleted tests only because the functionality and its tests"
+        " were already implemented but some tests were duplicated\n"
+        "- Did nothing because the functionality and its tests"
+        " were already implemented\n"
+        "- Implemented the functionality and its tests"
+        " because both were missing\n"
+        "- Performed a non-predefined action\n"
+        "- Reclassified tests only because the functionality and its"
+        " tests were already implemented but the tests"
+        " were misclassified\n"
+        "Output your choice as:\n"
+        "ONE_LINE_PREDEFINED_ACTION: <your choice>",
     )
 
     return "\n".join(lines) + "\n"
@@ -190,6 +212,17 @@ _ACTION_SUMMARY_RE = re.compile(
 def _extract_action_summary(text: str) -> str:
     """Extract the action summary block from Claude's response text."""
     m = _ACTION_SUMMARY_RE.search(text)
+    return m.group(1).strip() if m else ""
+
+
+_PREDEFINED_ACTION_RE = re.compile(
+    r"ONE_LINE_PREDEFINED_ACTION:\s*(.+)",
+)
+
+
+def _extract_predefined_action(text: str) -> str:
+    """Extract the ONE_LINE_PREDEFINED_ACTION from Claude's response."""
+    m = _PREDEFINED_ACTION_RE.search(text)
     return m.group(1).strip() if m else ""
 
 
@@ -255,6 +288,7 @@ def invoke_claude(
         sys.exit(1)
 
     summary = _parse_action_summary(result.stdout)
+    retry_result = None
     if not summary:
         print("Retrying for ACTION_SUMMARY...", file=sys.stderr)
         retry_cmd = ["claude", "-p", "--model", model,
@@ -273,10 +307,17 @@ def invoke_claude(
               " after retry.", file=sys.stderr)
         sys.exit(1)
 
-    return summary
+    predefined = _extract_predefined_action(result.stdout)
+    if not predefined and retry_result:
+        predefined = _extract_predefined_action(retry_result.stdout)
+    if not predefined:
+        predefined = "Performed a non-predefined action"
+
+    return summary, predefined
 
 
-def commit_implementation(subclause, issue, *, action=""):
+def commit_implementation(subclause, issue, *,
+                          action="", predefined_action=""):
     """Commit, push, and mark the subclause complete on the issue."""
     added, modified, deleted = get_porcelain_changes()
     label = _format_subclause_label(subclause)
@@ -289,10 +330,18 @@ def commit_implementation(subclause, issue, *, action=""):
     if sha:
         organization, repo = get_remote_repo()
         mark_subclause_complete(organization, repo, issue, subclause, sha)
+    if predefined_action:
+        organization, repo = get_remote_repo()
+        body = fetch_issue_body(organization, repo, issue)
+        table_label = format_subclause_label(subclause)
+        body = update_subclause_status(
+            body, table_label, "Reviewed", action=predefined_action,
+        )
+        update_issue_body(organization, repo, issue, body)
 
 
-def run_prompt(build_fn, args: argparse.Namespace) -> str:
-    """Build a prompt via *build_fn*, invoke Claude, return action summary."""
+def run_prompt(build_fn, args: argparse.Namespace) -> tuple[str, str]:
+    """Build a prompt via *build_fn*, invoke Claude, return (summary, predefined_action)."""
     prompt = build_fn(
         args.subclause, str(args.lrm), exclude=args.exclude,
     )
@@ -362,6 +411,10 @@ def main(argv=None):
         f" issue #{args.issue}, model {args.model}",
     )
 
-    action = run_prompt(build_prompt, args)
+    action, predefined_action = run_prompt(build_prompt, args)
     print(f"Action summary:\n{action}")
-    commit_implementation(args.subclause, args.issue, action=action)
+    print(f"Predefined action: {predefined_action}")
+    commit_implementation(
+        args.subclause, args.issue,
+        action=action, predefined_action=predefined_action,
+    )

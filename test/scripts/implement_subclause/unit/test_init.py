@@ -154,7 +154,7 @@ def test_parse_args_exclude_value(isc, tmp_path):
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt")
+@patch("implement_subclause.run_prompt", return_value=("summary", "action"))
 def test_main_dispatches_depth_1(mock_run, _mock_commit, isc, tmp_path):
     """main() passes args namespace to run_prompt."""
     lrm = tmp_path / "lrm.pdf"
@@ -164,7 +164,7 @@ def test_main_dispatches_depth_1(mock_run, _mock_commit, isc, tmp_path):
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt")
+@patch("implement_subclause.run_prompt", return_value=("summary", "action"))
 def test_main_calls_commit_implementation_subclause(
     _mock_run, mock_commit, isc, tmp_path,
 ):
@@ -176,7 +176,7 @@ def test_main_calls_commit_implementation_subclause(
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt")
+@patch("implement_subclause.run_prompt", return_value=("summary", "action"))
 def test_main_calls_commit_implementation_issue(
     _mock_run, mock_commit, isc, tmp_path,
 ):
@@ -188,7 +188,7 @@ def test_main_calls_commit_implementation_issue(
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value="- Added foo.cpp")
+@patch("implement_subclause.run_prompt", return_value=("- Added foo.cpp", "Deemed not implementable"))
 def test_main_passes_action_to_commit(
     _mock_run, mock_commit, isc, tmp_path,
 ):
@@ -200,7 +200,19 @@ def test_main_passes_action_to_commit(
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value="- Added foo.cpp")
+@patch("implement_subclause.run_prompt", return_value=("- Added foo.cpp", "Deemed not implementable"))
+def test_main_passes_predefined_action_to_commit(
+    _mock_run, mock_commit, isc, tmp_path,
+):
+    """main() passes predefined action from run_prompt to commit_implementation."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
+    assert mock_commit.call_args[1]["predefined_action"] == "Deemed not implementable"
+
+
+@patch("implement_subclause.commit_implementation")
+@patch("implement_subclause.run_prompt", return_value=("- Added foo.cpp", "Deemed not implementable"))
 def test_main_prints_action_summary(
     _mock_run, _mock_commit, isc, tmp_path, capsys,
 ):
@@ -275,6 +287,26 @@ def test_parse_action_summary_envelope_without_result(isc):
     """Returns empty when JSON envelope has no result key."""
     parse = getattr(isc, "_parse_action_summary")
     assert parse('{"session_id":"x"}') == ""
+
+
+# ---- _extract_predefined_action --------------------------------------------
+
+
+def test_extract_predefined_action_found(isc):
+    """Extracts the predefined action from text."""
+    extract = getattr(isc, "_extract_predefined_action")
+    text = (
+        "some output\n"
+        "ONE_LINE_PREDEFINED_ACTION: Deemed not implementable\n"
+        "trailing"
+    )
+    assert extract(text) == "Deemed not implementable"
+
+
+def test_extract_predefined_action_not_found(isc):
+    """Returns empty string when no predefined action line."""
+    extract = getattr(isc, "_extract_predefined_action")
+    assert extract("no action here") == ""
 
 
 # ---- commit_implementation -------------------------------------------------
@@ -354,6 +386,26 @@ def test_commit_implementation_changed_includes_added_and_modified(isc):
         isc, changes=(["a.cpp"], ["b.cpp"], []),
     )
     assert mocks["cap"].call_args[0][0] == ["a.cpp", "b.cpp"]
+
+
+@patch("implement_subclause.update_issue_body")
+@patch("implement_subclause.update_subclause_status",
+       return_value="updated body")
+@patch("implement_subclause.fetch_issue_body", return_value="table body")
+@patch("implement_subclause.mark_subclause_complete")
+@patch("implement_subclause.get_remote_repo", return_value=("org", "repo"))
+@patch("implement_subclause.commit_and_push", return_value="abc123")
+@patch("implement_subclause.get_porcelain_changes",
+       return_value=(["a.cpp"], [], []))
+def test_commit_implementation_updates_issue_with_predefined_action(
+    _m_files, _m_cap, _m_repo, _m_mark, _m_fetch,
+    mock_update_status, mock_update_body, isc,
+):
+    """commit_implementation updates the issue row with the predefined action."""
+    isc.commit_implementation(
+        "6.6.1", 8, action="summary", predefined_action="Deemed not implementable",
+    )
+    assert mock_update_status.called
 
 
 # ---- __main__ guard --------------------------------------------------------
