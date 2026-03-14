@@ -353,6 +353,14 @@ def test_discover_subclauses_passes_effort_high(ic, monkeypatch) -> None:
     assert cmd[idx + 1] == "high"
 
 
+def test_discover_subclauses_uses_dangerously_skip_permissions(
+    ic, monkeypatch,
+) -> None:
+    """discover_subclauses passes --dangerously-skip-permissions."""
+    mock_run = _discover_subclauses_cmd(ic, monkeypatch)
+    assert "--dangerously-skip-permissions" in mock_run.call_args[0][0]
+
+
 def test_discover_subclauses_excludes_parent_clause(
     ic, monkeypatch,
 ) -> None:

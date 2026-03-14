@@ -331,6 +331,21 @@ def test_invoke_claude_retry_returns_rationale(isc):
         assert isc.invoke_claude("prompt", subclause="4.1") == "- Did X because Y"
 
 
+def test_invoke_claude_retry_uses_dangerously_skip_permissions(isc):
+    """Retry command includes --dangerously-skip-permissions."""
+    no_summary = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
+    with_summary = MagicMock(
+        returncode=0,
+        stdout='ACTION_SUMMARY_START\n- Did X because Y\nACTION_SUMMARY_END',
+        stderr="",
+    )
+    with patch("implement_subclause.run_claude_cli",
+               side_effect=[no_summary, with_summary]) as mock_run:
+        isc.invoke_claude("prompt", subclause="4.1")
+    retry_cmd = mock_run.call_args_list[1][0][0]
+    assert "--dangerously-skip-permissions" in retry_cmd
+
+
 @patch("implement_subclause.sys.exit")
 def test_invoke_claude_exits_after_retry_with_no_rationale(mock_exit, isc):
     """invoke_claude exits when both attempts fail to produce rationale."""

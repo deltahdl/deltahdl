@@ -423,10 +423,10 @@ def test_call_claude_output_format_json(ct, monkeypatch):
     assert cmd[idx + 1] == "json"
 
 
-def test_call_claude_allows_read(ct, monkeypatch):
-    """CLI command includes --allowedTools Read."""
+def test_call_claude_uses_dangerously_skip_permissions(ct, monkeypatch):
+    """CLI command includes --dangerously-skip-permissions."""
     cmd = _capture_claude_cmd(ct, monkeypatch)
-    assert "--allowedTools" in cmd and "Read" in cmd
+    assert "--dangerously-skip-permissions" in cmd
 
 
 def test_call_claude_json_schema(ct, monkeypatch):

@@ -449,7 +449,7 @@ def _call_claude(prompt, schema=None):
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
     cmd = ["claude", "-p", "--model", "opus", "--effort", "high",
-           "--output-format", "json", "--allowedTools", "Read"]
+           "--output-format", "json", "--dangerously-skip-permissions"]
     if schema:
         cmd.extend(["--json-schema", schema])
     delays = [5, 10]

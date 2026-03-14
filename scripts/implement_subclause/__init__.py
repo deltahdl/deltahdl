@@ -258,7 +258,8 @@ def invoke_claude(
     if not summary:
         print("Retrying for ACTION_SUMMARY...", file=sys.stderr)
         retry_cmd = ["claude", "-p", "--model", model,
-                     "--output-format", "json", "--continue"]
+                     "--output-format", "json",
+                     "--dangerously-skip-permissions", "--continue"]
         retry_result = run_claude_cli(
             retry_cmd,
             "You did not provide an ACTION_SUMMARY block."

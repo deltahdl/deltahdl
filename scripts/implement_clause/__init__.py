@@ -56,7 +56,8 @@ def discover_subclauses(
         end="", flush=True,
     )
 
-    cmd = ["claude", "-p", "--model", model, "--effort", "high"]
+    cmd = ["claude", "-p", "--model", model, "--effort", "high",
+           "--dangerously-skip-permissions"]
     result = run_with_dots(run_claude_cli, cmd, prompt, env=env)
     if result.returncode != 0:
         print(
