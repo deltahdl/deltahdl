@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_4_ProgramEnclosedByKeywords) {
+TEST(ParserClause03, ProgramEnclosedByKeywords) {
   auto r = Parse("program p; endprogram");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(ParserClause03, Cl3_4_ProgramEnclosedByKeywords) {
   EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
 
-TEST(ParserClause03, Cl3_4_ProgramWithDataDeclarations) {
+TEST(ParserClause03, ProgramWithDataDeclarations) {
   auto r = Parse(
       "program p;\n"
       "  logic [7:0] count;\n"
@@ -26,7 +26,7 @@ TEST(ParserClause03, Cl3_4_ProgramWithDataDeclarations) {
   EXPECT_GE(r.cu->programs[0]->items.size(), 3u);
 }
 
-TEST(ParserClause03, Cl3_4_ProgramWithClassDefinition) {
+TEST(ParserClause03, ProgramWithClassDefinition) {
   auto r = Parse(
       "program p;\n"
       "  class my_trans;\n"
@@ -39,7 +39,7 @@ TEST(ParserClause03, Cl3_4_ProgramWithClassDefinition) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kClassDecl));
 }
 
-TEST(ParserClause03, Cl3_4_ProgramWithFunction) {
+TEST(ParserClause03, ProgramWithFunction) {
   auto r = Parse(
       "program p;\n"
       "  function int add(int a, int b);\n"
@@ -52,7 +52,7 @@ TEST(ParserClause03, Cl3_4_ProgramWithFunction) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
-TEST(ParserClause03, Cl3_4_ProgramWithTask) {
+TEST(ParserClause03, ProgramWithTask) {
   auto r = Parse(
       "program p;\n"
       "  task do_work;\n"
@@ -64,7 +64,7 @@ TEST(ParserClause03, Cl3_4_ProgramWithTask) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kTaskDecl));
 }
 
-TEST(ParserClause03, Cl3_4_ProgramWithInitialBlock) {
+TEST(ParserClause03, ProgramWithInitialBlock) {
   auto r = Parse(
       "program p;\n"
       "  initial begin\n"
@@ -77,7 +77,7 @@ TEST(ParserClause03, Cl3_4_ProgramWithInitialBlock) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-TEST(ParserClause03, Cl3_4_ProgramWithFinalBlock) {
+TEST(ParserClause03, ProgramWithFinalBlock) {
   auto r = Parse(
       "program p;\n"
       "  final $display(\"done\");\n"
@@ -88,7 +88,7 @@ TEST(ParserClause03, Cl3_4_ProgramWithFinalBlock) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
 }
 
-TEST(ParserClause03, Cl3_4_ProgramWithMultipleInitials) {
+TEST(ParserClause03, ProgramWithMultipleInitials) {
   auto r = Parse(
       "program p;\n"
       "  initial $display(\"a\");\n"
@@ -101,7 +101,7 @@ TEST(ParserClause03, Cl3_4_ProgramWithMultipleInitials) {
       2u);
 }
 
-TEST(ParserClause03, Cl3_4_ProgramCannotContainAlways) {
+TEST(ParserClause03, ProgramCannotContainAlways) {
   auto r = Parse(
       "program p;\n"
       "  logic clk, d, q;\n"
@@ -110,7 +110,7 @@ TEST(ParserClause03, Cl3_4_ProgramCannotContainAlways) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_4_ProgramCannotContainAlwaysComb) {
+TEST(ParserClause03, ProgramCannotContainAlwaysComb) {
   auto r = Parse(
       "program p;\n"
       "  logic a, b;\n"
@@ -119,7 +119,7 @@ TEST(ParserClause03, Cl3_4_ProgramCannotContainAlwaysComb) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_4_ProgramCannotContainAlwaysFF) {
+TEST(ParserClause03, ProgramCannotContainAlwaysFF) {
   auto r = Parse(
       "program p;\n"
       "  logic clk, d, q;\n"
@@ -128,7 +128,7 @@ TEST(ParserClause03, Cl3_4_ProgramCannotContainAlwaysFF) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_4_ProgramCannotContainAlwaysLatch) {
+TEST(ParserClause03, ProgramCannotContainAlwaysLatch) {
   auto r = Parse(
       "program p;\n"
       "  logic en, d, q;\n"
@@ -137,7 +137,7 @@ TEST(ParserClause03, Cl3_4_ProgramCannotContainAlwaysLatch) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_4_ProgramCannotContainModuleInst) {
+TEST(ParserClause03, ProgramCannotContainModuleInst) {
   auto r = Parse(
       "module sub; endmodule\n"
       "program p;\n"
@@ -146,7 +146,7 @@ TEST(ParserClause03, Cl3_4_ProgramCannotContainModuleInst) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_4_ProgramCannotContainGateInst) {
+TEST(ParserClause03, ProgramCannotContainGateInst) {
   auto r = Parse(
       "program p;\n"
       "  wire a, b, y;\n"
@@ -155,7 +155,7 @@ TEST(ParserClause03, Cl3_4_ProgramCannotContainGateInst) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_4_ProgramCannotContainUdpInst) {
+TEST(ParserClause03, ProgramCannotContainUdpInst) {
   auto r = Parse(
       "primitive udp_buf (output out, input in);\n"
       "  table 0 : 0; 1 : 1; endtable\n"
@@ -167,7 +167,7 @@ TEST(ParserClause03, Cl3_4_ProgramCannotContainUdpInst) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_4_ProgramWithPorts) {
+TEST(ParserClause03, ProgramWithPorts) {
   auto r = Parse(
       "program p(input clk, input [16:1] addr, inout [7:0] data);\n"
       "endprogram\n");
@@ -176,7 +176,7 @@ TEST(ParserClause03, Cl3_4_ProgramWithPorts) {
   EXPECT_EQ(r.cu->programs[0]->ports.size(), 3u);
 }
 
-TEST(ParserClause03, Cl3_4_SampleProgramDeclaration) {
+TEST(ParserClause03, SampleProgramDeclaration) {
   auto r = Parse(
       "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
       "  initial begin\n"
