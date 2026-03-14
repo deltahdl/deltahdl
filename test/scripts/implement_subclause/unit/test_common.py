@@ -210,6 +210,12 @@ def test_format_prompt_includes_action_summary_instruction(isc):
     assert "ACTION_SUMMARY_START" in result
 
 
+def test_format_prompt_demands_rationale(isc):
+    """Prompt demands categorical rationale with 'because' for every action."""
+    result = isc.format_prompt("10.10.2", "~/LRM.txt")
+    assert "because" in result
+
+
 # ---- invoke_claude --------------------------------------------------------
 
 
@@ -299,26 +305,52 @@ def test_invoke_claude_finds_summary_in_raw_stdout(isc):
         assert isc.invoke_claude("prompt", subclause="4.1") == "- Modified eval_expr.cpp"
 
 
-@patch("implement_subclause.run_claude_cli")
-def test_invoke_claude_returns_empty_when_no_summary(_mock_run, isc):
-    """invoke_claude returns empty string when no ACTION_SUMMARY block."""
-    _mock_run.return_value = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
-    assert isc.invoke_claude("test prompt", subclause="4.1", model="opus") == ""
-
-
-@patch("implement_subclause.run_claude_cli")
-def test_invoke_claude_envelope_without_result_key(_mock_run, isc):
-    """invoke_claude returns empty when JSON envelope has no result key."""
-    _mock_run.return_value = MagicMock(
-        returncode=0, stdout='{"session_id":"x"}', stderr="",
+def test_invoke_claude_retries_on_missing_rationale(isc):
+    """invoke_claude retries once when ACTION_SUMMARY is missing."""
+    no_summary = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
+    with_summary = MagicMock(
+        returncode=0,
+        stdout='ACTION_SUMMARY_START\n- Did X because Y\nACTION_SUMMARY_END',
+        stderr="",
     )
-    assert isc.invoke_claude("prompt", subclause="4.1") == ""
+    with patch("implement_subclause.run_claude_cli",
+               side_effect=[no_summary, with_summary]) as mock_run:
+        isc.invoke_claude("prompt", subclause="4.1")
+    assert mock_run.call_count == 2
+
+
+def test_invoke_claude_retry_returns_rationale(isc):
+    """invoke_claude returns the rationale from the retry call."""
+    no_summary = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
+    with_summary = MagicMock(
+        returncode=0,
+        stdout='ACTION_SUMMARY_START\n- Did X because Y\nACTION_SUMMARY_END',
+        stderr="",
+    )
+    with patch("implement_subclause.run_claude_cli",
+               side_effect=[no_summary, with_summary]):
+        assert isc.invoke_claude("prompt", subclause="4.1") == "- Did X because Y"
+
+
+@patch("implement_subclause.sys.exit")
+def test_invoke_claude_exits_after_retry_with_no_rationale(mock_exit, isc):
+    """invoke_claude exits when both attempts fail to produce rationale."""
+    no_summary = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
+    with patch("implement_subclause.run_claude_cli",
+               return_value=no_summary):
+        isc.invoke_claude("prompt", subclause="4.1")
+    assert mock_exit.called
+
+
+_OK_STDOUT = (
+    'ACTION_SUMMARY_START\n- Done because needed\nACTION_SUMMARY_END'
+)
 
 
 @patch("implement_subclause.run_claude_cli")
 def test_invoke_claude_prints_implementing_numeric(_mock_run, isc, capsys):
     """invoke_claude prints Implementing with section sign for numeric subclauses."""
-    _mock_run.return_value = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
+    _mock_run.return_value = MagicMock(returncode=0, stdout=_OK_STDOUT, stderr="")
     isc.invoke_claude("test prompt", subclause="4.1", model="opus")
     assert "Implementing §4.1 via Claude..." in capsys.readouterr().out
 
@@ -326,7 +358,7 @@ def test_invoke_claude_prints_implementing_numeric(_mock_run, isc, capsys):
 @patch("implement_subclause.run_claude_cli")
 def test_invoke_claude_prints_implementing_annex(_mock_run, isc, capsys):
     """invoke_claude prints Implementing Annex for annex subclauses."""
-    _mock_run.return_value = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
+    _mock_run.return_value = MagicMock(returncode=0, stdout=_OK_STDOUT, stderr="")
     isc.invoke_claude("test prompt", subclause="A.8", model="opus")
     assert "Implementing Annex A.8 via Claude..." in capsys.readouterr().out
 
@@ -336,7 +368,7 @@ def test_invoke_claude_prints_progress_dots(isc, capsys):
 
     def slow_run(*_args, **_kwargs):
         time.sleep(0.15)
-        return MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
+        return MagicMock(returncode=0, stdout=_OK_STDOUT, stderr="")
 
     with patch("implement_subclause.run_claude_cli", side_effect=slow_run), \
          patch.object(isc, "_DOT_INTERVAL_SECONDS", 0.05):

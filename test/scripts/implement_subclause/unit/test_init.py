@@ -211,17 +211,6 @@ def test_main_prints_action_summary(
     assert "- Added foo.cpp" in capsys.readouterr().out
 
 
-@patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value="")
-def test_main_skips_action_print_when_empty(
-    _mock_run, _mock_commit, isc, tmp_path, capsys,
-):
-    """main() does not print action summary when it is empty."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
-    assert "Action summary" not in capsys.readouterr().out
-
 
 def test_parse_args_rejects_figures_flag(isc, tmp_path):
     """--figures flag is no longer accepted."""
@@ -279,6 +268,15 @@ def test_extract_action_summary_strips_whitespace(isc):
     assert extract(text) == "- Did something"
 
 
+# ---- _parse_action_summary ------------------------------------------------
+
+
+def test_parse_action_summary_envelope_without_result(isc):
+    """Returns empty when JSON envelope has no result key."""
+    parse = getattr(isc, "_parse_action_summary")
+    assert parse('{"session_id":"x"}') == ""
+
+
 # ---- commit_implementation -------------------------------------------------
 
 
@@ -316,9 +314,9 @@ def test_commit_implementation_message_annex_prefix(isc):
     assert "Implement Annex A.8.1" in msg
 
 
-def test_commit_implementation_message_has_co_authored_by(isc):
-    """Commit message contains Co-Authored-By trailer."""
-    assert "Co-Authored-By:" in _commit_impl_and_capture(isc)["cap"].call_args[0][2]
+def test_commit_implementation_message_no_co_authored_by(isc):
+    """Commit message does not contain Co-Authored-By trailer."""
+    assert "Co-Authored-By" not in _commit_impl_and_capture(isc)["cap"].call_args[0][2]
 
 
 def test_commit_implementation_calls_mark_subclause_complete(isc):
@@ -348,23 +346,6 @@ def test_commit_implementation_message_omits_action_when_empty(isc):
     """Commit message has no double blank lines when action is empty."""
     msg = _commit_impl_and_capture(isc)["cap"].call_args[0][2]
     assert "\n\n\n" not in msg
-
-
-def test_commit_implementation_message_has_file_summary(isc):
-    """Commit message contains file change summary."""
-    mocks = _commit_impl_and_capture(
-        isc, changes=(["new.cpp"], ["old.cpp"], []),
-    )
-    assert "Added new.cpp" in mocks["cap"].call_args[0][2]
-
-
-def test_commit_implementation_message_has_both_summary_and_action(isc):
-    """Commit message contains both file summary and action rationale."""
-    mocks = _commit_impl_and_capture(
-        isc, changes=(["new.cpp"], [], []), action="- Implemented feature X",
-    )
-    msg = mocks["cap"].call_args[0][2]
-    assert "Added new.cpp" in msg
 
 
 def test_commit_implementation_changed_includes_added_and_modified(isc):

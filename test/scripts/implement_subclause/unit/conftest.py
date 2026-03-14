@@ -17,13 +17,18 @@ def isc(module_loader):
     )
 
 
+_RUN_OK_STDOUT = (
+    '{"result":"ACTION_SUMMARY_START\\n- Done because needed\\nACTION_SUMMARY_END"}'
+)
+
+
 @pytest.fixture()
 def run_ok():
-    """Patch run_claude_cli with a successful mock result."""
+    """Patch run_claude_cli with a successful mock result containing an ACTION_SUMMARY."""
     with patch("implement_subclause.run_claude_cli") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0,
-            stdout='{"result":"done"}',
+            stdout=_RUN_OK_STDOUT,
             stderr="",
         )
         yield mock_run

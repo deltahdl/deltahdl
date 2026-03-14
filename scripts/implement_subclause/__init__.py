@@ -21,7 +21,6 @@ from lib.python.cli import (
     validate_lrm,
 )
 from lib.python.git import (
-    build_file_change_summary,
     commit_and_push,
     get_porcelain_changes,
     get_remote_repo,
@@ -157,13 +156,15 @@ def format_prompt(
     lines.append("Do not build or run tests.")
 
     lines.append(
-        "At the very end of your response, output an action summary"
-        " describing all actions you took and why, using this format:\n"
+        "At the very end of your response, output an action summary."
+        " Every line MUST include 'because' with a categorical rationale"
+        " explaining why the action was necessary"
+        " (what was missing, wrong, or misplaced).\n"
         "ACTION_SUMMARY_START\n"
-        "- Added <file> with <N> new tests for <feature>\n"
-        "- Moved <TestName> from <source_file> (belongs under this subclause)\n"
-        "- Deleted <file> (tests consolidated into <target_file>)\n"
-        "- Modified <file> to support <feature>\n"
+        "- Added <file> because <what was missing or needed>\n"
+        "- Moved <TestName> from <file> because <why it was misplaced>\n"
+        "- Deleted <file> because <why it was no longer needed>\n"
+        "- Modified <file> because <what capability was missing>\n"
         "ACTION_SUMMARY_END",
     )
 
@@ -190,6 +191,19 @@ def _extract_action_summary(text: str) -> str:
     """Extract the action summary block from Claude's response text."""
     m = _ACTION_SUMMARY_RE.search(text)
     return m.group(1).strip() if m else ""
+
+
+def _parse_action_summary(stdout: str) -> str:
+    """Search raw stdout and the JSON envelope result for ACTION_SUMMARY."""
+    summary = _extract_action_summary(stdout)
+    if not summary:
+        try:
+            envelope = json.loads(stdout)
+            if isinstance(envelope, dict) and "result" in envelope:
+                summary = _extract_action_summary(envelope["result"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -254,40 +268,36 @@ def invoke_claude(
         )
         sys.exit(1)
 
-    summary = _extract_action_summary(result.stdout)
+    summary = _parse_action_summary(result.stdout)
     if not summary:
-        try:
-            envelope = json.loads(result.stdout)
-            if isinstance(envelope, dict) and "result" in envelope:
-                summary = _extract_action_summary(envelope["result"])
-        except (json.JSONDecodeError, TypeError):
-            pass
+        print("Retrying for ACTION_SUMMARY...", file=sys.stderr)
+        retry_cmd = ["claude", "-p", "--model", model,
+                     "--output-format", "json", "--continue"]
+        retry_result = run_claude_cli(
+            retry_cmd,
+            "You did not provide an ACTION_SUMMARY block."
+            " Output one now with rationale for every action.",
+            env=env,
+        )
+        if retry_result.returncode == 0:
+            summary = _parse_action_summary(retry_result.stdout)
+    if not summary:
+        print("ERROR: Claude did not provide an ACTION_SUMMARY"
+              " after retry.", file=sys.stderr)
+        sys.exit(1)
 
     return summary
-
-
-def _build_commit_body(added, modified, deleted, action):
-    """Assemble the commit body from file changes and action rationale."""
-    parts = []
-    summary = build_file_change_summary(added, modified, deleted)
-    if summary:
-        parts.append(summary)
-    if action:
-        parts.append(action)
-    return "\n\n".join(parts)
 
 
 def commit_implementation(subclause, issue, *, action=""):
     """Commit, push, and mark the subclause complete on the issue."""
     added, modified, deleted = get_porcelain_changes()
-    trailer = "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-    body = _build_commit_body(added, modified, deleted, action)
     label = _format_subclause_label(subclause)
 
-    if body:
-        message = f"Implement {label}\n\n{body}\n\n{trailer}\n"
+    if action:
+        message = f"Implement {label}\n\n{action}\n"
     else:
-        message = f"Implement {label}\n\n{trailer}\n"
+        message = f"Implement {label}\n"
     sha = commit_and_push(added + modified, deleted, message)
     if sha:
         organization, repo = get_remote_repo()
@@ -366,6 +376,5 @@ def main(argv=None):
     )
 
     action = run_prompt(build_prompt, args)
-    if action:
-        print(f"Action summary:\n{action}")
+    print(f"Action summary:\n{action}")
     commit_implementation(args.subclause, args.issue, action=action)
