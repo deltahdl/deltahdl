@@ -75,6 +75,7 @@ struct SemaphoreObject {
 
 enum class MbxPutStatus : uint8_t { kPlaced, kBlock };
 enum class MbxGetStatus : uint8_t { kRetrieved, kBlock };
+enum class MbxPeekStatus : uint8_t { kCopied, kBlock };
 
 struct MailboxObject {
   int32_t bound = 0;  // 0 means unbounded.
@@ -126,11 +127,19 @@ struct MailboxObject {
     return 1;
   }
 
-  // section 15.4.5: Non-blocking peek. Returns 0 on success, -1 if empty.
-  int32_t TryPeek(uint64_t& msg) {
-    if (messages.empty()) return -1;
+  // §15.4.7: Blocking peek. Copies front message without removing it.
+  // Returns kCopied on success, kBlock if the caller must suspend (empty).
+  MbxPeekStatus Peek(uint64_t& msg) {
+    if (messages.empty()) return MbxPeekStatus::kBlock;
     msg = messages.front();
-    return 0;
+    return MbxPeekStatus::kCopied;
+  }
+
+  // §15.4.8: Non-blocking peek. Returns positive int on success, 0 if empty.
+  int32_t TryPeek(uint64_t& msg) {
+    if (messages.empty()) return 0;
+    msg = messages.front();
+    return 1;
   }
 
   bool IsFull() const { return bound > 0 && Num() >= bound; }
