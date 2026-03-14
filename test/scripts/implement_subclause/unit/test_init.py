@@ -187,6 +187,30 @@ def test_main_calls_commit_implementation_issue(
     assert mock_commit.call_args[0][1] == 8
 
 
+@patch("implement_subclause.commit_implementation")
+@patch("implement_subclause.run_prompt", return_value="- Added foo.cpp")
+def test_main_passes_action_to_commit(
+    _mock_run, mock_commit, isc, tmp_path,
+):
+    """main() passes action summary from run_prompt to commit_implementation."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
+    assert mock_commit.call_args[1]["action"] == "- Added foo.cpp"
+
+
+@patch("implement_subclause.commit_implementation")
+@patch("implement_subclause.run_prompt", return_value="- Added foo.cpp")
+def test_main_prints_action_summary(
+    _mock_run, _mock_commit, isc, tmp_path, capsys,
+):
+    """main() prints the action summary to stdout."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
+    assert "- Added foo.cpp" in capsys.readouterr().out
+
+
 def test_parse_args_rejects_figures_flag(isc, tmp_path):
     """--figures flag is no longer accepted."""
     lrm = tmp_path / "lrm.pdf"
@@ -207,6 +231,37 @@ def test_parse_args_rejects_tables_flag(isc, tmp_path):
             "--lrm", str(lrm), "--subclause", "4", "--issue", "6",
             "--tables", "4_1=tbl.md",
         ])
+
+
+# ---- _extract_action_summary ------------------------------------------------
+
+
+def test_extract_action_summary_found(isc):
+    """Returns content between ACTION_SUMMARY delimiters."""
+    text = (
+        "Some preamble.\n"
+        "ACTION_SUMMARY_START\n"
+        "- Added foo.cpp\n"
+        "- Modified bar.cpp\n"
+        "ACTION_SUMMARY_END\n"
+        "Trailing text."
+    )
+    assert isc._extract_action_summary(text) == "- Added foo.cpp\n- Modified bar.cpp"
+
+
+def test_extract_action_summary_not_found(isc):
+    """Returns empty string when no ACTION_SUMMARY block is present."""
+    assert isc._extract_action_summary("No summary here.") == ""
+
+
+def test_extract_action_summary_strips_whitespace(isc):
+    """Strips leading/trailing whitespace from extracted summary."""
+    text = (
+        "ACTION_SUMMARY_START\n"
+        "  - Did something  \n"
+        "ACTION_SUMMARY_END"
+    )
+    assert isc._extract_action_summary(text) == "- Did something"
 
 
 # ---- get_unstaged_files -----------------------------------------------------
@@ -281,7 +336,7 @@ def test_get_unstaged_files_skips_blank_lines(monkeypatch, isc):
 # ---- commit_implementation -------------------------------------------------
 
 
-def _commit_impl_and_capture(isc):
+def _commit_impl_and_capture(isc, *, action=""):
     """Run commit_implementation with standard mocks; return mock dict."""
     with (
         patch("implement_subclause.get_unstaged_files",
@@ -292,7 +347,7 @@ def _commit_impl_and_capture(isc):
               return_value=("org", "repo")) as m_repo,
         patch("implement_subclause.mark_subclause_complete") as m_mark,
     ):
-        isc.commit_implementation("6.6.1", 8)
+        isc.commit_implementation("6.6.1", 8, action=action)
     return {"files": m_files, "cap": m_cap, "repo": m_repo, "mark": m_mark}
 
 
@@ -326,6 +381,18 @@ def test_commit_implementation_skips_mark_when_no_sha(
     """commit_implementation does not mark when commit_and_push returns None."""
     isc.commit_implementation("6.6.1", 8)
     assert not mock_mark.called
+
+
+def test_commit_implementation_message_has_action(isc):
+    """Commit message contains action text when provided."""
+    mocks = _commit_impl_and_capture(isc, action="- Added foo.cpp")
+    assert "- Added foo.cpp" in mocks["cap"].call_args[0][2]
+
+
+def test_commit_implementation_message_omits_action_when_empty(isc):
+    """Commit message has no double blank lines when action is empty."""
+    msg = _commit_impl_and_capture(isc)["cap"].call_args[0][2]
+    assert "\n\n\n" not in msg
 
 
 # ---- __main__ guard --------------------------------------------------------

@@ -202,72 +202,102 @@ def test_format_prompt_exclude_empty_no_exclusion(isc):
     assert "implemented separately" not in result
 
 
+def test_format_prompt_includes_action_summary_instruction(isc):
+    """Prompt instructs Claude to output an ACTION_SUMMARY block."""
+    result = isc.format_prompt("10.10.2", "~/LRM.txt")
+    assert "ACTION_SUMMARY_START" in result
+
+
 # ---- invoke_claude --------------------------------------------------------
 
 
-def test_invoke_claude_passes_verbose(isc, popen_ok):
+def test_invoke_claude_passes_verbose(isc, run_ok):
     """invoke_claude includes --verbose in the CLI command."""
     isc.invoke_claude("test prompt", model="opus")
-    assert "--verbose" in popen_ok.call_args[0][0]
+    assert "--verbose" in run_ok.call_args[0][0]
 
 
-def test_invoke_claude_uses_print_mode(isc, popen_ok):
+def test_invoke_claude_uses_print_mode(isc, run_ok):
     """invoke_claude uses -p (print mode)."""
     isc.invoke_claude("test prompt", model="opus")
-    assert "-p" in popen_ok.call_args[0][0]
+    assert "-p" in run_ok.call_args[0][0]
 
 
-def test_invoke_claude_uses_stream_json(isc, popen_ok):
-    """invoke_claude uses --output-format stream-json for real-time output."""
+def test_invoke_claude_uses_json_output_format(isc, run_ok):
+    """invoke_claude uses --output-format json to capture output."""
     isc.invoke_claude("test prompt", model="opus")
-    cmd = popen_ok.call_args[0][0]
+    cmd = run_ok.call_args[0][0]
     idx = cmd.index("--output-format")
-    assert cmd[idx + 1] == "stream-json"
+    assert cmd[idx + 1] == "json"
 
 
-def test_invoke_claude_uses_dangerously_skip_permissions(isc, popen_ok):
+def test_invoke_claude_uses_dangerously_skip_permissions(isc, run_ok):
     """invoke_claude uses --dangerously-skip-permissions."""
     isc.invoke_claude("test prompt", model="opus")
-    assert "--dangerously-skip-permissions" in popen_ok.call_args[0][0]
+    assert "--dangerously-skip-permissions" in run_ok.call_args[0][0]
 
 
-def test_invoke_claude_no_continue_by_default(isc, popen_ok):
+def test_invoke_claude_no_continue_by_default(isc, run_ok):
     """invoke_claude does not include --continue by default."""
     isc.invoke_claude("test prompt", model="opus")
-    assert "--continue" not in popen_ok.call_args[0][0]
+    assert "--continue" not in run_ok.call_args[0][0]
 
 
-def test_invoke_claude_uses_continue_when_set(isc, popen_ok):
+def test_invoke_claude_uses_continue_when_set(isc, run_ok):
     """invoke_claude includes --continue when continue_session=True."""
     isc.invoke_claude("test prompt", model="opus", continue_session=True)
-    assert "--continue" in popen_ok.call_args[0][0]
+    assert "--continue" in run_ok.call_args[0][0]
 
 
-def test_invoke_claude_success(isc, popen_ok):
-    """invoke_claude streams prompt to Claude CLI and returns on success."""
+def test_invoke_claude_success(isc, run_ok):
+    """invoke_claude calls subprocess.run on success."""
     isc.invoke_claude("test prompt", model="opus")
-    assert popen_ok.return_value.communicate.called
+    assert run_ok.called
 
 
 @patch("implement_subclause.sys.exit")
-@patch("implement_subclause.subprocess.Popen")
-def test_invoke_claude_failure_exits(mock_popen, mock_exit, isc):
+@patch("implement_subclause.subprocess.run")
+def test_invoke_claude_failure_exits(mock_run, mock_exit, isc):
     """invoke_claude calls sys.exit on non-zero return code."""
-    proc = MagicMock()
-    proc.communicate.return_value = (None, None)
-    proc.returncode = 1
-    proc.__enter__ = MagicMock(return_value=proc)
-    proc.__exit__ = MagicMock(return_value=False)
-    mock_popen.return_value = proc
+    mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="err")
     isc.invoke_claude("test prompt")
     assert mock_exit.called
+
+
+def test_invoke_claude_captures_output(isc, run_ok):
+    """invoke_claude passes capture_output=True to subprocess.run."""
+    isc.invoke_claude("test prompt", model="opus")
+    assert run_ok.call_args[1].get("capture_output") is True
+
+
+def test_invoke_claude_returns_action_summary(isc):
+    """invoke_claude extracts and returns action summary from response."""
+    import json
+    envelope = json.dumps({
+        "result": (
+            "Done.\n"
+            "ACTION_SUMMARY_START\n"
+            "- Added foo.cpp\n"
+            "ACTION_SUMMARY_END"
+        ),
+    })
+    with patch("implement_subclause.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout=envelope, stderr="",
+        )
+        assert isc.invoke_claude("prompt") == "- Added foo.cpp"
+
+
+def test_invoke_claude_returns_empty_when_no_summary(isc, run_ok):
+    """invoke_claude returns empty string when no ACTION_SUMMARY block."""
+    assert isc.invoke_claude("test prompt", model="opus") == ""
 
 
 # ---- run_prompt -----------------------------------------------------------
 
 
 def _run_prompt_and_capture(isc, tmp_path, *, exclude=""):
-    """Helper: invoke run_prompt with a mock build_fn and return (mock_invoke, build_fn)."""
+    """Helper: invoke run_prompt with a mock build_fn and return (mock_invoke, build_fn, result)."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     build_fn = MagicMock(return_value="generated prompt")
@@ -275,33 +305,40 @@ def _run_prompt_and_capture(isc, tmp_path, *, exclude=""):
         lrm=lrm, subclause="4.1",
         model="opus", continue_session=False, exclude=exclude,
     )
-    with patch("implement_subclause.invoke_claude") as mock_invoke:
-        isc.run_prompt(build_fn, args)
-    return mock_invoke, build_fn
+    with patch("implement_subclause.invoke_claude",
+               return_value="- Did something") as mock_invoke:
+        result = isc.run_prompt(build_fn, args)
+    return mock_invoke, build_fn, result
 
 
 def test_run_prompt_calls_invoke(isc, tmp_path):
     """run_prompt builds prompt and invokes Claude."""
-    mock_invoke, _ = _run_prompt_and_capture(isc, tmp_path)
+    mock_invoke, _, _ = _run_prompt_and_capture(isc, tmp_path)
     assert mock_invoke.call_args[0][0] == "generated prompt"
 
 
 def test_run_prompt_does_not_load_titles(isc, tmp_path):
     """run_prompt passes only positional args (subclause, lrm_path)."""
-    _, build_fn = _run_prompt_and_capture(isc, tmp_path)
+    _, build_fn, _ = _run_prompt_and_capture(isc, tmp_path)
     assert len(build_fn.call_args[0]) == 2  # subclause, lrm_path
 
 
 def test_run_prompt_passes_subclause(isc, tmp_path):
     """run_prompt passes the subclause as the first positional arg."""
-    _, build_fn = _run_prompt_and_capture(isc, tmp_path)
+    _, build_fn, _ = _run_prompt_and_capture(isc, tmp_path)
     assert build_fn.call_args[0][0] == "4.1"
 
 
 def test_run_prompt_passes_exclude(isc, tmp_path):
     """run_prompt passes exclude to build_fn."""
-    _, build_fn = _run_prompt_and_capture(isc, tmp_path, exclude="4.1.1,4.1.2")
+    _, build_fn, _ = _run_prompt_and_capture(isc, tmp_path, exclude="4.1.1,4.1.2")
     assert build_fn.call_args[1]["exclude"] == "4.1.1,4.1.2"
+
+
+def test_run_prompt_returns_action_summary(isc, tmp_path):
+    """run_prompt returns the action summary from invoke_claude."""
+    _, _, result = _run_prompt_and_capture(isc, tmp_path)
+    assert result == "- Did something"
 
 
 @patch("implement_subclause.invoke_claude")
@@ -318,9 +355,9 @@ def test_run_prompt_passes_continue_session(mock_invoke, isc, tmp_path):
     assert mock_invoke.call_args[1]["continue_session"] is True
 
 
-def test_invoke_claude_passes_effort_high(isc, popen_ok):
+def test_invoke_claude_passes_effort_high(isc, run_ok):
     """invoke_claude includes --effort high in the CLI command."""
     isc.invoke_claude("test prompt", model="opus")
-    cmd = popen_ok.call_args[0][0]
+    cmd = run_ok.call_args[0][0]
     idx = cmd.index("--effort")
     assert cmd[idx + 1] == "high"

@@ -4,6 +4,7 @@ Builds an optimized prompt and invokes Claude CLI.
 """
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -143,6 +144,17 @@ def format_prompt(
     lines.append("Do not copy LRM prose into source comments.")
     lines.append("Do not build or run tests.")
 
+    lines.append(
+        "At the very end of your response, output an action summary"
+        " describing all actions you took and why, using this format:\n"
+        "ACTION_SUMMARY_START\n"
+        "- Added <file> with <N> new tests for <feature>\n"
+        "- Moved <TestName> from <source_file> (belongs under this subclause)\n"
+        "- Deleted <file> (tests consolidated into <target_file>)\n"
+        "- Modified <file> to support <feature>\n"
+        "ACTION_SUMMARY_END",
+    )
+
     return "\n".join(lines) + "\n"
 
 
@@ -156,16 +168,30 @@ def build_prompt(
     return format_prompt(clause, lrm, exclude=exclude)
 
 
+_ACTION_SUMMARY_RE = re.compile(
+    r"ACTION_SUMMARY_START\n(.*?)\nACTION_SUMMARY_END",
+    re.DOTALL,
+)
+
+
+def _extract_action_summary(text: str) -> str:
+    """Extract the action summary block from Claude's response text."""
+    m = _ACTION_SUMMARY_RE.search(text)
+    return m.group(1).strip() if m else ""
+
+
 # ---------------------------------------------------------------------------
 # Claude CLI invocation
 # ---------------------------------------------------------------------------
 
 def invoke_claude(
     prompt: str, *, model: str = "opus", continue_session: bool = False,
-) -> None:
-    """Launch Claude CLI in print mode with the implementation prompt.
+) -> str:
+    """Invoke Claude CLI and return the extracted action summary.
 
-    Streams stdout/stderr to the terminal in real time.
+    Uses ``--output-format json`` so the response can be parsed for the
+    ACTION_SUMMARY block.  Returns the action summary string, or ``""``
+    if none was found.
     """
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
@@ -175,7 +201,7 @@ def invoke_claude(
         "--model", model,
         "--effort", "high",
         "--verbose",
-        "--output-format", "stream-json",
+        "--output-format", "json",
         "--dangerously-skip-permissions",
     ]
 
@@ -183,22 +209,31 @@ def invoke_claude(
         cmd.append("--continue")
 
     print(f"Invoking Claude ({model})...")
-    with subprocess.Popen(
+    result = subprocess.run(
         cmd,
-        stdin=subprocess.PIPE,
-        stdout=sys.stdout,
-        stderr=sys.stderr,
+        input=prompt,
+        capture_output=True,
         text=True,
         env=env,
-    ) as proc:
-        proc.communicate(input=prompt)
+        check=False,
+    )
 
-    if proc.returncode != 0:
+    if result.returncode != 0:
         print(
-            f"\nERROR: Claude exited with code {proc.returncode}",
+            f"\nERROR: Claude exited with code {result.returncode}",
             file=sys.stderr,
         )
         sys.exit(1)
+
+    text = ""
+    try:
+        envelope = json.loads(result.stdout)
+        if isinstance(envelope, dict) and "result" in envelope:
+            text = envelope["result"]
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    return _extract_action_summary(text)
 
 
 def get_unstaged_files():
@@ -218,24 +253,27 @@ def get_unstaged_files():
     return changed, deleted
 
 
-def commit_implementation(subclause, issue):
+def commit_implementation(subclause, issue, *, action=""):
     """Commit, push, and mark the subclause complete on the issue."""
     changed, deleted = get_unstaged_files()
     trailer = "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-    message = f"Implement §{subclause}\n\n{trailer}\n"
+    if action:
+        message = f"Implement §{subclause}\n\n{action}\n\n{trailer}\n"
+    else:
+        message = f"Implement §{subclause}\n\n{trailer}\n"
     sha = commit_and_push(changed, deleted, message)
     if sha:
         organization, repo = get_remote_repo()
         mark_subclause_complete(organization, repo, issue, subclause, sha)
 
 
-def run_prompt(build_fn, args: argparse.Namespace) -> None:
-    """Build a prompt via *build_fn* and invoke Claude."""
+def run_prompt(build_fn, args: argparse.Namespace) -> str:
+    """Build a prompt via *build_fn*, invoke Claude, return action summary."""
     prompt = build_fn(
         args.subclause, str(args.lrm), exclude=args.exclude,
     )
     print(f"Built prompt ({len(prompt)} characters)")
-    invoke_claude(
+    return invoke_claude(
         prompt, model=args.model,
         continue_session=args.continue_session,
     )
@@ -299,5 +337,7 @@ def main(argv=None):
         f" issue #{args.issue}, model {args.model}",
     )
 
-    run_prompt(build_prompt, args)
-    commit_implementation(args.subclause, args.issue)
+    action = run_prompt(build_prompt, args)
+    if action:
+        print(f"Action summary:\n{action}")
+    commit_implementation(args.subclause, args.issue, action=action)

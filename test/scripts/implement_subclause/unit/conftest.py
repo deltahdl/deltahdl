@@ -18,13 +18,12 @@ def isc(module_loader):
 
 
 @pytest.fixture()
-def popen_ok():
-    """Patch subprocess.Popen with a successful mock process."""
-    with patch("implement_subclause.subprocess.Popen") as mock_popen:
-        proc = MagicMock()
-        proc.communicate.return_value = (None, None)
-        proc.returncode = 0
-        proc.__enter__ = MagicMock(return_value=proc)
-        proc.__exit__ = MagicMock(return_value=False)
-        mock_popen.return_value = proc
-        yield mock_popen
+def run_ok():
+    """Patch subprocess.run with a successful mock result."""
+    with patch("implement_subclause.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='{"result":"done"}',
+            stderr="",
+        )
+        yield mock_run
