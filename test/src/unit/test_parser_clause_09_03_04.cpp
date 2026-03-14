@@ -544,4 +544,9 @@ TEST(BlockNameParsing, NamedBlockWithoutEndLabelOk) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §3.1 — Error: mismatched end label.
+TEST(BlockNames, MismatchedEndLabelIsError) {
+  EXPECT_FALSE(ParseOk("module foo; endmodule : bar\n"));
+}
+
 }  // namespace

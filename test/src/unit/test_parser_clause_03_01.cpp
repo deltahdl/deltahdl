@@ -6,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §3.1 — Error: mismatched end label.
-TEST(CompilationUnitStructure, MismatchedEndLabelIsError) {
-  EXPECT_FALSE(ParseOk("module foo; endmodule : bar\n"));
-}
-
 // §3.1 — Module with design element name containing underscores and digits.
 TEST(CompilationUnitStructure, DesignElementNameWithUnderscoresAndDigits) {
   auto r = Parse("module my_module_123; endmodule\n");
