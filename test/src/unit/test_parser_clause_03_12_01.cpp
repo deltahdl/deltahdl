@@ -234,4 +234,18 @@ TEST(CompilationUnitStructure,
   EXPECT_TRUE(r.cu->configs.empty());
 }
 
+TEST(CompilationUnitStructure, DefaultFieldValues) {
+  auto r = Parse("");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->default_nettype, NetType::kWire);
+  EXPECT_EQ(r.cu->cu_time_unit, TimeUnit::kNs);
+  EXPECT_EQ(r.cu->cu_time_prec, TimeUnit::kNs);
+  EXPECT_FALSE(r.cu->has_cu_timeunit);
+  EXPECT_FALSE(r.cu->has_cu_timeprecision);
+  EXPECT_TRUE(r.cu->libraries.empty());
+  EXPECT_TRUE(r.cu->lib_includes.empty());
+  EXPECT_TRUE(r.cu->bind_directives.empty());
+}
+
 }  // namespace
