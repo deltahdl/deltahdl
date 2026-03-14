@@ -240,19 +240,19 @@ def test_run_steps_skips_when_not_implementable(isc):
         returncode=0, stdout=_OK_STDOUT, stderr="",
     )
 
-    def side_effect(func, *args, **kwargs):
+    def fake_run(_func, *_args, **_kwargs):
         """Return not-implementable for step 2, summary for last."""
-        side_effect.count += 1
-        if side_effect.count == 2:
+        fake_run.count += 1
+        if fake_run.count == 2:
             return not_impl
         return summary_result
 
-    side_effect.count = 0
+    fake_run.count = 0
 
     steps = isc.build_steps("4.1", "~/LRM.txt")
-    with patch("implement_subclause.run_with_dots", side_effect=side_effect):
-        result = isc.run_steps(steps, model="opus")
-    assert side_effect.count == 3  # read, check, summary
+    with patch("implement_subclause.run_with_dots", side_effect=fake_run):
+        isc.run_steps(steps, model="opus")
+    assert fake_run.count == 3  # read, check, summary
 
 
 @patch("implement_subclause.sys.exit")
