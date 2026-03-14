@@ -80,7 +80,8 @@ struct MailboxObject {
   std::vector<std::coroutine_handle<>> peek_waiters;
   std::vector<std::coroutine_handle<>> put_waiters;
 
-  explicit MailboxObject(int32_t b = 0) : bound(b) {}
+  // §15.4.1: Negative bounds are illegal; clamp to 0 (unbounded).
+  explicit MailboxObject(int32_t b = 0) : bound(b < 0 ? 0 : b) {}
 
   // section 15.4.2: Number of messages.
   int32_t Num() const { return static_cast<int32_t>(messages.size()); }
