@@ -606,4 +606,8 @@ TEST(ProgramEndLabel, EndLabelMatchesProgramName) {
   EXPECT_EQ(r.cu->programs[0]->name, "qux");
 }
 
+TEST(ProgramDeclaration, MissingEndprogramIsError) {
+  EXPECT_FALSE(ParseOk("program p;"));
+}
+
 }  // namespace

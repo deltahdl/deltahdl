@@ -6,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, MissingEndprogramIsError) {
-  EXPECT_FALSE(ParseOk("program p;"));
-}
-
 TEST(CompilationUnitStructure, MissingEndcheckerIsError) {
   EXPECT_FALSE(ParseOk("checker c;"));
 }
