@@ -6,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, UnrecognizedTopLevelTokenIsError) {
-  EXPECT_FALSE(ParseOk("42"));
-}
-
 TEST(CompilationUnitStructure, MultiplePackagesAccumulate) {
   auto r = Parse(
       "package p1; endpackage\n"

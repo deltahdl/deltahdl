@@ -297,4 +297,8 @@ TEST(CompilationUnitStructure, PreservesInsertionOrder) {
   EXPECT_EQ(r.cu->packages[1]->name, "p2");
 }
 
+TEST(CompilationUnitStructure, UnrecognizedTopLevelTokenIsError) {
+  EXPECT_FALSE(ParseOk("42"));
+}
+
 }  // namespace
