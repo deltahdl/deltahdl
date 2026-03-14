@@ -6,7 +6,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lib.python.git import commit_and_push, get_remote_repo, run_git
+from lib.python.git import (
+    build_file_change_summary,
+    commit_and_push,
+    get_porcelain_changes,
+    get_remote_repo,
+    run_git,
+)
 from lib.python.test_fixtures.subprocess_stubs import (
     stub_subprocess_failure,
     stub_subprocess_success,
@@ -310,3 +316,77 @@ def test_get_remote_repo_exits_on_unparseable_url(monkeypatch):
     monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
     with pytest.raises(SystemExit):
         get_remote_repo()
+
+
+# ---- get_porcelain_changes -------------------------------------------------
+
+
+def _porcelain_result(monkeypatch, stdout):
+    """Stub subprocess.run to return the given porcelain stdout."""
+    mock_result = MagicMock(returncode=0, stdout=stdout, stderr="")
+    monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
+
+
+def test_get_porcelain_changes_untracked_in_added(monkeypatch):
+    """Untracked files appear in the added list."""
+    _porcelain_result(monkeypatch, "?? src/new.cpp\n")
+    added, _, _ = get_porcelain_changes()
+    assert added == ["src/new.cpp"]
+
+
+def test_get_porcelain_changes_modified_in_modified(monkeypatch):
+    """Modified files appear in the modified list."""
+    _porcelain_result(monkeypatch, " M src/foo.cpp\n")
+    _, modified, _ = get_porcelain_changes()
+    assert modified == ["src/foo.cpp"]
+
+
+def test_get_porcelain_changes_deleted_in_deleted(monkeypatch):
+    """Deleted files appear in the deleted list."""
+    _porcelain_result(monkeypatch, " D src/old.cpp\n")
+    _, _, deleted = get_porcelain_changes()
+    assert deleted == ["src/old.cpp"]
+
+
+def test_get_porcelain_changes_empty(monkeypatch):
+    """Empty status returns three empty lists."""
+    _porcelain_result(monkeypatch, "")
+    assert get_porcelain_changes() == ([], [], [])
+
+
+def test_get_porcelain_changes_skips_blank_lines(monkeypatch):
+    """Blank lines in status output are skipped."""
+    _porcelain_result(monkeypatch, " M a.cpp\n\n M b.cpp\n")
+    _, modified, _ = get_porcelain_changes()
+    assert len(modified) == 2
+
+
+# ---- build_file_change_summary --------------------------------------------
+
+
+def test_build_file_change_summary_added_only():
+    """Summary for added files only."""
+    assert build_file_change_summary(["src/foo.cpp"], [], []) == "Added foo.cpp"
+
+
+def test_build_file_change_summary_all_three():
+    """Summary with added, modified, and deleted."""
+    result = build_file_change_summary(["a.cpp"], ["b.cpp"], ["c.cpp"])
+    assert result == "Added a.cpp; modified b.cpp; deleted c.cpp"
+
+
+def test_build_file_change_summary_empty():
+    """Empty lists return empty string."""
+    assert build_file_change_summary([], [], []) == ""
+
+
+def test_build_file_change_summary_uses_basenames():
+    """Summary uses basenames, not full paths."""
+    result = build_file_change_summary(["test/src/unit/foo.cpp"], [], [])
+    assert result == "Added foo.cpp"
+
+
+def test_build_file_change_summary_sorts():
+    """Files are sorted alphabetically within each category."""
+    result = build_file_change_summary(["z.cpp", "a.cpp"], [], [])
+    assert result == "Added a.cpp, z.cpp"

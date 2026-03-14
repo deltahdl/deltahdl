@@ -1,5 +1,6 @@
 """Shared git commit and push helpers."""
 
+import os.path
 import re
 import subprocess
 import sys
@@ -60,3 +61,37 @@ def get_remote_repo(remote: str = "origin") -> tuple[str, str]:
               file=sys.stderr)
         sys.exit(1)
     return m.group(1), m.group(2)
+
+
+def get_porcelain_changes():
+    """Return (added, modified, deleted) from ``git status --porcelain``."""
+    result = run_git(["git", "status", "--porcelain"])
+    added, modified, deleted = [], [], []
+    for line in result.stdout.splitlines():
+        if not line:
+            continue
+        status = line[:2]
+        path = line[3:]
+        if status == "??":
+            added.append(path)
+        elif status.strip() == "D":
+            deleted.append(path)
+        else:
+            modified.append(path)
+    return added, modified, deleted
+
+
+def build_file_change_summary(added, modified, deleted):
+    """Build a human-readable summary of file changes.
+
+    Returns a string like ``"Added foo.cpp, bar.cpp; modified baz.cpp;
+    deleted old.cpp"`` using basenames sorted alphabetically.  Returns
+    ``""`` when all lists are empty.
+    """
+    parts = []
+    for label, files in [("Added", added), ("modified", modified),
+                         ("deleted", deleted)]:
+        if files:
+            names = sorted(os.path.basename(f) for f in files)
+            parts.append(f"{label} {', '.join(names)}")
+    return "; ".join(parts)

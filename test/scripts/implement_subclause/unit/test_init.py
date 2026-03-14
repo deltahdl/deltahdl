@@ -1,7 +1,7 @@
 """Unit tests for implement_subclause (arg parsing and dispatch)."""
 
 import runpy
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -279,83 +279,21 @@ def test_extract_action_summary_strips_whitespace(isc):
     assert extract(text) == "- Did something"
 
 
-# ---- get_unstaged_files -----------------------------------------------------
-
-
-def test_get_unstaged_files_modified(monkeypatch, isc):
-    """Modified files appear in changed list."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = " M src/foo.cpp\n"
-    mock_result.stderr = ""
-    monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
-    changed, _deleted = isc.get_unstaged_files()
-    assert "src/foo.cpp" in changed
-
-
-def test_get_unstaged_files_untracked(monkeypatch, isc):
-    """Untracked files appear in changed list."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "?? src/new.cpp\n"
-    mock_result.stderr = ""
-    monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
-    changed, _deleted = isc.get_unstaged_files()
-    assert "src/new.cpp" in changed
-
-
-def test_get_unstaged_files_deleted(monkeypatch, isc):
-    """Deleted files appear in deleted list."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = " D src/old.cpp\n"
-    mock_result.stderr = ""
-    monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
-    _changed, deleted = isc.get_unstaged_files()
-    assert "src/old.cpp" in deleted
-
-
-def test_get_unstaged_files_empty_changed(monkeypatch, isc):
-    """Empty status returns empty changed list."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = ""
-    mock_result.stderr = ""
-    monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
-    changed, _ = isc.get_unstaged_files()
-    assert changed == []
-
-
-def test_get_unstaged_files_empty_deleted(monkeypatch, isc):
-    """Empty status returns empty deleted list."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = ""
-    mock_result.stderr = ""
-    monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
-    _, deleted = isc.get_unstaged_files()
-    assert deleted == []
-
-
-def test_get_unstaged_files_skips_blank_lines(monkeypatch, isc):
-    """Blank lines in status output are skipped."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = " M a.cpp\n\n M b.cpp\n"
-    mock_result.stderr = ""
-    monkeypatch.setattr("implement_subclause.run_git", lambda *a, **kw: mock_result)
-    changed, _ = isc.get_unstaged_files()
-    assert len(changed) == 2
-
-
 # ---- commit_implementation -------------------------------------------------
 
 
-def _commit_impl_and_capture(isc, *, action=""):
+def _commit_impl_and_capture(isc, *, action="",
+                             added=None, modified=None, deleted=None):
     """Run commit_implementation with standard mocks; return mock dict."""
+    if added is None:
+        added = ["a.cpp"]
+    if modified is None:
+        modified = []
+    if deleted is None:
+        deleted = []
     with (
-        patch("implement_subclause.get_unstaged_files",
-              return_value=(["a.cpp"], [])) as m_files,
+        patch("implement_subclause.get_porcelain_changes",
+              return_value=(added, modified, deleted)) as m_files,
         patch("implement_subclause.commit_and_push",
               return_value="abc123") as m_cap,
         patch("implement_subclause.get_remote_repo",
@@ -389,7 +327,7 @@ def test_commit_implementation_calls_mark_subclause_complete(isc):
 
 @patch("implement_subclause.mark_subclause_complete")
 @patch("implement_subclause.commit_and_push", return_value=None)
-@patch("implement_subclause.get_unstaged_files", return_value=([], []))
+@patch("implement_subclause.get_porcelain_changes", return_value=([], [], []))
 def test_commit_implementation_skips_mark_when_no_sha(
     _mock_files, _mock_cap, mock_mark, isc,
 ):
@@ -408,6 +346,31 @@ def test_commit_implementation_message_omits_action_when_empty(isc):
     """Commit message has no double blank lines when action is empty."""
     msg = _commit_impl_and_capture(isc)["cap"].call_args[0][2]
     assert "\n\n\n" not in msg
+
+
+def test_commit_implementation_message_has_file_summary(isc):
+    """Commit message contains file change summary."""
+    mocks = _commit_impl_and_capture(
+        isc, added=["new.cpp"], modified=["old.cpp"],
+    )
+    assert "Added new.cpp" in mocks["cap"].call_args[0][2]
+
+
+def test_commit_implementation_message_has_both_summary_and_action(isc):
+    """Commit message contains both file summary and action rationale."""
+    mocks = _commit_impl_and_capture(
+        isc, added=["new.cpp"], action="- Implemented feature X",
+    )
+    msg = mocks["cap"].call_args[0][2]
+    assert "Added new.cpp" in msg
+
+
+def test_commit_implementation_changed_includes_added_and_modified(isc):
+    """commit_and_push receives added + modified as changed files."""
+    mocks = _commit_impl_and_capture(
+        isc, added=["a.cpp"], modified=["b.cpp"],
+    )
+    assert mocks["cap"].call_args[0][0] == ["a.cpp", "b.cpp"]
 
 
 # ---- __main__ guard --------------------------------------------------------

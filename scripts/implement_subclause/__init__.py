@@ -20,7 +20,12 @@ from lib.python.cli import (
     run_claude_cli,
     validate_lrm,
 )
-from lib.python.git import commit_and_push, get_remote_repo, run_git
+from lib.python.git import (
+    build_file_change_summary,
+    commit_and_push,
+    get_porcelain_changes,
+    get_remote_repo,
+)
 from lib.python.github import mark_subclause_complete
 
 
@@ -242,40 +247,34 @@ def invoke_claude(
         )
         sys.exit(1)
 
-    text = ""
-    try:
-        envelope = json.loads(result.stdout)
-        if isinstance(envelope, dict) and "result" in envelope:
-            text = envelope["result"]
-    except (json.JSONDecodeError, TypeError):
-        pass
+    summary = _extract_action_summary(result.stdout)
+    if not summary:
+        try:
+            envelope = json.loads(result.stdout)
+            if isinstance(envelope, dict) and "result" in envelope:
+                summary = _extract_action_summary(envelope["result"])
+        except (json.JSONDecodeError, TypeError):
+            pass
 
-    return _extract_action_summary(text)
-
-
-def get_unstaged_files():
-    """Return (changed, deleted) file lists from git status --porcelain."""
-    result = run_git(["git", "status", "--porcelain"])
-    changed = []
-    deleted = []
-    for line in result.stdout.splitlines():
-        if not line:
-            continue
-        status = line[:2]
-        path = line[3:]
-        if status.strip() == "D":
-            deleted.append(path)
-        else:
-            changed.append(path)
-    return changed, deleted
+    return summary
 
 
 def commit_implementation(subclause, issue, *, action=""):
     """Commit, push, and mark the subclause complete on the issue."""
-    changed, deleted = get_unstaged_files()
+    added, modified, deleted = get_porcelain_changes()
+    changed = added + modified
     trailer = "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+    file_summary = build_file_change_summary(added, modified, deleted)
+
+    body_parts = []
+    if file_summary:
+        body_parts.append(file_summary)
     if action:
-        message = f"Implement §{subclause}\n\n{action}\n\n{trailer}\n"
+        body_parts.append(action)
+    body = "\n\n".join(body_parts)
+
+    if body:
+        message = f"Implement §{subclause}\n\n{body}\n\n{trailer}\n"
     else:
         message = f"Implement §{subclause}\n\n{trailer}\n"
     sha = commit_and_push(changed, deleted, message)

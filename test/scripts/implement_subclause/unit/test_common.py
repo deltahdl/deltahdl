@@ -283,6 +283,22 @@ def test_invoke_claude_returns_action_summary(isc):
         assert isc.invoke_claude("prompt", subclause="4.1") == "- Added foo.cpp"
 
 
+def test_invoke_claude_finds_summary_in_raw_stdout(isc):
+    """invoke_claude finds ACTION_SUMMARY in raw stdout even when not in result field."""
+    raw_stdout = (
+        '{"result":"All done."}\n'
+        "some other output\n"
+        "ACTION_SUMMARY_START\n"
+        "- Modified eval_expr.cpp\n"
+        "ACTION_SUMMARY_END\n"
+    )
+    with patch("implement_subclause.run_claude_cli") as mock_run:
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout=raw_stdout, stderr="",
+        )
+        assert isc.invoke_claude("prompt", subclause="4.1") == "- Modified eval_expr.cpp"
+
+
 @patch("implement_subclause.run_claude_cli")
 def test_invoke_claude_returns_empty_when_no_summary(_mock_run, isc):
     """invoke_claude returns empty string when no ACTION_SUMMARY block."""
