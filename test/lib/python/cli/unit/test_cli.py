@@ -132,13 +132,13 @@ def test_add_github_args_repo() -> None:
 # ---- invoke_implement_subclause ---------------------------------------------
 
 
-_SC_PARAMS = SubclauseParams(lrm="/tmp/lrm.pdf", issue=42, model="opus")
-
-
 def _invoke_and_capture(monkeypatch, *, continue_session=False):
     """Invoke with stubbed subprocess and return captured command."""
     captured = stub_subprocess_success(monkeypatch)
-    invoke_implement_subclause(_SC_PARAMS, "6.1", continue_session)
+    invoke_implement_subclause(
+        "/tmp/lrm.pdf", "6.1", 42,
+        continue_session=continue_session,
+    )
     return captured[0]
 
 
@@ -194,7 +194,7 @@ def test_invoke_implement_subclause_no_exclude(monkeypatch) -> None:
 def test_invoke_implement_subclause_with_exclude(monkeypatch) -> None:
     """Appends --exclude when exclude is non-empty."""
     captured = stub_subprocess_success(monkeypatch)
-    invoke_implement_subclause(_SC_PARAMS, "6.1", False, exclude="6.1.1,6.1.2")
+    invoke_implement_subclause("/tmp/lrm.pdf", "6.1", 42, exclude="6.1.1,6.1.2")
     cmd = captured[0]
     assert cmd[cmd.index("--exclude") + 1] == "6.1.1,6.1.2"
 
@@ -203,7 +203,7 @@ def test_invoke_implement_subclause_failure(monkeypatch) -> None:
     """Calls sys.exit on nonzero returncode."""
     stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
-        invoke_implement_subclause(_SC_PARAMS, "6.1", False)
+        invoke_implement_subclause("/tmp/lrm.pdf", "6.1", 42)
 
 
 # ---- parse_clause_issues ----------------------------------------------------

@@ -183,25 +183,32 @@ def run_claude_cli(cmd, prompt, *, env, timeout=None):
     return subprocess.run(cmd, check=False, **kwargs)
 
 
-def invoke_implement_subclause(
-    params: SubclauseParams,
-    subclause: str,
-    continue_session: bool,
+def _build_subclause_cmd(
+    lrm: str, subclause: str, issue: int, *,
+    model: str = "opus", continue_session: bool = False,
     exclude: str = "",
-) -> None:
-    """Shell out to ``python -m implement_subclause``."""
-    print(f"Invoking implement_subclause for {subclause}...")
+) -> list[str]:
+    """Build the command for ``python -m implement_subclause``."""
     cmd = [
         sys.executable, "-m", "implement_subclause",
-        "--lrm", params.lrm,
+        "--lrm", lrm,
         "--subclause", subclause,
-        "--issue", str(params.issue),
-        "--model", params.model,
+        "--issue", str(issue),
+        "--model", model,
     ]
     if continue_session:
         cmd.append("--continue")
     if exclude:
         cmd.extend(["--exclude", exclude])
+    return cmd
+
+
+def invoke_implement_subclause(
+    lrm: str, subclause: str, issue: int, **kwargs,
+) -> None:
+    """Shell out to ``python -m implement_subclause``."""
+    print(f"Invoking implement_subclause for {subclause}...")
+    cmd = _build_subclause_cmd(lrm, subclause, issue, **kwargs)
     result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
         sys.exit(result.returncode)
