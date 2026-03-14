@@ -215,15 +215,30 @@ def _extract_action_summary(text: str) -> str:
     return m.group(1).strip() if m else ""
 
 
-_PREDEFINED_ACTION_RE = re.compile(
-    r"ONE_LINE_PREDEFINED_ACTION:\s*(.+)",
-)
+_PREDEFINED_ACTIONS = [
+    "Added tests only because the functionality was already"
+    " implemented but its tests were missing",
+    "Deferred via --exclude",
+    "Deemed not implementable",
+    "Deleted tests only because the functionality and its tests"
+    " were already implemented but some tests were duplicated",
+    "Did nothing because the functionality and its tests"
+    " were already implemented",
+    "Implemented the functionality and its tests"
+    " because both were missing",
+    "Performed a non-predefined action",
+    "Reclassified tests only because the functionality and its"
+    " tests were already implemented but the tests"
+    " were misclassified",
+]
 
 
 def _extract_predefined_action(text: str) -> str:
     """Extract the ONE_LINE_PREDEFINED_ACTION from Claude's response."""
-    m = _PREDEFINED_ACTION_RE.search(text)
-    return m.group(1).strip() if m else ""
+    for action in _PREDEFINED_ACTIONS:
+        if action in text:
+            return action
+    return ""
 
 
 def _parse_action_summary(stdout: str) -> str:

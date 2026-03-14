@@ -312,6 +312,16 @@ def test_extract_predefined_action_not_found(isc):
     assert extract("no action here") == ""
 
 
+def test_extract_predefined_action_in_json_context(isc):
+    """Extracts only the action, not trailing JSON garbage."""
+    extract = getattr(isc, "_extract_predefined_action")
+    text = (
+        'ONE_LINE_PREDEFINED_ACTION: Deemed not implementable"}'
+        '],"stop_reason":"end_turn","session_id":"abc"}'
+    )
+    assert extract(text) == "Deemed not implementable"
+
+
 # ---- commit_implementation -------------------------------------------------
 
 
