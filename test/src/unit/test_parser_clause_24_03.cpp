@@ -598,4 +598,12 @@ TEST(SourceText, ProgramWildcardPorts) {
   EXPECT_TRUE(r.cu->programs[0]->has_wildcard_ports);
 }
 
+TEST(ProgramEndLabel, EndLabelMatchesProgramName) {
+  auto r = Parse("program qux; endprogram : qux\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "qux");
+}
+
 }  // namespace
