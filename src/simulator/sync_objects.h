@@ -73,6 +73,8 @@ struct SemaphoreObject {
 // --- Mailbox (IEEE 1800-2023 section 15.4) ---
 // A bounded or unbounded FIFO queue for message passing between processes.
 
+enum class MbxPutStatus : uint8_t { kPlaced, kBlock };
+
 struct MailboxObject {
   int32_t bound = 0;  // 0 means unbounded.
   std::deque<uint64_t> messages;
@@ -86,7 +88,17 @@ struct MailboxObject {
   // section 15.4.2: Number of messages.
   int32_t Num() const { return static_cast<int32_t>(messages.size()); }
 
-  // section 15.4.3: Non-blocking put. Returns 0 on success, -1 if full.
+  // §15.4.3: Blocking put. Places message in FIFO order.
+  // Returns kPlaced on success, kBlock if the caller must suspend (bounded & full).
+  // Unbounded mailboxes always return kPlaced.
+  MbxPutStatus Put(uint64_t msg) {
+    if (IsFull()) return MbxPutStatus::kBlock;
+    messages.push_back(msg);
+    WakeGetWaiters();
+    return MbxPutStatus::kPlaced;
+  }
+
+  // §15.4.4: Non-blocking put. Returns 0 on success, -1 if full.
   int32_t TryPut(uint64_t msg) {
     if (bound > 0 && Num() >= bound) return -1;
     messages.push_back(msg);

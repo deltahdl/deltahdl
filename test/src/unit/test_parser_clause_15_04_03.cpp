@@ -1,11 +1,38 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(ParserSection15, MailboxNewThenPutGet) {
+// §15.4.3: put() call on a mailbox parses.
+TEST(MailboxPutParser, PutCallParses) {
+  auto r = Parse(
+      "module m;\n"
+      "  mailbox mbx;\n"
+      "  initial begin\n"
+      "    mbx.put(42);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §15.4.3: put() with a variable expression parses.
+TEST(MailboxPutParser, PutWithVariableExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  mailbox mbx;\n"
+      "  int data;\n"
+      "  initial begin\n"
+      "    mbx.put(data);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §15.4.3: put() on parameterized mailbox parses.
+TEST(MailboxPutParser, PutOnParameterizedMailbox) {
   auto r = Parse(
       "module m;\n"
       "  mailbox #(int) mbx;\n"
@@ -15,9 +42,22 @@ TEST(ParserSection15, MailboxNewThenPutGet) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §15.4.3: Multiple put() calls in sequence parse.
+TEST(MailboxPutParser, MultiplePutCalls) {
+  auto r = Parse(
+      "module m;\n"
+      "  mailbox mbx;\n"
+      "  initial begin\n"
+      "    mbx.put(1);\n"
+      "    mbx.put(2);\n"
+      "    mbx.put(3);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace
