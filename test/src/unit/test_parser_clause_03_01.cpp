@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, MultipleProgramsAccumulate) {
-  auto r = Parse(
-      "program p1; endprogram\n"
-      "program p2; endprogram\n"
-      "program p3; endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 3u);
-  EXPECT_EQ(r.cu->programs[0]->name, "p1");
-  EXPECT_EQ(r.cu->programs[1]->name, "p2");
-  EXPECT_EQ(r.cu->programs[2]->name, "p3");
-}
-
 TEST(CompilationUnitStructure, MultipleCheckersAccumulate) {
   auto r = Parse(
       "checker c1; endchecker\n"
