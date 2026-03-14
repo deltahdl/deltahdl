@@ -887,11 +887,48 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-// --- Immediate assertions (§16.3) ---
+// --- Immediate assertions (§16.3) and deferred assertions (§16.4) ---
 
 static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
                                     Arena& arena) {
   auto cond = EvalExpr(stmt->assert_expr, ctx, arena);
+
+  if (stmt->is_deferred) {
+    // §16.4: Expression evaluated now; action deferred.
+    // §16.4.1: Observed (#0) → Reactive region; final → Postponed region.
+    uint64_t cond_val = cond.ToUint64();
+    auto& sched = ctx.GetScheduler();
+    auto time = ctx.CurrentTime();
+    Region region = stmt->is_final_deferred ? Region::kPostponed
+                                            : Region::kReactive;
+    const Stmt* action = nullptr;
+    bool is_fail = (cond_val == 0);
+
+    if (!is_fail) {
+      action = stmt->assert_pass_stmt;
+    } else {
+      action = stmt->assert_fail_stmt;
+    }
+
+    if (action) {
+      auto* event = sched.GetEventPool().Acquire();
+      event->callback = [action, &ctx, &arena]() {
+        ExecStmt(action, ctx, arena).RunSync();
+      };
+      sched.ScheduleEvent(time, region, event);
+    } else if (is_fail && stmt->kind != StmtKind::kCoverImmediate) {
+      // §16.4: Default $error when assert/assume fails with no else clause.
+      auto* event = sched.GetEventPool().Acquire();
+      event->callback = [&ctx]() {
+        ctx.IncrementAssertionFailCount();
+        std::cerr << "ERROR: Assertion failed.\n";
+      };
+      sched.ScheduleEvent(time, region, event);
+    }
+    co_return StmtResult::kDone;
+  }
+
+  // §16.3: Simple immediate assertion — execute actions inline.
   if (cond.ToUint64() != 0) {
     // Pass action.
     if (stmt->assert_pass_stmt) {

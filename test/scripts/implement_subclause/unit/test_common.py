@@ -446,3 +446,19 @@ def test_invoke_claude_passes_effort_high(isc, run_ok):
     cmd = run_ok.call_args[0][0]
     idx = cmd.index("--effort")
     assert cmd[idx + 1] == "high"
+
+
+def test_invoke_claude_retry_includes_effort_high(isc):
+    """Retry command includes --effort high."""
+    no_summary = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
+    with_summary = MagicMock(
+        returncode=0,
+        stdout='ACTION_SUMMARY_START\n- Did X because Y\nACTION_SUMMARY_END',
+        stderr="",
+    )
+    with patch("implement_subclause.run_claude_cli",
+               side_effect=[no_summary, with_summary]) as mock_run:
+        isc.invoke_claude("prompt", subclause="4.1")
+    retry_cmd = mock_run.call_args_list[1][0][0]
+    idx = retry_cmd.index("--effort")
+    assert retry_cmd[idx + 1] == "high"

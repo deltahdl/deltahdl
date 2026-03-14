@@ -113,6 +113,8 @@ struct DeferredAssertion {
   std::function<void()> pass_action;
   std::function<void()> fail_action;
   AssertionSeverity severity = AssertionSeverity::kError;
+  bool is_final = false;     // §16.4.1: final vs observed deferred
+  uint32_t process_id = 0;   // §16.4.5: owning process
 };
 
 void ExecuteDeferredAssertionAction(const DeferredAssertion& da);
@@ -159,7 +161,14 @@ class SvaEngine {
   void FlushDeferredAssertionsRespectingControl(Scheduler& sched, SimTime time);
   void KillAssertionsForInstance(std::string_view inst);
 
+  // §16.4.2: Clear pending reports for a given process (flush point).
+  void ClearQueueForProcess(uint32_t process_id);
+
+  // §16.4.4: Cancel pending reports for a specific assertion instance.
+  void CancelReportsForAssertion(std::string_view inst);
+
   uint32_t DeferredQueueSize() const;
+  uint32_t DeferredQueueSizeForProcess(uint32_t process_id) const;
   AssertionControl& GetControl() { return control_; }
 
  private:

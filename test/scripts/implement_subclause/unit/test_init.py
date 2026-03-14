@@ -277,6 +277,20 @@ def test_parse_action_summary_envelope_without_result(isc):
     assert parse('{"session_id":"x"}') == ""
 
 
+def test_parse_action_summary_escaped_newlines(isc):
+    """Finds ACTION_SUMMARY when newlines are escaped as literal backslash-n."""
+    parse = getattr(isc, "_parse_action_summary")
+    # Raw stdout that is NOT valid JSON but contains escaped newlines
+    raw = (
+        "some preamble\\n"
+        "ACTION_SUMMARY_START\\n"
+        "- Did X because Y\\n"
+        "ACTION_SUMMARY_END\\n"
+        "trailing"
+    )
+    assert parse(raw) == "- Did X because Y"
+
+
 # ---- commit_implementation -------------------------------------------------
 
 

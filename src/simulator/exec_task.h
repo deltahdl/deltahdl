@@ -86,6 +86,14 @@ struct ExecTask {
     return handle_.promise().result;
   }
 
+  // §16.4: Drive the coroutine synchronously to completion.
+  // Suitable for simple statements (assignments, task calls) that do not
+  // suspend mid-execution.
+  void RunSync() {
+    if (is_immediate_ || !handle_) return;
+    if (!handle_.done()) handle_.resume();
+  }
+
  private:
   void Destroy() {
     if (handle_) {
