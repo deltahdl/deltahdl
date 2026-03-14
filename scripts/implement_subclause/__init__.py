@@ -199,6 +199,13 @@ def _extract_action_summary(text: str) -> str:
 _DOT_INTERVAL_SECONDS = 5
 
 
+def _format_subclause_label(subclause):
+    """Return display label: '§X.Y' for numeric, 'Annex X.Y' for annexes."""
+    if subclause[0].isalpha():
+        return f"Annex {subclause}"
+    return f"§{subclause}"
+
+
 def invoke_claude(
     prompt: str, *, subclause: str,
     model: str = "opus", continue_session: bool = False,
@@ -224,8 +231,8 @@ def invoke_claude(
     if continue_session:
         cmd.append("--continue")
 
-    prefix = f"Annex {subclause}" if subclause[0].isalpha() else f"§{subclause}"
-    print(f"Implementing {prefix} via Claude...", end="", flush=True)
+    label = _format_subclause_label(subclause)
+    print(f"Implementing {label} via Claude...", end="", flush=True)
 
     stop = threading.Event()
 
@@ -273,10 +280,11 @@ def commit_implementation(subclause, issue, *, action=""):
         body_parts.append(action)
     body = "\n\n".join(body_parts)
 
+    label = _format_subclause_label(subclause)
     if body:
-        message = f"Implement §{subclause}\n\n{body}\n\n{trailer}\n"
+        message = f"Implement {label}\n\n{body}\n\n{trailer}\n"
     else:
-        message = f"Implement §{subclause}\n\n{trailer}\n"
+        message = f"Implement {label}\n\n{trailer}\n"
     sha = commit_and_push(changed, deleted, message)
     if sha:
         organization, repo = get_remote_repo()

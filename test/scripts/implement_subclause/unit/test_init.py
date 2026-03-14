@@ -282,7 +282,7 @@ def test_extract_action_summary_strips_whitespace(isc):
 # ---- commit_implementation -------------------------------------------------
 
 
-def _commit_impl_and_capture(isc, *, action="",
+def _commit_impl_and_capture(isc, *, subclause="6.6.1", action="",
                              added=None, modified=None, deleted=None):
     """Run commit_implementation with standard mocks; return mock dict."""
     if added is None:
@@ -300,7 +300,7 @@ def _commit_impl_and_capture(isc, *, action="",
               return_value=("org", "repo")) as m_repo,
         patch("implement_subclause.mark_subclause_complete") as m_mark,
     ):
-        isc.commit_implementation("6.6.1", 8, action=action)
+        isc.commit_implementation(subclause, 8, action=action)
     return {"files": m_files, "cap": m_cap, "repo": m_repo, "mark": m_mark}
 
 
@@ -310,8 +310,14 @@ def test_commit_implementation_calls_commit_and_push(isc):
 
 
 def test_commit_implementation_message_has_subclause(isc):
-    """Commit message contains the subclause."""
-    assert "§6.6.1" in _commit_impl_and_capture(isc)["cap"].call_args[0][2]
+    """Commit message uses section sign for numeric subclauses."""
+    assert "Implement §6.6.1" in _commit_impl_and_capture(isc)["cap"].call_args[0][2]
+
+
+def test_commit_implementation_message_annex_prefix(isc):
+    """Commit message uses Annex prefix for annex subclauses."""
+    msg = _commit_impl_and_capture(isc, subclause="A.8.1")["cap"].call_args[0][2]
+    assert "Implement Annex A.8.1" in msg
 
 
 def test_commit_implementation_message_has_co_authored_by(isc):
