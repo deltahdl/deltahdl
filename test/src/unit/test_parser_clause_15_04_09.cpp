@@ -1,11 +1,11 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(ParserSection15, MailboxParameterized) {
+// §15.4.9: mailbox #(type) declaration parses.
+TEST(MailboxParameterizedParser, ParameterizedDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  mailbox #(string) m_box;\n"
@@ -18,7 +18,8 @@ TEST(ParserSection15, MailboxParameterized) {
   EXPECT_EQ(items[0]->name, "m_box");
 }
 
-TEST(ParserSection15, MailboxNewParameterizedString) {
+// §15.4.9: mailbox #(string) with new parses.
+TEST(MailboxParameterizedParser, ParameterizedStringWithNew) {
   auto r = Parse(
       "module m;\n"
       "  mailbox #(string) sm;\n"
@@ -31,7 +32,8 @@ TEST(ParserSection15, MailboxNewParameterizedString) {
   ASSERT_FALSE(r.cu->modules[0]->items.empty());
 }
 
-TEST(ParserSection15, MailboxNewParameterizedInt) {
+// §15.4.9: mailbox #(int) with new(bound) parses.
+TEST(MailboxParameterizedParser, ParameterizedIntWithBound) {
   auto r = Parse(
       "module m;\n"
       "  mailbox #(int) mbx;\n"
@@ -43,7 +45,8 @@ TEST(ParserSection15, MailboxNewParameterizedInt) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserAnnexG, AnnexGMailboxUsage) {
+// §15.4.9: mailbox #(int) inline declaration with new and method calls.
+TEST(MailboxParameterizedParser, ParameterizedWithMethodCalls) {
   auto r = Parse(
       "module m;\n"
       "  mailbox #(int) mb = new();\n"
@@ -53,6 +56,30 @@ TEST(ParserAnnexG, AnnexGMailboxUsage) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+// §15.4.9: typedef mailbox #(type) parses.
+TEST(MailboxParameterizedParser, TypedefParameterizedMailbox) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef mailbox #(string) s_mbox;\n"
+      "  s_mbox sm;\n"
+      "  initial begin\n"
+      "    sm = new;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §15.4.9: Default (unparameterized) mailbox is typeless.
+TEST(MailboxParameterizedParser, UnparameterizedMailboxParses) {
+  auto r = Parse(
+      "module m;\n"
+      "  mailbox mb;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace
