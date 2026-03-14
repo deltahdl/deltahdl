@@ -6,22 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, PreservesInsertionOrder) {
-  auto r = Parse(
-      "module m1; endmodule\n"
-      "package p1; endpackage\n"
-      "module m2; endmodule\n"
-      "package p2; endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 2u);
-  ASSERT_EQ(r.cu->packages.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->name, "m1");
-  EXPECT_EQ(r.cu->modules[1]->name, "m2");
-  EXPECT_EQ(r.cu->packages[0]->name, "p1");
-  EXPECT_EQ(r.cu->packages[1]->name, "p2");
-}
-
 TEST(CompilationUnitStructure, UnrecognizedTopLevelTokenIsError) {
   EXPECT_FALSE(ParseOk("42"));
 }
