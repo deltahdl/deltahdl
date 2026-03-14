@@ -325,7 +325,11 @@ def invoke_claude(
         retry_result = run_claude_cli(
             retry_cmd,
             "You did not provide an ACTION_SUMMARY block."
-            " Output one now with rationale for every action.",
+            " Output one now using this exact format:\n"
+            "ACTION_SUMMARY_START\n"
+            "- <action> because <rationale>\n"
+            "ACTION_SUMMARY_END\n"
+            "ONE_LINE_PREDEFINED_ACTION: <one of the predefined actions>",
             env=env,
         )
         if retry_result.returncode == 0:
