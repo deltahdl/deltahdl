@@ -49,7 +49,7 @@ TEST(IpcSync, MailboxMultipleGetPutCycles) {
   EXPECT_EQ(mb.Num(), 100);
   for (uint64_t i = 0; i < 100; ++i) {
     uint64_t msg = 0;
-    EXPECT_EQ(mb.TryGet(msg), 0);
+    EXPECT_EQ(mb.TryGet(msg), 1);
     EXPECT_EQ(msg, i);
   }
   EXPECT_EQ(mb.Num(), 0);

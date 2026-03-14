@@ -117,13 +117,13 @@ struct MailboxObject {
     return MbxGetStatus::kRetrieved;
   }
 
-  // §15.4.6: Non-blocking get. Returns 0 on success, -1 if empty.
+  // §15.4.6: Non-blocking get. Returns positive int on success, 0 if empty.
   int32_t TryGet(uint64_t& msg) {
-    if (messages.empty()) return -1;
+    if (messages.empty()) return 0;
     msg = messages.front();
     messages.pop_front();
     WakePutWaiters();
-    return 0;
+    return 1;
   }
 
   // section 15.4.5: Non-blocking peek. Returns 0 on success, -1 if empty.
