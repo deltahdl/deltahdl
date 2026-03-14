@@ -353,4 +353,16 @@ TEST(CompilationUnitStructure, MultipleCheckersAccumulate) {
   EXPECT_EQ(r.cu->checkers[2]->name, "c3");
 }
 
+TEST(CompilationUnitScope, FunctionGoesToCuItems) {
+  auto r = Parse(
+      "function int add(int a, int b);\n"
+      "  return a + b;\n"
+      "endfunction\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_GE(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace
