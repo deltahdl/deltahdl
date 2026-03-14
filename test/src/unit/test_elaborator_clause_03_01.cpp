@@ -2,7 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, Cl3_1_ModuleAsContainer) {
+TEST(ElabClause03, ModuleAsContainer) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  logic a;\n"
@@ -11,7 +11,7 @@ TEST(ElabClause03, Cl3_1_ModuleAsContainer) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_1_ModuleWithProceduralBlock) {
+TEST(ElabClause03, ModuleWithProceduralBlock) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  logic clk, d, q;\n"
@@ -19,7 +19,7 @@ TEST(ElabClause03, Cl3_1_ModuleWithProceduralBlock) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_1_ModuleWithSubroutine) {
+TEST(ElabClause03, ModuleWithSubroutine) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  function int add(int a, int b);\n"
@@ -28,25 +28,25 @@ TEST(ElabClause03, Cl3_1_ModuleWithSubroutine) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_1_ModuleWithPorts) {
+TEST(ElabClause03, ModuleWithPorts) {
   EXPECT_TRUE(
       ElabOk("module m(input logic a, output logic b);\n"
              "  assign b = a;\n"
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_1_EmptyModuleElaborates) {
+TEST(ElabClause03, EmptyModuleElaborates) {
   EXPECT_TRUE(ElabOk("module m; endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_1_EmptyProgramElaborates) {
+TEST(ElabClause03, EmptyProgramElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc("program p; endprogram\n", f, "p");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_1_ProgramAsContainer) {
+TEST(ElabClause03, ProgramAsContainer) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program p;\n"
@@ -58,7 +58,7 @@ TEST(ElabClause03, Cl3_1_ProgramAsContainer) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_1_ProgramWithPorts) {
+TEST(ElabClause03, ProgramWithPorts) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program p(input logic clk);\n"
@@ -69,14 +69,14 @@ TEST(ElabClause03, Cl3_1_ProgramWithPorts) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_1_EmptyInterfaceElaborates) {
+TEST(ElabClause03, EmptyInterfaceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc("interface ifc; endinterface\n", f, "ifc");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_1_InterfaceAsContainer) {
+TEST(ElabClause03, InterfaceAsContainer) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc;\n"
@@ -88,7 +88,7 @@ TEST(ElabClause03, Cl3_1_InterfaceAsContainer) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_1_InterfaceWithPorts) {
+TEST(ElabClause03, InterfaceWithPorts) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc(input logic clk);\n"
@@ -99,14 +99,14 @@ TEST(ElabClause03, Cl3_1_InterfaceWithPorts) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_1_EmptyCheckerElaborates) {
+TEST(ElabClause03, EmptyCheckerElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc("checker chk; endchecker\n", f, "chk");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_1_CheckerAsContainer) {
+TEST(ElabClause03, CheckerAsContainer) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk;\n"
@@ -117,7 +117,7 @@ TEST(ElabClause03, Cl3_1_CheckerAsContainer) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_1_UnknownTopIsError) {
+TEST(ElabClause03, UnknownTopIsError) {
   ElabFixture f;
   auto* design = ElaborateSrc("module m; endmodule\n", f, "nonexistent");
   EXPECT_EQ(design, nullptr);

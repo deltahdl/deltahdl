@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_1_EmptySourceProducesValidCU) {
+TEST(ParserClause03, EmptySourceProducesValidCU) {
   auto r = Parse("");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -19,7 +19,7 @@ TEST(ParserClause03, Cl3_1_EmptySourceProducesValidCU) {
   EXPECT_TRUE(r.cu->cu_items.empty());
 }
 
-TEST(ParserClause03, Cl3_1_ModuleDeclKindDistinctValues) {
+TEST(ParserClause03, ModuleDeclKindDistinctValues) {
   EXPECT_NE(ModuleDeclKind::kModule, ModuleDeclKind::kInterface);
   EXPECT_NE(ModuleDeclKind::kModule, ModuleDeclKind::kProgram);
   EXPECT_NE(ModuleDeclKind::kModule, ModuleDeclKind::kChecker);
@@ -28,7 +28,7 @@ TEST(ParserClause03, Cl3_1_ModuleDeclKindDistinctValues) {
   EXPECT_NE(ModuleDeclKind::kProgram, ModuleDeclKind::kChecker);
 }
 
-TEST(ParserClause03, Cl3_1_ModuleIsParsedAsModule) {
+TEST(ParserClause03, ModuleIsParsedAsModule) {
   auto r = Parse("module m; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -37,7 +37,7 @@ TEST(ParserClause03, Cl3_1_ModuleIsParsedAsModule) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-TEST(ParserClause03, Cl3_1_ProgramIsParsedAsProgram) {
+TEST(ParserClause03, ProgramIsParsedAsProgram) {
   auto r = Parse("program p; endprogram");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -46,7 +46,7 @@ TEST(ParserClause03, Cl3_1_ProgramIsParsedAsProgram) {
   EXPECT_EQ(r.cu->programs[0]->name, "p");
 }
 
-TEST(ParserClause03, Cl3_1_InterfaceIsParsedAsInterface) {
+TEST(ParserClause03, InterfaceIsParsedAsInterface) {
   auto r = Parse("interface ifc; endinterface");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -55,7 +55,7 @@ TEST(ParserClause03, Cl3_1_InterfaceIsParsedAsInterface) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
 }
 
-TEST(ParserClause03, Cl3_1_CheckerIsParsedAsChecker) {
+TEST(ParserClause03, CheckerIsParsedAsChecker) {
   auto r = Parse("checker chk; endchecker");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -64,7 +64,7 @@ TEST(ParserClause03, Cl3_1_CheckerIsParsedAsChecker) {
   EXPECT_EQ(r.cu->checkers[0]->name, "chk");
 }
 
-TEST(ParserClause03, Cl3_1_PackageIsParsedAsPackage) {
+TEST(ParserClause03, PackageIsParsedAsPackage) {
   auto r = Parse("package pkg; endpackage");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -72,7 +72,7 @@ TEST(ParserClause03, Cl3_1_PackageIsParsedAsPackage) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
-TEST(ParserClause03, Cl3_1_PrimitiveIsParsedAsUdp) {
+TEST(ParserClause03, PrimitiveIsParsedAsUdp) {
   auto r = Parse(
       "primitive udp_buf (output out, input in);\n"
       "  table 0 : 0; 1 : 1; endtable\n"
@@ -83,7 +83,7 @@ TEST(ParserClause03, Cl3_1_PrimitiveIsParsedAsUdp) {
   EXPECT_EQ(r.cu->udps[0]->name, "udp_buf");
 }
 
-TEST(ParserClause03, Cl3_1_ConfigIsParsedAsConfig) {
+TEST(ParserClause03, ConfigIsParsedAsConfig) {
   auto r = Parse(
       "module m; endmodule\n"
       "config cfg; design m; endconfig\n");
@@ -93,7 +93,7 @@ TEST(ParserClause03, Cl3_1_ConfigIsParsedAsConfig) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-TEST(ParserClause03, Cl3_1_DesignElementsSortedIntoCorrectCollections) {
+TEST(ParserClause03, DesignElementsSortedIntoCorrectCollections) {
   auto r = Parse(
       "module m; endmodule\n"
       "program p; endprogram\n"
@@ -109,7 +109,7 @@ TEST(ParserClause03, Cl3_1_DesignElementsSortedIntoCorrectCollections) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
-TEST(ParserClause03, Cl3_1_MultipleModulesInOneCU) {
+TEST(ParserClause03, MultipleModulesInOneCU) {
   auto r = Parse(
       "module a; endmodule\nmodule b; endmodule\n"
       "module c; endmodule\n");
@@ -121,7 +121,7 @@ TEST(ParserClause03, Cl3_1_MultipleModulesInOneCU) {
   EXPECT_EQ(r.cu->modules[2]->name, "c");
 }
 
-TEST(ParserClause03, Cl3_1_DesignElementsAreContainers) {
+TEST(ParserClause03, DesignElementsAreContainers) {
   auto r = Parse(
       "module m;\n"
       "  logic a;\n"
@@ -133,11 +133,11 @@ TEST(ParserClause03, Cl3_1_DesignElementsAreContainers) {
   EXPECT_FALSE(r.cu->modules[0]->items.empty());
 }
 
-TEST(ParserClause03, Cl3_1_MismatchedEndKeywordIsError) {
+TEST(ParserClause03, MismatchedEndKeywordIsError) {
   EXPECT_FALSE(ParseOk("module m; endprogram"));
 }
 
-TEST(ParserClause03, Cl3_1_UnclosedDesignElementIsError) {
+TEST(ParserClause03, UnclosedDesignElementIsError) {
   EXPECT_FALSE(ParseOk("module m;"));
 }
 
