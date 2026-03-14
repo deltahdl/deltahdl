@@ -19,6 +19,7 @@ struct Variable {
   bool has_pending_nba = false;
   bool is_event = false;
   bool is_signed = false;
+  uint64_t triggered_ticks = UINT64_MAX;
 
   // Watchers return true if consumed (should be removed), false to keep.
   std::vector<std::function<bool()>> watchers;

@@ -386,9 +386,16 @@ MailboxObject* SimContext::FindMailbox(std::string_view name) {
 
 void SimContext::SetEventTriggered(std::string_view name) {
   event_triggered_[name] = scheduler_.CurrentTime().ticks;
+  // §15.5.5.1: Store on the Variable so merged aliases share triggered state.
+  auto* var = FindVariable(name);
+  if (var) var->triggered_ticks = scheduler_.CurrentTime().ticks;
 }
 
 bool SimContext::IsEventTriggered(std::string_view name) const {
+  // §15.5.5.1: Check the Variable first so merged events share triggered state.
+  auto vit = variables_.find(name);
+  if (vit != variables_.end())
+    return vit->second->triggered_ticks == scheduler_.CurrentTime().ticks;
   auto it = event_triggered_.find(name);
   if (it == event_triggered_.end()) return false;
   return it->second == scheduler_.CurrentTime().ticks;
