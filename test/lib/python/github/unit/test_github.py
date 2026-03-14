@@ -18,7 +18,6 @@ from lib.python.github import (
     fetch_issue_title,
     format_subclause_label,
     mark_master_complete,
-    mark_subclause_complete,
     next_unchecked,
     remove_test_row,
     sync_checklist,
@@ -333,83 +332,6 @@ def test_mark_master_complete_warns_when_not_found(
         "lib.python.github.update_issue_body", lambda *_a: None,
     )
     mark_master_complete("o", "r", 1, 999)
-    assert "WARNING" in capsys.readouterr().err
-
-
-# --- mark_subclause_complete ---
-
-
-_SUBCLAUSE_BODY = (
-    "## Subclauses\n\n"
-    "- [x] 15.4.7 Peek()\n"
-    "- [ ] 15.4.8 Try_peek()\n"
-    "- [ ] 15.4.9 Parameterized mailboxes\n"
-)
-
-_SHA = "abc1234def5678901234567890abcdef12345678"
-
-
-def _mark_and_capture(monkeypatch, body=_SUBCLAUSE_BODY, subclause="15.4.8"):
-    """Call mark_subclause_complete and return the updated body."""
-    monkeypatch.setattr(
-        "lib.python.github.fetch_issue_body", lambda *_a: body,
-    )
-    updated: list[str] = []
-    monkeypatch.setattr(
-        "lib.python.github.update_issue_body",
-        lambda _o, _r, _i, b: updated.append(b),
-    )
-    mark_subclause_complete("org", "repo", 17, subclause, _SHA)
-    assert updated, "update_issue_body was not called"
-    return updated[0]
-
-
-def test_mark_subclause_complete_checks_box(monkeypatch) -> None:
-    """The checkbox is checked."""
-    assert "- [x] [15.4.8 Try_peek()](" in _mark_and_capture(monkeypatch)
-
-
-def test_mark_subclause_complete_links_label(monkeypatch) -> None:
-    """The label links to the commit URL."""
-    body = _mark_and_capture(monkeypatch)
-    assert f"org/repo/commit/{_SHA})" in body
-
-
-def test_mark_subclause_complete_preserves_other(monkeypatch) -> None:
-    """Other lines are unchanged."""
-    body = _mark_and_capture(monkeypatch)
-    assert "- [x] 15.4.7 Peek()\n" in body
-
-
-def test_mark_subclause_complete_preserves_unchecked(monkeypatch) -> None:
-    """Other unchecked lines are unchanged."""
-    body = _mark_and_capture(monkeypatch)
-    assert "- [ ] 15.4.9 Parameterized mailboxes\n" in body
-
-
-def test_mark_subclause_complete_indented(monkeypatch) -> None:
-    """Works with indented subclauses."""
-    body = (
-        "## Subclauses\n\n"
-        "- [x] 15.4 Mailboxes\n"
-        "  - [ ] 15.4.1 New()\n"
-    )
-    result = _mark_and_capture(monkeypatch, body=body, subclause="15.4.1")
-    assert "  - [x] [15.4.1 New()](" in result
-
-
-def test_mark_subclause_complete_warns_not_found(
-    monkeypatch, capsys,
-) -> None:
-    """Prints warning when subclause is not found."""
-    monkeypatch.setattr(
-        "lib.python.github.fetch_issue_body",
-        lambda *_a: "- [x] 15.4.8 Try_peek()\n",
-    )
-    monkeypatch.setattr(
-        "lib.python.github.update_issue_body", lambda *_a: None,
-    )
-    mark_subclause_complete("org", "repo", 17, "99.99", _SHA)
     assert "WARNING" in capsys.readouterr().err
 
 
