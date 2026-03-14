@@ -361,6 +361,16 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (TryClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryAssocCopyAssign(stmt, ctx)) return StmtResult::kDone;
   if (TryQueueBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
+  // §15.5.5: Event-to-event assignment shares the synchronization queue.
+  if (stmt->lhs->kind == ExprKind::kIdentifier &&
+      stmt->rhs && stmt->rhs->kind == ExprKind::kIdentifier) {
+    auto* lhs_var = ctx.FindVariable(stmt->lhs->text);
+    auto* rhs_var = ctx.FindVariable(stmt->rhs->text);
+    if (lhs_var && lhs_var->is_event && rhs_var && rhs_var->is_event) {
+      ctx.AliasVariable(stmt->lhs->text, stmt->rhs->text);
+      return StmtResult::kDone;
+    }
+  }
   // §7.4.3: Unpacked array slice assignment (arr_b[5:3] = arr_a[2:0]).
   if (TryUnpackedSliceAssign(stmt, ctx, arena)) return StmtResult::kDone;
   // §7.4.5: Multi-dimensional sub-array copy (B[1][1] = A[0][2]).

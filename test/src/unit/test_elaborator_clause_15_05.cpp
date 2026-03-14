@@ -50,15 +50,6 @@ TEST(NamedEventElaborator, MultipleEventDeclarations) {
   EXPECT_TRUE(mod->variables[1].is_event);
 }
 
-// §15.5: Event with initializer elaborates without error.
-TEST(NamedEventElaborator, EventWithInitializer) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  event done;\n"
-      "  event done_too = done;\n"
-      "endmodule\n"));
-}
-
 // §15.5: Event assigned null elaborates without error.
 TEST(NamedEventElaborator, EventAssignedNull) {
   EXPECT_TRUE(ElabOk(

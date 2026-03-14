@@ -418,6 +418,14 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
 // §10.9.2: Evaluate variable initializer with struct pattern awareness.
 void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
                            uint32_t width) {
+  // §15.5.5: Event initialization from another event shares the handle.
+  if (var.is_event && var.init_expr->kind == ExprKind::kIdentifier) {
+    auto* target = ctx_.FindVariable(var.init_expr->text);
+    if (target && target->is_event) {
+      ctx_.AliasVariable(var.name, var.init_expr->text);
+      return;
+    }
+  }
   auto* sinfo = ctx_.GetVariableStructType(var.name);
   // §A.6.7.1: Unwrap typed assignment pattern expression (kCast wrapping
   // pattern).

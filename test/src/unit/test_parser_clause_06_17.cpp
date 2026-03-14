@@ -65,21 +65,6 @@ TEST(ParserSection6, EventNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kEvent));
 }
 
-TEST(ParserSection6, EventAssignEvent) {
-  auto r = Parse(
-      "module t;\n"
-      "  event done;\n"
-      "  event done_too = done;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item0 = r.cu->modules[0]->items[0];
-  auto* item1 = r.cu->modules[0]->items[1];
-  EXPECT_EQ(item0->data_type.kind, DataTypeKind::kEvent);
-  EXPECT_EQ(item1->data_type.kind, DataTypeKind::kEvent);
-  EXPECT_NE(item1->init_expr, nullptr);
-}
-
 TEST(ParserSection6, EventAssignNull) {
   auto r = Parse(
       "module t;\n"

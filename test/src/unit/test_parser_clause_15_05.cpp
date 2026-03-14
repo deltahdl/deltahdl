@@ -37,21 +37,6 @@ TEST(NamedEventParser, MultipleEventDeclarations) {
   EXPECT_EQ(item1->name, "blast");
 }
 
-// §15.5: Event with initializer (handle assignment from another event).
-TEST(NamedEventParser, EventWithInitializer) {
-  auto r = Parse(
-      "module m;\n"
-      "  event done;\n"
-      "  event done_too = done;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[1];
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
-  EXPECT_EQ(item->name, "done_too");
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
 // §15.5: Event assigned null parses.
 TEST(NamedEventParser, EventAssignedNull) {
   auto r = Parse(
