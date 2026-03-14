@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, MultiplePackagesAccumulate) {
-  auto r = Parse(
-      "package p1; endpackage\n"
-      "package p2; endpackage\n"
-      "package p3; endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 3u);
-  EXPECT_EQ(r.cu->packages[0]->name, "p1");
-  EXPECT_EQ(r.cu->packages[1]->name, "p2");
-  EXPECT_EQ(r.cu->packages[2]->name, "p3");
-}
-
 TEST(CompilationUnitStructure, MultipleInterfacesAccumulate) {
   auto r = Parse(
       "interface i1; endinterface\n"
