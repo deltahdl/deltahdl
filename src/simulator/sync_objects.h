@@ -168,7 +168,7 @@ struct MailboxObject {
   }
 };
 
-// --- Event triggered state (IEEE 1800-2023 section 15.5.2) ---
+// --- Event triggered state (IEEE 1800-2023 section 15.5.3) ---
 // Tracks the sticky .triggered property within a timeslot.
 
 struct EventTriggeredState {

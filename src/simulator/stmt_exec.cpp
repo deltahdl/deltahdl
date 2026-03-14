@@ -694,7 +694,7 @@ static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
   }
   auto* var = ctx.FindVariable(stmt->expr->text);
   if (!var) return StmtResult::kDone;
-  // §15.5.2: Set sticky triggered state for this timeslot.
+  // §15.5.3: Set sticky triggered state for this timeslot.
   ctx.SetEventTriggered(stmt->expr->text);
   // §9.4.2: Schedule triggered processes in Active region rather than
   // running them inline, so the triggering process continues first.

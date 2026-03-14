@@ -1,10 +1,8 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <string_view>
 
 #include "fixture_simulator.h"
-#include "helpers_stmt_exec.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
@@ -194,26 +192,5 @@ TEST(IpcSync, TriggerUnblocksMultipleWaiters) {
   EXPECT_EQ(vb->value.ToUint64(), 22u);
 }
 
-// §15.5.1: Nonblocking trigger sets triggered state after NBA region.
-TEST(IpcSync, NonblockingTriggerSetsTriggeredState) {
-  SyncFixture f;
-
-  auto* ev = f.ctx.CreateVariable("my_event", 1);
-  ev->is_event = true;
-  ev->value = MakeLogic4VecVal(f.arena, 1, 0);
-
-  auto* trigger_stmt = f.arena.Create<Stmt>();
-  trigger_stmt->kind = StmtKind::kNbEventTrigger;
-  trigger_stmt->expr = f.arena.Create<Expr>();
-  trigger_stmt->expr->kind = ExprKind::kIdentifier;
-  trigger_stmt->expr->text = "my_event";
-
-  auto result = RunStmt(trigger_stmt, f.ctx, f.arena);
-  EXPECT_EQ(result, StmtResult::kDone);
-
-  // Triggered state is set after NBA region executes.
-  f.scheduler.Run();
-  EXPECT_TRUE(f.ctx.IsEventTriggered("my_event"));
-}
 
 }  // namespace

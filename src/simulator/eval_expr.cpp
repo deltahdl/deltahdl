@@ -222,6 +222,11 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
     }
     return ExtractStructField(base_var, sinfo, field_name, arena);
   }
+  // §15.5.3: event.triggered returns 1'b1 if triggered in current time step.
+  if (base_var && base_var->is_event && field_name == "triggered") {
+    return MakeLogic4VecVal(arena, 1,
+                            ctx.IsEventTriggered(base_name) ? 1u : 0u);
+  }
   if (TryClassPropertyAccess(base_var, field_name, ctx, arena, out)) return out;
   if (TryCollectionAccess(base_name, field_name, ctx, arena, out)) return out;
   if (TryStaticMemberAccess(base_name, field_name, ctx, out)) return out;

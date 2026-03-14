@@ -259,7 +259,7 @@ class SimContext {
   MailboxObject* CreateMailbox(std::string_view name, int32_t bound);
   MailboxObject* FindMailbox(std::string_view name);
 
-  // §15.5.2: Event triggered state management.
+  // §15.5.3: Event triggered state management.
   void SetEventTriggered(std::string_view name);
   bool IsEventTriggered(std::string_view name) const;
 
@@ -335,7 +335,7 @@ class SimContext {
   std::unordered_map<std::string_view, SemaphoreObject*> semaphores_;
   // §15.4: Mailbox objects.
   std::unordered_map<std::string_view, MailboxObject*> mailboxes_;
-  // §15.5.2: Event triggered timestamps (ticks when last triggered).
+  // §15.5.3: Event triggered timestamps (ticks when last triggered).
   std::unordered_map<std::string_view, uint64_t> event_triggered_;
   // §8: Class type registry and variable→class type mapping.
   std::unordered_map<std::string_view, ClassTypeInfo*> class_types_;
