@@ -1,8 +1,5 @@
 """Unit tests for implement_subclause."""
 
-import argparse
-import inspect
-import json
 from unittest.mock import MagicMock, patch
 
 
