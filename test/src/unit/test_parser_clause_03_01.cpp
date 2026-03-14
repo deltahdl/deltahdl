@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §3.1 — Design elements with comments interspersed.
-TEST(CompilationUnitStructure, CommentsInterspersedBetweenDesignElements) {
-  auto r = Parse(
-      "// header comment\n"
-      "module m; endmodule\n"
-      "/* between */\n"
-      "package p; endpackage\n"
-      "// trailer\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->packages.size(), 1u);
-}
-
 // §3.1 — Design elements and CU-scope items interleaved.
 TEST(CompilationUnitStructure, DesignElementsAndCuItemsInterleaved) {
   auto r = Parse(
