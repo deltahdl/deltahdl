@@ -283,17 +283,13 @@ def test_extract_action_summary_strips_whitespace(isc):
 
 
 def _commit_impl_and_capture(isc, *, subclause="6.6.1", action="",
-                             added=None, modified=None, deleted=None):
+                             changes=None):
     """Run commit_implementation with standard mocks; return mock dict."""
-    if added is None:
-        added = ["a.cpp"]
-    if modified is None:
-        modified = []
-    if deleted is None:
-        deleted = []
+    if changes is None:
+        changes = (["a.cpp"], [], [])
     with (
         patch("implement_subclause.get_porcelain_changes",
-              return_value=(added, modified, deleted)) as m_files,
+              return_value=changes) as m_files,
         patch("implement_subclause.commit_and_push",
               return_value="abc123") as m_cap,
         patch("implement_subclause.get_remote_repo",
@@ -357,7 +353,7 @@ def test_commit_implementation_message_omits_action_when_empty(isc):
 def test_commit_implementation_message_has_file_summary(isc):
     """Commit message contains file change summary."""
     mocks = _commit_impl_and_capture(
-        isc, added=["new.cpp"], modified=["old.cpp"],
+        isc, changes=(["new.cpp"], ["old.cpp"], []),
     )
     assert "Added new.cpp" in mocks["cap"].call_args[0][2]
 
@@ -365,7 +361,7 @@ def test_commit_implementation_message_has_file_summary(isc):
 def test_commit_implementation_message_has_both_summary_and_action(isc):
     """Commit message contains both file summary and action rationale."""
     mocks = _commit_impl_and_capture(
-        isc, added=["new.cpp"], action="- Implemented feature X",
+        isc, changes=(["new.cpp"], [], []), action="- Implemented feature X",
     )
     msg = mocks["cap"].call_args[0][2]
     assert "Added new.cpp" in msg
@@ -374,7 +370,7 @@ def test_commit_implementation_message_has_both_summary_and_action(isc):
 def test_commit_implementation_changed_includes_added_and_modified(isc):
     """commit_and_push receives added + modified as changed files."""
     mocks = _commit_impl_and_capture(
-        isc, added=["a.cpp"], modified=["b.cpp"],
+        isc, changes=(["a.cpp"], ["b.cpp"], []),
     )
     assert mocks["cap"].call_args[0][0] == ["a.cpp", "b.cpp"]
 
