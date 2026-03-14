@@ -2,7 +2,9 @@
 
 import argparse
 import sys
+import time
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -443,3 +445,10 @@ def test_run_with_dots_calls_function():
     calls = []
     run_with_dots(lambda: calls.append(1))
     assert len(calls) == 1
+
+
+def test_run_with_dots_prints_dots(capsys):
+    """run_with_dots prints dots while the function runs."""
+    with patch("lib.python.cli._DOT_INTERVAL_SECONDS", 0.05):
+        run_with_dots(lambda: time.sleep(0.15))
+    assert "." in capsys.readouterr().out
