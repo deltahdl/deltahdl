@@ -174,6 +174,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
 void Elaborator::RegisterCuScopeItems() {
   // §15.3: semaphore is a built-in class type in the std package.
   class_names_.insert("semaphore");
+  // §15.4: mailbox is a built-in class type in the std package.
+  class_names_.insert("mailbox");
   for (auto* item : unit_->cu_items) {
     if (!item->name.empty()) cu_scope_names_.insert(item->name);
     if (item->kind == ModuleItemKind::kTypedef) {
