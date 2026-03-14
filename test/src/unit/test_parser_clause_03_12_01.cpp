@@ -442,4 +442,17 @@ TEST(CompilationUnitStructure, CuScopeClassesAccumulate) {
   EXPECT_EQ(r.cu->classes[1]->name, "C2");
 }
 
+// §3.1 — CU-scope items: multiple functions and tasks accumulate.
+TEST(CompilationUnitStructure, MultipleCuScopeSubroutinesAccumulate) {
+  auto r = Parse(
+      "function void f1; endfunction\n"
+      "function void f2; endfunction\n"
+      "task t1; endtask\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_GE(r.cu->cu_items.size(), 3u);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace
