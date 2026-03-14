@@ -6,6 +6,85 @@ import subprocess
 import sys
 
 
+def format_subclause_label(subclause: str) -> str:
+    """Return display label: ``§X.Y`` for numeric, ``X.Y`` for annexes."""
+    if subclause[0].isalpha():
+        return subclause
+    return f"§{subclause}"
+
+
+def build_subclause_table(items: dict[str, str]) -> str:
+    """Build a 4-column markdown table for subclauses.
+
+    All rows start as ``Unreviewed`` with an empty action.
+    """
+    header = (
+        "| Label | Title | Status | Action |\n"
+        "|-------|-------|--------|--------|\n"
+    )
+    rows = "\n".join(
+        f"| {format_subclause_label(k)} | {v} | Unreviewed | |"
+        for k, v in items.items()
+    )
+    return header + rows + "\n"
+
+
+_SUBCLAUSE_ROW_RE = re.compile(
+    r"^\| ([^|]+) \| ([^|]+) \| ([^|]+) \|([^|]*)\|$",
+    re.MULTILINE,
+)
+
+
+def parse_subclause_rows(body: str) -> dict[str, tuple[str, str, str]]:
+    """Parse subclause table rows into ``{label: (title, status, action)}``."""
+    rows: dict[str, tuple[str, str, str]] = {}
+    for m in _SUBCLAUSE_ROW_RE.finditer(body):
+        label = m.group(1).strip()
+        if label == "Label":
+            continue
+        title = m.group(2).strip()
+        status = m.group(3).strip()
+        action = m.group(4).strip()
+        rows[label] = (title, status, action)
+    return rows
+
+
+def sync_subclause_table(body: str, items: dict[str, str]) -> str:
+    """Rebuild the subclause table, preserving existing statuses."""
+    existing = parse_subclause_rows(body)
+    rows = []
+    for subclause, title in items.items():
+        label = format_subclause_label(subclause)
+        if label in existing:
+            _, status, action = existing[label]
+            action_cell = f" {action} " if action else " "
+            rows.append(f"| {label} | {title} | {status} |{action_cell}|")
+        else:
+            rows.append(f"| {label} | {title} | Unreviewed | |")
+    header = (
+        "| Label | Title | Status | Action |\n"
+        "|-------|-------|--------|--------|\n"
+    )
+    return header + "\n".join(rows) + "\n"
+
+
+def update_subclause_status(body: str, label: str, status: str, *,
+                            action: str = "") -> str:
+    """Update the Status and Action columns for *label* in the table."""
+    row_re = re.compile(
+        r"^(\| " + re.escape(label) + r" \|[^|]*)\|[^|]*\|[^|]*\|$",
+        re.MULTILINE,
+    )
+    match = row_re.search(body)
+    if not match:
+        print(f"ERROR: Row for {label!r} not found in issue body",
+              file=sys.stderr)
+        sys.exit(1)
+    action_cell = f" {action} " if action else " "
+    new_row = f"{match.group(1)}| {status} |{action_cell}|"
+    return body[:match.start()] + new_row + body[match.end():]
+
+
 def fetch_issue_body(organization: str, repo: str, issue: int) -> str:
     """Fetch the body of a GitHub issue using ``gh api``."""
     print(f"Fetching issue #{issue} from {organization}/{repo}...")

@@ -7,10 +7,15 @@ from unittest.mock import patch
 import pytest
 
 from lib.python.github import (
+    build_subclause_table,
     build_synced_body,
+    parse_subclause_rows,
+    sync_subclause_table,
+    update_subclause_status,
     close_issue,
     fetch_issue_body,
     fetch_issue_title,
+    format_subclause_label,
     mark_master_complete,
     mark_subclause_complete,
     next_unchecked,
@@ -432,3 +437,127 @@ def test_remove_test_row_not_found() -> None:
     """Raises ValueError when test name not in body."""
     with pytest.raises(ValueError, match="NoSuchTest"):
         remove_test_row(_TABLE_BODY, "NoSuchTest")
+
+
+# ---- format_subclause_label ------------------------------------------------
+
+
+def test_format_subclause_label_numeric() -> None:
+    """Numeric subclauses get the section sign prefix."""
+    assert format_subclause_label("3.14.1") == "§3.14.1"
+
+
+def test_format_subclause_label_annex() -> None:
+    """Annex subclauses use bare identifiers without section sign."""
+    assert format_subclause_label("A.1.1") == "A.1.1"
+
+
+# ---- build_subclause_table -------------------------------------------------
+
+
+def test_build_subclause_table_basic() -> None:
+    """Builds a markdown table with Unreviewed status."""
+    result = build_subclause_table({"3.1": "General", "3.2": "Design"})
+    assert "| §3.1 | General | Unreviewed | |" in result
+
+
+def test_build_subclause_table_annex_label() -> None:
+    """Annex subclauses use bare identifiers in the label column."""
+    result = build_subclause_table({"A.1": "Syntax"})
+    assert "| A.1 | Syntax | Unreviewed | |" in result
+
+
+def test_build_subclause_table_has_header() -> None:
+    """Table starts with a header row."""
+    result = build_subclause_table({"3.1": "General"})
+    assert result.startswith("| Label | Title | Status | Action |")
+
+
+# ---- update_subclause_status -----------------------------------------------
+
+_SUBCLAUSE_TABLE = (
+    "| Label | Title | Status | Action |\n"
+    "|-------|-------|--------|--------|\n"
+    "| §3.1 | General | Unreviewed | |\n"
+    "| §3.2 | Design | Unreviewed | |\n"
+)
+
+
+def test_update_subclause_status_sets_reviewed() -> None:
+    """Updates status column to Reviewed."""
+    result = update_subclause_status(_SUBCLAUSE_TABLE, "§3.1", "Reviewed")
+    assert "| §3.1 | General | Reviewed |" in result
+
+
+def test_update_subclause_status_sets_action() -> None:
+    """Updates action column."""
+    result = update_subclause_status(
+        _SUBCLAUSE_TABLE, "§3.1", "Reviewed",
+        action="Deemed not implementable",
+    )
+    assert "Deemed not implementable" in result
+
+
+def test_update_subclause_status_exits_on_missing_label() -> None:
+    """Exits when label is not found in table."""
+    with pytest.raises(SystemExit):
+        update_subclause_status(_SUBCLAUSE_TABLE, "§99.1", "Reviewed")
+
+
+def test_update_subclause_status_preserves_other_rows() -> None:
+    """Other rows are not modified."""
+    result = update_subclause_status(_SUBCLAUSE_TABLE, "§3.1", "Reviewed")
+    assert "| §3.2 | Design | Unreviewed | |" in result
+
+
+# ---- parse_subclause_rows --------------------------------------------------
+
+_REVIEWED_TABLE = (
+    "| Label | Title | Status | Action |\n"
+    "|-------|-------|--------|--------|\n"
+    "| §3.1 | General | Reviewed | Deemed not implementable |\n"
+    "| §3.2 | Design | Unreviewed | |\n"
+)
+
+
+def test_parse_subclause_rows_extracts_status() -> None:
+    """Parses the status column from a reviewed row."""
+    rows = parse_subclause_rows(_REVIEWED_TABLE)
+    assert rows["§3.1"][1] == "Reviewed"
+
+
+def test_parse_subclause_rows_extracts_action() -> None:
+    """Parses the action column from a reviewed row."""
+    rows = parse_subclause_rows(_REVIEWED_TABLE)
+    assert rows["§3.1"][2] == "Deemed not implementable"
+
+
+def test_parse_subclause_rows_extracts_title() -> None:
+    """Parses the title column."""
+    rows = parse_subclause_rows(_REVIEWED_TABLE)
+    assert rows["§3.1"][0] == "General"
+
+
+def test_parse_subclause_rows_empty_action() -> None:
+    """Empty action is parsed as empty string."""
+    rows = parse_subclause_rows(_REVIEWED_TABLE)
+    assert rows["§3.2"][2] == ""
+
+
+# ---- sync_subclause_table --------------------------------------------------
+
+
+def test_sync_subclause_table_preserves_status() -> None:
+    """Existing reviewed rows keep their status and action."""
+    result = sync_subclause_table(
+        _REVIEWED_TABLE, {"3.1": "General", "3.2": "Design"},
+    )
+    assert "| §3.1 | General | Reviewed | Deemed not implementable |" in result
+
+
+def test_sync_subclause_table_adds_new() -> None:
+    """New subclauses are added as Unreviewed."""
+    result = sync_subclause_table(
+        _REVIEWED_TABLE, {"3.1": "General", "3.2": "Design", "3.3": "Modules"},
+    )
+    assert "| §3.3 | Modules | Unreviewed | |" in result
