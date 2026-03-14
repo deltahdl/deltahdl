@@ -297,4 +297,8 @@ TEST(PackageDeclaration, PackageEndLabel) {
   EXPECT_EQ(r.cu->packages[0]->name, "bar");
 }
 
+TEST(PackageDeclaration, MissingEndpackageIsError) {
+  EXPECT_FALSE(ParseOk("package p;"));
+}
+
 }  // namespace
