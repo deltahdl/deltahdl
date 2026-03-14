@@ -183,8 +183,15 @@ def _parse_action_summary(stdout: str) -> str:
     """Search raw stdout and the JSON envelope result for ACTION_SUMMARY."""
     summary = _extract_action_summary(stdout)
     if not summary:
+        summary = _extract_action_summary(stdout.replace("\\n", "\n"))
+    if not summary:
         try:
             envelope = json.loads(stdout)
+            if isinstance(envelope, list):
+                for item in reversed(envelope):
+                    if isinstance(item, dict) and "result" in item:
+                        envelope = item
+                        break
             if isinstance(envelope, dict) and "result" in envelope:
                 summary = _extract_action_summary(envelope["result"])
         except (json.JSONDecodeError, TypeError):

@@ -280,6 +280,45 @@ def test_parse_action_summary_envelope_without_result(isc):
     assert parse('{"session_id":"x"}') == ""
 
 
+def test_parse_action_summary_json_array(isc):
+    """Finds ACTION_SUMMARY in the last element of a JSON array."""
+    parse = getattr(isc, "_parse_action_summary")
+    import json
+    # Use json.dumps which escapes newlines — but the JSON parsing path
+    # will decode them back to literal newlines for _extract_action_summary.
+    stdout = json.dumps([
+        {"type": "init"},
+        {"result": (
+            "ACTION_SUMMARY_START\n"
+            "- Did X because Y\n"
+            "ACTION_SUMMARY_END"
+        )},
+    ])
+    # Replace \\n with something else so escaped-newline path doesn't match
+    # but JSON parsing still works
+    stdout = stdout.replace("\\n", "\\u000a")
+    assert parse(stdout) == "- Did X because Y"
+
+
+def test_parse_action_summary_json_array_no_result(isc):
+    """Returns empty when JSON array has no element with result key."""
+    parse = getattr(isc, "_parse_action_summary")
+    import json
+    stdout = json.dumps([{"type": "init"}, {"session_id": "x"}])
+    assert parse(stdout) == ""
+
+
+def test_parse_action_summary_escaped_newlines(isc):
+    """Finds ACTION_SUMMARY when newlines are escaped in raw stdout."""
+    parse = getattr(isc, "_parse_action_summary")
+    raw = (
+        'ACTION_SUMMARY_START\\n'
+        '- Did X because Y\\n'
+        'ACTION_SUMMARY_END'
+    )
+    assert parse(raw) == "- Did X because Y"
+
+
 # ---- commit_implementation -------------------------------------------------
 
 
