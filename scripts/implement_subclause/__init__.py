@@ -134,16 +134,22 @@ def build_steps(
          " Do NOT put tests in a parent clause file."
          + exclude_note + constraints),
         ("Renaming test suites",
-         "Rename any test suites with unintuitive names"
-         " (e.g., containing clause numbers like Cl5_7_1_)"
-         " to PascalCase names that describe what is being tested."
+         f"Rename any test suites that test §{subclause} requirements"
+         " and have unintuitive names"
+         " (e.g., containing clause numbers like Cl5_7_1_),"
+         " regardless of which file they are in."
+         " Use PascalCase names that describe what is being tested."
          " Do NOT include clause or annex numbers."
+         " Do NOT rename or modify tests that belong to other subclauses."
          + constraints),
         ("Renaming test names",
-         "Rename any test names with unintuitive names"
-         " (e.g., containing clause numbers like Cl5_7_1_)"
-         " to PascalCase names that describe what is being tested."
+         f"Rename any test names that test §{subclause} requirements"
+         " and have unintuitive names"
+         " (e.g., containing clause numbers like Cl5_7_1_),"
+         " regardless of which file they are in."
+         " Use PascalCase names that describe what is being tested."
          " Do NOT include clause or annex numbers."
+         " Do NOT rename or modify tests that belong to other subclauses."
          + constraints),
         ("Implementing missing tests",
          f"Write missing unit tests for §{subclause} requirements."

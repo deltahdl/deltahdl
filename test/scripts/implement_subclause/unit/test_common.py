@@ -141,6 +141,24 @@ def test_build_steps_each_has_description(isc):
     assert all(desc for desc, _ in steps)
 
 
+def test_build_steps_delete_step_scoped_to_subclause(isc):
+    """Delete duplicates step references the subclause."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    assert "§4.1" in steps[3][1]
+
+
+def test_build_steps_rename_suites_scoped_to_subclause(isc):
+    """Rename suites step references the subclause."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    assert "§4.1" in steps[5][1]
+
+
+def test_build_steps_rename_tests_scoped_to_subclause(isc):
+    """Rename tests step references the subclause."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    assert "§4.1" in steps[6][1]
+
+
 def test_build_steps_exclude_appears_in_step(isc):
     """Exclude subclauses appear in a step prompt."""
     steps = isc.build_steps("15.3", "~/LRM.txt", exclude="15.3.1")
