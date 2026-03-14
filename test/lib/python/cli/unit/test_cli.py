@@ -10,7 +10,6 @@ import pytest
 
 from lib.python.cli import (
     ClauseParams,
-    SubclauseParams,
     add_clauses_arg,
     add_continue_arg,
     add_github_args,
