@@ -121,7 +121,7 @@ def test_main_first_no_continue(iscs, monkeypatch, base_argv):
     assert mock_invoke.call_args_list[0][1]["continue_session"] is False
 
 
-def test_main_skips_unextractable_issue(iscs, monkeypatch, base_argv, capsys):
+def test_main_skips_unextractable_issue(iscs, monkeypatch, base_argv):
     """main() skips issues whose title has no subclause number."""
     monkeypatch.setattr(
         iscs, "fetch_issue_title",
