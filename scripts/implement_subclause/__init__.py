@@ -12,7 +12,8 @@ from pathlib import Path
 
 from lib.python.classify import STAGE_TO_PREFIX, clause_to_filename
 from lib.python.cli import add_continue_arg, add_lrm_arg, add_model_arg, validate_lrm
-from lib.python.git import commit_and_push, run_git
+from lib.python.git import commit_and_push, get_remote_repo, run_git
+from lib.python.github import mark_subclause_complete
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +67,6 @@ def format_prompt(
     subclause: str,
     lrm: str,
     *,
-    issue: int,
     exclude: str = "",
 ) -> str:
     """Assemble the implementation prompt from structured inputs."""
@@ -143,11 +143,6 @@ def format_prompt(
     lines.append("Do not copy LRM prose into source comments.")
     lines.append("Do not build or run tests.")
 
-    lines.append(
-        f"After implementation, mark §{subclause}"
-        f" complete in Issue #{issue}.",
-    )
-
     return "\n".join(lines) + "\n"
 
 
@@ -155,11 +150,10 @@ def build_prompt(
     clause: str,
     lrm: str,
     *,
-    issue: int,
     exclude: str = "",
 ) -> str:
     """Build the implementation prompt for any clause depth."""
-    return format_prompt(clause, lrm, issue=issue, exclude=exclude)
+    return format_prompt(clause, lrm, exclude=exclude)
 
 
 # ---------------------------------------------------------------------------
@@ -224,18 +218,21 @@ def get_unstaged_files():
     return changed, deleted
 
 
-def commit_implementation(subclause):
-    """Commit and push all dirty files after implementation."""
+def commit_implementation(subclause, issue):
+    """Commit, push, and mark the subclause complete on the issue."""
     changed, deleted = get_unstaged_files()
     trailer = "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
     message = f"Implement §{subclause}\n\n{trailer}\n"
-    commit_and_push(changed, deleted, message)
+    sha = commit_and_push(changed, deleted, message)
+    if sha:
+        organization, repo = get_remote_repo()
+        mark_subclause_complete(organization, repo, issue, subclause, sha)
 
 
 def run_prompt(build_fn, args: argparse.Namespace) -> None:
     """Build a prompt via *build_fn* and invoke Claude."""
     prompt = build_fn(
-        args.subclause, str(args.lrm), issue=args.issue, exclude=args.exclude,
+        args.subclause, str(args.lrm), exclude=args.exclude,
     )
     print(f"Built prompt ({len(prompt)} characters)")
     invoke_claude(
@@ -303,4 +300,4 @@ def main(argv=None):
     )
 
     run_prompt(build_prompt, args)
-    commit_implementation(args.subclause)
+    commit_implementation(args.subclause, args.issue)

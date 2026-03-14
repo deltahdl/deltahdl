@@ -165,12 +165,26 @@ def test_main_dispatches_depth_1(mock_run, _mock_commit, isc, tmp_path):
 
 @patch("implement_subclause.commit_implementation")
 @patch("implement_subclause.run_prompt")
-def test_main_calls_commit_implementation(_mock_run, mock_commit, isc, tmp_path):
+def test_main_calls_commit_implementation_subclause(
+    _mock_run, mock_commit, isc, tmp_path,
+):
     """main() calls commit_implementation with the subclause."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
     assert mock_commit.call_args[0][0] == "6.6.1"
+
+
+@patch("implement_subclause.commit_implementation")
+@patch("implement_subclause.run_prompt")
+def test_main_calls_commit_implementation_issue(
+    _mock_run, mock_commit, isc, tmp_path,
+):
+    """main() calls commit_implementation with the issue number."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
+    assert mock_commit.call_args[0][1] == 8
 
 
 def test_parse_args_rejects_figures_flag(isc, tmp_path):
@@ -267,31 +281,63 @@ def test_get_unstaged_files_skips_blank_lines(monkeypatch, isc):
 # ---- commit_implementation -------------------------------------------------
 
 
-@patch("implement_subclause.commit_and_push")
-@patch("implement_subclause.get_unstaged_files")
-def test_commit_implementation_calls_commit_and_push(mock_files, mock_cap, isc):
+@patch("implement_subclause.mark_subclause_complete")
+@patch("implement_subclause.get_remote_repo", return_value=("org", "repo"))
+@patch("implement_subclause.commit_and_push", return_value="abc123")
+@patch("implement_subclause.get_unstaged_files", return_value=(["a.cpp"], []))
+def test_commit_implementation_calls_commit_and_push(
+    _mock_files, mock_cap, _mock_repo, _mock_mark, isc,
+):
     """commit_implementation passes files and message to commit_and_push."""
-    mock_files.return_value = (["a.cpp"], [])
-    isc.commit_implementation("6.6.1")
+    isc.commit_implementation("6.6.1", 8)
     assert mock_cap.called
 
 
-@patch("implement_subclause.commit_and_push")
-@patch("implement_subclause.get_unstaged_files")
-def test_commit_implementation_message_has_subclause(mock_files, mock_cap, isc):
+@patch("implement_subclause.mark_subclause_complete")
+@patch("implement_subclause.get_remote_repo", return_value=("org", "repo"))
+@patch("implement_subclause.commit_and_push", return_value="abc123")
+@patch("implement_subclause.get_unstaged_files", return_value=(["a.cpp"], []))
+def test_commit_implementation_message_has_subclause(
+    _mock_files, mock_cap, _mock_repo, _mock_mark, isc,
+):
     """Commit message contains the subclause."""
-    mock_files.return_value = (["a.cpp"], [])
-    isc.commit_implementation("6.6.1")
+    isc.commit_implementation("6.6.1", 8)
     assert "§6.6.1" in mock_cap.call_args[0][2]
 
 
-@patch("implement_subclause.commit_and_push")
-@patch("implement_subclause.get_unstaged_files")
-def test_commit_implementation_message_has_co_authored_by(mock_files, mock_cap, isc):
+@patch("implement_subclause.mark_subclause_complete")
+@patch("implement_subclause.get_remote_repo", return_value=("org", "repo"))
+@patch("implement_subclause.commit_and_push", return_value="abc123")
+@patch("implement_subclause.get_unstaged_files", return_value=(["a.cpp"], []))
+def test_commit_implementation_message_has_co_authored_by(
+    _mock_files, mock_cap, _mock_repo, _mock_mark, isc,
+):
     """Commit message contains Co-Authored-By trailer."""
-    mock_files.return_value = (["a.cpp"], [])
-    isc.commit_implementation("6.6.1")
+    isc.commit_implementation("6.6.1", 8)
     assert "Co-Authored-By:" in mock_cap.call_args[0][2]
+
+
+@patch("implement_subclause.mark_subclause_complete")
+@patch("implement_subclause.get_remote_repo", return_value=("org", "repo"))
+@patch("implement_subclause.commit_and_push", return_value="abc123")
+@patch("implement_subclause.get_unstaged_files", return_value=(["a.cpp"], []))
+def test_commit_implementation_calls_mark_subclause_complete(
+    _mock_files, _mock_cap, _mock_repo, mock_mark, isc,
+):
+    """commit_implementation marks the subclause complete on the issue."""
+    isc.commit_implementation("6.6.1", 8)
+    assert mock_mark.call_args[0] == ("org", "repo", 8, "6.6.1", "abc123")
+
+
+@patch("implement_subclause.mark_subclause_complete")
+@patch("implement_subclause.commit_and_push", return_value=None)
+@patch("implement_subclause.get_unstaged_files", return_value=([], []))
+def test_commit_implementation_skips_mark_when_no_sha(
+    _mock_files, _mock_cap, mock_mark, isc,
+):
+    """commit_implementation does not mark when commit_and_push returns None."""
+    isc.commit_implementation("6.6.1", 8)
+    assert not mock_mark.called
 
 
 # ---- __main__ guard --------------------------------------------------------

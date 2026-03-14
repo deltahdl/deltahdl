@@ -123,6 +123,29 @@ def remove_test_row(body: str, test_name: str) -> str:
     return body[:match.start()] + body[match.end():]
 
 
+def mark_subclause_complete(
+    organization: str, repo: str, issue: int,
+    subclause: str, sha: str,
+) -> None:
+    """Mark a subclause checkbox as complete, linking the label to the commit."""
+    body = fetch_issue_body(organization, repo, issue)
+    commit_url = (
+        f"https://github.com/{organization}/{repo}/commit/{sha}"
+    )
+    pattern = re.compile(
+        r"^(\s*- )\[ \] (" + re.escape(subclause) + r" .+)$",
+        re.MULTILINE,
+    )
+    new_body, count = pattern.subn(
+        rf"\g<1>[x] [\g<2>]({commit_url})", body,
+    )
+    if count == 0:
+        print(f"WARNING: No unchecked checkbox found for {subclause}"
+              f" on issue #{issue}.", file=sys.stderr)
+        return
+    update_issue_body(organization, repo, issue, new_body)
+
+
 def mark_master_complete(
     organization: str, repo: str, master_issue: int,
     sub_issue: int,

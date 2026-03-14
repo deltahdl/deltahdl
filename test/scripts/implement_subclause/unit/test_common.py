@@ -116,7 +116,7 @@ class TestBuildHierarchyAnnex:
 
 def test_format_prompt_forbids_building(isc):
     """Prompt tells Claude not to build or run tests."""
-    result = isc.format_prompt("4.1", "~/LRM.txt", issue=6)
+    result = isc.format_prompt("4.1", "~/LRM.txt")
     assert "Do not build or run tests" in result
 
 
@@ -128,62 +128,62 @@ def test_format_prompt_no_supplementary_param(isc):
 
 def test_format_prompt_mentions_general(isc):
     """Prompt instructs Claude to read General sections."""
-    result = isc.format_prompt("4.4.3", "~/LRM.txt", issue=6)
+    result = isc.format_prompt("4.4.3", "~/LRM.txt")
     assert "General" in result
 
 
 def test_format_prompt_mentions_overview(isc):
     """Prompt instructs Claude to read Overview sections."""
-    result = isc.format_prompt("4.4.3", "~/LRM.txt", issue=6)
+    result = isc.format_prompt("4.4.3", "~/LRM.txt")
     assert "Overview" in result
 
 
 def test_format_prompt_scope_constraint(isc):
     """Prompt constrains Claude to only implement the requested subclause."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    result = isc.format_prompt("10.10.2", "~/LRM.txt")
     assert "Only implement §10.10.2" in result
 
 
 def test_format_prompt_elaborator_test_filename(isc):
     """Prompt includes elaborator subclause-specific test filename."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    result = isc.format_prompt("10.10.2", "~/LRM.txt")
     assert "test_elaborator_clause_10_10_02.cpp" in result
 
 
 def test_format_prompt_simulator_test_filename(isc):
     """Prompt includes simulator subclause-specific test filename."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    result = isc.format_prompt("10.10.2", "~/LRM.txt")
     assert "test_simulator_clause_10_10_02.cpp" in result
 
 
 def test_format_prompt_forbids_parent_file(isc):
     """Prompt forbids putting tests in parent clause file."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    result = isc.format_prompt("10.10.2", "~/LRM.txt")
     assert "parent clause file" in result
 
 
 def test_format_prompt_search_for_misplaced_tests(isc):
     """Prompt instructs Claude to search test/src/unit/ for misplaced tests."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    result = isc.format_prompt("10.10.2", "~/LRM.txt")
     assert "Search test/src/unit/" in result
 
 
 def test_format_prompt_search_mentions_subclause(isc):
     """Misplaced-test search instruction references the target subclause."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    result = isc.format_prompt("10.10.2", "~/LRM.txt")
     assert "§10.10.2" in result
 
 
 def test_format_prompt_forbids_git_commits(isc):
     """Prompt forbids making git commits."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt", issue=6)
+    result = isc.format_prompt("10.10.2", "~/LRM.txt")
     assert "Do not make git commits" in result
 
 
 def test_format_prompt_exclude_lists_subclauses(isc):
     """Prompt lists excluded subclauses when exclude is non-empty."""
     result = isc.format_prompt(
-        "15.3", "~/LRM.txt", issue=6, exclude="15.3.1,15.3.2",
+        "15.3", "~/LRM.txt", exclude="15.3.1,15.3.2",
     )
     assert "§15.3.1" in result
 
@@ -191,14 +191,14 @@ def test_format_prompt_exclude_lists_subclauses(isc):
 def test_format_prompt_exclude_says_separately(isc):
     """Prompt says excluded subclauses are implemented separately."""
     result = isc.format_prompt(
-        "15.3", "~/LRM.txt", issue=6, exclude="15.3.1,15.3.2",
+        "15.3", "~/LRM.txt", exclude="15.3.1,15.3.2",
     )
     assert "separately" in result
 
 
 def test_format_prompt_exclude_empty_no_exclusion(isc):
     """Prompt has no exclusion text when exclude is empty."""
-    result = isc.format_prompt("15.3", "~/LRM.txt", issue=6)
+    result = isc.format_prompt("15.3", "~/LRM.txt")
     assert "implemented separately" not in result
 
 
@@ -272,7 +272,7 @@ def _run_prompt_and_capture(isc, tmp_path, *, exclude=""):
     lrm.write_text("")
     build_fn = MagicMock(return_value="generated prompt")
     args = argparse.Namespace(
-        lrm=lrm, subclause="4.1", issue=6,
+        lrm=lrm, subclause="4.1",
         model="opus", continue_session=False, exclude=exclude,
     )
     with patch("implement_subclause.invoke_claude") as mock_invoke:
@@ -311,7 +311,7 @@ def test_run_prompt_passes_continue_session(mock_invoke, isc, tmp_path):
     lrm.write_text("")
     build_fn = MagicMock(return_value="generated prompt")
     args = argparse.Namespace(
-        lrm=lrm, subclause="4.1", issue=6,
+        lrm=lrm, subclause="4.1",
         model="opus", continue_session=True, exclude="",
     )
     isc.run_prompt(build_fn, args)

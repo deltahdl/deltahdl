@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lib.python.git import commit_and_push, run_git
+from lib.python.git import commit_and_push, get_remote_repo, run_git
 from lib.python.test_fixtures.subprocess_stubs import (
     stub_subprocess_failure,
     stub_subprocess_success,
@@ -120,13 +120,13 @@ def test_commit_and_push_calls_git_push(monkeypatch):
 
 
 def test_commit_and_push_order(monkeypatch):
-    """Operations happen in order: add, rm, commit, push."""
+    """Operations happen in order: add, rm, commit, rev-parse, push."""
     captured = stub_subprocess_success(monkeypatch)
     commit_and_push(
         [Path("/a/b.cpp")], [Path("/a/d.cpp")], "msg",
     )
     ops = [c[1] for c in captured]
-    assert ops == ["add", "rm", "commit", "push"]
+    assert ops == ["add", "rm", "commit", "rev-parse", "push"]
 
 
 def test_commit_and_push_noop_when_empty(monkeypatch):
@@ -168,13 +168,14 @@ def test_commit_and_push_exits_on_push_failure(monkeypatch):
     call_count = [0]
     success = MagicMock()
     success.returncode = 0
+    success.stdout = "fakeSHA\n"
     failure = MagicMock()
     failure.returncode = 1
     failure.stderr = "push error"
 
     def alternating(_cmd, **_kw):
         call_count[0] += 1
-        if call_count[0] <= 2:
+        if call_count[0] <= 3:  # add, commit, rev-parse succeed
             return success
         return failure
 
@@ -252,10 +253,42 @@ def test_commit_and_push_calls_rev_parse(monkeypatch):
     assert rev_parse_cmds[0] == ["git", "rev-parse", "HEAD"]
 
 
-def test_commit_and_push_rev_parse_before_push(monkeypatch):
-    """git rev-parse HEAD is called after commit but before push."""
+def test_commit_and_push_rev_parse_after_commit(monkeypatch):
+    """git rev-parse HEAD is called after git commit."""
     captured = stub_subprocess_success(monkeypatch)
     commit_and_push([Path("/a/b.cpp")], [], "msg")
     ops = [c[1] for c in captured]
     assert ops.index("rev-parse") > ops.index("commit")
-    assert ops.index("rev-parse") < ops.index("push")
+
+
+# ---- get_remote_repo -------------------------------------------------------
+
+
+def test_get_remote_repo_ssh(monkeypatch):
+    """Parses org/repo from an SSH remote URL."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "git@github.com:deltahdl/deltahdl.git\n"
+    mock_result.stderr = ""
+    monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
+    assert get_remote_repo() == ("deltahdl", "deltahdl")
+
+
+def test_get_remote_repo_https(monkeypatch):
+    """Parses org/repo from an HTTPS remote URL."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "https://github.com/myorg/myrepo.git\n"
+    mock_result.stderr = ""
+    monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
+    assert get_remote_repo() == ("myorg", "myrepo")
+
+
+def test_get_remote_repo_https_no_dotgit(monkeypatch):
+    """Parses org/repo from an HTTPS URL without .git suffix."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "https://github.com/myorg/myrepo\n"
+    mock_result.stderr = ""
+    monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
+    assert get_remote_repo() == ("myorg", "myrepo")

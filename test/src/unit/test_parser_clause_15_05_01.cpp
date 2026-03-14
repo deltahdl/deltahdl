@@ -116,4 +116,52 @@ TEST(EventTriggerParser, BlockingTriggerNamedEvent) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
+// §15.5.1: Nonblocking trigger with delay control.
+TEST(EventTriggerParser, NonblockingWithDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ->> #5 ev;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
+  EXPECT_NE(stmt->expr, nullptr);
+  EXPECT_NE(stmt->delay, nullptr);
+}
+
+// §15.5.1: Nonblocking trigger with parenthesized delay.
+TEST(EventTriggerParser, NonblockingWithParenDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ->> #(10) ev;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
+  EXPECT_NE(stmt->delay, nullptr);
+}
+
+// §15.5.1: Nonblocking trigger without delay has null delay.
+TEST(EventTriggerParser, NonblockingNoDelayHasNullDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ->> ev;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
+  EXPECT_EQ(stmt->delay, nullptr);
+}
+
 }  // namespace

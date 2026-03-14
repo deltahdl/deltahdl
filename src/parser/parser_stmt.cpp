@@ -163,12 +163,23 @@ Stmt* Parser::ParseEventTriggerStmt() {
   return s;
 }
 
-// §15.5.1 — nonblocking event trigger: ->> [delay_or_event] event_id;
+// §15.5.1 — nonblocking event trigger: ->> [delay_or_event_control] event_id;
 Stmt* Parser::ParseNbEventTriggerStmt() {
   auto* s = arena_.Create<Stmt>();
   s->kind = StmtKind::kNbEventTrigger;
   s->range.start = CurrentLoc();
   Consume();  // ->>
+  // §15.5.1: Optional delay control before event identifier.
+  if (Check(TokenKind::kHash)) {
+    Consume();
+    if (Check(TokenKind::kLParen)) {
+      Consume();
+      s->delay = ParseMinTypMaxExpr();
+      Expect(TokenKind::kRParen);
+    } else {
+      s->delay = ParsePrimaryExpr();
+    }
+  }
   s->expr = ParseExpr();
   Expect(TokenKind::kSemicolon);
   return s;

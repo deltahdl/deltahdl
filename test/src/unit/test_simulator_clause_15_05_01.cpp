@@ -4,14 +4,9 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
-#include "simulator/awaiters.h"
-#include "simulator/exec_task.h"
+#include "helpers_stmt_exec.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
-#include "simulator/process.h"
-#include "simulator/stmt_exec.h"
-#include "simulator/stmt_result.h"
-#include "simulator/sync_objects.h"
 #include "simulator/variable.h"
 
 namespace {
@@ -106,6 +101,119 @@ TEST(IpcSync, TriggerSetsValueAfterWait) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
+}
+
+// §15.5.1: Nonblocking trigger (->> ev) unblocks a waiting process.
+TEST(IpcSync, NonblockingTriggerUnblocksWaiter) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    @(ev);\n"
+      "    result = 77;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #5 ->> ev;\n"
+      "    #2 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 77u);
+}
+
+// §15.5.1: Nonblocking trigger with delay unblocks waiter at delayed time.
+TEST(IpcSync, NonblockingTriggerWithDelay) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    @(ev);\n"
+      "    result = 88;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    ->> #10 ev;\n"
+      "    #20 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 88u);
+}
+
+// §15.5.1: Blocking trigger unblocks multiple waiting processes.
+TEST(IpcSync, TriggerUnblocksMultipleWaiters) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    @(ev);\n"
+      "    a = 8'd11;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    @(ev);\n"
+      "    b = 8'd22;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #5 -> ev;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 11u);
+  EXPECT_EQ(vb->value.ToUint64(), 22u);
+}
+
+// §15.5.1: Nonblocking trigger sets triggered state after NBA region.
+TEST(IpcSync, NonblockingTriggerSetsTriggeredState) {
+  SyncFixture f;
+
+  auto* ev = f.ctx.CreateVariable("my_event", 1);
+  ev->is_event = true;
+  ev->value = MakeLogic4VecVal(f.arena, 1, 0);
+
+  auto* trigger_stmt = f.arena.Create<Stmt>();
+  trigger_stmt->kind = StmtKind::kNbEventTrigger;
+  trigger_stmt->expr = f.arena.Create<Expr>();
+  trigger_stmt->expr->kind = ExprKind::kIdentifier;
+  trigger_stmt->expr->text = "my_event";
+
+  auto result = RunStmt(trigger_stmt, f.ctx, f.arena);
+  EXPECT_EQ(result, StmtResult::kDone);
+
+  // Triggered state is set after NBA region executes.
+  f.scheduler.Run();
+  EXPECT_TRUE(f.ctx.IsEventTriggered("my_event"));
 }
 
 }  // namespace
