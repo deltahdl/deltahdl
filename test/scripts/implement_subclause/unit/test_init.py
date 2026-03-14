@@ -150,14 +150,14 @@ def test_parse_args_exclude_value(isc, tmp_path):
     assert args.exclude == "15.3.1,15.3.2"
 
 
-_MOCK_PROMPT_RESULT = ("- Added foo.cpp", "Deemed not implementable")
+_MOCK_PROMPT_RESULT = "- Added foo.cpp"
 
 
 # ---- main ------------------------------------------------------------------
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value=("summary", "action"))
+@patch("implement_subclause.run_prompt", return_value="summary")
 def test_main_dispatches_depth_1(mock_run, _mock_commit, isc, tmp_path):
     """main() passes args namespace to run_prompt."""
     lrm = tmp_path / "lrm.pdf"
@@ -167,7 +167,7 @@ def test_main_dispatches_depth_1(mock_run, _mock_commit, isc, tmp_path):
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value=("summary", "action"))
+@patch("implement_subclause.run_prompt", return_value="summary")
 def test_main_calls_commit_implementation_subclause(
     _mock_run, mock_commit, isc, tmp_path,
 ):
@@ -179,7 +179,7 @@ def test_main_calls_commit_implementation_subclause(
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value=("summary", "action"))
+@patch("implement_subclause.run_prompt", return_value="summary")
 def test_main_calls_commit_implementation_issue(
     _mock_run, mock_commit, isc, tmp_path,
 ):
@@ -200,18 +200,6 @@ def test_main_passes_action_to_commit(
     lrm.write_text("")
     isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
     assert mock_commit.call_args[1]["action"] == "- Added foo.cpp"
-
-
-@patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value=_MOCK_PROMPT_RESULT)
-def test_main_passes_predefined_action_to_commit(
-    _mock_run, mock_commit, isc, tmp_path,
-):
-    """main() passes predefined action from run_prompt to commit_implementation."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
-    assert mock_commit.call_args[1]["predefined_action"] == "Deemed not implementable"
 
 
 @patch("implement_subclause.commit_implementation")
@@ -292,36 +280,6 @@ def test_parse_action_summary_envelope_without_result(isc):
     assert parse('{"session_id":"x"}') == ""
 
 
-# ---- _extract_predefined_action --------------------------------------------
-
-
-def test_extract_predefined_action_found(isc):
-    """Extracts the predefined action from text."""
-    extract = getattr(isc, "_extract_predefined_action")
-    text = (
-        "some output\n"
-        "ONE_LINE_PREDEFINED_ACTION: Deemed not implementable\n"
-        "trailing"
-    )
-    assert extract(text) == "Deemed not implementable"
-
-
-def test_extract_predefined_action_not_found(isc):
-    """Returns empty string when no predefined action line."""
-    extract = getattr(isc, "_extract_predefined_action")
-    assert extract("no action here") == ""
-
-
-def test_extract_predefined_action_in_json_context(isc):
-    """Extracts only the action, not trailing JSON garbage."""
-    extract = getattr(isc, "_extract_predefined_action")
-    text = (
-        'ONE_LINE_PREDEFINED_ACTION: Deemed not implementable"}'
-        '],"stop_reason":"end_turn","session_id":"abc"}'
-    )
-    assert extract(text) == "Deemed not implementable"
-
-
 # ---- commit_implementation -------------------------------------------------
 
 
@@ -335,11 +293,9 @@ def _commit_impl_and_capture(isc, *, subclause="6.6.1", action="",
               return_value=changes) as m_files,
         patch("implement_subclause.commit_and_push",
               return_value="abc123") as m_cap,
-        patch("implement_subclause.get_remote_repo",
-              return_value=("org", "repo")) as m_repo,
     ):
         isc.commit_implementation(subclause, 8, action=action)
-    return {"files": m_files, "cap": m_cap, "repo": m_repo}
+    return {"files": m_files, "cap": m_cap}
 
 
 def test_commit_implementation_calls_commit_and_push(isc):
@@ -383,45 +339,10 @@ def test_commit_implementation_changed_includes_added_and_modified(isc):
     assert mocks["cap"].call_args[0][0] == ["a.cpp", "b.cpp"]
 
 
-@patch("implement_subclause.update_issue_body")
-@patch("implement_subclause.update_subclause_status",
-       return_value="updated body")
-@patch("implement_subclause.fetch_issue_body", return_value="table body")
-@patch("implement_subclause.get_remote_repo", return_value=("org", "repo"))
-@patch("implement_subclause.commit_and_push", return_value="abc123")
-@patch("implement_subclause.get_porcelain_changes",
-       return_value=(["a.cpp"], [], []))
-def test_commit_implementation_updates_issue_with_predefined_action(
-    _m_files, _m_cap, _m_repo, _m_fetch,
-    mock_update_status, _mock_update_body, isc,
-):
-    """commit_implementation updates the issue row with linked action."""
-    isc.commit_implementation(
-        "6.6.1", 8,
-        action="summary",
-        predefined_action="Deemed not implementable",
-    )
-    assert "commit/abc123" in mock_update_status.call_args[1]["commit_url"]
-
-
-@patch("implement_subclause.update_issue_body")
-@patch("implement_subclause.update_subclause_status",
-       return_value="updated body")
-@patch("implement_subclause.fetch_issue_body", return_value="table body")
-@patch("implement_subclause.get_remote_repo", return_value=("org", "repo"))
-@patch("implement_subclause.commit_and_push", return_value=None)
-@patch("implement_subclause.get_porcelain_changes",
-       return_value=([], [], []))
-def test_commit_implementation_no_link_when_no_sha(
-    _m_files, _m_cap, _m_repo, _m_fetch,
-    mock_update_status, _mock_update_body, isc,
-):
-    """No commit_url when commit_and_push returns None."""
-    isc.commit_implementation(
-        "6.6.1", 8,
-        predefined_action="Deemed not implementable",
-    )
-    assert mock_update_status.call_args[1]["commit_url"] == ""
+def test_commit_implementation_message_closes_issue(isc):
+    """Commit message contains Closes #issue."""
+    msg = _commit_impl_and_capture(isc)["cap"].call_args[0][2]
+    assert "Closes #8" in msg
 
 
 # ---- __main__ guard --------------------------------------------------------

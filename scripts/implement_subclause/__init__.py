@@ -23,13 +23,6 @@ from lib.python.cli import (
 from lib.python.git import (
     commit_and_push,
     get_porcelain_changes,
-    get_remote_repo,
-)
-from lib.python.github import (
-    fetch_issue_body,
-    format_subclause_label,
-    update_issue_body,
-    update_subclause_status,
 )
 
 
@@ -161,12 +154,6 @@ def format_prompt(
     lines.append("Do not build or run tests.")
 
     lines.append(
-        "If existing tests already cover this subclause, do NOT pick"
-        " 'Deemed not implementable'. A subclause with existing tests"
-        " was already implemented.",
-    )
-
-    lines.append(
         "At the very end of your response, output an action summary."
         " Every line MUST include 'because' with a categorical rationale"
         " explaining why the action was necessary"
@@ -176,27 +163,7 @@ def format_prompt(
         "- Moved <TestName> from <file> because <why it was misplaced>\n"
         "- Deleted <file> because <why it was no longer needed>\n"
         "- Modified <file> because <what capability was missing>\n"
-        "ACTION_SUMMARY_END\n"
-        "Then pick EXACTLY ONE of these predefined actions:\n"
-        "- Added tests only because the functionality was already"
-        " implemented but its tests were missing\n"
-        "- Deemed not implementable\n"
-        "- Did nothing because the functionality and its tests"
-        " were already implemented\n"
-        "- Implemented the functionality and its tests"
-        " because both were missing\n"
-        "- Only deleted tests because the subclause's functionalities"
-        " and its tests were already implemented but some tests"
-        " were duplicated\n"
-        "- Only reclassified tests because the subclause's"
-        " functionalities and its tests were already implemented"
-        " but the tests were misclassified\n"
-        "- Only renamed tests because the subclause's functionalities"
-        " and its tests were already implemented but the tests"
-        " were improperly named\n"
-        "- Performed a non-predefined action\n"
-        "Output your choice as:\n"
-        "ONE_LINE_PREDEFINED_ACTION: <your choice>",
+        "ACTION_SUMMARY_END",
     )
 
     return "\n".join(lines) + "\n"
@@ -222,36 +189,6 @@ def _extract_action_summary(text: str) -> str:
     """Extract the action summary block from Claude's response text."""
     m = _ACTION_SUMMARY_RE.search(text)
     return m.group(1).strip() if m else ""
-
-
-_PREDEFINED_ACTIONS = [
-    "Added tests only because the functionality was already"
-    " implemented but its tests were missing",
-    "Deferred via --exclude",
-    "Deemed not implementable",
-    "Did nothing because the functionality and its tests"
-    " were already implemented",
-    "Implemented the functionality and its tests"
-    " because both were missing",
-    "Only deleted tests because the subclause's functionalities"
-    " and its tests were already implemented but some tests"
-    " were duplicated",
-    "Only reclassified tests because the subclause's"
-    " functionalities and its tests were already implemented"
-    " but the tests were misclassified",
-    "Only renamed tests because the subclause's functionalities"
-    " and its tests were already implemented but the tests"
-    " were improperly named",
-    "Performed a non-predefined action",
-]
-
-
-def _extract_predefined_action(text: str) -> str:
-    """Extract the ONE_LINE_PREDEFINED_ACTION from Claude's response."""
-    for action in _PREDEFINED_ACTIONS:
-        if action in text:
-            return action
-    return ""
 
 
 def _parse_action_summary(stdout: str) -> str:
@@ -281,8 +218,8 @@ def _format_subclause_label(subclause):
 def invoke_claude(
     prompt: str, *, subclause: str,
     model: str = "opus", continue_session: bool = False,
-) -> tuple[str, str]:
-    """Invoke Claude CLI and return ``(action_summary, predefined_action)``.
+) -> str:
+    """Invoke Claude CLI and return the extracted action summary.
 
     Uses ``--output-format json`` so the response can be parsed for the
     ACTION_SUMMARY block.  Returns the action summary string, or ``""``
@@ -316,7 +253,6 @@ def invoke_claude(
         sys.exit(1)
 
     summary = _parse_action_summary(result.stdout)
-    retry_result = None
     if not summary:
         print("Retrying for ACTION_SUMMARY...", file=sys.stderr)
         retry_cmd = ["claude", "-p", "--model", model,
@@ -328,8 +264,7 @@ def invoke_claude(
             " Output one now using this exact format:\n"
             "ACTION_SUMMARY_START\n"
             "- <action> because <rationale>\n"
-            "ACTION_SUMMARY_END\n"
-            "ONE_LINE_PREDEFINED_ACTION: <one of the predefined actions>",
+            "ACTION_SUMMARY_END",
             env=env,
         )
         if retry_result.returncode == 0:
@@ -339,44 +274,24 @@ def invoke_claude(
               " after retry.", file=sys.stderr)
         sys.exit(1)
 
-    predefined = _extract_predefined_action(result.stdout)
-    if not predefined and retry_result:
-        predefined = _extract_predefined_action(retry_result.stdout)
-    if not predefined:
-        predefined = "Performed a non-predefined action"
-
-    return summary, predefined
+    return summary
 
 
-def commit_implementation(subclause, issue, *,
-                          action="", predefined_action=""):
-    """Commit, push, and mark the subclause complete on the issue."""
+def commit_implementation(subclause, issue, *, action=""):
+    """Commit, push, and close the issue via the commit message."""
     added, modified, deleted = get_porcelain_changes()
     label = _format_subclause_label(subclause)
 
+    parts = [f"Implement {label}"]
     if action:
-        message = f"Implement {label}\n\n{action}\n"
-    else:
-        message = f"Implement {label}\n"
-    sha = commit_and_push(added + modified, deleted, message)
-    if predefined_action:
-        organization, repo = get_remote_repo()
-        commit_url = ""
-        if sha:
-            commit_url = (
-                f"https://github.com/{organization}/{repo}/commit/{sha}"
-            )
-        body = fetch_issue_body(organization, repo, issue)
-        table_label = format_subclause_label(subclause)
-        body = update_subclause_status(
-            body, table_label, "Reviewed",
-            action=predefined_action, commit_url=commit_url,
-        )
-        update_issue_body(organization, repo, issue, body)
+        parts.append(action)
+    parts.append(f"Closes #{issue}")
+    message = "\n\n".join(parts) + "\n"
+    commit_and_push(added + modified, deleted, message)
 
 
-def run_prompt(build_fn, args: argparse.Namespace) -> tuple[str, str]:
-    """Build a prompt via *build_fn*, invoke Claude, return (summary, predefined_action)."""
+def run_prompt(build_fn, args: argparse.Namespace) -> str:
+    """Build a prompt via *build_fn*, invoke Claude, return action summary."""
     prompt = build_fn(
         args.subclause, str(args.lrm), exclude=args.exclude,
     )
@@ -408,7 +323,7 @@ def parse_args(argv=None):
         "--issue",
         type=int,
         required=True,
-        help="GitHub Issue number to read and correct after implementation.",
+        help="GitHub Issue number to close via commit message.",
     )
     parser.add_argument(
         "--exclude",
@@ -446,10 +361,6 @@ def main(argv=None):
         f" issue #{args.issue}, model {args.model}",
     )
 
-    action, predefined_action = run_prompt(build_prompt, args)
+    action = run_prompt(build_prompt, args)
     print(f"Action summary:\n{action}")
-    print(f"Predefined action: {predefined_action}")
-    commit_implementation(
-        args.subclause, args.issue,
-        action=action, predefined_action=predefined_action,
-    )
+    commit_implementation(args.subclause, args.issue, action=action)

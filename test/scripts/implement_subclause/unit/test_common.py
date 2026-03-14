@@ -215,28 +215,10 @@ def test_format_prompt_demands_rationale(isc):
     assert "because" in result
 
 
-def test_format_prompt_lists_predefined_actions(isc):
-    """Prompt includes predefined action choices."""
+def test_format_prompt_no_predefined_actions(isc):
+    """Prompt does not include predefined action choices."""
     result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "ONE_LINE_PREDEFINED_ACTION" in result
-
-
-def test_format_prompt_includes_deemed_not_implementable(isc):
-    """Prompt includes the deemed-not-implementable action."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "Deemed not implementable" in result
-
-
-def test_format_prompt_includes_only_renamed_tests(isc):
-    """Prompt includes the only-renamed-tests action."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "Only renamed tests" in result
-
-
-def test_format_prompt_includes_only_reclassified_tests(isc):
-    """Prompt includes the only-reclassified-tests action."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "Only reclassified tests" in result
+    assert "ONE_LINE_PREDEFINED_ACTION" not in result
 
 
 # ---- invoke_claude --------------------------------------------------------
@@ -309,8 +291,8 @@ def test_invoke_claude_returns_action_summary(isc):
         mock_run.return_value = MagicMock(
             returncode=0, stdout=envelope, stderr="",
         )
-        summary, _ = isc.invoke_claude("prompt", subclause="4.1")
-    assert summary == "- Added foo.cpp"
+        result = isc.invoke_claude("prompt", subclause="4.1")
+    assert result == "- Added foo.cpp"
 
 
 def test_invoke_claude_finds_summary_in_raw_stdout(isc):
@@ -326,8 +308,8 @@ def test_invoke_claude_finds_summary_in_raw_stdout(isc):
         mock_run.return_value = MagicMock(
             returncode=0, stdout=raw_stdout, stderr="",
         )
-        summary, _ = isc.invoke_claude("prompt", subclause="4.1")
-    assert summary == "- Modified eval_expr.cpp"
+        result = isc.invoke_claude("prompt", subclause="4.1")
+    assert result == "- Modified eval_expr.cpp"
 
 
 def _invoke_with_retry(isc):
@@ -335,10 +317,7 @@ def _invoke_with_retry(isc):
     no_summary = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
     with_summary = MagicMock(
         returncode=0,
-        stdout=(
-            'ACTION_SUMMARY_START\n- Did X because Y\nACTION_SUMMARY_END\n'
-            'ONE_LINE_PREDEFINED_ACTION: Deemed not implementable'
-        ),
+        stdout='ACTION_SUMMARY_START\n- Did X because Y\nACTION_SUMMARY_END',
         stderr="",
     )
     with patch("implement_subclause.run_claude_cli",
@@ -355,8 +334,8 @@ def test_invoke_claude_retries_on_missing_rationale(isc):
 
 def test_invoke_claude_retry_returns_rationale(isc):
     """invoke_claude returns the rationale from the retry call."""
-    _, (summary, _) = _invoke_with_retry(isc)
-    assert summary == "- Did X because Y"
+    _, result = _invoke_with_retry(isc)
+    assert result == "- Did X because Y"
 
 
 def test_invoke_claude_retry_uses_dangerously_skip_permissions(isc):
@@ -377,9 +356,7 @@ def test_invoke_claude_exits_after_retry_with_no_rationale(mock_exit, isc):
 
 
 _OK_STDOUT = (
-    'ACTION_SUMMARY_START\n- Done because needed\nACTION_SUMMARY_END\n'
-    'ONE_LINE_PREDEFINED_ACTION: Implemented the functionality'
-    ' and its tests because both were missing'
+    'ACTION_SUMMARY_START\n- Done because needed\nACTION_SUMMARY_END'
 )
 
 
@@ -422,7 +399,7 @@ def _run_prompt_and_capture(isc, tmp_path, *, exclude=""):
         model="opus", continue_session=False, exclude=exclude,
     )
     with patch("implement_subclause.invoke_claude",
-               return_value=("- Did something", "Deemed not implementable")) as mock_invoke:
+               return_value="- Did something") as mock_invoke:
         result = isc.run_prompt(build_fn, args)
     return mock_invoke, build_fn, result
 
@@ -453,8 +430,8 @@ def test_run_prompt_passes_exclude(isc, tmp_path):
 
 def test_run_prompt_returns_action_summary(isc, tmp_path):
     """run_prompt returns the action summary from invoke_claude."""
-    _, _, (summary, _) = _run_prompt_and_capture(isc, tmp_path)
-    assert summary == "- Did something"
+    _, _, result = _run_prompt_and_capture(isc, tmp_path)
+    assert result == "- Did something"
 
 
 def test_run_prompt_passes_subclause_to_invoke(isc, tmp_path):
