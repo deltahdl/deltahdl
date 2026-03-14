@@ -74,6 +74,7 @@ struct SemaphoreObject {
 // A bounded or unbounded FIFO queue for message passing between processes.
 
 enum class MbxPutStatus : uint8_t { kPlaced, kBlock };
+enum class MbxGetStatus : uint8_t { kRetrieved, kBlock };
 
 struct MailboxObject {
   int32_t bound = 0;  // 0 means unbounded.
@@ -106,7 +107,17 @@ struct MailboxObject {
     return 1;
   }
 
-  // section 15.4.4: Non-blocking get. Returns 0 on success, -1 if empty.
+  // §15.4.5: Blocking get. Retrieves and removes front message.
+  // Returns kRetrieved on success, kBlock if the caller must suspend (empty).
+  MbxGetStatus Get(uint64_t& msg) {
+    if (messages.empty()) return MbxGetStatus::kBlock;
+    msg = messages.front();
+    messages.pop_front();
+    WakePutWaiters();
+    return MbxGetStatus::kRetrieved;
+  }
+
+  // §15.4.6: Non-blocking get. Returns 0 on success, -1 if empty.
   int32_t TryGet(uint64_t& msg) {
     if (messages.empty()) return -1;
     msg = messages.front();
