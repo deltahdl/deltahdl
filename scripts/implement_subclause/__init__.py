@@ -112,6 +112,8 @@ def build_steps(
         )
 
     constraints = (
+        f" Only act on requirements directly defined by §{subclause},"
+        " not requirements it merely references."
         " Do not make git commits or push."
         " Do not copy LRM prose into source comments."
         " Do not build or run tests."
@@ -119,6 +121,13 @@ def build_steps(
 
     return [
         ("Reading LRM", read_ctx),
+        ("Checking implementability",
+         f"Does §{subclause} define any requirements that can be"
+         " implemented as software (syntax to parse, semantics to"
+         " simulate, behavior to enforce, constraints to check)?"
+         " A subclause that only lists topics covered elsewhere or"
+         " provides a general overview is NOT implementable."
+         " Respond with exactly IMPLEMENTABLE: yes or IMPLEMENTABLE: no"),
         ("Auditing src",
          f"Search src/ for existing code that implements §{subclause}."
          " Report what aligns with the LRM and what is missing."
@@ -231,9 +240,14 @@ def run_steps(steps, *, model="opus",
 
     total = len(steps)
     summary = ""
+    skip_to_summary = False
 
     for i, (description, prompt) in enumerate(steps):
         step_num = i + 1
+
+        if skip_to_summary and step_num < total:
+            continue
+
         use_continue = continue_session if i == 0 else True
 
         cmd = [
@@ -259,6 +273,10 @@ def run_steps(steps, *, model="opus",
                 file=sys.stderr,
             )
             sys.exit(1)
+
+        if step_num == 2 and "IMPLEMENTABLE: no" in result.stdout:
+            print("Not implementable — skipping to summary.")
+            skip_to_summary = True
 
         if step_num == total:
             summary = _parse_action_summary(result.stdout)

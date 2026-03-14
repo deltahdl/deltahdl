@@ -118,9 +118,9 @@ def test_build_steps_returns_list(isc):
     assert isinstance(steps, list)
 
 
-def test_build_steps_has_10_steps(isc):
-    """build_steps returns exactly 10 steps."""
-    assert len(isc.build_steps("4.1", "~/LRM.txt")) == 10
+def test_build_steps_has_11_steps(isc):
+    """build_steps returns exactly 11 steps."""
+    assert len(isc.build_steps("4.1", "~/LRM.txt")) == 11
 
 
 def test_build_steps_first_mentions_lrm(isc):
@@ -135,6 +135,12 @@ def test_build_steps_last_mentions_action_summary(isc):
     assert "ACTION_SUMMARY" in steps[-1][1]
 
 
+def test_build_steps_second_checks_implementability(isc):
+    """Second step asks Claude if the subclause is implementable."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    assert "IMPLEMENTABLE" in steps[1][1]
+
+
 def test_build_steps_each_has_description(isc):
     """Each step has a non-empty description."""
     steps = isc.build_steps("4.1", "~/LRM.txt")
@@ -144,19 +150,19 @@ def test_build_steps_each_has_description(isc):
 def test_build_steps_delete_step_scoped_to_subclause(isc):
     """Delete duplicates step references the subclause."""
     steps = isc.build_steps("4.1", "~/LRM.txt")
-    assert "§4.1" in steps[3][1]
+    assert "§4.1" in steps[4][1]
 
 
 def test_build_steps_rename_suites_scoped_to_subclause(isc):
     """Rename suites step references the subclause."""
     steps = isc.build_steps("4.1", "~/LRM.txt")
-    assert "§4.1" in steps[5][1]
+    assert "§4.1" in steps[6][1]
 
 
 def test_build_steps_rename_tests_scoped_to_subclause(isc):
     """Rename tests step references the subclause."""
     steps = isc.build_steps("4.1", "~/LRM.txt")
-    assert "§4.1" in steps[6][1]
+    assert "§4.1" in steps[7][1]
 
 
 def test_build_steps_exclude_appears_in_step(isc):
@@ -164,6 +170,13 @@ def test_build_steps_exclude_appears_in_step(isc):
     steps = isc.build_steps("15.3", "~/LRM.txt", exclude="15.3.1")
     prompts = " ".join(p for _, p in steps)
     assert "15.3.1" in prompts
+
+
+def test_build_steps_constraints_include_directly_defined(isc):
+    """Constraints mention only directly defined requirements."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    prompts = " ".join(p for _, p in steps)
+    assert "directly defined" in prompts
 
 
 # ---- run_steps -------------------------------------------------------------
@@ -193,8 +206,8 @@ def _run_steps_and_capture(isc):
 
 
 def test_run_steps_call_count(isc):
-    """run_steps calls run_with_dots 10 times (once per step)."""
-    assert _run_steps_and_capture(isc).call_count == 10
+    """run_steps calls run_with_dots 11 times (once per step)."""
+    assert _run_steps_and_capture(isc).call_count == 11
 
 
 def test_run_steps_returns_action_summary(isc):
@@ -215,7 +228,31 @@ def test_run_steps_prints_step_numbers(isc, capsys):
                side_effect=lambda f, *a, **kw: f(*a, **kw)):
         isc.run_steps(steps, model="opus")
     out = capsys.readouterr().out
-    assert "Step 1/10:" in out
+    assert "Step 1/11:" in out
+
+
+def test_run_steps_skips_when_not_implementable(isc):
+    """run_steps skips implementation steps when subclause is not implementable."""
+    not_impl = MagicMock(
+        returncode=0, stdout="IMPLEMENTABLE: no", stderr="",
+    )
+    summary_result = MagicMock(
+        returncode=0, stdout=_OK_STDOUT, stderr="",
+    )
+
+    def side_effect(func, *args, **kwargs):
+        """Return not-implementable for step 2, summary for last."""
+        side_effect.count += 1
+        if side_effect.count == 2:
+            return not_impl
+        return summary_result
+
+    side_effect.count = 0
+
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    with patch("implement_subclause.run_with_dots", side_effect=side_effect):
+        result = isc.run_steps(steps, model="opus")
+    assert side_effect.count == 3  # read, check, summary
 
 
 @patch("implement_subclause.sys.exit")
