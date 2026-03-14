@@ -340,4 +340,17 @@ TEST(CompilationUnitStructure, MultipleProgramsAccumulate) {
   EXPECT_EQ(r.cu->programs[2]->name, "p3");
 }
 
+TEST(CompilationUnitStructure, MultipleCheckersAccumulate) {
+  auto r = Parse(
+      "checker c1; endchecker\n"
+      "checker c2; endchecker\n"
+      "checker c3; endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 3u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "c1");
+  EXPECT_EQ(r.cu->checkers[1]->name, "c2");
+  EXPECT_EQ(r.cu->checkers[2]->name, "c3");
+}
+
 }  // namespace
