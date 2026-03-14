@@ -6,8 +6,6 @@ import json
 import time
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 # ---- build_hierarchy --------------------------------------------------------
 
@@ -285,22 +283,34 @@ def test_invoke_claude_returns_action_summary(isc):
         assert isc.invoke_claude("prompt", subclause="4.1") == "- Added foo.cpp"
 
 
-@pytest.mark.usefixtures("run_ok")
-def test_invoke_claude_returns_empty_when_no_summary(isc):
+@patch("implement_subclause.run_claude_cli")
+def test_invoke_claude_returns_empty_when_no_summary(_mock_run, isc):
     """invoke_claude returns empty string when no ACTION_SUMMARY block."""
+    _mock_run.return_value = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
     assert isc.invoke_claude("test prompt", subclause="4.1", model="opus") == ""
 
 
-@pytest.mark.usefixtures("run_ok")
-def test_invoke_claude_prints_implementing_numeric(isc, capsys):
+@patch("implement_subclause.run_claude_cli")
+def test_invoke_claude_envelope_without_result_key(_mock_run, isc):
+    """invoke_claude returns empty when JSON envelope has no result key."""
+    _mock_run.return_value = MagicMock(
+        returncode=0, stdout='{"session_id":"x"}', stderr="",
+    )
+    assert isc.invoke_claude("prompt", subclause="4.1") == ""
+
+
+@patch("implement_subclause.run_claude_cli")
+def test_invoke_claude_prints_implementing_numeric(_mock_run, isc, capsys):
     """invoke_claude prints Implementing with section sign for numeric subclauses."""
+    _mock_run.return_value = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
     isc.invoke_claude("test prompt", subclause="4.1", model="opus")
     assert "Implementing §4.1 via Claude..." in capsys.readouterr().out
 
 
-@pytest.mark.usefixtures("run_ok")
-def test_invoke_claude_prints_implementing_annex(isc, capsys):
+@patch("implement_subclause.run_claude_cli")
+def test_invoke_claude_prints_implementing_annex(_mock_run, isc, capsys):
     """invoke_claude prints Implementing Annex for annex subclauses."""
+    _mock_run.return_value = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
     isc.invoke_claude("test prompt", subclause="A.8", model="opus")
     assert "Implementing Annex A.8 via Claude..." in capsys.readouterr().out
 

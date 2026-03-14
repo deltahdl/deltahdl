@@ -211,6 +211,18 @@ def test_main_prints_action_summary(
     assert "- Added foo.cpp" in capsys.readouterr().out
 
 
+@patch("implement_subclause.commit_implementation")
+@patch("implement_subclause.run_prompt", return_value="")
+def test_main_skips_action_print_when_empty(
+    _mock_run, _mock_commit, isc, tmp_path, capsys,
+):
+    """main() does not print action summary when it is empty."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
+    assert "Action summary" not in capsys.readouterr().out
+
+
 def test_parse_args_rejects_figures_flag(isc, tmp_path):
     """--figures flag is no longer accepted."""
     lrm = tmp_path / "lrm.pdf"
