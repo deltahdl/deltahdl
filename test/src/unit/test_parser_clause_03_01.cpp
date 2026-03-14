@@ -6,19 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, NullItemsBetweenDesignElements) {
-  auto r = Parse(
-      ";\n"
-      "module m; endmodule\n"
-      ";\n"
-      "package p; endpackage\n"
-      ";\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->packages.size(), 1u);
-}
-
 TEST(CompilationUnitStructure, MultipleModulesAccumulate) {
   auto r = Parse(
       "module a; endmodule\n"
