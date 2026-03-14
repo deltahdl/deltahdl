@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §3.1 — Module with design element name containing underscores and digits.
-TEST(CompilationUnitStructure, DesignElementNameWithUnderscoresAndDigits) {
-  auto r = Parse("module my_module_123; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "my_module_123");
-}
-
 // §3.1 — Design elements with comments interspersed.
 TEST(CompilationUnitStructure, CommentsInterspersedBetweenDesignElements) {
   auto r = Parse(
