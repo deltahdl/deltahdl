@@ -439,4 +439,12 @@ TEST_F(VerifyParseTest, CheckerWithDefaultClocking) {
   EXPECT_FALSE(unit->checkers[0]->items.empty());
 }
 
+TEST(CheckerDeclaration, EndLabelMatchesCheckerName) {
+  auto r = Parse("checker ck; endchecker : ck\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "ck");
+}
+
 }  // namespace

@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, CheckerEndLabel) {
-  auto r = Parse("checker ck; endchecker : ck\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_EQ(r.cu->checkers[0]->name, "ck");
-}
-
 // §3.1 — Error: missing end-keyword.
 TEST(CompilationUnitStructure, MissingEndmoduleIsError) {
   EXPECT_FALSE(ParseOk("module m;"));
