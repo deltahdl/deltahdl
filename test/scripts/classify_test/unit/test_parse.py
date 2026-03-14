@@ -652,3 +652,45 @@ def test_parse_file_named_namespace_has_ns(tmp_path, ct):
     src.write_text(_NAMED_NS_FILE, encoding="utf-8")
     pf = ct.parse_file(src)
     assert pf.has_namespace_wrapper is True
+
+
+# ---- multi-line TEST macro -------------------------------------------------
+
+
+def test_parse_body_multiline_test_macro(ct):
+    """_parse_body finds TEST macros split across two lines."""
+    lines = [
+        "TEST(MySuite,\n",
+        "     MyTest) {\n",
+        "  EXPECT_TRUE(true);\n",
+        "}\n",
+    ]
+    parse_body = getattr(ct, "_parse_body")
+    _, _, tests, _ = parse_body(lines, 0)
+    assert len(tests) == 1
+
+
+def test_parse_body_multiline_test_name(ct):
+    """_parse_body extracts the correct test name from multi-line macro."""
+    lines = [
+        "TEST(MySuite,\n",
+        "     MyTest) {\n",
+        "  EXPECT_TRUE(true);\n",
+        "}\n",
+    ]
+    parse_body = getattr(ct, "_parse_body")
+    _, _, tests, _ = parse_body(lines, 0)
+    assert tests[0].test_name == "MyTest"
+
+
+def test_parse_body_multiline_test_suite(ct):
+    """_parse_body extracts the correct suite name from multi-line macro."""
+    lines = [
+        "TEST(MySuite,\n",
+        "     MyTest) {\n",
+        "  EXPECT_TRUE(true);\n",
+        "}\n",
+    ]
+    parse_body = getattr(ct, "_parse_body")
+    _, _, tests, _ = parse_body(lines, 0)
+    assert tests[0].suite_name == "MySuite"
