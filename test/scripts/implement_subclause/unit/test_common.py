@@ -227,6 +227,18 @@ def test_format_prompt_includes_deemed_not_implementable(isc):
     assert "Deemed not implementable" in result
 
 
+def test_format_prompt_includes_only_renamed_tests(isc):
+    """Prompt includes the only-renamed-tests action."""
+    result = isc.format_prompt("10.10.2", "~/LRM.txt")
+    assert "Only renamed tests" in result
+
+
+def test_format_prompt_includes_only_reclassified_tests(isc):
+    """Prompt includes the only-reclassified-tests action."""
+    result = isc.format_prompt("10.10.2", "~/LRM.txt")
+    assert "Only reclassified tests" in result
+
+
 # ---- invoke_claude --------------------------------------------------------
 
 

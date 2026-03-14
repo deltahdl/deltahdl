@@ -175,16 +175,20 @@ def format_prompt(
         "- Added tests only because the functionality was already"
         " implemented but its tests were missing\n"
         "- Deemed not implementable\n"
-        "- Deleted tests only because the functionality and its tests"
-        " were already implemented but some tests were duplicated\n"
         "- Did nothing because the functionality and its tests"
         " were already implemented\n"
         "- Implemented the functionality and its tests"
         " because both were missing\n"
+        "- Only deleted tests because the subclause's functionalities"
+        " and its tests were already implemented but some tests"
+        " were duplicated\n"
+        "- Only reclassified tests because the subclause's"
+        " functionalities and its tests were already implemented"
+        " but the tests were misclassified\n"
+        "- Only renamed tests because the subclause's functionalities"
+        " and its tests were already implemented but the tests"
+        " were improperly named\n"
         "- Performed a non-predefined action\n"
-        "- Reclassified tests only because the functionality and its"
-        " tests were already implemented but the tests"
-        " were misclassified\n"
         "Output your choice as:\n"
         "ONE_LINE_PREDEFINED_ACTION: <your choice>",
     )
@@ -219,16 +223,20 @@ _PREDEFINED_ACTIONS = [
     " implemented but its tests were missing",
     "Deferred via --exclude",
     "Deemed not implementable",
-    "Deleted tests only because the functionality and its tests"
-    " were already implemented but some tests were duplicated",
     "Did nothing because the functionality and its tests"
     " were already implemented",
     "Implemented the functionality and its tests"
     " because both were missing",
+    "Only deleted tests because the subclause's functionalities"
+    " and its tests were already implemented but some tests"
+    " were duplicated",
+    "Only reclassified tests because the subclause's"
+    " functionalities and its tests were already implemented"
+    " but the tests were misclassified",
+    "Only renamed tests because the subclause's functionalities"
+    " and its tests were already implemented but the tests"
+    " were improperly named",
     "Performed a non-predefined action",
-    "Reclassified tests only because the functionality and its"
-    " tests were already implemented but the tests"
-    " were misclassified",
 ]
 
 
