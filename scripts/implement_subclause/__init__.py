@@ -161,6 +161,12 @@ def format_prompt(
     lines.append("Do not build or run tests.")
 
     lines.append(
+        "If existing tests already cover this subclause, do NOT pick"
+        " 'Deemed not implementable'. A subclause with existing tests"
+        " was already implemented.",
+    )
+
+    lines.append(
         "At the very end of your response, output an action summary."
         " Every line MUST include 'because' with a categorical rationale"
         " explaining why the action was necessary"
