@@ -478,4 +478,14 @@ TEST(CompilationUnitStructure, CuScopeImportGoesToCuItems) {
   EXPECT_GE(r.cu->cu_items.size(), 1u);
 }
 
+// §3.1 — CU-scope variable declaration is stored in cu_items.
+TEST(CompilationUnitStructure, CuScopeVarDeclGoesToCuItems) {
+  auto r = Parse(
+      "int global_var;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_GE(r.cu->cu_items.size(), 1u);
+}
+
 }  // namespace
