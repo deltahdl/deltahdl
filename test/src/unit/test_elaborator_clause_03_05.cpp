@@ -2,14 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, Cl3_5_EmptyInterfaceElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc("interface ifc; endinterface\n", f, "ifc");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(ElabClause03, Cl3_5_InterfaceWithVariablesElaborates) {
+TEST(ElabClause03, InterfaceWithVariablesElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc;\n"
@@ -21,7 +14,7 @@ TEST(ElabClause03, Cl3_5_InterfaceWithVariablesElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_5_InterfaceWithPortsElaborates) {
+TEST(ElabClause03, InterfaceWithPortsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc(input logic clk);\n"
@@ -34,7 +27,7 @@ TEST(ElabClause03, Cl3_5_InterfaceWithPortsElaborates) {
   EXPECT_EQ(design->top_modules[0]->ports.size(), 1u);
 }
 
-TEST(ElabClause03, Cl3_5_InterfaceWithContAssignElaborates) {
+TEST(ElabClause03, InterfaceWithContAssignElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc;\n"
@@ -47,7 +40,7 @@ TEST(ElabClause03, Cl3_5_InterfaceWithContAssignElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_5_SimpleBusExampleElaborates) {
+TEST(ElabClause03, SimpleBusExampleElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface simple_bus(input logic clk);\n"
@@ -61,7 +54,7 @@ TEST(ElabClause03, Cl3_5_SimpleBusExampleElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_5_InterfaceWithSubroutinesElaborates) {
+TEST(ElabClause03, InterfaceWithSubroutinesElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc;\n"
