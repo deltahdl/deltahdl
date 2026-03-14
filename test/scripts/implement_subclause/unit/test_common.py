@@ -304,8 +304,8 @@ def test_invoke_claude_finds_summary_in_raw_stdout(isc):
         assert isc.invoke_claude("prompt", subclause="4.1") == "- Modified eval_expr.cpp"
 
 
-def test_invoke_claude_retries_on_missing_rationale(isc):
-    """invoke_claude retries once when ACTION_SUMMARY is missing."""
+def _invoke_with_retry(isc):
+    """Call invoke_claude with a mock that fails then succeeds; return mock_run."""
     no_summary = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
     with_summary = MagicMock(
         returncode=0,
@@ -314,34 +314,25 @@ def test_invoke_claude_retries_on_missing_rationale(isc):
     )
     with patch("implement_subclause.run_claude_cli",
                side_effect=[no_summary, with_summary]) as mock_run:
-        isc.invoke_claude("prompt", subclause="4.1")
+        result = isc.invoke_claude("prompt", subclause="4.1")
+    return mock_run, result
+
+
+def test_invoke_claude_retries_on_missing_rationale(isc):
+    """invoke_claude retries once when ACTION_SUMMARY is missing."""
+    mock_run, _ = _invoke_with_retry(isc)
     assert mock_run.call_count == 2
 
 
 def test_invoke_claude_retry_returns_rationale(isc):
     """invoke_claude returns the rationale from the retry call."""
-    no_summary = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
-    with_summary = MagicMock(
-        returncode=0,
-        stdout='ACTION_SUMMARY_START\n- Did X because Y\nACTION_SUMMARY_END',
-        stderr="",
-    )
-    with patch("implement_subclause.run_claude_cli",
-               side_effect=[no_summary, with_summary]):
-        assert isc.invoke_claude("prompt", subclause="4.1") == "- Did X because Y"
+    _, result = _invoke_with_retry(isc)
+    assert result == "- Did X because Y"
 
 
 def test_invoke_claude_retry_uses_dangerously_skip_permissions(isc):
     """Retry command includes --dangerously-skip-permissions."""
-    no_summary = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
-    with_summary = MagicMock(
-        returncode=0,
-        stdout='ACTION_SUMMARY_START\n- Did X because Y\nACTION_SUMMARY_END',
-        stderr="",
-    )
-    with patch("implement_subclause.run_claude_cli",
-               side_effect=[no_summary, with_summary]) as mock_run:
-        isc.invoke_claude("prompt", subclause="4.1")
+    mock_run, _ = _invoke_with_retry(isc)
     retry_cmd = mock_run.call_args_list[1][0][0]
     assert "--dangerously-skip-permissions" in retry_cmd
 
