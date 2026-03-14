@@ -245,12 +245,19 @@ def test_commit_and_push_noop_returns_none(monkeypatch):
 
 
 def test_commit_and_push_calls_rev_parse(monkeypatch):
-    """Calls git rev-parse HEAD after git commit."""
+    """Calls git rev-parse exactly once."""
     captured = stub_subprocess_success(monkeypatch)
     commit_and_push([Path("/a/b.cpp")], [], "msg")
     rev_parse_cmds = [c for c in captured if c[:2] == ["git", "rev-parse"]]
     assert len(rev_parse_cmds) == 1
-    assert rev_parse_cmds[0] == ["git", "rev-parse", "HEAD"]
+
+
+def test_commit_and_push_rev_parse_uses_head(monkeypatch):
+    """git rev-parse is called with HEAD."""
+    captured = stub_subprocess_success(monkeypatch)
+    commit_and_push([Path("/a/b.cpp")], [], "msg")
+    rev_parse_cmd = next(c for c in captured if c[:2] == ["git", "rev-parse"])
+    assert rev_parse_cmd == ["git", "rev-parse", "HEAD"]
 
 
 def test_commit_and_push_rev_parse_after_commit(monkeypatch):
