@@ -74,7 +74,7 @@ def test_parse_args_clause_and_annex_exclusive(ic, tmp_path) -> None:
     with pytest.raises(SystemExit):
         ic.parse_args([
             "--lrm", str(lrm), "--clause", "4", "--annex", "A",
-            "--sub-issue", "1", "--master-issue", "99",
+            "--issue", "1",
             "--organization", "o", "--repo", "r",
         ])
 
@@ -84,7 +84,7 @@ def test_parse_args_missing_lrm(ic) -> None:
     with pytest.raises(SystemExit):
         ic.parse_args([
             "--lrm", "/no/such/file", "--clause", "4",
-            "--sub-issue", "1", "--master-issue", "99",
+            "--issue", "1",
             "--organization", "o", "--repo", "r",
         ])
 
@@ -119,7 +119,7 @@ def test_parse_args_no_clause_or_annex(ic, tmp_path) -> None:
     with pytest.raises(SystemExit):
         ic.parse_args([
             "--lrm", str(lrm),
-            "--sub-issue", "1", "--master-issue", "99",
+            "--issue", "1",
             "--organization", "o", "--repo", "r",
         ])
 
@@ -135,7 +135,7 @@ def test_parse_args_rejects_removed_flag(ic, tmp_path, flag, value) -> None:
     with pytest.raises(SystemExit):
         ic.parse_args([
             "--lrm", str(lrm), "--clause", "4",
-            "--sub-issue", "1", "--master-issue", "99",
+            "--issue", "1",
             "--organization", "o", "--repo", "r",
             flag, value,
         ])
