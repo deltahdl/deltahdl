@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA605, EventTriggerBlocking) {
+TEST(EventTriggerParser, BlockingTrigger) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -20,7 +20,7 @@ TEST(ParserA605, EventTriggerBlocking) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-TEST(ParserA605, EventTriggerNonblocking) {
+TEST(EventTriggerParser, NonblockingTrigger) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -35,7 +35,7 @@ TEST(ParserA605, EventTriggerNonblocking) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-TEST(ParserSection15, NonblockingEventTrigger) {
+TEST(EventTriggerParser, NonblockingWithDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  event e;\n"
@@ -49,7 +49,7 @@ TEST(ParserSection15, NonblockingEventTrigger) {
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
 }
 
-TEST(ParserSection15, NonblockingEventTriggerHierarchical) {
+TEST(EventTriggerParser, NonblockingHierarchical) {
   auto r = Parse(
       "module m;\n"
       "  initial ->> top.e;\n"
@@ -60,7 +60,7 @@ TEST(ParserSection15, NonblockingEventTriggerHierarchical) {
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
 }
 
-TEST(ParserSection15, EventTriggerAndWait) {
+TEST(EventTriggerParser, BlockingWithDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  event e;\n"
@@ -74,7 +74,7 @@ TEST(ParserSection15, EventTriggerAndWait) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
 }
 
-TEST(ParserA604, StmtItemEventTrigger) {
+TEST(EventTriggerParser, StmtItemBlockingTrigger) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -88,7 +88,7 @@ TEST(ParserA604, StmtItemEventTrigger) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
 }
 
-TEST(ParserA604, StmtItemNonblockingEventTrigger) {
+TEST(EventTriggerParser, StmtItemNonblockingTrigger) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -102,7 +102,7 @@ TEST(ParserA604, StmtItemNonblockingEventTrigger) {
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
 }
 
-TEST(ParserSection12, EventTrigger) {
+TEST(EventTriggerParser, BlockingTriggerNamedEvent) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"

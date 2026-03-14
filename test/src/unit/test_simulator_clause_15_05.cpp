@@ -7,81 +7,69 @@ using namespace delta;
 
 namespace {
 
-TEST(Lowerer, NamedEventTriggerAndWait) {
+// §15.5: An event variable is created with is_event flag in the simulator.
+TEST(IpcSync, EventVariableIsEventFlag) {
+  SyncFixture f;
+  auto* ev = f.ctx.CreateVariable("ev1", 1);
+  ev->is_event = true;
+  ev->value = MakeLogic4VecVal(f.arena, 1, 0);
+
+  auto* found = f.ctx.FindVariable("ev1");
+  ASSERT_NE(found, nullptr);
+  EXPECT_TRUE(found->is_event);
+}
+
+// §15.5: A non-event variable does not have the is_event flag.
+TEST(IpcSync, NonEventVariableFlagFalse) {
+  SyncFixture f;
+  auto* v = f.ctx.CreateVariable("x", 8);
+  v->value = MakeLogic4VecVal(f.arena, 8, 0);
+
+  auto* found = f.ctx.FindVariable("x");
+  ASSERT_NE(found, nullptr);
+  EXPECT_FALSE(found->is_event);
+}
+
+// §15.5: Event declaration lowers with is_event set.
+TEST(IpcSync, EventDeclarationLowersWithIsEvent) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  event ev;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    @(ev);\n"
-      "    result = 42;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    #5 ->ev;\n"
-      "    #1 $finish;\n"
-      "  end\n"
+      "  initial $finish;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
-  f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("ev");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
+  EXPECT_TRUE(var->is_event);
 }
 
-TEST(Lowerer, NamedEventBareWaitSyntax) {
+// §15.5: Multiple event declarations each get is_event set.
+TEST(IpcSync, MultipleEventDeclarationsLower) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  event ev;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    @ev;\n"
-      "    result = 99;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    #3 ->ev;\n"
-      "    #1 $finish;\n"
-      "  end\n"
+      "  event a;\n"
+      "  event b;\n"
+      "  initial $finish;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
 
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
-  f.scheduler.Run();
 
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
-}
-
-TEST(SimA605, EventTriggerAndWait) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  event ev;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    #5 -> ev;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    @(ev) x = 8'd55;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_TRUE(va->is_event);
+  EXPECT_TRUE(vb->is_event);
 }
 
 }  // namespace

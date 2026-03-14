@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA603, ActionBlockWaitOrder) {
+TEST(WaitOrderParser, ActionBlockWaitOrder) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -19,7 +19,7 @@ TEST(ParserA603, ActionBlockWaitOrder) {
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
 }
 
-TEST(ParserA603, ActionBlockWaitOrderElse) {
+TEST(WaitOrderParser, ActionBlockWaitOrderElse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -33,7 +33,7 @@ TEST(ParserA603, ActionBlockWaitOrderElse) {
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
 }
 
-TEST(ParserSection15, WaitOrderBasic) {
+TEST(WaitOrderParser, WaitOrderBasic) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -51,7 +51,7 @@ TEST(ParserSection15, WaitOrderBasic) {
   }
 }
 
-TEST(ParserSection15, WaitOrderWithElseKind) {
+TEST(WaitOrderParser, WaitOrderWithElseKind) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -66,7 +66,7 @@ TEST(ParserSection15, WaitOrderWithElseKind) {
   ASSERT_EQ(stmt->wait_order_events.size(), 3u);
 }
 
-TEST(ParserSection15, WaitOrderWithElseBranches) {
+TEST(WaitOrderParser, WaitOrderWithElseBranches) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -81,7 +81,7 @@ TEST(ParserSection15, WaitOrderWithElseBranches) {
   ASSERT_NE(stmt->else_branch, nullptr);
 }
 
-TEST(ParserSection15, WaitOrderTwoEvents) {
+TEST(WaitOrderParser, WaitOrderTwoEvents) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -95,7 +95,7 @@ TEST(ParserSection15, WaitOrderTwoEvents) {
   ASSERT_EQ(stmt->wait_order_events.size(), 2u);
 }
 
-TEST(ParserSection15, WaitOrderNullAction) {
+TEST(WaitOrderParser, WaitOrderNullAction) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -108,7 +108,7 @@ TEST(ParserSection15, WaitOrderNullAction) {
   EXPECT_EQ(stmt->kind, StmtKind::kWaitOrder);
 }
 
-TEST(ParserA605, WaitOrderNull) {
+TEST(WaitOrderParser, WaitOrderNull) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -123,7 +123,7 @@ TEST(ParserA605, WaitOrderNull) {
   ASSERT_EQ(stmt->wait_order_events.size(), 3u);
 }
 
-TEST(ParserA605, WaitOrderWithAction) {
+TEST(WaitOrderParser, WaitOrderWithAction) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -138,7 +138,7 @@ TEST(ParserA605, WaitOrderWithAction) {
   EXPECT_NE(stmt->then_branch, nullptr);
 }
 
-TEST(ParserA605, WaitOrderWithElse) {
+TEST(WaitOrderParser, WaitOrderWithElse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -155,7 +155,7 @@ TEST(ParserA605, WaitOrderWithElse) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-TEST(ParserA605, WaitOrderElseOnly) {
+TEST(WaitOrderParser, WaitOrderElseOnly) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

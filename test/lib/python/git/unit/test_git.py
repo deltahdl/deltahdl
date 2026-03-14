@@ -213,3 +213,49 @@ def test_commit_and_push_prints_pushed(monkeypatch, capsys):
     stub_subprocess_success(monkeypatch)
     commit_and_push([Path("/a/b.cpp")], [], "msg")
     assert "Pushed." in capsys.readouterr().out
+
+
+def test_commit_and_push_returns_sha(monkeypatch):
+    """Returns the commit SHA after a successful commit."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = ""
+    mock_result.stderr = ""
+    sha_result = MagicMock()
+    sha_result.returncode = 0
+    sha_result.stdout = "abc1234def5678\n"
+    sha_result.stderr = ""
+
+    def dispatch(cmd, **_kw):
+        if cmd[:2] == ["git", "rev-parse"]:
+            return sha_result
+        return mock_result
+
+    monkeypatch.setattr(subprocess, "run", dispatch)
+    result = commit_and_push([Path("/a/b.cpp")], [], "msg")
+    assert result == "abc1234def5678"
+
+
+def test_commit_and_push_noop_returns_none(monkeypatch):
+    """Returns None when there are no files to commit."""
+    stub_subprocess_success(monkeypatch)
+    result = commit_and_push([], [], "msg")
+    assert result is None
+
+
+def test_commit_and_push_calls_rev_parse(monkeypatch):
+    """Calls git rev-parse HEAD after git commit."""
+    captured = stub_subprocess_success(monkeypatch)
+    commit_and_push([Path("/a/b.cpp")], [], "msg")
+    rev_parse_cmds = [c for c in captured if c[:2] == ["git", "rev-parse"]]
+    assert len(rev_parse_cmds) == 1
+    assert rev_parse_cmds[0] == ["git", "rev-parse", "HEAD"]
+
+
+def test_commit_and_push_rev_parse_before_push(monkeypatch):
+    """git rev-parse HEAD is called after commit but before push."""
+    captured = stub_subprocess_success(monkeypatch)
+    commit_and_push([Path("/a/b.cpp")], [], "msg")
+    ops = [c[1] for c in captured]
+    assert ops.index("rev-parse") > ops.index("commit")
+    assert ops.index("rev-parse") < ops.index("push")

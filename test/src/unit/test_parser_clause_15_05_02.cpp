@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection15, WaitForEventWithBody) {
+TEST(EventWaitParser, WaitForEventWithBody) {
   auto r = Parse(
       "module m;\n"
       "  event e;\n"
@@ -20,7 +20,7 @@ TEST(ParserSection15, WaitForEventWithBody) {
   ASSERT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserSection15, WaitForEventHierarchical) {
+TEST(EventWaitParser, WaitForEventHierarchical) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

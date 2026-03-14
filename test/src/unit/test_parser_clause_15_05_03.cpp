@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection15, TriggeredMethodWait) {
+TEST(EventTriggeredParser, TriggeredMethodWait) {
   auto r = Parse(
       "module m;\n"
       "  event blast;\n"
@@ -19,7 +19,7 @@ TEST(ParserSection15, TriggeredMethodWait) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-TEST(ParserSection15, TriggeredMethodForkPattern) {
+TEST(EventTriggeredParser, TriggeredMethodForkPattern) {
   auto r = Parse(
       "module m;\n"
       "  event blast;\n"
@@ -39,7 +39,7 @@ TEST(ParserSection15, TriggeredMethodForkPattern) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kWait);
 }
 
-TEST(ParserSection15, TriggeredMethodHierarchical) {
+TEST(EventTriggeredParser, TriggeredMethodHierarchical) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -52,7 +52,7 @@ TEST(ParserSection15, TriggeredMethodHierarchical) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-TEST(ParserSection15, TriggeredMethodEventAlias) {
+TEST(EventTriggeredParser, TriggeredMethodEventAlias) {
   auto r = Parse(
       "module m;\n"
       "  event done;\n"
@@ -71,7 +71,7 @@ TEST(ParserSection15, TriggeredMethodEventAlias) {
   ASSERT_GE(stmt->fork_stmts.size(), 2u);
 }
 
-TEST(ParserSection15, TriggeredMethodWithBodyStmt) {
+TEST(EventTriggeredParser, TriggeredMethodWithBodyStmt) {
   auto r = Parse(
       "module m;\n"
       "  event e;\n"
