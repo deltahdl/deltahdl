@@ -3,6 +3,7 @@
 import argparse
 import inspect
 import json
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -290,13 +291,15 @@ def test_invoke_claude_returns_empty_when_no_summary(isc):
     assert isc.invoke_claude("test prompt", subclause="4.1", model="opus") == ""
 
 
-def test_invoke_claude_prints_implementing_numeric(isc, run_ok, capsys):
+@pytest.mark.usefixtures("run_ok")
+def test_invoke_claude_prints_implementing_numeric(isc, capsys):
     """invoke_claude prints Implementing with section sign for numeric subclauses."""
     isc.invoke_claude("test prompt", subclause="4.1", model="opus")
     assert "Implementing §4.1 via Claude..." in capsys.readouterr().out
 
 
-def test_invoke_claude_prints_implementing_annex(isc, run_ok, capsys):
+@pytest.mark.usefixtures("run_ok")
+def test_invoke_claude_prints_implementing_annex(isc, capsys):
     """invoke_claude prints Implementing Annex for annex subclauses."""
     isc.invoke_claude("test prompt", subclause="A.8", model="opus")
     assert "Implementing Annex A.8 via Claude..." in capsys.readouterr().out
@@ -304,7 +307,6 @@ def test_invoke_claude_prints_implementing_annex(isc, run_ok, capsys):
 
 def test_invoke_claude_prints_progress_dots(isc, capsys):
     """invoke_claude prints dots while waiting for Claude."""
-    import time
 
     def slow_run(*_args, **_kwargs):
         time.sleep(0.15)
