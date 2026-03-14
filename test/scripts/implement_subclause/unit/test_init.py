@@ -1,5 +1,6 @@
 """Unit tests for implement_subclause (arg parsing and dispatch)."""
 
+import json
 import runpy
 from unittest.mock import patch
 
@@ -283,7 +284,6 @@ def test_parse_action_summary_envelope_without_result(isc):
 def test_parse_action_summary_json_array(isc):
     """Finds ACTION_SUMMARY in the last element of a JSON array."""
     parse = getattr(isc, "_parse_action_summary")
-    import json
     # Use json.dumps which escapes newlines — but the JSON parsing path
     # will decode them back to literal newlines for _extract_action_summary.
     stdout = json.dumps([
@@ -303,7 +303,6 @@ def test_parse_action_summary_json_array(isc):
 def test_parse_action_summary_json_array_no_result(isc):
     """Returns empty when JSON array has no element with result key."""
     parse = getattr(isc, "_parse_action_summary")
-    import json
     stdout = json.dumps([{"type": "init"}, {"session_id": "x"}])
     assert parse(stdout) == ""
 
