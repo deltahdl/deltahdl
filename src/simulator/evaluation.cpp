@@ -16,6 +16,9 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   auto* var = ctx.FindVariable(expr->text);
   if (var) {
+    // §15.5.5.3: Boolean value of event — 0 if null, 1 otherwise.
+    if (var->is_event)
+      return MakeLogic4VecVal(arena, 1, var->is_null_event ? 0u : 1u);
     auto val = var->value;
     if (ctx.IsRealVariable(expr->text)) val.is_real = true;
     if (ctx.IsStringVariable(expr->text)) val.is_string = true;
@@ -677,6 +680,38 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->op == TokenKind::kArrow) return EvalLogicalImpl(expr, ctx, arena);
   if (expr->op == TokenKind::kLtDashGt)
     return EvalLogicalEquiv(expr, ctx, arena);
+  // §15.5.5.3: Event comparison — compare by Variable* identity.
+  if (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq ||
+      expr->op == TokenKind::kEqEqEq || expr->op == TokenKind::kBangEqEq) {
+    auto* lhs_id = (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier)
+                        ? expr->lhs
+                        : nullptr;
+    auto* rhs_id = (expr->rhs && expr->rhs->kind == ExprKind::kIdentifier)
+                        ? expr->rhs
+                        : nullptr;
+    Variable* lv = lhs_id ? ctx.FindVariable(lhs_id->text) : nullptr;
+    Variable* rv = rhs_id ? ctx.FindVariable(rhs_id->text) : nullptr;
+    bool lhs_is_event = lv && lv->is_event;
+    bool rhs_is_event = rv && rv->is_event;
+    bool lhs_is_null =
+        lhs_id && lhs_id->text == "null" && !lv;
+    bool rhs_is_null =
+        rhs_id && rhs_id->text == "null" && !rv;
+    if (lhs_is_event || rhs_is_event) {
+      bool equal = false;
+      if (lhs_is_event && rhs_is_event) {
+        equal = (lv == rv);
+      } else if (lhs_is_event && rhs_is_null) {
+        equal = lv->is_null_event;
+      } else if (rhs_is_event && lhs_is_null) {
+        equal = rv->is_null_event;
+      }
+      bool is_eq_op = (expr->op == TokenKind::kEqEq ||
+                        expr->op == TokenKind::kEqEqEq);
+      return MakeLogic4VecVal(arena, 1,
+                              (is_eq_op == equal) ? 1u : 0u);
+    }
+  }
   return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena),
                       EvalExpr(expr->rhs, ctx, arena), arena, context_width);
 }

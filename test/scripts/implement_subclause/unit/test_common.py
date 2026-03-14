@@ -216,19 +216,19 @@ def test_format_prompt_includes_action_summary_instruction(isc):
 
 def test_invoke_claude_passes_verbose(isc, run_ok):
     """invoke_claude includes --verbose in the CLI command."""
-    isc.invoke_claude("test prompt", model="opus")
+    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
     assert "--verbose" in run_ok.call_args[0][0]
 
 
 def test_invoke_claude_uses_print_mode(isc, run_ok):
     """invoke_claude uses -p (print mode)."""
-    isc.invoke_claude("test prompt", model="opus")
+    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
     assert "-p" in run_ok.call_args[0][0]
 
 
 def test_invoke_claude_uses_json_output_format(isc, run_ok):
     """invoke_claude uses --output-format json to capture output."""
-    isc.invoke_claude("test prompt", model="opus")
+    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
     cmd = run_ok.call_args[0][0]
     idx = cmd.index("--output-format")
     assert cmd[idx + 1] == "json"
@@ -236,25 +236,25 @@ def test_invoke_claude_uses_json_output_format(isc, run_ok):
 
 def test_invoke_claude_uses_dangerously_skip_permissions(isc, run_ok):
     """invoke_claude uses --dangerously-skip-permissions."""
-    isc.invoke_claude("test prompt", model="opus")
+    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
     assert "--dangerously-skip-permissions" in run_ok.call_args[0][0]
 
 
 def test_invoke_claude_no_continue_by_default(isc, run_ok):
     """invoke_claude does not include --continue by default."""
-    isc.invoke_claude("test prompt", model="opus")
+    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
     assert "--continue" not in run_ok.call_args[0][0]
 
 
 def test_invoke_claude_uses_continue_when_set(isc, run_ok):
     """invoke_claude includes --continue when continue_session=True."""
-    isc.invoke_claude("test prompt", model="opus", continue_session=True)
+    isc.invoke_claude("test prompt", subclause="4.1", model="opus", continue_session=True)
     assert "--continue" in run_ok.call_args[0][0]
 
 
 def test_invoke_claude_success(isc, run_ok):
     """invoke_claude calls subprocess.run on success."""
-    isc.invoke_claude("test prompt", model="opus")
+    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
     assert run_ok.called
 
 
@@ -263,7 +263,7 @@ def test_invoke_claude_success(isc, run_ok):
 def test_invoke_claude_failure_exits(mock_run, mock_exit, isc):
     """invoke_claude calls sys.exit on non-zero return code."""
     mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="err")
-    isc.invoke_claude("test prompt")
+    isc.invoke_claude("test prompt", subclause="4.1")
     assert mock_exit.called
 
 
@@ -281,7 +281,7 @@ def test_invoke_claude_returns_action_summary(isc):
         mock_run.return_value = MagicMock(
             returncode=0, stdout=envelope, stderr="",
         )
-        assert isc.invoke_claude("prompt") == "- Added foo.cpp"
+        assert isc.invoke_claude("prompt", subclause="4.1") == "- Added foo.cpp"
 
 
 @pytest.mark.usefixtures("run_ok")
@@ -354,7 +354,7 @@ def test_run_prompt_passes_continue_session(mock_invoke, isc, tmp_path):
 
 def test_invoke_claude_passes_effort_high(isc, run_ok):
     """invoke_claude includes --effort high in the CLI command."""
-    isc.invoke_claude("test prompt", model="opus")
+    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
     cmd = run_ok.call_args[0][0]
     idx = cmd.index("--effort")
     assert cmd[idx + 1] == "high"
