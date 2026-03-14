@@ -15,4 +15,9 @@ TEST(ModuleEndLabel, EndLabelMatchesModuleName) {
   EXPECT_EQ(r.cu->modules[0]->name, "foo");
 }
 
+// §3.1 — Error: missing end-keyword.
+TEST(ModuleDefinitions, MissingEndmoduleIsError) {
+  EXPECT_FALSE(ParseOk("module m;"));
+}
+
 }  // namespace

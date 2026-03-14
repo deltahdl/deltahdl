@@ -6,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §3.1 — Error: missing end-keyword.
-TEST(CompilationUnitStructure, MissingEndmoduleIsError) {
-  EXPECT_FALSE(ParseOk("module m;"));
-}
-
 TEST(CompilationUnitStructure, MissingEndpackageIsError) {
   EXPECT_FALSE(ParseOk("package p;"));
 }
