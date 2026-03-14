@@ -88,10 +88,14 @@ def build_steps(
             " Also read any General or Overview subclauses at each level."
         )
     else:
-        read_ctx = (
-            f"Read §{subclause} in the LRM at {lrm}."
-            " Also read any General or Overview child subclauses."
-        )
+        parts = subclause.split(".")
+        is_general = len(parts) == 2 and parts[1] == "1"
+        read_ctx = f"Read §{subclause} in the LRM at {lrm}."
+        if not is_general:
+            read_ctx += (
+                " Also read any General or Overview subclauses"
+                " for context."
+            )
 
     examples = [
         clause_to_filename(prefix, subclause) + ".cpp"

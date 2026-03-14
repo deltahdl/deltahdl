@@ -61,10 +61,15 @@ class TestDepth1:
         prompt = _all_prompts(isc,"B", "~/LRM.pdf")
         assert "~/LRM.pdf" in prompt
 
-    def test_depth_1_mentions_general_overview(self, isc):
-        """Depth-1 prompt instructs Claude to read General/Overview."""
-        prompt = _all_prompts(isc,"4", "~/LRM.pdf")
-        assert "General" in prompt or "Overview" in prompt
+    def test_depth_1_non_general_mentions_general_overview(self, isc):
+        """Non-General depth-1 prompt reads General/Overview for context."""
+        prompt = _all_prompts(isc, "4", "~/LRM.pdf")
+        assert "General" in prompt
+
+    def test_depth_1_general_omits_general_overview(self, isc):
+        """X.1 (General) prompt does not read General/Overview."""
+        steps = isc.build_steps("4.1", "~/LRM.pdf")
+        assert "General or Overview" not in steps[0][1]
 
 
 # ---------------------------------------------------------------------------
@@ -80,9 +85,9 @@ class TestDepth2:
         prompt = _all_prompts(isc,"4.1", "~/LRM.pdf")
         assert not _check_common_structure(prompt, "4.1")
 
-    def test_depth_2_mentions_general_overview(self, isc):
-        """Depth-2 prompt instructs Claude to read General/Overview."""
-        prompt = _all_prompts(isc,"4.4", "~/LRM.pdf")
+    def test_depth_2_non_general_mentions_general_overview(self, isc):
+        """Non-General depth-2 prompt reads General/Overview for context."""
+        prompt = _all_prompts(isc, "4.4", "~/LRM.pdf")
         assert "General" in prompt
 
 
