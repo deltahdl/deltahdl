@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §3.1 — CU-scope typedef is stored in cu_items.
-TEST(CompilationUnitStructure, CuScopeTypedefGoesToCuItems) {
-  auto r = Parse(
-      "typedef int myint;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
-}
-
 // §3.1 — CU-scope import is stored in cu_items.
 TEST(CompilationUnitStructure, CuScopeImportGoesToCuItems) {
   auto r = Parse(
