@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA701, SpecifyWithPathDeclSimulates) {
+TEST(SpecifyBlockDeclSim, SpecifyWithPathDeclSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -26,7 +26,7 @@ TEST(SimA701, SpecifyWithPathDeclSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA703, TerminalBitSelectSimulates) {
+TEST(SpecifyTerminalSim, TerminalBitSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -97,7 +97,7 @@ TEST(Elaboration, PackedDimOnReg_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(SimCh9, AlwaysCombResultWidth8) {
+TEST(AlwaysCombBasicSim, AlwaysCombResultWidth8) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -118,7 +118,7 @@ TEST(SimCh9, AlwaysCombResultWidth8) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(SimCh10, VerifyWidthAndToUint64_8bit) {
+TEST(BlockingAssignSim, VerifyWidthAndToUint64_8bit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -140,7 +140,7 @@ TEST(SimCh10, VerifyWidthAndToUint64_8bit) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(ParserA25, PackedDimElaboratesWidth) {
+TEST(DeclarationRangeParsing, PackedDimElaboratesWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [7:0] x; endmodule\n", f);
   ASSERT_NE(design, nullptr);
@@ -150,7 +150,7 @@ TEST(ParserA25, PackedDimElaboratesWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-TEST(ElabA83, GenvarExprElaborates) {
+TEST(ExpressionElaboration, GenvarExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

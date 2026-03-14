@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4425, ObservedRegionExecutesEvents) {
+TEST(ObservedRegionSim, ObservedRegionExecutesEvents) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,7 +23,7 @@ TEST(SimCh4425, ObservedRegionExecutesEvents) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4425, ObservedRegionHoldsMultipleEvents) {
+TEST(ObservedRegionSim, ObservedRegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -38,7 +38,7 @@ TEST(SimCh4425, ObservedRegionHoldsMultipleEvents) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh4425, ObservedSchedulesPassFailIntoReactive) {
+TEST(ObservedRegionSim, ObservedSchedulesPassFailIntoReactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -59,7 +59,7 @@ TEST(SimCh4425, ObservedSchedulesPassFailIntoReactive) {
   EXPECT_EQ(order[1], "reactive");
 }
 
-TEST(SimCh4425, MultiplePassFailActionsScheduledInReactive) {
+TEST(ObservedRegionSim, MultiplePassFailActionsScheduledInReactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -86,13 +86,13 @@ TEST(SimCh4425, MultiplePassFailActionsScheduledInReactive) {
   EXPECT_EQ(order[3], "reactive2");
 }
 
-TEST(SimCh4425, ObservedExecutesAfterActiveRegionSet) {
+TEST(ObservedRegionSim, ObservedExecutesAfterActiveRegionSet) {
   VerifyFourRegionOrder({Region::kActive, "active"},
                         {Region::kInactive, "inactive"}, {Region::kNBA, "nba"},
                         {Region::kObserved, "observed"});
 }
 
-TEST(SimCh4425, ObservedToActiveRestart) {
+TEST(ObservedRegionSim, ObservedToActiveRestart) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -113,7 +113,7 @@ TEST(SimCh4425, ObservedToActiveRestart) {
   EXPECT_EQ(order[1], "active_restart");
 }
 
-TEST(SimCh4425, ObservedIsAfterPostNBABeforePostObserved) {
+TEST(ObservedRegionSim, ObservedIsAfterPostNBABeforePostObserved) {
   auto observed_ord = static_cast<int>(Region::kObserved);
   auto post_nba_ord = static_cast<int>(Region::kPostNBA);
   auto post_observed_ord = static_cast<int>(Region::kPostObserved);
@@ -121,7 +121,7 @@ TEST(SimCh4425, ObservedIsAfterPostNBABeforePostObserved) {
   EXPECT_LT(observed_ord, post_observed_ord);
 }
 
-TEST(SimCh4425, PreObservedExecutesBeforeObserved) {
+TEST(ObservedRegionSim, PreObservedExecutesBeforeObserved) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -140,7 +140,7 @@ TEST(SimCh4425, PreObservedExecutesBeforeObserved) {
   EXPECT_EQ(order[1], "observed");
 }
 
-TEST(SimCh4425, ObservedExecutesBeforePostObserved) {
+TEST(ObservedRegionSim, ObservedExecutesBeforePostObserved) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -159,7 +159,7 @@ TEST(SimCh4425, ObservedExecutesBeforePostObserved) {
   EXPECT_EQ(order[1], "post_observed");
 }
 
-TEST(SimCh4425, ObservedEventsAcrossMultipleTimeSlots) {
+TEST(ObservedRegionSim, ObservedEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;

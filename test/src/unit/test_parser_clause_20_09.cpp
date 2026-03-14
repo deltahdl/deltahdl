@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexD2, AnnexDCountonesParse) {
+TEST(OptionalSystemTaskExtendedParsing, CountonesParse) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $countones(data);\n"
@@ -18,7 +18,7 @@ TEST(ParserAnnexD2, AnnexDCountonesParse) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserAnnexD2, AnnexDCountonesRhs) {
+TEST(OptionalSystemTaskExtendedParsing, CountonesRhs) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $countones(data);\n"
@@ -30,7 +30,7 @@ TEST(ParserAnnexD2, AnnexDCountonesRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-TEST(ParserAnnexD2, AnnexDIsunknownParse) {
+TEST(OptionalSystemTaskExtendedParsing, IsunknownParse) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $isunknown(data);\n"
@@ -42,7 +42,7 @@ TEST(ParserAnnexD2, AnnexDIsunknownParse) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserAnnexD2, AnnexDIsunknownRhs) {
+TEST(OptionalSystemTaskExtendedParsing, IsunknownRhs) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $isunknown(data);\n"
@@ -54,7 +54,7 @@ TEST(ParserAnnexD2, AnnexDIsunknownRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-TEST(ParserAnnexD2, AnnexDOnehot) {
+TEST(OptionalSystemTaskExtendedParsing, Onehot) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

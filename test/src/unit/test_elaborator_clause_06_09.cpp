@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabSection6, Sec6_9_1_ScalarWidth) {
+TEST(VectorDeclarationElaboration, ScalarWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic a; endmodule\n", f);
   ASSERT_NE(design, nullptr);

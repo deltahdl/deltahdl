@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA82, SystemTfCallBitsExprArg) {
+TEST(SubroutineCallExprParsing, SystemTfCallBitsExprArg) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] v;\n"
@@ -21,7 +21,7 @@ TEST(ParserA82, SystemTfCallBitsExprArg) {
   EXPECT_EQ(stmt->rhs->callee, "$bits");
 }
 
-TEST(ParserA84, ConstantPrimaryTypeReference) {
+TEST(PrimaryParsing, ConstantPrimaryTypeReference) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] x;\n"

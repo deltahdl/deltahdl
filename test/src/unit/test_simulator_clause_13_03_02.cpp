@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Sim13032, StaticTaskRetainsValues) {
+TEST(TaskBodySim, StaticTaskRetainsValues) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -24,7 +24,7 @@ TEST(Sim13032, StaticTaskRetainsValues) {
   EXPECT_EQ(val, 60u);
 }
 
-TEST(Sim13032, AutomaticTaskFreshVars) {
+TEST(TaskBodySim, AutomaticTaskFreshVars) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -44,7 +44,7 @@ TEST(Sim13032, AutomaticTaskFreshVars) {
   EXPECT_EQ(val, 30u);
 }
 
-TEST(Sim13032, StaticTaskArgsRetainValues) {
+TEST(TaskBodySim, StaticTaskArgsRetainValues) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -62,7 +62,7 @@ TEST(Sim13032, StaticTaskArgsRetainValues) {
   EXPECT_EQ(val, 3u);
 }
 
-TEST(Sim13032, AutomaticTaskInputFromCaller) {
+TEST(TaskBodySim, AutomaticTaskInputFromCaller) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"

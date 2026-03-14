@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, AssignmentCompatibleRealToReal) {
+TEST(DataTypeParsing, AssignmentCompatibleRealToReal) {
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -13,7 +13,7 @@ TEST(ParserSection6, AssignmentCompatibleRealToReal) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(ParserSection6, AssignCompatibleByteToShortint) {
+TEST(DataTypeParsing, AssignCompatibleByteToShortint) {
   DataType a;
   a.kind = DataTypeKind::kByte;
   DataType b;
@@ -21,7 +21,7 @@ TEST(ParserSection6, AssignCompatibleByteToShortint) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(ParserSection6, AssignCompatibleRealToReal) {
+TEST(DataTypeParsing, AssignCompatibleRealToReal) {
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -29,7 +29,7 @@ TEST(ParserSection6, AssignCompatibleRealToReal) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(ParserSection6, AssignCompatibleEnumToLogic) {
+TEST(DataTypeParsing, AssignCompatibleEnumToLogic) {
   DataType a;
   a.kind = DataTypeKind::kEnum;
   DataType b;
@@ -37,7 +37,7 @@ TEST(ParserSection6, AssignCompatibleEnumToLogic) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(ParserSection6, AssignmentCompatibleIntegral) {
+TEST(DataTypeParsing, AssignmentCompatibleIntegral) {
   DataType a;
   a.kind = DataTypeKind::kInt;
   DataType b;
@@ -45,7 +45,7 @@ TEST(ParserSection6, AssignmentCompatibleIntegral) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(ParserSection6, AssignmentCompatibleEnumToInt) {
+TEST(DataTypeParsing, AssignmentCompatibleEnumToInt) {
   DataType a;
   a.kind = DataTypeKind::kEnum;
   DataType b;
@@ -53,7 +53,7 @@ TEST(ParserSection6, AssignmentCompatibleEnumToInt) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(ParserSection6, NotAssignmentCompatibleStringInt) {
+TEST(DataTypeParsing, NotAssignmentCompatibleStringInt) {
   DataType a;
   a.kind = DataTypeKind::kString;
   DataType b;
@@ -61,7 +61,7 @@ TEST(ParserSection6, NotAssignmentCompatibleStringInt) {
   EXPECT_FALSE(IsAssignmentCompatible(a, b));
 }
 
-TEST(ParserSection6, AssignCompatibleRealToLogic) {
+TEST(DataTypeParsing, AssignCompatibleRealToLogic) {
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -69,7 +69,7 @@ TEST(ParserSection6, AssignCompatibleRealToLogic) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(ParserSection6, AssignCompatibleRealtimeToShortreal) {
+TEST(DataTypeParsing, AssignCompatibleRealtimeToShortreal) {
   DataType a;
   a.kind = DataTypeKind::kRealtime;
   DataType b;
@@ -77,7 +77,7 @@ TEST(ParserSection6, AssignCompatibleRealtimeToShortreal) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(ParserSection6, NotAssignCompatibleChandleToInt) {
+TEST(DataTypeParsing, NotAssignCompatibleChandleToInt) {
   DataType a;
   a.kind = DataTypeKind::kChandle;
   DataType b;

@@ -30,7 +30,7 @@ TEST(BidrectionalSwitches, TranifAcceptsDelays) {
   EXPECT_EQ(MaxSwitchDelays(SwitchType::kTranif1), 2u);
 }
 
-TEST(SimCh4095, TransistorSourceElements) {
+TEST(SwitchProcessingSchedulingSim, TransistorSourceElements) {
   Arena arena;
   Scheduler sched(arena);
 

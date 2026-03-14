@@ -22,7 +22,7 @@ TEST(ConstEval, ScopedTernary) {
       ConstEvalInt(ParseExprFrom("WIDTH > 8 ? WIDTH : 8", f), scope_small), 8);
 }
 
-TEST(ElabA83, TernaryInContAssignElaborates) {
+TEST(ExpressionElaboration, TernaryInContAssignElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -35,7 +35,7 @@ TEST(ElabA83, TernaryInContAssignElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh9, AlwaysCombTernaryTrue) {
+TEST(AlwaysCombBasicSim, AlwaysCombTernaryTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -56,7 +56,7 @@ TEST(SimCh9, AlwaysCombTernaryTrue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimCh9, AlwaysCombTernaryFalse) {
+TEST(AlwaysCombBasicSim, AlwaysCombTernaryFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -77,7 +77,7 @@ TEST(SimCh9, AlwaysCombTernaryFalse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimCh9, AlwaysCombChainedTernary) {
+TEST(AlwaysCombBasicSim, AlwaysCombChainedTernary) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -100,7 +100,7 @@ TEST(SimCh9, AlwaysCombChainedTernary) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimCh9c, TernarySelectsFirst) {
+TEST(AlwaysLatchBasicSim, TernarySelectsFirst) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -126,7 +126,7 @@ TEST(SimCh9c, TernarySelectsFirst) {
   EXPECT_EQ(q->value.ToUint64(), 0xCAu);
 }
 
-TEST(SimCh9c, TernarySelectsSecond) {
+TEST(AlwaysLatchBasicSim, TernarySelectsSecond) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -152,7 +152,7 @@ TEST(SimCh9c, TernarySelectsSecond) {
   EXPECT_EQ(q->value.ToUint64(), 0xFEu);
 }
 
-TEST(SimCh10, BlockingAssignTernary) {
+TEST(BlockingAssignSim, BlockingAssignTernary) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -174,7 +174,7 @@ TEST(SimCh10, BlockingAssignTernary) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimCh10, BlockingAssignTernaryFalse) {
+TEST(BlockingAssignSim, BlockingAssignTernaryFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

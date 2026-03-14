@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0412, MultipleInterfaceInstances) {
+TEST(InterfaceInstantiationGrammar, MultipleInterfaceInstances) {
   auto r = Parse("module m; my_if u0(.a(a)), u1(.a(b)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -18,7 +18,7 @@ TEST(ParserAnnexA0412, MultipleInterfaceInstances) {
   EXPECT_EQ(i1->inst_name, "u1");
 }
 
-TEST(ParserAnnexA0412, InterfaceInstEmptyPorts) {
+TEST(InterfaceInstantiationGrammar, InterfaceInstEmptyPorts) {
   auto r = Parse("module m; my_if u0(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -27,7 +27,7 @@ TEST(ParserAnnexA0412, InterfaceInstEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-TEST(ParserAnnexA0412, InterfaceInstInsideInterface) {
+TEST(InterfaceInstantiationGrammar, InterfaceInstInsideInterface) {
   auto r = Parse(
       "interface outer_if;\n"
       "  inner_if u0(.clk(clk));\n"

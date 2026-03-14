@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserCh513, BuiltInMethod_PushBack) {
+TEST(BuiltInMethodParsing, BuiltInMethod_PushBack) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q[$];\n"
@@ -13,7 +13,7 @@ TEST(ParserCh513, BuiltInMethod_PushBack) {
               "endmodule"));
 }
 
-TEST(ParserSection7, QueueMethodPushBack) {
+TEST(AggregateTypeParsing, QueueMethodPushBack) {
   auto r = Parse(
       "module t;\n"
       "  int q[$];\n"
@@ -25,7 +25,7 @@ TEST(ParserSection7, QueueMethodPushBack) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-TEST(ParserSection7, QueuePushBack) {
+TEST(AggregateTypeParsing, QueuePushBack) {
   auto r = Parse(
       "module t;\n"
       "  int q[$];\n"

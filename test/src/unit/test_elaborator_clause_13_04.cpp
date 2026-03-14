@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA82, FunctionCallInContAssign) {
+TEST(SubroutineCallExprElaboration, FunctionCallInContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -21,7 +21,7 @@ TEST(ElabA82, FunctionCallInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA603, ForkJoinIllegalInFunction) {
+TEST(BlockStatementElaboration, ForkJoinIllegalInFunction) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -35,7 +35,7 @@ TEST(ElabA603, ForkJoinIllegalInFunction) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1304, FunctionWithOutputArgsElaborates) {
+TEST(FunctionElaboration, FunctionWithOutputArgsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -48,7 +48,7 @@ TEST(Elab1304, FunctionWithOutputArgsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1304, FunctionWithRefArgElaborates) {
+TEST(FunctionElaboration, FunctionWithRefArgElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -61,7 +61,7 @@ TEST(Elab1304, FunctionWithRefArgElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1304, FunctionEmptyBodyElaborates) {
+TEST(FunctionElaboration, FunctionEmptyBodyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -73,7 +73,7 @@ TEST(Elab1304, FunctionEmptyBodyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1304, FunctionWithDelayError) {
+TEST(FunctionElaboration, FunctionWithDelayError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -85,7 +85,7 @@ TEST(Elab1304, FunctionWithDelayError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1304, FunctionEnablesTaskError) {
+TEST(FunctionElaboration, FunctionEnablesTaskError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -98,7 +98,7 @@ TEST(Elab1304, FunctionEnablesTaskError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1304, ForkJoinNoneInFunctionOk) {
+TEST(FunctionElaboration, ForkJoinNoneInFunctionOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

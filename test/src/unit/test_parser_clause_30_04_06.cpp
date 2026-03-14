@@ -5,14 +5,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A7SpecifyFullPath) {
+TEST(FormalSyntaxParsing, SpecifyFullPath) {
   auto r =
       Parse("module m; specify (a, b *> c, d) = 10; endspecify endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA703, ListOfPathInputsMultiple) {
+TEST(SpecifyTerminalParsing, ListOfPathInputsMultiple) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -29,7 +29,7 @@ TEST(ParserA703, ListOfPathInputsMultiple) {
   EXPECT_EQ(si->path.src_ports[2].name, "c");
 }
 
-TEST(ParserA703, MixedOutputTerminalsFullPath) {
+TEST(SpecifyTerminalParsing, MixedOutputTerminalsFullPath) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

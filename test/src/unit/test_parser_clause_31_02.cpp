@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA705, MultipleTimingChecks) {
+TEST(SystemTimingCheckParsing, MultipleTimingChecks) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

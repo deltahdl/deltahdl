@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, LiteralAsExpression) {
+TEST(OperatorAndExpressionParsing, LiteralAsExpression) {
   auto r = Parse(
       "module t;\n"
       "  initial x = 42;\n"
@@ -14,7 +14,7 @@ TEST(ParserSection11, LiteralAsExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA83, ExprPrimary) {
+TEST(ExpressionParsing, ExprPrimary) {
   auto r = Parse("module m; initial x = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA83, IndexedPartSelectElaborates) {
+TEST(ExpressionElaboration, IndexedPartSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -18,7 +18,7 @@ TEST(ElabA83, IndexedPartSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA83, ConstantRangePackedDimElaborates) {
+TEST(ExpressionElaboration, ConstantRangePackedDimElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -31,7 +31,7 @@ TEST(ElabA83, ConstantRangePackedDimElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA84, PrimaryPartSelectRangeElaborates) {
+TEST(PrimaryElaboration, PrimaryPartSelectRangeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -57,7 +57,7 @@ TEST(Elaboration, RealIndex_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ElabA84, PrimaryHierIdentSelectElaborates) {
+TEST(PrimaryElaboration, PrimaryHierIdentSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -70,7 +70,7 @@ TEST(ElabA84, PrimaryHierIdentSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh9c, BitSelectHighBit) {
+TEST(AlwaysLatchBasicSim, BitSelectHighBit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -97,7 +97,7 @@ TEST(SimCh9c, BitSelectHighBit) {
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9c, PartSelectLowerNibble) {
+TEST(AlwaysLatchBasicSim, PartSelectLowerNibble) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -125,7 +125,7 @@ TEST(SimCh9c, PartSelectLowerNibble) {
   EXPECT_EQ(q->value.ToUint64(), 0xBu);
 }
 
-TEST(SimCh9c, PartSelectUpperNibble) {
+TEST(AlwaysLatchBasicSim, PartSelectUpperNibble) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -153,7 +153,7 @@ TEST(SimCh9c, PartSelectUpperNibble) {
   EXPECT_EQ(q->value.ToUint64(), 0xAu);
 }
 
-TEST(SimCh10, BlockingAssignSplitPacked) {
+TEST(BlockingAssignSim, BlockingAssignSplitPacked) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

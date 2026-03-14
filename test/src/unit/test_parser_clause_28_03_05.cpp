@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0411, InstanceArrayWithRange) {
+TEST(ModuleInstantiationGrammar, InstanceArrayWithRange) {
   auto r = Parse("module m; sub u0[3:0](.a(a)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserAnnexA0411, InstanceArrayWithRange) {
   EXPECT_NE(item->inst_range_right, nullptr);
 }
 
-TEST(ParserAnnexA0412, InterfaceInstArray) {
+TEST(InterfaceInstantiationGrammar, InterfaceInstArray) {
   auto r = Parse("module m; my_if u0 [3:0] (.a(a)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -25,7 +25,7 @@ TEST(ParserAnnexA0412, InterfaceInstArray) {
   EXPECT_NE(item->inst_range_right, nullptr);
 }
 
-TEST(ParserSection23, InstanceArrayKind) {
+TEST(ModuleAndHierarchyParsing, InstanceArrayKind) {
   auto r = Parse(
       "module top;\n"
       "  sub inst[3:0] (.a(a), .b(b));\n"
@@ -37,7 +37,7 @@ TEST(ParserSection23, InstanceArrayKind) {
   EXPECT_EQ(item->inst_name, "inst");
 }
 
-TEST(ParserSection23, InstanceArrayRange) {
+TEST(ModuleAndHierarchyParsing, InstanceArrayRange) {
   auto r = Parse(
       "module top;\n"
       "  sub inst[3:0] (.a(a), .b(b));\n"

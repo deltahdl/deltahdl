@@ -6,100 +6,100 @@
 
 using namespace delta;
 
-TEST(SimCh50702, RealFixedPointDecimal) {
+TEST(RealLiteralConstantSim, RealFixedPointDecimal) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 1.2;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 1.2);
 }
 
-TEST(SimCh50702, RealSmallFixedPoint) {
+TEST(RealLiteralConstantSim, RealSmallFixedPoint) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 0.1;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 0.1);
 }
 
-TEST(SimCh50702, RealLargeFixedPoint) {
+TEST(RealLiteralConstantSim, RealLargeFixedPoint) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 2394.26331;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 2394.26331);
 }
 
-TEST(SimCh50702, RealScientificUpperE) {
+TEST(RealLiteralConstantSim, RealScientificUpperE) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 1.2E12;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 1.2e12);
 }
 
-TEST(SimCh50702, RealScientificLowerENeg) {
+TEST(RealLiteralConstantSim, RealScientificLowerENeg) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 1.30e-2;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 1.30e-2);
 }
 
-TEST(SimCh50702, RealScientificZeroExponent) {
+TEST(RealLiteralConstantSim, RealScientificZeroExponent) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 0.1e-0;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 0.1);
 }
 
-TEST(SimCh50702, RealIntegerScientific) {
+TEST(RealLiteralConstantSim, RealIntegerScientific) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 23E10;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 23e10);
 }
 
-TEST(SimCh50702, RealIntegerNegativeExponent) {
+TEST(RealLiteralConstantSim, RealIntegerNegativeExponent) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 29E-2;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 29e-2);
 }
 
-TEST(SimCh50702, RealUnderscoreIgnored) {
+TEST(RealLiteralConstantSim, RealUnderscoreIgnored) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 236.123_763_e-12;\nendmodule\n",
       "x");
   EXPECT_DOUBLE_EQ(v, 236.123763e-12);
 }
 
-TEST(SimCh50702, RealNegativeUnaryMinus) {
+TEST(RealLiteralConstantSim, RealNegativeUnaryMinus) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = -1.5;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, -1.5);
 }
 
-TEST(SimCh50702, RealExponentPositiveSign) {
+TEST(RealLiteralConstantSim, RealExponentPositiveSign) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 1.0e+2;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 100.0);
 }
 
-TEST(SimCh50702, RealIEEE754BitExact) {
+TEST(RealLiteralConstantSim, RealIEEE754BitExact) {
   auto bits =
       RunAndGet("module t;\n  real x;\n  initial x = 1.0;\nendmodule\n", "x");
   uint64_t expected = 0x3FF0000000000000ULL;
   EXPECT_EQ(bits, expected);
 }
 
-TEST(SimCh50702, RealArithmeticExpression) {
+TEST(RealLiteralConstantSim, RealArithmeticExpression) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 1.5 + 2.25;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 3.75);
 }
 
-TEST(SimCh50702, RealVariablePreservesValue) {
+TEST(RealLiteralConstantSim, RealVariablePreservesValue) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 3.14159265358979;\nendmodule\n",
       "x");
   EXPECT_DOUBLE_EQ(v, 3.14159265358979);
 }
 
-TEST(SimCh50702, RealLargeScientific) {
+TEST(RealLiteralConstantSim, RealLargeScientific) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 39e8;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 39e8);
 }
 
-TEST(SimA87, ScientificNotation) {
+TEST(NumberSim, ScientificNotation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -116,7 +116,7 @@ TEST(SimA87, ScientificNotation) {
   EXPECT_DOUBLE_EQ(ToDouble(var), 1500.0);
 }
 
-TEST(SimA87, ScientificPositiveExp) {
+TEST(NumberSim, ScientificPositiveExp) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -133,7 +133,7 @@ TEST(SimA87, ScientificPositiveExp) {
   EXPECT_DOUBLE_EQ(ToDouble(var), 100.0);
 }
 
-TEST(SimA87, ScientificNegativeExp) {
+TEST(NumberSim, ScientificNegativeExp) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -150,7 +150,7 @@ TEST(SimA87, ScientificNegativeExp) {
   EXPECT_DOUBLE_EQ(ToDouble(var), 0.01);
 }
 
-TEST(SimA87, ExpUppercase) {
+TEST(NumberSim, ExpUppercase) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

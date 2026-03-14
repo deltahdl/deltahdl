@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0412, InterfaceInstWithNamedParams) {
+TEST(InterfaceInstantiationGrammar, InterfaceInstWithNamedParams) {
   auto r = Parse("module m; my_if #(.W(16)) u0(.a(a)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

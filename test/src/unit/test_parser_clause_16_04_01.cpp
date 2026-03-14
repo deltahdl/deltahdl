@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection16, DeferredAssertHash0PassAndFail) {
+TEST(AssertionParsing, DeferredAssertHash0PassAndFail) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -21,7 +21,7 @@ TEST(ParserSection16, DeferredAssertHash0PassAndFail) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserA610, DeferredAssertHash0ActionBlock) {
+TEST(AssertionStatementSyntaxParsing, DeferredAssertHash0ActionBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial assert #0 (1) $display(\"p\"); else $display(\"f\");\n"

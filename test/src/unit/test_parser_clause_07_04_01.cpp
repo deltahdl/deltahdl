@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA25, PackedDimConstantRange) {
+TEST(DeclarationRangeParsing, PackedDimConstantRange) {
   auto r = Parse("module m; logic [7:0] x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -17,7 +17,7 @@ TEST(ParserA25, PackedDimConstantRange) {
   ASSERT_NE(item->data_type.packed_dim_right, nullptr);
 }
 
-TEST(ParserA25, PackedDimMultiple) {
+TEST(DeclarationRangeParsing, PackedDimMultiple) {
   auto r = Parse("module m; logic [3:0][7:0] x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -26,7 +26,7 @@ TEST(ParserA25, PackedDimMultiple) {
   EXPECT_EQ(item->data_type.extra_packed_dims.size(), 1u);
 }
 
-TEST(ParserSection6, Sec6_11_MultiplePackedDims) {
+TEST(DataTypeParsing, MultiplePackedDims) {
   auto r = Parse(
       "module t;\n"
       "  logic [3:0][7:0] data;\n"
@@ -41,7 +41,7 @@ TEST(ParserSection6, Sec6_11_MultiplePackedDims) {
   EXPECT_FALSE(item->data_type.extra_packed_dims.empty());
 }
 
-TEST(ParserSection7, PackedArrayMultiDim) {
+TEST(AggregateTypeParsing, PackedArrayMultiDim) {
   auto r = Parse(
       "module t;\n"
       "  bit [3:0][7:0] packed_2d;\n"
@@ -53,7 +53,7 @@ TEST(ParserSection7, PackedArrayMultiDim) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
 }
 
-TEST(ParserA83, ConstantRangeInPackedDim) {
+TEST(ExpressionParsing, ConstantRangeInPackedDim) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] x;\n"
@@ -67,7 +67,7 @@ TEST(ParserA83, ConstantRangeInPackedDim) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(ParserA84, ConstantBitSelectPackedDim) {
+TEST(PrimaryParsing, ConstantBitSelectPackedDim) {
   auto r = Parse("module m; logic [7:0] data; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

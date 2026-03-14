@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_Tranif0Basic) {
+TEST(PrimitiveInstantiationParsing, GateInst_Tranif0Basic) {
   auto r = Parse(
       "module m;\n"
       "  tranif0 (io1, io2, ctrl);\n"
@@ -17,28 +17,28 @@ TEST(ParserA301, GateInst_Tranif0Basic) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA301, GateInst_Tranif1Basic) {
+TEST(PrimitiveInstantiationParsing, GateInst_Tranif1Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  tranif1 (io1, io2, ctrl);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_Rtranif0Basic) {
+TEST(PrimitiveInstantiationParsing, GateInst_Rtranif0Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  rtranif0 (io1, io2, ctrl);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_Rtranif1Basic) {
+TEST(PrimitiveInstantiationParsing, GateInst_Rtranif1Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  rtranif1 (io1, io2, ctrl);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_PassEnWithDelay) {
+TEST(PrimitiveInstantiationParsing, GateInst_PassEnWithDelay) {
   auto r = Parse(
       "module m;\n"
       "  tranif0 #(3, 5) t1(io1, io2, ctrl);\n"
@@ -49,7 +49,7 @@ TEST(ParserA301, GateInst_PassEnWithDelay) {
   EXPECT_NE(g->gate_delay, nullptr);
 }
 
-TEST(ParserA301, GateInst_TranBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_TranBasic) {
   auto r = Parse(
       "module m;\n"
       "  tran (io1, io2);\n"
@@ -60,14 +60,14 @@ TEST(ParserA301, GateInst_TranBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA301, GateInst_RtranBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_RtranBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  rtran (io1, io2);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, PassSwitchInst_TranNamed) {
+TEST(PrimitiveInstantiationParsing, PassSwitchInst_TranNamed) {
   auto r = Parse(
       "module m;\n"
       "  tran t1(io1, io2);\n"
@@ -79,7 +79,7 @@ TEST(ParserA301, PassSwitchInst_TranNamed) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA301, PassSwitchInst_RtranNamed) {
+TEST(PrimitiveInstantiationParsing, PassSwitchInst_RtranNamed) {
   auto r = Parse(
       "module m;\n"
       "  rtran rt1(io1, io2);\n"
@@ -90,7 +90,7 @@ TEST(ParserA301, PassSwitchInst_RtranNamed) {
   EXPECT_EQ(g->gate_inst_name, "rt1");
 }
 
-TEST(ParserA301, PassSwitchInst_Unnamed) {
+TEST(PrimitiveInstantiationParsing, PassSwitchInst_Unnamed) {
   auto r = Parse(
       "module m;\n"
       "  tran (io1, io2);\n"
@@ -101,7 +101,7 @@ TEST(ParserA301, PassSwitchInst_Unnamed) {
   EXPECT_TRUE(g->gate_inst_name.empty());
 }
 
-TEST(ParserA301, PassEnSwitchInst_Tranif0Named) {
+TEST(PrimitiveInstantiationParsing, PassEnSwitchInst_Tranif0Named) {
   auto r = Parse(
       "module m;\n"
       "  tranif0 t1(io1, io2, ctrl);\n"
@@ -113,7 +113,7 @@ TEST(ParserA301, PassEnSwitchInst_Tranif0Named) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA301, PassEnSwitchInst_Tranif1Named) {
+TEST(PrimitiveInstantiationParsing, PassEnSwitchInst_Tranif1Named) {
   auto r = Parse(
       "module m;\n"
       "  tranif1 t1(io1, io2, ctrl);\n"
@@ -124,7 +124,7 @@ TEST(ParserA301, PassEnSwitchInst_Tranif1Named) {
   EXPECT_EQ(g->gate_inst_name, "t1");
 }
 
-TEST(ParserA301, PassEnSwitchInst_Rtranif0Named) {
+TEST(PrimitiveInstantiationParsing, PassEnSwitchInst_Rtranif0Named) {
   auto r = Parse(
       "module m;\n"
       "  rtranif0 rt1(io1, io2, ctrl);\n"
@@ -135,7 +135,7 @@ TEST(ParserA301, PassEnSwitchInst_Rtranif0Named) {
   EXPECT_EQ(g->gate_inst_name, "rt1");
 }
 
-TEST(ParserA301, PassEnSwitchInst_Rtranif1Named) {
+TEST(PrimitiveInstantiationParsing, PassEnSwitchInst_Rtranif1Named) {
   auto r = Parse(
       "module m;\n"
       "  rtranif1 rt1(io1, io2, ctrl);\n"
@@ -146,7 +146,7 @@ TEST(ParserA301, PassEnSwitchInst_Rtranif1Named) {
   EXPECT_EQ(g->gate_inst_name, "rt1");
 }
 
-TEST(ParserA301, PassEnSwitchInst_Unnamed) {
+TEST(PrimitiveInstantiationParsing, PassEnSwitchInst_Unnamed) {
   auto r = Parse(
       "module m;\n"
       "  tranif0 (io1, io2, ctrl);\n"
@@ -157,7 +157,7 @@ TEST(ParserA301, PassEnSwitchInst_Unnamed) {
   EXPECT_TRUE(g->gate_inst_name.empty());
 }
 
-TEST(ParserA301, GateInst_AllPassSwitchTypes) {
+TEST(PrimitiveInstantiationParsing, GateInst_AllPassSwitchTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  tran  t1(a, b);\n"
@@ -165,7 +165,7 @@ TEST(ParserA301, GateInst_AllPassSwitchTypes) {
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_AllPassEnSwitchTypes) {
+TEST(PrimitiveInstantiationParsing, GateInst_AllPassEnSwitchTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  tranif0  t0(a, b, c);\n"
@@ -175,7 +175,7 @@ TEST(ParserA301, GateInst_AllPassEnSwitchTypes) {
               "endmodule\n"));
 }
 
-TEST(ParserA303, InoutTerminal_SimpleIdent) {
+TEST(PrimitiveTerminalParsing, InoutTerminal_SimpleIdent) {
   auto r = Parse(
       "module m;\n"
       "  tran (a, b);\n"
@@ -186,7 +186,7 @@ TEST(ParserA303, InoutTerminal_SimpleIdent) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA303, InoutTerminal_RtranBasic) {
+TEST(PrimitiveTerminalParsing, InoutTerminal_RtranBasic) {
   auto r = Parse(
       "module m;\n"
       "  rtran (p, q);\n"
@@ -197,7 +197,7 @@ TEST(ParserA303, InoutTerminal_RtranBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA304, PassEnSwitchtype_Tranif0) {
+TEST(PrimitiveGateTypeParsing, PassEnSwitchtype_Tranif0) {
   auto r = Parse(
       "module m;\n"
       "  tranif0 (a, b, ctrl);\n"
@@ -208,7 +208,7 @@ TEST(ParserA304, PassEnSwitchtype_Tranif0) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, PassEnSwitchtype_Tranif1) {
+TEST(PrimitiveGateTypeParsing, PassEnSwitchtype_Tranif1) {
   auto r = Parse(
       "module m;\n"
       "  tranif1 (a, b, ctrl);\n"
@@ -219,7 +219,7 @@ TEST(ParserA304, PassEnSwitchtype_Tranif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, PassEnSwitchtype_Rtranif0) {
+TEST(PrimitiveGateTypeParsing, PassEnSwitchtype_Rtranif0) {
   auto r = Parse(
       "module m;\n"
       "  rtranif0 (a, b, ctrl);\n"
@@ -230,7 +230,7 @@ TEST(ParserA304, PassEnSwitchtype_Rtranif0) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, PassEnSwitchtype_Rtranif1) {
+TEST(PrimitiveGateTypeParsing, PassEnSwitchtype_Rtranif1) {
   auto r = Parse(
       "module m;\n"
       "  rtranif1 (a, b, ctrl);\n"
@@ -241,7 +241,7 @@ TEST(ParserA304, PassEnSwitchtype_Rtranif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, PassSwitchtype_Tran) {
+TEST(PrimitiveGateTypeParsing, PassSwitchtype_Tran) {
   auto r = Parse(
       "module m;\n"
       "  tran (a, b);\n"
@@ -252,7 +252,7 @@ TEST(ParserA304, PassSwitchtype_Tran) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA304, PassSwitchtype_Rtran) {
+TEST(PrimitiveGateTypeParsing, PassSwitchtype_Rtran) {
   auto r = Parse(
       "module m;\n"
       "  rtran (a, b);\n"

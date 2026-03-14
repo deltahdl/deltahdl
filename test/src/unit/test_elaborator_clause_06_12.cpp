@@ -90,7 +90,7 @@ TEST(Elaboration, RealAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(ElabA87, NumberRealElaborates) {
+TEST(NumberElaboration, NumberRealElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

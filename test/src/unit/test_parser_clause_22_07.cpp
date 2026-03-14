@@ -4,42 +4,42 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, TimescaleNsPs) {
+TEST(CompilerDirectiveParsing, TimescaleNsPs) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`timescale 1ns/1ps\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, Timescale10ns1ns) {
+TEST(CompilerDirectiveParsing, Timescale10ns1ns) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`timescale 10ns/1ns\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, Timescale100ns10ns) {
+TEST(CompilerDirectiveParsing, Timescale100ns10ns) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`timescale 100ns/10ns\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, TimescaleUsNs) {
+TEST(CompilerDirectiveParsing, TimescaleUsNs) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`timescale 1us/1ns\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, TimescaleMsUs) {
+TEST(CompilerDirectiveParsing, TimescaleMsUs) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`timescale 1ms/1us\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, MultipleTimescales) {
+TEST(CompilerDirectiveParsing, MultipleTimescales) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`timescale 1ns/1ps\n"
                               "module m1;\n"
@@ -49,7 +49,7 @@ TEST(ParserSection22, MultipleTimescales) {
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, TimescaleWithDelays) {
+TEST(CompilerDirectiveParsing, TimescaleWithDelays) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`timescale 1ns/1ps\n"
                               "module t;\n"

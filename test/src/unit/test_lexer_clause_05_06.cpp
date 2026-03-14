@@ -8,83 +8,83 @@ using namespace delta;
 
 namespace {
 
-TEST(LexerClause05, Cl5_6_SimpleIdentLetters) {
+TEST(LexicalConventionLexing, SimpleIdentLetters) {
   auto r = LexOne("abc ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "abc");
 }
 
-TEST(LexerClause05, Cl5_6_SimpleIdentDigits) {
+TEST(LexicalConventionLexing, SimpleIdentDigits) {
   auto r = LexOne("val42 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "val42");
 }
 
-TEST(LexerClause05, Cl5_6_SimpleIdentUnderscore) {
+TEST(LexicalConventionLexing, SimpleIdentUnderscore) {
   auto r = LexOne("_bus3 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "_bus3");
 }
 
-TEST(LexerClause05, Cl5_6_SimpleIdentDollar) {
+TEST(LexicalConventionLexing, SimpleIdentDollar) {
   auto r = LexOne("n$657 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "n$657");
 }
 
-TEST(LexerClause05, Cl5_6_SimpleIdentMixed) {
+TEST(LexicalConventionLexing, SimpleIdentMixed) {
   auto r = LexOne("abc_123$xyz ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "abc_123$xyz");
 }
 
-TEST(LexerClause05, Cl5_6_LrmExampleShiftreg) {
+TEST(LexicalConventionLexing, LrmExampleShiftreg) {
   auto r = LexOne("shiftreg_a ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "shiftreg_a");
 }
 
-TEST(LexerClause05, Cl5_6_LrmExampleBusaIndex) {
+TEST(LexicalConventionLexing, LrmExampleBusaIndex) {
   auto r = LexOne("busa_index ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "busa_index");
 }
 
-TEST(LexerClause05, Cl5_6_LrmExampleError_condition) {
+TEST(LexicalConventionLexing, LrmExampleError_condition) {
   auto r = LexOne("error_condition ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "error_condition");
 }
 
-TEST(LexerClause05, Cl5_6_LrmExampleMerge_ab) {
+TEST(LexicalConventionLexing, LrmExampleMerge_ab) {
   auto r = LexOne("merge_ab ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "merge_ab");
 }
 
-TEST(LexerClause05, Cl5_6_LrmExampleData0) {
+TEST(LexicalConventionLexing, LrmExampleData0) {
   auto r = LexOne("_data_3_ ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "_data_3_");
 }
 
-TEST(LexerClause05, Cl5_6_DigitStartIsNumber) {
+TEST(LexicalConventionLexing, DigitStartIsNumber) {
   auto r = LexOne("42abc ");
 
   EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
 }
 
-TEST(LexerClause05, Cl5_6_DollarStartIsSystemOrDollar) {
+TEST(LexicalConventionLexing, DollarStartIsSystemOrDollar) {
   auto r = LexOne("$finish ");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
 }
 
-TEST(LexerClause05, Cl5_6_BareDollarIsDollarToken) {
+TEST(LexicalConventionLexing, BareDollarIsDollarToken) {
   auto r = LexOne("$ ");
   EXPECT_EQ(r.token.kind, TokenKind::kDollar);
 }
 
-TEST(LexerClause05, Cl5_6_CaseSensitive) {
+TEST(LexicalConventionLexing, CaseSensitive) {
   auto tokens = Lex("ABC abc Abc");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].text, "ABC");
@@ -92,18 +92,18 @@ TEST(LexerClause05, Cl5_6_CaseSensitive) {
   EXPECT_EQ(tokens[2].text, "Abc");
 }
 
-TEST(LexerClause05, Cl5_6_KeywordRecognized) {
+TEST(LexicalConventionLexing, KeywordRecognized) {
   auto r = LexOne("module ");
   EXPECT_EQ(r.token.kind, TokenKind::kKwModule);
 }
 
-TEST(LexerClause05, Cl5_6_UppercaseNotKeyword) {
+TEST(LexicalConventionLexing, UppercaseNotKeyword) {
   auto r = LexOne("Module ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "Module");
 }
 
-TEST(LexerClause05, Cl5_6_MaxLength1024Ok) {
+TEST(LexicalConventionLexing, MaxLength1024Ok) {
   std::string id(1024, 'a');
   id += " ";
   auto [tokens, errors] = LexWithDiag(id);
@@ -113,19 +113,19 @@ TEST(LexerClause05, Cl5_6_MaxLength1024Ok) {
   EXPECT_EQ(tokens[0].text.size(), 1024u);
 }
 
-TEST(LexerClause05, Cl5_6_MaxLength1025Error) {
+TEST(LexicalConventionLexing, MaxLength1025Error) {
   std::string id(1025, 'a');
   auto [tokens, errors] = LexWithDiag(id);
   EXPECT_TRUE(errors);
 }
 
-TEST(LexerClause05, Cl5_6_EscapedMaxLength1025Error) {
+TEST(LexicalConventionLexing, EscapedMaxLength1025Error) {
   std::string id = "\\" + std::string(1025, 'a') + " ";
   auto [tokens, errors] = LexWithDiag(id);
   EXPECT_TRUE(errors);
 }
 
-TEST(LexerClause05, Cl5_6_SimpleAndEscapedInStream) {
+TEST(LexicalConventionLexing, SimpleAndEscapedInStream) {
   auto tokens = Lex("abc \\def ghi");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CrossBodyItem_FunctionDecl) {
+TEST(CovergroupDeclParsing, CrossBodyItem_FunctionDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -19,7 +19,7 @@ TEST(ParserA211, CrossBodyItem_FunctionDecl) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CrossSetExpression) {
+TEST(CovergroupDeclParsing, CrossSetExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"

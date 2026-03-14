@@ -14,7 +14,7 @@ TEST(ConstEval, Shifts) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("16 >>> 2", f)), 4);
 }
 
-TEST(ElabA86, BinaryArithShiftRightElaborates) {
+TEST(OperatorElaboration, BinaryArithShiftRightElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -26,7 +26,7 @@ TEST(ElabA86, BinaryArithShiftRightElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, BinaryArithShiftLeftElaborates) {
+TEST(OperatorElaboration, BinaryArithShiftLeftElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -38,7 +38,7 @@ TEST(ElabA86, BinaryArithShiftLeftElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh9, AlwaysCombBitSelect) {
+TEST(AlwaysCombBasicSim, AlwaysCombBitSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -62,7 +62,7 @@ TEST(SimCh9, AlwaysCombBitSelect) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9, AlwaysCombUpperPartSelect) {
+TEST(AlwaysCombBasicSim, AlwaysCombUpperPartSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -85,7 +85,7 @@ TEST(SimCh9, AlwaysCombUpperPartSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
-TEST(SimCh9, AlwaysCombShift) {
+TEST(AlwaysCombBasicSim, AlwaysCombShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -105,7 +105,7 @@ TEST(SimCh9, AlwaysCombShift) {
   EXPECT_EQ(var->value.ToUint64(), 0x30u);
 }
 
-TEST(SimCh9b, AlwaysCombLeftShift) {
+TEST(AlwaysCombExtendedSim, AlwaysCombLeftShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -129,7 +129,7 @@ TEST(SimCh9b, AlwaysCombLeftShift) {
   EXPECT_EQ(y->value.ToUint64(), 0x3Cu);
 }
 
-TEST(SimCh9b, AlwaysCombRightShift) {
+TEST(AlwaysCombExtendedSim, AlwaysCombRightShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -153,7 +153,7 @@ TEST(SimCh9b, AlwaysCombRightShift) {
   EXPECT_EQ(y->value.ToUint64(), 0x0Fu);
 }
 
-TEST(SimCh10, BlockingAssignShiftOps) {
+TEST(BlockingAssignSim, BlockingAssignShiftOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

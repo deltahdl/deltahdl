@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA221, DataTypeVirtualInterface) {
+TEST(NetAndVariableTypeParsing, DataTypeVirtualInterface) {
   auto r = Parse(
       "interface my_ifc; endinterface\n"
       "module m; virtual interface my_ifc vif; endmodule");
@@ -15,7 +15,7 @@ TEST(ParserA221, DataTypeVirtualInterface) {
   EXPECT_EQ(item->data_type.type_name, "my_ifc");
 }
 
-TEST(ParserSection25, VirtualInterfaceDecl) {
+TEST(InterfaceParsing, VirtualInterfaceDecl) {
   auto r = Parse(
       "module top;\n"
       "  virtual interface simple_bus bus_if;\n"
@@ -28,7 +28,7 @@ TEST(ParserSection25, VirtualInterfaceDecl) {
   EXPECT_EQ(item->name, "bus_if");
 }
 
-TEST(ParserSection25, VirtualInterfaceNoKeyword) {
+TEST(InterfaceParsing, VirtualInterfaceNoKeyword) {
   auto r = Parse(
       "module top;\n"
       "  virtual simple_bus bus_if;\n"
@@ -41,7 +41,7 @@ TEST(ParserSection25, VirtualInterfaceNoKeyword) {
   EXPECT_EQ(item->name, "bus_if");
 }
 
-TEST(ParserSection25, VirtualInterfaceWithModportKind) {
+TEST(InterfaceParsing, VirtualInterfaceWithModportKind) {
   auto r = Parse(
       "module top;\n"
       "  virtual interface simple_bus.target bus_if;\n"
@@ -53,7 +53,7 @@ TEST(ParserSection25, VirtualInterfaceWithModportKind) {
   EXPECT_EQ(item->name, "bus_if");
 }
 
-TEST(ParserSection25, VirtualInterfaceWithModportNames) {
+TEST(InterfaceParsing, VirtualInterfaceWithModportNames) {
   auto r = Parse(
       "module top;\n"
       "  virtual interface simple_bus.target bus_if;\n"
@@ -64,7 +64,7 @@ TEST(ParserSection25, VirtualInterfaceWithModportNames) {
   EXPECT_EQ(item->data_type.modport_name, "target");
 }
 
-TEST(ParserSection25, VirtualInterfaceAssignment) {
+TEST(InterfaceParsing, VirtualInterfaceAssignment) {
   auto r = Parse(
       "module top;\n"
       "  virtual interface simple_bus vif;\n"
@@ -78,7 +78,7 @@ TEST(ParserSection25, VirtualInterfaceAssignment) {
   EXPECT_EQ(mod->items[0]->data_type.kind, DataTypeKind::kVirtualInterface);
 }
 
-TEST(ParserSection25, VirtualInterfaceMultipleDecls) {
+TEST(InterfaceParsing, VirtualInterfaceMultipleDecls) {
   auto r = Parse(
       "module top;\n"
       "  virtual interface bus_if a_if;\n"

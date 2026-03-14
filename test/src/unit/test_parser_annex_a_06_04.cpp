@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA604, FunctionStatementOrNullWithNull) {
+TEST(StatementSyntaxParsing, FunctionStatementOrNullWithNull) {
   auto r = Parse(
       "module m;\n"
       "  function void f();\n"
@@ -20,7 +20,7 @@ TEST(ParserA604, FunctionStatementOrNullWithNull) {
   EXPECT_EQ(func->func_body_stmts[0]->kind, StmtKind::kNull);
 }
 
-TEST(ParserA604, FunctionStatementWithLabel) {
+TEST(StatementSyntaxParsing, FunctionStatementWithLabel) {
   auto r = Parse(
       "module m;\n"
       "  function void f();\n"
@@ -35,7 +35,7 @@ TEST(ParserA604, FunctionStatementWithLabel) {
   EXPECT_EQ(func->func_body_stmts[0]->label, "step1");
 }
 
-TEST(ParserA604, FunctionStatementWithAttribute) {
+TEST(StatementSyntaxParsing, FunctionStatementWithAttribute) {
   auto r = Parse(
       "module m;\n"
       "  function void f();\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, EnableGates) {
+TEST(GateLevelModelingParsing, EnableGates) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  bufif0 (out, in, en);\n"
@@ -33,7 +33,7 @@ TEST(Parser, GateBufif0) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
-TEST(ParserSection28, GateWithThreeDelays) {
+TEST(GateLevelModelingParsing, GateWithThreeDelays) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  bufif0 #(10, 12, 11) b3(out, in, ctrl);\n"
@@ -44,7 +44,7 @@ TEST(ParserSection28, GateWithThreeDelays) {
   EXPECT_NE(item->gate_delay, nullptr);
 }
 
-TEST(ParserA223, Delay3GateThreeValues) {
+TEST(DelayParsing, Delay3GateThreeValues) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire y, a, b;\n"

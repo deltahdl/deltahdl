@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection8, ParameterizedClass) {
+TEST(ClassParsing, ParameterizedClass) {
   auto r = Parse(
       "class stack #(parameter int DEPTH = 8);\n"
       "  int data;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection8, ParameterizedClass) {
   EXPECT_EQ(cls->params[0].first, "DEPTH");
 }
 
-TEST(ParserSection8, ParameterizedClassMultipleParams) {
+TEST(ClassParsing, ParameterizedClassMultipleParams) {
   auto r = Parse(
       "class fifo #(parameter int WIDTH = 8, parameter int DEPTH = 16);\n"
       "endclass\n");
@@ -29,7 +29,7 @@ TEST(ParserSection8, ParameterizedClassMultipleParams) {
   EXPECT_EQ(cls->params[1].first, "DEPTH");
 }
 
-TEST(ParserSection8, ParameterizedClassTypeParam) {
+TEST(ClassParsing, ParameterizedClassTypeParam) {
   auto r = Parse(
       "class container #(type T = int);\n"
       "  T data;\n"
@@ -41,7 +41,7 @@ TEST(ParserSection8, ParameterizedClassTypeParam) {
   EXPECT_EQ(cls->params[0].first, "T");
 }
 
-TEST(ParserSection8, ParameterizedClassExtendsName) {
+TEST(ClassParsing, ParameterizedClassExtendsName) {
   auto r = Parse(
       "class Base;\n"
       "  int x;\n"
@@ -56,7 +56,7 @@ TEST(ParserSection8, ParameterizedClassExtendsName) {
   EXPECT_EQ(cls->base_class, "Base");
 }
 
-TEST(ParserSection8, ParameterizedClassExtendsParams) {
+TEST(ClassParsing, ParameterizedClassExtendsParams) {
   auto r = Parse(
       "class Base;\n"
       "  int x;\n"
@@ -71,7 +71,7 @@ TEST(ParserSection8, ParameterizedClassExtendsParams) {
   EXPECT_EQ(cls->params[0].first, "N");
 }
 
-TEST(ParserSection8, ParameterizedClassInsideModuleName) {
+TEST(ClassParsing, ParameterizedClassInsideModuleName) {
   auto r = Parse(
       "module class_tb;\n"
       "  class test_cls #(parameter a = 12);\n"
@@ -84,7 +84,7 @@ TEST(ParserSection8, ParameterizedClassInsideModuleName) {
   EXPECT_EQ(cls->name, "test_cls");
 }
 
-TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
+TEST(ClassParsing, ParameterizedClassInsideModuleParams) {
   auto r = Parse(
       "module class_tb;\n"
       "  class test_cls #(parameter a = 12);\n"
@@ -99,7 +99,7 @@ TEST(ParserSection8, ParameterizedClassInsideModuleParams) {
   EXPECT_EQ(cls->class_decl->params[0].first, "a");
 }
 
-TEST(ParserSection13, Sec13_8_MultipleParamsWithDefaults) {
+TEST(TaskAndFunctionParsing, MultipleParamsWithDefaults) {
   auto r = Parse(
       "virtual class Codec#(parameter IN_W = 8,\n"
       "                     parameter OUT_W = $clog2(IN_W));\n"
@@ -116,7 +116,7 @@ TEST(ParserSection13, Sec13_8_MultipleParamsWithDefaults) {
   EXPECT_EQ(r.cu->classes[0]->params[1].first, "OUT_W");
 }
 
-TEST(ParserSection13, Sec13_8_ThreeParams) {
+TEST(TaskAndFunctionParsing, ThreeParams) {
   auto r = Parse(
       "virtual class Xform#(parameter IN_W = 8,\n"
       "                     parameter OUT_W = IN_W * 2,\n"
@@ -131,7 +131,7 @@ TEST(ParserSection13, Sec13_8_ThreeParams) {
   ASSERT_EQ(r.cu->classes[0]->params.size(), 3u);
 }
 
-TEST(ParserSection13, Sec13_8_NoDefaultParam) {
+TEST(TaskAndFunctionParsing, NoDefaultParam) {
   auto r = Parse(
       "virtual class Shifter#(parameter int AMOUNT);\n"
       "  static function logic [31:0] left(input logic [31:0] val);\n"
@@ -143,7 +143,7 @@ TEST(ParserSection13, Sec13_8_NoDefaultParam) {
   ASSERT_EQ(r.cu->classes[0]->params.size(), 1u);
 }
 
-TEST(ParserSection13, Sec13_8_ClassExtends) {
+TEST(TaskAndFunctionParsing, ClassExtends) {
   EXPECT_TRUE(
       ParseOk("class Base;\n"
               "  virtual function void display();\n"
@@ -156,7 +156,7 @@ TEST(ParserSection13, Sec13_8_ClassExtends) {
               "endclass\n"));
 }
 
-TEST(ParserSection8, ParameterizedClassSpecialization) {
+TEST(ClassParsing, ParameterizedClassSpecialization) {
   auto r = Parse(
       "class vector #(int size = 1);\n"
       "  bit [size-1:0] a;\n"
@@ -169,7 +169,7 @@ TEST(ParserSection8, ParameterizedClassSpecialization) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection8, ParameterizedClassStackType) {
+TEST(ClassParsing, ParameterizedClassStackType) {
   auto r = Parse(
       "class stack #(type T = int);\n"
       "  T items[];\n"
@@ -183,7 +183,7 @@ TEST(ParserSection8, ParameterizedClassStackType) {
   EXPECT_EQ(cls->params[0].first, "T");
 }
 
-TEST(ParserSection8, ParameterizedClassDefaultInstantiation) {
+TEST(ClassParsing, ParameterizedClassDefaultInstantiation) {
   auto r = Parse(
       "class stack #(type T = int);\n"
       "  T items[];\n"
@@ -196,7 +196,7 @@ TEST(ParserSection8, ParameterizedClassDefaultInstantiation) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection8, TypeParameterClassMember) {
+TEST(ClassParsing, TypeParameterClassMember) {
   auto r = Parse(
       "class container #(type T = int);\n"
       "  T value;\n"
@@ -216,7 +216,7 @@ TEST(SourceText, ClassWithParams) {
   EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
 }
 
-TEST(ParserSection8, ClassWithParameter) {
+TEST(ClassParsing, ClassWithParameter) {
   auto r = Parse(
       "class par_cls;\n"
       "  parameter int b = 23;\n"

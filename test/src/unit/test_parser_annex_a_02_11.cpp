@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverageOption_AutoBinMax) {
+TEST(CovergroupDeclParsing, CoverageOption_AutoBinMax) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -13,7 +13,7 @@ TEST(ParserA211, CoverageOption_AutoBinMax) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, BlockEventExpression_MultipleOr) {
+TEST(CovergroupDeclParsing, BlockEventExpression_MultipleOr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @@(begin a or begin b or end c);\n"
@@ -22,7 +22,7 @@ TEST(ParserA211, BlockEventExpression_MultipleOr) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, HierarchicalBtfIdentifier_Dotted) {
+TEST(CovergroupDeclParsing, HierarchicalBtfIdentifier_Dotted) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @@(begin top.dut.task1);\n"

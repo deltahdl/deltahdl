@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection11, Sec11_1_AllBinaryOperatorsParse) {
+TEST(OperatorAndExpressionParsing, AllBinaryOperatorsParse) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -38,7 +38,7 @@ TEST(ParserSection11, Sec11_1_AllBinaryOperatorsParse) {
               "endmodule\n"));
 }
 
-TEST(ParserSection11, Sec11_1_AllUnaryOperatorsParse) {
+TEST(OperatorAndExpressionParsing, AllUnaryOperatorsParse) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -57,7 +57,7 @@ TEST(ParserSection11, Sec11_1_AllUnaryOperatorsParse) {
               "endmodule\n"));
 }
 
-TEST(ParserCh501, Sec5_1_SingleCharOperators) {
+TEST(LexicalOverviewParsing, SingleCharOperators) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"

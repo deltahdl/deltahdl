@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A2ClassWithConstraint) {
+TEST(FormalSyntaxParsing, ClassWithConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -78,7 +78,7 @@ TEST(SourceText, ConstraintBlockItems) {
   EXPECT_EQ(members[3]->name, "order_c");
 }
 
-TEST(ParserSection8, ClassWithConstraint) {
+TEST(ClassParsing, ClassWithConstraint) {
   auto r = Parse(
       "class Constrained;\n"
       "  rand int x;\n"

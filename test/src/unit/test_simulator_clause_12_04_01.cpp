@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA606, IfElseIfChainSelectsCorrectBranch) {
+TEST(ConditionalStatementSim, IfElseIfChainSelectsCorrectBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -29,7 +29,7 @@ TEST(SimA606, IfElseIfChainSelectsCorrectBranch) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-TEST(SimA606, IfElseIfFallsToElse) {
+TEST(ConditionalStatementSim, IfElseIfFallsToElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

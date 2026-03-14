@@ -35,7 +35,7 @@ TEST(Constraint, RandsequenceBasicProduction) {
   EXPECT_LE(val, 2);
 }
 
-TEST(SimA612, CodeBlockSideEffect) {
+TEST(RandsequenceSim, CodeBlockSideEffect) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -57,7 +57,7 @@ TEST(SimA612, CodeBlockSideEffect) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA612, ProductionSequenceOrder) {
+TEST(RandsequenceSim, ProductionSequenceOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -81,7 +81,7 @@ TEST(SimA612, ProductionSequenceOrder) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-TEST(SimA612, NoProductionNameUsesFirst) {
+TEST(RandsequenceSim, NoProductionNameUsesFirst) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, BitstreamCastStructToInt) {
+TEST(DataTypeParsing, BitstreamCastStructToInt) {
   EXPECT_TRUE(ParseOk(
       "module t;\n"
       "  typedef struct packed { logic [15:0] hi; logic [15:0] lo; } pair_t;\n"
@@ -18,7 +18,7 @@ TEST(ParserSection6, BitstreamCastStructToInt) {
       "endmodule\n"));
 }
 
-TEST(ParserSection6, BitstreamCastIntToStruct) {
+TEST(DataTypeParsing, BitstreamCastIntToStruct) {
   EXPECT_TRUE(ParseOk(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -29,7 +29,7 @@ TEST(ParserSection6, BitstreamCastIntToStruct) {
       "endmodule\n"));
 }
 
-TEST(ParserSection6, BitStreamCastToType) {
+TEST(DataTypeParsing, BitStreamCastToType) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { logic [3:0] a; logic [3:0] b; } pair_t;\n"
@@ -41,7 +41,7 @@ TEST(ParserSection6, BitStreamCastToType) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection6, BitStreamCastFromStruct) {
+TEST(DataTypeParsing, BitStreamCastFromStruct) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { logic [3:0] a; logic [3:0] b; } pair_t;\n"
@@ -54,7 +54,7 @@ TEST(ParserSection6, BitStreamCastFromStruct) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection6, BitstreamCastStructToStruct) {
+TEST(DataTypeParsing, BitstreamCastStructToStruct) {
   EXPECT_TRUE(ParseOk(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -68,7 +68,7 @@ TEST(ParserSection6, BitstreamCastStructToStruct) {
       "endmodule\n"));
 }
 
-TEST(ParserSection6, BitstreamCastStringType) {
+TEST(DataTypeParsing, BitstreamCastStringType) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef bit [$bits(int)-1:0] tagbits;\n"

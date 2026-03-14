@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh6, TypeRefVarDecl) {
+TEST(DataTypeSim, TypeRefVarDecl) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -31,7 +31,7 @@ TEST(SimCh6, TypeRefVarDecl) {
   EXPECT_EQ(var->value.ToUint64(), 100u);
 }
 
-TEST(SimCh6b, TypeOpInt) {
+TEST(TypeOperatorSim, TypeOpInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -56,7 +56,7 @@ TEST(SimCh6b, TypeOpInt) {
   EXPECT_TRUE(var->is_signed);
 }
 
-TEST(SimCh6b, TypeOpLogic) {
+TEST(TypeOperatorSim, TypeOpLogic) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -81,7 +81,7 @@ TEST(SimCh6b, TypeOpLogic) {
   EXPECT_FALSE(var->is_signed);
 }
 
-TEST(SimCh6b, TypeOpByte) {
+TEST(TypeOperatorSim, TypeOpByte) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -106,7 +106,7 @@ TEST(SimCh6b, TypeOpByte) {
   EXPECT_TRUE(var->is_signed);
 }
 
-TEST(SimCh6b, TypeOpShortint) {
+TEST(TypeOperatorSim, TypeOpShortint) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -131,7 +131,7 @@ TEST(SimCh6b, TypeOpShortint) {
   EXPECT_TRUE(var->is_signed);
 }
 
-TEST(SimCh6b, TypeOpLongint) {
+TEST(TypeOperatorSim, TypeOpLongint) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -156,7 +156,7 @@ TEST(SimCh6b, TypeOpLongint) {
   EXPECT_TRUE(var->is_signed);
 }
 
-TEST(SimCh6b, TypeOpInteger) {
+TEST(TypeOperatorSim, TypeOpInteger) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -181,7 +181,7 @@ TEST(SimCh6b, TypeOpInteger) {
   EXPECT_TRUE(var->is_signed);
 }
 
-TEST(SimCh6b, TypeOpReal) {
+TEST(TypeOperatorSim, TypeOpReal) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -204,7 +204,7 @@ TEST(SimCh6b, TypeOpReal) {
   EXPECT_EQ(var->value.width, 64u);
 }
 
-TEST(SimCh6b, TypeOpPreservesSignedInt) {
+TEST(TypeOperatorSim, TypeOpPreservesSignedInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -226,7 +226,7 @@ TEST(SimCh6b, TypeOpPreservesSignedInt) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-TEST(SimCh6b, TypeOpPreservesUnsignedLogic) {
+TEST(TypeOperatorSim, TypeOpPreservesUnsignedLogic) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -247,7 +247,7 @@ TEST(SimCh6b, TypeOpPreservesUnsignedLogic) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh6b, TypeOpShortintWidth16) {
+TEST(TypeOperatorSim, TypeOpShortintWidth16) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -268,7 +268,7 @@ TEST(SimCh6b, TypeOpShortintWidth16) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-TEST(SimCh6b, TypeOpIntegerWidth32) {
+TEST(TypeOperatorSim, TypeOpIntegerWidth32) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -289,7 +289,7 @@ TEST(SimCh6b, TypeOpIntegerWidth32) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
-TEST(SimCh6b, TypeOpWidthTruncation) {
+TEST(TypeOperatorSim, TypeOpWidthTruncation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -323,7 +323,7 @@ static void LowerRunAndCompareWidths(SimFixture& f, RtlirDesign* design,
   EXPECT_EQ(va_out->value.width, vb_out->value.width);
 }
 
-TEST(SimCh6b, TypeOpIntDifferentValues) {
+TEST(TypeOperatorSim, TypeOpIntDifferentValues) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -344,7 +344,7 @@ TEST(SimCh6b, TypeOpIntDifferentValues) {
   EXPECT_EQ(vb->value.ToUint64(), 2000u);
 }
 
-TEST(SimCh6b, TypeOpShortintSignExtension) {
+TEST(TypeOperatorSim, TypeOpShortintSignExtension) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -372,7 +372,7 @@ TEST(SimCh6b, TypeOpShortintSignExtension) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFu);
 }
 
-TEST(SimCh6b, TypeOpParameterTypeDefault) {
+TEST(TypeOperatorSim, TypeOpParameterTypeDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -397,7 +397,7 @@ TEST(SimCh6b, TypeOpParameterTypeDefault) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SimCh6b, TypeOpEnumType) {
+TEST(TypeOperatorSim, TypeOpEnumType) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -423,7 +423,7 @@ TEST(SimCh6b, TypeOpEnumType) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(SimCh6b, TypeOpByteComputation) {
+TEST(TypeOperatorSim, TypeOpByteComputation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -448,7 +448,7 @@ TEST(SimCh6b, TypeOpByteComputation) {
   EXPECT_EQ(var->value.ToUint64(), 150u);
 }
 
-TEST(SimCh6b, TypeOpIntOverflow) {
+TEST(TypeOperatorSim, TypeOpIntOverflow) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -470,7 +470,7 @@ TEST(SimCh6b, TypeOpIntOverflow) {
   EXPECT_EQ(var->value.ToUint64(), 0x12345678u);
 }
 
-TEST(SimCh6b, TypeOpMatchingWidths) {
+TEST(TypeOperatorSim, TypeOpMatchingWidths) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -490,7 +490,7 @@ TEST(SimCh6b, TypeOpMatchingWidths) {
   EXPECT_EQ(va->is_signed, vb->is_signed);
 }
 
-TEST(SimCh6b, TypeOpByteFullRange) {
+TEST(TypeOperatorSim, TypeOpByteFullRange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -511,7 +511,7 @@ TEST(SimCh6b, TypeOpByteFullRange) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimCh6b, TypeOpLongintFullValue) {
+TEST(TypeOperatorSim, TypeOpLongintFullValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -532,7 +532,7 @@ TEST(SimCh6b, TypeOpLongintFullValue) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEDEADBEEFu);
 }
 
-TEST(SimCh6b, TypeOpLongintMaxValue) {
+TEST(TypeOperatorSim, TypeOpLongintMaxValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -554,7 +554,7 @@ TEST(SimCh6b, TypeOpLongintMaxValue) {
   EXPECT_TRUE(var->is_signed);
 }
 
-TEST(SimCh6b, TypeOpShortintZero) {
+TEST(TypeOperatorSim, TypeOpShortintZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -576,7 +576,7 @@ TEST(SimCh6b, TypeOpShortintZero) {
   EXPECT_TRUE(var->is_signed);
 }
 
-TEST(SimCh6b, TypeOpByteArithmeticSigned) {
+TEST(TypeOperatorSim, TypeOpByteArithmeticSigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -602,7 +602,7 @@ TEST(SimCh6b, TypeOpByteArithmeticSigned) {
   EXPECT_EQ(var->value.ToUint64(), 155u);
 }
 
-TEST(SimCh6b, TypeOpChainedTypeRef) {
+TEST(TypeOperatorSim, TypeOpChainedTypeRef) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -629,7 +629,7 @@ TEST(SimCh6b, TypeOpChainedTypeRef) {
   EXPECT_TRUE(vc->is_signed);
 }
 
-TEST(SimCh6b, TypeOpMultipleAssignments) {
+TEST(TypeOperatorSim, TypeOpMultipleAssignments) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -654,7 +654,7 @@ TEST(SimCh6b, TypeOpMultipleAssignments) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimCh6b, TypeOpShortintMaxUnsigned) {
+TEST(TypeOperatorSim, TypeOpShortintMaxUnsigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -676,7 +676,7 @@ TEST(SimCh6b, TypeOpShortintMaxUnsigned) {
   EXPECT_TRUE(var->is_signed);
 }
 
-TEST(SimCh6b, TypeOpByteFromWiderAssignment) {
+TEST(TypeOperatorSim, TypeOpByteFromWiderAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -703,7 +703,7 @@ TEST(SimCh6b, TypeOpByteFromWiderAssignment) {
   EXPECT_TRUE(var->is_signed);
 }
 
-TEST(SimCh6b, TypeOpLocalparamType) {
+TEST(TypeOperatorSim, TypeOpLocalparamType) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -725,7 +725,7 @@ TEST(SimCh6b, TypeOpLocalparamType) {
   EXPECT_TRUE(var->is_signed);
 }
 
-TEST(SimCh6b, TypeOpLogicVector) {
+TEST(TypeOperatorSim, TypeOpLogicVector) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

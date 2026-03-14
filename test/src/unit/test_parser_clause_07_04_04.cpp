@@ -7,14 +7,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA25, UnpackedDimMultiple) {
+TEST(DeclarationRangeParsing, UnpackedDimMultiple) {
   auto r = Parse("module m; logic x [3:0][7:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->unpacked_dims.size(), 2u);
 }
-TEST(ParserSection7, MultidimensionalArray) {
+TEST(AggregateTypeParsing, MultidimensionalArray) {
   auto r = Parse(
       "module t;\n"
       "  int matrix[4][8];\n"
@@ -25,7 +25,7 @@ TEST(ParserSection7, MultidimensionalArray) {
   EXPECT_GE(item->unpacked_dims.size(), 2u);
 }
 
-TEST(ParserSection7, MultidimensionalPackedArray) {
+TEST(AggregateTypeParsing, MultidimensionalPackedArray) {
   auto r = Parse(
       "module t;\n"
       "  bit [3:0] [7:0] joe [1:10];\n"

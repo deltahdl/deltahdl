@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause05, Cl5_13_ArraySizeMethodElaborates) {
+TEST(LexicalConventionElaboration, ArraySizeMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int arr [0:3];\n"
@@ -13,7 +13,7 @@ TEST(ElabClause05, Cl5_13_ArraySizeMethodElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_13_ArraySizeNoParensElaborates) {
+TEST(LexicalConventionElaboration, ArraySizeNoParensElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int arr [0:2];\n"
@@ -22,7 +22,7 @@ TEST(ElabClause05, Cl5_13_ArraySizeNoParensElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_13_QueueMethodElaborates) {
+TEST(LexicalConventionElaboration, QueueMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int q [$];\n"
@@ -32,7 +32,7 @@ TEST(ElabClause05, Cl5_13_QueueMethodElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_13_QueueSizeElaborates) {
+TEST(LexicalConventionElaboration, QueueSizeElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int q [$];\n"
@@ -41,7 +41,7 @@ TEST(ElabClause05, Cl5_13_QueueSizeElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_13_DynArraySizeElaborates) {
+TEST(LexicalConventionElaboration, DynArraySizeElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int dyn [];\n"
@@ -50,7 +50,7 @@ TEST(ElabClause05, Cl5_13_DynArraySizeElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_13_MutatingMethodElaborates) {
+TEST(LexicalConventionElaboration, MutatingMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int arr [0:2];\n"
@@ -58,7 +58,7 @@ TEST(ElabClause05, Cl5_13_MutatingMethodElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_13_ReductionMethodElaborates) {
+TEST(LexicalConventionElaboration, ReductionMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int arr [0:2] = '{1, 2, 3};\n"

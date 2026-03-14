@@ -262,7 +262,7 @@ TEST(Process, CoroutineDestroyOnScopeExit) {
   SimCoroutine coro = MakeTestCoroutine();
 }
 
-TEST(ParserClause03, Cl3_14_SimTimeOperations) {
+TEST(DesignBuildingBlockParsing, SimTimeOperations) {
   SimTime t0{0};
   SimTime t1{1000};
   SimTime t2{1000};

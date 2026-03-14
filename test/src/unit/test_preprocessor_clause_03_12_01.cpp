@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_12_1_DirectivesLocalToCU) {
+TEST(DesignBuildingBlockParsing, DirectivesLocalToCU) {
   auto r1 = ParseWithPreprocessor(
       "`define FOO 1\n"
       "module m1;\n"
@@ -23,7 +23,7 @@ TEST(ParserClause03, Cl3_12_1_DirectivesLocalToCU) {
   EXPECT_TRUE(r2.has_errors);
 }
 
-TEST(ParserClause03, Cl3_12_1_CompilationUnitDefinition) {
+TEST(DesignBuildingBlockParsing, CompilationUnitDefinition) {
   auto r = ParseWithPreprocessor(
       "module a; endmodule\n"
       "module b; endmodule\n");
@@ -35,7 +35,7 @@ TEST(ParserClause03, Cl3_12_1_CompilationUnitDefinition) {
   EXPECT_EQ(r.cu->modules[1]->name, "b");
 }
 
-TEST(ParserClause03, Cl3_12_1_CuScopeContainsPackageItems) {
+TEST(DesignBuildingBlockParsing, CuScopeContainsPackageItems) {
   auto r = ParseWithPreprocessor(
       "function int helper(int x); return x + 1; endfunction\n"
       "task auto_task; endtask\n"
@@ -50,7 +50,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeContainsPackageItems) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserClause03, Cl3_12_1_IncludeBecomesPartOfCU) {
+TEST(DesignBuildingBlockParsing, IncludeBecomesPartOfCU) {
   auto r = ParseWithPreprocessor(
       "`define MY_CONST 42\n"
       "module m;\n"
@@ -62,7 +62,7 @@ TEST(ParserClause03, Cl3_12_1_IncludeBecomesPartOfCU) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserClause03, Cl3_12_1_GloballyVisibleDesignElements) {
+TEST(DesignBuildingBlockParsing, GloballyVisibleDesignElements) {
   auto r = ParseWithPreprocessor(
       "package pkg; endpackage\n"
       "interface intf; endinterface\n"
@@ -85,7 +85,7 @@ TEST(ParserClause03, Cl3_12_1_GloballyVisibleDesignElements) {
   EXPECT_EQ(r.cu->udps.size(), 1u);
 }
 
-TEST(ParserClause03, Cl3_12_1_CuScopeClassDecl) {
+TEST(DesignBuildingBlockParsing, CuScopeClassDecl) {
   auto r = ParseWithPreprocessor(
       "class my_class;\n"
       "  int x;\n"
@@ -105,7 +105,7 @@ static const ModuleItem* FindItemByKindAndName(
   return nullptr;
 }
 
-TEST(ParserClause03, Cl3_12_1_NameResolutionOrder) {
+TEST(DesignBuildingBlockParsing, NameResolutionOrder) {
   auto r = ParseWithPreprocessor(
       "function int helper(int x); return x; endfunction\n"
       "module m;\n"
@@ -123,7 +123,7 @@ TEST(ParserClause03, Cl3_12_1_NameResolutionOrder) {
             nullptr);
 }
 
-TEST(ParserClause03, Cl3_12_1_CuScopeCannotBeImported) {
+TEST(DesignBuildingBlockParsing, CuScopeCannotBeImported) {
   auto r = ParseWithPreprocessor(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -138,7 +138,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeCannotBeImported) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-TEST(ParserClause03, Cl3_12_1_HierRefFromCUScope) {
+TEST(DesignBuildingBlockParsing, HierRefFromCUScope) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  module_a u1();\n"
@@ -151,7 +151,7 @@ TEST(ParserClause03, Cl3_12_1_HierRefFromCUScope) {
   ASSERT_EQ(r.cu->modules.size(), 2u);
 }
 
-TEST(ParserClause03, Cl3_12_1_TypeSharingViaCUScope) {
+TEST(DesignBuildingBlockParsing, TypeSharingViaCUScope) {
   auto r = ParseWithPreprocessor(
       "class shared_type;\n"
       "  int value;\n"
@@ -168,7 +168,7 @@ TEST(ParserClause03, Cl3_12_1_TypeSharingViaCUScope) {
   ASSERT_EQ(r.cu->modules.size(), 2u);
 }
 
-TEST(ParserClause03, Cl3_12_1_CheckerAtCUScope) {
+TEST(DesignBuildingBlockParsing, CheckerAtCUScope) {
   auto r = ParseWithPreprocessor(
       "checker my_chk;\n"
       "endchecker\n"
@@ -178,7 +178,7 @@ TEST(ParserClause03, Cl3_12_1_CheckerAtCUScope) {
   ASSERT_EQ(r.cu->checkers.size(), 1u);
 }
 
-TEST(ParserClause03, Cl3_12_1_CuScopeTypedefStored) {
+TEST(DesignBuildingBlockParsing, CuScopeTypedefStored) {
   auto r = ParseWithPreprocessor(
       "typedef logic [7:0] byte_t;\n"
       "module m; endmodule\n");
@@ -189,7 +189,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeTypedefStored) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "byte_t");
 }
 
-TEST(ParserClause03, Cl3_12_1_CuScopeLocalparamStored) {
+TEST(DesignBuildingBlockParsing, CuScopeLocalparamStored) {
   auto r = ParseWithPreprocessor(
       "localparam int WIDTH = 8;\n"
       "module m; endmodule\n");
@@ -200,7 +200,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeLocalparamStored) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "WIDTH");
 }
 
-TEST(ParserClause03, Cl3_12_1_CuScopeImportStored) {
+TEST(DesignBuildingBlockParsing, CuScopeImportStored) {
   auto r = ParseWithPreprocessor(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -213,7 +213,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeImportStored) {
   EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kImportDecl);
 }
 
-TEST(ParserClause03, Cl3_12_1_CuScopeVarDeclStored) {
+TEST(DesignBuildingBlockParsing, CuScopeVarDeclStored) {
   auto r = ParseWithPreprocessor(
       "int global_counter;\n"
       "module m; endmodule\n");
@@ -224,7 +224,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeVarDeclStored) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "global_counter");
 }
 
-TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
+TEST(DesignBuildingBlockParsing, DollarUnitScopeResolution) {
   auto r = ParseWithPreprocessor(
       "bit b;\n"
       "task t;\n"
@@ -236,7 +236,7 @@ TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_12_1_ForwardRefOnlyDefinedNames) {
+TEST(DesignBuildingBlockParsing, ForwardRefOnlyDefinedNames) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  initial begin end\n"
@@ -255,7 +255,7 @@ TEST(SourceText, EmptySourceText) {
   EXPECT_TRUE(r.cu->modules.empty());
 }
 
-TEST(ParserClause03, Cl3_13_UnitScopeDeclarations) {
+TEST(DesignBuildingBlockParsing, UnitScopeDeclarations) {
   auto r = ParseWithPreprocessor(
       "function automatic int helper(int x);\n"
       "  return x + 1;\n"

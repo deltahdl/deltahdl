@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Section20, Typename) {
+TEST(UtilitySystemTaskTest, Typename) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$typename", {MakeInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);

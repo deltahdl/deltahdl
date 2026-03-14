@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection1110_1, StringLiteralCopyToVector) {
+TEST(StringLiteralVectorParsing, StringLiteralCopyToVector) {
   auto r = Parse(
       "module t;\n"
       "  bit [8*14:1] stringvar;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection1110_1, StringLiteralCopyToVector) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-TEST(ParserSection1110_1, StringLiteralConcatInVector) {
+TEST(StringLiteralVectorParsing, StringLiteralConcatInVector) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  bit [8*14:1] stringvar;\n"
@@ -28,7 +28,7 @@ TEST(ParserSection1110_1, StringLiteralConcatInVector) {
               "endmodule\n"));
 }
 
-TEST(ParserSection1110_1, StringLiteralCompare) {
+TEST(StringLiteralVectorParsing, StringLiteralCompare) {
   auto r = Parse(
       "module t;\n"
       "  bit [8*10:1] s1, s2;\n"
@@ -43,7 +43,7 @@ TEST(ParserSection1110_1, StringLiteralCompare) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection1110_1, StringLiteralWideVector) {
+TEST(StringLiteralVectorParsing, StringLiteralWideVector) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  bit [8*20:1] wide;\n"

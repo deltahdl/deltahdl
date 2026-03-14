@@ -104,7 +104,7 @@ TEST(Functions, DefaultsAndNamedArgsCombined) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 21u);
 }
 
-TEST(SimA609, NamedArgCall) {
+TEST(SubroutineCallSim, NamedArgCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -126,7 +126,7 @@ TEST(SimA609, NamedArgCall) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-TEST(SimA609, MixedPositionalNamedArgs) {
+TEST(SubroutineCallSim, MixedPositionalNamedArgs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -149,7 +149,7 @@ TEST(SimA609, MixedPositionalNamedArgs) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-TEST(SimA82, NamedArgBinding) {
+TEST(SubroutineCallExprSim, NamedArgBinding) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -36,7 +36,7 @@ TEST_F(DpiParseTest, ImportPureFunction) {
   EXPECT_EQ(items[0]->name, "get_val");
 }
 
-TEST(ParserSection13, DpiImportPureFunction) {
+TEST(TaskAndFunctionParsing, DpiImportPureFunction) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" pure function int c_mul(int a, int b);\n"

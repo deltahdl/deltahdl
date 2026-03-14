@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A4ModuleInstNamed) {
+TEST(FormalSyntaxParsing, ModuleInstNamed) {
   auto r = Parse("module m; sub u0(.clk(clk), .data(data)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(ParserAnnexA, A4ModuleInstNamed) {
   EXPECT_EQ(item->inst_ports.size(), 2u);
 }
 
-TEST(ParserAnnexA0411, NamedPortEmptyExpression) {
+TEST(ModuleInstantiationGrammar, NamedPortEmptyExpression) {
   auto r = Parse("module m; sub u0(.clk(clk), .nc()); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -31,7 +31,7 @@ ModuleItem* FindModuleInst(const std::vector<ModuleItem*>& items) {
   return nullptr;
 }
 
-TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
+TEST(ModuleInstantiationGrammar, ElaborationModuleInstPortBinding) {
   auto r = Parse(
       "module child(input a, output b);\n"
       "  assign b = a;\n"
@@ -50,7 +50,7 @@ TEST(ParserAnnexA0411, ElaborationModuleInstPortBinding) {
   EXPECT_EQ(inst->inst_ports.size(), 2u);
 }
 
-TEST(ParserSection4, Sec4_6_NamedPortConnections) {
+TEST(SchedulingSemanticsParsing, NamedPortConnections) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.clk(clk), .rst(rst), .d(data));\n"
@@ -66,7 +66,7 @@ TEST(ParserSection4, Sec4_6_NamedPortConnections) {
   EXPECT_EQ(item->inst_ports[2].first, "d");
 }
 
-TEST(ParserSection23, ModuleInstBasic) {
+TEST(ModuleAndHierarchyParsing, ModuleInstBasic) {
   auto r = Parse(
       "module top;\n"
       "  sub u1(.a(w1), .b(w2));\n"
@@ -79,7 +79,7 @@ TEST(ParserSection23, ModuleInstBasic) {
   ASSERT_EQ(item->inst_ports.size(), 2u);
 }
 
-TEST(ParserSection23, PortConnectionNamed) {
+TEST(ModuleAndHierarchyParsing, PortConnectionNamed) {
   auto r = Parse(
       "module top;\n"
       "  sub u1(.clk(sys_clk), .rst(sys_rst), .data(bus));\n"
@@ -93,7 +93,7 @@ TEST(ParserSection23, PortConnectionNamed) {
   EXPECT_EQ(item->inst_ports[2].first, "data");
 }
 
-TEST(ParserSection23, PortConnectionEmptyNamed) {
+TEST(ModuleAndHierarchyParsing, PortConnectionEmptyNamed) {
   auto r = Parse(
       "module top;\n"
       "  sub u1(.clk(sys_clk), .unused());\n"
@@ -106,7 +106,7 @@ TEST(ParserSection23, PortConnectionEmptyNamed) {
   EXPECT_EQ(item->inst_ports[1].second, nullptr);
 }
 
-TEST(ParserSection23, SimpleModuleInstance) {
+TEST(ModuleAndHierarchyParsing, SimpleModuleInstance) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.a(x), .b(y));\n"
@@ -118,7 +118,7 @@ TEST(ParserSection23, SimpleModuleInstance) {
   EXPECT_EQ(item->inst_name, "u1");
 }
 
-TEST(ParserSection23, NamedPortConnectionsOrder) {
+TEST(ModuleAndHierarchyParsing, NamedPortConnectionsOrder) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.b(y), .a(x));\n"
@@ -130,7 +130,7 @@ TEST(ParserSection23, NamedPortConnectionsOrder) {
   EXPECT_EQ(item->inst_ports[1].first, "a");
 }
 
-TEST(ParserSection23, NamedPortEmptyConnection) {
+TEST(ModuleAndHierarchyParsing, NamedPortEmptyConnection) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.a(x), .b());\n"
@@ -144,7 +144,7 @@ TEST(ParserSection23, NamedPortEmptyConnection) {
   EXPECT_EQ(item->inst_ports[1].second, nullptr);
 }
 
-TEST(ParserSection23, PortConnectionRulesNamedMultiple) {
+TEST(ModuleAndHierarchyParsing, PortConnectionRulesNamedMultiple) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.clk(clk), .rst(rst), .data(d), .out(q));\n"
@@ -158,7 +158,7 @@ TEST(ParserSection23, PortConnectionRulesNamedMultiple) {
   EXPECT_EQ(item->inst_ports[3].first, "out");
 }
 
-TEST(ParserSection23, PortConnectionAllEmpty) {
+TEST(ModuleAndHierarchyParsing, PortConnectionAllEmpty) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.a(), .b(), .c());\n"
@@ -171,7 +171,7 @@ TEST(ParserSection23, PortConnectionAllEmpty) {
   }
 }
 
-TEST(ParserSection23, NamedPortWithPartSelect) {
+TEST(ModuleAndHierarchyParsing, NamedPortWithPartSelect) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.a(bus[7:0]), .b(bus[15:8]));\n"
@@ -185,7 +185,7 @@ TEST(ParserSection23, NamedPortWithPartSelect) {
   EXPECT_NE(item->inst_ports[1].second, nullptr);
 }
 
-TEST(ParserSection23, NamedPortWithConcatenation) {
+TEST(ModuleAndHierarchyParsing, NamedPortWithConcatenation) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.data({a, b, c}));\n"
@@ -198,7 +198,7 @@ TEST(ParserSection23, NamedPortWithConcatenation) {
   EXPECT_EQ(item->inst_ports[0].second->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserCh512, Attribute_OnPortConnection) {
+TEST(AttributeParserParsing, Attribute_OnPortConnection) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sub u1(.a(x), (* no_connect *) .b(y));\n"

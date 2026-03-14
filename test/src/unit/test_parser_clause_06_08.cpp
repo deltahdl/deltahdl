@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA213, DataDeclBasicVar) {
+TEST(TypeDeclParsing, DataDeclBasicVar) {
   auto r = Parse("module m; logic [7:0] data; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserA213, DataDeclBasicVar) {
   EXPECT_EQ(item->name, "data");
 }
 
-TEST(ParserA213, DataDeclVarPrefix) {
+TEST(TypeDeclParsing, DataDeclVarPrefix) {
   auto r = Parse("module m; var logic x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -23,7 +23,7 @@ TEST(ParserA213, DataDeclVarPrefix) {
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
 }
 
-TEST(ParserA213, DataDeclLifetimeAutomatic) {
+TEST(TypeDeclParsing, DataDeclLifetimeAutomatic) {
   auto r = Parse("module m; automatic int counter; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -32,7 +32,7 @@ TEST(ParserA213, DataDeclLifetimeAutomatic) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-TEST(ParserA213, DataDeclLifetimeStatic) {
+TEST(TypeDeclParsing, DataDeclLifetimeStatic) {
   auto r = Parse("module m; static int counter; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -41,14 +41,14 @@ TEST(ParserA213, DataDeclLifetimeStatic) {
   EXPECT_TRUE(item->is_static);
 }
 
-TEST(ParserA23, ListOfVariableDeclAssignmentsSingle) {
+TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsSingle) {
   auto r = Parse("module m; int x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kVarDecl);
 }
 
-TEST(ParserA23, ListOfVariableDeclAssignmentsMultiple) {
+TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsMultiple) {
   auto r = Parse("module m; int a = 1, b = 2, c = 3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -59,7 +59,7 @@ TEST(ParserA23, ListOfVariableDeclAssignmentsMultiple) {
   EXPECT_GE(count, 3);
 }
 
-TEST(ParserA24, VarDeclAssignmentBasic) {
+TEST(DeclarationAssignmentParsing, VarDeclAssignmentBasic) {
   auto r = Parse("module m; int x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -69,7 +69,7 @@ TEST(ParserA24, VarDeclAssignmentBasic) {
   EXPECT_EQ(item->init_expr, nullptr);
 }
 
-TEST(ParserA28, DataDeclMultiVarsInBlock) {
+TEST(BlockItemDeclParsing, DataDeclMultiVarsInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -86,7 +86,7 @@ TEST(ParserA28, DataDeclMultiVarsInBlock) {
   EXPECT_EQ(body->stmts[2]->var_name, "c");
 }
 
-TEST(ParserAnnexA, A2VarDeclWithInit) {
+TEST(FormalSyntaxParsing, VarDeclWithInit) {
   auto r = Parse("module m; logic [7:0] data = 8'hFF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -94,7 +94,7 @@ TEST(ParserAnnexA, A2VarDeclWithInit) {
   EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
 }
 
-TEST(ParserA213, DataDeclMultipleAssign) {
+TEST(TypeDeclParsing, DataDeclMultipleAssign) {
   auto r = Parse("module m; int a = 1, b = 2; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -105,7 +105,7 @@ TEST(ParserA213, DataDeclMultipleAssign) {
   EXPECT_GE(count, 2);
 }
 
-TEST(ParserA221, DataTypeScopedType) {
+TEST(NetAndVariableTypeParsing, DataTypeScopedType) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef int my_int_t;\n"
@@ -118,7 +118,7 @@ TEST(ParserA221, DataTypeScopedType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA23, ListOfVariableDeclAssignmentsWithDims) {
+TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsWithDims) {
   auto r = Parse("module m; logic [7:0] mem [256], cache [64]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -129,7 +129,7 @@ TEST(ParserA23, ListOfVariableDeclAssignmentsWithDims) {
   EXPECT_GE(count, 2);
 }
 
-TEST(ParserSection6, Sec6_5_IntVarDeclKind) {
+TEST(DataTypeParsing, IntVarDeclKind) {
   auto r = Parse(
       "module t;\n"
       "  int count;\n"
@@ -144,7 +144,7 @@ TEST(ParserSection6, Sec6_5_IntVarDeclKind) {
   EXPECT_EQ(item->name, "count");
 }
 
-TEST(ParserSection6, Sec6_5_LogicVarInit) {
+TEST(DataTypeParsing, LogicVarInit) {
   auto r = Parse(
       "module t;\n"
       "  logic v = 1'b0;\n"
@@ -158,7 +158,7 @@ TEST(ParserSection6, Sec6_5_LogicVarInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection6, Sec6_11_MultipleVarsWithPackedDims) {
+TEST(DataTypeParsing, MultipleVarsWithPackedDims) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
@@ -177,7 +177,7 @@ TEST(ParserSection6, Sec6_11_MultipleVarsWithPackedDims) {
   }
 }
 
-TEST(ParserSection6, Sec6_5_MultipleLogicDecls) {
+TEST(DataTypeParsing, MultipleLogicDecls) {
   auto r = Parse(
       "module t;\n"
       "  logic x, y, z;\n"
@@ -196,7 +196,7 @@ TEST(ParserSection6, Sec6_5_MultipleLogicDecls) {
   EXPECT_EQ(items[2]->name, "z");
 }
 
-TEST(ParserSection6, Sec6_11_ByteWithInitializer) {
+TEST(DataTypeParsing, ByteWithInitializer) {
   auto r = Parse(
       "module t;\n"
       "  byte b = 8'hFF;\n"
@@ -210,14 +210,14 @@ TEST(ParserSection6, Sec6_11_ByteWithInitializer) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection6, VarKeywordLogicDecl) {
+TEST(DataTypeParsing, VarKeywordLogicDecl) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var logic [7:0] data;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, MultipleIntDeclsCommaSeparated) {
+TEST(DataTypeParsing, MultipleIntDeclsCommaSeparated) {
   auto r = Parse(
       "module m;\n"
       "  int a, b, c;\n"
@@ -227,13 +227,13 @@ TEST(ParserSection6, MultipleIntDeclsCommaSeparated) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-TEST(ParserSection6, VarKeywordImplicitType) {
+TEST(DataTypeParsing, VarKeywordImplicitType) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var [3:0] nibble;\n"
               "endmodule\n"));
 }
-TEST(ParserSection6, IntWithInitializer) {
+TEST(DataTypeParsing, IntWithInitializer) {
   auto r = Parse(
       "module m;\n"
       "  int x = 42;\n"
@@ -246,14 +246,14 @@ TEST(ParserSection6, IntWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection6, VarWithEnumType) {
+TEST(DataTypeParsing, VarWithEnumType) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var enum bit { clear, error } status;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_IntWithComplexInit) {
+TEST(DataTypeParsing, IntWithComplexInit) {
   auto r = Parse(
       "module t;\n"
       "  int x = 1 + 2 * 3;\n"
@@ -268,7 +268,7 @@ TEST(ParserSection6, Sec6_11_IntWithComplexInit) {
   EXPECT_EQ(item->init_expr->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection6, Sec6_11_IntegerAndRealCoexist) {
+TEST(DataTypeParsing, IntegerAndRealCoexist) {
   auto r = Parse(
       "module t;\n"
       "  int count;\n"
@@ -286,14 +286,14 @@ TEST(ParserSection6, Sec6_11_IntegerAndRealCoexist) {
   EXPECT_EQ(items[3]->data_type.kind, DataTypeKind::kShortreal);
 }
 
-TEST(ParserSection6, VarRegDecl) {
+TEST(DataTypeParsing, VarRegDecl) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  var reg r;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, VarImplicitInProcedural) {
+TEST(DataTypeParsing, VarImplicitInProcedural) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -302,7 +302,7 @@ TEST(ParserSection6, VarImplicitInProcedural) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, MixedIntegerRealStringTypes) {
+TEST(DataTypeParsing, MixedIntegerRealStringTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int i;\n"
@@ -316,7 +316,7 @@ TEST(ParserSection6, MixedIntegerRealStringTypes) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, IntegerTypesInProcedural) {
+TEST(DataTypeParsing, IntegerTypesInProcedural) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -333,7 +333,7 @@ TEST(ParserSection6, IntegerTypesInProcedural) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, RealWithInitializer) {
+TEST(DataTypeParsing, RealWithInitializer) {
   auto r = Parse(
       "module m;\n"
       "  real pi = 3.14159;\n"
@@ -346,7 +346,7 @@ TEST(ParserSection6, RealWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection6, ShortrealWithInitializer) {
+TEST(DataTypeParsing, ShortrealWithInitializer) {
   auto r = Parse(
       "module m;\n"
       "  shortreal f = 1.5;\n"
@@ -359,7 +359,7 @@ TEST(ParserSection6, ShortrealWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection6, Sec6_8_VarByteDecl) {
+TEST(DataTypeParsing, VarByteDecl) {
   auto r = Parse(
       "module t;\n"
       "  var byte my_byte;\n"
@@ -373,7 +373,7 @@ TEST(ParserSection6, Sec6_8_VarByteDecl) {
   EXPECT_EQ(item->name, "my_byte");
 }
 
-TEST(ParserSection6, Sec6_8_VarImplicitLogicWithRange) {
+TEST(DataTypeParsing, VarImplicitLogicWithRange) {
   auto r = Parse(
       "module t;\n"
       "  var [15:0] vw;\n"
@@ -388,7 +388,7 @@ TEST(ParserSection6, Sec6_8_VarImplicitLogicWithRange) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 15u);
 }
 
-TEST(ParserSection6, Sec6_8_MixedScalarAndArrayDecl) {
+TEST(DataTypeParsing, MixedScalarAndArrayDecl) {
   auto r = Parse(
       "module t;\n"
       "  shortint s1, s2 [0:9];\n"
@@ -403,7 +403,7 @@ TEST(ParserSection6, Sec6_8_MixedScalarAndArrayDecl) {
   EXPECT_FALSE(items[1]->unpacked_dims.empty());
 }
 
-TEST(ParserSection6, Sec6_8_ConstVarDecl) {
+TEST(DataTypeParsing, ConstVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  const int MAX = 100;\n"
@@ -419,7 +419,7 @@ TEST(ParserSection6, Sec6_8_ConstVarDecl) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection6, Sec6_8_IntInitZero) {
+TEST(DataTypeParsing, IntInitZero) {
   auto r = Parse(
       "module t;\n"
       "  int i = 0;\n"
@@ -434,7 +434,7 @@ TEST(ParserSection6, Sec6_8_IntInitZero) {
   EXPECT_EQ(item->init_expr->int_val, 0u);
 }
 
-TEST(ParserSection6, Sec6_8_InputVarLogicPort) {
+TEST(DataTypeParsing, InputVarLogicPort) {
   auto r = Parse(
       "module t(input var logic data_in);\n"
       "endmodule\n");

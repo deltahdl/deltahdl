@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA221, CastingTypeSimpleInt) {
+TEST(NetAndVariableTypeParsing, CastingTypeSimpleInt) {
   auto r = Parse(
       "module m;\n"
       "  initial begin int x; x = int'(3.14); end\n"
@@ -15,7 +15,7 @@ TEST(ParserA221, CastingTypeSimpleInt) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA221, CastingTypeSigning) {
+TEST(NetAndVariableTypeParsing, CastingTypeSigning) {
   auto r = Parse(
       "module m;\n"
       "  initial begin int x; x = signed'(8'hFF); end\n"
@@ -24,7 +24,7 @@ TEST(ParserA221, CastingTypeSigning) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA221, CastingTypeString) {
+TEST(NetAndVariableTypeParsing, CastingTypeString) {
   auto r = Parse(
       "module m;\n"
       "  initial begin string s; s = string'(65); end\n"
@@ -33,7 +33,7 @@ TEST(ParserA221, CastingTypeString) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA221, CastingTypeConst) {
+TEST(NetAndVariableTypeParsing, CastingTypeConst) {
   auto r = Parse(
       "module m;\n"
       "  initial begin int x; x = const'(42); end\n"
@@ -42,7 +42,7 @@ TEST(ParserA221, CastingTypeConst) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA221, CastingTypeUserDefined) {
+TEST(NetAndVariableTypeParsing, CastingTypeUserDefined) {
   auto r = Parse(
       "module m;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -52,7 +52,7 @@ TEST(ParserA221, CastingTypeUserDefined) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection7, Sec7_2_2_TypeCastToStruct) {
+TEST(AggregateTypeParsing, TypeCastToStruct) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } s_t;\n"
@@ -67,7 +67,7 @@ TEST(ParserSection7, Sec7_2_2_TypeCastToStruct) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
 
-TEST(ParserSection10, Sec10_4_2_CastRhs) {
+TEST(AssignmentParsing, NonblockingCastRhs) {
   auto r = Parse(
       "module m;\n"
       "  int q;\n"
@@ -84,7 +84,7 @@ TEST(ParserSection10, Sec10_4_2_CastRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
 
-TEST(ParserSection10, Sec10_4_1_CastRhs) {
+TEST(AssignmentParsing, BlockingCastRhs) {
   auto r = Parse(
       "module m;\n"
       "  int a;\n"
@@ -102,7 +102,7 @@ TEST(ParserSection10, Sec10_4_1_CastRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedCastToInt) {
+TEST(AggregateTypeParsing, PackedCastToInt) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -120,7 +120,7 @@ TEST(ParserSection7, Sec7_2_1_PackedCastToInt) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
 
-TEST(ParserSection7, Sec7_2_1_IntCastToPackedStruct) {
+TEST(AggregateTypeParsing, IntCastToPackedStruct) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -138,7 +138,7 @@ TEST(ParserSection7, Sec7_2_1_IntCastToPackedStruct) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCast);
 }
 
-TEST(ParserA84, ConstantPrimaryCast) {
+TEST(PrimaryParsing, ConstantPrimaryCast) {
   auto r = Parse(
       "module m;\n"
       "  parameter int P = int'(3.14);\n"
@@ -150,7 +150,7 @@ TEST(ParserA84, ConstantPrimaryCast) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kCast);
 }
 
-TEST(ParserA84, PrimaryCast) {
+TEST(PrimaryParsing, PrimaryCast) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] a;\n"
@@ -163,7 +163,7 @@ TEST(ParserA84, PrimaryCast) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-TEST(ParserA84, CastInExpression) {
+TEST(PrimaryParsing, CastInExpression) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] a;\n"
@@ -177,7 +177,7 @@ TEST(ParserA84, CastInExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-TEST(ParserA84, CastSigned) {
+TEST(PrimaryParsing, CastSigned) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] a;\n"
@@ -190,7 +190,7 @@ TEST(ParserA84, CastSigned) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-TEST(ParserA84, ConstantCastInParam) {
+TEST(PrimaryParsing, ConstantCastInParam) {
   auto r = Parse("module m; parameter int P = int'(3.0); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -199,7 +199,7 @@ TEST(ParserA84, ConstantCastInParam) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kCast);
 }
 
-TEST(ParserSection11, Sec11_1_CastExpression) {
+TEST(OperatorAndExpressionParsing, CastExpression) {
   auto r = Parse(
       "module t;\n"
       "  initial x = int'(3.14);\n"
@@ -209,7 +209,7 @@ TEST(ParserSection11, Sec11_1_CastExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-TEST(ParserSection8, StaticCastTypeSyntax) {
+TEST(ClassParsing, StaticCastTypeSyntax) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -221,7 +221,7 @@ TEST(ParserSection8, StaticCastTypeSyntax) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, CastCompatibleRealToInt) {
+TEST(DataTypeParsing, CastCompatibleRealToInt) {
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -229,7 +229,7 @@ TEST(ParserSection6, CastCompatibleRealToInt) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-TEST(ParserSection6, StaticCastRealToInt) {
+TEST(DataTypeParsing, StaticCastRealToInt) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -239,7 +239,7 @@ TEST(ParserSection6, StaticCastRealToInt) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, StaticCastStringType) {
+TEST(DataTypeParsing, StaticCastStringType) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -249,7 +249,7 @@ TEST(ParserSection6, StaticCastStringType) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeCast_UserDefined) {
+TEST(DataTypeParsing, TypeCast_UserDefined) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
                "  typedef enum {a, b, c, d} e;\n"
@@ -261,7 +261,7 @@ TEST(ParserSection6, TypeCast_UserDefined) {
                "endmodule\n"));
 }
 
-TEST(ParserSection6, VoidCastExpression) {
+TEST(DataTypeParsing, VoidCastExpression) {
   auto r = Parse(
       "module t;\n"
       "  function int foo(); return 1; endfunction\n"
@@ -273,7 +273,7 @@ TEST(ParserSection6, VoidCastExpression) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-TEST(ParserSection6, IntCast) {
+TEST(DataTypeParsing, IntCast) {
   auto r = Parse(
       "module t;\n"
       "  initial x = int'(y);\n"
@@ -286,7 +286,7 @@ TEST(ParserSection6, IntCast) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-TEST(ParserSection6, IntCast_Details) {
+TEST(DataTypeParsing, IntCast_Details) {
   auto r = Parse(
       "module t;\n"
       "  initial x = int'(y);\n"
@@ -300,7 +300,7 @@ TEST(ParserSection6, IntCast_Details) {
   ASSERT_NE(rhs->lhs, nullptr);
 }
 
-TEST(ParserSection6, SignedCast) {
+TEST(DataTypeParsing, SignedCast) {
   auto r = Parse(
       "module t;\n"
       "  initial x = signed'(y);\n"
@@ -314,7 +314,7 @@ TEST(ParserSection6, SignedCast) {
   EXPECT_EQ(rhs->text, "signed");
 }
 
-TEST(ParserSection6, ConstCast) {
+TEST(DataTypeParsing, ConstCast) {
   auto r = Parse(
       "module t;\n"
       "  initial x = const'(y);\n"
@@ -328,7 +328,7 @@ TEST(ParserSection6, ConstCast) {
   EXPECT_EQ(rhs->text, "const");
 }
 
-TEST(ParserSection6, RealCastExplicit) {
+TEST(DataTypeParsing, RealCastExplicit) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 3.7;\n"
@@ -337,7 +337,7 @@ TEST(ParserSection6, RealCastExplicit) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, ShortrealCast) {
+TEST(DataTypeParsing, ShortrealCast) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int i = 42;\n"
@@ -346,7 +346,7 @@ TEST(ParserSection6, ShortrealCast) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, SizeCastLiteral) {
+TEST(DataTypeParsing, SizeCastLiteral) {
   auto r = Parse(
       "module m;\n"
       "  logic [31:0] x;\n"
@@ -357,7 +357,7 @@ TEST(ParserSection6, SizeCastLiteral) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, SizeCastParameter) {
+TEST(DataTypeParsing, SizeCastParameter) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  parameter P = 17;\n"
@@ -371,7 +371,7 @@ TEST(ParserSection6, SizeCastParameter) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, CastRealExprToInt) {
+TEST(DataTypeParsing, CastRealExprToInt) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int result;\n"
@@ -379,7 +379,7 @@ TEST(ParserSection6, CastRealExprToInt) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, CastConcatShortint) {
+TEST(DataTypeParsing, CastConcatShortint) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  shortint result;\n"
@@ -387,7 +387,7 @@ TEST(ParserSection6, CastConcatShortint) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, UnsignedCast) {
+TEST(DataTypeParsing, UnsignedCast) {
   auto r = Parse(
       "module m;\n"
       "  initial x = unsigned'(-4);\n"

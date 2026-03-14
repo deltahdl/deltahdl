@@ -23,7 +23,7 @@ TEST(Elaboration, WidthInference_ContAssignWidth) {
   EXPECT_EQ(mod->assigns[0].width, 8);
 }
 
-TEST(SimCh10, BlockingAssignTruncation) {
+TEST(BlockingAssignSim, BlockingAssignTruncation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -46,7 +46,7 @@ TEST(SimCh10, BlockingAssignTruncation) {
   EXPECT_EQ(var->value.ToUint64(), 0xFu);
 }
 
-TEST(SimCh10b, NBAWidthExtension) {
+TEST(NonblockingAssignSim, NBAWidthExtension) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -69,7 +69,7 @@ TEST(SimCh10b, NBAWidthExtension) {
   EXPECT_EQ(var->value.width, 32u);
 }
 
-TEST(SimCh10b, NBAPreservesWidth) {
+TEST(NonblockingAssignSim, NBAPreservesWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

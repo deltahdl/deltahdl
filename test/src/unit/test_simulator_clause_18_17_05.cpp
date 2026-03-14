@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA612, RandJoinBothExecute) {
+TEST(RandsequenceSim, RandJoinBothExecute) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

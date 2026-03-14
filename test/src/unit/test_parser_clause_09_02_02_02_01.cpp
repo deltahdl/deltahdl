@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombVarDecls) {
+TEST(ProcessParsing, AlwaysCombVarDecls) {
   auto r = Parse(
       "module m;\n"
       "  always_comb begin\n"
@@ -16,7 +16,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombVarDecls) {
   VerifyAlwaysVarDecl(r);
 }
 
-TEST(ParserSection9, Sec9_2_2_FunctionCall) {
+TEST(ProcessParsing, FunctionCall) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] a, b, result;\n"
@@ -35,7 +35,7 @@ TEST(ParserSection9, Sec9_2_2_FunctionCall) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kCall);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombFunctionCall) {
+TEST(ProcessParsing, AlwaysCombFunctionCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function logic [3:0] mux2(input logic sel,\n"
@@ -48,7 +48,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombFunctionCall) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_2_2_ImplicitSensitivity) {
+TEST(ProcessParsing, ImplicitSensitivity) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, c;\n"
@@ -64,7 +64,7 @@ TEST(ParserSection9, Sec9_2_2_ImplicitSensitivity) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ParserSection9b, AlwaysCombWithAssertion) {
+TEST(ProceduralAssignAndControlParsing, AlwaysCombWithAssertion) {
   auto r = Parse(
       "module m;\n"
       "  always_comb begin\n"
@@ -76,7 +76,7 @@ TEST(ParserSection9b, AlwaysCombWithAssertion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombEmptySensitivity) {
+TEST(ProcessParsing, AlwaysCombEmptySensitivity) {
   auto r = Parse(
       "module m;\n"
       "  always_comb y = a | b;\n"
@@ -88,7 +88,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombEmptySensitivity) {
   EXPECT_TRUE(item->sensitivity.empty());
 }
 
-TEST(ParserSection9c, AlwaysCombWithFunctionCall) {
+TEST(ProcessTimingAndControlParsing, AlwaysCombWithFunctionCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function logic [3:0] mux(input logic sel,\n"

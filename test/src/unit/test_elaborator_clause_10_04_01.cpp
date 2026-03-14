@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA60701, PatternInBlockingAssignment) {
+TEST(PatternSim, PatternInBlockingAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -32,7 +32,7 @@ TEST(SimA60701, PatternInBlockingAssignment) {
   EXPECT_EQ(b->value.ToUint64(), 22u);
 }
 
-TEST(SimCh10, SimpleBlockingAssign) {
+TEST(BlockingAssignSim, SimpleBlockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -53,7 +53,7 @@ TEST(SimCh10, SimpleBlockingAssign) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(SimCh10, SequentialBlockingImmediate) {
+TEST(BlockingAssignSim, SequentialBlockingImmediate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -75,7 +75,7 @@ TEST(SimCh10, SequentialBlockingImmediate) {
   EXPECT_EQ(b->value.ToUint64(), 2u);
 }
 
-TEST(SimCh10, BlockingAssignExpression) {
+TEST(BlockingAssignSim, BlockingAssignExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -96,7 +96,7 @@ TEST(SimCh10, BlockingAssignExpression) {
   EXPECT_EQ(var->value.ToUint64(), 13u);
 }
 
-TEST(SimCh10, BlockingAssignBitSelect) {
+TEST(BlockingAssignSim, BlockingAssignBitSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -118,7 +118,7 @@ TEST(SimCh10, BlockingAssignBitSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0x01u);
 }
 
-TEST(SimCh10, BlockingAssignPartSelect) {
+TEST(BlockingAssignSim, BlockingAssignPartSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -140,7 +140,7 @@ TEST(SimCh10, BlockingAssignPartSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-TEST(SimCh10, BlockingAssignFunctionCall) {
+TEST(BlockingAssignSim, BlockingAssignFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -164,7 +164,7 @@ TEST(SimCh10, BlockingAssignFunctionCall) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimCh10, BlockingAssignLastWins) {
+TEST(BlockingAssignSim, BlockingAssignLastWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -187,7 +187,7 @@ TEST(SimCh10, BlockingAssignLastWins) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimCh10, BlockingAssignChain) {
+TEST(BlockingAssignSim, BlockingAssignChain) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

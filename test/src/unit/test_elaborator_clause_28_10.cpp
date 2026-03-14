@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection28, ElaboratePullupGate) {
+TEST(GateLevelModelingParsing, ElaboratePullupGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -21,7 +21,7 @@ TEST(ParserSection28, ElaboratePullupGate) {
   EXPECT_EQ(mod->assigns[0].rhs->int_val, 1);
 }
 
-TEST(ParserSection28, ElaboratePulldownGate) {
+TEST(GateLevelModelingParsing, ElaboratePulldownGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"

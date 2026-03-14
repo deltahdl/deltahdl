@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection12, IfElseIfChain) {
+TEST(ProceduralStatementParsing, IfElseIfChain) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -24,7 +24,7 @@ TEST(ParserSection12, IfElseIfChain) {
   EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kIf);
 }
 
-TEST(ParserA606, IfElseIfElse) {
+TEST(ConditionalSyntaxParsing, IfElseIfElse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -46,7 +46,7 @@ TEST(ParserA606, IfElseIfElse) {
   EXPECT_EQ(stmt->else_branch->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserA606, IfElseIfNoFinalElse) {
+TEST(ConditionalSyntaxParsing, IfElseIfNoFinalElse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -68,7 +68,7 @@ TEST(ParserA606, IfElseIfNoFinalElse) {
   EXPECT_EQ(stmt->else_branch->else_branch->else_branch, nullptr);
 }
 
-TEST(ParserSection12, IfElseIfElseChain) {
+TEST(ProceduralStatementParsing, IfElseIfElseChain) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -92,7 +92,7 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection9, Sec9_2_3_NestedIfElse) {
+TEST(ProcessParsing, NestedIfElse) {
   auto r = Parse(
       "module m;\n"
       "  logic en1, en2, d1, d2, q;\n"

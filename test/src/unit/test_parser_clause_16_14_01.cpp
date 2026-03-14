@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, ConcurrentAssertionItem_AssertProperty) {
+TEST(AssertionDeclParsing, ConcurrentAssertionItem_AssertProperty) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a |-> b);\n"
@@ -18,7 +18,7 @@ TEST(ParserA210, ConcurrentAssertionItem_AssertProperty) {
   EXPECT_TRUE(item->loc.IsValid());
 }
 
-TEST(ParserA210, AssertProperty_WithActionBlock) {
+TEST(AssertionDeclParsing, AssertProperty_WithActionBlock) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a |-> b)\n"
@@ -32,7 +32,7 @@ TEST(ParserA210, AssertProperty_WithActionBlock) {
   EXPECT_NE(item->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserA210, AssertProperty_PassOnly) {
+TEST(AssertionDeclParsing, AssertProperty_PassOnly) {
   auto r = Parse(
       "module m;\n"
       "  assert property (a) $display(\"ok\");\n"
@@ -45,7 +45,7 @@ TEST(ParserA210, AssertProperty_PassOnly) {
   EXPECT_EQ(item->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserA210, AssertProperty_FailOnly) {
+TEST(AssertionDeclParsing, AssertProperty_FailOnly) {
   auto r = Parse(
       "module m;\n"
       "  assert property (a |-> b) else $error(\"fail\");\n"
@@ -59,7 +59,7 @@ TEST(ParserA210, AssertProperty_FailOnly) {
 }
 using VerifyParseTest = ProgramTestParse;
 
-TEST(ParserSection16, Sec16_5_1_AssertPropertySimple) {
+TEST(AssertionParsing, AssertPropertySimple) {
   auto r = Parse(
       "module m;\n"
       "  assert property (a && b);\n"
@@ -72,7 +72,7 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertySimple) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
-TEST(ParserSection16, AssertPropertyModuleLevel) {
+TEST(AssertionParsing, AssertPropertyModuleLevel) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a |-> b);\n"
@@ -89,7 +89,7 @@ TEST(ParserSection16, AssertPropertyModuleLevel) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserSection16, AssertPropertyWithElse) {
+TEST(AssertionParsing, AssertPropertyWithElse) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req |-> ack)\n"
@@ -103,7 +103,7 @@ TEST(ParserSection16, AssertPropertyWithElse) {
   EXPECT_NE(ap->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserSection16, Sec16_5_1_AssertPropertyClockedPosedge) {
+TEST(AssertionParsing, AssertPropertyClockedPosedge) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a);\n"
@@ -116,7 +116,7 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyClockedPosedge) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
-TEST(ParserSection16, Sec16_5_1_AssertPropertyPassAndFailActions) {
+TEST(AssertionParsing, AssertPropertyPassAndFailActions) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req |-> ack)\n"
@@ -131,7 +131,7 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyPassAndFailActions) {
   EXPECT_NE(ap->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserSection16, Sec16_5_1_AssertPropertyPassOnly) {
+TEST(AssertionParsing, AssertPropertyPassOnly) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) valid)\n"
@@ -146,7 +146,7 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyPassOnly) {
   EXPECT_EQ(ap->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserSection16, Sec16_5_1_AssertPropertyFailOnly) {
+TEST(AssertionParsing, AssertPropertyFailOnly) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a |-> b)\n"
@@ -161,7 +161,7 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyFailOnly) {
   EXPECT_NE(ap->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserSection16, ConcurrentAssertWithClock) {
+TEST(AssertionParsing, ConcurrentAssertWithClock) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a);\n"
@@ -173,7 +173,7 @@ TEST(ParserSection16, ConcurrentAssertWithClock) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
-TEST(ParserSection16, ConcurrentAssertNegedgeClock) {
+TEST(AssertionParsing, ConcurrentAssertNegedgeClock) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(negedge clk) a |-> b);\n"
@@ -186,7 +186,7 @@ using DpiParseTest = ProgramTestParse;
 
 using ApiParseTest = ProgramTestParse;
 
-TEST(ParserSection39, AssertPropertyStatement) {
+TEST(AssertionApiParsing, AssertPropertyStatement) {
   auto r = Parse(R"(
     module m;
       logic clk, a, b;
@@ -205,7 +205,7 @@ TEST(ParserSection39, AssertPropertyStatement) {
   EXPECT_TRUE(found_assert);
 }
 
-TEST(ParserA610, AssertPropertyModule) {
+TEST(AssertionStatementSyntaxParsing, AssertPropertyModule) {
   auto r = Parse(
       "module m;\n"
       "  assert property (a |-> b);\n"
@@ -216,7 +216,7 @@ TEST(ParserA610, AssertPropertyModule) {
   ASSERT_NE(item, nullptr);
 }
 
-TEST(ParserA610, AssertPropertyActionBlock) {
+TEST(AssertionStatementSyntaxParsing, AssertPropertyActionBlock) {
   auto r = Parse(
       "module m;\n"
       "  assert property (a) $display(\"pass\"); else $display(\"fail\");\n"
@@ -229,7 +229,7 @@ TEST(ParserA610, AssertPropertyActionBlock) {
   ASSERT_NE(item->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserAnnexF, AnnexFAssertActionBlocks) {
+TEST(AssertionSemanticsParsing, AssertActionBlocks) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a |-> b)\n"

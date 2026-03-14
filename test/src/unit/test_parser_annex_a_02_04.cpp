@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA24, NetDeclAssignmentBasic) {
+TEST(DeclarationAssignmentParsing, NetDeclAssignmentBasic) {
   auto r = Parse("module m; wire w; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(ParserA24, NetDeclAssignmentBasic) {
   EXPECT_EQ(item->init_expr, nullptr);
 }
 
-TEST(ParserA24, NetDeclAssignmentWithUnpackedDims) {
+TEST(DeclarationAssignmentParsing, NetDeclAssignmentWithUnpackedDims) {
   auto r = Parse("module m; wire w [3:0][7:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -24,7 +24,7 @@ TEST(ParserA24, NetDeclAssignmentWithUnpackedDims) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
-TEST(ParserA24, ParamAssignmentBasic) {
+TEST(DeclarationAssignmentParsing, ParamAssignmentBasic) {
   auto r = Parse("module m; parameter WIDTH = 8; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

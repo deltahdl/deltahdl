@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, InterfaceEnclosedByKeywords) {
+TEST(DesignBuildingBlockParsing, InterfaceEnclosedByKeywords) {
   auto r = Parse("interface ifc; endinterface");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(ParserClause03, InterfaceEnclosedByKeywords) {
   EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
 }
 
-TEST(ParserClause03, InterfaceWithParameters) {
+TEST(DesignBuildingBlockParsing, InterfaceWithParameters) {
   auto r = Parse(
       "interface ifc #(parameter int WIDTH = 8);\n"
       "  logic [WIDTH-1:0] data;\n"
@@ -24,7 +24,7 @@ TEST(ParserClause03, InterfaceWithParameters) {
   EXPECT_FALSE(r.cu->interfaces[0]->params.empty());
 }
 
-TEST(ParserClause03, InterfaceWithConstants) {
+TEST(DesignBuildingBlockParsing, InterfaceWithConstants) {
   auto r = Parse(
       "interface ifc;\n"
       "  localparam int DEPTH = 16;\n"
@@ -37,7 +37,7 @@ TEST(ParserClause03, InterfaceWithConstants) {
       1u);
 }
 
-TEST(ParserClause03, InterfaceWithVariables) {
+TEST(DesignBuildingBlockParsing, InterfaceWithVariables) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic req, gnt;\n"
@@ -50,7 +50,7 @@ TEST(ParserClause03, InterfaceWithVariables) {
   EXPECT_FALSE(r.cu->interfaces[0]->items.empty());
 }
 
-TEST(ParserClause03, InterfaceWithNets) {
+TEST(DesignBuildingBlockParsing, InterfaceWithNets) {
   auto r = Parse(
       "interface ifc;\n"
       "  wire valid;\n"
@@ -62,7 +62,7 @@ TEST(ParserClause03, InterfaceWithNets) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kNetDecl));
 }
 
-TEST(ParserClause03, InterfaceWithFunction) {
+TEST(DesignBuildingBlockParsing, InterfaceWithFunction) {
   auto r = Parse(
       "interface ifc;\n"
       "  function automatic int transform(int val);\n"
@@ -75,7 +75,7 @@ TEST(ParserClause03, InterfaceWithFunction) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
-TEST(ParserClause03, InterfaceWithTask) {
+TEST(DesignBuildingBlockParsing, InterfaceWithTask) {
   auto r = Parse(
       "interface ifc;\n"
       "  task do_transfer;\n"
@@ -87,7 +87,7 @@ TEST(ParserClause03, InterfaceWithTask) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kTaskDecl));
 }
 
-TEST(ParserClause03, InterfaceWithInitialBlock) {
+TEST(DesignBuildingBlockParsing, InterfaceWithInitialBlock) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic flag;\n"
@@ -99,7 +99,7 @@ TEST(ParserClause03, InterfaceWithInitialBlock) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-TEST(ParserClause03, InterfaceWithAlwaysBlock) {
+TEST(DesignBuildingBlockParsing, InterfaceWithAlwaysBlock) {
   EXPECT_TRUE(
       ParseOk("interface ifc;\n"
               "  logic clk, gnt, req;\n"
@@ -107,7 +107,7 @@ TEST(ParserClause03, InterfaceWithAlwaysBlock) {
               "endinterface\n"));
 }
 
-TEST(ParserClause03, InterfaceWithContAssign) {
+TEST(DesignBuildingBlockParsing, InterfaceWithContAssign) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic a;\n"
@@ -120,7 +120,7 @@ TEST(ParserClause03, InterfaceWithContAssign) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kContAssign));
 }
 
-TEST(ParserClause03, InterfaceWithModport) {
+TEST(DesignBuildingBlockParsing, InterfaceWithModport) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic req, gnt;\n"
@@ -134,7 +134,7 @@ TEST(ParserClause03, InterfaceWithModport) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
 }
 
-TEST(ParserClause03, ModportWithDirectionalPorts) {
+TEST(DesignBuildingBlockParsing, ModportWithDirectionalPorts) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic a, b, c;\n"
@@ -149,7 +149,7 @@ TEST(ParserClause03, ModportWithDirectionalPorts) {
   EXPECT_EQ(mp->ports[2].direction, Direction::kOutput);
 }
 
-TEST(ParserClause03, InterfaceWithPorts) {
+TEST(DesignBuildingBlockParsing, InterfaceWithPorts) {
   auto r = Parse(
       "interface ifc(input logic clk);\n"
       "  logic req, gnt;\n"
@@ -159,7 +159,7 @@ TEST(ParserClause03, InterfaceWithPorts) {
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
 }
 
-TEST(ParserClause03, SimpleBusExample) {
+TEST(DesignBuildingBlockParsing, SimpleBusExample) {
   auto r = Parse(
       "interface simple_bus(input logic clk);\n"
       "  logic req, gnt;\n"
@@ -175,7 +175,7 @@ TEST(ParserClause03, SimpleBusExample) {
   EXPECT_FALSE(r.cu->interfaces[0]->items.empty());
 }
 
-TEST(ParserClause03, SimpleBusUsageInModules) {
+TEST(DesignBuildingBlockParsing, SimpleBusUsageInModules) {
   EXPECT_TRUE(
       ParseOk("interface simple_bus(input logic clk);\n"
               "  logic req, gnt;\n"
@@ -189,7 +189,7 @@ TEST(ParserClause03, SimpleBusUsageInModules) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, InterfaceInstantiationInModule) {
+TEST(DesignBuildingBlockParsing, InterfaceInstantiationInModule) {
   EXPECT_TRUE(
       ParseOk("interface simple_bus(input logic clk);\n"
               "  logic req, gnt;\n"
@@ -200,7 +200,7 @@ TEST(ParserClause03, InterfaceInstantiationInModule) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, InterfaceWithMixedContents) {
+TEST(DesignBuildingBlockParsing, InterfaceWithMixedContents) {
   EXPECT_TRUE(
       ParseOk("interface ifc #(parameter int W = 8) (input logic clk);\n"
               "  localparam int DEPTH = 4;\n"

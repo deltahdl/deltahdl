@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA221, DataTypeTypeReference) {
+TEST(NetAndVariableTypeParsing, DataTypeTypeReference) {
   auto r = Parse(
       "module m;\n"
       "  int a;\n"
@@ -20,7 +20,7 @@ TEST(ParserA221, DataTypeTypeReference) {
   EXPECT_NE(item->data_type.type_ref_expr, nullptr);
 }
 
-TEST(ParserA221, TypeRefExpression) {
+TEST(NetAndVariableTypeParsing, TypeRefExpression) {
   auto r = Parse(
       "module m;\n"
       "  int a;\n"
@@ -30,7 +30,7 @@ TEST(ParserA221, TypeRefExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA221, TypeRefDataType) {
+TEST(NetAndVariableTypeParsing, TypeRefDataType) {
   auto r = Parse(
       "module m;\n"
       "  initial begin $display(\"%s\", $typename(type(logic [7:0]))); end\n"
@@ -39,7 +39,7 @@ TEST(ParserA221, TypeRefDataType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA221, IncompleteClassScopedType) {
+TEST(NetAndVariableTypeParsing, IncompleteClassScopedType) {
   auto r = Parse(
       "class outer;\n"
       "  typedef int inner_t;\n"
@@ -51,7 +51,7 @@ TEST(ParserA221, IncompleteClassScopedType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection8, TypeRefVarDecl) {
+TEST(ClassParsing, TypeRefVarDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real a = 1.0;\n"
@@ -60,13 +60,13 @@ TEST(ParserSection8, TypeRefVarDecl) {
               "endmodule\n"));
 }
 
-TEST(ParserSection8, TypeRefDataTypeParam) {
+TEST(ClassParsing, TypeRefDataTypeParam) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter type T = type(logic [11:0]));\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection8, TypeRefComparison) {
+TEST(ClassParsing, TypeRefComparison) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter type T = int)\n"
               "  ();\n"
@@ -76,7 +76,7 @@ TEST(ParserSection8, TypeRefComparison) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeOperatorExpr_Kind) {
+TEST(DataTypeParsing, TypeOperatorExpr_Kind) {
   auto r = Parse(
       "module t;\n"
       "  initial x = type(y);\n"
@@ -89,7 +89,7 @@ TEST(ParserSection6, TypeOperatorExpr_Kind) {
   EXPECT_EQ(rhs->kind, ExprKind::kTypeRef);
 }
 
-TEST(ParserSection6, TypeOperatorExpr_Inner) {
+TEST(DataTypeParsing, TypeOperatorExpr_Inner) {
   auto r = Parse(
       "module t;\n"
       "  initial x = type(y);\n"
@@ -103,7 +103,7 @@ TEST(ParserSection6, TypeOperatorExpr_Inner) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
   EXPECT_EQ(rhs->lhs->text, "y");
 }
-TEST(ParserSection6, TypeOperatorInDataType) {
+TEST(DataTypeParsing, TypeOperatorInDataType) {
   auto r = Parse(
       "module t;\n"
       "  parameter type T = type(int);\n"
@@ -117,7 +117,7 @@ TEST(ParserSection6, TypeOperatorInDataType) {
   EXPECT_EQ(item->init_expr->kind, ExprKind::kTypeRef);
 }
 
-TEST(ParserA84, PrimaryTypeRef) {
+TEST(PrimaryParsing, PrimaryTypeRef) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] x;\n"
@@ -130,7 +130,7 @@ TEST(ParserA84, PrimaryTypeRef) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefExprKind) {
+TEST(DataTypeParsing, TypeRefExprKind) {
   auto r = Parse(
       "module t;\n"
       "  initial x = type(y);\n"
@@ -144,7 +144,7 @@ TEST(ParserSection6, Sec6_11_1_TypeRefExprKind) {
   EXPECT_EQ(rhs->kind, ExprKind::kTypeRef);
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefInnerIdent) {
+TEST(DataTypeParsing, TypeRefInnerIdent) {
   auto r = Parse(
       "module t;\n"
       "  initial x = type(y);\n"
@@ -161,7 +161,7 @@ TEST(ParserSection6, Sec6_11_1_TypeRefInnerIdent) {
   EXPECT_EQ(rhs->lhs->text, "y");
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefDataTypeText) {
+TEST(DataTypeParsing, TypeRefDataTypeText) {
   auto r = Parse(
       "module t;\n"
       "  initial x = type(int);\n"
@@ -175,7 +175,7 @@ TEST(ParserSection6, Sec6_11_1_TypeRefDataTypeText) {
   EXPECT_EQ(rhs->kind, ExprKind::kTypeRef);
 }
 
-TEST(ParserSection6, Sec6_11_1_VarTypeRefDeclKind) {
+TEST(DataTypeParsing, VarTypeRefDeclKind) {
   auto r = Parse(
       "module t;\n"
       "  int a;\n"
@@ -190,7 +190,7 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefDeclKind) {
   EXPECT_EQ(items[1]->name, "b");
 }
 
-TEST(ParserSection6, Sec6_11_1_VarTypeRefExprIdent) {
+TEST(DataTypeParsing, VarTypeRefExprIdent) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -206,7 +206,7 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefExprIdent) {
   EXPECT_EQ(ref->text, "x");
 }
 
-TEST(ParserSection6, Sec6_11_1_VarTypeRefBinaryExpr) {
+TEST(DataTypeParsing, VarTypeRefBinaryExpr) {
   auto r = Parse(
       "module t;\n"
       "  real a, b;\n"
@@ -230,7 +230,7 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefBinaryExpr) {
   EXPECT_EQ(ref->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefParamDefault) {
+TEST(DataTypeParsing, TypeRefParamDefault) {
   auto r = Parse(
       "module t #(parameter type T = type(logic));\n"
       "endmodule\n");
@@ -238,13 +238,13 @@ TEST(ParserSection6, Sec6_11_1_TypeRefParamDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefParamPackedDim) {
+TEST(DataTypeParsing, TypeRefParamPackedDim) {
   EXPECT_TRUE(
       ParseOk("module t #(parameter type T = type(logic [7:0]));\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefEqComparison) {
+TEST(DataTypeParsing, TypeRefEqComparison) {
   EXPECT_TRUE(
       ParseOk("module t #(parameter type T = int)\n"
               "  ();\n"
@@ -254,7 +254,7 @@ TEST(ParserSection6, Sec6_11_1_TypeRefEqComparison) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefNeqComparison) {
+TEST(DataTypeParsing, TypeRefNeqComparison) {
   EXPECT_TRUE(
       ParseOk("module t #(parameter type T = int)\n"
               "  ();\n"
@@ -264,7 +264,7 @@ TEST(ParserSection6, Sec6_11_1_TypeRefNeqComparison) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefCaseEq) {
+TEST(DataTypeParsing, TypeRefCaseEq) {
   EXPECT_TRUE(
       ParseOk("module t #(parameter type T = int)\n"
               "  ();\n"
@@ -274,7 +274,7 @@ TEST(ParserSection6, Sec6_11_1_TypeRefCaseEq) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefCaseNeq) {
+TEST(DataTypeParsing, TypeRefCaseNeq) {
   EXPECT_TRUE(
       ParseOk("module t #(parameter type T = int)\n"
               "  ();\n"
@@ -284,7 +284,7 @@ TEST(ParserSection6, Sec6_11_1_TypeRefCaseNeq) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefInCaseExpr) {
+TEST(DataTypeParsing, TypeRefInCaseExpr) {
   EXPECT_TRUE(
       ParseOk("module t #(parameter type T = int)\n"
               "  ();\n"
@@ -298,7 +298,7 @@ TEST(ParserSection6, Sec6_11_1_TypeRefInCaseExpr) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefOnLogic) {
+TEST(DataTypeParsing, TypeRefOnLogic) {
   auto r = Parse(
       "module t;\n"
       "  initial x = type(logic);\n"
@@ -311,49 +311,49 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnLogic) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTypeRef);
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefOnBit) {
+TEST(DataTypeParsing, TypeRefOnBit) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial x = type(bit);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefOnByte) {
+TEST(DataTypeParsing, TypeRefOnByte) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial x = type(byte);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefOnShortint) {
+TEST(DataTypeParsing, TypeRefOnShortint) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial x = type(shortint);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefOnLongint) {
+TEST(DataTypeParsing, TypeRefOnLongint) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial x = type(longint);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefOnReal) {
+TEST(DataTypeParsing, TypeRefOnReal) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial x = type(real);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefOnString) {
+TEST(DataTypeParsing, TypeRefOnString) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial x = type(string);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefPackedArray) {
+TEST(DataTypeParsing, TypeRefPackedArray) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial x = type(logic [15:0]);\n"
@@ -367,7 +367,7 @@ static ModuleItem* FindItemByName(ParseResult& r, std::string_view name) {
   return nullptr;
 }
 
-TEST(ParserSection6, Sec6_11_1_VarTypeRefTernary) {
+TEST(DataTypeParsing, VarTypeRefTernary) {
   auto r = Parse(
       "module t;\n"
       "  int a;\n"
@@ -384,7 +384,7 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefTernary) {
   EXPECT_EQ(ref->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefCaseLogicPacked) {
+TEST(DataTypeParsing, TypeRefCaseLogicPacked) {
   EXPECT_TRUE(
       ParseOk("module t #(parameter type T = type(logic [11:0]))\n"
               "  ();\n"
@@ -397,7 +397,7 @@ TEST(ParserSection6, Sec6_11_1_TypeRefCaseLogicPacked) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_MultipleVarTypeRefDecls) {
+TEST(DataTypeParsing, MultipleVarTypeRefDecls) {
   auto r = Parse(
       "module t;\n"
       "  int x;\n"
@@ -417,7 +417,7 @@ TEST(ParserSection6, Sec6_11_1_MultipleVarTypeRefDecls) {
   EXPECT_EQ(type_ref_count, 2);
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefOnLiteral) {
+TEST(DataTypeParsing, TypeRefOnLiteral) {
   auto r = Parse(
       "module t;\n"
       "  initial x = type(42);\n"
@@ -433,7 +433,7 @@ TEST(ParserSection6, Sec6_11_1_TypeRefOnLiteral) {
   EXPECT_EQ(stmt->rhs->lhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserSection6, Sec6_11_1_VarTypeRefConcat) {
+TEST(DataTypeParsing, VarTypeRefConcat) {
   auto r = Parse(
       "module t;\n"
       "  logic [3:0] a, b;\n"
@@ -449,14 +449,14 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefConcat) {
   EXPECT_EQ(ref->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefOnShortreal) {
+TEST(DataTypeParsing, TypeRefOnShortreal) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial x = type(shortreal);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_11_1_ParamTypeDefaultInt) {
+TEST(DataTypeParsing, ParamTypeDefaultInt) {
   auto r = Parse(
       "module t #(parameter type T = type(int));\n"
       "endmodule\n");
@@ -464,7 +464,7 @@ TEST(ParserSection6, Sec6_11_1_ParamTypeDefaultInt) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, Sec6_11_1_VarTypeRefMemberAccess) {
+TEST(DataTypeParsing, VarTypeRefMemberAccess) {
   auto r = Parse(
       "module t;\n"
       "  var type(pkg.field) x;\n"
@@ -477,14 +477,14 @@ TEST(ParserSection6, Sec6_11_1_VarTypeRefMemberAccess) {
   ASSERT_NE(item->data_type.type_ref_expr, nullptr);
 }
 
-TEST(ParserSection6, Sec6_11_1_TypeRefOnTime) {
+TEST(DataTypeParsing, TypeRefOnTime) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial x = type(time);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, VarTypeOpDecl) {
+TEST(DataTypeParsing, VarTypeOpDecl) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int a;\n"
@@ -492,14 +492,14 @@ TEST(ParserSection6, VarTypeOpDecl) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeOpInParamDefault) {
+TEST(DataTypeParsing, TypeOpInParamDefault) {
   EXPECT_TRUE(
       ParseOk("module t #(parameter type T = type(logic [7:0]));\n"
               "  T data;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeRefInferWidth) {
+TEST(DataTypeParsing, TypeRefInferWidth) {
   Arena arena;
   auto* inner = arena.Create<Expr>();
   inner->kind = ExprKind::kIntegerLiteral;
@@ -510,7 +510,7 @@ TEST(ParserSection6, TypeRefInferWidth) {
   EXPECT_EQ(InferExprWidth(ref, typedefs), 32u);
 }
 
-TEST(ParserSection6, VarTypeOp_Basic) {
+TEST(DataTypeParsing, VarTypeOp_Basic) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
                "  real a = 4.76;\n"
@@ -519,7 +519,7 @@ TEST(ParserSection6, VarTypeOp_Basic) {
                "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeRef_DataType) {
+TEST(DataTypeParsing, TypeRef_DataType) {
   EXPECT_TRUE(
       ParseOk6("module top #(parameter type T = type(logic[11:0]))\n"
                "  ();\n"
@@ -537,7 +537,7 @@ TEST(ParserSection6, TypeRef_DataType) {
                "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeRefThis) {
+TEST(DataTypeParsing, TypeRefThis) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
               "  static function type(this) get();\n"
@@ -546,14 +546,14 @@ TEST(ParserSection6, TypeRefThis) {
               "endclass\n"));
 }
 
-TEST(ParserSection6, LocalparamTypeFromTypeOp) {
+TEST(DataTypeParsing, LocalparamTypeFromTypeOp) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  localparam type T = type(bit [12:0]);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeRefSimpleExprNoHier) {
+TEST(DataTypeParsing, TypeRefSimpleExprNoHier) {
   auto r = Parse(
       "module t;\n"
       "  int i;\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, SwriteBasic) {
+TEST(IoSystemTaskParsing, SwriteBasic) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  string s;\n"
@@ -12,7 +12,7 @@ TEST(ParserSection21, SwriteBasic) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, SwritebHexOctal) {
+TEST(IoSystemTaskParsing, SwritebHexOctal) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  string s;\n"
@@ -24,7 +24,7 @@ TEST(ParserSection21, SwritebHexOctal) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, SformatBasic) {
+TEST(IoSystemTaskParsing, SformatBasic) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  string s;\n"
@@ -32,7 +32,7 @@ TEST(ParserSection21, SformatBasic) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, SformatNoExtraArgs) {
+TEST(IoSystemTaskParsing, SformatNoExtraArgs) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  string s;\n"
@@ -40,7 +40,7 @@ TEST(ParserSection21, SformatNoExtraArgs) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, SformatfInExpression) {
+TEST(IoSystemTaskParsing, SformatfInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  string s;\n"
@@ -48,7 +48,7 @@ TEST(ParserSection21, SformatfInExpression) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, SformatfMultipleArgs) {
+TEST(IoSystemTaskParsing, SformatfMultipleArgs) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  string s;\n"
@@ -56,7 +56,7 @@ TEST(ParserSection21, SformatfMultipleArgs) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, SformatfUsedAsArgument) {
+TEST(IoSystemTaskParsing, SformatfUsedAsArgument) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $display(\"%s\", $sformatf(\"nested %d\", 7));\n"

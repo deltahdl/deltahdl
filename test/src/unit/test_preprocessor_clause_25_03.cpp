@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_5_LrmExample) {
+TEST(DesignBuildingBlockParsing, LrmExample) {
   auto r = ParseWithPreprocessor(
       "interface simple_bus(input logic clk);\n"
       "  logic req, gnt;\n"

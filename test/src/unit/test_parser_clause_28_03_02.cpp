@@ -28,13 +28,13 @@ TEST(GateDecl, StrengthSpecValidForNOutputGates) {
   EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNot));
 }
 
-TEST(ParserAnnexA, A3GateInstWithStrengthAndDelay) {
+TEST(FormalSyntaxParsing, GateInstWithStrengthAndDelay) {
   auto r = Parse("module m; and (strong0, weak1) #5 g(y, a, b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA301, GateInst_EnableWithStrength) {
+TEST(PrimitiveInstantiationParsing, GateInst_EnableWithStrength) {
   auto r = Parse(
       "module m;\n"
       "  bufif0 (strong0, pull1) b1(out, in, ctrl);\n"
@@ -46,7 +46,7 @@ TEST(ParserA301, GateInst_EnableWithStrength) {
   EXPECT_NE(g->drive_strength1, 0);
 }
 
-TEST(ParserA301, GateInst_NInputWithStrength) {
+TEST(PrimitiveInstantiationParsing, GateInst_NInputWithStrength) {
   auto r = Parse(
       "module m;\n"
       "  and (pull0, pull1) a1(out, a, b);\n"
@@ -58,7 +58,7 @@ TEST(ParserA301, GateInst_NInputWithStrength) {
   EXPECT_NE(g->drive_strength1, 0);
 }
 
-TEST(ParserA301, GateInst_NOutputWithStrength) {
+TEST(PrimitiveInstantiationParsing, GateInst_NOutputWithStrength) {
   auto r = Parse(
       "module m;\n"
       "  buf (strong0, strong1) b1(out, in);\n"
@@ -70,7 +70,7 @@ TEST(ParserA301, GateInst_NOutputWithStrength) {
   EXPECT_NE(g->drive_strength1, 0);
 }
 
-TEST(ParserA301, GateInst_StrengthOrder_Strength1First) {
+TEST(PrimitiveInstantiationParsing, GateInst_StrengthOrder_Strength1First) {
   auto r = Parse(
       "module m;\n"
       "  and (pull1, strong0) a1(out, in1, in2);\n"
@@ -82,7 +82,7 @@ TEST(ParserA301, GateInst_StrengthOrder_Strength1First) {
   EXPECT_NE(g->drive_strength1, 0);
 }
 
-TEST(ParserA301, GateInst_SharedStrengthAcrossInstances) {
+TEST(PrimitiveInstantiationParsing, GateInst_SharedStrengthAcrossInstances) {
   auto r = Parse(
       "module m;\n"
       "  and (weak0, weak1) a1(o1, i1, i2), a2(o2, i3, i4);\n"
@@ -94,7 +94,7 @@ TEST(ParserA301, GateInst_SharedStrengthAcrossInstances) {
   EXPECT_EQ(gates[0]->drive_strength1, gates[1]->drive_strength1);
 }
 
-TEST(ParserA302, PulldownStrength_Strength0Strength1) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_Strength0Strength1) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (strong0, pull1) pd1(out);\n"
@@ -107,7 +107,7 @@ TEST(ParserA302, PulldownStrength_Strength0Strength1) {
   EXPECT_EQ(g->gate_inst_name, "pd1");
 }
 
-TEST(ParserA302, PulldownStrength_Supply0Weak1) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_Supply0Weak1) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (supply0, weak1) (out);\n"
@@ -119,7 +119,7 @@ TEST(ParserA302, PulldownStrength_Supply0Weak1) {
   EXPECT_EQ(g->drive_strength1, 2u);
 }
 
-TEST(ParserA302, PulldownStrength_Pull0Highz1) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_Pull0Highz1) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (pull0, highz1) pd1(out);\n"
@@ -131,7 +131,7 @@ TEST(ParserA302, PulldownStrength_Pull0Highz1) {
   EXPECT_EQ(g->drive_strength1, 1u);
 }
 
-TEST(ParserA302, PulldownStrength_Strength1Strength0) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_Strength1Strength0) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (pull1, strong0) pd1(out);\n"
@@ -143,7 +143,7 @@ TEST(ParserA302, PulldownStrength_Strength1Strength0) {
   EXPECT_EQ(g->drive_strength1, 3u);
 }
 
-TEST(ParserA302, PulldownStrength_Highz1Supply0) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_Highz1Supply0) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (highz1, supply0) (out);\n"
@@ -155,7 +155,7 @@ TEST(ParserA302, PulldownStrength_Highz1Supply0) {
   EXPECT_EQ(g->drive_strength1, 1u);
 }
 
-TEST(ParserA302, PulldownStrength_SingleStrength0) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_SingleStrength0) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (strong0) pd1(out);\n"
@@ -167,7 +167,7 @@ TEST(ParserA302, PulldownStrength_SingleStrength0) {
   EXPECT_EQ(g->drive_strength1, 0u);
 }
 
-TEST(ParserA302, PulldownStrength_SingleSupply0) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_SingleSupply0) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (supply0) (out);\n"
@@ -179,7 +179,7 @@ TEST(ParserA302, PulldownStrength_SingleSupply0) {
   EXPECT_EQ(g->drive_strength1, 0u);
 }
 
-TEST(ParserA302, PulldownStrength_SingleWeak0) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_SingleWeak0) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (weak0) pd1(out);\n"
@@ -191,7 +191,7 @@ TEST(ParserA302, PulldownStrength_SingleWeak0) {
   EXPECT_EQ(g->drive_strength1, 0u);
 }
 
-TEST(ParserA302, PulldownStrength_SinglePull0) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_SinglePull0) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (pull0) pd1(out);\n"
@@ -203,7 +203,7 @@ TEST(ParserA302, PulldownStrength_SinglePull0) {
   EXPECT_EQ(g->drive_strength1, 0u);
 }
 
-TEST(ParserA302, PulldownStrength_SingleHighz0) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_SingleHighz0) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (highz0) pd1(out);\n"
@@ -215,7 +215,7 @@ TEST(ParserA302, PulldownStrength_SingleHighz0) {
   EXPECT_EQ(g->drive_strength1, 0u);
 }
 
-TEST(ParserA302, PulldownStrength_MultipleInstances) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_MultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (strong0, weak1) pd1(a), pd2(b);\n"
@@ -229,7 +229,7 @@ TEST(ParserA302, PulldownStrength_MultipleInstances) {
   EXPECT_EQ(gates[1]->drive_strength1, 2u);
 }
 
-TEST(ParserA302, PulldownStrength_SingleStrength0_MultipleInstances) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_SingleStrength0_MultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (pull0) pd1(a), pd2(b);\n"
@@ -243,7 +243,7 @@ TEST(ParserA302, PulldownStrength_SingleStrength0_MultipleInstances) {
   EXPECT_EQ(gates[1]->drive_strength1, 0u);
 }
 
-TEST(ParserA302, PulldownStrength_AllStrength0Values) {
+TEST(PrimitiveStrengthParsing, PulldownStrength_AllStrength0Values) {
   EXPECT_TRUE(ParseOk("module m; pulldown (highz0) (out); endmodule"));
   EXPECT_TRUE(ParseOk("module m; pulldown (weak0) (out); endmodule"));
   EXPECT_TRUE(ParseOk("module m; pulldown (pull0) (out); endmodule"));
@@ -251,7 +251,7 @@ TEST(ParserA302, PulldownStrength_AllStrength0Values) {
   EXPECT_TRUE(ParseOk("module m; pulldown (supply0) (out); endmodule"));
 }
 
-TEST(ParserA302, PullupStrength_AllStrength1Values) {
+TEST(PrimitiveStrengthParsing, PullupStrength_AllStrength1Values) {
   EXPECT_TRUE(ParseOk("module m; pullup (highz1) (out); endmodule"));
   EXPECT_TRUE(ParseOk("module m; pullup (weak1) (out); endmodule"));
   EXPECT_TRUE(ParseOk("module m; pullup (pull1) (out); endmodule"));

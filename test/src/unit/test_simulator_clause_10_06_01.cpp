@@ -78,7 +78,7 @@ TEST(StmtExec, AssignDeassignBlockingAssign) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-TEST(SimCh10d, AssignOverridesProceduralAssign) {
+TEST(ProceduralContinuousAssignSim, AssignOverridesProceduralAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -98,7 +98,7 @@ TEST(SimCh10d, AssignOverridesProceduralAssign) {
   EXPECT_TRUE(q->is_forced);
 }
 
-TEST(SimCh10d, DeassignThenProceduralAssign) {
+TEST(ProceduralContinuousAssignSim, DeassignThenProceduralAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -120,7 +120,7 @@ TEST(SimCh10d, DeassignThenProceduralAssign) {
   EXPECT_EQ(q->value.ToUint64(), 77u);
 }
 
-TEST(SimCh10d, DeassignRetainsValue) {
+TEST(ProceduralContinuousAssignSim, DeassignRetainsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -142,7 +142,7 @@ TEST(SimCh10d, DeassignRetainsValue) {
   EXPECT_EQ(q->value.ToUint64(), 50u);
 }
 
-TEST(SimCh10d, ReAssignReplacesFirst) {
+TEST(ProceduralContinuousAssignSim, ReAssignReplacesFirst) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -163,7 +163,7 @@ TEST(SimCh10d, ReAssignReplacesFirst) {
   EXPECT_TRUE(q->is_forced);
 }
 
-TEST(SimCh10d, AssignExpressionRhs) {
+TEST(ProceduralContinuousAssignSim, AssignExpressionRhs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

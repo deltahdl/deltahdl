@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserAnnexA0412, ElaborationInterfaceInstInModule) {
+TEST(InterfaceInstantiationGrammar, ElaborationInterfaceInstInModule) {
   ElabFixture f;
   auto* design = Elaborate(
       "interface my_bus(input logic clk, input logic rst);\n"
@@ -24,7 +24,7 @@ TEST(ParserAnnexA0412, ElaborationInterfaceInstInModule) {
   EXPECT_NE(top->children[0].resolved, nullptr);
 }
 
-TEST(ParserAnnexA0412, ElaborationInterfaceInsideInterface) {
+TEST(InterfaceInstantiationGrammar, ElaborationInterfaceInsideInterface) {
   ElabFixture f;
   auto* design = Elaborate(
       "interface inner_if(input logic sig);\n"

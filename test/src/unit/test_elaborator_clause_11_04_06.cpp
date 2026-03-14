@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA86, BinaryWildcardEqElaborates) {
+TEST(OperatorElaboration, BinaryWildcardEqElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(ElabA86, BinaryWildcardEqElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, BinaryWildcardNeqElaborates) {
+TEST(OperatorElaboration, BinaryWildcardNeqElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

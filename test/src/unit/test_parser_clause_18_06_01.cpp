@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA82, RandomizeCallBasic) {
+TEST(SubroutineCallExprParsing, RandomizeCallBasic) {
   auto r = Parse(
       "module m;\n"
       "  initial begin obj.randomize(); end\n"

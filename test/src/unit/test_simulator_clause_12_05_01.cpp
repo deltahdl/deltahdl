@@ -172,7 +172,7 @@ TEST(StmtExec, CasezWithZInSelector) {
   EXPECT_EQ(result_var->value.ToUint64(), 55u);
 }
 
-TEST(SimA60701, CasezQuestionMarkDontCare) {
+TEST(PatternSim, CasezQuestionMarkDontCare) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -198,7 +198,7 @@ TEST(SimA60701, CasezQuestionMarkDontCare) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA60701, CasezSecondItemMatch) {
+TEST(PatternSim, CasezSecondItemMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -223,7 +223,7 @@ TEST(SimA60701, CasezSecondItemMatch) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(SimA60701, CasexXInSelectorTreatedAsDontCare) {
+TEST(PatternSim, CasexXInSelectorTreatedAsDontCare) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -247,7 +247,7 @@ TEST(SimA60701, CasexXInSelectorTreatedAsDontCare) {
   ASSERT_NE(var, nullptr);
 }
 
-TEST(SimA60701, CasezZInSelectorIsDontCare) {
+TEST(PatternSim, CasezZInSelectorIsDontCare) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -273,7 +273,7 @@ TEST(SimA60701, CasezZInSelectorIsDontCare) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimA60701, CasezDontCareInPatternOnly) {
+TEST(PatternSim, CasezDontCareInPatternOnly) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

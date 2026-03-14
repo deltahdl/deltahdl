@@ -27,7 +27,7 @@ TEST_F(SpecifyTest, RuntimeMultiplePathDelays) {
   EXPECT_EQ(mgr.GetPathDelay("in2", "out2"), 8u);
 }
 
-TEST(SimA702, PathDeclsDoNotInterfereBehavioral) {
+TEST(SpecifyPathSim, PathDeclsDoNotInterfereBehavioral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

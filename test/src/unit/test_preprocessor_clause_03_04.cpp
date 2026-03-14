@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, DataAndClassDeclarations) {
+TEST(DesignBuildingBlockParsing, DataAndClassDeclarations) {
   auto r = ParseWithPreprocessor(
       "program p;\n"
       "  logic [7:0] count;\n"

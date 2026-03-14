@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA26, DpiExportFunction) {
+TEST(FunctionDeclParsing, DpiExportFunction) {
   auto r = Parse(
       "module m;\n"
       "  function void sv_func(); endfunction\n"
@@ -24,7 +24,7 @@ TEST(ParserA26, DpiExportFunction) {
   EXPECT_FALSE(item->dpi_is_task);
 }
 
-TEST(ParserA26, DpiExportWithCIdentifier) {
+TEST(FunctionDeclParsing, DpiExportWithCIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  function void sv_func(); endfunction\n"
@@ -38,7 +38,7 @@ TEST(ParserA26, DpiExportWithCIdentifier) {
   EXPECT_EQ(item->name, "sv_func");
 }
 
-TEST(ParserA26, DpiExportDpiLegacy) {
+TEST(FunctionDeclParsing, DpiExportDpiLegacy) {
   auto r = Parse(
       "module m;\n"
       "  function void sv_func(); endfunction\n"
@@ -90,7 +90,7 @@ TEST_F(AnnexHParseTest, AnnexHDpiExportWithCName) {
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
-TEST(ParserSection38, DpiExportFunctionForCalltf) {
+TEST(DpiParsing, DpiExportFunctionForCalltf) {
   auto r = Parse(R"(
     module m;
       export "DPI-C" function calltf_routine;
@@ -105,7 +105,7 @@ TEST(ParserSection38, DpiExportFunctionForCalltf) {
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
-TEST(ParserSection38, DpiExportWithCNameForSystf) {
+TEST(DpiParsing, DpiExportWithCNameForSystf) {
   auto r = Parse(R"(
     module m;
       export "DPI-C" my_c_calltf = function sv_calltf;

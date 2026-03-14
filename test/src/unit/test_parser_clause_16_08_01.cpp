@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, SequenceFormalType_Sequence) {
+TEST(AssertionDeclParsing, SequenceFormalType_Sequence) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(sequence sub_seq);\n"
@@ -13,7 +13,7 @@ TEST(ParserA210, SequenceFormalType_Sequence) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceFormalType_Untyped) {
+TEST(AssertionDeclParsing, SequenceFormalType_Untyped) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(untyped x);\n"
@@ -22,7 +22,7 @@ TEST(ParserA210, SequenceFormalType_Untyped) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceFormalType_DataType) {
+TEST(AssertionDeclParsing, SequenceFormalType_DataType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(int x);\n"

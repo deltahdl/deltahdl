@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, InitialConstruct_SingleStmt) {
+TEST(ProceduralBlockSyntaxParsing, InitialConstruct_SingleStmt) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"hello\");\n"
@@ -25,7 +25,7 @@ TEST(Parser, ModuleWithInitialBlock) {
   ASSERT_EQ(r.cu->modules[0]->items.size(), 1);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
-TEST(ParserSection9b, StructuredProcMultipleInitial) {
+TEST(ProceduralAssignAndControlParsing, StructuredProcMultipleInitial) {
   auto r = Parse(
       "module m;\n"
       "  initial a = 0;\n"
@@ -41,7 +41,7 @@ TEST(ParserSection9b, StructuredProcMultipleInitial) {
   EXPECT_EQ(count, 3);
 }
 
-TEST(ParserSection9c, InitialWithTaskCall) {
+TEST(ProcessTimingAndControlParsing, InitialWithTaskCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  task my_task;\n"
@@ -53,7 +53,7 @@ TEST(ParserSection9c, InitialWithTaskCall) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, InitialBlock) {
+TEST(ProcessParsing, InitialBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial x = 1;\n"
@@ -70,7 +70,7 @@ TEST(ParserSection9, InitialBlock) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserClause09_02_01, InitialBeginEndWithInit) {
+TEST(InitialProcedureParsing, InitialBeginEndWithInit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -87,7 +87,7 @@ TEST(ParserClause09_02_01, InitialBeginEndWithInit) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserClause09_02_01, InitialWaveformStimulus) {
+TEST(InitialProcedureParsing, InitialWaveformStimulus) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -107,7 +107,7 @@ TEST(ParserClause09_02_01, InitialWaveformStimulus) {
   EXPECT_EQ(item->body->stmts.size(), 5u);
 }
 
-TEST(ParserClause09_02_01, InitialNullStatement) {
+TEST(InitialProcedureParsing, InitialNullStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial ;\n"

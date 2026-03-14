@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA26, DpiImportFunction) {
+TEST(FunctionDeclParsing, DpiImportFunction) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" function int c_add(input int a, input int b);\n"
@@ -25,7 +25,7 @@ TEST(ParserA26, DpiImportFunction) {
   ASSERT_EQ(item->func_args.size(), 2u);
 }
 
-TEST(ParserA26, DpiImportTask) {
+TEST(FunctionDeclParsing, DpiImportTask) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" task c_do_work(input int x);\n"
@@ -38,7 +38,7 @@ TEST(ParserA26, DpiImportTask) {
   EXPECT_EQ(item->name, "c_do_work");
 }
 
-TEST(ParserA26, DpiSpecStringDpiC) {
+TEST(FunctionDeclParsing, DpiSpecStringDpiC) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" function void foo();\n"
@@ -48,7 +48,7 @@ TEST(ParserA26, DpiSpecStringDpiC) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kDpiImport);
 }
 
-TEST(ParserA26, DpiSpecStringDpi) {
+TEST(FunctionDeclParsing, DpiSpecStringDpi) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI\" function void foo();\n"
@@ -58,7 +58,7 @@ TEST(ParserA26, DpiSpecStringDpi) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kDpiImport);
 }
 
-TEST(ParserA26, DpiFunctionImportPure) {
+TEST(FunctionDeclParsing, DpiFunctionImportPure) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" pure function int pure_add(input int a, input int "
@@ -71,7 +71,7 @@ TEST(ParserA26, DpiFunctionImportPure) {
   EXPECT_FALSE(item->dpi_is_context);
 }
 
-TEST(ParserA26, DpiFunctionImportContext) {
+TEST(FunctionDeclParsing, DpiFunctionImportContext) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" context function void ctx_func();\n"
@@ -83,7 +83,7 @@ TEST(ParserA26, DpiFunctionImportContext) {
   EXPECT_FALSE(item->dpi_is_pure);
 }
 
-TEST(ParserA26, DpiTaskImportContext) {
+TEST(FunctionDeclParsing, DpiTaskImportContext) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" context task ctx_task(input int x);\n"
@@ -95,7 +95,7 @@ TEST(ParserA26, DpiTaskImportContext) {
   EXPECT_TRUE(item->dpi_is_task);
 }
 
-TEST(ParserA26, DpiImportWithCIdentifier) {
+TEST(FunctionDeclParsing, DpiImportWithCIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" c_my_func = function int my_func(input int x);\n"
@@ -108,7 +108,7 @@ TEST(ParserA26, DpiImportWithCIdentifier) {
   EXPECT_EQ(item->name, "my_func");
 }
 
-TEST(ParserA26, DpiImportTaskWithCIdentifier) {
+TEST(FunctionDeclParsing, DpiImportTaskWithCIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" c_work = task do_work();\n"
@@ -121,7 +121,7 @@ TEST(ParserA26, DpiImportTaskWithCIdentifier) {
   EXPECT_TRUE(item->dpi_is_task);
 }
 
-TEST(ParserA26, DpiImportPureWithCIdentifier) {
+TEST(FunctionDeclParsing, DpiImportPureWithCIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" pure c_fn = function int fn(input int a);\n"
@@ -134,7 +134,7 @@ TEST(ParserA26, DpiImportPureWithCIdentifier) {
   EXPECT_EQ(item->name, "fn");
 }
 
-TEST(ParserA26, DpiFuncProtoNoArgs) {
+TEST(FunctionDeclParsing, DpiFuncProtoNoArgs) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" function int get_value();\n"
@@ -145,7 +145,7 @@ TEST(ParserA26, DpiFuncProtoNoArgs) {
   EXPECT_TRUE(item->func_args.empty());
 }
 
-TEST(ParserA26, DpiFuncProtoMultipleArgs) {
+TEST(FunctionDeclParsing, DpiFuncProtoMultipleArgs) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" function int compute(\n"
@@ -157,7 +157,7 @@ TEST(ParserA26, DpiFuncProtoMultipleArgs) {
   ASSERT_EQ(item->func_args.size(), 3u);
 }
 
-TEST(ParserA26, DpiTaskProtoWithArgs) {
+TEST(FunctionDeclParsing, DpiTaskProtoWithArgs) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" task run_sim(\n"
@@ -275,7 +275,7 @@ TEST_F(AnnexHParseTest, AnnexJDpiImportCoexistence) {
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kContAssign);
 }
 
-TEST(ParserSection38, DpiImportVoidCallbackFunction) {
+TEST(DpiParsing, DpiImportVoidCallbackFunction) {
   auto r = Parse(R"(
     module m;
       import "DPI-C" function void my_callback();
@@ -290,7 +290,7 @@ TEST(ParserSection38, DpiImportVoidCallbackFunction) {
   EXPECT_FALSE(items[0]->dpi_is_task);
 }
 
-TEST(ParserSection38, DpiImportWithCNameForCallback) {
+TEST(DpiParsing, DpiImportWithCNameForCallback) {
   auto r = Parse(R"(
     module m;
       import "DPI-C" vpi_cb_rtn =
@@ -305,7 +305,7 @@ TEST(ParserSection38, DpiImportWithCNameForCallback) {
   EXPECT_EQ(items[0]->name, "cb_value_change");
 }
 
-TEST(ParserSection38, DpiImportPureFunctionForSizetf) {
+TEST(DpiParsing, DpiImportPureFunctionForSizetf) {
   auto r = Parse(R"(
     module m;
       import "DPI-C" pure function int my_sizetf(input string data);
@@ -374,7 +374,7 @@ static bool ParseOk38(const std::string& src) {
   return !diag.HasErrors();
 }
 
-TEST(ParserSection38, MultipleDpiDeclarationsForVpiRegistration) {
+TEST(DpiParsing, MultipleDpiDeclarationsForVpiRegistration) {
   EXPECT_TRUE(ParseOk38(R"(
     module m;
       import "DPI-C" context function int calltf(input string data);
@@ -441,7 +441,7 @@ TEST(SourceText, PackageItemDpiImportExport) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
 }
 
-TEST(ParserSection13, DpiImportWithCName) {
+TEST(TaskAndFunctionParsing, DpiImportWithCName) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" c_real_name = function void sv_wrapper();\n"

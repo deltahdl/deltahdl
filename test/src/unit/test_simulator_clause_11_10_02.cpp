@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA11102, StringLiteralPaddedWithZeros) {
+TEST(ConcurrentAssertionSyntaxSim, StringLiteralPaddedWithZeros) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -25,7 +25,7 @@ TEST(SimA11102, StringLiteralPaddedWithZeros) {
   EXPECT_EQ(var->value.words[1].aval & 0xFFFF, 0x0000u);
 }
 
-TEST(SimA11102, PaddingAffectsConcatComparison) {
+TEST(ConcurrentAssertionSyntaxSim, PaddingAffectsConcatComparison) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -48,7 +48,7 @@ TEST(SimA11102, PaddingAffectsConcatComparison) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimA11102, ExactWidthNoPadding) {
+TEST(ConcurrentAssertionSyntaxSim, ExactWidthNoPadding) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -74,7 +74,7 @@ TEST(SimA11102, ExactWidthNoPadding) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA11102, PaddingIndistinguishableFromNul) {
+TEST(ConcurrentAssertionSyntaxSim, PaddingIndistinguishableFromNul) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -96,7 +96,7 @@ TEST(SimA11102, PaddingIndistinguishableFromNul) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA11102, PaddedStringSelfCompare) {
+TEST(ConcurrentAssertionSyntaxSim, PaddedStringSelfCompare) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

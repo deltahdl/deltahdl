@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA25, UnpackedDimensionConstantRange) {
+TEST(DeclarationRangeParsing, UnpackedDimensionConstantRange) {
   auto r = Parse("module m; logic x [7:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserA25, UnpackedDimensionConstantRange) {
   EXPECT_EQ(item->unpacked_dims[0]->op, TokenKind::kColon);
 }
 
-TEST(ParserA25, UnpackedDimensionConstantExpr) {
+TEST(DeclarationRangeParsing, UnpackedDimensionConstantExpr) {
   auto r = Parse("module m; logic x [8]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -26,7 +26,7 @@ TEST(ParserA25, UnpackedDimensionConstantExpr) {
   EXPECT_EQ(item->unpacked_dims[0]->int_val, 8u);
 }
 
-TEST(ParserA25, MultipleUnpackedDimensions) {
+TEST(DeclarationRangeParsing, MultipleUnpackedDimensions) {
   auto r = Parse("module m; logic x [3:0][7:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -34,7 +34,7 @@ TEST(ParserA25, MultipleUnpackedDimensions) {
   EXPECT_EQ(item->unpacked_dims.size(), 2u);
 }
 
-TEST(ParserA25, PackedDimensionConstantRange) {
+TEST(DeclarationRangeParsing, PackedDimensionConstantRange) {
   auto r = Parse("module m; logic [15:0] x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -43,7 +43,7 @@ TEST(ParserA25, PackedDimensionConstantRange) {
   EXPECT_NE(item->data_type.packed_dim_right, nullptr);
 }
 
-TEST(ParserA25, PackedDimensionMultiple) {
+TEST(DeclarationRangeParsing, PackedDimensionMultiple) {
   auto r = Parse("module m; logic [3:0][7:0] x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -52,7 +52,7 @@ TEST(ParserA25, PackedDimensionMultiple) {
   EXPECT_GE(item->data_type.extra_packed_dims.size(), 1u);
 }
 
-TEST(ParserA25, UnsizedDimension) {
+TEST(DeclarationRangeParsing, UnsizedDimension) {
   auto r = Parse("module m; logic x []; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -61,7 +61,7 @@ TEST(ParserA25, UnsizedDimension) {
   EXPECT_EQ(item->unpacked_dims[0], nullptr);
 }
 
-TEST(ParserA25, AssociativeDimensionWildcard) {
+TEST(DeclarationRangeParsing, AssociativeDimensionWildcard) {
   auto r = Parse("module m; int x [*]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -71,7 +71,7 @@ TEST(ParserA25, AssociativeDimensionWildcard) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "*");
 }
 
-TEST(ParserA25, AssociativeDimensionWithType) {
+TEST(DeclarationRangeParsing, AssociativeDimensionWithType) {
   auto r = Parse("module m; int x [string]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -81,7 +81,7 @@ TEST(ParserA25, AssociativeDimensionWithType) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "string");
 }
 
-TEST(ParserA25, AssociativeDimensionWithIntType) {
+TEST(DeclarationRangeParsing, AssociativeDimensionWithIntType) {
   auto r = Parse("module m; string x [int]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -91,7 +91,7 @@ TEST(ParserA25, AssociativeDimensionWithIntType) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "int");
 }
 
-TEST(ParserA25, QueueDimensionUnbounded) {
+TEST(DeclarationRangeParsing, QueueDimensionUnbounded) {
   auto r = Parse("module m; int x [$]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -102,7 +102,7 @@ TEST(ParserA25, QueueDimensionUnbounded) {
   EXPECT_EQ(item->unpacked_dims[0]->rhs, nullptr);
 }
 
-TEST(ParserA25, QueueDimensionBounded) {
+TEST(DeclarationRangeParsing, QueueDimensionBounded) {
   auto r = Parse("module m; int x [$:255]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -114,7 +114,7 @@ TEST(ParserA25, QueueDimensionBounded) {
   EXPECT_EQ(item->unpacked_dims[0]->rhs->int_val, 255u);
 }
 
-TEST(ParserA25, VariableDimensionOnFuncArg) {
+TEST(DeclarationRangeParsing, VariableDimensionOnFuncArg) {
   auto r = Parse(
       "module m;\n"
       "  function void f(int x [3:0]);\n"
@@ -127,7 +127,7 @@ TEST(ParserA25, VariableDimensionOnFuncArg) {
   EXPECT_GE(item->func_args[0].unpacked_dims.size(), 1u);
 }
 
-TEST(ParserA25, MixedPackedAndUnpackedDims) {
+TEST(DeclarationRangeParsing, MixedPackedAndUnpackedDims) {
   auto r = Parse("module m; logic [7:0] x [3:0][1:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -136,7 +136,7 @@ TEST(ParserA25, MixedPackedAndUnpackedDims) {
   EXPECT_EQ(item->unpacked_dims.size(), 2u);
 }
 
-TEST(ParserA25, ParamWithUnpackedDims) {
+TEST(DeclarationRangeParsing, ParamWithUnpackedDims) {
   auto r = Parse("module m; parameter int P [1:0] = '{0, 1}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

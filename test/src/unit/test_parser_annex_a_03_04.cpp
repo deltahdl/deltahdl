@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA34, CmosSwitchType_Cmos) {
+TEST(SwitchInstanceParsing, CmosSwitchType_Cmos) {
   auto r = Parse(
       "module m;\n"
       "  cmos g1(out, in, nctrl, pctrl);\n"
@@ -16,7 +16,7 @@ TEST(ParserA34, CmosSwitchType_Cmos) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-TEST(ParserA34, CmosSwitchType_Rcmos) {
+TEST(SwitchInstanceParsing, CmosSwitchType_Rcmos) {
   auto r = Parse(
       "module m;\n"
       "  rcmos g1(out, in, nctrl, pctrl);\n"
@@ -27,7 +27,7 @@ TEST(ParserA34, CmosSwitchType_Rcmos) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-TEST(ParserA34, EnableGateType_Bufif0) {
+TEST(SwitchInstanceParsing, EnableGateType_Bufif0) {
   auto r = Parse(
       "module m;\n"
       "  bufif0 (out, in, en);\n"
@@ -38,7 +38,7 @@ TEST(ParserA34, EnableGateType_Bufif0) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA34, EnableGateType_Bufif1) {
+TEST(SwitchInstanceParsing, EnableGateType_Bufif1) {
   auto r = Parse(
       "module m;\n"
       "  bufif1 (out, in, en);\n"
@@ -49,7 +49,7 @@ TEST(ParserA34, EnableGateType_Bufif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA34, EnableGateType_Notif0) {
+TEST(SwitchInstanceParsing, EnableGateType_Notif0) {
   auto r = Parse(
       "module m;\n"
       "  notif0 (out, in, en);\n"
@@ -60,7 +60,7 @@ TEST(ParserA34, EnableGateType_Notif0) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA34, EnableGateType_Notif1) {
+TEST(SwitchInstanceParsing, EnableGateType_Notif1) {
   auto r = Parse(
       "module m;\n"
       "  notif1 (out, in, en);\n"
@@ -71,7 +71,7 @@ TEST(ParserA34, EnableGateType_Notif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA34, MosSwitchType_Nmos) {
+TEST(SwitchInstanceParsing, MosSwitchType_Nmos) {
   auto r = Parse(
       "module m;\n"
       "  nmos (out, in, gate);\n"
@@ -82,7 +82,7 @@ TEST(ParserA34, MosSwitchType_Nmos) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA34, MosSwitchType_Pmos) {
+TEST(SwitchInstanceParsing, MosSwitchType_Pmos) {
   auto r = Parse(
       "module m;\n"
       "  pmos (out, in, gate);\n"
@@ -93,7 +93,7 @@ TEST(ParserA34, MosSwitchType_Pmos) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA34, MosSwitchType_Rnmos) {
+TEST(SwitchInstanceParsing, MosSwitchType_Rnmos) {
   auto r = Parse(
       "module m;\n"
       "  rnmos (out, in, gate);\n"
@@ -104,7 +104,7 @@ TEST(ParserA34, MosSwitchType_Rnmos) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA34, MosSwitchType_Rpmos) {
+TEST(SwitchInstanceParsing, MosSwitchType_Rpmos) {
   auto r = Parse(
       "module m;\n"
       "  rpmos (out, in, gate);\n"
@@ -115,7 +115,7 @@ TEST(ParserA34, MosSwitchType_Rpmos) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA34, NInputGateType_And) {
+TEST(SwitchInstanceParsing, NInputGateType_And) {
   auto r = Parse(
       "module m;\n"
       "  and (y, a, b);\n"
@@ -126,7 +126,7 @@ TEST(ParserA34, NInputGateType_And) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA34, NInputGateType_Nand) {
+TEST(SwitchInstanceParsing, NInputGateType_Nand) {
   auto r = Parse(
       "module m;\n"
       "  nand (y, a, b);\n"
@@ -136,7 +136,7 @@ TEST(ParserA34, NInputGateType_Nand) {
   ASSERT_NE(g, nullptr);
 }
 
-TEST(ParserA34, NInputGateType_Or) {
+TEST(SwitchInstanceParsing, NInputGateType_Or) {
   auto r = Parse(
       "module m;\n"
       "  or (y, a, b);\n"
@@ -146,7 +146,7 @@ TEST(ParserA34, NInputGateType_Or) {
   ASSERT_NE(g, nullptr);
 }
 
-TEST(ParserA34, NInputGateType_Nor) {
+TEST(SwitchInstanceParsing, NInputGateType_Nor) {
   auto r = Parse(
       "module m;\n"
       "  nor (y, a, b);\n"
@@ -156,7 +156,7 @@ TEST(ParserA34, NInputGateType_Nor) {
   ASSERT_NE(g, nullptr);
 }
 
-TEST(ParserA34, NInputGateType_Xor) {
+TEST(SwitchInstanceParsing, NInputGateType_Xor) {
   auto r = Parse(
       "module m;\n"
       "  xor (y, a, b);\n"
@@ -166,7 +166,7 @@ TEST(ParserA34, NInputGateType_Xor) {
   ASSERT_NE(g, nullptr);
 }
 
-TEST(ParserA34, NInputGateType_Xnor) {
+TEST(SwitchInstanceParsing, NInputGateType_Xnor) {
   auto r = Parse(
       "module m;\n"
       "  xnor (y, a, b);\n"
@@ -176,7 +176,7 @@ TEST(ParserA34, NInputGateType_Xnor) {
   ASSERT_NE(g, nullptr);
 }
 
-TEST(ParserA34, NOutputGateType_Buf) {
+TEST(SwitchInstanceParsing, NOutputGateType_Buf) {
   auto r = Parse(
       "module m;\n"
       "  buf (out, in);\n"
@@ -187,7 +187,7 @@ TEST(ParserA34, NOutputGateType_Buf) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA34, NOutputGateType_Not) {
+TEST(SwitchInstanceParsing, NOutputGateType_Not) {
   auto r = Parse(
       "module m;\n"
       "  not (out, in);\n"
@@ -198,7 +198,7 @@ TEST(ParserA34, NOutputGateType_Not) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA34, PassEnSwitchType_Tranif0) {
+TEST(SwitchInstanceParsing, PassEnSwitchType_Tranif0) {
   auto r = Parse(
       "module m;\n"
       "  tranif0 (a, b, ctrl);\n"
@@ -209,7 +209,7 @@ TEST(ParserA34, PassEnSwitchType_Tranif0) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA34, PassEnSwitchType_Tranif1) {
+TEST(SwitchInstanceParsing, PassEnSwitchType_Tranif1) {
   auto r = Parse(
       "module m;\n"
       "  tranif1 (a, b, ctrl);\n"
@@ -219,7 +219,7 @@ TEST(ParserA34, PassEnSwitchType_Tranif1) {
   ASSERT_NE(g, nullptr);
 }
 
-TEST(ParserA34, PassEnSwitchType_Rtranif0) {
+TEST(SwitchInstanceParsing, PassEnSwitchType_Rtranif0) {
   auto r = Parse(
       "module m;\n"
       "  rtranif0 (a, b, ctrl);\n"
@@ -229,7 +229,7 @@ TEST(ParserA34, PassEnSwitchType_Rtranif0) {
   ASSERT_NE(g, nullptr);
 }
 
-TEST(ParserA34, PassEnSwitchType_Rtranif1) {
+TEST(SwitchInstanceParsing, PassEnSwitchType_Rtranif1) {
   auto r = Parse(
       "module m;\n"
       "  rtranif1 (a, b, ctrl);\n"
@@ -239,7 +239,7 @@ TEST(ParserA34, PassEnSwitchType_Rtranif1) {
   ASSERT_NE(g, nullptr);
 }
 
-TEST(ParserA34, PassSwitchType_Tran) {
+TEST(SwitchInstanceParsing, PassSwitchType_Tran) {
   auto r = Parse(
       "module m;\n"
       "  tran (a, b);\n"
@@ -250,7 +250,7 @@ TEST(ParserA34, PassSwitchType_Tran) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA34, PassSwitchType_Rtran) {
+TEST(SwitchInstanceParsing, PassSwitchType_Rtran) {
   auto r = Parse(
       "module m;\n"
       "  rtran (a, b);\n"
@@ -261,7 +261,7 @@ TEST(ParserA34, PassSwitchType_Rtran) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA34, PullGate_Pullup) {
+TEST(SwitchInstanceParsing, PullGate_Pullup) {
   auto r = Parse(
       "module m;\n"
       "  pullup (net_a);\n"
@@ -272,7 +272,7 @@ TEST(ParserA34, PullGate_Pullup) {
   EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
 
-TEST(ParserA34, PullGate_Pulldown) {
+TEST(SwitchInstanceParsing, PullGate_Pulldown) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (net_a);\n"
@@ -283,7 +283,7 @@ TEST(ParserA34, PullGate_Pulldown) {
   EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
 
-TEST(ParserA34, AllGateTypesWithNamedInstances) {
+TEST(SwitchInstanceParsing, AllGateTypesWithNamedInstances) {
   auto r = Parse(
       "module m;\n"
       "  and g1(y, a, b);\n"

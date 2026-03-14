@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, CastCompatibleRealToIntType) {
+TEST(DataTypeParsing, CastCompatibleRealToIntType) {
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -14,7 +14,7 @@ TEST(ParserSection6, CastCompatibleRealToIntType) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-TEST(ParserSection6, CastCompatibleEnumToInt) {
+TEST(DataTypeParsing, CastCompatibleEnumToInt) {
   DataType a;
   a.kind = DataTypeKind::kEnum;
   DataType b;
@@ -22,7 +22,7 @@ TEST(ParserSection6, CastCompatibleEnumToInt) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-TEST(ParserSection6, CastCompatibleIntToEnum) {
+TEST(DataTypeParsing, CastCompatibleIntToEnum) {
   DataType a;
   a.kind = DataTypeKind::kInt;
   DataType b;
@@ -30,7 +30,7 @@ TEST(ParserSection6, CastCompatibleIntToEnum) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-TEST(ParserSection6, CastCompatibleRealToShortreal) {
+TEST(DataTypeParsing, CastCompatibleRealToShortreal) {
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -38,7 +38,7 @@ TEST(ParserSection6, CastCompatibleRealToShortreal) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-TEST(ParserSection6, NotCastCompatibleStringToInt) {
+TEST(DataTypeParsing, NotCastCompatibleStringToInt) {
   DataType a;
   a.kind = DataTypeKind::kString;
   DataType b;

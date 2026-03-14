@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection7c, QueueInsertAndDelete) {
+TEST(DynamicArrayAndQueueParsing, QueueInsertAndDelete) {
   auto r = Parse(
       "module m;\n"
       "  int q[$];\n"

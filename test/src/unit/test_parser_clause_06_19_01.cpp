@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A2TypedefEnumWithBase) {
+TEST(FormalSyntaxParsing, TypedefEnumWithBase) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum logic [1:0] {IDLE, RUN, DONE} state_t;\n"
@@ -15,7 +15,7 @@ TEST(ParserAnnexA, A2TypedefEnumWithBase) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
 }
 
-TEST(ParserA213, TypedefEnum) {
+TEST(TypeDeclParsing, TypedefEnum) {
   auto r = Parse("module m; typedef enum {A, B, C} abc_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -24,7 +24,7 @@ TEST(ParserA213, TypedefEnum) {
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
 }
 
-TEST(ParserSection8, EnumTypedefUsage) {
+TEST(ClassParsing, EnumTypedefUsage) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum {NO, YES} boolean;\n"
@@ -53,7 +53,7 @@ TEST(Parser, EnumWithValues) {
   }
 }
 
-TEST(ParserClause03, Cl3_13_EnumInModuleScope) {
+TEST(DesignBuildingBlockParsing, EnumInModuleScope) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum logic [1:0] {IDLE, RUN, DONE} state_t;\n"
@@ -72,7 +72,7 @@ TEST(ParserClause03, Cl3_13_EnumInModuleScope) {
   EXPECT_TRUE(found_typedef);
 }
 
-TEST(ParserSection8, TypedefEnumWithMembers) {
+TEST(ClassParsing, TypedefEnumWithMembers) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum {RED, GREEN, BLUE} color_t;\n"
@@ -85,7 +85,7 @@ TEST(ParserSection8, TypedefEnumWithMembers) {
   EXPECT_EQ(items[0]->typedef_type.kind, DataTypeKind::kEnum);
 }
 
-TEST(ParserSection6, EnumBasic) {
+TEST(DataTypeParsing, EnumBasic) {
   auto r = Parse(
       "module t;\n"
       "  typedef enum { RED, GREEN, BLUE } color_t;\n"

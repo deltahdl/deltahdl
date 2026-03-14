@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA221, StructMemberRandc) {
+TEST(NetAndVariableTypeParsing, StructMemberRandc) {
   auto r = Parse(
       "module m;\n"
       "  struct { randc bit [7:0] x; } s;\n"
@@ -17,7 +17,7 @@ TEST(ParserA221, StructMemberRandc) {
   EXPECT_TRUE(members[0].is_randc);
 }
 
-TEST(ParserA221, StructMemberBasic) {
+TEST(NetAndVariableTypeParsing, StructMemberBasic) {
   auto r = Parse(
       "module m;\n"
       "  struct { logic [7:0] data; int count; } s;\n"
@@ -30,7 +30,7 @@ TEST(ParserA221, StructMemberBasic) {
   EXPECT_EQ(members[1].name, "count");
 }
 
-TEST(ParserA221, StructMemberRand) {
+TEST(NetAndVariableTypeParsing, StructMemberRand) {
   auto r = Parse(
       "module m;\n"
       "  struct { rand int a; int b; } s;\n"
@@ -43,7 +43,7 @@ TEST(ParserA221, StructMemberRand) {
   EXPECT_FALSE(members[1].is_rand);
 }
 
-TEST(ParserA221, StructMemberAttr) {
+TEST(NetAndVariableTypeParsing, StructMemberAttr) {
   auto r = Parse(
       "module m;\n"
       "  struct { (* mark *) int a; int b; } s;\n"
@@ -56,7 +56,7 @@ TEST(ParserA221, StructMemberAttr) {
   EXPECT_TRUE(members[1].attrs.empty());
 }
 
-TEST(ParserSection7, Sec7_2_2_MemberAccessOnRHS) {
+TEST(AggregateTypeParsing, MemberAccessOnRHS) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int x; int y; } point_t;\n"
@@ -96,7 +96,7 @@ static void VerifyStructMemberNames(const std::vector<StructMember>& members,
   }
 }
 
-TEST(ParserSection7, StructBasic) {
+TEST(AggregateTypeParsing, StructBasic) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct {\n"
@@ -114,7 +114,7 @@ TEST(ParserSection7, StructBasic) {
                           std::size(expected_names));
 }
 
-TEST(ParserCh5, StructMembers_CommaSeparated) {
+TEST(DataObjectParsing, StructMembers_CommaSeparated) {
   auto r = Parse(
       "module m;\n"
       "  struct { int X, Y, Z; } s;\n"
@@ -124,7 +124,7 @@ TEST(ParserCh5, StructMembers_CommaSeparated) {
   EXPECT_EQ(item->data_type.struct_members.size(), 3u);
 }
 
-TEST(ParserSection7, StructVariableDecl) {
+TEST(AggregateTypeParsing, StructVariableDecl) {
   auto r = Parse(
       "module t;\n"
       "  struct { int a; int b; } my_var;\n"
@@ -136,7 +136,7 @@ TEST(ParserSection7, StructVariableDecl) {
   EXPECT_EQ(item->name, "my_var");
 }
 
-TEST(ParserSection7, StructMemberUnpackedDim) {
+TEST(AggregateTypeParsing, StructMemberUnpackedDim) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct {\n"
@@ -150,7 +150,7 @@ TEST(ParserSection7, StructMemberUnpackedDim) {
   EXPECT_FALSE(item->typedef_type.struct_members[0].unpacked_dims.empty());
 }
 
-TEST(ParserSection7, StructMultipleMembersSameType) {
+TEST(AggregateTypeParsing, StructMultipleMembersSameType) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct {\n"
@@ -169,7 +169,7 @@ TEST(ParserSection7, StructMultipleMembersSameType) {
   }
 }
 
-TEST(ParserSection7, UnpackedStructDecl) {
+TEST(AggregateTypeParsing, UnpackedStructDecl) {
   auto r = Parse(
       "module t;\n"
       "  struct {\n"
@@ -186,7 +186,7 @@ TEST(ParserSection7, UnpackedStructDecl) {
   EXPECT_EQ(item->data_type.struct_members.size(), 3u);
 }
 
-TEST(ParserSection7, UnpackedStructTypedefDecl) {
+TEST(AggregateTypeParsing, UnpackedStructTypedefDecl) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct {\n"
@@ -214,7 +214,7 @@ static bool ParseOk5(const std::string& src) {
   return !diag.HasErrors();
 }
 
-TEST(ParserCh5, StructMembers_Single) {
+TEST(DataObjectParsing, StructMembers_Single) {
   EXPECT_TRUE(ParseOk5("module m; struct { int X; } s; endmodule"));
 }
 

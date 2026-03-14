@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_CmosBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_CmosBasic) {
   auto r = Parse(
       "module m;\n"
       "  cmos (out, in, nctrl, pctrl);\n"
@@ -17,7 +17,7 @@ TEST(ParserA301, GateInst_CmosBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-TEST(ParserA301, GateInst_RcmosBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_RcmosBasic) {
   auto r = Parse(
       "module m;\n"
       "  rcmos (out, in, nctrl, pctrl);\n"
@@ -28,7 +28,7 @@ TEST(ParserA301, GateInst_RcmosBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-TEST(ParserA301, GateInst_CmosWithDelay) {
+TEST(PrimitiveInstantiationParsing, GateInst_CmosWithDelay) {
   auto r = Parse(
       "module m;\n"
       "  cmos #5 (out, in, nctrl, pctrl);\n"
@@ -39,7 +39,7 @@ TEST(ParserA301, GateInst_CmosWithDelay) {
   EXPECT_NE(g->gate_delay, nullptr);
 }
 
-TEST(ParserA301, GateInst_CmosWithDelay3) {
+TEST(PrimitiveInstantiationParsing, GateInst_CmosWithDelay3) {
   auto r = Parse(
       "module m;\n"
       "  cmos #(2, 3, 4) (out, in, nctrl, pctrl);\n"
@@ -52,7 +52,7 @@ TEST(ParserA301, GateInst_CmosWithDelay3) {
   EXPECT_NE(g->gate_delay_decay, nullptr);
 }
 
-TEST(ParserA301, CmosSwitchInst_Unnamed) {
+TEST(PrimitiveInstantiationParsing, CmosSwitchInst_Unnamed) {
   auto r = Parse(
       "module m;\n"
       "  cmos (out, in, nctrl, pctrl);\n"
@@ -64,7 +64,7 @@ TEST(ParserA301, CmosSwitchInst_Unnamed) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-TEST(ParserA301, GateInst_AllCmosSwitchTypes) {
+TEST(PrimitiveInstantiationParsing, GateInst_AllCmosSwitchTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  cmos  c1(o, i, n, p);\n"
@@ -72,7 +72,7 @@ TEST(ParserA301, GateInst_AllCmosSwitchTypes) {
               "endmodule\n"));
 }
 
-TEST(ParserA304, CmosSwitchtype_Cmos) {
+TEST(PrimitiveGateTypeParsing, CmosSwitchtype_Cmos) {
   auto r = Parse(
       "module m;\n"
       "  cmos (out, in, nctrl, pctrl);\n"
@@ -83,7 +83,7 @@ TEST(ParserA304, CmosSwitchtype_Cmos) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-TEST(ParserA304, CmosSwitchtype_Rcmos) {
+TEST(PrimitiveGateTypeParsing, CmosSwitchtype_Rcmos) {
   auto r = Parse(
       "module m;\n"
       "  rcmos (out, in, nctrl, pctrl);\n"

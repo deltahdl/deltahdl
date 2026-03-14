@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA612, RsRuleMultipleAlternatives) {
+TEST(RandsequenceSyntaxParsing, RsRuleMultipleAlternatives) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -21,7 +21,7 @@ TEST(ParserA612, RsRuleMultipleAlternatives) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsWeightIntegralNumber) {
+TEST(RandsequenceSyntaxParsing, RsWeightIntegralNumber) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -36,7 +36,7 @@ TEST(ParserA612, RsWeightIntegralNumber) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsWeightIdentifier) {
+TEST(RandsequenceSyntaxParsing, RsWeightIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  int w = 5;\n"
@@ -52,7 +52,7 @@ TEST(ParserA612, RsWeightIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsWeightParenExpr) {
+TEST(RandsequenceSyntaxParsing, RsWeightParenExpr) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -67,7 +67,7 @@ TEST(ParserA612, RsWeightParenExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsWeightWithCodeBlock) {
+TEST(RandsequenceSyntaxParsing, RsWeightWithCodeBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

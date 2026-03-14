@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh41, EventBasedSchedulingEndToEnd) {
+TEST(SchedulerOverviewSim, EventBasedSchedulingEndToEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -27,7 +27,7 @@ TEST(SimCh41, EventBasedSchedulingEndToEnd) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 8u);
 }
 
-TEST(SimCh41, TimeSlotProgressionNeverGoesBackward) {
+TEST(SchedulerOverviewSim, TimeSlotProgressionNeverGoesBackward) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> observed_times;
@@ -47,7 +47,7 @@ TEST(SimCh41, TimeSlotProgressionNeverGoesBackward) {
   }
 }
 
-TEST(SimCh41, EmptySchedulerTerminatesImmediately) {
+TEST(SchedulerOverviewSim, EmptySchedulerTerminatesImmediately) {
   Arena arena;
   Scheduler sched(arena);
   EXPECT_FALSE(sched.HasEvents());
@@ -55,13 +55,13 @@ TEST(SimCh41, EmptySchedulerTerminatesImmediately) {
   EXPECT_EQ(sched.CurrentTime().ticks, 0u);
 }
 
-TEST(SimCh41, AllSeventeenRegionsPresent) { EXPECT_EQ(kRegionCount, 17u); }
+TEST(SchedulerOverviewSim, AllSeventeenRegionsPresent) { EXPECT_EQ(kRegionCount, 17u); }
 
-TEST(SimCh41, StratifiedRegionsExecuteInOrder) {
+TEST(SchedulerOverviewSim, StratifiedRegionsExecuteInOrder) {
   VerifyAllRegionsExecuteInOrder();
 }
 
-TEST(SimCh41, ActiveSetIteratesBeforeReactiveSet) {
+TEST(SchedulerOverviewSim, ActiveSetIteratesBeforeReactiveSet) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -86,7 +86,7 @@ TEST(SimCh41, ActiveSetIteratesBeforeReactiveSet) {
   EXPECT_EQ(order[2], "reactive");
 }
 
-TEST(SimCh41, PostponedIsLastRegionInTimeSlot) {
+TEST(SchedulerOverviewSim, PostponedIsLastRegionInTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -100,7 +100,7 @@ TEST(SimCh41, PostponedIsLastRegionInTimeSlot) {
   EXPECT_EQ(order[2], "postponed");
 }
 
-TEST(SimCh41, BeginEndBlockSequentialExecution) {
+TEST(SchedulerOverviewSim, BeginEndBlockSequentialExecution) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -114,7 +114,7 @@ TEST(SimCh41, BeginEndBlockSequentialExecution) {
   EXPECT_EQ(result, 3u);
 }
 
-TEST(SimCh41, NBAExecutionOrderMatchesSourceOrder) {
+TEST(SchedulerOverviewSim, NBAExecutionOrderMatchesSourceOrder) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a;\n"
@@ -127,7 +127,7 @@ TEST(SimCh41, NBAExecutionOrderMatchesSourceOrder) {
   EXPECT_EQ(result, 1u);
 }
 
-TEST(SimCh41, DeterministicSequentialWithinProcess) {
+TEST(SchedulerOverviewSim, DeterministicSequentialWithinProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -148,7 +148,7 @@ TEST(SimCh41, DeterministicSequentialWithinProcess) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 30u);
 }
 
-TEST(SimCh41, ConcurrentWriteSameTimeSlotLastWriteWins) {
+TEST(SchedulerOverviewSim, ConcurrentWriteSameTimeSlotLastWriteWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -167,7 +167,7 @@ TEST(SimCh41, ConcurrentWriteSameTimeSlotLastWriteWins) {
   EXPECT_TRUE(val == 1u || val == 2u);
 }
 
-TEST(SimCh41, ActiveRegionInterleavingIsPossible) {
+TEST(SchedulerOverviewSim, ActiveRegionInterleavingIsPossible) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -186,7 +186,7 @@ TEST(SimCh41, ActiveRegionInterleavingIsPossible) {
               (order[0] == 2 && order[1] == 1));
 }
 
-TEST(SimCh41, PLIRegionsExistInEnum) {
+TEST(SchedulerOverviewSim, PLIRegionsExistInEnum) {
   EXPECT_LT(static_cast<int>(Region::kPreActive),
             static_cast<int>(Region::kActive));
   EXPECT_LT(static_cast<int>(Region::kPreNBA), static_cast<int>(Region::kNBA));
@@ -203,22 +203,22 @@ TEST(SimCh41, PLIRegionsExistInEnum) {
             static_cast<int>(Region::kPostponed));
 }
 
-TEST(SimCh41, PLIPreActiveBeforeSimulationActive) {
+TEST(SchedulerOverviewSim, PLIPreActiveBeforeSimulationActive) {
   VerifyTwoRegionOrder({Region::kPreActive, "pre_active"},
                        {Region::kActive, "active"});
 }
 
-TEST(SimCh41, PLIPrePostponedBeforePostponed) {
+TEST(SchedulerOverviewSim, PLIPrePostponedBeforePostponed) {
   VerifyTwoRegionOrder({Region::kPrePostponed, "pre_postponed"},
                        {Region::kPostponed, "postponed"});
 }
 
-TEST(SimCh41, PLIPostNBAAfterNBABeforePreObserved) {
+TEST(SchedulerOverviewSim, PLIPostNBAAfterNBABeforePreObserved) {
   VerifyThreeRegionOrder({Region::kNBA, "nba"}, {Region::kPostNBA, "post_nba"},
                          {Region::kPreObserved, "pre_observed"});
 }
 
-TEST(SimCh41, FullPipelineIntegration) {
+TEST(SchedulerOverviewSim, FullPipelineIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -245,7 +245,7 @@ TEST(SimCh41, FullPipelineIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 99u);
 }
 
-TEST(SimCh41, MultiTimeSlotWithRegionOrdering) {
+TEST(SchedulerOverviewSim, MultiTimeSlotWithRegionOrdering) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;

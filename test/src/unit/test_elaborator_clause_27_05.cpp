@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA042, ElaborationGenerateIfTrue) {
+TEST(GenerateInstantiationGrammar, ElaborationGenerateIfTrue) {
   ElabFixture f;
   auto* design = Elaborate(
       "module top #(parameter W = 16) ();\n"
@@ -25,7 +25,7 @@ TEST(ParserAnnexA042, ElaborationGenerateIfTrue) {
   EXPECT_TRUE(found_wide);
 }
 
-TEST(ParserAnnexA042, ElaborationGenerateIfFalse) {
+TEST(GenerateInstantiationGrammar, ElaborationGenerateIfFalse) {
   ElabFixture f;
   auto* design = Elaborate(
       "module top #(parameter W = 4) ();\n"
@@ -45,7 +45,7 @@ TEST(ParserAnnexA042, ElaborationGenerateIfFalse) {
   EXPECT_TRUE(found_narrow);
 }
 
-TEST(ParserAnnexA042, ElaborationGenerateCase) {
+TEST(GenerateInstantiationGrammar, ElaborationGenerateCase) {
   ElabFixture f;
   auto* design = Elaborate(
       "module top #(parameter SEL = 1) ();\n"
@@ -65,7 +65,7 @@ TEST(ParserAnnexA042, ElaborationGenerateCase) {
   EXPECT_TRUE(found_bus1);
 }
 
-TEST(ParserAnnexA042, ElaborationGenerateCaseDefault) {
+TEST(GenerateInstantiationGrammar, ElaborationGenerateCaseDefault) {
   ElabFixture f;
   auto* design = Elaborate(
       "module top #(parameter SEL = 99) ();\n"

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA705, RuntimeTimingCheckEntryHold) {
+TEST(SystemTimingCheckSim, RuntimeTimingCheckEntryHold) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kHold;

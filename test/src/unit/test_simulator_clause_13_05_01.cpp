@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA609, TaskCallWithArgs) {
+TEST(SubroutineCallSim, TaskCallWithArgs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -31,7 +31,7 @@ TEST(SimA609, TaskCallWithArgs) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimA82, TfCallTaskOutputArg) {
+TEST(SubroutineCallExprSim, TfCallTaskOutputArg) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -127,7 +127,7 @@ TEST(Eval, NestedFunctionOutputArgs) {
   EXPECT_EQ(result_var->value.ToUint64(), 105u);
 }
 
-TEST(Sim1351, PassByValueIsolation) {
+TEST(SubroutineCallBasicSim, PassByValueIsolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -145,7 +145,7 @@ TEST(Sim1351, PassByValueIsolation) {
   LowerRunAndCheck(f, design, {{"x", 5u}, {"y", 15u}});
 }
 
-TEST(Sim1351, InoutCopyInOut) {
+TEST(SubroutineCallBasicSim, InoutCopyInOut) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

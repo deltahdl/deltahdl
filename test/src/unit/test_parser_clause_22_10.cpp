@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, CelldefineEndcelldefine) {
+TEST(CompilerDirectiveParsing, CelldefineEndcelldefine) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`celldefine\n"
                               "module inv(output y, input a);\n"
@@ -13,21 +13,21 @@ TEST(ParserSection22, CelldefineEndcelldefine) {
                               "`endcelldefine\n"));
 }
 
-TEST(ParserSection22, Celldefine_NoPairing) {
+TEST(CompilerDirectiveParsing, Celldefine_NoPairing) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`celldefine\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, Endcelldefine_Standalone) {
+TEST(CompilerDirectiveParsing, Endcelldefine_Standalone) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`endcelldefine\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, Celldefine_MultiplePairs) {
+TEST(CompilerDirectiveParsing, Celldefine_MultiplePairs) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`celldefine\n"
                               "module a;\n"
@@ -39,7 +39,7 @@ TEST(ParserSection22, Celldefine_MultiplePairs) {
                               "`endcelldefine\n"));
 }
 
-TEST(ParserSection22, Celldefine_InsideModule) {
+TEST(CompilerDirectiveParsing, Celldefine_InsideModule) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module t;\n"
                               "`celldefine\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA607, ConstExprCaseExpr) {
+TEST(CaseSyntaxParsing, ConstExprCaseExpr) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

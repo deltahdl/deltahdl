@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA829, DynamicAllocationOk) {
+TEST(ClassTypeElaboration, DynamicAllocationOk) {
   EXPECT_TRUE(
       ElabOk("class MyClass;\n"
              "  int x;\n"
@@ -13,7 +13,7 @@ TEST(ElabA829, DynamicAllocationOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA829, MultipleClassTypesOk) {
+TEST(ClassTypeElaboration, MultipleClassTypesOk) {
   EXPECT_TRUE(
       ElabOk("class A;\n"
              "  int x;\n"
@@ -25,7 +25,7 @@ TEST(ElabA829, MultipleClassTypesOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA829, NullAssignmentOk) {
+TEST(ClassTypeElaboration, NullAssignmentOk) {
   EXPECT_TRUE(
       ElabOk("class MyClass;\n"
              "  int x;\n"

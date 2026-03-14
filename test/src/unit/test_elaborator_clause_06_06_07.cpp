@@ -16,7 +16,7 @@ static void VerifyNetByName(const RtlirModule* mod, std::string_view name,
 
 namespace {
 
-TEST(SimCh6, NettypeCreatesNet) {
+TEST(DataTypeSim, NettypeCreatesNet) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -41,7 +41,7 @@ TEST(SimCh6, NettypeCreatesNet) {
   ASSERT_NE(net, nullptr);
 }
 
-TEST(SimCh6, NettypeWideNet) {
+TEST(DataTypeSim, NettypeWideNet) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

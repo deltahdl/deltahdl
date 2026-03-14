@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA609, TfCallEmptyParens) {
+TEST(SubroutineCallSyntaxParsing, TfCallEmptyParens) {
   auto r = Parse(
       "module m;\n"
       "  task foo; endtask\n"

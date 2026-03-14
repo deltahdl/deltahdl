@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA702, StateDependentIfnoneSimple) {
+TEST(SpecifyPathParsing, StateDependentIfnoneSimple) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -43,7 +43,7 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
   return spec->specify_items[0];
 }
 
-TEST(ParserA702, PathDeclStateDependentIfnone) {
+TEST(SpecifyPathParsing, PathDeclStateDependentIfnone) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -58,7 +58,7 @@ TEST(ParserA702, PathDeclStateDependentIfnone) {
   EXPECT_EQ(si->path.condition, nullptr);
 }
 
-TEST(ParserA83, ModulePathConditionalInSpecify) {
+TEST(ExpressionParsing, ModulePathConditionalInSpecify) {
   auto r = Parse(
       "module m(input a, input en, output y);\n"
       "  specify\n"
@@ -70,7 +70,7 @@ TEST(ParserA83, ModulePathConditionalInSpecify) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection28, Sec28_12_IfnonePath) {
+TEST(GateLevelModelingParsing, IfnonePath) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b);\n"
       "  specify\n"

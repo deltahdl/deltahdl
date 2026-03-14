@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA603, NestedForkInSeqBlock) {
+TEST(BlockStatementSyntaxParsing, NestedForkInSeqBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

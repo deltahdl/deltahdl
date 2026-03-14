@@ -33,7 +33,7 @@ TEST(EvalOpXZ, ShiftLeftXOperand) {
   EXPECT_EQ(result.words[0].bval & 0xFu, 0b1000u);
 }
 
-TEST(SimA83, LeftShift) {
+TEST(ExpressionSim, LeftShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -50,7 +50,7 @@ TEST(SimA83, LeftShift) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-TEST(SimA83, RightShift) {
+TEST(ExpressionSim, RightShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -67,7 +67,7 @@ TEST(SimA83, RightShift) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-TEST(SimA86, BinaryLogicalLeftShift) {
+TEST(OperatorSim, BinaryLogicalLeftShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -84,7 +84,7 @@ TEST(SimA86, BinaryLogicalLeftShift) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-TEST(SimA86, BinaryLogicalRightShift) {
+TEST(OperatorSim, BinaryLogicalRightShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -101,7 +101,7 @@ TEST(SimA86, BinaryLogicalRightShift) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-TEST(SimA86, BinaryArithLeftShift) {
+TEST(OperatorSim, BinaryArithLeftShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -118,7 +118,7 @@ TEST(SimA86, BinaryArithLeftShift) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-TEST(SimA86, BinaryArithRightShift) {
+TEST(OperatorSim, BinaryArithRightShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

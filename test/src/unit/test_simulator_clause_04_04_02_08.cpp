@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4428, ReNBARegionExecutesEvents) {
+TEST(ReNbaRegionSim, ReNBARegionExecutesEvents) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,12 +23,12 @@ TEST(SimCh4428, ReNBARegionExecutesEvents) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4428, ReNBAExecutesAfterReInactive) {
+TEST(ReNbaRegionSim, ReNBAExecutesAfterReInactive) {
   VerifyTwoRegionOrder({Region::kReInactive, "reinactive"},
                        {Region::kReNBA, "renba"});
 }
 
-TEST(SimCh4428, AllReInactiveEventsCompleteBeforeReNBA) {
+TEST(ReNbaRegionSim, AllReInactiveEventsCompleteBeforeReNBA) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -51,7 +51,7 @@ TEST(SimCh4428, AllReInactiveEventsCompleteBeforeReNBA) {
   EXPECT_EQ(order[3], "renba");
 }
 
-TEST(SimCh4428, NonblockingAssignmentSchedulesReNBACurrentTime) {
+TEST(ReNbaRegionSim, NonblockingAssignmentSchedulesReNBACurrentTime) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -72,7 +72,7 @@ TEST(SimCh4428, NonblockingAssignmentSchedulesReNBACurrentTime) {
   EXPECT_EQ(order[1], "renba");
 }
 
-TEST(SimCh4428, NonblockingAssignmentSchedulesReNBALaterTime) {
+TEST(ReNbaRegionSim, NonblockingAssignmentSchedulesReNBALaterTime) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> renba_times;
@@ -92,17 +92,17 @@ TEST(SimCh4428, NonblockingAssignmentSchedulesReNBALaterTime) {
   EXPECT_EQ(renba_times[0], 5u);
 }
 
-TEST(SimCh4428, ReNBAToReactiveIteration) {
+TEST(ReNbaRegionSim, ReNBAToReactiveIteration) {
   VerifyIterationChain(Region::kReactive, "reactive", Region::kReNBA, "renba");
 }
 
-TEST(SimCh4428, ReNBAExecutesAfterReactiveAndReInactiveBeforePostReNBA) {
+TEST(ReNbaRegionSim, ReNBAExecutesAfterReactiveAndReInactiveBeforePostReNBA) {
   VerifyFourRegionOrder(
       {Region::kReactive, "reactive"}, {Region::kReInactive, "reinactive"},
       {Region::kReNBA, "renba"}, {Region::kPostReNBA, "post_renba"});
 }
 
-TEST(SimCh4428, ReNBAIsWithinReactiveRegionSet) {
+TEST(ReNbaRegionSim, ReNBAIsWithinReactiveRegionSet) {
   auto renba_ord = static_cast<int>(Region::kReNBA);
   auto reinactive_ord = static_cast<int>(Region::kReInactive);
   auto post_renba_ord = static_cast<int>(Region::kPostReNBA);
@@ -110,11 +110,11 @@ TEST(SimCh4428, ReNBAIsWithinReactiveRegionSet) {
   EXPECT_LT(renba_ord, post_renba_ord);
 }
 
-TEST(SimCh4428, ReNBAEventsAcrossMultipleTimeSlots) {
+TEST(ReNbaRegionSim, ReNBAEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kReNBA);
 }
 
-TEST(SimCh4428, ReNBARegionHoldsMultipleEvents) {
+TEST(ReNbaRegionSim, ReNBARegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;

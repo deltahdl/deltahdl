@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, Sec6_9_ScalarNoRange) {
+TEST(DataTypeParsing, ScalarNoRange) {
   auto r = Parse(
       "module t;\n"
       "  logic a;\n"

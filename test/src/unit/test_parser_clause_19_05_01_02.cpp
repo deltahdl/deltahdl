@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, BinsOrOptions_SetCovergroupExpr) {
+TEST(CovergroupDeclParsing, BinsOrOptions_SetCovergroupExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -15,7 +15,7 @@ TEST(ParserA211, BinsOrOptions_SetCovergroupExpr) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, SetCovergroupExpression) {
+TEST(CovergroupDeclParsing, SetCovergroupExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"

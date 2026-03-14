@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection9, Sec9_2_2_Concatenation) {
+TEST(ProcessParsing, Concatenation) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] a, b;\n"
@@ -23,7 +23,7 @@ TEST(ParserSection9, Sec9_2_2_Concatenation) {
   EXPECT_EQ(item->body->rhs->elements.size(), 2u);
 }
 
-TEST(ParserSection11, ConcatWithPartSelects) {
+TEST(OperatorAndExpressionParsing, ConcatWithPartSelects) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] a, w, b;\n"
@@ -37,7 +37,7 @@ TEST(ParserSection11, ConcatWithPartSelects) {
   EXPECT_EQ(rhs->elements.size(), 4u);
 }
 
-TEST(ParserAnnexA, A8Concatenation) {
+TEST(FormalSyntaxParsing, Concatenation) {
   auto r = Parse("module m; initial x = {a, b, c}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -46,7 +46,7 @@ TEST(ParserAnnexA, A8Concatenation) {
   EXPECT_EQ(stmt->rhs->elements.size(), 3u);
 }
 
-TEST(ParserSection9, Sec9_2_2_ConcatenationLHS) {
+TEST(ProcessParsing, ConcatenationLHS) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] hi, lo;\n"
@@ -63,7 +63,7 @@ TEST(ParserSection9, Sec9_2_2_ConcatenationLHS) {
   EXPECT_EQ(item->body->lhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserSection11, ConcatOnLhsOfAssign) {
+TEST(OperatorAndExpressionParsing, ConcatOnLhsOfAssign) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic log1, log2, log3;\n"
@@ -71,7 +71,7 @@ TEST(ParserSection11, ConcatOnLhsOfAssign) {
               "endmodule\n"));
 }
 
-TEST(ParserSection11, ConcatPartSelectPostfix) {
+TEST(OperatorAndExpressionParsing, ConcatPartSelectPostfix) {
   auto r = Parse(
       "module t;\n"
       "  byte a, b;\n"
@@ -82,7 +82,7 @@ TEST(ParserSection11, ConcatPartSelectPostfix) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, ConcatSingleElement) {
+TEST(OperatorAndExpressionParsing, ConcatSingleElement) {
   auto r = Parse(
       "module t;\n"
       "  initial x = {a};\n"
@@ -93,7 +93,7 @@ TEST(ParserSection11, ConcatSingleElement) {
   EXPECT_EQ(rhs->elements.size(), 1u);
 }
 
-TEST(ParserSection11, Sec11_4_1_SelectOnConcatenation) {
+TEST(OperatorAndExpressionParsing, SelectOnConcatenation) {
   auto r = Parse(
       "module t;\n"
       "  initial x = {a, b}[3];\n"
@@ -108,7 +108,7 @@ TEST(ParserSection11, Sec11_4_1_SelectOnConcatenation) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-TEST(ParserA81, ConcatenationSingleElement) {
+TEST(ConcatenationParsing, ConcatenationSingleElement) {
   auto r = Parse("module m; initial x = {a}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -118,7 +118,7 @@ TEST(ParserA81, ConcatenationSingleElement) {
   EXPECT_EQ(stmt->rhs->elements.size(), 1u);
 }
 
-TEST(ParserA81, ConcatenationTwoElements) {
+TEST(ConcatenationParsing, ConcatenationTwoElements) {
   auto r = Parse("module m; initial x = {a, b}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -128,7 +128,7 @@ TEST(ParserA81, ConcatenationTwoElements) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-TEST(ParserA81, ConcatenationThreeElements) {
+TEST(ConcatenationParsing, ConcatenationThreeElements) {
   auto r = Parse("module m; initial x = {a, b, c}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -138,7 +138,7 @@ TEST(ParserA81, ConcatenationThreeElements) {
   EXPECT_EQ(stmt->rhs->elements.size(), 3u);
 }
 
-TEST(ParserA81, ConcatenationNested) {
+TEST(ConcatenationParsing, ConcatenationNested) {
   auto r = Parse("module m; initial x = {a, {b, c}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -156,7 +156,7 @@ TEST(ConstEval, Concatenation) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("{4'd3, 4'd5}", f)), 0x35);
 }
 
-TEST(ParserA81, ConstantConcatenation) {
+TEST(ConcatenationParsing, ConstantConcatenation) {
   auto r = Parse(
       "module m;\n"
       "  parameter P = {8'hAB, 8'hCD};\n"
@@ -165,7 +165,7 @@ TEST(ParserA81, ConstantConcatenation) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA81, ConcatenationPostfixBitSelect) {
+TEST(ConcatenationParsing, ConcatenationPostfixBitSelect) {
   auto r = Parse("module m; initial x = {a, b}[3]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -174,7 +174,7 @@ TEST(ParserA81, ConcatenationPostfixBitSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserA81, ConcatenationPostfixPartSelect) {
+TEST(ConcatenationParsing, ConcatenationPostfixPartSelect) {
   auto r = Parse("module m; initial x = {a, b}[5:2]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -183,7 +183,7 @@ TEST(ParserA81, ConcatenationPostfixPartSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserA84, ConstantPrimaryConcatenation) {
+TEST(PrimaryParsing, ConstantPrimaryConcatenation) {
   auto r = Parse("module m; parameter int P = {4'd1, 4'd2}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -192,7 +192,7 @@ TEST(ParserA84, ConstantPrimaryConcatenation) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserA84, PrimaryConcatenation) {
+TEST(PrimaryParsing, PrimaryConcatenation) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] a, b;\n"
@@ -206,7 +206,7 @@ TEST(ParserA84, PrimaryConcatenation) {
   EXPECT_EQ(rhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserA85, VarLvalueNonblockingConcat) {
+TEST(LvalueParsing, VarLvalueNonblockingConcat) {
   auto r = Parse(
       "module m; logic [3:0] a, b;\n"
       "  initial {a, b} <= 8'hFF;\n"
@@ -220,7 +220,7 @@ TEST(ParserA85, VarLvalueNonblockingConcat) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserSection11, Sec11_1_ConcatenationElements) {
+TEST(OperatorAndExpressionParsing, ConcatenationElements) {
   auto r = Parse(
       "module t;\n"
       "  initial x = {a, b, 1'b0};\n"
@@ -233,7 +233,7 @@ TEST(ParserSection11, Sec11_1_ConcatenationElements) {
   EXPECT_EQ(rhs->elements[2]->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserSection11, ConcatenationBasic) {
+TEST(OperatorAndExpressionParsing, ConcatenationBasic) {
   auto r = Parse(
       "module t;\n"
       "  initial x = {a, b, c};\n"
@@ -244,7 +244,7 @@ TEST(ParserSection11, ConcatenationBasic) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-TEST(ParserSection10, Sec10_4_1_Concatenation) {
+TEST(AssignmentParsing, Concatenation) {
   auto r = Parse(
       "module m;\n"
       "  reg [3:0] a, b, c, d;\n"

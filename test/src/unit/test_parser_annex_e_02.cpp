@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexE, AnnexEDefaultDecayTimeInteger) {
+TEST(OptionalDirectiveParsing, DefaultDecayTimeInteger) {
   auto r =
       ParseWithPreprocessor("`default_decay_time 10\nmodule m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -14,7 +14,7 @@ TEST(ParserAnnexE, AnnexEDefaultDecayTimeInteger) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-TEST(ParserAnnexE, AnnexEDefaultDecayTimeReal) {
+TEST(OptionalDirectiveParsing, DefaultDecayTimeReal) {
   auto r =
       ParseWithPreprocessor("`default_decay_time 3.5\nmodule m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -23,7 +23,7 @@ TEST(ParserAnnexE, AnnexEDefaultDecayTimeReal) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-TEST(ParserAnnexE, AnnexEDefaultDecayTimeInfinite) {
+TEST(OptionalDirectiveParsing, DefaultDecayTimeInfinite) {
   auto r = ParseWithPreprocessor(
       "`default_decay_time infinite\nmodule m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -32,7 +32,7 @@ TEST(ParserAnnexE, AnnexEDefaultDecayTimeInfinite) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-TEST(ParserAnnexE, AnnexEDefaultDecayTimeMultipleModules) {
+TEST(OptionalDirectiveParsing, DefaultDecayTimeMultipleModules) {
   auto r = ParseWithPreprocessor(
       "`default_decay_time 50\n"
       "module a; endmodule\n"

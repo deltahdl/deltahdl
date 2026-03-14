@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA60703, TernaryMatchesTrue) {
+TEST(PatternConditionalSim, TernaryMatchesTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -28,7 +28,7 @@ TEST(SimA60703, TernaryMatchesTrue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA60703, TernaryMatchesFalse) {
+TEST(PatternConditionalSim, TernaryMatchesFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -48,7 +48,7 @@ TEST(SimA60703, TernaryMatchesFalse) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SimA60703, TernaryMatchesWildcard) {
+TEST(PatternConditionalSim, TernaryMatchesWildcard) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -69,7 +69,7 @@ TEST(SimA60703, TernaryMatchesWildcard) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA60703, TernaryMatchesGuardTrue) {
+TEST(PatternConditionalSim, TernaryMatchesGuardTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -91,7 +91,7 @@ TEST(SimA60703, TernaryMatchesGuardTrue) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA60703, TernaryMatchesGuardFalse) {
+TEST(PatternConditionalSim, TernaryMatchesGuardFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -113,7 +113,7 @@ TEST(SimA60703, TernaryMatchesGuardFalse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimA60703, TernaryMatchesInAssignment) {
+TEST(PatternConditionalSim, TernaryMatchesInAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

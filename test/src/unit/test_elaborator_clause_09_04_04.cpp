@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_04_04, WaitSequenceTriggeredElaborates) {
+TEST(EventTriggeredElaboration, WaitSequenceTriggeredElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -21,7 +21,7 @@ TEST(ElabClause09_04_04, WaitSequenceTriggeredElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_04, WaitMultipleTriggeredElaborates) {
+TEST(EventTriggeredElaboration, WaitMultipleTriggeredElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -41,7 +41,7 @@ TEST(ElabClause09_04_04, WaitMultipleTriggeredElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_04, WaitTriggeredWithActionElaborates) {
+TEST(EventTriggeredElaboration, WaitTriggeredWithActionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

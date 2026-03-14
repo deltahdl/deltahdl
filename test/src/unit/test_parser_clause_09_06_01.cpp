@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection9b, WaitForkStatement) {
+TEST(ProceduralAssignAndControlParsing, WaitForkStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -22,7 +22,7 @@ TEST(ParserSection9b, WaitForkStatement) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kWaitFork);
 }
 
-TEST(ParserSection9b, ForkJoinNoneWithWaitFork) {
+TEST(ProceduralAssignAndControlParsing, ForkJoinNoneWithWaitFork) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -38,7 +38,7 @@ TEST(ParserSection9b, ForkJoinNoneWithWaitFork) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenWaitFork) {
+TEST(ProcessParsing, ForkJoinNoneThenWaitFork) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -59,7 +59,7 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenWaitFork) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kWaitFork);
 }
 
-TEST(ParserA605, WaitFork) {
+TEST(TimingControlSyntaxParsing, WaitFork) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

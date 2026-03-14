@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh10j, EmptyConcatClearsQueue) {
+TEST(UnpackedArrayConcatSim, EmptyConcatClearsQueue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -27,7 +27,7 @@ TEST(SimCh10j, EmptyConcatClearsQueue) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-TEST(ElabCh10j, QueueConcatElaborates) {
+TEST(UnpackedArrayConcatElaboration, QueueConcatElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

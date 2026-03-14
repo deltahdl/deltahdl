@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA24, SpecparamAssignmentMintypmax) {
+TEST(DeclarationAssignmentParsing, SpecparamAssignmentMintypmax) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -29,7 +29,7 @@ TEST(SourceText, SpecparamAsModuleItem) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
 }
 
-TEST(ParserA24, SpecparamAssignmentBasic) {
+TEST(DeclarationAssignmentParsing, SpecparamAssignmentBasic) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -92,7 +92,7 @@ static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
   return false;
 }
 
-TEST(ParserSection28, SpecifyBlockWithSpecparam) {
+TEST(GateLevelModelingParsing, SpecifyBlockWithSpecparam) {
   auto r = Parse(
       "module m(input clk, output q);\n"
       "  specify\n"
@@ -107,7 +107,7 @@ TEST(ParserSection28, SpecifyBlockWithSpecparam) {
   EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kPathDecl));
 }
 
-TEST(ParserA701, SpecparamMultipleDecls) {
+TEST(SpecifyBlockDeclParsing, SpecparamMultipleDecls) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -118,7 +118,7 @@ TEST(ParserA701, SpecparamMultipleDecls) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA701, SpecifyItemSpecparamDecl) {
+TEST(SpecifyBlockDeclParsing, SpecifyItemSpecparamDecl) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

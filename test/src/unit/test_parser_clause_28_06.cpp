@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_Bufif0Basic) {
+TEST(PrimitiveInstantiationParsing, GateInst_Bufif0Basic) {
   auto r = Parse(
       "module m;\n"
       "  bufif0 (out, in, ctrl);\n"
@@ -17,28 +17,28 @@ TEST(ParserA301, GateInst_Bufif0Basic) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA301, GateInst_Bufif1Basic) {
+TEST(PrimitiveInstantiationParsing, GateInst_Bufif1Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  bufif1 (out, in, ctrl);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_Notif0Basic) {
+TEST(PrimitiveInstantiationParsing, GateInst_Notif0Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  notif0 (out, in, ctrl);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_Notif1Basic) {
+TEST(PrimitiveInstantiationParsing, GateInst_Notif1Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  notif1 (out, in, ctrl);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, EnableGateInst_Unnamed) {
+TEST(PrimitiveInstantiationParsing, EnableGateInst_Unnamed) {
   auto r = Parse(
       "module m;\n"
       "  bufif0 (out, in, en);\n"
@@ -50,7 +50,7 @@ TEST(ParserA301, EnableGateInst_Unnamed) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA301, EnableGateInst_Named) {
+TEST(PrimitiveInstantiationParsing, EnableGateInst_Named) {
   auto r = Parse(
       "module m;\n"
       "  notif1 n1(out, in, en);\n"
@@ -62,7 +62,7 @@ TEST(ParserA301, EnableGateInst_Named) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA301, GateInst_AllEnableGateTypes) {
+TEST(PrimitiveInstantiationParsing, GateInst_AllEnableGateTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  bufif0 b0(o, i, c);\n"
@@ -72,7 +72,7 @@ TEST(ParserA301, GateInst_AllEnableGateTypes) {
               "endmodule\n"));
 }
 
-TEST(ParserA304, EnableGatetype_Bufif0) {
+TEST(PrimitiveGateTypeParsing, EnableGatetype_Bufif0) {
   auto r = Parse(
       "module m;\n"
       "  bufif0 (out, in, en);\n"
@@ -83,7 +83,7 @@ TEST(ParserA304, EnableGatetype_Bufif0) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, EnableGatetype_Bufif1) {
+TEST(PrimitiveGateTypeParsing, EnableGatetype_Bufif1) {
   auto r = Parse(
       "module m;\n"
       "  bufif1 (out, in, en);\n"
@@ -94,7 +94,7 @@ TEST(ParserA304, EnableGatetype_Bufif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, EnableGatetype_Notif0) {
+TEST(PrimitiveGateTypeParsing, EnableGatetype_Notif0) {
   auto r = Parse(
       "module m;\n"
       "  notif0 (out, in, en);\n"
@@ -105,7 +105,7 @@ TEST(ParserA304, EnableGatetype_Notif0) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, EnableGatetype_Notif1) {
+TEST(PrimitiveGateTypeParsing, EnableGatetype_Notif1) {
   auto r = Parse(
       "module m;\n"
       "  notif1 (out, in, en);\n"

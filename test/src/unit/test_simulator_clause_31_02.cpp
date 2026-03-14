@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA705, RuntimeAllTwelveKinds) {
+TEST(SystemTimingCheckSim, RuntimeAllTwelveKinds) {
   SpecifyManager mgr;
   TimingCheckKind kinds[] = {
       TimingCheckKind::kSetup,     TimingCheckKind::kHold,

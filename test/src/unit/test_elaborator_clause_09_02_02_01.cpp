@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_02_02_01, AlwaysWithTimingNoWarning) {
+TEST(AlwaysCombElaboration, AlwaysWithTimingNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(ElabClause09_02_02_01, AlwaysWithTimingNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(ElabClause09_02_02_01, AlwaysWithSensitivityNoWarning) {
+TEST(AlwaysCombElaboration, AlwaysWithSensitivityNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -28,7 +28,7 @@ TEST(ElabClause09_02_02_01, AlwaysWithSensitivityNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(ElabClause09_02_02_01, AlwaysWithoutTimingWarns) {
+TEST(AlwaysCombElaboration, AlwaysWithoutTimingWarns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -40,7 +40,7 @@ TEST(ElabClause09_02_02_01, AlwaysWithoutTimingWarns) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(ElabClause09_02_02_01, AlwaysWithDelayInsideBlockNoWarning) {
+TEST(AlwaysCombElaboration, AlwaysWithDelayInsideBlockNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -55,7 +55,7 @@ TEST(ElabClause09_02_02_01, AlwaysWithDelayInsideBlockNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(ElabClause09_02_02_01, AlwaysElaboratesToKAlways) {
+TEST(AlwaysCombElaboration, AlwaysElaboratesToKAlways) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

@@ -6,84 +6,84 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, SequenceExpr_CycleDelay) {
+TEST(AssertionDeclParsing, SequenceExpr_CycleDelay) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) ##2 a);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceExpr_Concatenation) {
+TEST(AssertionDeclParsing, SequenceExpr_Concatenation) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a ##1 b ##2 c);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceExpr_ClockingEvent) {
+TEST(AssertionDeclParsing, SequenceExpr_ClockingEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a |-> @(negedge clk) b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, CycleDelayRange_Constant) {
+TEST(AssertionDeclParsing, CycleDelayRange_Constant) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a ##1 b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, CycleDelayRange_Range) {
+TEST(AssertionDeclParsing, CycleDelayRange_Range) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a ##[1:5] b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, CycleDelayRange_OpenEndRange) {
+TEST(AssertionDeclParsing, CycleDelayRange_OpenEndRange) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a ##[1:$] b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, CycleDelayRange_Star) {
+TEST(AssertionDeclParsing, CycleDelayRange_Star) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) ##[*] a);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, CycleDelayRange_Plus) {
+TEST(AssertionDeclParsing, CycleDelayRange_Plus) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) ##[+] a);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, CycleDelayRange_Zero) {
+TEST(AssertionDeclParsing, CycleDelayRange_Zero) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a ##0 b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, CycleDelayConstRange_FiniteRange) {
+TEST(AssertionDeclParsing, CycleDelayConstRange_FiniteRange) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a ##[2:5] b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, CycleDelayConstRange_OpenEnd) {
+TEST(AssertionDeclParsing, CycleDelayConstRange_OpenEnd) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a ##[1:$] b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceListOfArguments_Mixed) {
+TEST(AssertionDeclParsing, SequenceListOfArguments_Mixed) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(a, b, c); a ##1 b ##1 c; endsequence\n"
@@ -91,7 +91,7 @@ TEST(ParserA210, SequenceListOfArguments_Mixed) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceExpr_ParenWithMatchItems) {
+TEST(AssertionDeclParsing, SequenceExpr_ParenWithMatchItems) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"
@@ -99,14 +99,14 @@ TEST(ParserA210, SequenceExpr_ParenWithMatchItems) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, Sec16_5_1_SequenceDelayOperator) {
+TEST(AssertionParsing, SequenceDelayOperator) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) req ##1 gnt ##1 !req);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection16, SequenceConcatDelay1) {
+TEST(AssertionParsing, SequenceConcatDelay1) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req ##1 gnt ##1 !req);\n"
@@ -115,7 +115,7 @@ TEST(ParserSection16, SequenceConcatDelay1) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, SequenceConcatDelay2) {
+TEST(AssertionParsing, SequenceConcatDelay2) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req ##2 gnt);\n"
@@ -124,7 +124,7 @@ TEST(ParserSection16, SequenceConcatDelay2) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, SequenceDelayRange) {
+TEST(AssertionParsing, SequenceDelayRange) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req ##[4:32] gnt);\n"
@@ -140,7 +140,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-TEST(ParserAnnexF, AnnexFSequenceConcatDelay) {
+TEST(AssertionSemanticsParsing, SequenceConcatDelay) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a ##2 b ##3 c);\n"
@@ -150,7 +150,7 @@ TEST(ParserAnnexF, AnnexFSequenceConcatDelay) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserAnnexF, AnnexFRangedRepetition) {
+TEST(AssertionSemanticsParsing, RangedRepetition) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a ##[1:5] b);\n"
@@ -160,7 +160,7 @@ TEST(ParserAnnexF, AnnexFRangedRepetition) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserAnnexF, AnnexFChainedConcat) {
+TEST(AssertionSemanticsParsing, ChainedConcat) {
   auto r = Parse(
       "module m;\n"
       "  sequence s_chain;\n"
@@ -172,7 +172,7 @@ TEST(ParserAnnexF, AnnexFChainedConcat) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kSequenceDecl));
 }
 
-TEST(ParserAnnexF, AnnexFUnboundedDelayRange) {
+TEST(AssertionSemanticsParsing, UnboundedDelayRange) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req |-> ##[0:$] ack);\n"
@@ -182,7 +182,7 @@ TEST(ParserAnnexF, AnnexFUnboundedDelayRange) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserSection16, SequenceWithRangeDelay) {
+TEST(AssertionParsing, SequenceWithRangeDelay) {
   auto r = Parse(
       "module m;\n"
       "  sequence s_handshake;\n"

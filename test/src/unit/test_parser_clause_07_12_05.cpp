@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7, ArrayMapMethod) {
+TEST(AggregateTypeParsing, ArrayMapMethod) {
   auto r = Parse(
       "module t;\n"
       "  int arr[4];\n"

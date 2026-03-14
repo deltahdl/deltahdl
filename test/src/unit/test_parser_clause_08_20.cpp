@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA26, FuncDynamicOverrideInitial) {
+TEST(FunctionDeclParsing, FuncDynamicOverrideInitial) {
   auto r = Parse(
       "class C;\n"
       "  virtual function :initial int foo(); return 0; endfunction\n"
@@ -16,7 +16,7 @@ TEST(ParserA26, FuncDynamicOverrideInitial) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA26, FuncDynamicOverrideExtends) {
+TEST(FunctionDeclParsing, FuncDynamicOverrideExtends) {
   auto r = Parse(
       "class C;\n"
       "  virtual function :extends int foo(); return 0; endfunction\n"
@@ -25,7 +25,7 @@ TEST(ParserA26, FuncDynamicOverrideExtends) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA26, FuncDynamicOverrideFinal) {
+TEST(FunctionDeclParsing, FuncDynamicOverrideFinal) {
   auto r = Parse(
       "class C;\n"
       "  virtual function :final int foo(); return 0; endfunction\n"
@@ -34,7 +34,7 @@ TEST(ParserA26, FuncDynamicOverrideFinal) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA26, FuncDynamicOverrideInitialFinal) {
+TEST(FunctionDeclParsing, FuncDynamicOverrideInitialFinal) {
   auto r = Parse(
       "class C;\n"
       "  virtual function :initial :final int foo();\n"
@@ -44,7 +44,7 @@ TEST(ParserA26, FuncDynamicOverrideInitialFinal) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA26, FuncDynamicOverrideExtendsFinal) {
+TEST(FunctionDeclParsing, FuncDynamicOverrideExtendsFinal) {
   auto r = Parse(
       "class C;\n"
       "  virtual function :extends :final int foo();\n"
@@ -54,7 +54,7 @@ TEST(ParserA26, FuncDynamicOverrideExtendsFinal) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA27, TaskDynamicOverrideInitial) {
+TEST(TaskDeclParsing, TaskDynamicOverrideInitial) {
   auto r = Parse(
       "class C;\n"
       "  virtual task :initial my_task(); endtask\n"
@@ -63,7 +63,7 @@ TEST(ParserA27, TaskDynamicOverrideInitial) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA27, TaskDynamicOverrideExtends) {
+TEST(TaskDeclParsing, TaskDynamicOverrideExtends) {
   auto r = Parse(
       "class C;\n"
       "  virtual task :extends my_task(); endtask\n"
@@ -72,7 +72,7 @@ TEST(ParserA27, TaskDynamicOverrideExtends) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA27, TaskDynamicOverrideFinal) {
+TEST(TaskDeclParsing, TaskDynamicOverrideFinal) {
   auto r = Parse(
       "class C;\n"
       "  virtual task :final my_task(); endtask\n"
@@ -81,7 +81,7 @@ TEST(ParserA27, TaskDynamicOverrideFinal) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA27, TaskDynamicOverrideInitialFinal) {
+TEST(TaskDeclParsing, TaskDynamicOverrideInitialFinal) {
   auto r = Parse(
       "class C;\n"
       "  virtual task :initial :final my_task(); endtask\n"
@@ -90,7 +90,7 @@ TEST(ParserA27, TaskDynamicOverrideInitialFinal) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA27, TaskDynamicOverrideExtendsFinal) {
+TEST(TaskDeclParsing, TaskDynamicOverrideExtendsFinal) {
   auto r = Parse(
       "class C;\n"
       "  virtual task :extends :final my_task(); endtask\n"
@@ -98,7 +98,7 @@ TEST(ParserA27, TaskDynamicOverrideExtendsFinal) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-TEST(ParserSection8, ClassWithVirtualMethod) {
+TEST(ClassParsing, ClassWithVirtualMethod) {
   auto r = Parse(
       "class Base;\n"
       "  virtual function void display();\n"
@@ -116,7 +116,7 @@ TEST(ParserSection8, ClassWithVirtualMethod) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserA820, InitialSpecifierStored) {
+TEST(VirtualMethodParsing, InitialSpecifierStored) {
   auto r = Parse(
       "class C;\n"
       "  virtual function :initial int foo(); return 0; endfunction\n"
@@ -129,7 +129,7 @@ TEST(ParserA820, InitialSpecifierStored) {
   EXPECT_FALSE(m->is_method_final);
 }
 
-TEST(ParserA820, ExtendsSpecifierStored) {
+TEST(VirtualMethodParsing, ExtendsSpecifierStored) {
   auto r = Parse(
       "class C;\n"
       "  virtual function :extends int foo(); return 0; endfunction\n"
@@ -141,7 +141,7 @@ TEST(ParserA820, ExtendsSpecifierStored) {
   EXPECT_TRUE(m->is_method_extends);
 }
 
-TEST(ParserA820, FinalSpecifierStored) {
+TEST(VirtualMethodParsing, FinalSpecifierStored) {
   auto r = Parse(
       "class C;\n"
       "  virtual function :final int foo(); return 0; endfunction\n"
@@ -152,7 +152,7 @@ TEST(ParserA820, FinalSpecifierStored) {
   EXPECT_TRUE(m->is_method_final);
 }
 
-TEST(ParserA820, InitialFinalCombined) {
+TEST(VirtualMethodParsing, InitialFinalCombined) {
   auto r = Parse(
       "class C;\n"
       "  virtual function :initial :final int foo();\n"
@@ -165,7 +165,7 @@ TEST(ParserA820, InitialFinalCombined) {
   EXPECT_TRUE(m->is_method_final);
 }
 
-TEST(ParserA820, ExtendsFinalCombined) {
+TEST(VirtualMethodParsing, ExtendsFinalCombined) {
   auto r = Parse(
       "class C;\n"
       "  virtual function :extends :final int foo();\n"
@@ -178,7 +178,7 @@ TEST(ParserA820, ExtendsFinalCombined) {
   EXPECT_TRUE(m->is_method_final);
 }
 
-TEST(ParserA820, DerivedOverrideWithoutVirtual) {
+TEST(VirtualMethodParsing, DerivedOverrideWithoutVirtual) {
   EXPECT_TRUE(
       ParseOk("class Base;\n"
               "  virtual function void display(); endfunction\n"
@@ -188,7 +188,7 @@ TEST(ParserA820, DerivedOverrideWithoutVirtual) {
               "endclass\n"));
 }
 
-TEST(ParserA820, TaskInitialSpecifier) {
+TEST(VirtualMethodParsing, TaskInitialSpecifier) {
   auto r = Parse(
       "class C;\n"
       "  virtual task :initial my_task(); endtask\n"
@@ -199,7 +199,7 @@ TEST(ParserA820, TaskInitialSpecifier) {
   EXPECT_TRUE(m->is_method_initial);
 }
 
-TEST(ParserClause08_03, MethodExtendsSpecifier) {
+TEST(ClassSyntaxParsing, MethodExtendsSpecifier) {
   auto r = Parse(
       "class C;\n"
       "  function :extends void bar(); endfunction\n"
@@ -207,7 +207,7 @@ TEST(ParserClause08_03, MethodExtendsSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause08_03, MethodFinalSpecifier) {
+TEST(ClassSyntaxParsing, MethodFinalSpecifier) {
   auto r = Parse(
       "class C;\n"
       "  function :final void baz(); endfunction\n"
@@ -215,7 +215,7 @@ TEST(ParserClause08_03, MethodFinalSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause08_03, MethodInitialFinalSpecifiers) {
+TEST(ClassSyntaxParsing, MethodInitialFinalSpecifiers) {
   auto r = Parse(
       "class C;\n"
       "  function :initial :final void qux(); endfunction\n"
@@ -223,7 +223,7 @@ TEST(ParserClause08_03, MethodInitialFinalSpecifiers) {
   ASSERT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause08_03, TaskDynamicOverrideSpecifiers) {
+TEST(ClassSyntaxParsing, TaskDynamicOverrideSpecifiers) {
   auto r = Parse(
       "class C;\n"
       "  task :extends my_task(); endtask\n"

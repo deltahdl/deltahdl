@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA052, AnsiPortList_MixedInputKeyword) {
+TEST(UdpPortGrammar, AnsiPortList_MixedInputKeyword) {
   auto r = Parse(
       "primitive gate(output out, input a, input b, c);\n"
       "  table\n"
@@ -22,7 +22,7 @@ TEST(ParserAnnexA052, AnsiPortList_MixedInputKeyword) {
   EXPECT_EQ(udp->input_names[2], "c");
 }
 
-TEST(ParserAnnexA052, PortDecl_OutputPlain) {
+TEST(UdpPortGrammar, PortDecl_OutputPlain) {
   auto r = Parse(
       "primitive inv(out, a);\n"
       "  output out;\n"
@@ -39,7 +39,7 @@ TEST(ParserAnnexA052, PortDecl_OutputPlain) {
   EXPECT_FALSE(udp->is_sequential);
 }
 
-TEST(ParserAnnexA052, PortDecl_OutputReg) {
+TEST(UdpPortGrammar, PortDecl_OutputReg) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
       "  output reg q;\n"
@@ -56,7 +56,7 @@ TEST(ParserAnnexA052, PortDecl_OutputReg) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
-TEST(ParserAnnexA052, PortDecl_AllThreeAlternatives) {
+TEST(UdpPortGrammar, PortDecl_AllThreeAlternatives) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
       "  output q;\n"
@@ -78,7 +78,7 @@ TEST(ParserAnnexA052, PortDecl_AllThreeAlternatives) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
-TEST(ParserAnnexA052, OutputDeclAnsi_RegInitZero) {
+TEST(UdpPortGrammar, OutputDeclAnsi_RegInitZero) {
   auto r = Parse(
       "primitive dff(output reg q = 1'b0, input d, input clk);\n"
       "  table\n"
@@ -94,7 +94,7 @@ TEST(ParserAnnexA052, OutputDeclAnsi_RegInitZero) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
-TEST(ParserAnnexA052, InputDecl_SingleId) {
+TEST(UdpPortGrammar, InputDecl_SingleId) {
   auto r = Parse(
       "primitive inv(out, a);\n"
       "  output out;\n"
@@ -111,7 +111,7 @@ TEST(ParserAnnexA052, InputDecl_SingleId) {
   EXPECT_EQ(udp->input_names[0], "a");
 }
 
-TEST(ParserAnnexA052, InputDecl_MultipleIds) {
+TEST(UdpPortGrammar, InputDecl_MultipleIds) {
   auto r = Parse(
       "primitive gate(out, a, b, c, d);\n"
       "  output out;\n"
@@ -131,7 +131,7 @@ TEST(ParserAnnexA052, InputDecl_MultipleIds) {
   EXPECT_EQ(udp->input_names[3], "d");
 }
 
-TEST(ParserAnnexA052, AttrOnOutputDecl) {
+TEST(UdpPortGrammar, AttrOnOutputDecl) {
   auto r = Parse(
       "primitive inv(out, a);\n"
       "  (* synthesis = \"off\" *) output out;\n"
@@ -147,7 +147,7 @@ TEST(ParserAnnexA052, AttrOnOutputDecl) {
   EXPECT_EQ(udp->output_name, "out");
 }
 
-TEST(ParserAnnexA052, AttrOnRegDecl) {
+TEST(UdpPortGrammar, AttrOnRegDecl) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
       "  output q;\n"

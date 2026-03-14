@@ -58,7 +58,7 @@ TEST(Parser, ReturnWithValue) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-TEST(ParserSection12, BreakInsideWhile) {
+TEST(ProceduralStatementParsing, BreakInsideWhile) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -81,7 +81,7 @@ TEST(ParserSection12, BreakInsideWhile) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBreak);
 }
 
-TEST(ParserSection12, ContinueInsideDoWhile) {
+TEST(ProceduralStatementParsing, ContinueInsideDoWhile) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -104,7 +104,7 @@ TEST(ParserSection12, ContinueInsideDoWhile) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
 }
 
-TEST(ParserSection12, BreakInsideForeach) {
+TEST(ProceduralStatementParsing, BreakInsideForeach) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -124,7 +124,7 @@ TEST(ParserSection12, BreakInsideForeach) {
   EXPECT_EQ(blk->stmts[0]->then_branch->kind, StmtKind::kBreak);
 }
 
-TEST(ParserSection12, ContinueInsideForeach) {
+TEST(ProceduralStatementParsing, ContinueInsideForeach) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -153,7 +153,7 @@ static ModuleItem* FindFunc12b(ParseResult& r, std::string_view name) {
   return nullptr;
 }
 
-TEST(ParserSection12, ReturnFromVoidFunctionEarly) {
+TEST(ProceduralStatementParsing, ReturnFromVoidFunctionEarly) {
   auto r = Parse(
       "module t;\n"
       "  function void check(int val);\n"
@@ -173,7 +173,7 @@ TEST(ParserSection12, ReturnFromVoidFunctionEarly) {
   EXPECT_EQ(if_stmt->then_branch->expr, nullptr);
 }
 
-TEST(ParserA604, StmtItemJumpStatementBreak) {
+TEST(StatementSyntaxParsing, StmtItemJumpStatementBreak) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -189,7 +189,7 @@ TEST(ParserA604, StmtItemJumpStatementBreak) {
   VerifyForeverLoopJump(body, StmtKind::kBreak);
 }
 
-TEST(ParserA604, StmtItemJumpStatementContinue) {
+TEST(StatementSyntaxParsing, StmtItemJumpStatementContinue) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -205,7 +205,7 @@ TEST(ParserA604, StmtItemJumpStatementContinue) {
   VerifyForeverLoopJump(body, StmtKind::kContinue);
 }
 
-TEST(ParserA604, StmtItemJumpStatementReturn) {
+TEST(StatementSyntaxParsing, StmtItemJumpStatementReturn) {
   auto r = Parse(
       "module m;\n"
       "  function void f();\n"
@@ -220,7 +220,7 @@ TEST(ParserA604, StmtItemJumpStatementReturn) {
   EXPECT_EQ(func->func_body_stmts[0]->kind, StmtKind::kReturn);
 }
 
-TEST(ParserA605, JumpReturnWithExpr) {
+TEST(TimingControlSyntaxParsing, JumpReturnWithExpr) {
   auto r = Parse(
       "module m;\n"
       "  function int f(); return 42; endfunction\n"
@@ -235,7 +235,7 @@ TEST(ParserA605, JumpReturnWithExpr) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-TEST(ParserA605, JumpReturnVoid) {
+TEST(TimingControlSyntaxParsing, JumpReturnVoid) {
   auto r = Parse(
       "module m;\n"
       "  function void f(); return; endfunction\n"
@@ -250,7 +250,7 @@ TEST(ParserA605, JumpReturnVoid) {
   EXPECT_EQ(stmt->expr, nullptr);
 }
 
-TEST(ParserA605, JumpBreak) {
+TEST(TimingControlSyntaxParsing, JumpBreak) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -266,7 +266,7 @@ TEST(ParserA605, JumpBreak) {
   VerifyForeverLoopJump(body, StmtKind::kBreak);
 }
 
-TEST(ParserA605, JumpContinue) {
+TEST(TimingControlSyntaxParsing, JumpContinue) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -282,7 +282,7 @@ TEST(ParserA605, JumpContinue) {
   VerifyForeverLoopJump(body, StmtKind::kContinue);
 }
 
-TEST(ParserSection12, ReturnVoid) {
+TEST(ProceduralStatementParsing, ReturnVoid) {
   auto r = Parse(
       "module t;\n"
       "  function void bar();\n"
@@ -296,7 +296,7 @@ TEST(ParserSection12, ReturnVoid) {
   EXPECT_EQ(ret->expr, nullptr);
 }
 
-TEST(ParserSection12, BreakStatementParses) {
+TEST(ProceduralStatementParsing, BreakStatementParses) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -311,7 +311,7 @@ TEST(ParserSection12, BreakStatementParses) {
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
 }
 
-TEST(ParserSection12, BreakStatementInBody) {
+TEST(ProceduralStatementParsing, BreakStatementInBody) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -330,7 +330,7 @@ TEST(ParserSection12, BreakStatementInBody) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBreak);
 }
 
-TEST(ParserSection12, ContinueStatementParses) {
+TEST(ProceduralStatementParsing, ContinueStatementParses) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -349,7 +349,7 @@ TEST(ParserSection12, ContinueStatementParses) {
   EXPECT_EQ(body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection12, ContinueStatementInBody) {
+TEST(ProceduralStatementParsing, ContinueStatementInBody) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A4GenerateIfElse) {
+TEST(FormalSyntaxParsing, GenerateIfElse) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH > 8) begin\n"
@@ -27,7 +27,7 @@ TEST(ParserAnnexA, A4GenerateIfElse) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserAnnexA, A4GenerateCase) {
+TEST(FormalSyntaxParsing, GenerateCase) {
   auto r = Parse(
       "module m;\n"
       "  case (WIDTH)\n"
@@ -46,7 +46,7 @@ TEST(ParserAnnexA, A4GenerateCase) {
   EXPECT_EQ(item->gen_case_items.size(), 2u);
 }
 
-TEST(ParserAnnexA042, IfGenerateBasic) {
+TEST(GenerateInstantiationGrammar, IfGenerateBasic) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH > 1)\n"
@@ -60,7 +60,7 @@ TEST(ParserAnnexA042, IfGenerateBasic) {
   EXPECT_EQ(gen->gen_else, nullptr);
 }
 
-TEST(ParserAnnexA042, IfGenerateWithElse) {
+TEST(GenerateInstantiationGrammar, IfGenerateWithElse) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH > 1)\n"
@@ -76,7 +76,7 @@ TEST(ParserAnnexA042, IfGenerateWithElse) {
   ASSERT_EQ(gen->gen_else->gen_body.size(), 1u);
 }
 
-TEST(ParserAnnexA042, IfGenerateElseIfChain) {
+TEST(GenerateInstantiationGrammar, IfGenerateElseIfChain) {
   auto r = Parse(
       "module m;\n"
       "  if (W == 1)\n"
@@ -95,7 +95,7 @@ TEST(ParserAnnexA042, IfGenerateElseIfChain) {
   ASSERT_NE(gen->gen_else->gen_else, nullptr);
 }
 
-TEST(ParserAnnexA042, CaseGenerateBasic) {
+TEST(GenerateInstantiationGrammar, CaseGenerateBasic) {
   auto r = Parse(
       "module m;\n"
       "  case (WIDTH)\n"
@@ -112,7 +112,7 @@ TEST(ParserAnnexA042, CaseGenerateBasic) {
   EXPECT_FALSE(gen->gen_case_items[1].is_default);
 }
 
-TEST(ParserAnnexA042, CaseGenerateMultiplePatterns) {
+TEST(GenerateInstantiationGrammar, CaseGenerateMultiplePatterns) {
   auto r = Parse(
       "module m;\n"
       "  case (WIDTH)\n"
@@ -130,7 +130,7 @@ TEST(ParserAnnexA042, CaseGenerateMultiplePatterns) {
   EXPECT_TRUE(gen->gen_case_items[2].is_default);
 }
 
-TEST(ParserAnnexA042, NestedForInsideIf) {
+TEST(GenerateInstantiationGrammar, NestedForInsideIf) {
   auto r = Parse(
       "module m;\n"
       "  if (USE_PIPELINE) begin\n"
@@ -147,7 +147,7 @@ TEST(ParserAnnexA042, NestedForInsideIf) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
 }
 
-TEST(ParserSection27, GenerateIfWithNestedFor) {
+TEST(GenerateConstructParsing, GenerateIfWithNestedFor) {
   auto r = Parse(
       "module m;\n"
       "  if (USE_PIPELINE) begin\n"
@@ -164,7 +164,7 @@ TEST(ParserSection27, GenerateIfWithNestedFor) {
   EXPECT_EQ(mod->items[0]->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
 }
 
-TEST(ParserSection23, GenerateRegionWithIf) {
+TEST(ModuleAndHierarchyParsing, GenerateRegionWithIf) {
   auto r = Parse(
       "module m;\n"
       "  generate\n"
@@ -183,7 +183,7 @@ TEST(ParserSection23, GenerateRegionWithIf) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserSection23, IfGenerateWithElseIf) {
+TEST(ModuleAndHierarchyParsing, IfGenerateWithElseIf) {
   auto r = Parse(
       "module m;\n"
       "  if (W == 8) begin : w8\n"
@@ -204,7 +204,7 @@ TEST(ParserSection23, IfGenerateWithElseIf) {
   ASSERT_NE(item->gen_else->gen_else, nullptr);
 }
 
-TEST(ParserSection23, IfGenerateNoElse) {
+TEST(ModuleAndHierarchyParsing, IfGenerateNoElse) {
   auto r = Parse(
       "module m;\n"
       "  if (EN) begin\n"
@@ -218,7 +218,7 @@ TEST(ParserSection23, IfGenerateNoElse) {
   EXPECT_EQ(item->gen_else, nullptr);
 }
 
-TEST(ParserSection23, IfGenerateSingleItemNoBegin) {
+TEST(ModuleAndHierarchyParsing, IfGenerateSingleItemNoBegin) {
   auto r = Parse(
       "module m;\n"
       "  if (EN)\n"
@@ -343,7 +343,7 @@ TEST(Parser, GenerateCaseInRegion) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserClause03, Cl3_13_LabeledIfGenerateBlock) {
+TEST(DesignBuildingBlockParsing, LabeledIfGenerateBlock) {
   auto r = Parse(
       "module m;\n"
       "  parameter USE_FAST = 1;\n"
@@ -366,7 +366,7 @@ TEST(ParserClause03, Cl3_13_LabeledIfGenerateBlock) {
   EXPECT_TRUE(found_gen_if);
 }
 
-TEST(ParserSection23, CaseGenerateMultipleLabels) {
+TEST(ModuleAndHierarchyParsing, CaseGenerateMultipleLabels) {
   auto r = Parse(
       "module m;\n"
       "  case (SEL)\n"
@@ -382,7 +382,7 @@ TEST(ParserSection23, CaseGenerateMultipleLabels) {
   EXPECT_EQ(item->gen_case_items[1].patterns.size(), 2);
 }
 
-TEST(ParserSection27, GenerateIfSingleItemParse) {
+TEST(GenerateConstructParsing, GenerateIfSingleItemParse) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH > 1)\n"
@@ -396,7 +396,7 @@ TEST(ParserSection27, GenerateIfSingleItemParse) {
   ASSERT_EQ(gen->gen_body.size(), 1);
 }
 
-TEST(ParserSection27, GenerateIfSingleItemBody) {
+TEST(GenerateConstructParsing, GenerateIfSingleItemBody) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH > 1)\n"
@@ -408,7 +408,7 @@ TEST(ParserSection27, GenerateIfSingleItemBody) {
   EXPECT_EQ(gen->gen_else, nullptr);
 }
 
-TEST(ParserSection27, GenerateIfElseSingleItemParse) {
+TEST(GenerateConstructParsing, GenerateIfElseSingleItemParse) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH > 1)\n"
@@ -424,7 +424,7 @@ TEST(ParserSection27, GenerateIfElseSingleItemParse) {
   ASSERT_EQ(gen->gen_body.size(), 1);
 }
 
-TEST(ParserSection27, GenerateIfElseSingleItemBranches) {
+TEST(GenerateConstructParsing, GenerateIfElseSingleItemBranches) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH > 1)\n"
@@ -440,7 +440,7 @@ TEST(ParserSection27, GenerateIfElseSingleItemBranches) {
   EXPECT_EQ(gen->gen_else->gen_body[0]->kind, ModuleItemKind::kContAssign);
 }
 
-TEST(ParserSection27, GenerateCaseParse) {
+TEST(GenerateConstructParsing, GenerateCaseParse) {
   auto r = Parse(
       "module m;\n"
       "  case (WIDTH)\n"
@@ -457,7 +457,7 @@ TEST(ParserSection27, GenerateCaseParse) {
   ASSERT_EQ(gen->gen_case_items.size(), 3u);
 }
 
-TEST(ParserSection27, GenerateCaseItemDefaults) {
+TEST(GenerateConstructParsing, GenerateCaseItemDefaults) {
   auto r = Parse(
       "module m;\n"
       "  case (WIDTH)\n"
@@ -474,7 +474,7 @@ TEST(ParserSection27, GenerateCaseItemDefaults) {
   }
 }
 
-TEST(ParserSection27, GenerateIfBeginEnd) {
+TEST(GenerateConstructParsing, GenerateIfBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH > 1) begin\n"
@@ -490,7 +490,7 @@ TEST(ParserSection27, GenerateIfBeginEnd) {
   ASSERT_GE(gen->gen_body.size(), 2u);
 }
 
-TEST(ParserSection27, GenerateIfElseIfChainParse) {
+TEST(GenerateConstructParsing, GenerateIfElseIfChainParse) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH == 1)\n"
@@ -508,7 +508,7 @@ TEST(ParserSection27, GenerateIfElseIfChainParse) {
   ASSERT_NE(gen->gen_else, nullptr);
 }
 
-TEST(ParserSection27, GenerateIfElseIfChainNesting) {
+TEST(GenerateConstructParsing, GenerateIfElseIfChainNesting) {
   auto r = Parse(
       "module m;\n"
       "  if (WIDTH == 1)\n"
@@ -524,7 +524,7 @@ TEST(ParserSection27, GenerateIfElseIfChainNesting) {
   ASSERT_NE(gen->gen_else->gen_else, nullptr);
 }
 
-TEST(ParserSection23, ConditionalGenerateIfElse) {
+TEST(ModuleAndHierarchyParsing, ConditionalGenerateIfElse) {
   auto r = Parse(
       "module top;\n"
       "  if (WIDTH == 8) begin\n"
@@ -539,7 +539,7 @@ TEST(ParserSection23, ConditionalGenerateIfElse) {
   ASSERT_NE(gen->gen_else, nullptr);
 }
 
-TEST(ParserSection23, ConditionalGenerateCase) {
+TEST(ModuleAndHierarchyParsing, ConditionalGenerateCase) {
   auto r = Parse(
       "module top;\n"
       "  case (MODE)\n"

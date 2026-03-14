@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection16, DeferredAssertModuleLevel) {
+TEST(AssertionParsing, DeferredAssertModuleLevel) {
   auto r = Parse(
       "module top();\n"
       "  logic a = 1;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection16, DeferredAssertModuleLevel) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection16, DeferredAssumeModuleLevel) {
+TEST(AssertionParsing, DeferredAssumeModuleLevel) {
   auto r = Parse(
       "module top();\n"
       "  logic a = 1;\n"
@@ -27,7 +27,7 @@ TEST(ParserSection16, DeferredAssumeModuleLevel) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection16, DeferredCoverModuleLevel) {
+TEST(AssertionParsing, DeferredCoverModuleLevel) {
   auto r = Parse(
       "module top();\n"
       "  logic a = 1;\n"
@@ -38,7 +38,7 @@ TEST(ParserSection16, DeferredCoverModuleLevel) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection16, AssertFinalModuleLevel) {
+TEST(AssertionParsing, AssertFinalModuleLevel) {
   auto r = Parse(
       "module top();\n"
       "  logic a = 1;\n"
@@ -49,7 +49,7 @@ TEST(ParserSection16, AssertFinalModuleLevel) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserA610, DeferredAssertHash0Module) {
+TEST(AssertionStatementSyntaxParsing, DeferredAssertHash0Module) {
   auto r = Parse(
       "module m;\n"
       "  logic x;\n"
@@ -59,7 +59,7 @@ TEST(ParserA610, DeferredAssertHash0Module) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA610, DeferredAssertFinalModule) {
+TEST(AssertionStatementSyntaxParsing, DeferredAssertFinalModule) {
   auto r = Parse(
       "module m;\n"
       "  logic x;\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA612, CaseProduction) {
+TEST(RandsequenceSim, CaseProduction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

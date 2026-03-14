@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA23, ListOfInterfaceIdentifiersMultiple) {
+TEST(DeclarationListParsing, ListOfInterfaceIdentifiersMultiple) {
   auto r = Parse("module m(a, b, c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -16,7 +16,7 @@ TEST(ParserA23, ListOfInterfaceIdentifiersMultiple) {
   EXPECT_EQ(r.cu->modules[0]->ports[2].name, "c");
 }
 
-TEST(ParserSection23, NonAnsiPortsBasic) {
+TEST(ModuleAndHierarchyParsing, NonAnsiPortsBasic) {
   auto r = Parse(
       "module m(a, b);\n"
       "  input a;\n"
@@ -26,7 +26,7 @@ TEST(ParserSection23, NonAnsiPortsBasic) {
   VerifyTwoPortModule(r, "a", Direction::kInput, "b", Direction::kOutput);
 }
 
-TEST(ParserSection23, NonAnsiPortsWithTypesPortA) {
+TEST(ModuleAndHierarchyParsing, NonAnsiPortsWithTypesPortA) {
   auto r = Parse(
       "module m(a, b);\n"
       "  input [7:0] a;\n"
@@ -40,7 +40,7 @@ TEST(ParserSection23, NonAnsiPortsWithTypesPortA) {
   EXPECT_NE(mod->ports[0].data_type.packed_dim_left, nullptr);
 }
 
-TEST(ParserSection23, NonAnsiPortsWithTypesPortB) {
+TEST(ModuleAndHierarchyParsing, NonAnsiPortsWithTypesPortB) {
   auto r = Parse(
       "module m(a, b);\n"
       "  input [7:0] a;\n"
@@ -54,7 +54,7 @@ TEST(ParserSection23, NonAnsiPortsWithTypesPortB) {
   EXPECT_EQ(mod->ports[1].data_type.kind, DataTypeKind::kReg);
 }
 
-TEST(ParserSection23, NonAnsiPortsMixed) {
+TEST(ModuleAndHierarchyParsing, NonAnsiPortsMixed) {
   auto r = Parse(
       "module m(a, b, c, d);\n"
       "  input a, b;\n"
@@ -81,7 +81,7 @@ TEST(ParserSection23, NonAnsiPortsMixed) {
   EXPECT_NE(mod->ports[2].data_type.packed_dim_left, nullptr);
 }
 
-TEST(ParserSection23, Sec23_2_2_NonAnsiPortDeclarations) {
+TEST(ModuleAndHierarchyParsing, NonAnsiPortDeclarations) {
   auto r = Parse(
       "module m (a, b, y);\n"
       "  input a, b;\n"
@@ -98,7 +98,7 @@ TEST(ParserSection23, Sec23_2_2_NonAnsiPortDeclarations) {
       ParseOk("module m (a, b); inout [7:0] a; inout [7:0] b; endmodule\n"));
 }
 
-TEST(ParserSection23, NonAnsiInoutPort) {
+TEST(ModuleAndHierarchyParsing, NonAnsiInoutPort) {
   auto r = Parse(
       "module m(bus);\n"
       "  inout [7:0] bus;\n"
@@ -111,7 +111,7 @@ TEST(ParserSection23, NonAnsiInoutPort) {
   EXPECT_NE(mod->ports[0].data_type.packed_dim_left, nullptr);
 }
 
-TEST(ParserSection23, NonAnsiMultiplePortsSameDir) {
+TEST(ModuleAndHierarchyParsing, NonAnsiMultiplePortsSameDir) {
   auto r = Parse(
       "module m(x, y, z);\n"
       "  output x, y, z;\n"
@@ -124,7 +124,7 @@ TEST(ParserSection23, NonAnsiMultiplePortsSameDir) {
   }
 }
 
-TEST(ModuleParamsA13, NonAnsiPorts) {
+TEST(ModuleParamsParsing, NonAnsiPorts) {
   auto r = Parse(
       "module m(a, b, y);\n"
       "  input a, b;\n"

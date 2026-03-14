@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA24, ClassNewNoArgs) {
+TEST(DeclarationAssignmentParsing, ClassNewNoArgs) {
   auto r = Parse(
       "class C;\n"
       "endclass\n"
@@ -16,7 +16,7 @@ TEST(ParserA24, ClassNewNoArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection8, ParameterizedClassScopeNew) {
+TEST(ClassParsing, ParameterizedClassScopeNew) {
   auto r = Parse(
       "module m;\n"
       "  class test_cls #(parameter int t = 12);\n"
@@ -34,7 +34,7 @@ TEST(ParserSection8, ParameterizedClassScopeNew) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserA88, TypedConstructorNoArgs) {
+TEST(StringParsing, TypedConstructorNoArgs) {
   auto r = Parse(
       "class C; endclass\n"
       "class D extends C; endclass\n"
@@ -46,7 +46,7 @@ TEST(ParserA88, TypedConstructorNoArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA88, TypedConstructorWithArgs) {
+TEST(StringParsing, TypedConstructorWithArgs) {
   auto r = Parse(
       "class C;\n"
       "  function new(int x); endfunction\n"
@@ -62,7 +62,7 @@ TEST(ParserA88, TypedConstructorWithArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA88, ShallowCopy) {
+TEST(StringParsing, ShallowCopy) {
   auto r = Parse(
       "class C;\n"
       "  int data;\n"
@@ -78,7 +78,7 @@ TEST(ParserA88, ShallowCopy) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA88, TypedConstructorNamedArgs) {
+TEST(StringParsing, TypedConstructorNamedArgs) {
   auto r = Parse(
       "class C;\n"
       "  int x;\n"
@@ -92,7 +92,7 @@ TEST(ParserA88, TypedConstructorNamedArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA88, ParameterizedTypedConstructor) {
+TEST(StringParsing, ParameterizedTypedConstructor) {
   auto r = Parse(
       "class E #(type T = int) extends C;\n"
       "  T x;\n"

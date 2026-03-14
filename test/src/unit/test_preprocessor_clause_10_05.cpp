@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection10, VarDeclAssignment) {
+TEST(AssignmentParsing, VarDeclAssignment) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  int x = 42;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection10, VarDeclAssignment) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection10, VarDeclAssignmentLogic) {
+TEST(AssignmentParsing, VarDeclAssignmentLogic) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  logic [7:0] data = 8'hFF;\n"

@@ -15,7 +15,7 @@ TEST(ConstEval, BitsExpr) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(16'h0)", f)), 16);
 }
 
-TEST(ElabA82, SystemTfCallBitsElaborates) {
+TEST(SubroutineCallExprElaboration, SystemTfCallBitsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -28,7 +28,7 @@ TEST(ElabA82, SystemTfCallBitsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Section20, BitsOf32BitValue) {
+TEST(UtilitySystemTaskTest, BitsOf32BitValue) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$bits", {MakeInt(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);

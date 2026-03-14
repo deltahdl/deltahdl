@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh4, ParallelProcessesSequentialBodies) {
+TEST(SchedulingSemanticsSim, ParallelProcessesSequentialBodies) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -34,7 +34,7 @@ TEST(SimCh4, ParallelProcessesSequentialBodies) {
   EXPECT_EQ(vb->value.ToUint64(), 27u);
 }
 
-TEST(SimCh4, ThreeParallelInitialBlocks) {
+TEST(SchedulingSemanticsSim, ThreeParallelInitialBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -53,7 +53,7 @@ TEST(SimCh4, ThreeParallelInitialBlocks) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 33u);
 }
 
-TEST(SimCh4, ParallelConditionalLogic) {
+TEST(SchedulingSemanticsSim, ParallelConditionalLogic) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -76,7 +76,7 @@ TEST(SimCh4, ParallelConditionalLogic) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0u);
 }
 
-TEST(SimCh4, ThreeAbstractionLevels) {
+TEST(SchedulingSemanticsSim, ThreeAbstractionLevels) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

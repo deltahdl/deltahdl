@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection18, GetRandstateCall) {
+TEST(ConstrainedRandomParsing, GetRandstateCall) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection18, GetRandstateCall) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18, GetRandstateAssignToVar) {
+TEST(ConstrainedRandomParsing, GetRandstateAssignToVar) {
   auto r = Parse(
       "module top;\n"
       "  initial begin\n"
@@ -32,7 +32,7 @@ TEST(ParserSection18, GetRandstateAssignToVar) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection18, GetRandstateInFunction) {
+TEST(ConstrainedRandomParsing, GetRandstateInFunction) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"

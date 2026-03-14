@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, BinaryEq) {
+TEST(OperatorParsing, BinaryEq) {
   auto r = Parse("module m; initial x = (a == b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserA86, BinaryEq) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEq);
 }
 
-TEST(ParserA86, BinaryNeq) {
+TEST(OperatorParsing, BinaryNeq) {
   auto r = Parse("module m; initial x = (a != b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -25,7 +25,7 @@ TEST(ParserA86, BinaryNeq) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEq);
 }
 
-TEST(ParserA86, BinaryCaseEq) {
+TEST(OperatorParsing, BinaryCaseEq) {
   auto r = Parse("module m; initial x = (a === b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -35,7 +35,7 @@ TEST(ParserA86, BinaryCaseEq) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEqEq);
 }
 
-TEST(ParserA86, BinaryCaseNeq) {
+TEST(OperatorParsing, BinaryCaseNeq) {
   auto r = Parse("module m; initial x = (a !== b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -45,7 +45,7 @@ TEST(ParserA86, BinaryCaseNeq) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEqEq);
 }
 
-TEST(ParserSection11, EqualityInComplexExpr) {
+TEST(OperatorAndExpressionParsing, EqualityInComplexExpr) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a == b) && (c != d);\n"
@@ -57,7 +57,7 @@ TEST(ParserSection11, EqualityInComplexExpr) {
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
 
-TEST(ParserSection11, CaseEqualityInAssign) {
+TEST(OperatorAndExpressionParsing, CaseEqualityInAssign) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a === 4'bx01z) ? 1 : 0;\n"
@@ -69,7 +69,7 @@ TEST(ParserSection11, CaseEqualityInAssign) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, EqualityEq) {
+TEST(OperatorAndExpressionParsing, EqualityEq) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a == b);\n"
@@ -79,7 +79,7 @@ TEST(ParserSection11, EqualityEq) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEq);
 }
 
-TEST(ParserSection11, EqualityNeq) {
+TEST(OperatorAndExpressionParsing, EqualityNeq) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a != b);\n"
@@ -89,7 +89,7 @@ TEST(ParserSection11, EqualityNeq) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEq);
 }
 
-TEST(ParserSection11, CaseEqualityEq) {
+TEST(OperatorAndExpressionParsing, CaseEqualityEq) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a === b);\n"
@@ -99,7 +99,7 @@ TEST(ParserSection11, CaseEqualityEq) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEqEq);
 }
 
-TEST(ParserSection11, CaseEqualityNeq) {
+TEST(OperatorAndExpressionParsing, CaseEqualityNeq) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a !== b);\n"
@@ -109,7 +109,7 @@ TEST(ParserSection11, CaseEqualityNeq) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEqEq);
 }
 
-TEST(ParserA83, ExprEquality) {
+TEST(ExpressionParsing, ExprEquality) {
   auto r = Parse("module m; initial x = (a == b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -119,7 +119,7 @@ TEST(ParserA83, ExprEquality) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEq);
 }
 
-TEST(ParserA83, ExprCaseEquality) {
+TEST(ExpressionParsing, ExprCaseEquality) {
   auto r = Parse("module m; initial x = (a === b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -129,7 +129,7 @@ TEST(ParserA83, ExprCaseEquality) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEqEq);
 }
 
-TEST(ParserCh505, Operator_CaseEquality) {
+TEST(OperatorTokenParserParsing, Operator_CaseEquality) {
   auto r = Parse(
       "module m;\n"
       "  initial x = (a === b);\n"
@@ -143,11 +143,11 @@ TEST(ParserCh505, Operator_CaseEquality) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEqEq);
 }
 
-TEST(ParserCh505, Operator_CaseInequality) {
+TEST(OperatorTokenParserParsing, Operator_CaseInequality) {
   EXPECT_TRUE(ParseOk("module m; initial x = (a !== b); endmodule"));
 }
 
-TEST(ParserA86, BinaryEqEq) {
+TEST(OperatorParsing, BinaryEqEq) {
   auto r = Parse("module m; initial x = a == b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -157,7 +157,7 @@ TEST(ParserA86, BinaryEqEq) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEq);
 }
 
-TEST(ParserA86, BinaryNotEq) {
+TEST(OperatorParsing, BinaryNotEq) {
   auto r = Parse("module m; initial x = a != b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -167,7 +167,7 @@ TEST(ParserA86, BinaryNotEq) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEq);
 }
 
-TEST(ParserA86, BinaryCaseNotEq) {
+TEST(OperatorParsing, BinaryCaseNotEq) {
   auto r = Parse("module m; initial x = a !== b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

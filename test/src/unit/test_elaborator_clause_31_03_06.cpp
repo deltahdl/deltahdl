@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA70501, RecremFullArgsElaborates) {
+TEST(TimingCheckCommandElaboration, RecremFullArgsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

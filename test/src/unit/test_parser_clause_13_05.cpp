@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA609, TfCallNoParens) {
+TEST(SubroutineCallSyntaxParsing, TfCallNoParens) {
   auto r = Parse(
       "module m;\n"
       "  task foo; endtask\n"
@@ -18,7 +18,7 @@ TEST(ParserA609, TfCallNoParens) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-TEST(ParserA609, VoidCastFunctionCall) {
+TEST(SubroutineCallSyntaxParsing, VoidCastFunctionCall) {
   auto r = Parse(
       "module m;\n"
       "  function int foo(); return 1; endfunction\n"
@@ -35,7 +35,7 @@ TEST(ParserA609, VoidCastFunctionCall) {
   EXPECT_EQ(expr->lhs->callee, "foo");
 }
 
-TEST(ParserA609, MethodCallWithArgs) {
+TEST(SubroutineCallSyntaxParsing, MethodCallWithArgs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin obj.method(1, 2); end\n"
@@ -48,7 +48,7 @@ TEST(ParserA609, MethodCallWithArgs) {
   EXPECT_EQ(expr->args.size(), 2u);
 }
 
-TEST(ParserA604, StmtItemSubroutineCallStatement) {
+TEST(StatementSyntaxParsing, StmtItemSubroutineCallStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -62,7 +62,7 @@ TEST(ParserA604, StmtItemSubroutineCallStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-TEST(ParserA82, FunctionSubroutineCallNested) {
+TEST(SubroutineCallExprParsing, FunctionSubroutineCallNested) {
   auto r = Parse(
       "module m;\n"
       "  initial x = f(g(1));\n"
@@ -80,7 +80,7 @@ TEST(ParserA82, FunctionSubroutineCallNested) {
   EXPECT_EQ(stmt->rhs->args[0]->callee, "g");
 }
 
-TEST(ParserA82, ListOfArgsPositionalOnly) {
+TEST(SubroutineCallExprParsing, ListOfArgsPositionalOnly) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foo(1, 2, 3); end\n"
@@ -94,7 +94,7 @@ TEST(ParserA82, ListOfArgsPositionalOnly) {
   EXPECT_TRUE(expr->arg_names.empty());
 }
 
-TEST(ParserSection11, Sec11_1_ExprAsFunctionArgument) {
+TEST(OperatorAndExpressionParsing, ExprAsFunctionArgument) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $display(a + b, c * d, {e, f});\n"

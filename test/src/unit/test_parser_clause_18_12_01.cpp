@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection18, StdRandomizeWithConstraint) {
+TEST(ConstrainedRandomParsing, StdRandomizeWithConstraint) {
   auto r = Parse(
       "module top;\n"
       "  initial begin\n"
@@ -17,7 +17,7 @@ TEST(ParserSection18, StdRandomizeWithConstraint) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection18, StdRandomizeWithMultipleVars) {
+TEST(ConstrainedRandomParsing, StdRandomizeWithMultipleVars) {
   auto r = Parse(
       "module top;\n"
       "  initial begin\n"
@@ -30,7 +30,7 @@ TEST(ParserSection18, StdRandomizeWithMultipleVars) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserA82, StdRandomizeCall) {
+TEST(SubroutineCallExprParsing, StdRandomizeCall) {
   auto r = Parse(
       "module m;\n"
       "  initial begin std::randomize(x) with { x > 0; }; end\n"

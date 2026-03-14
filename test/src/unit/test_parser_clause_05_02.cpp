@@ -4,11 +4,11 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_2_FreeFormatSingleLine) {
+TEST(LexicalConventionParsing, FreeFormatSingleLine) {
   EXPECT_TRUE(ParseOk("module t; logic a; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_2_FreeFormatMultiline) {
+TEST(LexicalConventionParsing, FreeFormatMultiline) {
   EXPECT_TRUE(
       ParseOk("module\n"
               "  t\n"
@@ -19,15 +19,15 @@ TEST(ParserClause05, Cl5_2_FreeFormatMultiline) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_2_FreeFormatMaximallyCompact) {
+TEST(LexicalConventionParsing, FreeFormatMaximallyCompact) {
   EXPECT_TRUE(ParseOk("module t;logic a;endmodule"));
 }
 
-TEST(ParserClause05, Cl5_2_FreeFormatExcessiveWhitespace) {
+TEST(LexicalConventionParsing, FreeFormatExcessiveWhitespace) {
   EXPECT_TRUE(ParseOk("  module   t  ;   logic   a  ;   endmodule  "));
 }
 
-TEST(ParserClause05, Cl5_2_WhitespaceVariationsProduceSameAST) {
+TEST(LexicalConventionParsing, WhitespaceVariationsProduceSameAST) {
   auto compact = Parse("module t;logic a;assign a=1'b0;endmodule");
   auto spread = Parse(
       "module\n  t\n;\n  logic\n  a\n;\n  assign\n  a\n=\n1'b0\n;\n"
@@ -41,7 +41,7 @@ TEST(ParserClause05, Cl5_2_WhitespaceVariationsProduceSameAST) {
   EXPECT_EQ(compact.cu->modules[0]->name, spread.cu->modules[0]->name);
 }
 
-TEST(ParserClause05, Cl5_2_AllTokenCategoriesParsed) {
+TEST(LexicalConventionParsing, AllTokenCategoriesParsed) {
   EXPECT_TRUE(
       ParseOk("module t; // line comment\n"
               "  /* block comment */\n"
@@ -50,7 +50,7 @@ TEST(ParserClause05, Cl5_2_AllTokenCategoriesParsed) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_2_EscapedIdentifierPreservesWhitespaceRule) {
+TEST(LexicalConventionParsing, EscapedIdentifierPreservesWhitespaceRule) {
   auto r = Parse(
       "module t;\n"
       "  logic \\my+sig ;\n"
@@ -60,18 +60,18 @@ TEST(ParserClause05, Cl5_2_EscapedIdentifierPreservesWhitespaceRule) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause05, Cl5_2_EscapedKeywordAsIdentifier) {
+TEST(LexicalConventionParsing, EscapedKeywordAsIdentifier) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic \\module ;\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_2_TabsAndFormfeedsAsWhitespace) {
+TEST(LexicalConventionParsing, TabsAndFormfeedsAsWhitespace) {
   EXPECT_TRUE(ParseOk("module\tt\f;\flogic\ta\t;\tendmodule"));
 }
 
-TEST(ParserClause05, Cl5_2_EmptyModuleBody) {
+TEST(LexicalConventionParsing, EmptyModuleBody) {
   EXPECT_TRUE(ParseOk("module t; endmodule"));
 }
 

@@ -5,14 +5,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA223, DelayValueInStatement) {
+TEST(DelayParsing, DelayValueInStatement) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial #10 $display(\"hello\");\n"
               "endmodule"));
 }
 
-TEST(ParserSection9c, ZeroDelayControl) {
+TEST(ProcessTimingAndControlParsing, ZeroDelayControl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -27,7 +27,7 @@ TEST(ParserSection9c, ZeroDelayControl) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserSection9c, ChainedDelayControls) {
+TEST(ProcessTimingAndControlParsing, ChainedDelayControls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -46,7 +46,7 @@ TEST(ParserSection9c, ChainedDelayControls) {
   }
 }
 
-TEST(ParserSection9c, DelayWithExpression) {
+TEST(ProcessTimingAndControlParsing, DelayWithExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -61,7 +61,7 @@ TEST(ParserSection9c, DelayWithExpression) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserSection4, Sec4_5_ZeroDelayControl) {
+TEST(SchedulingSemanticsParsing, ZeroDelayControl) {
   auto r = Parse(
       "module m;\n"
       "  reg a;\n"
@@ -78,7 +78,7 @@ TEST(ParserSection4, Sec4_5_ZeroDelayControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserSection4, Sec4_5_UnitDelayControl) {
+TEST(SchedulingSemanticsParsing, UnitDelayControl) {
   auto r = Parse(
       "module m;\n"
       "  reg a;\n"
@@ -95,7 +95,7 @@ TEST(ParserSection4, Sec4_5_UnitDelayControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserSection9, DelayControlReal) {
+TEST(ProcessParsing, DelayControlReal) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -121,7 +121,7 @@ static ModuleItem* FindInitialBlock(ParseResult& r) {
   return FindItemByKindFromResult(r, ModuleItemKind::kInitialBlock);
 }
 
-TEST(ParserSection4, Sec4_5_InitialBlockWithDelays) {
+TEST(SchedulingSemanticsParsing, InitialBlockWithDelays) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -141,7 +141,7 @@ TEST(ParserSection4, Sec4_5_InitialBlockWithDelays) {
   EXPECT_EQ(init_item->body->stmts[1]->kind, StmtKind::kDelay);
 }
 
-TEST(ParserA604, StmtItemProceduralTimingControlDelay) {
+TEST(StatementSyntaxParsing, StmtItemProceduralTimingControlDelay) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -155,7 +155,7 @@ TEST(ParserA604, StmtItemProceduralTimingControlDelay) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
-TEST(ParserA605, ProceduralTimingControlDelay) {
+TEST(TimingControlSyntaxParsing, ProceduralTimingControlDelay) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -172,7 +172,7 @@ TEST(ParserA605, ProceduralTimingControlDelay) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserA605, ProceduralTimingControlDelayNull) {
+TEST(TimingControlSyntaxParsing, ProceduralTimingControlDelayNull) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -188,7 +188,7 @@ TEST(ParserA605, ProceduralTimingControlDelayNull) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
 }
 
-TEST(ParserA605, DelayControlNumeric) {
+TEST(TimingControlSyntaxParsing, DelayControlNumeric) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -203,7 +203,7 @@ TEST(ParserA605, DelayControlNumeric) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserA605, DelayControlIdentifier) {
+TEST(TimingControlSyntaxParsing, DelayControlIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -219,7 +219,7 @@ TEST(ParserA605, DelayControlIdentifier) {
   EXPECT_EQ(stmt->delay->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserA605, DelayControlParenthesized) {
+TEST(TimingControlSyntaxParsing, DelayControlParenthesized) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -234,7 +234,7 @@ TEST(ParserA605, DelayControlParenthesized) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserA605, DelayControlMintypmax) {
+TEST(TimingControlSyntaxParsing, DelayControlMintypmax) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -250,7 +250,7 @@ TEST(ParserA605, DelayControlMintypmax) {
   EXPECT_EQ(stmt->delay->kind, ExprKind::kMinTypMax);
 }
 
-TEST(ParserA605, ProceduralTimingControlDelayControl) {
+TEST(TimingControlSyntaxParsing, ProceduralTimingControlDelayControl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -264,7 +264,7 @@ TEST(ParserA605, ProceduralTimingControlDelayControl) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
-TEST(ParserSection9, Sec9_3_1_BlockWithDelayControl) {
+TEST(ProcessParsing, BlockWithDelayControl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -281,7 +281,7 @@ TEST(ParserSection9, Sec9_3_1_BlockWithDelayControl) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDelay);
 }
 
-TEST(ParserSection9, DelayControl) {
+TEST(ProcessParsing, DelayControl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

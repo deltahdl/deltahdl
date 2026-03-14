@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexE2, AnnexEAllDirectivesCombined) {
+TEST(OptionalDirectiveExtendedParsing, AllDirectivesCombined) {
   auto r = ParseWithPreprocessor(
       "`default_decay_time 10\n"
       "`default_trireg_strength 100\n"

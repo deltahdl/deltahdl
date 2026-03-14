@@ -60,7 +60,7 @@ TEST(StmtExec, PriorityIfNoMatchNoElseWarning) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA606, UniqueIfQualifierStored) {
+TEST(ConditionalStatementSim, UniqueIfQualifierStored) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -82,7 +82,7 @@ TEST(SimA606, UniqueIfQualifierStored) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimA606, PriorityIfFirstMatch) {
+TEST(ConditionalStatementSim, PriorityIfFirstMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -103,7 +103,7 @@ TEST(SimA606, PriorityIfFirstMatch) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA606, UniqueIfNoMatchNoElseWarning) {
+TEST(ConditionalStatementSim, UniqueIfNoMatchNoElseWarning) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -126,7 +126,7 @@ TEST(SimA606, UniqueIfNoMatchNoElseWarning) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA606, UniqueIfNoMatchWithElseNoWarning) {
+TEST(ConditionalStatementSim, UniqueIfNoMatchWithElseNoWarning) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -149,7 +149,7 @@ TEST(SimA606, UniqueIfNoMatchWithElseNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(SimA606, Unique0IfNoMatchNoElseNoWarning) {
+TEST(ConditionalStatementSim, Unique0IfNoMatchNoElseNoWarning) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -172,7 +172,7 @@ TEST(SimA606, Unique0IfNoMatchNoElseNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(SimA606, UniqueIfOverlapWarning) {
+TEST(ConditionalStatementSim, UniqueIfOverlapWarning) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -196,7 +196,7 @@ TEST(SimA606, UniqueIfOverlapWarning) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA606, Unique0IfOverlapWarning) {
+TEST(ConditionalStatementSim, Unique0IfOverlapWarning) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -218,7 +218,7 @@ TEST(SimA606, Unique0IfOverlapWarning) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA606, UniqueIfSingleConditionNoOverlap) {
+TEST(ConditionalStatementSim, UniqueIfSingleConditionNoOverlap) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

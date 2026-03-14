@@ -6,7 +6,7 @@
 
 using namespace delta;
 
-TEST(SimCh503, WhitespaceSameResultWithSpaces) {
+TEST(WhiteSpaceSim, WhitespaceSameResultWithSpaces) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -20,7 +20,7 @@ TEST(SimCh503, WhitespaceSameResultWithSpaces) {
   EXPECT_EQ(result, 30u);
 }
 
-TEST(SimCh503, WhitespaceSameResultWithTabs) {
+TEST(WhiteSpaceSim, WhitespaceSameResultWithTabs) {
   auto result = RunAndGet(
       "module\tt\t;\n"
       "\tlogic\t[7:0]\ta\t,\tb\t,\tresult\t;\n"
@@ -34,7 +34,7 @@ TEST(SimCh503, WhitespaceSameResultWithTabs) {
   EXPECT_EQ(result, 30u);
 }
 
-TEST(SimCh503, WhitespaceSameResultWithNewlines) {
+TEST(WhiteSpaceSim, WhitespaceSameResultWithNewlines) {
   auto result = RunAndGet(
       "module\n"
       "t\n"
@@ -53,13 +53,13 @@ TEST(SimCh503, WhitespaceSameResultWithNewlines) {
   EXPECT_EQ(result, 42u);
 }
 
-TEST(SimCh503, WhitespaceSameResultMinimal) {
+TEST(WhiteSpaceSim, WhitespaceSameResultMinimal) {
   auto result = RunAndGet(
       "module t;logic [7:0] result;initial result=8'd55;endmodule", "result");
   EXPECT_EQ(result, 55u);
 }
 
-TEST(SimCh503, WhitespaceSameResultExcessive) {
+TEST(WhiteSpaceSim, WhitespaceSameResultExcessive) {
   auto result = RunAndGet(
       "  \t\n  module   \t  t  \n  ;  \n"
       "  logic   [  7  :  0  ]   result  ;  \n"
@@ -69,7 +69,7 @@ TEST(SimCh503, WhitespaceSameResultExcessive) {
   EXPECT_EQ(result, 77u);
 }
 
-TEST(SimCh503, WhitespaceFormfeedInSource) {
+TEST(WhiteSpaceSim, WhitespaceFormfeedInSource) {
   auto result = RunAndGet(
       "module t;\f"
       "logic [7:0] result;\f"
@@ -79,7 +79,7 @@ TEST(SimCh503, WhitespaceFormfeedInSource) {
   EXPECT_EQ(result, 99u);
 }
 
-TEST(SimCh503, WhitespaceMixedInExpression) {
+TEST(WhiteSpaceSim, WhitespaceMixedInExpression) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, b, c, result;\n"
@@ -94,7 +94,7 @@ TEST(SimCh503, WhitespaceMixedInExpression) {
   EXPECT_EQ(result, 12u);
 }
 
-TEST(SimCh503, WhitespaceAroundAssignment) {
+TEST(WhiteSpaceSim, WhitespaceAroundAssignment) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -104,7 +104,7 @@ TEST(SimCh503, WhitespaceAroundAssignment) {
   EXPECT_EQ(result, 33u);
 }
 
-TEST(SimCh503, WhitespaceStringLiteralPreserved) {
+TEST(WhiteSpaceSim, WhitespaceStringLiteralPreserved) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -125,7 +125,7 @@ TEST(SimCh503, WhitespaceStringLiteralPreserved) {
   EXPECT_EQ((val >> 16) & 0xFF, 0x61u);
 }
 
-TEST(SimCh503, WhitespaceStringLiteralTabPreserved) {
+TEST(WhiteSpaceSim, WhitespaceStringLiteralTabPreserved) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -146,7 +146,7 @@ TEST(SimCh503, WhitespaceStringLiteralTabPreserved) {
   EXPECT_EQ((val >> 16) & 0xFF, 0x61u);
 }
 
-TEST(SimCh503, WhitespaceSeparatesKeywords) {
+TEST(WhiteSpaceSim, WhitespaceSeparatesKeywords) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -156,7 +156,7 @@ TEST(SimCh503, WhitespaceSeparatesKeywords) {
   EXPECT_EQ(result, 1u);
 }
 
-TEST(SimCh503, WhitespaceAlwaysCombWithFormfeed) {
+TEST(WhiteSpaceSim, WhitespaceAlwaysCombWithFormfeed) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, result;\n"
@@ -169,7 +169,7 @@ TEST(SimCh503, WhitespaceAlwaysCombWithFormfeed) {
   EXPECT_EQ(result, 10u);
 }
 
-TEST(SimCh503, WhitespaceInConcatenation) {
+TEST(WhiteSpaceSim, WhitespaceInConcatenation) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [3:0] a, b;\n"
@@ -184,7 +184,7 @@ TEST(SimCh503, WhitespaceInConcatenation) {
   EXPECT_EQ(result, 0xA5u);
 }
 
-TEST(SimCh503, WhitespaceAroundTernary) {
+TEST(WhiteSpaceSim, WhitespaceAroundTernary) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -194,7 +194,7 @@ TEST(SimCh503, WhitespaceAroundTernary) {
   EXPECT_EQ(result, 100u);
 }
 
-TEST(SimCh503, WhitespaceMultipleStatements) {
+TEST(WhiteSpaceSim, WhitespaceMultipleStatements) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection11, StringConcatenation) {
+TEST(OperatorAndExpressionParsing, StringConcatenation) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  string hello, s;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection11, StringConcatenation) {
               "endmodule\n"));
 }
 
-TEST(ParserSection11, StringReplication) {
+TEST(OperatorAndExpressionParsing, StringReplication) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -28,7 +28,7 @@ TEST(ParserSection11, StringReplication) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, StringConcatOp) {
+TEST(DataTypeParsing, StringConcatOp) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  string a, b, c;\n"

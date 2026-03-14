@@ -20,20 +20,20 @@ TEST(TypeEval, StringNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kString));
 }
 
-TEST(ParserA212, VarDataTypeString) {
+TEST(ConstraintDeclParsing, VarDataTypeString) {
   auto r = Parse("module m(input string name); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA221, DataTypeString) {
+TEST(NetAndVariableTypeParsing, DataTypeString) {
   auto r = Parse("module m; string s; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kString);
 }
 
-TEST(ParserSection6, StringBlockDecl) {
+TEST(DataTypeParsing, StringBlockDecl) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -48,7 +48,7 @@ TEST(ParserSection6, StringBlockDecl) {
   EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
 }
 
-TEST(ParserSection6, StringFunctionArg) {
+TEST(DataTypeParsing, StringFunctionArg) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  function void print_msg(string s);\n"
@@ -56,7 +56,7 @@ TEST(ParserSection6, StringFunctionArg) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_5_StringVarDecl) {
+TEST(DataTypeParsing, StringVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  string msg;\n"
@@ -71,14 +71,14 @@ TEST(ParserSection6, Sec6_5_StringVarDecl) {
   EXPECT_EQ(item->name, "msg");
 }
 
-TEST(ParserCh509, StringLiteral_AsParameter) {
+TEST(StringLiteralParserParsing, StringLiteral_AsParameter) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  parameter string MSG = \"default message\";\n"
               "endmodule"));
 }
 
-TEST(ParserSection6, BlockVarDecl_StringType) {
+TEST(DataTypeParsing, BlockVarDecl_StringType) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -93,7 +93,7 @@ TEST(ParserSection6, BlockVarDecl_StringType) {
   EXPECT_EQ(stmt->var_name, "s");
 }
 
-TEST(ParserSection11, StringCompareEquality) {
+TEST(OperatorAndExpressionParsing, StringCompareEquality) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  string s1, s2;\n"
@@ -105,7 +105,7 @@ TEST(ParserSection11, StringCompareEquality) {
               "endmodule\n"));
 }
 
-TEST(ParserSection8, StringTypeModuleLevel) {
+TEST(ClassParsing, StringTypeModuleLevel) {
   auto r = Parse(
       "module m;\n"
       "  string name;\n"
@@ -117,7 +117,7 @@ TEST(ParserSection8, StringTypeModuleLevel) {
   EXPECT_EQ(item->name, "name");
 }
 
-TEST(ParserSection8, StringTypeWithInit) {
+TEST(ClassParsing, StringTypeWithInit) {
   auto r = Parse(
       "module m;\n"
       "  string greeting = \"hello\";\n"
@@ -129,7 +129,7 @@ TEST(ParserSection8, StringTypeWithInit) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection8, StringTypeBlockLevel) {
+TEST(ClassParsing, StringTypeBlockLevel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -144,7 +144,7 @@ TEST(ParserSection8, StringTypeBlockLevel) {
   EXPECT_EQ(stmt->var_decl_type.kind, DataTypeKind::kString);
 }
 
-TEST(ParserSection6, StringInProcedural) {
+TEST(DataTypeParsing, StringInProcedural) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -154,7 +154,7 @@ TEST(ParserSection6, StringInProcedural) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, StringDeclBasic) {
+TEST(DataTypeParsing, StringDeclBasic) {
   auto r = Parse(
       "module m;\n"
       "  string s;\n"
@@ -167,7 +167,7 @@ TEST(ParserSection6, StringDeclBasic) {
   EXPECT_EQ(item->name, "s");
 }
 
-TEST(ParserSection6, StringDeclWithInitializer) {
+TEST(DataTypeParsing, StringDeclWithInitializer) {
   auto r = Parse(
       "module m;\n"
       "  string name = \"hello\";\n"
@@ -180,14 +180,14 @@ TEST(ParserSection6, StringDeclWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection6, StringDeclEmptyInit) {
+TEST(DataTypeParsing, StringDeclEmptyInit) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  string s = \"\";\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, StringParameterDecl) {
+TEST(DataTypeParsing, StringParameterDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  parameter string DEFAULT_NAME = \"John Smith\";\n"
@@ -195,7 +195,7 @@ TEST(ParserSection6, StringParameterDecl) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, StringInFunctionArg) {
+TEST(DataTypeParsing, StringInFunctionArg) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function void greet(string name);\n"
@@ -204,7 +204,7 @@ TEST(ParserSection6, StringInFunctionArg) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, StringFunctionReturn) {
+TEST(DataTypeParsing, StringFunctionReturn) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function string get_msg();\n"
@@ -213,7 +213,7 @@ TEST(ParserSection6, StringFunctionReturn) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, StringComparison) {
+TEST(DataTypeParsing, StringComparison) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  string a, b;\n"
@@ -227,7 +227,7 @@ TEST(ParserSection6, StringComparison) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, MultipleStringDecls) {
+TEST(DataTypeParsing, MultipleStringDecls) {
   auto r = Parse(
       "module m;\n"
       "  string x, y, z;\n"

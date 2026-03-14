@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA70502, TimestampCondMinTypMaxElaborates) {
+TEST(TimingCheckArgumentElaboration, TimestampCondMinTypMaxElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(ElabA70502, TimestampCondMinTypMaxElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70502, DelayedDataWithBracketElaborates) {
+TEST(TimingCheckArgumentElaboration, DelayedDataWithBracketElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(ElabA70502, DelayedDataWithBracketElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70502, DelayedRefWithBracketMinTypMaxElaborates) {
+TEST(TimingCheckArgumentElaboration, DelayedRefWithBracketMinTypMaxElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -43,7 +43,7 @@ TEST(ElabA70502, DelayedRefWithBracketMinTypMaxElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70502, RemainActiveFlagMinTypMaxElaborates) {
+TEST(TimingCheckArgumentElaboration, RemainActiveFlagMinTypMaxElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

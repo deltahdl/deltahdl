@@ -16,7 +16,7 @@ TEST_F(ApiParseTest, WritememhSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-TEST(ParserSection21, WritememhCall) {
+TEST(IoSystemTaskParsing, WritememhCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  reg [7:0] mem [0:255];\n"
@@ -24,7 +24,7 @@ TEST(ParserSection21, WritememhCall) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, WritemembCall) {
+TEST(IoSystemTaskParsing, WritemembCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  reg [7:0] mem [0:255];\n"

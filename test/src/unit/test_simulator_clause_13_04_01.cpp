@@ -24,7 +24,7 @@ TEST(Functions, VoidFunctionReturnsZero) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(SimA604, FunctionStatementExecution) {
+TEST(StatementSimSyntax, FunctionStatementExecution) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -46,7 +46,7 @@ TEST(SimA604, FunctionStatementExecution) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SimA605, JumpReturnFromFunction) {
+TEST(TimingControlSim, JumpReturnFromFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -68,7 +68,7 @@ TEST(SimA605, JumpReturnFromFunction) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA609, FunctionCallAsStatement) {
+TEST(SubroutineCallSim, FunctionCallAsStatement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -91,7 +91,7 @@ TEST(SimA609, FunctionCallAsStatement) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SimA609, FunctionReturnValue) {
+TEST(SubroutineCallSim, FunctionReturnValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -113,7 +113,7 @@ TEST(SimA609, FunctionReturnValue) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA82, TfCallReturnValue) {
+TEST(SubroutineCallExprSim, TfCallReturnValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -133,7 +133,7 @@ TEST(SimA82, TfCallReturnValue) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA82, NestedFunctionCalls) {
+TEST(SubroutineCallExprSim, NestedFunctionCalls) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -156,7 +156,7 @@ TEST(SimA82, NestedFunctionCalls) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-TEST(SimA82, VoidCastFunctionCall) {
+TEST(SubroutineCallExprSim, VoidCastFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -174,7 +174,7 @@ TEST(SimA82, VoidCastFunctionCall) {
   LowerRunAndCheck(f, design, {{"x", 55u}});
 }
 
-TEST(Sim1341, FunctionNameAssignReturnsValue) {
+TEST(FunctionReturnSim, FunctionNameAssignReturnsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -191,7 +191,7 @@ TEST(Sim1341, FunctionNameAssignReturnsValue) {
   LowerRunAndCheck(f, design, {{"x", 14u}});
 }
 
-TEST(Sim1341, ReturnOverridesFunctionNameAssign) {
+TEST(FunctionReturnSim, ReturnOverridesFunctionNameAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -208,7 +208,7 @@ TEST(Sim1341, ReturnOverridesFunctionNameAssign) {
   LowerRunAndCheck(f, design, {{"x", 42u}});
 }
 
-TEST(Sim1341, EmptyFunctionReturnsZero) {
+TEST(FunctionReturnSim, EmptyFunctionReturnsZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -223,7 +223,7 @@ TEST(Sim1341, EmptyFunctionReturnsZero) {
   LowerRunAndCheck(f, design, {{"x", 0u}});
 }
 
-TEST(Sim1341, FunctionNameAssignConditional) {
+TEST(FunctionReturnSim, FunctionNameAssignConditional) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -242,7 +242,7 @@ TEST(Sim1341, FunctionNameAssignConditional) {
   LowerRunAndCheck(f, design, {{"x", 7u}});
 }
 
-TEST(Sim1341, VoidFunctionCallAsStatement) {
+TEST(FunctionReturnSim, VoidFunctionCallAsStatement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

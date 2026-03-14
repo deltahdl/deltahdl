@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimClause100303, SingleDelayDefersAssignment) {
+TEST(AssignmentDelaySim, SingleDelayDefersAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -24,7 +24,7 @@ TEST(SimClause100303, SingleDelayDefersAssignment) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 10u);
 }
 
-TEST(SimClause100303, RiseFallDelayUsesRiseForZeroToOne) {
+TEST(AssignmentDelaySim, RiseFallDelayUsesRiseForZeroToOne) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -42,7 +42,7 @@ TEST(SimClause100303, RiseFallDelayUsesRiseForZeroToOne) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 5u);
 }
 
-TEST(SimClause100303, RiseFallDelayUsesFallForOneToZero) {
+TEST(AssignmentDelaySim, RiseFallDelayUsesFallForOneToZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -66,7 +66,7 @@ TEST(SimClause100303, RiseFallDelayUsesFallForOneToZero) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 30u);
 }
 
-TEST(SimClause100303, ThreeDelayTurnoff) {
+TEST(AssignmentDelaySim, ThreeDelayTurnoff) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -87,7 +87,7 @@ TEST(SimClause100303, ThreeDelayTurnoff) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 35u);
 }
 
-TEST(SimClause100303, NoDelayAssignsImmediately) {
+TEST(AssignmentDelaySim, NoDelayAssignsImmediately) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -105,7 +105,7 @@ TEST(SimClause100303, NoDelayAssignsImmediately) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-TEST(SimClause100303, TwoDelayVectorUsesMinForXToKnown) {
+TEST(AssignmentDelaySim, TwoDelayVectorUsesMinForXToKnown) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

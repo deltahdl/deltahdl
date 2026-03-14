@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserAnnexA0413, ElaborationProgramInstInModule) {
+TEST(ProgramInstantiationGrammar, ElaborationProgramInstInModule) {
   ElabFixture f;
   auto* design = Elaborate(
       "program my_prog(input logic clk, input logic rst);\n"
@@ -24,7 +24,7 @@ TEST(ParserAnnexA0413, ElaborationProgramInstInModule) {
   EXPECT_NE(top->children[0].resolved, nullptr);
 }
 
-TEST(ParserAnnexA0413, ElaborationProgramInstPortBindings) {
+TEST(ProgramInstantiationGrammar, ElaborationProgramInstPortBindings) {
   ElabFixture f;
   auto* design = Elaborate(
       "program simple_prog(input logic data);\n"

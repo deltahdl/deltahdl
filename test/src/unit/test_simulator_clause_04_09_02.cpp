@@ -10,11 +10,11 @@
 
 using namespace delta;
 
-TEST(SimCh4092, ProceduralContinuousAssignmentCorrespondsToProcess) {
+TEST(ProceduralContinuousSchedulingSim, ProceduralContinuousAssignmentCorrespondsToProcess) {
   VerifyCACorrespondsToProcess();
 }
 
-TEST(SimCh4092, AssignStatementOverridesProceduralAssignment) {
+TEST(ProceduralContinuousSchedulingSim, AssignStatementOverridesProceduralAssignment) {
   Arena arena;
   Scheduler sched(arena);
   int reg_val = 0;
@@ -45,7 +45,7 @@ TEST(SimCh4092, AssignStatementOverridesProceduralAssignment) {
   EXPECT_EQ(reg_val, 99);
 }
 
-TEST(SimCh4092, ForceStatementOverridesAllDrivers) {
+TEST(ProceduralContinuousSchedulingSim, ForceStatementOverridesAllDrivers) {
   Arena arena;
   Scheduler sched(arena);
   int net_val = 0;
@@ -81,7 +81,7 @@ TEST(SimCh4092, ForceStatementOverridesAllDrivers) {
   EXPECT_EQ(net_val, 77);
 }
 
-TEST(SimCh4092, SensitiveToSourceElements) {
+TEST(ProceduralContinuousSchedulingSim, SensitiveToSourceElements) {
   Arena arena;
   Scheduler sched(arena);
   int a = 0;
@@ -118,11 +118,11 @@ TEST(SimCh4092, SensitiveToSourceElements) {
   EXPECT_EQ(dst, 7);
 }
 
-TEST(SimCh4092, SchedulesActiveUpdateEvent) {
+TEST(ProceduralContinuousSchedulingSim, SchedulesActiveUpdateEvent) {
   VerifyCASchedulesActiveUpdateEvent();
 }
 
-TEST(SimCh4092, UsesCurrentValuesToDetermineTarget) {
+TEST(ProceduralContinuousSchedulingSim, UsesCurrentValuesToDetermineTarget) {
   Arena arena;
   Scheduler sched(arena);
   int select = 0;
@@ -167,7 +167,7 @@ TEST(SimCh4092, UsesCurrentValuesToDetermineTarget) {
   EXPECT_EQ(target_b, 2);
 }
 
-TEST(SimCh4092, DeassignDeactivatesAssign) {
+TEST(ProceduralContinuousSchedulingSim, DeassignDeactivatesAssign) {
   Arena arena;
   Scheduler sched(arena);
   int src = 0;
@@ -212,7 +212,7 @@ TEST(SimCh4092, DeassignDeactivatesAssign) {
   EXPECT_FALSE(assign_active);
 }
 
-TEST(SimCh4092, ReleaseDeactivatesForce) {
+TEST(ProceduralContinuousSchedulingSim, ReleaseDeactivatesForce) {
   Arena arena;
   Scheduler sched(arena);
   int net_val = 0;
@@ -262,7 +262,7 @@ TEST(SimCh4092, ReleaseDeactivatesForce) {
   EXPECT_EQ(net_val, 5);
 }
 
-TEST(SimCh4092, DeassignAllowsSubsequentProceduralAssignment) {
+TEST(ProceduralContinuousSchedulingSim, DeassignAllowsSubsequentProceduralAssignment) {
   Arena arena;
   Scheduler sched(arena);
   int reg_val = 0;
@@ -296,7 +296,7 @@ TEST(SimCh4092, DeassignAllowsSubsequentProceduralAssignment) {
   EXPECT_EQ(reg_val, 42);
 }
 
-TEST(SimCh4092, ReEvaluatesOnEachSourceChange) {
+TEST(ProceduralContinuousSchedulingSim, ReEvaluatesOnEachSourceChange) {
   Arena arena;
   Scheduler sched(arena);
   int src = 0;

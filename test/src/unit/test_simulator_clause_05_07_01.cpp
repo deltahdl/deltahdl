@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA84, PrimaryIntegerLiteral) {
+TEST(PrimarySim, PrimaryIntegerLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -27,7 +27,7 @@ TEST(SimA84, PrimaryIntegerLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(SimA84, PrimaryUnbasedUnsized1) {
+TEST(PrimarySim, PrimaryUnbasedUnsized1) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -44,7 +44,7 @@ TEST(SimA84, PrimaryUnbasedUnsized1) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimA84, PrimaryUnbasedUnsized0) {
+TEST(PrimarySim, PrimaryUnbasedUnsized0) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -61,7 +61,7 @@ TEST(SimA84, PrimaryUnbasedUnsized0) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimA84, PrimaryHexLiteral) {
+TEST(PrimarySim, PrimaryHexLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -78,7 +78,7 @@ TEST(SimA84, PrimaryHexLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-TEST(SimA84, PrimaryBinaryLiteral) {
+TEST(PrimarySim, PrimaryBinaryLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -95,7 +95,7 @@ TEST(SimA84, PrimaryBinaryLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 0xCCu);
 }
 
-TEST(SimA87, NumberIntegral) {
+TEST(NumberSim, NumberIntegral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -112,7 +112,7 @@ TEST(SimA87, NumberIntegral) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA87, DecimalUnsized) {
+TEST(NumberSim, DecimalUnsized) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -129,7 +129,7 @@ TEST(SimA87, DecimalUnsized) {
   EXPECT_EQ(var->value.ToUint64(), 255u);
 }
 
-TEST(SimA87, BinaryNumber) {
+TEST(NumberSim, BinaryNumber) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -146,7 +146,7 @@ TEST(SimA87, BinaryNumber) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-TEST(SimA87, HexNumber) {
+TEST(NumberSim, HexNumber) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -163,7 +163,7 @@ TEST(SimA87, HexNumber) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimA87, DecimalSizedBase) {
+TEST(NumberSim, DecimalSizedBase) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -180,7 +180,7 @@ TEST(SimA87, DecimalSizedBase) {
   EXPECT_EQ(var->value.ToUint64(), 200u);
 }
 
-TEST(SimA87, DecimalZDigitAllBits) {
+TEST(NumberSim, DecimalZDigitAllBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -198,7 +198,7 @@ TEST(SimA87, DecimalZDigitAllBits) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-TEST(SimA87, Size16Bit) {
+TEST(NumberSim, Size16Bit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -215,7 +215,7 @@ TEST(SimA87, Size16Bit) {
   EXPECT_EQ(var->value.ToUint64(), 0xBEEFu);
 }
 
-TEST(SimA87, UnsignedNumberUnderscores) {
+TEST(NumberSim, UnsignedNumberUnderscores) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -232,7 +232,7 @@ TEST(SimA87, UnsignedNumberUnderscores) {
   EXPECT_EQ(var->value.ToUint64(), 1000u);
 }
 
-TEST(SimA87, BinaryValueUnderscores) {
+TEST(NumberSim, BinaryValueUnderscores) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -249,7 +249,7 @@ TEST(SimA87, BinaryValueUnderscores) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-TEST(SimA87, DecimalBaseUpper) {
+TEST(NumberSim, DecimalBaseUpper) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -266,7 +266,7 @@ TEST(SimA87, DecimalBaseUpper) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimA87, BinaryBaseUpper) {
+TEST(NumberSim, BinaryBaseUpper) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -283,7 +283,7 @@ TEST(SimA87, BinaryBaseUpper) {
   EXPECT_EQ(var->value.ToUint64(), 0xFu);
 }
 
-TEST(SimA87, OctalBaseUpper) {
+TEST(NumberSim, OctalBaseUpper) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -300,7 +300,7 @@ TEST(SimA87, OctalBaseUpper) {
   EXPECT_EQ(var->value.ToUint64(), 077u);
 }
 
-TEST(SimA87, HexBaseUpper) {
+TEST(NumberSim, HexBaseUpper) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -317,7 +317,7 @@ TEST(SimA87, HexBaseUpper) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(SimA87, SignedDecimal) {
+TEST(NumberSim, SignedDecimal) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -334,7 +334,7 @@ TEST(SimA87, SignedDecimal) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimA87, SignedBinary) {
+TEST(NumberSim, SignedBinary) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -351,7 +351,7 @@ TEST(SimA87, SignedBinary) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
-TEST(SimA87, SignedHex) {
+TEST(NumberSim, SignedHex) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -368,7 +368,7 @@ TEST(SimA87, SignedHex) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(SimA87, XDigitInHex) {
+TEST(NumberSim, XDigitInHex) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -389,7 +389,7 @@ TEST(SimA87, XDigitInHex) {
   EXPECT_EQ(bval & 0xFu, 0xFu);
 }
 
-TEST(SimA87, ZDigitInHex) {
+TEST(NumberSim, ZDigitInHex) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -410,7 +410,7 @@ TEST(SimA87, ZDigitInHex) {
   EXPECT_EQ(bval & 0xFu, 0xFu);
 }
 
-TEST(SimA87, QuestionMarkAsZ) {
+TEST(NumberSim, QuestionMarkAsZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -429,7 +429,7 @@ TEST(SimA87, QuestionMarkAsZ) {
   EXPECT_NE(bval & 0x5u, 0u);
 }
 
-TEST(SimA87, UnbasedUnsizedZero) {
+TEST(NumberSim, UnbasedUnsizedZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -446,7 +446,7 @@ TEST(SimA87, UnbasedUnsizedZero) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimA87, UnbasedUnsizedOne) {
+TEST(NumberSim, UnbasedUnsizedOne) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -463,7 +463,7 @@ TEST(SimA87, UnbasedUnsizedOne) {
   EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0xFFu);
 }
 
-TEST(SimA87, UnbasedUnsizedX) {
+TEST(NumberSim, UnbasedUnsizedX) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -482,7 +482,7 @@ TEST(SimA87, UnbasedUnsizedX) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-TEST(SimA87, UnbasedUnsizedZ) {
+TEST(NumberSim, UnbasedUnsizedZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -500,7 +500,7 @@ TEST(SimA87, UnbasedUnsizedZ) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-TEST(SimA87, HexDigitUppercase) {
+TEST(NumberSim, HexDigitUppercase) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -517,7 +517,7 @@ TEST(SimA87, HexDigitUppercase) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDEFu);
 }
 
-TEST(SimCh50701, SimpleDecimalNumber) {
+TEST(IntegerLiteralConstantSim, SimpleDecimalNumber) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -527,7 +527,7 @@ TEST(SimCh50701, SimpleDecimalNumber) {
   EXPECT_EQ(result, 659u);
 }
 
-TEST(SimCh50701, SizedBinaryLiteral) {
+TEST(IntegerLiteralConstantSim, SizedBinaryLiteral) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -537,7 +537,7 @@ TEST(SimCh50701, SizedBinaryLiteral) {
   EXPECT_EQ(result, 9u);
 }
 
-TEST(SimCh50701, SizedOctalLiteral) {
+TEST(IntegerLiteralConstantSim, SizedOctalLiteral) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [15:0] x;\n"
@@ -547,7 +547,7 @@ TEST(SimCh50701, SizedOctalLiteral) {
   EXPECT_EQ(result, 07460u);
 }
 
-TEST(SimCh50701, SizedDecimalLiteral) {
+TEST(IntegerLiteralConstantSim, SizedDecimalLiteral) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -557,7 +557,7 @@ TEST(SimCh50701, SizedDecimalLiteral) {
   EXPECT_EQ(result, 3u);
 }
 
-TEST(SimCh50701, UnsizedHexLiteral) {
+TEST(IntegerLiteralConstantSim, UnsizedHexLiteral) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -567,7 +567,7 @@ TEST(SimCh50701, UnsizedHexLiteral) {
   EXPECT_EQ(result, 0x837FFu);
 }
 
-TEST(SimCh50701, UnsizedOctalLiteral) {
+TEST(IntegerLiteralConstantSim, UnsizedOctalLiteral) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -577,7 +577,7 @@ TEST(SimCh50701, UnsizedOctalLiteral) {
   EXPECT_EQ(result, 07460u);
 }
 
-TEST(SimCh50701, UnaryMinusBeforeSize) {
+TEST(IntegerLiteralConstantSim, UnaryMinusBeforeSize) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -587,7 +587,7 @@ TEST(SimCh50701, UnaryMinusBeforeSize) {
   EXPECT_EQ(result, 250u);
 }
 
-TEST(SimCh50701, NegativeTwosComplement) {
+TEST(IntegerLiteralConstantSim, NegativeTwosComplement) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -597,7 +597,7 @@ TEST(SimCh50701, NegativeTwosComplement) {
   EXPECT_EQ(result, 255u);
 }
 
-TEST(SimCh50701, TruncationFromLeft) {
+TEST(IntegerLiteralConstantSim, TruncationFromLeft) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -607,7 +607,7 @@ TEST(SimCh50701, TruncationFromLeft) {
   EXPECT_EQ(result, 0x09u);
 }
 
-TEST(SimCh50701, SignedBasedLiteral) {
+TEST(IntegerLiteralConstantSim, SignedBasedLiteral) {
   auto result = RunAndGet(
       "module t;\n"
       "  integer x;\n"

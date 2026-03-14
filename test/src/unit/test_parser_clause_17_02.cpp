@@ -271,7 +271,7 @@ TEST(SourceText, DescriptionChecker) {
   EXPECT_EQ(r.cu->checkers[0]->name, "chk");
 }
 
-TEST(ParserAnnexA, A1CheckerDecl) {
+TEST(FormalSyntaxParsing, CheckerDecl) {
   auto r = Parse("checker chk; endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

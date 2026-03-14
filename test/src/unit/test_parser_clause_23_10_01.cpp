@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA23, ListOfDefparamAssignmentsThree) {
+TEST(DeclarationListParsing, ListOfDefparamAssignmentsThree) {
   auto r = Parse(
       "module top;\n"
       "  defparam u0.A = 1, u0.B = 2, u0.C = 3;\n"
@@ -15,7 +15,7 @@ TEST(ParserA23, ListOfDefparamAssignmentsThree) {
   EXPECT_EQ(item->defparam_assigns.size(), 3u);
 }
 
-TEST(ParserAnnexA, A9DefparamDecl) {
+TEST(FormalSyntaxParsing, DefparamDecl) {
   auto r = Parse("module m; defparam u.WIDTH = 16; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

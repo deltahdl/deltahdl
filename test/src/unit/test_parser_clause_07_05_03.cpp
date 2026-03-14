@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7c, DynamicArrayDelete) {
+TEST(DynamicArrayAndQueueParsing, DynamicArrayDelete) {
   auto r = Parse(
       "module m;\n"
       "  int dyn[];\n"
@@ -17,7 +17,7 @@ TEST(ParserSection7c, DynamicArrayDelete) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-TEST(ParserSection7, DynamicArrayDeleteMethod) {
+TEST(AggregateTypeParsing, DynamicArrayDeleteMethod) {
   auto r = Parse(
       "module t;\n"
       "  int dyn[];\n"

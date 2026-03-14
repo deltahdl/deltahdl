@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA603, SeqBlockExecutionOrder) {
+TEST(BlockStatementSimSyntax, SeqBlockExecutionOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -27,7 +27,7 @@ TEST(SimA603, SeqBlockExecutionOrder) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimA603, SeqBlockValuePropagation) {
+TEST(BlockStatementSimSyntax, SeqBlockValuePropagation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -47,7 +47,7 @@ TEST(SimA603, SeqBlockValuePropagation) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-TEST(SimCh4, SequentialWithinBeginEnd) {
+TEST(SchedulingSemanticsSim, SequentialWithinBeginEnd) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"

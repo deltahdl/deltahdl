@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection12, ForeverWithTimingControl) {
+TEST(ProceduralStatementParsing, ForeverWithTimingControl) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -17,7 +17,7 @@ TEST(ParserSection12, ForeverWithTimingControl) {
               "endmodule\n"));
 }
 
-TEST(ParserA608, ForeverLoop) {
+TEST(LoopSyntaxParsing, ForeverLoop) {
   auto r = Parse(
       "module m;\n"
       "  initial begin forever #5 clk = ~clk; end\n"
@@ -30,7 +30,7 @@ TEST(ParserA608, ForeverLoop) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserA608, ForeverNullStmt) {
+TEST(LoopSyntaxParsing, ForeverNullStmt) {
   auto r = Parse(
       "module m;\n"
       "  initial begin forever ; end\n"
@@ -42,7 +42,7 @@ TEST(ParserA608, ForeverNullStmt) {
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
 }
 
-TEST(ParserSection12, ForeverLoopWithBlock) {
+TEST(ProceduralStatementParsing, ForeverLoopWithBlock) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"

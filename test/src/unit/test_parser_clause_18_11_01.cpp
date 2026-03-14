@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection18, RandomizeWithNullArg) {
+TEST(ConstrainedRandomParsing, RandomizeWithNullArg) {
   auto r = Parse(
       "class C;\n"
       "  rand int x, y;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection18, RandomizeWithNullArg) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserA82, RandomizeCallWithNull) {
+TEST(SubroutineCallExprParsing, RandomizeCallWithNull) {
   auto r = Parse(
       "module m;\n"
       "  initial begin obj.randomize(null); end\n"

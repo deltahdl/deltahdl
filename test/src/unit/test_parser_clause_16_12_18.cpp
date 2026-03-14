@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, PropertyFormalType_Property) {
+TEST(AssertionDeclParsing, PropertyFormalType_Property) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p(property q);\n"
@@ -13,7 +13,7 @@ TEST(ParserA210, PropertyFormalType_Property) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyFormalType_Sequence) {
+TEST(AssertionDeclParsing, PropertyFormalType_Sequence) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p(sequence s);\n"
@@ -22,7 +22,7 @@ TEST(ParserA210, PropertyFormalType_Sequence) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyFormalType_Implicit) {
+TEST(AssertionDeclParsing, PropertyFormalType_Implicit) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p(x);\n"

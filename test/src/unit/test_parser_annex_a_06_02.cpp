@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA602, InitialConstruct) {
+TEST(ProceduralBlockSyntaxParsing, InitialConstruct) {
   auto r = Parse(
       "module m;\n"
       "  initial a = 0;\n"
@@ -17,7 +17,7 @@ TEST(ParserA602, InitialConstruct) {
   EXPECT_NE(item->body, nullptr);
 }
 
-TEST(ParserA602, AlwaysConstruct) {
+TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct) {
   auto r = Parse(
       "module m;\n"
       "  always #5 clk = ~clk;\n"
@@ -29,7 +29,7 @@ TEST(ParserA602, AlwaysConstruct) {
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
 }
 
-TEST(ParserA602, AlwaysComb) {
+TEST(ProceduralBlockSyntaxParsing, AlwaysComb) {
   auto r = Parse(
       "module m;\n"
       "  always_comb a = b;\n"
@@ -41,7 +41,7 @@ TEST(ParserA602, AlwaysComb) {
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
 }
 
-TEST(ParserA602, AlwaysLatch) {
+TEST(ProceduralBlockSyntaxParsing, AlwaysLatch) {
   auto r = Parse(
       "module m;\n"
       "  always_latch\n"
@@ -54,7 +54,7 @@ TEST(ParserA602, AlwaysLatch) {
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
 }
 
-TEST(ParserA602, AlwaysFF) {
+TEST(ProceduralBlockSyntaxParsing, AlwaysFF) {
   auto r = Parse(
       "module m;\n"
       "  always_ff @(posedge clk)\n"
@@ -67,7 +67,7 @@ TEST(ParserA602, AlwaysFF) {
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
 }
 
-TEST(ParserA602, FinalConstruct) {
+TEST(ProceduralBlockSyntaxParsing, FinalConstruct) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"done\");\n"
@@ -79,7 +79,7 @@ TEST(ParserA602, FinalConstruct) {
   EXPECT_NE(item->body, nullptr);
 }
 
-TEST(ParserA602, BlockingAssignment) {
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment) {
   auto r = Parse(
       "module m;\n"
       "  initial a = 1;\n"
@@ -93,7 +93,7 @@ TEST(ParserA602, BlockingAssignment) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserA602, NonblockingAssignment) {
+TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment) {
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= d; end\n"
@@ -105,7 +105,7 @@ TEST(ParserA602, NonblockingAssignment) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserA602, NonblockingWithIntraDelay) {
+TEST(ProceduralBlockSyntaxParsing, NonblockingWithIntraDelay) {
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= #10 d; end\n"
@@ -118,7 +118,7 @@ TEST(ParserA602, NonblockingWithIntraDelay) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserA602, OperatorAssignment) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a += 3; end\n"
@@ -130,7 +130,7 @@ TEST(ParserA602, OperatorAssignment) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserA602, ProceduralContinuousAssign) {
+TEST(ProceduralBlockSyntaxParsing, ProceduralContinuousAssign) {
   auto r = Parse(
       "module m;\n"
       "  initial begin assign q = d; end\n"
@@ -142,7 +142,7 @@ TEST(ParserA602, ProceduralContinuousAssign) {
   EXPECT_EQ(stmt->kind, StmtKind::kAssign);
 }
 
-TEST(ParserA602, ProceduralDeassign) {
+TEST(ProceduralBlockSyntaxParsing, ProceduralDeassign) {
   auto r = Parse(
       "module m;\n"
       "  initial begin deassign q; end\n"
@@ -154,7 +154,7 @@ TEST(ParserA602, ProceduralDeassign) {
   EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
 }
 
-TEST(ParserA602, ForceStatement) {
+TEST(ProceduralBlockSyntaxParsing, ForceStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin force q = 1; end\n"
@@ -168,7 +168,7 @@ TEST(ParserA602, ForceStatement) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserA602, ReleaseStatement) {
+TEST(ProceduralBlockSyntaxParsing, ReleaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin release q; end\n"
@@ -181,7 +181,7 @@ TEST(ParserA602, ReleaseStatement) {
   EXPECT_NE(stmt->lhs, nullptr);
 }
 
-TEST(ParserA602, IncExpression) {
+TEST(ProceduralBlockSyntaxParsing, IncExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin i++; end\n"
@@ -190,7 +190,7 @@ TEST(ParserA602, IncExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA602, DecExpression) {
+TEST(ProceduralBlockSyntaxParsing, DecExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin i--; end\n"

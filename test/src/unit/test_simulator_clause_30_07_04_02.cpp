@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA701, SpecifyWithShowcancelledSimulates) {
+TEST(SpecifyBlockDeclSim, SpecifyWithShowcancelledSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

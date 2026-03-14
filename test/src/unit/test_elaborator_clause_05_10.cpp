@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause05, Cl5_10_PositionalStructLiteral) {
+TEST(LexicalConventionElaboration, PositionalStructLiteral) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -13,7 +13,7 @@ TEST(ElabClause05, Cl5_10_PositionalStructLiteral) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_10_NamedMemberStructLiteral) {
+TEST(LexicalConventionElaboration, NamedMemberStructLiteral) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -22,7 +22,7 @@ TEST(ElabClause05, Cl5_10_NamedMemberStructLiteral) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_10_DefaultStructLiteral) {
+TEST(LexicalConventionElaboration, DefaultStructLiteral) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -31,7 +31,7 @@ TEST(ElabClause05, Cl5_10_DefaultStructLiteral) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_10_TypePrefixedPattern) {
+TEST(LexicalConventionElaboration, TypePrefixedPattern) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct packed { logic [7:0] x; logic [7:0] y; } pt_t;\n"
@@ -40,7 +40,7 @@ TEST(ElabClause05, Cl5_10_TypePrefixedPattern) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_10_StructLiteralVarInit) {
+TEST(LexicalConventionElaboration, StructLiteralVarInit) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -48,7 +48,7 @@ TEST(ElabClause05, Cl5_10_StructLiteralVarInit) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_10_InvalidMemberName) {
+TEST(LexicalConventionElaboration, InvalidMemberName) {
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -59,7 +59,7 @@ TEST(ElabClause05, Cl5_10_InvalidMemberName) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ElabClause05, Cl5_10_DuplicateMemberKey) {
+TEST(LexicalConventionElaboration, DuplicateMemberKey) {
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"

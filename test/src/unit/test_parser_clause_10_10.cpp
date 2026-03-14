@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection10, UnpackedArrayConcat) {
+TEST(AssignmentParsing, UnpackedArrayConcat) {
   auto r = Parse(
       "module m;\n"
       "  int A[3];\n"
@@ -17,7 +17,7 @@ TEST(ParserSection10, UnpackedArrayConcat) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, UnpackedArrayConcatEmpty) {
+TEST(AssignmentParsing, UnpackedArrayConcatEmpty) {
   auto r = Parse(
       "module m;\n"
       "  int q[$];\n"
@@ -30,7 +30,7 @@ TEST(ParserSection10, UnpackedArrayConcatEmpty) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserSection10, UnpackedArrayConcatNested) {
+TEST(AssignmentParsing, UnpackedArrayConcatNested) {
   auto r = Parse(
       "module m;\n"
       "  int A[2], B[2], C[4];\n"
@@ -42,7 +42,7 @@ TEST(ParserSection10, UnpackedArrayConcatNested) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection7, EmptyConcatClearQueue_Rhs) {
+TEST(AggregateTypeParsing, EmptyConcatClearQueue_Rhs) {
   auto r = Parse(
       "module t;\n"
       "  int q[$];\n"
@@ -56,7 +56,7 @@ TEST(ParserSection7, EmptyConcatClearQueue_Rhs) {
   EXPECT_TRUE(stmt->rhs->elements.empty());
 }
 
-TEST(ParserA81, EmptyUnpackedArrayConcatenation) {
+TEST(ConcatenationParsing, EmptyUnpackedArrayConcatenation) {
   auto r = Parse("module m; initial x = {}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

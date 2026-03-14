@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, Force_Variable) {
+TEST(ProceduralBlockSyntaxParsing, Force_Variable) {
   auto r = Parse(
       "module m;\n"
       "  initial begin force q = 1; end\n"
@@ -19,7 +19,7 @@ TEST(ParserA602, Force_Variable) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserA602, Force_Net) {
+TEST(ProceduralBlockSyntaxParsing, Force_Net) {
   auto r = Parse(
       "module m;\n"
       "  initial begin force net_a = 0; end\n"
@@ -31,7 +31,7 @@ TEST(ParserA602, Force_Net) {
   EXPECT_EQ(stmt->kind, StmtKind::kForce);
 }
 
-TEST(ParserA602, Release_Variable) {
+TEST(ProceduralBlockSyntaxParsing, Release_Variable) {
   auto r = Parse(
       "module m;\n"
       "  initial begin release q; end\n"
@@ -44,7 +44,7 @@ TEST(ParserA602, Release_Variable) {
   EXPECT_NE(stmt->lhs, nullptr);
 }
 
-TEST(ParserA602, Release_Net) {
+TEST(ProceduralBlockSyntaxParsing, Release_Net) {
   auto r = Parse(
       "module m;\n"
       "  initial begin release net_a; end\n"
@@ -56,7 +56,7 @@ TEST(ParserA602, Release_Net) {
   EXPECT_EQ(stmt->kind, StmtKind::kRelease);
 }
 
-TEST(ParserA602, Force_WithConcat) {
+TEST(ProceduralBlockSyntaxParsing, Force_WithConcat) {
   auto r = Parse(
       "module m;\n"
       "  initial begin force {a, b} = 2'b11; end\n"
@@ -69,7 +69,7 @@ TEST(ParserA602, Force_WithConcat) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserA602, Release_WithConcat) {
+TEST(ProceduralBlockSyntaxParsing, Release_WithConcat) {
   auto r = Parse(
       "module m;\n"
       "  initial begin release {a, b}; end\n"
@@ -80,7 +80,7 @@ TEST(ParserA602, Release_WithConcat) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kRelease);
 }
-TEST(ParserSection10, ForceNet) {
+TEST(AssignmentParsing, ForceNet) {
   auto r = Parse(
       "module m;\n"
       "  wire [7:0] bus;\n"
@@ -96,7 +96,7 @@ TEST(ParserSection10, ForceNet) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, ReleaseNet) {
+TEST(AssignmentParsing, ReleaseNet) {
   auto r = Parse(
       "module m;\n"
       "  wire [7:0] bus;\n"
@@ -111,7 +111,7 @@ TEST(ParserSection10, ReleaseNet) {
   ASSERT_NE(stmt->lhs, nullptr);
 }
 
-TEST(ParserA604, StmtItemForceStatement) {
+TEST(StatementSyntaxParsing, StmtItemForceStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -125,7 +125,7 @@ TEST(ParserA604, StmtItemForceStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kForce);
 }
 
-TEST(ParserA604, StmtItemReleaseStatement) {
+TEST(StatementSyntaxParsing, StmtItemReleaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -139,7 +139,7 @@ TEST(ParserA604, StmtItemReleaseStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kRelease);
 }
 
-TEST(ParserSection38, VpiSystemCallForce) {
+TEST(DpiParsing, VpiSystemCallForce) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -150,7 +150,7 @@ TEST(ParserSection38, VpiSystemCallForce) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection38, VpiSystemCallRelease) {
+TEST(DpiParsing, VpiSystemCallRelease) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -161,13 +161,13 @@ TEST(ParserSection38, VpiSystemCallRelease) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA85, VarLvalueForce) {
+TEST(LvalueParsing, VarLvalueForce) {
   auto r = Parse("module m; logic x; initial force x = 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA85, VarLvalueRelease) {
+TEST(LvalueParsing, VarLvalueRelease) {
   auto r = Parse(
       "module m; logic x;\n"
       "  initial begin force x = 1; release x; end\n"

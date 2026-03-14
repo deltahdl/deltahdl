@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA213, DataDeclTypeDeclaration) {
+TEST(TypeDeclParsing, DataDeclTypeDeclaration) {
   auto r = Parse("module m; typedef int my_int_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -12,7 +12,7 @@ TEST(ParserA213, DataDeclTypeDeclaration) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
 }
 
-TEST(ParserA213, PackageImportWildcard) {
+TEST(TypeDeclParsing, PackageImportWildcard) {
   auto r = Parse(
       "package pkg; endpackage\n"
       "module m; import pkg::*; endmodule");
@@ -22,7 +22,7 @@ TEST(ParserA213, PackageImportWildcard) {
   EXPECT_TRUE(item->import_item.is_wildcard);
 }
 
-TEST(ParserA213, PackageImportItemNamed) {
+TEST(TypeDeclParsing, PackageImportItemNamed) {
   auto r = Parse(
       "package pkg; endpackage\n"
       "module m; import pkg::my_func; endmodule");
@@ -34,7 +34,7 @@ TEST(ParserA213, PackageImportItemNamed) {
   EXPECT_FALSE(item->import_item.is_wildcard);
 }
 
-TEST(ParserA213, GenvarDeclSingle) {
+TEST(TypeDeclParsing, GenvarDeclSingle) {
   auto r = Parse("module m; genvar i; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

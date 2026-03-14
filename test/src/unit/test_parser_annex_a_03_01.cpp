@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA303, OutputTerminal_MultipleOutputs) {
+TEST(PrimitiveTerminalParsing, OutputTerminal_MultipleOutputs) {
   auto r = Parse(
       "module m;\n"
       "  buf (o1, o2, o3, in);\n"
@@ -17,7 +17,7 @@ TEST(ParserA303, OutputTerminal_MultipleOutputs) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-TEST(ParserA303, OutputTerminal_PullGate) {
+TEST(PrimitiveTerminalParsing, OutputTerminal_PullGate) {
   auto r = Parse(
       "module m;\n"
       "  pullup (net_a);\n"

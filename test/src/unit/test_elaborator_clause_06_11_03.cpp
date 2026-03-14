@@ -31,7 +31,7 @@ TEST(TypeEval, ImplicitlySignedTypes) {
   }
 }
 
-TEST(SimCh6b, TypeOpByteIsSigned) {
+TEST(TypeOperatorSim, TypeOpByteIsSigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -52,7 +52,7 @@ TEST(SimCh6b, TypeOpByteIsSigned) {
   EXPECT_EQ(var->value.width, 8u);
 }
 
-TEST(SimCh6b, IntDefaultSignedVsUnsignedOverride) {
+TEST(TypeOperatorSim, IntDefaultSignedVsUnsignedOverride) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

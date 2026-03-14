@@ -27,7 +27,7 @@ TEST(ConstEval, Power) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("3 ** 0", f)), 1);
 }
 
-TEST(ElabA83, BinaryExprInInitialElaborates) {
+TEST(ExpressionElaboration, BinaryExprInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -39,7 +39,7 @@ TEST(ElabA83, BinaryExprInInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, UnaryPlusElaborates) {
+TEST(OperatorElaboration, UnaryPlusElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -51,7 +51,7 @@ TEST(ElabA86, UnaryPlusElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, UnaryMinusElaborates) {
+TEST(OperatorElaboration, UnaryMinusElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -63,7 +63,7 @@ TEST(ElabA86, UnaryMinusElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, BinaryAddElaborates) {
+TEST(OperatorElaboration, BinaryAddElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -75,7 +75,7 @@ TEST(ElabA86, BinaryAddElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, BinaryDivElaborates) {
+TEST(OperatorElaboration, BinaryDivElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -87,7 +87,7 @@ TEST(ElabA86, BinaryDivElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, BinaryModElaborates) {
+TEST(OperatorElaboration, BinaryModElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -99,7 +99,7 @@ TEST(ElabA86, BinaryModElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, BinaryPowerElaborates) {
+TEST(OperatorElaboration, BinaryPowerElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -111,7 +111,7 @@ TEST(ElabA86, BinaryPowerElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh9, AlwaysCombAddSub) {
+TEST(AlwaysCombBasicSim, AlwaysCombAddSub) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -135,7 +135,7 @@ TEST(SimCh9, AlwaysCombAddSub) {
   EXPECT_EQ(var->value.ToUint64(), 63u);
 }
 
-TEST(SimCh9b, AlwaysCombSubtraction) {
+TEST(AlwaysCombExtendedSim, AlwaysCombSubtraction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -159,7 +159,7 @@ TEST(SimCh9b, AlwaysCombSubtraction) {
   EXPECT_EQ(y->value.ToUint64(), 0x40u);
 }
 
-TEST(SimCh9b, AlwaysCombMultiplication) {
+TEST(AlwaysCombExtendedSim, AlwaysCombMultiplication) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -183,7 +183,7 @@ TEST(SimCh9b, AlwaysCombMultiplication) {
   EXPECT_EQ(y->value.ToUint64(), 42u);
 }
 
-TEST(SimCh10, BlockingAssignArithmeticOps) {
+TEST(BlockingAssignSim, BlockingAssignArithmeticOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -216,7 +216,7 @@ TEST(SimCh10, BlockingAssignArithmeticOps) {
   EXPECT_EQ(r_div->value.ToUint64(), 3u);
 }
 
-TEST(SimCh10, BlockingAssignModulo) {
+TEST(BlockingAssignSim, BlockingAssignModulo) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -238,7 +238,7 @@ TEST(SimCh10, BlockingAssignModulo) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(SimCh10, BlockingAssignUnaryPlus) {
+TEST(BlockingAssignSim, BlockingAssignUnaryPlus) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

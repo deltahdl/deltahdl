@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, ProceduralContinuous_AllForms) {
+TEST(ProceduralBlockSyntaxParsing, ProceduralContinuous_AllForms) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

@@ -7,7 +7,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserClause03, Cl3_14_3_SingleModuleTimeunitSlash) {
+TEST(DesignBuildingBlockParsing, SingleModuleTimeunitSlash) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "  timeunit 1us / 1ps;\n"
@@ -18,7 +18,7 @@ TEST(ParserClause03, Cl3_14_3_SingleModuleTimeunitSlash) {
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
 
-TEST(ParserSection23, TimeunitDecl) {
+TEST(ModuleAndHierarchyParsing, TimeunitDecl) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -27,7 +27,7 @@ TEST(ParserSection23, TimeunitDecl) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-TEST(ParserSection23, TimeprecisionDecl) {
+TEST(ModuleAndHierarchyParsing, TimeprecisionDecl) {
   auto r = Parse(
       "module m;\n"
       "  timeprecision 1ps;\n"
@@ -36,7 +36,7 @@ TEST(ParserSection23, TimeprecisionDecl) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-TEST(ParserSection23, TimeunitAndTimeprecision) {
+TEST(ModuleAndHierarchyParsing, TimeunitAndTimeprecision) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -58,7 +58,7 @@ TEST(SourceText, ProgramTimeunitsDecl) {
   EXPECT_EQ(r.cu->programs[0]->name, "prg");
 }
 
-TEST(ParserClause03, Cl3_14_2_KeywordsSetUnitAndPrecision) {
+TEST(DesignBuildingBlockParsing, KeywordsSetUnitAndPrecision) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -73,7 +73,7 @@ TEST(ParserClause03, Cl3_14_2_KeywordsSetUnitAndPrecision) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_2_TimeunitSlashCombinesBoth) {
+TEST(DesignBuildingBlockParsing, TimeunitSlashCombinesBoth) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "  timeunit 1ns / 1ps;\n"
@@ -87,7 +87,7 @@ TEST(ParserClause03, Cl3_14_2_TimeunitSlashCombinesBoth) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_2_TimeunitAllSixUnits) {
+TEST(DesignBuildingBlockParsing, TimeunitAllSixUnits) {
   auto r_s = ParseTimescale31402("module m; timeunit 1s; endmodule\n");
   EXPECT_EQ(r_s.cu->modules[0]->time_unit, TimeUnit::kS);
   auto r_ms = ParseTimescale31402("module m; timeunit 1ms; endmodule\n");
@@ -102,7 +102,7 @@ TEST(ParserClause03, Cl3_14_2_TimeunitAllSixUnits) {
   EXPECT_EQ(r_fs.cu->modules[0]->time_unit, TimeUnit::kFs);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_TimeunitSetsUnit) {
+TEST(DesignBuildingBlockParsing, TimeunitSetsUnit) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -114,7 +114,7 @@ TEST(ParserClause03, Cl3_14_2_2_TimeunitSetsUnit) {
   EXPECT_EQ(mod->time_unit, TimeUnit::kNs);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_TimeprecisionSetsPrecision) {
+TEST(DesignBuildingBlockParsing, TimeprecisionSetsPrecision) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "  timeprecision 1ps;\n"
@@ -126,7 +126,7 @@ TEST(ParserClause03, Cl3_14_2_2_TimeprecisionSetsPrecision) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_TimeunitSlashSetsBoth) {
+TEST(DesignBuildingBlockParsing, TimeunitSlashSetsBoth) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "  timeunit 100ps / 10fs;\n"
@@ -140,7 +140,7 @@ TEST(ParserClause03, Cl3_14_2_2_TimeunitSlashSetsBoth) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kFs);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_LrmExampleD) {
+TEST(DesignBuildingBlockParsing, LrmExampleD) {
   auto r = ParseTimescale31402(
       "module D;\n"
       "  timeunit 100ps;\n"
@@ -155,7 +155,7 @@ TEST(ParserClause03, Cl3_14_2_2_LrmExampleD) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kFs);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_LrmExampleE) {
+TEST(DesignBuildingBlockParsing, LrmExampleE) {
   auto r = ParseTimescale31402(
       "module E;\n"
       "  timeunit 100ps / 10fs;\n"
@@ -169,7 +169,7 @@ TEST(ParserClause03, Cl3_14_2_2_LrmExampleE) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kFs);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_RemovesFileOrderDependency) {
+TEST(DesignBuildingBlockParsing, RemovesFileOrderDependency) {
   auto r1 = ParseTimescale31402(
       "`timescale 1us / 1ns\n"
       "module m;\n"
@@ -188,7 +188,7 @@ TEST(ParserClause03, Cl3_14_2_2_RemovesFileOrderDependency) {
   EXPECT_EQ(r1.cu->modules[0]->time_prec, TimeUnit::kFs);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_DefinesTimeScope) {
+TEST(DesignBuildingBlockParsing, DefinesTimeScope) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -199,7 +199,7 @@ TEST(ParserClause03, Cl3_14_2_2_DefinesTimeScope) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_WorksInInterface) {
+TEST(DesignBuildingBlockParsing, WorksInInterface) {
   auto r = ParseTimescale31402(
       "interface ifc;\n"
       "  timeunit 1us;\n"
@@ -215,7 +215,7 @@ TEST(ParserClause03, Cl3_14_2_2_WorksInInterface) {
   EXPECT_EQ(ifc->time_prec, TimeUnit::kNs);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_WorksInProgram) {
+TEST(DesignBuildingBlockParsing, WorksInProgram) {
   auto r = ParseTimescale31402(
       "program p;\n"
       "  timeunit 10ns;\n"
@@ -231,7 +231,7 @@ TEST(ParserClause03, Cl3_14_2_2_WorksInProgram) {
   EXPECT_EQ(prog->time_prec, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_AllThreeMagnitudes) {
+TEST(DesignBuildingBlockParsing, AllThreeMagnitudes) {
   EXPECT_FALSE(
       ParseTimescale31402("module m; timeunit 1ns; endmodule").has_errors);
   EXPECT_FALSE(
@@ -247,7 +247,7 @@ TEST(ParserClause03, Cl3_14_2_2_AllThreeMagnitudes) {
                    .has_errors);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_TimeunitAloneNoPrec) {
+TEST(DesignBuildingBlockParsing, TimeunitAloneNoPrec) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -257,7 +257,7 @@ TEST(ParserClause03, Cl3_14_2_2_TimeunitAloneNoPrec) {
   EXPECT_FALSE(r.cu->modules[0]->has_timeprecision);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_TimeprecisionAloneNoUnit) {
+TEST(DesignBuildingBlockParsing, TimeprecisionAloneNoUnit) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "  timeprecision 1ps;\n"
@@ -267,7 +267,7 @@ TEST(ParserClause03, Cl3_14_2_2_TimeprecisionAloneNoUnit) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_PrecedeOtherItems) {
+TEST(DesignBuildingBlockParsing, PrecedeOtherItems) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -279,7 +279,7 @@ TEST(ParserClause03, Cl3_14_2_2_PrecedeOtherItems) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_RepeatMatchingDeclaration) {
+TEST(DesignBuildingBlockParsing, RepeatMatchingDeclaration) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -295,7 +295,7 @@ TEST(ParserClause03, Cl3_14_2_2_RepeatMatchingDeclaration) {
   EXPECT_EQ(r.cu->modules[0]->time_prec, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_2_2_SeparateModulesIndependentScope) {
+TEST(DesignBuildingBlockParsing, SeparateModulesIndependentScope) {
   auto r = ParseTimescale31402(
       "module a;\n"
       "  timeunit 1ns;\n"
@@ -348,7 +348,7 @@ TEST(SourceText, TimeunitAndTimeprecisionSeparate) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_CUTimeunitSlashSyntax) {
+TEST(DesignBuildingBlockParsing, CUTimeunitSlashSyntax) {
   auto r = ParseTimescale31402(
       "timeunit 100ps / 10fs;\n"
       "module m;\n"

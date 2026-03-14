@@ -16,7 +16,7 @@ static Variable* RunAndFind(const std::string& src, SimFixture& f,
   return f.ctx.FindVariable(var_name);
 }
 
-TEST(SimCh13, VirtualClassIsAbstract) {
+TEST(ParameterizedClassSim, VirtualClassIsAbstract) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -34,7 +34,7 @@ TEST(SimCh13, VirtualClassIsAbstract) {
   EXPECT_TRUE(info->is_abstract);
 }
 
-TEST(SimCh13, ClassParamsPreserved) {
+TEST(ParameterizedClassSim, ClassParamsPreserved) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -55,7 +55,7 @@ TEST(SimCh13, ClassParamsPreserved) {
   EXPECT_EQ(info->decl->params[1].first, "B");
 }
 
-TEST(SimCh13, StaticMethodRegistered) {
+TEST(ParameterizedClassSim, StaticMethodRegistered) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -75,7 +75,7 @@ TEST(SimCh13, StaticMethodRegistered) {
   EXPECT_TRUE(it->second->is_static);
 }
 
-TEST(SimCh13, MultipleStaticMethodsRegistered) {
+TEST(ParameterizedClassSim, MultipleStaticMethodsRegistered) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -95,7 +95,7 @@ TEST(SimCh13, MultipleStaticMethodsRegistered) {
   EXPECT_NE(info->methods.find("beta"), info->methods.end());
 }
 
-TEST(SimCh13, NonVirtualParameterizedClass) {
+TEST(ParameterizedClassSim, NonVirtualParameterizedClass) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -114,7 +114,7 @@ TEST(SimCh13, NonVirtualParameterizedClass) {
   EXPECT_NE(info->methods.find("get_w"), info->methods.end());
 }
 
-TEST(SimCh13, SimpleParameterReturn) {
+TEST(ParameterizedClassSim, SimpleParameterReturn) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -129,7 +129,7 @@ TEST(SimCh13, SimpleParameterReturn) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-TEST(SimCh13, DefaultParameterValue) {
+TEST(ParameterizedClassSim, DefaultParameterValue) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -145,7 +145,7 @@ TEST(SimCh13, DefaultParameterValue) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(SimCh13, DefaultParamClog2) {
+TEST(ParameterizedClassSim, DefaultParamClog2) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -164,7 +164,7 @@ TEST(SimCh13, DefaultParamClog2) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimCh13, MultipleSpecializations) {
+TEST(ParameterizedClassSim, MultipleSpecializations) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -191,7 +191,7 @@ TEST(SimCh13, MultipleSpecializations) {
   EXPECT_EQ(r2->value.ToUint64(), 32u);
 }
 
-TEST(SimCh13, TwoParametersExplicit) {
+TEST(ParameterizedClassSim, TwoParametersExplicit) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -206,7 +206,7 @@ TEST(SimCh13, TwoParametersExplicit) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-TEST(SimCh13, ParameterArithmetic) {
+TEST(ParameterizedClassSim, ParameterArithmetic) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -221,7 +221,7 @@ TEST(SimCh13, ParameterArithmetic) {
   EXPECT_EQ(var->value.ToUint64(), 14u);
 }
 
-TEST(SimCh13, ParameterBitmask) {
+TEST(ParameterizedClassSim, ParameterBitmask) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -239,7 +239,7 @@ TEST(SimCh13, ParameterBitmask) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-TEST(SimCh13, ParameterIfElse) {
+TEST(ParameterizedClassSim, ParameterIfElse) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -258,7 +258,7 @@ TEST(SimCh13, ParameterIfElse) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(SimCh13, MethodWithInputArg) {
+TEST(ParameterizedClassSim, MethodWithInputArg) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -276,7 +276,7 @@ TEST(SimCh13, MethodWithInputArg) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-TEST(SimCh13, MethodWithTwoArgs) {
+TEST(ParameterizedClassSim, MethodWithTwoArgs) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -294,7 +294,7 @@ TEST(SimCh13, MethodWithTwoArgs) {
   EXPECT_EQ(var->value.ToUint64(), 17u);
 }
 
-TEST(SimCh13, TwoMethodsSameClass) {
+TEST(ParameterizedClassSim, TwoMethodsSameClass) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -324,7 +324,7 @@ TEST(SimCh13, TwoMethodsSameClass) {
   EXPECT_EQ(r2->value.ToUint64(), 11u);
 }
 
-TEST(SimCh13, ContinuousAssignCall) {
+TEST(ParameterizedClassSim, ContinuousAssignCall) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -339,7 +339,7 @@ TEST(SimCh13, ContinuousAssignCall) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimCh13, AlwaysCombCall) {
+TEST(ParameterizedClassSim, AlwaysCombCall) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -354,7 +354,7 @@ TEST(SimCh13, AlwaysCombCall) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimCh13, DifferentSpecsDifferentResults) {
+TEST(ParameterizedClassSim, DifferentSpecsDifferentResults) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -383,7 +383,7 @@ TEST(SimCh13, DifferentSpecsDifferentResults) {
   EXPECT_EQ(r8->value.ToUint64(), 255u);
 }
 
-TEST(SimCh13, ParameterSubtract) {
+TEST(ParameterizedClassSim, ParameterSubtract) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -400,7 +400,7 @@ TEST(SimCh13, ParameterSubtract) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-TEST(SimCh13, ChainedParamExpr) {
+TEST(ParameterizedClassSim, ChainedParamExpr) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -418,7 +418,7 @@ TEST(SimCh13, ChainedParamExpr) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-TEST(SimCh13, ParameterShift) {
+TEST(ParameterizedClassSim, ParameterShift) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -436,7 +436,7 @@ TEST(SimCh13, ParameterShift) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-TEST(SimCh13, MultipleCallsSameSpec) {
+TEST(ParameterizedClassSim, MultipleCallsSameSpec) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -465,7 +465,7 @@ TEST(SimCh13, MultipleCallsSameSpec) {
   EXPECT_EQ(r2->value.ToUint64(), 12u);
 }
 
-TEST(SimCh13, ZeroParamValue) {
+TEST(ParameterizedClassSim, ZeroParamValue) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -480,7 +480,7 @@ TEST(SimCh13, ZeroParamValue) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimCh13, ParameterNestedIf) {
+TEST(ParameterizedClassSim, ParameterNestedIf) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -505,7 +505,7 @@ TEST(SimCh13, ParameterNestedIf) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-TEST(SimCh13, ForLoopWithParam) {
+TEST(ParameterizedClassSim, ForLoopWithParam) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -525,7 +525,7 @@ TEST(SimCh13, ForLoopWithParam) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-TEST(SimCh13, ForLoopDifferentSpecs) {
+TEST(ParameterizedClassSim, ForLoopDifferentSpecs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -556,7 +556,7 @@ TEST(SimCh13, ForLoopDifferentSpecs) {
   EXPECT_EQ(r4->value.ToUint64(), 10u);
 }
 
-TEST(SimCh13, DecoderFunction) {
+TEST(ParameterizedClassSim, DecoderFunction) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -576,7 +576,7 @@ TEST(SimCh13, DecoderFunction) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-TEST(SimCh13, EncoderFunction) {
+TEST(ParameterizedClassSim, EncoderFunction) {
   SimFixture f;
   auto* var = RunAndFind(
       "module t;\n"
@@ -599,7 +599,7 @@ TEST(SimCh13, EncoderFunction) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-TEST(SimCh13, EncoderDecoderSameClass) {
+TEST(ParameterizedClassSim, EncoderDecoderSameClass) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -635,7 +635,7 @@ TEST(SimCh13, EncoderDecoderSameClass) {
   EXPECT_EQ(dec->value.ToUint64(), 8u);
 }
 
-TEST(SimCh13, ParserPreservesParams) {
+TEST(ParameterizedClassSim, ParserPreservesParams) {
   SimFixture f;
   auto fid = f.mgr.AddFile("<test>",
                            "module t;\n"

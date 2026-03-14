@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA213, LifetimeStaticInBlock) {
+TEST(TypeDeclParsing, LifetimeStaticInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -17,7 +17,7 @@ TEST(ParserA213, LifetimeStaticInBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA213, LifetimeAutomaticInBlock) {
+TEST(TypeDeclParsing, LifetimeAutomaticInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -28,7 +28,7 @@ TEST(ParserA213, LifetimeAutomaticInBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA28, DataDeclAutomaticInBlock) {
+TEST(BlockItemDeclParsing, DataDeclAutomaticInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -43,7 +43,7 @@ TEST(ParserA28, DataDeclAutomaticInBlock) {
   EXPECT_EQ(body->stmts[0]->var_is_automatic, true);
 }
 
-TEST(ParserA28, DataDeclStaticInBlock) {
+TEST(BlockItemDeclParsing, DataDeclStaticInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -58,7 +58,7 @@ TEST(ParserA28, DataDeclStaticInBlock) {
   EXPECT_EQ(body->stmts[0]->var_is_static, true);
 }
 
-TEST(ParserA603, SeqBlockWithAutomaticVar) {
+TEST(BlockStatementSyntaxParsing, SeqBlockWithAutomaticVar) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -75,7 +75,7 @@ TEST(ParserA603, SeqBlockWithAutomaticVar) {
   EXPECT_TRUE(body->stmts[0]->var_is_automatic);
 }
 
-TEST(ParserSection4, Sec4_9_4_VarDeclWithAssignInBlock) {
+TEST(SchedulingSemanticsParsing, VarDeclWithAssignInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -94,7 +94,7 @@ TEST(ParserSection4, Sec4_9_4_VarDeclWithAssignInBlock) {
   EXPECT_EQ(stmt->var_init->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection4, Sec4_9_4_StaticVarComplexInit) {
+TEST(SchedulingSemanticsParsing, StaticVarComplexInit) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int calc();\n"
@@ -115,7 +115,7 @@ TEST(ParserSection4, Sec4_9_4_StaticVarComplexInit) {
   EXPECT_EQ(var_stmt->var_init->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection4, Sec4_9_4_BlockVarDeclNoLifetime) {
+TEST(SchedulingSemanticsParsing, BlockVarDeclNoLifetime) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -134,7 +134,7 @@ TEST(ParserSection4, Sec4_9_4_BlockVarDeclNoLifetime) {
   EXPECT_NE(stmt->var_init, nullptr);
 }
 
-TEST(ParserSection6, Sec6_21_LifetimeAutomaticAndStatic) {
+TEST(DataTypeParsing, LifetimeAutomaticAndStatic) {
   EXPECT_TRUE(ParseOk("module automatic m; endmodule\n"));
   EXPECT_TRUE(ParseOk("module static m; endmodule\n"));
   auto fa = Parse(
@@ -185,7 +185,7 @@ TEST(ParserSection6, Sec6_21_LifetimeAutomaticAndStatic) {
               "endprogram\n"));
 }
 
-TEST(ParserSection9, Sec9_3_1_AutomaticVarDeclInBlock) {
+TEST(ProcessParsing, AutomaticVarDeclInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -205,7 +205,7 @@ TEST(ParserSection9, Sec9_3_1_AutomaticVarDeclInBlock) {
   EXPECT_NE(body->stmts[0]->var_init, nullptr);
 }
 
-TEST(ParserSection4, Sec4_6_AutomaticVarInitPerEntry) {
+TEST(SchedulingSemanticsParsing, AutomaticVarInitPerEntry) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -220,7 +220,7 @@ TEST(ParserSection4, Sec4_6_AutomaticVarInitPerEntry) {
   EXPECT_TRUE(stmt->var_is_automatic);
   EXPECT_NE(stmt->var_init, nullptr);
 }
-TEST(ParserSection9c, AutomaticVarDeclInBlock) {
+TEST(ProcessTimingAndControlParsing, AutomaticVarDeclInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -237,7 +237,7 @@ TEST(ParserSection9c, AutomaticVarDeclInBlock) {
   EXPECT_TRUE(body->stmts[0]->var_is_automatic);
 }
 
-TEST(ParserSection4, Sec4_9_4_StaticVarInBeginEnd) {
+TEST(SchedulingSemanticsParsing, StaticVarInBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -255,7 +255,7 @@ TEST(ParserSection4, Sec4_9_4_StaticVarInBeginEnd) {
   EXPECT_EQ(stmt->var_name, "counter");
 }
 
-TEST(ParserSection4, Sec4_9_4_AutoVarInBeginEnd) {
+TEST(SchedulingSemanticsParsing, AutoVarInBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -280,7 +280,7 @@ TEST_F(ProgramParseTest, ProgramWithAutomaticLifetime) {
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
 
-TEST(ParserSection6, Sec6_11_StaticLifetimeInt) {
+TEST(DataTypeParsing, StaticLifetimeInt) {
   auto r = Parse(
       "module t;\n"
       "  function automatic int count();\n"
@@ -293,7 +293,7 @@ TEST(ParserSection6, Sec6_11_StaticLifetimeInt) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, Sec6_11_AutomaticLifetimeInt) {
+TEST(DataTypeParsing, AutomaticLifetimeInt) {
   auto r = Parse(
       "module t;\n"
       "  function static int get_temp();\n"
@@ -305,7 +305,7 @@ TEST(ParserSection6, Sec6_11_AutomaticLifetimeInt) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, BlockVarDecl_Automatic) {
+TEST(DataTypeParsing, BlockVarDecl_Automatic) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -319,7 +319,7 @@ TEST(ParserSection6, BlockVarDecl_Automatic) {
   EXPECT_TRUE(stmt->var_is_automatic);
 }
 
-TEST(ParserSection6, BlockVarDecl_Automatic_Props) {
+TEST(DataTypeParsing, BlockVarDecl_Automatic_Props) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -333,7 +333,7 @@ TEST(ParserSection6, BlockVarDecl_Automatic_Props) {
   EXPECT_EQ(stmt->var_name, "auto1");
 }
 
-TEST(ParserSection6, BlockVarDecl_Static) {
+TEST(DataTypeParsing, BlockVarDecl_Static) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -347,7 +347,7 @@ TEST(ParserSection6, BlockVarDecl_Static) {
   EXPECT_TRUE(stmt->var_is_static);
 }
 
-TEST(ParserSection6, BlockVarDecl_Static_Props) {
+TEST(DataTypeParsing, BlockVarDecl_Static_Props) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -361,7 +361,7 @@ TEST(ParserSection6, BlockVarDecl_Static_Props) {
   EXPECT_EQ(stmt->var_name, "st2");
 }
 
-TEST(ParserSection6, BlockVarDecl_AutomaticWithInit) {
+TEST(DataTypeParsing, BlockVarDecl_AutomaticWithInit) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -376,7 +376,7 @@ TEST(ParserSection6, BlockVarDecl_AutomaticWithInit) {
   ASSERT_NE(stmt->var_init, nullptr);
 }
 
-TEST(ParserSection6, BlockVarDecl_StaticVar) {
+TEST(DataTypeParsing, BlockVarDecl_StaticVar) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
                "  initial begin\n"
@@ -385,7 +385,7 @@ TEST(ParserSection6, BlockVarDecl_StaticVar) {
                "endmodule\n"));
 }
 
-TEST(ParserSection6, AutomaticVarDecl) {
+TEST(DataTypeParsing, AutomaticVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  function automatic int get_val();\n"
@@ -399,7 +399,7 @@ TEST(ParserSection6, AutomaticVarDecl) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-TEST(ParserSection4, Sec4_9_4_StaticVarInInitialBlock) {
+TEST(SchedulingSemanticsParsing, StaticVarInInitialBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -416,7 +416,7 @@ TEST(ParserSection4, Sec4_9_4_StaticVarInInitialBlock) {
   EXPECT_NE(stmt->var_init, nullptr);
 }
 
-TEST(ParserSection4, Sec4_9_4_ProgramBlockVarAutoDefault) {
+TEST(SchedulingSemanticsParsing, ProgramBlockVarAutoDefault) {
   auto r = Parse(
       "program p;\n"
       "  initial begin\n"
@@ -441,7 +441,7 @@ static ModuleItem* FirstFuncOrTask(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection4, Sec4_9_4_MultipleStaticVarsInFunc) {
+TEST(SchedulingSemanticsParsing, MultipleStaticVarsInFunc) {
   auto r = Parse(
       "module m;\n"
       "  function automatic void multi_static();\n"
@@ -471,7 +471,7 @@ TEST(ParserSection4, Sec4_9_4_MultipleStaticVarsInFunc) {
   EXPECT_EQ(fn->func_body_stmts[2]->var_name, "c");
 }
 
-TEST(ParserSection4, Sec4_9_4_MultipleAutoVarsInFunc) {
+TEST(SchedulingSemanticsParsing, MultipleAutoVarsInFunc) {
   auto r = Parse(
       "module m;\n"
       "  function static void multi_auto(int x);\n"
@@ -494,7 +494,7 @@ TEST(ParserSection4, Sec4_9_4_MultipleAutoVarsInFunc) {
   EXPECT_EQ(fn->func_body_stmts[1]->var_name, "q");
 }
 
-TEST(ParserSection4, Sec4_9_4_MixedStaticAutoInBlock) {
+TEST(SchedulingSemanticsParsing, MixedStaticAutoInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -516,7 +516,7 @@ TEST(ParserSection4, Sec4_9_4_MixedStaticAutoInBlock) {
   EXPECT_EQ(body->stmts[1]->var_name, "scratch");
 }
 
-TEST(ParserSection4, Sec4_9_4_StaticVarPackedDims) {
+TEST(SchedulingSemanticsParsing, StaticVarPackedDims) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -534,7 +534,7 @@ TEST(ParserSection4, Sec4_9_4_StaticVarPackedDims) {
   EXPECT_NE(stmt->var_decl_type.packed_dim_right, nullptr);
 }
 
-TEST(ParserSection4, Sec4_9_4_VarInNestedBeginEnd) {
+TEST(SchedulingSemanticsParsing, VarInNestedBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -562,7 +562,7 @@ static ClassMember* FindClassMethod(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection4, Sec4_9_4_StaticVarInClassMethod) {
+TEST(SchedulingSemanticsParsing, StaticVarInClassMethod) {
   auto r = Parse(
       "class Counter;\n"
       "  function int next();\n"
@@ -584,7 +584,7 @@ TEST(ParserSection4, Sec4_9_4_StaticVarInClassMethod) {
   EXPECT_TRUE(method_member->method->func_body_stmts[0]->var_is_static);
 }
 
-TEST(ParserSection4, Sec4_9_4_AutoVarInClassMethod) {
+TEST(SchedulingSemanticsParsing, AutoVarInClassMethod) {
   auto r = Parse(
       "class Worker;\n"
       "  task run();\n"
@@ -610,7 +610,7 @@ static Stmt* FirstBodyStmt(ModuleItem* item) {
   return item->func_body_stmts[0];
 }
 
-TEST(ParserSection4, Sec4_9_3_AutoVarInStaticFunc) {
+TEST(SchedulingSemanticsParsing, AutoVarInStaticFunc) {
   auto r = Parse(
       "module m;\n"
       "  function static int process(int x);\n"
@@ -631,7 +631,7 @@ TEST(ParserSection4, Sec4_9_3_AutoVarInStaticFunc) {
   EXPECT_FALSE(var_stmt->var_is_static);
 }
 
-TEST(ParserSection4, Sec4_9_3_StaticVarInAutoFunc) {
+TEST(SchedulingSemanticsParsing, StaticVarInAutoFunc) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int accumulate(int x);\n"
@@ -654,7 +654,7 @@ TEST(ParserSection4, Sec4_9_3_StaticVarInAutoFunc) {
   EXPECT_NE(var_stmt->var_init, nullptr);
 }
 
-TEST(ParserSection6, VarInUnnamedBlockVisibleToNested) {
+TEST(DataTypeParsing, VarInUnnamedBlockVisibleToNested) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -668,7 +668,7 @@ TEST(ParserSection6, VarInUnnamedBlockVisibleToNested) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, CuScopeFuncStaticDefault) {
+TEST(DataTypeParsing, CuScopeFuncStaticDefault) {
   auto r = Parse(
       "function int global_fn(int x);\n"
       "  return x + 1;\n"
@@ -680,7 +680,7 @@ TEST(ParserSection6, CuScopeFuncStaticDefault) {
   EXPECT_FALSE(r.cu->cu_items[0]->is_automatic);
 }
 
-TEST(ParserSection6, TaskAutomaticLifetime) {
+TEST(DataTypeParsing, TaskAutomaticLifetime) {
   auto r = Parse(
       "module m;\n"
       "  task automatic my_task(input int x);\n"

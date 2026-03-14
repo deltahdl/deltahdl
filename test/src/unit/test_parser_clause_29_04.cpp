@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A5UdpCombinational) {
+TEST(FormalSyntaxParsing, UdpCombinational) {
   auto r = Parse(
       "primitive mux2(output y, input a, input b, input s);\n"
       "  table\n"
@@ -25,7 +25,7 @@ TEST(ParserAnnexA, A5UdpCombinational) {
   EXPECT_FALSE(r.cu->udps[0]->is_sequential);
 }
 
-TEST(ParserAnnexA051, AnsiCombinational) {
+TEST(UdpDeclGrammar, AnsiCombinational) {
   auto r = Parse(
       "primitive and_gate(output out, input a, input b);\n"
       "  table\n"
@@ -48,7 +48,7 @@ TEST(ParserAnnexA051, AnsiCombinational) {
   ASSERT_EQ(udp->table.size(), 4u);
 }
 
-TEST(ParserAnnexA051, MultipleUdps) {
+TEST(UdpDeclGrammar, MultipleUdps) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table\n"
@@ -69,7 +69,7 @@ TEST(ParserAnnexA051, MultipleUdps) {
   EXPECT_EQ(r.cu->udps[1]->name, "buf2");
 }
 
-TEST(ParserAnnexA051, SingleInput) {
+TEST(UdpDeclGrammar, SingleInput) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table\n"
@@ -89,7 +89,7 @@ TEST(ParserAnnexA051, SingleInput) {
   EXPECT_EQ(udp->table[0].output, '1');
 }
 
-TEST(ParserAnnexA051, SimCombinationalEval) {
+TEST(UdpDeclGrammar, SimCombinationalEval) {
   auto r = Parse(
       "primitive and_gate(output out, input a, input b);\n"
       "  table\n"
@@ -110,7 +110,7 @@ TEST(ParserAnnexA051, SimCombinationalEval) {
   EXPECT_EQ(state.Evaluate({'1', '1'}), '1');
 }
 
-TEST(ParserAnnexA053, UdpBody_CombinationalAlternative) {
+TEST(UdpBodyGrammar, UdpBody_CombinationalAlternative) {
   auto r = Parse(
       "primitive and_gate(output y, input a, b);\n"
       "  table\n"
@@ -128,7 +128,7 @@ TEST(ParserAnnexA053, UdpBody_CombinationalAlternative) {
   EXPECT_EQ(udp->table.size(), 4);
 }
 
-TEST(ParserAnnexA053, UdpBody_SimCombinational) {
+TEST(UdpBodyGrammar, UdpBody_SimCombinational) {
   auto r = Parse(
       "primitive or_gate(output y, input a, b);\n"
       "  table\n"
@@ -147,7 +147,7 @@ TEST(ParserAnnexA053, UdpBody_SimCombinational) {
   EXPECT_EQ(eval.Evaluate({'1', '1'}), '1');
 }
 
-TEST(ParserAnnexA053, CombBody_SingleEntry) {
+TEST(UdpBodyGrammar, CombBody_SingleEntry) {
   auto r = Parse(
       "primitive buf_prim(output y, input a);\n"
       "  table\n"
@@ -161,7 +161,7 @@ TEST(ParserAnnexA053, CombBody_SingleEntry) {
   EXPECT_EQ(udp->table.size(), 1);
 }
 
-TEST(ParserAnnexA053, CombBody_MultipleEntries) {
+TEST(UdpBodyGrammar, CombBody_MultipleEntries) {
   auto r = Parse(
       "primitive xor_gate(output y, input a, b);\n"
       "  table\n"
@@ -177,7 +177,7 @@ TEST(ParserAnnexA053, CombBody_MultipleEntries) {
   EXPECT_EQ(udp->table.size(), 4);
 }
 
-TEST(ParserAnnexA053, CombBody_SimFirstMatch) {
+TEST(UdpBodyGrammar, CombBody_SimFirstMatch) {
   auto r = Parse(
       "primitive nand_gate(output y, input a, b);\n"
       "  table\n"
@@ -195,7 +195,7 @@ TEST(ParserAnnexA053, CombBody_SimFirstMatch) {
   EXPECT_EQ(eval.Evaluate({'1', '1'}), '0');
 }
 
-TEST(ParserAnnexA053, CombEntry_Structure) {
+TEST(UdpBodyGrammar, CombEntry_Structure) {
   auto r = Parse(
       "primitive buf_prim(output y, input a);\n"
       "  table\n"
@@ -247,7 +247,7 @@ static void VerifyUdpInputNames(const UdpDecl* udp,
   }
 }
 
-TEST(ParserSection29, CombinationalUdp) {
+TEST(UserDefinedPrimitiveParsing, CombinationalUdp) {
   auto r = Parse(
       "primitive mux(output out, input a, b, sel);\n"
       "  table\n"
@@ -271,7 +271,7 @@ TEST(ParserSection29, CombinationalUdp) {
   EXPECT_EQ(udp->table[0].current_state, 0);
 }
 
-TEST(ParserClause03, Cl3_7_CombinationalUdp) {
+TEST(DesignBuildingBlockParsing, CombinationalUdp) {
   auto r = Parse(
       "primitive udp_or (output out, input a, b);\n"
       "  table\n"
@@ -296,7 +296,7 @@ TEST(ParserClause03, Cl3_7_CombinationalUdp) {
   EXPECT_EQ(udp->table[3].output, '1');
 }
 
-TEST(ParserSection29, UdpMultiple) {
+TEST(UserDefinedPrimitiveParsing, UdpMultiple) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table\n"

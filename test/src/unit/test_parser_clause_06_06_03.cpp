@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, Sec6_7_1_WandDecl) {
+TEST(DataTypeParsing, WandDecl) {
   auto r = Parse(
       "module t;\n"
       "  wand w;\n"
@@ -20,7 +20,7 @@ TEST(ParserSection6, Sec6_7_1_WandDecl) {
   EXPECT_EQ(item->name, "w");
 }
 
-TEST(ParserSection6, Sec6_7_1_WorDecl) {
+TEST(DataTypeParsing, WorDecl) {
   auto r = Parse(
       "module t;\n"
       "  wor w;\n"
@@ -35,7 +35,7 @@ TEST(ParserSection6, Sec6_7_1_WorDecl) {
   EXPECT_EQ(item->name, "w");
 }
 
-TEST(ParserSection6, Sec6_7_1_TriandDecl) {
+TEST(DataTypeParsing, TriandDecl) {
   auto r = Parse(
       "module t;\n"
       "  triand ta;\n"
@@ -49,7 +49,7 @@ TEST(ParserSection6, Sec6_7_1_TriandDecl) {
   EXPECT_TRUE(item->data_type.is_net);
 }
 
-TEST(ParserSection6, Sec6_7_1_TriorDecl) {
+TEST(DataTypeParsing, TriorDecl) {
   auto r = Parse(
       "module t;\n"
       "  trior to1;\n"

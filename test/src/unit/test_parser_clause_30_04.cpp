@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA702, MultiplePathDeclarations) {
+TEST(SpecifyPathParsing, MultiplePathDeclarations) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

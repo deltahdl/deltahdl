@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_03_01, SeqBlockInInitialElaborates) {
+TEST(SequentialBlockElaboration, SeqBlockInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -27,7 +27,7 @@ TEST(ElabClause09_03_01, SeqBlockInInitialElaborates) {
   EXPECT_TRUE(found);
 }
 
-TEST(ElabClause09_03_01, NestedSeqBlocksElaborate) {
+TEST(SequentialBlockElaboration, NestedSeqBlocksElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -45,7 +45,7 @@ TEST(ElabClause09_03_01, NestedSeqBlocksElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_01, SeqBlockWithVarDeclElaborates) {
+TEST(SequentialBlockElaboration, SeqBlockWithVarDeclElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -61,7 +61,7 @@ TEST(ElabClause09_03_01, SeqBlockWithVarDeclElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_01, SeqBlockInAlwaysComb) {
+TEST(SequentialBlockElaboration, SeqBlockInAlwaysComb) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -76,7 +76,7 @@ TEST(ElabClause09_03_01, SeqBlockInAlwaysComb) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh10, BlockingAssignBeginEnd) {
+TEST(BlockingAssignSim, BlockingAssignBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

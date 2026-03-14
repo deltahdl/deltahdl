@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection12, CasezWithQuestionMark) {
+TEST(ProceduralStatementParsing, CasezWithQuestionMark) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -24,7 +24,7 @@ TEST(ParserSection12, CasezWithQuestionMark) {
   ASSERT_EQ(stmt->case_items.size(), 4u);
 }
 
-TEST(ParserSection12, CasexMultipleItemsWithExpressions) {
+TEST(ProceduralStatementParsing, CasexMultipleItemsWithExpressions) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -44,7 +44,7 @@ TEST(ParserSection12, CasexMultipleItemsWithExpressions) {
   ASSERT_EQ(stmt->case_items.size(), 4u);
 }
 
-TEST(ParserA607, CasezKeyword) {
+TEST(CaseSyntaxParsing, CasezKeyword) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -58,7 +58,7 @@ TEST(ParserA607, CasezKeyword) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
 }
 
-TEST(ParserA607, CasexKeyword) {
+TEST(CaseSyntaxParsing, CasexKeyword) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -72,7 +72,7 @@ TEST(ParserA607, CasexKeyword) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
 }
 
-TEST(ParserSection12, CasezInsideAlwaysFF) {
+TEST(ProceduralStatementParsing, CasezInsideAlwaysFF) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic clk;\n"
@@ -94,7 +94,7 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection9, Sec9_2_3_CasexStatement) {
+TEST(ProcessParsing, AlwaysLatchCasexStatement) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] sel, q, a, b;\n"
@@ -114,7 +114,7 @@ TEST(ParserSection9, Sec9_2_3_CasexStatement) {
   EXPECT_EQ(item->body->case_kind, TokenKind::kKwCasex);
 }
 
-TEST(ParserSection9, Sec9_2_3_CasezStatement) {
+TEST(ProcessParsing, AlwaysLatchCasezStatement) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] sel, q, a, b;\n"
@@ -134,7 +134,7 @@ TEST(ParserSection9, Sec9_2_3_CasezStatement) {
   EXPECT_EQ(item->body->case_kind, TokenKind::kKwCasez);
 }
 
-TEST(ParserSection12, CasexStatement) {
+TEST(ProceduralStatementParsing, CasexStatement) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -152,7 +152,7 @@ TEST(ParserSection12, CasexStatement) {
   ASSERT_EQ(stmt->case_items.size(), 2u);
 }
 
-TEST(ParserSection12, CasezStatement) {
+TEST(ProceduralStatementParsing, CasezStatement) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -170,7 +170,7 @@ TEST(ParserSection12, CasezStatement) {
   ASSERT_EQ(stmt->case_items.size(), 2u);
 }
 
-TEST(ParserSection9, Sec9_2_2_CasexStatement) {
+TEST(ProcessParsing, AlwaysCombCasexStatement) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] opcode;\n"
@@ -195,7 +195,7 @@ TEST(ParserSection9, Sec9_2_2_CasexStatement) {
   ASSERT_EQ(stmt->case_items.size(), 3u);
 }
 
-TEST(ParserSection9, Sec9_2_2_CasezStatement) {
+TEST(ProcessParsing, AlwaysCombCasezStatement) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] req;\n"

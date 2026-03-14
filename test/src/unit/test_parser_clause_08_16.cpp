@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection8, DynamicCastClassHandles) {
+TEST(ClassParsing, DynamicCastClassHandles) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  class Base;\n"
@@ -23,7 +23,7 @@ TEST(ParserSection8, DynamicCastClassHandles) {
               "endmodule\n"));
 }
 
-TEST(ParserA816, SubclassToSuperclassAssign) {
+TEST(ClassCastParsing, SubclassToSuperclassAssign) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
               "  int i;\n"
@@ -41,7 +41,7 @@ TEST(ParserA816, SubclassToSuperclassAssign) {
               "endmodule\n"));
 }
 
-TEST(ParserA816, CastAsFunction) {
+TEST(ClassCastParsing, CastAsFunction) {
   EXPECT_TRUE(
       ParseOk("class Base; int x; endclass\n"
               "class Derived extends Base; int y; endclass\n"
@@ -57,7 +57,7 @@ TEST(ParserA816, CastAsFunction) {
               "endmodule\n"));
 }
 
-TEST(ParserA816, CastAsTask) {
+TEST(ClassCastParsing, CastAsTask) {
   EXPECT_TRUE(
       ParseOk("class Base; int x; endclass\n"
               "class Derived extends Base; int y; endclass\n"
@@ -72,7 +72,7 @@ TEST(ParserA816, CastAsTask) {
               "endmodule\n"));
 }
 
-TEST(ParserA816, CastWithNullSource) {
+TEST(ClassCastParsing, CastWithNullSource) {
   EXPECT_TRUE(
       ParseOk("class Base; endclass\n"
               "class Derived extends Base; endclass\n"
@@ -84,7 +84,7 @@ TEST(ParserA816, CastWithNullSource) {
               "endmodule\n"));
 }
 
-TEST(ParserA816, SuperclassToSubclassAssignParses) {
+TEST(ClassCastParsing, SuperclassToSubclassAssignParses) {
   EXPECT_TRUE(
       ParseOk("class Base; int x; endclass\n"
               "class Derived extends Base; int y; endclass\n"
@@ -98,7 +98,7 @@ TEST(ParserA816, SuperclassToSubclassAssignParses) {
               "endmodule\n"));
 }
 
-TEST(ParserA816, CastInConditional) {
+TEST(ClassCastParsing, CastInConditional) {
   EXPECT_TRUE(
       ParseOk("class Base; endclass\n"
               "class Derived extends Base; endclass\n"

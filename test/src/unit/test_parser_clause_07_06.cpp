@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection7, ArrayAssignWhole) {
+TEST(AggregateTypeParsing, ArrayAssignWhole) {
   auto r = Parse(
       "module t;\n"
       "  int a[4], b[4];\n"
@@ -16,7 +16,7 @@ TEST(ParserSection7, ArrayAssignWhole) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection7, ArraySliceAssign) {
+TEST(AggregateTypeParsing, ArraySliceAssign) {
   auto r = Parse(
       "module t;\n"
       "  int a[8], b[8];\n"

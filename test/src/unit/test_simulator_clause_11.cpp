@@ -4,7 +4,7 @@
 
 using namespace delta;
 
-TEST(SimCh11, TernaryBasicTrue) {
+TEST(TernaryOperatorSim, TernaryBasicTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -25,7 +25,7 @@ TEST(SimCh11, TernaryBasicTrue) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimCh11, TernaryBasicFalse) {
+TEST(TernaryOperatorSim, TernaryBasicFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -46,7 +46,7 @@ TEST(SimCh11, TernaryBasicFalse) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimCh11, TernaryVariableCondition) {
+TEST(TernaryOperatorSim, TernaryVariableCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -69,7 +69,7 @@ TEST(SimCh11, TernaryVariableCondition) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimCh11, TernaryComparisonMax) {
+TEST(TernaryOperatorSim, TernaryComparisonMax) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -92,7 +92,7 @@ TEST(SimCh11, TernaryComparisonMax) {
   EXPECT_EQ(var->value.ToUint64(), 50u);
 }
 
-TEST(SimCh11, TernaryEqualityCondition) {
+TEST(TernaryOperatorSim, TernaryEqualityCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -114,7 +114,7 @@ TEST(SimCh11, TernaryEqualityCondition) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh11, TernaryNested) {
+TEST(TernaryOperatorSim, TernaryNested) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -138,7 +138,7 @@ TEST(SimCh11, TernaryNested) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(SimCh11, TernaryChainedPriorityEncoder) {
+TEST(TernaryOperatorSim, TernaryChainedPriorityEncoder) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -163,7 +163,7 @@ TEST(SimCh11, TernaryChainedPriorityEncoder) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimCh11, TernaryContinuousAssign) {
+TEST(TernaryOperatorSim, TernaryContinuousAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -190,7 +190,7 @@ TEST(SimCh11, TernaryContinuousAssign) {
   EXPECT_EQ(net->resolved->value.ToUint64(), 55u);
 }
 
-TEST(SimCh11, TernaryBlockingAssign) {
+TEST(TernaryOperatorSim, TernaryBlockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -212,7 +212,7 @@ TEST(SimCh11, TernaryBlockingAssign) {
   EXPECT_EQ(var->value.ToUint64(), 100u);
 }
 
-TEST(SimCh11, TernaryNonblockingAssign) {
+TEST(TernaryOperatorSim, TernaryNonblockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -235,7 +235,7 @@ TEST(SimCh11, TernaryNonblockingAssign) {
   EXPECT_EQ(var->value.ToUint64(), 22u);
 }
 
-TEST(SimCh11, TernaryBitwiseCondition) {
+TEST(TernaryOperatorSim, TernaryBitwiseCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -260,7 +260,7 @@ TEST(SimCh11, TernaryBitwiseCondition) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimCh11, TernaryLogicalOrCondition) {
+TEST(TernaryOperatorSim, TernaryLogicalOrCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -284,7 +284,7 @@ TEST(SimCh11, TernaryLogicalOrCondition) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-TEST(SimCh11, TernaryConcatResult) {
+TEST(TernaryOperatorSim, TernaryConcatResult) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -308,7 +308,7 @@ TEST(SimCh11, TernaryConcatResult) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
-TEST(SimCh11, TernaryFunctionCallBranch) {
+TEST(TernaryOperatorSim, TernaryFunctionCallBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -334,7 +334,7 @@ TEST(SimCh11, TernaryFunctionCallBranch) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimCh11, TernaryDifferentWidthOperands) {
+TEST(TernaryOperatorSim, TernaryDifferentWidthOperands) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -360,7 +360,7 @@ TEST(SimCh11, TernaryDifferentWidthOperands) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-TEST(SimCh11, TernarySignedOperands) {
+TEST(TernaryOperatorSim, TernarySignedOperands) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -385,7 +385,7 @@ TEST(SimCh11, TernarySignedOperands) {
   EXPECT_EQ(var->value.ToUint64(), neg5_u32);
 }
 
-TEST(SimCh11, TernarySelectConstants) {
+TEST(TernaryOperatorSim, TernarySelectConstants) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -406,7 +406,7 @@ TEST(SimCh11, TernarySelectConstants) {
   EXPECT_EQ(var->value.ToUint64(), 100u);
 }
 
-TEST(SimCh11, TernaryAlwaysComb) {
+TEST(TernaryOperatorSim, TernaryAlwaysComb) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -433,7 +433,7 @@ TEST(SimCh11, TernaryAlwaysComb) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-TEST(SimCh11, TernaryAsFunctionArgument) {
+TEST(TernaryOperatorSim, TernaryAsFunctionArgument) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -459,7 +459,7 @@ TEST(SimCh11, TernaryAsFunctionArgument) {
   EXPECT_EQ(var->value.ToUint64(), 21u);
 }
 
-TEST(SimCh11, TernaryArithmeticBranches) {
+TEST(TernaryOperatorSim, TernaryArithmeticBranches) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -484,7 +484,7 @@ TEST(SimCh11, TernaryArithmeticBranches) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimCh11, TernaryUnaryNotCondition) {
+TEST(TernaryOperatorSim, TernaryUnaryNotCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -507,7 +507,7 @@ TEST(SimCh11, TernaryUnaryNotCondition) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SimCh11, TernaryMultipleInExpression) {
+TEST(TernaryOperatorSim, TernaryMultipleInExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -531,7 +531,7 @@ TEST(SimCh11, TernaryMultipleInExpression) {
   EXPECT_EQ(var->value.ToUint64(), 50u);
 }
 
-TEST(SimCh11, TernaryResultInComputation) {
+TEST(TernaryOperatorSim, TernaryResultInComputation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -554,7 +554,7 @@ TEST(SimCh11, TernaryResultInComputation) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimCh11, TernaryBitSelectCondition) {
+TEST(TernaryOperatorSim, TernaryBitSelectCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -578,7 +578,7 @@ TEST(SimCh11, TernaryBitSelectCondition) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh11, TernaryPartSelectOperands) {
+TEST(TernaryOperatorSim, TernaryPartSelectOperands) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -602,7 +602,7 @@ TEST(SimCh11, TernaryPartSelectOperands) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(SimCh11, TernaryResultWidth8Bit) {
+TEST(TernaryOperatorSim, TernaryResultWidth8Bit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -626,7 +626,7 @@ TEST(SimCh11, TernaryResultWidth8Bit) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimCh11, TernaryResultWidth32Bit) {
+TEST(TernaryOperatorSim, TernaryResultWidth32Bit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -648,7 +648,7 @@ TEST(SimCh11, TernaryResultWidth32Bit) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
-TEST(SimCh11, TernaryNestedOuterFalse) {
+TEST(TernaryOperatorSim, TernaryNestedOuterFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -670,7 +670,7 @@ TEST(SimCh11, TernaryNestedOuterFalse) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-TEST(SimCh11, TernaryChainedDefault) {
+TEST(TernaryOperatorSim, TernaryChainedDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -695,7 +695,7 @@ TEST(SimCh11, TernaryChainedDefault) {
   EXPECT_EQ(var->value.ToUint64(), 999u);
 }
 
-TEST(SimCh11, TernaryLogicalAndCondition) {
+TEST(TernaryOperatorSim, TernaryLogicalAndCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

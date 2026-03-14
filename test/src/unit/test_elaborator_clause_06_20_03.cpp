@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh6, TypeParameterDefault) {
+TEST(DataTypeSim, TypeParameterDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

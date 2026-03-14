@@ -6,328 +6,328 @@ using namespace delta;
 
 namespace {
 
-TEST(LexerClause05, Cl5_5_SingleCharPlus) {
+TEST(LexicalConventionLexing, SingleCharPlus) {
   auto r = LexOne("+");
   EXPECT_EQ(r.token.kind, TokenKind::kPlus);
   EXPECT_EQ(r.token.text.size(), 1u);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharMinus) {
+TEST(LexicalConventionLexing, SingleCharMinus) {
   auto r = LexOne("-");
   EXPECT_EQ(r.token.kind, TokenKind::kMinus);
   EXPECT_EQ(r.token.text.size(), 1u);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharStar) {
+TEST(LexicalConventionLexing, SingleCharStar) {
   auto r = LexOne("* ");
   EXPECT_EQ(r.token.kind, TokenKind::kStar);
   EXPECT_EQ(r.token.text.size(), 1u);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharSlash) {
+TEST(LexicalConventionLexing, SingleCharSlash) {
   auto tokens = Lex("a / b");
   EXPECT_EQ(tokens[1].kind, TokenKind::kSlash);
   EXPECT_EQ(tokens[1].text.size(), 1u);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharPercent) {
+TEST(LexicalConventionLexing, SingleCharPercent) {
   auto r = LexOne("%");
   EXPECT_EQ(r.token.kind, TokenKind::kPercent);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharAmp) {
+TEST(LexicalConventionLexing, SingleCharAmp) {
   auto r = LexOne("& ");
   EXPECT_EQ(r.token.kind, TokenKind::kAmp);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharPipe) {
+TEST(LexicalConventionLexing, SingleCharPipe) {
   auto r = LexOne("| ");
   EXPECT_EQ(r.token.kind, TokenKind::kPipe);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharCaret) {
+TEST(LexicalConventionLexing, SingleCharCaret) {
   auto r = LexOne("^ ");
   EXPECT_EQ(r.token.kind, TokenKind::kCaret);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharTilde) {
+TEST(LexicalConventionLexing, SingleCharTilde) {
   auto r = LexOne("~ ");
   EXPECT_EQ(r.token.kind, TokenKind::kTilde);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharBang) {
+TEST(LexicalConventionLexing, SingleCharBang) {
   auto r = LexOne("! ");
   EXPECT_EQ(r.token.kind, TokenKind::kBang);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharLt) {
+TEST(LexicalConventionLexing, SingleCharLt) {
   auto r = LexOne("< ");
   EXPECT_EQ(r.token.kind, TokenKind::kLt);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharGt) {
+TEST(LexicalConventionLexing, SingleCharGt) {
   auto r = LexOne("> ");
   EXPECT_EQ(r.token.kind, TokenKind::kGt);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharQuestion) {
+TEST(LexicalConventionLexing, SingleCharQuestion) {
   auto r = LexOne("?");
   EXPECT_EQ(r.token.kind, TokenKind::kQuestion);
 }
 
-TEST(LexerClause05, Cl5_5_SingleCharEq) {
+TEST(LexicalConventionLexing, SingleCharEq) {
   auto r = LexOne("= ");
   EXPECT_EQ(r.token.kind, TokenKind::kEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharPower) {
+TEST(LexicalConventionLexing, DoubleCharPower) {
   auto r = LexOne("**");
   EXPECT_EQ(r.token.kind, TokenKind::kPower);
   EXPECT_EQ(r.token.text.size(), 2u);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharTildeAmp) {
+TEST(LexicalConventionLexing, DoubleCharTildeAmp) {
   auto r = LexOne("~&");
   EXPECT_EQ(r.token.kind, TokenKind::kTildeAmp);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharTildePipe) {
+TEST(LexicalConventionLexing, DoubleCharTildePipe) {
   auto r = LexOne("~|");
   EXPECT_EQ(r.token.kind, TokenKind::kTildePipe);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharTildeCaret) {
+TEST(LexicalConventionLexing, DoubleCharTildeCaret) {
   auto r = LexOne("~^");
   EXPECT_EQ(r.token.kind, TokenKind::kTildeCaret);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharCaretTilde) {
+TEST(LexicalConventionLexing, DoubleCharCaretTilde) {
   auto r = LexOne("^~");
   EXPECT_EQ(r.token.kind, TokenKind::kCaretTilde);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharAmpAmp) {
+TEST(LexicalConventionLexing, DoubleCharAmpAmp) {
   auto r = LexOne("&&");
   EXPECT_EQ(r.token.kind, TokenKind::kAmpAmp);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharPipePipe) {
+TEST(LexicalConventionLexing, DoubleCharPipePipe) {
   auto r = LexOne("||");
   EXPECT_EQ(r.token.kind, TokenKind::kPipePipe);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharEqEq) {
+TEST(LexicalConventionLexing, DoubleCharEqEq) {
   auto r = LexOne("== ");
   EXPECT_EQ(r.token.kind, TokenKind::kEqEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharBangEq) {
+TEST(LexicalConventionLexing, DoubleCharBangEq) {
   auto r = LexOne("!= ");
   EXPECT_EQ(r.token.kind, TokenKind::kBangEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharLtEq) {
+TEST(LexicalConventionLexing, DoubleCharLtEq) {
   auto r = LexOne("<= ");
   EXPECT_EQ(r.token.kind, TokenKind::kLtEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharGtEq) {
+TEST(LexicalConventionLexing, DoubleCharGtEq) {
   auto r = LexOne(">= ");
   EXPECT_EQ(r.token.kind, TokenKind::kGtEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharLtLt) {
+TEST(LexicalConventionLexing, DoubleCharLtLt) {
   auto r = LexOne("<< ");
   EXPECT_EQ(r.token.kind, TokenKind::kLtLt);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharGtGt) {
+TEST(LexicalConventionLexing, DoubleCharGtGt) {
   auto r = LexOne(">> ");
   EXPECT_EQ(r.token.kind, TokenKind::kGtGt);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharPlusPlus) {
+TEST(LexicalConventionLexing, DoubleCharPlusPlus) {
   auto r = LexOne("++");
   EXPECT_EQ(r.token.kind, TokenKind::kPlusPlus);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharMinusMinus) {
+TEST(LexicalConventionLexing, DoubleCharMinusMinus) {
   auto r = LexOne("--");
   EXPECT_EQ(r.token.kind, TokenKind::kMinusMinus);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharPlusEq) {
+TEST(LexicalConventionLexing, DoubleCharPlusEq) {
   auto r = LexOne("+=");
   EXPECT_EQ(r.token.kind, TokenKind::kPlusEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharMinusEq) {
+TEST(LexicalConventionLexing, DoubleCharMinusEq) {
   auto r = LexOne("-=");
   EXPECT_EQ(r.token.kind, TokenKind::kMinusEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharStarEq) {
+TEST(LexicalConventionLexing, DoubleCharStarEq) {
   auto r = LexOne("*=");
   EXPECT_EQ(r.token.kind, TokenKind::kStarEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharSlashEq) {
+TEST(LexicalConventionLexing, DoubleCharSlashEq) {
   auto r = LexOne("/=");
   EXPECT_EQ(r.token.kind, TokenKind::kSlashEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharPercentEq) {
+TEST(LexicalConventionLexing, DoubleCharPercentEq) {
   auto r = LexOne("%=");
   EXPECT_EQ(r.token.kind, TokenKind::kPercentEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharAmpEq) {
+TEST(LexicalConventionLexing, DoubleCharAmpEq) {
   auto r = LexOne("&=");
   EXPECT_EQ(r.token.kind, TokenKind::kAmpEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharPipeEq) {
+TEST(LexicalConventionLexing, DoubleCharPipeEq) {
   auto r = LexOne("|=");
   EXPECT_EQ(r.token.kind, TokenKind::kPipeEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharCaretEq) {
+TEST(LexicalConventionLexing, DoubleCharCaretEq) {
   auto r = LexOne("^=");
   EXPECT_EQ(r.token.kind, TokenKind::kCaretEq);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharArrow) {
+TEST(LexicalConventionLexing, DoubleCharArrow) {
   auto r = LexOne("->");
   EXPECT_EQ(r.token.kind, TokenKind::kArrow);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharEqGt) {
+TEST(LexicalConventionLexing, DoubleCharEqGt) {
   auto r = LexOne("=>");
   EXPECT_EQ(r.token.kind, TokenKind::kEqGt);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharStarGt) {
+TEST(LexicalConventionLexing, DoubleCharStarGt) {
   auto r = LexOne("*>");
   EXPECT_EQ(r.token.kind, TokenKind::kStarGt);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharHashHash) {
+TEST(LexicalConventionLexing, DoubleCharHashHash) {
   auto r = LexOne("##");
   EXPECT_EQ(r.token.kind, TokenKind::kHashHash);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharColonColon) {
+TEST(LexicalConventionLexing, DoubleCharColonColon) {
   auto r = LexOne("::");
   EXPECT_EQ(r.token.kind, TokenKind::kColonColon);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharAtAt) {
+TEST(LexicalConventionLexing, DoubleCharAtAt) {
   auto r = LexOne("@@");
   EXPECT_EQ(r.token.kind, TokenKind::kAtAt);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleCharDotStar) {
+TEST(LexicalConventionLexing, DoubleCharDotStar) {
   auto r = LexOne(".*");
   EXPECT_EQ(r.token.kind, TokenKind::kDotStar);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharEqEqEq) {
+TEST(LexicalConventionLexing, TripleCharEqEqEq) {
   auto r = LexOne("===");
   EXPECT_EQ(r.token.kind, TokenKind::kEqEqEq);
   EXPECT_EQ(r.token.text.size(), 3u);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharBangEqEq) {
+TEST(LexicalConventionLexing, TripleCharBangEqEq) {
   auto r = LexOne("!==");
   EXPECT_EQ(r.token.kind, TokenKind::kBangEqEq);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharEqEqQuestion) {
+TEST(LexicalConventionLexing, TripleCharEqEqQuestion) {
   auto r = LexOne("==?");
   EXPECT_EQ(r.token.kind, TokenKind::kEqEqQuestion);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharBangEqQuestion) {
+TEST(LexicalConventionLexing, TripleCharBangEqQuestion) {
   auto r = LexOne("!=?");
   EXPECT_EQ(r.token.kind, TokenKind::kBangEqQuestion);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharLtLtLt) {
+TEST(LexicalConventionLexing, TripleCharLtLtLt) {
   auto r = LexOne("<<<");
   EXPECT_EQ(r.token.kind, TokenKind::kLtLtLt);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharGtGtGt) {
+TEST(LexicalConventionLexing, TripleCharGtGtGt) {
   auto r = LexOne(">>>");
   EXPECT_EQ(r.token.kind, TokenKind::kGtGtGt);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharLtLtEq) {
+TEST(LexicalConventionLexing, TripleCharLtLtEq) {
   auto r = LexOne("<<=");
   EXPECT_EQ(r.token.kind, TokenKind::kLtLtEq);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharGtGtEq) {
+TEST(LexicalConventionLexing, TripleCharGtGtEq) {
   auto r = LexOne(">>=");
   EXPECT_EQ(r.token.kind, TokenKind::kGtGtEq);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharAmpAmpAmp) {
+TEST(LexicalConventionLexing, TripleCharAmpAmpAmp) {
   auto r = LexOne("&&&");
   EXPECT_EQ(r.token.kind, TokenKind::kAmpAmpAmp);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharPipeDashGt) {
+TEST(LexicalConventionLexing, TripleCharPipeDashGt) {
   auto r = LexOne("|->");
   EXPECT_EQ(r.token.kind, TokenKind::kPipeDashGt);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharPipeEqGt) {
+TEST(LexicalConventionLexing, TripleCharPipeEqGt) {
   auto r = LexOne("|=>");
   EXPECT_EQ(r.token.kind, TokenKind::kPipeEqGt);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharLtDashGt) {
+TEST(LexicalConventionLexing, TripleCharLtDashGt) {
   auto r = LexOne("<->");
   EXPECT_EQ(r.token.kind, TokenKind::kLtDashGt);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharHashMinusHash) {
+TEST(LexicalConventionLexing, TripleCharHashMinusHash) {
   auto r = LexOne("#-#");
   EXPECT_EQ(r.token.kind, TokenKind::kHashMinusHash);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharHashEqHash) {
+TEST(LexicalConventionLexing, TripleCharHashEqHash) {
   auto r = LexOne("#=#");
   EXPECT_EQ(r.token.kind, TokenKind::kHashEqHash);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharDashGtGt) {
+TEST(LexicalConventionLexing, TripleCharDashGtGt) {
   auto r = LexOne("->>");
   EXPECT_EQ(r.token.kind, TokenKind::kDashGtGt);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharPlusSlashMinus) {
+TEST(LexicalConventionLexing, TripleCharPlusSlashMinus) {
   auto r = LexOne("+/-");
   EXPECT_EQ(r.token.kind, TokenKind::kPlusSlashMinus);
 }
 
-TEST(LexerClause05, Cl5_5_TripleCharPlusPercentMinus) {
+TEST(LexicalConventionLexing, TripleCharPlusPercentMinus) {
   auto r = LexOne("+%-");
   EXPECT_EQ(r.token.kind, TokenKind::kPlusPercentMinus);
 }
 
-TEST(LexerClause05, Cl5_5_QuadCharLtLtLtEq) {
+TEST(LexicalConventionLexing, QuadCharLtLtLtEq) {
   auto r = LexOne("<<<=");
   EXPECT_EQ(r.token.kind, TokenKind::kLtLtLtEq);
 }
 
-TEST(LexerClause05, Cl5_5_QuadCharGtGtGtEq) {
+TEST(LexicalConventionLexing, QuadCharGtGtGtEq) {
   auto r = LexOne(">>>=");
   EXPECT_EQ(r.token.kind, TokenKind::kGtGtGtEq);
 }
 
-TEST(LexerClause05, Cl5_5_OperatorsAdjacentToIdentifiers) {
+TEST(LexicalConventionLexing, OperatorsAdjacentToIdentifiers) {
   auto tokens = Lex("a+b*c-d");
   ASSERT_EQ(tokens.size(), 8u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -339,7 +339,7 @@ TEST(LexerClause05, Cl5_5_OperatorsAdjacentToIdentifiers) {
   EXPECT_EQ(tokens[6].kind, TokenKind::kIdentifier);
 }
 
-TEST(LexerClause05, Cl5_5_MaximalMunchForOperators) {
+TEST(LexicalConventionLexing, MaximalMunchForOperators) {
   auto tokens = Lex("a===b");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -347,7 +347,7 @@ TEST(LexerClause05, Cl5_5_MaximalMunchForOperators) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
 }
 
-TEST(LexerClause05, Cl5_5_DoubleNotTriple) {
+TEST(LexicalConventionLexing, DoubleNotTriple) {
   auto tokens = Lex("a == b");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[1].kind, TokenKind::kEqEq);

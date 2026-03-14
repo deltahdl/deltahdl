@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA24, DynamicArrayNewSize) {
+TEST(DeclarationAssignmentParsing, DynamicArrayNewSize) {
   auto r = Parse(
       "module m;\n"
       "  int d[];\n"
@@ -15,7 +15,7 @@ TEST(ParserA24, DynamicArrayNewSize) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA24, DynamicArrayNewSizeAndInit) {
+TEST(DeclarationAssignmentParsing, DynamicArrayNewSizeAndInit) {
   auto r = Parse(
       "module m;\n"
       "  int d[];\n"
@@ -26,7 +26,7 @@ TEST(ParserA24, DynamicArrayNewSizeAndInit) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA24, DynamicArrayDeclWithNew) {
+TEST(DeclarationAssignmentParsing, DynamicArrayDeclWithNew) {
   auto r = Parse(
       "module m;\n"
       "  int d[] = new[5];\n"
@@ -34,7 +34,7 @@ TEST(ParserA24, DynamicArrayDeclWithNew) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-TEST(ParserA602, BlockingAssignment_DynamicArrayNew) {
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_DynamicArrayNew) {
   auto r = Parse(
       "module m;\n"
       "  initial begin arr = new[10]; end\n"
@@ -46,7 +46,7 @@ TEST(ParserA602, BlockingAssignment_DynamicArrayNew) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserA602, BlockingAssignment_DynamicArrayNewWithInit) {
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_DynamicArrayNewWithInit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin arr = new[10](old_arr); end\n"
@@ -58,7 +58,7 @@ TEST(ParserA602, BlockingAssignment_DynamicArrayNewWithInit) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection7c, DynamicArrayNewConstruct) {
+TEST(DynamicArrayAndQueueParsing, DynamicArrayNewConstruct) {
   auto r = Parse(
       "module m;\n"
       "  int dyn[];\n"
@@ -68,7 +68,7 @@ TEST(ParserSection7c, DynamicArrayNewConstruct) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection7, DynamicArrayNew) {
+TEST(AggregateTypeParsing, DynamicArrayNew) {
   auto r = Parse(
       "module t;\n"
       "  int dyn[];\n"
@@ -81,7 +81,7 @@ TEST(ParserSection7, DynamicArrayNew) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection7, DynamicArrayNewWithInit) {
+TEST(AggregateTypeParsing, DynamicArrayNewWithInit) {
   auto r = Parse(
       "module t;\n"
       "  int dyn[];\n"

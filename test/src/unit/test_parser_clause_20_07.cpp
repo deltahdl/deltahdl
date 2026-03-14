@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7, ArrayDimensionsQuery) {
+TEST(AggregateTypeParsing, ArrayDimensionsQuery) {
   auto r = Parse(
       "module t;\n"
       "  int arr[4][8];\n"
@@ -19,7 +19,7 @@ TEST(ParserSection7, ArrayDimensionsQuery) {
   EXPECT_EQ(stmt->rhs->callee, "$dimensions");
 }
 
-TEST(ParserSection7, ArraySizeQuery) {
+TEST(AggregateTypeParsing, ArraySizeQuery) {
   auto r = Parse(
       "module t;\n"
       "  int arr[4];\n"
@@ -33,7 +33,7 @@ TEST(ParserSection7, ArraySizeQuery) {
   EXPECT_EQ(stmt->rhs->callee, "$size");
 }
 
-TEST(ParserSection20, ArrayLeftFunction) {
+TEST(UtilitySystemTaskParsing, ArrayLeftFunction) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] arr;\n"
@@ -46,7 +46,7 @@ TEST(ParserSection20, ArrayLeftFunction) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection20, ArrayRightFunction) {
+TEST(UtilitySystemTaskParsing, ArrayRightFunction) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] arr;\n"
@@ -59,7 +59,7 @@ TEST(ParserSection20, ArrayRightFunction) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection20, ArraySizeFunction) {
+TEST(UtilitySystemTaskParsing, ArraySizeFunction) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] arr [16];\n"
@@ -72,7 +72,7 @@ TEST(ParserSection20, ArraySizeFunction) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection20, ArrayHighLowFunctions) {
+TEST(UtilitySystemTaskParsing, ArrayHighLowFunctions) {
   auto r = Parse(
       "module m;\n"
       "  logic [15:0] mem [0:255];\n"
@@ -84,7 +84,7 @@ TEST(ParserSection20, ArrayHighLowFunctions) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection20, ArrayDimensionsFunction) {
+TEST(UtilitySystemTaskParsing, ArrayDimensionsFunction) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0][7:0] data;\n"
@@ -97,7 +97,7 @@ TEST(ParserSection20, ArrayDimensionsFunction) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection20, ArrayIncrementFunction) {
+TEST(UtilitySystemTaskParsing, ArrayIncrementFunction) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] arr;\n"
@@ -110,7 +110,7 @@ TEST(ParserSection20, ArrayIncrementFunction) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection20, ArraySizeWithDimArg) {
+TEST(UtilitySystemTaskParsing, ArraySizeWithDimArg) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] mem [0:15];\n"
@@ -123,7 +123,7 @@ TEST(ParserSection20, ArraySizeWithDimArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection20, ArrayUnpackedDimensionsFunction) {
+TEST(UtilitySystemTaskParsing, ArrayUnpackedDimensionsFunction) {
   auto r = Parse(
       "module m;\n"
       "  logic arr [4][8];\n"

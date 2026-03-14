@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_3_ContinuousAssignment) {
+TEST(DesignBuildingBlockParsing, ContinuousAssignment) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  logic a, b, y;\n"
@@ -46,7 +46,7 @@ TEST(Parser, ContinuousAssignment) {
   EXPECT_TRUE(found_assign);
 }
 
-TEST(ParserSection10, ContinuousAssignBasic) {
+TEST(AssignmentParsing, ContinuousAssignBasic) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire a, b;\n"

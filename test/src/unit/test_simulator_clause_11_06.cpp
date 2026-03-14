@@ -11,7 +11,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA116, AssignmentContextWidthPreservesCarry) {
+TEST(AssertionControlSim, AssignmentContextWidthPreservesCarry) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -34,7 +34,7 @@ TEST(SimA116, AssignmentContextWidthPreservesCarry) {
   EXPECT_EQ(var->value.ToUint64(), 0x10000u);
 }
 
-TEST(SimA116, AssignmentContextWidthSameSize) {
+TEST(AssertionControlSim, AssignmentContextWidthSameSize) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -57,7 +57,7 @@ TEST(SimA116, AssignmentContextWidthSameSize) {
   EXPECT_EQ(var->value.ToUint64(), 0x0000u);
 }
 
-TEST(SimA116, ContextWidthPropagatesForMultiplication) {
+TEST(AssertionControlSim, ContextWidthPropagatesForMultiplication) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -79,7 +79,7 @@ TEST(SimA116, ContextWidthPropagatesForMultiplication) {
   EXPECT_EQ(var->value.ToUint64(), 0xE1u);
 }
 
-TEST(SimA116, ContextWidthParamInEvalExpr) {
+TEST(AssertionControlSim, ContextWidthParamInEvalExpr) {
   SimFixture f;
 
   MakeVar(f, "ca", 4, 0xF);
@@ -95,7 +95,7 @@ TEST(SimA116, ContextWidthParamInEvalExpr) {
   EXPECT_EQ(r2.width, 5u);
 }
 
-TEST(SimA116, CastingSetsContextWidth) {
+TEST(AssertionControlSim, CastingSetsContextWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -118,7 +118,7 @@ TEST(SimA116, CastingSetsContextWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0x8000u);
 }
 
-TEST(SimA116, SubtractionContextWidthPreservesBorrow) {
+TEST(AssertionControlSim, SubtractionContextWidthPreservesBorrow) {
   SimFixture f;
 
   MakeVar(f, "sa", 8, 0);

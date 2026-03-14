@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA705, SystemTimingCheckTimeskew) {
+TEST(SystemTimingCheckParsing, SystemTimingCheckTimeskew) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -20,7 +20,7 @@ TEST(ParserA705, SystemTimingCheckTimeskew) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kTimeskew);
 }
 
-TEST(ParserA70501, TimeskewWithFlags) {
+TEST(TimingCheckCommandParsing, TimeskewWithFlags) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -36,7 +36,7 @@ TEST(ParserA70501, TimeskewWithFlags) {
   ASSERT_NE(tc->remain_active_flag, nullptr);
 }
 
-TEST(ParserA70502, EventBasedFlagAndRemainActiveFlag) {
+TEST(TimingCheckArgumentParsing, EventBasedFlagAndRemainActiveFlag) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -51,7 +51,7 @@ TEST(ParserA70502, EventBasedFlagAndRemainActiveFlag) {
   ASSERT_NE(tc->remain_active_flag, nullptr);
 }
 
-TEST(ParserA70502, RemainActiveFlagMinTypMax) {
+TEST(TimingCheckArgumentParsing, RemainActiveFlagMinTypMax) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

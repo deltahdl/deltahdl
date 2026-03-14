@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elab1302, DelayInFunctionIsError) {
+TEST(SubroutineOverviewElaboration, DelayInFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(Elab1302, DelayInFunctionIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1302, EventControlInFunctionIsError) {
+TEST(SubroutineOverviewElaboration, EventControlInFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -29,7 +29,7 @@ TEST(Elab1302, EventControlInFunctionIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1302, WaitInFunctionIsError) {
+TEST(SubroutineOverviewElaboration, WaitInFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -42,7 +42,7 @@ TEST(Elab1302, WaitInFunctionIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1302, WaitForkInFunctionIsError) {
+TEST(SubroutineOverviewElaboration, WaitForkInFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -54,7 +54,7 @@ TEST(Elab1302, WaitForkInFunctionIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1302, WaitOrderInFunctionIsError) {
+TEST(SubroutineOverviewElaboration, WaitOrderInFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -67,7 +67,7 @@ TEST(Elab1302, WaitOrderInFunctionIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1302, NestedDelayInFunctionIsError) {
+TEST(SubroutineOverviewElaboration, NestedDelayInFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -81,7 +81,7 @@ TEST(Elab1302, NestedDelayInFunctionIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1302, FunctionWithNoTimeControlIsOk) {
+TEST(SubroutineOverviewElaboration, FunctionWithNoTimeControlIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -94,7 +94,7 @@ TEST(Elab1302, FunctionWithNoTimeControlIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1302, FunctionEnablesTaskIsError) {
+TEST(SubroutineOverviewElaboration, FunctionEnablesTaskIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -108,7 +108,7 @@ TEST(Elab1302, FunctionEnablesTaskIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1302, FunctionCallsFunctionIsOk) {
+TEST(SubroutineOverviewElaboration, FunctionCallsFunctionIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -120,7 +120,7 @@ TEST(Elab1302, FunctionCallsFunctionIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1302, TaskEnablesTaskIsOk) {
+TEST(SubroutineOverviewElaboration, TaskEnablesTaskIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -132,7 +132,7 @@ TEST(Elab1302, TaskEnablesTaskIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1302, TaskEnablesFunctionIsOk) {
+TEST(SubroutineOverviewElaboration, TaskEnablesFunctionIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -147,7 +147,7 @@ TEST(Elab1302, TaskEnablesFunctionIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1302, TaskReturnsValueIsError) {
+TEST(SubroutineOverviewElaboration, TaskReturnsValueIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -159,7 +159,7 @@ TEST(Elab1302, TaskReturnsValueIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1302, TaskBareReturnIsOk) {
+TEST(SubroutineOverviewElaboration, TaskBareReturnIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -172,7 +172,7 @@ TEST(Elab1302, TaskBareReturnIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1302, TaskNoReturnIsOk) {
+TEST(SubroutineOverviewElaboration, TaskNoReturnIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -186,7 +186,7 @@ TEST(Elab1302, TaskNoReturnIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1302, TaskWithDelayIsOk) {
+TEST(SubroutineOverviewElaboration, TaskWithDelayIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -199,7 +199,7 @@ TEST(Elab1302, TaskWithDelayIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1302, TaskWithEventControlIsOk) {
+TEST(SubroutineOverviewElaboration, TaskWithEventControlIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

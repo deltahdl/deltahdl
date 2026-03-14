@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, FeofFerror) {
+TEST(IoSystemTaskParsing, FeofFerror) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  integer fd, eof_flag;\n"

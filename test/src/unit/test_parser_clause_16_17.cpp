@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, ExpectPropertyStatement) {
+TEST(AssertionDeclParsing, ExpectPropertyStatement) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
       "  initial begin\n"
@@ -14,7 +14,7 @@ TEST(ParserA210, ExpectPropertyStatement) {
       "endmodule\n"));
 }
 
-TEST(ParserA210, ExpectPropertyStatement_NoActions) {
+TEST(AssertionDeclParsing, ExpectPropertyStatement_NoActions) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -23,7 +23,7 @@ TEST(ParserA210, ExpectPropertyStatement_NoActions) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, ExpectStatement) {
+TEST(AssertionParsing, ExpectStatement) {
   auto r = Parse(
       "module top();\n"
       "  logic clk, a, b;\n"

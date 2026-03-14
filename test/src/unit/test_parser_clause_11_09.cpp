@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A8MemberAccess) {
+TEST(FormalSyntaxParsing, MemberAccess) {
   auto r = Parse("module m; initial x = s.field; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -13,7 +13,7 @@ TEST(ParserAnnexA, A8MemberAccess) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserA60701, TaggedExprAstKind) {
+TEST(PatternParsing, TaggedExprAstKind) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -32,7 +32,7 @@ TEST(ParserA60701, TaggedExprAstKind) {
   EXPECT_EQ(rhs->rhs->text, "Valid");
 }
 
-TEST(ParserA83, TaggedUnionWithValue) {
+TEST(ExpressionParsing, TaggedUnionWithValue) {
   auto r = Parse("module m; initial x = tagged Valid 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -44,7 +44,7 @@ TEST(ParserA83, TaggedUnionWithValue) {
   ASSERT_NE(rhs->lhs, nullptr);
 }
 
-TEST(ParserA83, TaggedUnionWithoutValue) {
+TEST(ExpressionParsing, TaggedUnionWithoutValue) {
   auto r = Parse("module m; initial x = tagged Invalid; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -56,7 +56,7 @@ TEST(ParserA83, TaggedUnionWithoutValue) {
   EXPECT_EQ(rhs->lhs, nullptr);
 }
 
-TEST(ParserSection11, TaggedUnionExpr) {
+TEST(OperatorAndExpressionParsing, TaggedUnionExpr) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"

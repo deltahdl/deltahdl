@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA608, ForeachLoop) {
+TEST(LoopStatementElaboration, ForeachLoop) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection8, ClassWithQualifiersLocalProtected) {
+TEST(ClassParsing, ClassWithQualifiersLocalProtected) {
   auto r = Parse(
       "class MyClass;\n"
       "  local int secret;\n"
@@ -20,7 +20,7 @@ TEST(ParserSection8, ClassWithQualifiersLocalProtected) {
   EXPECT_TRUE(cls->members[1]->is_protected);
 }
 
-TEST(ParserA818, LocalMethodParses) {
+TEST(DataHidingParsing, LocalMethodParses) {
   auto r = Parse(
       "class Packet;\n"
       "  local function int get_id();\n"
@@ -33,7 +33,7 @@ TEST(ParserA818, LocalMethodParses) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_local);
 }
 
-TEST(ParserA818, ProtectedPropertyParses) {
+TEST(DataHidingParsing, ProtectedPropertyParses) {
   auto r = Parse(
       "class Packet;\n"
       "  protected int payload;\n"
@@ -44,28 +44,28 @@ TEST(ParserA818, ProtectedPropertyParses) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_protected);
 }
 
-TEST(ParserA818, LocalAndProtectedError) {
+TEST(DataHidingParsing, LocalAndProtectedError) {
   EXPECT_FALSE(
       ParseOk("class Packet;\n"
               "  local protected int x;\n"
               "endclass\n"));
 }
 
-TEST(ParserA818, DuplicateLocalError) {
+TEST(DataHidingParsing, DuplicateLocalError) {
   EXPECT_FALSE(
       ParseOk("class Packet;\n"
               "  local local int x;\n"
               "endclass\n"));
 }
 
-TEST(ParserA818, DuplicateProtectedError) {
+TEST(DataHidingParsing, DuplicateProtectedError) {
   EXPECT_FALSE(
       ParseOk("class Packet;\n"
               "  protected protected int x;\n"
               "endclass\n"));
 }
 
-TEST(ParserA818, LocalAccessSameClassParses) {
+TEST(DataHidingParsing, LocalAccessSameClassParses) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
               "  local integer i;\n"
@@ -75,7 +75,7 @@ TEST(ParserA818, LocalAccessSameClassParses) {
               "endclass\n"));
 }
 
-TEST(ParserA818, ProtectedMethodInDerived) {
+TEST(DataHidingParsing, ProtectedMethodInDerived) {
   EXPECT_TRUE(
       ParseOk("class Base;\n"
               "  protected function int secret();\n"
@@ -89,7 +89,7 @@ TEST(ParserA818, ProtectedMethodInDerived) {
               "endclass\n"));
 }
 
-TEST(ParserA818, UnqualifiedMembersPublic) {
+TEST(DataHidingParsing, UnqualifiedMembersPublic) {
   auto r = Parse(
       "class Packet;\n"
       "  int x;\n"
@@ -120,7 +120,7 @@ TEST(SourceText, ClassQualifierCombinations) {
   EXPECT_TRUE(members[2]->is_virtual);
 }
 
-TEST(ParserClause08_03, ErrorDuplicateVirtual) {
+TEST(ClassSyntaxParsing, ErrorDuplicateVirtual) {
   auto r = Parse(
       "class C;\n"
       "  virtual virtual function void f(); endfunction\n"

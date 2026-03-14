@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA815, SuperInDerivedMethodOk) {
+TEST(SuperElaboration, SuperInDerivedMethodOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  integer value;\n"
@@ -23,7 +23,7 @@ TEST(ElabA815, SuperInDerivedMethodOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA815, SuperInModuleBlockError) {
+TEST(SuperElaboration, SuperInModuleBlockError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  initial begin\n"
@@ -33,7 +33,7 @@ TEST(ElabA815, SuperInModuleBlockError) {
              "endmodule\n"));
 }
 
-TEST(ElabA815, SuperInStaticMethodError) {
+TEST(SuperElaboration, SuperInStaticMethodError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  int x;\n"
@@ -48,7 +48,7 @@ TEST(ElabA815, SuperInStaticMethodError) {
              "endmodule\n"));
 }
 
-TEST(ElabA815, SuperNewInConstructorOk) {
+TEST(SuperElaboration, SuperNewInConstructorOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  function new();\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA702, EdgeSensitivePathSimulates) {
+TEST(SpecifyPathSim, EdgeSensitivePathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA85, StreamingConcatAsLhsRightShift) {
+TEST(LvalueParsing, StreamingConcatAsLhsRightShift) {
   auto r = Parse(
       "module m; logic [31:0] a, b;\n"
       "  initial {>> {a, b}} = 64'hDEADBEEF;\n"
@@ -19,7 +19,7 @@ TEST(ParserA85, StreamingConcatAsLhsRightShift) {
   EXPECT_EQ(stmt->lhs->elements.size(), 2u);
 }
 
-TEST(ParserA85, StreamingConcatAsLhsLeftShift) {
+TEST(LvalueParsing, StreamingConcatAsLhsLeftShift) {
   auto r = Parse(
       "module m; logic [7:0] a, b;\n"
       "  initial {<< byte {a, b}} = 16'hABCD;\n"
@@ -34,7 +34,7 @@ TEST(ParserA85, StreamingConcatAsLhsLeftShift) {
   ASSERT_NE(stmt->lhs->lhs, nullptr);
 }
 
-TEST(ParserA85, StreamingConcatAsLhsWithSliceSize) {
+TEST(LvalueParsing, StreamingConcatAsLhsWithSliceSize) {
   auto r = Parse(
       "module m; logic [31:0] a, b;\n"
       "  initial {>> 8 {a}} = b;\n"
@@ -47,7 +47,7 @@ TEST(ParserA85, StreamingConcatAsLhsWithSliceSize) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(ParserA85, StreamingConcatAsLhsNonblocking) {
+TEST(LvalueParsing, StreamingConcatAsLhsNonblocking) {
   auto r = Parse(
       "module m; logic [7:0] x;\n"
       "  initial {>> {x}} <= 8'hFF;\n"
@@ -60,7 +60,7 @@ TEST(ParserA85, StreamingConcatAsLhsNonblocking) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(ParserA85, StreamingConcatAsLhsSingleElement) {
+TEST(LvalueParsing, StreamingConcatAsLhsSingleElement) {
   auto r = Parse(
       "module m; logic [15:0] v;\n"
       "  initial {<< 4 {v}} = 16'hABCD;\n"
@@ -74,7 +74,7 @@ TEST(ParserA85, StreamingConcatAsLhsSingleElement) {
   EXPECT_EQ(stmt->lhs->elements.size(), 1u);
 }
 
-TEST(ParserA85, StreamingConcatAsLhsFromStreamingRhs) {
+TEST(LvalueParsing, StreamingConcatAsLhsFromStreamingRhs) {
   auto r = Parse(
       "module m; logic [7:0] a, b, c, d;\n"
       "  initial {>> {a, b}} = {>> {c, d}};\n"

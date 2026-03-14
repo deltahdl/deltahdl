@@ -7,14 +7,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A7SpecifyParallelPath) {
+TEST(FormalSyntaxParsing, SpecifyParallelPath) {
   auto r = Parse("module m; specify (a => b) = 5; endspecify endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecifyBlock);
   ASSERT_GE(r.cu->modules[0]->items[0]->specify_items.size(), 1u);
 }
-TEST(ParserA701, SpecifyBlockSingleItem) {
+TEST(SpecifyBlockDeclParsing, SpecifyBlockSingleItem) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -28,7 +28,7 @@ TEST(ParserA701, SpecifyBlockSingleItem) {
   ASSERT_EQ(spec->specify_items.size(), 1u);
 }
 
-TEST(ParserSection28, Sec28_12_MultiplePathsInSpecifyBlock) {
+TEST(GateLevelModelingParsing, MultiplePathsInSpecifyBlock) {
   auto r = Parse(
       "module m(input a, b, output x, y);\n"
       "  specify\n"
@@ -50,7 +50,7 @@ TEST(ParserSection28, Sec28_12_MultiplePathsInSpecifyBlock) {
   EXPECT_EQ(spec->specify_items[2]->path.path_kind, SpecifyPathKind::kParallel);
 }
 
-TEST(ParserA703, InputTerminalBitSelect) {
+TEST(SpecifyTerminalParsing, InputTerminalBitSelect) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -68,7 +68,7 @@ TEST(ParserA703, InputTerminalBitSelect) {
   EXPECT_EQ(si->path.src_ports[0].range_right, nullptr);
 }
 
-TEST(ParserA701, SpecifyItemPathDecl) {
+TEST(SpecifyBlockDeclParsing, SpecifyItemPathDecl) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -83,7 +83,7 @@ TEST(ParserA701, SpecifyItemPathDecl) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
 }
 
-TEST(ParserA703, OutputTerminalPartSelect) {
+TEST(SpecifyTerminalParsing, OutputTerminalPartSelect) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -108,7 +108,7 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
   return spec->specify_items[0];
 }
 
-TEST(ParserA702, PathDeclSimpleParallel) {
+TEST(SpecifyPathParsing, PathDeclSimpleParallel) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -126,7 +126,7 @@ TEST(ParserA702, PathDeclSimpleParallel) {
   EXPECT_FALSE(si->path.is_ifnone);
 }
 
-TEST(ParserA702, PathDeclSimpleFull) {
+TEST(SpecifyPathParsing, PathDeclSimpleFull) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -142,7 +142,7 @@ TEST(ParserA702, PathDeclSimpleFull) {
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
 }
 
-TEST(ParserA703, BothInputOutputWithRanges) {
+TEST(SpecifyTerminalParsing, BothInputOutputWithRanges) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -159,7 +159,7 @@ TEST(ParserA703, BothInputOutputWithRanges) {
   EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
 }
 
-TEST(ParserA703, OutputIdentifierDotted) {
+TEST(SpecifyTerminalParsing, OutputIdentifierDotted) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -175,7 +175,7 @@ TEST(ParserA703, OutputIdentifierDotted) {
   EXPECT_EQ(si->path.dst_ports[0].name, "sig");
 }
 
-TEST(ParserA702, SimplePathParallelSingleDelay) {
+TEST(SpecifyPathParsing, SimplePathParallelSingleDelay) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -194,7 +194,7 @@ TEST(ParserA702, SimplePathParallelSingleDelay) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
-TEST(ParserA702, SimplePathFullMultiplePorts) {
+TEST(SpecifyPathParsing, SimplePathFullMultiplePorts) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -208,7 +208,7 @@ TEST(ParserA702, SimplePathFullMultiplePorts) {
   VerifyFullPathPorts(si, {"a", "b", "c"}, {"x", "y"});
 }
 
-TEST(ParserA703, MixedInputTerminalsFullPath) {
+TEST(SpecifyTerminalParsing, MixedInputTerminalsFullPath) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -228,7 +228,7 @@ TEST(ParserA703, MixedInputTerminalsFullPath) {
   EXPECT_EQ(si->path.src_ports[2].range_kind, SpecifyRangeKind::kPartSelect);
 }
 
-TEST(ParserA83, ModulePathExprInSpecify) {
+TEST(ExpressionParsing, ModulePathExprInSpecify) {
   auto r = Parse(
       "module m(input a, output y);\n"
       "  specify\n"
@@ -239,7 +239,7 @@ TEST(ParserA83, ModulePathExprInSpecify) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_3_SpecifyBlock) {
+TEST(DesignBuildingBlockParsing, SpecifyBlock) {
   EXPECT_TRUE(
       ParseOk("module m (input a, output y);\n"
               "  assign y = a;\n"
@@ -248,7 +248,7 @@ TEST(ParserClause03, Cl3_3_SpecifyBlock) {
               "  endspecify\n"
               "endmodule\n"));
 }
-TEST(ParserSection28, Sec28_12_MultipleSourceDestPorts) {
+TEST(GateLevelModelingParsing, MultipleSourceDestPorts) {
   auto sp = ParseSpecifySingle(
       "module m(input a, b, c, output x, y);\n"
       "  specify\n"
@@ -284,7 +284,7 @@ TEST_F(SpecifyTest, ParallelPathDelay) {
   ASSERT_EQ(item->path.delays.size(), 1u);
 }
 
-TEST(ParserA701, SpecifyItemPathDeclaration) {
+TEST(SpecifyBlockDeclParsing, SpecifyItemPathDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

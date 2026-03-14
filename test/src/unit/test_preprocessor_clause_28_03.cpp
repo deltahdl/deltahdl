@@ -14,7 +14,7 @@ static bool HasGateOfKind(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserClause03, Cl3_7_BuiltInPrimitives) {
+TEST(DesignBuildingBlockParsing, BuiltInPrimitives) {
   auto r = ParseWithPreprocessor(
       "module gate_test(input a, b, c, output w, x, y, z);\n"
       "  and g1(w, a, b);\n"
@@ -33,7 +33,7 @@ TEST(ParserClause03, Cl3_7_BuiltInPrimitives) {
   EXPECT_TRUE(HasGateOfKind(r.cu->modules[0]->items, GateKind::kNmos));
 }
 
-TEST(ParserA222, DriveStrengthGateInst) {
+TEST(StrengthParsing, DriveStrengthGateInst) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire y, a, b;\n"
@@ -59,7 +59,7 @@ static void VerifyGateInstances(const std::vector<ModuleItem*>& items,
   }
 }
 
-TEST(ParserSection28, MultipleInstances) {
+TEST(GateLevelModelingParsing, MultipleInstances) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and g1(a, b, c), g2(d, e, f);\n"
@@ -71,7 +71,7 @@ TEST(ParserSection28, MultipleInstances) {
   VerifyGateInstances(mod->items, GateKind::kAnd, expected_names, 2);
 }
 
-TEST(ParserSection28, MultipleInstancesThree) {
+TEST(GateLevelModelingParsing, MultipleInstancesThree) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  nand n1(a, b, c), n2(d, e, f), n3(g, h, i);\n"
@@ -84,7 +84,7 @@ TEST(ParserSection28, MultipleInstancesThree) {
   EXPECT_EQ(mod->items[2]->gate_inst_name, "n3");
 }
 
-TEST(ParserSection28, MultipleInstancesNoNames) {
+TEST(GateLevelModelingParsing, MultipleInstancesNoNames) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  or (a, b, c), (d, e, f);\n"
@@ -105,7 +105,7 @@ static void VerifyStrengthDelayInstances(const std::vector<ModuleItem*>& items,
   }
 }
 
-TEST(ParserSection28, MultipleInstancesWithStrengthAndDelay) {
+TEST(GateLevelModelingParsing, MultipleInstancesWithStrengthAndDelay) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and (strong0, strong1) #5 g1(a, b, c), g2(d, e, f);\n"

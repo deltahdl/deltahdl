@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA85, VarLvalueForce) {
+TEST(LvalueSim, VarLvalueForce) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -285,7 +285,7 @@ TEST(StmtExec, ForceReleaseThenAssign) {
   EXPECT_EQ(var->value.ToUint64(), 75u);
 }
 
-TEST(SimCh10d, ForceOverridesBlockingAssign) {
+TEST(ProceduralContinuousAssignSim, ForceOverridesBlockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -306,7 +306,7 @@ TEST(SimCh10d, ForceOverridesBlockingAssign) {
   EXPECT_TRUE(x->is_forced);
 }
 
-TEST(SimCh10d, ReleaseVariableHoldsValue) {
+TEST(ProceduralContinuousAssignSim, ReleaseVariableHoldsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -328,7 +328,7 @@ TEST(SimCh10d, ReleaseVariableHoldsValue) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-TEST(SimCh10d, ForceReleaseThenAssign) {
+TEST(ProceduralContinuousAssignSim, ForceReleaseThenAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -350,7 +350,7 @@ TEST(SimCh10d, ForceReleaseThenAssign) {
   EXPECT_EQ(x->value.ToUint64(), 75u);
 }
 
-TEST(SimCh10d, ForceOverridesAssign) {
+TEST(ProceduralContinuousAssignSim, ForceOverridesAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -370,7 +370,7 @@ TEST(SimCh10d, ForceOverridesAssign) {
   EXPECT_EQ(x->value.ToUint64(), 99u);
 }
 
-TEST(SimCh10d, ForcePreventsBlockingAssign) {
+TEST(ProceduralContinuousAssignSim, ForcePreventsBlockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -392,7 +392,7 @@ TEST(SimCh10d, ForcePreventsBlockingAssign) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-TEST(SimCh10d, ForceExpressionRhs) {
+TEST(ProceduralContinuousAssignSim, ForceExpressionRhs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

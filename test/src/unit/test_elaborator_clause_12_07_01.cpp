@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA608, ForLoopTypedInit) {
+TEST(LoopStatementElaboration, ForLoopTypedInit) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(ElabA608, ForLoopTypedInit) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA608, ForLoopUntypedInit) {
+TEST(LoopStatementElaboration, ForLoopUntypedInit) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -34,7 +34,7 @@ TEST(ElabA608, ForLoopUntypedInit) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA608, NestedLoops) {
+TEST(LoopStatementElaboration, NestedLoops) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -52,7 +52,7 @@ TEST(ElabA608, NestedLoops) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh10, BlockingAssignForLoop) {
+TEST(BlockingAssignSim, BlockingAssignForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

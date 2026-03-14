@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA053, UdpBody_SequentialAlternative) {
+TEST(UdpBodyGrammar, UdpBody_SequentialAlternative) {
   auto r = Parse(
       "primitive latch(output reg q, input d, en);\n"
       "  table\n"
@@ -22,7 +22,7 @@ TEST(ParserAnnexA053, UdpBody_SequentialAlternative) {
   EXPECT_EQ(udp->table.size(), 3);
 }
 
-TEST(ParserAnnexA053, UdpBody_SimSequential) {
+TEST(UdpBodyGrammar, UdpBody_SimSequential) {
   auto r = Parse(
       "primitive latch(output reg q, input d, en);\n"
       "  table\n"
@@ -42,7 +42,7 @@ TEST(ParserAnnexA053, UdpBody_SimSequential) {
   EXPECT_EQ(eval.GetOutput(), '0');
 }
 
-TEST(ParserAnnexA053, SeqInputList_LevelOnly) {
+TEST(UdpBodyGrammar, SeqInputList_LevelOnly) {
   auto r = Parse(
       "primitive latch(output reg q, input d, en);\n"
       "  table\n"

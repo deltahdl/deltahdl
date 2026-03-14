@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA70501, RecremDualLimitsStored) {
+TEST(TimingCheckCommandSim, RecremDualLimitsStored) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kRecrem;

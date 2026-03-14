@@ -5,14 +5,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserCh513, BuiltInMethod_ChainedAccess) {
+TEST(BuiltInMethodParsing, BuiltInMethod_ChainedAccess) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial x = obj.sub.method();\n"
               "endmodule"));
 }
 
-TEST(ParserSection11, Sec11_1_MemberAccessExpression) {
+TEST(OperatorAndExpressionParsing, MemberAccessExpression) {
   auto r = Parse(
       "module t;\n"
       "  initial x = obj.field;\n"
@@ -22,7 +22,7 @@ TEST(ParserSection11, Sec11_1_MemberAccessExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserSection7, Sec7_2_2_MemberAssignment) {
+TEST(AggregateTypeParsing, MemberAssignment) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int a; int b; } pair_t;\n"
@@ -41,7 +41,7 @@ TEST(ParserSection7, Sec7_2_2_MemberAssignment) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserSection7, StructMemberAccess) {
+TEST(AggregateTypeParsing, StructMemberAccess) {
   auto r = Parse(
       "module t;\n"
       "  struct { int x; int y; } s;\n"

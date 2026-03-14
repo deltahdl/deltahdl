@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA60701, StructPositionalPatternElaborates) {
+TEST(PatternElaboration, StructPositionalPatternElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -24,7 +24,7 @@ TEST(ElabA60701, StructPositionalPatternElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-TEST(ElabA60701, TypedPatternExpressionElaborates) {
+TEST(PatternElaboration, TypedPatternExpressionElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -38,7 +38,7 @@ TEST(ElabA60701, TypedPatternExpressionElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-TEST(SimA60701, NamedStructPatternInit) {
+TEST(PatternSim, NamedStructPatternInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -59,7 +59,7 @@ TEST(SimA60701, NamedStructPatternInit) {
   EXPECT_EQ(var->value.ToUint64(), 2580u);
 }
 
-TEST(SimA60701, NamedStructPatternReversedOrder) {
+TEST(PatternSim, NamedStructPatternReversedOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -80,7 +80,7 @@ TEST(SimA60701, NamedStructPatternReversedOrder) {
   EXPECT_EQ(var->value.ToUint64(), 2580u);
 }
 
-TEST(SimA60701, PositionalStructPatternInit) {
+TEST(PatternSim, PositionalStructPatternInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -101,7 +101,7 @@ TEST(SimA60701, PositionalStructPatternInit) {
   EXPECT_EQ(var->value.ToUint64(), 775u);
 }
 
-TEST(SimA60701, ThreeFieldStructNamedPattern) {
+TEST(PatternSim, ThreeFieldStructNamedPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -126,7 +126,7 @@ TEST(SimA60701, ThreeFieldStructNamedPattern) {
   EXPECT_EQ(var->value.ToUint64(), 0x010203u);
 }
 
-TEST(SimA60701, ConstPatternInVarDeclInit) {
+TEST(PatternSim, ConstPatternInVarDeclInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -177,7 +177,7 @@ TEST(Elaboration, StructPattern_UncoveredMember) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ElabA60701, StructNamedPatternElaborates) {
+TEST(PatternElaboration, StructNamedPatternElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -204,7 +204,7 @@ TEST(AggregateExpr, AssignmentPatternAsAggregate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh10i, StructTypeKeyedPattern) {
+TEST(AssignmentPatternSim, StructTypeKeyedPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

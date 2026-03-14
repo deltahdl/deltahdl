@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7, EmptyConcatClearQueue_Parse) {
+TEST(AggregateTypeParsing, EmptyConcatClearQueue_Parse) {
   auto r = Parse(
       "module t;\n"
       "  int q[$];\n"
@@ -18,7 +18,7 @@ TEST(ParserSection7, EmptyConcatClearQueue_Parse) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection7, QueueConcatAssign) {
+TEST(AggregateTypeParsing, QueueConcatAssign) {
   auto r = Parse(
       "module t;\n"
       "  int q[$];\n"

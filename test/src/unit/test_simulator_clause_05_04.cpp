@@ -5,7 +5,7 @@
 
 using namespace delta;
 
-TEST(SimCh504, CommentLineCommentStripped) {
+TEST(CommentSim, CommentLineCommentStripped) {
   auto result = RunAndGet(
       "module t; // module declaration\n"
       "  logic [7:0] result; // variable\n"
@@ -15,7 +15,7 @@ TEST(SimCh504, CommentLineCommentStripped) {
   EXPECT_EQ(result, 77u);
 }
 
-TEST(SimCh504, CommentBlockCommentStripped) {
+TEST(CommentSim, CommentBlockCommentStripped) {
   auto result = RunAndGet(
       "module /* module */ t /* name */;\n"
       "  logic /* type */ [7:0] /* width */ result /* var */;\n"
@@ -25,7 +25,7 @@ TEST(SimCh504, CommentBlockCommentStripped) {
   EXPECT_EQ(result, 55u);
 }
 
-TEST(SimCh504, CommentBlockNotNested) {
+TEST(CommentSim, CommentBlockNotNested) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -35,7 +35,7 @@ TEST(SimCh504, CommentBlockNotNested) {
   EXPECT_EQ(result, 33u);
 }
 
-TEST(SimCh504, CommentLineInsideBlockNoEffect) {
+TEST(CommentSim, CommentLineInsideBlockNoEffect) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -47,7 +47,7 @@ TEST(SimCh504, CommentLineInsideBlockNoEffect) {
   EXPECT_EQ(result, 99u);
 }
 
-TEST(SimCh504, CommentBlockInsideLineNoEffect) {
+TEST(CommentSim, CommentBlockInsideLineNoEffect) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -59,7 +59,7 @@ TEST(SimCh504, CommentBlockInsideLineNoEffect) {
   EXPECT_EQ(result, 22u);
 }
 
-TEST(SimCh504, CommentMixedInExpression) {
+TEST(CommentSim, CommentMixedInExpression) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -73,7 +73,7 @@ TEST(SimCh504, CommentMixedInExpression) {
   EXPECT_EQ(result, 30u);
 }
 
-TEST(SimCh504, CommentMultilineBlockSpan) {
+TEST(CommentSim, CommentMultilineBlockSpan) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -88,7 +88,7 @@ TEST(SimCh504, CommentMultilineBlockSpan) {
   EXPECT_EQ(result, 11u);
 }
 
-TEST(SimCh504, CommentBlockAsSeparator) {
+TEST(CommentSim, CommentBlockAsSeparator) {
   auto result = RunAndGet(
       "module/**/t;logic/**/[7:0]/**/result;initial/**/result=8'd71;"
       "endmodule",

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA609, TfCallElaborates) {
+TEST(SubroutineCallElaborationSyntax, TfCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(ElabA609, TfCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA84, PrimaryFunctionCallElaborates) {
+TEST(PrimaryElaboration, PrimaryFunctionCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -32,7 +32,7 @@ TEST(ElabA84, PrimaryFunctionCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1350, OutputArgLiteralError) {
+TEST(SubroutineCallElaboration, OutputArgLiteralError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -45,7 +45,7 @@ TEST(Elab1350, OutputArgLiteralError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1350, InoutArgLiteralError) {
+TEST(SubroutineCallElaboration, InoutArgLiteralError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -58,7 +58,7 @@ TEST(Elab1350, InoutArgLiteralError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1350, OutputArgVariableOk) {
+TEST(SubroutineCallElaboration, OutputArgVariableOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -73,7 +73,7 @@ TEST(Elab1350, OutputArgVariableOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1350, TooManyArgsError) {
+TEST(SubroutineCallElaboration, TooManyArgsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"

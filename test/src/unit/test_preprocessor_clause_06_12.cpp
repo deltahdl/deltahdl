@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, ShortrealInit) {
+TEST(DataTypeParsing, ShortrealInit) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  shortreal sr = 1.5;\n"

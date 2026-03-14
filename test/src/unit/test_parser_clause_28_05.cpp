@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_BufBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_BufBasic) {
   auto r = Parse(
       "module m;\n"
       "  buf (out, in);\n"
@@ -17,7 +17,7 @@ TEST(ParserA301, GateInst_BufBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA301, GateInst_NotBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_NotBasic) {
   auto r = Parse(
       "module m;\n"
       "  not (out, in);\n"
@@ -28,7 +28,7 @@ TEST(ParserA301, GateInst_NotBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA301, GateInst_NOutputMultipleOutputs) {
+TEST(PrimitiveInstantiationParsing, GateInst_NOutputMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
       "  buf (o1, o2, o3, in);\n"
@@ -39,7 +39,7 @@ TEST(ParserA301, GateInst_NOutputMultipleOutputs) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-TEST(ParserA301, NOutputGateInst_SingleOutput) {
+TEST(PrimitiveInstantiationParsing, NOutputGateInst_SingleOutput) {
   auto r = Parse(
       "module m;\n"
       "  buf b1(out, in);\n"
@@ -50,7 +50,7 @@ TEST(ParserA301, NOutputGateInst_SingleOutput) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA301, NOutputGateInst_ThreeOutputs) {
+TEST(PrimitiveInstantiationParsing, NOutputGateInst_ThreeOutputs) {
   auto r = Parse(
       "module m;\n"
       "  not n1(o1, o2, o3, in);\n"
@@ -61,7 +61,7 @@ TEST(ParserA301, NOutputGateInst_ThreeOutputs) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-TEST(ParserA301, NOutputGateInst_Unnamed) {
+TEST(PrimitiveInstantiationParsing, NOutputGateInst_Unnamed) {
   auto r = Parse(
       "module m;\n"
       "  buf (o1, o2, in);\n"
@@ -73,7 +73,7 @@ TEST(ParserA301, NOutputGateInst_Unnamed) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, NOutputGatetype_Buf) {
+TEST(PrimitiveGateTypeParsing, NOutputGatetype_Buf) {
   auto r = Parse(
       "module m;\n"
       "  buf (out, in);\n"
@@ -84,7 +84,7 @@ TEST(ParserA304, NOutputGatetype_Buf) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA304, NOutputGatetype_Not) {
+TEST(PrimitiveGateTypeParsing, NOutputGatetype_Not) {
   auto r = Parse(
       "module m;\n"
       "  not (out, in);\n"

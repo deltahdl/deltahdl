@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, StrengthWithDelay) {
+TEST(GateLevelModelingParsing, StrengthWithDelay) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and (strong0, strong1) #5 g1(out, a, b);\n"
@@ -19,7 +19,7 @@ TEST(ParserSection28, StrengthWithDelay) {
   ASSERT_EQ(item->gate_terminals.size(), 3);
 }
 
-TEST(ParserSection28, StrengthSpec) {
+TEST(GateLevelModelingParsing, StrengthSpec) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and (strong0, weak1) g1(out, a, b);\n"
@@ -32,7 +32,7 @@ TEST(ParserSection28, StrengthSpec) {
   EXPECT_EQ(item->gate_inst_name, "g1");
 }
 
-TEST(ParserSection28, StrengthSpecSupply) {
+TEST(GateLevelModelingParsing, StrengthSpecSupply) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  nand (supply0, supply1) g1(out, a, b);\n"
@@ -43,7 +43,7 @@ TEST(ParserSection28, StrengthSpecSupply) {
   EXPECT_EQ(item->drive_strength1, 5);
 }
 
-TEST(ParserSection28, StrengthSpecHighz) {
+TEST(GateLevelModelingParsing, StrengthSpecHighz) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  or (highz0, pull1) g1(out, a, b);\n"

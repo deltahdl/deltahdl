@@ -4,33 +4,33 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA10, RefPortOnModule) {
+TEST(TopLevelGrammarElaboration, RefPortOnModule) {
   EXPECT_TRUE(
       ElabOk("module m(ref int x);\n"
              "endmodule\n"));
 }
 
-TEST(ElabA10, InoutPortOnModule) {
+TEST(TopLevelGrammarElaboration, InoutPortOnModule) {
   EXPECT_TRUE(
       ElabOk("module m(inout wire a);\n"
              "endmodule\n"));
 }
 
-TEST(ElabA10, TimeunitDeclOk) {
+TEST(TopLevelGrammarElaboration, TimeunitDeclOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  timeunit 1ns;\n"
              "endmodule\n"));
 }
 
-TEST(ElabA10, TimeprecisionDeclOk) {
+TEST(TopLevelGrammarElaboration, TimeprecisionDeclOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  timeprecision 1ps;\n"
              "endmodule\n"));
 }
 
-TEST(ElabA10, TimeunitAndPrecisionOk) {
+TEST(TopLevelGrammarElaboration, TimeunitAndPrecisionOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  timeunit 1ns;\n"
@@ -38,7 +38,7 @@ TEST(ElabA10, TimeunitAndPrecisionOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA10, ParameterInClassIsLocalparam) {
+TEST(TopLevelGrammarElaboration, ParameterInClassIsLocalparam) {
   EXPECT_TRUE(
       ElabOk("class c;\n"
              "  parameter int WIDTH = 8;\n"
@@ -46,7 +46,7 @@ TEST(ElabA10, ParameterInClassIsLocalparam) {
              "module m; endmodule\n"));
 }
 
-TEST(ElabA10, AutomaticInInitialBlockOk) {
+TEST(TopLevelGrammarElaboration, AutomaticInInitialBlockOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  initial begin\n"
@@ -55,7 +55,7 @@ TEST(ElabA10, AutomaticInInitialBlockOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA10, AutomaticInModuleScopeError) {
+TEST(TopLevelGrammarElaboration, AutomaticInModuleScopeError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -65,7 +65,7 @@ TEST(ElabA10, AutomaticInModuleScopeError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ElabA10, ImportInClassScopeError) {
+TEST(TopLevelGrammarElaboration, ImportInClassScopeError) {
   ElabFixture f;
   ElaborateSrc(
       "package pkg;\n"
@@ -79,21 +79,21 @@ TEST(ElabA10, ImportInClassScopeError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ElabA10, VectoredRequiresPackedDim) {
+TEST(TopLevelGrammarElaboration, VectoredRequiresPackedDim) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  wire vectored [7:0] bus;\n"
              "endmodule\n"));
 }
 
-TEST(ElabA10, ScalaredRequiresPackedDim) {
+TEST(TopLevelGrammarElaboration, ScalaredRequiresPackedDim) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  wire scalared [3:0] w;\n"
              "endmodule\n"));
 }
 
-TEST(ElabA10, StructPackedWithDimOk) {
+TEST(TopLevelGrammarElaboration, StructPackedWithDimOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  typedef struct packed {\n"
@@ -104,7 +104,7 @@ TEST(ElabA10, StructPackedWithDimOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA10, TypeRefWithWireOk) {
+TEST(TopLevelGrammarElaboration, TypeRefWithWireOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  wire x;\n"
@@ -112,7 +112,7 @@ TEST(ElabA10, TypeRefWithWireOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA10, TypeRefWithVarOk) {
+TEST(TopLevelGrammarElaboration, TypeRefWithVarOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int x;\n"
@@ -120,7 +120,7 @@ TEST(ElabA10, TypeRefWithVarOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA10, DotStarOk) {
+TEST(TopLevelGrammarElaboration, DotStarOk) {
   EXPECT_TRUE(
       ElabOk("module sub(input a, output b);\n"
              "  assign b = a;\n"
@@ -131,7 +131,7 @@ TEST(ElabA10, DotStarOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA10, ReplicationWithConstantOk) {
+TEST(TopLevelGrammarElaboration, ReplicationWithConstantOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  logic [7:0] x;\n"
@@ -139,7 +139,7 @@ TEST(ElabA10, ReplicationWithConstantOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA10, EmptyUnpackedArrayConcatOk) {
+TEST(TopLevelGrammarElaboration, EmptyUnpackedArrayConcatOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int q[$];\n"
@@ -147,7 +147,7 @@ TEST(ElabA10, EmptyUnpackedArrayConcatOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA10, ThisInClassMethodOk) {
+TEST(TopLevelGrammarElaboration, ThisInClassMethodOk) {
   EXPECT_TRUE(
       ElabOk("class c;\n"
              "  int x;\n"
@@ -158,7 +158,7 @@ TEST(ElabA10, ThisInClassMethodOk) {
              "module m; endmodule\n"));
 }
 
-TEST(ElabA10, DollarInQueueSelectOk) {
+TEST(TopLevelGrammarElaboration, DollarInQueueSelectOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int q[$];\n"

@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection4, Sec4_5_StrobeSystemCall) {
+TEST(SchedulingSemanticsParsing, StrobeSystemCall) {
   auto r = Parse(
       "module m;\n"
       "  reg a;\n"
@@ -22,14 +22,14 @@ TEST(ParserSection4, Sec4_5_StrobeSystemCall) {
   EXPECT_EQ(stmt->expr->callee, "$strobe");
 }
 
-TEST(ParserSection21, StrobeBasicCall) {
+TEST(IoSystemTaskParsing, StrobeBasicCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $strobe(\"val=%d\", x);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection21, StrobebHexOctal) {
+TEST(IoSystemTaskParsing, StrobebHexOctal) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"

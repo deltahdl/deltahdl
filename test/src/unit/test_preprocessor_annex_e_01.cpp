@@ -273,7 +273,7 @@ TEST(Preprocessor, DelayMode_DefaultIsNone) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kNone);
 }
 
-TEST(Preprocessor, AnnexE_AllDirectivesCombined) {
+TEST(Preprocessor, AllDirectivesCombined) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP(
@@ -288,7 +288,7 @@ TEST(Preprocessor, AnnexE_AllDirectivesCombined) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kDistributed);
 }
 
-TEST(Preprocessor, AnnexE_ResetallResetsState) {
+TEST(Preprocessor, ResetallResetsState) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP(
@@ -304,21 +304,21 @@ TEST(Preprocessor, AnnexE_ResetallResetsState) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kNone);
 }
 
-TEST(Preprocessor, AnnexE_CannotRedefineAsMarco) {
+TEST(Preprocessor, CannotRedefineAsMarco) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`define default_decay_time 42\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, AnnexE_CannotRedefineDelayModeDistributed) {
+TEST(Preprocessor, CannotRedefineDelayModeDistributed) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   PreprocessWithPP("`define delay_mode_distributed 1\n", f, pp);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, AnnexE_DirectivesStrippedFromOutput) {
+TEST(Preprocessor, DirectivesStrippedFromOutput) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto out =

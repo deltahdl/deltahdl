@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA609, MethodCallElaborates) {
+TEST(SubroutineCallElaborationSyntax, MethodCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -15,7 +15,7 @@ TEST(ElabA609, MethodCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, ClassWithMethodElaborates) {
+TEST(OperatorElaboration, ClassWithMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  int data;\n"
@@ -28,7 +28,7 @@ TEST(ElabA86, ClassWithMethodElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabA86, MethodCallOnInstanceElaborates) {
+TEST(OperatorElaboration, MethodCallOnInstanceElaborates) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  function int current_status();\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA302, PullupStrength_Strength0Strength1) {
+TEST(PrimitiveStrengthParsing, PullupStrength_Strength0Strength1) {
   auto r = Parse(
       "module m;\n"
       "  pullup (strong0, pull1) pu1(out);\n"
@@ -19,7 +19,7 @@ TEST(ParserA302, PullupStrength_Strength0Strength1) {
   EXPECT_EQ(g->gate_inst_name, "pu1");
 }
 
-TEST(ParserA302, PullupStrength_Weak0Supply1) {
+TEST(PrimitiveStrengthParsing, PullupStrength_Weak0Supply1) {
   auto r = Parse(
       "module m;\n"
       "  pullup (weak0, supply1) (out);\n"
@@ -31,7 +31,7 @@ TEST(ParserA302, PullupStrength_Weak0Supply1) {
   EXPECT_EQ(g->drive_strength1, 5u);
 }
 
-TEST(ParserA302, PullupStrength_Strength1Strength0) {
+TEST(PrimitiveStrengthParsing, PullupStrength_Strength1Strength0) {
   auto r = Parse(
       "module m;\n"
       "  pullup (supply1, weak0) pu1(out);\n"
@@ -43,7 +43,7 @@ TEST(ParserA302, PullupStrength_Strength1Strength0) {
   EXPECT_EQ(g->drive_strength1, 5u);
 }
 
-TEST(ParserA302, PullupStrength_Highz1Strong0) {
+TEST(PrimitiveStrengthParsing, PullupStrength_Highz1Strong0) {
   auto r = Parse(
       "module m;\n"
       "  pullup (highz1, strong0) (out);\n"
@@ -55,7 +55,7 @@ TEST(ParserA302, PullupStrength_Highz1Strong0) {
   EXPECT_EQ(g->drive_strength1, 1u);
 }
 
-TEST(ParserA302, PullupStrength_SingleStrength1) {
+TEST(PrimitiveStrengthParsing, PullupStrength_SingleStrength1) {
   auto r = Parse(
       "module m;\n"
       "  pullup (strong1) pu1(out);\n"
@@ -67,7 +67,7 @@ TEST(ParserA302, PullupStrength_SingleStrength1) {
   EXPECT_EQ(g->drive_strength1, 4u);
 }
 
-TEST(ParserA302, PullupStrength_SingleSupply1) {
+TEST(PrimitiveStrengthParsing, PullupStrength_SingleSupply1) {
   auto r = Parse(
       "module m;\n"
       "  pullup (supply1) (out);\n"
@@ -79,7 +79,7 @@ TEST(ParserA302, PullupStrength_SingleSupply1) {
   EXPECT_EQ(g->drive_strength1, 5u);
 }
 
-TEST(ParserA302, PullupStrength_SingleWeak1) {
+TEST(PrimitiveStrengthParsing, PullupStrength_SingleWeak1) {
   auto r = Parse(
       "module m;\n"
       "  pullup (weak1) pu1(out);\n"
@@ -91,7 +91,7 @@ TEST(ParserA302, PullupStrength_SingleWeak1) {
   EXPECT_EQ(g->drive_strength1, 2u);
 }
 
-TEST(ParserA302, PullupStrength_SinglePull1) {
+TEST(PrimitiveStrengthParsing, PullupStrength_SinglePull1) {
   auto r = Parse(
       "module m;\n"
       "  pullup (pull1) pu1(out);\n"
@@ -103,7 +103,7 @@ TEST(ParserA302, PullupStrength_SinglePull1) {
   EXPECT_EQ(g->drive_strength1, 3u);
 }
 
-TEST(ParserA302, PullupStrength_SingleHighz1) {
+TEST(PrimitiveStrengthParsing, PullupStrength_SingleHighz1) {
   auto r = Parse(
       "module m;\n"
       "  pullup (highz1) pu1(out);\n"
@@ -115,7 +115,7 @@ TEST(ParserA302, PullupStrength_SingleHighz1) {
   EXPECT_EQ(g->drive_strength1, 1u);
 }
 
-TEST(ParserA302, PullupStrength_MultipleInstances) {
+TEST(PrimitiveStrengthParsing, PullupStrength_MultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  pullup (weak0, strong1) pu1(a), pu2(b);\n"
@@ -129,7 +129,7 @@ TEST(ParserA302, PullupStrength_MultipleInstances) {
   EXPECT_EQ(gates[1]->drive_strength1, 4u);
 }
 
-TEST(ParserA302, PullupStrength_SingleStrength1_MultipleInstances) {
+TEST(PrimitiveStrengthParsing, PullupStrength_SingleStrength1_MultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  pullup (pull1) pu1(a), pu2(b);\n"

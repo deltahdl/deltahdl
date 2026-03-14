@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, SequencePortItem_LocalInout) {
+TEST(AssertionDeclParsing, SequencePortItem_LocalInout) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(local inout int x);\n"
@@ -13,7 +13,7 @@ TEST(ParserA210, SequencePortItem_LocalInout) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceLvarPortDirection_Input) {
+TEST(AssertionDeclParsing, SequenceLvarPortDirection_Input) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(local input int x);\n"
@@ -22,7 +22,7 @@ TEST(ParserA210, SequenceLvarPortDirection_Input) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceLvarPortDirection_Output) {
+TEST(AssertionDeclParsing, SequenceLvarPortDirection_Output) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(local output int x);\n"

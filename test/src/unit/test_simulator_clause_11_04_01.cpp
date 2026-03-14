@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA85, VarLvalueCompoundAdd) {
+TEST(LvalueSim, VarLvalueCompoundAdd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

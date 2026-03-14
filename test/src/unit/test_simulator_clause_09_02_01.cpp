@@ -59,7 +59,7 @@ TEST(Lowerer, SensitivityMapEmpty) {
   EXPECT_TRUE(procs.empty());
 }
 
-TEST(SimCh4, ParallelInitialBlocks) {
+TEST(SchedulingSemanticsSim, ParallelInitialBlocks) {
   auto a = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -70,7 +70,7 @@ TEST(SimCh4, ParallelInitialBlocks) {
   EXPECT_EQ(a, 42u);
 }
 
-TEST(SimCh4, ParallelInitialBlocksBothComplete) {
+TEST(SchedulingSemanticsSim, ParallelInitialBlocksBothComplete) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -91,7 +91,7 @@ TEST(SimCh4, ParallelInitialBlocksBothComplete) {
   EXPECT_EQ(vb->value.ToUint64(), 99u);
 }
 
-TEST(SimCh4, EmptyProcessNoInterference) {
+TEST(SchedulingSemanticsSim, EmptyProcessNoInterference) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -107,7 +107,7 @@ TEST(SimCh4, EmptyProcessNoInterference) {
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 77u);
 }
 
-TEST(SimCh4, FiveParallelInitialBlocks) {
+TEST(SchedulingSemanticsSim, FiveParallelInitialBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

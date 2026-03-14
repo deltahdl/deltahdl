@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA70501, SetupholdFullArgsElaborates) {
+TEST(TimingCheckCommandElaboration, SetupholdFullArgsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(ElabA70501, SetupholdFullArgsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70502, TimecheckCondMinTypMaxElaborates) {
+TEST(TimingCheckArgumentElaboration, TimecheckCondMinTypMaxElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

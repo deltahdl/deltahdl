@@ -13,7 +13,7 @@ TEST(SourceText, ClassWithImplements) {
   EXPECT_EQ(r.cu->classes[0]->name, "C");
 }
 
-TEST(ParserSection8, ClassImplementsMultipleInterfaces) {
+TEST(ClassParsing, ClassImplementsMultipleInterfaces) {
   EXPECT_TRUE(
       ParseOk("interface class A;\n"
               "  pure virtual function void fa();\n"
@@ -29,7 +29,7 @@ TEST(ParserSection8, ClassImplementsMultipleInterfaces) {
               "endclass\n"));
 }
 
-TEST(ParserSection8, ClassImplementsInterface) {
+TEST(ClassParsing, ClassImplementsInterface) {
   auto r = Parse(
       "interface class PutIf;\n"
       "  pure virtual function void put(int a);\n"
@@ -43,7 +43,7 @@ TEST(ParserSection8, ClassImplementsInterface) {
   EXPECT_EQ(r.cu->classes[1]->name, "Fifo");
 }
 
-TEST(ParserSection8, InterfaceClassExtendsMultiple) {
+TEST(ClassParsing, InterfaceClassExtendsMultiple) {
   auto r = Parse(
       "interface class A;\n"
       "  pure virtual function void fa();\n"
@@ -60,7 +60,7 @@ TEST(ParserSection8, InterfaceClassExtendsMultiple) {
   EXPECT_EQ(r.cu->classes[2]->base_class, "A");
 }
 
-TEST(ParserSection8, ExtendsAndImplements) {
+TEST(ClassParsing, ExtendsAndImplements) {
   auto r = Parse(
       "interface class Iface;\n"
       "  pure virtual function void foo();\n"
@@ -76,7 +76,7 @@ TEST(ParserSection8, ExtendsAndImplements) {
   EXPECT_EQ(r.cu->classes[2]->base_class, "Base");
 }
 
-TEST(ParserClause08_03, ImplementsMultipleInterfaces) {
+TEST(ClassSyntaxParsing, ImplementsMultipleInterfaces) {
   auto r = Parse(
       "class C implements IFace1, IFace2, IFace3;\n"
       "endclass\n");
@@ -89,7 +89,7 @@ TEST(ParserClause08_03, ImplementsMultipleInterfaces) {
   EXPECT_EQ(cls->implements_types[2], "IFace3");
 }
 
-TEST(ParserClause08_03, ImplementsWithParamAssignment) {
+TEST(ClassSyntaxParsing, ImplementsWithParamAssignment) {
   auto r = Parse(
       "class C implements IFace#(int);\n"
       "endclass\n");

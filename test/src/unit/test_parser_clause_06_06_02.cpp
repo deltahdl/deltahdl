@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, Sec6_5_UwireDecl) {
+TEST(DataTypeParsing, UwireDeclAsVariable) {
   auto r = Parse(
       "module t;\n"
       "  uwire single;\n"
@@ -19,7 +19,7 @@ TEST(ParserSection6, Sec6_5_UwireDecl) {
   EXPECT_EQ(item->name, "single");
 }
 
-TEST(ParserSection6, Sec6_7_1_UwireDecl) {
+TEST(DataTypeParsing, UwireDeclAsNet) {
   auto r = Parse(
       "module t;\n"
       "  uwire uw;\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexD2, AnnexDScaleParse) {
+TEST(OptionalSystemTaskExtendedParsing, ScaleParse) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $scale(hier_ref);\n"
@@ -17,7 +17,7 @@ TEST(ParserAnnexD2, AnnexDScaleParse) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserAnnexD2, AnnexDScaleRhs) {
+TEST(OptionalSystemTaskExtendedParsing, ScaleRhs) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $scale(hier_ref);\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, ChandleInClass) {
+TEST(DataTypeParsing, ChandleInClass) {
   auto r = ParseWithPreprocessor(
       "class Wrapper;\n"
       "  chandle ptr;\n"

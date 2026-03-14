@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA84, ConstantPrimaryCastElaborates) {
+TEST(PrimaryElaboration, ConstantPrimaryCastElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(ElabA84, ConstantPrimaryCastElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA84, PrimaryCastInInitialElaborates) {
+TEST(PrimaryElaboration, PrimaryCastInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -29,7 +29,7 @@ TEST(ElabA84, PrimaryCastInInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh6, CastSigned) {
+TEST(DataTypeSim, CastSigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -53,7 +53,7 @@ TEST(SimCh6, CastSigned) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-TEST(SimCh6, CastUnsigned) {
+TEST(DataTypeSim, CastUnsigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -77,7 +77,7 @@ TEST(SimCh6, CastUnsigned) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-TEST(SimCh6, CastShortint) {
+TEST(DataTypeSim, CastShortint) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -101,7 +101,7 @@ TEST(SimCh6, CastShortint) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
-TEST(SimCh6b, TypeOpStructMemberWidth) {
+TEST(TypeOperatorSim, TypeOpStructMemberWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -128,7 +128,7 @@ TEST(SimCh6b, TypeOpStructMemberWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-TEST(SimCh9d, AlwaysStarTypeCast) {
+TEST(AlwaysStarSim, AlwaysStarTypeCast) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -153,7 +153,7 @@ TEST(SimCh9d, AlwaysStarTypeCast) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-TEST(SimCh10, BlockingAssignTypeCast) {
+TEST(BlockingAssignSim, BlockingAssignTypeCast) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -177,7 +177,7 @@ TEST(SimCh10, BlockingAssignTypeCast) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-TEST(SimCh6, CastRealMulToInt) {
+TEST(DataTypeSim, CastRealMulToInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -196,7 +196,7 @@ TEST(SimCh6, CastRealMulToInt) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-TEST(SimCh6, CastConcatToShortint) {
+TEST(DataTypeSim, CastConcatToShortint) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -215,7 +215,7 @@ TEST(SimCh6, CastConcatToShortint) {
   EXPECT_EQ(var->value.ToUint64(), 0xFACEu);
 }
 
-TEST(SimCh6, CastByteTruncate) {
+TEST(DataTypeSim, CastByteTruncate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

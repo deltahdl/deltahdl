@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_06_03, DisableForkAfterJoinAnyElaborates) {
+TEST(DisableForkElaboration, DisableForkAfterJoinAnyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -22,7 +22,7 @@ TEST(ElabClause09_06_03, DisableForkAfterJoinAnyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_06_03, DisableForkAfterJoinNoneElaborates) {
+TEST(DisableForkElaboration, DisableForkAfterJoinNoneElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -40,7 +40,7 @@ TEST(ElabClause09_06_03, DisableForkAfterJoinNoneElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_06_03, DisableForkStandaloneElaborates) {
+TEST(DisableForkElaboration, DisableForkStandaloneElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -53,7 +53,7 @@ TEST(ElabClause09_06_03, DisableForkStandaloneElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_06_03, DisableForkInTaskElaborates) {
+TEST(DisableForkElaboration, DisableForkInTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

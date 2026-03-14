@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_9_PrimaryStringLiteral) {
+TEST(LexicalConventionParsing, PrimaryStringLiteral) {
   auto r = Parse("module m; initial x = \"hello\"; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(ParserClause05, Cl5_9_PrimaryStringLiteral) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-TEST(ParserClause05, Cl5_9_ConstantPrimaryStringLiteral) {
+TEST(LexicalConventionParsing, ConstantPrimaryStringLiteral) {
   auto r = Parse("module m; parameter string S = \"hello\"; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -23,7 +23,7 @@ TEST(ParserClause05, Cl5_9_ConstantPrimaryStringLiteral) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kStringLiteral);
 }
 
-TEST(ParserClause05, Cl5_9_StringInSystemCall) {
+TEST(LexicalConventionParsing, StringInSystemCall) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"hello world\");\n"
@@ -37,7 +37,7 @@ TEST(ParserClause05, Cl5_9_StringInSystemCall) {
   EXPECT_EQ(stmt->expr->args[0]->kind, ExprKind::kStringLiteral);
 }
 
-TEST(ParserClause05, Cl5_9_StringAssignment) {
+TEST(LexicalConventionParsing, StringAssignment) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  byte c1;\n"
@@ -45,21 +45,21 @@ TEST(ParserClause05, Cl5_9_StringAssignment) {
               "endmodule"));
 }
 
-TEST(ParserClause05, Cl5_9_StringPackedArray) {
+TEST(LexicalConventionParsing, StringPackedArray) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  bit [8*12:1] stringvar = \"Hello world\\n\";\n"
               "endmodule"));
 }
 
-TEST(ParserClause05, Cl5_9_StringInConcatenation) {
+TEST(LexicalConventionParsing, StringInConcatenation) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial $display({\"A\", \"B\"});\n"
               "endmodule"));
 }
 
-TEST(ParserClause05, Cl5_9_StringWithWorld) {
+TEST(LexicalConventionParsing, StringWithWorld) {
   auto r = Parse("module m; initial x = \"world\"; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA26, FuncBodyOldStylePorts) {
+TEST(FunctionDeclParsing, FuncBodyOldStylePorts) {
   auto r = Parse(
       "module m;\n"
       "  function int foo;\n"
@@ -23,7 +23,7 @@ TEST(ParserA26, FuncBodyOldStylePorts) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-TEST(ParserSection13, FunctionNoPorts) {
+TEST(TaskAndFunctionParsing, FunctionNoPorts) {
   auto r = Parse(
       "module m;\n"
       "  function int get_magic();\n"
@@ -37,7 +37,7 @@ TEST(ParserSection13, FunctionNoPorts) {
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
 }
 
-TEST(ParserSection13, FunctionMultipleBodyStmts) {
+TEST(TaskAndFunctionParsing, FunctionMultipleBodyStmts) {
   auto r = Parse(
       "module m;\n"
       "  function int clamp(int val, int lo, int hi);\n"
@@ -53,7 +53,7 @@ TEST(ParserSection13, FunctionMultipleBodyStmts) {
   EXPECT_GE(fn->func_body_stmts.size(), 3u);
 }
 
-TEST(ParserSection4, Sec4_9_3_AutoFuncWithAllPortDirs) {
+TEST(SchedulingSemanticsParsing, AutoFuncWithAllPortDirs) {
   auto r = Parse(
       "module m;\n"
       "  function automatic void multi_dir(\n"
@@ -96,7 +96,7 @@ TEST(Parser, FunctionDecl) {
   }
 }
 
-TEST(ParserA23, ListOfTfVariableIdentifiersThree) {
+TEST(DeclarationListParsing, ListOfTfVariableIdentifiersThree) {
   auto r = Parse(
       "module m;\n"
       "  function int sum3;\n"
@@ -113,7 +113,7 @@ TEST(ParserA23, ListOfTfVariableIdentifiersThree) {
   EXPECT_EQ(item->func_args[2].name, "z");
 }
 
-TEST(ParserA26, FuncReturnTypeImplicit) {
+TEST(FunctionDeclParsing, FuncReturnTypeImplicit) {
   auto r =
       Parse("module m;\n  function foo(); return 1; endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -123,7 +123,7 @@ TEST(ParserA26, FuncReturnTypeImplicit) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kImplicit);
 }
 
-TEST(ParserSection6, Sec6_11_IntegerTypesAsFunctionParams) {
+TEST(DataTypeParsing, IntegerTypesAsFunctionParams) {
   auto r = Parse(
       "module t;\n"
       "  function void f(int a, byte b);\n"
@@ -141,7 +141,7 @@ TEST(ParserSection6, Sec6_11_IntegerTypesAsFunctionParams) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-TEST(ParserA26, FuncReturnTypeImplicitSigned) {
+TEST(FunctionDeclParsing, FuncReturnTypeImplicitSigned) {
   auto r = Parse(
       "module m;\n  function signed [7:0] foo();\n"
       "    return 0;\n  endfunction\nendmodule\n");
@@ -152,7 +152,7 @@ TEST(ParserA26, FuncReturnTypeImplicitSigned) {
   EXPECT_TRUE(item->return_type.is_signed);
 }
 
-TEST(ParserA26, FuncBodyNewStyleWithArgs) {
+TEST(FunctionDeclParsing, FuncBodyNewStyleWithArgs) {
   auto r = Parse(
       "module m;\n"
       "  function int add(input int a, input int b);\n"
@@ -167,7 +167,7 @@ TEST(ParserA26, FuncBodyNewStyleWithArgs) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-TEST(ParserA26, FuncBodyNewStyleMultipleDirections) {
+TEST(FunctionDeclParsing, FuncBodyNewStyleMultipleDirections) {
   auto r = Parse(
       "module m;\n"
       "  function void xfer(input int a, output int b, inout int c, ref int "
@@ -180,7 +180,7 @@ TEST(ParserA26, FuncBodyNewStyleMultipleDirections) {
                            Direction::kInout, Direction::kRef});
 }
 
-TEST(ParserA604, FunctionStatement) {
+TEST(StatementSyntaxParsing, FunctionStatement) {
   auto r = Parse(
       "module m;\n"
       "  function void f();\n"
@@ -195,7 +195,7 @@ TEST(ParserA604, FunctionStatement) {
   EXPECT_EQ(func->func_body_stmts[0]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserA604, FunctionBodyMultipleStatements) {
+TEST(StatementSyntaxParsing, FunctionBodyMultipleStatements) {
   auto r = Parse(
       "module m;\n"
       "  function void f();\n"
@@ -214,7 +214,7 @@ TEST(ParserA604, FunctionBodyMultipleStatements) {
   EXPECT_EQ(func->func_body_stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection18, FuncBodyVarDecl) {
+TEST(ConstrainedRandomParsing, FuncBodyVarDecl) {
   auto r = Parse(
       "module top;\n"
       "  function int foo();\n"
@@ -228,7 +228,7 @@ TEST(ParserSection18, FuncBodyVarDecl) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserA26, FuncBodyNewStyleEmptyPorts) {
+TEST(FunctionDeclParsing, FuncBodyNewStyleEmptyPorts) {
   auto r =
       Parse("module m;\n  function void foo();\n  endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -238,7 +238,7 @@ TEST(ParserA26, FuncBodyNewStyleEmptyPorts) {
   EXPECT_TRUE(item->func_args.empty());
 }
 
-TEST(ParserA26, FuncBodyNewStyleStickyDirection) {
+TEST(FunctionDeclParsing, FuncBodyNewStyleStickyDirection) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(input int a, int b, int c);\n"
@@ -250,7 +250,7 @@ TEST(ParserA26, FuncBodyNewStyleStickyDirection) {
       {Direction::kInput, Direction::kInput, Direction::kInput});
 }
 
-TEST(ParserA26, FuncBodyWithBlockItemDecl) {
+TEST(FunctionDeclParsing, FuncBodyWithBlockItemDecl) {
   auto r = Parse(
       "module m;\n"
       "  function int foo(input int x);\n"
@@ -265,7 +265,7 @@ TEST(ParserA26, FuncBodyWithBlockItemDecl) {
   EXPECT_GE(item->func_body_stmts.size(), 1u);
 }
 
-TEST(ParserA26, FuncBodyWithEndLabel) {
+TEST(FunctionDeclParsing, FuncBodyWithEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  function void foo();\n"
@@ -276,7 +276,7 @@ TEST(ParserA26, FuncBodyWithEndLabel) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "foo");
 }
 
-TEST(ParserA26, FuncBodyOldStyleOutputPort) {
+TEST(FunctionDeclParsing, FuncBodyOldStyleOutputPort) {
   auto r = Parse(
       "module m;\n"
       "  function void xfer;\n"
@@ -291,7 +291,7 @@ TEST(ParserA26, FuncBodyOldStyleOutputPort) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
-TEST(ParserA26, FuncArgUnpackedDim) {
+TEST(FunctionDeclParsing, FuncArgUnpackedDim) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(input int arr [4]);\n"
@@ -303,7 +303,7 @@ TEST(ParserA26, FuncArgUnpackedDim) {
   EXPECT_EQ(item->func_args[0].unpacked_dims.size(), 1u);
 }
 
-TEST(ParserA28, BlockItemInFunction) {
+TEST(BlockItemDeclParsing, BlockItemInFunction) {
   auto r = Parse(
       "module m;\n"
       "  function int foo(input int x);\n"
@@ -320,7 +320,7 @@ TEST(ParserA28, BlockItemInFunction) {
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserSection13, ArrayParamOnFuncArg) {
+TEST(TaskAndFunctionParsing, ArrayParamOnFuncArg) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(int data[3]);\n"
@@ -333,7 +333,7 @@ TEST(ParserSection13, ArrayParamOnFuncArg) {
   EXPECT_EQ(fn->func_args[0].unpacked_dims.size(), 1u);
 }
 
-TEST(ParserSection13, NoDimsOnFuncArg) {
+TEST(TaskAndFunctionParsing, NoDimsOnFuncArg) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(int x);\n"
@@ -346,7 +346,7 @@ TEST(ParserSection13, NoDimsOnFuncArg) {
   EXPECT_TRUE(fn->func_args[0].unpacked_dims.empty());
 }
 
-TEST(ParserSection13, OldStyleFunction) {
+TEST(TaskAndFunctionParsing, OldStyleFunction) {
   auto r = Parse(
       "module m;\n"
       "  function [7:0] myfunc;\n"
@@ -361,7 +361,7 @@ TEST(ParserSection13, OldStyleFunction) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kInput);
 }
 
-TEST(ParserSection13, FunctionEndLabel) {
+TEST(TaskAndFunctionParsing, FunctionEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  function int add(int a, int b);\n"
@@ -374,7 +374,7 @@ TEST(ParserSection13, FunctionEndLabel) {
   EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
 }
 
-TEST(ParserSection13, FunctionEmptyBody) {
+TEST(TaskAndFunctionParsing, FunctionEmptyBody) {
   auto r = Parse(
       "module m;\n"
       "  function void nop();\n"
@@ -387,7 +387,7 @@ TEST(ParserSection13, FunctionEmptyBody) {
   EXPECT_TRUE(fn->func_body_stmts.empty());
 }
 
-TEST(ParserSection4, Sec4_9_3_AutoFuncWithOutputArg) {
+TEST(SchedulingSemanticsParsing, AutoFuncWithOutputArg) {
   auto r = Parse(
       "module m;\n"
       "  function automatic void compute(input int a, output int b);\n"
@@ -407,7 +407,7 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithOutputArg) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-TEST(ParserSection13, FunctionDefaultDirectionInput) {
+TEST(TaskAndFunctionParsing, FunctionDefaultDirectionInput) {
   auto r = Parse(
       "module m;\n"
       "  function int f(int a, int b);\n"
@@ -422,7 +422,7 @@ TEST(ParserSection13, FunctionDefaultDirectionInput) {
   EXPECT_EQ(fn->func_args[1].direction, Direction::kInput);
 }
 
-TEST(ParserSection13, FunctionDirectionStickyOutput) {
+TEST(TaskAndFunctionParsing, FunctionDirectionStickyOutput) {
   auto r = Parse(
       "module m;\n"
       "  function void f(output int a, int b);\n"
@@ -436,7 +436,7 @@ TEST(ParserSection13, FunctionDirectionStickyOutput) {
   EXPECT_EQ(fn->func_args[1].direction, Direction::kOutput);
 }
 
-TEST(ParserSection13, FunctionMultipleStmtsSequential) {
+TEST(TaskAndFunctionParsing, FunctionMultipleStmtsSequential) {
   auto r = Parse(
       "module m;\n"
       "  function void f();\n"
@@ -452,7 +452,7 @@ TEST(ParserSection13, FunctionMultipleStmtsSequential) {
   ASSERT_GE(fn->func_body_stmts.size(), 3u);
 }
 
-TEST(ParserSection13, FunctionRefArg) {
+TEST(TaskAndFunctionParsing, FunctionRefArg) {
   auto r = Parse(
       "module m;\n"
       "  function void f(ref int a);\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, DumpallAndFlush) {
+TEST(IoSystemTaskParsing, DumpallAndFlush) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -15,7 +15,7 @@ TEST(ParserSection21, DumpallAndFlush) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, DumpvarsInInitialBlock) {
+TEST(IoSystemTaskParsing, DumpvarsInInitialBlock) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -25,7 +25,7 @@ TEST(ParserSection21, DumpvarsInInitialBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, FullVcdWorkflow) {
+TEST(IoSystemTaskParsing, FullVcdWorkflow) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  reg clk;\n"

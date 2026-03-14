@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_6_3_SystemTaskDisplay) {
+TEST(LexicalConventionParsing, SystemTaskDisplay) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"hello\");\n"
@@ -18,7 +18,7 @@ TEST(ParserClause05, Cl5_6_3_SystemTaskDisplay) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-TEST(ParserClause05, Cl5_6_3_SystemTfCallEmptyParens) {
+TEST(LexicalConventionParsing, SystemTfCallEmptyParens) {
   auto r = Parse(
       "module m;\n"
       "  initial $finish();\n"
@@ -32,7 +32,7 @@ TEST(ParserClause05, Cl5_6_3_SystemTfCallEmptyParens) {
   EXPECT_TRUE(expr->args.empty());
 }
 
-TEST(ParserClause05, Cl5_6_3_SystemTfCallWithArgs) {
+TEST(LexicalConventionParsing, SystemTfCallWithArgs) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] x;\n"
@@ -47,7 +47,7 @@ TEST(ParserClause05, Cl5_6_3_SystemTfCallWithArgs) {
   EXPECT_EQ(expr->args.size(), 2u);
 }
 
-TEST(ParserClause05, Cl5_6_3_SystemTfCallEmptyArgs) {
+TEST(LexicalConventionParsing, SystemTfCallEmptyArgs) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(,,1);\n"
@@ -63,7 +63,7 @@ TEST(ParserClause05, Cl5_6_3_SystemTfCallEmptyArgs) {
   ASSERT_NE(expr->args[2], nullptr);
 }
 
-TEST(ParserClause05, Cl5_6_3_SystemDeposit) {
+TEST(LexicalConventionParsing, SystemDeposit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -74,7 +74,7 @@ TEST(ParserClause05, Cl5_6_3_SystemDeposit) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause05, Cl5_6_3_SystemFunctionInExpression) {
+TEST(LexicalConventionParsing, SystemFunctionInExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $time;\n"

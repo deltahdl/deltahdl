@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA504, UdpInst_BasicNamed) {
+TEST(UdpInstantiationParsing, UdpInst_BasicNamed) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
       "  table\n"
@@ -24,7 +24,7 @@ TEST(ParserA504, UdpInst_BasicNamed) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA504, UdpInst_Unnamed) {
+TEST(UdpInstantiationParsing, UdpInst_Unnamed) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
       "  table\n"
@@ -44,7 +44,7 @@ TEST(ParserA504, UdpInst_Unnamed) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA504, UdpInst_DriveStrength) {
+TEST(UdpInstantiationParsing, UdpInst_DriveStrength) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
       "  table\n"
@@ -63,7 +63,7 @@ TEST(ParserA504, UdpInst_DriveStrength) {
   EXPECT_NE(insts[0]->drive_strength1, 0);
 }
 
-TEST(ParserA504, UdpInst_DriveStrengthReversed) {
+TEST(UdpInstantiationParsing, UdpInst_DriveStrengthReversed) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
       "  table\n"
@@ -82,7 +82,7 @@ TEST(ParserA504, UdpInst_DriveStrengthReversed) {
   EXPECT_NE(insts[0]->drive_strength1, 0);
 }
 
-TEST(ParserA504, UdpInst_DelaySingle) {
+TEST(UdpInstantiationParsing, UdpInst_DelaySingle) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
       "  table\n"
@@ -102,7 +102,7 @@ TEST(ParserA504, UdpInst_DelaySingle) {
   EXPECT_EQ(insts[0]->gate_delay_decay, nullptr);
 }
 
-TEST(ParserA504, UdpInst_DelayRiseFall) {
+TEST(UdpInstantiationParsing, UdpInst_DelayRiseFall) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
       "  table\n"
@@ -122,7 +122,7 @@ TEST(ParserA504, UdpInst_DelayRiseFall) {
   EXPECT_EQ(insts[0]->gate_delay_decay, nullptr);
 }
 
-TEST(ParserA504, UdpInst_StrengthAndDelay) {
+TEST(UdpInstantiationParsing, UdpInst_StrengthAndDelay) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
       "  table\n"
@@ -142,7 +142,7 @@ TEST(ParserA504, UdpInst_StrengthAndDelay) {
   EXPECT_NE(insts[0]->gate_delay, nullptr);
 }
 
-TEST(ParserA504, UdpInst_MultipleInstances) {
+TEST(UdpInstantiationParsing, UdpInst_MultipleInstances) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
       "  table\n"
@@ -161,7 +161,7 @@ TEST(ParserA504, UdpInst_MultipleInstances) {
   EXPECT_EQ(insts[1]->gate_inst_name, "u2");
 }
 
-TEST(ParserA504, UdpInst_MultipleWithStrengthDelay) {
+TEST(UdpInstantiationParsing, UdpInst_MultipleWithStrengthDelay) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
       "  table\n"
@@ -183,7 +183,7 @@ TEST(ParserA504, UdpInst_MultipleWithStrengthDelay) {
   EXPECT_NE(insts[1]->gate_delay, nullptr);
 }
 
-TEST(ParserA504, UdpInst_InstanceArray) {
+TEST(UdpInstantiationParsing, UdpInst_InstanceArray) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
       "  table\n"
@@ -203,7 +203,7 @@ TEST(ParserA504, UdpInst_InstanceArray) {
   EXPECT_NE(insts[0]->inst_range_right, nullptr);
 }
 
-TEST(ParserA504, UdpInst_SingleInput) {
+TEST(UdpInstantiationParsing, UdpInst_SingleInput) {
   auto r = Parse(
       "primitive my_buf(output y, input a);\n"
       "  table\n"
@@ -221,7 +221,7 @@ TEST(ParserA504, UdpInst_SingleInput) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 2u);
 }
 
-TEST(ParserA504, UdpInst_ManyInputs) {
+TEST(UdpInstantiationParsing, UdpInst_ManyInputs) {
   auto r = Parse(
       "primitive my_gate(output y, input a, input b, input c, input d);\n"
       "  table\n"
@@ -239,7 +239,7 @@ TEST(ParserA504, UdpInst_ManyInputs) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 5u);
 }
 
-TEST(ParserA504, UdpInst_WithAttributes) {
+TEST(UdpInstantiationParsing, UdpInst_WithAttributes) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"
       "  table\n"
@@ -257,7 +257,7 @@ TEST(ParserA504, UdpInst_WithAttributes) {
   EXPECT_FALSE(insts[0]->attrs.empty());
 }
 
-TEST(ParserSection29, UdpInstance) {
+TEST(UserDefinedPrimitiveParsing, UdpInstance) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table\n"

@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA601, NetAssignment_TernaryRhs) {
+TEST(ContinuousAssignSyntaxParsing, NetAssignment_TernaryRhs) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, sel, y;\n"
@@ -17,7 +17,7 @@ TEST(ParserA601, NetAssignment_TernaryRhs) {
   ASSERT_EQ(cas.size(), 1u);
   EXPECT_NE(cas[0]->assign_rhs, nullptr);
 }
-TEST(ParserA602, VariableAssignment_TernaryRhs) {
+TEST(ProceduralBlockSyntaxParsing, VariableAssignment_TernaryRhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = sel ? a : b; end\n"
@@ -30,7 +30,7 @@ TEST(ParserA602, VariableAssignment_TernaryRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryInCaseExpr) {
+TEST(OperatorAndExpressionParsing, TernaryInCaseExpr) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -49,7 +49,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryInCaseExpr) {
   EXPECT_EQ(stmt->condition->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithSystemCall) {
+TEST(OperatorAndExpressionParsing, TernaryWithSystemCall) {
   auto r = Parse(
       "module t;\n"
       "  initial x = sel ? $random : 0;\n"
@@ -66,7 +66,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithSystemCall) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithUnaryOperands) {
+TEST(OperatorAndExpressionParsing, TernaryWithUnaryOperands) {
   auto r = Parse(
       "module t;\n"
       "  initial x = sel ? ~a : &b;\n"
@@ -84,7 +84,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithUnaryOperands) {
   EXPECT_EQ(rhs->false_expr->op, TokenKind::kAmp);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryAsFunctionArgument) {
+TEST(OperatorAndExpressionParsing, TernaryAsFunctionArgument) {
   auto r = Parse(
       "module t;\n"
       "  initial x = func(sel ? a : b);\n"
@@ -100,7 +100,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryAsFunctionArgument) {
   EXPECT_EQ(rhs->args[0]->kind, ExprKind::kTernary);
 }
 
-TEST(ParserA83, ConditionalExprSimple) {
+TEST(ExpressionParsing, ConditionalExprSimple) {
   auto r = Parse("module m; initial x = a ? b : c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -112,7 +112,7 @@ TEST(ParserA83, ConditionalExprSimple) {
   ASSERT_NE(rhs->false_expr, nullptr);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithCast) {
+TEST(OperatorAndExpressionParsing, TernaryWithCast) {
   auto r = Parse(
       "module t;\n"
       "  initial x = sel ? int'(a) : int'(b);\n"
@@ -128,7 +128,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithCast) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kCast);
 }
 
-TEST(ParserSection9, Sec9_2_2_TernaryExpression) {
+TEST(ProcessParsing, TernaryExpression) {
   auto r = Parse(
       "module m;\n"
       "  logic sel, a, b, y;\n"
@@ -144,7 +144,7 @@ TEST(ParserSection9, Sec9_2_2_TernaryExpression) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserA83, ConditionalExprNested) {
+TEST(ExpressionParsing, ConditionalExprNested) {
   auto r = Parse("module m; initial x = a ? b ? c : d : e; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -154,7 +154,7 @@ TEST(ParserA83, ConditionalExprNested) {
   EXPECT_EQ(rhs->true_expr->kind, ExprKind::kTernary);
 }
 
-TEST(ParserA83, ConditionalExprWithBinaryCondition) {
+TEST(ExpressionParsing, ConditionalExprWithBinaryCondition) {
   auto r = Parse("module m; initial x = (a > b) ? a : b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -163,7 +163,7 @@ TEST(ParserA83, ConditionalExprWithBinaryCondition) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithInsideCondition) {
+TEST(OperatorAndExpressionParsing, TernaryWithInsideCondition) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -181,7 +181,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithInsideCondition) {
   EXPECT_EQ(stmt->condition->condition->kind, ExprKind::kInside);
 }
 
-TEST(ParserSection11, Sec11_4_6_VerifyExprKindTernary) {
+TEST(OperatorAndExpressionParsing, VerifyExprKindTernary) {
   auto r = Parse(
       "module t;\n"
       "  initial x = en ? val_a : val_b;\n"
@@ -193,7 +193,7 @@ TEST(ParserSection11, Sec11_4_6_VerifyExprKindTernary) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, Sec11_4_6_VerifyTernaryFields) {
+TEST(OperatorAndExpressionParsing, VerifyTernaryFields) {
   auto r = Parse(
       "module t;\n"
       "  initial x = cond_sig ? true_val : false_val;\n"
@@ -204,7 +204,7 @@ TEST(ParserSection11, Sec11_4_6_VerifyTernaryFields) {
   VerifyTernaryFieldsAllIdentifier(rhs);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryInModulePortConnection) {
+TEST(OperatorAndExpressionParsing, TernaryInModulePortConnection) {
   auto r = Parse(
       "module t;\n"
       "  sub u1(.out(sel ? a : b));\n"
@@ -220,7 +220,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryInModulePortConnection) {
   EXPECT_EQ(inst->inst_ports[0].second->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryInAlwaysComb) {
+TEST(OperatorAndExpressionParsing, TernaryInAlwaysComb) {
   auto r = Parse(
       "module t;\n"
       "  logic sel, a, b, y;\n"
@@ -236,7 +236,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryInAlwaysComb) {
   ASSERT_NE(item->body->rhs, nullptr);
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
-TEST(ParserSection11, ConstExprTernaryInLocalparam) {
+TEST(OperatorAndExpressionParsing, ConstExprTernaryInLocalparam) {
   auto r = Parse(
       "module t #(parameter A = 1);\n"
       "  localparam B = (A > 0) ? 10 : 20;\n"
@@ -245,7 +245,7 @@ TEST(ParserSection11, ConstExprTernaryInLocalparam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryInGenerateIfCondition) {
+TEST(OperatorAndExpressionParsing, TernaryInGenerateIfCondition) {
   auto r = Parse(
       "module t;\n"
       "  parameter A = 1;\n"
@@ -263,7 +263,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryInGenerateIfCondition) {
   EXPECT_EQ(gen->gen_cond->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, Sec11_4_6_MultipleTernariesInExpr) {
+TEST(OperatorAndExpressionParsing, MultipleTernariesInExpr) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (s1 ? a : b) + (s2 ? c : d);\n"
@@ -280,7 +280,7 @@ TEST(ParserSection11, Sec11_4_6_MultipleTernariesInExpr) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection10, Sec10_4_1_TernaryRhs) {
+TEST(AssignmentParsing, TernaryRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c, sel;\n"
@@ -297,7 +297,7 @@ TEST(ParserSection10, Sec10_4_1_TernaryRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithStringLiterals) {
+TEST(OperatorAndExpressionParsing, TernaryWithStringLiterals) {
   auto r = Parse(
       "module t;\n"
       "  string s;\n"
@@ -314,7 +314,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithStringLiterals) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kStringLiteral);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithRealLiterals) {
+TEST(OperatorAndExpressionParsing, TernaryWithRealLiterals) {
   auto r = Parse(
       "module t;\n"
       "  real r;\n"
@@ -331,7 +331,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithRealLiterals) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserSection11, Sec11_4_6_DeeplyNestedTernary) {
+TEST(OperatorAndExpressionParsing, DeeplyNestedTernary) {
   auto r = Parse(
       "module t;\n"
       "  initial x = s1 ? a : s2 ? b : s3 ? c : d;\n"
@@ -351,7 +351,7 @@ TEST(ParserSection11, Sec11_4_6_DeeplyNestedTernary) {
             ExprKind::kIdentifier);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryContAssignWithBitSelectLhs) {
+TEST(OperatorAndExpressionParsing, TernaryContAssignWithBitSelectLhs) {
   auto r = Parse(
       "module t;\n"
       "  wire [7:0] out;\n"
@@ -368,7 +368,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryContAssignWithBitSelectLhs) {
   EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserA606, CondPredicateTripleAnd) {
+TEST(ConditionalSyntaxParsing, CondPredicateTripleAnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -383,7 +383,7 @@ TEST(ParserA606, CondPredicateTripleAnd) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-TEST(ParserSection7, Sec7_2_2_StructTernary) {
+TEST(AggregateTypeParsing, StructTernary) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int a; int b; } pair_t;\n"
@@ -399,7 +399,7 @@ TEST(ParserSection7, Sec7_2_2_StructTernary) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, TernaryFieldAccess) {
+TEST(OperatorAndExpressionParsing, TernaryFieldAccess) {
   auto r = Parse(
       "module t;\n"
       "  initial x = sel ? a : b;\n"
@@ -412,7 +412,7 @@ TEST(ParserSection11, TernaryFieldAccess) {
   ASSERT_NE(rhs->false_expr, nullptr);
 }
 
-TEST(ParserSection11, NestedTernaryRightAssoc) {
+TEST(OperatorAndExpressionParsing, NestedTernaryRightAssoc) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a ? b : c ? d : e;\n"
@@ -424,7 +424,7 @@ TEST(ParserSection11, NestedTernaryRightAssoc) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, TernaryTristateDriver) {
+TEST(OperatorAndExpressionParsing, TernaryTristateDriver) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  wire drive_busa;\n"
@@ -433,7 +433,7 @@ TEST(ParserSection11, TernaryTristateDriver) {
               "endmodule\n"));
 }
 
-TEST(ParserAnnexA, A8TernaryExpr) {
+TEST(FormalSyntaxParsing, TernaryExpr) {
   auto r = Parse("module m; initial x = (a > b) ? a : b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -442,7 +442,7 @@ TEST(ParserAnnexA, A8TernaryExpr) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection9, Sec9_2_3_TernaryExpressionRHS) {
+TEST(ProcessParsing, TernaryExpressionRHS) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic en, sel;\n"
@@ -452,7 +452,7 @@ TEST(ParserSection9, Sec9_2_3_TernaryExpressionRHS) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_2_2_NestedTernary) {
+TEST(ProcessParsing, NestedTernary) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -469,7 +469,7 @@ TEST(ParserSection9, Sec9_2_2_NestedTernary) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, Sec11_4_1_BitSelectInTernaryCondition) {
+TEST(OperatorAndExpressionParsing, BitSelectInTernaryCondition) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] flags;\n"
@@ -485,7 +485,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectInTernaryCondition) {
   EXPECT_EQ(rhs->condition->index_end, nullptr);
 }
 
-TEST(ParserSection11, Sec11_4_6_SimpleTernary) {
+TEST(OperatorAndExpressionParsing, SimpleTernary) {
   auto r = Parse(
       "module t;\n"
       "  initial x = sel ? a : b;\n"
@@ -503,7 +503,7 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryInContAssign) {
+TEST(OperatorAndExpressionParsing, TernaryInContAssign) {
   auto r = Parse(
       "module t;\n"
       "  wire sel, a, b, y;\n"
@@ -521,7 +521,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryInContAssign) {
   ASSERT_NE(ca->assign_rhs->false_expr, nullptr);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryInBlockingAssign) {
+TEST(OperatorAndExpressionParsing, TernaryInBlockingAssign) {
   auto r = Parse(
       "module t;\n"
       "  initial y = sel ? a : b;\n"
@@ -535,7 +535,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryInBlockingAssign) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryInNonblockingAssign) {
+TEST(OperatorAndExpressionParsing, TernaryInNonblockingAssign) {
   auto r = Parse(
       "module t;\n"
       "  reg q;\n"
@@ -550,7 +550,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryInNonblockingAssign) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, Sec11_4_6_NestedTernaryWithParens) {
+TEST(OperatorAndExpressionParsing, NestedTernaryWithParens) {
   auto r = Parse(
       "module t;\n"
       "  initial x = sel1 ? (sel2 ? a : b) : c;\n"
@@ -566,7 +566,7 @@ TEST(ParserSection11, Sec11_4_6_NestedTernaryWithParens) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserSection11, Sec11_4_6_ChainedTernaryRightAssoc) {
+TEST(OperatorAndExpressionParsing, ChainedTernaryRightAssoc) {
   auto r = Parse(
       "module t;\n"
       "  initial x = sel1 ? a : sel2 ? b : c;\n"
@@ -587,7 +587,7 @@ TEST(ParserSection11, Sec11_4_6_ChainedTernaryRightAssoc) {
   EXPECT_EQ(rhs->false_expr->false_expr->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithComplexCondition) {
+TEST(OperatorAndExpressionParsing, TernaryWithComplexCondition) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a > b) ? y : z;\n"
@@ -602,7 +602,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithComplexCondition) {
   EXPECT_EQ(rhs->condition->op, TokenKind::kGt);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithBinaryOperands) {
+TEST(OperatorAndExpressionParsing, TernaryWithBinaryOperands) {
   auto r = Parse(
       "module t;\n"
       "  initial x = sel ? (a + b) : (c - d);\n"
@@ -620,7 +620,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithBinaryOperands) {
   EXPECT_EQ(rhs->false_expr->op, TokenKind::kMinus);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithFuncCallOperands) {
+TEST(OperatorAndExpressionParsing, TernaryWithFuncCallOperands) {
   auto r = Parse(
       "module t;\n"
       "  initial x = sel ? func(a) : func(b);\n"
@@ -637,7 +637,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithFuncCallOperands) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kCall);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithConcatenationOperands) {
+TEST(OperatorAndExpressionParsing, TernaryWithConcatenationOperands) {
   auto r = Parse(
       "module t;\n"
       "  initial x = sel ? {a, b} : {c, d};\n"
@@ -655,7 +655,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithConcatenationOperands) {
   EXPECT_EQ(rhs->false_expr->elements.size(), 2u);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithReplication) {
+TEST(OperatorAndExpressionParsing, TernaryWithReplication) {
   auto r = Parse(
       "module t;\n"
       "  initial x = sel ? {4{a}} : {4{b}};\n"
@@ -672,7 +672,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithReplication) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kReplicate);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithBitSelectOperands) {
+TEST(OperatorAndExpressionParsing, TernaryWithBitSelectOperands) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -691,7 +691,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithBitSelectOperands) {
   EXPECT_EQ(rhs->false_expr->index_end, nullptr);
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryInIfCondition) {
+TEST(OperatorAndExpressionParsing, TernaryInIfCondition) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -707,7 +707,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryInIfCondition) {
   EXPECT_EQ(stmt->condition->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection11, Sec11_1_TernaryConditionalFields) {
+TEST(OperatorAndExpressionParsing, TernaryConditionalFields) {
   auto r = Parse(
       "module t;\n"
       "  initial x = en ? val_a : val_b;\n"

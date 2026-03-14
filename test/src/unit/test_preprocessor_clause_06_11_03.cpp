@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, VectorSignedBitType) {
+TEST(DataTypeParsing, VectorSignedBitType) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  bit signed [15:0] sb;\n"

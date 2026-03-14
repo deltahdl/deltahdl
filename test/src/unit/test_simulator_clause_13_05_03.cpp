@@ -52,7 +52,7 @@ TEST(Functions, DefaultArgumentMultiple) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 6u);
 }
 
-TEST(SimA609, FunctionDefaultArg) {
+TEST(SubroutineCallSim, FunctionDefaultArg) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -75,7 +75,7 @@ TEST(SimA609, FunctionDefaultArg) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-TEST(Sim1353, DefaultArgOverride) {
+TEST(DefaultArgumentSim, DefaultArgOverride) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

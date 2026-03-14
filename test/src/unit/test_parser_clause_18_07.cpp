@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection18, RandomizeWithMultipleConstraints) {
+TEST(ConstrainedRandomParsing, RandomizeWithMultipleConstraints) {
   auto r = Parse(
       "class SimpleSum;\n"
       "  rand bit [7:0] x, y, z;\n"
@@ -19,7 +19,7 @@ TEST(ParserSection18, RandomizeWithMultipleConstraints) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18, RandomizeWithRestrictedIdList) {
+TEST(ConstrainedRandomParsing, RandomizeWithRestrictedIdList) {
   auto r = Parse(
       "class C;\n"
       "  rand integer x;\n"
@@ -33,7 +33,7 @@ TEST(ParserSection18, RandomizeWithRestrictedIdList) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserA82, RandomizeCallWithConstraintBlock) {
+TEST(SubroutineCallExprParsing, RandomizeCallWithConstraintBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin obj.randomize() with { x < 10; }; end\n"
@@ -42,7 +42,7 @@ TEST(ParserA82, RandomizeCallWithConstraintBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection18, RandomizeWithInlineConstraint) {
+TEST(ConstrainedRandomParsing, RandomizeWithInlineConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -55,7 +55,7 @@ TEST(ParserSection18, RandomizeWithInlineConstraint) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18, RandomizeWithIdListAndConstraint) {
+TEST(ConstrainedRandomParsing, RandomizeWithIdListAndConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int x, y;\n"

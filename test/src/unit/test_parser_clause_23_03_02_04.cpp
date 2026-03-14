@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0411, WildcardPortConnection) {
+TEST(ModuleInstantiationGrammar, WildcardPortConnection) {
   auto r = Parse("module m; sub u0(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -13,7 +13,7 @@ TEST(ParserAnnexA0411, WildcardPortConnection) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
-TEST(ParserAnnexA0411, WildcardWithNamedPorts) {
+TEST(ModuleInstantiationGrammar, WildcardWithNamedPorts) {
   auto r = Parse("module m; sub u0(.clk(clk), .*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -30,7 +30,7 @@ ModuleItem* FindModuleInst(const std::vector<ModuleItem*>& items) {
   return nullptr;
 }
 
-TEST(ParserAnnexA0411, ElaborationWildcardPortConnection) {
+TEST(ModuleInstantiationGrammar, ElaborationWildcardPortConnection) {
   auto r = Parse(
       "module sub(input a, output b);\n"
       "  assign b = a;\n"
@@ -47,7 +47,7 @@ TEST(ParserAnnexA0411, ElaborationWildcardPortConnection) {
   EXPECT_EQ(inst->inst_ports.size(), 0u);
 }
 
-TEST(ParserAnnexA0412, InterfaceInstWildcardPort) {
+TEST(InterfaceInstantiationGrammar, InterfaceInstWildcardPort) {
   auto r = Parse("module m; my_if u0(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -55,7 +55,7 @@ TEST(ParserAnnexA0412, InterfaceInstWildcardPort) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
-TEST(ParserAnnexA0413, ProgramInstWildcardPort) {
+TEST(ProgramInstantiationGrammar, ProgramInstWildcardPort) {
   auto r = Parse(
       "program my_prog(input logic clk);\n"
       "endprogram\n"
@@ -66,7 +66,7 @@ TEST(ParserAnnexA0413, ProgramInstWildcardPort) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
-TEST(ParserSection23, WildcardConnection) {
+TEST(ModuleAndHierarchyParsing, WildcardConnection) {
   auto r = Parse(
       "module top;\n"
       "  sub m1(.*);\n"
@@ -79,7 +79,7 @@ TEST(ParserSection23, WildcardConnection) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
-TEST(ParserSection23, WildcardWithNamed) {
+TEST(ModuleAndHierarchyParsing, WildcardWithNamed) {
   auto r = Parse(
       "module top;\n"
       "  sub m1(.*, .clk(sys_clk));\n"
@@ -92,7 +92,7 @@ TEST(ParserSection23, WildcardWithNamed) {
   EXPECT_EQ(item->inst_ports[0].first, "clk");
 }
 
-TEST(ParserSection23, WildcardOnly) {
+TEST(ModuleAndHierarchyParsing, WildcardOnly) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.*);\n"
@@ -104,7 +104,7 @@ TEST(ParserSection23, WildcardOnly) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-TEST(ParserSection23, WildcardWithNamedOverrides) {
+TEST(ModuleAndHierarchyParsing, WildcardWithNamedOverrides) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.*, .rst(global_rst), .clk(sys_clk));\n"
@@ -117,7 +117,7 @@ TEST(ParserSection23, WildcardWithNamedOverrides) {
   EXPECT_EQ(item->inst_ports[1].first, "clk");
 }
 
-TEST(ParserSection23, WildcardWithEmptyPort) {
+TEST(ModuleAndHierarchyParsing, WildcardWithEmptyPort) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.*, .unused());\n"

@@ -9,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA60421, DeferredOverlapViolationReported) {
+TEST(StatementTimingSim, DeferredOverlapViolationReported) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -28,7 +28,7 @@ TEST(SimA60421, DeferredOverlapViolationReported) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA60421, DeferredPriorityNoMatchReported) {
+TEST(StatementTimingSim, DeferredPriorityNoMatchReported) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -47,7 +47,7 @@ TEST(SimA60421, DeferredPriorityNoMatchReported) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA60421, FlushClearsPendingViolations) {
+TEST(StatementTimingSim, FlushClearsPendingViolations) {
   SimFixture f;
 
   Process proc;
@@ -66,7 +66,7 @@ TEST(SimA60421, FlushClearsPendingViolations) {
   f.ctx.SetCurrentProcess(nullptr);
 }
 
-TEST(SimA60421, MatureReportsImmediately) {
+TEST(StatementTimingSim, MatureReportsImmediately) {
   SimFixture f;
 
   Process proc;
@@ -82,7 +82,7 @@ TEST(SimA60421, MatureReportsImmediately) {
   f.ctx.SetCurrentProcess(nullptr);
 }
 
-TEST(SimA60421, MultipleViolationsMature) {
+TEST(StatementTimingSim, MultipleViolationsMature) {
   SimFixture f;
 
   Process proc;
@@ -99,7 +99,7 @@ TEST(SimA60421, MultipleViolationsMature) {
   f.ctx.SetCurrentProcess(nullptr);
 }
 
-TEST(SimA60421, FlushAfterPartialAccumulation) {
+TEST(StatementTimingSim, FlushAfterPartialAccumulation) {
   SimFixture f;
 
   Process proc;

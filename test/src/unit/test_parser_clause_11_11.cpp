@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA223, Delay2MintypMaxSingleValue) {
+TEST(DelayParsing, Delay2MintypMaxSingleValue) {
   auto r = Parse(
       "module m;\n"
       "  wire out, in;\n"
@@ -17,7 +17,7 @@ TEST(ParserA223, Delay2MintypMaxSingleValue) {
   EXPECT_EQ(item->assign_delay->kind, ExprKind::kMinTypMax);
 }
 
-TEST(ParserA83, ConstantMinTypMaxInSpecparam) {
+TEST(ExpressionParsing, ConstantMinTypMaxInSpecparam) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -28,7 +28,7 @@ TEST(ParserA83, ConstantMinTypMaxInSpecparam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA83, MinTypMaxInDelay) {
+TEST(ExpressionParsing, MinTypMaxInDelay) {
   auto r = Parse(
       "module m;\n"
       "  wire y;\n"
@@ -38,7 +38,7 @@ TEST(ParserA83, MinTypMaxInDelay) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA83, MinTypMaxSingleExpr) {
+TEST(ExpressionParsing, MinTypMaxSingleExpr) {
   auto r = Parse(
       "module m;\n"
       "  wire y;\n"
@@ -48,7 +48,7 @@ TEST(ParserA83, MinTypMaxSingleExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA84, ConstantPrimaryParenthesized) {
+TEST(PrimaryParsing, ConstantPrimaryParenthesized) {
   auto r = Parse("module m; parameter int P = (1 + 2); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -57,7 +57,7 @@ TEST(ParserA84, ConstantPrimaryParenthesized) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection11, MinTypMaxInGateDelay) {
+TEST(OperatorAndExpressionParsing, MinTypMaxInGateDelay) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  wire a, b, c;\n"
@@ -65,7 +65,7 @@ TEST(ParserSection11, MinTypMaxInGateDelay) {
               "endmodule\n"));
 }
 
-TEST(ParserSection11, MinTypMaxInSpecparam) {
+TEST(OperatorAndExpressionParsing, MinTypMaxInSpecparam) {
   EXPECT_TRUE(
       ParseOk("module t(input a, output b);\n"
               "  specify\n"

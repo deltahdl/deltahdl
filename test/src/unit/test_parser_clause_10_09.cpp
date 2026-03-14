@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7, Sec7_2_2_TypePrefixedPattern) {
+TEST(AggregateTypeParsing, TypePrefixedPattern) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int a; int b; } pair_t;\n"
@@ -18,7 +18,7 @@ TEST(ParserSection7, Sec7_2_2_TypePrefixedPattern) {
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
 }
-TEST(ParserSection10, AssignmentPatternTypePrefixed) {
+TEST(AssignmentParsing, AssignmentPatternTypePrefixed) {
   auto r = Parse(
       "module m;\n"
       "  typedef int T[3];\n"
@@ -28,7 +28,7 @@ TEST(ParserSection10, AssignmentPatternTypePrefixed) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserA60701, AssignmentPatternWithType) {
+TEST(PatternParsing, AssignmentPatternWithType) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct { logic [7:0] a; logic [7:0] b; } pair_t;\n"
@@ -41,7 +41,7 @@ TEST(ParserA60701, AssignmentPatternWithType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, AssignmentPatternWithIntegerAtomType) {
+TEST(PatternParsing, AssignmentPatternWithIntegerAtomType) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -53,7 +53,7 @@ TEST(ParserA60701, AssignmentPatternWithIntegerAtomType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, PatternKeyDefault) {
+TEST(PatternParsing, PatternKeyDefault) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -64,7 +64,7 @@ TEST(ParserA60701, PatternKeyDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, AssignmentPatternVariableLvalue) {
+TEST(PatternParsing, AssignmentPatternVariableLvalue) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -75,7 +75,7 @@ TEST(ParserA60701, AssignmentPatternVariableLvalue) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, AssignmentPatternElementsCount) {
+TEST(PatternParsing, AssignmentPatternElementsCount) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -93,7 +93,7 @@ TEST(ParserA60701, AssignmentPatternElementsCount) {
   EXPECT_EQ(rhs->elements.size(), 4u);
 }
 
-TEST(ParserCh510, AssignmentPatternPositional_Elements) {
+TEST(StructureLiteralParsing, AssignmentPatternPositional_Elements) {
   auto r = Parse(
       "module t;\n"
       "  initial x = '{1, 2, 3};\n"
@@ -107,7 +107,7 @@ TEST(ParserCh510, AssignmentPatternPositional_Elements) {
   EXPECT_TRUE(rhs->pattern_keys.empty());
 }
 
-TEST(ParserA60701, EmptyAssignmentPattern) {
+TEST(PatternParsing, EmptyAssignmentPattern) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

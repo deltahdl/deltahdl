@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, AssignCompatibleRealToInt) {
+TEST(DataTypeParsing, AssignCompatibleRealToInt) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  int x;\n"

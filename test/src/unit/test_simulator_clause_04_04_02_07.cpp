@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4427, ReInactiveRegionExecutesEvents) {
+TEST(ReInactiveRegionSim, ReInactiveRegionExecutesEvents) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,12 +23,12 @@ TEST(SimCh4427, ReInactiveRegionExecutesEvents) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4427, ReInactiveExecutesAfterReactive) {
+TEST(ReInactiveRegionSim, ReInactiveExecutesAfterReactive) {
   VerifyTwoRegionOrder({Region::kReactive, "reactive"},
                        {Region::kReInactive, "reinactive"});
 }
 
-TEST(SimCh4427, AllReactiveEventsCompleteBeforeReInactive) {
+TEST(ReInactiveRegionSim, AllReactiveEventsCompleteBeforeReInactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -51,7 +51,7 @@ TEST(SimCh4427, AllReactiveEventsCompleteBeforeReInactive) {
   EXPECT_EQ(order[3], "reinactive");
 }
 
-TEST(SimCh4427, ZeroDelaySchedulesIntoReInactive) {
+TEST(ReInactiveRegionSim, ZeroDelaySchedulesIntoReInactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -72,7 +72,7 @@ TEST(SimCh4427, ZeroDelaySchedulesIntoReInactive) {
   EXPECT_EQ(order[1], "after_zero_delay");
 }
 
-TEST(SimCh4427, ReInactiveToReactiveIteration) {
+TEST(ReInactiveRegionSim, ReInactiveToReactiveIteration) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -99,7 +99,7 @@ TEST(SimCh4427, ReInactiveToReactiveIteration) {
   EXPECT_EQ(order[2], "reactive2");
 }
 
-TEST(SimCh4427, ChainedZeroDelayIteration) {
+TEST(ReInactiveRegionSim, ChainedZeroDelayIteration) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -134,7 +134,7 @@ TEST(SimCh4427, ChainedZeroDelayIteration) {
   EXPECT_EQ(order, expected);
 }
 
-TEST(SimCh4427, ReInactiveIsWithinReactiveRegionSet) {
+TEST(ReInactiveRegionSim, ReInactiveIsWithinReactiveRegionSet) {
   auto reinactive_ord = static_cast<int>(Region::kReInactive);
   auto reactive_ord = static_cast<int>(Region::kReactive);
   auto pre_postponed_ord = static_cast<int>(Region::kPrePostponed);
@@ -142,16 +142,16 @@ TEST(SimCh4427, ReInactiveIsWithinReactiveRegionSet) {
   EXPECT_LT(reinactive_ord, pre_postponed_ord);
 }
 
-TEST(SimCh4427, ReInactiveExecutesBeforeReNBA) {
+TEST(ReInactiveRegionSim, ReInactiveExecutesBeforeReNBA) {
   VerifyTwoRegionOrder({Region::kReInactive, "reinactive"},
                        {Region::kReNBA, "renba"});
 }
 
-TEST(SimCh4427, ReInactiveEventsAcrossMultipleTimeSlots) {
+TEST(ReInactiveRegionSim, ReInactiveEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kReInactive);
 }
 
-TEST(SimCh4427, ReInactiveRegionHoldsMultipleEvents) {
+TEST(ReInactiveRegionSim, ReInactiveRegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;

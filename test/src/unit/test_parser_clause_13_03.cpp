@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection13, TaskWithInoutPort) {
+TEST(TaskAndFunctionParsing, TaskWithInoutPort) {
   auto r = Parse(
       "module m;\n"
       "  task transform(inout logic [7:0] data);\n"
@@ -19,7 +19,7 @@ TEST(ParserSection13, TaskWithInoutPort) {
   EXPECT_EQ(tk->func_args[0].direction, Direction::kInout);
 }
 
-TEST(ParserSection13, TaskWithNoPorts) {
+TEST(TaskAndFunctionParsing, TaskWithNoPorts) {
   auto r = Parse(
       "module m;\n"
       "  task idle();\n"
@@ -33,7 +33,7 @@ TEST(ParserSection13, TaskWithNoPorts) {
   EXPECT_TRUE(tk->func_args.empty());
 }
 
-TEST(ParserA27, TfPortItemVarWithDirection) {
+TEST(TaskDeclParsing, TfPortItemVarWithDirection) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(input var int x);\n"
@@ -47,7 +47,7 @@ TEST(ParserA27, TfPortItemVarWithDirection) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-TEST(ParserA27, TfPortItemNoNameInPrototype) {
+TEST(TaskDeclParsing, TfPortItemNoNameInPrototype) {
   auto r = Parse(
       "module m;\n"
       "  extern task my_task(input int, output int);\n"
@@ -58,7 +58,7 @@ TEST(ParserA27, TfPortItemNoNameInPrototype) {
   ASSERT_EQ(item->func_args.size(), 2u);
 }
 
-TEST(ParserA28, BlockItemInTask) {
+TEST(BlockItemDeclParsing, BlockItemInTask) {
   auto r = Parse(
       "module m;\n"
       "  task my_task();\n"
@@ -88,7 +88,7 @@ TEST(Parser, TaskDecl) {
   ASSERT_EQ(mod->items[0]->func_args.size(), 1);
 }
 
-TEST(ParserA27, TfItemDeclMixed) {
+TEST(TaskDeclParsing, TfItemDeclMixed) {
   auto r = Parse(
       "module m;\n"
       "  task my_task;\n"
@@ -106,7 +106,7 @@ TEST(ParserA27, TfItemDeclMixed) {
   EXPECT_GE(item->func_body_stmts.size(), 1u);
 }
 
-TEST(ParserSection13, MultipleDimsOnFuncArg) {
+TEST(TaskAndFunctionParsing, MultipleDimsOnFuncArg) {
   auto r = Parse(
       "module m;\n"
       "  task bar(logic mem[16][8]);\n"
@@ -119,7 +119,7 @@ TEST(ParserSection13, MultipleDimsOnFuncArg) {
   EXPECT_EQ(tk->func_args[0].unpacked_dims.size(), 2u);
 }
 
-TEST(ParserSection13, OldStyleTask) {
+TEST(TaskAndFunctionParsing, OldStyleTask) {
   auto r = Parse(
       "module m;\n"
       "  task mytask;\n"
@@ -136,7 +136,7 @@ TEST(ParserSection13, OldStyleTask) {
   EXPECT_EQ(tk->func_args[1].direction, Direction::kOutput);
 }
 
-TEST(ParserSection13, OldStyleTaskMultipleInputs) {
+TEST(TaskAndFunctionParsing, OldStyleTaskMultipleInputs) {
   auto r = Parse(
       "module m;\n"
       "  task add;\n"
@@ -157,7 +157,7 @@ TEST(ParserSection13, OldStyleTaskMultipleInputs) {
   }
 }
 
-TEST(ParserSection13, TaskEndLabel) {
+TEST(TaskAndFunctionParsing, TaskEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  task do_work(int x);\n"
@@ -170,7 +170,7 @@ TEST(ParserSection13, TaskEndLabel) {
   EXPECT_EQ(tk->kind, ModuleItemKind::kTaskDecl);
 }
 
-TEST(ParserSection13, TaskWithTimingControl) {
+TEST(TaskAndFunctionParsing, TaskWithTimingControl) {
   auto r = Parse(
       "module m;\n"
       "  task wait_clk(input int n);\n"
@@ -185,7 +185,7 @@ TEST(ParserSection13, TaskWithTimingControl) {
   EXPECT_EQ(tk->func_args[0].direction, Direction::kInput);
 }
 
-TEST(ParserA23, ListOfTfVariableIdentifiersTask) {
+TEST(DeclarationListParsing, ListOfTfVariableIdentifiersTask) {
   auto r = Parse(
       "module m;\n"
       "  task report;\n"
@@ -203,7 +203,7 @@ TEST(ParserA23, ListOfTfVariableIdentifiersTask) {
   EXPECT_EQ(item->func_args[2].direction, Direction::kOutput);
 }
 
-TEST(ParserA27, TaskBodyNewStyleEmptyPorts) {
+TEST(TaskDeclParsing, TaskBodyNewStyleEmptyPorts) {
   auto r = Parse(
       "module m;\n"
       "  task my_task();\n"
@@ -226,7 +226,7 @@ static void VerifyTwoArgTask(ParseResult& r) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-TEST(ParserA27, TaskBodyNewStyleWithArgs) {
+TEST(TaskDeclParsing, TaskBodyNewStyleWithArgs) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(input int a, input int b);\n"
@@ -235,7 +235,7 @@ TEST(ParserA27, TaskBodyNewStyleWithArgs) {
   VerifyTwoArgTask(r);
 }
 
-TEST(ParserA27, TaskBodyNewStyleMultipleDirections) {
+TEST(TaskDeclParsing, TaskBodyNewStyleMultipleDirections) {
   auto r = Parse(
       "module m;\n"
       "  task xfer(input int a, output int b, inout int c, ref int d);\n"
@@ -248,7 +248,7 @@ TEST(ParserA27, TaskBodyNewStyleMultipleDirections) {
                            Direction::kInout, Direction::kRef});
 }
 
-TEST(ParserA27, TaskBodyNewStyleStickyDirection) {
+TEST(TaskDeclParsing, TaskBodyNewStyleStickyDirection) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(input int a, int b, int c);\n"
@@ -261,7 +261,7 @@ TEST(ParserA27, TaskBodyNewStyleStickyDirection) {
       {Direction::kInput, Direction::kInput, Direction::kInput});
 }
 
-TEST(ParserA27, TaskBodyWithEndLabel) {
+TEST(TaskDeclParsing, TaskBodyWithEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  task my_task();\n"
@@ -272,7 +272,7 @@ TEST(ParserA27, TaskBodyWithEndLabel) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "my_task");
 }
 
-TEST(ParserA27, TaskBodyOldStylePorts) {
+TEST(TaskDeclParsing, TaskBodyOldStylePorts) {
   auto r = Parse(
       "module m;\n"
       "  task my_task;\n"
@@ -284,7 +284,7 @@ TEST(ParserA27, TaskBodyOldStylePorts) {
   VerifyTwoArgTask(r);
 }
 
-TEST(ParserA27, TaskBodyOldStyleOutputPort) {
+TEST(TaskDeclParsing, TaskBodyOldStyleOutputPort) {
   auto r = Parse(
       "module m;\n"
       "  task my_task;\n"
@@ -299,7 +299,7 @@ TEST(ParserA27, TaskBodyOldStyleOutputPort) {
   ASSERT_EQ(item->func_args.size(), 2u);
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
-TEST(ParserSection6, VoidTaskReturnType) {
+TEST(DataTypeParsing, VoidTaskReturnType) {
   auto r = Parse(
       "module t;\n"
       "  task do_nothing();\n"
@@ -311,7 +311,7 @@ TEST(ParserSection6, VoidTaskReturnType) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
 }
 
-TEST(ParserSection13, TaskDefaultDirectionInput) {
+TEST(TaskAndFunctionParsing, TaskDefaultDirectionInput) {
   auto r = Parse(
       "module m;\n"
       "  task t(int a, int b);\n"
@@ -325,7 +325,7 @@ TEST(ParserSection13, TaskDefaultDirectionInput) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kInput);
 }
 
-TEST(ParserSection13, TaskEmptyBody) {
+TEST(TaskAndFunctionParsing, TaskEmptyBody) {
   auto r = Parse(
       "module m;\n"
       "  task empty_task;\n"
@@ -338,7 +338,7 @@ TEST(ParserSection13, TaskEmptyBody) {
   EXPECT_TRUE(item->func_body_stmts.empty());
 }
 
-TEST(ParserSection13, TaskDirectionStickyOutput) {
+TEST(TaskAndFunctionParsing, TaskDirectionStickyOutput) {
   auto r = Parse(
       "module m;\n"
       "  task t(output logic [7:0] a, b);\n"
@@ -352,7 +352,7 @@ TEST(ParserSection13, TaskDirectionStickyOutput) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
-TEST(ParserSection13, TaskMultipleStatements) {
+TEST(TaskAndFunctionParsing, TaskMultipleStatements) {
   auto r = Parse(
       "module m;\n"
       "  task compute(input int a, output int b, output int c);\n"
@@ -366,7 +366,7 @@ TEST(ParserSection13, TaskMultipleStatements) {
   ASSERT_GE(item->func_body_stmts.size(), 2u);
 }
 
-TEST(ParserSection13, TaskReturnStatement) {
+TEST(TaskAndFunctionParsing, TaskReturnStatement) {
   auto r = Parse(
       "module m;\n"
       "  task t(input int a);\n"

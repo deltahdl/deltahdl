@@ -38,7 +38,7 @@ TEST(Lexical, ContAssign_WithParenDelay) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserSection10, ContinuousAssignDelay) {
+TEST(AssignmentParsing, ContinuousAssignDelay) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire a, b;\n"

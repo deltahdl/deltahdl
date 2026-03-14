@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA26, FunctionDeclBasic) {
+TEST(FunctionDeclParsing, FunctionDeclBasic) {
   auto r = Parse(
       "module m;\n"
       "  function int add(int a, int b);\n"
@@ -21,7 +21,7 @@ TEST(ParserA26, FunctionDeclBasic) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
-TEST(ParserA26, FunctionDeclLifetimeAutomatic) {
+TEST(FunctionDeclParsing, FunctionDeclLifetimeAutomatic) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int f(); return 0; endfunction\n"
@@ -34,7 +34,7 @@ TEST(ParserA26, FunctionDeclLifetimeAutomatic) {
   EXPECT_FALSE(item->is_static);
 }
 
-TEST(ParserA26, FunctionDeclLifetimeStatic) {
+TEST(FunctionDeclParsing, FunctionDeclLifetimeStatic) {
   auto r = Parse(
       "module m;\n"
       "  function static int f(); return 0; endfunction\n"
@@ -47,7 +47,7 @@ TEST(ParserA26, FunctionDeclLifetimeStatic) {
   EXPECT_TRUE(item->is_static);
 }
 
-TEST(ParserA26, FunctionDeclVoidReturn) {
+TEST(FunctionDeclParsing, FunctionDeclVoidReturn) {
   auto r = Parse(
       "module m;\n"
       "  function void f(); endfunction\n"
@@ -59,7 +59,7 @@ TEST(ParserA26, FunctionDeclVoidReturn) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-TEST(ParserA26, FunctionOldStylePorts) {
+TEST(FunctionDeclParsing, FunctionOldStylePorts) {
   auto r = Parse(
       "module m;\n"
       "  function int f;\n"
@@ -76,14 +76,14 @@ TEST(ParserA26, FunctionOldStylePorts) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
 }
 
-TEST(ParserA26, FunctionEndLabel) {
+TEST(FunctionDeclParsing, FunctionEndLabel) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function int f(); return 0; endfunction : f\n"
               "endmodule\n"));
 }
 
-TEST(ParserA26, FunctionImplicitReturnType) {
+TEST(FunctionDeclParsing, FunctionImplicitReturnType) {
   auto r = Parse(
       "module m;\n"
       "  function [7:0] f(); return 8'hFF; endfunction\n"
@@ -96,28 +96,28 @@ TEST(ParserA26, FunctionImplicitReturnType) {
   EXPECT_NE(item->return_type.packed_dim_right, nullptr);
 }
 
-TEST(ParserA26, FunctionDynOverrideInitial) {
+TEST(FunctionDeclParsing, FunctionDynOverrideInitial) {
   EXPECT_TRUE(
       ParseOk("class c;\n"
               "  virtual function :initial void f(); endfunction\n"
               "endclass\n"));
 }
 
-TEST(ParserA26, FunctionDynOverrideFinal) {
+TEST(FunctionDeclParsing, FunctionDynOverrideFinal) {
   EXPECT_TRUE(
       ParseOk("class c;\n"
               "  virtual function :final void f(); endfunction\n"
               "endclass\n"));
 }
 
-TEST(ParserA26, FunctionDynOverrideExtends) {
+TEST(FunctionDeclParsing, FunctionDynOverrideExtends) {
   EXPECT_TRUE(
       ParseOk("class c;\n"
               "  virtual function :extends void f(); endfunction\n"
               "endclass\n"));
 }
 
-TEST(ParserA26, DpiImportFunction) {
+TEST(FunctionDeclParsing, DpiImportFunction) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" function int c_func(int x);\n"
@@ -130,7 +130,7 @@ TEST(ParserA26, DpiImportFunction) {
   EXPECT_FALSE(item->dpi_is_task);
 }
 
-TEST(ParserA26, DpiImportTask) {
+TEST(FunctionDeclParsing, DpiImportTask) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" task c_task(int x);\n"
@@ -143,7 +143,7 @@ TEST(ParserA26, DpiImportTask) {
   EXPECT_TRUE(item->dpi_is_task);
 }
 
-TEST(ParserA26, DpiImportPure) {
+TEST(FunctionDeclParsing, DpiImportPure) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" pure function int pure_func(int x);\n"
@@ -157,7 +157,7 @@ TEST(ParserA26, DpiImportPure) {
   EXPECT_FALSE(item->dpi_is_context);
 }
 
-TEST(ParserA26, DpiImportContext) {
+TEST(FunctionDeclParsing, DpiImportContext) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" context function void ctx_func();\n"
@@ -170,7 +170,7 @@ TEST(ParserA26, DpiImportContext) {
   EXPECT_TRUE(item->dpi_is_context);
 }
 
-TEST(ParserA26, DpiImportWithCIdentifier) {
+TEST(FunctionDeclParsing, DpiImportWithCIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" c_name = function void sv_func();\n"
@@ -183,7 +183,7 @@ TEST(ParserA26, DpiImportWithCIdentifier) {
   EXPECT_EQ(item->dpi_c_name, "c_name");
 }
 
-TEST(ParserA26, DpiExportFunction) {
+TEST(FunctionDeclParsing, DpiExportFunction) {
   auto r = Parse(
       "module m;\n"
       "  function void my_func(); endfunction\n"
@@ -197,7 +197,7 @@ TEST(ParserA26, DpiExportFunction) {
   EXPECT_FALSE(item->dpi_is_task);
 }
 
-TEST(ParserA26, DpiExportTask) {
+TEST(FunctionDeclParsing, DpiExportTask) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(); endtask\n"
@@ -211,7 +211,7 @@ TEST(ParserA26, DpiExportTask) {
   EXPECT_TRUE(item->dpi_is_task);
 }
 
-TEST(ParserA26, DpiExportWithCIdentifier) {
+TEST(FunctionDeclParsing, DpiExportWithCIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  function void my_func(); endfunction\n"
@@ -225,28 +225,28 @@ TEST(ParserA26, DpiExportWithCIdentifier) {
   EXPECT_EQ(item->dpi_c_name, "c_alias");
 }
 
-TEST(ParserA26, DpiSpecStringDPI) {
+TEST(FunctionDeclParsing, DpiSpecStringDPI) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  import \"DPI\" function void f();\n"
               "endmodule\n"));
 }
 
-TEST(ParserA26, FunctionPrototypeNoArgs) {
+TEST(FunctionDeclParsing, FunctionPrototypeNoArgs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  import \"DPI-C\" function void no_args;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA26, FunctionPrototypeEmptyParens) {
+TEST(FunctionDeclParsing, FunctionPrototypeEmptyParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  import \"DPI-C\" function void empty_args();\n"
               "endmodule\n"));
 }
 
-TEST(ParserA26, FunctionBodyWithBlockItem) {
+TEST(FunctionDeclParsing, FunctionBodyWithBlockItem) {
   auto r = Parse(
       "module m;\n"
       "  function int f(int x);\n"

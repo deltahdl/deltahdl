@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverageSpecOrOption_Option) {
+TEST(CovergroupDeclParsing, CoverageSpecOrOption_Option) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -15,7 +15,7 @@ TEST(ParserA211, CoverageSpecOrOption_Option) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverageOption_OptionMember) {
+TEST(CovergroupDeclParsing, CoverageOption_OptionMember) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -24,7 +24,7 @@ TEST(ParserA211, CoverageOption_OptionMember) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverageOption_Goal) {
+TEST(CovergroupDeclParsing, CoverageOption_Goal) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -33,7 +33,7 @@ TEST(ParserA211, CoverageOption_Goal) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, BinsSelectionOrOption_CoverageOption) {
+TEST(CovergroupDeclParsing, BinsSelectionOrOption_CoverageOption) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -46,7 +46,7 @@ TEST(ParserA211, BinsSelectionOrOption_CoverageOption) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_MultipleOptions) {
+TEST(CovergroupDeclParsing, CoverGroup_MultipleOptions) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"

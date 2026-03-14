@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, FinalConstruct_SingleStmt) {
+TEST(ProceduralBlockSyntaxParsing, FinalConstruct_SingleStmt) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"done\");\n"
@@ -17,7 +17,7 @@ TEST(ParserA602, FinalConstruct_SingleStmt) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ParserA602, FinalConstruct_BeginEnd) {
+TEST(ProceduralBlockSyntaxParsing, FinalConstruct_BeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  final begin\n"
@@ -34,7 +34,7 @@ TEST(ParserA602, FinalConstruct_BeginEnd) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserA602, FinalConstruct_Multiple) {
+TEST(ProceduralBlockSyntaxParsing, FinalConstruct_Multiple) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"a\");\n"
@@ -46,7 +46,7 @@ TEST(ParserA602, FinalConstruct_Multiple) {
   EXPECT_EQ(finals.size(), 2u);
 }
 
-TEST(ParserA602, Integration_InitialFinalCoexistence) {
+TEST(ProceduralBlockSyntaxParsing, Integration_InitialFinalCoexistence) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -65,7 +65,7 @@ TEST(ParserA602, Integration_InitialFinalCoexistence) {
   ASSERT_NE(fin, nullptr);
 }
 
-TEST(ParserSection9c, FinalBlockWithBeginEnd) {
+TEST(ProcessTimingAndControlParsing, FinalBlockWithBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  final begin\n"
@@ -82,7 +82,7 @@ TEST(ParserSection9c, FinalBlockWithBeginEnd) {
   EXPECT_GE(final_item->body->stmts.size(), 2u);
 }
 
-TEST(ParserSection9c, MultipleFinalBlocks) {
+TEST(ProcessTimingAndControlParsing, MultipleFinalBlocks) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"final1\");\n"
@@ -97,7 +97,7 @@ TEST(ParserSection9c, MultipleFinalBlocks) {
   EXPECT_EQ(count, 2);
 }
 
-TEST(ParserSection4, Sec4_6_ProgramWithFinalBlock) {
+TEST(SchedulingSemanticsParsing, ProgramWithFinalBlock) {
   auto r = Parse(
       "program p;\n"
       "  final begin\n"
@@ -110,7 +110,7 @@ TEST(ParserSection4, Sec4_6_ProgramWithFinalBlock) {
   ASSERT_EQ(r.cu->programs[0]->items.size(), 1u);
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
 }
-TEST(ParserSection9, Sec9_3_1_BlockInFinalBlock) {
+TEST(ProcessParsing, BlockInFinalBlock) {
   auto r = Parse(
       "module m;\n"
       "  final begin\n"
@@ -143,7 +143,7 @@ TEST_F(ProgramTestParse, ProgramWithFinalBlock) {
   ASSERT_EQ(unit->programs[0]->items.size(), 1u);
   EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
 }
-TEST(ParserSection9b, StructuredProcFinalBlock) {
+TEST(ProceduralAssignAndControlParsing, StructuredProcFinalBlock) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"done\");\n"
@@ -154,7 +154,7 @@ TEST(ParserSection9b, StructuredProcFinalBlock) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
 }
 
-TEST(ParserSection4, Sec4_5_FinalBlock) {
+TEST(SchedulingSemanticsParsing, FinalBlock) {
   auto r = Parse(
       "module m;\n"
       "  final begin\n"
@@ -169,7 +169,7 @@ TEST(ParserSection4, Sec4_5_FinalBlock) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ParserSection9, FinalBlock) {
+TEST(ProcessParsing, FinalBlock) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"done\");\n"

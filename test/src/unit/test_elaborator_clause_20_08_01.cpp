@@ -15,7 +15,7 @@ TEST(ConstEval, Clog2) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$clog2(5)", f)), 3);
 }
 
-TEST(ElabA82, SystemTfCallAsExprElaborates) {
+TEST(SubroutineCallExprElaboration, SystemTfCallAsExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -27,7 +27,7 @@ TEST(ElabA82, SystemTfCallAsExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA84, PrimarySystemCallElaborates) {
+TEST(PrimaryElaboration, PrimarySystemCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -38,28 +38,28 @@ TEST(ElabA84, PrimarySystemCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Section20, Clog2Zero) {
+TEST(UtilitySystemTaskTest, Clog2Zero) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(Section20, Clog2Two) {
+TEST(UtilitySystemTaskTest, Clog2Two) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 2)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(Section20, Clog2Three) {
+TEST(UtilitySystemTaskTest, Clog2Three) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$clog2", {MakeInt(f.arena, 3)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 2u);
 }
 
-TEST(SimCh10, BlockingAssignSysClog2) {
+TEST(BlockingAssignSim, BlockingAssignSysClog2) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

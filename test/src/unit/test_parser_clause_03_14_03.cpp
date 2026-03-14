@@ -6,7 +6,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserClause03, Cl3_14_3_ConsidersTimescalePrec) {
+TEST(DesignBuildingBlockParsing, ConsidersTimescalePrec) {
   auto r = ParseTimescale31402(
       "`timescale 1ns / 1ps\n"
       "module a;\n"
@@ -18,7 +18,7 @@ TEST(ParserClause03, Cl3_14_3_ConsidersTimescalePrec) {
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_3_MinAcrossAllThreeSources) {
+TEST(DesignBuildingBlockParsing, MinAcrossAllThreeSources) {
   auto r = ParseTimescale31402(
       "`timescale 1us / 1ns\n"
       "module a;\n"
@@ -33,7 +33,7 @@ TEST(ParserClause03, Cl3_14_3_MinAcrossAllThreeSources) {
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_3_DefaultWhenNoneSpecified) {
+TEST(DesignBuildingBlockParsing, DefaultWhenNoneSpecified) {
   auto r = ParseTimescale31402(
       "module a;\n"
       "endmodule\n");
@@ -43,7 +43,7 @@ TEST(ParserClause03, Cl3_14_3_DefaultWhenNoneSpecified) {
   EXPECT_EQ(gp, TimeUnit::kNs);
 }
 
-TEST(ParserClause03, Cl3_14_3_StepEqualsGlobalPrecision) {
+TEST(DesignBuildingBlockParsing, StepEqualsGlobalPrecision) {
   auto r = ParseTimescale31402(
       "module a;\n"
       "  timeprecision 1fs;\n"
@@ -58,7 +58,7 @@ TEST(ParserClause03, Cl3_14_3_StepEqualsGlobalPrecision) {
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
 
-TEST(ParserClause03, Cl3_14_3_CUScopeTimeprecisionIncluded) {
+TEST(DesignBuildingBlockParsing, CUScopeTimeprecisionIncluded) {
   auto r = ParseTimescale31402(
       "timeprecision 1fs;\n"
       "module a;\n"
@@ -70,7 +70,7 @@ TEST(ParserClause03, Cl3_14_3_CUScopeTimeprecisionIncluded) {
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
 
-TEST(ParserClause03, Cl3_14_3_InterfacesAndProgramsContribute) {
+TEST(DesignBuildingBlockParsing, InterfacesAndProgramsContribute) {
   auto r = ParseTimescale31402(
       "interface i;\n"
       "  timeprecision 1ps;\n"
@@ -87,7 +87,7 @@ TEST(ParserClause03, Cl3_14_3_InterfacesAndProgramsContribute) {
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_3_MinOfTimeprecisionStatements) {
+TEST(DesignBuildingBlockParsing, MinOfTimeprecisionStatements) {
   auto r = ParseTimescale31402(
       "module a;\n"
       "  timeprecision 1ns;\n"
@@ -104,7 +104,7 @@ TEST(ParserClause03, Cl3_14_3_MinOfTimeprecisionStatements) {
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_3_ConsidersTimeunitPrecArg) {
+TEST(DesignBuildingBlockParsing, ConsidersTimeunitPrecArg) {
   auto r = ParseTimescale31402(
       "module a;\n"
       "  timeunit 1us / 1fs;\n"

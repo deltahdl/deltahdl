@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverageSpec_CoverCross) {
+TEST(CovergroupDeclParsing, CoverageSpec_CoverCross) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -17,7 +17,7 @@ TEST(ParserA211, CoverageSpec_CoverCross) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverCross_Basic) {
+TEST(CovergroupDeclParsing, CoverCross_Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -28,7 +28,7 @@ TEST(ParserA211, CoverCross_Basic) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverCross_Labeled) {
+TEST(CovergroupDeclParsing, CoverCross_Labeled) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -39,7 +39,7 @@ TEST(ParserA211, CoverCross_Labeled) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverCross_WithIff) {
+TEST(CovergroupDeclParsing, CoverCross_WithIff) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -50,7 +50,7 @@ TEST(ParserA211, CoverCross_WithIff) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, ListOfCrossItems_Two) {
+TEST(CovergroupDeclParsing, ListOfCrossItems_Two) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -61,7 +61,7 @@ TEST(ParserA211, ListOfCrossItems_Two) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, ListOfCrossItems_Three) {
+TEST(CovergroupDeclParsing, ListOfCrossItems_Three) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -73,7 +73,7 @@ TEST(ParserA211, ListOfCrossItems_Three) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CrossItem_CoverPointIdentifier) {
+TEST(CovergroupDeclParsing, CrossItem_CoverPointIdentifier) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -84,7 +84,7 @@ TEST(ParserA211, CrossItem_CoverPointIdentifier) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CrossBody_Empty) {
+TEST(CovergroupDeclParsing, CrossBody_Empty) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -95,7 +95,7 @@ TEST(ParserA211, CrossBody_Empty) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_EmptyCrossBody) {
+TEST(CovergroupDeclParsing, CoverGroup_EmptyCrossBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -106,7 +106,7 @@ TEST(ParserA211, CoverGroup_EmptyCrossBody) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_CrossThreeItems) {
+TEST(CovergroupDeclParsing, CoverGroup_CrossThreeItems) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"

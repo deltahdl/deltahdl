@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA84, PrimaryNull) {
+TEST(PrimaryParsing, PrimaryNull) {
   auto r = Parse("module m; initial x = null; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserA84, PrimaryNull) {
   EXPECT_EQ(rhs->text, "null");
 }
 
-TEST(ParserA84, BitSelectMultiDim) {
+TEST(PrimaryParsing, BitSelectMultiDim) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] mem [0:3];\n"
@@ -29,7 +29,7 @@ TEST(ParserA84, BitSelectMultiDim) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserA84, SelectMemberBitSelect) {
+TEST(PrimaryParsing, SelectMemberBitSelect) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
@@ -41,7 +41,7 @@ TEST(ParserA84, SelectMemberBitSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA82, FunctionCallInBinaryExpr) {
+TEST(SubroutineCallExprParsing, FunctionCallInBinaryExpr) {
   auto r = Parse(
       "module m;\n"
       "  initial x = f(1) + g(2);\n"
@@ -58,7 +58,7 @@ TEST(ParserA82, FunctionCallInBinaryExpr) {
   EXPECT_EQ(stmt->rhs->rhs->kind, ExprKind::kCall);
 }
 
-TEST(ParserA84, ModulePathPrimaryNumber) {
+TEST(PrimaryParsing, ModulePathPrimaryNumber) {
   auto r = Parse(
       "module m(input a, output b);\n"
       "  specify\n"
@@ -69,7 +69,7 @@ TEST(ParserA84, ModulePathPrimaryNumber) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA84, ModulePathPrimaryIdentifier) {
+TEST(PrimaryParsing, ModulePathPrimaryIdentifier) {
   auto r = Parse(
       "module m(input a, input en, output b);\n"
       "  specify\n"
@@ -80,7 +80,7 @@ TEST(ParserA84, ModulePathPrimaryIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA84, PrimaryHierarchicalIdentifier) {
+TEST(PrimaryParsing, PrimaryHierarchicalIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] data;\n"
@@ -94,7 +94,7 @@ TEST(ParserA84, PrimaryHierarchicalIdentifier) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserA84, PrimaryParenthesizedExpr) {
+TEST(PrimaryParsing, PrimaryParenthesizedExpr) {
   auto r = Parse("module m; initial x = (1 + 2); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -103,7 +103,7 @@ TEST(ParserA84, PrimaryParenthesizedExpr) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
 }
 
-TEST(ParserA84, PrimaryLiteralInteger) {
+TEST(PrimaryParsing, PrimaryLiteralInteger) {
   auto r = Parse("module m; initial x = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -112,7 +112,7 @@ TEST(ParserA84, PrimaryLiteralInteger) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA84, PrimaryLiteralString) {
+TEST(PrimaryParsing, PrimaryLiteralString) {
   auto r = Parse("module m; initial x = \"hello\"; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -121,7 +121,7 @@ TEST(ParserA84, PrimaryLiteralString) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-TEST(ParserA84, PrimaryLiteralReal) {
+TEST(PrimaryParsing, PrimaryLiteralReal) {
   auto r = Parse("module m; initial x = 3.14; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -130,13 +130,13 @@ TEST(ParserA84, PrimaryLiteralReal) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserA84, PrimaryLiteralTimeLiteral) {
+TEST(PrimaryParsing, PrimaryLiteralTimeLiteral) {
   auto r = Parse("module m; initial #10ns; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA84, PrimaryUnbasedUnsizedLiteral0) {
+TEST(PrimaryParsing, PrimaryUnbasedUnsizedLiteral0) {
   auto r = Parse("module m; initial x = '0; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -145,7 +145,7 @@ TEST(ParserA84, PrimaryUnbasedUnsizedLiteral0) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(ParserA84, PrimaryUnbasedUnsizedLiteral1) {
+TEST(PrimaryParsing, PrimaryUnbasedUnsizedLiteral1) {
   auto r = Parse("module m; initial x = '1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -154,7 +154,7 @@ TEST(ParserA84, PrimaryUnbasedUnsizedLiteral1) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(ParserA84, CastExpression) {
+TEST(PrimaryParsing, CastExpression) {
   auto r = Parse("module m; initial x = int'(3.14); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -163,7 +163,7 @@ TEST(ParserA84, CastExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-TEST(ParserA84, PrimaryThis) {
+TEST(PrimaryParsing, PrimaryThis) {
   auto r = Parse(
       "class C;\n"
       "  function void f();\n"
@@ -174,7 +174,7 @@ TEST(ParserA84, PrimaryThis) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA84, PrimaryDollarSign) {
+TEST(PrimaryParsing, PrimaryDollarSign) {
   auto r = Parse(
       "module m;\n"
       "  int q[$];\n"
@@ -184,7 +184,7 @@ TEST(ParserA84, PrimaryDollarSign) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA84, PrimaryConcatenationWithRange) {
+TEST(PrimaryParsing, PrimaryConcatenationWithRange) {
   auto r = Parse("module m; initial x = {a, b}[3:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

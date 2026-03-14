@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Sim1380, ParameterizedStaticFunctionReturnsValue) {
+TEST(ParameterizedSubroutineSim, ParameterizedStaticFunctionReturnsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "virtual class Doubler#(parameter W = 8);\n"
@@ -22,7 +22,7 @@ TEST(Sim1380, ParameterizedStaticFunctionReturnsValue) {
   LowerRunAndCheck(f, design, {{"result", 42u}});
 }
 
-TEST(Sim1380, DifferentSpecializationsWork) {
+TEST(ParameterizedSubroutineSim, DifferentSpecializationsWork) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "virtual class Identity#(parameter W = 8);\n"
@@ -43,7 +43,7 @@ TEST(Sim1380, DifferentSpecializationsWork) {
   LowerRunAndCheck(f, design, {{"a", 0xABu}, {"b", 0xCDu}});
 }
 
-TEST(Sim1380, ParamUsedInForLoop) {
+TEST(ParameterizedSubroutineSim, ParamUsedInForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "virtual class Popcount#(parameter W = 8);\n"
@@ -66,7 +66,7 @@ TEST(Sim1380, ParamUsedInForLoop) {
   LowerRunAndCheck(f, design, {{"result", 4u}});
 }
 
-TEST(Sim1380, MultipleMethodsSameClass) {
+TEST(ParameterizedSubroutineSim, MultipleMethodsSameClass) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "virtual class Math#(parameter W = 8);\n"

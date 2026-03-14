@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection16, DeferredAssumeHash0WithAction) {
+TEST(AssertionParsing, DeferredAssumeHash0WithAction) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -16,7 +16,7 @@ TEST(ParserSection16, DeferredAssumeHash0WithAction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserA610, DeferredAssertHash0) {
+TEST(AssertionStatementSyntaxParsing, DeferredAssertHash0) {
   auto r = Parse(
       "module m;\n"
       "  initial assert #0 (1);\n"
@@ -29,7 +29,7 @@ TEST(ParserA610, DeferredAssertHash0) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-TEST(ParserA610, DeferredAssertFinal) {
+TEST(AssertionStatementSyntaxParsing, DeferredAssertFinal) {
   auto r = Parse(
       "module m;\n"
       "  initial assert final (1);\n"
@@ -42,7 +42,7 @@ TEST(ParserA610, DeferredAssertFinal) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-TEST(ParserA610, DeferredAssumeHash0) {
+TEST(AssertionStatementSyntaxParsing, DeferredAssumeHash0) {
   auto r = Parse(
       "module m;\n"
       "  initial assume #0 (1);\n"
@@ -55,7 +55,7 @@ TEST(ParserA610, DeferredAssumeHash0) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-TEST(ParserA610, DeferredAssumeFinal) {
+TEST(AssertionStatementSyntaxParsing, DeferredAssumeFinal) {
   auto r = Parse(
       "module m;\n"
       "  initial assume final (1);\n"
@@ -68,7 +68,7 @@ TEST(ParserA610, DeferredAssumeFinal) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-TEST(ParserA610, DeferredCoverHash0) {
+TEST(AssertionStatementSyntaxParsing, DeferredCoverHash0) {
   auto r = Parse(
       "module m;\n"
       "  initial cover #0 (1);\n"
@@ -81,7 +81,7 @@ TEST(ParserA610, DeferredCoverHash0) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-TEST(ParserA610, DeferredCoverFinal) {
+TEST(AssertionStatementSyntaxParsing, DeferredCoverFinal) {
   auto r = Parse(
       "module m;\n"
       "  initial cover final (1);\n"

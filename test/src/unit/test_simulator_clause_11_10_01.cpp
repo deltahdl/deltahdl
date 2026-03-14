@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA11101, StringLiteralCopyToVector) {
+TEST(ImmediateAssertionSyntaxSim, StringLiteralCopyToVector) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -24,7 +24,7 @@ TEST(SimA11101, StringLiteralCopyToVector) {
   EXPECT_EQ(var->value.ToUint64(), 0x48656c6c6fULL);
 }
 
-TEST(SimA11101, StringLiteralCopyPaddedWithZeros) {
+TEST(ImmediateAssertionSyntaxSim, StringLiteralCopyPaddedWithZeros) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -42,7 +42,7 @@ TEST(SimA11101, StringLiteralCopyPaddedWithZeros) {
   EXPECT_EQ(var->value.ToUint64(), 0x4869ULL);
 }
 
-TEST(SimA11101, StringLiteralConcatenate) {
+TEST(ImmediateAssertionSyntaxSim, StringLiteralConcatenate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -63,7 +63,7 @@ TEST(SimA11101, StringLiteralConcatenate) {
   EXPECT_EQ(var->value.words[0].aval & 0xFF, 0x21u);
 }
 
-TEST(SimA11101, StringLiteralCompareEqual) {
+TEST(ImmediateAssertionSyntaxSim, StringLiteralCompareEqual) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -85,7 +85,7 @@ TEST(SimA11101, StringLiteralCompareEqual) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA11101, StringLiteralCompareNotEqual) {
+TEST(ImmediateAssertionSyntaxSim, StringLiteralCompareNotEqual) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -107,7 +107,7 @@ TEST(SimA11101, StringLiteralCompareNotEqual) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA11101, SingleCharStringLiteral) {
+TEST(ImmediateAssertionSyntaxSim, SingleCharStringLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

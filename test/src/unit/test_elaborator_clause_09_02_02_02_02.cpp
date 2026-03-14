@@ -9,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_02_02_02_02, AlwaysStarIsAlwaysKind) {
+TEST(AlwaysLatchTimingElaboration, AlwaysStarIsAlwaysKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -23,7 +23,7 @@ TEST(ElabClause09_02_02_02_02, AlwaysStarIsAlwaysKind) {
   EXPECT_EQ(proc.kind, RtlirProcessKind::kAlways);
 }
 
-TEST(ElabClause09_02_02_02_02, AlwaysStarNoMultiDriverError) {
+TEST(AlwaysLatchTimingElaboration, AlwaysStarNoMultiDriverError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -36,7 +36,7 @@ TEST(ElabClause09_02_02_02_02, AlwaysStarNoMultiDriverError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_02_02, AlwaysStarAllowsTimingControl) {
+TEST(AlwaysLatchTimingElaboration, AlwaysStarAllowsTimingControl) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -48,7 +48,7 @@ TEST(ElabClause09_02_02_02_02, AlwaysStarAllowsTimingControl) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_02_02, AlwaysCombRejectsTimingControl) {
+TEST(AlwaysLatchTimingElaboration, AlwaysCombRejectsTimingControl) {
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -59,7 +59,7 @@ TEST(ElabClause09_02_02_02_02, AlwaysCombRejectsTimingControl) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(SimCh9, AlwaysCombExecutesAtTimeZero) {
+TEST(AlwaysCombBasicSim, AlwaysCombExecutesAtTimeZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -81,7 +81,7 @@ TEST(SimCh9, AlwaysCombExecutesAtTimeZero) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9b, AlwaysCombConstAssignTime0) {
+TEST(AlwaysCombExtendedSim, AlwaysCombConstAssignTime0) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -101,7 +101,7 @@ TEST(SimCh9b, AlwaysCombConstAssignTime0) {
   EXPECT_EQ(y->value.ToUint64(), 42u);
 }
 
-TEST(SimCh9d, AlwaysStarEquivAlwaysComb) {
+TEST(AlwaysStarSim, AlwaysStarEquivAlwaysComb) {
   SimFixture f_star;
   auto* d_star = ElaborateSrc(
       "module t;\n"
@@ -145,7 +145,7 @@ TEST(SimCh9d, AlwaysStarEquivAlwaysComb) {
   EXPECT_EQ(y_star->value.ToUint64(), y_comb->value.ToUint64());
 }
 
-TEST(ElabClause09_04_02, EventControlInAlwaysCombErrors) {
+TEST(EventControlElaboration, EventControlInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -156,7 +156,7 @@ TEST(ElabClause09_04_02, EventControlInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_04_03, WaitInAlwaysCombErrors) {
+TEST(LevelSensitiveEventElaboration, WaitInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"

@@ -171,7 +171,7 @@ TEST(StmtExec, ForeachIteratorVariableAccessible) {
   EXPECT_EQ(last->value.ToUint64(), 4u);
 }
 
-TEST(SimA608, MixedRepeatInsideFor) {
+TEST(LoopStatementSim, MixedRepeatInsideFor) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

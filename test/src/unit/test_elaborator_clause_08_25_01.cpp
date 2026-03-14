@@ -22,7 +22,7 @@ TEST(Elaboration, ParameterizedType_Vector) {
   EXPECT_EQ(mod->variables[0].width, 8);
 }
 
-TEST(ElabA8251, DefaultSpecializationScopeOk) {
+TEST(InterfaceClassMethodElaboration, DefaultSpecializationScopeOk) {
   EXPECT_TRUE(
       ElabOk("class C #(type T = int);\n"
              "  typedef T my_type;\n"
@@ -32,7 +32,7 @@ TEST(ElabA8251, DefaultSpecializationScopeOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA8251, ValueParamScopeOk) {
+TEST(InterfaceClassMethodElaboration, ValueParamScopeOk) {
   EXPECT_TRUE(
       ElabOk("class C #(int p = 1);\n"
              "  parameter int q = 5;\n"

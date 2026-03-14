@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0413, ElaborationProgramInstWithParams) {
+TEST(ProgramInstantiationGrammar, ElaborationProgramInstWithParams) {
   ElabFixture f;
   auto* design = Elaborate(
       "program param_prog #(parameter int W = 8)(input logic [W-1:0] data);\n"

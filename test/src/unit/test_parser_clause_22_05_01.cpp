@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, DefineSimpleMacro) {
+TEST(CompilerDirectiveParsing, DefineSimpleMacro) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define WIDTH 8\n"
                               "module t;\n"

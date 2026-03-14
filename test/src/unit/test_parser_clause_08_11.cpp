@@ -5,13 +5,13 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA84, PrimaryThis) {
+TEST(PrimaryParsing, PrimaryThis) {
   auto r = Parse("module m; initial x = this; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA609, ThisMethodCall) {
+TEST(SubroutineCallSyntaxParsing, ThisMethodCall) {
   auto r = Parse(
       "module m;\n"
       "  initial begin this.method(); end\n"
@@ -23,19 +23,19 @@ TEST(ParserA609, ThisMethodCall) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-TEST(ParserA84, ImplicitClassHandleThis) {
+TEST(PrimaryParsing, ImplicitClassHandleThis) {
   auto r = Parse("module m; initial x = this; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA84, ImplicitClassHandleThisMember) {
+TEST(PrimaryParsing, ImplicitClassHandleThisMember) {
   auto r = Parse("module m; initial x = this.field; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA82, MethodCallRootThis) {
+TEST(SubroutineCallExprParsing, MethodCallRootThis) {
   auto r = Parse(
       "module m;\n"
       "  initial begin this.method(); end\n"
@@ -47,7 +47,7 @@ TEST(ParserA82, MethodCallRootThis) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-TEST(ParserSection8, ThisExpression) {
+TEST(ClassParsing, ThisExpression) {
   auto r = Parse(
       "class MyClass;\n"
       "  int data;\n"
@@ -59,7 +59,7 @@ TEST(ParserSection8, ThisExpression) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection8, ThisKeywordPropertyAccess) {
+TEST(ClassParsing, ThisKeywordPropertyAccess) {
   EXPECT_TRUE(
       ParseOk("class MyClass;\n"
               "  int value;\n"
@@ -69,7 +69,7 @@ TEST(ParserSection8, ThisKeywordPropertyAccess) {
               "endclass\n"));
 }
 
-TEST(ParserA811, ThisDisambiguationInConstructor) {
+TEST(ThisParsing, ThisDisambiguationInConstructor) {
   auto r = Parse(
       "class Demo;\n"
       "  integer x;\n"
@@ -86,7 +86,7 @@ TEST(ParserA811, ThisDisambiguationInConstructor) {
   EXPECT_EQ(ctor->method->name, "new");
 }
 
-TEST(ParserA811, ThisChainedMemberAccess) {
+TEST(ThisParsing, ThisChainedMemberAccess) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
               "  int a;\n"
@@ -96,7 +96,7 @@ TEST(ParserA811, ThisChainedMemberAccess) {
               "endclass\n"));
 }
 
-TEST(ParserA811, ThisMethodCallChain) {
+TEST(ThisParsing, ThisMethodCallChain) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
               "  function C get_self();\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA29, ImportMultipleIdentifiers) {
+TEST(InterfaceDeclParsing, ImportMultipleIdentifiers) {
   auto r = Parse(
       "interface bus;\n"
       "  modport target(import Read, Write);\n"
@@ -20,7 +20,7 @@ TEST(ParserA29, ImportMultipleIdentifiers) {
   EXPECT_EQ(mp->ports[1].name, "Write");
 }
 
-TEST(ParserA29, ImportSingleIdentifier) {
+TEST(InterfaceDeclParsing, ImportSingleIdentifier) {
   auto r = Parse(
       "interface bus;\n"
       "  modport target(import Read);\n"
@@ -33,7 +33,7 @@ TEST(ParserA29, ImportSingleIdentifier) {
   EXPECT_EQ(mp->ports[0].name, "Read");
 }
 
-TEST(ParserA29, MixedDirImportExport) {
+TEST(InterfaceDeclParsing, MixedDirImportExport) {
   auto r = Parse(
       "interface bus;\n"
       "  logic req, gnt;\n"
@@ -54,14 +54,14 @@ TEST(ParserA29, MixedDirImportExport) {
   EXPECT_TRUE(mp->ports[3].is_export);
 }
 
-TEST(ParserA29, AttrOnImportPort) {
+TEST(InterfaceDeclParsing, AttrOnImportPort) {
   EXPECT_TRUE(
       ParseOk("interface bus;\n"
               "  modport target((* synthesis *) import Read);\n"
               "endinterface\n"));
 }
 
-TEST(ParserSection25, ModportImportExportName) {
+TEST(InterfaceParsing, ModportImportExportName) {
   auto r = Parse(
       "interface bus;\n"
       "  modport target(import Read, export Write);\n"
@@ -72,7 +72,7 @@ TEST(ParserSection25, ModportImportExportName) {
   ASSERT_EQ(mp->ports.size(), 2);
 }
 
-TEST(ParserSection25, ModportImportExportPorts) {
+TEST(InterfaceParsing, ModportImportExportPorts) {
   auto r = Parse(
       "interface bus;\n"
       "  modport target(import Read, export Write);\n"
@@ -84,7 +84,7 @@ TEST(ParserSection25, ModportImportExportPorts) {
   VerifyImportExportPort(mp->ports[1], false, true, "Write");
 }
 
-TEST(ParserSection25, ModportImportWithDirectionSecond) {
+TEST(InterfaceParsing, ModportImportWithDirectionSecond) {
   auto r = Parse(
       "interface bus;\n"
       "  logic data;\n"
@@ -129,7 +129,7 @@ TEST(SourceText, ExternTaskPrototypeInInterface) {
   EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
 }
 
-TEST(ParserA27, TaskBodyInterfaceScope) {
+TEST(TaskDeclParsing, TaskBodyInterfaceScope) {
   auto r = Parse(
       "interface intf;\n"
       "  extern task my_task();\n"
@@ -140,7 +140,7 @@ TEST(ParserA27, TaskBodyInterfaceScope) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA29, ImportFunctionPrototype) {
+TEST(InterfaceDeclParsing, ImportFunctionPrototype) {
   auto r = Parse(
       "interface bus;\n"
       "  modport init(import function int compute(input int a));\n"
@@ -155,7 +155,7 @@ TEST(ParserA29, ImportFunctionPrototype) {
   EXPECT_EQ(mp->ports[0].prototype->name, "compute");
 }
 
-TEST(ParserA29, ImportTaskNoArgs) {
+TEST(InterfaceDeclParsing, ImportTaskNoArgs) {
   auto r = Parse(
       "interface bus;\n"
       "  modport target(import task doWork);\n"
@@ -168,14 +168,14 @@ TEST(ParserA29, ImportTaskNoArgs) {
   EXPECT_EQ(mp->ports[0].prototype->name, "doWork");
 }
 
-TEST(ParserA29, ImportFunctionVoidReturn) {
+TEST(InterfaceDeclParsing, ImportFunctionVoidReturn) {
   EXPECT_TRUE(
       ParseOk("interface bus;\n"
               "  modport init(import function void reset());\n"
               "endinterface\n"));
 }
 
-TEST(ParserA29, ImportFlag_NotExport) {
+TEST(InterfaceDeclParsing, ImportFlag_NotExport) {
   auto r = Parse(
       "interface bus;\n"
       "  modport target(import Read);\n"
@@ -187,7 +187,7 @@ TEST(ParserA29, ImportFlag_NotExport) {
   EXPECT_FALSE(mp->ports[0].is_export);
 }
 
-TEST(ParserA29, FunctionPrototype_ReturnType) {
+TEST(InterfaceDeclParsing, FunctionPrototype_ReturnType) {
   auto r = Parse(
       "interface bus;\n"
       "  modport init(import function int compute(input int a));\n"
@@ -201,7 +201,7 @@ TEST(ParserA29, FunctionPrototype_ReturnType) {
   EXPECT_EQ(mp->ports[0].prototype->data_type.kind, DataTypeKind::kInt);
 }
 
-TEST(ParserA29, TaskPrototype_HasArgs) {
+TEST(InterfaceDeclParsing, TaskPrototype_HasArgs) {
   auto r = Parse(
       "interface bus;\n"
       "  modport init(import task Read(input logic [7:0] raddr));\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, BeginKeywords1364_1995) {
+TEST(CompilerDirectiveParsing, BeginKeywords1364_1995) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`begin_keywords \"1364-1995\"\n"
                               "module t;\n"

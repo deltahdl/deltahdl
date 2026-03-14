@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA608, RepeatCount) {
+TEST(LoopStatementSim, RepeatCount) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -26,7 +26,7 @@ TEST(SimA608, RepeatCount) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(SimA608, RepeatZero) {
+TEST(LoopStatementSim, RepeatZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -46,7 +46,7 @@ TEST(SimA608, RepeatZero) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA608, RepeatBlock) {
+TEST(LoopStatementSim, RepeatBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -73,7 +73,7 @@ TEST(SimA608, RepeatBlock) {
   EXPECT_EQ(vb->value.ToUint64(), 6u);
 }
 
-TEST(SimA608, RepeatOne) {
+TEST(LoopStatementSim, RepeatOne) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -93,7 +93,7 @@ TEST(SimA608, RepeatOne) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA608, RepeatVariableCount) {
+TEST(LoopStatementSim, RepeatVariableCount) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

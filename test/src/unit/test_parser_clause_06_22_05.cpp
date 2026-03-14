@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, TypeIncompatibleStringInt) {
+TEST(DataTypeParsing, TypeIncompatibleStringInt) {
   DataType a;
   a.kind = DataTypeKind::kString;
   DataType b;
@@ -13,7 +13,7 @@ TEST(ParserSection6, TypeIncompatibleStringInt) {
   EXPECT_FALSE(IsCastCompatible(a, b));
 }
 
-TEST(ParserSection6, TypeIncompatibleChandleInt) {
+TEST(DataTypeParsing, TypeIncompatibleChandleInt) {
   DataType a;
   a.kind = DataTypeKind::kChandle;
   DataType b;
@@ -21,7 +21,7 @@ TEST(ParserSection6, TypeIncompatibleChandleInt) {
   EXPECT_FALSE(IsCastCompatible(a, b));
 }
 
-TEST(ParserSection6, TypeIncompatibleEventInt) {
+TEST(DataTypeParsing, TypeIncompatibleEventInt) {
   DataType a;
   a.kind = DataTypeKind::kEvent;
   DataType b;
@@ -29,7 +29,7 @@ TEST(ParserSection6, TypeIncompatibleEventInt) {
   EXPECT_FALSE(IsCastCompatible(a, b));
 }
 
-TEST(ParserSection6, TypeIncompatibleStringChandle) {
+TEST(DataTypeParsing, TypeIncompatibleStringChandle) {
   DataType a;
   a.kind = DataTypeKind::kString;
   DataType b;

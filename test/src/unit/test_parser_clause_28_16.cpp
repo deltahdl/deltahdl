@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_EnableWithDelay) {
+TEST(PrimitiveInstantiationParsing, GateInst_EnableWithDelay) {
   auto r = Parse(
       "module m;\n"
       "  notif1 #(3, 4, 5) (out, in, ctrl);\n"
@@ -19,7 +19,7 @@ TEST(ParserA301, GateInst_EnableWithDelay) {
   EXPECT_NE(g->gate_delay_decay, nullptr);
 }
 
-TEST(ParserSection6, Sec6_7_1_WireTwoDelays) {
+TEST(DataTypeParsing, WireTwoDelays) {
   auto r = Parse(
       "module t;\n"
       "  wire #(3, 5) w;\n"
@@ -36,7 +36,7 @@ TEST(ParserSection6, Sec6_7_1_WireTwoDelays) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-TEST(ParserSection6, Sec6_7_1_WireThreeDelays) {
+TEST(DataTypeParsing, WireThreeDelays) {
   auto r = Parse(
       "module t;\n"
       "  wire #(2, 4, 6) w;\n"
@@ -53,7 +53,7 @@ TEST(ParserSection6, Sec6_7_1_WireThreeDelays) {
   ASSERT_NE(item->net_delay_decay, nullptr);
   EXPECT_EQ(item->net_delay_decay->int_val, 6u);
 }
-TEST(ParserSection6, TriregSingleDelay) {
+TEST(DataTypeParsing, TriregSingleDelay) {
   auto r = Parse(
       "module t;\n"
       "  trireg #5 t1;\n"
@@ -65,7 +65,7 @@ TEST(ParserSection6, TriregSingleDelay) {
   EXPECT_EQ(item->net_delay->int_val, 5u);
 }
 
-TEST(ParserSection6, TriregSingleDelay_NoFallDecay) {
+TEST(DataTypeParsing, TriregSingleDelay_NoFallDecay) {
   auto r = Parse(
       "module t;\n"
       "  trireg #5 t1;\n"

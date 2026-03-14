@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection9c, SequenceEventParenthesized) {
+TEST(ProcessTimingAndControlParsing, SequenceEventParenthesized) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s1;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection9c, SequenceEventParenthesized) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9b, SequenceEventInEventControl) {
+TEST(ProceduralAssignAndControlParsing, SequenceEventInEventControl) {
   auto r = Parse(
       "module m;\n"
       "  sequence abc;\n"

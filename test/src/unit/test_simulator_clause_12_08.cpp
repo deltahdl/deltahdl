@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA605, JumpBreakExitsLoop) {
+TEST(TimingControlSim, JumpBreakExitsLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -29,7 +29,7 @@ TEST(SimA605, JumpBreakExitsLoop) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimA605, JumpContinueSkipsIteration) {
+TEST(TimingControlSim, JumpContinueSkipsIteration) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -52,7 +52,7 @@ TEST(SimA605, JumpContinueSkipsIteration) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-TEST(SimA605, JumpReturnVoidFunction) {
+TEST(TimingControlSim, JumpReturnVoidFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -76,7 +76,7 @@ TEST(SimA605, JumpReturnVoidFunction) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA608, ForeverContinue) {
+TEST(LoopStatementSim, ForeverContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -103,7 +103,7 @@ TEST(SimA608, ForeverContinue) {
   EXPECT_EQ(count->value.ToUint64(), 4u);
 }
 
-TEST(SimA608, RepeatBreak) {
+TEST(LoopStatementSim, RepeatBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -126,7 +126,7 @@ TEST(SimA608, RepeatBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimA608, RepeatContinue) {
+TEST(LoopStatementSim, RepeatContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -152,7 +152,7 @@ TEST(SimA608, RepeatContinue) {
   EXPECT_EQ(count->value.ToUint64(), 4u);
 }
 
-TEST(SimA608, WhileBreak) {
+TEST(LoopStatementSim, WhileBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -175,7 +175,7 @@ TEST(SimA608, WhileBreak) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-TEST(SimA608, ForBreak) {
+TEST(LoopStatementSim, ForBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -198,7 +198,7 @@ TEST(SimA608, ForBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimA608, ForContinue) {
+TEST(LoopStatementSim, ForContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -222,7 +222,7 @@ TEST(SimA608, ForContinue) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-TEST(SimA608, DoWhileBreak) {
+TEST(LoopStatementSim, DoWhileBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -245,7 +245,7 @@ TEST(SimA608, DoWhileBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimA608, DoWhileContinue) {
+TEST(LoopStatementSim, DoWhileContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -271,7 +271,7 @@ TEST(SimA608, DoWhileContinue) {
   EXPECT_EQ(count->value.ToUint64(), 4u);
 }
 
-TEST(SimA608, NestedLoopInnerBreak) {
+TEST(LoopStatementSim, NestedLoopInnerBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -297,7 +297,7 @@ TEST(SimA608, NestedLoopInnerBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimA605, JumpReturnWithValue) {
+TEST(TimingControlSim, JumpReturnWithValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -319,7 +319,7 @@ TEST(SimA605, JumpReturnWithValue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA605, JumpReturnEarlyFromFunction) {
+TEST(TimingControlSim, JumpReturnEarlyFromFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -342,7 +342,7 @@ TEST(SimA605, JumpReturnEarlyFromFunction) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA608, NestedLoopInnerContinue) {
+TEST(LoopStatementSim, NestedLoopInnerContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

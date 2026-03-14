@@ -265,9 +265,9 @@ static const KwEntry kTableB1[] = {
 
 static constexpr size_t kTableB1Count = sizeof(kTableB1) / sizeof(kTableB1[0]);
 
-TEST(LexerAnnexB, TableB1CountIs248) { EXPECT_EQ(kTableB1Count, 248u); }
+TEST(KeywordListLexing, TableB1CountIs248) { EXPECT_EQ(kTableB1Count, 248u); }
 
-TEST(LexerAnnexB, AllKeywordsAreReserved) {
+TEST(KeywordListLexing, AllKeywordsAreReserved) {
   for (size_t i = 0; i < kTableB1Count; ++i) {
     auto tokens = Lex(kTableB1[i].text);
     ASSERT_GE(tokens.size(), 2u) << "keyword: " << kTableB1[i].text;
@@ -276,7 +276,7 @@ TEST(LexerAnnexB, AllKeywordsAreReserved) {
   }
 }
 
-TEST(LexerAnnexB, EachKeywordMapsToCorrectTokenKind) {
+TEST(KeywordListLexing, EachKeywordMapsToCorrectTokenKind) {
   for (size_t i = 0; i < kTableB1Count; ++i) {
     auto tokens = Lex(kTableB1[i].text);
     ASSERT_GE(tokens.size(), 2u) << "keyword: " << kTableB1[i].text;
@@ -285,7 +285,7 @@ TEST(LexerAnnexB, EachKeywordMapsToCorrectTokenKind) {
   }
 }
 
-TEST(LexerAnnexB, LookupKeywordReturnsCorrectTokenKind) {
+TEST(KeywordListLexing, LookupKeywordReturnsCorrectTokenKind) {
   for (size_t i = 0; i < kTableB1Count; ++i) {
     auto result = LookupKeyword(kTableB1[i].text);
     ASSERT_TRUE(result.has_value())
@@ -295,7 +295,7 @@ TEST(LexerAnnexB, LookupKeywordReturnsCorrectTokenKind) {
   }
 }
 
-TEST(LexerAnnexB, UppercaseIsNotKeyword) {
+TEST(KeywordListLexing, UppercaseIsNotKeyword) {
   const char* const kSamples[] = {
       "MODULE", "WIRE",    "REG",    "INPUT",   "OUTPUT", "ALWAYS", "IF",
       "ELSE",   "BEGIN",   "END",    "CLASS",   "LOGIC",  "INT",    "FUNCTION",
@@ -309,7 +309,7 @@ TEST(LexerAnnexB, UppercaseIsNotKeyword) {
   }
 }
 
-TEST(LexerAnnexB, MixedCaseIsNotKeyword) {
+TEST(KeywordListLexing, MixedCaseIsNotKeyword) {
   const char* const kSamples[] = {
       "Module",  "Wire",     "Reg",    "Input",      "Output",
       "Always",  "Begin",    "End",    "Class",      "Logic",
@@ -324,7 +324,7 @@ TEST(LexerAnnexB, MixedCaseIsNotKeyword) {
   }
 }
 
-TEST(LexerAnnexB, EscapedKeywordsAreIdentifiers) {
+TEST(KeywordListLexing, EscapedKeywordsAreIdentifiers) {
   const char* const kSamples[] = {
       "module",   "wire",     "reg",        "input",      "output",  "always",
       "if",       "else",     "begin",      "end",        "class",   "logic",
@@ -341,7 +341,7 @@ TEST(LexerAnnexB, EscapedKeywordsAreIdentifiers) {
   }
 }
 
-TEST(LexerAnnexB, NonKeywordsAreIdentifiers) {
+TEST(KeywordListLexing, NonKeywordsAreIdentifiers) {
   const char* const kNonKeywords[] = {
       "foo",   "bar",   "my_signal", "data_in", "clk",        "reset",
       "valid", "ready", "counter",   "state",   "next_state", "addr",
@@ -356,7 +356,7 @@ TEST(LexerAnnexB, NonKeywordsAreIdentifiers) {
   }
 }
 
-TEST(LexerAnnexB, TableB1IsAlphabetical) {
+TEST(KeywordListLexing, TableB1IsAlphabetical) {
   for (size_t i = 1; i < kTableB1Count; ++i) {
     EXPECT_LT(std::string_view(kTableB1[i - 1].text),
               std::string_view(kTableB1[i].text))
@@ -365,7 +365,7 @@ TEST(LexerAnnexB, TableB1IsAlphabetical) {
   }
 }
 
-TEST(LexerAnnexB, EachKeywordProducesOneToken) {
+TEST(KeywordListLexing, EachKeywordProducesOneToken) {
   for (size_t i = 0; i < kTableB1Count; ++i) {
     auto tokens = Lex(kTableB1[i].text);
     EXPECT_EQ(tokens.size(), 2u)
@@ -375,7 +375,7 @@ TEST(LexerAnnexB, EachKeywordProducesOneToken) {
   }
 }
 
-TEST(LexerAnnexB, KeywordTextIsPreserved) {
+TEST(KeywordListLexing, KeywordTextIsPreserved) {
   for (size_t i = 0; i < kTableB1Count; ++i) {
     auto tokens = Lex(kTableB1[i].text);
     ASSERT_GE(tokens.size(), 2u) << "keyword: " << kTableB1[i].text;
@@ -384,7 +384,7 @@ TEST(LexerAnnexB, KeywordTextIsPreserved) {
   }
 }
 
-TEST(LexerAnnexB, NoDuplicateTokenKinds) {
+TEST(KeywordListLexing, NoDuplicateTokenKinds) {
   std::set<TokenKind> seen;
   for (size_t i = 0; i < kTableB1Count; ++i) {
     auto [it, inserted] = seen.insert(kTableB1[i].expected);

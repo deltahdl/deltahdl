@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA70501, SetupholdDualLimitsStored) {
+TEST(TimingCheckCommandSim, SetupholdDualLimitsStored) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kSetuphold;
@@ -25,7 +25,7 @@ TEST(SimA70501, SetupholdDualLimitsStored) {
   EXPECT_EQ(stored.notifier, "ntfr");
 }
 
-TEST(SimA70501, SetupholdFullArgsSimulates) {
+TEST(TimingCheckCommandSim, SetupholdFullArgsSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, AutomaticFunctionLocalVar) {
+TEST(DataTypeParsing, AutomaticFunctionLocalVar) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  function automatic int factorial(int n);\n"

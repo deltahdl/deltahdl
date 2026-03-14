@@ -48,7 +48,7 @@ TEST(SourceText, ExternConstraintDeclaration) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18, ImplicitExternConstraintDecl) {
+TEST(ConstrainedRandomParsing, ImplicitExternConstraintDecl) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -59,7 +59,7 @@ TEST(ParserSection18, ImplicitExternConstraintDecl) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18, OutOfBlockConstraint) {
+TEST(ConstrainedRandomParsing, OutOfBlockConstraint) {
   auto r = Parse(
       "class a;\n"
       "  rand int b;\n"
@@ -71,7 +71,7 @@ TEST(ParserSection18, OutOfBlockConstraint) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection8, ExternConstraintDecl) {
+TEST(ClassParsing, ExternConstraintDecl) {
   auto r = Parse(
       "class A;\n"
       "  rand int x;\n"

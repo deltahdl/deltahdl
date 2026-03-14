@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA25, AssocDimIntType) {
+TEST(DeclarationRangeParsing, AssocDimIntType) {
   auto r = Parse("module m; logic [7:0] aa [int]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -17,7 +17,7 @@ TEST(ParserA25, AssocDimIntType) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "int");
 }
 
-TEST(ParserA25, AssocDimByteType) {
+TEST(DeclarationRangeParsing, AssocDimByteType) {
   auto r = Parse("module m; int aa [byte]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -25,7 +25,7 @@ TEST(ParserA25, AssocDimByteType) {
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
   EXPECT_EQ(item->unpacked_dims[0]->text, "byte");
 }
-TEST(ParserSection7, AssocArrayIntIndex) {
+TEST(AggregateTypeParsing, AssocArrayIntIndex) {
   auto r = Parse(
       "module t;\n"
       "  byte lookup[int];\n"
@@ -38,7 +38,7 @@ TEST(ParserSection7, AssocArrayIntIndex) {
   ASSERT_NE(item->unpacked_dims[0], nullptr);
 }
 
-TEST(ParserSection7, AssocArrayIntegerIndex) {
+TEST(AggregateTypeParsing, AssocArrayIntegerIndex) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] cache[integer];\n"
@@ -50,7 +50,7 @@ TEST(ParserSection7, AssocArrayIntegerIndex) {
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
 }
 
-TEST(ParserSection7, AssocArrayIntegerIndex_DimExpr) {
+TEST(AggregateTypeParsing, AssocArrayIntegerIndex_DimExpr) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] cache[integer];\n"
@@ -63,7 +63,7 @@ TEST(ParserSection7, AssocArrayIntegerIndex_DimExpr) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "integer");
 }
 
-TEST(ParserSection7, AssociativeArrayIntIndex) {
+TEST(AggregateTypeParsing, AssociativeArrayIntIndex) {
   auto r = Parse(
       "module t;\n"
       "  string names[int];\n"

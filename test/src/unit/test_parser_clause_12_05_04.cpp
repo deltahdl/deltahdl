@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA607, CaseInsideParse) {
+TEST(CaseSyntaxParsing, CaseInsideParse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -24,7 +24,7 @@ TEST(ParserA607, CaseInsideParse) {
   EXPECT_TRUE(stmt->case_inside);
 }
 
-TEST(ParserSection12, CaseInside) {
+TEST(ProceduralStatementParsing, CaseInside) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -41,7 +41,7 @@ TEST(ParserSection12, CaseInside) {
   EXPECT_TRUE(stmt->case_inside);
 }
 
-TEST(ParserA607, CaseInsideRange) {
+TEST(CaseSyntaxParsing, CaseInsideRange) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -60,7 +60,7 @@ TEST(ParserA607, CaseInsideRange) {
   ASSERT_GE(stmt->case_items.size(), 2u);
 }
 
-TEST(ParserA607, CaseInsideMultipleRanges) {
+TEST(CaseSyntaxParsing, CaseInsideMultipleRanges) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -78,7 +78,7 @@ TEST(ParserA607, CaseInsideMultipleRanges) {
   EXPECT_EQ(stmt->case_items[0].patterns.size(), 3u);
 }
 
-TEST(ParserA607, ValueRangeExpression) {
+TEST(CaseSyntaxParsing, ValueRangeExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -93,7 +93,7 @@ TEST(ParserA607, ValueRangeExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA607, ValueRangeBracket) {
+TEST(CaseSyntaxParsing, ValueRangeBracket) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

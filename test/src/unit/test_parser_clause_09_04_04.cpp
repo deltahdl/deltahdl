@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection9, WaitSequenceTriggered) {
+TEST(ProcessParsing, WaitSequenceTriggered) {
   auto r = Parse(
       "module m;\n"
       "  sequence abc;\n"
@@ -18,7 +18,7 @@ TEST(ParserSection9, WaitSequenceTriggered) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection9, WaitSequenceTriggeredOr) {
+TEST(ProcessParsing, WaitSequenceTriggeredOr) {
   auto r = Parse(
       "module m;\n"
       "  sequence s1;\n"
@@ -35,7 +35,7 @@ TEST(ParserSection9, WaitSequenceTriggeredOr) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection9c, WaitSequenceTriggeredWithAction) {
+TEST(ProcessTimingAndControlParsing, WaitSequenceTriggeredWithAction) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence req_ack;\n"
@@ -48,7 +48,7 @@ TEST(ParserSection9c, WaitSequenceTriggeredWithAction) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9c, WaitTriggeredInLoop) {
+TEST(ProcessTimingAndControlParsing, WaitTriggeredInLoop) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s;\n"

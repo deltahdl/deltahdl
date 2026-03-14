@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Sim13031, StaticTaskVarsPersist) {
+TEST(TaskDeclSim, StaticTaskVarsPersist) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -26,7 +26,7 @@ TEST(Sim13031, StaticTaskVarsPersist) {
   EXPECT_EQ(val, 3u);
 }
 
-TEST(Sim13031, AutomaticTaskVarsFresh) {
+TEST(TaskDeclSim, AutomaticTaskVarsFresh) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -46,7 +46,7 @@ TEST(Sim13031, AutomaticTaskVarsFresh) {
   EXPECT_EQ(val, 1u);
 }
 
-TEST(Sim13031, DefaultTaskIsStatic) {
+TEST(TaskDeclSim, DefaultTaskIsStatic) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -65,7 +65,7 @@ TEST(Sim13031, DefaultTaskIsStatic) {
   EXPECT_EQ(val, 2u);
 }
 
-TEST(Sim13031, StaticTaskWithInputArgs) {
+TEST(TaskDeclSim, StaticTaskWithInputArgs) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -85,7 +85,7 @@ TEST(Sim13031, StaticTaskWithInputArgs) {
   EXPECT_EQ(val, 30u);
 }
 
-TEST(Sim13031, SetupReturnsTaskItem) {
+TEST(TaskDeclSim, SetupReturnsTaskItem) {
   SimFixture f;
   auto* task = f.arena.Create<ModuleItem>();
   task->kind = ModuleItemKind::kTaskDecl;

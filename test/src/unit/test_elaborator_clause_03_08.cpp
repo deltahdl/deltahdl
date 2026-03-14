@@ -2,7 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, Cl3_8_FunctionWithReturnElaborates) {
+TEST(DesignBuildingBlockElaboration, FunctionWithReturnElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  function int add(int a, int b);\n"
@@ -11,7 +11,7 @@ TEST(ElabClause03, Cl3_8_FunctionWithReturnElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_8_VoidFunctionElaborates) {
+TEST(DesignBuildingBlockElaboration, VoidFunctionElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  function void log(int v);\n"
@@ -20,7 +20,7 @@ TEST(ElabClause03, Cl3_8_VoidFunctionElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_8_TaskElaborates) {
+TEST(DesignBuildingBlockElaboration, TaskElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  task do_work;\n"
@@ -28,7 +28,7 @@ TEST(ElabClause03, Cl3_8_TaskElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_8_TaskAndFunctionCoexistElaborate) {
+TEST(DesignBuildingBlockElaboration, TaskAndFunctionCoexistElaborate) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  function int add(int a, int b); return a + b; endfunction\n"

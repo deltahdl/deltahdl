@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA704, SixDelayPathElaborates) {
+TEST(SpecifyPathDelayElaboration, SixDelayPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(ElabA704, SixDelayPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA704, TwelveDelayPathElaborates) {
+TEST(SpecifyPathDelayElaboration, TwelveDelayPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(ElabA704, TwelveDelayPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA704, MinTypMaxDelayElaborates) {
+TEST(SpecifyPathDelayElaboration, MinTypMaxDelayElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -43,7 +43,7 @@ TEST(ElabA704, MinTypMaxDelayElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA704, MinTypMaxTwoDelaysElaborates) {
+TEST(SpecifyPathDelayElaboration, MinTypMaxTwoDelaysElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -56,7 +56,7 @@ TEST(ElabA704, MinTypMaxTwoDelaysElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA704, SixDelayMinTypMaxElaborates) {
+TEST(SpecifyPathDelayElaboration, SixDelayMinTypMaxElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

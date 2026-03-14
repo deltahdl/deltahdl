@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexE2, AnnexEDefaultTriregStrength) {
+TEST(OptionalDirectiveExtendedParsing, DefaultTriregStrength) {
   auto r = ParseWithPreprocessor(
       "`default_trireg_strength 50\n"
       "module m; endmodule\n");
@@ -16,7 +16,7 @@ TEST(ParserAnnexE2, AnnexEDefaultTriregStrength) {
   }
 }
 
-TEST(ParserAnnexE2, AnnexEDefaultTriregStrength_CUValue) {
+TEST(OptionalDirectiveExtendedParsing, DefaultTriregStrength_CUValue) {
   auto r = ParseWithPreprocessor(
       "`default_trireg_strength 150\n"
       "module m; endmodule\n");
@@ -26,7 +26,7 @@ TEST(ParserAnnexE2, AnnexEDefaultTriregStrength_CUValue) {
   EXPECT_EQ(r.cu->default_trireg_strength, 150u);
 }
 
-TEST(ParserAnnexE2, AnnexEDefaultTriregStrength_NoDirective) {
+TEST(OptionalDirectiveExtendedParsing, DefaultTriregStrength_NoDirective) {
   auto r = ParseWithPreprocessor("module m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

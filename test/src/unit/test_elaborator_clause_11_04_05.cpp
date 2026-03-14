@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA86, BinaryCaseEqElaborates) {
+TEST(OperatorElaboration, BinaryCaseEqElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -18,7 +18,7 @@ TEST(ElabA86, BinaryCaseEqElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, BinaryCaseNeqElaborates) {
+TEST(OperatorElaboration, BinaryCaseNeqElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(ElabA86, BinaryCaseNeqElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh9b, AlwaysCombEqualityCheck) {
+TEST(AlwaysCombExtendedSim, AlwaysCombEqualityCheck) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -56,7 +56,7 @@ TEST(SimCh9b, AlwaysCombEqualityCheck) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-TEST(SimCh10, BlockingAssignComparisonOps) {
+TEST(BlockingAssignSim, BlockingAssignComparisonOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

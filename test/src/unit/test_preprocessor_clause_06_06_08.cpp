@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, InterconnectDeclFlag) {
+TEST(DataTypeParsing, InterconnectDeclFlag) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  interconnect ibus;\n"

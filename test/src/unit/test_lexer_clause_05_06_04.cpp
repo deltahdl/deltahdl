@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexerClause05, Cl5_6_4_BacktickIsUnexpectedInLexer) {
+TEST(LexicalConventionLexing, BacktickIsUnexpectedInLexer) {
   SourceManager mgr;
   DiagEngine diag(mgr);
   auto fid = mgr.AddFile("<test>", "`define FOO 1");

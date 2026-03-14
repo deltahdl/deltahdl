@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA612, RandsequenceWithName) {
+TEST(RandsequenceSyntaxParsing, RandsequenceWithName) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -24,7 +24,7 @@ TEST(ParserA612, RandsequenceWithName) {
   EXPECT_EQ(stmt->rs_top_production, "main");
 }
 
-TEST(ParserA612, RandsequenceNoName) {
+TEST(RandsequenceSyntaxParsing, RandsequenceNoName) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -41,7 +41,7 @@ TEST(ParserA612, RandsequenceNoName) {
   EXPECT_TRUE(stmt->rs_top_production.empty());
 }
 
-TEST(ParserA612, RsProductionMultipleProds) {
+TEST(RandsequenceSyntaxParsing, RsProductionMultipleProds) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -57,7 +57,7 @@ TEST(ParserA612, RsProductionMultipleProds) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsRuleAlternatives) {
+TEST(RandsequenceSyntaxParsing, RsRuleAlternatives) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -73,7 +73,7 @@ TEST(ParserA612, RsRuleAlternatives) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsWeightSpecification) {
+TEST(RandsequenceSyntaxParsing, RsWeightSpecification) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -88,7 +88,7 @@ TEST(ParserA612, RsWeightSpecification) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsCodeBlock) {
+TEST(RandsequenceSyntaxParsing, RsCodeBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -101,7 +101,7 @@ TEST(ParserA612, RsCodeBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsIfElse) {
+TEST(RandsequenceSyntaxParsing, RsIfElse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -116,7 +116,7 @@ TEST(ParserA612, RsIfElse) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsRepeat) {
+TEST(RandsequenceSyntaxParsing, RsRepeat) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -130,7 +130,7 @@ TEST(ParserA612, RsRepeat) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsCase) {
+TEST(RandsequenceSyntaxParsing, RsCase) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -150,7 +150,7 @@ TEST(ParserA612, RsCase) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsRandJoin) {
+TEST(RandsequenceSyntaxParsing, RsRandJoin) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -165,7 +165,7 @@ TEST(ParserA612, RsRandJoin) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsWeightWithCodeBlock) {
+TEST(RandsequenceSyntaxParsing, RsWeightWithCodeBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -181,7 +181,7 @@ TEST(ParserA612, RsWeightWithCodeBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, NestedRandsequence) {
+TEST(RandsequenceSyntaxParsing, NestedRandsequence) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA608, WhileContinue) {
+TEST(LoopStatementSim, WhileContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_11_HierarchyAndInstantiation) {
+TEST(DesignBuildingBlockParsing, HierarchyAndInstantiation) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  logic in1, in2, sel;\n"

@@ -9,7 +9,7 @@
 using namespace delta;
 namespace {
 
-TEST(Section21, ReadmemhBasic) {
+TEST(IoSystemTaskTest, ReadmemhBasic) {
   SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_readmemh.txt";
   {
@@ -30,7 +30,7 @@ TEST(Section21, ReadmemhBasic) {
   std::remove(tmp_path.c_str());
 }
 
-TEST(Section21, ReadmembBasic) {
+TEST(IoSystemTaskTest, ReadmembBasic) {
   SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_readmemb.txt";
   {

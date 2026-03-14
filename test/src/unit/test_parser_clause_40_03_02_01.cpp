@@ -15,7 +15,7 @@ TEST_F(ApiParseTest, CoverageControlSystemCall) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-TEST(ParserSection40, CoverageControlInAlwaysBlock) {
+TEST(DataReadApiParsing, CoverageControlInAlwaysBlock) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, reset;

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabCh10j, EmptyUnpackedArrayConcatElab) {
+TEST(UnpackedArrayConcatElaboration, EmptyUnpackedArrayConcatElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

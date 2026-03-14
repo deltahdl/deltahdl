@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, ValueSet_4StateLogicDecl) {
+TEST(DataTypeParsing, ValueSet_4StateLogicDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic [3:0] val;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection6, ValueSet_4StateLogicDecl) {
   EXPECT_TRUE(Is4stateType(DataTypeKind::kLogic));
 }
 
-TEST(ParserSection6, ValueSet_4StateRegDecl) {
+TEST(DataTypeParsing, ValueSet_4StateRegDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  reg [7:0] r;\n"
@@ -29,7 +29,7 @@ TEST(ParserSection6, ValueSet_4StateRegDecl) {
   EXPECT_TRUE(Is4stateType(DataTypeKind::kReg));
 }
 
-TEST(ParserSection6, ValueSet_4StateIntegerDecl) {
+TEST(DataTypeParsing, ValueSet_4StateIntegerDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  integer i;\n"
@@ -41,7 +41,7 @@ TEST(ParserSection6, ValueSet_4StateIntegerDecl) {
   EXPECT_TRUE(Is4stateType(DataTypeKind::kInteger));
 }
 
-TEST(ParserSection6, ValueSet_2StateBitDecl) {
+TEST(DataTypeParsing, ValueSet_2StateBitDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  bit [3:0] b;\n"
@@ -53,7 +53,7 @@ TEST(ParserSection6, ValueSet_2StateBitDecl) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kBit));
 }
 
-TEST(ParserSection6, ValueSet_2StateIntDecl) {
+TEST(DataTypeParsing, ValueSet_2StateIntDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  int x;\n"
@@ -65,7 +65,7 @@ TEST(ParserSection6, ValueSet_2StateIntDecl) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kInt));
 }
 
-TEST(ParserSection6, ValueSet_2StateByteDecl) {
+TEST(DataTypeParsing, ValueSet_2StateByteDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  byte b;\n"

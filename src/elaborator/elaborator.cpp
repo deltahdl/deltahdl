@@ -120,6 +120,19 @@ void Elaborator::ValidateNameSpaces() {
   }
 }
 
+// §3.1: Recursively collect all elaborated modules from the instantiation
+// hierarchy into the design's all_modules map.
+static void CollectAllModules(
+    RtlirModule* mod,
+    std::unordered_map<std::string_view, RtlirModule*>& all_modules) {
+  if (!mod) return;
+  auto [it, inserted] = all_modules.try_emplace(mod->name, mod);
+  if (!inserted) return;  // Already visited (diamond instantiation).
+  for (auto& child : mod->children) {
+    CollectAllModules(child.resolved, all_modules);
+  }
+}
+
 RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // §3.13: Validate definitions and package name spaces.
   ValidateNameSpaces();
@@ -154,7 +167,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ApplyDefparams(top, mod_decl);
 
   design->top_modules.push_back(top);
-  design->all_modules[top->name] = top;
+  // §3.1: Register the full instantiation hierarchy in the design's module map.
+  CollectAllModules(top, design->all_modules);
   // §3.12.1: CU-scope functions/tasks available to all modules.
   for (auto* item : unit_->cu_items) {
     if (item->kind == ModuleItemKind::kFunctionDecl ||

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabCh42, SingleModuleDesignHasOneTopModule) {
+TEST(HardwareModelExecutionElaboration, SingleModuleDesignHasOneTopModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -16,7 +16,7 @@ TEST(ElabCh42, SingleModuleDesignHasOneTopModule) {
   EXPECT_EQ(design->top_modules[0]->name, "top");
 }
 
-TEST(ElabCh42, TopModuleRegisteredInAllModulesMap) {
+TEST(HardwareModelExecutionElaboration, TopModuleRegisteredInAllModulesMap) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -29,7 +29,7 @@ TEST(ElabCh42, TopModuleRegisteredInAllModulesMap) {
   EXPECT_EQ(it->second, design->top_modules[0]);
 }
 
-TEST(ElabCh42, HierarchicalDesignElaboratesChildModules) {
+TEST(HardwareModelExecutionElaboration, HierarchicalDesignElaboratesChildModules) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child;\n"
@@ -46,7 +46,7 @@ TEST(ElabCh42, HierarchicalDesignElaboratesChildModules) {
   EXPECT_EQ(top->children[0].inst_name, "c1");
 }
 
-TEST(ElabCh42, ChildModuleResolvedPointerIsNotNull) {
+TEST(HardwareModelExecutionElaboration, ChildModuleResolvedPointerIsNotNull) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child;\n"
@@ -62,7 +62,7 @@ TEST(ElabCh42, ChildModuleResolvedPointerIsNotNull) {
   EXPECT_NE(top->children[0].resolved, nullptr);
 }
 
-TEST(ElabCh42, ChildModuleAppearsInAllModulesMap) {
+TEST(HardwareModelExecutionElaboration, ChildModuleAppearsInAllModulesMap) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child;\n"
@@ -77,7 +77,7 @@ TEST(ElabCh42, ChildModuleAppearsInAllModulesMap) {
   EXPECT_NE(it, design->all_modules.end());
 }
 
-TEST(ElabCh42, MultipleInstancesOfSameModule) {
+TEST(HardwareModelExecutionElaboration, MultipleInstancesOfSameModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child;\n"
@@ -95,7 +95,7 @@ TEST(ElabCh42, MultipleInstancesOfSameModule) {
   EXPECT_EQ(top->children[1].inst_name, "c2");
 }
 
-TEST(ElabCh42, EmptyModuleElaboratesWithNoPorts) {
+TEST(HardwareModelExecutionElaboration, EmptyModuleElaboratesWithNoPorts) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module empty;\n"
@@ -110,7 +110,7 @@ TEST(ElabCh42, EmptyModuleElaboratesWithNoPorts) {
   EXPECT_TRUE(mod->children.empty());
 }
 
-TEST(ElabCh42, ModuleWithPortsElaboratesPorts) {
+TEST(HardwareModelExecutionElaboration, ModuleWithPortsElaboratesPorts) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m(input logic a, output logic b);\n"
@@ -123,7 +123,7 @@ TEST(ElabCh42, ModuleWithPortsElaboratesPorts) {
   ASSERT_GE(mod->ports.size(), 2u);
 }
 
-TEST(ElabCh42, UnresolvedModuleNameProducesError) {
+TEST(HardwareModelExecutionElaboration, UnresolvedModuleNameProducesError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -136,7 +136,7 @@ TEST(ElabCh42, UnresolvedModuleNameProducesError) {
   }
 }
 
-TEST(ElabCh42, DesignWithVariablesAndProcesses) {
+TEST(HardwareModelExecutionElaboration, DesignWithVariablesAndProcesses) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -153,7 +153,7 @@ TEST(ElabCh42, DesignWithVariablesAndProcesses) {
   EXPECT_EQ(mod->processes.size(), 2u);
 }
 
-TEST(ElabCh42, ElaborateSpecificTopModuleByName) {
+TEST(HardwareModelExecutionElaboration, ElaborateSpecificTopModuleByName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module a;\n"
@@ -167,7 +167,7 @@ TEST(ElabCh42, ElaborateSpecificTopModuleByName) {
   EXPECT_EQ(design->top_modules[0]->name, "a");
 }
 
-TEST(ElabCh42, PortBindingInHierarchicalInstance) {
+TEST(HardwareModelExecutionElaboration, PortBindingInHierarchicalInstance) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic a, output logic b);\n"
@@ -185,7 +185,7 @@ TEST(ElabCh42, PortBindingInHierarchicalInstance) {
   EXPECT_GE(top->children[0].port_bindings.size(), 2u);
 }
 
-TEST(ElabCh42, DeepHierarchyThreeLevels) {
+TEST(HardwareModelExecutionElaboration, DeepHierarchyThreeLevels) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module leaf;\n"
@@ -207,7 +207,7 @@ TEST(ElabCh42, DeepHierarchyThreeLevels) {
   EXPECT_EQ(mid->children[0].module_name, "leaf");
 }
 
-TEST(ElabCh42, ModuleUsedAtMultipleLevels) {
+TEST(HardwareModelExecutionElaboration, ModuleUsedAtMultipleLevels) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module shared;\n"
@@ -226,7 +226,7 @@ TEST(ElabCh42, ModuleUsedAtMultipleLevels) {
   EXPECT_NE(it, design->all_modules.end());
 }
 
-TEST(ElabCh42, TwoIndependentTopModules) {
+TEST(HardwareModelExecutionElaboration, TwoIndependentTopModules) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module a;\n"

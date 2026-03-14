@@ -14,7 +14,7 @@ TEST(ConstEval, Bitwise) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("5 ^ 3", f)), 6);
 }
 
-TEST(ElabA83, UnaryExprInInitialElaborates) {
+TEST(ExpressionElaboration, UnaryExprInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -26,7 +26,7 @@ TEST(ElabA83, UnaryExprInInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, UnaryBitwiseNotElaborates) {
+TEST(OperatorElaboration, UnaryBitwiseNotElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -38,7 +38,7 @@ TEST(ElabA86, UnaryBitwiseNotElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, BinaryBitwiseXnorElaborates) {
+TEST(OperatorElaboration, BinaryBitwiseXnorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -50,7 +50,7 @@ TEST(ElabA86, BinaryBitwiseXnorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh9, AlwaysCombPartSelect) {
+TEST(AlwaysCombBasicSim, AlwaysCombPartSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -73,7 +73,7 @@ TEST(SimCh9, AlwaysCombPartSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0xBu);
 }
 
-TEST(SimCh9b, AlwaysCombNand) {
+TEST(AlwaysCombExtendedSim, AlwaysCombNand) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -98,7 +98,7 @@ TEST(SimCh9b, AlwaysCombNand) {
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0xF0u);
 }
 
-TEST(SimCh9b, AlwaysCombChainedLogic) {
+TEST(AlwaysCombExtendedSim, AlwaysCombChainedLogic) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -124,7 +124,7 @@ TEST(SimCh9b, AlwaysCombChainedLogic) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimCh10, BlockingAssignBitwiseOps) {
+TEST(BlockingAssignSim, BlockingAssignBitwiseOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_12_1_CuScopeBindDirective) {
+TEST(DesignBuildingBlockParsing, CuScopeBindDirective) {
   auto r = ParseWithPreprocessor(
       "module target; endmodule\n"
       "bind target target chk_inst();\n");

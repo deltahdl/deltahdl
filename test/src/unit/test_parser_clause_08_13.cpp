@@ -3,7 +3,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection8, ExtendsScopedName) {
+TEST(ClassParsing, ExtendsScopedName) {
   auto r = Parse(
       "class Child extends pkg::Base;\n"
       "endclass\n");
@@ -38,7 +38,7 @@ TEST(SourceText, ClassWithFinal) {
   EXPECT_EQ(r.cu->classes[0]->name, "C");
 }
 
-TEST(ParserSection8, ClassExtendsBase) {
+TEST(ClassParsing, ClassExtendsBase) {
   auto r = Parse(
       "class Base;\n"
       "  int x;\n"
@@ -52,7 +52,7 @@ TEST(ParserSection8, ClassExtendsBase) {
   EXPECT_TRUE(r.cu->classes[0]->base_class.empty());
 }
 
-TEST(ParserSection8, ClassExtendsDerived) {
+TEST(ClassParsing, ClassExtendsDerived) {
   auto r = Parse(
       "class Base;\n"
       "  int x;\n"
@@ -66,7 +66,7 @@ TEST(ParserSection8, ClassExtendsDerived) {
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
 
-TEST(ParserA813, SubclassInheritsAndAddsMembers) {
+TEST(InheritanceParsing, SubclassInheritsAndAddsMembers) {
   auto r = Parse(
       "class Packet;\n"
       "  int data;\n"
@@ -89,7 +89,7 @@ TEST(ParserA813, SubclassInheritsAndAddsMembers) {
   EXPECT_GE(lp->members.size(), 2u);
 }
 
-TEST(ParserA813, FinalClassWithExtends) {
+TEST(InheritanceParsing, FinalClassWithExtends) {
   auto r = Parse(
       "class Base;\n"
       "endclass\n"
@@ -102,7 +102,7 @@ TEST(ParserA813, FinalClassWithExtends) {
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
 
-TEST(ParserA813, ExtendsWithConstructorArgs) {
+TEST(InheritanceParsing, ExtendsWithConstructorArgs) {
   auto r = Parse(
       "class Base;\n"
       "  function new(int x);\n"
@@ -117,7 +117,7 @@ TEST(ParserA813, ExtendsWithConstructorArgs) {
   ASSERT_GE(cls->extends_args.size(), 1u);
 }
 
-TEST(ParserA813, ExtendsWithDefault) {
+TEST(InheritanceParsing, ExtendsWithDefault) {
   auto r = Parse(
       "class Base;\n"
       "endclass\n"
@@ -128,7 +128,7 @@ TEST(ParserA813, ExtendsWithDefault) {
   EXPECT_TRUE(r.cu->classes[1]->extends_has_default);
 }
 
-TEST(ParserA813, SingleInheritanceChain) {
+TEST(InheritanceParsing, SingleInheritanceChain) {
   auto r = Parse(
       "class A;\n"
       "endclass\n"

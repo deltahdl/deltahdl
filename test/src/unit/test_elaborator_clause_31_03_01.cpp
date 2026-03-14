@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA705, SetupTimingCheckElaborates) {
+TEST(SystemTimingCheckElaboration, SetupTimingCheckElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(ElabA705, SetupTimingCheckElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA705, TimingChecksWithSpecparamsElaborate) {
+TEST(SystemTimingCheckElaboration, TimingChecksWithSpecparamsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -31,7 +31,7 @@ TEST(ElabA705, TimingChecksWithSpecparamsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70501, SetupWithNotifierElaborates) {
+TEST(TimingCheckCommandElaboration, SetupWithNotifierElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -44,7 +44,7 @@ TEST(ElabA70501, SetupWithNotifierElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70503, TerminalBitSelectElaborates) {
+TEST(TimingCheckEventDefElaboration, TerminalBitSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -57,7 +57,7 @@ TEST(ElabA70503, TerminalBitSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70503, TimingCheckEventPosedgeElaborates) {
+TEST(TimingCheckEventDefElaboration, TimingCheckEventPosedgeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -70,7 +70,7 @@ TEST(ElabA70503, TimingCheckEventPosedgeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70503, TimingCheckEventNoEdgeElaborates) {
+TEST(TimingCheckEventDefElaboration, TimingCheckEventNoEdgeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

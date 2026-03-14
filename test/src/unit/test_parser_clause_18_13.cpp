@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection18, GetSetRandstateRoundtrip) {
+TEST(ConstrainedRandomParsing, GetSetRandstateRoundtrip) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"

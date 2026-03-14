@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_6_IdentAllLegalChars) {
+TEST(LexicalConventionParsing, IdentAllLegalChars) {
   auto r = Parse("module m; logic abc_123$xyz; endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = FirstItem(r);
@@ -13,7 +13,7 @@ TEST(ParserClause05, Cl5_6_IdentAllLegalChars) {
   EXPECT_EQ(item->name, "abc_123$xyz");
 }
 
-TEST(ParserClause05, Cl5_6_IdentStartsWithUnderscore) {
+TEST(LexicalConventionParsing, IdentStartsWithUnderscore) {
   auto r = Parse("module m; logic _start_val; endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = FirstItem(r);
@@ -21,7 +21,7 @@ TEST(ParserClause05, Cl5_6_IdentStartsWithUnderscore) {
   EXPECT_EQ(item->name, "_start_val");
 }
 
-TEST(ParserClause05, Cl5_6_IdentStartsWithLetter) {
+TEST(LexicalConventionParsing, IdentStartsWithLetter) {
   auto r = Parse("module m; logic Data0; endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = FirstItem(r);
@@ -29,11 +29,11 @@ TEST(ParserClause05, Cl5_6_IdentStartsWithLetter) {
   EXPECT_EQ(item->name, "Data0");
 }
 
-TEST(ParserClause05, Cl5_6_IdentWithDollarSign) {
+TEST(LexicalConventionParsing, IdentWithDollarSign) {
   EXPECT_TRUE(ParseOk("module m; logic n$657; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_6_CaseSensitive) {
+TEST(LexicalConventionParsing, CaseSensitive) {
   auto r = Parse(
       "module m;\n"
       "  logic X;\n"
@@ -45,7 +45,7 @@ TEST(ParserClause05, Cl5_6_CaseSensitive) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->name, "x");
 }
 
-TEST(ParserClause05, Cl5_6_NumberFollowedByIdentifier) {
+TEST(LexicalConventionParsing, NumberFollowedByIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  initial x = 42 + abc;\n"
@@ -63,7 +63,7 @@ TEST(ParserClause05, Cl5_6_NumberFollowedByIdentifier) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserClause05, Cl5_6_LetIdentUnderscore) {
+TEST(LexicalConventionParsing, LetIdentUnderscore) {
   auto r = Parse(
       "module m;\n"
       "  let _my_let_123 = 0;\n"
@@ -75,7 +75,7 @@ TEST(ParserClause05, Cl5_6_LetIdentUnderscore) {
   EXPECT_EQ(item->name, "_my_let_123");
 }
 
-TEST(ParserClause05, Cl5_6_SimpleWithUnderscore) {
+TEST(LexicalConventionParsing, SimpleWithUnderscore) {
   auto r = Parse("module m; logic _bus3; endmodule");
   ASSERT_NE(r.cu, nullptr);
   auto* item = FirstItem(r);

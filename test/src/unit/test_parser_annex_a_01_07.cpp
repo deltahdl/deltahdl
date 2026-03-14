@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ProgramItemsA17, ProgramWithInitial) {
+TEST(ProgramItemsParsing, ProgramWithInitial) {
   auto r = Parse(
       "program test_prg;\n"
       "  initial begin\n"
@@ -19,7 +19,7 @@ TEST(ProgramItemsA17, ProgramWithInitial) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-TEST(ProgramItemsA17, ProgramContinuousAssign) {
+TEST(ProgramItemsParsing, ProgramContinuousAssign) {
   auto r = Parse(
       "program test_prg;\n"
       "  wire a, y;\n"
@@ -31,7 +31,7 @@ TEST(ProgramItemsA17, ProgramContinuousAssign) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kContAssign));
 }
 
-TEST(ProgramItemsA17, ProgramFinal) {
+TEST(ProgramItemsParsing, ProgramFinal) {
   auto r = Parse(
       "program test_prg;\n"
       "  final $display(\"done\");\n"
@@ -42,7 +42,7 @@ TEST(ProgramItemsA17, ProgramFinal) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
 }
 
-TEST(ProgramItemsA17, ProgramFunctionDecl) {
+TEST(ProgramItemsParsing, ProgramFunctionDecl) {
   auto r = Parse(
       "program test_prg;\n"
       "  function int add(int a, int b);\n"
@@ -55,7 +55,7 @@ TEST(ProgramItemsA17, ProgramFunctionDecl) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
-TEST(ProgramItemsA17, ProgramTaskDecl) {
+TEST(ProgramItemsParsing, ProgramTaskDecl) {
   auto r = Parse(
       "program test_prg;\n"
       "  task run();\n"
@@ -68,7 +68,7 @@ TEST(ProgramItemsA17, ProgramTaskDecl) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kTaskDecl));
 }
 
-TEST(ProgramItemsA17, ProgramTimeunits) {
+TEST(ProgramItemsParsing, ProgramTimeunits) {
   auto r = Parse(
       "program test_prg;\n"
       "  timeunit 1ns;\n"
@@ -78,7 +78,7 @@ TEST(ProgramItemsA17, ProgramTimeunits) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ProgramItemsA17, ProgramGenFor) {
+TEST(ProgramItemsParsing, ProgramGenFor) {
   auto r = Parse(
       "program test_prg;\n"
       "  genvar i;\n"
@@ -92,7 +92,7 @@ TEST(ProgramItemsA17, ProgramGenFor) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateFor));
 }
 
-TEST(ProgramItemsA17, ProgramGenIf) {
+TEST(ProgramItemsParsing, ProgramGenIf) {
   auto r = Parse(
       "program test_prg;\n"
       "  if (1) begin : blk\n"
@@ -105,7 +105,7 @@ TEST(ProgramItemsA17, ProgramGenIf) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateIf));
 }
 
-TEST(ProgramItemsA17, ProgramElabTask) {
+TEST(ProgramItemsParsing, ProgramElabTask) {
   auto r = Parse(
       "program test_prg;\n"
       "  $error(\"test error\");\n"
@@ -114,7 +114,7 @@ TEST(ProgramItemsA17, ProgramElabTask) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ProgramItemsA17, ProgramAnsiPorts) {
+TEST(ProgramItemsParsing, ProgramAnsiPorts) {
   auto r = Parse(
       "program test_prg(input logic clk, input logic rst);\n"
       "  initial begin end\n"
@@ -124,7 +124,7 @@ TEST(ProgramItemsA17, ProgramAnsiPorts) {
   EXPECT_EQ(r.cu->programs[0]->ports.size(), 2u);
 }
 
-TEST(ProgramItemsA17, ProgramConcurrentAssert) {
+TEST(ProgramItemsParsing, ProgramConcurrentAssert) {
   auto r = Parse(
       "program test_prg;\n"
       "  assert property (@(posedge clk) a |-> b);\n"
@@ -133,7 +133,7 @@ TEST(ProgramItemsA17, ProgramConcurrentAssert) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ProgramItemsA17, ProgramGenerateRegion) {
+TEST(ProgramItemsParsing, ProgramGenerateRegion) {
   auto r = Parse(
       "program test_prg;\n"
       "  generate\n"
@@ -144,7 +144,7 @@ TEST(ProgramItemsA17, ProgramGenerateRegion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ProgramItemsA17, ProgramClocking) {
+TEST(ProgramItemsParsing, ProgramClocking) {
   auto r = Parse(
       "program test_prg;\n"
       "  clocking cb @(posedge clk);\n"

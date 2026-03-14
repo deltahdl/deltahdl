@@ -5,7 +5,7 @@
 
 namespace {
 
-TEST(VpiAnnexK2, ValueFormatConstants) {
+TEST(VpiConstantAndStructSim, ValueFormatConstants) {
   EXPECT_EQ(vpiBinStrVal, 1);
   EXPECT_EQ(vpiOctStrVal, 2);
   EXPECT_EQ(vpiHexStrVal, 3);
@@ -15,7 +15,7 @@ TEST(VpiAnnexK2, ValueFormatConstants) {
   EXPECT_EQ(vpiStringVal, 7);
 }
 
-TEST(VpiAnnexK2, ObjectTypeConstants) {
+TEST(VpiConstantAndStructSim, ObjectTypeConstants) {
   EXPECT_EQ(vpiModule, 32);
   EXPECT_EQ(vpiNet, 36);
   EXPECT_EQ(vpiReg, 48);
@@ -23,23 +23,23 @@ TEST(VpiAnnexK2, ObjectTypeConstants) {
   EXPECT_EQ(vpiCallback, 107);
 }
 
-TEST(VpiAnnexK2, TimeTypeConstants) {
+TEST(VpiConstantAndStructSim, TimeTypeConstants) {
   EXPECT_EQ(vpiSimTime, 1);
   EXPECT_EQ(vpiScaledRealTime, 2);
 }
 
-TEST(VpiAnnexK2, CallbackReasonConstants) {
+TEST(VpiConstantAndStructSim, CallbackReasonConstants) {
   EXPECT_EQ(cbValueChange, 1);
   EXPECT_EQ(cbReadWriteSynch, 2);
   EXPECT_EQ(cbEndOfSimulation, 3);
 }
 
-TEST(VpiAnnexK2, VpiValueDefaultInit) {
+TEST(VpiConstantAndStructSim, VpiValueDefaultInit) {
   s_vpi_value val = {};
   EXPECT_EQ(val.format, 0);
 }
 
-TEST(VpiAnnexK2, VpiCbDataDefaultInit) {
+TEST(VpiConstantAndStructSim, VpiCbDataDefaultInit) {
   s_cb_data cb = {};
   EXPECT_EQ(cb.reason, 0);
   EXPECT_EQ(cb.obj, nullptr);
@@ -48,7 +48,7 @@ TEST(VpiAnnexK2, VpiCbDataDefaultInit) {
   EXPECT_EQ(cb.user_data, nullptr);
 }
 
-TEST(VpiAnnexK2, VpiSystfDataDefaultInit) {
+TEST(VpiConstantAndStructSim, VpiSystfDataDefaultInit) {
   s_vpi_systf_data data = {};
   EXPECT_EQ(data.type, 0);
   EXPECT_EQ(data.tfname, nullptr);
@@ -76,7 +76,7 @@ TEST(SvVpiUser, AlwaysTypeConstants) {
   EXPECT_EQ(vpiAlwaysLatch, 4);
 }
 
-TEST(VpiAnnexK2, VpiTimeDefaultInit) {
+TEST(VpiConstantAndStructSim, VpiTimeDefaultInit) {
   s_vpi_time time = {};
   EXPECT_EQ(time.type, 0);
   EXPECT_EQ(time.high, 0u);

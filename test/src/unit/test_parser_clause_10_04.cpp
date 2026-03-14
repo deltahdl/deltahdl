@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, MixedAssignments_BlockingAndNonblocking) {
+TEST(ProceduralBlockSyntaxParsing, MixedAssignments_BlockingAndNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -29,7 +29,7 @@ static ModuleItem* FindInitialBlock(ParseResult& r) {
   return FindItemByKind(r, ModuleItemKind::kInitialBlock);
 }
 
-TEST(ParserSection4, Sec4_5_MixBlockingNonblocking) {
+TEST(SchedulingSemanticsParsing, MixBlockingNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c, d;\n"

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA609, SystemTaskDisplay) {
+TEST(SubroutineCallSim, SystemTaskDisplay) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

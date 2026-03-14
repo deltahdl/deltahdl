@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexE, AnnexEDelayModeZero) {
+TEST(OptionalDirectiveParsing, DelayModeZero) {
   auto r = ParseWithPreprocessor("`delay_mode_zero\nmodule m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

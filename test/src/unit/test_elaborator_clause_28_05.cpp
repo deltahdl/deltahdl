@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection28, ElaborateBufGate) {
+TEST(GateLevelModelingParsing, ElaborateBufGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -20,7 +20,7 @@ TEST(ParserSection28, ElaborateBufGate) {
   EXPECT_EQ(mod->assigns[0].rhs->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserSection28, ElaborateNotGate) {
+TEST(GateLevelModelingParsing, ElaborateNotGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"

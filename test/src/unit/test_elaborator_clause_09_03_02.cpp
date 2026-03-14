@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_03_02, ForkJoinInInitialElaborates) {
+TEST(ParallelBlockElaboration, ForkJoinInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -23,7 +23,7 @@ TEST(ElabClause09_03_02, ForkJoinInInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_02, ForkJoinAnyElaborates) {
+TEST(ParallelBlockElaboration, ForkJoinAnyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -40,7 +40,7 @@ TEST(ElabClause09_03_02, ForkJoinAnyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_02, ForkJoinNoneElaborates) {
+TEST(ParallelBlockElaboration, ForkJoinNoneElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -57,7 +57,7 @@ TEST(ElabClause09_03_02, ForkJoinNoneElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_02, EmptyForkJoinElaborates) {
+TEST(ParallelBlockElaboration, EmptyForkJoinElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -71,7 +71,7 @@ TEST(ElabClause09_03_02, EmptyForkJoinElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_02, BeginEndInsideForkElaborates) {
+TEST(ParallelBlockElaboration, BeginEndInsideForkElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

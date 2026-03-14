@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, FscanfCall) {
+TEST(IoSystemTaskParsing, FscanfCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  integer fd, code, val;\n"
@@ -15,7 +15,7 @@ TEST(ParserSection21, FscanfCall) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, SscanfCall) {
+TEST(IoSystemTaskParsing, SscanfCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  integer code, val;\n"

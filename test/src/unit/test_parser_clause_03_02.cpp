@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, ModuleDeclKindDistinctValues) {
+TEST(DesignBuildingBlockParsing, ModuleDeclKindDistinctValues) {
   EXPECT_NE(ModuleDeclKind::kModule, ModuleDeclKind::kInterface);
   EXPECT_NE(ModuleDeclKind::kModule, ModuleDeclKind::kProgram);
   EXPECT_NE(ModuleDeclKind::kModule, ModuleDeclKind::kChecker);
@@ -13,7 +13,7 @@ TEST(ParserClause03, ModuleDeclKindDistinctValues) {
   EXPECT_NE(ModuleDeclKind::kProgram, ModuleDeclKind::kChecker);
 }
 
-TEST(ParserClause03, ModuleKeywordIntroducesModule) {
+TEST(DesignBuildingBlockParsing, ModuleKeywordIntroducesModule) {
   auto r = Parse("module m; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -21,7 +21,7 @@ TEST(ParserClause03, ModuleKeywordIntroducesModule) {
   EXPECT_EQ(r.cu->modules[0]->decl_kind, ModuleDeclKind::kModule);
 }
 
-TEST(ParserClause03, MacromoduleKeywordIntroducesModule) {
+TEST(DesignBuildingBlockParsing, MacromoduleKeywordIntroducesModule) {
   auto r = Parse("macromodule mm; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -30,7 +30,7 @@ TEST(ParserClause03, MacromoduleKeywordIntroducesModule) {
   EXPECT_EQ(r.cu->modules[0]->name, "mm");
 }
 
-TEST(ParserClause03, ProgramKeywordIntroducesProgram) {
+TEST(DesignBuildingBlockParsing, ProgramKeywordIntroducesProgram) {
   auto r = Parse("program p; endprogram");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -38,7 +38,7 @@ TEST(ParserClause03, ProgramKeywordIntroducesProgram) {
   EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
 
-TEST(ParserClause03, InterfaceKeywordIntroducesInterface) {
+TEST(DesignBuildingBlockParsing, InterfaceKeywordIntroducesInterface) {
   auto r = Parse("interface ifc; endinterface");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -46,7 +46,7 @@ TEST(ParserClause03, InterfaceKeywordIntroducesInterface) {
   EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
 }
 
-TEST(ParserClause03, CheckerKeywordIntroducesChecker) {
+TEST(DesignBuildingBlockParsing, CheckerKeywordIntroducesChecker) {
   auto r = Parse("checker chk; endchecker");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -54,7 +54,7 @@ TEST(ParserClause03, CheckerKeywordIntroducesChecker) {
   EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
 }
 
-TEST(ParserClause03, PackageKeywordIntroducesPackage) {
+TEST(DesignBuildingBlockParsing, PackageKeywordIntroducesPackage) {
   auto r = Parse("package pkg; endpackage");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -62,7 +62,7 @@ TEST(ParserClause03, PackageKeywordIntroducesPackage) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
-TEST(ParserClause03, PrimitiveKeywordIntroducesPrimitive) {
+TEST(DesignBuildingBlockParsing, PrimitiveKeywordIntroducesPrimitive) {
   auto r = Parse(
       "primitive udp_buf (output out, input in);\n"
       "  table 0 : 0; 1 : 1; endtable\n"
@@ -73,7 +73,7 @@ TEST(ParserClause03, PrimitiveKeywordIntroducesPrimitive) {
   EXPECT_EQ(r.cu->udps[0]->name, "udp_buf");
 }
 
-TEST(ParserClause03, ConfigKeywordIntroducesConfig) {
+TEST(DesignBuildingBlockParsing, ConfigKeywordIntroducesConfig) {
   auto r = Parse(
       "module m; endmodule\n"
       "config cfg; design m; endconfig\n");
@@ -83,7 +83,7 @@ TEST(ParserClause03, ConfigKeywordIntroducesConfig) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-TEST(ParserClause03, ModuleContainsDeclarationsAndCode) {
+TEST(DesignBuildingBlockParsing, ModuleContainsDeclarationsAndCode) {
   auto r = Parse(
       "module m;\n"
       "  logic a;\n"
@@ -96,7 +96,7 @@ TEST(ParserClause03, ModuleContainsDeclarationsAndCode) {
   EXPECT_FALSE(r.cu->modules[0]->items.empty());
 }
 
-TEST(ParserClause03, ProgramContainsDeclarationsAndCode) {
+TEST(DesignBuildingBlockParsing, ProgramContainsDeclarationsAndCode) {
   auto r = Parse(
       "program p;\n"
       "  logic a;\n"
@@ -107,7 +107,7 @@ TEST(ParserClause03, ProgramContainsDeclarationsAndCode) {
   EXPECT_FALSE(r.cu->programs[0]->items.empty());
 }
 
-TEST(ParserClause03, InterfaceContainsDeclarations) {
+TEST(DesignBuildingBlockParsing, InterfaceContainsDeclarations) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic req, gnt;\n"
@@ -118,7 +118,7 @@ TEST(ParserClause03, InterfaceContainsDeclarations) {
   EXPECT_FALSE(r.cu->interfaces[0]->items.empty());
 }
 
-TEST(ParserClause03, CheckerContainsDeclarations) {
+TEST(DesignBuildingBlockParsing, CheckerContainsDeclarations) {
   auto r = Parse(
       "checker chk;\n"
       "  logic flag;\n"
@@ -128,7 +128,7 @@ TEST(ParserClause03, CheckerContainsDeclarations) {
   EXPECT_FALSE(r.cu->checkers[0]->items.empty());
 }
 
-TEST(ParserClause03, PackageContainsDeclarations) {
+TEST(DesignBuildingBlockParsing, PackageContainsDeclarations) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -139,7 +139,7 @@ TEST(ParserClause03, PackageContainsDeclarations) {
   EXPECT_FALSE(r.cu->packages[0]->items.empty());
 }
 
-TEST(ParserClause03, TopLevelClassIsNotDesignElement) {
+TEST(DesignBuildingBlockParsing, TopLevelClassIsNotDesignElement) {
   auto r = Parse(
       "class C;\n"
       "  int x;\n"
@@ -157,7 +157,7 @@ TEST(ParserClause03, TopLevelClassIsNotDesignElement) {
   EXPECT_TRUE(r.cu->configs.empty());
 }
 
-TEST(ParserClause03, CuScopeTypedefIsNotDesignElement) {
+TEST(DesignBuildingBlockParsing, CuScopeTypedefIsNotDesignElement) {
   auto r = Parse(
       "typedef int myint;\n"
       "module m; endmodule\n");
@@ -168,7 +168,7 @@ TEST(ParserClause03, CuScopeTypedefIsNotDesignElement) {
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
-TEST(ParserClause03, CuScopeParamIsNotDesignElement) {
+TEST(DesignBuildingBlockParsing, CuScopeParamIsNotDesignElement) {
   auto r = Parse(
       "parameter int P = 42;\n"
       "module m; endmodule\n");
@@ -179,15 +179,15 @@ TEST(ParserClause03, CuScopeParamIsNotDesignElement) {
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
-TEST(ParserClause03, UnrecognizedTopLevelTokenIsError) {
+TEST(DesignBuildingBlockParsing, UnrecognizedTopLevelTokenIsError) {
   EXPECT_FALSE(ParseOk("always_comb begin end"));
 }
 
-TEST(ParserClause03, BareStatementAtTopLevelIsError) {
+TEST(DesignBuildingBlockParsing, BareStatementAtTopLevelIsError) {
   EXPECT_FALSE(ParseOk("assign x = 1;"));
 }
 
-TEST(ParserClause03, AllSevenDesignElementsCoexist) {
+TEST(DesignBuildingBlockParsing, AllSevenDesignElementsCoexist) {
   auto r = Parse(
       "module m; endmodule\n"
       "program p; endprogram\n"
@@ -209,7 +209,7 @@ TEST(ParserClause03, AllSevenDesignElementsCoexist) {
   EXPECT_EQ(r.cu->configs.size(), 1u);
 }
 
-TEST(ParserClause03, DesignElementsInterleaveWithNonDesignElements) {
+TEST(DesignBuildingBlockParsing, DesignElementsInterleaveWithNonDesignElements) {
   auto r = Parse(
       "typedef int myint;\n"
       "module m; endmodule\n"

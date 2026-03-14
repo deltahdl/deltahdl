@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, SequenceExpr_Intersect) {
+TEST(AssertionDeclParsing, SequenceExpr_Intersect) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"
@@ -19,7 +19,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-TEST(ParserAnnexF, AnnexFIntersect) {
+TEST(AssertionSemanticsParsing, Intersect) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"

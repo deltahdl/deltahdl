@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection7, UnionBasic) {
+TEST(AggregateTypeParsing, UnionBasic) {
   auto r = Parse(
       "module t;\n"
       "  typedef union {\n"

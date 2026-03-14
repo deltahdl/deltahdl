@@ -57,7 +57,7 @@ TEST(Lowerer, ForkJoin) {
   }
 }
 
-TEST(SimA603, ForkJoinAllChildrenExecute) {
+TEST(BlockStatementSimSyntax, ForkJoinAllChildrenExecute) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -73,7 +73,7 @@ TEST(SimA603, ForkJoinAllChildrenExecute) {
   LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
 }
 
-TEST(SimA603, ForkJoinNoneChildrenExecute) {
+TEST(BlockStatementSimSyntax, ForkJoinNoneChildrenExecute) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -90,7 +90,7 @@ TEST(SimA603, ForkJoinNoneChildrenExecute) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
 }
 
-TEST(SimA603, ForkJoinAnyChildrenExecute) {
+TEST(BlockStatementSimSyntax, ForkJoinAnyChildrenExecute) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -115,7 +115,7 @@ TEST(SimA603, ForkJoinAnyChildrenExecute) {
   EXPECT_EQ(b->value.ToUint64(), 8u);
 }
 
-TEST(SimA603, ForkWithSingleBeginEnd) {
+TEST(BlockStatementSimSyntax, ForkWithSingleBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -139,7 +139,7 @@ TEST(SimA603, ForkWithSingleBeginEnd) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(SimA603, EmptyForkJoin) {
+TEST(BlockStatementSimSyntax, EmptyForkJoin) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA83, InsideValueNoMatch) {
+TEST(ExpressionSim, InsideValueNoMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -24,7 +24,7 @@ TEST(SimA83, InsideValueNoMatch) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimA83, InsideRangeMatch) {
+TEST(ExpressionSim, InsideRangeMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -41,7 +41,7 @@ TEST(SimA83, InsideRangeMatch) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(ElabA83, InsideExprElaborates) {
+TEST(ExpressionElaboration, InsideExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh10, BlockingAssignIfElse) {
+TEST(BlockingAssignSim, BlockingAssignIfElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

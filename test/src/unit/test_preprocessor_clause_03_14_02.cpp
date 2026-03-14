@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_14_2_EquivalentSpecifications) {
+TEST(DesignBuildingBlockParsing, EquivalentSpecifications) {
   auto pp = PreprocessTimescale("`timescale 1ns / 1ps\n");
   EXPECT_FALSE(pp.has_errors);
 

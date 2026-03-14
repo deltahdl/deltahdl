@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection12, ForLoopPostIncrementStep) {
+TEST(ProceduralStatementParsing, ForLoopPostIncrementStep) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -18,7 +18,7 @@ TEST(ParserSection12, ForLoopPostIncrementStep) {
   EXPECT_NE(stmt->for_step, nullptr);
 }
 
-TEST(ParserSection12, ForLoopPostDecrementStep) {
+TEST(ProceduralStatementParsing, ForLoopPostDecrementStep) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -32,7 +32,7 @@ TEST(ParserSection12, ForLoopPostDecrementStep) {
   EXPECT_NE(stmt->for_step, nullptr);
 }
 
-TEST(ParserSection12, ForLoopWithBlockBody) {
+TEST(ProceduralStatementParsing, ForLoopWithBlockBody) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -50,7 +50,7 @@ TEST(ParserSection12, ForLoopWithBlockBody) {
   EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection10, Sec10_4_1_InForLoopBody) {
+TEST(AssignmentParsing, InForLoopBody) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] mem [0:3];\n"
@@ -68,7 +68,7 @@ TEST(ParserSection10, Sec10_4_1_InForLoopBody) {
   EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection11, PostfixIncrementInForStep) {
+TEST(OperatorAndExpressionParsing, PostfixIncrementInForStep) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -80,7 +80,7 @@ TEST(ParserSection11, PostfixIncrementInForStep) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection12, ForWithIncrementStep) {
+TEST(ProceduralStatementParsing, ForWithIncrementStep) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -96,7 +96,7 @@ TEST(ParserSection12, ForWithIncrementStep) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
-TEST(ParserSection12, ForWithByteDecl) {
+TEST(ProceduralStatementParsing, ForWithByteDecl) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -111,7 +111,7 @@ TEST(ParserSection12, ForWithByteDecl) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kByte);
 }
 
-TEST(ParserSection12, ForWithBlockBody) {
+TEST(ProceduralStatementParsing, ForWithBlockBody) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -129,7 +129,7 @@ TEST(ParserSection12, ForWithBlockBody) {
   EXPECT_EQ(stmt->for_body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection12, IfElseInsideForBody) {
+TEST(ProceduralStatementParsing, IfElseInsideForBody) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -155,7 +155,7 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection9, Sec9_2_3_ForLoop) {
+TEST(ProcessParsing, ForLoop) {
   auto r = Parse(
       "module m;\n"
       "  logic en;\n"
@@ -178,7 +178,7 @@ TEST(ParserSection9, Sec9_2_3_ForLoop) {
   EXPECT_NE(item->body->stmts[0]->for_body, nullptr);
 }
 
-TEST(ParserSection12, ForWithDecrement) {
+TEST(ProceduralStatementParsing, ForWithDecrement) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -194,7 +194,7 @@ TEST(ParserSection12, ForWithDecrement) {
   EXPECT_NE(stmt->for_step, nullptr);
 }
 
-TEST(ParserA604, StmtItemLoopStatement) {
+TEST(StatementSyntaxParsing, StmtItemLoopStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -208,7 +208,7 @@ TEST(ParserA604, StmtItemLoopStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
 }
 
-TEST(ParserSection12, ForWithIntDeclParses) {
+TEST(ProceduralStatementParsing, ForWithIntDeclParses) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -223,7 +223,7 @@ TEST(ParserSection12, ForWithIntDeclParses) {
   EXPECT_NE(stmt->for_cond, nullptr);
 }
 
-TEST(ParserSection12, ForWithIntDeclParts) {
+TEST(ProceduralStatementParsing, ForWithIntDeclParts) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -237,7 +237,7 @@ TEST(ParserSection12, ForWithIntDeclParts) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
-TEST(ParserSection12, ForWithLogicDecl) {
+TEST(ProceduralStatementParsing, ForWithLogicDecl) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -251,7 +251,7 @@ TEST(ParserSection12, ForWithLogicDecl) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kLogic);
 }
 
-TEST(ParserSection4, Sec4_9_4_ForLoopVarDecl) {
+TEST(SchedulingSemanticsParsing, ForLoopVarDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -268,7 +268,7 @@ TEST(ParserSection4, Sec4_9_4_ForLoopVarDecl) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
-TEST(ParserSection12, ForWithoutDeclStillWorks) {
+TEST(ProceduralStatementParsing, ForWithoutDeclStillWorks) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -282,7 +282,7 @@ TEST(ParserSection12, ForWithoutDeclStillWorks) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kImplicit);
 }
 
-TEST(ParserA608, ForLoopParse) {
+TEST(LoopSyntaxParsing, ForLoopParse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -296,7 +296,7 @@ TEST(ParserA608, ForLoopParse) {
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
 }
 
-TEST(ParserA608, ForLoopParts) {
+TEST(LoopSyntaxParsing, ForLoopParts) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -312,7 +312,7 @@ TEST(ParserA608, ForLoopParts) {
   EXPECT_NE(stmt->for_body, nullptr);
 }
 
-TEST(ParserA608, ForLoopTypedInit) {
+TEST(LoopSyntaxParsing, ForLoopTypedInit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -326,7 +326,7 @@ TEST(ParserA608, ForLoopTypedInit) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
-TEST(ParserA608, ForLoopUntypedInit) {
+TEST(LoopSyntaxParsing, ForLoopUntypedInit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -340,7 +340,7 @@ TEST(ParserA608, ForLoopUntypedInit) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kImplicit);
 }
 
-TEST(ParserA608, ForEmptyInit) {
+TEST(LoopSyntaxParsing, ForEmptyInit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -355,7 +355,7 @@ TEST(ParserA608, ForEmptyInit) {
   EXPECT_EQ(stmt->for_init, nullptr);
 }
 
-TEST(ParserA608, ForEmptyCond) {
+TEST(LoopSyntaxParsing, ForEmptyCond) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -372,7 +372,7 @@ TEST(ParserA608, ForEmptyCond) {
   EXPECT_EQ(stmt->for_cond, nullptr);
 }
 
-TEST(ParserA608, ForEmptyStep) {
+TEST(LoopSyntaxParsing, ForEmptyStep) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -389,7 +389,7 @@ TEST(ParserA608, ForEmptyStep) {
   EXPECT_EQ(stmt->for_step, nullptr);
 }
 
-TEST(ParserA608, ForAllEmpty) {
+TEST(LoopSyntaxParsing, ForAllEmpty) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -406,7 +406,7 @@ TEST(ParserA608, ForAllEmpty) {
   EXPECT_EQ(stmt->for_step, nullptr);
 }
 
-TEST(ParserA608, ForNullStmt) {
+TEST(LoopSyntaxParsing, ForNullStmt) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -420,7 +420,7 @@ TEST(ParserA608, ForNullStmt) {
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
 }
 
-TEST(ParserA608, ForVarKeyword) {
+TEST(LoopSyntaxParsing, ForVarKeyword) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -435,7 +435,7 @@ TEST(ParserA608, ForVarKeyword) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
-TEST(ParserA608, ForLogicTypeInit) {
+TEST(LoopSyntaxParsing, ForLogicTypeInit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -449,7 +449,7 @@ TEST(ParserA608, ForLogicTypeInit) {
   EXPECT_EQ(stmt->for_init_type.kind, DataTypeKind::kLogic);
 }
 
-TEST(ParserA608, ForStepCompoundAssign) {
+TEST(LoopSyntaxParsing, ForStepCompoundAssign) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -464,7 +464,7 @@ TEST(ParserA608, ForStepCompoundAssign) {
   EXPECT_NE(stmt->for_step, nullptr);
 }
 
-TEST(ParserA608, ForStepPostIncrement) {
+TEST(LoopSyntaxParsing, ForStepPostIncrement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -478,7 +478,7 @@ TEST(ParserA608, ForStepPostIncrement) {
   EXPECT_NE(stmt->for_step, nullptr);
 }
 
-TEST(ParserA608, ForStepPreIncrement) {
+TEST(LoopSyntaxParsing, ForStepPreIncrement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -492,7 +492,7 @@ TEST(ParserA608, ForStepPreIncrement) {
   EXPECT_NE(stmt->for_step, nullptr);
 }
 
-TEST(ParserA608, ForStepPostDecrement) {
+TEST(LoopSyntaxParsing, ForStepPostDecrement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -505,7 +505,7 @@ TEST(ParserA608, ForStepPostDecrement) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_NE(stmt->for_step, nullptr);
 }
-TEST(ParserSection9, Sec9_3_1_BlockWithForLoop) {
+TEST(ProcessParsing, BlockWithForLoop) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -539,7 +539,7 @@ static Stmt* FindStmtByKind(ModuleItem* item, StmtKind kind) {
   return nullptr;
 }
 
-TEST(ParserSection4, Sec4_9_4_ForLoopInitInStaticFunc) {
+TEST(SchedulingSemanticsParsing, ForLoopInitInStaticFunc) {
   auto r = Parse(
       "module m;\n"
       "  function static int sum_n(int n);\n"
@@ -560,7 +560,7 @@ TEST(ParserSection4, Sec4_9_4_ForLoopInitInStaticFunc) {
   EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
-TEST(ParserSection4, Sec4_9_4_ForLoopInitInAutoFunc) {
+TEST(SchedulingSemanticsParsing, ForLoopInitInAutoFunc) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int sum_auto(int n);\n"
@@ -580,7 +580,7 @@ TEST(ParserSection4, Sec4_9_4_ForLoopInitInAutoFunc) {
   EXPECT_EQ(for_stmt->for_init_type.kind, DataTypeKind::kInt);
 }
 
-TEST(ParserSection4, Sec4_9_3_AutomaticFuncWithForLoop) {
+TEST(SchedulingSemanticsParsing, AutomaticFuncWithForLoop) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int sum_to_n(int n);\n"

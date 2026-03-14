@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA23, ListOfVariablePortIdentifiersSingle) {
+TEST(DeclarationListParsing, ListOfVariablePortIdentifiersSingle) {
   auto r = Parse("module m(output logic q = 1'b0); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -13,7 +13,7 @@ TEST(ParserA23, ListOfVariablePortIdentifiersSingle) {
   EXPECT_NE(port.default_value, nullptr);
 }
 
-TEST(ParserA23, ListOfTfVariableIdentifiersMultiple) {
+TEST(DeclarationListParsing, ListOfTfVariableIdentifiersMultiple) {
   auto r = Parse(
       "module m;\n"
       "  function int add;\n"
@@ -30,7 +30,7 @@ TEST(ParserA23, ListOfTfVariableIdentifiersMultiple) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-TEST(ParserA23, ListOfTfVariableIdentifiersSingle) {
+TEST(DeclarationListParsing, ListOfTfVariableIdentifiersSingle) {
   auto r = Parse(
       "module m;\n"
       "  function int f;\n"
@@ -45,7 +45,7 @@ TEST(ParserA23, ListOfTfVariableIdentifiersSingle) {
   EXPECT_EQ(item->func_args.size(), 1u);
 }
 
-TEST(ParserA23, ListOfTypeAssignmentsMultiple) {
+TEST(DeclarationListParsing, ListOfTypeAssignmentsMultiple) {
   auto r = Parse(
       "module m; parameter type T1 = int, T2 = real, T3 = string; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -57,7 +57,7 @@ TEST(ParserA23, ListOfTypeAssignmentsMultiple) {
   EXPECT_GE(count, 3);
 }
 
-TEST(ParserA23, ListOfUdpPortIdentifiersSingle) {
+TEST(DeclarationListParsing, ListOfUdpPortIdentifiersSingle) {
   auto r = Parse(
       "primitive buf_p(output out, input in);\n"
       "  table 0 : 0; 1 : 1; endtable\n"

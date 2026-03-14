@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA221, EnumNameWithRange) {
+TEST(NetAndVariableTypeParsing, EnumNameWithRange) {
   auto r = Parse("module m; enum {A[3]} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -12,7 +12,7 @@ TEST(ParserA221, EnumNameWithRange) {
   EXPECT_NE(member.range_start, nullptr);
 }
 
-TEST(ParserA221, EnumNameWithRangeColon) {
+TEST(NetAndVariableTypeParsing, EnumNameWithRangeColon) {
   auto r = Parse("module m; enum {A[0:3] = 10} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -22,7 +22,7 @@ TEST(ParserA221, EnumNameWithRangeColon) {
   EXPECT_NE(member.value, nullptr);
 }
 
-TEST(ParserSection6, EnumRangeNOnly) {
+TEST(DataTypeParsing, EnumRangeNOnly) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum {add=10, sub[5], jmp[6:8]} E1;\n"
@@ -31,7 +31,7 @@ TEST(ParserSection6, EnumRangeNOnly) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, EnumRangeNM) {
+TEST(DataTypeParsing, EnumRangeNM) {
   auto r = Parse(
       "module m;\n"
       "  enum {register[2] = 1, register[2:4] = 10} vr;\n"

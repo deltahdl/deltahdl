@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA821, AbstractClassOk) {
+TEST(AbstractClassElaboration, AbstractClassOk) {
   EXPECT_TRUE(
       ElabOk("virtual class Base;\n"
              "  pure virtual function void display();\n"
@@ -13,7 +13,7 @@ TEST(ElabA821, AbstractClassOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA821, ConcreteOverridesAllPureVirtuals) {
+TEST(AbstractClassElaboration, ConcreteOverridesAllPureVirtuals) {
   EXPECT_TRUE(
       ElabOk("virtual class Shape;\n"
              "  pure virtual function int area();\n"
@@ -26,7 +26,7 @@ TEST(ElabA821, ConcreteOverridesAllPureVirtuals) {
              "endmodule\n"));
 }
 
-TEST(ElabA821, NonAbstractMissingPureVirtualError) {
+TEST(AbstractClassElaboration, NonAbstractMissingPureVirtualError) {
   EXPECT_FALSE(
       ElabOk("virtual class Shape;\n"
              "  pure virtual function int area();\n"
@@ -38,7 +38,7 @@ TEST(ElabA821, NonAbstractMissingPureVirtualError) {
              "endmodule\n"));
 }
 
-TEST(ElabA821, AbstractExtendsAbstractOk) {
+TEST(AbstractClassElaboration, AbstractExtendsAbstractOk) {
   EXPECT_TRUE(
       ElabOk("virtual class Shape;\n"
              "  pure virtual function int area();\n"
@@ -50,7 +50,7 @@ TEST(ElabA821, AbstractExtendsAbstractOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA821, NonAbstractMissingInheritedPureVirtualError) {
+TEST(AbstractClassElaboration, NonAbstractMissingInheritedPureVirtualError) {
   EXPECT_FALSE(
       ElabOk("virtual class Shape;\n"
              "  pure virtual function int area();\n"
@@ -66,7 +66,7 @@ TEST(ElabA821, NonAbstractMissingInheritedPureVirtualError) {
              "endmodule\n"));
 }
 
-TEST(ElabA821, FinalOnPureVirtualError) {
+TEST(AbstractClassElaboration, FinalOnPureVirtualError) {
   EXPECT_FALSE(
       ElabOk("virtual class Base;\n"
              "  pure virtual function :final void display();\n"
@@ -75,7 +75,7 @@ TEST(ElabA821, FinalOnPureVirtualError) {
              "endmodule\n"));
 }
 
-TEST(ElabA821, ConcreteImplementsAllDeepPureVirtuals) {
+TEST(AbstractClassElaboration, ConcreteImplementsAllDeepPureVirtuals) {
   EXPECT_TRUE(
       ElabOk("virtual class Shape;\n"
              "  pure virtual function int area();\n"
@@ -92,7 +92,7 @@ TEST(ElabA821, ConcreteImplementsAllDeepPureVirtuals) {
              "endmodule\n"));
 }
 
-TEST(ElabA821, ConcreteExtendedToAbstractOk) {
+TEST(AbstractClassElaboration, ConcreteExtendedToAbstractOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  function void foo(); endfunction\n"
@@ -104,7 +104,7 @@ TEST(ElabA821, ConcreteExtendedToAbstractOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA821, EmptyBodyMethodNotPureVirtual) {
+TEST(AbstractClassElaboration, EmptyBodyMethodNotPureVirtual) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  virtual function int compute(); endfunction\n"

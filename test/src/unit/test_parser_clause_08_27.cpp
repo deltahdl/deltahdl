@@ -3,7 +3,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection8, ForwardTypedefClassSelfRef) {
+TEST(ClassParsing, ForwardTypedefClassSelfRef) {
   auto r = Parse(
       "typedef class Node;\n"
       "class Node;\n"
@@ -15,7 +15,7 @@ TEST(ParserSection8, ForwardTypedefClassSelfRef) {
   EXPECT_EQ(r.cu->classes[0]->name, "Node");
 }
 
-TEST(ParserSection8, TypedefClass) {
+TEST(ClassParsing, TypedefClass) {
   auto r = Parse(
       "typedef class MyClass;\n"
       "class MyClass;\n"
@@ -26,7 +26,7 @@ TEST(ParserSection8, TypedefClass) {
   EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
 }
 
-TEST(ParserSection8, TypedefClassMutualReference) {
+TEST(ClassParsing, TypedefClassMutualReference) {
   auto r = Parse(
       "typedef class C2;\n"
       "class C1;\n"
@@ -42,7 +42,7 @@ TEST(ParserSection8, TypedefClassMutualReference) {
   EXPECT_EQ(r.cu->classes[1]->name, "C2");
 }
 
-TEST(ParserSection8, TypedefInterfaceClass) {
+TEST(ClassParsing, TypedefInterfaceClass) {
   auto r = Parse(
       "typedef interface class IC;\n"
       "interface class IC;\n"

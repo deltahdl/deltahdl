@@ -5,21 +5,21 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, PropertyExpr_Parenthesized) {
+TEST(AssertionDeclParsing, PropertyExpr_Parenthesized) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) (a |-> b));\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyExpr_And) {
+TEST(AssertionDeclParsing, PropertyExpr_And) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a and b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyAndSequenceDeclsTogether) {
+TEST(AssertionDeclParsing, PropertyAndSequenceDeclsTogether) {
   auto r = Parse(
       "module m;\n"
       "  property p; a; endproperty\n"
@@ -36,7 +36,7 @@ TEST(ParserA210, PropertyAndSequenceDeclsTogether) {
       nullptr);
 }
 
-TEST(ParserA210, SequenceActualArg_EventExpr) {
+TEST(AssertionDeclParsing, SequenceActualArg_EventExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(a, b); a ##1 b; endsequence\n"

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA25, AssocDimWildcard) {
+TEST(DeclarationRangeParsing, AssocDimWildcard) {
   auto r = Parse("module m; int aa [*]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -17,7 +17,7 @@ TEST(ParserA25, AssocDimWildcard) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "*");
 }
 
-TEST(ParserSection7, AssocArrayWildcard) {
+TEST(AggregateTypeParsing, AssocArrayWildcard) {
   auto r = Parse(
       "module t;\n"
       "  integer aa[*];\n"
@@ -29,7 +29,7 @@ TEST(ParserSection7, AssocArrayWildcard) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection7, AssociativeArrayWildcardIndex) {
+TEST(AggregateTypeParsing, AssociativeArrayWildcardIndex) {
   auto r = Parse(
       "module t;\n"
       "  int aa[*];\n"

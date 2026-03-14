@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA701, SpecifyBlockWithAllItemKindsElaborates) {
+TEST(SpecifyBlockDeclElaboration, SpecifyBlockWithAllItemKindsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -22,7 +22,7 @@ TEST(ElabA701, SpecifyBlockWithAllItemKindsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA705, TimingChecksMixedWithPathsElaborate) {
+TEST(SystemTimingCheckElaboration, TimingChecksMixedWithPathsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -38,7 +38,7 @@ TEST(ElabA705, TimingChecksMixedWithPathsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA705, MultipleSpecifyBlocksElaborate) {
+TEST(SystemTimingCheckElaboration, MultipleSpecifyBlocksElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -54,7 +54,7 @@ TEST(ElabA705, MultipleSpecifyBlocksElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimA701, EmptySpecifyBlockSimulates) {
+TEST(SpecifyBlockDeclSim, EmptySpecifyBlockSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -73,7 +73,7 @@ TEST(SimA701, EmptySpecifyBlockSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(ElabA701, EmptySpecifyBlockElaborates) {
+TEST(SpecifyBlockDeclElaboration, EmptySpecifyBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

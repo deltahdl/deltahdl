@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7, TaskWithArrayArg) {
+TEST(AggregateTypeParsing, TaskWithArrayArg) {
   auto r = Parse(
       "module m;\n"
       "  task fun(int a[3:1][3:1]);\n"
@@ -20,7 +20,7 @@ TEST(ParserSection7, TaskWithArrayArg) {
   EXPECT_GE(item->func_args[0].unpacked_dims.size(), 2u);
 }
 
-TEST(ParserSection7, FuncWithDynamicArrayArg) {
+TEST(AggregateTypeParsing, FuncWithDynamicArrayArg) {
   auto r = Parse(
       "module m;\n"
       "  function int sum(int arr[]);\n"
@@ -38,7 +38,7 @@ TEST(ParserSection7, FuncWithDynamicArrayArg) {
   EXPECT_EQ(item->func_args[0].unpacked_dims[0], nullptr);
 }
 
-TEST(ParserSection7, TaskWithMultipleArrayArgs) {
+TEST(AggregateTypeParsing, TaskWithMultipleArrayArgs) {
   auto r = Parse(
       "module m;\n"
       "  task t(input int a[4], output int b[8]);\n"
@@ -54,7 +54,7 @@ TEST(ParserSection7, TaskWithMultipleArrayArgs) {
   EXPECT_FALSE(item->func_args[1].unpacked_dims.empty());
 }
 
-TEST(ParserSection7, FuncWithStringArrayArg) {
+TEST(AggregateTypeParsing, FuncWithStringArrayArg) {
   auto r = Parse(
       "module m;\n"
       "  task t(string arr[4:1]);\n"

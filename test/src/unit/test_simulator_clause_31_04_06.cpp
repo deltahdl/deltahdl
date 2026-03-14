@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA70501, NochangeOffsetsStored) {
+TEST(TimingCheckCommandSim, NochangeOffsetsStored) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kNochange;
@@ -21,7 +21,7 @@ TEST(SimA70501, NochangeOffsetsStored) {
   EXPECT_EQ(stored.kind, TimingCheckKind::kNochange);
 }
 
-TEST(SimA70502, NochangeMinTypMaxOffsetsSimulates) {
+TEST(TimingCheckArgumentSim, NochangeMinTypMaxOffsetsSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

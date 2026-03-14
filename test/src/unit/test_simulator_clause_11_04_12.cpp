@@ -73,7 +73,7 @@ TEST(EvalOp, ReplicateXZPropagation) {
   EXPECT_EQ(result.words[0].bval, 0x55u);
 }
 
-TEST(SimA81, ConcatAsLHS) {
+TEST(ConcatenationSim, ConcatAsLHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -84,7 +84,7 @@ TEST(SimA81, ConcatAsLHS) {
   LowerRunAndCheck(f, design, {{"a", 0xCu}, {"b", 0x3u}});
 }
 
-TEST(SimA85, NetLvalueConcatProcedural) {
+TEST(LvalueSim, NetLvalueConcatProcedural) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

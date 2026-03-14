@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, BinsOrEmpty_Semicolon) {
+TEST(CovergroupDeclParsing, BinsOrEmpty_Semicolon) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"

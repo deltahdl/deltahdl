@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, StreamingWithPartSelect) {
+TEST(OperatorAndExpressionParsing, StreamingWithPartSelect) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] pkt[10];\n"
@@ -19,7 +19,7 @@ TEST(ParserSection11, StreamingWithPartSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, StreamingWithSimpleIndex) {
+TEST(OperatorAndExpressionParsing, StreamingWithSimpleIndex) {
   auto r = Parse(
       "module t;\n"
       "  int arr[4], out[4];\n"
@@ -29,7 +29,7 @@ TEST(ParserSection11, StreamingWithSimpleIndex) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA81, StreamExpressionWithArrayRange) {
+TEST(ConcatenationParsing, StreamExpressionWithArrayRange) {
   auto r = Parse("module m; initial x = {<< {a with [3]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -38,19 +38,19 @@ TEST(ParserA81, StreamExpressionWithArrayRange) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(ParserA81, StreamExprWithFixedRange) {
+TEST(ConcatenationParsing, StreamExprWithFixedRange) {
   auto r = Parse("module m; initial x = {<< {a with [3:0]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA81, StreamExprWithPlusRange) {
+TEST(ConcatenationParsing, StreamExprWithPlusRange) {
   auto r = Parse("module m; initial x = {<< {a with [0+:4]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA81, StreamExprWithMinusRange) {
+TEST(ConcatenationParsing, StreamExprWithMinusRange) {
   auto r = Parse("module m; initial x = {<< {a with [7-:4]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

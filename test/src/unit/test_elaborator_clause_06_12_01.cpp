@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh6, CastRealToInt_RoundUp) {
+TEST(DataTypeSim, CastRealToInt_RoundUp) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -30,7 +30,7 @@ TEST(SimCh6, CastRealToInt_RoundUp) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimCh6, CastRealToInt_NegRound) {
+TEST(DataTypeSim, CastRealToInt_NegRound) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -55,7 +55,7 @@ TEST(SimCh6, CastRealToInt_NegRound) {
   EXPECT_EQ(var->value.ToUint64(), neg2_32bit);
 }
 
-TEST(SimCh6, CastRealToInt_Truncate) {
+TEST(DataTypeSim, CastRealToInt_Truncate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -79,7 +79,7 @@ TEST(SimCh6, CastRealToInt_Truncate) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(SimCh6, CastRealToInt_LrmExamples) {
+TEST(DataTypeSim, CastRealToInt_LrmExamples) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -101,7 +101,7 @@ TEST(SimCh6, CastRealToInt_LrmExamples) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 35u);
 }
 
-TEST(SimCh6, CastRealToInt_PosHalfRoundsAway) {
+TEST(DataTypeSim, CastRealToInt_PosHalfRoundsAway) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

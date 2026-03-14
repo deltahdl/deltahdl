@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA23, ListOfTfVariableIdentifiersWithDefaults) {
+TEST(DeclarationListParsing, ListOfTfVariableIdentifiersWithDefaults) {
   auto r = Parse(
       "module m;\n"
       "  function int compute(input int a = 1, input int b = 2);\n"
@@ -20,7 +20,7 @@ TEST(ParserA23, ListOfTfVariableIdentifiersWithDefaults) {
   EXPECT_NE(item->func_args[1].default_value, nullptr);
 }
 
-TEST(ParserA26, FuncBodyNewStyleWithDefaultValue) {
+TEST(FunctionDeclParsing, FuncBodyNewStyleWithDefaultValue) {
   auto r = Parse(
       "module m;\n"
       "  function int foo(input int x = 5);\n"
@@ -33,7 +33,7 @@ TEST(ParserA26, FuncBodyNewStyleWithDefaultValue) {
   EXPECT_NE(item->func_args[0].default_value, nullptr);
 }
 
-TEST(ParserA27, TaskBodyNewStyleDefaultValue) {
+TEST(TaskDeclParsing, TaskBodyNewStyleDefaultValue) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(input int x = 5);\n"
@@ -46,7 +46,7 @@ TEST(ParserA27, TaskBodyNewStyleDefaultValue) {
   EXPECT_NE(item->func_args[0].default_value, nullptr);
 }
 
-TEST(ParserSection4, Sec4_9_3_AutoFuncWithDefaultArgs) {
+TEST(SchedulingSemanticsParsing, AutoFuncWithDefaultArgs) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int scale(int x, int factor = 2);\n"
@@ -65,7 +65,7 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithDefaultArgs) {
   EXPECT_NE(item->func_args[1].default_value, nullptr);
 }
 
-TEST(ParserSection13, MixedDefaultAndNonDefaultArgs) {
+TEST(TaskAndFunctionParsing, MixedDefaultAndNonDefaultArgs) {
   auto r = Parse(
       "module m;\n"
       "  function int fun(int j, string s = \"no\", int k = 0);\n"
@@ -81,7 +81,7 @@ TEST(ParserSection13, MixedDefaultAndNonDefaultArgs) {
   EXPECT_NE(fn->func_args[2].default_value, nullptr);
 }
 
-TEST(ParserSection13, DefaultArgWithExpression) {
+TEST(TaskAndFunctionParsing, DefaultArgWithExpression) {
   auto r = Parse(
       "module m;\n"
       "  function int compute(int size = 8 * 4);\n"
@@ -96,7 +96,7 @@ TEST(ParserSection13, DefaultArgWithExpression) {
   EXPECT_EQ(fn->func_args[0].default_value->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection13, DefaultArgValues) {
+TEST(TaskAndFunctionParsing, DefaultArgValues) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(int a = 0, int b = 1);\n"
@@ -110,7 +110,7 @@ TEST(ParserSection13, DefaultArgValues) {
   EXPECT_NE(fn->func_args[1].default_value, nullptr);
 }
 
-TEST(ParserSection13, DefaultArgValueOnTask) {
+TEST(TaskAndFunctionParsing, DefaultArgValueOnTask) {
   auto r = Parse(
       "module m;\n"
       "  task bar(int x, int y = 10);\n"
@@ -124,7 +124,7 @@ TEST(ParserSection13, DefaultArgValueOnTask) {
   EXPECT_NE(tk->func_args[1].default_value, nullptr);
 }
 
-TEST(ParserSection13, DefaultArgNoDefault) {
+TEST(TaskAndFunctionParsing, DefaultArgNoDefault) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(int a, int b);\n"

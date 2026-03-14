@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA818, PublicMemberAccessOk) {
+TEST(DataHidingElaboration, PublicMemberAccessOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  int x;\n"
@@ -18,7 +18,7 @@ TEST(ElabA818, PublicMemberAccessOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA818, LocalMemberAccessError) {
+TEST(DataHidingElaboration, LocalMemberAccessError) {
   EXPECT_FALSE(
       ElabOk("class Packet;\n"
              "  local int secret;\n"
@@ -32,7 +32,7 @@ TEST(ElabA818, LocalMemberAccessError) {
              "endmodule\n"));
 }
 
-TEST(ElabA818, ProtectedMemberAccessError) {
+TEST(DataHidingElaboration, ProtectedMemberAccessError) {
   EXPECT_FALSE(
       ElabOk("class Packet;\n"
              "  protected int hidden;\n"
@@ -46,7 +46,7 @@ TEST(ElabA818, ProtectedMemberAccessError) {
              "endmodule\n"));
 }
 
-TEST(ElabA818, LocalMethodAccessError) {
+TEST(DataHidingElaboration, LocalMethodAccessError) {
   EXPECT_FALSE(
       ElabOk("class Packet;\n"
              "  local function int get_id();\n"
@@ -62,7 +62,7 @@ TEST(ElabA818, LocalMethodAccessError) {
              "endmodule\n"));
 }
 
-TEST(ElabA818, PublicMethodAccessOk) {
+TEST(DataHidingElaboration, PublicMethodAccessOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  function void show(); endfunction\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverageSpec_CoverPoint) {
+TEST(CovergroupDeclParsing, CoverageSpec_CoverPoint) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -15,7 +15,7 @@ TEST(ParserA211, CoverageSpec_CoverPoint) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverPoint_BasicExpression) {
+TEST(CovergroupDeclParsing, CoverPoint_BasicExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -24,7 +24,7 @@ TEST(ParserA211, CoverPoint_BasicExpression) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverPoint_Labeled) {
+TEST(CovergroupDeclParsing, CoverPoint_Labeled) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -33,7 +33,7 @@ TEST(ParserA211, CoverPoint_Labeled) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverPoint_WithIff) {
+TEST(CovergroupDeclParsing, CoverPoint_WithIff) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -42,7 +42,7 @@ TEST(ParserA211, CoverPoint_WithIff) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverPoint_LabeledWithIff) {
+TEST(CovergroupDeclParsing, CoverPoint_LabeledWithIff) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -51,7 +51,7 @@ TEST(ParserA211, CoverPoint_LabeledWithIff) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverPoint_ComplexExpression) {
+TEST(CovergroupDeclParsing, CoverPoint_ComplexExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -60,7 +60,7 @@ TEST(ParserA211, CoverPoint_ComplexExpression) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, BinsOrEmpty_EmptyBraces) {
+TEST(CovergroupDeclParsing, BinsOrEmpty_EmptyBraces) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -69,7 +69,7 @@ TEST(ParserA211, BinsOrEmpty_EmptyBraces) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, BinsOrOptions_Default) {
+TEST(CovergroupDeclParsing, BinsOrOptions_Default) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -80,7 +80,7 @@ TEST(ParserA211, BinsOrOptions_Default) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_AllBinTypes) {
+TEST(CovergroupDeclParsing, CoverGroup_AllBinTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -98,7 +98,7 @@ TEST(ParserA211, CoverGroup_AllBinTypes) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_WildcardIllegalIgnore) {
+TEST(CovergroupDeclParsing, CoverGroup_WildcardIllegalIgnore) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"

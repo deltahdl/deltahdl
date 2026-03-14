@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA88, QuotedStringPacksBigEndian) {
+TEST(StringLiteralSim, QuotedStringPacksBigEndian) {
   auto v = RunAndGet(
       "module t;\n"
       "  bit [15:0] s;\n"
@@ -15,7 +15,7 @@ TEST(SimA88, QuotedStringPacksBigEndian) {
   EXPECT_EQ(v, 0x4142u);
 }
 
-TEST(SimA88, TripleQuotedStringPacksBigEndian) {
+TEST(StringLiteralSim, TripleQuotedStringPacksBigEndian) {
   auto v = RunAndGet(
       "module t;\n"
       "  bit [15:0] s;\n"
@@ -25,7 +25,7 @@ TEST(SimA88, TripleQuotedStringPacksBigEndian) {
   EXPECT_EQ(v, 0x4142u);
 }
 
-TEST(SimA88, EscapeSeqAnyAsciiNewline) {
+TEST(StringLiteralSim, EscapeSeqAnyAsciiNewline) {
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -35,7 +35,7 @@ TEST(SimA88, EscapeSeqAnyAsciiNewline) {
   EXPECT_EQ(v, 0x0Au);
 }
 
-TEST(SimA88, EscapeSeqAnyAsciiTab) {
+TEST(StringLiteralSim, EscapeSeqAnyAsciiTab) {
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -45,7 +45,7 @@ TEST(SimA88, EscapeSeqAnyAsciiTab) {
   EXPECT_EQ(v, 0x09u);
 }
 
-TEST(SimA88, EscapeSeqAnyAsciiBackslash) {
+TEST(StringLiteralSim, EscapeSeqAnyAsciiBackslash) {
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -55,7 +55,7 @@ TEST(SimA88, EscapeSeqAnyAsciiBackslash) {
   EXPECT_EQ(v, 0x5Cu);
 }
 
-TEST(SimA88, EscapeSeqAnyAsciiDoubleQuote) {
+TEST(StringLiteralSim, EscapeSeqAnyAsciiDoubleQuote) {
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -65,7 +65,7 @@ TEST(SimA88, EscapeSeqAnyAsciiDoubleQuote) {
   EXPECT_EQ(v, 0x22u);
 }
 
-TEST(SimA88, EscapeSeqOctalOneDigit) {
+TEST(StringLiteralSim, EscapeSeqOctalOneDigit) {
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -75,7 +75,7 @@ TEST(SimA88, EscapeSeqOctalOneDigit) {
   EXPECT_EQ(v, 0x07u);
 }
 
-TEST(SimA88, EscapeSeqOctalTwoDigits) {
+TEST(StringLiteralSim, EscapeSeqOctalTwoDigits) {
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -85,7 +85,7 @@ TEST(SimA88, EscapeSeqOctalTwoDigits) {
   EXPECT_EQ(v, 0x3Fu);
 }
 
-TEST(SimA88, EscapeSeqOctalThreeDigits) {
+TEST(StringLiteralSim, EscapeSeqOctalThreeDigits) {
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -95,7 +95,7 @@ TEST(SimA88, EscapeSeqOctalThreeDigits) {
   EXPECT_EQ(v, 0x41u);
 }
 
-TEST(SimA88, EscapeSeqHexOneDigit) {
+TEST(StringLiteralSim, EscapeSeqHexOneDigit) {
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -105,7 +105,7 @@ TEST(SimA88, EscapeSeqHexOneDigit) {
   EXPECT_EQ(v, 0x0Au);
 }
 
-TEST(SimA88, EscapeSeqHexTwoDigits) {
+TEST(StringLiteralSim, EscapeSeqHexTwoDigits) {
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -115,7 +115,7 @@ TEST(SimA88, EscapeSeqHexTwoDigits) {
   EXPECT_EQ(v, 0x41u);
 }
 
-TEST(SimA88, TripleQuotedStringItemNewlineIsLiteral) {
+TEST(StringLiteralSim, TripleQuotedStringItemNewlineIsLiteral) {
   auto v = RunAndGet(
       "module t;\n"
       "  bit [23:0] s;\n"
@@ -125,7 +125,7 @@ TEST(SimA88, TripleQuotedStringItemNewlineIsLiteral) {
   EXPECT_EQ(v, 0x410A42u);
 }
 
-TEST(SimA88, TripleQuotedStringItemDoubleQuoteIsLiteral) {
+TEST(StringLiteralSim, TripleQuotedStringItemDoubleQuoteIsLiteral) {
   auto v = RunAndGet(
       "module t;\n"
       "  bit [23:0] s;\n"
@@ -135,7 +135,7 @@ TEST(SimA88, TripleQuotedStringItemDoubleQuoteIsLiteral) {
   EXPECT_EQ(v, 0x412242u);
 }
 
-TEST(SimA88, TripleQuotedStringEscapeSeq) {
+TEST(StringLiteralSim, TripleQuotedStringEscapeSeq) {
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -145,7 +145,7 @@ TEST(SimA88, TripleQuotedStringEscapeSeq) {
   EXPECT_EQ(v, 0x0Au);
 }
 
-TEST(SimA88, TripleQuotedStringEscapeSeqOctal) {
+TEST(StringLiteralSim, TripleQuotedStringEscapeSeqOctal) {
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -155,7 +155,7 @@ TEST(SimA88, TripleQuotedStringEscapeSeqOctal) {
   EXPECT_EQ(v, 0x41u);
 }
 
-TEST(SimA88, TripleQuotedStringEscapeSeqHex) {
+TEST(StringLiteralSim, TripleQuotedStringEscapeSeqHex) {
   auto v = RunAndGet(
       "module t;\n"
       "  byte c;\n"
@@ -165,7 +165,7 @@ TEST(SimA88, TripleQuotedStringEscapeSeqHex) {
   EXPECT_EQ(v, 0x41u);
 }
 
-TEST(SimA88, QuotedStringWidthPerCharacter) {
+TEST(StringLiteralSim, QuotedStringWidthPerCharacter) {
   auto v = RunAndGet(
       "module t;\n"
       "  bit [23:0] s;\n"

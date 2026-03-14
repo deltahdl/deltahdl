@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA702, SimpleParallelPathSimulates) {
+TEST(SpecifyPathSim, SimpleParallelPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -26,7 +26,7 @@ TEST(SimA702, SimpleParallelPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA702, SimpleFullPathSimulates) {
+TEST(SpecifyPathSim, SimpleFullPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA24, VarDeclAssignmentWithDims) {
+TEST(DeclarationAssignmentParsing, VarDeclAssignmentWithDims) {
   auto r = Parse("module m; int arr [3:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserA24, VarDeclAssignmentWithDims) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
-TEST(ParserA25, UnpackedDimConstantRange) {
+TEST(DeclarationRangeParsing, UnpackedDimConstantRange) {
   auto r = Parse("module m; logic x [7:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -28,7 +28,7 @@ TEST(ParserA25, UnpackedDimConstantRange) {
   EXPECT_EQ(item->unpacked_dims[0]->op, TokenKind::kColon);
 }
 
-TEST(ParserA25, UnpackedDimConstantExpression) {
+TEST(DeclarationRangeParsing, UnpackedDimConstantExpression) {
   auto r = Parse("module m; logic x [8]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -40,7 +40,7 @@ TEST(ParserA25, UnpackedDimConstantExpression) {
   EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA28, DataDeclUnpackedDimsInBlock) {
+TEST(BlockItemDeclParsing, DataDeclUnpackedDimsInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -56,7 +56,7 @@ TEST(ParserA28, DataDeclUnpackedDimsInBlock) {
   EXPECT_EQ(body->stmts[0]->var_unpacked_dims.size(), 1u);
 }
 
-TEST(ParserSection6, Sec6_11_IntUnpackedDim) {
+TEST(DataTypeParsing, IntUnpackedDim) {
   auto r = Parse(
       "module t;\n"
       "  int arr[5];\n"
@@ -70,7 +70,7 @@ TEST(ParserSection6, Sec6_11_IntUnpackedDim) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection6, Sec6_5_LogicUnpackedDim) {
+TEST(DataTypeParsing, LogicUnpackedDim) {
   auto r = Parse(
       "module t;\n"
       "  logic arr [4];\n"
@@ -85,7 +85,7 @@ TEST(ParserSection6, Sec6_5_LogicUnpackedDim) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection7, UnpackedArraySize) {
+TEST(AggregateTypeParsing, UnpackedArraySize) {
   auto r = Parse(
       "module t;\n"
       "  int arr[8];\n"
@@ -97,7 +97,7 @@ TEST(ParserSection7, UnpackedArraySize) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection7, UnpackedArrayRange) {
+TEST(AggregateTypeParsing, UnpackedArrayRange) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] mem[0:255];\n"
@@ -109,7 +109,7 @@ TEST(ParserSection7, UnpackedArrayRange) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection7, UnpackedArrayFixedSize) {
+TEST(AggregateTypeParsing, UnpackedArrayFixedSize) {
   auto r = Parse(
       "module t;\n"
       "  int arr [3];\n"
@@ -121,7 +121,7 @@ TEST(ParserSection7, UnpackedArrayFixedSize) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection6, Sec6_11_Int2DUnpackedArray) {
+TEST(DataTypeParsing, Int2DUnpackedArray) {
   auto r = Parse(
       "module t;\n"
       "  int matrix[3][4];\n"
@@ -135,7 +135,7 @@ TEST(ParserSection6, Sec6_11_Int2DUnpackedArray) {
   ASSERT_GE(item->unpacked_dims.size(), 2u);
 }
 
-TEST(ParserSection6, Sec6_11_IntUnpackedRangeNotation) {
+TEST(DataTypeParsing, IntUnpackedRangeNotation) {
   auto r = Parse(
       "module t;\n"
       "  int data [0:7];\n"
@@ -159,11 +159,11 @@ static bool ParseOk5(const std::string& src) {
   return !diag.HasErrors();
 }
 
-TEST(ParserCh5, UnpackedDim_Range) {
+TEST(DataObjectParsing, UnpackedDim_Range) {
   EXPECT_TRUE(ParseOk5("module m; int a[1:0]; endmodule"));
 }
 
-TEST(ParserCh5, UnpackedDim_MultiRange) {
+TEST(DataObjectParsing, UnpackedDim_MultiRange) {
   EXPECT_TRUE(ParseOk5("module m; int a[1:2][1:3]; endmodule"));
 }
 

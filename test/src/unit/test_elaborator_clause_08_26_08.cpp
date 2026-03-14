@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA8268, InterfaceMethodDefaultArgsOk) {
+TEST(InterfaceClassMultiExtendElaboration, InterfaceMethodDefaultArgsOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
              "  pure virtual function void foo(int a = 5);\n"

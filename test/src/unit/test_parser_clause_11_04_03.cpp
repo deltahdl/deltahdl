@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, BinaryDiv) {
+TEST(OperatorParsing, BinaryDiv) {
   auto r = Parse("module m; initial x = a / b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -20,7 +20,7 @@ TEST(ParserA86, BinaryDiv) {
   EXPECT_EQ(rhs->op, TokenKind::kSlash);
 }
 
-TEST(ParserA86, BinaryMod) {
+TEST(OperatorParsing, BinaryMod) {
   auto r = Parse("module m; initial x = a % b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -30,7 +30,7 @@ TEST(ParserA86, BinaryMod) {
   EXPECT_EQ(rhs->op, TokenKind::kPercent);
 }
 
-TEST(ParserA86, BinaryPower) {
+TEST(OperatorParsing, BinaryPower) {
   auto r = Parse("module m; initial x = a ** b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -40,14 +40,14 @@ TEST(ParserA86, BinaryPower) {
   EXPECT_EQ(rhs->op, TokenKind::kPower);
 }
 
-TEST(ParserSection11, ComplexMixedExpressionParses) {
+TEST(OperatorAndExpressionParsing, ComplexMixedExpressionParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial x = (a + b) * c - d / e % f;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection11, UnaryPlusOperator) {
+TEST(OperatorAndExpressionParsing, UnaryPlusOperator) {
   auto r = Parse(
       "module t;\n"
       "  initial x = +a;\n"
@@ -58,7 +58,7 @@ TEST(ParserSection11, UnaryPlusOperator) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
-TEST(ParserSection11, ArithmeticAdd) {
+TEST(OperatorAndExpressionParsing, ArithmeticAdd) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a + b;\n"
@@ -71,7 +71,7 @@ TEST(ParserSection11, ArithmeticAdd) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
-TEST(ParserSection11, ArithmeticSub) {
+TEST(OperatorAndExpressionParsing, ArithmeticSub) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a - b;\n"
@@ -81,7 +81,7 @@ TEST(ParserSection11, ArithmeticSub) {
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
 }
 
-TEST(ParserSection11, ArithmeticMul) {
+TEST(OperatorAndExpressionParsing, ArithmeticMul) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a * b;\n"
@@ -91,7 +91,7 @@ TEST(ParserSection11, ArithmeticMul) {
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
 
-TEST(ParserSection11, ArithmeticMod) {
+TEST(OperatorAndExpressionParsing, ArithmeticMod) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a % b;\n"
@@ -101,7 +101,7 @@ TEST(ParserSection11, ArithmeticMod) {
   EXPECT_EQ(rhs->op, TokenKind::kPercent);
 }
 
-TEST(ParserSection11, ArithmeticPower) {
+TEST(OperatorAndExpressionParsing, ArithmeticPower) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a ** b;\n"
@@ -111,7 +111,7 @@ TEST(ParserSection11, ArithmeticPower) {
   EXPECT_EQ(rhs->op, TokenKind::kPower);
 }
 
-TEST(ParserSection11, UnaryNegation) {
+TEST(OperatorAndExpressionParsing, UnaryNegation) {
   auto r = Parse(
       "module t;\n"
       "  initial x = -a;\n"
@@ -122,7 +122,7 @@ TEST(ParserSection11, UnaryNegation) {
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
 }
 
-TEST(ParserA83, ExprBinaryAdd) {
+TEST(ExpressionParsing, ExprBinaryAdd) {
   auto r = Parse("module m; initial x = a + b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -132,7 +132,7 @@ TEST(ParserA83, ExprBinaryAdd) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
-TEST(ParserA86, UnaryPlus) {
+TEST(OperatorParsing, UnaryPlus) {
   auto r = Parse("module m; initial x = +a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -142,7 +142,7 @@ TEST(ParserA86, UnaryPlus) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
-TEST(ParserA86, UnaryMinus) {
+TEST(OperatorParsing, UnaryMinus) {
   auto r = Parse("module m; initial x = -a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -152,7 +152,7 @@ TEST(ParserA86, UnaryMinus) {
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
 }
 
-TEST(ParserA86, BinaryAdd) {
+TEST(OperatorParsing, BinaryAdd) {
   auto r = Parse("module m; initial x = a + b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -162,7 +162,7 @@ TEST(ParserA86, BinaryAdd) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
-TEST(ParserA86, BinarySub) {
+TEST(OperatorParsing, BinarySub) {
   auto r = Parse("module m; initial x = a - b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -172,7 +172,7 @@ TEST(ParserA86, BinarySub) {
   EXPECT_EQ(rhs->op, TokenKind::kMinus);
 }
 
-TEST(ParserSection11, Sec11_1_BinaryPowerOperator) {
+TEST(OperatorAndExpressionParsing, BinaryPowerOperator) {
   auto r = Parse(
       "module t;\n"
       "  initial x = base ** exp;\n"
@@ -187,11 +187,11 @@ TEST(ParserSection11, Sec11_1_BinaryPowerOperator) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserCh505, Operator_Power) {
+TEST(OperatorTokenParserParsing, Operator_Power) {
   EXPECT_TRUE(ParseOk("module m; initial x = 2 ** 10; endmodule"));
 }
 
-TEST(ParserSection10, Sec10_4_1_ExprAddition) {
+TEST(AssignmentParsing, ExprAddition) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] a, b, c;\n"

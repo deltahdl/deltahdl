@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA24, VarDeclAssignmentWithInit) {
+TEST(DeclarationAssignmentParsing, VarDeclAssignmentWithInit) {
   auto r = Parse("module m; int x = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(ParserA24, VarDeclAssignmentWithInit) {
   EXPECT_EQ(item->name, "x");
   EXPECT_NE(item->init_expr, nullptr);
 }
-TEST(ParserSection6, VariableInitialization) {
+TEST(DataTypeParsing, VariableInitialization) {
   auto r = Parse(
       "module t;\n"
       "  logic v = 1'b1;\n"
@@ -25,7 +25,7 @@ TEST(ParserSection6, VariableInitialization) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection4, Sec4_6_VarInitAtDeclaration) {
+TEST(SchedulingSemanticsParsing, VarInitAtDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  int x = 42;\n"
@@ -37,7 +37,7 @@ TEST(ParserSection4, Sec4_6_VarInitAtDeclaration) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_NE(item->init_expr, nullptr);
 }
-TEST(ParserCh90301, BlockVarDecl_WithInit) {
+TEST(BlockVarDeclParsing, BlockVarDecl_WithInit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -52,7 +52,7 @@ TEST(ParserCh90301, BlockVarDecl_WithInit) {
   EXPECT_NE(blk->stmts[0]->var_init, nullptr);
 }
 
-TEST(ParserSection10, Sec10_5_VarInitWithExpr) {
+TEST(AssignmentParsing, VarInitWithExpr) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] consta = 8'hF0;\n"
@@ -69,7 +69,7 @@ TEST(ParserSection10, Sec10_5_VarInitWithExpr) {
   EXPECT_EQ(v->init_expr->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection10, Sec10_5_MixedInitInOneStmt) {
+TEST(AssignmentParsing, MixedInitInOneStmt) {
   auto r = Parse(
       "module m;\n"
       "  int a = 1, b, c = 3;\n"
@@ -83,7 +83,7 @@ TEST(ParserSection10, Sec10_5_MixedInitInOneStmt) {
   EXPECT_NE(items[2]->init_expr, nullptr);
 }
 
-TEST(ParserSection10, Sec10_5_BlockLocalWithExprInit) {
+TEST(AssignmentParsing, BlockLocalWithExprInit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

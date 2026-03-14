@@ -5,13 +5,13 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA84, ImplicitClassHandleSuper) {
+TEST(PrimaryParsing, ImplicitClassHandleSuper) {
   auto r = Parse("module m; initial x = super; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA82, MethodCallRootSuper) {
+TEST(SubroutineCallExprParsing, MethodCallRootSuper) {
   auto r = Parse(
       "module m;\n"
       "  initial begin super.method(); end\n"
@@ -39,7 +39,7 @@ TEST(SourceText, ClassConstructorSuperNew) {
   EXPECT_EQ(r.cu->classes[1]->members[0]->method->name, "new");
 }
 
-TEST(ParserA815, SuperMemberAccess) {
+TEST(SuperParsing, SuperMemberAccess) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
               "  integer value;\n"
@@ -55,7 +55,7 @@ TEST(ParserA815, SuperMemberAccess) {
               "endclass\n"));
 }
 
-TEST(ParserA815, SuperNewInConstructor) {
+TEST(SuperParsing, SuperNewInConstructor) {
   EXPECT_TRUE(
       ParseOk("class Base;\n"
               "  function new();\n"
@@ -68,7 +68,7 @@ TEST(ParserA815, SuperNewInConstructor) {
               "endclass\n"));
 }
 
-TEST(ParserA815, SuperSuperError) {
+TEST(SuperParsing, SuperSuperError) {
   auto r = Parse(
       "class A;\n"
       "  int count;\n"
@@ -83,7 +83,7 @@ TEST(ParserA815, SuperSuperError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserA815, SuperMethodCall) {
+TEST(SuperParsing, SuperMethodCall) {
   auto r = Parse(
       "class Base;\n"
       "  function int foo();\n"
@@ -99,7 +99,7 @@ TEST(ParserA815, SuperMethodCall) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA815, SuperNewWithArgs) {
+TEST(SuperParsing, SuperNewWithArgs) {
   auto r = Parse(
       "class Base;\n"
       "  int x;\n"

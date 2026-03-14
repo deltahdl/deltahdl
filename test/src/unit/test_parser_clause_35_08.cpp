@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA26, DpiExportTask) {
+TEST(FunctionDeclParsing, DpiExportTask) {
   auto r = Parse(
       "module m;\n"
       "  task sv_task(); endtask\n"
@@ -49,7 +49,7 @@ TEST_F(AnnexHParseTest, AnnexHDpiExportTask) {
   EXPECT_TRUE(items[0]->dpi_is_task);
 }
 
-TEST(ParserSection38, DpiExportTaskForSystf) {
+TEST(DpiParsing, DpiExportTaskForSystf) {
   auto r = Parse(R"(
     module m;
       export "DPI-C" task systf_handler;

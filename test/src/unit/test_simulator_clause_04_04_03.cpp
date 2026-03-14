@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh443, PLIRegionEnumsExist) {
+TEST(PliRegionSim, PLIRegionEnumsExist) {
   auto preponed = static_cast<int>(Region::kPreponed);
   auto pre_active = static_cast<int>(Region::kPreActive);
   auto pre_nba = static_cast<int>(Region::kPreNBA);
@@ -31,7 +31,7 @@ TEST(SimCh443, PLIRegionEnumsExist) {
   }
 }
 
-TEST(SimCh443, ExactlyNinePLIRegionsExist) {
+TEST(PliRegionSim, ExactlyNinePLIRegionsExist) {
   std::vector<Region> pli_regions = {
       Region::kPreponed, Region::kPreActive,   Region::kPreNBA,
       Region::kPostNBA,  Region::kPreObserved, Region::kPostObserved,
@@ -43,7 +43,7 @@ TEST(SimCh443, ExactlyNinePLIRegionsExist) {
   }
 }
 
-TEST(SimCh443, PLIRegionsAreInterleavedWithSimulationRegions) {
+TEST(PliRegionSim, PLIRegionsAreInterleavedWithSimulationRegions) {
   EXPECT_LT(static_cast<int>(Region::kPreActive),
             static_cast<int>(Region::kActive));
   EXPECT_LT(static_cast<int>(Region::kPreNBA), static_cast<int>(Region::kNBA));
@@ -61,18 +61,18 @@ TEST(SimCh443, PLIRegionsAreInterleavedWithSimulationRegions) {
             static_cast<int>(Region::kReNBA));
 }
 
-TEST(SimCh443, PreActiveExecutesBetweenPreponedAndActive) {
+TEST(PliRegionSim, PreActiveExecutesBetweenPreponedAndActive) {
   VerifyThreeRegionOrder({Region::kPreponed, "preponed"},
                          {Region::kPreActive, "pre_active"},
                          {Region::kActive, "active"});
 }
 
-TEST(SimCh443, PreNBAExecutesBetweenInactiveAndNBA) {
+TEST(PliRegionSim, PreNBAExecutesBetweenInactiveAndNBA) {
   VerifyThreeRegionOrder({Region::kInactive, "inactive"},
                          {Region::kPreNBA, "pre_nba"}, {Region::kNBA, "nba"});
 }
 
-TEST(SimCh443, PostNBAExecutesAfterNBA) {
+TEST(PliRegionSim, PostNBAExecutesAfterNBA) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -86,31 +86,31 @@ TEST(SimCh443, PostNBAExecutesAfterNBA) {
   EXPECT_EQ(order[1], "post_nba");
 }
 
-TEST(SimCh443, PreObservedExecutesBetweenPostNBAAndObserved) {
+TEST(PliRegionSim, PreObservedExecutesBetweenPostNBAAndObserved) {
   VerifyThreeRegionOrder({Region::kPostNBA, "post_nba"},
                          {Region::kPreObserved, "pre_observed"},
                          {Region::kObserved, "observed"});
 }
 
-TEST(SimCh443, PostObservedExecutesBetweenObservedAndReactive) {
+TEST(PliRegionSim, PostObservedExecutesBetweenObservedAndReactive) {
   VerifyThreeRegionOrder({Region::kObserved, "observed"},
                          {Region::kPostObserved, "post_observed"},
                          {Region::kReactive, "reactive"});
 }
 
-TEST(SimCh443, PreReNBAExecutesBetweenReInactiveAndReNBA) {
+TEST(PliRegionSim, PreReNBAExecutesBetweenReInactiveAndReNBA) {
   VerifyThreeRegionOrder({Region::kReInactive, "reinactive"},
                          {Region::kPreReNBA, "pre_renba"},
                          {Region::kReNBA, "renba"});
 }
 
-TEST(SimCh443, PostReNBAExecutesBetweenReNBAAndPrePostponed) {
+TEST(PliRegionSim, PostReNBAExecutesBetweenReNBAAndPrePostponed) {
   VerifyThreeRegionOrder({Region::kReNBA, "renba"},
                          {Region::kPostReNBA, "post_renba"},
                          {Region::kPrePostponed, "pre_postponed"});
 }
 
-TEST(SimCh443, PrePostponedExecutesBeforePostponed) {
+TEST(PliRegionSim, PrePostponedExecutesBeforePostponed) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -124,9 +124,9 @@ TEST(SimCh443, PrePostponedExecutesBeforePostponed) {
   EXPECT_EQ(order[1], "postponed");
 }
 
-TEST(SimCh443, FullPLIRegionOrderingPerFigure41) { VerifyAllRegionOrder(); }
+TEST(PliRegionSim, FullPLIRegionOrderingPerFigure41) { VerifyAllRegionOrder(); }
 
-TEST(SimCh443, PLIRegionsExecuteAcrossMultipleTimeSlots) {
+TEST(PliRegionSim, PLIRegionsExecuteAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -145,7 +145,7 @@ TEST(SimCh443, PLIRegionsExecuteAcrossMultipleTimeSlots) {
   EXPECT_EQ(order[3], "t1_nba");
 }
 
-TEST(SimCh443, PLICallbackSchedulesIntoSimulationRegion) {
+TEST(PliRegionSim, PLICallbackSchedulesIntoSimulationRegion) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;

@@ -9,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh9d, AlwaysStarSimpleAnd) {
+TEST(AlwaysStarSim, AlwaysStarSimpleAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -33,7 +33,7 @@ TEST(SimCh9d, AlwaysStarSimpleAnd) {
   EXPECT_EQ(y->value.ToUint64(), 0x30u);
 }
 
-TEST(SimCh9d, AlwaysStarIfElseTrueBranch) {
+TEST(AlwaysStarSim, AlwaysStarIfElseTrueBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -61,7 +61,7 @@ TEST(SimCh9d, AlwaysStarIfElseTrueBranch) {
   EXPECT_EQ(y->value.ToUint64(), 0xAAu);
 }
 
-TEST(SimCh9d, AlwaysStarCaseStatement) {
+TEST(AlwaysStarSim, AlwaysStarCaseStatement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -91,7 +91,7 @@ TEST(SimCh9d, AlwaysStarCaseStatement) {
   EXPECT_EQ(y->value.ToUint64(), 0x30u);
 }
 
-TEST(SimCh9d, AlwaysStarAllRhsSensitive) {
+TEST(AlwaysStarSim, AlwaysStarAllRhsSensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -117,7 +117,7 @@ TEST(SimCh9d, AlwaysStarAllRhsSensitive) {
   EXPECT_EQ(y->value.ToUint64(), 0x33u);
 }
 
-TEST(SimCh9d, AlwaysStarLhsNotSensitive) {
+TEST(AlwaysStarSim, AlwaysStarLhsNotSensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -141,7 +141,7 @@ TEST(SimCh9d, AlwaysStarLhsNotSensitive) {
   EXPECT_EQ(y->value.ToUint64(), 0x0Au);
 }
 
-TEST(SimCh9d, AlwaysStarParenForm) {
+TEST(AlwaysStarSim, AlwaysStarParenForm) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -165,7 +165,7 @@ TEST(SimCh9d, AlwaysStarParenForm) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimCh9d, AlwaysStarTernaryOp) {
+TEST(AlwaysStarSim, AlwaysStarTernaryOp) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -191,7 +191,7 @@ TEST(SimCh9d, AlwaysStarTernaryOp) {
   EXPECT_EQ(y->value.ToUint64(), 0xADu);
 }
 
-TEST(SimCh9d, AlwaysStarConcatenation) {
+TEST(AlwaysStarSim, AlwaysStarConcatenation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -216,7 +216,7 @@ TEST(SimCh9d, AlwaysStarConcatenation) {
   EXPECT_EQ(y->value.ToUint64(), 0xC3u);
 }
 
-TEST(SimCh9d, AlwaysStarBitSelect) {
+TEST(AlwaysStarSim, AlwaysStarBitSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -244,7 +244,7 @@ TEST(SimCh9d, AlwaysStarBitSelect) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9d, AlwaysStarPartSelect) {
+TEST(AlwaysStarSim, AlwaysStarPartSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -273,7 +273,7 @@ TEST(SimCh9d, AlwaysStarPartSelect) {
   EXPECT_EQ(y->value.ToUint64(), 0xEu);
 }
 
-TEST(SimCh9d, AlwaysStarFunctionCall) {
+TEST(AlwaysStarSim, AlwaysStarFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -300,7 +300,7 @@ TEST(SimCh9d, AlwaysStarFunctionCall) {
   EXPECT_EQ(y->value.ToUint64(), 0x13u);
 }
 
-TEST(SimCh9d, AlwaysStarNestedExpr) {
+TEST(AlwaysStarSim, AlwaysStarNestedExpr) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -326,7 +326,7 @@ TEST(SimCh9d, AlwaysStarNestedExpr) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimCh9d, AlwaysStarMultipleStmts) {
+TEST(AlwaysStarSim, AlwaysStarMultipleStmts) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -345,7 +345,7 @@ TEST(SimCh9d, AlwaysStarMultipleStmts) {
   LowerRunAndCheck(f, design, {{"x", 0x11u}, {"y", 0x22u}});
 }
 
-TEST(SimCh9d, AlwaysStarArithmetic) {
+TEST(AlwaysStarSim, AlwaysStarArithmetic) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -370,7 +370,7 @@ TEST(SimCh9d, AlwaysStarArithmetic) {
   EXPECT_EQ(y->value.ToUint64(), 30u);
 }
 
-TEST(SimCh9d, AlwaysStarBitwiseOps) {
+TEST(AlwaysStarSim, AlwaysStarBitwiseOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -396,7 +396,7 @@ TEST(SimCh9d, AlwaysStarBitwiseOps) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimCh9d, AlwaysStarComparison) {
+TEST(AlwaysStarSim, AlwaysStarComparison) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -422,7 +422,7 @@ TEST(SimCh9d, AlwaysStarComparison) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9d, AlwaysStarLogicalOps) {
+TEST(AlwaysStarSim, AlwaysStarLogicalOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -446,7 +446,7 @@ TEST(SimCh9d, AlwaysStarLogicalOps) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9d, AlwaysStarUnaryOps) {
+TEST(AlwaysStarSim, AlwaysStarUnaryOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -470,7 +470,7 @@ TEST(SimCh9d, AlwaysStarUnaryOps) {
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0x5Au);
 }
 
-TEST(SimCh9d, AlwaysStarMultipleOutputs) {
+TEST(AlwaysStarSim, AlwaysStarMultipleOutputs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -500,7 +500,7 @@ TEST(SimCh9d, AlwaysStarMultipleOutputs) {
   EXPECT_EQ(diff->value.ToUint64(), 0x20u);
 }
 
-TEST(SimCh9d, AlwaysStarLocalVar) {
+TEST(AlwaysStarSim, AlwaysStarLocalVar) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -528,7 +528,7 @@ TEST(SimCh9d, AlwaysStarLocalVar) {
   EXPECT_EQ(y->value.ToUint64(), 0x33u);
 }
 
-TEST(SimCh9d, AlwaysStarBeginEnd) {
+TEST(AlwaysStarSim, AlwaysStarBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -558,7 +558,7 @@ TEST(SimCh9d, AlwaysStarBeginEnd) {
   EXPECT_EQ(y->value.ToUint64(), 0x05u);
 }
 
-TEST(SimCh9d, AlwaysStarPriorityEncoder) {
+TEST(AlwaysStarSim, AlwaysStarPriorityEncoder) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -588,7 +588,7 @@ TEST(SimCh9d, AlwaysStarPriorityEncoder) {
   EXPECT_EQ(grant->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9d, AlwaysStarCaseDecode) {
+TEST(AlwaysStarSim, AlwaysStarCaseDecode) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -619,7 +619,7 @@ TEST(SimCh9d, AlwaysStarCaseDecode) {
   EXPECT_EQ(sel->value.ToUint64(), 8u);
 }
 
-TEST(SimCh9d, MultipleAlwaysStarIndependent) {
+TEST(AlwaysStarSim, MultipleAlwaysStarIndependent) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -649,7 +649,7 @@ TEST(SimCh9d, MultipleAlwaysStarIndependent) {
   EXPECT_EQ(y->value.ToUint64(), 0xA5u);
 }
 
-TEST(SimCh9d, AlwaysStarCombOutputFromInitial) {
+TEST(AlwaysStarSim, AlwaysStarCombOutputFromInitial) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -673,7 +673,7 @@ TEST(SimCh9d, AlwaysStarCombOutputFromInitial) {
   EXPECT_EQ(y->value.ToUint64(), 0x5555u);
 }
 
-TEST(SimCh9d, AlwaysStarResultWidthAndValue8) {
+TEST(AlwaysStarSim, AlwaysStarResultWidthAndValue8) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -697,7 +697,7 @@ TEST(SimCh9d, AlwaysStarResultWidthAndValue8) {
   EXPECT_EQ(y->value.ToUint64(), 0xABu);
 }
 
-TEST(SimCh9d, AlwaysStarParenResultWidth32) {
+TEST(AlwaysStarSim, AlwaysStarParenResultWidth32) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

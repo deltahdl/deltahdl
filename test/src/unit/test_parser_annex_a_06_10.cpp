@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA610, DeferredAssertHash0) {
+TEST(AssertionStatementSyntaxParsing, DeferredAssertHash0) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -20,7 +20,7 @@ TEST(ParserA610, DeferredAssertHash0) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-TEST(ParserA610, DeferredAssertFinal) {
+TEST(AssertionStatementSyntaxParsing, DeferredAssertFinal) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -35,7 +35,7 @@ TEST(ParserA610, DeferredAssertFinal) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-TEST(ParserA610, DeferredAssumeHash0) {
+TEST(AssertionStatementSyntaxParsing, DeferredAssumeHash0) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -50,7 +50,7 @@ TEST(ParserA610, DeferredAssumeHash0) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-TEST(ParserA610, DeferredCoverHash0) {
+TEST(AssertionStatementSyntaxParsing, DeferredCoverHash0) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -65,7 +65,7 @@ TEST(ParserA610, DeferredCoverHash0) {
   EXPECT_TRUE(stmt->is_deferred);
 }
 
-TEST(ParserA610, DeferredCoverFinal) {
+TEST(AssertionStatementSyntaxParsing, DeferredCoverFinal) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

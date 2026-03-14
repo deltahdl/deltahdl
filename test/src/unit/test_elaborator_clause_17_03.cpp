@@ -20,7 +20,7 @@ TEST(CheckerElab, CheckerInstantiatedFromModule) {
   EXPECT_EQ(mod->children[0].resolved->name, "sub_chk");
 }
 
-TEST(ParserAnnexA0414, ElaborationCheckerInstInModule) {
+TEST(CheckerInstantiationGrammar, ElaborationCheckerInstInModule) {
   ElabFixture f;
   auto* design = Elaborate(
       "checker my_chk(input logic clk, input logic rst);\n"
@@ -39,7 +39,7 @@ TEST(ParserAnnexA0414, ElaborationCheckerInstInModule) {
   EXPECT_NE(top->children[0].resolved, nullptr);
 }
 
-TEST(ParserAnnexA0414, ElaborationCheckerInstPortBindings) {
+TEST(CheckerInstantiationGrammar, ElaborationCheckerInstPortBindings) {
   ElabFixture f;
   auto* design = Elaborate(
       "checker simple_chk(input logic data);\n"
@@ -56,7 +56,7 @@ TEST(ParserAnnexA0414, ElaborationCheckerInstPortBindings) {
   EXPECT_EQ(top->children[0].port_bindings[0].port_name, "data");
 }
 
-TEST(ParserAnnexA0414, ElaborationCheckerInsideChecker) {
+TEST(CheckerInstantiationGrammar, ElaborationCheckerInsideChecker) {
   ElabFixture f;
   auto* design = Elaborate(
       "checker inner_chk(input logic sig);\n"

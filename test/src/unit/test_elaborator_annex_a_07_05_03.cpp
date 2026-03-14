@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA70503, TerminalInterfaceDotPortElaborates) {
+TEST(TimingCheckEventDefElaboration, TerminalInterfaceDotPortElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(ElabA70503, TerminalInterfaceDotPortElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70503, TimingCheckEventNegedgeElaborates) {
+TEST(TimingCheckEventDefElaboration, TimingCheckEventNegedgeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

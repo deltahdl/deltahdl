@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA28, BlockItemDataDecl) {
+TEST(BlockItemDeclParsing, BlockItemDataDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -21,7 +21,7 @@ TEST(ParserA28, BlockItemDataDecl) {
   EXPECT_EQ(stmt->var_name, "x");
 }
 
-TEST(ParserA28, BlockItemDataDeclWithInit) {
+TEST(BlockItemDeclParsing, BlockItemDataDeclWithInit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -36,7 +36,7 @@ TEST(ParserA28, BlockItemDataDeclWithInit) {
   EXPECT_NE(stmt->var_init, nullptr);
 }
 
-TEST(ParserA28, BlockItemLocalparamDecl) {
+TEST(BlockItemDeclParsing, BlockItemLocalparamDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -52,7 +52,7 @@ TEST(ParserA28, BlockItemLocalparamDecl) {
   EXPECT_EQ(stmt->var_name, "WIDTH");
 }
 
-TEST(ParserA28, BlockItemParameterDecl) {
+TEST(BlockItemDeclParsing, BlockItemParameterDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -67,7 +67,7 @@ TEST(ParserA28, BlockItemParameterDecl) {
   EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserA28, BlockItemLetDecl) {
+TEST(BlockItemDeclParsing, BlockItemLetDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -84,7 +84,7 @@ TEST(ParserA28, BlockItemLetDecl) {
   EXPECT_EQ(stmt->decl_item->kind, ModuleItemKind::kLetDecl);
 }
 
-TEST(ParserA28, BlockItemTypedefDecl) {
+TEST(BlockItemDeclParsing, BlockItemTypedefDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -101,7 +101,7 @@ TEST(ParserA28, BlockItemTypedefDecl) {
   EXPECT_EQ(stmt->decl_item->kind, ModuleItemKind::kTypedef);
 }
 
-TEST(ParserA28, BlockItemImportDecl) {
+TEST(BlockItemDeclParsing, BlockItemImportDecl) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef int my_type;\n"
@@ -121,7 +121,7 @@ TEST(ParserA28, BlockItemImportDecl) {
   EXPECT_EQ(stmt->decl_item->kind, ModuleItemKind::kImportDecl);
 }
 
-TEST(ParserA28, BlockItemConstDataDecl) {
+TEST(BlockItemDeclParsing, BlockItemConstDataDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -136,7 +136,7 @@ TEST(ParserA28, BlockItemConstDataDecl) {
   EXPECT_TRUE(stmt->var_is_const);
 }
 
-TEST(ParserA28, BlockItemAutomaticLifetime) {
+TEST(BlockItemDeclParsing, BlockItemAutomaticLifetime) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -152,7 +152,7 @@ TEST(ParserA28, BlockItemAutomaticLifetime) {
   EXPECT_TRUE(stmt->var_is_automatic);
 }
 
-TEST(ParserA28, BlockItemStaticLifetime) {
+TEST(BlockItemDeclParsing, BlockItemStaticLifetime) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -168,7 +168,7 @@ TEST(ParserA28, BlockItemStaticLifetime) {
   EXPECT_TRUE(stmt->var_is_static);
 }
 
-TEST(ParserA28, TaskBodyBlockItem) {
+TEST(BlockItemDeclParsing, TaskBodyBlockItem) {
   auto r = Parse(
       "module m;\n"
       "  task t();\n"
@@ -183,7 +183,7 @@ TEST(ParserA28, TaskBodyBlockItem) {
   EXPECT_GE(item->func_body_stmts.size(), 1u);
 }
 
-TEST(ParserA28, ForkJoinBlockItem) {
+TEST(BlockItemDeclParsing, ForkJoinBlockItem) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial fork\n"
@@ -193,7 +193,7 @@ TEST(ParserA28, ForkJoinBlockItem) {
               "endmodule\n"));
 }
 
-TEST(ParserA28, MultipleBlockItemDecls) {
+TEST(BlockItemDeclParsing, MultipleBlockItemDecls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

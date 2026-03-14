@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection18b, DistInsideIfConstraint) {
+TEST(DistributionConstraintParsing, DistInsideIfConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"

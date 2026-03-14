@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexD, AnnexDCountdrivers) {
+TEST(OptionalSystemTaskParserParsing, Countdrivers) {
   auto r = Parse("module m; initial $countdrivers(sig); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* stmt = FirstInitialStmt(r);

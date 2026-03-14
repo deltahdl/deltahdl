@@ -66,7 +66,7 @@ TEST(Elaborator, GenerateForWithAssign) {
   EXPECT_EQ(mod->variables[1].name, "i_1_w");
 }
 
-TEST(ParserAnnexA042, ElaborationGenerateForExpansion) {
+TEST(GenerateInstantiationGrammar, ElaborationGenerateForExpansion) {
   ElabFixture f;
   auto* design = Elaborate(
       "module top #(parameter N = 3) ();\n"
@@ -85,7 +85,7 @@ TEST(ParserAnnexA042, ElaborationGenerateForExpansion) {
   EXPECT_EQ(mod->variables[2].name, "i_2_x");
 }
 
-TEST(ParserAnnexA042, ElaborationGenerateForZeroIter) {
+TEST(GenerateInstantiationGrammar, ElaborationGenerateForZeroIter) {
   ElabFixture f;
   auto* design = Elaborate(
       "module top #(parameter N = 0) ();\n"
@@ -101,7 +101,7 @@ TEST(ParserAnnexA042, ElaborationGenerateForZeroIter) {
   EXPECT_EQ(mod->variables.size(), 0u);
 }
 
-TEST(ParserAnnexA042, ElaborationGenerateForWithAssign) {
+TEST(GenerateInstantiationGrammar, ElaborationGenerateForWithAssign) {
   ElabFixture f;
   auto* design = Elaborate(
       "module top #(parameter N = 2) ();\n"
@@ -119,7 +119,7 @@ TEST(ParserAnnexA042, ElaborationGenerateForWithAssign) {
   EXPECT_EQ(mod->assigns.size(), 2u);
 }
 
-TEST(ParserAnnexA042, ElaborationGenerateForModuleInst) {
+TEST(GenerateInstantiationGrammar, ElaborationGenerateForModuleInst) {
   ElabFixture f;
   auto* design = Elaborate(
       "module sub(input logic a); endmodule\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA60703, MatchesInTernary) {
+TEST(PatternConditionalParsing, MatchesInTernary) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -15,7 +15,7 @@ TEST(ParserA60703, MatchesInTernary) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60703, MatchesWithGuardInTernary) {
+TEST(PatternConditionalParsing, MatchesWithGuardInTernary) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -26,7 +26,7 @@ TEST(ParserA60703, MatchesWithGuardInTernary) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60703, MatchesWildcardInTernary) {
+TEST(PatternConditionalParsing, MatchesWildcardInTernary) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

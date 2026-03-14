@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, VarBareNoType) {
+TEST(DataTypeParsing, VarBareNoType) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  var v;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection6, VarBareNoType) {
   EXPECT_EQ(item->name, "v");
 }
 
-TEST(ParserSection6, VarWithInitializer) {
+TEST(DataTypeParsing, VarWithInitializer) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  int i = 0;\n"
@@ -29,7 +29,7 @@ TEST(ParserSection6, VarWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection6, MultipleVarDeclsSameStmt) {
+TEST(DataTypeParsing, MultipleVarDeclsSameStmt) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  shortint s1, s2;\n"

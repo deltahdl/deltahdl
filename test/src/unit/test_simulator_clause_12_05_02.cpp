@@ -63,7 +63,7 @@ TEST(StmtExec, CaseInsideNoMatchDefault) {
   EXPECT_EQ(result_var->value.ToUint64(), 77u);
 }
 
-TEST(SimA607, ConstExprAsCaseExpr) {
+TEST(CaseStatementSim, ConstExprAsCaseExpr) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -86,7 +86,7 @@ TEST(SimA607, ConstExprAsCaseExpr) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA607, SequentialCaseStatements) {
+TEST(CaseStatementSim, SequentialCaseStatements) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -115,7 +115,7 @@ TEST(SimA607, SequentialCaseStatements) {
   EXPECT_EQ(y->value.ToUint64(), 22u);
 }
 
-TEST(SimA607, ConstCaseExprPriorityEncoder) {
+TEST(CaseStatementSim, ConstCaseExprPriorityEncoder) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -142,7 +142,7 @@ TEST(SimA607, ConstCaseExprPriorityEncoder) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA607, ConstCaseExprFallsToDefault) {
+TEST(CaseStatementSim, ConstCaseExprFallsToDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

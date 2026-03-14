@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection16, MulticlockSequenceDeclTwo) {
+TEST(AssertionParsing, MulticlockSequenceDeclTwo) {
   auto r = Parse(
       "module m;\n"
       "  sequence s_multi;\n"

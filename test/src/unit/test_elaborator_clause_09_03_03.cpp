@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_03_03, NestedSeqBlocksElaborate) {
+TEST(StatementBlockElaboration, NestedSeqBlocksElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -21,7 +21,7 @@ TEST(ElabClause09_03_03, NestedSeqBlocksElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_03, ForkInsideSeqBlockElaborates) {
+TEST(StatementBlockElaboration, ForkInsideSeqBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -39,7 +39,7 @@ TEST(ElabClause09_03_03, ForkInsideSeqBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_03, SeqBlockInsideForkElaborates) {
+TEST(StatementBlockElaboration, SeqBlockInsideForkElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -59,7 +59,7 @@ TEST(ElabClause09_03_03, SeqBlockInsideForkElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_03, DeeplyNestedBlocksElaborate) {
+TEST(StatementBlockElaboration, DeeplyNestedBlocksElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -79,7 +79,7 @@ TEST(ElabClause09_03_03, DeeplyNestedBlocksElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_02, NestedForkElaborates) {
+TEST(ParallelBlockElaboration, NestedForkElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

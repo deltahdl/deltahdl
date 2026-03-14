@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, PropertyInstance_InAssert) {
+TEST(AssertionDeclParsing, PropertyInstance_InAssert) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p; a |-> b; endproperty\n"
@@ -14,7 +14,7 @@ TEST(ParserA210, PropertyInstance_InAssert) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyInstance_WithArgs) {
+TEST(AssertionDeclParsing, PropertyInstance_WithArgs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p(x, y); x |-> y; endproperty\n"
@@ -22,7 +22,7 @@ TEST(ParserA210, PropertyInstance_WithArgs) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyListOfArguments_Named) {
+TEST(AssertionDeclParsing, PropertyListOfArguments_Named) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p(x, y); x |-> y; endproperty\n"
@@ -30,7 +30,7 @@ TEST(ParserA210, PropertyListOfArguments_Named) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyActualArg_Expr) {
+TEST(AssertionDeclParsing, PropertyActualArg_Expr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p(x); x; endproperty\n"
@@ -38,7 +38,7 @@ TEST(ParserA210, PropertyActualArg_Expr) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyExpr_PropertyInstance) {
+TEST(AssertionDeclParsing, PropertyExpr_PropertyInstance) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p; a; endproperty\n"
@@ -46,7 +46,7 @@ TEST(ParserA210, PropertyExpr_PropertyInstance) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyListOfArguments_Mixed) {
+TEST(AssertionDeclParsing, PropertyListOfArguments_Mixed) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p(x, y, z); x |-> y ##1 z; endproperty\n"
@@ -61,7 +61,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-TEST(ParserAnnexF, AnnexFPropertyReference) {
+TEST(AssertionSemanticsParsing, PropertyReference) {
   auto r = Parse(
       "module m;\n"
       "  property p_base;\n"
@@ -75,7 +75,7 @@ TEST(ParserAnnexF, AnnexFPropertyReference) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserSection16, Sec16_5_1_AssertWithNamedPropertyInstance) {
+TEST(AssertionParsing, AssertWithNamedPropertyInstance) {
   auto r = Parse(
       "module m;\n"
       "  property p_handshake;\n"
@@ -95,7 +95,7 @@ TEST(ParserSection16, Sec16_5_1_AssertWithNamedPropertyInstance) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
-TEST(ParserSection16, PropertyInstanceWithArgs) {
+TEST(AssertionParsing, PropertyInstanceWithArgs) {
   auto r = Parse(
       "module m;\n"
       "  property p1(a, b);\n"

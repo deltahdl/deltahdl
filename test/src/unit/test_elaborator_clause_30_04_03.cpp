@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA702, EdgeSensitivePathElaborates) {
+TEST(SpecifyPathElaboration, EdgeSensitivePathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(ElabA702, EdgeSensitivePathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA702, EdgeSensitiveWithDataSourceElaborates) {
+TEST(SpecifyPathElaboration, EdgeSensitiveWithDataSourceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

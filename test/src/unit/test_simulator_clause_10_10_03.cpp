@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh10j, TypedAssignPatternInArrayConcat) {
+TEST(UnpackedArrayConcatSim, TypedAssignPatternInArrayConcat) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -29,7 +29,7 @@ TEST(SimCh10j, TypedAssignPatternInArrayConcat) {
   }
 }
 
-TEST(SimCh10j, UnpackedArrayConcatInAssignPattern) {
+TEST(UnpackedArrayConcatSim, UnpackedArrayConcatInAssignPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -55,7 +55,7 @@ TEST(SimCh10j, UnpackedArrayConcatInAssignPattern) {
   EXPECT_EQ(c11->value.ToUint64(), 4u);
 }
 
-TEST(SimCh10j, MixedSelfDeterminedItems) {
+TEST(UnpackedArrayConcatSim, MixedSelfDeterminedItems) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

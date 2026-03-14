@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection9, StatementLabelOnBeginBlock) {
+TEST(ProcessParsing, StatementLabelOnBeginBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial\n"
@@ -19,7 +19,7 @@ TEST(ParserSection9, StatementLabelOnBeginBlock) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   EXPECT_EQ(item->body->label, "name");
 }
-TEST(ParserSection9, StatementLabelOnForkBlock) {
+TEST(ProcessParsing, StatementLabelOnForkBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial\n"
@@ -34,7 +34,7 @@ TEST(ParserSection9, StatementLabelOnForkBlock) {
   EXPECT_EQ(stmt->label, "name");
 }
 
-TEST(ParserSection9c, StatementLabelOnWhile) {
+TEST(ProcessTimingAndControlParsing, StatementLabelOnWhile) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -48,7 +48,7 @@ TEST(ParserSection9c, StatementLabelOnWhile) {
   EXPECT_EQ(stmt->label, "spin");
 }
 
-TEST(ParserSection9c, StatementLabelOnCase) {
+TEST(ProcessTimingAndControlParsing, StatementLabelOnCase) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -67,7 +67,7 @@ TEST(ParserSection9c, StatementLabelOnCase) {
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
 }
 
-TEST(ParserA603, SeqBlockWithStatementLabel) {
+TEST(BlockStatementSyntaxParsing, SeqBlockWithStatementLabel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -84,7 +84,7 @@ TEST(ParserA603, SeqBlockWithStatementLabel) {
   EXPECT_EQ(stmt->label, "labelA");
 }
 
-TEST(ParserSection9, StatementLabelOnAssignment) {
+TEST(ProcessParsing, StatementLabelOnAssignment) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -97,7 +97,7 @@ TEST(ParserSection9, StatementLabelOnAssignment) {
   EXPECT_EQ(stmt->label, "my_label");
 }
 
-TEST(ParserSection9, StatementLabelOnIf) {
+TEST(ProcessParsing, StatementLabelOnIf) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -110,7 +110,7 @@ TEST(ParserSection9, StatementLabelOnIf) {
   EXPECT_EQ(stmt->label, "check");
 }
 
-TEST(ParserA603, ForkWithStatementLabel) {
+TEST(BlockStatementSyntaxParsing, ForkWithStatementLabel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -127,7 +127,7 @@ TEST(ParserA603, ForkWithStatementLabel) {
   EXPECT_EQ(stmt->label, "labelB");
 }
 
-TEST(ParserSection9, StatementLabelOnForLoop) {
+TEST(ProcessParsing, StatementLabelOnForLoop) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -140,7 +140,7 @@ TEST(ParserSection9, StatementLabelOnForLoop) {
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
 }
 
-TEST(ParserA604, StatementWithLabel) {
+TEST(StatementSyntaxParsing, StatementWithLabel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -155,7 +155,7 @@ TEST(ParserA604, StatementWithLabel) {
   EXPECT_EQ(stmt->label, "my_label");
 }
 
-TEST(ParserSection12, StatementLabelOnAssign) {
+TEST(ProceduralStatementParsing, StatementLabelOnAssign) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -168,7 +168,7 @@ TEST(ParserSection12, StatementLabelOnAssign) {
   EXPECT_EQ(stmt->label, "assign_val");
 }
 
-TEST(ParserSection12, StatementLabelOnForever) {
+TEST(ProceduralStatementParsing, StatementLabelOnForever) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -181,7 +181,7 @@ TEST(ParserSection12, StatementLabelOnForever) {
   EXPECT_EQ(stmt->kind, StmtKind::kForever);
 }
 
-TEST(ParserClause09_03_05, LabelAndBlockNameErrors) {
+TEST(StatementLabelParsing, LabelAndBlockNameErrors) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -193,7 +193,7 @@ TEST(ParserClause09_03_05, LabelAndBlockNameErrors) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause09_03_05, LabelStoredOnStmt) {
+TEST(StatementLabelParsing, LabelStoredOnStmt) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA609, NamedArgCallElaborates) {
+TEST(SubroutineCallElaborationSyntax, NamedArgCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(ElabA609, NamedArgCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA82, NamedArgsElaborate) {
+TEST(SubroutineCallExprElaboration, NamedArgsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(ElabA82, NamedArgsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1354, UnknownNamedArgError) {
+TEST(ArgumentBindingElaboration, UnknownNamedArgError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -42,7 +42,7 @@ TEST(Elab1354, UnknownNamedArgError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1354, MixedPositionalNamedOk) {
+TEST(ArgumentBindingElaboration, MixedPositionalNamedOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

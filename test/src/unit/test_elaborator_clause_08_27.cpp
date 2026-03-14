@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA827, ForwardTypedefClassOk) {
+TEST(ClassObjectElaboration, ForwardTypedefClassOk) {
   EXPECT_TRUE(
       ElabOk("typedef class C2;\n"
              "class C1;\n"
@@ -17,7 +17,7 @@ TEST(ElabA827, ForwardTypedefClassOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA827, ClassWithoutForwardTypedefOk) {
+TEST(ClassObjectElaboration, ClassWithoutForwardTypedefOk) {
   EXPECT_TRUE(
       ElabOk("class MyClass;\n"
              "  int x;\n"
@@ -26,7 +26,7 @@ TEST(ElabA827, ClassWithoutForwardTypedefOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA827, ForwardTypedefInterfaceClassOk) {
+TEST(ClassObjectElaboration, ForwardTypedefInterfaceClassOk) {
   EXPECT_TRUE(
       ElabOk("typedef interface class IC;\n"
              "interface class IC;\n"

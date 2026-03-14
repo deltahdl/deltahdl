@@ -2,7 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, Cl3_11_TwoLevelHierarchyElaborates) {
+TEST(DesignBuildingBlockElaboration, TwoLevelHierarchyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module sub(input logic a, output logic b);\n"
@@ -19,7 +19,7 @@ TEST(ElabClause03, Cl3_11_TwoLevelHierarchyElaborates) {
   EXPECT_FALSE(design->top_modules[0]->children.empty());
 }
 
-TEST(ElabClause03, Cl3_11_ThreeLevelHierarchyElaborates) {
+TEST(DesignBuildingBlockElaboration, ThreeLevelHierarchyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module leaf; endmodule\n"
@@ -30,7 +30,7 @@ TEST(ElabClause03, Cl3_11_ThreeLevelHierarchyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_11_GateLevelMux2to1Elaborates) {
+TEST(DesignBuildingBlockElaboration, GateLevelMux2to1Elaborates) {
   EXPECT_TRUE(
       ElabOk("module mux2to1 (input wire a, b, sel,\n"
              "                output logic y);\n"
@@ -46,7 +46,7 @@ TEST(ElabClause03, Cl3_11_GateLevelMux2to1Elaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_11_PortCommunicationElaborates) {
+TEST(DesignBuildingBlockElaboration, PortCommunicationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module inv(input logic a, output logic y);\n"

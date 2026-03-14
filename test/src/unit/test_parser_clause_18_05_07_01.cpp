@@ -20,7 +20,7 @@ TEST(SourceText, ConstraintForeach) {
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "fc");
 }
 
-TEST(ParserSection18, RandArrayInClassWithConstraint) {
+TEST(ConstrainedRandomParsing, RandArrayInClassWithConstraint) {
   auto r = Parse(
       "class a;\n"
       "  rand int B[5];\n"

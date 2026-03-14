@@ -2,7 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, Cl3_12_ParameterizedModuleElaborates) {
+TEST(DesignBuildingBlockElaboration, ParameterizedModuleElaborates) {
   EXPECT_TRUE(
       ElabOk("module sub #(parameter W = 8) (\n"
              "    input [W-1:0] a, output [W-1:0] y);\n"
@@ -14,7 +14,7 @@ TEST(ElabClause03, Cl3_12_ParameterizedModuleElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_12_InstantiationWithPortsElaborates) {
+TEST(DesignBuildingBlockElaboration, InstantiationWithPortsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module inv(input logic a, output logic y);\n"
@@ -31,7 +31,7 @@ TEST(ElabClause03, Cl3_12_InstantiationWithPortsElaborates) {
   EXPECT_FALSE(design->top_modules[0]->children.empty());
 }
 
-TEST(ElabClause03, Cl3_12_ProgramElaborates) {
+TEST(DesignBuildingBlockElaboration, ProgramElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program p;\n"
@@ -42,7 +42,7 @@ TEST(ElabClause03, Cl3_12_ProgramElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_12_InterfaceElaborates) {
+TEST(DesignBuildingBlockElaboration, InterfaceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc;\n"
@@ -53,7 +53,7 @@ TEST(ElabClause03, Cl3_12_InterfaceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_12_PackageImportElaborates) {
+TEST(DesignBuildingBlockElaboration, PackageImportElaborates) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
              "  typedef logic [7:0] byte_t;\n"

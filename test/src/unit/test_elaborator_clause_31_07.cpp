@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA70503, TimingCheckConditionBareElaborates) {
+TEST(TimingCheckEventDefElaboration, TimingCheckConditionBareElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(ElabA70503, TimingCheckConditionBareElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70503, TimingCheckConditionParenthesizedElaborates) {
+TEST(TimingCheckEventDefElaboration, TimingCheckConditionParenthesizedElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(ElabA70503, TimingCheckConditionParenthesizedElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70503, TimingCheckConditionNegationElaborates) {
+TEST(TimingCheckEventDefElaboration, TimingCheckConditionNegationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -43,7 +43,7 @@ TEST(ElabA70503, TimingCheckConditionNegationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70503, ConditionBothEventsElaborates) {
+TEST(TimingCheckEventDefElaboration, ConditionBothEventsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -56,7 +56,7 @@ TEST(ElabA70503, ConditionBothEventsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70503, ControlledTimingCheckEventWidthCondElaborates) {
+TEST(TimingCheckEventDefElaboration, ControlledTimingCheckEventWidthCondElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -69,7 +69,7 @@ TEST(ElabA70503, ControlledTimingCheckEventWidthCondElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70503, FullCombinationElaborates) {
+TEST(TimingCheckEventDefElaboration, FullCombinationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

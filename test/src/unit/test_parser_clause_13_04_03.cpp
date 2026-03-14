@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA82, ConstantFunctionCallInParam) {
+TEST(SubroutineCallExprParsing, ConstantFunctionCallInParam) {
   auto r = Parse(
       "module m #(parameter int P = calc(4));\n"
       "  function int calc(int n); return n * 2; endfunction\n"
@@ -19,7 +19,7 @@ TEST(ParserA82, ConstantFunctionCallInParam) {
   EXPECT_EQ(params[0].second->callee, "calc");
 }
 
-TEST(ParserA82, ConstantFunctionCallInLocalparam) {
+TEST(SubroutineCallExprParsing, ConstantFunctionCallInLocalparam) {
   auto r = Parse(
       "module m;\n"
       "  function int clog2_fn(int n); return $clog2(n); endfunction\n"

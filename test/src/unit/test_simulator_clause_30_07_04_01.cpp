@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA701, SpecifyWithPulsestyleSimulates) {
+TEST(SpecifyBlockDeclSim, SpecifyWithPulsestyleSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

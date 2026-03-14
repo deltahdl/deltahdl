@@ -6,84 +6,84 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, SequenceExpr_ExprWithBooleanAbbrev) {
+TEST(AssertionDeclParsing, SequenceExpr_ExprWithBooleanAbbrev) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a [*3]);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, ConsecutiveRepetition_Exact) {
+TEST(AssertionDeclParsing, ConsecutiveRepetition_Exact) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a [*3] |-> b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, ConsecutiveRepetition_Range) {
+TEST(AssertionDeclParsing, ConsecutiveRepetition_Range) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a [*1:3] |-> b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, ConsecutiveRepetition_Star) {
+TEST(AssertionDeclParsing, ConsecutiveRepetition_Star) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a [*] ##1 b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, ConsecutiveRepetition_Plus) {
+TEST(AssertionDeclParsing, ConsecutiveRepetition_Plus) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a [+] ##1 b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, NonconsecutiveRepetition) {
+TEST(AssertionDeclParsing, NonconsecutiveRepetition) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a [=3] |-> b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, NonconsecutiveRepetition_Range) {
+TEST(AssertionDeclParsing, NonconsecutiveRepetition_Range) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a [=1:3] |-> b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, GotoRepetition_Exact) {
+TEST(AssertionDeclParsing, GotoRepetition_Exact) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a [->2] |-> b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, GotoRepetition_Range) {
+TEST(AssertionDeclParsing, GotoRepetition_Range) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a [->1:3] |-> b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, ConstOrRangeExpr_Constant) {
+TEST(AssertionDeclParsing, ConstOrRangeExpr_Constant) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a [*5]);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, ConstOrRangeExpr_Range) {
+TEST(AssertionDeclParsing, ConstOrRangeExpr_Range) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a [*2:8]);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceExpr_SequenceInstanceWithAbbrev) {
+TEST(AssertionDeclParsing, SequenceExpr_SequenceInstanceWithAbbrev) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s; a ##1 b; endsequence\n"
@@ -91,21 +91,21 @@ TEST(ParserA210, SequenceExpr_SequenceInstanceWithAbbrev) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, Sec16_5_1_SequenceConsecutiveRepetition) {
+TEST(AssertionParsing, SequenceConsecutiveRepetition) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a[*3] |-> b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection16, Sec16_5_1_SequenceGotoRepetition) {
+TEST(AssertionParsing, SequenceGotoRepetition) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) req |-> ack[->1]);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection16, SequenceConsecutiveRepetition) {
+TEST(AssertionParsing, SequenceConsecutiveRepetitionParseResult) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a[*3] |-> b);\n"
@@ -114,7 +114,7 @@ TEST(ParserSection16, SequenceConsecutiveRepetition) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, SequenceRepetitionRange) {
+TEST(AssertionParsing, SequenceRepetitionRange) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a[*1:3] ##1 b);\n"
@@ -123,7 +123,7 @@ TEST(ParserSection16, SequenceRepetitionRange) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, SequenceGotoRepetition) {
+TEST(AssertionParsing, SequenceGotoRepetitionParseResult) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req |-> ack[->1]);\n"
@@ -139,7 +139,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-TEST(ParserAnnexF, AnnexFConsecutiveRepetition) {
+TEST(AssertionSemanticsParsing, ConsecutiveRepetition) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a[*3] |-> b);\n"
@@ -149,7 +149,7 @@ TEST(ParserAnnexF, AnnexFConsecutiveRepetition) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserAnnexF, AnnexFGotoRepetition) {
+TEST(AssertionSemanticsParsing, GotoRepetition) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req |-> ack[->1]);\n"
@@ -159,7 +159,7 @@ TEST(ParserAnnexF, AnnexFGotoRepetition) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserAnnexF, AnnexFNonconsecutiveRepetition) {
+TEST(AssertionSemanticsParsing, NonconsecutiveRepetition) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req |-> ack[=2]);\n"

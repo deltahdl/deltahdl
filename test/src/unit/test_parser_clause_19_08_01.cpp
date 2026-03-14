@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CovergroupDecl_WithSampleFunction) {
+TEST(CovergroupDeclParsing, CovergroupDecl_WithSampleFunction) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg with function sample(int x, bit y);\n"
@@ -13,7 +13,7 @@ TEST(ParserA211, CovergroupDecl_WithSampleFunction) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverageEvent_WithFunctionSample) {
+TEST(CovergroupDeclParsing, CoverageEvent_WithFunctionSample) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg with function sample(bit [3:0] val);\n"
@@ -22,7 +22,7 @@ TEST(ParserA211, CoverageEvent_WithFunctionSample) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_SampleFunctionWithBody) {
+TEST(CovergroupDeclParsing, CoverGroup_SampleFunctionWithBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg with function sample(int val);\n"
@@ -34,7 +34,7 @@ TEST(ParserA211, CoverGroup_SampleFunctionWithBody) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_SampleFunctionASTVerification) {
+TEST(CovergroupDeclParsing, CoverGroup_SampleFunctionASTVerification) {
   auto r = Parse(
       "module m;\n"
       "  covergroup sampled_cg with function sample(int data);\n"

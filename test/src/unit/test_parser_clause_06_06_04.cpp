@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, Sec6_5_TriregDecl) {
+TEST(DataTypeParsing, TriregDecl) {
   auto r = Parse(
       "module t;\n"
       "  trireg cap;\n"

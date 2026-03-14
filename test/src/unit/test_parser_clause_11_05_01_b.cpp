@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, Sec11_4_1_BitSelectsInConcatenation) {
+TEST(OperatorAndExpressionParsing, BitSelectsInConcatenation) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] data;\n"
@@ -22,7 +22,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectsInConcatenation) {
   }
 }
 
-TEST(ParserSection11, Sec11_4_1_IndexedPartSelectParamWidth) {
+TEST(OperatorAndExpressionParsing, IndexedPartSelectParamWidth) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  parameter W = 8;\n"
@@ -31,7 +31,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectParamWidth) {
               "endmodule\n"));
 }
 
-TEST(ParserSection11, Sec11_4_6_TernaryWithPartSelectOperands) {
+TEST(OperatorAndExpressionParsing, TernaryWithPartSelectOperands) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -50,7 +50,7 @@ TEST(ParserSection11, Sec11_4_6_TernaryWithPartSelectOperands) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kSelect);
   ASSERT_NE(rhs->false_expr->index_end, nullptr);
 }
-TEST(ParserSection11, IndexedPartSelectVariableBase) {
+TEST(OperatorAndExpressionParsing, IndexedPartSelectVariableBase) {
   auto r = Parse(
       "module t;\n"
       "  logic [63:0] dword;\n"
@@ -65,7 +65,7 @@ TEST(ParserSection11, IndexedPartSelectVariableBase) {
   EXPECT_TRUE(rhs->is_part_select_plus);
 }
 
-TEST(ParserSection11, Sec11_1_BitSelectIndex) {
+TEST(OperatorAndExpressionParsing, BitSelectIndex) {
   auto r = Parse(
       "module t;\n"
       "  initial x = data[7];\n"
@@ -80,7 +80,7 @@ TEST(ParserSection11, Sec11_1_BitSelectIndex) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-TEST(ParserSection11, Sec11_1_PartSelectIndexAndEnd) {
+TEST(OperatorAndExpressionParsing, PartSelectIndexAndEnd) {
   auto r = Parse(
       "module t;\n"
       "  initial x = data[15:0];\n"
@@ -94,7 +94,7 @@ TEST(ParserSection11, Sec11_1_PartSelectIndexAndEnd) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
-TEST(ParserSection11, Sec11_1_IndexedPartSelectPlusFlag) {
+TEST(OperatorAndExpressionParsing, IndexedPartSelectPlusFlag) {
   auto r = Parse(
       "module t;\n"
       "  initial x = vec[i +: 4];\n"
@@ -108,7 +108,7 @@ TEST(ParserSection11, Sec11_1_IndexedPartSelectPlusFlag) {
   ASSERT_NE(rhs->index_end, nullptr);
 }
 
-TEST(ParserSection11, Sec11_1_IndexedPartSelectMinusFlag) {
+TEST(OperatorAndExpressionParsing, IndexedPartSelectMinusFlag) {
   auto r = Parse(
       "module t;\n"
       "  initial x = vec[j -: 8];\n"
@@ -120,7 +120,7 @@ TEST(ParserSection11, Sec11_1_IndexedPartSelectMinusFlag) {
   EXPECT_FALSE(rhs->is_part_select_plus);
 }
 
-TEST(ParserSection11, BitSelect) {
+TEST(OperatorAndExpressionParsing, BitSelect) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a[3];\n"
@@ -130,7 +130,7 @@ TEST(ParserSection11, BitSelect) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserSection11, PartSelectConstant) {
+TEST(OperatorAndExpressionParsing, PartSelectConstant) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a[7:0];\n"
@@ -140,7 +140,7 @@ TEST(ParserSection11, PartSelectConstant) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedIndexedPartSelectMinus) {
+TEST(AggregateTypeParsing, PackedIndexedPartSelectMinus) {
   auto r = Parse(
       "module t;\n"
       "  struct packed {\n"
@@ -160,7 +160,7 @@ TEST(ParserSection7, Sec7_2_1_PackedIndexedPartSelectMinus) {
   EXPECT_TRUE(stmt->rhs->is_part_select_minus);
 }
 
-TEST(ParserSection10, Sec10_4_1_BitSelect) {
+TEST(AssignmentParsing, BitSelect) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] a;\n"
@@ -184,7 +184,7 @@ static Expr* FirstAssignLhs(ParseResult& r) {
   return stmt->lhs;
 }
 
-TEST(ParserSection11, Sec11_4_1_BitSelectOnLhsBlocking) {
+TEST(OperatorAndExpressionParsing, BitSelectOnLhsBlocking) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] vec;\n"

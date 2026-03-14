@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA612, RsCaseItemDefault) {
+TEST(RandsequenceSyntaxParsing, RsCaseItemDefault) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -23,7 +23,7 @@ TEST(ParserA612, RsCaseItemDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsCaseItemDefaultColon) {
+TEST(RandsequenceSyntaxParsing, RsCaseItemDefaultColon) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -39,7 +39,7 @@ TEST(ParserA612, RsCaseItemDefaultColon) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsProdAsCase) {
+TEST(RandsequenceSyntaxParsing, RsProdAsCase) {
   auto r = Parse(
       "module m;\n"
       "  int sel = 1;\n"
@@ -56,7 +56,7 @@ TEST(ParserA612, RsProdAsCase) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsCaseMultipleItems) {
+TEST(RandsequenceSyntaxParsing, RsCaseMultipleItems) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -76,7 +76,7 @@ TEST(ParserA612, RsCaseMultipleItems) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsCaseItemCommaSeparated) {
+TEST(RandsequenceSyntaxParsing, RsCaseItemCommaSeparated) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

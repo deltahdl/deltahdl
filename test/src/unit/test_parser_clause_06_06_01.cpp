@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, WireDecl) {
+TEST(DataTypeParsing, WireDecl) {
   auto r = Parse(
       "module t;\n"
       "  wire w;\n"
@@ -20,7 +20,7 @@ TEST(ParserSection6, WireDecl) {
   EXPECT_EQ(item->name, "w");
 }
 
-TEST(ParserSection6, TriDecl) {
+TEST(DataTypeParsing, TriDecl) {
   auto r = Parse(
       "module t;\n"
       "  tri t0;\n"
@@ -35,7 +35,7 @@ TEST(ParserSection6, TriDecl) {
   EXPECT_EQ(item->name, "t0");
 }
 
-TEST(ParserSection6, WireAndTriBothAreNets) {
+TEST(DataTypeParsing, WireAndTriBothAreNets) {
   auto r = Parse(
       "module t;\n"
       "  wire a;\n"
@@ -49,7 +49,7 @@ TEST(ParserSection6, WireAndTriBothAreNets) {
   EXPECT_TRUE(items[1]->data_type.is_net);
 }
 
-TEST(ParserSection6, WireVectorDecl) {
+TEST(DataTypeParsing, WireVectorDecl) {
   auto r = Parse(
       "module t;\n"
       "  wire [7:0] bus;\n"
@@ -63,7 +63,7 @@ TEST(ParserSection6, WireVectorDecl) {
   EXPECT_EQ(item->name, "bus");
 }
 
-TEST(ParserSection6, TriVectorDecl) {
+TEST(DataTypeParsing, TriVectorDecl) {
   auto r = Parse(
       "module t;\n"
       "  tri [3:0] bus;\n"
@@ -77,7 +77,7 @@ TEST(ParserSection6, TriVectorDecl) {
   EXPECT_EQ(item->name, "bus");
 }
 
-TEST(ParserSection6, WireDeclWithAssign) {
+TEST(DataTypeParsing, WireDeclWithAssign) {
   auto r = Parse(
       "module t;\n"
       "  wire w = 1'b1;\n"
@@ -86,7 +86,7 @@ TEST(ParserSection6, WireDeclWithAssign) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, WireMultipleDeclarators) {
+TEST(DataTypeParsing, WireMultipleDeclarators) {
   auto r = Parse(
       "module t;\n"
       "  wire a, b, c;\n"
@@ -96,7 +96,7 @@ TEST(ParserSection6, WireMultipleDeclarators) {
   EXPECT_EQ(r.cu->modules[0]->items.size(), 3u);
 }
 
-TEST(ParserSection6, WireAndTriIdenticalSyntax) {
+TEST(DataTypeParsing, WireAndTriIdenticalSyntax) {
   EXPECT_TRUE(ParseOk("module t; wire [7:0] a; endmodule\n"));
   EXPECT_TRUE(ParseOk("module t; tri [7:0] a; endmodule\n"));
   EXPECT_TRUE(ParseOk("module t; wire a, b; endmodule\n"));

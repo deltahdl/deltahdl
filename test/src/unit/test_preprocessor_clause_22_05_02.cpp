@@ -4,7 +4,7 @@
 
 using namespace delta;
 
-TEST(Preprocessor, Clause22_5_2_UndefPreviouslyDefinedMacro) {
+TEST(Preprocessor, UndefPreviouslyDefinedMacro) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO 42\n"
@@ -17,7 +17,7 @@ TEST(Preprocessor, Clause22_5_2_UndefPreviouslyDefinedMacro) {
   EXPECT_EQ(result.find("visible"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_2_UndefinedMacroHasNoValue) {
+TEST(Preprocessor, UndefinedMacroHasNoValue) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO 42\n"
@@ -28,14 +28,14 @@ TEST(Preprocessor, Clause22_5_2_UndefinedMacroHasNoValue) {
   EXPECT_NE(result.find("`FOO"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_2_UndefUndefinedMacroNoError) {
+TEST(Preprocessor, UndefUndefinedMacroNoError) {
   PreprocFixture f;
   Preprocess("`undef NEVER_DEFINED\n", f);
 
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_2_UndefThenRedefine) {
+TEST(Preprocessor, UndefThenRedefine) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define VAL 1\n"
@@ -47,7 +47,7 @@ TEST(Preprocessor, Clause22_5_2_UndefThenRedefine) {
   EXPECT_NE(result.find('2'), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_2_UndefInInactiveConditionalSkipped) {
+TEST(Preprocessor, UndefInInactiveConditionalSkipped) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define KEEP 42\n"
@@ -61,7 +61,7 @@ TEST(Preprocessor, Clause22_5_2_UndefInInactiveConditionalSkipped) {
   EXPECT_NE(result.find("42"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_2_UndefDoesNotAffectOtherMacros) {
+TEST(Preprocessor, UndefDoesNotAffectOtherMacros) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define A 1\n"
@@ -73,7 +73,7 @@ TEST(Preprocessor, Clause22_5_2_UndefDoesNotAffectOtherMacros) {
   EXPECT_NE(result.find('2'), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_2_UndefFunctionLikeMacro) {
+TEST(Preprocessor, UndefFunctionLikeMacro) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define ADD(a,b) a + b\n"

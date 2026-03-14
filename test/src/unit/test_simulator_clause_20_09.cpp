@@ -16,77 +16,77 @@ TEST(SysTask, CountbitsMatchingPattern) {
   EXPECT_EQ(result.ToUint64(), 4u);
 }
 
-TEST(Section20, CountonesZero) {
+TEST(UtilitySystemTaskTest, CountonesZero) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$countones", {MakeInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(Section20, CountonesAllBits) {
+TEST(UtilitySystemTaskTest, CountonesAllBits) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$countones", {MakeInt(f.arena, 0xFF)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 8u);
 }
 
-TEST(Section20, CountonesSparse) {
+TEST(UtilitySystemTaskTest, CountonesSparse) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$countones", {MakeInt(f.arena, 0b10101)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 3u);
 }
 
-TEST(Section20, OnehotTrue) {
+TEST(UtilitySystemTaskTest, OnehotTrue) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$onehot", {MakeInt(f.arena, 4)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(Section20, OnehotFalseZero) {
+TEST(UtilitySystemTaskTest, OnehotFalseZero) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$onehot", {MakeInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(Section20, OnehotFalseMultiple) {
+TEST(UtilitySystemTaskTest, OnehotFalseMultiple) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$onehot", {MakeInt(f.arena, 3)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(Section20, Onehot0True) {
+TEST(UtilitySystemTaskTest, Onehot0True) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeInt(f.arena, 0)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(Section20, Onehot0TrueOneBit) {
+TEST(UtilitySystemTaskTest, Onehot0TrueOneBit) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeInt(f.arena, 8)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(Section20, Onehot0FalseMultiple) {
+TEST(UtilitySystemTaskTest, Onehot0FalseMultiple) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$onehot0", {MakeInt(f.arena, 3)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(Section20, IsunknownFalse) {
+TEST(UtilitySystemTaskTest, IsunknownFalse) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$isunknown", {MakeInt(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(Section20, IsunknownTrueXVar) {
+TEST(UtilitySystemTaskTest, IsunknownTrueXVar) {
   SimFixture f;
 
   f.ctx.CreateVariable("xvar", 8);

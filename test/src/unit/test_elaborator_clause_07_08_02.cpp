@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA25, AssocDimElaboratesStringIndex) {
+TEST(DeclarationRangeParsing, AssocDimElaboratesStringIndex) {
   ElabFixture f;
   auto* design = Elaborate("module m; int aa [string]; endmodule\n", f);
   ASSERT_NE(design, nullptr);

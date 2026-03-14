@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserClause03, Cl3_13_ParameterAndLocalparamInModule) {
+TEST(DesignBuildingBlockParsing, ParameterAndLocalparamInModule) {
   auto r = Parse(
       "module m;\n"
       "  parameter int WIDTH = 8;\n"
@@ -25,7 +25,7 @@ TEST(ParserClause03, Cl3_13_ParameterAndLocalparamInModule) {
   EXPECT_TRUE(found_localparam);
 }
 
-TEST(ParserSection8, ClassWithLocalparam) {
+TEST(ClassParsing, ClassWithLocalparam) {
   auto r = Parse(
       "class my_cls;\n"
       "  localparam int SIZE = 8;\n"
@@ -35,7 +35,7 @@ TEST(ParserSection8, ClassWithLocalparam) {
   EXPECT_EQ(r.cu->classes[0]->name, "my_cls");
 }
 
-TEST(ParserA24, LocalparamAssignment) {
+TEST(DeclarationAssignmentParsing, LocalparamAssignment) {
   auto r = Parse("module m; localparam int LP = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -44,7 +44,7 @@ TEST(ParserA24, LocalparamAssignment) {
   EXPECT_EQ(item->name, "LP");
 }
 
-TEST(ParserA28, LocalparamInBlock) {
+TEST(BlockItemDeclParsing, LocalparamInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -61,28 +61,28 @@ TEST(ParserA28, LocalparamInBlock) {
   EXPECT_EQ(body->stmts[0]->var_name, "X");
 }
 
-TEST(ParserSection6, LocalparamConstant) {
+TEST(DataTypeParsing, LocalparamConstant) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  localparam int DEPTH = 16;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, LocalparamInHeaderPort) {
+TEST(DataTypeParsing, LocalparamInHeaderPort) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter int W = 8, localparam int W2 = W * 2)\n"
               "  (input logic [W-1:0] d);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, LocalparamInPackage) {
+TEST(DataTypeParsing, LocalparamInPackage) {
   EXPECT_TRUE(
       ParseOk("package p;\n"
               "  localparam int SIZE = 256;\n"
               "endpackage\n"));
 }
 
-TEST(ParserSection6, LocalparamDerivedFromParam) {
+TEST(DataTypeParsing, LocalparamDerivedFromParam) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter int W = 8);\n"
               "  localparam int W2 = W * 2;\n"

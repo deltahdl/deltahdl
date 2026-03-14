@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA29, ExportSingleIdentifier) {
+TEST(InterfaceDeclParsing, ExportSingleIdentifier) {
   auto r = Parse(
       "interface bus;\n"
       "  modport target(export Write);\n"
@@ -17,7 +17,7 @@ TEST(ParserA29, ExportSingleIdentifier) {
   EXPECT_EQ(mp->ports[0].name, "Write");
 }
 
-TEST(ParserA29, ExportMultipleIdentifiers) {
+TEST(InterfaceDeclParsing, ExportMultipleIdentifiers) {
   auto r = Parse(
       "interface bus;\n"
       "  modport target(export Read, Write);\n"
@@ -32,7 +32,7 @@ TEST(ParserA29, ExportMultipleIdentifiers) {
   EXPECT_EQ(mp->ports[1].name, "Write");
 }
 
-TEST(ParserA29, ImportTaskPrototype) {
+TEST(InterfaceDeclParsing, ImportTaskPrototype) {
   auto r = Parse(
       "interface bus;\n"
       "  modport init(import task Read(input logic [7:0] raddr));\n"
@@ -47,14 +47,14 @@ TEST(ParserA29, ImportTaskPrototype) {
   EXPECT_EQ(mp->ports[0].prototype->name, "Read");
 }
 
-TEST(ParserA29, ExportTaskPrototype) {
+TEST(InterfaceDeclParsing, ExportTaskPrototype) {
   EXPECT_TRUE(
       ParseOk("interface bus;\n"
               "  modport target(export task Read(input logic [7:0] addr));\n"
               "endinterface\n"));
 }
 
-TEST(ParserA29, FullPrototypeMixed) {
+TEST(InterfaceDeclParsing, FullPrototypeMixed) {
   EXPECT_TRUE(
       ParseOk("interface bus;\n"
               "  logic req, gnt;\n"
@@ -69,7 +69,7 @@ TEST(ParserA29, FullPrototypeMixed) {
               "endinterface\n"));
 }
 
-TEST(ParserA29, ExportFlag_NotImport) {
+TEST(InterfaceDeclParsing, ExportFlag_NotImport) {
   auto r = Parse(
       "interface bus;\n"
       "  modport target(export Write);\n"
@@ -81,7 +81,7 @@ TEST(ParserA29, ExportFlag_NotImport) {
   EXPECT_TRUE(mp->ports[0].is_export);
 }
 
-TEST(ParserA29, ImportMultiplePrototypes) {
+TEST(InterfaceDeclParsing, ImportMultiplePrototypes) {
   auto r = Parse(
       "interface bus;\n"
       "  modport init(\n"

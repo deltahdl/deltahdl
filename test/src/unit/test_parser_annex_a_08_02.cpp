@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA609, TfCallMultipleArgs) {
+TEST(SubroutineCallSyntaxParsing, TfCallMultipleArgs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foo(1, 2, 3); end\n"
@@ -18,7 +18,7 @@ TEST(ParserA609, TfCallMultipleArgs) {
   EXPECT_EQ(expr->args.size(), 3u);
 }
 
-TEST(ParserA609, SystemTfCallNoParens) {
+TEST(SubroutineCallSyntaxParsing, SystemTfCallNoParens) {
   auto r = Parse(
       "module m;\n"
       "  initial $finish;\n"
@@ -32,7 +32,7 @@ TEST(ParserA609, SystemTfCallNoParens) {
   EXPECT_TRUE(expr->args.empty());
 }
 
-TEST(ParserAnnexA, A8SystemFunctionCall) {
+TEST(FormalSyntaxParsing, SystemFunctionCall) {
   auto r = Parse(
       "module m; initial begin $display(\"v=%0d\", x); $finish; end "
       "endmodule\n");
@@ -40,7 +40,7 @@ TEST(ParserAnnexA, A8SystemFunctionCall) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserAnnexA, A8FunctionCallExpr) {
+TEST(FormalSyntaxParsing, FunctionCallExpr) {
   auto r = Parse("module m; initial x = func(a, b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -48,7 +48,7 @@ TEST(ParserAnnexA, A8FunctionCallExpr) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-TEST(ParserA82, TfCallNoArgs) {
+TEST(SubroutineCallExprParsing, TfCallNoArgs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foo(); end\n"
@@ -62,7 +62,7 @@ TEST(ParserA82, TfCallNoArgs) {
   EXPECT_TRUE(expr->args.empty());
 }
 
-TEST(ParserA82, SystemTfCallMultipleExprArgs) {
+TEST(SubroutineCallExprParsing, SystemTfCallMultipleExprArgs) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"%d %d\", 1, 2);\n"
@@ -75,7 +75,7 @@ TEST(ParserA82, SystemTfCallMultipleExprArgs) {
   EXPECT_EQ(expr->args.size(), 3u);
 }
 
-TEST(ParserA82, SystemTfCallEmptyArgSlots) {
+TEST(SubroutineCallExprParsing, SystemTfCallEmptyArgSlots) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(,,42);\n"
@@ -91,7 +91,7 @@ TEST(ParserA82, SystemTfCallEmptyArgSlots) {
   ASSERT_NE(expr->args[2], nullptr);
 }
 
-TEST(ParserA82, ListOfArgsNamedEmptyExpr) {
+TEST(SubroutineCallExprParsing, ListOfArgsNamedEmptyExpr) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foo(.a(), .b(1)); end\n"

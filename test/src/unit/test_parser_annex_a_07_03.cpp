@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA703, ListOfPathOutputsMultiple) {
+TEST(SpecifyTerminalParsing, ListOfPathOutputsMultiple) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -22,7 +22,7 @@ TEST(ParserA703, ListOfPathOutputsMultiple) {
   EXPECT_EQ(si->path.dst_ports[2].name, "z");
 }
 
-TEST(ParserA703, InputTerminalPartSelect) {
+TEST(SpecifyTerminalParsing, InputTerminalPartSelect) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -40,7 +40,7 @@ TEST(ParserA703, InputTerminalPartSelect) {
   EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
 }
 
-TEST(ParserA703, OutputTerminalBitSelect) {
+TEST(SpecifyTerminalParsing, OutputTerminalBitSelect) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -57,7 +57,7 @@ TEST(ParserA703, OutputTerminalBitSelect) {
   EXPECT_NE(si->path.dst_ports[0].range_left, nullptr);
 }
 
-TEST(ParserA703, InputIdentifierDotted) {
+TEST(SpecifyTerminalParsing, InputIdentifierDotted) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -73,7 +73,7 @@ TEST(ParserA703, InputIdentifierDotted) {
   EXPECT_EQ(si->path.src_ports[0].name, "sig");
 }
 
-TEST(ParserA703, DottedInputWithRange) {
+TEST(SpecifyTerminalParsing, DottedInputWithRange) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -89,7 +89,7 @@ TEST(ParserA703, DottedInputWithRange) {
   EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
 }
 
-TEST(ParserA703, DottedOutputWithRange) {
+TEST(SpecifyTerminalParsing, DottedOutputWithRange) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -105,7 +105,7 @@ TEST(ParserA703, DottedOutputWithRange) {
   EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
 }
 
-TEST(ParserA703, InputTerminalPlusIndexed) {
+TEST(SpecifyTerminalParsing, InputTerminalPlusIndexed) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -123,7 +123,7 @@ TEST(ParserA703, InputTerminalPlusIndexed) {
   EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
 }
 
-TEST(ParserA703, InputTerminalMinusIndexed) {
+TEST(SpecifyTerminalParsing, InputTerminalMinusIndexed) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -141,7 +141,7 @@ TEST(ParserA703, InputTerminalMinusIndexed) {
   EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
 }
 
-TEST(ParserA703, TerminalInConditionalPath) {
+TEST(SpecifyTerminalParsing, TerminalInConditionalPath) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -159,7 +159,7 @@ TEST(ParserA703, TerminalInConditionalPath) {
   EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
 }
 
-TEST(ParserA703, AllDottedTerminalsFullPath) {
+TEST(SpecifyTerminalParsing, AllDottedTerminalsFullPath) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -180,7 +180,7 @@ TEST(ParserA703, AllDottedTerminalsFullPath) {
   EXPECT_EQ(si->path.dst_ports[0].name, "c");
 }
 
-TEST(ParserA703, SimpleTerminalNoRange) {
+TEST(SpecifyTerminalParsing, SimpleTerminalNoRange) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -199,7 +199,7 @@ TEST(ParserA703, SimpleTerminalNoRange) {
   EXPECT_TRUE(si->path.dst_ports[0].interface_name.empty());
 }
 
-TEST(ParserA70503, TerminalBitSelect) {
+TEST(TimingCheckEventDefParsing, TerminalBitSelect) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -214,7 +214,7 @@ TEST(ParserA70503, TerminalBitSelect) {
   EXPECT_NE(tc->ref_terminal.range_left, nullptr);
 }
 
-TEST(ParserA70503, TerminalBitSelectOnDataSignal) {
+TEST(TimingCheckEventDefParsing, TerminalBitSelectOnDataSignal) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

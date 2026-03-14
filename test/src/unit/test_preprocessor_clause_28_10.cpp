@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, PullGates) {
+TEST(GateLevelModelingParsing, PullGates) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  pullup (out);\n"

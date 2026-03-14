@@ -13,7 +13,7 @@ TEST(SourceText, DescriptionPackageItemTask) {
   ASSERT_EQ(r.cu->cu_items.size(), 1u);
 }
 
-TEST(ParserClause03, Cl3_12_1_ForwardRefSyntaxValid) {
+TEST(DesignBuildingBlockParsing, ForwardRefSyntaxValid) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire w;\n"
@@ -30,7 +30,7 @@ TEST(Parser, PackageAndModule) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
   EXPECT_EQ(r.cu->modules[0]->name, "top");
 }
-TEST(ParserSection23, MultipleModuleDefinitions) {
+TEST(ModuleAndHierarchyParsing, MultipleModuleDefinitions) {
   auto r = Parse(
       "module a; endmodule\n"
       "module b; endmodule\n"
@@ -42,7 +42,7 @@ TEST(ParserSection23, MultipleModuleDefinitions) {
   EXPECT_EQ(r.cu->modules[2]->name, "c");
 }
 
-TEST(ParserSection18, TopLevelFunction) {
+TEST(ConstrainedRandomParsing, TopLevelFunction) {
   auto r = Parse(
       "function int my_func(int x);\n"
       "  return x + 1;\n"
@@ -53,7 +53,7 @@ TEST(ParserSection18, TopLevelFunction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserClause03, Cl3_12_1_CuScopeTypedef) {
+TEST(DesignBuildingBlockParsing, CuScopeTypedef) {
   auto r = Parse(
       "typedef int myint;\n"
       "module m; endmodule\n");
@@ -64,7 +64,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeTypedef) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "myint");
 }
 
-TEST(ParserClause03, Cl3_12_1_CuScopeLocalparam) {
+TEST(DesignBuildingBlockParsing, CuScopeLocalparam) {
   auto r = Parse(
       "localparam int WIDTH = 8;\n"
       "module m; endmodule\n");
@@ -75,7 +75,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeLocalparam) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "WIDTH");
 }
 
-TEST(ParserClause03, Cl3_12_1_CuScopeParameter) {
+TEST(DesignBuildingBlockParsing, CuScopeParameter) {
   auto r = Parse(
       "parameter int DEPTH = 16;\n"
       "module m; endmodule\n");
@@ -86,7 +86,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeParameter) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "DEPTH");
 }
 
-TEST(ParserClause03, Cl3_12_1_CuScopeImport) {
+TEST(DesignBuildingBlockParsing, CuScopeImport) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -99,7 +99,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeImport) {
   EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kImportDecl);
 }
 
-TEST(ParserClause03, Cl3_12_1_CuScopeDataDecl) {
+TEST(DesignBuildingBlockParsing, CuScopeDataDecl) {
   auto r = Parse(
       "bit b;\n"
       "module m; endmodule\n");
@@ -110,7 +110,7 @@ TEST(ParserClause03, Cl3_12_1_CuScopeDataDecl) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "b");
 }
 
-TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolutionExpr) {
+TEST(DesignBuildingBlockParsing, DollarUnitScopeResolutionExpr) {
   auto r = Parse(
       "bit b;\n"
       "module m;\n"
@@ -131,7 +131,7 @@ TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolutionExpr) {
   EXPECT_EQ(assign_stmt->rhs->scope_prefix, "$unit");
 }
 
-TEST(ParserClause03, Cl3_12_1_DollarUnitScopeInAssignment) {
+TEST(DesignBuildingBlockParsing, DollarUnitScopeInAssignment) {
   EXPECT_TRUE(
       ParseOk("task t;\n"
               "  int b;\n"
@@ -140,7 +140,7 @@ TEST(ParserClause03, Cl3_12_1_DollarUnitScopeInAssignment) {
               "module m; endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_12_1_MultipleCuScopeItems) {
+TEST(DesignBuildingBlockParsing, MultipleCuScopeItems) {
   auto r = Parse(
       "typedef logic [7:0] byte_t;\n"
       "localparam int N = 4;\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_PulldownNamed) {
+TEST(PrimitiveInstantiationParsing, GateInst_PulldownNamed) {
   auto r = Parse(
       "module m;\n"
       "  pulldown pd1(out);\n"
@@ -17,7 +17,7 @@ TEST(ParserA301, GateInst_PulldownNamed) {
   EXPECT_EQ(g->gate_inst_name, "pd1");
 }
 
-TEST(ParserA301, GateInst_PullupNamed) {
+TEST(PrimitiveInstantiationParsing, GateInst_PullupNamed) {
   auto r = Parse(
       "module m;\n"
       "  pullup pu1(out);\n"
@@ -28,7 +28,7 @@ TEST(ParserA301, GateInst_PullupNamed) {
   EXPECT_EQ(g->gate_inst_name, "pu1");
 }
 
-TEST(ParserA301, CmosSwitchInst_Named) {
+TEST(PrimitiveInstantiationParsing, CmosSwitchInst_Named) {
   auto r = Parse(
       "module m;\n"
       "  cmos c1(out, in, nctrl, pctrl);\n"
@@ -40,7 +40,7 @@ TEST(ParserA301, CmosSwitchInst_Named) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-TEST(ParserA301, CmosSwitchInst_RcmosNamed) {
+TEST(PrimitiveInstantiationParsing, CmosSwitchInst_RcmosNamed) {
   auto r = Parse(
       "module m;\n"
       "  rcmos rc1(out, in, nctrl, pctrl);\n"
@@ -51,7 +51,7 @@ TEST(ParserA301, CmosSwitchInst_RcmosNamed) {
   EXPECT_EQ(g->gate_inst_name, "rc1");
 }
 
-TEST(ParserA301, GateInst_NamedUnnamedMixedInMulti) {
+TEST(PrimitiveInstantiationParsing, GateInst_NamedUnnamedMixedInMulti) {
   auto r = Parse(
       "module m;\n"
       "  and a1(o1, i1, i2), a2(o2, i3, i4), a3(o3, i5, i6);\n"

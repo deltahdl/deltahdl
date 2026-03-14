@@ -25,7 +25,7 @@ TEST(SourceText, PackageLifetimeWithItems) {
   EXPECT_EQ(r.cu->packages[0]->items.size(), 2u);
 }
 
-TEST(ParserSection26, PackageWithParameter) {
+TEST(PackageParsing, PackageWithParameter) {
   auto r = Parse(
       "package cfg_pkg;\n"
       "  parameter int WIDTH = 8;\n"
@@ -35,7 +35,7 @@ TEST(ParserSection26, PackageWithParameter) {
   ASSERT_FALSE(r.cu->packages[0]->items.empty());
 }
 
-TEST(ParserSection26, PackageWithFunction) {
+TEST(PackageParsing, PackageWithFunction) {
   auto r = Parse(
       "package util_pkg;\n"
       "  function int add(int a, int b);\n"
@@ -48,7 +48,7 @@ TEST(ParserSection26, PackageWithFunction) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
-TEST(ParserSection26, MultiplePackages) {
+TEST(PackageParsing, MultiplePackages) {
   auto r = Parse(
       "package a;\n"
       "endpackage\n"
@@ -60,7 +60,7 @@ TEST(ParserSection26, MultiplePackages) {
   EXPECT_EQ(r.cu->packages[1]->name, "b");
 }
 
-TEST(ParserSection26, PackageWithStructTypedef) {
+TEST(PackageParsing, PackageWithStructTypedef) {
   auto r = Parse(
       "package types_pkg;\n"
       "  typedef struct {\n"
@@ -73,7 +73,7 @@ TEST(ParserSection26, PackageWithStructTypedef) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kTypedef));
 }
 
-TEST(ParserSection26, PackageWithClassDecl) {
+TEST(PackageParsing, PackageWithClassDecl) {
   auto r = Parse(
       "package cls_pkg;\n"
       "  class transaction;\n"
@@ -120,7 +120,7 @@ TEST(SourceText, PackageItemCheckerDecl) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
-TEST(ParserSection23, EndLabelPackage) {
+TEST(ModuleAndHierarchyParsing, EndLabelPackage) {
   auto r = Parse("package mypkg; endpackage : mypkg\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1);
@@ -205,7 +205,7 @@ TEST(SourceText, PackageItemEmptyStmt) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-TEST(ParserClause03, Cl3_13_PackageWithInternalDeclarations) {
+TEST(DesignBuildingBlockParsing, PackageWithInternalDeclarations) {
   auto r = Parse(
       "package my_pkg;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -244,7 +244,7 @@ TEST(SourceText, PackageEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserAnnexA, A1PackageDecl) {
+TEST(FormalSyntaxParsing, PackageDecl) {
   auto r = Parse(
       "package pkg;\n"
       "  parameter int W = 8;\n"
@@ -256,7 +256,7 @@ TEST(ParserAnnexA, A1PackageDecl) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
-TEST(ParserSection26, EmptyPackage) {
+TEST(PackageParsing, EmptyPackage) {
   auto r = Parse(
       "package pkg;\n"
       "endpackage\n");
@@ -265,7 +265,7 @@ TEST(ParserSection26, EmptyPackage) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
-TEST(ParserSection26, PackageWithEndLabel) {
+TEST(PackageParsing, PackageWithEndLabel) {
   auto r = Parse(
       "package my_pkg;\n"
       "endpackage : my_pkg\n");
@@ -285,7 +285,7 @@ static bool ParseOk5(const std::string& src) {
   return !diag.HasErrors();
 }
 
-TEST(ParserCh5, ModuleBody_NullItem) {
+TEST(DataObjectParsing, ModuleBody_NullItem) {
   EXPECT_TRUE(ParseOk5("module m; ; endmodule"));
 }
 

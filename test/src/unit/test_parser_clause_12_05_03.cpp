@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection4, Sec4_6_UniqueCaseOneMatch) {
+TEST(SchedulingSemanticsParsing, UniqueCaseOneMatch) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -24,7 +24,7 @@ TEST(ParserSection4, Sec4_6_UniqueCaseOneMatch) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-TEST(ParserSection4, Sec4_6_Unique0CaseAtMostOneMatch) {
+TEST(SchedulingSemanticsParsing, Unique0CaseAtMostOneMatch) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -42,7 +42,7 @@ TEST(ParserSection4, Sec4_6_Unique0CaseAtMostOneMatch) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-TEST(ParserSection4, Sec4_6_PriorityCaseFirstMatch) {
+TEST(SchedulingSemanticsParsing, PriorityCaseFirstMatch) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -61,7 +61,7 @@ TEST(ParserSection4, Sec4_6_PriorityCaseFirstMatch) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-TEST(ParserSection9, Sec9_2_2_UniqueCase) {
+TEST(ProcessParsing, UniqueCase) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -84,7 +84,7 @@ TEST(ParserSection9, Sec9_2_2_UniqueCase) {
   ASSERT_EQ(stmt->case_items.size(), 4u);
 }
 
-TEST(ParserSection12, UniqueCasezQualifier) {
+TEST(ProceduralStatementParsing, UniqueCasezQualifier) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -102,7 +102,7 @@ TEST(ParserSection12, UniqueCasezQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-TEST(ParserSection9, Sec9_2_2_PriorityCase) {
+TEST(ProcessParsing, PriorityCase) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] req;\n"
@@ -126,7 +126,7 @@ TEST(ParserSection9, Sec9_2_2_PriorityCase) {
   ASSERT_EQ(stmt->case_items.size(), 5u);
 }
 
-TEST(ParserSection12, PriorityCasex) {
+TEST(ProceduralStatementParsing, PriorityCasex) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -144,7 +144,7 @@ TEST(ParserSection12, PriorityCasex) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarUniqueCase) {
+TEST(ProcessParsing, AtStarUniqueCase) {
   auto r = Parse(
       "module m;\n"
       "  reg [1:0] sel;\n"
@@ -162,7 +162,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarUniqueCase) {
   EXPECT_EQ(case_stmt->qualifier, CaseQualifier::kUnique);
 }
 
-TEST(ParserSection4, Sec4_6_PriorityCaseWithDefault) {
+TEST(SchedulingSemanticsParsing, PriorityCaseWithDefault) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -183,7 +183,7 @@ TEST(ParserSection4, Sec4_6_PriorityCaseWithDefault) {
   EXPECT_TRUE(HasDefaultCaseItem(stmt));
 }
 
-TEST(ParserSection4, Sec4_6_UniqueCaseMultipleItems) {
+TEST(SchedulingSemanticsParsing, UniqueCaseMultipleItems) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -204,7 +204,7 @@ TEST(ParserSection4, Sec4_6_UniqueCaseMultipleItems) {
   EXPECT_EQ(stmt->case_items.size(), 4u);
 }
 
-TEST(ParserSection9, Sec9_2_2_Unique0Case) {
+TEST(ProcessParsing, Unique0Case) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -226,7 +226,7 @@ TEST(ParserSection9, Sec9_2_2_Unique0Case) {
   ASSERT_EQ(stmt->case_items.size(), 3u);
 }
 
-TEST(ParserSection12, UniqueCase) {
+TEST(ProceduralStatementParsing, UniqueCase) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -243,7 +243,7 @@ TEST(ParserSection12, UniqueCase) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-TEST(ParserSection12, PriorityCase) {
+TEST(ProceduralStatementParsing, PriorityCase) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -260,7 +260,7 @@ TEST(ParserSection12, PriorityCase) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-TEST(ParserA607, UniqueCaseParse) {
+TEST(CaseSyntaxParsing, UniqueCaseParse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -284,7 +284,7 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection9, Sec9_2_3_UniqueCaseStatement) {
+TEST(ProcessParsing, UniqueCaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -306,7 +306,7 @@ TEST(ParserSection9, Sec9_2_3_UniqueCaseStatement) {
   EXPECT_EQ(item->body->qualifier, CaseQualifier::kUnique);
 }
 
-TEST(ParserSection12, UniqueCaseInsideAlwaysComb) {
+TEST(ProceduralStatementParsing, UniqueCaseInsideAlwaysComb) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic [1:0] sel;\n"
@@ -322,7 +322,7 @@ TEST(ParserSection12, UniqueCaseInsideAlwaysComb) {
               "endmodule\n"));
 }
 
-TEST(ParserA607, Unique0CaseParse) {
+TEST(CaseSyntaxParsing, Unique0CaseParse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -339,7 +339,7 @@ TEST(ParserA607, Unique0CaseParse) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-TEST(ParserSection9, Sec9_2_3_PriorityCaseStatement) {
+TEST(ProcessParsing, PriorityCaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -360,7 +360,7 @@ TEST(ParserSection9, Sec9_2_3_PriorityCaseStatement) {
   EXPECT_EQ(item->body->qualifier, CaseQualifier::kPriority);
 }
 
-TEST(ParserA607, PriorityCaseParse) {
+TEST(CaseSyntaxParsing, PriorityCaseParse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -377,7 +377,7 @@ TEST(ParserA607, PriorityCaseParse) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-TEST(ParserA607, PriorityCasezParse) {
+TEST(CaseSyntaxParsing, PriorityCasezParse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -395,7 +395,7 @@ TEST(ParserA607, PriorityCasezParse) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
 }
 
-TEST(ParserSection12, Unique0CaseWithDefault) {
+TEST(ProceduralStatementParsing, Unique0CaseWithDefault) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -415,7 +415,7 @@ TEST(ParserSection12, Unique0CaseWithDefault) {
   EXPECT_TRUE(stmt->case_items[2].is_default);
 }
 
-TEST(ParserSection9, Sec9_2_3_Unique0CaseStatement) {
+TEST(ProcessParsing, Unique0CaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -435,7 +435,7 @@ TEST(ParserSection9, Sec9_2_3_Unique0CaseStatement) {
   EXPECT_EQ(item->body->qualifier, CaseQualifier::kUnique0);
 }
 
-TEST(ParserSection12, UniqueCasexQualifier) {
+TEST(ProceduralStatementParsing, UniqueCasexQualifier) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"

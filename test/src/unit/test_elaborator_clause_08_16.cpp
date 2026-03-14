@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA816, SubclassToSuperclassAssignOk) {
+TEST(ClassCastElaboration, SubclassToSuperclassAssignOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  int i;\n"
@@ -22,7 +22,7 @@ TEST(ElabA816, SubclassToSuperclassAssignOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA816, CastSuperToSubclassOk) {
+TEST(ClassCastElaboration, CastSuperToSubclassOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  int x;\n"
@@ -41,7 +41,7 @@ TEST(ElabA816, CastSuperToSubclassOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA816, CastAsFunctionOk) {
+TEST(ClassCastElaboration, CastAsFunctionOk) {
   EXPECT_TRUE(
       ElabOk("class Base; int x; endclass\n"
              "class Derived extends Base; int y; endclass\n"
@@ -57,7 +57,7 @@ TEST(ElabA816, CastAsFunctionOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA816, CastWithNullOk) {
+TEST(ClassCastElaboration, CastWithNullOk) {
   EXPECT_TRUE(
       ElabOk("class Base; endclass\n"
              "class Derived extends Base; endclass\n"

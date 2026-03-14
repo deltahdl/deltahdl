@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA703, MixedTerminalFormsDoNotInterfere) {
+TEST(SpecifyTerminalSim, MixedTerminalFormsDoNotInterfere) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -5,13 +5,13 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserCh50603, SystemFunction_InExpression) {
+TEST(SystemNameParserParsing, SystemFunction_InExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  parameter W = $clog2(256);\n"
               "endmodule"));
 }
-TEST(ParserSection11, ConstExprSystemFuncInParam) {
+TEST(OperatorAndExpressionParsing, ConstExprSystemFuncInParam) {
   auto r = Parse(
       "module t;\n"
       "  parameter N = 16;\n"
@@ -21,7 +21,7 @@ TEST(ParserSection11, ConstExprSystemFuncInParam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA82, SystemTfCallAsExpr) {
+TEST(SubroutineCallExprParsing, SystemTfCallAsExpr) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $clog2(256);\n"
@@ -36,7 +36,7 @@ TEST(ParserA82, SystemTfCallAsExpr) {
   EXPECT_EQ(stmt->rhs->args.size(), 1u);
 }
 
-TEST(ParserA84, PrimarySystemCall) {
+TEST(PrimaryParsing, PrimarySystemCall) {
   auto r = Parse("module m; initial x = $clog2(16); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

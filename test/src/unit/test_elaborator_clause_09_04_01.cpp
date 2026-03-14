@@ -9,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_04_01, DelayControlInInitialElaborates) {
+TEST(DelayControlElaboration, DelayControlInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -23,7 +23,7 @@ TEST(ElabClause09_04_01, DelayControlInInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_01, ExpressionDelayElaborates) {
+TEST(DelayControlElaboration, ExpressionDelayElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -37,7 +37,7 @@ TEST(ElabClause09_04_01, ExpressionDelayElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_01, DelayInAlwaysElaborates) {
+TEST(DelayControlElaboration, DelayInAlwaysElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

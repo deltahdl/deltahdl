@@ -54,7 +54,7 @@ TEST(EvalOpXZ, RealComparisonSingleBit) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(SimA86, BinaryLessThan) {
+TEST(OperatorSim, BinaryLessThan) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -71,7 +71,7 @@ TEST(SimA86, BinaryLessThan) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, BinaryGreaterThan) {
+TEST(OperatorSim, BinaryGreaterThan) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -88,7 +88,7 @@ TEST(SimA86, BinaryGreaterThan) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, BinaryGreaterOrEqual) {
+TEST(OperatorSim, BinaryGreaterOrEqual) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

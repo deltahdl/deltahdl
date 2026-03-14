@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, DynamicCastTask) {
+TEST(DataTypeParsing, DynamicCastTask) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef enum { A, B, C } abc_t;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection6, DynamicCastTask) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, DynamicCastFunction) {
+TEST(DataTypeParsing, DynamicCastFunction) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef enum { X, Y, Z } xyz_t;\n"
@@ -29,7 +29,7 @@ TEST(ParserSection6, DynamicCastFunction) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, DynamicCastCall) {
+TEST(DataTypeParsing, DynamicCastCall) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -45,7 +45,7 @@ TEST(ParserSection6, DynamicCastCall) {
   EXPECT_EQ(stmt->expr->callee, "$cast");
 }
 
-TEST(ParserSection6, DynamicCastInCondition) {
+TEST(DataTypeParsing, DynamicCastInCondition) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -59,7 +59,7 @@ TEST(ParserSection6, DynamicCastInCondition) {
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
 }
 
-TEST(ParserSection6, DynamicCastAssignResult) {
+TEST(DataTypeParsing, DynamicCastAssignResult) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"

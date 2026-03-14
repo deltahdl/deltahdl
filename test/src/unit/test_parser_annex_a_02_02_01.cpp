@@ -4,14 +4,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA221, DataTypeNonInteger) {
+TEST(NetAndVariableTypeParsing, DataTypeNonInteger) {
   auto r = Parse("module m; real x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kReal);
 }
 
-TEST(ParserA221, IntegerVectorTypes) {
+TEST(NetAndVariableTypeParsing, IntegerVectorTypes) {
   auto r = Parse(
       "module m;\n"
       "  bit a;\n"
@@ -25,7 +25,7 @@ TEST(ParserA221, IntegerVectorTypes) {
   EXPECT_EQ(r.cu->modules[0]->items[2]->data_type.kind, DataTypeKind::kReg);
 }
 
-TEST(ParserA221, NetTypeVariants) {
+TEST(NetAndVariableTypeParsing, NetTypeVariants) {
   auto r = Parse(
       "module m;\n"
       "  supply0 s0;\n"
@@ -58,28 +58,28 @@ TEST(ParserA221, NetTypeVariants) {
   EXPECT_EQ(items[11]->data_type.kind, DataTypeKind::kWor);
 }
 
-TEST(ParserA221, NetPortTypeWithNetType) {
+TEST(NetAndVariableTypeParsing, NetPortTypeWithNetType) {
   auto r = Parse("module m(inout tri [7:0] bus); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInout);
 }
 
-TEST(ParserA221, VarDataTypeWithVar) {
+TEST(NetAndVariableTypeParsing, VarDataTypeWithVar) {
   auto r = Parse("module m(input var logic d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
 }
 
-TEST(ParserA221, SigningSigned) {
+TEST(NetAndVariableTypeParsing, SigningSigned) {
   auto r = Parse("module m; logic signed [7:0] x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->modules[0]->items[0]->data_type.is_signed);
 }
 
-TEST(ParserA221, StructUnionStruct) {
+TEST(NetAndVariableTypeParsing, StructUnionStruct) {
   auto r = Parse(
       "module m;\n"
       "  struct { int a; int b; } s;\n"
@@ -89,7 +89,7 @@ TEST(ParserA221, StructUnionStruct) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kStruct);
 }
 
-TEST(ParserA221, DataTypeClassType) {
+TEST(NetAndVariableTypeParsing, DataTypeClassType) {
   auto r = Parse(
       "class my_cls;\n"
       "  typedef int my_type;\n"

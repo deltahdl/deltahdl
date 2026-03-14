@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA221, StructUnionUnionTagged) {
+TEST(NetAndVariableTypeParsing, StructUnionUnionTagged) {
   auto r = Parse(
       "module m;\n"
       "  union tagged { int a; real b; } u;\n"
@@ -16,7 +16,7 @@ TEST(ParserA221, StructUnionUnionTagged) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kUnion);
   EXPECT_TRUE(item->data_type.is_tagged);
 }
-TEST(ParserSection7, UnionTagged) {
+TEST(AggregateTypeParsing, UnionTagged) {
   auto r = Parse(
       "module t;\n"
       "  typedef union tagged {\n"
@@ -32,7 +32,7 @@ TEST(ParserSection7, UnionTagged) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
-TEST(ParserSection7, UnionWithNestedStruct) {
+TEST(AggregateTypeParsing, UnionWithNestedStruct) {
   auto r = Parse(
       "module t;\n"
       "  typedef union tagged {\n"
@@ -50,7 +50,7 @@ TEST(ParserSection7, UnionWithNestedStruct) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
-TEST(ParserSection7, TaggedUnionVoidMember) {
+TEST(AggregateTypeParsing, TaggedUnionVoidMember) {
   auto r = Parse(
       "module t;\n"
       "  typedef union tagged {\n"

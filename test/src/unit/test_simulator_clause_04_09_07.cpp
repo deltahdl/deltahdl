@@ -9,7 +9,7 @@
 
 using namespace delta;
 
-TEST(SimCh4097, ArgumentPassedByValue) {
+TEST(SubroutineArgSchedulingSim, ArgumentPassedByValue) {
   Arena arena;
   Scheduler sched(arena);
   int caller_var = 10;
@@ -29,7 +29,7 @@ TEST(SimCh4097, ArgumentPassedByValue) {
   EXPECT_EQ(subroutine_local, 99);
 }
 
-TEST(SimCh4097, CopyInOnInvocation) {
+TEST(SubroutineArgSchedulingSim, CopyInOnInvocation) {
   Arena arena;
   Scheduler sched(arena);
   int src = 42;
@@ -51,7 +51,7 @@ TEST(SimCh4097, CopyInOnInvocation) {
   EXPECT_EQ(src, 999);
 }
 
-TEST(SimCh4097, CopyOutOnReturn) {
+TEST(SubroutineArgSchedulingSim, CopyOutOnReturn) {
   Arena arena;
   Scheduler sched(arena);
   int caller_dst = 0;
@@ -72,7 +72,7 @@ TEST(SimCh4097, CopyOutOnReturn) {
   EXPECT_EQ(caller_dst, 77);
 }
 
-TEST(SimCh4097, InoutArgCopiedInAndOut) {
+TEST(SubroutineArgSchedulingSim, InoutArgCopiedInAndOut) {
   Arena arena;
   Scheduler sched(arena);
   int caller_var = 5;
@@ -92,7 +92,7 @@ TEST(SimCh4097, InoutArgCopiedInAndOut) {
   EXPECT_EQ(caller_var, 15);
 }
 
-TEST(SimCh4097, MultipleCopyOutArgsOnReturn) {
+TEST(SubroutineArgSchedulingSim, MultipleCopyOutArgsOnReturn) {
   Arena arena;
   Scheduler sched(arena);
   int dst_a = 0;
@@ -118,7 +118,7 @@ TEST(SimCh4097, MultipleCopyOutArgsOnReturn) {
   EXPECT_EQ(dst_c, 3);
 }
 
-TEST(SimCh4097, CopyOutBehavesAsBlockingAssignment) {
+TEST(SubroutineArgSchedulingSim, CopyOutBehavesAsBlockingAssignment) {
   Arena arena;
   Scheduler sched(arena);
   int result = 0;
@@ -139,7 +139,7 @@ TEST(SimCh4097, CopyOutBehavesAsBlockingAssignment) {
   EXPECT_EQ(observed_after_call, 42);
 }
 
-TEST(SimCh4097, CopyOutEnablesEventsOnUpdate) {
+TEST(SubroutineArgSchedulingSim, CopyOutEnablesEventsOnUpdate) {
   Arena arena;
   Scheduler sched(arena);
   int sig = 0;
@@ -164,7 +164,7 @@ TEST(SimCh4097, CopyOutEnablesEventsOnUpdate) {
   EXPECT_TRUE(sensitive_triggered);
 }
 
-TEST(SimCh4097, CopyOutDoesNotSuspendProcess) {
+TEST(SubroutineArgSchedulingSim, CopyOutDoesNotSuspendProcess) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -187,7 +187,7 @@ TEST(SimCh4097, CopyOutDoesNotSuspendProcess) {
   EXPECT_EQ(order[1], "after_call");
 }
 
-TEST(SimCh4097, CopyOutOccursInActiveRegion) {
+TEST(SubroutineArgSchedulingSim, CopyOutOccursInActiveRegion) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -210,7 +210,7 @@ TEST(SimCh4097, CopyOutOccursInActiveRegion) {
   EXPECT_EQ(order[1], "nba_event");
 }
 
-TEST(SimCh4097, CopyInAndCopyOutAreIndependent) {
+TEST(SubroutineArgSchedulingSim, CopyInAndCopyOutAreIndependent) {
   Arena arena;
   Scheduler sched(arena);
   int caller_x = 10;

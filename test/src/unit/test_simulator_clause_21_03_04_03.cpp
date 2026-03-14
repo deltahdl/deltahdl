@@ -7,7 +7,7 @@
 using namespace delta;
 namespace {
 
-TEST(Section21, SscanfDecimal) {
+TEST(IoSystemTaskTest, SscanfDecimal) {
   SimFixture f;
   auto* dest = f.ctx.CreateVariable("scanned", 32);
   dest->value = MakeLogic4VecVal(f.arena, 32, 0);

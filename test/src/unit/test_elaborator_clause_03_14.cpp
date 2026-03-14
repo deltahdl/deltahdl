@@ -2,7 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, Cl3_14_PrecisionLessPreciseThanUnit) {
+TEST(DesignBuildingBlockElaboration, PrecisionLessPreciseThanUnit) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  timeunit 1ps;\n"
@@ -10,7 +10,7 @@ TEST(ElabClause03, Cl3_14_PrecisionLessPreciseThanUnit) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_14_PrecisionEqualToUnit) {
+TEST(DesignBuildingBlockElaboration, PrecisionEqualToUnit) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  timeunit 1ns;\n"
@@ -18,7 +18,7 @@ TEST(ElabClause03, Cl3_14_PrecisionEqualToUnit) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_14_PrecisionFinerThanUnit) {
+TEST(DesignBuildingBlockElaboration, PrecisionFinerThanUnit) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  timeunit 1ns;\n"
@@ -26,11 +26,11 @@ TEST(ElabClause03, Cl3_14_PrecisionFinerThanUnit) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_14_NoTimescaleElaboratesOk) {
+TEST(DesignBuildingBlockElaboration, NoTimescaleElaboratesOk) {
   EXPECT_TRUE(ElabOk("module m; logic x; endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_14_ModuleWithDelayElaborates) {
+TEST(DesignBuildingBlockElaboration, ModuleWithDelayElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  timeunit 1ns;\n"

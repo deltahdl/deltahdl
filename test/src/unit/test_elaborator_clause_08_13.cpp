@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA813, ClassExtendsOk) {
+TEST(InheritanceElaboration, ClassExtendsOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  int x;\n"
@@ -17,7 +17,7 @@ TEST(ElabA813, ClassExtendsOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA813, ExtendFinalClassError) {
+TEST(InheritanceElaboration, ExtendFinalClassError) {
   EXPECT_FALSE(
       ElabOk("class :final TopPacket;\n"
              "endclass\n"
@@ -28,7 +28,7 @@ TEST(ElabA813, ExtendFinalClassError) {
              "endmodule\n"));
 }
 
-TEST(ElabA813, FinalClassAloneOk) {
+TEST(InheritanceElaboration, FinalClassAloneOk) {
   EXPECT_TRUE(
       ElabOk("class :final Sealed;\n"
              "  int x;\n"
@@ -38,7 +38,7 @@ TEST(ElabA813, FinalClassAloneOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA813, MultiLevelInheritanceOk) {
+TEST(InheritanceElaboration, MultiLevelInheritanceOk) {
   EXPECT_TRUE(
       ElabOk("class A;\n"
              "endclass\n"
@@ -51,7 +51,7 @@ TEST(ElabA813, MultiLevelInheritanceOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA813, ExtendFinalInChainError) {
+TEST(InheritanceElaboration, ExtendFinalInChainError) {
   EXPECT_FALSE(
       ElabOk("class A;\n"
              "endclass\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA606, IfBasic) {
+TEST(ConditionalSyntaxParsing, IfBasic) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -22,7 +22,7 @@ TEST(ParserA606, IfBasic) {
   EXPECT_EQ(stmt->else_branch, nullptr);
 }
 
-TEST(ParserA606, IfElse) {
+TEST(ConditionalSyntaxParsing, IfElse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -39,7 +39,7 @@ TEST(ParserA606, IfElse) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-TEST(ParserA606, IfElseIfElse) {
+TEST(ConditionalSyntaxParsing, IfElseIfElse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -58,7 +58,7 @@ TEST(ParserA606, IfElseIfElse) {
   EXPECT_NE(stmt->else_branch->else_branch, nullptr);
 }
 
-TEST(ParserA606, UniqueIf) {
+TEST(ConditionalSyntaxParsing, UniqueIf) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -74,7 +74,7 @@ TEST(ParserA606, UniqueIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-TEST(ParserA606, Unique0If) {
+TEST(ConditionalSyntaxParsing, Unique0If) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -88,7 +88,7 @@ TEST(ParserA606, Unique0If) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-TEST(ParserA606, PriorityIf) {
+TEST(ConditionalSyntaxParsing, PriorityIf) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -104,7 +104,7 @@ TEST(ParserA606, PriorityIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-TEST(ParserA606, IfNullThenBranch) {
+TEST(ConditionalSyntaxParsing, IfNullThenBranch) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -122,7 +122,7 @@ TEST(ParserA606, IfNullThenBranch) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-TEST(ParserA606, IfWithBlock) {
+TEST(ConditionalSyntaxParsing, IfWithBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

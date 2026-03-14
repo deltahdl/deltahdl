@@ -3,7 +3,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection8, ConstProperty) {
+TEST(ClassParsing, ConstProperty) {
   auto r = Parse(
       "class MyClass;\n"
       "  const int MAX = 100;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection8, ConstProperty) {
   EXPECT_EQ(cls->members[0]->name, "MAX");
 }
 
-TEST(ParserSection8, StaticConstProperty) {
+TEST(ClassParsing, StaticConstProperty) {
   auto r = Parse(
       "class Config;\n"
       "  static const int VERSION = 3;\n"
@@ -46,7 +46,7 @@ TEST(SourceText, ClassConstProperty) {
   EXPECT_TRUE(members[1]->is_static);
 }
 
-TEST(ParserA819, GlobalConstantWithInitializer) {
+TEST(ConstantClassPropertyParsing, GlobalConstantWithInitializer) {
   auto r = Parse(
       "class Jumbo_Packet;\n"
       "  const int max_size = 9 * 1024;\n"
@@ -58,7 +58,7 @@ TEST(ParserA819, GlobalConstantWithInitializer) {
   EXPECT_NE(m->init_expr, nullptr);
 }
 
-TEST(ParserA819, InstanceConstantNoInitializer) {
+TEST(ConstantClassPropertyParsing, InstanceConstantNoInitializer) {
   auto r = Parse(
       "class Big_Packet;\n"
       "  const int size;\n"
@@ -73,7 +73,7 @@ TEST(ParserA819, InstanceConstantNoInitializer) {
   EXPECT_EQ(m->init_expr, nullptr);
 }
 
-TEST(ParserA819, StaticConstGlobalConstant) {
+TEST(ConstantClassPropertyParsing, StaticConstGlobalConstant) {
   auto r = Parse(
       "class Config;\n"
       "  static const int VERSION = 3;\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA29, ModportSingleItem) {
+TEST(InterfaceDeclParsing, ModportSingleItem) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic clk, data;\n"
@@ -18,7 +18,7 @@ TEST(ParserA29, ModportSingleItem) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
 }
 
-TEST(ParserA29, ModportMultipleItems) {
+TEST(InterfaceDeclParsing, ModportMultipleItems) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic clk, data;\n"
@@ -32,7 +32,7 @@ TEST(ParserA29, ModportMultipleItems) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
 }
 
-TEST(ParserA29, ModportSimplePortsInput) {
+TEST(InterfaceDeclParsing, ModportSimplePortsInput) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic a, b;\n"
@@ -48,7 +48,7 @@ TEST(ParserA29, ModportSimplePortsInput) {
   EXPECT_EQ(mp->ports[1].name, "b");
 }
 
-TEST(ParserA29, ModportSimplePortsOutput) {
+TEST(InterfaceDeclParsing, ModportSimplePortsOutput) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic q;\n"
@@ -61,7 +61,7 @@ TEST(ParserA29, ModportSimplePortsOutput) {
   EXPECT_EQ(mp->ports[0].direction, Direction::kOutput);
 }
 
-TEST(ParserA29, ModportSimplePortsInout) {
+TEST(InterfaceDeclParsing, ModportSimplePortsInout) {
   auto r = Parse(
       "interface ifc;\n"
       "  wire bus;\n"
@@ -74,7 +74,7 @@ TEST(ParserA29, ModportSimplePortsInout) {
   EXPECT_EQ(mp->ports[0].direction, Direction::kInout);
 }
 
-TEST(ParserA29, ModportSimplePortsRef) {
+TEST(InterfaceDeclParsing, ModportSimplePortsRef) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic sig;\n"
@@ -87,7 +87,7 @@ TEST(ParserA29, ModportSimplePortsRef) {
   EXPECT_EQ(mp->ports[0].direction, Direction::kRef);
 }
 
-TEST(ParserA29, ModportSimplePortExplicitExpr) {
+TEST(InterfaceDeclParsing, ModportSimplePortExplicitExpr) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic a;\n"
@@ -101,7 +101,7 @@ TEST(ParserA29, ModportSimplePortExplicitExpr) {
   EXPECT_NE(mp->ports[0].expr, nullptr);
 }
 
-TEST(ParserA29, ModportSimplePortEmptyExpr) {
+TEST(InterfaceDeclParsing, ModportSimplePortEmptyExpr) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic a;\n"
@@ -115,7 +115,7 @@ TEST(ParserA29, ModportSimplePortEmptyExpr) {
   EXPECT_EQ(mp->ports[0].expr, nullptr);
 }
 
-TEST(ParserA29, ModportTfPortsImportIdentifier) {
+TEST(InterfaceDeclParsing, ModportTfPortsImportIdentifier) {
   auto r = Parse(
       "interface ifc;\n"
       "  modport mp(import my_func);\n"
@@ -127,7 +127,7 @@ TEST(ParserA29, ModportTfPortsImportIdentifier) {
   VerifyImportExportPort(mp->ports[0], true, false, "my_func");
 }
 
-TEST(ParserA29, ModportTfPortsExportIdentifier) {
+TEST(InterfaceDeclParsing, ModportTfPortsExportIdentifier) {
   auto r = Parse(
       "interface ifc;\n"
       "  modport mp(export my_task);\n"
@@ -139,7 +139,7 @@ TEST(ParserA29, ModportTfPortsExportIdentifier) {
   VerifyImportExportPort(mp->ports[0], false, true, "my_task");
 }
 
-TEST(ParserA29, ModportImportFunctionPrototype) {
+TEST(InterfaceDeclParsing, ModportImportFunctionPrototype) {
   auto r = Parse(
       "interface ifc;\n"
       "  modport mp(import function int compute(int a));\n"
@@ -154,7 +154,7 @@ TEST(ParserA29, ModportImportFunctionPrototype) {
   EXPECT_EQ(mp->ports[0].prototype->name, "compute");
 }
 
-TEST(ParserA29, ModportImportTaskPrototype) {
+TEST(InterfaceDeclParsing, ModportImportTaskPrototype) {
   auto r = Parse(
       "interface ifc;\n"
       "  modport mp(import task do_work(int x));\n"
@@ -168,7 +168,7 @@ TEST(ParserA29, ModportImportTaskPrototype) {
   EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kTaskDecl);
 }
 
-TEST(ParserA29, ModportClockingDecl) {
+TEST(InterfaceDeclParsing, ModportClockingDecl) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic clk;\n"
@@ -183,7 +183,7 @@ TEST(ParserA29, ModportClockingDecl) {
   EXPECT_EQ(mp->ports[0].name, "cb");
 }
 
-TEST(ParserA29, ModportMixedDirections) {
+TEST(InterfaceDeclParsing, ModportMixedDirections) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic clk, data_in, data_out, valid;\n"
@@ -203,7 +203,7 @@ TEST(ParserA29, ModportMixedDirections) {
   EXPECT_EQ(mp->ports[3].name, "data_in");
 }
 
-TEST(ParserA29, MultipleModportDecls) {
+TEST(InterfaceDeclParsing, MultipleModportDecls) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic a, b;\n"

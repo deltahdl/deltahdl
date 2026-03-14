@@ -8,7 +8,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserCh505, Operator_Ternary) {
+TEST(OperatorTokenParserParsing, Operator_Ternary) {
   auto r = Parse(
       "module m;\n"
       "  initial x = sel ? a : b;\n"
@@ -31,7 +31,7 @@ TEST(Eval, Ternary) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-TEST(ParserSection11, ConditionalTernary) {
+TEST(OperatorAndExpressionParsing, ConditionalTernary) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a > b) ? a : b;\n"

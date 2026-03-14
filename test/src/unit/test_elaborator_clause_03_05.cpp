@@ -2,7 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, InterfaceWithVariablesElaborates) {
+TEST(DesignBuildingBlockElaboration, InterfaceWithVariablesElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc;\n"
@@ -14,7 +14,7 @@ TEST(ElabClause03, InterfaceWithVariablesElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, InterfaceWithPortsElaborates) {
+TEST(DesignBuildingBlockElaboration, InterfaceWithPortsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc(input logic clk);\n"
@@ -27,7 +27,7 @@ TEST(ElabClause03, InterfaceWithPortsElaborates) {
   EXPECT_EQ(design->top_modules[0]->ports.size(), 1u);
 }
 
-TEST(ElabClause03, InterfaceWithContAssignElaborates) {
+TEST(DesignBuildingBlockElaboration, InterfaceWithContAssignElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc;\n"
@@ -40,7 +40,7 @@ TEST(ElabClause03, InterfaceWithContAssignElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, SimpleBusExampleElaborates) {
+TEST(DesignBuildingBlockElaboration, SimpleBusExampleElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface simple_bus(input logic clk);\n"
@@ -54,7 +54,7 @@ TEST(ElabClause03, SimpleBusExampleElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, InterfaceWithSubroutinesElaborates) {
+TEST(DesignBuildingBlockElaboration, InterfaceWithSubroutinesElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc;\n"

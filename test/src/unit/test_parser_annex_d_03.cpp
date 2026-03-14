@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexD2, AnnexDGetpatternParse) {
+TEST(OptionalSystemTaskExtendedParsing, GetpatternParse) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $getpattern(mem_addr);\n"
@@ -17,7 +17,7 @@ TEST(ParserAnnexD2, AnnexDGetpatternParse) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserAnnexD2, AnnexDGetpatternRhs) {
+TEST(OptionalSystemTaskExtendedParsing, GetpatternRhs) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $getpattern(mem_addr);\n"

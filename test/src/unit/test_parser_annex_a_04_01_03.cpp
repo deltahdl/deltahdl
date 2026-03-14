@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0413, ProgramInstWithOrderedParams) {
+TEST(ProgramInstantiationGrammar, ProgramInstWithOrderedParams) {
   auto r = Parse(
       "program my_prog #(parameter int W = 8)(input logic [W-1:0] data);\n"
       "endprogram\n"
@@ -19,7 +19,7 @@ TEST(ParserAnnexA0413, ProgramInstWithOrderedParams) {
   ASSERT_EQ(item->inst_params.size(), 1u);
 }
 
-TEST(ParserAnnexA0413, ProgramInstEmptyPorts) {
+TEST(ProgramInstantiationGrammar, ProgramInstEmptyPorts) {
   auto r = Parse(
       "program my_prog;\n"
       "endprogram\n"

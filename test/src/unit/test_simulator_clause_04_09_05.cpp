@@ -13,7 +13,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh4095, UnidirectionalEventProcessing) {
+TEST(SwitchProcessingSchedulingSim, UnidirectionalEventProcessing) {
   Arena arena;
   Scheduler sched(arena);
   int input = 5;
@@ -34,7 +34,7 @@ TEST(SimCh4095, UnidirectionalEventProcessing) {
   EXPECT_EQ(output, 10);
 }
 
-TEST(SimCh4095, BidirectionalSignalFlow) {
+TEST(SwitchProcessingSchedulingSim, BidirectionalSignalFlow) {
   Arena arena;
   Scheduler sched(arena);
   int net_a = 0;
@@ -73,7 +73,7 @@ TEST(SimCh4095, BidirectionalSignalFlow) {
   EXPECT_EQ(net_b, 0);
 }
 
-TEST(SimCh4095, CoordinatedProcessingOfConnectedNodes) {
+TEST(SwitchProcessingSchedulingSim, CoordinatedProcessingOfConnectedNodes) {
   Arena arena;
   Scheduler sched(arena);
 
@@ -104,7 +104,7 @@ TEST(SimCh4095, CoordinatedProcessingOfConnectedNodes) {
   EXPECT_EQ(n2, 1);
 }
 
-TEST(SimCh4095, InputsAndOutputsInteract) {
+TEST(SwitchProcessingSchedulingSim, InputsAndOutputsInteract) {
   Arena arena;
   Scheduler sched(arena);
   int node_a = 0;
@@ -130,7 +130,7 @@ TEST(SimCh4095, InputsAndOutputsInteract) {
   EXPECT_EQ(node_b, 1);
 }
 
-TEST(SimCh4095, RelaxationTechnique) {
+TEST(SwitchProcessingSchedulingSim, RelaxationTechnique) {
   Arena arena;
   Scheduler sched(arena);
 
@@ -166,7 +166,7 @@ TEST(SimCh4095, RelaxationTechnique) {
   EXPECT_EQ(iterations, 2);
 }
 
-TEST(SimCh4095, IntermingledWithOtherActiveEvents) {
+TEST(SwitchProcessingSchedulingSim, IntermingledWithOtherActiveEvents) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -202,7 +202,7 @@ TEST(SimCh4095, IntermingledWithOtherActiveEvents) {
   EXPECT_TRUE(has_proc);
 }
 
-TEST(SimCh4095, SteadyStateUniqueLevel) {
+TEST(SwitchProcessingSchedulingSim, SteadyStateUniqueLevel) {
   Arena arena;
   Scheduler sched(arena);
 
@@ -231,7 +231,7 @@ TEST(SimCh4095, SteadyStateUniqueLevel) {
   EXPECT_EQ(node_a_result, 1);
 }
 
-TEST(SimCh4095, SteadyStateAmbiguousX) {
+TEST(SwitchProcessingSchedulingSim, SteadyStateAmbiguousX) {
   Arena arena;
   Scheduler sched(arena);
 
@@ -259,7 +259,7 @@ TEST(SimCh4095, SteadyStateAmbiguousX) {
   EXPECT_EQ(node_b_result, x_val);
 }
 
-TEST(SimCh4095, UserDefinedNetTypeSwitchOffForXZ) {
+TEST(SwitchProcessingSchedulingSim, UserDefinedNetTypeSwitchOffForXZ) {
   Arena arena;
   Scheduler sched(arena);
   int udn_a = 5;

@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh44310, PostponedRegionExecutesPLICallbacks) {
+TEST(PliPostponedRegionSim, PostponedRegionExecutesPLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,7 +23,7 @@ TEST(SimCh44310, PostponedRegionExecutesPLICallbacks) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh44310, PostponedCanReadValues) {
+TEST(PliPostponedRegionSim, PostponedCanReadValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -41,7 +41,7 @@ TEST(SimCh44310, PostponedCanReadValues) {
   EXPECT_EQ(sampled, 42);
 }
 
-TEST(SimCh44310, PostponedReadsStateFromActiveAndReactiveRegions) {
+TEST(PliPostponedRegionSim, PostponedReadsStateFromActiveAndReactiveRegions) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -63,7 +63,7 @@ TEST(SimCh44310, PostponedReadsStateFromActiveAndReactiveRegions) {
   EXPECT_EQ(sampled, 77);
 }
 
-TEST(SimCh44310, PostponedExecutesAfterPrePostponed) {
+TEST(PliPostponedRegionSim, PostponedExecutesAfterPrePostponed) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -82,7 +82,7 @@ TEST(SimCh44310, PostponedExecutesAfterPrePostponed) {
   EXPECT_EQ(order[1], "postponed");
 }
 
-TEST(SimCh44310, PostponedIsLastRegionInTimeSlot) {
+TEST(PliPostponedRegionSim, PostponedIsLastRegionInTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -102,7 +102,7 @@ TEST(SimCh44310, PostponedIsLastRegionInTimeSlot) {
   EXPECT_EQ(order[4], "postponed");
 }
 
-TEST(SimCh44310, PostponedIsLastRegionOrdinal) {
+TEST(PliPostponedRegionSim, PostponedIsLastRegionOrdinal) {
   auto postponed_ord = static_cast<int>(Region::kPostponed);
   auto pre_postponed_ord = static_cast<int>(Region::kPrePostponed);
   auto count_ord = static_cast<int>(Region::kCOUNT);
@@ -110,7 +110,7 @@ TEST(SimCh44310, PostponedIsLastRegionOrdinal) {
   EXPECT_EQ(postponed_ord, count_ord - 1);
 }
 
-TEST(SimCh44310, PostponedRegionHoldsMultiplePLICallbacks) {
+TEST(PliPostponedRegionSim, PostponedRegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -125,11 +125,11 @@ TEST(SimCh44310, PostponedRegionHoldsMultiplePLICallbacks) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh44310, PostponedEventsAcrossMultipleTimeSlots) {
+TEST(PliPostponedRegionSim, PostponedEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kPostponed);
 }
 
-TEST(SimCh44310, PostponedProvidesReadOnlySnapshotAfterAllRegions) {
+TEST(PliPostponedRegionSim, PostponedProvidesReadOnlySnapshotAfterAllRegions) {
   Arena arena;
   Scheduler sched(arena);
   int a = 0;
@@ -155,7 +155,7 @@ TEST(SimCh44310, PostponedProvidesReadOnlySnapshotAfterAllRegions) {
   EXPECT_EQ(sum_in_postponed, 40);
 }
 
-TEST(SimCh44310, PostponedInfrastructureWithFullRegionChain) {
+TEST(PliPostponedRegionSim, PostponedInfrastructureWithFullRegionChain) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;

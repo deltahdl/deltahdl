@@ -3,7 +3,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection7, AssocArrayLiteralWithDefault) {
+TEST(AggregateTypeParsing, AssocArrayLiteralWithDefault) {
   auto r = Parse(
       "module t;\n"
       "  string words[int] = '{default: \"hello\"};\n"
@@ -12,7 +12,7 @@ TEST(ParserSection7, AssocArrayLiteralWithDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection7, AssocArrayLiteralKeyValue) {
+TEST(AggregateTypeParsing, AssocArrayLiteralKeyValue) {
   auto r = Parse(
       "module t;\n"
       "  integer tab[string] = '{\"Peter\":20, \"Paul\":22, default:-1};\n"

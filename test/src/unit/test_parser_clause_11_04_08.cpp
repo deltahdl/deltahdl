@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection10, Sec10_4_1_ExprBitwiseAnd) {
+TEST(AssignmentParsing, ExprBitwiseAnd) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] a, b, c;\n"
@@ -20,7 +20,7 @@ TEST(ParserSection10, Sec10_4_1_ExprBitwiseAnd) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
-TEST(ParserSection11, XnorBinaryOperator) {
+TEST(OperatorAndExpressionParsing, XnorBinaryOperator) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a ^~ b;\n"
@@ -31,7 +31,7 @@ TEST(ParserSection11, XnorBinaryOperator) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-TEST(ParserA86, BinaryBitwiseAnd) {
+TEST(OperatorParsing, BinaryBitwiseAnd) {
   auto r = Parse("module m; initial x = a & b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -41,7 +41,7 @@ TEST(ParserA86, BinaryBitwiseAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-TEST(ParserA86, BinaryBitwiseOr) {
+TEST(OperatorParsing, BinaryBitwiseOr) {
   auto r = Parse("module m; initial x = a | b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -51,7 +51,7 @@ TEST(ParserA86, BinaryBitwiseOr) {
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
 }
 
-TEST(ParserA86, BinaryBitwiseXor) {
+TEST(OperatorParsing, BinaryBitwiseXor) {
   auto r = Parse("module m; initial x = a ^ b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -61,7 +61,7 @@ TEST(ParserA86, BinaryBitwiseXor) {
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
 }
 
-TEST(ParserA86, BinaryBitwiseXnor) {
+TEST(OperatorParsing, BinaryBitwiseXnor) {
   auto r = Parse("module m; initial x = a ^~ b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -71,7 +71,7 @@ TEST(ParserA86, BinaryBitwiseXnor) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-TEST(ParserA86, BinaryBitwiseXnorAlt) {
+TEST(OperatorParsing, BinaryBitwiseXnorAlt) {
   auto r = Parse("module m; initial x = a ~^ b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -81,7 +81,7 @@ TEST(ParserA86, BinaryBitwiseXnorAlt) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
 }
 
-TEST(ParserA83, ExprUnaryOp) {
+TEST(ExpressionParsing, ExprUnaryOp) {
   auto r = Parse("module m; initial x = ~a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -91,7 +91,7 @@ TEST(ParserA83, ExprUnaryOp) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
-TEST(ParserA86, UnaryBitwiseNot) {
+TEST(OperatorParsing, UnaryBitwiseNot) {
   auto r = Parse("module m; initial x = ~a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -101,7 +101,7 @@ TEST(ParserA86, UnaryBitwiseNot) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
-TEST(ParserSection11, Sec11_1_UnaryBitwiseNot) {
+TEST(OperatorAndExpressionParsing, UnaryBitwiseNot) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ~b;\n"
@@ -112,7 +112,7 @@ TEST(ParserSection11, Sec11_1_UnaryBitwiseNot) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
-TEST(ParserSection11, Sec11_1_BinaryXnorTildeCaret) {
+TEST(OperatorAndExpressionParsing, BinaryXnorTildeCaret) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a ~^ b;\n"
@@ -123,7 +123,7 @@ TEST(ParserSection11, Sec11_1_BinaryXnorTildeCaret) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
 }
 
-TEST(ParserSection11, Sec11_1_ExprInContinuousAssign) {
+TEST(OperatorAndExpressionParsing, ExprInContinuousAssign) {
   auto r = Parse(
       "module t;\n"
       "  wire a, b, c;\n"
@@ -144,7 +144,7 @@ TEST(ParserSection11, Sec11_1_ExprInContinuousAssign) {
   EXPECT_EQ(ca->assign_rhs->op, TokenKind::kCaret);
 }
 
-TEST(ParserSection11, BitwiseAnd) {
+TEST(OperatorAndExpressionParsing, BitwiseAnd) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a & b;\n"
@@ -154,7 +154,7 @@ TEST(ParserSection11, BitwiseAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-TEST(ParserSection11, BitwiseOr) {
+TEST(OperatorAndExpressionParsing, BitwiseOr) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a | b;\n"
@@ -164,7 +164,7 @@ TEST(ParserSection11, BitwiseOr) {
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
 }
 
-TEST(ParserSection11, BitwiseXor) {
+TEST(OperatorAndExpressionParsing, BitwiseXor) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a ^ b;\n"
@@ -174,7 +174,7 @@ TEST(ParserSection11, BitwiseXor) {
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
 }
 
-TEST(ParserSection11, BitwiseNot) {
+TEST(OperatorAndExpressionParsing, BitwiseNot) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ~a;\n"
@@ -185,7 +185,7 @@ TEST(ParserSection11, BitwiseNot) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
-TEST(ParserCh505, Operator_UnaryBitwiseNegate) {
+TEST(OperatorTokenParserParsing, Operator_UnaryBitwiseNegate) {
   auto r = Parse(
       "module m;\n"
       "  initial x = ~y;\n"
@@ -199,7 +199,7 @@ TEST(ParserCh505, Operator_UnaryBitwiseNegate) {
   EXPECT_EQ(rhs->op, TokenKind::kTilde);
 }
 
-TEST(ParserA86, BinaryXnor) {
+TEST(OperatorParsing, BinaryXnor) {
   auto r = Parse("module m; initial x = a ^~ b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

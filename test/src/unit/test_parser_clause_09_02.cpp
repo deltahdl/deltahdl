@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, InitialConstruct_Multiple) {
+TEST(ProceduralBlockSyntaxParsing, InitialConstruct_Multiple) {
   auto r = Parse(
       "module m;\n"
       "  initial a = 0;\n"
@@ -18,7 +18,7 @@ TEST(ParserA602, InitialConstruct_Multiple) {
   EXPECT_EQ(inits.size(), 3u);
 }
 
-TEST(ParserSection9b, StructuredProcInitialAndAlways) {
+TEST(ProceduralAssignAndControlParsing, StructuredProcInitialAndAlways) {
   auto r = Parse(
       "module m;\n"
       "  initial a = 0;\n"
@@ -31,7 +31,7 @@ TEST(ParserSection9b, StructuredProcInitialAndAlways) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kAlwaysBlock);
 }
 
-TEST(ParserSection9c, MultipleInitialProcedures) {
+TEST(ProcessTimingAndControlParsing, MultipleInitialProcedures) {
   auto r = Parse(
       "module m;\n"
       "  initial a = 0;\n"
@@ -47,7 +47,7 @@ TEST(ParserSection9c, MultipleInitialProcedures) {
   EXPECT_EQ(count, 3);
 }
 
-TEST(ParserClause09_02, Syntax9_1_AllSixProcedureTypes) {
+TEST(StructuredProcedureParsing, Syntax9_1_AllSixProcedureTypes) {
   auto r = Parse(
       "module m;\n"
       "  logic clk, a, b, c, d, e;\n"
@@ -69,7 +69,7 @@ TEST(ParserClause09_02, Syntax9_1_AllSixProcedureTypes) {
   EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kFinalBlock));
 }
 
-TEST(ParserClause09_02, NoLimitOnProcedureCount) {
+TEST(StructuredProcedureParsing, NoLimitOnProcedureCount) {
   auto r = Parse(
       "module m;\n"
       "  initial a = 0;\n"
@@ -89,7 +89,7 @@ TEST(ParserClause09_02, NoLimitOnProcedureCount) {
   EXPECT_EQ(CountItemsByKind(items, ModuleItemKind::kAlwaysBlock), 4u);
 }
 
-TEST(ParserClause09_02, FinalBlockParsing) {
+TEST(StructuredProcedureParsing, FinalBlockParsing) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"end\");\n"
@@ -102,7 +102,7 @@ TEST(ParserClause09_02, FinalBlockParsing) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ParserClause09_02, MultipleFinalBlocks) {
+TEST(StructuredProcedureParsing, MultipleFinalBlocks) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"a\");\n"
@@ -116,7 +116,7 @@ TEST(ParserClause09_02, MultipleFinalBlocks) {
       3u);
 }
 
-TEST(ParserClause09_02, AlwaysKeywordVariants) {
+TEST(StructuredProcedureParsing, AlwaysKeywordVariants) {
   auto r = Parse(
       "module m;\n"
       "  logic clk, a;\n"

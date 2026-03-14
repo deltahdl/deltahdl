@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection7, QueuePopFront) {
+TEST(AggregateTypeParsing, QueuePopFront) {
   auto r = Parse(
       "module t;\n"
       "  int q[$];\n"

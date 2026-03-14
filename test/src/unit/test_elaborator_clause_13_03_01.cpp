@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA27, ElabTaskAutomaticLifetime) {
+TEST(TaskDeclParsing, ElabTaskAutomaticLifetime) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(ParserA27, ElabTaskAutomaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elab13031, StaticTaskElaborates) {
+TEST(TaskDeclElaboration, StaticTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -31,7 +31,7 @@ TEST(Elab13031, StaticTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab13031, StaticVarInAutoTaskElaborates) {
+TEST(TaskDeclElaboration, StaticVarInAutoTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -45,7 +45,7 @@ TEST(Elab13031, StaticVarInAutoTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab13031, AutoVarInStaticTaskElaborates) {
+TEST(TaskDeclElaboration, AutoVarInStaticTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

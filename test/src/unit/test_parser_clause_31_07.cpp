@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70503, ScalarTimingCheckCondCaseEquality) {
+TEST(TimingCheckEventDefParsing, ScalarTimingCheckCondCaseEquality) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -20,7 +20,7 @@ TEST(ParserA70503, ScalarTimingCheckCondCaseEquality) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-TEST(ParserA70503, ScalarTimingCheckCondCaseInequality) {
+TEST(TimingCheckEventDefParsing, ScalarTimingCheckCondCaseInequality) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -33,7 +33,7 @@ TEST(ParserA70503, ScalarTimingCheckCondCaseInequality) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-TEST(ParserA70503, ScalarConstant1b0) {
+TEST(TimingCheckEventDefParsing, ScalarConstant1b0) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -43,7 +43,7 @@ TEST(ParserA70503, ScalarConstant1b0) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA70503, ScalarConstant1B1) {
+TEST(TimingCheckEventDefParsing, ScalarConstant1B1) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -53,7 +53,7 @@ TEST(ParserA70503, ScalarConstant1B1) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA70503, ScalarConstantDecimal1) {
+TEST(TimingCheckEventDefParsing, ScalarConstantDecimal1) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -63,7 +63,7 @@ TEST(ParserA70503, ScalarConstantDecimal1) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA70503, ScalarConstantDecimal0) {
+TEST(TimingCheckEventDefParsing, ScalarConstantDecimal0) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -73,7 +73,7 @@ TEST(ParserA70503, ScalarConstantDecimal0) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA70503, ConditionBothEvents) {
+TEST(TimingCheckEventDefParsing, ConditionBothEvents) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -87,7 +87,7 @@ TEST(ParserA70503, ConditionBothEvents) {
   EXPECT_NE(tc->data_condition, nullptr);
 }
 
-TEST(ParserA70503, TerminalBitSelectWithCondition) {
+TEST(TimingCheckEventDefParsing, TerminalBitSelectWithCondition) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -102,7 +102,7 @@ TEST(ParserA70503, TerminalBitSelectWithCondition) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-TEST(ParserA70503, EdgeTerminalPartSelectWithCondition) {
+TEST(TimingCheckEventDefParsing, EdgeTerminalPartSelectWithCondition) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -117,7 +117,7 @@ TEST(ParserA70503, EdgeTerminalPartSelectWithCondition) {
   EXPECT_NE(tc->data_condition, nullptr);
 }
 
-TEST(ParserSection28, Sec28_12_TimingCheckWithEdges) {
+TEST(GateLevelModelingParsing, TimingCheckWithEdges) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
       "  specify\n"
@@ -165,7 +165,7 @@ TEST_F(SpecifyTest, ConditionedHoldBothSignals) {
   EXPECT_NE(tc.data_condition, nullptr);
 }
 
-TEST(ParserA70503, ControlledTimingCheckEventWithCondition) {
+TEST(TimingCheckEventDefParsing, ControlledTimingCheckEventWithCondition) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -180,7 +180,7 @@ TEST(ParserA70503, ControlledTimingCheckEventWithCondition) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-TEST(ParserA70503, TerminalSimpleIdentifier) {
+TEST(TimingCheckEventDefParsing, TerminalSimpleIdentifier) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

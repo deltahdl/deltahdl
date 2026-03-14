@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA29, BasicModportDecl) {
+TEST(InterfaceDeclParsing, BasicModportDecl) {
   auto r = Parse(
       "interface bus;\n"
       "  logic a;\n"
@@ -17,7 +17,7 @@ TEST(ParserA29, BasicModportDecl) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "target");
 }
 
-TEST(ParserA29, MultipleSimplePortsSameDir) {
+TEST(InterfaceDeclParsing, MultipleSimplePortsSameDir) {
   auto r = Parse(
       "interface bus;\n"
       "  logic a, b, c;\n"
@@ -35,7 +35,7 @@ TEST(ParserA29, MultipleSimplePortsSameDir) {
   EXPECT_EQ(mp->ports[2].name, "c");
 }
 
-TEST(ParserA29, DirectionPersistsAcrossPorts) {
+TEST(InterfaceDeclParsing, DirectionPersistsAcrossPorts) {
   auto r = Parse(
       "interface bus;\n"
       "  logic a, b, c, d;\n"
@@ -51,7 +51,7 @@ TEST(ParserA29, DirectionPersistsAcrossPorts) {
   EXPECT_EQ(mp->ports[3].direction, Direction::kOutput);
 }
 
-TEST(ParserSection25, ModportImportWithDirectionFirst) {
+TEST(InterfaceParsing, ModportImportWithDirectionFirst) {
   auto r = Parse(
       "interface bus;\n"
       "  logic data;\n"
@@ -109,7 +109,7 @@ TEST(Parser, ModportMultipleGroups) {
   EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
 }
 
-TEST(ParserClause03, Cl3_13_InterfaceWithModports) {
+TEST(DesignBuildingBlockParsing, InterfaceWithModports) {
   auto r = Parse(
       "interface bus_if;\n"
       "  logic [7:0] data;\n"
@@ -127,7 +127,7 @@ TEST(ParserClause03, Cl3_13_InterfaceWithModports) {
   EXPECT_EQ(ifc->modports[1]->name, "slave");
 }
 
-TEST(ParserAnnexA, A1InterfaceDecl) {
+TEST(FormalSyntaxParsing, InterfaceDecl) {
   auto r = Parse(
       "interface bus_if;\n"
       "  logic [7:0] data;\n"
@@ -141,7 +141,7 @@ TEST(ParserAnnexA, A1InterfaceDecl) {
   EXPECT_EQ(r.cu->interfaces[0]->modports.size(), 2u);
 }
 
-TEST(ParserA29, AllFourDirections) {
+TEST(InterfaceDeclParsing, AllFourDirections) {
   auto r = Parse(
       "interface bus;\n"
       "  logic a, b, c;\n"
@@ -158,7 +158,7 @@ TEST(ParserA29, AllFourDirections) {
   EXPECT_EQ(mp->ports[3].direction, Direction::kRef);
 }
 
-TEST(ParserA29, ModportDeclHasSourceLoc) {
+TEST(InterfaceDeclParsing, ModportDeclHasSourceLoc) {
   auto r = Parse(
       "interface bus;\n"
       "  logic a;\n"

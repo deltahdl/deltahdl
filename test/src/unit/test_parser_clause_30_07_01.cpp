@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA24, PulseControlSpecparamRejectOnly) {
+TEST(DeclarationAssignmentParsing, PulseControlSpecparamRejectOnly) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -15,7 +15,7 @@ TEST(ParserA24, PulseControlSpecparamRejectOnly) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA24, PulseControlSpecparamRejectAndError) {
+TEST(DeclarationAssignmentParsing, PulseControlSpecparamRejectAndError) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -26,7 +26,7 @@ TEST(ParserA24, PulseControlSpecparamRejectAndError) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA24, PulseControlSpecparamPathSpecific) {
+TEST(DeclarationAssignmentParsing, PulseControlSpecparamPathSpecific) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -37,7 +37,7 @@ TEST(ParserA24, PulseControlSpecparamPathSpecific) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA24, PulseControlSpecparamModuleLevel) {
+TEST(DeclarationAssignmentParsing, PulseControlSpecparamModuleLevel) {
   auto r = Parse(
       "module m;\n"
       "  specparam PATHPULSE$ = (2, 5);\n"
@@ -46,7 +46,7 @@ TEST(ParserA24, PulseControlSpecparamModuleLevel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA24, LimitValueMintypmax) {
+TEST(DeclarationAssignmentParsing, LimitValueMintypmax) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

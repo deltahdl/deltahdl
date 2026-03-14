@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, PassGateTran) {
+TEST(GateLevelModelingParsing, PassGateTran) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  tran (a, b);\n"

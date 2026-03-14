@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection8, ClassWithProperties) {
+TEST(ClassParsing, ClassWithProperties) {
   auto r = Parse(
       "class Packet;\n"
       "  int header;\n"
@@ -21,7 +21,7 @@ TEST(ParserSection8, ClassWithProperties) {
   }
 }
 
-TEST(ParserA85, PropertyAccessDotNotation) {
+TEST(LvalueParsing, PropertyAccessDotNotation) {
   auto r = Parse(
       "class Packet;\n"
       "  int command;\n"
@@ -49,7 +49,7 @@ TEST(ParserA85, PropertyAccessDotNotation) {
   EXPECT_EQ(cls->members[1]->name, "address");
 }
 
-TEST(ParserA85, VariousPropertyDataTypes) {
+TEST(LvalueParsing, VariousPropertyDataTypes) {
   ParseOk(
       "class C;\n"
       "  int i;\n"
@@ -67,7 +67,7 @@ TEST(ParserA85, VariousPropertyDataTypes) {
       "endclass\n");
 }
 
-TEST(ParserA85, ParameterizedClassWithValueParam) {
+TEST(LvalueParsing, ParameterizedClassWithValueParam) {
   auto r = Parse(
       "class vector #(parameter width = 7);\n"
       "  bit [width:0] data;\n"
@@ -80,7 +80,7 @@ TEST(ParserA85, ParameterizedClassWithValueParam) {
   EXPECT_EQ(cls->params[0].first, "width");
 }
 
-TEST(ParserA85, ParameterAccessViaScope) {
+TEST(LvalueParsing, ParameterAccessViaScope) {
   ParseOk(
       "class vector #(parameter width = 7, type T = int);\n"
       "  T data;\n"
@@ -95,7 +95,7 @@ TEST(ParserA85, ParameterAccessViaScope) {
       "endmodule\n");
 }
 
-TEST(ParserSection8, MultiplePropertiesCommaSeparated) {
+TEST(ClassParsing, MultiplePropertiesCommaSeparated) {
   auto r = Parse(
       "class MyClass;\n"
       "  int a, b, c;\n"
@@ -110,7 +110,7 @@ TEST(ParserSection8, MultiplePropertiesCommaSeparated) {
   }
 }
 
-TEST(ParserClause03, Cl3_13_ClassScopeMembers) {
+TEST(DesignBuildingBlockParsing, ClassScopeMembers) {
   auto r = Parse(
       "class my_cls;\n"
       "  int data;\n"

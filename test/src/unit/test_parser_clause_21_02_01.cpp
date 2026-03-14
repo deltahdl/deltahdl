@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, DisplayInAlwaysBlock) {
+TEST(IoSystemTaskParsing, DisplayInAlwaysBlock) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  reg clk;\n"
@@ -14,7 +14,7 @@ TEST(ParserSection21, DisplayInAlwaysBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserSection4, Sec4_5_DisplaySystemCall) {
+TEST(SchedulingSemanticsParsing, DisplaySystemCall) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -31,7 +31,7 @@ TEST(ParserSection4, Sec4_5_DisplaySystemCall) {
   EXPECT_EQ(stmt->expr->callee, "$display");
 }
 
-TEST(ParserSection11, SystemCallEmptyArgs) {
+TEST(OperatorAndExpressionParsing, SystemCallEmptyArgs) {
   auto r = Parse(
       "module t;\n"
       "  initial $display(5,,2,,3);\n"
@@ -40,7 +40,7 @@ TEST(ParserSection11, SystemCallEmptyArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, SystemCallLeadingEmptyArg) {
+TEST(OperatorAndExpressionParsing, SystemCallLeadingEmptyArg) {
   auto r = Parse(
       "module t;\n"
       "  initial $display(,\"hello\");\n"
@@ -49,7 +49,7 @@ TEST(ParserSection11, SystemCallLeadingEmptyArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection21, DisplayParsesAsSystemCall) {
+TEST(IoSystemTaskParsing, DisplayParsesAsSystemCall) {
   auto r = Parse(
       "module t;\n"
       "  initial $display(\"hello\");\n"
@@ -63,42 +63,42 @@ TEST(ParserSection21, DisplayParsesAsSystemCall) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ParserSection21, DisplayBasicCall) {
+TEST(IoSystemTaskParsing, DisplayBasicCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $display(\"hello\");\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection21, DisplayNoArgs) {
+TEST(IoSystemTaskParsing, DisplayNoArgs) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $display;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection21, DisplayMultipleArgs) {
+TEST(IoSystemTaskParsing, DisplayMultipleArgs) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $display(\"x=%d y=%h\", x, y);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection21, WriteBasicCall) {
+TEST(IoSystemTaskParsing, WriteBasicCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $write(\"no newline\");\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection21, WriteNoArgs) {
+TEST(IoSystemTaskParsing, WriteNoArgs) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $write;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection21, DisplaybHexOctal) {
+TEST(IoSystemTaskParsing, DisplaybHexOctal) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -109,7 +109,7 @@ TEST(ParserSection21, DisplaybHexOctal) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, WritebHexOctal) {
+TEST(IoSystemTaskParsing, WritebHexOctal) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"

@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh49, ContinuousAssignmentAsProcessAndEvent) {
+TEST(AssignmentSchedulingSim, ContinuousAssignmentAsProcessAndEvent) {
   Arena arena;
   Scheduler sched(arena);
   int src = 0;
@@ -32,7 +32,7 @@ TEST(SimCh49, ContinuousAssignmentAsProcessAndEvent) {
   EXPECT_EQ(dst, 5);
 }
 
-TEST(SimCh49, ProceduralContinuousAssignmentAsProcessAndEvent) {
+TEST(AssignmentSchedulingSim, ProceduralContinuousAssignmentAsProcessAndEvent) {
   Arena arena;
   Scheduler sched(arena);
   int forced_val = 0;
@@ -60,7 +60,7 @@ TEST(SimCh49, ProceduralContinuousAssignmentAsProcessAndEvent) {
   EXPECT_FALSE(force_active);
 }
 
-TEST(SimCh49, BlockingAssignmentAsProcessAndEvent) {
+TEST(AssignmentSchedulingSim, BlockingAssignmentAsProcessAndEvent) {
   Arena arena;
   Scheduler sched(arena);
   int result = 0;
@@ -87,7 +87,7 @@ TEST(SimCh49, BlockingAssignmentAsProcessAndEvent) {
   EXPECT_EQ(resume_time.ticks, 2u);
 }
 
-TEST(SimCh49, BlockingAssignmentZeroDelaySchedulesInactive) {
+TEST(AssignmentSchedulingSim, BlockingAssignmentZeroDelaySchedulesInactive) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -116,7 +116,7 @@ TEST(SimCh49, BlockingAssignmentZeroDelaySchedulesInactive) {
   EXPECT_EQ(order[1], "inactive");
 }
 
-TEST(SimCh49, NonblockingAssignmentAsNBAEvent) {
+TEST(AssignmentSchedulingSim, NonblockingAssignmentAsNBAEvent) {
   Arena arena;
   Scheduler sched(arena);
   int a = 0;
@@ -144,7 +144,7 @@ TEST(SimCh49, NonblockingAssignmentAsNBAEvent) {
   EXPECT_EQ(b, 2);
 }
 
-TEST(SimCh49, SwitchProcessingAsActiveEvents) {
+TEST(AssignmentSchedulingSim, SwitchProcessingAsActiveEvents) {
   Arena arena;
   Scheduler sched(arena);
   int node_a = 0;
@@ -165,7 +165,7 @@ TEST(SimCh49, SwitchProcessingAsActiveEvents) {
   EXPECT_EQ(node_b, 1);
 }
 
-TEST(SimCh49, PortConnectionAsImplicitContinuousAssignment) {
+TEST(AssignmentSchedulingSim, PortConnectionAsImplicitContinuousAssignment) {
   Arena arena;
   Scheduler sched(arena);
   int outside_sig = 0;
@@ -187,7 +187,7 @@ TEST(SimCh49, PortConnectionAsImplicitContinuousAssignment) {
   EXPECT_EQ(local_input, 7);
 }
 
-TEST(SimCh49, SubroutineArgumentPassingAsBlockingAssignment) {
+TEST(AssignmentSchedulingSim, SubroutineArgumentPassingAsBlockingAssignment) {
   Arena arena;
   Scheduler sched(arena);
   int caller_arg = 10;
@@ -209,7 +209,7 @@ TEST(SimCh49, SubroutineArgumentPassingAsBlockingAssignment) {
   EXPECT_EQ(caller_out, 15);
 }
 
-TEST(SimCh49, AllAssignmentTypesUseSchedulerInfrastructure) {
+TEST(AssignmentSchedulingSim, AllAssignmentTypesUseSchedulerInfrastructure) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> executed;
@@ -226,7 +226,7 @@ TEST(SimCh49, AllAssignmentTypesUseSchedulerInfrastructure) {
   EXPECT_EQ(executed.size(), 7u);
 }
 
-TEST(SimCh49, AssignmentOrderingFollowsRegionOrdering) {
+TEST(AssignmentSchedulingSim, AssignmentOrderingFollowsRegionOrdering) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;

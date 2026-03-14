@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, UnconnectedDrivePull1) {
+TEST(CompilerDirectiveParsing, UnconnectedDrivePull1) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`unconnected_drive pull1\n"
                               "module t;\n"
@@ -12,7 +12,7 @@ TEST(ParserSection22, UnconnectedDrivePull1) {
                               "`nounconnected_drive\n"));
 }
 
-TEST(ParserSection22, UnconnectedDrivePull0) {
+TEST(CompilerDirectiveParsing, UnconnectedDrivePull0) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`unconnected_drive pull0\n"
                               "module t;\n"
@@ -20,21 +20,21 @@ TEST(ParserSection22, UnconnectedDrivePull0) {
                               "`nounconnected_drive\n"));
 }
 
-TEST(ParserSection22, UnconnectedDrive_NoPairing) {
+TEST(CompilerDirectiveParsing, UnconnectedDrive_NoPairing) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`unconnected_drive pull1\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, NounconnectedDrive_Standalone) {
+TEST(CompilerDirectiveParsing, NounconnectedDrive_Standalone) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`nounconnected_drive\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, UnconnectedDrive_MultipleModules) {
+TEST(CompilerDirectiveParsing, UnconnectedDrive_MultipleModules) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`unconnected_drive pull0\n"
                               "module a;\n"
@@ -44,7 +44,7 @@ TEST(ParserSection22, UnconnectedDrive_MultipleModules) {
                               "`nounconnected_drive\n"));
 }
 
-TEST(ParserSection22, UnconnectedDrive_Supersede) {
+TEST(CompilerDirectiveParsing, UnconnectedDrive_Supersede) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`unconnected_drive pull0\n"
                               "module a;\n"
@@ -55,14 +55,14 @@ TEST(ParserSection22, UnconnectedDrive_Supersede) {
                               "`nounconnected_drive\n"));
 }
 
-TEST(ParserSection22, UnconnectedDrive_InsideModule_Error) {
+TEST(CompilerDirectiveParsing, UnconnectedDrive_InsideModule_Error) {
   EXPECT_FALSE(
       ParseWithPreprocessorOk("module t;\n"
                               "`unconnected_drive pull0\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, NounconnectedDrive_InsideModule_Error) {
+TEST(CompilerDirectiveParsing, NounconnectedDrive_InsideModule_Error) {
   EXPECT_FALSE(
       ParseWithPreprocessorOk("module t;\n"
                               "`nounconnected_drive\n"

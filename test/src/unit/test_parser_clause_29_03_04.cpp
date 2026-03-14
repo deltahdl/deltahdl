@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA051, SimUnmatchedInputsX) {
+TEST(UdpDeclGrammar, SimUnmatchedInputsX) {
   auto r = Parse(
       "primitive partial(output out, input a, input b);\n"
       "  table\n"
@@ -25,7 +25,7 @@ TEST(ParserAnnexA051, SimUnmatchedInputsX) {
   EXPECT_EQ(state.Evaluate({'1', '0'}), 'x');
 }
 
-TEST(ParserAnnexA053, SeqBody_WithoutInitial) {
+TEST(UdpBodyGrammar, SeqBody_WithoutInitial) {
   auto r = Parse(
       "primitive latch_noinit(output reg q, input d, en);\n"
       "  table\n"
@@ -42,7 +42,7 @@ TEST(ParserAnnexA053, SeqBody_WithoutInitial) {
   EXPECT_EQ(udp->table.size(), 3);
 }
 
-TEST(ParserAnnexA053, SeqEntry_ThreeFields) {
+TEST(UdpBodyGrammar, SeqEntry_ThreeFields) {
   auto r = Parse(
       "primitive srff(output reg q, input s, r);\n"
       "  table\n"
@@ -68,7 +68,7 @@ TEST(ParserAnnexA053, SeqEntry_ThreeFields) {
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
-TEST(ParserAnnexA053, LevelInputList_Single) {
+TEST(UdpBodyGrammar, LevelInputList_Single) {
   auto r = Parse(
       "primitive inv(output y, input a);\n"
       "  table\n"
@@ -82,7 +82,7 @@ TEST(ParserAnnexA053, LevelInputList_Single) {
   EXPECT_EQ(udp->table[0].inputs[0], '0');
 }
 
-TEST(ParserAnnexA053, EdgeInputList_LeadingLevel) {
+TEST(UdpBodyGrammar, EdgeInputList_LeadingLevel) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
       "  table\n"
@@ -97,7 +97,7 @@ TEST(ParserAnnexA053, EdgeInputList_LeadingLevel) {
   EXPECT_EQ(udp->table[0].inputs[1], 'r');
 }
 
-TEST(ParserSection29, SequentialCurrentStateField) {
+TEST(UserDefinedPrimitiveParsing, SequentialCurrentStateField) {
   auto r = Parse(
       "primitive srff(output reg q, input s, r);\n"
       "  table\n"
@@ -149,7 +149,7 @@ static void VerifySeqUdpTable(const UdpDecl* udp, const SeqUdpRow expected[],
   }
 }
 
-TEST(ParserSection29, SequentialUdp) {
+TEST(UserDefinedPrimitiveParsing, SequentialUdp) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
       "  table\n"

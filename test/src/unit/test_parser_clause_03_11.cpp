@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_11_ModuleInstantiatesModule) {
+TEST(DesignBuildingBlockParsing, ModuleInstantiatesModule) {
   auto r = Parse(
       "module sub; endmodule\n"
       "module top;\n"
@@ -17,7 +17,7 @@ TEST(ParserClause03, Cl3_11_ModuleInstantiatesModule) {
       HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
 }
 
-TEST(ParserClause03, Cl3_11_ModuleInstantiatesPrimitive) {
+TEST(DesignBuildingBlockParsing, ModuleInstantiatesPrimitive) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire a, b, y;\n"
@@ -25,7 +25,7 @@ TEST(ParserClause03, Cl3_11_ModuleInstantiatesPrimitive) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_11_ModuleInstantiatesInterface) {
+TEST(DesignBuildingBlockParsing, ModuleInstantiatesInterface) {
   EXPECT_TRUE(
       ParseOk("interface ifc; logic req; endinterface\n"
               "module m;\n"
@@ -33,7 +33,7 @@ TEST(ParserClause03, Cl3_11_ModuleInstantiatesInterface) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_11_PortConnections) {
+TEST(DesignBuildingBlockParsing, PortConnections) {
   auto r = Parse(
       "module sub(input logic a, output logic b);\n"
       "  assign b = a;\n"
@@ -50,7 +50,7 @@ TEST(ParserClause03, Cl3_11_PortConnections) {
   EXPECT_FALSE(inst->inst_ports.empty());
 }
 
-TEST(ParserClause03, Cl3_11_TopMux2to1Example) {
+TEST(DesignBuildingBlockParsing, TopMux2to1Example) {
   auto r = Parse(
       "module mux2to1 (input wire a, b, sel,\n"
       "                output logic y);\n"
@@ -72,14 +72,14 @@ TEST(ParserClause03, Cl3_11_TopMux2to1Example) {
       HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
 }
 
-TEST(ParserClause03, Cl3_11_MultipleLevelsOfHierarchy) {
+TEST(DesignBuildingBlockParsing, MultipleLevelsOfHierarchy) {
   EXPECT_TRUE(
       ParseOk("module leaf; endmodule\n"
               "module mid; leaf u0(); endmodule\n"
               "module top; mid u0(); endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_11_MultipleTopLevelModules) {
+TEST(DesignBuildingBlockParsing, MultipleTopLevelModules) {
   auto r = Parse(
       "module top_a; endmodule\n"
       "module top_b; endmodule\n");

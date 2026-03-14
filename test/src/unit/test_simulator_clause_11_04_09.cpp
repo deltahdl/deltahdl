@@ -80,7 +80,7 @@ TEST(EvalOpXZ, ReductionXorWithX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(SimA83, ReductionAnd) {
+TEST(ExpressionSim, ReductionAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -97,7 +97,7 @@ TEST(SimA83, ReductionAnd) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA83, ReductionOr) {
+TEST(ExpressionSim, ReductionOr) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -114,7 +114,7 @@ TEST(SimA83, ReductionOr) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimA86, UnaryReductionAnd) {
+TEST(OperatorSim, UnaryReductionAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -131,7 +131,7 @@ TEST(SimA86, UnaryReductionAnd) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, UnaryReductionNand) {
+TEST(OperatorSim, UnaryReductionNand) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -148,7 +148,7 @@ TEST(SimA86, UnaryReductionNand) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimA86, UnaryReductionOr) {
+TEST(OperatorSim, UnaryReductionOr) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -165,7 +165,7 @@ TEST(SimA86, UnaryReductionOr) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimA86, UnaryReductionNor) {
+TEST(OperatorSim, UnaryReductionNor) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -182,7 +182,7 @@ TEST(SimA86, UnaryReductionNor) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, UnaryReductionXor) {
+TEST(OperatorSim, UnaryReductionXor) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -200,7 +200,7 @@ TEST(SimA86, UnaryReductionXor) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimA86, UnaryReductionXnor) {
+TEST(OperatorSim, UnaryReductionXnor) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -218,7 +218,7 @@ TEST(SimA86, UnaryReductionXnor) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, UnaryReductionXnorAlt) {
+TEST(OperatorSim, UnaryReductionXnorAlt) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarBodyDirectAssign) {
+TEST(ProcessParsing, AlwaysStarBodyDirectAssign) {
   auto r = Parse(
       "module m;\n"
       "  always @* x = a ^ b;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarBodyDirectAssign) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserA605, EventControlAtStar) {
+TEST(TimingControlSyntaxParsing, EventControlAtStar) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -32,7 +32,7 @@ TEST(ParserA605, EventControlAtStar) {
   EXPECT_TRUE(stmt->is_star_event);
 }
 
-TEST(ParserA605, EventControlAtStarParen) {
+TEST(TimingControlSyntaxParsing, EventControlAtStarParen) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -47,7 +47,7 @@ TEST(ParserA605, EventControlAtStarParen) {
   EXPECT_TRUE(stmt->is_star_event);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarBeginEndBlock) {
+TEST(ProcessParsing, AlwaysStarBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  always @* begin\n"
@@ -65,7 +65,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarParenBeginEndBlock) {
+TEST(ProcessParsing, AlwaysStarParenBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  always @(*) begin\n"
@@ -82,7 +82,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarParenBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarIfElse) {
+TEST(ProcessParsing, AlwaysStarIfElse) {
   auto r = Parse(
       "module m;\n"
       "  always @*\n"
@@ -100,7 +100,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarIfElse) {
   EXPECT_NE(item->body->else_branch, nullptr);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarCaseStatement) {
+TEST(ProcessParsing, AlwaysStarCaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  always @*\n"
@@ -120,7 +120,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarCaseStatement) {
   EXPECT_GE(item->body->case_items.size(), 3u);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarComplexLogic) {
+TEST(ProcessParsing, AlwaysStarComplexLogic) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] a, b, c, y;\n"
@@ -137,7 +137,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarComplexLogic) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection9, StarEventBareAlways) {
+TEST(ProcessParsing, StarEventBareAlways) {
   auto r = Parse(
       "module m;\n"
       "  always @* a = b;\n"
@@ -150,7 +150,7 @@ TEST(ParserSection9, StarEventBareAlways) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, StarEventParenAlways) {
+TEST(ProcessParsing, StarEventParenAlways) {
   auto r = Parse(
       "module m;\n"
       "  always @(*) begin a = b; end\n"
@@ -163,7 +163,7 @@ TEST(ParserSection9, StarEventParenAlways) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection9, StarEventBareStmt) {
+TEST(ProcessParsing, StarEventBareStmt) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -178,7 +178,7 @@ TEST(ParserSection9, StarEventBareStmt) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-TEST(ParserSection9, StarEventParenStmt) {
+TEST(ProcessParsing, StarEventParenStmt) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

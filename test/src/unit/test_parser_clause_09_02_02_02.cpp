@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, AlwaysConstruct_AlwaysComb) {
+TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_AlwaysComb) {
   auto r = Parse(
       "module m;\n"
       "  always_comb y = a & b;\n"
@@ -18,7 +18,7 @@ TEST(ParserA602, AlwaysConstruct_AlwaysComb) {
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
 }
 
-TEST(ParserSection9, Sec9_2_2_NestedIfElseAndCase) {
+TEST(ProcessParsing, NestedIfElseAndCase) {
   auto r = Parse(
       "module m;\n"
       "  logic mode;\n"
@@ -49,7 +49,7 @@ TEST(ParserSection9, Sec9_2_2_NestedIfElseAndCase) {
   EXPECT_EQ(stmt->then_branch->stmts[0]->kind, StmtKind::kCase);
 }
 
-TEST(ParserSection9, Sec9_2_2_ForLoop) {
+TEST(ProcessParsing, ForLoop) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] data_in [0:3];\n"
@@ -68,7 +68,7 @@ TEST(ParserSection9, Sec9_2_2_ForLoop) {
   EXPECT_NE(stmt->for_body, nullptr);
 }
 
-TEST(ParserSection9, Sec9_3_1_BlockInAlwaysComb) {
+TEST(ProcessParsing, BlockInAlwaysComb) {
   auto r = Parse(
       "module m;\n"
       "  always_comb begin\n"
@@ -86,7 +86,7 @@ TEST(ParserSection9, Sec9_3_1_BlockInAlwaysComb) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombMultipleAssigns) {
+TEST(ProcessParsing, AlwaysCombMultipleAssigns) {
   auto r = Parse(
       "module m;\n"
       "  always_comb begin\n"
@@ -98,7 +98,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombMultipleAssigns) {
   VerifyAlwaysMultiAssigns(r);
 }
 
-TEST(ParserSection9, Sec9_2_2_MultipleAssignments) {
+TEST(ProcessParsing, MultipleAssignments) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, c, x, y, z;\n"
@@ -120,7 +120,7 @@ TEST(ParserSection9, Sec9_2_2_MultipleAssignments) {
   }
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombNestedIfElseInBlock) {
+TEST(ProcessParsing, AlwaysCombNestedIfElseInBlock) {
   auto r = Parse(
       "module m;\n"
       "  always_comb begin\n"
@@ -134,7 +134,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombNestedIfElseInBlock) {
   VerifyAlwaysNestedIfElse(r);
 }
 
-TEST(ParserSection4, Sec4_6_AlwaysCombWithCaseInside) {
+TEST(SchedulingSemanticsParsing, AlwaysCombWithCaseInside) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -159,7 +159,7 @@ TEST(ParserSection4, Sec4_6_AlwaysCombWithCaseInside) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kCase);
 }
 
-TEST(ParserSection9, Sec9_2_2_MultipleAlwaysCombBlocks) {
+TEST(ProcessParsing, MultipleAlwaysCombBlocks) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, x, y;\n"
@@ -178,7 +178,7 @@ TEST(ParserSection9, Sec9_2_2_MultipleAlwaysCombBlocks) {
   ASSERT_NE(second->body, nullptr);
 }
 
-TEST(ParserSection9, Sec9_2_2_ArrayIndexing) {
+TEST(ProcessParsing, ArrayIndexing) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] mem [0:15];\n"
@@ -196,7 +196,7 @@ TEST(ParserSection9, Sec9_2_2_ArrayIndexing) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysComb) {
+TEST(DataTypeParsing, VarDrivenByAlwaysComb) {
   auto r = Parse(
       "module t;\n"
       "  logic a, y;\n"
@@ -215,7 +215,7 @@ TEST(ParserSection6, Sec6_5_VarDrivenByAlwaysComb) {
   EXPECT_TRUE(found_comb);
 }
 
-TEST(ParserSection4, Sec4_6_AlwaysCombMultipleOutputs) {
+TEST(SchedulingSemanticsParsing, AlwaysCombMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, sum, carry;\n"
@@ -234,7 +234,7 @@ TEST(ParserSection4, Sec4_6_AlwaysCombMultipleOutputs) {
   EXPECT_GE(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserSection9, Sec9_2_2_ParseOkComplexMuxPattern) {
+TEST(ProcessParsing, ParseOkComplexMuxPattern) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic [3:0] sel;\n"
@@ -250,7 +250,7 @@ TEST(ParserSection9, Sec9_2_2_ParseOkComplexMuxPattern) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombAlwaysKind) {
+TEST(ProcessParsing, AlwaysCombAlwaysKind) {
   auto r = Parse(
       "module m;\n"
       "  always_comb a = b & c;\n"
@@ -262,7 +262,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombAlwaysKind) {
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
 }
 
-TEST(ParserSection4, Sec4_5_AlwaysComb) {
+TEST(SchedulingSemanticsParsing, AlwaysComb) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -277,7 +277,7 @@ TEST(ParserSection4, Sec4_5_AlwaysComb) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombBodyDirectAssign) {
+TEST(ProcessParsing, AlwaysCombBodyDirectAssign) {
   auto r = Parse(
       "module m;\n"
       "  always_comb x = a ^ b;\n"
@@ -290,7 +290,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombBodyDirectAssign) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombBeginEndBlock) {
+TEST(ProcessParsing, AlwaysCombBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  always_comb begin\n"
@@ -308,7 +308,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserSection9, Sec9_2_2_PriorityEncoderPattern) {
+TEST(ProcessParsing, PriorityEncoderPattern) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] req;\n"
@@ -345,7 +345,7 @@ TEST(ParserSection9, Sec9_2_2_PriorityEncoderPattern) {
   EXPECT_EQ(item->body->stmts[2]->kind, StmtKind::kIf);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombIfElse) {
+TEST(ProcessParsing, AlwaysCombIfElse) {
   auto r = Parse(
       "module m;\n"
       "  always_comb\n"
@@ -363,7 +363,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombIfElse) {
   EXPECT_NE(item->body->else_branch, nullptr);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombCaseStatement) {
+TEST(ProcessParsing, AlwaysCombCaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  always_comb\n"
@@ -383,7 +383,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombCaseStatement) {
   EXPECT_GE(item->body->case_items.size(), 3u);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysCombComplexLogic) {
+TEST(ProcessParsing, AlwaysCombComplexLogic) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] a, b, c, y;\n"
@@ -400,7 +400,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysCombComplexLogic) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection9, Sec9_2_2_SimpleBlockingAssign) {
+TEST(ProcessParsing, SimpleBlockingAssign) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, c;\n"
@@ -416,7 +416,7 @@ TEST(ParserSection9, Sec9_2_2_SimpleBlockingAssign) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, Sec9_2_2_BeginEndBlock) {
+TEST(ProcessParsing, BeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, x, y;\n"
@@ -437,7 +437,7 @@ TEST(ParserSection9, Sec9_2_2_BeginEndBlock) {
   EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9c, AlwaysCombBeginEnd) {
+TEST(ProcessTimingAndControlParsing, AlwaysCombBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, c, y;\n"
@@ -456,7 +456,7 @@ TEST(ParserSection9c, AlwaysCombBeginEnd) {
   EXPECT_GE(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserSection9c, AlwaysCombWithIf) {
+TEST(ProcessTimingAndControlParsing, AlwaysCombWithIf) {
   auto r = Parse(
       "module m;\n"
       "  logic sel, a, b, y;\n"
@@ -473,7 +473,7 @@ TEST(ParserSection9c, AlwaysCombWithIf) {
   EXPECT_EQ(item->body->kind, StmtKind::kIf);
 }
 
-TEST(ParserSection9c, AlwaysCombCaseStatement) {
+TEST(ProcessTimingAndControlParsing, AlwaysCombCaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -493,7 +493,7 @@ TEST(ParserSection9c, AlwaysCombCaseStatement) {
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kCase);
 }
-TEST(ParserSection9, AlwaysComb) {
+TEST(ProcessParsing, AlwaysComb) {
   auto r = Parse(
       "module m;\n"
       "  always_comb a = b & c;\n"
@@ -510,7 +510,7 @@ static ModuleItem* NthItem(ParseResult& r, size_t n) {
   return r.cu->modules[0]->items[n];
 }
 
-TEST(ParserSection7, Sec7_2_2_AssignInAlwaysComb) {
+TEST(AggregateTypeParsing, AssignInAlwaysComb) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { logic a; logic b; } pair_t;\n"
@@ -530,7 +530,7 @@ TEST(ParserSection7, Sec7_2_2_AssignInAlwaysComb) {
   EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysCombBlock);
 }
 
-TEST(ParserSection4, Sec4_6_AlwaysCombCombinational) {
+TEST(SchedulingSemanticsParsing, AlwaysCombCombinational) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, y;\n"

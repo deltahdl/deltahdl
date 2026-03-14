@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0411, BasicModuleInst) {
+TEST(ModuleInstantiationGrammar, BasicModuleInst) {
   auto r = Parse("module m; sub u0(a, b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserAnnexA0411, BasicModuleInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-TEST(ParserAnnexA0411, MultipleHierarchicalInstances) {
+TEST(ModuleInstantiationGrammar, MultipleHierarchicalInstances) {
   auto r = Parse("module m; sub u0(a), u1(b), u2(c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -34,7 +34,7 @@ TEST(ParserAnnexA0411, MultipleHierarchicalInstances) {
   EXPECT_EQ(i2->inst_name, "u2");
 }
 
-TEST(ParserAnnexA0411, MultipleInstancesWithParams) {
+TEST(ModuleInstantiationGrammar, MultipleInstancesWithParams) {
   auto r = Parse("module m; sub #(8) u0(a), u1(b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -47,7 +47,7 @@ TEST(ParserAnnexA0411, MultipleInstancesWithParams) {
   EXPECT_EQ(i1->inst_params.size(), 1u);
 }
 
-TEST(ParserAnnexA0411, EmptyParameterValueAssignment) {
+TEST(ModuleInstantiationGrammar, EmptyParameterValueAssignment) {
   auto r = Parse("module m; sub #() u0(a); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -56,7 +56,7 @@ TEST(ParserAnnexA0411, EmptyParameterValueAssignment) {
   EXPECT_EQ(item->inst_params.size(), 0u);
 }
 
-TEST(ParserAnnexA0411, FullCombination) {
+TEST(ModuleInstantiationGrammar, FullCombination) {
   auto r = Parse(
       "module m;\n"
       "  sub #(.W(8)) u0[3:0](.clk(clk), .*);\n"
@@ -74,7 +74,7 @@ TEST(ParserAnnexA0411, FullCombination) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
-TEST(ParserAnnexA0411, MultipleInstancesSharedParams) {
+TEST(ModuleInstantiationGrammar, MultipleInstancesSharedParams) {
   auto r = Parse(
       "module sub #(parameter W = 1)(input [W-1:0] d);\n"
       "endmodule\n"
@@ -94,7 +94,7 @@ TEST(ParserAnnexA0411, MultipleInstancesSharedParams) {
   EXPECT_EQ(i1->inst_params[0].first, "W");
 }
 
-TEST(ParserAnnexA0412, InterfaceInstEmptyParam) {
+TEST(InterfaceInstantiationGrammar, InterfaceInstEmptyParam) {
   auto r = Parse("module m; my_if #() u0(.a(a)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -103,7 +103,7 @@ TEST(ParserAnnexA0412, InterfaceInstEmptyParam) {
   EXPECT_TRUE(item->inst_params.empty());
 }
 
-TEST(ParserAnnexA0413, ProgramInstEmptyParam) {
+TEST(ProgramInstantiationGrammar, ProgramInstEmptyParam) {
   auto r = Parse(
       "program my_prog(input logic clk);\n"
       "endprogram\n"
@@ -114,7 +114,7 @@ TEST(ParserAnnexA0413, ProgramInstEmptyParam) {
   EXPECT_EQ(item->inst_module, "my_prog");
   EXPECT_TRUE(item->inst_params.empty());
 }
-TEST(ParserSection23, InstanceArraySingle) {
+TEST(ModuleAndHierarchyParsing, InstanceArraySingle) {
   auto r = Parse(
       "module top;\n"
       "  sub inst[8] (.a(a));\n"
@@ -128,7 +128,7 @@ TEST(ParserSection23, InstanceArraySingle) {
   EXPECT_EQ(item->inst_range_right, nullptr);
 }
 
-TEST(ParserSection23, ModuleInstanceEmptyPorts) {
+TEST(ModuleAndHierarchyParsing, ModuleInstanceEmptyPorts) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 ();\n"

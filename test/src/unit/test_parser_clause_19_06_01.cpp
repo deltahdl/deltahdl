@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CoverCross_WithBody) {
+TEST(CovergroupDeclParsing, CoverCross_WithBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -17,7 +17,7 @@ TEST(ParserA211, CoverCross_WithBody) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CrossBody_WithItems) {
+TEST(CovergroupDeclParsing, CrossBody_WithItems) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -30,7 +30,7 @@ TEST(ParserA211, CrossBody_WithItems) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CrossBodyItem_BinsSelection) {
+TEST(CovergroupDeclParsing, CrossBodyItem_BinsSelection) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -43,7 +43,7 @@ TEST(ParserA211, CrossBodyItem_BinsSelection) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, BinsSelectionOrOption_BinsSelection) {
+TEST(CovergroupDeclParsing, BinsSelectionOrOption_BinsSelection) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -56,7 +56,7 @@ TEST(ParserA211, BinsSelectionOrOption_BinsSelection) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, BinsSelection_Basic) {
+TEST(CovergroupDeclParsing, BinsSelection_Basic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -69,7 +69,7 @@ TEST(ParserA211, BinsSelection_Basic) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, BinsSelection_WithIff) {
+TEST(CovergroupDeclParsing, BinsSelection_WithIff) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -82,7 +82,7 @@ TEST(ParserA211, BinsSelection_WithIff) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, SelectExpression_SelectCondition) {
+TEST(CovergroupDeclParsing, SelectExpression_SelectCondition) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -95,7 +95,7 @@ TEST(ParserA211, SelectExpression_SelectCondition) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, SelectExpression_Negated) {
+TEST(CovergroupDeclParsing, SelectExpression_Negated) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -108,7 +108,7 @@ TEST(ParserA211, SelectExpression_Negated) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, SelectExpression_And) {
+TEST(CovergroupDeclParsing, SelectExpression_And) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -121,7 +121,7 @@ TEST(ParserA211, SelectExpression_And) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, SelectExpression_Or) {
+TEST(CovergroupDeclParsing, SelectExpression_Or) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -134,7 +134,7 @@ TEST(ParserA211, SelectExpression_Or) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, SelectExpression_Parenthesized) {
+TEST(CovergroupDeclParsing, SelectExpression_Parenthesized) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -147,7 +147,7 @@ TEST(ParserA211, SelectExpression_Parenthesized) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, SelectCondition_Binsof) {
+TEST(CovergroupDeclParsing, SelectCondition_Binsof) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -160,7 +160,7 @@ TEST(ParserA211, SelectCondition_Binsof) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, SelectCondition_BinsofIntersect) {
+TEST(CovergroupDeclParsing, SelectCondition_BinsofIntersect) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -173,7 +173,7 @@ TEST(ParserA211, SelectCondition_BinsofIntersect) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, BinsExpression_Variable) {
+TEST(CovergroupDeclParsing, BinsExpression_Variable) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -186,7 +186,7 @@ TEST(ParserA211, BinsExpression_Variable) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, BinsExpression_CoverPointDotBin) {
+TEST(CovergroupDeclParsing, BinsExpression_CoverPointDotBin) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -199,7 +199,7 @@ TEST(ParserA211, BinsExpression_CoverPointDotBin) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_CrossWithBinsSelection) {
+TEST(CovergroupDeclParsing, CoverGroup_CrossWithBinsSelection) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"

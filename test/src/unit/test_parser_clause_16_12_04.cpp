@@ -6,14 +6,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, PropertyExpr_Or) {
+TEST(AssertionDeclParsing, PropertyExpr_Or) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a or b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection16, Sec16_5_1_PropertyOr) {
+TEST(AssertionParsing, PropertyOr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (\n"
@@ -28,7 +28,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-TEST(ParserAnnexF, AnnexFPropertyOr) {
+TEST(AssertionSemanticsParsing, PropertyOr) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"
@@ -39,7 +39,7 @@ TEST(ParserAnnexF, AnnexFPropertyOr) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserSection16, PropertyDisjunction) {
+TEST(AssertionParsing, PropertyDisjunction) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"
@@ -49,7 +49,7 @@ TEST(ParserSection16, PropertyDisjunction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, PropertyDisjunctionAndConjunctionCombined) {
+TEST(AssertionParsing, PropertyDisjunctionAndConjunctionCombined) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"

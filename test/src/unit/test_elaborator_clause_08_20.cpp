@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA820, VirtualMethodOk) {
+TEST(VirtualMethodElaboration, VirtualMethodOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  virtual function void display(); endfunction\n"
@@ -14,7 +14,7 @@ TEST(ElabA820, VirtualMethodOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA820, VirtualOverrideOk) {
+TEST(VirtualMethodElaboration, VirtualOverrideOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  virtual function void display(); endfunction\n"
@@ -27,7 +27,7 @@ TEST(ElabA820, VirtualOverrideOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA820, InitialAndExtendsError) {
+TEST(VirtualMethodElaboration, InitialAndExtendsError) {
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  function :initial :extends void foo(); endfunction\n"
@@ -37,7 +37,7 @@ TEST(ElabA820, InitialAndExtendsError) {
              "endmodule\n"));
 }
 
-TEST(ElabA820, InitialOverridesVirtualError) {
+TEST(VirtualMethodElaboration, InitialOverridesVirtualError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  virtual function void f2(); endfunction\n"
@@ -50,7 +50,7 @@ TEST(ElabA820, InitialOverridesVirtualError) {
              "endmodule\n"));
 }
 
-TEST(ElabA820, ExtendsNoVirtualBaseError) {
+TEST(VirtualMethodElaboration, ExtendsNoVirtualBaseError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  function void f1(); endfunction\n"
@@ -63,7 +63,7 @@ TEST(ElabA820, ExtendsNoVirtualBaseError) {
              "endmodule\n"));
 }
 
-TEST(ElabA820, OverrideFinalError) {
+TEST(VirtualMethodElaboration, OverrideFinalError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  virtual function :final void f2(); endfunction\n"
@@ -76,7 +76,7 @@ TEST(ElabA820, OverrideFinalError) {
              "endmodule\n"));
 }
 
-TEST(ElabA820, InitialNonVirtualBaseOk) {
+TEST(VirtualMethodElaboration, InitialNonVirtualBaseOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  function void f1(); endfunction\n"
@@ -89,7 +89,7 @@ TEST(ElabA820, InitialNonVirtualBaseOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA820, ExtendsFinalOk) {
+TEST(VirtualMethodElaboration, ExtendsFinalOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  virtual function void f2(); endfunction\n"

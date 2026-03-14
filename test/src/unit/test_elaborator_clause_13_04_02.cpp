@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA26, ElabFunctionAutomaticLifetime) {
+TEST(FunctionDeclParsing, ElabFunctionAutomaticLifetime) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -20,7 +20,7 @@ TEST(ParserA26, ElabFunctionAutomaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elab1342, StaticFunctionElaborates) {
+TEST(FunctionBodyElaboration, StaticFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -35,7 +35,7 @@ TEST(Elab1342, StaticFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1342, StaticVarInAutoFuncElaborates) {
+TEST(FunctionBodyElaboration, StaticVarInAutoFuncElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -50,7 +50,7 @@ TEST(Elab1342, StaticVarInAutoFuncElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1342, AutoVarInStaticFuncElaborates) {
+TEST(FunctionBodyElaboration, AutoVarInStaticFuncElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -64,7 +64,7 @@ TEST(Elab1342, AutoVarInStaticFuncElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1342, DefaultLifetimeFuncElaborates) {
+TEST(FunctionBodyElaboration, DefaultLifetimeFuncElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

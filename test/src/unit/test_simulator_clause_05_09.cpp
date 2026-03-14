@@ -4,31 +4,31 @@ using namespace delta;
 
 namespace {
 
-TEST(SimClause05, Cl5_9_SingleCharValue) {
+TEST(LexicalConventionSim, SingleCharValue) {
   auto v =
       RunAndGet("module t;\n  byte c;\n  initial c = \"A\";\nendmodule\n", "c");
   EXPECT_EQ(v, 0x41u);
 }
 
-TEST(SimClause05, Cl5_9_MultiCharValue) {
+TEST(LexicalConventionSim, MultiCharValue) {
   auto v = RunAndGet(
       "module t;\n  bit [23:0] s;\n  initial s = \"ABC\";\nendmodule\n", "s");
   EXPECT_EQ(v, 0x414243u);
 }
 
-TEST(SimClause05, Cl5_9_ZeroPadLeft) {
+TEST(LexicalConventionSim, ZeroPadLeft) {
   auto v = RunAndGet(
       "module t;\n  bit [15:0] s;\n  initial s = \"A\";\nendmodule\n", "s");
   EXPECT_EQ(v, 0x0041u);
 }
 
-TEST(SimClause05, Cl5_9_TruncateLeft) {
+TEST(LexicalConventionSim, TruncateLeft) {
   auto v = RunAndGet(
       "module t;\n  byte s;\n  initial s = \"ABCD\";\nendmodule\n", "s");
   EXPECT_EQ(v, 0x44u);
 }
 
-TEST(SimClause05, Cl5_9_TripleQuotedBasic) {
+TEST(LexicalConventionSim, TripleQuotedBasic) {
   auto v = RunAndGet(
       "module t;\n  bit [15:0] s;\n"
       "  initial s = \"\"\"AB\"\"\";\nendmodule\n",
@@ -36,7 +36,7 @@ TEST(SimClause05, Cl5_9_TripleQuotedBasic) {
   EXPECT_EQ(v, 0x4142u);
 }
 
-TEST(SimClause05, Cl5_9_TripleQuotedNewline) {
+TEST(LexicalConventionSim, TripleQuotedNewline) {
   auto v = RunAndGet(
       "module t;\n  bit [23:0] s;\n"
       "  initial s = \"\"\"A\nB\"\"\";\nendmodule\n",
@@ -44,7 +44,7 @@ TEST(SimClause05, Cl5_9_TripleQuotedNewline) {
   EXPECT_EQ(v, 0x410A42u);
 }
 
-TEST(SimClause05, Cl5_9_TripleQuotedEmbeddedQuote) {
+TEST(LexicalConventionSim, TripleQuotedEmbeddedQuote) {
   auto v = RunAndGet(
       "module t;\n  bit [23:0] s;\n"
       "  initial s = \"\"\"A\"B\"\"\";\nendmodule\n",
@@ -52,7 +52,7 @@ TEST(SimClause05, Cl5_9_TripleQuotedEmbeddedQuote) {
   EXPECT_EQ(v, 0x412242u);
 }
 
-TEST(SimClause05, Cl5_9_LineContinuation) {
+TEST(LexicalConventionSim, LineContinuation) {
   auto v = RunAndGet(
       "module t;\n  bit [31:0] s;\n"
       "  initial s = \"AB\\\nCD\";\nendmodule\n",
@@ -60,7 +60,7 @@ TEST(SimClause05, Cl5_9_LineContinuation) {
   EXPECT_EQ(v, 0x41424344u);
 }
 
-TEST(SimClause05, Cl5_9_DoubleBackslashNewline) {
+TEST(LexicalConventionSim, DoubleBackslashNewline) {
   auto v = RunAndGet(
       "module t;\n  bit [23:0] s;\n"
       "  initial s = \"A\\\\\\\nB\";\nendmodule\n",
@@ -68,7 +68,7 @@ TEST(SimClause05, Cl5_9_DoubleBackslashNewline) {
   EXPECT_EQ(v, 0x415C42u);
 }
 
-TEST(SimClause05, Cl5_9_TripleQuotedLineContinuation) {
+TEST(LexicalConventionSim, TripleQuotedLineContinuation) {
   auto v = RunAndGet(
       "module t;\n  bit [31:0] s;\n"
       "  initial s = \"\"\"AB\\\nCD\"\"\";\nendmodule\n",

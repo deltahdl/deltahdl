@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, StreamingRightDetails) {
+TEST(OperatorAndExpressionParsing, StreamingRightDetails) {
   auto r = Parse(
       "module t;\n"
       "  initial x = {>> {a, b, c}};\n"
@@ -15,7 +15,7 @@ TEST(ParserSection11, StreamingRightDetails) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-TEST(ParserA81, StreamConcatMultipleElements) {
+TEST(ConcatenationParsing, StreamConcatMultipleElements) {
   auto r = Parse("module m; initial x = {<< {a, b, c}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

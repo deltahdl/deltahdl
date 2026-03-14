@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA609, ListOfArgsAllNamed) {
+TEST(SubroutineCallSyntaxParsing, ListOfArgsAllNamed) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foo(.a(1), .b(2)); end\n"
@@ -21,7 +21,7 @@ TEST(ParserA609, ListOfArgsAllNamed) {
   EXPECT_EQ(expr->args.size(), 2u);
 }
 
-TEST(ParserA609, ListOfArgsNamedEmpty) {
+TEST(SubroutineCallSyntaxParsing, ListOfArgsNamedEmpty) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foo(.a(), .b(1)); end\n"
@@ -36,7 +36,7 @@ TEST(ParserA609, ListOfArgsNamedEmpty) {
   ASSERT_NE(expr->args[1], nullptr);
 }
 
-TEST(ParserSection13, NamedArgBindingOnTaskCall) {
+TEST(TaskAndFunctionParsing, NamedArgBindingOnTaskCall) {
   auto r = Parse(
       "module m;\n"
       "  task drive(input int addr, input int data);\n"
@@ -55,7 +55,7 @@ TEST(ParserSection13, NamedArgBindingOnTaskCall) {
   EXPECT_EQ(call->arg_names[1], "addr");
 }
 
-TEST(ParserA609, ListOfArgsMixedPositionalThenNamed) {
+TEST(SubroutineCallSyntaxParsing, ListOfArgsMixedPositionalThenNamed) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foo(1, 2, .c(3)); end\n"
@@ -71,7 +71,7 @@ TEST(ParserA609, ListOfArgsMixedPositionalThenNamed) {
   EXPECT_EQ(expr->arg_names[0], "c");
 }
 
-TEST(ParserSection13, NamedArgBindingEmptyArg) {
+TEST(TaskAndFunctionParsing, NamedArgBindingEmptyArg) {
   auto r = Parse(
       "module m;\n"
       "  function int fun(int j = 1, string s = \"no\");\n"
@@ -92,7 +92,7 @@ TEST(ParserSection13, NamedArgBindingEmptyArg) {
   EXPECT_EQ(stmt->rhs->arg_names[1], "j");
 }
 
-TEST(ParserSection13, NamedArgBindingAllNamed) {
+TEST(TaskAndFunctionParsing, NamedArgBindingAllNamed) {
   auto r = Parse(
       "module m;\n"
       "  function int add(int a, int b, int c);\n"
@@ -113,7 +113,7 @@ TEST(ParserSection13, NamedArgBindingAllNamed) {
   EXPECT_EQ(stmt->rhs->arg_names[2], "b");
 }
 
-TEST(ParserA82, ListOfArgsMixed) {
+TEST(SubroutineCallExprParsing, ListOfArgsMixed) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foo(1, .b(2)); end\n"
@@ -128,7 +128,7 @@ TEST(ParserA82, ListOfArgsMixed) {
   EXPECT_EQ(expr->arg_names[0], "b");
 }
 
-TEST(ParserSection13, NamedArgBindingParses) {
+TEST(TaskAndFunctionParsing, NamedArgBindingParses) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(int a, int b);\n"
@@ -144,7 +144,7 @@ TEST(ParserSection13, NamedArgBindingParses) {
   EXPECT_EQ(call->kind, ExprKind::kCall);
 }
 
-TEST(ParserSection13, NamedArgBindingNames) {
+TEST(TaskAndFunctionParsing, NamedArgBindingNames) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(int a, int b);\n"
@@ -163,7 +163,7 @@ TEST(ParserSection13, NamedArgBindingNames) {
   }
 }
 
-TEST(ParserSection13, PositionalArgsHaveEmptyNames) {
+TEST(TaskAndFunctionParsing, PositionalArgsHaveEmptyNames) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(int a, int b);\n"
@@ -178,7 +178,7 @@ TEST(ParserSection13, PositionalArgsHaveEmptyNames) {
   EXPECT_EQ(call->kind, ExprKind::kCall);
 }
 
-TEST(ParserSection13, PositionalArgsNoNamedArgs) {
+TEST(TaskAndFunctionParsing, PositionalArgsNoNamedArgs) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(int a, int b);\n"

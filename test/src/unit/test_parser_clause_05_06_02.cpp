@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_6_2_KeywordsAreReserved) {
+TEST(LexicalConventionParsing, KeywordsAreReserved) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire w;\n"
@@ -17,11 +17,11 @@ TEST(ParserClause05, Cl5_6_2_KeywordsAreReserved) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_6_2_UppercaseNotKeyword) {
+TEST(LexicalConventionParsing, UppercaseNotKeyword) {
   EXPECT_FALSE(ParseOk("MODULE m; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_6_2_EscapedKeywordAsIdentifier) {
+TEST(LexicalConventionParsing, EscapedKeywordAsIdentifier) {
   EXPECT_TRUE(ParseOk("module m; logic \\begin ; endmodule"));
 }
 

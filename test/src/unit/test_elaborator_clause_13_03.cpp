@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA27, ElabTaskDeclInModule) {
+TEST(TaskDeclParsing, ElabTaskDeclInModule) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(ParserA27, ElabTaskDeclInModule) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elab1303, TaskWithOutputArgsElaborates) {
+TEST(TaskElaboration, TaskWithOutputArgsElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(Elab1303, TaskWithOutputArgsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1303, TaskWithInoutArgElaborates) {
+TEST(TaskElaboration, TaskWithInoutArgElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -43,7 +43,7 @@ TEST(Elab1303, TaskWithInoutArgElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1303, TaskEmptyBodyElaborates) {
+TEST(TaskElaboration, TaskEmptyBodyElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -55,7 +55,7 @@ TEST(Elab1303, TaskEmptyBodyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1303, TaskEnablesTaskElaborates) {
+TEST(TaskElaboration, TaskEnablesTaskElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"

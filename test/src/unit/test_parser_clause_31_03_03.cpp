@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70501, SetupholdTwoLimits) {
+TEST(TimingCheckCommandParsing, SetupholdTwoLimits) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -21,7 +21,7 @@ TEST(ParserA70501, SetupholdTwoLimits) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-TEST(ParserA70501, SetupholdFullArgs) {
+TEST(TimingCheckCommandParsing, SetupholdFullArgs) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -37,7 +37,7 @@ TEST(ParserA70501, SetupholdFullArgs) {
   EXPECT_EQ(tc->delayed_data, "dDATA");
 }
 
-TEST(ParserA70502, TimestampCondMinTypMax) {
+TEST(TimingCheckArgumentParsing, TimestampCondMinTypMax) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -51,7 +51,7 @@ TEST(ParserA70502, TimestampCondMinTypMax) {
   EXPECT_EQ(tc->timestamp_cond->kind, ExprKind::kMinTypMax);
 }
 
-TEST(ParserA70502, TimecheckCondMinTypMax) {
+TEST(TimingCheckArgumentParsing, TimecheckCondMinTypMax) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -65,7 +65,7 @@ TEST(ParserA70502, TimecheckCondMinTypMax) {
   EXPECT_EQ(tc->timecheck_cond->kind, ExprKind::kMinTypMax);
 }
 
-TEST(ParserA70502, DelayedRefDataSimple) {
+TEST(TimingCheckArgumentParsing, DelayedRefDataSimple) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -93,7 +93,7 @@ TEST_F(SpecifyTest, SetupholdTimingCheck) {
   ASSERT_GE(tc.limits.size(), 2u);
 }
 
-TEST(ParserSection28, Sec28_12_TimingCheckSetuphold) {
+TEST(GateLevelModelingParsing, TimingCheckSetuphold) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
       "  specify\n"
@@ -112,7 +112,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckSetuphold) {
   ASSERT_EQ(si->timing_check.limits.size(), 2u);
 }
 
-TEST(ParserA705, SystemTimingCheckSetuphold) {
+TEST(SystemTimingCheckParsing, SystemTimingCheckSetuphold) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

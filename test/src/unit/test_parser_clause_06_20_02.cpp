@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA23, ListOfParamAssignmentsWithDims) {
+TEST(DeclarationListParsing, ListOfParamAssignmentsWithDims) {
   auto r = Parse(
       "module m;\n"
       "  parameter int A [2] = '{1, 2}, B [3] = '{3, 4, 5};\n"
@@ -19,7 +19,7 @@ TEST(ParserA23, ListOfParamAssignmentsWithDims) {
   EXPECT_GE(count, 2);
 }
 
-TEST(ParserA24, ParamAssignmentWithUnpackedDim) {
+TEST(DeclarationAssignmentParsing, ParamAssignmentWithUnpackedDim) {
   auto r = Parse("module m; parameter int ARR [3:0] = '{1,2,3,4}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -29,7 +29,7 @@ TEST(ParserA24, ParamAssignmentWithUnpackedDim) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
-TEST(ParserA83, ParamExprLiteralValue) {
+TEST(ExpressionParsing, ParamExprLiteralValue) {
   auto r = Parse(
       "module m #(parameter int P = 10);\n"
       "endmodule\n");
@@ -39,7 +39,7 @@ TEST(ParserA83, ParamExprLiteralValue) {
             ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserSection13, Sec13_8_StringTypeParam) {
+TEST(TaskAndFunctionParsing, StringTypeParam) {
   EXPECT_TRUE(
       ParseOk("virtual class Logger#(parameter string PREFIX = \"LOG\");\n"
               "  static task info(string msg);\n"
@@ -48,7 +48,7 @@ TEST(ParserSection13, Sec13_8_StringTypeParam) {
               "endclass\n"));
 }
 
-TEST(ParserSection13, Sec13_8_ExplicitlyTypedParam) {
+TEST(TaskAndFunctionParsing, ExplicitlyTypedParam) {
   auto r = Parse(
       "virtual class Buffer#(parameter int SIZE = 256);\n"
       "  static function int capacity();\n"
@@ -59,7 +59,7 @@ TEST(ParserSection13, Sec13_8_ExplicitlyTypedParam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, ParamDecl_ImplicitType) {
+TEST(DataTypeParsing, ParamDecl_ImplicitType) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
                "  localparam [10:0] p = 1 << 5;\n"
@@ -67,7 +67,7 @@ TEST(ParserSection6, ParamDecl_ImplicitType) {
                "endmodule\n"));
 }
 
-TEST(ParserSection6, ParamDecl_UnpackedDims) {
+TEST(DataTypeParsing, ParamDecl_UnpackedDims) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
                "  parameter logic [31:0] p [3:0] = '{1, 2, 3, 4};\n"

@@ -11,7 +11,7 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA702, ParallelPathNegativePolarity) {
+TEST(SpecifyPathParsing, ParallelPathNegativePolarity) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -26,7 +26,7 @@ TEST(ParserA702, ParallelPathNegativePolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
 }
 
-TEST(ParserA702, FullPathNegativePolarity) {
+TEST(SpecifyPathParsing, FullPathNegativePolarity) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

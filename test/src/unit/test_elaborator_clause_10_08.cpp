@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh10f, ContAssignTruncatesInAssignLikeContext) {
+TEST(AssignmentLikeContextSim, ContAssignTruncatesInAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -24,7 +24,7 @@ TEST(SimCh10f, ContAssignTruncatesInAssignLikeContext) {
   EXPECT_EQ(out->value.ToUint64(), 0xBu);
 }
 
-TEST(SimCh10f, ProceduralAssignExtendsInAssignLikeContext) {
+TEST(AssignmentLikeContextSim, ProceduralAssignExtendsInAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -43,7 +43,7 @@ TEST(SimCh10f, ProceduralAssignExtendsInAssignLikeContext) {
   EXPECT_EQ(wide->value.ToUint64(), 0x000Au);
 }
 
-TEST(SimCh10f, ReturnStatementAssignLikeContext) {
+TEST(AssignmentLikeContextSim, ReturnStatementAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -63,7 +63,7 @@ TEST(SimCh10f, ReturnStatementAssignLikeContext) {
   EXPECT_EQ(result->value.ToUint64(), 0xCDu);
 }
 
-TEST(SimCh10f, SubroutineArgAssignLikeContext) {
+TEST(AssignmentLikeContextSim, SubroutineArgAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -84,7 +84,7 @@ TEST(SimCh10f, SubroutineArgAssignLikeContext) {
   EXPECT_EQ(result->value.ToUint64(), 0xFEu);
 }
 
-TEST(SimCh10f, OutputPortAssignLikeContext) {
+TEST(AssignmentLikeContextSim, OutputPortAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module inner(output logic [3:0] o);\n"
@@ -106,7 +106,7 @@ TEST(SimCh10f, OutputPortAssignLikeContext) {
   }
 }
 
-TEST(SimCh10f, ConditionalExprInAssignLikeContext) {
+TEST(AssignmentLikeContextSim, ConditionalExprInAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -125,7 +125,7 @@ TEST(SimCh10f, ConditionalExprInAssignLikeContext) {
   EXPECT_EQ(result->value.ToUint64(), 0xFEu);
 }
 
-TEST(SimCh10f, ParenExprInAssignLikeContext) {
+TEST(AssignmentLikeContextSim, ParenExprInAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -142,7 +142,7 @@ TEST(SimCh10f, ParenExprInAssignLikeContext) {
   EXPECT_EQ(a->value.ToUint64(), 0xADu);
 }
 
-TEST(SimCh10f, NBAAssignLikeContext) {
+TEST(AssignmentLikeContextSim, NBAAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

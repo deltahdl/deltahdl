@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_1_SourceWithAllTokenCategoriesParses) {
+TEST(LexicalConventionParsing, SourceWithAllTokenCategoriesParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic [7:0] data = 8'hAB;\n"
@@ -12,7 +12,7 @@ TEST(ParserClause05, Cl5_1_SourceWithAllTokenCategoriesParses) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_CommentsDoNotAffectParseResult) {
+TEST(LexicalConventionParsing, CommentsDoNotAffectParseResult) {
   auto with = Parse(
       "module /* block */ t; // line\n"
       "  logic a;\n"
@@ -30,7 +30,7 @@ TEST(ParserClause05, Cl5_1_CommentsDoNotAffectParseResult) {
   EXPECT_EQ(with.cu->modules[0]->name, without.cu->modules[0]->name);
 }
 
-TEST(ParserClause05, Cl5_1_IntegerLiteralInExpression) {
+TEST(LexicalConventionParsing, IntegerLiteralInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic [31:0] x;\n"
@@ -38,7 +38,7 @@ TEST(ParserClause05, Cl5_1_IntegerLiteralInExpression) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_RealLiteralInExpression) {
+TEST(LexicalConventionParsing, RealLiteralInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  real r;\n"
@@ -46,21 +46,21 @@ TEST(ParserClause05, Cl5_1_RealLiteralInExpression) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_StringLiteralInExpression) {
+TEST(LexicalConventionParsing, StringLiteralInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $display(\"hello world\");\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_TimeLiteralInExpression) {
+TEST(LexicalConventionParsing, TimeLiteralInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial #10ns;\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_UnbasedUnsizedLiteralInExpression) {
+TEST(LexicalConventionParsing, UnbasedUnsizedLiteralInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic [15:0] x;\n"
@@ -68,7 +68,7 @@ TEST(ParserClause05, Cl5_1_UnbasedUnsizedLiteralInExpression) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_ArrayLiteralParses) {
+TEST(LexicalConventionParsing, ArrayLiteralParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int arr [0:1];\n"
@@ -76,7 +76,7 @@ TEST(ParserClause05, Cl5_1_ArrayLiteralParses) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_StructureLiteralParses) {
+TEST(LexicalConventionParsing, StructureLiteralParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; int b; } ab_t;\n"
@@ -85,7 +85,7 @@ TEST(ParserClause05, Cl5_1_StructureLiteralParses) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_StructureLiteralWithNamedMembersParses) {
+TEST(LexicalConventionParsing, StructureLiteralWithNamedMembersParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; int b; } ab_t;\n"
@@ -94,7 +94,7 @@ TEST(ParserClause05, Cl5_1_StructureLiteralWithNamedMembersParses) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_StructureLiteralWithDefaultParses) {
+TEST(LexicalConventionParsing, StructureLiteralWithDefaultParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; int b; } ab_t;\n"
@@ -103,21 +103,21 @@ TEST(ParserClause05, Cl5_1_StructureLiteralWithDefaultParses) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_TripleQuotedStringInExpression) {
+TEST(LexicalConventionParsing, TripleQuotedStringInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $display(\"\"\"hello\"\"\");\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_EscapedIdentifierInExpression) {
+TEST(LexicalConventionParsing, EscapedIdentifierInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic \\bus+a ;\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_SystemTaskCallParses) {
+TEST(LexicalConventionParsing, SystemTaskCallParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -127,7 +127,7 @@ TEST(ParserClause05, Cl5_1_SystemTaskCallParses) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_SystemFunctionInExpression) {
+TEST(LexicalConventionParsing, SystemFunctionInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic [31:0] x;\n"
@@ -135,7 +135,7 @@ TEST(ParserClause05, Cl5_1_SystemFunctionInExpression) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_BuiltinMethodCallParses) {
+TEST(LexicalConventionParsing, BuiltinMethodCallParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int q[$];\n"
@@ -144,7 +144,7 @@ TEST(ParserClause05, Cl5_1_BuiltinMethodCallParses) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_BuiltinMethodCallWithoutParensParses) {
+TEST(LexicalConventionParsing, BuiltinMethodCallWithoutParensParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int q[$];\n"
@@ -153,7 +153,7 @@ TEST(ParserClause05, Cl5_1_BuiltinMethodCallWithoutParensParses) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_AttributeOnModuleParses) {
+TEST(LexicalConventionParsing, AttributeOnModuleParses) {
   auto r = Parse(
       "(* synthesis *) module t;\n"
       "endmodule\n");
@@ -164,7 +164,7 @@ TEST(ParserClause05, Cl5_1_AttributeOnModuleParses) {
   EXPECT_EQ(r.cu->modules[0]->attrs[0].name, "synthesis");
 }
 
-TEST(ParserClause05, Cl5_1_AttributeWithValueParses) {
+TEST(LexicalConventionParsing, AttributeWithValueParses) {
   auto r = Parse(
       "(* full_case = 1 *) module t;\n"
       "endmodule\n");
@@ -176,7 +176,7 @@ TEST(ParserClause05, Cl5_1_AttributeWithValueParses) {
   EXPECT_NE(r.cu->modules[0]->attrs[0].value, nullptr);
 }
 
-TEST(ParserClause05, Cl5_1_MultipleAttributesOnModule) {
+TEST(LexicalConventionParsing, MultipleAttributesOnModule) {
   auto r = Parse(
       "(* synthesis, full_case *) module t;\n"
       "endmodule\n");
@@ -186,7 +186,7 @@ TEST(ParserClause05, Cl5_1_MultipleAttributesOnModule) {
   EXPECT_GE(r.cu->modules[0]->attrs.size(), 2u);
 }
 
-TEST(ParserClause05, Cl5_1_AllFourAreasInOneParse) {
+TEST(LexicalConventionParsing, AllFourAreasInOneParse) {
   EXPECT_TRUE(
       ParseOk("(* optimize *) module t;\n"
               "  logic [7:0] data = 8'hFF;\n"
@@ -197,11 +197,11 @@ TEST(ParserClause05, Cl5_1_AllFourAreasInOneParse) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_1_UnterminatedAttributeIsError) {
+TEST(LexicalConventionParsing, UnterminatedAttributeIsError) {
   EXPECT_FALSE(ParseOk("(* missing_end module t; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_1_EmptyAttributeIsError) {
+TEST(LexicalConventionParsing, EmptyAttributeIsError) {
   EXPECT_FALSE(ParseOk("(* *) module t; endmodule"));
 }
 

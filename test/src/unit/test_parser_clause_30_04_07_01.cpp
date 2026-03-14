@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA702, ParallelPathNoPolarity) {
+TEST(SpecifyPathParsing, ParallelPathNoPolarity) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -19,7 +19,7 @@ TEST(ParserA702, ParallelPathNoPolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNone);
 }
 
-TEST(ParserA702, FullPathNoPolarity) {
+TEST(SpecifyPathParsing, FullPathNoPolarity) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

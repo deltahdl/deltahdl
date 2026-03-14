@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elab1370, ForwardFunctionReference) {
+TEST(TaskFunctionNameElaboration, ForwardFunctionReference) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(Elab1370, ForwardFunctionReference) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1370, ForwardTaskReference) {
+TEST(TaskFunctionNameElaboration, ForwardTaskReference) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -34,7 +34,7 @@ TEST(Elab1370, ForwardTaskReference) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1370, TaskCallsForwardFunction) {
+TEST(TaskFunctionNameElaboration, TaskCallsForwardFunction) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -52,7 +52,7 @@ TEST(Elab1370, TaskCallsForwardFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1370, MutuallyRecursiveFunctions) {
+TEST(TaskFunctionNameElaboration, MutuallyRecursiveFunctions) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

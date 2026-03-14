@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7, ArrayReverseMethod) {
+TEST(AggregateTypeParsing, ArrayReverseMethod) {
   auto r = Parse(
       "module t;\n"
       "  int arr[4];\n"
@@ -17,7 +17,7 @@ TEST(ParserSection7, ArrayReverseMethod) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-TEST(ParserSection7, ArrayShuffleMethod) {
+TEST(AggregateTypeParsing, ArrayShuffleMethod) {
   auto r = Parse(
       "module t;\n"
       "  int arr[4];\n"
@@ -29,7 +29,7 @@ TEST(ParserSection7, ArrayShuffleMethod) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-TEST(ParserCh513, BuiltInMethod_WithArgs) {
+TEST(BuiltInMethodParsing, BuiltInMethod_WithArgs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q[$];\n"
@@ -37,7 +37,7 @@ TEST(ParserCh513, BuiltInMethod_WithArgs) {
               "endmodule"));
 }
 
-TEST(ParserSection7, ArrayMethodSort) {
+TEST(AggregateTypeParsing, ArrayMethodSort) {
   auto r = Parse(
       "module t;\n"
       "  int arr[] = '{5, 3, 1, 4, 2};\n"
@@ -49,7 +49,7 @@ TEST(ParserSection7, ArrayMethodSort) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-TEST(ParserSection7, ArrayMethodRsort) {
+TEST(AggregateTypeParsing, ArrayMethodRsort) {
   auto r = Parse(
       "module t;\n"
       "  int arr[] = '{1, 2, 3, 4, 5};\n"
@@ -61,7 +61,7 @@ TEST(ParserSection7, ArrayMethodRsort) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-TEST(ParserSection7, ArrayMethodShuffle) {
+TEST(AggregateTypeParsing, ArrayMethodShuffle) {
   auto r = Parse(
       "module t;\n"
       "  int arr[] = '{1, 2, 3};\n"
@@ -72,7 +72,7 @@ TEST(ParserSection7, ArrayMethodShuffle) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
-TEST(ParserSection7, ArraySortWithClause) {
+TEST(AggregateTypeParsing, ArraySortWithClause) {
   auto r = Parse(
       "module t;\n"
       "  initial arr.sort with (item.x);\n"
@@ -85,7 +85,7 @@ TEST(ParserSection7, ArraySortWithClause) {
   ASSERT_NE(expr, nullptr);
 }
 
-TEST(ParserSection7, ArrayMethodReverse) {
+TEST(AggregateTypeParsing, ArrayMethodReverse) {
   auto r = Parse(
       "module t;\n"
       "  int arr[] = '{1, 2, 3};\n"

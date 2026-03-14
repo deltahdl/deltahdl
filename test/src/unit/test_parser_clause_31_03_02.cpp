@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70501, HoldTimingCheck) {
+TEST(TimingCheckCommandParsing, HoldTimingCheck) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -22,7 +22,7 @@ TEST(ParserA70501, HoldTimingCheck) {
   EXPECT_EQ(tc->data_terminal.name, "data");
 }
 
-TEST(ParserAnnexA, A7TimingCheckHold) {
+TEST(FormalSyntaxParsing, TimingCheckHold) {
   auto r = Parse(
       "module m;\n"
       "  specify $hold(posedge clk, data, 5); endspecify\n"
@@ -31,7 +31,7 @@ TEST(ParserAnnexA, A7TimingCheckHold) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection28, Sec28_12_TimingCheckHold) {
+TEST(GateLevelModelingParsing, TimingCheckHold) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
       "  specify\n"
@@ -51,7 +51,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckHold) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
-TEST(ParserA705, SystemTimingCheckHold) {
+TEST(SystemTimingCheckParsing, SystemTimingCheckHold) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

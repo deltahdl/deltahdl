@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection18, DistConstraintEqualWeight) {
+TEST(ConstrainedRandomParsing, DistConstraintEqualWeight) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection18, DistConstraintEqualWeight) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18, DistConstraintDivideWeight) {
+TEST(ConstrainedRandomParsing, DistConstraintDivideWeight) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -27,7 +27,7 @@ TEST(ParserSection18, DistConstraintDivideWeight) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18, DistConstraintWithRange) {
+TEST(ConstrainedRandomParsing, DistConstraintWithRange) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -38,7 +38,7 @@ TEST(ParserSection18, DistConstraintWithRange) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18, DistConstraintWithDefault) {
+TEST(ConstrainedRandomParsing, DistConstraintWithDefault) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -49,7 +49,7 @@ TEST(ParserSection18, DistConstraintWithDefault) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18b, DistEqualWeightSingleValue) {
+TEST(DistributionConstraintParsing, DistEqualWeightSingleValue) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -60,7 +60,7 @@ TEST(ParserSection18b, DistEqualWeightSingleValue) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18b, DistDivideWeightMultipleValues) {
+TEST(DistributionConstraintParsing, DistDivideWeightMultipleValues) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -71,7 +71,7 @@ TEST(ParserSection18b, DistDivideWeightMultipleValues) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18b, DistWithRangeAndEqualWeight) {
+TEST(DistributionConstraintParsing, DistWithRangeAndEqualWeight) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -82,7 +82,7 @@ TEST(ParserSection18b, DistWithRangeAndEqualWeight) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18b, DistWithMixedWeightTypes) {
+TEST(DistributionConstraintParsing, DistWithMixedWeightTypes) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -93,7 +93,7 @@ TEST(ParserSection18b, DistWithMixedWeightTypes) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18b, DistWithDefaultWeight) {
+TEST(DistributionConstraintParsing, DistWithDefaultWeight) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -104,7 +104,7 @@ TEST(ParserSection18b, DistWithDefaultWeight) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18b, DistWithExpressionWeights) {
+TEST(DistributionConstraintParsing, DistWithExpressionWeights) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -115,7 +115,7 @@ TEST(ParserSection18b, DistWithExpressionWeights) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18b, DistWithNegativeValues) {
+TEST(DistributionConstraintParsing, DistWithNegativeValues) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -126,7 +126,7 @@ TEST(ParserSection18b, DistWithNegativeValues) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection18b, DistMultipleConstraints) {
+TEST(DistributionConstraintParsing, DistMultipleConstraints) {
   auto r = Parse(
       "class C;\n"
       "  rand int x, y;\n"

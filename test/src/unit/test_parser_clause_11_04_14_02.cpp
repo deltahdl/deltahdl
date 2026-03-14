@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, StreamingLeft) {
+TEST(OperatorAndExpressionParsing, StreamingLeft) {
   auto r = Parse(
       "module t;\n"
       "  initial x = {<< {a, b, c}};\n"
@@ -17,7 +17,7 @@ TEST(ParserSection11, StreamingLeft) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
 }
 
-TEST(ParserA81, StreamingWithTypeSliceSize) {
+TEST(ConcatenationParsing, StreamingWithTypeSliceSize) {
   auto r = Parse("module m; initial x = {<< byte {a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -27,7 +27,7 @@ TEST(ParserA81, StreamingWithTypeSliceSize) {
   ASSERT_NE(stmt->rhs->lhs, nullptr);
 }
 
-TEST(ParserA81, StreamingWithIntSliceSize) {
+TEST(ConcatenationParsing, StreamingWithIntSliceSize) {
   auto r = Parse("module m; initial x = {<< int {a, b}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -37,7 +37,7 @@ TEST(ParserA81, StreamingWithIntSliceSize) {
   ASSERT_NE(stmt->rhs->lhs, nullptr);
 }
 
-TEST(ParserA81, StreamingWithExprSliceSize) {
+TEST(ConcatenationParsing, StreamingWithExprSliceSize) {
   auto r = Parse("module m; initial x = {<< 4 {a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -47,7 +47,7 @@ TEST(ParserA81, StreamingWithExprSliceSize) {
   ASSERT_NE(stmt->rhs->lhs, nullptr);
 }
 
-TEST(ParserSection11, StreamingWithTypedSlice) {
+TEST(OperatorAndExpressionParsing, StreamingWithTypedSlice) {
   auto r = Parse(
       "module t;\n"
       "  byte a;\n"

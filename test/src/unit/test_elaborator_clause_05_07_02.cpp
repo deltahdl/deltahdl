@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause05, Cl5_7_2_FixedPointElaborates) {
+TEST(LexicalConventionElaboration, FixedPointElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(ElabClause05, Cl5_7_2_FixedPointElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause05, Cl5_7_2_ScientificNotationElaborates) {
+TEST(LexicalConventionElaboration, ScientificNotationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -28,7 +28,7 @@ TEST(ElabClause05, Cl5_7_2_ScientificNotationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause05, Cl5_7_2_ExponentOnlyElaborates) {
+TEST(LexicalConventionElaboration, ExponentOnlyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -40,7 +40,7 @@ TEST(ElabClause05, Cl5_7_2_ExponentOnlyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause05, Cl5_7_2_NegativeExponentElaborates) {
+TEST(LexicalConventionElaboration, NegativeExponentElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

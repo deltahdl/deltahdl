@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA26, ElabFunctionDeclInModule) {
+TEST(FunctionDeclParsing, ElabFunctionDeclInModule) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -20,7 +20,7 @@ TEST(ParserA26, ElabFunctionDeclInModule) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(ElabA604, VoidFunctionReturnWithValueError) {
+TEST(StatementElaboration, VoidFunctionReturnWithValueError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -32,7 +32,7 @@ TEST(ElabA604, VoidFunctionReturnWithValueError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabA604, NonVoidFunctionReturnWithValue) {
+TEST(StatementElaboration, NonVoidFunctionReturnWithValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -45,7 +45,7 @@ TEST(ElabA604, NonVoidFunctionReturnWithValue) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA609, VoidCastElaborates) {
+TEST(SubroutineCallElaborationSyntax, VoidCastElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -57,7 +57,7 @@ TEST(ElabA609, VoidCastElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA82, TfCallAsExprElaborates) {
+TEST(SubroutineCallExprElaboration, TfCallAsExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -72,7 +72,7 @@ TEST(ElabA82, TfCallAsExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA82, NestedCallsElaborate) {
+TEST(SubroutineCallExprElaboration, NestedCallsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -86,7 +86,7 @@ TEST(ElabA82, NestedCallsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1341, VarSameNameAsFunctionInsideBody) {
+TEST(FunctionReturnElaboration, VarSameNameAsFunctionInsideBody) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -100,7 +100,7 @@ TEST(Elab1341, VarSameNameAsFunctionInsideBody) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1341, FunctionNameAssignElaborates) {
+TEST(FunctionReturnElaboration, FunctionNameAssignElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -113,7 +113,7 @@ TEST(Elab1341, FunctionNameAssignElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1341, NonVoidReturnWithExpr) {
+TEST(FunctionReturnElaboration, NonVoidReturnWithExpr) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

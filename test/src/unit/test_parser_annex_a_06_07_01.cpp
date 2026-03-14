@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA60701, AssignmentPatternExprList) {
+TEST(PatternParsing, AssignmentPatternExprList) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -20,7 +20,7 @@ TEST(ParserA60701, AssignmentPatternExprList) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserA60701, AssignmentPatternStructKeys) {
+TEST(PatternParsing, AssignmentPatternStructKeys) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -31,7 +31,7 @@ TEST(ParserA60701, AssignmentPatternStructKeys) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, AssignmentPatternReplication) {
+TEST(PatternParsing, AssignmentPatternReplication) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -42,7 +42,7 @@ TEST(ParserA60701, AssignmentPatternReplication) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, AssignmentPatternDefault) {
+TEST(PatternParsing, AssignmentPatternDefault) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -53,7 +53,7 @@ TEST(ParserA60701, AssignmentPatternDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, AssignmentPatternWithType) {
+TEST(PatternParsing, AssignmentPatternWithType) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct { int x; int y; } point_t;\n"
@@ -65,7 +65,7 @@ TEST(ParserA60701, AssignmentPatternWithType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, AssignmentPatternIntegerAtomType) {
+TEST(PatternParsing, AssignmentPatternIntegerAtomType) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -76,7 +76,7 @@ TEST(ParserA60701, AssignmentPatternIntegerAtomType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, AssignmentPatternNetLvalue) {
+TEST(PatternParsing, AssignmentPatternNetLvalue) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b;\n"
@@ -86,7 +86,7 @@ TEST(ParserA60701, AssignmentPatternNetLvalue) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, AssignmentPatternVariableLvalue) {
+TEST(PatternParsing, AssignmentPatternVariableLvalue) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -97,7 +97,7 @@ TEST(ParserA60701, AssignmentPatternVariableLvalue) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, CaseMatchesPattern) {
+TEST(PatternParsing, CaseMatchesPattern) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -111,7 +111,7 @@ TEST(ParserA60701, CaseMatchesPattern) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, CondPatternMatches) {
+TEST(PatternParsing, CondPatternMatches) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

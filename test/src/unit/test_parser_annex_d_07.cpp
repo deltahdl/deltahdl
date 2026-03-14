@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexD, AnnexDLog) {
+TEST(OptionalSystemTaskParserParsing, Log) {
   auto r = Parse(
       "module m;\n"
       "  initial begin $log(\"sim.log\"); $nolog; end\n"

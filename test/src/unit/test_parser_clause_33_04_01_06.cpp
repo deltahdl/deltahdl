@@ -120,7 +120,7 @@ TEST_F(ConfigTest, CellClauseWithLibUse) {
   EXPECT_EQ(rule->use_cell, "fast_adder");
 }
 
-TEST(ParserSection34, ConfigWithUseClause) {
+TEST(ProtectedEnvelopeParsing, ConfigWithUseClause) {
   auto r = Parse(R"(
     config map_cfg;
       design work.top;

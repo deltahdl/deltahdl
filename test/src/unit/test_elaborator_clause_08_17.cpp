@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA817, SuperNewFirstStatementOk) {
+TEST(ChainedConstructorElaboration, SuperNewFirstStatementOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  function new();\n"
@@ -20,7 +20,7 @@ TEST(ElabA817, SuperNewFirstStatementOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA817, SuperNewNotFirstStatementError) {
+TEST(ChainedConstructorElaboration, SuperNewNotFirstStatementError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  function new();\n"
@@ -38,7 +38,7 @@ TEST(ElabA817, SuperNewNotFirstStatementError) {
              "endmodule\n"));
 }
 
-TEST(ElabA817, ExtendsArgsAndSuperNewError) {
+TEST(ChainedConstructorElaboration, ExtendsArgsAndSuperNewError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  function new(int x);\n"
@@ -54,7 +54,7 @@ TEST(ElabA817, ExtendsArgsAndSuperNewError) {
              "endmodule\n"));
 }
 
-TEST(ElabA817, ExtendsArgsNoSuperNewOk) {
+TEST(ChainedConstructorElaboration, ExtendsArgsNoSuperNewOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  function new(int x);\n"
@@ -67,7 +67,7 @@ TEST(ElabA817, ExtendsArgsNoSuperNewOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA817, ImplicitChainingOk) {
+TEST(ChainedConstructorElaboration, ImplicitChainingOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  function new();\n"

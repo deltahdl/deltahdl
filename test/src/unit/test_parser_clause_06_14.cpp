@@ -21,14 +21,14 @@ TEST(TypeEval, ChandleNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kChandle));
 }
 
-TEST(ParserA221, DataTypeChandle) {
+TEST(NetAndVariableTypeParsing, DataTypeChandle) {
   auto r = Parse("module m; chandle h; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kChandle);
 }
 
-TEST(ParserSection6, Sec6_5_ChandleVarDecl) {
+TEST(DataTypeParsing, ChandleVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  chandle handle;\n"
@@ -43,7 +43,7 @@ TEST(ParserSection6, Sec6_5_ChandleVarDecl) {
   EXPECT_EQ(item->name, "handle");
 }
 
-TEST(ParserA84, ConstantPrimaryNull) {
+TEST(PrimaryParsing, ConstantPrimaryNull) {
   auto r = Parse("module m; initial x = null; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -53,14 +53,14 @@ TEST(ParserA84, ConstantPrimaryNull) {
   EXPECT_EQ(rhs->text, "null");
 }
 
-TEST(ParserSection6, ChandleMultipleDecls) {
+TEST(DataTypeParsing, ChandleMultipleDecls) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  chandle h1, h2;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, ChandleVarDecl) {
+TEST(DataTypeParsing, ChandleVarDeclSimple) {
   auto r = Parse(
       "module t;\n"
       "  chandle ch;\n"
@@ -72,7 +72,7 @@ TEST(ParserSection6, ChandleVarDecl) {
   EXPECT_EQ(item->name, "ch");
 }
 
-TEST(ParserSection6, ChandleFunctionReturn) {
+TEST(DataTypeParsing, ChandleFunctionReturn) {
   auto r = Parse(
       "module m;\n"
       "  function chandle get_handle();\n"
@@ -86,7 +86,7 @@ TEST(ParserSection6, ChandleFunctionReturn) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kChandle);
 }
 
-TEST(ParserSection6, ChandleFunctionArg) {
+TEST(DataTypeParsing, ChandleFunctionArg) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function void use_handle(chandle h);\n"
@@ -94,7 +94,7 @@ TEST(ParserSection6, ChandleFunctionArg) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, ChandleAssignNull) {
+TEST(DataTypeParsing, ChandleAssignNull) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  chandle h;\n"
@@ -102,7 +102,7 @@ TEST(ParserSection6, ChandleAssignNull) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, ChandleEqualityWithNull) {
+TEST(DataTypeParsing, ChandleEqualityWithNull) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  chandle h;\n"

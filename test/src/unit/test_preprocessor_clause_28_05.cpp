@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, BasicBufGate) {
+TEST(GateLevelModelingParsing, BasicBufGate) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  buf b1(out, in);\n"
@@ -18,7 +18,7 @@ TEST(ParserSection28, BasicBufGate) {
   ASSERT_EQ(item->gate_terminals.size(), 2);
 }
 
-TEST(ParserSection28, BasicNotGate) {
+TEST(GateLevelModelingParsing, BasicNotGate) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  not n1(out, in);\n"

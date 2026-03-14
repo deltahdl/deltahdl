@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_13_HierarchicalReferenceSyntax) {
+TEST(DesignBuildingBlockParsing, HierarchicalReferenceSyntax) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"

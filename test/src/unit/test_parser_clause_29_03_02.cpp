@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA23, ListOfUdpPortIdentifiersMultiple) {
+TEST(DeclarationListParsing, ListOfUdpPortIdentifiersMultiple) {
   auto r = Parse(
       "primitive mux(output out, input a, b, sel);\n"
       "  table\n"
@@ -19,7 +19,7 @@ TEST(ParserA23, ListOfUdpPortIdentifiersMultiple) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserAnnexA051, AnsiSequential) {
+TEST(UdpDeclGrammar, AnsiSequential) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
       "  table\n"
@@ -38,7 +38,7 @@ TEST(ParserAnnexA051, AnsiSequential) {
   ASSERT_EQ(udp->table.size(), 2u);
 }
 
-TEST(ParserAnnexA051, AnsiSharedInputKeyword) {
+TEST(UdpDeclGrammar, AnsiSharedInputKeyword) {
   auto r = Parse(
       "primitive mux(output out, input a, b, sel);\n"
       "  table\n"
@@ -58,7 +58,7 @@ TEST(ParserAnnexA051, AnsiSharedInputKeyword) {
   EXPECT_EQ(udp->input_names[2], "sel");
 }
 
-TEST(ParserAnnexA051, NonAnsiSequentialWithReg) {
+TEST(UdpDeclGrammar, NonAnsiSequentialWithReg) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
       "  output reg q;\n"
@@ -81,7 +81,7 @@ TEST(ParserAnnexA051, NonAnsiSequentialWithReg) {
   EXPECT_EQ(udp->input_names[1], "clk");
 }
 
-TEST(ParserAnnexA052, AnsiPortList_SingleInput) {
+TEST(UdpPortGrammar, AnsiPortList_SingleInput) {
   auto r = Parse(
       "primitive inv(output out, input a);\n"
       "  table\n"
@@ -97,7 +97,7 @@ TEST(ParserAnnexA052, AnsiPortList_SingleInput) {
   EXPECT_EQ(udp->input_names[0], "a");
 }
 
-TEST(ParserAnnexA052, PortDecl_InputList) {
+TEST(UdpPortGrammar, PortDecl_InputList) {
   auto r = Parse(
       "primitive gate(out, a, b, c);\n"
       "  output out;\n"
@@ -116,7 +116,7 @@ TEST(ParserAnnexA052, PortDecl_InputList) {
   EXPECT_EQ(udp->input_names[2], "c");
 }
 
-TEST(ParserAnnexA052, PortDecl_RegStandalone) {
+TEST(UdpPortGrammar, PortDecl_RegStandalone) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
       "  output q;\n"
@@ -135,7 +135,7 @@ TEST(ParserAnnexA052, PortDecl_RegStandalone) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
-TEST(ParserAnnexA052, OutputDeclAnsi_RegInitOne) {
+TEST(UdpPortGrammar, OutputDeclAnsi_RegInitOne) {
   auto r = Parse(
       "primitive dff(output reg q = 1'b1, input d, input clk);\n"
       "  table\n"
@@ -150,7 +150,7 @@ TEST(ParserAnnexA052, OutputDeclAnsi_RegInitOne) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-TEST(ParserAnnexA052, OutputDeclAnsi_RegInitX) {
+TEST(UdpPortGrammar, OutputDeclAnsi_RegInitX) {
   auto r = Parse(
       "primitive dff(output reg q = 1'bx, input d, input clk);\n"
       "  table\n"
@@ -165,7 +165,7 @@ TEST(ParserAnnexA052, OutputDeclAnsi_RegInitX) {
   EXPECT_EQ(udp->initial_value, 'x');
 }
 
-TEST(ParserAnnexA052, OutputDeclNonAnsi_RegInitZero) {
+TEST(UdpPortGrammar, OutputDeclNonAnsi_RegInitZero) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
       "  output reg q = 1'b0;\n"
@@ -183,7 +183,7 @@ TEST(ParserAnnexA052, OutputDeclNonAnsi_RegInitZero) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
-TEST(ParserAnnexA052, OutputDeclNonAnsi_RegInitOne) {
+TEST(UdpPortGrammar, OutputDeclNonAnsi_RegInitOne) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
       "  output reg q = 1'b1;\n"
@@ -200,7 +200,7 @@ TEST(ParserAnnexA052, OutputDeclNonAnsi_RegInitOne) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-TEST(ParserAnnexA052, OutputDeclWildcard_RegInit) {
+TEST(UdpPortGrammar, OutputDeclWildcard_RegInit) {
   auto r = Parse(
       "primitive dff(.*);\n"
       "  output reg q = 1'b0;\n"
@@ -218,7 +218,7 @@ TEST(ParserAnnexA052, OutputDeclWildcard_RegInit) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
-TEST(ParserAnnexA052, InputDecl_SeparateDecls) {
+TEST(UdpPortGrammar, InputDecl_SeparateDecls) {
   auto r = Parse(
       "primitive gate(out, a, b, c);\n"
       "  output out;\n"
@@ -239,7 +239,7 @@ TEST(ParserAnnexA052, InputDecl_SeparateDecls) {
   EXPECT_EQ(udp->input_names[2], "c");
 }
 
-TEST(ParserAnnexA052, RegDecl_AfterOutput) {
+TEST(UdpPortGrammar, RegDecl_AfterOutput) {
   auto r = Parse(
       "primitive latch(q, d, en);\n"
       "  output q;\n"
@@ -259,7 +259,7 @@ TEST(ParserAnnexA052, RegDecl_AfterOutput) {
   ASSERT_EQ(udp->input_names.size(), 2u);
 }
 
-TEST(ParserAnnexA052, RegDecl_AfterInputs) {
+TEST(UdpPortGrammar, RegDecl_AfterInputs) {
   auto r = Parse(
       "primitive latch(q, d, en);\n"
       "  output q;\n"
@@ -277,7 +277,7 @@ TEST(ParserAnnexA052, RegDecl_AfterInputs) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
-TEST(ParserAnnexA052, AttrOnInputDecl) {
+TEST(UdpPortGrammar, AttrOnInputDecl) {
   auto r = Parse(
       "primitive inv(out, a);\n"
       "  output out;\n"
@@ -294,7 +294,7 @@ TEST(ParserAnnexA052, AttrOnInputDecl) {
   EXPECT_EQ(udp->input_names[0], "a");
 }
 
-TEST(ParserAnnexA052, SimPortLevelInit) {
+TEST(UdpPortGrammar, SimPortLevelInit) {
   auto r = Parse(
       "primitive latch(output reg q = 1'b0, input d, input en);\n"
       "  table\n"
@@ -319,7 +319,7 @@ TEST(ParserAnnexA052, SimPortLevelInit) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-TEST(ParserAnnexA052, SimNonAnsiPortLevelInit) {
+TEST(UdpPortGrammar, SimNonAnsiPortLevelInit) {
   auto r = Parse(
       "primitive latch(q, d, en);\n"
       "  output reg q = 1'b1;\n"
@@ -343,7 +343,7 @@ TEST(ParserAnnexA052, SimNonAnsiPortLevelInit) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-TEST(ParserAnnexA052, SimStandaloneRegSequential) {
+TEST(UdpPortGrammar, SimStandaloneRegSequential) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
       "  output q;\n"

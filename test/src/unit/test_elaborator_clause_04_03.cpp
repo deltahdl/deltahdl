@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabCh43, InitialBlockElaboratesToInitialProcess) {
+TEST(EventSimulationElaboration, InitialBlockElaboratesToInitialProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(ElabCh43, InitialBlockElaboratesToInitialProcess) {
   EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kInitial);
 }
 
-TEST(ElabCh43, FinalBlockElaboratesToFinalProcess) {
+TEST(EventSimulationElaboration, FinalBlockElaboratesToFinalProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -33,7 +33,7 @@ TEST(ElabCh43, FinalBlockElaboratesToFinalProcess) {
   EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kFinal);
 }
 
-TEST(ElabCh43, AlwaysCombElaboratesToAlwaysCombProcess) {
+TEST(EventSimulationElaboration, AlwaysCombElaboratesToAlwaysCombProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -48,7 +48,7 @@ TEST(ElabCh43, AlwaysCombElaboratesToAlwaysCombProcess) {
   EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kAlwaysComb);
 }
 
-TEST(ElabCh43, AlwaysFFElaboratesToAlwaysFFProcess) {
+TEST(EventSimulationElaboration, AlwaysFFElaboratesToAlwaysFFProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -63,7 +63,7 @@ TEST(ElabCh43, AlwaysFFElaboratesToAlwaysFFProcess) {
   EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kAlwaysFF);
 }
 
-TEST(ElabCh43, AlwaysLatchElaboratesToAlwaysLatchProcess) {
+TEST(EventSimulationElaboration, AlwaysLatchElaboratesToAlwaysLatchProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -78,7 +78,7 @@ TEST(ElabCh43, AlwaysLatchElaboratesToAlwaysLatchProcess) {
   EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kAlwaysLatch);
 }
 
-TEST(ElabCh43, PlainAlwaysElaboratesToAlwaysProcess) {
+TEST(EventSimulationElaboration, PlainAlwaysElaboratesToAlwaysProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -93,7 +93,7 @@ TEST(ElabCh43, PlainAlwaysElaboratesToAlwaysProcess) {
   EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kAlways);
 }
 
-TEST(ElabCh43, MultipleProcessKindsInOneModule) {
+TEST(EventSimulationElaboration, MultipleProcessKindsInOneModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -112,7 +112,7 @@ TEST(ElabCh43, MultipleProcessKindsInOneModule) {
   EXPECT_EQ(mod->processes[2].kind, RtlirProcessKind::kAlwaysFF);
 }
 
-TEST(ElabCh43, ProcessBodyIsNotNull) {
+TEST(EventSimulationElaboration, ProcessBodyIsNotNull) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -126,7 +126,7 @@ TEST(ElabCh43, ProcessBodyIsNotNull) {
   EXPECT_NE(mod->processes[0].body, nullptr);
 }
 
-TEST(ElabCh43, ContinuousAssignIsNotAProcess) {
+TEST(EventSimulationElaboration, ContinuousAssignIsNotAProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -141,7 +141,7 @@ TEST(ElabCh43, ContinuousAssignIsNotAProcess) {
   EXPECT_GE(mod->assigns.size(), 1u);
 }
 
-TEST(ElabCh43, InitialAndFinalCoexist) {
+TEST(EventSimulationElaboration, InitialAndFinalCoexist) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -158,7 +158,7 @@ TEST(ElabCh43, InitialAndFinalCoexist) {
   EXPECT_EQ(mod->processes[1].kind, RtlirProcessKind::kFinal);
 }
 
-TEST(ElabCh43, AllSixProcessKindsInOneModule) {
+TEST(EventSimulationElaboration, AllSixProcessKindsInOneModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -183,7 +183,7 @@ TEST(ElabCh43, AllSixProcessKindsInOneModule) {
   EXPECT_EQ(mod->processes[5].kind, RtlirProcessKind::kAlwaysLatch);
 }
 
-TEST(ElabCh43, BeginEndBlockInProcess) {
+TEST(EventSimulationElaboration, BeginEndBlockInProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -203,7 +203,7 @@ TEST(ElabCh43, BeginEndBlockInProcess) {
   EXPECT_NE(mod->processes[0].body, nullptr);
 }
 
-TEST(ElabCh43, ModuleWithOnlyContinuousAssignsHasNoProcesses) {
+TEST(EventSimulationElaboration, ModuleWithOnlyContinuousAssignsHasNoProcesses) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

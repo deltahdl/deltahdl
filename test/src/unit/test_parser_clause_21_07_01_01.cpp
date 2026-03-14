@@ -4,14 +4,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, DumpfileBasic) {
+TEST(IoSystemTaskParsing, DumpfileBasic) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $dumpfile(\"dump.vcd\");\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection21, DumpfileDefaultName) {
+TEST(IoSystemTaskParsing, DumpfileDefaultName) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $dumpfile;\n"

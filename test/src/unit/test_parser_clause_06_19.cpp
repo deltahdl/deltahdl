@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA221, EnumBaseAtomType) {
+TEST(NetAndVariableTypeParsing, EnumBaseAtomType) {
   auto r = Parse("module m; enum int {A, B} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,14 +15,14 @@ TEST(ParserA221, EnumBaseAtomType) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
 }
 
-TEST(ParserA221, EnumNameBasic) {
+TEST(NetAndVariableTypeParsing, EnumNameBasic) {
   auto r = Parse("module m; enum {RED, GREEN, BLUE} color; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.enum_members.size(), 3u);
 }
 
-TEST(ParserSection8, EnumAnonymousDeclMembers) {
+TEST(ClassParsing, EnumAnonymousDeclMembers) {
   auto r = Parse(
       "module m;\n"
       "  enum {IDLE, RUNNING, DONE} state;\n"
@@ -38,7 +38,7 @@ TEST(ParserSection8, EnumAnonymousDeclMembers) {
   EXPECT_EQ(item->data_type.enum_members[2].name, "DONE");
 }
 
-TEST(ParserSection8, EnumExplicitBaseTypeValues) {
+TEST(ClassParsing, EnumExplicitBaseTypeValues) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  enum bit [3:0] {BRONZE = 4'h3, SILVER, GOLD = 4'h5}"
@@ -58,7 +58,7 @@ TEST(Parser, InlineEnumVar) {
   ASSERT_EQ(item->data_type.enum_members.size(), 2);
 }
 
-TEST(ParserA221, DataTypeEnum) {
+TEST(NetAndVariableTypeParsing, DataTypeEnum) {
   auto r = Parse("module m; enum logic [1:0] {A, B, C} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -66,14 +66,14 @@ TEST(ParserA221, DataTypeEnum) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEnum);
 }
 
-TEST(ParserA221, EnumBaseVectorWithDim) {
+TEST(NetAndVariableTypeParsing, EnumBaseVectorWithDim) {
   auto r = Parse("module m; enum logic [7:0] {A=0, B=255} x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_NE(r.cu->modules[0]->items[0]->data_type.packed_dim_left, nullptr);
 }
 
-TEST(ParserA221, EnumBaseTypeIdentifier) {
+TEST(NetAndVariableTypeParsing, EnumBaseTypeIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  typedef logic [3:0] nibble_t;\n"
@@ -83,17 +83,17 @@ TEST(ParserA221, EnumBaseTypeIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, EnumIsIntegral) {
+TEST(DataTypeParsing, EnumIsIntegral) {
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kEnum));
 }
 
-TEST(ParserSection6, EnumDefaultWidth32) {
+TEST(DataTypeParsing, EnumDefaultWidth32) {
   DataType dt;
   dt.kind = DataTypeKind::kEnum;
   EXPECT_EQ(EvalTypeWidth(dt), 32u);
 }
 
-TEST(ParserSection6, EnumFirstNameDefaultsToZero) {
+TEST(DataTypeParsing, EnumFirstNameDefaultsToZero) {
   auto r = Parse(
       "module m;\n"
       "  enum {A, B, C} x;\n"
@@ -109,7 +109,7 @@ TEST(ParserSection6, EnumFirstNameDefaultsToZero) {
   EXPECT_EQ(members[2].value, nullptr);
 }
 
-TEST(ParserSection6, EnumMixedValues) {
+TEST(DataTypeParsing, EnumMixedValues) {
   auto r = Parse(
       "module m;\n"
       "  enum {a=3, b=7, c} x;\n"
@@ -123,7 +123,7 @@ TEST(ParserSection6, EnumMixedValues) {
   EXPECT_EQ(members[2].value, nullptr);
 }
 
-TEST(ParserSection6, Enum4StateBaseXZ) {
+TEST(DataTypeParsing, Enum4StateBaseXZ) {
   auto r = Parse(
       "module m;\n"
       "  enum integer {IDLE=0, XX='x, S1=1, S2=2} state;\n"

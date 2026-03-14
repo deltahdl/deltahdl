@@ -6,7 +6,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection1010_3, NestedConcatInsideConcat) {
+TEST(UnpackedArrayConcatParsing, NestedConcatInsideConcat) {
   auto r = Parse(
       "module m;\n"
       "  byte BA[2];\n"
@@ -22,7 +22,7 @@ TEST(ParserSection1010_3, NestedConcatInsideConcat) {
   EXPECT_EQ(rhs->elements[1]->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserSection1010_3, StringConcatInsideConcat) {
+TEST(UnpackedArrayConcatParsing, StringConcatInsideConcat) {
   auto r = Parse(
       "module m;\n"
       "  string SQ[$];\n"
@@ -38,7 +38,7 @@ TEST(ParserSection1010_3, StringConcatInsideConcat) {
   EXPECT_EQ(rhs->elements[1]->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserSection1010_3, TypedAssignPatternInConcat) {
+TEST(UnpackedArrayConcatParsing, TypedAssignPatternInConcat) {
   auto r = Parse(
       "module m;\n"
       "  typedef int AI3[1:3];\n"
@@ -50,7 +50,7 @@ TEST(ParserSection1010_3, TypedAssignPatternInConcat) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection1010_3, UnpackedArrayConcatInAssignPattern) {
+TEST(UnpackedArrayConcatParsing, UnpackedArrayConcatInAssignPattern) {
   auto r = Parse(
       "module m;\n"
       "  typedef int T_QI[$];\n"

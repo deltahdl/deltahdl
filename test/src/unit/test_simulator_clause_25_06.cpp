@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA703, DottedTerminalSimulates) {
+TEST(SpecifyTerminalSim, DottedTerminalSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

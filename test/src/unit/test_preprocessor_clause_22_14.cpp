@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(PreprocSection22_14, BeginKeywordsEmitsMarker) {
+TEST(KeywordVersionPreprocessing, BeginKeywordsEmitsMarker) {
   PreprocFixture f;
   auto out = Preprocess(
       "`begin_keywords \"1800-2023\"\n"
@@ -22,7 +22,7 @@ TEST(PreprocSection22_14, BeginKeywordsEmitsMarker) {
   EXPECT_EQ(ver, KeywordVersion::kVer18002023);
 }
 
-TEST(PreprocSection22_14, EndKeywordsRestoresDefault) {
+TEST(KeywordVersionPreprocessing, EndKeywordsRestoresDefault) {
   PreprocFixture f;
   auto out = Preprocess(
       "`begin_keywords \"1364-1995\"\n"
@@ -39,7 +39,7 @@ TEST(PreprocSection22_14, EndKeywordsRestoresDefault) {
   EXPECT_EQ(ver, KeywordVersion::kVer18002023);
 }
 
-TEST(PreprocSection22_14, AllVersionSpecifiersRecognized) {
+TEST(KeywordVersionPreprocessing, AllVersionSpecifiersRecognized) {
   struct Case {
     const char* spec;
     KeywordVersion expected;
@@ -69,37 +69,37 @@ TEST(PreprocSection22_14, AllVersionSpecifiersRecognized) {
   }
 }
 
-TEST(PreprocSection22_14, ErrorUnrecognizedVersion) {
+TEST(KeywordVersionPreprocessing, ErrorUnrecognizedVersion) {
   PreprocFixture f;
   Preprocess("`begin_keywords \"9999-9999\"\n`end_keywords\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(PreprocSection22_14, ErrorMissingQuotedString) {
+TEST(KeywordVersionPreprocessing, ErrorMissingQuotedString) {
   PreprocFixture f;
   Preprocess("`begin_keywords\n`end_keywords\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(PreprocSection22_14, ErrorMissingClosingQuote) {
+TEST(KeywordVersionPreprocessing, ErrorMissingClosingQuote) {
   PreprocFixture f;
   Preprocess("`begin_keywords \"1800-2023\n`end_keywords\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(PreprocSection22_14, ErrorEndKeywordsWithoutBegin) {
+TEST(KeywordVersionPreprocessing, ErrorEndKeywordsWithoutBegin) {
   PreprocFixture f;
   Preprocess("`end_keywords\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(PreprocSection22_14, ErrorEmptyVersionString) {
+TEST(KeywordVersionPreprocessing, ErrorEmptyVersionString) {
   PreprocFixture f;
   Preprocess("`begin_keywords \"\"\n`end_keywords\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(PreprocSection22_14, NestedBeginKeywords) {
+TEST(KeywordVersionPreprocessing, NestedBeginKeywords) {
   PreprocFixture f;
   auto out = Preprocess(
       "`begin_keywords \"1800-2005\"\n"
@@ -134,7 +134,7 @@ TEST(PreprocSection22_14, NestedBeginKeywords) {
             KeywordVersion::kVer18002023);
 }
 
-TEST(PreprocSection22_14, DoubleNestedBeginKeywords) {
+TEST(KeywordVersionPreprocessing, DoubleNestedBeginKeywords) {
   PreprocFixture f;
   Preprocess(
       "`begin_keywords \"1800-2012\"\n"
@@ -148,7 +148,7 @@ TEST(PreprocSection22_14, DoubleNestedBeginKeywords) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(PreprocSection22_14, ResetallDoesNotAffectKeywordVersion) {
+TEST(KeywordVersionPreprocessing, ResetallDoesNotAffectKeywordVersion) {
   PreprocFixture f;
   Preprocess(
       "`begin_keywords \"1364-1995\"\n"
@@ -159,7 +159,7 @@ TEST(PreprocSection22_14, ResetallDoesNotAffectKeywordVersion) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(PreprocSection22_14, ErrorBeginKeywordsInsideDesignElement) {
+TEST(KeywordVersionPreprocessing, ErrorBeginKeywordsInsideDesignElement) {
   PreprocFixture f;
   Preprocess(
       "module m;\n"
@@ -170,7 +170,7 @@ TEST(PreprocSection22_14, ErrorBeginKeywordsInsideDesignElement) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(PreprocSection22_14, ErrorEndKeywordsInsideDesignElement) {
+TEST(KeywordVersionPreprocessing, ErrorEndKeywordsInsideDesignElement) {
   PreprocFixture f;
   Preprocess(
       "`begin_keywords \"1800-2023\"\n"
@@ -181,7 +181,7 @@ TEST(PreprocSection22_14, ErrorEndKeywordsInsideDesignElement) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(PreprocSection22_14, BeginKeywordsInFalseIfdef) {
+TEST(KeywordVersionPreprocessing, BeginKeywordsInFalseIfdef) {
   PreprocFixture f;
   auto out = Preprocess(
       "`ifdef UNDEFINED\n"
@@ -194,7 +194,7 @@ TEST(PreprocSection22_14, BeginKeywordsInFalseIfdef) {
   EXPECT_EQ(out.find(kKeywordMarker), std::string::npos);
 }
 
-TEST(PreprocSection22_14, LexerSeesVersionSwitch) {
+TEST(KeywordVersionPreprocessing, LexerSeesVersionSwitch) {
   PreprocFixture f;
   auto out = Preprocess(
       "`begin_keywords \"1364-2001\"\n"
@@ -219,7 +219,7 @@ TEST(PreprocSection22_14, LexerSeesVersionSwitch) {
   EXPECT_TRUE(found_logic);
 }
 
-TEST(PreprocSection22_14, LexerSeesKeywordAfterEndKeywords) {
+TEST(KeywordVersionPreprocessing, LexerSeesKeywordAfterEndKeywords) {
   PreprocFixture f;
   auto out = Preprocess(
       "`begin_keywords \"1364-2001\"\n"
@@ -246,7 +246,7 @@ TEST(PreprocSection22_14, LexerSeesKeywordAfterEndKeywords) {
   EXPECT_EQ(logic_kinds[1], TokenKind::kKwLogic);
 }
 
-TEST(PreprocSection22_14, LogicAsIdentifierUnder1364_2001) {
+TEST(KeywordVersionPreprocessing, LogicAsIdentifierUnder1364_2001) {
   PreprocFixture f;
   auto out = Preprocess(
       "`begin_keywords \"1364-2001\"\n"
@@ -271,7 +271,7 @@ TEST(PreprocSection22_14, LogicAsIdentifierUnder1364_2001) {
   EXPECT_TRUE(found);
 }
 
-TEST(PreprocSection22_14, InterfaceNotKeywordUnder1364_2005) {
+TEST(KeywordVersionPreprocessing, InterfaceNotKeywordUnder1364_2005) {
   PreprocFixture f;
   auto out = Preprocess(
       "`begin_keywords \"1364-2005\"\n"
@@ -296,7 +296,7 @@ TEST(PreprocSection22_14, InterfaceNotKeywordUnder1364_2005) {
   EXPECT_TRUE(found);
 }
 
-TEST(PreprocSection22_14, MarkerFormatCorrect) {
+TEST(KeywordVersionPreprocessing, MarkerFormatCorrect) {
   PreprocFixture f;
   auto out = Preprocess(
       "`begin_keywords \"1800-2009\"\n"

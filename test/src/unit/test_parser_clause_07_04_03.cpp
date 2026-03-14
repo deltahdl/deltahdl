@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA25, PackedAndUnpackedDims) {
+TEST(DeclarationRangeParsing, PackedAndUnpackedDims) {
   auto r = Parse("module m; logic [7:0] mem [0:255]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -16,7 +16,7 @@ TEST(ParserA25, PackedAndUnpackedDims) {
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
 }
 
-TEST(ParserSection6, Sec6_11_LogicPackedAndUnpackedDims) {
+TEST(DataTypeParsing, LogicPackedAndUnpackedDims) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] mem[256];\n"
@@ -31,7 +31,7 @@ TEST(ParserSection6, Sec6_11_LogicPackedAndUnpackedDims) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection6, Sec6_11_PackedAndUnpackedWithRange) {
+TEST(DataTypeParsing, PackedAndUnpackedWithRange) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] mem [0:3];\n"
@@ -47,7 +47,7 @@ TEST(ParserSection6, Sec6_11_PackedAndUnpackedWithRange) {
   EXPECT_EQ(item->name, "mem");
 }
 
-TEST(ParserSection7, PackedArrayWithUnpacked) {
+TEST(AggregateTypeParsing, PackedArrayWithUnpacked) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] mem [0:255];\n"
@@ -59,7 +59,7 @@ TEST(ParserSection7, PackedArrayWithUnpacked) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection7, MemoryDeclaration_Type) {
+TEST(AggregateTypeParsing, MemoryDeclaration_Type) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] mema [0:255];\n"
@@ -72,7 +72,7 @@ TEST(ParserSection7, MemoryDeclaration_Type) {
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
 }
 
-TEST(ParserSection7, MemoryDeclaration_Dim) {
+TEST(AggregateTypeParsing, MemoryDeclaration_Dim) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] mema [0:255];\n"
@@ -86,7 +86,7 @@ TEST(ParserSection7, MemoryDeclaration_Dim) {
   EXPECT_EQ(dim->kind, ExprKind::kBinary);
   EXPECT_EQ(dim->op, TokenKind::kColon);
 }
-TEST(ParserSection6, VectorWithMultipleDims) {
+TEST(DataTypeParsing, VectorWithMultipleDims) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] mem [0:255];\n"

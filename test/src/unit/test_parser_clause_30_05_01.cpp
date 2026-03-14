@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, Sec28_12_SpecparamMinTypMax) {
+TEST(GateLevelModelingParsing, SpecparamMinTypMax) {
   EXPECT_TRUE(
       ParseOk("module m(input a, output b);\n"
               "  specify\n"
@@ -42,7 +42,7 @@ TEST_F(SpecifyTest, PathDelayThreeValues) {
   ASSERT_EQ(spec->specify_items[0]->path.delays.size(), 3u);
 }
 
-TEST(ParserSection28, Sec28_12_TwoDelayPath) {
+TEST(GateLevelModelingParsing, TwoDelayPath) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b);\n"
       "  specify\n"
@@ -56,7 +56,7 @@ TEST(ParserSection28, Sec28_12_TwoDelayPath) {
   ASSERT_EQ(sp.sole_item->path.delays.size(), 2u);
 }
 
-TEST(ParserSection28, Sec28_12_ThreeDelayPath) {
+TEST(GateLevelModelingParsing, ThreeDelayPath) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b);\n"
       "  specify\n"
@@ -69,7 +69,7 @@ TEST(ParserSection28, Sec28_12_ThreeDelayPath) {
   ASSERT_EQ(sp.sole_item->path.delays.size(), 3u);
 }
 
-TEST(ParserSection28, Sec28_12_SixDelayPath) {
+TEST(GateLevelModelingParsing, SixDelayPath) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b);\n"
       "  specify\n"
@@ -82,7 +82,7 @@ TEST(ParserSection28, Sec28_12_SixDelayPath) {
   ASSERT_EQ(sp.sole_item->path.delays.size(), 6u);
 }
 
-TEST(ParserSection28, Sec28_12_TwelveDelayPath) {
+TEST(GateLevelModelingParsing, TwelveDelayPath) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b);\n"
       "  specify\n"
@@ -95,7 +95,7 @@ TEST(ParserSection28, Sec28_12_TwelveDelayPath) {
   ASSERT_EQ(sp.sole_item->path.delays.size(), 12u);
 }
 
-TEST(ParserA704, ListOfPathDelayExpr6) {
+TEST(SpecifyPathDelayParsing, ListOfPathDelayExpr6) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -109,7 +109,7 @@ TEST(ParserA704, ListOfPathDelayExpr6) {
   ASSERT_EQ(si->path.delays.size(), 6u);
 }
 
-TEST(ParserA704, ListOfPathDelayExpr12) {
+TEST(SpecifyPathDelayParsing, ListOfPathDelayExpr12) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -123,7 +123,7 @@ TEST(ParserA704, ListOfPathDelayExpr12) {
   ASSERT_EQ(si->path.delays.size(), 12u);
 }
 
-TEST(ParserA704, PathDelayExprMinTypMaxBare) {
+TEST(SpecifyPathDelayParsing, PathDelayExprMinTypMaxBare) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -138,7 +138,7 @@ TEST(ParserA704, PathDelayExprMinTypMaxBare) {
   EXPECT_EQ(si->path.delays[0]->kind, ExprKind::kMinTypMax);
 }
 
-TEST(ParserA704, PathDelayExprMinTypMaxParenthesized) {
+TEST(SpecifyPathDelayParsing, PathDelayExprMinTypMaxParenthesized) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -153,7 +153,7 @@ TEST(ParserA704, PathDelayExprMinTypMaxParenthesized) {
   EXPECT_EQ(si->path.delays[0]->kind, ExprKind::kMinTypMax);
 }
 
-TEST(ParserA704, PathDelayExprMinTypMax2) {
+TEST(SpecifyPathDelayParsing, PathDelayExprMinTypMax2) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -169,7 +169,7 @@ TEST(ParserA704, PathDelayExprMinTypMax2) {
   EXPECT_EQ(si->path.delays[1]->kind, ExprKind::kMinTypMax);
 }
 
-TEST(ParserA704, PathDelayExprMinTypMax3) {
+TEST(SpecifyPathDelayParsing, PathDelayExprMinTypMax3) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -186,7 +186,7 @@ TEST(ParserA704, PathDelayExprMinTypMax3) {
   }
 }
 
-TEST(ParserA704, PathDelayExprMinTypMax6) {
+TEST(SpecifyPathDelayParsing, PathDelayExprMinTypMax6) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -203,7 +203,7 @@ TEST(ParserA704, PathDelayExprMinTypMax6) {
   }
 }
 
-TEST(ParserA704, PathDelayExprMinTypMax12) {
+TEST(SpecifyPathDelayParsing, PathDelayExprMinTypMax12) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -222,7 +222,7 @@ TEST(ParserA704, PathDelayExprMinTypMax12) {
   }
 }
 
-TEST(ParserA704, PathDelayRiseFallSpecparams) {
+TEST(SpecifyPathDelayParsing, PathDelayRiseFallSpecparams) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -235,7 +235,7 @@ TEST(ParserA704, PathDelayRiseFallSpecparams) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA704, InvalidDelayCount4) {
+TEST(SpecifyPathDelayParsing, InvalidDelayCount4) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -245,7 +245,7 @@ TEST(ParserA704, InvalidDelayCount4) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserA704, InvalidDelayCount5) {
+TEST(SpecifyPathDelayParsing, InvalidDelayCount5) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -255,7 +255,7 @@ TEST(ParserA704, InvalidDelayCount5) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserA704, SixDelaysParallelPath) {
+TEST(SpecifyPathDelayParsing, SixDelaysParallelPath) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -270,7 +270,7 @@ TEST(ParserA704, SixDelaysParallelPath) {
   ASSERT_EQ(si->path.delays.size(), 6u);
 }
 
-TEST(ParserA704, TwelveDelaysParallelPath) {
+TEST(SpecifyPathDelayParsing, TwelveDelaysParallelPath) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -285,7 +285,7 @@ TEST(ParserA704, TwelveDelaysParallelPath) {
   ASSERT_EQ(si->path.delays.size(), 12u);
 }
 
-TEST(ParserA704, SixDelaysEdgeSensitive) {
+TEST(SpecifyPathDelayParsing, SixDelaysEdgeSensitive) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

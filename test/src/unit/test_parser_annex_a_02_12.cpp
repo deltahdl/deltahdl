@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, LetPortItem_ExplicitType) {
+TEST(ConstraintDeclParsing, LetPortItem_ExplicitType) {
   auto r = Parse(
       "module m;\n"
       "  let f(logic [15:0] val) = val;\n"
@@ -18,7 +18,7 @@ TEST(ParserA212, LetPortItem_ExplicitType) {
   EXPECT_EQ(item->func_args[0].name, "val");
 }
 
-TEST(ParserA212, LetPortItem_WithDefault) {
+TEST(ConstraintDeclParsing, LetPortItem_WithDefault) {
   auto r = Parse(
       "module m;\n"
       "  let f(x = 42) = x;\n"
@@ -32,7 +32,7 @@ TEST(ParserA212, LetPortItem_WithDefault) {
   EXPECT_NE(item->func_args[0].default_value, nullptr);
 }
 
-TEST(ParserA212, LetPortItem_NoDefault) {
+TEST(ConstraintDeclParsing, LetPortItem_NoDefault) {
   auto r = Parse(
       "module m;\n"
       "  let f(x) = x;\n"
@@ -44,14 +44,14 @@ TEST(ParserA212, LetPortItem_NoDefault) {
   EXPECT_EQ(item->func_args[0].default_value, nullptr);
 }
 
-TEST(ParserA212, LetPortItem_WithUnpackedDim) {
+TEST(ConstraintDeclParsing, LetPortItem_WithUnpackedDim) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(logic x [3:0]) = x[0];\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetPortItem_TypedWithDefault) {
+TEST(ConstraintDeclParsing, LetPortItem_TypedWithDefault) {
   auto r = Parse(
       "module m;\n"
       "  let at_least(logic sig, logic rst = 1'b0) = rst || sig;\n"
@@ -65,42 +65,42 @@ TEST(ParserA212, LetPortItem_TypedWithDefault) {
   EXPECT_NE(item->func_args[1].default_value, nullptr);
 }
 
-TEST(ParserA212, LetPortItem_IntType) {
+TEST(ConstraintDeclParsing, LetPortItem_IntType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(int a, int b) = a * b;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetPortItem_BitType) {
+TEST(ConstraintDeclParsing, LetPortItem_BitType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(bit [7:0] x) = x;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetPortItem_RegType) {
+TEST(ConstraintDeclParsing, LetPortItem_RegType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(reg [3:0] r) = r;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetPortItem_AttributeInstance) {
+TEST(ConstraintDeclParsing, LetPortItem_AttributeInstance) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f((* my_attr *) logic x) = x;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetPortItem_AttributeInstanceMultiple) {
+TEST(ConstraintDeclParsing, LetPortItem_AttributeInstanceMultiple) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f((* a = 1 *) x, (* b *) y) = x + y;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetFormalType_Implicit) {
+TEST(ConstraintDeclParsing, LetFormalType_Implicit) {
   auto r = Parse(
       "module m;\n"
       "  let f(x) = x;\n"
@@ -112,49 +112,49 @@ TEST(ParserA212, LetFormalType_Implicit) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-TEST(ParserA212, LetFormalType_Logic) {
+TEST(ConstraintDeclParsing, LetFormalType_Logic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(logic x) = x;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetFormalType_LogicPacked) {
+TEST(ConstraintDeclParsing, LetFormalType_LogicPacked) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(logic [31:0] x) = x;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetFormalType_Integer) {
+TEST(ConstraintDeclParsing, LetFormalType_Integer) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(integer x) = x;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetFormalType_Real) {
+TEST(ConstraintDeclParsing, LetFormalType_Real) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(real x) = x;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetFormalType_SignedImplicit) {
+TEST(ConstraintDeclParsing, LetFormalType_SignedImplicit) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(signed [7:0] x) = x;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetFormalType_UnsignedImplicit) {
+TEST(ConstraintDeclParsing, LetFormalType_UnsignedImplicit) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(unsigned [7:0] x) = x;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetFormalType_MixedUntypedAndTyped) {
+TEST(ConstraintDeclParsing, LetFormalType_MixedUntypedAndTyped) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(untyped a, logic [7:0] b) = b;\n"

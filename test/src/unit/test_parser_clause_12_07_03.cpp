@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection9, Sec9_2_2_ForeachLoop) {
+TEST(ProcessParsing, ForeachLoop) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] arr [0:3];\n"
@@ -22,7 +22,7 @@ TEST(ParserSection9, Sec9_2_2_ForeachLoop) {
   ASSERT_FALSE(stmt->foreach_vars.empty());
 }
 
-TEST(ParserSection12, ForeachBasicParses) {
+TEST(ProceduralStatementParsing, ForeachBasicParses) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -37,7 +37,7 @@ TEST(ParserSection12, ForeachBasicParses) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserSection12, ForeachBasicVars) {
+TEST(ProceduralStatementParsing, ForeachBasicVars) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -50,7 +50,7 @@ TEST(ParserSection12, ForeachBasicVars) {
   EXPECT_EQ(stmt->foreach_vars[0], "i");
 }
 
-TEST(ParserSection12, ForeachEmptyVar) {
+TEST(ProceduralStatementParsing, ForeachEmptyVar) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -64,7 +64,7 @@ TEST(ParserSection12, ForeachEmptyVar) {
   ASSERT_EQ(stmt->foreach_vars.size(), 2u);
 }
 
-TEST(ParserSection12, ForeachEmptyVarValues) {
+TEST(ProceduralStatementParsing, ForeachEmptyVarValues) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -77,7 +77,7 @@ TEST(ParserSection12, ForeachEmptyVarValues) {
   EXPECT_EQ(stmt->foreach_vars[1], "j");
 }
 
-TEST(ParserSection12, ForeachWithBlock) {
+TEST(ProceduralStatementParsing, ForeachWithBlock) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -94,7 +94,7 @@ TEST(ParserSection12, ForeachWithBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserA608, ForeachStmt) {
+TEST(LoopSyntaxParsing, ForeachStmt) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foreach (arr[i]) $display(arr[i]); end\n"
@@ -108,7 +108,7 @@ TEST(ParserA608, ForeachStmt) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserA608, ForeachSingleVar) {
+TEST(LoopSyntaxParsing, ForeachSingleVar) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foreach (arr[i]) x = i; end\n"
@@ -121,7 +121,7 @@ TEST(ParserA608, ForeachSingleVar) {
   EXPECT_EQ(stmt->foreach_vars[0], "i");
 }
 
-TEST(ParserA608, ForeachMultipleVars) {
+TEST(LoopSyntaxParsing, ForeachMultipleVars) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foreach (matrix[i, j]) x = i; end\n"
@@ -135,7 +135,7 @@ TEST(ParserA608, ForeachMultipleVars) {
   EXPECT_EQ(stmt->foreach_vars[1], "j");
 }
 
-TEST(ParserA608, ForeachEmptyVarSlot) {
+TEST(LoopSyntaxParsing, ForeachEmptyVarSlot) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foreach (arr[, j]) x = j; end\n"
@@ -149,7 +149,7 @@ TEST(ParserA608, ForeachEmptyVarSlot) {
   EXPECT_EQ(stmt->foreach_vars[1], "j");
 }
 
-TEST(ParserA608, ForeachHierarchicalArray) {
+TEST(LoopSyntaxParsing, ForeachHierarchicalArray) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foreach (obj.arr[i]) x = i; end\n"
@@ -163,7 +163,7 @@ TEST(ParserA608, ForeachHierarchicalArray) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserA608, ForeachBlockBody) {
+TEST(LoopSyntaxParsing, ForeachBlockBody) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

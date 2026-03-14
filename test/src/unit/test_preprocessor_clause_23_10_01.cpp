@@ -42,7 +42,7 @@ TEST(SourceText, ParameterOverrideDefparam) {
   EXPECT_EQ(dp->defparam_assigns.size(), 2u);
 }
 
-TEST(ParserA23, ListOfDefparamAssignmentsSingle) {
+TEST(DeclarationListParsing, ListOfDefparamAssignmentsSingle) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  defparam u0.WIDTH = 8;\n"
@@ -54,7 +54,7 @@ TEST(ParserA23, ListOfDefparamAssignmentsSingle) {
   EXPECT_EQ(item->defparam_assigns.size(), 1u);
 }
 
-TEST(ParserA23, ListOfDefparamAssignmentsMultiple) {
+TEST(DeclarationListParsing, ListOfDefparamAssignmentsMultiple) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  defparam u0.WIDTH = 16, u1.DEPTH = 8;\n"
@@ -66,7 +66,7 @@ TEST(ParserA23, ListOfDefparamAssignmentsMultiple) {
   EXPECT_EQ(item->defparam_assigns.size(), 2u);
 }
 
-TEST(ParserA24, DefparamAssignmentHierarchical) {
+TEST(DeclarationAssignmentParsing, DefparamAssignmentHierarchical) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  defparam u0.sub.WIDTH = 16;\n"

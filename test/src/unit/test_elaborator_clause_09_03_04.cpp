@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_03_04, NamedSeqBlockElaborates) {
+TEST(BlockNameElaboration, NamedSeqBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -21,7 +21,7 @@ TEST(ElabClause09_03_04, NamedSeqBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_04, NamedForkBlockElaborates) {
+TEST(BlockNameElaboration, NamedForkBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

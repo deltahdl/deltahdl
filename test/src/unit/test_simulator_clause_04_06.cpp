@@ -7,11 +7,11 @@
 
 using namespace delta;
 
-TEST(SimCh46, SequentialStatementsExecuteInSourceOrder) {
+TEST(DeterminismSim, SequentialStatementsExecuteInSourceOrder) {
   VerifyActiveRegionFIFO();
 }
 
-TEST(SimCh46, SuspendedProcessResumesInOrder) {
+TEST(DeterminismSim, SuspendedProcessResumesInOrder) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -38,7 +38,7 @@ TEST(SimCh46, SuspendedProcessResumesInOrder) {
   EXPECT_EQ(order[2], "A1");
 }
 
-TEST(SimCh46, LargeSequentialBlockPreservesOrder) {
+TEST(DeterminismSim, LargeSequentialBlockPreservesOrder) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -56,7 +56,7 @@ TEST(SimCh46, LargeSequentialBlockPreservesOrder) {
   }
 }
 
-TEST(SimCh46, NBAExecutionOrder) {
+TEST(DeterminismSim, NBAExecutionOrder) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> nba_order;
@@ -74,7 +74,7 @@ TEST(SimCh46, NBAExecutionOrder) {
   EXPECT_EQ(nba_order[2], 2);
 }
 
-TEST(SimCh46, NBALastAssignmentWins) {
+TEST(DeterminismSim, NBALastAssignmentWins) {
   Arena arena;
   Scheduler sched(arena);
   int a = -1;
@@ -91,7 +91,7 @@ TEST(SimCh46, NBALastAssignmentWins) {
   EXPECT_EQ(a, 1);
 }
 
-TEST(SimCh46, ActiveGeneratedNBAsExecuteInOrder) {
+TEST(DeterminismSim, ActiveGeneratedNBAsExecuteInOrder) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> nba_order;
@@ -113,7 +113,7 @@ TEST(SimCh46, ActiveGeneratedNBAsExecuteInOrder) {
   EXPECT_EQ(nba_order[2], 2);
 }
 
-TEST(SimCh46, SequentialStatementsProduceOrderedNBAs) {
+TEST(DeterminismSim, SequentialStatementsProduceOrderedNBAs) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> log;
@@ -136,7 +136,7 @@ TEST(SimCh46, SequentialStatementsProduceOrderedNBAs) {
   EXPECT_EQ(log, expected);
 }
 
-TEST(SimCh46, SourceOrderPreservedAcrossTimeSlots) {
+TEST(DeterminismSim, SourceOrderPreservedAcrossTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -165,7 +165,7 @@ TEST(SimCh46, SourceOrderPreservedAcrossTimeSlots) {
   EXPECT_EQ(order[3], "t5_1");
 }
 
-TEST(SimCh46, NBAOrderingAcrossTimeSlots) {
+TEST(DeterminismSim, NBAOrderingAcrossTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> values;
@@ -201,7 +201,7 @@ TEST(SimCh46, NBAOrderingAcrossTimeSlots) {
   EXPECT_EQ(values[1], 40);
 }
 
-TEST(SimCh46, ReactiveNBAExecutionOrder) {
+TEST(DeterminismSim, ReactiveNBAExecutionOrder) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -219,7 +219,7 @@ TEST(SimCh46, ReactiveNBAExecutionOrder) {
   EXPECT_EQ(order[2], 2);
 }
 
-TEST(SimCh4, ComputationChainInProcess) {
+TEST(SchedulingSemanticsSim, ComputationChainInProcess) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [15:0] x;\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexE2, AnnexEDelayModePath) {
+TEST(OptionalDirectiveExtendedParsing, DelayModePath) {
   auto r = ParseWithPreprocessor(
       "`delay_mode_path\n"
       "module m; endmodule\n");

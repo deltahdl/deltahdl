@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA051, SequentialWithInitial) {
+TEST(UdpDeclGrammar, SequentialWithInitial) {
   auto r = Parse(
       "primitive srff(output reg q, input s, input r);\n"
       "  initial q = 1'b0;\n"
@@ -26,7 +26,7 @@ TEST(ParserAnnexA051, SequentialWithInitial) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
-TEST(ParserAnnexA051, SequentialInitialX) {
+TEST(UdpDeclGrammar, SequentialInitialX) {
   auto r = Parse(
       "primitive dff_x(output reg q, input d, input clk);\n"
       "  initial q = 1'bx;\n"
@@ -42,7 +42,7 @@ TEST(ParserAnnexA051, SequentialInitialX) {
   EXPECT_EQ(udp->initial_value, 'x');
 }
 
-TEST(ParserAnnexA051, SimSequentialWithInitial) {
+TEST(UdpDeclGrammar, SimSequentialWithInitial) {
   auto r = Parse(
       "primitive latch(output reg q, input d, input en);\n"
       "  initial q = 1'b0;\n"
@@ -69,7 +69,7 @@ TEST(ParserAnnexA051, SimSequentialWithInitial) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-TEST(ParserAnnexA053, SeqBody_WithInitial) {
+TEST(UdpBodyGrammar, SeqBody_WithInitial) {
   auto r = Parse(
       "primitive latch_init(output reg q, input d, en);\n"
       "  initial q = 0;\n"
@@ -88,7 +88,7 @@ TEST(ParserAnnexA053, SeqBody_WithInitial) {
   EXPECT_EQ(udp->table.size(), 3);
 }
 
-TEST(ParserAnnexA053, SeqBody_SimInitialValue) {
+TEST(UdpBodyGrammar, SeqBody_SimInitialValue) {
   auto r = Parse(
       "primitive latch_init(output reg q, input d, en);\n"
       "  initial q = 1;\n"
@@ -108,7 +108,7 @@ TEST(ParserAnnexA053, SeqBody_SimInitialValue) {
   EXPECT_EQ(eval.GetOutput(), '1');
 }
 
-TEST(ParserAnnexA053, InitStmt_ValueOne) {
+TEST(UdpBodyGrammar, InitStmt_ValueOne) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
       "  initial q = 1;\n"
@@ -123,7 +123,7 @@ TEST(ParserAnnexA053, InitStmt_ValueOne) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-TEST(ParserAnnexA053, InitVal_1b0) {
+TEST(UdpBodyGrammar, InitVal_1b0) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
       "  initial q = 1'b0;\n"
@@ -135,7 +135,7 @@ TEST(ParserAnnexA053, InitVal_1b0) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '0');
 }
 
-TEST(ParserAnnexA053, InitVal_1b1) {
+TEST(UdpBodyGrammar, InitVal_1b1) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
       "  initial q = 1'b1;\n"
@@ -147,7 +147,7 @@ TEST(ParserAnnexA053, InitVal_1b1) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
 }
 
-TEST(ParserAnnexA053, InitVal_1bx) {
+TEST(UdpBodyGrammar, InitVal_1bx) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
       "  initial q = 1'bx;\n"
@@ -159,7 +159,7 @@ TEST(ParserAnnexA053, InitVal_1bx) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
-TEST(ParserAnnexA053, InitVal_1bX) {
+TEST(UdpBodyGrammar, InitVal_1bX) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
       "  initial q = 1'bX;\n"
@@ -171,7 +171,7 @@ TEST(ParserAnnexA053, InitVal_1bX) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
-TEST(ParserAnnexA053, InitVal_1B0) {
+TEST(UdpBodyGrammar, InitVal_1B0) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
       "  initial q = 1'B0;\n"
@@ -183,7 +183,7 @@ TEST(ParserAnnexA053, InitVal_1B0) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '0');
 }
 
-TEST(ParserAnnexA053, InitVal_1B1) {
+TEST(UdpBodyGrammar, InitVal_1B1) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
       "  initial q = 1'B1;\n"
@@ -195,7 +195,7 @@ TEST(ParserAnnexA053, InitVal_1B1) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
 }
 
-TEST(ParserAnnexA053, InitVal_1Bx) {
+TEST(UdpBodyGrammar, InitVal_1Bx) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
       "  initial q = 1'Bx;\n"
@@ -207,7 +207,7 @@ TEST(ParserAnnexA053, InitVal_1Bx) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
-TEST(ParserAnnexA053, InitVal_1BX) {
+TEST(UdpBodyGrammar, InitVal_1BX) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
       "  initial q = 1'BX;\n"
@@ -219,7 +219,7 @@ TEST(ParserAnnexA053, InitVal_1BX) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
-TEST(ParserAnnexA053, InitVal_Bare0) {
+TEST(UdpBodyGrammar, InitVal_Bare0) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
       "  initial q = 0;\n"
@@ -231,7 +231,7 @@ TEST(ParserAnnexA053, InitVal_Bare0) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '0');
 }
 
-TEST(ParserAnnexA053, InitVal_Bare1) {
+TEST(UdpBodyGrammar, InitVal_Bare1) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
       "  initial q = 1;\n"
@@ -243,7 +243,7 @@ TEST(ParserAnnexA053, InitVal_Bare1) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
 }
 
-TEST(ParserClause03, Cl3_7_SequentialUdp) {
+TEST(DesignBuildingBlockParsing, SequentialUdp) {
   auto r = Parse(
       "primitive udp_latch (output reg q, input d, en);\n"
       "  initial q = 0;\n"
@@ -268,7 +268,7 @@ TEST(ParserClause03, Cl3_7_SequentialUdp) {
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
-TEST(ParserSection29, SequentialUdpInitial) {
+TEST(UserDefinedPrimitiveParsing, SequentialUdpInitial) {
   auto r = Parse(
       "primitive srff(output reg q, input s, r);\n"
       "  initial q = 1'b1;\n"

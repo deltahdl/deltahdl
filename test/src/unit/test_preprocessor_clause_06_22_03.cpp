@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, CompatibleTypesIntToLogic) {
+TEST(DataTypeParsing, CompatibleTypesIntToLogic) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  int a;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection6, CompatibleTypesIntToLogic) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, AssignCompatibleIntToReal) {
+TEST(DataTypeParsing, AssignCompatibleIntToReal) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  real r;\n"

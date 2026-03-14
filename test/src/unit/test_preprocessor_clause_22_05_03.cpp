@@ -4,7 +4,7 @@
 
 using namespace delta;
 
-TEST(Preprocessor, Clause22_5_3_UndefineAllUndefinedAllMacros) {
+TEST(Preprocessor, UndefineAllUndefinedAllMacros) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO 42\n"
@@ -16,7 +16,7 @@ TEST(Preprocessor, Clause22_5_3_UndefineAllUndefinedAllMacros) {
   EXPECT_EQ(result.find("visible"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_3_UndefineAllMultipleMacros) {
+TEST(Preprocessor, UndefineAllMultipleMacros) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define A 1\n"
@@ -38,7 +38,7 @@ TEST(Preprocessor, Clause22_5_3_UndefineAllMultipleMacros) {
   EXPECT_EQ(result.find("c_visible"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_3_UndefineAllTakesNoArguments) {
+TEST(Preprocessor, UndefineAllTakesNoArguments) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO 1\n"
@@ -49,7 +49,7 @@ TEST(Preprocessor, Clause22_5_3_UndefineAllTakesNoArguments) {
   EXPECT_NE(result.find("int x = 5;"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_3_UndefineAllCanAppearAnywhere) {
+TEST(Preprocessor, UndefineAllCanAppearAnywhere) {
   PreprocFixture f;
   Preprocess(
       "`define FOO 1\n"
@@ -60,7 +60,7 @@ TEST(Preprocessor, Clause22_5_3_UndefineAllCanAppearAnywhere) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_3_DefineAfterUndefineAll) {
+TEST(Preprocessor, DefineAfterUndefineAll) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO 1\n"
@@ -72,7 +72,7 @@ TEST(Preprocessor, Clause22_5_3_DefineAfterUndefineAll) {
   EXPECT_NE(result.find("99"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_3_UndefineAllIncludesFunctionLikeMacros) {
+TEST(Preprocessor, UndefineAllIncludesFunctionLikeMacros) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define ADD(a,b) a + b\n"

@@ -2,32 +2,32 @@
 
 namespace {
 
-TEST(ElabClause03, EmptyModuleElaborates) {
+TEST(DesignBuildingBlockElaboration, EmptyModuleElaborates) {
   EXPECT_TRUE(ElabOk("module m; endmodule\n"));
 }
 
-TEST(ElabClause03, EmptyProgramElaborates) {
+TEST(DesignBuildingBlockElaboration, EmptyProgramElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc("program p; endprogram\n", f, "p");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, EmptyInterfaceElaborates) {
+TEST(DesignBuildingBlockElaboration, EmptyInterfaceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc("interface ifc; endinterface\n", f, "ifc");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, EmptyCheckerElaborates) {
+TEST(DesignBuildingBlockElaboration, EmptyCheckerElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc("checker chk; endchecker\n", f, "chk");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, ModuleAsContainer) {
+TEST(DesignBuildingBlockElaboration, ModuleAsContainer) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  logic a;\n"
@@ -36,7 +36,7 @@ TEST(ElabClause03, ModuleAsContainer) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, UnknownTopIsError) {
+TEST(DesignBuildingBlockElaboration, UnknownTopIsError) {
   ElabFixture f;
   auto* design = ElaborateSrc("module m; endmodule\n", f, "nonexistent");
   EXPECT_EQ(design, nullptr);

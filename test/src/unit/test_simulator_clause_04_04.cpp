@@ -7,7 +7,7 @@
 
 using namespace delta;
 
-TEST(SimCh44, EventsDynamicallyScheduledAndExecuted) {
+TEST(StratifiedSchedulerSim, EventsDynamicallyScheduledAndExecuted) {
   Arena arena;
   Scheduler sched(arena);
   bool executed = false;
@@ -22,7 +22,7 @@ TEST(SimCh44, EventsDynamicallyScheduledAndExecuted) {
   EXPECT_FALSE(sched.HasEvents());
 }
 
-TEST(SimCh44, EventsRemovedAfterExecution) {
+TEST(StratifiedSchedulerSim, EventsRemovedAfterExecution) {
   Arena arena;
   Scheduler sched(arena);
   auto& pool = sched.GetEventPool();
@@ -36,7 +36,7 @@ TEST(SimCh44, EventsRemovedAfterExecution) {
   EXPECT_EQ(pool.FreeCount(), 1u);
 }
 
-TEST(SimCh44, FirstDivisionByTime) {
+TEST(StratifiedSchedulerSim, FirstDivisionByTime) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> exec_times;
@@ -57,7 +57,7 @@ TEST(SimCh44, FirstDivisionByTime) {
   EXPECT_EQ(exec_times[2], 20u);
 }
 
-TEST(SimCh44, AllEventsAtSameTimeFormOneTimeSlot) {
+TEST(StratifiedSchedulerSim, AllEventsAtSameTimeFormOneTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
   int timestep_count = 0;
@@ -76,7 +76,7 @@ TEST(SimCh44, AllEventsAtSameTimeFormOneTimeSlot) {
   EXPECT_EQ(event_count, 5);
 }
 
-TEST(SimCh44, AllEventsInCurrentSlotBeforeNext) {
+TEST(StratifiedSchedulerSim, AllEventsInCurrentSlotBeforeNext) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::pair<uint64_t, int>> log;
@@ -103,7 +103,7 @@ TEST(SimCh44, AllEventsInCurrentSlotBeforeNext) {
   EXPECT_EQ(log[3].first, 10u);
 }
 
-TEST(SimCh44, SimulatorNeverGoesBackwardsInTime) {
+TEST(StratifiedSchedulerSim, SimulatorNeverGoesBackwardsInTime) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;
@@ -124,7 +124,7 @@ TEST(SimCh44, SimulatorNeverGoesBackwardsInTime) {
   }
 }
 
-TEST(SimCh44, EmptyTimeSlotsSkipped) {
+TEST(StratifiedSchedulerSim, EmptyTimeSlotsSkipped) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;
@@ -145,13 +145,13 @@ TEST(SimCh44, EmptyTimeSlotsSkipped) {
   EXPECT_EQ(times[2], 500u);
 }
 
-TEST(SimCh44, TimeSlotHas17OrderedRegions) {
+TEST(StratifiedSchedulerSim, TimeSlotHas17OrderedRegions) {
   EXPECT_EQ(kRegionCount, 17u);
   EXPECT_EQ(static_cast<int>(Region::kPreponed), 0);
   EXPECT_EQ(static_cast<int>(Region::kPostponed), 16);
 }
 
-TEST(SimCh44, All17RegionsNamedAndOrdered) {
+TEST(StratifiedSchedulerSim, All17RegionsNamedAndOrdered) {
   EXPECT_LT(static_cast<int>(Region::kPreponed),
             static_cast<int>(Region::kPreActive));
   EXPECT_LT(static_cast<int>(Region::kPreActive),
@@ -184,9 +184,9 @@ TEST(SimCh44, All17RegionsNamedAndOrdered) {
             static_cast<int>(Region::kPostponed));
 }
 
-TEST(SimCh44, AllRegionsExecuteInOrder) { VerifyAllRegionsExecuteInOrder(); }
+TEST(StratifiedSchedulerSim, AllRegionsExecuteInOrder) { VerifyAllRegionsExecuteInOrder(); }
 
-TEST(SimCh44, TimeSlotAnyNonemptyInRange) {
+TEST(StratifiedSchedulerSim, TimeSlotAnyNonemptyInRange) {
   Arena arena;
   EventPool pool(arena);
   TimeSlot slot;
@@ -201,7 +201,7 @@ TEST(SimCh44, TimeSlotAnyNonemptyInRange) {
   EXPECT_FALSE(slot.AnyNonemptyIn(Region::kReactive, Region::kReNBA));
 }
 
-TEST(SimCh44, EventQueueFIFOOrder) {
+TEST(StratifiedSchedulerSim, EventQueueFIFOOrder) {
   Arena arena;
   EventPool pool(arena);
   EventQueue queue;
@@ -221,7 +221,7 @@ TEST(SimCh44, EventQueueFIFOOrder) {
   EXPECT_TRUE(queue.empty());
 }
 
-TEST(SimCh44, EventQueueClear) {
+TEST(StratifiedSchedulerSim, EventQueueClear) {
   Arena arena;
   EventPool pool(arena);
   EventQueue queue;
@@ -234,7 +234,7 @@ TEST(SimCh44, EventQueueClear) {
   EXPECT_TRUE(queue.empty());
 }
 
-TEST(SimCh44, RegionsPredictableDesignTestbenchInteraction) {
+TEST(StratifiedSchedulerSim, RegionsPredictableDesignTestbenchInteraction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -253,7 +253,7 @@ TEST(SimCh44, RegionsPredictableDesignTestbenchInteraction) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
 }
 
-TEST(SimCh44, PredictableNBAToAlwaysCombInteraction) {
+TEST(StratifiedSchedulerSim, PredictableNBAToAlwaysCombInteraction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -270,7 +270,7 @@ TEST(SimCh44, PredictableNBAToAlwaysCombInteraction) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 51u);
 }
 
-TEST(SimCh44, DynamicSchedulingWithinSameTimeSlot) {
+TEST(StratifiedSchedulerSim, DynamicSchedulingWithinSameTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
   int timestep_count = 0;
@@ -291,7 +291,7 @@ TEST(SimCh44, DynamicSchedulingWithinSameTimeSlot) {
   EXPECT_EQ(timestep_count, 1);
 }
 
-TEST(SimCh44, BlockingAndNBACompleteInSameTimeSlot) {
+TEST(StratifiedSchedulerSim, BlockingAndNBACompleteInSameTimeSlot) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -306,7 +306,7 @@ TEST(SimCh44, BlockingAndNBACompleteInSameTimeSlot) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
 }
 
-TEST(SimCh44, MultipleTimeSlotsFormDistinctSlots) {
+TEST(StratifiedSchedulerSim, MultipleTimeSlotsFormDistinctSlots) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -321,7 +321,7 @@ TEST(SimCh44, MultipleTimeSlotsFormDistinctSlots) {
   EXPECT_EQ(result, 3u);
 }
 
-TEST(SimCh44, EventCalendarTimeOrdered) {
+TEST(StratifiedSchedulerSim, EventCalendarTimeOrdered) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;
@@ -344,7 +344,7 @@ TEST(SimCh44, EventCalendarTimeOrdered) {
   EXPECT_EQ(times[4], 50u);
 }
 
-TEST(SimCh44, NoEventsNoAdvance) {
+TEST(StratifiedSchedulerSim, NoEventsNoAdvance) {
   Arena arena;
   Scheduler sched(arena);
   EXPECT_FALSE(sched.HasEvents());
@@ -353,7 +353,7 @@ TEST(SimCh44, NoEventsNoAdvance) {
   EXPECT_FALSE(sched.HasEvents());
 }
 
-TEST(SimCh44, RegionOrderingPerTimeSlot) {
+TEST(StratifiedSchedulerSim, RegionOrderingPerTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::pair<uint64_t, std::string>> log;
@@ -379,7 +379,7 @@ TEST(SimCh44, RegionOrderingPerTimeSlot) {
   EXPECT_EQ(log[3].second, "t10_nba");
 }
 
-TEST(SimCh4, SameTimeSlotExecution) {
+TEST(SchedulingSemanticsSim, SameTimeSlotExecution) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -403,7 +403,7 @@ TEST(SimCh4, SameTimeSlotExecution) {
   EXPECT_EQ(vb->value.ToUint64(), 2u);
 }
 
-TEST(SimCh4, SimulationNeverGoesBackward) {
+TEST(SchedulingSemanticsSim, SimulationNeverGoesBackward) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"

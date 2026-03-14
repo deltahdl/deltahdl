@@ -43,7 +43,7 @@ TEST(EvalOpXZ, CaseEqStillExact) {
   EXPECT_EQ(result.words[0].bval, 0u);
 }
 
-TEST(SimA83, EqualityTrue) {
+TEST(ExpressionSim, EqualityTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -60,7 +60,7 @@ TEST(SimA83, EqualityTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA83, InequalityTrue) {
+TEST(ExpressionSim, InequalityTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -77,7 +77,7 @@ TEST(SimA83, InequalityTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, BinaryEqTrue) {
+TEST(OperatorSim, BinaryEqTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -94,7 +94,7 @@ TEST(SimA86, BinaryEqTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, BinaryNeqTrue) {
+TEST(OperatorSim, BinaryNeqTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -111,7 +111,7 @@ TEST(SimA86, BinaryNeqTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, BinaryCaseEq) {
+TEST(OperatorSim, BinaryCaseEq) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -128,7 +128,7 @@ TEST(SimA86, BinaryCaseEq) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, BinaryCaseNeq) {
+TEST(OperatorSim, BinaryCaseNeq) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

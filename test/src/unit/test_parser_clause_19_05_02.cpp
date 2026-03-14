@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, BinsOrOptions_DefaultSequence) {
+TEST(CovergroupDeclParsing, BinsOrOptions_DefaultSequence) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -15,7 +15,7 @@ TEST(ParserA211, BinsOrOptions_DefaultSequence) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, TransList_Single) {
+TEST(CovergroupDeclParsing, TransList_Single) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -26,7 +26,7 @@ TEST(ParserA211, TransList_Single) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, TransList_Multiple) {
+TEST(CovergroupDeclParsing, TransList_Multiple) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -37,7 +37,7 @@ TEST(ParserA211, TransList_Multiple) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, TransSet_SingleRange) {
+TEST(CovergroupDeclParsing, TransSet_SingleRange) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -48,7 +48,7 @@ TEST(ParserA211, TransSet_SingleRange) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, TransSet_MultipleRanges) {
+TEST(CovergroupDeclParsing, TransSet_MultipleRanges) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -59,7 +59,7 @@ TEST(ParserA211, TransSet_MultipleRanges) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, TransRangeList_SimpleItem) {
+TEST(CovergroupDeclParsing, TransRangeList_SimpleItem) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -70,7 +70,7 @@ TEST(ParserA211, TransRangeList_SimpleItem) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, TransRangeList_ConsecutiveRepeat) {
+TEST(CovergroupDeclParsing, TransRangeList_ConsecutiveRepeat) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -81,7 +81,7 @@ TEST(ParserA211, TransRangeList_ConsecutiveRepeat) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, TransRangeList_GotoRepeat) {
+TEST(CovergroupDeclParsing, TransRangeList_GotoRepeat) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -92,7 +92,7 @@ TEST(ParserA211, TransRangeList_GotoRepeat) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, TransRangeList_NonConsecutiveRepeat) {
+TEST(CovergroupDeclParsing, TransRangeList_NonConsecutiveRepeat) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -103,7 +103,7 @@ TEST(ParserA211, TransRangeList_NonConsecutiveRepeat) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, TransItem_SingleValue) {
+TEST(CovergroupDeclParsing, TransItem_SingleValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -114,7 +114,7 @@ TEST(ParserA211, TransItem_SingleValue) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, TransItem_MultipleValues) {
+TEST(CovergroupDeclParsing, TransItem_MultipleValues) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -125,7 +125,7 @@ TEST(ParserA211, TransItem_MultipleValues) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, RepeatRange_SingleExpr) {
+TEST(CovergroupDeclParsing, RepeatRange_SingleExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -136,7 +136,7 @@ TEST(ParserA211, RepeatRange_SingleExpr) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, RepeatRange_Range) {
+TEST(CovergroupDeclParsing, RepeatRange_Range) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -147,7 +147,7 @@ TEST(ParserA211, RepeatRange_Range) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_TransitionBins) {
+TEST(CovergroupDeclParsing, CoverGroup_TransitionBins) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"

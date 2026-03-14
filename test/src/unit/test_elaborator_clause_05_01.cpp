@@ -2,42 +2,42 @@
 
 namespace {
 
-TEST(ElabClause05, Cl5_1_ModuleWithIntegerLiteralElaborates) {
+TEST(LexicalConventionElaboration, ModuleWithIntegerLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  logic [7:0] x = 8'hFF;\n"
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_1_ModuleWithRealLiteralElaborates) {
+TEST(LexicalConventionElaboration, ModuleWithRealLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  real r = 3.14;\n"
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_1_ModuleWithStringLiteralElaborates) {
+TEST(LexicalConventionElaboration, ModuleWithStringLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  initial $display(\"hello\");\n"
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_1_ModuleWithAttributeElaborates) {
+TEST(LexicalConventionElaboration, ModuleWithAttributeElaborates) {
   EXPECT_TRUE(
       ElabOk("(* synthesis *) module t;\n"
              "  logic a;\n"
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_1_ModuleWithTimeLiteralElaborates) {
+TEST(LexicalConventionElaboration, ModuleWithTimeLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  initial #10ns;\n"
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_1_ModuleWithUnbasedUnsizedLiteralElaborates) {
+TEST(LexicalConventionElaboration, ModuleWithUnbasedUnsizedLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  logic [15:0] x;\n"
@@ -45,7 +45,7 @@ TEST(ElabClause05, Cl5_1_ModuleWithUnbasedUnsizedLiteralElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_1_ModuleWithArrayLiteralElaborates) {
+TEST(LexicalConventionElaboration, ModuleWithArrayLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  int arr [0:1];\n"
@@ -53,7 +53,7 @@ TEST(ElabClause05, Cl5_1_ModuleWithArrayLiteralElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_1_ModuleWithStructureLiteralElaborates) {
+TEST(LexicalConventionElaboration, ModuleWithStructureLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct { int a; int b; } ab_t;\n"
@@ -62,7 +62,7 @@ TEST(ElabClause05, Cl5_1_ModuleWithStructureLiteralElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_1_ModuleWithBuiltinMethodElaborates) {
+TEST(LexicalConventionElaboration, ModuleWithBuiltinMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  int q[$];\n"
@@ -71,7 +71,7 @@ TEST(ElabClause05, Cl5_1_ModuleWithBuiltinMethodElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_1_ModuleWithEscapedIdentifierElaborates) {
+TEST(LexicalConventionElaboration, ModuleWithEscapedIdentifierElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  logic \\bus+a ;\n"
@@ -79,7 +79,7 @@ TEST(ElabClause05, Cl5_1_ModuleWithEscapedIdentifierElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_1_AllFourAreasElaborate) {
+TEST(LexicalConventionElaboration, AllFourAreasElaborate) {
   EXPECT_TRUE(
       ElabOk("(* optimize *) module t;\n"
              "  logic [7:0] data = 8'hAB;\n"
@@ -88,7 +88,7 @@ TEST(ElabClause05, Cl5_1_AllFourAreasElaborate) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_1_CommentsDoNotAffectElaboration) {
+TEST(LexicalConventionElaboration, CommentsDoNotAffectElaboration) {
   EXPECT_TRUE(
       ElabOk("module /* block */ t; // line comment\n"
              "  logic /* type */ a; // declaration\n"

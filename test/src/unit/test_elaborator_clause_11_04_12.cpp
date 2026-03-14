@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA81, ConcatWithVariables) {
+TEST(ConcatenationSim, ConcatWithVariables) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -29,7 +29,7 @@ TEST(SimA81, ConcatWithVariables) {
   EXPECT_EQ(var->value.ToUint64(), 0xC3u);
 }
 
-TEST(SimA81, ConcatDoesNotInterfere) {
+TEST(ConcatenationSim, ConcatDoesNotInterfere) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -50,7 +50,7 @@ TEST(SimA81, ConcatDoesNotInterfere) {
   EXPECT_EQ(vb->value.ToUint64(), 99u);
 }
 
-TEST(ElabA81, ConcatenationInContAssign) {
+TEST(ConcatenationElaboration, ConcatenationInContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -63,7 +63,7 @@ TEST(ElabA81, ConcatenationInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA81, ConstantConcatenationInParam) {
+TEST(ConcatenationElaboration, ConstantConcatenationInParam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -74,7 +74,7 @@ TEST(ElabA81, ConstantConcatenationInParam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA81, ConcatInInitialBlock) {
+TEST(ConcatenationElaboration, ConcatInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -87,7 +87,7 @@ TEST(ElabA81, ConcatInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA84, PrimaryConcatenationElaborates) {
+TEST(PrimaryElaboration, PrimaryConcatenationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -100,7 +100,7 @@ TEST(ElabA84, PrimaryConcatenationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh9, AlwaysCombConcatenation) {
+TEST(AlwaysCombBasicSim, AlwaysCombConcatenation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -124,7 +124,7 @@ TEST(SimCh9, AlwaysCombConcatenation) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(SimCh10, BlockingAssignConcatRHS) {
+TEST(BlockingAssignSim, BlockingAssignConcatRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

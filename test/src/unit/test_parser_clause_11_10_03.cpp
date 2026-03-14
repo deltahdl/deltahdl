@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection1110_3, EmptyStringLiteralParses) {
+TEST(EmptyStringLiteralParsing, EmptyStringLiteralParses) {
   auto r = Parse(
       "module t;\n"
       "  bit [7:0] v;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection1110_3, EmptyStringLiteralParses) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
-TEST(ParserSection1110_3, EmptyStringComparedWithZeroParses) {
+TEST(EmptyStringLiteralParsing, EmptyStringComparedWithZeroParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic result;\n"

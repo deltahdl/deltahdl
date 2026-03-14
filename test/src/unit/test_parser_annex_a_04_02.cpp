@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA042, GenvarInitWithGenvarKeyword) {
+TEST(GenerateInstantiationGrammar, GenvarInitWithGenvarKeyword) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
@@ -18,7 +18,7 @@ TEST(ParserAnnexA042, GenvarInitWithGenvarKeyword) {
   ASSERT_NE(gen->gen_init, nullptr);
 }
 
-TEST(ParserAnnexA042, GenvarIterationCompoundAssign) {
+TEST(GenerateInstantiationGrammar, GenvarIterationCompoundAssign) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i += 1) begin\n"
@@ -31,7 +31,7 @@ TEST(ParserAnnexA042, GenvarIterationCompoundAssign) {
   ASSERT_NE(gen->gen_step, nullptr);
 }
 
-TEST(ParserAnnexA042, CaseGenerateWithDefault) {
+TEST(GenerateInstantiationGrammar, CaseGenerateWithDefault) {
   auto r = Parse(
       "module m;\n"
       "  case (WIDTH)\n"
@@ -47,7 +47,7 @@ TEST(ParserAnnexA042, CaseGenerateWithDefault) {
   EXPECT_TRUE(gen->gen_case_items[1].is_default);
 }
 
-TEST(ParserAnnexA042, GenerateItemAlwaysBlock) {
+TEST(GenerateInstantiationGrammar, GenerateItemAlwaysBlock) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i++) begin : blk\n"
@@ -61,7 +61,7 @@ TEST(ParserAnnexA042, GenerateItemAlwaysBlock) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kAlwaysBlock);
 }
 
-TEST(ParserAnnexA042, GenerateItemInInterface) {
+TEST(GenerateInstantiationGrammar, GenerateItemInInterface) {
   auto r = Parse(
       "interface my_if;\n"
       "  if (W > 0)\n"

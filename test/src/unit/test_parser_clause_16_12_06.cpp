@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, PropertyExpr_IfElse) {
+TEST(AssertionDeclParsing, PropertyExpr_IfElse) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"
@@ -14,7 +14,7 @@ TEST(ParserA210, PropertyExpr_IfElse) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyExpr_IfNoElse) {
+TEST(AssertionDeclParsing, PropertyExpr_IfNoElse) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"
@@ -22,7 +22,7 @@ TEST(ParserA210, PropertyExpr_IfNoElse) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, Sec16_5_1_PropertyIfElse) {
+TEST(AssertionParsing, PropertyIfElse) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (\n"
@@ -39,7 +39,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-TEST(ParserAnnexF, AnnexFPropertyIfElse) {
+TEST(AssertionSemanticsParsing, PropertyIfElse) {
   auto r = Parse(
       "module m;\n"
       "  property p_cond;\n"
@@ -51,7 +51,7 @@ TEST(ParserAnnexF, AnnexFPropertyIfElse) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kPropertyDecl));
 }
 
-TEST(ParserSection16, PropertyIfElse) {
+TEST(AssertionParsing, PropertyIfElseParseResult) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"
@@ -63,7 +63,7 @@ TEST(ParserSection16, PropertyIfElse) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, PropertyIfWithoutElse) {
+TEST(AssertionParsing, PropertyIfWithoutElse) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"
@@ -74,7 +74,7 @@ TEST(ParserSection16, PropertyIfWithoutElse) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, PropertyIfElseInDecl) {
+TEST(AssertionParsing, PropertyIfElseInDecl) {
   auto r = Parse(
       "module m;\n"
       "  property p1;\n"

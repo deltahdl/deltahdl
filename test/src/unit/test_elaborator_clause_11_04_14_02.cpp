@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA81, StreamingRightShift) {
+TEST(ConcatenationSim, StreamingRightShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -24,7 +24,7 @@ TEST(SimA81, StreamingRightShift) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(SimA81, StreamingLeftShift) {
+TEST(ConcatenationSim, StreamingLeftShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -42,7 +42,7 @@ TEST(SimA81, StreamingLeftShift) {
   EXPECT_EQ(var->value.ToUint64(), 0xD5u);
 }
 
-TEST(ElabA81, StreamingConcatLeftShiftElab) {
+TEST(ConcatenationElaboration, StreamingConcatLeftShiftElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -54,7 +54,7 @@ TEST(ElabA81, StreamingConcatLeftShiftElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA81, StreamingConcatRightShiftElab) {
+TEST(ConcatenationElaboration, StreamingConcatRightShiftElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -66,7 +66,7 @@ TEST(ElabA81, StreamingConcatRightShiftElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA81, StreamingWithSliceSizeElab) {
+TEST(ConcatenationElaboration, StreamingWithSliceSizeElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -78,7 +78,7 @@ TEST(ElabA81, StreamingWithSliceSizeElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA84, PrimaryStreamingConcatElaborates) {
+TEST(PrimaryElaboration, PrimaryStreamingConcatElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

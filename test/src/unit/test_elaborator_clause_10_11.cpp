@@ -17,7 +17,7 @@ void ExpectThreeNetsAllEqual(SimFixture& f, uint64_t expected) {
   EXPECT_EQ(vc->value.ToUint64(), expected);
 }
 
-TEST(ElabCh10k, AliasTwoNetsElaborates) {
+TEST(NetAliasingElaboration, AliasTwoNetsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -29,7 +29,7 @@ TEST(ElabCh10k, AliasTwoNetsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabCh10k, AliasThreeNetsElaborates) {
+TEST(NetAliasingElaboration, AliasThreeNetsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -41,7 +41,7 @@ TEST(ElabCh10k, AliasThreeNetsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabCh10k, AliasBitSelectConcatElaborates) {
+TEST(NetAliasingElaboration, AliasBitSelectConcatElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -53,7 +53,7 @@ TEST(ElabCh10k, AliasBitSelectConcatElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabCh10k, AliasStoresNetsInRtlir) {
+TEST(NetAliasingElaboration, AliasStoresNetsInRtlir) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -67,7 +67,7 @@ TEST(ElabCh10k, AliasStoresNetsInRtlir) {
   EXPECT_EQ(design->top_modules[0]->aliases[0].nets.size(), 2u);
 }
 
-TEST(ElabCh10k, MultipleAliasStatementsAccumulate) {
+TEST(NetAliasingElaboration, MultipleAliasStatementsAccumulate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -81,7 +81,7 @@ TEST(ElabCh10k, MultipleAliasStatementsAccumulate) {
   EXPECT_EQ(design->top_modules[0]->aliases.size(), 2u);
 }
 
-TEST(ElabCh10k, AliasVariableIsError) {
+TEST(NetAliasingElaboration, AliasVariableIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -93,7 +93,7 @@ TEST(ElabCh10k, AliasVariableIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabCh10k, AliasSelfIsError) {
+TEST(NetAliasingElaboration, AliasSelfIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"

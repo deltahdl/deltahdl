@@ -8,19 +8,19 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA213, NetDeclVectored) {
+TEST(TypeDeclParsing, NetDeclVectored) {
   auto r = Parse("module m; wire vectored [7:0] bus; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA213, NetDeclScalared) {
+TEST(TypeDeclParsing, NetDeclScalared) {
   auto r = Parse("module m; wire scalared [7:0] bus; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, Sec6_7_1_ScalaredWithExplicitType) {
+TEST(DataTypeParsing, ScalaredWithExplicitType) {
   auto r = Parse(
       "module t;\n"
       "  wire scalared logic [7:0] s;\n"
@@ -35,7 +35,7 @@ TEST(ParserSection6, Sec6_7_1_ScalaredWithExplicitType) {
   EXPECT_EQ(item->name, "s");
 }
 
-TEST(ParserSection6, Sec6_7_1_WireVectoredQualifier) {
+TEST(DataTypeParsing, WireVectoredQualifier) {
   auto r = Parse(
       "module t;\n"
       "  wire vectored [7:0] v;\n"
@@ -49,7 +49,7 @@ TEST(ParserSection6, Sec6_7_1_WireVectoredQualifier) {
   EXPECT_EQ(item->name, "v");
 }
 
-TEST(ParserSection6, Sec6_7_1_WireScalaredQualifier) {
+TEST(DataTypeParsing, WireScalaredQualifier) {
   auto r = Parse(
       "module t;\n"
       "  wire scalared [7:0] sc;\n"
@@ -63,7 +63,7 @@ TEST(ParserSection6, Sec6_7_1_WireScalaredQualifier) {
   EXPECT_EQ(item->name, "sc");
 }
 
-TEST(ParserSection6, Sec6_9_2_Tri1ScalaredBus) {
+TEST(DataTypeParsing, Tri1ScalaredBus) {
   auto r = Parse(
       "module t;\n"
       "  tri1 scalared [63:0] bus64;\n"
@@ -79,7 +79,7 @@ TEST(ParserSection6, Sec6_9_2_Tri1ScalaredBus) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 63u);
 }
 
-TEST(ParserSection6, Sec6_9_2_TriVectoredData) {
+TEST(DataTypeParsing, TriVectoredData) {
   auto r = Parse(
       "module t;\n"
       "  tri vectored [31:0] data;\n"
@@ -95,14 +95,14 @@ TEST(ParserSection6, Sec6_9_2_TriVectoredData) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 31u);
 }
 
-TEST(ParserSection6, Sec6_9_2_VectoredWithoutPackedDim) {
+TEST(DataTypeParsing, VectoredWithoutPackedDim) {
   NetDeclInfo info;
   info.is_vectored = true;
   info.packed_dim_count = 0;
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-TEST(ParserSection6, Sec6_9_2_ScalaredWithoutPackedDim) {
+TEST(DataTypeParsing, ScalaredWithoutPackedDim) {
   NetDeclInfo info;
   info.is_scalared = true;
   info.packed_dim_count = 0;

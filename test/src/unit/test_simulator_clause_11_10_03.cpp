@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA11103, EmptyStringLiteralIsZero) {
+TEST(ClockingAssertionSyntaxSim, EmptyStringLiteralIsZero) {
   SimFixture f;
   auto* expr = ParseExprFrom("\"\"", f);
   ASSERT_NE(expr, nullptr);
@@ -16,7 +16,7 @@ TEST(SimA11103, EmptyStringLiteralIsZero) {
   EXPECT_EQ(val.width, 8u);
 }
 
-TEST(SimA11103, EmptyStringEqualsNul) {
+TEST(ClockingAssertionSyntaxSim, EmptyStringEqualsNul) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -33,7 +33,7 @@ TEST(SimA11103, EmptyStringEqualsNul) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA11103, EmptyStringDiffersFromStringZero) {
+TEST(ClockingAssertionSyntaxSim, EmptyStringDiffersFromStringZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -51,7 +51,7 @@ TEST(SimA11103, EmptyStringDiffersFromStringZero) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimA11103, StringZeroHasAsciiValue) {
+TEST(ClockingAssertionSyntaxSim, StringZeroHasAsciiValue) {
   SimFixture f;
   auto* expr = ParseExprFrom("\"0\"", f);
   ASSERT_NE(expr, nullptr);
@@ -59,7 +59,7 @@ TEST(SimA11103, StringZeroHasAsciiValue) {
   EXPECT_EQ(val.ToUint64(), 0x30u);
 }
 
-TEST(SimA11103, EmptyStringAssignedToVector) {
+TEST(ClockingAssertionSyntaxSim, EmptyStringAssignedToVector) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

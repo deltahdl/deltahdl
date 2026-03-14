@@ -2,7 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, Cl3_13_DistinctNamesInModuleScope) {
+TEST(DesignBuildingBlockElaboration, DistinctNamesInModuleScope) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  logic a;\n"
@@ -11,7 +11,7 @@ TEST(ElabClause03, Cl3_13_DistinctNamesInModuleScope) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_13_SameNameDifferentModulesElab) {
+TEST(DesignBuildingBlockElaboration, SameNameDifferentModulesElab) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -34,7 +34,7 @@ TEST(ElabClause03, Cl3_13_SameNameDifferentModulesElab) {
   EXPECT_FALSE(diag.HasErrors());
 }
 
-TEST(ElabClause03, Cl3_13_RedeclVarInModuleScope) {
+TEST(DesignBuildingBlockElaboration, RedeclVarInModuleScope) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic x;\n"
@@ -42,7 +42,7 @@ TEST(ElabClause03, Cl3_13_RedeclVarInModuleScope) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_13_RedeclNetInModuleScope) {
+TEST(DesignBuildingBlockElaboration, RedeclNetInModuleScope) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  wire w;\n"
@@ -50,13 +50,13 @@ TEST(ElabClause03, Cl3_13_RedeclNetInModuleScope) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_13_DuplicateModuleDefinition) {
+TEST(DesignBuildingBlockElaboration, DuplicateModuleDefinition) {
   EXPECT_FALSE(
       ElabOk("module m; endmodule\n"
              "module m; endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_13_ModuleAndInterfaceSameName) {
+TEST(DesignBuildingBlockElaboration, ModuleAndInterfaceSameName) {
   ElabFixture f;
   ElaborateSrc(
       "module foo; endmodule\n"
@@ -65,7 +65,7 @@ TEST(ElabClause03, Cl3_13_ModuleAndInterfaceSameName) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_13_ModuleAndProgramSameName) {
+TEST(DesignBuildingBlockElaboration, ModuleAndProgramSameName) {
   ElabFixture f;
   ElaborateSrc(
       "module bar; endmodule\n"
@@ -74,21 +74,21 @@ TEST(ElabClause03, Cl3_13_ModuleAndProgramSameName) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_13_DuplicatePackageDefinition) {
+TEST(DesignBuildingBlockElaboration, DuplicatePackageDefinition) {
   EXPECT_FALSE(
       ElabOk("package p; endpackage\n"
              "package p; endpackage\n"
              "module m; endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_13_DistinctDefinitionNamesOk) {
+TEST(DesignBuildingBlockElaboration, DistinctDefinitionNamesOk) {
   EXPECT_TRUE(
       ElabOk("module m; endmodule\n"
              "interface ifc; endinterface\n"
              "program p; endprogram\n"));
 }
 
-TEST(ElabClause03, Cl3_13_ModuleNameSpaceCoexist) {
+TEST(DesignBuildingBlockElaboration, ModuleNameSpaceCoexist) {
   EXPECT_TRUE(
       ElabOk("module sub; endmodule\n"
              "module m;\n"

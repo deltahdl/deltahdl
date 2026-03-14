@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ClassItemsA19, ClassProperty) {
+TEST(ClassItemsParsing, ClassProperty) {
   auto r = Parse(
       "class C;\n"
       "  int x;\n"
@@ -16,7 +16,7 @@ TEST(ClassItemsA19, ClassProperty) {
   EXPECT_EQ(r.cu->classes[0]->members[0]->kind, ClassMemberKind::kProperty);
 }
 
-TEST(ClassItemsA19, RandProperty) {
+TEST(ClassItemsParsing, RandProperty) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -26,7 +26,7 @@ TEST(ClassItemsA19, RandProperty) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_rand);
 }
 
-TEST(ClassItemsA19, RandcProperty) {
+TEST(ClassItemsParsing, RandcProperty) {
   auto r = Parse(
       "class C;\n"
       "  randc bit [2:0] x;\n"
@@ -36,7 +36,7 @@ TEST(ClassItemsA19, RandcProperty) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_randc);
 }
 
-TEST(ClassItemsA19, StaticProperty) {
+TEST(ClassItemsParsing, StaticProperty) {
   auto r = Parse(
       "class C;\n"
       "  static int count;\n"
@@ -46,7 +46,7 @@ TEST(ClassItemsA19, StaticProperty) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_static);
 }
 
-TEST(ClassItemsA19, ProtectedProperty) {
+TEST(ClassItemsParsing, ProtectedProperty) {
   auto r = Parse(
       "class C;\n"
       "  protected int data;\n"
@@ -56,7 +56,7 @@ TEST(ClassItemsA19, ProtectedProperty) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_protected);
 }
 
-TEST(ClassItemsA19, LocalProperty) {
+TEST(ClassItemsParsing, LocalProperty) {
   auto r = Parse(
       "class C;\n"
       "  local int secret;\n"
@@ -66,7 +66,7 @@ TEST(ClassItemsA19, LocalProperty) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_local);
 }
 
-TEST(ClassItemsA19, ConstProperty) {
+TEST(ClassItemsParsing, ConstProperty) {
   auto r = Parse(
       "class C;\n"
       "  const int MAX = 100;\n"
@@ -76,7 +76,7 @@ TEST(ClassItemsA19, ConstProperty) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_const);
 }
 
-TEST(ClassItemsA19, ClassMethodFunction) {
+TEST(ClassItemsParsing, ClassMethodFunction) {
   auto r = Parse(
       "class C;\n"
       "  function void work();\n"
@@ -88,7 +88,7 @@ TEST(ClassItemsA19, ClassMethodFunction) {
   EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
 }
 
-TEST(ClassItemsA19, ClassMethodTask) {
+TEST(ClassItemsParsing, ClassMethodTask) {
   auto r = Parse(
       "class C;\n"
       "  task run();\n"
@@ -100,7 +100,7 @@ TEST(ClassItemsA19, ClassMethodTask) {
   EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
 }
 
-TEST(ClassItemsA19, PureVirtualMethod) {
+TEST(ClassItemsParsing, PureVirtualMethod) {
   auto r = Parse(
       "class C;\n"
       "  pure virtual function void work();\n"
@@ -111,7 +111,7 @@ TEST(ClassItemsA19, PureVirtualMethod) {
   EXPECT_TRUE(m->is_virtual);
 }
 
-TEST(ClassItemsA19, ExternMethod) {
+TEST(ClassItemsParsing, ExternMethod) {
   auto r = Parse(
       "class C;\n"
       "  extern function void compute();\n"
@@ -120,7 +120,7 @@ TEST(ClassItemsA19, ExternMethod) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, VirtualMethod) {
+TEST(ClassItemsParsing, VirtualMethod) {
   auto r = Parse(
       "class C;\n"
       "  virtual function void display();\n"
@@ -131,7 +131,7 @@ TEST(ClassItemsA19, VirtualMethod) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_virtual);
 }
 
-TEST(ClassItemsA19, StaticMethod) {
+TEST(ClassItemsParsing, StaticMethod) {
   auto r = Parse(
       "class C;\n"
       "  static function int get_count();\n"
@@ -143,7 +143,7 @@ TEST(ClassItemsA19, StaticMethod) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_static);
 }
 
-TEST(ClassItemsA19, Constructor) {
+TEST(ClassItemsParsing, Constructor) {
   auto r = Parse(
       "class C;\n"
       "  function new();\n"
@@ -153,7 +153,7 @@ TEST(ClassItemsA19, Constructor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, ConstructorWithArgs) {
+TEST(ClassItemsParsing, ConstructorWithArgs) {
   auto r = Parse(
       "class C;\n"
       "  function new(int val);\n"
@@ -163,7 +163,7 @@ TEST(ClassItemsA19, ConstructorWithArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, ConstraintPrototype) {
+TEST(ClassItemsParsing, ConstraintPrototype) {
   auto r = Parse(
       "class C;\n"
       "  constraint valid_range;\n"
@@ -172,7 +172,7 @@ TEST(ClassItemsA19, ConstraintPrototype) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, ConstraintDeclaration) {
+TEST(ClassItemsParsing, ConstraintDeclaration) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -182,7 +182,7 @@ TEST(ClassItemsA19, ConstraintDeclaration) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, NestedClass) {
+TEST(ClassItemsParsing, NestedClass) {
   auto r = Parse(
       "class Outer;\n"
       "  class Inner;\n"
@@ -193,7 +193,7 @@ TEST(ClassItemsA19, NestedClass) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, ClassCovergroup) {
+TEST(ClassItemsParsing, ClassCovergroup) {
   auto r = Parse(
       "class C;\n"
       "  covergroup cg @(posedge clk);\n"
@@ -204,7 +204,7 @@ TEST(ClassItemsA19, ClassCovergroup) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, ClassLocalparam) {
+TEST(ClassItemsParsing, ClassLocalparam) {
   auto r = Parse(
       "class C;\n"
       "  localparam int MAX = 255;\n"
@@ -213,7 +213,7 @@ TEST(ClassItemsA19, ClassLocalparam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, ClassParameter) {
+TEST(ClassItemsParsing, ClassParameter) {
   auto r = Parse(
       "class C;\n"
       "  parameter int W = 8;\n"
@@ -222,7 +222,7 @@ TEST(ClassItemsA19, ClassParameter) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, ClassNullItem) {
+TEST(ClassItemsParsing, ClassNullItem) {
   auto r = Parse(
       "class C;\n"
       "  ;\n"
@@ -231,7 +231,7 @@ TEST(ClassItemsA19, ClassNullItem) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, ClassPropertyWithAttr) {
+TEST(ClassItemsParsing, ClassPropertyWithAttr) {
   auto r = Parse(
       "class C;\n"
       "  (* my_attr *) int x;\n"
@@ -240,7 +240,7 @@ TEST(ClassItemsA19, ClassPropertyWithAttr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, InterfaceClassItems) {
+TEST(ClassItemsParsing, InterfaceClassItems) {
   auto r = Parse(
       "interface class IFace;\n"
       "  pure virtual function void do_work();\n"
@@ -254,7 +254,7 @@ TEST(ClassItemsA19, InterfaceClassItems) {
   EXPECT_TRUE(r.cu->classes[0]->is_interface);
 }
 
-TEST(ClassItemsA19, ClassExtendsWithArgs) {
+TEST(ClassItemsParsing, ClassExtendsWithArgs) {
   auto r = Parse(
       "class Derived extends Base(1, 2);\n"
       "endclass\n");
@@ -262,7 +262,7 @@ TEST(ClassItemsA19, ClassExtendsWithArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, ClassEndLabel) {
+TEST(ClassItemsParsing, ClassEndLabel) {
   auto r = Parse(
       "class C;\n"
       "endclass : C\n");
@@ -270,7 +270,7 @@ TEST(ClassItemsA19, ClassEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassItemsA19, ClassFinal) {
+TEST(ClassItemsParsing, ClassFinal) {
   auto r = Parse(
       "class C :final;\n"
       "endclass\n");

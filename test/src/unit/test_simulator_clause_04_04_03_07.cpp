@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4437, PreReNBARegionExecutesPLICallbacks) {
+TEST(PliPreReNbaSim, PreReNBARegionExecutesPLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,7 +23,7 @@ TEST(SimCh4437, PreReNBARegionExecutesPLICallbacks) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4437, PreReNBACanReadValues) {
+TEST(PliPreReNbaSim, PreReNBACanReadValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -41,7 +41,7 @@ TEST(SimCh4437, PreReNBACanReadValues) {
   EXPECT_EQ(sampled, 42);
 }
 
-TEST(SimCh4437, PreReNBACanWriteValues) {
+TEST(PliPreReNbaSim, PreReNBACanWriteValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -59,7 +59,7 @@ TEST(SimCh4437, PreReNBACanWriteValues) {
   EXPECT_EQ(sampled_in_re_nba, 99);
 }
 
-TEST(SimCh4437, PreReNBACanCreateEvents) {
+TEST(PliPreReNbaSim, PreReNBACanCreateEvents) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -80,7 +80,7 @@ TEST(SimCh4437, PreReNBACanCreateEvents) {
   EXPECT_EQ(order[1], "created_re_nba");
 }
 
-TEST(SimCh4437, PreReNBAExecutesBeforeReNBA) {
+TEST(PliPreReNbaSim, PreReNBAExecutesBeforeReNBA) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -99,13 +99,13 @@ TEST(SimCh4437, PreReNBAExecutesBeforeReNBA) {
   EXPECT_EQ(order[1], "re_nba");
 }
 
-TEST(SimCh4437, PreReNBAExecutesAfterReInactiveBeforeReNBA) {
+TEST(PliPreReNbaSim, PreReNBAExecutesAfterReInactiveBeforeReNBA) {
   VerifyThreeRegionOrder({Region::kReInactive, "re_inactive"},
                          {Region::kPreReNBA, "pre_re_nba"},
                          {Region::kReNBA, "re_nba"});
 }
 
-TEST(SimCh4437, PreReNBAIsWithinReactiveRegionSet) {
+TEST(PliPreReNbaSim, PreReNBAIsWithinReactiveRegionSet) {
   auto pre_re_nba_ord = static_cast<int>(Region::kPreReNBA);
   auto re_inactive_ord = static_cast<int>(Region::kReInactive);
   auto re_nba_ord = static_cast<int>(Region::kReNBA);
@@ -113,7 +113,7 @@ TEST(SimCh4437, PreReNBAIsWithinReactiveRegionSet) {
   EXPECT_LT(pre_re_nba_ord, re_nba_ord);
 }
 
-TEST(SimCh4437, PreReNBARegionHoldsMultiplePLICallbacks) {
+TEST(PliPreReNbaSim, PreReNBARegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -128,7 +128,7 @@ TEST(SimCh4437, PreReNBARegionHoldsMultiplePLICallbacks) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh4437, PreReNBAEventsAcrossMultipleTimeSlots) {
+TEST(PliPreReNbaSim, PreReNBAEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;
@@ -148,7 +148,7 @@ TEST(SimCh4437, PreReNBAEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-TEST(SimCh4437, PreReNBAReadWriteInReactiveRegionSetContext) {
+TEST(PliPreReNbaSim, PreReNBAReadWriteInReactiveRegionSetContext) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;

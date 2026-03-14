@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeunitTakesPriority) {
+TEST(DesignBuildingBlockParsing, ExplicitTimeunitTakesPriority) {
   auto r = ParseTimescale31402(
       "`timescale 1us / 1ns\n"
       "module m;\n"
@@ -21,7 +21,7 @@ TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeunitTakesPriority) {
   EXPECT_EQ(resolved.unit, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_ExplicitTimeprecisionTakesPriority) {
+TEST(DesignBuildingBlockParsing, ExplicitTimeprecisionTakesPriority) {
   auto r = ParseTimescale31402(
       "`timescale 1us / 1ns\n"
       "module m;\n"
@@ -42,7 +42,7 @@ static ModuleDecl* FindNestedModule(const std::vector<ModuleItem*>& items) {
   return nullptr;
 }
 
-TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInheritsUnit) {
+TEST(DesignBuildingBlockParsing, RuleA_NestedInheritsUnit) {
   auto r = ParseTimescale31402(
       "module outer;\n"
       "  timeunit 1ps;\n"
@@ -68,7 +68,7 @@ TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInheritsUnit) {
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kFs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInterfaceInherits) {
+TEST(DesignBuildingBlockParsing, RuleA_NestedInterfaceInherits) {
   auto r = ParseTimescale31402(
       "interface outer_if;\n"
       "  timeunit 1us;\n"
@@ -88,7 +88,7 @@ TEST(ParserClause03, Cl3_14_2_3_RuleA_NestedInterfaceInherits) {
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kNs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_RuleB_FallbackToTimescale) {
+TEST(DesignBuildingBlockParsing, RuleB_FallbackToTimescale) {
   auto r = ParseTimescale31402(
       "`timescale 1us / 1ps\n"
       "module m;\n"
@@ -104,7 +104,7 @@ TEST(ParserClause03, Cl3_14_2_3_RuleB_FallbackToTimescale) {
   EXPECT_EQ(resolved.precision, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_RuleC_FallbackToCUTimeunit) {
+TEST(DesignBuildingBlockParsing, RuleC_FallbackToCUTimeunit) {
   auto r = ParseTimescale31402(
       "timeunit 1ps;\n"
       "timeprecision 1fs;\n"
@@ -124,7 +124,7 @@ TEST(ParserClause03, Cl3_14_2_3_RuleC_FallbackToCUTimeunit) {
   EXPECT_EQ(resolved.precision, TimeUnit::kFs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_RuleD_DefaultTimeUnit) {
+TEST(DesignBuildingBlockParsing, RuleD_DefaultTimeUnit) {
   auto r = ParseTimescale31402(
       "module m;\n"
       "endmodule\n");
@@ -138,7 +138,7 @@ TEST(ParserClause03, Cl3_14_2_3_RuleD_DefaultTimeUnit) {
   EXPECT_EQ(resolved.precision, TimeUnit::kNs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_CUTimeunitOnlyByKeyword) {
+TEST(DesignBuildingBlockParsing, CUTimeunitOnlyByKeyword) {
   auto r = ParseTimescale31402(
       "`timescale 1us / 1ps\n"
       "module m;\n"
@@ -149,7 +149,7 @@ TEST(ParserClause03, Cl3_14_2_3_CUTimeunitOnlyByKeyword) {
   EXPECT_FALSE(r.cu->has_cu_timeprecision);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_FullPrecedenceChain) {
+TEST(DesignBuildingBlockParsing, FullPrecedenceChain) {
   auto r = ParseTimescale31402(
       "`timescale 1ms / 1us\n"
       "timeunit 1ns;\n"
@@ -180,7 +180,7 @@ TEST(ParserClause03, Cl3_14_2_3_FullPrecedenceChain) {
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kNs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_TimescaleBeforeCUTimeunit) {
+TEST(DesignBuildingBlockParsing, TimescaleBeforeCUTimeunit) {
   auto r = ParseTimescale31402(
       "timeunit 1fs;\n"
       "`timescale 1us / 1ps\n"
@@ -195,7 +195,7 @@ TEST(ParserClause03, Cl3_14_2_3_TimescaleBeforeCUTimeunit) {
   EXPECT_EQ(resolved.precision, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_SameRulesForPrecision) {
+TEST(DesignBuildingBlockParsing, SameRulesForPrecision) {
   auto r = ParseTimescale31402(
       "module outer;\n"
       "  timeunit 1ns;\n"
@@ -216,7 +216,7 @@ TEST(ParserClause03, Cl3_14_2_3_SameRulesForPrecision) {
   EXPECT_EQ(inner_resolved.precision, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_DefaultIsImplementationSpecific) {
+TEST(DesignBuildingBlockParsing, DefaultIsImplementationSpecific) {
   auto r = ParseTimescale31402("module m; endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto resolved =
@@ -225,7 +225,7 @@ TEST(ParserClause03, Cl3_14_2_3_DefaultIsImplementationSpecific) {
   EXPECT_EQ(resolved.precision, TimeUnit::kNs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToInterface) {
+TEST(DesignBuildingBlockParsing, CUTimeunitAppliesToInterface) {
   auto r = ParseTimescale31402(
       "timeunit 1ps;\n"
       "timeprecision 1fs;\n"
@@ -238,7 +238,7 @@ TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToInterface) {
   EXPECT_EQ(resolved.precision, TimeUnit::kFs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToProgram) {
+TEST(DesignBuildingBlockParsing, CUTimeunitAppliesToProgram) {
   auto r = ParseTimescale31402(
       "timeunit 1us;\n"
       "timeprecision 1ns;\n"
@@ -251,7 +251,7 @@ TEST(ParserClause03, Cl3_14_2_3_CUTimeunitAppliesToProgram) {
   EXPECT_EQ(resolved.precision, TimeUnit::kNs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_ProgramsCannotBeNested) {
+TEST(DesignBuildingBlockParsing, ProgramsCannotBeNested) {
   auto r = ParseTimescale31402(
       "program p;\n"
       "endprogram\n");
@@ -262,7 +262,7 @@ TEST(ParserClause03, Cl3_14_2_3_ProgramsCannotBeNested) {
   EXPECT_FALSE(resolved.has_unit);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_IndependentResolution) {
+TEST(DesignBuildingBlockParsing, IndependentResolution) {
   auto r = ParseTimescale31402(
       "`timescale 1us / 1ps\n"
       "module a;\n"
@@ -284,7 +284,7 @@ TEST(ParserClause03, Cl3_14_2_3_IndependentResolution) {
   EXPECT_EQ(resolved_b.precision, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_2_3_NestedOverridesInheritance) {
+TEST(DesignBuildingBlockParsing, NestedOverridesInheritance) {
   auto r = ParseTimescale31402(
       "module outer;\n"
       "  timeunit 1us;\n"

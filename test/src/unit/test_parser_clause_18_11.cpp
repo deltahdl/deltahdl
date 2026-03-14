@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA82, RandomizeCallWithVarList) {
+TEST(SubroutineCallExprParsing, RandomizeCallWithVarList) {
   auto r = Parse(
       "module m;\n"
       "  initial begin obj.randomize(x, y); end\n"
@@ -14,7 +14,7 @@ TEST(ParserA82, RandomizeCallWithVarList) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA82, VariableIdentifierList) {
+TEST(SubroutineCallExprParsing, VariableIdentifierList) {
   auto r = Parse(
       "module m;\n"
       "  initial begin obj.randomize(a, b, c); end\n"

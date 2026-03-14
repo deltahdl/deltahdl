@@ -4,7 +4,7 @@
 
 using namespace delta;
 
-TEST(Preprocessor, Clause22_2_GraveAccentRequiredForDirective) {
+TEST(Preprocessor, GraveAccentRequiredForDirective) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define MY_MAC 42\n"
@@ -14,7 +14,7 @@ TEST(Preprocessor, Clause22_2_GraveAccentRequiredForDirective) {
   EXPECT_NE(result.find("42"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_ApostropheIsNotGraveAccent) {
+TEST(Preprocessor, ApostropheIsNotGraveAccent) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define MY_MAC 42\n"
@@ -26,7 +26,7 @@ TEST(Preprocessor, Clause22_2_ApostropheIsNotGraveAccent) {
   EXPECT_NE(result.find("'MY_MAC"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_DirectiveInLineCommentIgnored) {
+TEST(Preprocessor, DirectiveInLineCommentIgnored) {
   PreprocFixture f;
   auto result = Preprocess(
       "// `define SHOULD_NOT_DEFINE 1\n"
@@ -36,7 +36,7 @@ TEST(Preprocessor, Clause22_2_DirectiveInLineCommentIgnored) {
   EXPECT_NE(result.find("`SHOULD_NOT_DEFINE"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_DirectiveInBlockCommentIgnored) {
+TEST(Preprocessor, DirectiveInBlockCommentIgnored) {
   PreprocFixture f;
   auto result = Preprocess(
       "/* `define SHOULD_NOT_DEFINE 1 */\n"
@@ -46,7 +46,7 @@ TEST(Preprocessor, Clause22_2_DirectiveInBlockCommentIgnored) {
   EXPECT_NE(result.find("`SHOULD_NOT_DEFINE"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_DirectiveInMultilineBlockCommentIgnored) {
+TEST(Preprocessor, DirectiveInMultilineBlockCommentIgnored) {
   PreprocFixture f;
   auto result = Preprocess(
       "/*\n"
@@ -58,7 +58,7 @@ TEST(Preprocessor, Clause22_2_DirectiveInMultilineBlockCommentIgnored) {
   EXPECT_NE(result.find("`SHOULD_NOT_DEFINE"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_MacroExpansionInLineCommentIgnored) {
+TEST(Preprocessor, MacroExpansionInLineCommentIgnored) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO replaced\n"
@@ -69,7 +69,7 @@ TEST(Preprocessor, Clause22_2_MacroExpansionInLineCommentIgnored) {
   EXPECT_EQ(result.find("replaced"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_MacroBeforeLineCommentExpanded) {
+TEST(Preprocessor, MacroBeforeLineCommentExpanded) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO replaced\n"
@@ -79,7 +79,7 @@ TEST(Preprocessor, Clause22_2_MacroBeforeLineCommentExpanded) {
   EXPECT_NE(result.find("replaced"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_MacroInInlineBlockCommentIgnored) {
+TEST(Preprocessor, MacroInInlineBlockCommentIgnored) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO replaced\n"
@@ -90,7 +90,7 @@ TEST(Preprocessor, Clause22_2_MacroInInlineBlockCommentIgnored) {
   EXPECT_EQ(result.find("replaced"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_BlockCommentAcrossMultipleLines) {
+TEST(Preprocessor, BlockCommentAcrossMultipleLines) {
   PreprocFixture f;
   auto result = Preprocess(
       "/*\n"
@@ -104,7 +104,7 @@ TEST(Preprocessor, Clause22_2_BlockCommentAcrossMultipleLines) {
   EXPECT_NE(result.find("`BAR"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_ResetallInBlockCommentIgnored) {
+TEST(Preprocessor, ResetallInBlockCommentIgnored) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
@@ -118,7 +118,7 @@ TEST(Preprocessor, Clause22_2_ResetallInBlockCommentIgnored) {
   EXPECT_TRUE(pp.HasTimescale());
 }
 
-TEST(Preprocessor, Clause22_2_DirectiveInStringLiteralIgnored) {
+TEST(Preprocessor, DirectiveInStringLiteralIgnored) {
   PreprocFixture f;
   auto result = Preprocess("string s = \"`define FOO 1\";\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
@@ -126,7 +126,7 @@ TEST(Preprocessor, Clause22_2_DirectiveInStringLiteralIgnored) {
   EXPECT_NE(result.find("\"`define FOO 1\""), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_MacroInStringLiteralNotExpanded) {
+TEST(Preprocessor, MacroInStringLiteralNotExpanded) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO replaced\n"
@@ -137,7 +137,7 @@ TEST(Preprocessor, Clause22_2_MacroInStringLiteralNotExpanded) {
   EXPECT_NE(result.find("`FOO"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_MacroExpansionWithinIncludeDirective) {
+TEST(Preprocessor, MacroExpansionWithinIncludeDirective) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.defines = {{"MY_FILE", "\"nonexistent.svh\""}};
@@ -146,7 +146,7 @@ TEST(Preprocessor, Clause22_2_MacroExpansionWithinIncludeDirective) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_2_DefineSupportsMultilineWithBackslash) {
+TEST(Preprocessor, DefineSupportsMultilineWithBackslash) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define MULTI_LINE_MAC \\\n"
@@ -159,7 +159,7 @@ TEST(Preprocessor, Clause22_2_DefineSupportsMultilineWithBackslash) {
   EXPECT_NE(result.find("line2"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_DirectiveInConditionalBlock) {
+TEST(Preprocessor, DirectiveInConditionalBlock) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.defines = {{"USE_TIMESCALE", "1"}};
@@ -171,7 +171,7 @@ TEST(Preprocessor, Clause22_2_DirectiveInConditionalBlock) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_2_DirectiveInInactiveConditionalBlockSkipped) {
+TEST(Preprocessor, DirectiveInInactiveConditionalBlockSkipped) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
@@ -184,7 +184,7 @@ TEST(Preprocessor, Clause22_2_DirectiveInInactiveConditionalBlockSkipped) {
   EXPECT_FALSE(pp.HasTimescale());
 }
 
-TEST(Preprocessor, Clause22_2_DirectiveInMacroTextProcessedOnExpansion) {
+TEST(Preprocessor, DirectiveInMacroTextProcessedOnExpansion) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
@@ -195,7 +195,7 @@ TEST(Preprocessor, Clause22_2_DirectiveInMacroTextProcessedOnExpansion) {
   EXPECT_TRUE(pp.HasTimescale());
 }
 
-TEST(Preprocessor, Clause22_2_DirectiveScopePersistsAcrossPreprocessCalls) {
+TEST(Preprocessor, DirectiveScopePersistsAcrossPreprocessCalls) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
 
@@ -208,7 +208,7 @@ TEST(Preprocessor, Clause22_2_DirectiveScopePersistsAcrossPreprocessCalls) {
   EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
 }
 
-TEST(Preprocessor, Clause22_2_BlockCommentStartInStringNotAComment) {
+TEST(Preprocessor, BlockCommentStartInStringNotAComment) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO val\n"
@@ -220,7 +220,7 @@ TEST(Preprocessor, Clause22_2_BlockCommentStartInStringNotAComment) {
   EXPECT_NE(result.find("val"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_LineCommentMarkerInStringNotAComment) {
+TEST(Preprocessor, LineCommentMarkerInStringNotAComment) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO val\n"
@@ -232,7 +232,7 @@ TEST(Preprocessor, Clause22_2_LineCommentMarkerInStringNotAComment) {
   EXPECT_NE(result.find("val"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_NestedBlockCommentsNotSupported) {
+TEST(Preprocessor, NestedBlockCommentsNotSupported) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO val\n"
@@ -242,7 +242,7 @@ TEST(Preprocessor, Clause22_2_NestedBlockCommentsNotSupported) {
   EXPECT_NE(result.find("val"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_EmptyBlockComment) {
+TEST(Preprocessor, EmptyBlockComment) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO val\n"
@@ -252,7 +252,7 @@ TEST(Preprocessor, Clause22_2_EmptyBlockComment) {
   EXPECT_NE(result.find("val"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterEndifOnSameLine) {
+TEST(Preprocessor, CodeAfterEndifOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO 1\n"
@@ -266,7 +266,7 @@ TEST(Preprocessor, Clause22_2_CodeAfterEndifOnSameLine) {
   EXPECT_NE(result.find("int b = 2"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterElseOnSameLine) {
+TEST(Preprocessor, CodeAfterElseOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess(
       "`ifdef UNDEF_MACRO\n"
@@ -279,7 +279,7 @@ TEST(Preprocessor, Clause22_2_CodeAfterElseOnSameLine) {
   EXPECT_NE(result.find("int b = 2"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterCelldefineOnSameLine) {
+TEST(Preprocessor, CodeAfterCelldefineOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess(
       "`celldefine module m;\n"
@@ -291,7 +291,7 @@ TEST(Preprocessor, Clause22_2_CodeAfterCelldefineOnSameLine) {
   EXPECT_NE(result.find("module m"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterEndcelldefineOnSameLine) {
+TEST(Preprocessor, CodeAfterEndcelldefineOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess(
       "`celldefine\n"
@@ -302,28 +302,28 @@ TEST(Preprocessor, Clause22_2_CodeAfterEndcelldefineOnSameLine) {
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterResetallOnSameLine) {
+TEST(Preprocessor, CodeAfterResetallOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess("`resetall int x = 1;\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterNounconnectedDriveOnSameLine) {
+TEST(Preprocessor, CodeAfterNounconnectedDriveOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess("`nounconnected_drive int x = 1;\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterUndefineallOnSameLine) {
+TEST(Preprocessor, CodeAfterUndefineallOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess("`undefineall int x = 1;\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_MacroAfterEndifExpandedOnSameLine) {
+TEST(Preprocessor, MacroAfterEndifExpandedOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define VAL 42\n"
@@ -336,7 +336,7 @@ TEST(Preprocessor, Clause22_2_MacroAfterEndifExpandedOnSameLine) {
   EXPECT_NE(result.find("42"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_DirectiveSupersededByAnother) {
+TEST(Preprocessor, DirectiveSupersededByAnother) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
@@ -347,7 +347,7 @@ TEST(Preprocessor, Clause22_2_DirectiveSupersededByAnother) {
   EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
 }
 
-TEST(Preprocessor, Clause22_2_MacroExpansionWithinIfdefUsingMacroBody) {
+TEST(Preprocessor, MacroExpansionWithinIfdefUsingMacroBody) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FEATURE_A 1\n"
@@ -359,7 +359,7 @@ TEST(Preprocessor, Clause22_2_MacroExpansionWithinIfdefUsingMacroBody) {
   EXPECT_NE(result.find("int enabled = 1"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_TimescaleOnSingleLine) {
+TEST(Preprocessor, TimescaleOnSingleLine) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>", "`timescale 1ns / 1ps\n");
@@ -368,7 +368,7 @@ TEST(Preprocessor, Clause22_2_TimescaleOnSingleLine) {
   EXPECT_TRUE(pp.HasTimescale());
 }
 
-TEST(Preprocessor, Clause22_2_BlockCommentEndFollowedByDirective) {
+TEST(Preprocessor, BlockCommentEndFollowedByDirective) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>", "/* comment */ `timescale 1ns / 1ps\n");
@@ -377,7 +377,7 @@ TEST(Preprocessor, Clause22_2_BlockCommentEndFollowedByDirective) {
   EXPECT_TRUE(pp.HasTimescale());
 }
 
-TEST(Preprocessor, Clause22_2_MultilineBlockCommentEndFollowedByDirective) {
+TEST(Preprocessor, MultilineBlockCommentEndFollowedByDirective) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
@@ -389,13 +389,13 @@ TEST(Preprocessor, Clause22_2_MultilineBlockCommentEndFollowedByDirective) {
   EXPECT_TRUE(pp.HasTimescale());
 }
 
-TEST(Preprocessor, Clause22_2_EscapedBacktickInStringNotDirective) {
+TEST(Preprocessor, EscapedBacktickInStringNotDirective) {
   PreprocFixture f;
   Preprocess("string s = \"value is \\`FOO\";\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_2_MultipleDirectivesScopeChaining) {
+TEST(Preprocessor, MultipleDirectivesScopeChaining) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
@@ -409,7 +409,7 @@ TEST(Preprocessor, Clause22_2_MultipleDirectivesScopeChaining) {
   EXPECT_TRUE(pp.HasTimescale());
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterTimescaleOnSameLine) {
+TEST(Preprocessor, CodeAfterTimescaleOnSameLine) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>", "`timescale 1ns / 1ps int x = 1;\n");
@@ -419,7 +419,7 @@ TEST(Preprocessor, Clause22_2_CodeAfterTimescaleOnSameLine) {
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterDefaultNettypeOnSameLine) {
+TEST(Preprocessor, CodeAfterDefaultNettypeOnSameLine) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>", "`default_nettype none int x = 1;\n");
@@ -429,7 +429,7 @@ TEST(Preprocessor, Clause22_2_CodeAfterDefaultNettypeOnSameLine) {
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterUnconnectedDriveOnSameLine) {
+TEST(Preprocessor, CodeAfterUnconnectedDriveOnSameLine) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>", "`unconnected_drive pull0 int x = 1;\n");
@@ -439,14 +439,14 @@ TEST(Preprocessor, Clause22_2_CodeAfterUnconnectedDriveOnSameLine) {
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterUndefOnSameLine) {
+TEST(Preprocessor, CodeAfterUndefOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess("`define FOO 1\n`undef FOO int x = 42;\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("int x = 42"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterEndKeywordsOnSameLine) {
+TEST(Preprocessor, CodeAfterEndKeywordsOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess(
       "`begin_keywords \"1800-2023\"\n"
@@ -456,7 +456,7 @@ TEST(Preprocessor, Clause22_2_CodeAfterEndKeywordsOnSameLine) {
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_CodeAfterBeginKeywordsOnSameLine) {
+TEST(Preprocessor, CodeAfterBeginKeywordsOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess(
       "`begin_keywords \"1800-2023\" int x = 1;\n"
@@ -466,7 +466,7 @@ TEST(Preprocessor, Clause22_2_CodeAfterBeginKeywordsOnSameLine) {
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_2_MacroExpansionWithinTimescale) {
+TEST(Preprocessor, MacroExpansionWithinTimescale) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.defines = {{"MY_PREC", "1ps"}};
@@ -477,7 +477,7 @@ TEST(Preprocessor, Clause22_2_MacroExpansionWithinTimescale) {
   EXPECT_TRUE(pp.HasTimescale());
 }
 
-TEST(Preprocessor, Clause22_2_MacroExpansionWithinDefaultNettype) {
+TEST(Preprocessor, MacroExpansionWithinDefaultNettype) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.defines = {{"MY_TYPE", "none"}};
@@ -488,13 +488,13 @@ TEST(Preprocessor, Clause22_2_MacroExpansionWithinDefaultNettype) {
   EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
 }
 
-TEST(Preprocessor, Clause22_2_DirectiveInsideDirectiveArgIsError) {
+TEST(Preprocessor, DirectiveInsideDirectiveArgIsError) {
   PreprocFixture f;
   Preprocess("`default_nettype `resetall\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_2_MacroInRemainderAfterDirectiveExpanded) {
+TEST(Preprocessor, MacroInRemainderAfterDirectiveExpanded) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.defines = {{"VAL", "42"}};

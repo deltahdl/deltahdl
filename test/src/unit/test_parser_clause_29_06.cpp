@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA051, SimSequentialEdgeSensitive) {
+TEST(UdpDeclGrammar, SimSequentialEdgeSensitive) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
       "  initial q = 1'bx;\n"
@@ -37,7 +37,7 @@ TEST(ParserAnnexA051, SimSequentialEdgeSensitive) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-TEST(ParserAnnexA053, EdgeIndicator_EdgeSymbol) {
+TEST(UdpBodyGrammar, EdgeIndicator_EdgeSymbol) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
       "  table\n"
@@ -51,7 +51,7 @@ TEST(ParserAnnexA053, EdgeIndicator_EdgeSymbol) {
   EXPECT_EQ(udp->table[0].inputs[1], 'r');
 }
 
-TEST(ParserAnnexA053, EdgeIndicator_SimParen01) {
+TEST(UdpBodyGrammar, EdgeIndicator_SimParen01) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
       "  initial q = 0;\n"

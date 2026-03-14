@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexD, AnnexDSave) {
+TEST(OptionalSystemTaskParserParsing, Save) {
   auto r = Parse(
       "module m;\n"
       "  initial begin $save(\"s.sav\"); $restart(\"s.sav\"); end\n"
@@ -13,7 +13,7 @@ TEST(ParserAnnexD, AnnexDSave) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserAnnexD2, AnnexDIncsaveParse) {
+TEST(OptionalSystemTaskExtendedParsing, IncsaveParse) {
   auto r = Parse(
       "module m;\n"
       "  initial $incsave(\"incremental.sav\");\n"
@@ -25,7 +25,7 @@ TEST(ParserAnnexD2, AnnexDIncsaveParse) {
   EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
 }
 
-TEST(ParserAnnexD2, AnnexDIncsaveExpr) {
+TEST(OptionalSystemTaskExtendedParsing, IncsaveExpr) {
   auto r = Parse(
       "module m;\n"
       "  initial $incsave(\"incremental.sav\");\n"

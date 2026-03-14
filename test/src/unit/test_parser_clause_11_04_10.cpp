@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, ArithmeticShiftLeft) {
+TEST(OperatorAndExpressionParsing, ArithmeticShiftLeft) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a <<< 2;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection11, ArithmeticShiftLeft) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLtLt);
 }
 
-TEST(ParserSection11, ArithmeticShiftRight) {
+TEST(OperatorAndExpressionParsing, ArithmeticShiftRight) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a >>> 2;\n"
@@ -30,7 +30,7 @@ TEST(ParserSection11, ArithmeticShiftRight) {
   EXPECT_EQ(rhs->op, TokenKind::kGtGtGt);
 }
 
-TEST(ParserA86, BinaryLogicalRightShift) {
+TEST(OperatorParsing, BinaryLogicalRightShift) {
   auto r = Parse("module m; initial x = a >> 2; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -40,7 +40,7 @@ TEST(ParserA86, BinaryLogicalRightShift) {
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
 }
 
-TEST(ParserA86, BinaryLogicalLeftShift) {
+TEST(OperatorParsing, BinaryLogicalLeftShift) {
   auto r = Parse("module m; initial x = a << 2; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -50,7 +50,7 @@ TEST(ParserA86, BinaryLogicalLeftShift) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
 }
 
-TEST(ParserA86, BinaryArithRightShift) {
+TEST(OperatorParsing, BinaryArithRightShift) {
   auto r = Parse("module m; initial x = a >>> 2; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -60,7 +60,7 @@ TEST(ParserA86, BinaryArithRightShift) {
   EXPECT_EQ(rhs->op, TokenKind::kGtGtGt);
 }
 
-TEST(ParserA86, BinaryArithLeftShift) {
+TEST(OperatorParsing, BinaryArithLeftShift) {
   auto r = Parse("module m; initial x = a <<< 2; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -70,7 +70,7 @@ TEST(ParserA86, BinaryArithLeftShift) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLtLt);
 }
 
-TEST(ParserA83, ExprLeftShift) {
+TEST(ExpressionParsing, ExprLeftShift) {
   auto r = Parse("module m; initial x = a << 2; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -80,7 +80,7 @@ TEST(ParserA83, ExprLeftShift) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
 }
 
-TEST(ParserA83, ExprRightShift) {
+TEST(ExpressionParsing, ExprRightShift) {
   auto r = Parse("module m; initial x = a >> 2; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -90,7 +90,7 @@ TEST(ParserA83, ExprRightShift) {
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
 }
 
-TEST(ParserSection11, LogicalShiftLeft) {
+TEST(OperatorAndExpressionParsing, LogicalShiftLeft) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a << 2;\n"
@@ -100,7 +100,7 @@ TEST(ParserSection11, LogicalShiftLeft) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
 }
 
-TEST(ParserSection11, LogicalShiftRight) {
+TEST(OperatorAndExpressionParsing, LogicalShiftRight) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a >> 2;\n"
@@ -110,15 +110,15 @@ TEST(ParserSection11, LogicalShiftRight) {
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
 }
 
-TEST(ParserCh505, Operator_LogicalShiftLeft) {
+TEST(OperatorTokenParserParsing, Operator_LogicalShiftLeft) {
   EXPECT_TRUE(ParseOk("module m; initial x = a <<< 2; endmodule"));
 }
 
-TEST(ParserCh505, Operator_ArithShiftRight) {
+TEST(OperatorTokenParserParsing, Operator_ArithShiftRight) {
   EXPECT_TRUE(ParseOk("module m; initial x = a >>> 1; endmodule"));
 }
 
-TEST(ParserA86, BinaryShiftRight) {
+TEST(OperatorParsing, BinaryShiftRight) {
   auto r = Parse("module m; initial x = a >> b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -128,7 +128,7 @@ TEST(ParserA86, BinaryShiftRight) {
   EXPECT_EQ(rhs->op, TokenKind::kGtGt);
 }
 
-TEST(ParserA86, BinaryShiftLeft) {
+TEST(OperatorParsing, BinaryShiftLeft) {
   auto r = Parse("module m; initial x = a << b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -138,7 +138,7 @@ TEST(ParserA86, BinaryShiftLeft) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
 }
 
-TEST(ParserA86, BinaryArithShiftRight) {
+TEST(OperatorParsing, BinaryArithShiftRight) {
   auto r = Parse("module m; initial x = a >>> b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -148,7 +148,7 @@ TEST(ParserA86, BinaryArithShiftRight) {
   EXPECT_EQ(rhs->op, TokenKind::kGtGtGt);
 }
 
-TEST(ParserA86, BinaryArithShiftLeft) {
+TEST(OperatorParsing, BinaryArithShiftLeft) {
   auto r = Parse("module m; initial x = a <<< b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

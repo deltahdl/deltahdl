@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexN, AnnexNDistUniform) {
+TEST(GlossaryParsing, DistUniform) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $dist_uniform(seed, 0, 100);\n"
@@ -17,7 +17,7 @@ TEST(ParserAnnexN, AnnexNDistUniform) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserAnnexN, AnnexNDistNormal) {
+TEST(GlossaryParsing, DistNormal) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $dist_normal(seed, 50, 10);\n"
@@ -29,7 +29,7 @@ TEST(ParserAnnexN, AnnexNDistNormal) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserAnnexN, AnnexNDistExponential) {
+TEST(GlossaryParsing, DistExponential) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $dist_exponential(seed, 5);\n"
@@ -41,7 +41,7 @@ TEST(ParserAnnexN, AnnexNDistExponential) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserAnnexN, AnnexNDistPoisson) {
+TEST(GlossaryParsing, DistPoisson) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $dist_poisson(seed, 10);\n"
@@ -53,7 +53,7 @@ TEST(ParserAnnexN, AnnexNDistPoisson) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserAnnexN, AnnexNDistChiSquare) {
+TEST(GlossaryParsing, DistChiSquare) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $dist_chi_square(seed, 3);\n"

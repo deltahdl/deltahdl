@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh9, AlwaysCombPriorityEncoder) {
+TEST(AlwaysCombBasicSim, AlwaysCombPriorityEncoder) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

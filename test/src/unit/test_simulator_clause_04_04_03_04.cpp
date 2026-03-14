@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4434, PostNBARegionExecutesPLICallbacks) {
+TEST(PliPostNbaSim, PostNBARegionExecutesPLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,7 +23,7 @@ TEST(SimCh4434, PostNBARegionExecutesPLICallbacks) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4434, PostNBACanReadValues) {
+TEST(PliPostNbaSim, PostNBACanReadValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -41,7 +41,7 @@ TEST(SimCh4434, PostNBACanReadValues) {
   EXPECT_EQ(sampled, 42);
 }
 
-TEST(SimCh4434, PostNBACanWriteValues) {
+TEST(PliPostNbaSim, PostNBACanWriteValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -59,7 +59,7 @@ TEST(SimCh4434, PostNBACanWriteValues) {
   EXPECT_EQ(sampled_in_observed, 99);
 }
 
-TEST(SimCh4434, PostNBACanCreateEvents) {
+TEST(PliPostNbaSim, PostNBACanCreateEvents) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -80,7 +80,7 @@ TEST(SimCh4434, PostNBACanCreateEvents) {
   EXPECT_EQ(order[1], "created_observed");
 }
 
-TEST(SimCh4434, PostNBAExecutesAfterNBA) {
+TEST(PliPostNbaSim, PostNBAExecutesAfterNBA) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -99,12 +99,12 @@ TEST(SimCh4434, PostNBAExecutesAfterNBA) {
   EXPECT_EQ(order[1], "post_nba");
 }
 
-TEST(SimCh4434, PostNBAExecutesAfterNBABeforePreObserved) {
+TEST(PliPostNbaSim, PostNBAExecutesAfterNBABeforePreObserved) {
   VerifyThreeRegionOrder({Region::kNBA, "nba"}, {Region::kPostNBA, "post_nba"},
                          {Region::kPreObserved, "pre_observed"});
 }
 
-TEST(SimCh4434, PostNBAIsWithinActiveRegionSet) {
+TEST(PliPostNbaSim, PostNBAIsWithinActiveRegionSet) {
   auto post_nba_ord = static_cast<int>(Region::kPostNBA);
   auto nba_ord = static_cast<int>(Region::kNBA);
   auto pre_observed_ord = static_cast<int>(Region::kPreObserved);
@@ -112,7 +112,7 @@ TEST(SimCh4434, PostNBAIsWithinActiveRegionSet) {
   EXPECT_LT(post_nba_ord, pre_observed_ord);
 }
 
-TEST(SimCh4434, PostNBARegionHoldsMultiplePLICallbacks) {
+TEST(PliPostNbaSim, PostNBARegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -127,7 +127,7 @@ TEST(SimCh4434, PostNBARegionHoldsMultiplePLICallbacks) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh4434, PostNBAEventsAcrossMultipleTimeSlots) {
+TEST(PliPostNbaSim, PostNBAEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;
@@ -147,7 +147,7 @@ TEST(SimCh4434, PostNBAEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-TEST(SimCh4434, PostNBAReadWriteInActiveRegionSetContext) {
+TEST(PliPostNbaSim, PostNBAReadWriteInActiveRegionSetContext) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7, AssocArrayClassIndex) {
+TEST(AggregateTypeParsing, AssocArrayClassIndex) {
   auto r = Parse(
       "module t;\n"
       "  class Foo;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection7, AssocArrayClassIndex) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection7, AssocArrayClassIndex_DimExpr) {
+TEST(AggregateTypeParsing, AssocArrayClassIndex_DimExpr) {
   auto r = Parse(
       "module t;\n"
       "  class MyClass;\n"
@@ -42,7 +42,7 @@ TEST(ParserSection7, AssocArrayClassIndex_DimExpr) {
   EXPECT_EQ(var_item->unpacked_dims[0]->text, "MyClass");
 }
 
-TEST(ParserSection7, AssocArrayClassIndex_MultipleVars) {
+TEST(AggregateTypeParsing, AssocArrayClassIndex_MultipleVars) {
   auto r = Parse(
       "module t;\n"
       "  class Key;\n"
@@ -55,7 +55,7 @@ TEST(ParserSection7, AssocArrayClassIndex_MultipleVars) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection7, AssocArrayClassIndex_DifferentElemTypes) {
+TEST(AggregateTypeParsing, AssocArrayClassIndex_DifferentElemTypes) {
   auto r = Parse(
       "module t;\n"
       "  class Idx;\n"

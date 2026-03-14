@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA704, SixDelayPathSimulates) {
+TEST(SpecifyPathDelaySim, SixDelayPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -27,7 +27,7 @@ TEST(SimA704, SixDelayPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA704, TwelveDelayPathSimulates) {
+TEST(SpecifyPathDelaySim, TwelveDelayPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -47,7 +47,7 @@ TEST(SimA704, TwelveDelayPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-TEST(SimA704, MinTypMaxDelaySimulates) {
+TEST(SpecifyPathDelaySim, MinTypMaxDelaySimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -67,7 +67,7 @@ TEST(SimA704, MinTypMaxDelaySimulates) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-TEST(SimA704, RuntimePathDelaySixDelays) {
+TEST(SpecifyPathDelaySim, RuntimePathDelaySixDelays) {
   SpecifyManager mgr;
   PathDelay pd;
   pd.src_port = "a";
@@ -93,7 +93,7 @@ TEST(SimA704, RuntimePathDelaySixDelays) {
   EXPECT_EQ(delays[0].delays[5], 6u);
 }
 
-TEST(SimA704, RuntimePathDelayTwelveDelays) {
+TEST(SpecifyPathDelaySim, RuntimePathDelayTwelveDelays) {
   SpecifyManager mgr;
   PathDelay pd;
   pd.src_port = "in";
@@ -113,7 +113,7 @@ TEST(SimA704, RuntimePathDelayTwelveDelays) {
   }
 }
 
-TEST(SimA704, RuntimePathDelaySingleDelay) {
+TEST(SpecifyPathDelaySim, RuntimePathDelaySingleDelay) {
   SpecifyManager mgr;
   PathDelay pd;
   pd.src_port = "a";

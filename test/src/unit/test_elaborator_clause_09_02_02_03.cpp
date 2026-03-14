@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_02_02_03, TimingControlInAlwaysLatchErrors) {
+TEST(AlwaysFfElaboration, TimingControlInAlwaysLatchErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -18,7 +18,7 @@ TEST(ElabClause09_02_02_03, TimingControlInAlwaysLatchErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_03, ForkJoinInAlwaysLatchErrors) {
+TEST(AlwaysFfElaboration, ForkJoinInAlwaysLatchErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -34,7 +34,7 @@ TEST(ElabClause09_02_02_03, ForkJoinInAlwaysLatchErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_03, IncompleteIfNoWarning) {
+TEST(AlwaysFfElaboration, IncompleteIfNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -48,7 +48,7 @@ TEST(ElabClause09_02_02_03, IncompleteIfNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(ElabClause09_02_02_03, CompleteIfElseWarnsNotLatched) {
+TEST(AlwaysFfElaboration, CompleteIfElseWarnsNotLatched) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -63,7 +63,7 @@ TEST(ElabClause09_02_02_03, CompleteIfElseWarnsNotLatched) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(ElabClause09_02_02_03, CaseWithoutDefaultNoWarning) {
+TEST(AlwaysFfElaboration, CaseWithoutDefaultNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -81,7 +81,7 @@ TEST(ElabClause09_02_02_03, CaseWithoutDefaultNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(ElabClause09_02_02_03, CaseWithDefaultWarnsNotLatched) {
+TEST(AlwaysFfElaboration, CaseWithDefaultWarnsNotLatched) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -100,7 +100,7 @@ TEST(ElabClause09_02_02_03, CaseWithDefaultWarnsNotLatched) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(ElabClause09_02_02_03, AlwaysLatchElaboratesToCorrectKind) {
+TEST(AlwaysFfElaboration, AlwaysLatchElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -119,7 +119,7 @@ TEST(ElabClause09_02_02_03, AlwaysLatchElaboratesToCorrectKind) {
   EXPECT_TRUE(found);
 }
 
-TEST(ElabClause09_02_02_03, MultiDriverTwoAlwaysLatchErrors) {
+TEST(AlwaysFfElaboration, MultiDriverTwoAlwaysLatchErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -131,7 +131,7 @@ TEST(ElabClause09_02_02_03, MultiDriverTwoAlwaysLatchErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(SimCh9c, ExecutesAtTimeZero) {
+TEST(AlwaysLatchBasicSim, ExecutesAtTimeZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -153,7 +153,7 @@ TEST(SimCh9c, ExecutesAtTimeZero) {
   EXPECT_EQ(q->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
+TEST(AlwaysLatchBasicSim, UnconditionalAssignAtTimeZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -173,7 +173,7 @@ TEST(SimCh9c, UnconditionalAssignAtTimeZero) {
   EXPECT_EQ(q->value.ToUint64(), 0xABu);
 }
 
-TEST(SimCh9c, IfWithoutElseRetainsDefault) {
+TEST(AlwaysLatchBasicSim, IfWithoutElseRetainsDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -199,7 +199,7 @@ TEST(SimCh9c, IfWithoutElseRetainsDefault) {
   EXPECT_EQ(q->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9c, EnableHighPassesData) {
+TEST(AlwaysLatchBasicSim, EnableHighPassesData) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -224,7 +224,7 @@ TEST(SimCh9c, EnableHighPassesData) {
   EXPECT_EQ(q->value.ToUint64(), 0x42u);
 }
 
-TEST(SimCh9c, EnableLowRetainsPreviousValue) {
+TEST(AlwaysLatchBasicSim, EnableLowRetainsPreviousValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -261,7 +261,7 @@ static void LowerRunAndFindQ1Q2(SimFixture& f, RtlirDesign* design,
   ASSERT_NE(q2_out, nullptr);
 }
 
-TEST(SimCh9c, MultipleLatchesInOneBlock) {
+TEST(AlwaysLatchBasicSim, MultipleLatchesInOneBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -287,7 +287,7 @@ TEST(SimCh9c, MultipleLatchesInOneBlock) {
   EXPECT_EQ(q2->value.ToUint64(), 0x55u);
 }
 
-TEST(SimCh9c, MultipleLatchesEnableLow) {
+TEST(AlwaysLatchBasicSim, MultipleLatchesEnableLow) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -313,7 +313,7 @@ TEST(SimCh9c, MultipleLatchesEnableLow) {
   EXPECT_EQ(q2->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9c, IncompleteCaseRetainsValue) {
+TEST(AlwaysLatchBasicSim, IncompleteCaseRetainsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -339,7 +339,7 @@ TEST(SimCh9c, IncompleteCaseRetainsValue) {
   EXPECT_EQ(q->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9c, LatchLogicType) {
+TEST(AlwaysLatchBasicSim, LatchLogicType) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -365,7 +365,7 @@ TEST(SimCh9c, LatchLogicType) {
   EXPECT_EQ(q->value.ToUint64(), 0xCu);
 }
 
-TEST(SimCh9c, LatchIntType) {
+TEST(AlwaysLatchBasicSim, LatchIntType) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -391,7 +391,7 @@ TEST(SimCh9c, LatchIntType) {
   EXPECT_EQ(q->value.ToUint64(), 12345u);
 }
 
-TEST(SimCh9c, LatchByteType) {
+TEST(AlwaysLatchBasicSim, LatchByteType) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -417,7 +417,7 @@ TEST(SimCh9c, LatchByteType) {
   EXPECT_EQ(q->value.ToUint64(), 0xFEu);
 }
 
-TEST(SimCh9c, BitSelectRHS) {
+TEST(AlwaysLatchBasicSim, BitSelectRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -444,7 +444,7 @@ TEST(SimCh9c, BitSelectRHS) {
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9c, ConcatenationRHS) {
+TEST(AlwaysLatchBasicSim, ConcatenationRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -472,7 +472,7 @@ TEST(SimCh9c, ConcatenationRHS) {
   EXPECT_EQ(q->value.ToUint64(), 0xA5u);
 }
 
-TEST(SimCh9c, ConcatenationRetainedWhenLow) {
+TEST(AlwaysLatchBasicSim, ConcatenationRetainedWhenLow) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -500,7 +500,7 @@ TEST(SimCh9c, ConcatenationRetainedWhenLow) {
   EXPECT_EQ(q->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9c, NestedIfElseBothTrue) {
+TEST(AlwaysLatchBasicSim, NestedIfElseBothTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -530,7 +530,7 @@ TEST(SimCh9c, NestedIfElseBothTrue) {
   EXPECT_EQ(q->value.ToUint64(), 0x11u);
 }
 
-TEST(SimCh9c, NestedIfElseInnerFalse) {
+TEST(AlwaysLatchBasicSim, NestedIfElseInnerFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -560,7 +560,7 @@ TEST(SimCh9c, NestedIfElseInnerFalse) {
   EXPECT_EQ(q->value.ToUint64(), 0x22u);
 }
 
-TEST(SimCh9c, NestedIfElseOuterFalse) {
+TEST(AlwaysLatchBasicSim, NestedIfElseOuterFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -591,7 +591,7 @@ TEST(SimCh9c, NestedIfElseOuterFalse) {
   EXPECT_EQ(q->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9c, MultipleOutputsDifferentSources) {
+TEST(AlwaysLatchBasicSim, MultipleOutputsDifferentSources) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -629,7 +629,7 @@ TEST(SimCh9c, MultipleOutputsDifferentSources) {
   EXPECT_EQ(q3->value.ToUint64(), 0x30u);
 }
 
-TEST(SimCh9c, MultipleOutputsIndependentEnables) {
+TEST(AlwaysLatchBasicSim, MultipleOutputsIndependentEnables) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -662,7 +662,7 @@ TEST(SimCh9c, MultipleOutputsIndependentEnables) {
   EXPECT_EQ(q2->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9c, OutputAvailableAfterRun) {
+TEST(AlwaysLatchBasicSim, OutputAvailableAfterRun) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -688,7 +688,7 @@ TEST(SimCh9c, OutputAvailableAfterRun) {
   EXPECT_EQ(q->value.ToUint64(), 0xBEEFu);
 }
 
-TEST(SimCh9c, WidthVerificationSingleBit) {
+TEST(AlwaysLatchBasicSim, WidthVerificationSingleBit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -714,7 +714,7 @@ TEST(SimCh9c, WidthVerificationSingleBit) {
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9c, Width32BitAndToUint64) {
+TEST(AlwaysLatchBasicSim, Width32BitAndToUint64) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -740,7 +740,7 @@ TEST(SimCh9c, Width32BitAndToUint64) {
   EXPECT_EQ(q->value.ToUint64(), 0xDEADBEEFu);
 }
 
-TEST(SimCh9c, BeginEndBlockWithArithmetic) {
+TEST(AlwaysLatchBasicSim, BeginEndBlockWithArithmetic) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

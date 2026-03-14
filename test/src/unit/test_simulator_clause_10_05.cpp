@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh10c, VarInitBeforeInitialBlock) {
+TEST(VariableInitSim, VarInitBeforeInitialBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -25,7 +25,7 @@ TEST(SimCh10c, VarInitBeforeInitialBlock) {
   EXPECT_EQ(y->value.ToUint64(), 42u);
 }
 
-TEST(SimCh10c, VarInitIsNotContinuous) {
+TEST(VariableInitSim, VarInitIsNotContinuous) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -51,7 +51,7 @@ TEST(SimCh10c, VarInitIsNotContinuous) {
   EXPECT_EQ(b->value.ToUint64(), 10u);
 }
 
-TEST(SimCh10c, VarInitHoldsUntilAssignment) {
+TEST(VariableInitSim, VarInitHoldsUntilAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -68,7 +68,7 @@ TEST(SimCh10c, VarInitHoldsUntilAssignment) {
   EXPECT_EQ(x->value.ToUint64(), 100u);
 }
 
-TEST(SimCh10c, VarInitWithExpression) {
+TEST(VariableInitSim, VarInitWithExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -84,7 +84,7 @@ TEST(SimCh10c, VarInitWithExpression) {
   EXPECT_EQ(v->value.ToUint64(), 0x30u);
 }
 
-TEST(SimCh10c, MultipleVarInitSameDecl) {
+TEST(VariableInitSim, MultipleVarInitSameDecl) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -100,7 +100,7 @@ TEST(SimCh10c, MultipleVarInitSameDecl) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 3u);
 }
 
-TEST(SimCh10c, VarInitBeforeAlwaysBlock) {
+TEST(VariableInitSim, VarInitBeforeAlwaysBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

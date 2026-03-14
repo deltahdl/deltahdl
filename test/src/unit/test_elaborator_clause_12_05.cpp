@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh9, AlwaysCombCaseDefault) {
+TEST(AlwaysCombBasicSim, AlwaysCombCaseDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -31,7 +31,7 @@ TEST(SimCh9, AlwaysCombCaseDefault) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimCh9b, AlwaysCombCaseMatch) {
+TEST(AlwaysCombExtendedSim, AlwaysCombCaseMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -61,7 +61,7 @@ TEST(SimCh9b, AlwaysCombCaseMatch) {
   EXPECT_EQ(y->value.ToUint64(), 0x30u);
 }
 
-TEST(SimCh9c, IncompleteCaseMatchAssigns) {
+TEST(AlwaysLatchBasicSim, IncompleteCaseMatchAssigns) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -86,7 +86,7 @@ TEST(SimCh9c, IncompleteCaseMatchAssigns) {
   EXPECT_EQ(q->value.ToUint64(), 0xAAu);
 }
 
-TEST(SimCh9c, IncompleteCaseSecondArm) {
+TEST(AlwaysLatchBasicSim, IncompleteCaseSecondArm) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -111,7 +111,7 @@ TEST(SimCh9c, IncompleteCaseSecondArm) {
   EXPECT_EQ(q->value.ToUint64(), 0xBBu);
 }
 
-TEST(SimCh10, BlockingAssignCase) {
+TEST(BlockingAssignSim, BlockingAssignCase) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA29, EmptyModport) {
+TEST(InterfaceDeclParsing, EmptyModport) {
   auto r = Parse(
       "interface bus;\n"
       "  modport empty();\n"

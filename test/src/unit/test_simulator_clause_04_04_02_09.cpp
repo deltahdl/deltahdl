@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4429, PostponedRegionExecutesEvents) {
+TEST(PostponedRegionSim, PostponedRegionExecutesEvents) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,7 +23,7 @@ TEST(SimCh4429, PostponedRegionExecutesEvents) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4429, PostponedRegionHoldsMultipleEvents) {
+TEST(PostponedRegionSim, PostponedRegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -38,7 +38,7 @@ TEST(SimCh4429, PostponedRegionHoldsMultipleEvents) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh4429, PostponedObservesFinalState) {
+TEST(PostponedRegionSim, PostponedObservesFinalState) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -68,7 +68,7 @@ TEST(SimCh4429, PostponedObservesFinalState) {
   EXPECT_EQ(sampled, 40);
 }
 
-TEST(SimCh4429, PostponedExecutesAfterAllOtherSimulationRegions) {
+TEST(PostponedRegionSim, PostponedExecutesAfterAllOtherSimulationRegions) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -87,7 +87,7 @@ TEST(SimCh4429, PostponedExecutesAfterAllOtherSimulationRegions) {
   EXPECT_EQ(order[7], "postponed");
 }
 
-TEST(SimCh4429, PostponedIsLastRegionOrdinal) {
+TEST(PostponedRegionSim, PostponedIsLastRegionOrdinal) {
   auto postponed_ord = static_cast<int>(Region::kPostponed);
   auto pre_postponed_ord = static_cast<int>(Region::kPrePostponed);
   auto count_ord = static_cast<int>(Region::kCOUNT);
@@ -95,7 +95,7 @@ TEST(SimCh4429, PostponedIsLastRegionOrdinal) {
   EXPECT_EQ(postponed_ord + 1, count_ord);
 }
 
-TEST(SimCh4429, PostponedDoesNotReExecuteDuringIteration) {
+TEST(PostponedRegionSim, PostponedDoesNotReExecuteDuringIteration) {
   Arena arena;
   Scheduler sched(arena);
   int postponed_count = 0;
@@ -120,7 +120,7 @@ TEST(SimCh4429, PostponedDoesNotReExecuteDuringIteration) {
   EXPECT_EQ(postponed_count, 1);
 }
 
-TEST(SimCh4429, PostponedAdvancesToNextTimeSlot) {
+TEST(PostponedRegionSim, PostponedAdvancesToNextTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -139,7 +139,7 @@ TEST(SimCh4429, PostponedAdvancesToNextTimeSlot) {
   EXPECT_EQ(order[1], "preponed_t1");
 }
 
-TEST(SimCh4429, PostponedPLIEventsExecuteInRegion) {
+TEST(PostponedRegionSim, PostponedPLIEventsExecuteInRegion) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -158,11 +158,11 @@ TEST(SimCh4429, PostponedPLIEventsExecuteInRegion) {
   EXPECT_EQ(order[1], "sim");
 }
 
-TEST(SimCh4429, PostponedEventsAcrossMultipleTimeSlots) {
+TEST(PostponedRegionSim, PostponedEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kPostponed);
 }
 
-TEST(SimCh4429, PostponedStatePersistsToNextPreponed) {
+TEST(PostponedRegionSim, PostponedStatePersistsToNextPreponed) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;

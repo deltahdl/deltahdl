@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA603, SeqBlockBasic) {
+TEST(BlockStatementSyntaxParsing, SeqBlockBasic) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -21,7 +21,7 @@ TEST(ParserA603, SeqBlockBasic) {
   ASSERT_GE(body->stmts.size(), 2u);
 }
 
-TEST(ParserA603, SeqBlockWithLabel) {
+TEST(BlockStatementSyntaxParsing, SeqBlockWithLabel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : myblock\n"
@@ -36,7 +36,7 @@ TEST(ParserA603, SeqBlockWithLabel) {
   EXPECT_EQ(body->label, "myblock");
 }
 
-TEST(ParserA603, SeqBlockWithBlockItemDecl) {
+TEST(BlockStatementSyntaxParsing, SeqBlockWithBlockItemDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -52,7 +52,7 @@ TEST(ParserA603, SeqBlockWithBlockItemDecl) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserA603, ParBlockBasic) {
+TEST(BlockStatementSyntaxParsing, ParBlockBasic) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -71,7 +71,7 @@ TEST(ParserA603, ParBlockBasic) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
 }
 
-TEST(ParserA603, ParBlockJoinAny) {
+TEST(BlockStatementSyntaxParsing, ParBlockJoinAny) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -89,7 +89,7 @@ TEST(ParserA603, ParBlockJoinAny) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinAny);
 }
 
-TEST(ParserA603, ParBlockJoinNone) {
+TEST(BlockStatementSyntaxParsing, ParBlockJoinNone) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -106,7 +106,7 @@ TEST(ParserA603, ParBlockJoinNone) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
 }
 
-TEST(ParserA603, ParBlockWithLabel) {
+TEST(BlockStatementSyntaxParsing, ParBlockWithLabel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -123,7 +123,7 @@ TEST(ParserA603, ParBlockWithLabel) {
   EXPECT_EQ(stmt->label, "par_block");
 }
 
-TEST(ParserA603, NestedSeqInPar) {
+TEST(BlockStatementSyntaxParsing, NestedSeqInPar) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

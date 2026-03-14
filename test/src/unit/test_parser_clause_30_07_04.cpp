@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA701, PulsestyleAndShowcancelledTogether) {
+TEST(SpecifyBlockDeclParsing, PulsestyleAndShowcancelledTogether) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

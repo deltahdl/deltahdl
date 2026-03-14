@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, ModuleWithPortDeclarations) {
+TEST(DesignBuildingBlockParsing, ModuleWithPortDeclarations) {
   auto r = Parse(
       "module m(input wire a, b, sel, output logic y);\n"
       "endmodule\n");
@@ -14,7 +14,7 @@ TEST(ParserClause03, ModuleWithPortDeclarations) {
   EXPECT_FALSE(r.cu->modules[0]->ports.empty());
 }
 
-TEST(ParserClause03, ModuleWithNetDecl) {
+TEST(DesignBuildingBlockParsing, ModuleWithNetDecl) {
   auto r = Parse(
       "module m;\n"
       "  wire [7:0] bus;\n"
@@ -25,7 +25,7 @@ TEST(ParserClause03, ModuleWithNetDecl) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kNetDecl);
 }
 
-TEST(ParserClause03, ModuleWithVarDecl) {
+TEST(DesignBuildingBlockParsing, ModuleWithVarDecl) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] data;\n"
@@ -36,7 +36,7 @@ TEST(ParserClause03, ModuleWithVarDecl) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kVarDecl);
 }
 
-TEST(ParserClause03, ModuleWithStructDecl) {
+TEST(DesignBuildingBlockParsing, ModuleWithStructDecl) {
   auto r = Parse(
       "module m;\n"
       "  struct packed { logic [7:0] a; logic [7:0] b; } s;\n"
@@ -45,7 +45,7 @@ TEST(ParserClause03, ModuleWithStructDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause03, ModuleWithUnionDecl) {
+TEST(DesignBuildingBlockParsing, ModuleWithUnionDecl) {
   auto r = Parse(
       "module m;\n"
       "  union packed { logic [7:0] a; logic [7:0] b; } u;\n"
@@ -54,7 +54,7 @@ TEST(ParserClause03, ModuleWithUnionDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause03, ModuleWithParamDecl) {
+TEST(DesignBuildingBlockParsing, ModuleWithParamDecl) {
   auto r = Parse(
       "module m;\n"
       "  parameter int WIDTH = 8;\n"
@@ -69,7 +69,7 @@ TEST(ParserClause03, ModuleWithParamDecl) {
   EXPECT_EQ(param_count, 2);
 }
 
-TEST(ParserClause03, ModuleWithTypedef) {
+TEST(DesignBuildingBlockParsing, ModuleWithTypedef) {
   auto r = Parse(
       "module m;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -80,7 +80,7 @@ TEST(ParserClause03, ModuleWithTypedef) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
 }
 
-TEST(ParserClause03, ModuleWithClassDecl) {
+TEST(DesignBuildingBlockParsing, ModuleWithClassDecl) {
   auto r = Parse(
       "module m;\n"
       "  class C;\n"
@@ -92,7 +92,7 @@ TEST(ParserClause03, ModuleWithClassDecl) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kClassDecl);
 }
 
-TEST(ParserClause03, ModuleWithImport) {
+TEST(DesignBuildingBlockParsing, ModuleWithImport) {
   auto r = Parse(
       "package pkg; typedef int myint; endpackage\n"
       "module m;\n"
@@ -103,7 +103,7 @@ TEST(ParserClause03, ModuleWithImport) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kImportDecl);
 }
 
-TEST(ParserClause03, ModuleWithFunction) {
+TEST(DesignBuildingBlockParsing, ModuleWithFunction) {
   auto r = Parse(
       "module m;\n"
       "  function int add(int a, int b);\n"
@@ -115,7 +115,7 @@ TEST(ParserClause03, ModuleWithFunction) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
 }
 
-TEST(ParserClause03, ModuleWithTask) {
+TEST(DesignBuildingBlockParsing, ModuleWithTask) {
   auto r = Parse(
       "module m;\n"
       "  task do_nothing;\n"
@@ -126,7 +126,7 @@ TEST(ParserClause03, ModuleWithTask) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
 }
 
-TEST(ParserClause03, ModuleWithModuleInst) {
+TEST(DesignBuildingBlockParsing, ModuleWithModuleInst) {
   auto r = Parse(
       "module sub; endmodule\n"
       "module m;\n"
@@ -137,7 +137,7 @@ TEST(ParserClause03, ModuleWithModuleInst) {
   EXPECT_EQ(r.cu->modules[1]->items[0]->kind, ModuleItemKind::kModuleInst);
 }
 
-TEST(ParserClause03, ModuleWithGateInst) {
+TEST(DesignBuildingBlockParsing, ModuleWithGateInst) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, y;\n"
@@ -152,7 +152,7 @@ TEST(ParserClause03, ModuleWithGateInst) {
   EXPECT_TRUE(has_gate);
 }
 
-TEST(ParserClause03, ModuleWithContAssign) {
+TEST(DesignBuildingBlockParsing, ModuleWithContAssign) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b;\n"
@@ -167,7 +167,7 @@ TEST(ParserClause03, ModuleWithContAssign) {
   EXPECT_TRUE(has_assign);
 }
 
-TEST(ParserClause03, ModuleWithInitialBlock) {
+TEST(DesignBuildingBlockParsing, ModuleWithInitialBlock) {
   auto r = Parse(
       "module m;\n"
       "  logic a;\n"
@@ -178,7 +178,7 @@ TEST(ParserClause03, ModuleWithInitialBlock) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kInitialBlock);
 }
 
-TEST(ParserClause03, ModuleWithFinalBlock) {
+TEST(DesignBuildingBlockParsing, ModuleWithFinalBlock) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"done\");\n"
@@ -188,7 +188,7 @@ TEST(ParserClause03, ModuleWithFinalBlock) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
 }
 
-TEST(ParserClause03, ModuleWithAlwaysBlock) {
+TEST(DesignBuildingBlockParsing, ModuleWithAlwaysBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic clk, q, d;\n"
@@ -196,7 +196,7 @@ TEST(ParserClause03, ModuleWithAlwaysBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, ModuleWithAlwaysComb) {
+TEST(DesignBuildingBlockParsing, ModuleWithAlwaysComb) {
   auto r = Parse(
       "module m;\n"
       "  logic a, y;\n"
@@ -207,7 +207,7 @@ TEST(ParserClause03, ModuleWithAlwaysComb) {
   EXPECT_EQ(r.cu->modules[0]->items[2]->kind, ModuleItemKind::kAlwaysCombBlock);
 }
 
-TEST(ParserClause03, ModuleWithAlwaysFF) {
+TEST(DesignBuildingBlockParsing, ModuleWithAlwaysFF) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic clk, d, q;\n"
@@ -215,7 +215,7 @@ TEST(ParserClause03, ModuleWithAlwaysFF) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, ModuleWithAlwaysLatch) {
+TEST(DesignBuildingBlockParsing, ModuleWithAlwaysLatch) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic en, d, q;\n"
@@ -223,7 +223,7 @@ TEST(ParserClause03, ModuleWithAlwaysLatch) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, ModuleWithGenerateFor) {
+TEST(DesignBuildingBlockParsing, ModuleWithGenerateFor) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  genvar i;\n"
@@ -233,7 +233,7 @@ TEST(ParserClause03, ModuleWithGenerateFor) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, ModuleWithGenerateIf) {
+TEST(DesignBuildingBlockParsing, ModuleWithGenerateIf) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  parameter int P = 1;\n"
@@ -243,7 +243,7 @@ TEST(ParserClause03, ModuleWithGenerateIf) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, ModuleWithSpecifyBlock) {
+TEST(DesignBuildingBlockParsing, ModuleWithSpecifyBlock) {
   auto r = Parse(
       "module m(input a, output y);\n"
       "  assign y = a;\n"
@@ -260,7 +260,7 @@ TEST(ParserClause03, ModuleWithSpecifyBlock) {
   EXPECT_TRUE(has_specify);
 }
 
-TEST(ParserClause03, Mux2to1Example) {
+TEST(DesignBuildingBlockParsing, Mux2to1Example) {
   auto r = Parse(
       "module mux2to1 (input wire a, b, sel,\n"
       "                output logic y);\n"
@@ -277,7 +277,7 @@ TEST(ParserClause03, Mux2to1Example) {
   EXPECT_FALSE(r.cu->modules[0]->items.empty());
 }
 
-TEST(ParserClause03, ModuleWithMixedContents) {
+TEST(DesignBuildingBlockParsing, ModuleWithMixedContents) {
   EXPECT_TRUE(ParseOk(
       "module m #(parameter int W = 8) (input logic clk, output logic [W-1:0] "
       "q);\n"
@@ -292,7 +292,7 @@ TEST(ParserClause03, ModuleWithMixedContents) {
       "endmodule\n"));
 }
 
-TEST(ParserClause03, MultipleModulesInOneCU) {
+TEST(DesignBuildingBlockParsing, MultipleModulesInOneCU) {
   auto r = Parse(
       "module a; endmodule\nmodule b; endmodule\n"
       "module c; endmodule\n");
@@ -304,11 +304,11 @@ TEST(ParserClause03, MultipleModulesInOneCU) {
   EXPECT_EQ(r.cu->modules[2]->name, "c");
 }
 
-TEST(ParserClause03, MismatchedEndKeywordIsError) {
+TEST(DesignBuildingBlockParsing, MismatchedEndKeywordIsError) {
   EXPECT_FALSE(ParseOk("module m; endprogram"));
 }
 
-TEST(ParserClause03, UnclosedModuleIsError) {
+TEST(DesignBuildingBlockParsing, UnclosedModuleIsError) {
   EXPECT_FALSE(ParseOk("module m;"));
 }
 

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA24, VarDeclAssignmentQueueDim) {
+TEST(DeclarationAssignmentParsing, VarDeclAssignmentQueueDim) {
   auto r = Parse("module m; int q [$]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(ParserA24, VarDeclAssignmentQueueDim) {
   EXPECT_EQ(item->name, "q");
 }
 
-TEST(ParserA25, VarDimAllFourAlternatives) {
+TEST(DeclarationRangeParsing, VarDimAllFourAlternatives) {
   auto r = Parse(
       "module m;\n"
       "  int d [];       \n"
@@ -41,7 +41,7 @@ TEST(ParserA25, VarDimAllFourAlternatives) {
   EXPECT_EQ(items[3]->unpacked_dims[0]->text, "$");
 }
 
-TEST(ParserA25, QueueDimUnbounded) {
+TEST(DeclarationRangeParsing, QueueDimUnbounded) {
   auto r = Parse("module m; int q [$]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -52,7 +52,7 @@ TEST(ParserA25, QueueDimUnbounded) {
   EXPECT_EQ(item->unpacked_dims[0]->rhs, nullptr);
 }
 
-TEST(ParserSection7, QueueDeclaration) {
+TEST(AggregateTypeParsing, QueueDeclaration) {
   auto r = Parse(
       "module t;\n"
       "  int q[$];\n"
@@ -63,7 +63,7 @@ TEST(ParserSection7, QueueDeclaration) {
   EXPECT_EQ(item->name, "q");
 }
 
-TEST(ParserSection7, QueueWithInitializer) {
+TEST(AggregateTypeParsing, QueueWithInitializer) {
   auto r = Parse(
       "module t;\n"
       "  integer Q[$] = '{3, 2, 7};\n"
@@ -75,7 +75,7 @@ TEST(ParserSection7, QueueWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection7, QueueUnbounded) {
+TEST(AggregateTypeParsing, QueueUnbounded) {
   auto r = Parse(
       "module t;\n"
       "  byte q[$];\n"
@@ -87,7 +87,7 @@ TEST(ParserSection7, QueueUnbounded) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection7, QueueOfStrings) {
+TEST(AggregateTypeParsing, QueueOfStrings) {
   auto r = Parse(
       "module t;\n"
       "  string names[$] = '{\"Bob\"};\n"
@@ -99,7 +99,7 @@ TEST(ParserSection7, QueueOfStrings) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection7c, QueueDecl) {
+TEST(DynamicArrayAndQueueParsing, QueueDecl) {
   auto r = Parse(
       "module m;\n"
       "  int q[$];\n"

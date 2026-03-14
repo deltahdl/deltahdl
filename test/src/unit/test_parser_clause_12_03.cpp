@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, InitialConstruct_NullStmt) {
+TEST(ProceduralBlockSyntaxParsing, InitialConstruct_NullStmt) {
   auto r = Parse(
       "module m;\n"
       "  initial ;\n"
@@ -18,7 +18,7 @@ TEST(ParserA602, InitialConstruct_NullStmt) {
   EXPECT_EQ(item->body->kind, StmtKind::kNull);
 }
 
-TEST(ParserA604, NullStatement) {
+TEST(StatementSyntaxParsing, NullStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -34,7 +34,7 @@ TEST(ParserA604, NullStatement) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNull);
 }
 
-TEST(ParserA604, NullStatementWithAttribute) {
+TEST(StatementSyntaxParsing, NullStatementWithAttribute) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -52,7 +52,7 @@ TEST(ParserA604, NullStatementWithAttribute) {
   EXPECT_EQ(stmt->attrs[0].name, "synthesis");
 }
 
-TEST(ParserA604, MultipleNullStatements) {
+TEST(StatementSyntaxParsing, MultipleNullStatements) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -71,7 +71,7 @@ TEST(ParserA604, MultipleNullStatements) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kNull);
 }
 
-TEST(ParserA604, StatementWithAttribute) {
+TEST(StatementSyntaxParsing, StatementWithAttribute) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -87,7 +87,7 @@ TEST(ParserA604, StatementWithAttribute) {
   EXPECT_EQ(stmt->attrs[0].name, "full_case");
 }
 
-TEST(ParserA604, StatementWithLabelAndAttribute) {
+TEST(StatementSyntaxParsing, StatementWithLabelAndAttribute) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

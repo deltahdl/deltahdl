@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, GateArrayRange) {
+TEST(GateLevelModelingParsing, GateArrayRange) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  nand n[0:3](out, a, b);\n"
@@ -17,7 +17,7 @@ TEST(ParserSection28, GateArrayRange) {
   EXPECT_EQ(item->gate_kind, GateKind::kNand);
 }
 
-TEST(ParserSection28, GateArrayWithDelay) {
+TEST(GateLevelModelingParsing, GateArrayWithDelay) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and #5 g[0:7](out, a, b);\n"

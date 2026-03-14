@@ -28,7 +28,7 @@ static bool LowerRunAndFindIR(SimFixture& f, RtlirDesign* design,
   return vi_out && vr_out;
 }
 
-TEST(SimCh507, NumberBothFormsCoexist) {
+TEST(NumberLiteralSim, NumberBothFormsCoexist) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -52,46 +52,46 @@ TEST(SimCh507, NumberBothFormsCoexist) {
   EXPECT_DOUBLE_EQ(d, 3.14);
 }
 
-TEST(SimCh507, NumberIntegralDecimal) {
+TEST(NumberLiteralSim, NumberIntegralDecimal) {
   auto v = RunAndGet(
       "module t;\n  logic [31:0] x;\n  initial x = 100;\nendmodule\n", "x");
   EXPECT_EQ(v, 100u);
 }
 
-TEST(SimCh507, NumberIntegralBinary) {
+TEST(NumberLiteralSim, NumberIntegralBinary) {
   auto v = RunAndGet(
       "module t;\n  logic [7:0] x;\n  initial x = 8'b1010_0101;\nendmodule\n",
       "x");
   EXPECT_EQ(v, 0xA5u);
 }
 
-TEST(SimCh507, NumberIntegralOctal) {
+TEST(NumberLiteralSim, NumberIntegralOctal) {
   auto v = RunAndGet(
       "module t;\n  logic [11:0] x;\n  initial x = 12'o7654;\nendmodule\n",
       "x");
   EXPECT_EQ(v, 07654u);
 }
 
-TEST(SimCh507, NumberIntegralHex) {
+TEST(NumberLiteralSim, NumberIntegralHex) {
   auto v = RunAndGet(
       "module t;\n  logic [15:0] x;\n  initial x = 16'hCAFE;\nendmodule\n",
       "x");
   EXPECT_EQ(v, 0xCAFEu);
 }
 
-TEST(SimCh507, NumberRealFixedPoint) {
+TEST(NumberLiteralSim, NumberRealFixedPoint) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 42.5;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 42.5);
 }
 
-TEST(SimCh507, NumberRealScientific) {
+TEST(NumberLiteralSim, NumberRealScientific) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 5.0e3;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 5000.0);
 }
 
-TEST(SimCh507, NumberAllIntegralBases) {
+TEST(NumberLiteralSim, NumberAllIntegralBases) {
   SimFixture f;
   ASSERT_TRUE(RunSim(f,
                      "module t;\n"
@@ -111,7 +111,7 @@ TEST(SimCh507, NumberAllIntegralBases) {
   }
 }
 
-TEST(SimCh507, NumberMixedInExpression) {
+TEST(NumberLiteralSim, NumberMixedInExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -135,7 +135,7 @@ TEST(SimCh507, NumberMixedInExpression) {
   EXPECT_DOUBLE_EQ(d, 4.0);
 }
 
-TEST(SimCh507, NumberAsPrimaryLiteralInTernary) {
+TEST(NumberLiteralSim, NumberAsPrimaryLiteralInTernary) {
   auto v = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -145,13 +145,13 @@ TEST(SimCh507, NumberAsPrimaryLiteralInTernary) {
   EXPECT_EQ(v, 99u);
 }
 
-TEST(SimCh507, NumberSizedDecimalBase) {
+TEST(NumberLiteralSim, NumberSizedDecimalBase) {
   auto v = RunAndGet(
       "module t;\n  logic [7:0] x;\n  initial x = 8'd200;\nendmodule\n", "x");
   EXPECT_EQ(v, 200u);
 }
 
-TEST(SimCh507, NumberUnderscoreInIntegral) {
+TEST(NumberLiteralSim, NumberUnderscoreInIntegral) {
   auto v = RunAndGet(
       "module t;\n  logic [31:0] x;\n  initial x = 1_000_000;\nendmodule\n",
       "x");

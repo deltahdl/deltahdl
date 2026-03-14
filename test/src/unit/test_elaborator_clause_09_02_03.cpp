@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_02_03, DelayInFinalErrors) {
+TEST(FinalProcedureElaboration, DelayInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -15,7 +15,7 @@ TEST(ElabClause09_02_03, DelayInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_03, EventControlInFinalErrors) {
+TEST(FinalProcedureElaboration, EventControlInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -26,7 +26,7 @@ TEST(ElabClause09_02_03, EventControlInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_03, WaitInFinalErrors) {
+TEST(FinalProcedureElaboration, WaitInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -37,7 +37,7 @@ TEST(ElabClause09_02_03, WaitInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_03, ForkJoinInFinalErrors) {
+TEST(FinalProcedureElaboration, ForkJoinInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -53,7 +53,7 @@ TEST(ElabClause09_02_03, ForkJoinInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_03, ValidFinalNoErrors) {
+TEST(FinalProcedureElaboration, ValidFinalNoErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -65,7 +65,7 @@ TEST(ElabClause09_02_03, ValidFinalNoErrors) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_02_03, ValidFinalBlockNoErrors) {
+TEST(FinalProcedureElaboration, ValidFinalBlockNoErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -80,7 +80,7 @@ TEST(ElabClause09_02_03, ValidFinalBlockNoErrors) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_02_03, ElaboratesToCorrectKind) {
+TEST(FinalProcedureElaboration, ElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -98,7 +98,7 @@ TEST(ElabClause09_02_03, ElaboratesToCorrectKind) {
   EXPECT_TRUE(found);
 }
 
-TEST(ElabClause09_02_03, MultipleFinalProcedures) {
+TEST(FinalProcedureElaboration, MultipleFinalProcedures) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -117,7 +117,7 @@ TEST(ElabClause09_02_03, MultipleFinalProcedures) {
   EXPECT_EQ(count, 2);
 }
 
-TEST(ElabClause09_02_03, FinalAndInitialCoexist) {
+TEST(FinalProcedureElaboration, FinalAndInitialCoexist) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -138,7 +138,7 @@ TEST(ElabClause09_02_03, FinalAndInitialCoexist) {
   EXPECT_TRUE(has_final);
 }
 
-TEST(ElabClause09_03_02, ForkInFinalErrors) {
+TEST(ParallelBlockElaboration, ForkInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -154,7 +154,7 @@ TEST(ElabClause09_03_02, ForkInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_06_01, WaitForkInFinalErrors) {
+TEST(WaitForkElaboration, WaitForkInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA213, PackageExportMultipleItems) {
+TEST(TypeDeclParsing, PackageExportMultipleItems) {
   auto r = Parse(
       "package pkg;\n"
       "  export p1::a, p2::b;\n"
@@ -19,7 +19,7 @@ TEST(ParserA213, PackageExportMultipleItems) {
   EXPECT_GE(export_count, 2);
 }
 
-TEST(ParserSection26, PackageExportWildcard) {
+TEST(PackageParsing, PackageExportWildcard) {
   auto r = Parse(
       "package p;\n"
       "  export *::*;\n"
@@ -30,7 +30,7 @@ TEST(ParserSection26, PackageExportWildcard) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kExportDecl));
 }
 
-TEST(ParserSection26, PackageExportSpecific) {
+TEST(PackageParsing, PackageExportSpecific) {
   auto r = Parse(
       "package p;\n"
       "  export other_pkg::some_func;\n"
@@ -39,7 +39,7 @@ TEST(ParserSection26, PackageExportSpecific) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-TEST(ParserSection23, ExportDecl) {
+TEST(ModuleAndHierarchyParsing, ExportDecl) {
   auto r = Parse(
       "package p;\n"
       "  export pkg::*;\n"
@@ -52,7 +52,7 @@ TEST(ParserSection23, ExportDecl) {
   EXPECT_TRUE(pkg->items[0]->import_item.is_wildcard);
 }
 
-TEST(ParserSection23, ExportWildcardAll) {
+TEST(ModuleAndHierarchyParsing, ExportWildcardAll) {
   auto r = Parse(
       "package p;\n"
       "  export *::*;\n"
@@ -77,7 +77,7 @@ TEST(SourceText, PackageExportNamed) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
 }
 
-TEST(ParserA213, PackageExportSingleItem) {
+TEST(TypeDeclParsing, PackageExportSingleItem) {
   auto r = Parse(
       "package pkg;\n"
       "  export other_pkg::some_func;\n"

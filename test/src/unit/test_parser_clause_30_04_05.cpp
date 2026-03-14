@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, SpecifyBlockSimplePath) {
+TEST(GateLevelModelingParsing, SpecifyBlockSimplePath) {
   auto r = Parse(
       "module m(input a, output b);\n"
       "  specify\n"
@@ -32,7 +32,7 @@ static bool HasFullPathDecl(ModuleItem* spec_block) {
   return false;
 }
 
-TEST(ParserSection28, SpecifyBlockFullPath) {
+TEST(GateLevelModelingParsing, SpecifyBlockFullPath) {
   auto r = Parse(
       "module m(input a, b, output c);\n"
       "  specify\n"

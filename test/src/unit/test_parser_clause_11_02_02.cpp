@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7, Sec7_2_2_StructComparison) {
+TEST(AggregateTypeParsing, StructComparison) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int a; int b; } pair_t;\n"

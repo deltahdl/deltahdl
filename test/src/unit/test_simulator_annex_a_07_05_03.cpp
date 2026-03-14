@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA70503, RuntimeTimingCheckEntryEdges) {
+TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryEdges) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kSetup;
@@ -21,7 +21,7 @@ TEST(SimA70503, RuntimeTimingCheckEntryEdges) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].data_edge, SpecifyEdge::kNone);
 }
 
-TEST(SimA70503, RuntimeTimingCheckEntryEdgeKw) {
+TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryEdgeKw) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kSetup;
@@ -33,7 +33,7 @@ TEST(SimA70503, RuntimeTimingCheckEntryEdgeKw) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].ref_edge, SpecifyEdge::kEdge);
 }
 
-TEST(SimA70503, TerminalBitSelectSimulates) {
+TEST(TimingCheckEventDefSim, TerminalBitSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -53,7 +53,7 @@ TEST(SimA70503, TerminalBitSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SimA70503, TerminalPartSelectSimulates) {
+TEST(TimingCheckEventDefSim, TerminalPartSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -73,7 +73,7 @@ TEST(SimA70503, TerminalPartSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-TEST(SimA70503, TimingCheckConditionSimulates) {
+TEST(TimingCheckEventDefSim, TimingCheckConditionSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -93,7 +93,7 @@ TEST(SimA70503, TimingCheckConditionSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-TEST(SimA70503, ControlledTimingCheckEventPeriodSimulates) {
+TEST(TimingCheckEventDefSim, ControlledTimingCheckEventPeriodSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -113,7 +113,7 @@ TEST(SimA70503, ControlledTimingCheckEventPeriodSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimA70503, FullCombinationSimulates) {
+TEST(TimingCheckEventDefSim, FullCombinationSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

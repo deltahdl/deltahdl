@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA84, PrimaryStreamingConcat) {
+TEST(PrimaryParsing, PrimaryStreamingConcat) {
   auto r = Parse(
       "module m;\n"
       "  logic [31:0] a;\n"
@@ -19,7 +19,7 @@ TEST(ParserA84, PrimaryStreamingConcat) {
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(ParserSection11, StreamingRight) {
+TEST(OperatorAndExpressionParsing, StreamingRight) {
   auto r = Parse(
       "module t;\n"
       "  initial x = {>> {a, b, c}};\n"
@@ -31,7 +31,7 @@ TEST(ParserSection11, StreamingRight) {
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(ParserSection11, StreamingWithSliceSize) {
+TEST(OperatorAndExpressionParsing, StreamingWithSliceSize) {
   auto r = Parse(
       "module t;\n"
       "  initial x = {<< 8 {a, b}};\n"
@@ -44,7 +44,7 @@ TEST(ParserSection11, StreamingWithSliceSize) {
   EXPECT_NE(rhs->lhs, nullptr);
 }
 
-TEST(ParserA81, StreamingConcatLeftShift) {
+TEST(ConcatenationParsing, StreamingConcatLeftShift) {
   auto r = Parse("module m; initial x = {<< {a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -54,7 +54,7 @@ TEST(ParserA81, StreamingConcatLeftShift) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kLtLt);
 }
 
-TEST(ParserA81, StreamingConcatRightShift) {
+TEST(ConcatenationParsing, StreamingConcatRightShift) {
   auto r = Parse("module m; initial x = {>> {a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -64,7 +64,7 @@ TEST(ParserA81, StreamingConcatRightShift) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kGtGt);
 }
 
-TEST(ParserSection11, Sec11_1_StreamingConcatLeftShift) {
+TEST(OperatorAndExpressionParsing, StreamingConcatLeftShift) {
   auto r = Parse(
       "module t;\n"
       "  initial x = {<< {a, b}};\n"
@@ -75,7 +75,7 @@ TEST(ParserSection11, Sec11_1_StreamingConcatLeftShift) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
   EXPECT_EQ(rhs->elements.size(), 2u);
 }
-TEST(ParserSection6, BitStreamCastStreaming) {
+TEST(DataTypeParsing, BitStreamCastStreaming) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"

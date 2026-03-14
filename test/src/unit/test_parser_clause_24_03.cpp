@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0413, BasicProgramInst) {
+TEST(ProgramInstantiationGrammar, BasicProgramInst) {
   auto r = Parse(
       "program my_prog(input logic clk);\n"
       "endprogram\n"
@@ -19,7 +19,7 @@ TEST(ParserAnnexA0413, BasicProgramInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-TEST(ParserAnnexA0413, MultipleProgramInstances) {
+TEST(ProgramInstantiationGrammar, MultipleProgramInstances) {
   auto r = Parse(
       "program my_prog(input logic clk);\n"
       "endprogram\n"
@@ -46,7 +46,7 @@ TEST(SourceText, ProgramParamsAndPorts) {
   EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
 }
 
-TEST(ParserSection4, Sec4_6_ProgramBlockDeterministicScheduling) {
+TEST(SchedulingSemanticsParsing, ProgramBlockDeterministicScheduling) {
   auto r = Parse(
       "program p;\n"
       "endprogram\n");
@@ -68,7 +68,7 @@ TEST(Parser, ProgramWithInitial) {
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
 
-TEST(ParserSection4, Sec4_6_ProgramWithInitialBlock) {
+TEST(SchedulingSemanticsParsing, ProgramWithInitialBlock) {
   auto r = Parse(
       "program p;\n"
       "  initial begin\n"
@@ -110,7 +110,7 @@ TEST_F(ProgramTestParse, ProgramWithMultipleInitialBlocks) {
       2);
 }
 
-TEST(ParserSection4, Sec4_9_4_ProgramWithFunction) {
+TEST(SchedulingSemanticsParsing, ProgramWithFunction) {
   EXPECT_TRUE(
       ParseOk("program p;\n"
               "  function automatic int get_val();\n"
@@ -185,7 +185,7 @@ TEST(SourceText, AnonymousProgramClasses) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-TEST(ParserSection4, Sec4_9_3_TaskInProgramBlock) {
+TEST(SchedulingSemanticsParsing, TaskInProgramBlock) {
   EXPECT_TRUE(
       ParseOk("program test_prog;\n"
               "  task run_test();\n"
@@ -210,7 +210,7 @@ TEST(SourceText, AnonymousProgramMisc) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-TEST(ParserSection4, Sec4_5_ProgramBlock) {
+TEST(SchedulingSemanticsParsing, ProgramBlock) {
   auto r = Parse(
       "program test_prog;\n"
       "  initial begin\n"
@@ -525,7 +525,7 @@ TEST(SourceText, ProgramMultipleItemTypes) {
   EXPECT_TRUE(HasItemKind(items, ModuleItemKind::kElabSystemTask));
 }
 
-TEST(ParserClause03, Cl3_13_ProgramBlockWithDeclarations) {
+TEST(DesignBuildingBlockParsing, ProgramBlockWithDeclarations) {
   auto r = Parse(
       "program test_prog;\n"
       "  int count;\n"

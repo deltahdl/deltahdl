@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA91, SingleAttrNoValue) {
+TEST(AttributeSyntaxParsing, SingleAttrNoValue) {
   auto r = Parse(
       "(* synthesis *)\n"
       "module m; endmodule\n");
@@ -17,7 +17,7 @@ TEST(ParserA91, SingleAttrNoValue) {
   EXPECT_EQ(r.cu->modules[0]->attrs[0].value, nullptr);
 }
 
-TEST(ParserA91, SingleAttrWithValue) {
+TEST(AttributeSyntaxParsing, SingleAttrWithValue) {
   auto r = Parse(
       "(* depth = 4 *)\n"
       "module m; endmodule\n");
@@ -28,7 +28,7 @@ TEST(ParserA91, SingleAttrWithValue) {
   EXPECT_NE(r.cu->modules[0]->attrs[0].value, nullptr);
 }
 
-TEST(ParserA91, MultipleAttrSpecs) {
+TEST(AttributeSyntaxParsing, MultipleAttrSpecs) {
   auto r = Parse(
       "(* full_case, parallel_case *)\n"
       "module m;\n"
@@ -41,7 +41,7 @@ TEST(ParserA91, MultipleAttrSpecs) {
   EXPECT_EQ(r.cu->modules[0]->attrs[1].name, "parallel_case");
 }
 
-TEST(ParserA91, MixedAttrWithAndWithoutValue) {
+TEST(AttributeSyntaxParsing, MixedAttrWithAndWithoutValue) {
   auto r = Parse(
       "(* full_case, depth = 8 *)\n"
       "module m; endmodule\n");
@@ -52,7 +52,7 @@ TEST(ParserA91, MixedAttrWithAndWithoutValue) {
   EXPECT_NE(r.cu->modules[0]->attrs[1].value, nullptr);
 }
 
-TEST(ParserA91, AttrValueConstExpr) {
+TEST(AttributeSyntaxParsing, AttrValueConstExpr) {
   auto r = Parse(
       "(* depth = 2 + 2 *)\n"
       "module m; endmodule\n");
@@ -63,7 +63,7 @@ TEST(ParserA91, AttrValueConstExpr) {
   EXPECT_EQ(r.cu->modules[0]->attrs[0].value->kind, ExprKind::kBinary);
 }
 
-TEST(ParserA91, AttrOnModuleItem) {
+TEST(AttributeSyntaxParsing, AttrOnModuleItem) {
   auto r = Parse(
       "module m;\n"
       "  (* dont_touch *)\n"
@@ -77,7 +77,7 @@ TEST(ParserA91, AttrOnModuleItem) {
   EXPECT_EQ(item->attrs[0].name, "dont_touch");
 }
 
-TEST(ParserA91, MultipleSeparateAttrInstances) {
+TEST(AttributeSyntaxParsing, MultipleSeparateAttrInstances) {
   auto r = Parse(
       "module m;\n"
       "  (* full_case *)\n"
@@ -93,7 +93,7 @@ TEST(ParserA91, MultipleSeparateAttrInstances) {
   EXPECT_EQ(item->attrs[1].name, "parallel_case");
 }
 
-TEST(ParserA91, AttrOnStatement) {
+TEST(AttributeSyntaxParsing, AttrOnStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -108,14 +108,14 @@ TEST(ParserA91, AttrOnStatement) {
   EXPECT_EQ(stmt->attrs[0].name, "weight");
 }
 
-TEST(ParserA91, AttrOnLetPortItem) {
+TEST(AttributeSyntaxParsing, AttrOnLetPortItem) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f((* attr = 5 *) int x) = x;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA91, ThreeAttrSpecs) {
+TEST(AttributeSyntaxParsing, ThreeAttrSpecs) {
   auto r = Parse(
       "(* a, b = 1, c *)\n"
       "module m; endmodule\n");
@@ -130,7 +130,7 @@ TEST(ParserA91, ThreeAttrSpecs) {
   EXPECT_EQ(r.cu->modules[0]->attrs[2].value, nullptr);
 }
 
-TEST(ParserA91, AttrOnCaseStatement) {
+TEST(AttributeSyntaxParsing, AttrOnCaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -148,7 +148,7 @@ TEST(ParserA91, AttrOnCaseStatement) {
   ASSERT_GE(stmt->attrs.size(), 2u);
 }
 
-TEST(ParserA91, AttrValueStringLiteral) {
+TEST(AttributeSyntaxParsing, AttrValueStringLiteral) {
   EXPECT_TRUE(ParseOk("(* tool = \"synplify\" *) module m; endmodule\n"));
 }
 

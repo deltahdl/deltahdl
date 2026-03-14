@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, DumpportsOffOnFlush) {
+TEST(IoSystemTaskParsing, DumpportsOffOnFlush) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0411, OrderedParameterAssignment) {
+TEST(ModuleInstantiationGrammar, OrderedParameterAssignment) {
   auto r = Parse("module m; sub #(8, 4) u0(a); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -16,7 +16,7 @@ TEST(ParserAnnexA0411, OrderedParameterAssignment) {
   EXPECT_EQ(item->inst_params[1].first, "");
 }
 
-TEST(ParserAnnexA0411, NamedParameterAssignment) {
+TEST(ModuleInstantiationGrammar, NamedParameterAssignment) {
   auto r = Parse("module m; sub #(.WIDTH(8), .DEPTH(4)) u0(a); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -28,7 +28,7 @@ TEST(ParserAnnexA0411, NamedParameterAssignment) {
   EXPECT_NE(item->inst_params[1].second, nullptr);
 }
 
-TEST(ParserAnnexA0411, NamedParameterEmptyExpression) {
+TEST(ModuleInstantiationGrammar, NamedParameterEmptyExpression) {
   auto r = Parse("module m; sub #(.WIDTH()) u0(a); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -38,7 +38,7 @@ TEST(ParserAnnexA0411, NamedParameterEmptyExpression) {
   EXPECT_EQ(item->inst_params[0].second, nullptr);
 }
 
-TEST(ParserAnnexA0411, SingleOrderedParam) {
+TEST(ModuleInstantiationGrammar, SingleOrderedParam) {
   auto r = Parse("module m; sub #(16) u0(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -46,7 +46,7 @@ TEST(ParserAnnexA0411, SingleOrderedParam) {
   EXPECT_EQ(item->inst_params.size(), 1u);
 }
 
-TEST(ParserAnnexA0411, InstanceArrayWithSize) {
+TEST(ModuleInstantiationGrammar, InstanceArrayWithSize) {
   auto r = Parse("module m; sub u0[4](.a(a)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -56,7 +56,7 @@ TEST(ParserAnnexA0411, InstanceArrayWithSize) {
   EXPECT_EQ(item->inst_range_right, nullptr);
 }
 
-TEST(ParserAnnexA0411, EmptyPortList) {
+TEST(ModuleInstantiationGrammar, EmptyPortList) {
   auto r = Parse("module m; sub u0(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -65,7 +65,7 @@ TEST(ParserAnnexA0411, EmptyPortList) {
   EXPECT_EQ(item->inst_ports.size(), 0u);
 }
 
-TEST(ParserAnnexA0411, NamedPortConnections) {
+TEST(ModuleInstantiationGrammar, NamedPortConnections) {
   auto r = Parse("module m; sub u0(.clk(clk), .data(d)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -75,7 +75,7 @@ TEST(ParserAnnexA0411, NamedPortConnections) {
   EXPECT_EQ(item->inst_ports[1].first, "data");
 }
 
-TEST(ParserAnnexA0411, NamedParamsAndNamedPorts) {
+TEST(ModuleInstantiationGrammar, NamedParamsAndNamedPorts) {
   auto r = Parse(
       "module m;\n"
       "  sub #(.W(8), .D(4)) u0(.clk(clk), .data(d));\n"
@@ -97,7 +97,7 @@ ModuleItem* FindModuleInst(const std::vector<ModuleItem*>& items) {
   return nullptr;
 }
 
-TEST(ParserAnnexA0411, ElaborationInstanceArray) {
+TEST(ModuleInstantiationGrammar, ElaborationInstanceArray) {
   auto r = Parse(
       "module sub(input a, output b);\n"
       "  assign b = a;\n"

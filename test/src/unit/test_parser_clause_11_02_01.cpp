@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA83, ConstantExprPrimary) {
+TEST(ExpressionParsing, ConstantExprPrimary) {
   auto r = Parse(
       "module m #(parameter int P = 42);\n"
       "endmodule\n");
@@ -18,7 +18,7 @@ TEST(ParserA83, ConstantExprPrimary) {
   EXPECT_EQ(params[0].second->int_val, 42u);
 }
 
-TEST(ParserSection11, ConstExprInParamDecl) {
+TEST(OperatorAndExpressionParsing, ConstExprInParamDecl) {
   auto r = Parse(
       "module t;\n"
       "  parameter WIDTH = 8;\n"
@@ -28,7 +28,7 @@ TEST(ParserSection11, ConstExprInParamDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA83, ConstantExprUnary) {
+TEST(ExpressionParsing, ConstantExprUnary) {
   auto r = Parse(
       "module m #(parameter int P = -1);\n"
       "endmodule\n");
@@ -40,7 +40,7 @@ TEST(ParserA83, ConstantExprUnary) {
   EXPECT_EQ(params[0].second->op, TokenKind::kMinus);
 }
 
-TEST(ParserA83, ConstantExprBinary) {
+TEST(ExpressionParsing, ConstantExprBinary) {
   auto r = Parse(
       "module m #(parameter int P = 3 + 4);\n"
       "endmodule\n");
@@ -52,7 +52,7 @@ TEST(ParserA83, ConstantExprBinary) {
   EXPECT_EQ(params[0].second->op, TokenKind::kPlus);
 }
 
-TEST(ParserA83, ConstantExprTernary) {
+TEST(ExpressionParsing, ConstantExprTernary) {
   auto r = Parse(
       "module m #(parameter int P = 1 ? 10 : 20);\n"
       "endmodule\n");
@@ -76,7 +76,7 @@ TEST(ConstEval, ScopedExprWithParam) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("WIDTH + 4", f), scope), 20);
 }
 
-TEST(ParserA84, ConstantPrimaryParameterIdentifier) {
+TEST(PrimaryParsing, ConstantPrimaryParameterIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  parameter int A = 5;\n"
@@ -89,7 +89,7 @@ TEST(ParserA84, ConstantPrimaryParameterIdentifier) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserA84, ConstantSelectParameterExpr) {
+TEST(PrimaryParsing, ConstantSelectParameterExpr) {
   auto r = Parse(
       "module m;\n"
       "  parameter int A [4] = '{1, 2, 3, 4};\n"

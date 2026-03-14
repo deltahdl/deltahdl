@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabCh49, ContinuousAssignElaboratesToRtlirAssign) {
+TEST(AssignmentSchedulingElaboration, ContinuousAssignElaboratesToRtlirAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -20,7 +20,7 @@ TEST(ElabCh49, ContinuousAssignElaboratesToRtlirAssign) {
   EXPECT_NE(mod->assigns[0].rhs, nullptr);
 }
 
-TEST(ElabCh49, MultipleContinuousAssigns) {
+TEST(AssignmentSchedulingElaboration, MultipleContinuousAssigns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -35,7 +35,7 @@ TEST(ElabCh49, MultipleContinuousAssigns) {
   EXPECT_GE(mod->assigns.size(), 2u);
 }
 
-TEST(ElabCh49, ContinuousAssignWidth) {
+TEST(AssignmentSchedulingElaboration, ContinuousAssignWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -50,7 +50,7 @@ TEST(ElabCh49, ContinuousAssignWidth) {
   EXPECT_EQ(mod->assigns[0].width, 8u);
 }
 
-TEST(ElabCh49, ContinuousAssignSeparateFromProcesses) {
+TEST(AssignmentSchedulingElaboration, ContinuousAssignSeparateFromProcesses) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -67,7 +67,7 @@ TEST(ElabCh49, ContinuousAssignSeparateFromProcesses) {
   EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kInitial);
 }
 
-TEST(ElabCh49, BlockingAssignInInitialIsProcess) {
+TEST(AssignmentSchedulingElaboration, BlockingAssignInInitialIsProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -86,7 +86,7 @@ TEST(ElabCh49, BlockingAssignInInitialIsProcess) {
   EXPECT_NE(mod->processes[0].body, nullptr);
 }
 
-TEST(ElabCh49, NonblockingAssignInAlwaysFFIsProcess) {
+TEST(AssignmentSchedulingElaboration, NonblockingAssignInAlwaysFFIsProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -102,7 +102,7 @@ TEST(ElabCh49, NonblockingAssignInAlwaysFFIsProcess) {
   EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kAlwaysFF);
 }
 
-TEST(ElabCh49, MixedAssignmentTypesElaborateCorrectly) {
+TEST(AssignmentSchedulingElaboration, MixedAssignmentTypesElaborateCorrectly) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -119,7 +119,7 @@ TEST(ElabCh49, MixedAssignmentTypesElaborateCorrectly) {
   ASSERT_EQ(mod->processes.size(), 2u);
 }
 
-TEST(ElabCh49, ContinuousAssignChainElaborates) {
+TEST(AssignmentSchedulingElaboration, ContinuousAssignChainElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -135,7 +135,7 @@ TEST(ElabCh49, ContinuousAssignChainElaborates) {
   EXPECT_GE(mod->assigns.size(), 3u);
 }
 
-TEST(ElabCh49, SingleBitContinuousAssignWidth) {
+TEST(AssignmentSchedulingElaboration, SingleBitContinuousAssignWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -150,7 +150,7 @@ TEST(ElabCh49, SingleBitContinuousAssignWidth) {
   EXPECT_EQ(mod->assigns[0].width, 1u);
 }
 
-TEST(ElabCh49, WideContinuousAssign32Bit) {
+TEST(AssignmentSchedulingElaboration, WideContinuousAssign32Bit) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -165,7 +165,7 @@ TEST(ElabCh49, WideContinuousAssign32Bit) {
   EXPECT_EQ(mod->assigns[0].width, 32u);
 }
 
-TEST(ElabCh49, AlwaysCombAssignIsProcessNotContinuous) {
+TEST(AssignmentSchedulingElaboration, AlwaysCombAssignIsProcessNotContinuous) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -180,7 +180,7 @@ TEST(ElabCh49, AlwaysCombAssignIsProcessNotContinuous) {
   EXPECT_EQ(mod->processes.size(), 1u);
 }
 
-TEST(ElabCh49, NonblockingAssignInAlwaysLatch) {
+TEST(AssignmentSchedulingElaboration, NonblockingAssignInAlwaysLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -195,7 +195,7 @@ TEST(ElabCh49, NonblockingAssignInAlwaysLatch) {
   EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kAlwaysLatch);
 }
 
-TEST(ElabCh49, MultipleAssignStatementsInInitialBlock) {
+TEST(AssignmentSchedulingElaboration, MultipleAssignStatementsInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA83, PrefixIncrement) {
+TEST(ExpressionSim, PrefixIncrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -25,7 +25,7 @@ TEST(SimA83, PrefixIncrement) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-TEST(SimA83, PrefixDecrement) {
+TEST(ExpressionSim, PrefixDecrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -42,7 +42,7 @@ TEST(SimA83, PrefixDecrement) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-TEST(SimA83, PostfixIncrement) {
+TEST(ExpressionSim, PostfixIncrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -59,7 +59,7 @@ TEST(SimA83, PostfixIncrement) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-TEST(SimA83, PostfixDecrement) {
+TEST(ExpressionSim, PostfixDecrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -76,7 +76,7 @@ TEST(SimA83, PostfixDecrement) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-TEST(SimA85, VarLvaluePreIncrement) {
+TEST(LvalueSim, VarLvaluePreIncrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -93,7 +93,7 @@ TEST(SimA85, VarLvaluePreIncrement) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-TEST(SimA85, VarLvaluePostDecrement) {
+TEST(LvalueSim, VarLvaluePostDecrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

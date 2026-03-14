@@ -6,21 +6,21 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, PropertyExpr_OverlappedImplication) {
+TEST(AssertionDeclParsing, PropertyExpr_OverlappedImplication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) req |-> ack);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyExpr_NonOverlappedImplication) {
+TEST(AssertionDeclParsing, PropertyExpr_NonOverlappedImplication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) req |=> ack);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceInstance_InProperty) {
+TEST(AssertionDeclParsing, SequenceInstance_InProperty) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s; a ##1 b; endsequence\n"
@@ -29,7 +29,7 @@ TEST(ParserA210, SequenceInstance_InProperty) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, Sec16_5_1_AssertPropertyOverlappedImplication) {
+TEST(AssertionParsing, AssertPropertyOverlappedImplication) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req |-> ack);\n"
@@ -42,7 +42,7 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyOverlappedImplication) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
-TEST(ParserSection16, Sec16_5_1_AssertPropertyNonOverlappedImplication) {
+TEST(AssertionParsing, AssertPropertyNonOverlappedImplication) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req |=> gnt);\n"
@@ -62,7 +62,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-TEST(ParserAnnexF, AnnexFOverlapImplication) {
+TEST(AssertionSemanticsParsing, OverlapImplication) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a && b |-> c);\n"
@@ -72,7 +72,7 @@ TEST(ParserAnnexF, AnnexFOverlapImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserAnnexF, AnnexFNonoverlapImplication) {
+TEST(AssertionSemanticsParsing, NonoverlapImplication) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req |=> gnt);\n"
@@ -82,7 +82,7 @@ TEST(ParserAnnexF, AnnexFNonoverlapImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserSection16, PropertyOverlappedImplication) {
+TEST(AssertionParsing, PropertyOverlappedImplication) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req |-> gnt);\n"
@@ -91,7 +91,7 @@ TEST(ParserSection16, PropertyOverlappedImplication) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, PropertyNonOverlappedImplication) {
+TEST(AssertionParsing, PropertyNonOverlappedImplication) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) req |=> gnt);\n"
@@ -100,7 +100,7 @@ TEST(ParserSection16, PropertyNonOverlappedImplication) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, SequenceUsedInPropertyDecl) {
+TEST(AssertionParsing, SequenceUsedInPropertyDecl) {
   auto r = Parse(
       "module m;\n"
       "  sequence s1;\n"

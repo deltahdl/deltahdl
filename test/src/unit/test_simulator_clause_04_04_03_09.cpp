@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4439, PrePostponedRegionExecutesPLICallbacks) {
+TEST(PliPrePostponedSim, PrePostponedRegionExecutesPLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,7 +23,7 @@ TEST(SimCh4439, PrePostponedRegionExecutesPLICallbacks) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4439, PrePostponedCanReadValues) {
+TEST(PliPrePostponedSim, PrePostponedCanReadValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -41,7 +41,7 @@ TEST(SimCh4439, PrePostponedCanReadValues) {
   EXPECT_EQ(sampled, 42);
 }
 
-TEST(SimCh4439, PrePostponedCanWriteValues) {
+TEST(PliPrePostponedSim, PrePostponedCanWriteValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -59,7 +59,7 @@ TEST(SimCh4439, PrePostponedCanWriteValues) {
   EXPECT_EQ(sampled_in_postponed, 99);
 }
 
-TEST(SimCh4439, PrePostponedCanCreateEvents) {
+TEST(PliPrePostponedSim, PrePostponedCanCreateEvents) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -80,7 +80,7 @@ TEST(SimCh4439, PrePostponedCanCreateEvents) {
   EXPECT_EQ(order[1], "created_postponed");
 }
 
-TEST(SimCh4439, PrePostponedExecutesAfterPostReNBA) {
+TEST(PliPrePostponedSim, PrePostponedExecutesAfterPostReNBA) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -99,13 +99,13 @@ TEST(SimCh4439, PrePostponedExecutesAfterPostReNBA) {
   EXPECT_EQ(order[1], "pre_postponed");
 }
 
-TEST(SimCh4439, PrePostponedExecutesAfterPostReNBABeforePostponed) {
+TEST(PliPrePostponedSim, PrePostponedExecutesAfterPostReNBABeforePostponed) {
   VerifyThreeRegionOrder({Region::kPostReNBA, "post_re_nba"},
                          {Region::kPrePostponed, "pre_postponed"},
                          {Region::kPostponed, "postponed"});
 }
 
-TEST(SimCh4439, PrePostponedIsWithinReactiveRegionSet) {
+TEST(PliPrePostponedSim, PrePostponedIsWithinReactiveRegionSet) {
   auto pre_postponed_ord = static_cast<int>(Region::kPrePostponed);
   auto post_re_nba_ord = static_cast<int>(Region::kPostReNBA);
   auto postponed_ord = static_cast<int>(Region::kPostponed);
@@ -113,7 +113,7 @@ TEST(SimCh4439, PrePostponedIsWithinReactiveRegionSet) {
   EXPECT_LT(pre_postponed_ord, postponed_ord);
 }
 
-TEST(SimCh4439, PrePostponedRegionHoldsMultiplePLICallbacks) {
+TEST(PliPrePostponedSim, PrePostponedRegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -128,7 +128,7 @@ TEST(SimCh4439, PrePostponedRegionHoldsMultiplePLICallbacks) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh4439, PrePostponedEventsAcrossMultipleTimeSlots) {
+TEST(PliPrePostponedSim, PrePostponedEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;
@@ -148,7 +148,7 @@ TEST(SimCh4439, PrePostponedEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-TEST(SimCh4439, PrePostponedReadWriteInReactiveRegionSetContext) {
+TEST(PliPrePostponedSim, PrePostponedReadWriteInReactiveRegionSetContext) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;

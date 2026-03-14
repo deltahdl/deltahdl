@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection8, WeakReferenceDecl) {
+TEST(ClassParsing, WeakReferenceDecl) {
   EXPECT_TRUE(
       ParseOk("class my_obj;\n"
               "  int x;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection8, WeakReferenceDecl) {
               "endmodule\n"));
 }
 
-TEST(ParserSection8, WeakReferenceAsMember) {
+TEST(ClassParsing, WeakReferenceAsMember) {
   EXPECT_TRUE(
       ParseOk("class my_obj;\n"
               "  int x;\n"

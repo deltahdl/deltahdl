@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA81, StreamingMultipleElements) {
+TEST(ConcatenationSim, StreamingMultipleElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

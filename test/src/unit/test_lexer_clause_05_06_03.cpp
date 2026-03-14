@@ -6,25 +6,25 @@ using namespace delta;
 
 namespace {
 
-TEST(LexerClause05, Cl5_6_3_BasicSystemIdentifier) {
+TEST(LexicalConventionLexing, BasicSystemIdentifier) {
   auto r = LexOne("$display ");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(r.token.text, "$display");
 }
 
-TEST(LexerClause05, Cl5_6_3_SystemFinish) {
+TEST(LexicalConventionLexing, SystemFinish) {
   auto r = LexOne("$finish ");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(r.token.text, "$finish");
 }
 
-TEST(LexerClause05, Cl5_6_3_SystemTime) {
+TEST(LexicalConventionLexing, SystemTime) {
   auto r = LexOne("$time ");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(r.token.text, "$time");
 }
 
-TEST(LexerClause05, Cl5_6_3_EmbeddedDollar) {
+TEST(LexicalConventionLexing, EmbeddedDollar) {
   auto tokens = Lex("$test$plusargs $value$plusargs");
   ASSERT_GE(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
@@ -33,24 +33,24 @@ TEST(LexerClause05, Cl5_6_3_EmbeddedDollar) {
   EXPECT_EQ(tokens[1].text, "$value$plusargs");
 }
 
-TEST(LexerClause05, Cl5_6_3_BareDollarNotSystemId) {
+TEST(LexicalConventionLexing, BareDollarNotSystemId) {
   auto r = LexOne("$ ");
   EXPECT_EQ(r.token.kind, TokenKind::kDollar);
 }
 
-TEST(LexerClause05, Cl5_6_3_DigitsInName) {
+TEST(LexicalConventionLexing, DigitsInName) {
   auto r = LexOne("$sformat ");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(r.token.text, "$sformat");
 }
 
-TEST(LexerClause05, Cl5_6_3_UnderscoreInName) {
+TEST(LexicalConventionLexing, UnderscoreInName) {
   auto r = LexOne("$read_mem ");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(r.token.text, "$read_mem");
 }
 
-TEST(LexerClause05, Cl5_6_3_MaxLengthOk) {
+TEST(LexicalConventionLexing, MaxLengthOk) {
   std::string id = "$" + std::string(1023, 'a');
   id += " ";
   auto [tokens, errors] = LexWithDiag(id);
@@ -59,7 +59,7 @@ TEST(LexerClause05, Cl5_6_3_MaxLengthOk) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
 }
 
-TEST(LexerClause05, Cl5_6_3_MultipleInStream) {
+TEST(LexicalConventionLexing, MultipleInStream) {
   auto tokens = Lex("$display $finish $time");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);

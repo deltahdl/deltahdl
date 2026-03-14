@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, TypeCompatibilityAnonymousStruct) {
+TEST(DataTypeParsing, TypeCompatibilityAnonymousStruct) {
   auto r = Parse(
       "module m;\n"
       "  struct packed { int A; int B; } AB1, AB2;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection6, TypeCompatibilityAnonymousStruct) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-TEST(ParserSection6, MatchingTypesSameSigningModifier) {
+TEST(DataTypeParsing, MatchingTypesSameSigningModifier) {
   DataType a;
   a.kind = DataTypeKind::kByte;
   a.is_signed = true;
@@ -26,7 +26,7 @@ TEST(ParserSection6, MatchingTypesSameSigningModifier) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, TypesMatchNamedSameType) {
+TEST(DataTypeParsing, TypesMatchNamedSameType) {
   DataType a;
   a.kind = DataTypeKind::kNamed;
   a.type_name = "mytype";
@@ -36,7 +36,7 @@ TEST(ParserSection6, TypesMatchNamedSameType) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, TypesMatchNamedDifferentType) {
+TEST(DataTypeParsing, TypesMatchNamedDifferentType) {
   DataType a;
   a.kind = DataTypeKind::kNamed;
   a.type_name = "type_a";
@@ -46,7 +46,7 @@ TEST(ParserSection6, TypesMatchNamedDifferentType) {
   EXPECT_FALSE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, TypesEquivalentSameSignedInt) {
+TEST(DataTypeParsing, TypesEquivalentSameSignedInt) {
   DataType a;
   a.kind = DataTypeKind::kInt;
   a.is_signed = true;
@@ -56,7 +56,7 @@ TEST(ParserSection6, TypesEquivalentSameSignedInt) {
   EXPECT_TRUE(TypesEquivalent(a, b));
 }
 
-TEST(ParserSection6, TypesMatchBuiltin) {
+TEST(DataTypeParsing, TypesMatchBuiltin) {
   DataType a;
   a.kind = DataTypeKind::kInt;
   DataType b;
@@ -64,7 +64,7 @@ TEST(ParserSection6, TypesMatchBuiltin) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, TypesMatchDifferent) {
+TEST(DataTypeParsing, TypesMatchDifferent) {
   DataType a;
   a.kind = DataTypeKind::kInt;
   DataType b;
@@ -72,7 +72,7 @@ TEST(ParserSection6, TypesMatchDifferent) {
   EXPECT_FALSE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, TypesMatchSignedness) {
+TEST(DataTypeParsing, TypesMatchSignedness) {
   DataType a;
   a.kind = DataTypeKind::kLogic;
   a.is_signed = true;
@@ -82,7 +82,7 @@ TEST(ParserSection6, TypesMatchSignedness) {
   EXPECT_FALSE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, MatchingTypesBuiltinTypedef) {
+TEST(DataTypeParsing, MatchingTypesBuiltinTypedef) {
   auto r = Parse(
       "module m;\n"
       "  typedef bit node;\n"
@@ -93,7 +93,7 @@ TEST(ParserSection6, MatchingTypesBuiltinTypedef) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-TEST(ParserSection6, MatchingTypesAnonymousStruct) {
+TEST(DataTypeParsing, MatchingTypesAnonymousStruct) {
   auto r = Parse(
       "module m;\n"
       "  struct packed {int A; int B;} AB1, AB2;\n"
@@ -102,7 +102,7 @@ TEST(ParserSection6, MatchingTypesAnonymousStruct) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
 }
 
-TEST(ParserSection6, MatchingTypesNamedTypedefStruct) {
+TEST(DataTypeParsing, MatchingTypesNamedTypedefStruct) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct packed {int A; int B;} AB_t;\n"
@@ -113,7 +113,7 @@ TEST(ParserSection6, MatchingTypesNamedTypedefStruct) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-TEST(ParserSection6, MatchingTypesSignedBitVector) {
+TEST(DataTypeParsing, MatchingTypesSignedBitVector) {
   auto r = Parse(
       "module m;\n"
       "  typedef bit signed [7:0] BYTE;\n"
@@ -123,7 +123,7 @@ TEST(ParserSection6, MatchingTypesSignedBitVector) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-TEST(ParserSection6, MatchingTypesArrayTypedef) {
+TEST(DataTypeParsing, MatchingTypesArrayTypedef) {
   auto r = Parse(
       "module m;\n"
       "  typedef byte MEM_BYTES [256];\n"
@@ -133,7 +133,7 @@ TEST(ParserSection6, MatchingTypesArrayTypedef) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-TEST(ParserSection6, TypesMatchNamedSame) {
+TEST(DataTypeParsing, TypesMatchNamedSame) {
   DataType a;
   a.kind = DataTypeKind::kNamed;
   a.type_name = "mytype";
@@ -143,7 +143,7 @@ TEST(ParserSection6, TypesMatchNamedSame) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, TypesMatchNamedDifferent) {
+TEST(DataTypeParsing, TypesMatchNamedDifferent) {
   DataType a;
   a.kind = DataTypeKind::kNamed;
   a.type_name = "type_a";
@@ -153,7 +153,7 @@ TEST(ParserSection6, TypesMatchNamedDifferent) {
   EXPECT_FALSE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, TypesMatchEventToEvent) {
+TEST(DataTypeParsing, TypesMatchEventToEvent) {
   DataType a;
   a.kind = DataTypeKind::kEvent;
   DataType b;
@@ -161,7 +161,7 @@ TEST(ParserSection6, TypesMatchEventToEvent) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, TypesMatchStringToString) {
+TEST(DataTypeParsing, TypesMatchStringToString) {
   DataType a;
   a.kind = DataTypeKind::kString;
   DataType b;
@@ -169,7 +169,7 @@ TEST(ParserSection6, TypesMatchStringToString) {
   EXPECT_TRUE(TypesMatch(a, b));
 }
 
-TEST(ParserSection6, TypesMatchChandleToHandle) {
+TEST(DataTypeParsing, TypesMatchChandleToHandle) {
   DataType a;
   a.kind = DataTypeKind::kChandle;
   DataType b;

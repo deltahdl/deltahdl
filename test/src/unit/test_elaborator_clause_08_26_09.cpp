@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA8269, InterfaceClassNoConstraintsOk) {
+TEST(InterfaceClassInheritElaboration, InterfaceClassNoConstraintsOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
              "  pure virtual function void foo();\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elab13032, AutoTaskLocalInNonblockingAssignError) {
+TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingAssignError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(Elab13032, AutoTaskLocalInNonblockingAssignError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab13032, AutoTaskModuleVarNonblockingOk) {
+TEST(TaskBodyElaboration, AutoTaskModuleVarNonblockingOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -31,7 +31,7 @@ TEST(Elab13032, AutoTaskModuleVarNonblockingOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab13032, StaticTaskLocalInNonblockingOk) {
+TEST(TaskBodyElaboration, StaticTaskLocalInNonblockingOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -45,7 +45,7 @@ TEST(Elab13032, StaticTaskLocalInNonblockingOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab13032, DefaultTaskLocalInNonblockingOk) {
+TEST(TaskBodyElaboration, DefaultTaskLocalInNonblockingOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -59,7 +59,7 @@ TEST(Elab13032, DefaultTaskLocalInNonblockingOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab13032, AutoTaskArgInNonblockingAssignError) {
+TEST(TaskBodyElaboration, AutoTaskArgInNonblockingAssignError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -71,7 +71,7 @@ TEST(Elab13032, AutoTaskArgInNonblockingAssignError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab13032, AutoTaskLocalBlockingAssignOk) {
+TEST(TaskBodyElaboration, AutoTaskLocalBlockingAssignOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

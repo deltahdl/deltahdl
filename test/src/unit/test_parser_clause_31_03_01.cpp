@@ -9,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70501, SetupTimingCheck) {
+TEST(TimingCheckCommandParsing, SetupTimingCheck) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -26,7 +26,7 @@ TEST(ParserA70501, SetupTimingCheck) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-TEST(ParserA70501, SetupWithNotifier) {
+TEST(TimingCheckCommandParsing, SetupWithNotifier) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -39,7 +39,7 @@ TEST(ParserA70501, SetupWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-TEST(ParserAnnexA, A7TimingCheckSetup) {
+TEST(FormalSyntaxParsing, TimingCheckSetup) {
   auto r = Parse(
       "module m;\n"
       "  specify $setup(data, posedge clk, 10); endspecify\n"
@@ -48,7 +48,7 @@ TEST(ParserAnnexA, A7TimingCheckSetup) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA701, SpecifyItemSystemTimingCheck) {
+TEST(SpecifyBlockDeclParsing, SpecifyItemSystemTimingCheck) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -73,7 +73,7 @@ TEST_F(SpecifyParseTest, SpecifyBlockWithTimingCheck) {
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kSpecifyBlock);
 }
 
-TEST(ParserSection28, Sec28_12_TimingCheckSetup) {
+TEST(GateLevelModelingParsing, TimingCheckSetup) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
       "  specify\n"
@@ -93,7 +93,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckSetup) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
-TEST(ParserA705, SystemTimingCheckSetup) {
+TEST(SystemTimingCheckParsing, SystemTimingCheckSetup) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

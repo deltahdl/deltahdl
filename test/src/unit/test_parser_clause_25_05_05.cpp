@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA29, ClockingInModport) {
+TEST(InterfaceDeclParsing, ClockingInModport) {
   auto r = Parse(
       "interface A_Bus(input logic clk);\n"
       "  clocking sb @(posedge clk);\n"
@@ -19,7 +19,7 @@ TEST(ParserA29, ClockingInModport) {
   EXPECT_EQ(mp->ports[0].name, "sb");
 }
 
-TEST(ParserA29, ClockingMixedWithDirectionPorts) {
+TEST(InterfaceDeclParsing, ClockingMixedWithDirectionPorts) {
   auto r = Parse(
       "interface A_Bus(input logic clk);\n"
       "  wire req, gnt;\n"
@@ -37,7 +37,7 @@ TEST(ParserA29, ClockingMixedWithDirectionPorts) {
   EXPECT_TRUE(iface->modports[1]->ports[0].is_clocking);
 }
 
-TEST(ParserA29, MixedDirImportClocking) {
+TEST(InterfaceDeclParsing, MixedDirImportClocking) {
   EXPECT_TRUE(
       ParseOk("interface A_Bus(input logic clk);\n"
               "  wire req, gnt;\n"
@@ -52,7 +52,7 @@ TEST(ParserA29, MixedDirImportClocking) {
               "endinterface\n"));
 }
 
-TEST(ParserA29, AttrOnClockingPort) {
+TEST(InterfaceDeclParsing, AttrOnClockingPort) {
   EXPECT_TRUE(
       ParseOk("interface bus(input logic clk);\n"
               "  clocking sb @(posedge clk);\n"
@@ -61,7 +61,7 @@ TEST(ParserA29, AttrOnClockingPort) {
               "endinterface\n"));
 }
 
-TEST(ParserA29, AllAlternativesTogether) {
+TEST(InterfaceDeclParsing, AllAlternativesTogether) {
   EXPECT_TRUE(
       ParseOk("interface complex_bus(input logic clk);\n"
               "  logic req, gnt;\n"
@@ -84,7 +84,7 @@ TEST(ParserA29, AllAlternativesTogether) {
               "endinterface\n"));
 }
 
-TEST(ParserA29, ClockingPort_NotImportExport) {
+TEST(InterfaceDeclParsing, ClockingPort_NotImportExport) {
   auto r = Parse(
       "interface A_Bus(input logic clk);\n"
       "  clocking sb @(posedge clk);\n"
@@ -101,7 +101,7 @@ TEST(ParserA29, ClockingPort_NotImportExport) {
   EXPECT_EQ(mp->ports[0].direction, Direction::kNone);
 }
 
-TEST(ParserSection19, InterfaceClockingWithModport) {
+TEST(FunctionalCoverageParsing, InterfaceClockingWithModport) {
   EXPECT_TRUE(
       ParseOk("interface bus_A (input clk);\n"
               "  logic [15:0] data;\n"

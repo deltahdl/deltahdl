@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA702, StateDependentIfSimpleFull) {
+TEST(SpecifyPathParsing, StateDependentIfSimpleFull) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -22,7 +22,7 @@ TEST(ParserA702, StateDependentIfSimpleFull) {
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
 }
 
-TEST(ParserA702, PolarityWithConditionalPath) {
+TEST(SpecifyPathParsing, PolarityWithConditionalPath) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -59,7 +59,7 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
   return spec->specify_items[0];
 }
 
-TEST(ParserA702, PathDeclStateDependentIf) {
+TEST(SpecifyPathParsing, PathDeclStateDependentIf) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -74,7 +74,7 @@ TEST(ParserA702, PathDeclStateDependentIf) {
   EXPECT_FALSE(si->path.is_ifnone);
 }
 
-TEST(ParserA86, BinaryModulePathBitwiseAnd) {
+TEST(OperatorParsing, BinaryModulePathBitwiseAnd) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
@@ -85,7 +85,7 @@ TEST(ParserA86, BinaryModulePathBitwiseAnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA704, SixDelaysConditionalPath) {
+TEST(SpecifyPathDelayParsing, SixDelaysConditionalPath) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -100,7 +100,7 @@ TEST(ParserA704, SixDelaysConditionalPath) {
   ASSERT_EQ(si->path.delays.size(), 6u);
 }
 
-TEST(ParserSection28, Sec28_12_ConditionalPath) {
+TEST(GateLevelModelingParsing, ConditionalPath) {
   auto sp = ParseSpecifySingle(
       "module m(input a, en, output b);\n"
       "  specify\n"
@@ -122,7 +122,7 @@ TEST(ParserSection28, Sec28_12_ConditionalPath) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
-TEST(ParserSection28, Sec28_12_ConditionalFullPath) {
+TEST(GateLevelModelingParsing, ConditionalFullPath) {
   EXPECT_TRUE(
       ParseOk("module m(input a, b, en, output y);\n"
               "  specify\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA70502, DelayedDataBracketSimulates) {
+TEST(TimingCheckArgumentSim, DelayedDataBracketSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

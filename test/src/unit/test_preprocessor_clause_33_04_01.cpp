@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
+TEST(DesignBuildingBlockParsing, ConfigBindingAndLibraries) {
   auto r = ParseWithPreprocessor(
       "config cfg1;\n"
       "  design work.top;\n"
@@ -36,7 +36,7 @@ TEST(ParserClause03, Cl3_10_ConfigBindingAndLibraries) {
   ASSERT_EQ(r2->liblist.size(), 2u);
 }
 
-TEST(ParserClause03, Cl3_12_1_ConfigAtCUScope) {
+TEST(DesignBuildingBlockParsing, ConfigAtCUScope) {
   auto r = ParseWithPreprocessor(
       "module lib_mod; endmodule\n"
       "config my_cfg;\n"

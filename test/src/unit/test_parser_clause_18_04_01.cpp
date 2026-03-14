@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection18, RandMultiDeclarator) {
+TEST(ConstrainedRandomParsing, RandMultiDeclarator) {
   auto r = Parse(
       "class C;\n"
       "  rand int a, b, c;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection18, RandMultiDeclarator) {
   EXPECT_GE(r.cu->classes[0]->members.size(), 3u);
 }
 
-TEST(ParserSection18, RandArrayInClass) {
+TEST(ConstrainedRandomParsing, RandArrayInClass) {
   auto r = Parse(
       "class a;\n"
       "  rand int B[5];\n"
@@ -27,7 +27,7 @@ TEST(ParserSection18, RandArrayInClass) {
   EXPECT_GE(r.cu->classes[0]->members.size(), 1u);
 }
 
-TEST(ParserSection8, ClassWithQualifiersStaticRand) {
+TEST(ClassParsing, ClassWithQualifiersStaticRand) {
   auto r = Parse(
       "class MyClass;\n"
       "  local int secret;\n"

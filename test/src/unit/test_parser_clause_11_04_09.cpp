@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, ReductionOnParenthesizedExpr) {
+TEST(OperatorAndExpressionParsing, ReductionOnParenthesizedExpr) {
   auto r = Parse(
       "module t;\n"
       "  initial x = &(a ^ b);\n"
@@ -15,7 +15,7 @@ TEST(ParserSection11, ReductionOnParenthesizedExpr) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-TEST(ParserA83, UnaryReductionAnd) {
+TEST(ExpressionParsing, UnaryReductionAnd) {
   auto r = Parse("module m; initial x = &a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -25,7 +25,7 @@ TEST(ParserA83, UnaryReductionAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-TEST(ParserA83, UnaryReductionOr) {
+TEST(ExpressionParsing, UnaryReductionOr) {
   auto r = Parse("module m; initial x = |a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -35,7 +35,7 @@ TEST(ParserA83, UnaryReductionOr) {
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
 }
 
-TEST(ParserA83, UnaryReductionXor) {
+TEST(ExpressionParsing, UnaryReductionXor) {
   auto r = Parse("module m; initial x = ^a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -45,7 +45,7 @@ TEST(ParserA83, UnaryReductionXor) {
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
 }
 
-TEST(ParserA86, UnaryReductionNand) {
+TEST(OperatorParsing, UnaryReductionNand) {
   auto r = Parse("module m; initial x = ~&a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -55,7 +55,7 @@ TEST(ParserA86, UnaryReductionNand) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeAmp);
 }
 
-TEST(ParserA86, UnaryReductionNor) {
+TEST(OperatorParsing, UnaryReductionNor) {
   auto r = Parse("module m; initial x = ~|a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -65,7 +65,7 @@ TEST(ParserA86, UnaryReductionNor) {
   EXPECT_EQ(rhs->op, TokenKind::kTildePipe);
 }
 
-TEST(ParserA86, UnaryReductionXnor) {
+TEST(OperatorParsing, UnaryReductionXnor) {
   auto r = Parse("module m; initial x = ~^a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -75,7 +75,7 @@ TEST(ParserA86, UnaryReductionXnor) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
 }
 
-TEST(ParserA86, UnaryReductionXnorAlt) {
+TEST(OperatorParsing, UnaryReductionXnorAlt) {
   auto r = Parse("module m; initial x = ^~a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -85,7 +85,7 @@ TEST(ParserA86, UnaryReductionXnorAlt) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-TEST(ParserSection11, ReductionXnorCaretTilde) {
+TEST(OperatorAndExpressionParsing, ReductionXnorCaretTilde) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ^~a;\n"
@@ -96,7 +96,7 @@ TEST(ParserSection11, ReductionXnorCaretTilde) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-TEST(ParserSection11, Sec11_1_UnaryReductionNand) {
+TEST(OperatorAndExpressionParsing, UnaryReductionNand) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ~&data;\n"
@@ -107,7 +107,7 @@ TEST(ParserSection11, Sec11_1_UnaryReductionNand) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeAmp);
 }
 
-TEST(ParserSection11, Sec11_1_UnaryReductionNor) {
+TEST(OperatorAndExpressionParsing, UnaryReductionNor) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ~|data;\n"
@@ -118,7 +118,7 @@ TEST(ParserSection11, Sec11_1_UnaryReductionNor) {
   EXPECT_EQ(rhs->op, TokenKind::kTildePipe);
 }
 
-TEST(ParserSection11, Sec11_1_UnaryReductionXnorTildeCaret) {
+TEST(OperatorAndExpressionParsing, UnaryReductionXnorTildeCaret) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ~^data;\n"
@@ -129,7 +129,7 @@ TEST(ParserSection11, Sec11_1_UnaryReductionXnorTildeCaret) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
 }
 
-TEST(ParserSection11, Sec11_1_UnaryReductionXnorCaretTilde) {
+TEST(OperatorAndExpressionParsing, UnaryReductionXnorCaretTilde) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ^~data;\n"
@@ -140,7 +140,7 @@ TEST(ParserSection11, Sec11_1_UnaryReductionXnorCaretTilde) {
   EXPECT_EQ(rhs->op, TokenKind::kCaretTilde);
 }
 
-TEST(ParserSection11, ReductionAnd) {
+TEST(OperatorAndExpressionParsing, ReductionAnd) {
   auto r = Parse(
       "module t;\n"
       "  initial x = &a;\n"
@@ -151,7 +151,7 @@ TEST(ParserSection11, ReductionAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-TEST(ParserSection11, ReductionOr) {
+TEST(OperatorAndExpressionParsing, ReductionOr) {
   auto r = Parse(
       "module t;\n"
       "  initial x = |a;\n"
@@ -162,7 +162,7 @@ TEST(ParserSection11, ReductionOr) {
   EXPECT_EQ(rhs->op, TokenKind::kPipe);
 }
 
-TEST(ParserSection11, ReductionXor) {
+TEST(OperatorAndExpressionParsing, ReductionXor) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ^a;\n"
@@ -173,7 +173,7 @@ TEST(ParserSection11, ReductionXor) {
   EXPECT_EQ(rhs->op, TokenKind::kCaret);
 }
 
-TEST(ParserSection11, ReductionNand) {
+TEST(OperatorAndExpressionParsing, ReductionNand) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ~&a;\n"
@@ -184,7 +184,7 @@ TEST(ParserSection11, ReductionNand) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeAmp);
 }
 
-TEST(ParserSection11, ReductionNor) {
+TEST(OperatorAndExpressionParsing, ReductionNor) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ~|a;\n"
@@ -195,7 +195,7 @@ TEST(ParserSection11, ReductionNor) {
   EXPECT_EQ(rhs->op, TokenKind::kTildePipe);
 }
 
-TEST(ParserSection11, ReductionXnor) {
+TEST(OperatorAndExpressionParsing, ReductionXnor) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ~^a;\n"
@@ -206,7 +206,7 @@ TEST(ParserSection11, ReductionXnor) {
   EXPECT_EQ(rhs->op, TokenKind::kTildeCaret);
 }
 
-TEST(ParserCh505, Operator_ReductionAnd) {
+TEST(OperatorTokenParserParsing, Operator_ReductionAnd) {
   auto r = Parse(
       "module m;\n"
       "  initial x = &y;\n"
@@ -220,7 +220,7 @@ TEST(ParserCh505, Operator_ReductionAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-TEST(ParserCh505, Operator_ReductionXnor) {
+TEST(OperatorTokenParserParsing, Operator_ReductionXnor) {
   EXPECT_TRUE(ParseOk("module m; initial x = ~^y; endmodule"));
 }
 

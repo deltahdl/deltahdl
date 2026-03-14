@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, AssertionItemDecl_SequenceDecl) {
+TEST(AssertionDeclParsing, AssertionItemDecl_SequenceDecl) {
   auto r = Parse(
       "module m;\n"
       "  sequence s_handshake;\n"
@@ -19,7 +19,7 @@ TEST(ParserA210, AssertionItemDecl_SequenceDecl) {
   EXPECT_EQ(item->name, "s_handshake");
 }
 
-TEST(ParserA210, SequenceDecl_WithEndLabel) {
+TEST(AssertionDeclParsing, SequenceDecl_WithEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  sequence s_req;\n"
@@ -33,7 +33,7 @@ TEST(ParserA210, SequenceDecl_WithEndLabel) {
   EXPECT_EQ(item->name, "s_req");
 }
 
-TEST(ParserA210, SequenceDecl_WithPortList) {
+TEST(AssertionDeclParsing, SequenceDecl_WithPortList) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(a, b);\n"
@@ -42,7 +42,7 @@ TEST(ParserA210, SequenceDecl_WithPortList) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceDecl_SourceLoc) {
+TEST(AssertionDeclParsing, SequenceDecl_SourceLoc) {
   auto r = Parse(
       "module m;\n"
       "  sequence my_seq;\n"
@@ -56,7 +56,7 @@ TEST(ParserA210, SequenceDecl_SourceLoc) {
   EXPECT_TRUE(item->loc.IsValid());
 }
 
-TEST(ParserA210, SequenceListOfArguments_Positional) {
+TEST(AssertionDeclParsing, SequenceListOfArguments_Positional) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(a, b); a ##1 b; endsequence\n"
@@ -64,7 +64,7 @@ TEST(ParserA210, SequenceListOfArguments_Positional) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceActualArg_Dollar) {
+TEST(AssertionDeclParsing, SequenceActualArg_Dollar) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(a, b); a ##1 b; endsequence\n"
@@ -72,7 +72,7 @@ TEST(ParserA210, SequenceActualArg_Dollar) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceListOfArguments_Named) {
+TEST(AssertionDeclParsing, SequenceListOfArguments_Named) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(a, b); a ##1 b; endsequence\n"
@@ -80,7 +80,7 @@ TEST(ParserA210, SequenceListOfArguments_Named) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequencePortItem_DefaultValue) {
+TEST(AssertionDeclParsing, SequencePortItem_DefaultValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s(a, b = 1'b1);\n"
@@ -89,7 +89,7 @@ TEST(ParserA210, SequencePortItem_DefaultValue) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, SequenceDeclaration) {
+TEST(AssertionParsing, SequenceDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  sequence s_req;\n"
@@ -107,7 +107,7 @@ TEST(ParserSection16, SequenceDeclaration) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserA611, ClockingItemSequenceDecl) {
+TEST(ClockingSyntaxParsing, ClockingItemSequenceDecl) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -124,7 +124,7 @@ TEST(ParserA611, ClockingItemSequenceDecl) {
   ASSERT_EQ(item->clocking_signals.size(), 1u);
 }
 
-TEST(ParserAnnexF, AnnexFSequenceDecl) {
+TEST(AssertionSemanticsParsing, SequenceDecl) {
   auto r = Parse(
       "module m;\n"
       "  sequence s1;\n"
@@ -143,7 +143,7 @@ TEST(ParserAnnexF, AnnexFSequenceDecl) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserSection16, SequenceWithFormalArgsDecl) {
+TEST(AssertionParsing, SequenceWithFormalArgsDecl) {
   auto r = Parse(
       "module m;\n"
       "  sequence s_req_ack(req, ack);\n"

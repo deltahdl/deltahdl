@@ -7,7 +7,7 @@
 
 using namespace delta;
 
-TEST(SimCh43, InitialProcedureIsProcess) {
+TEST(EventSimulationSim, InitialProcedureIsProcess) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -17,7 +17,7 @@ TEST(SimCh43, InitialProcedureIsProcess) {
   EXPECT_EQ(result, 42u);
 }
 
-TEST(SimCh43, AlwaysCombIsProcess) {
+TEST(EventSimulationSim, AlwaysCombIsProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -33,7 +33,7 @@ TEST(SimCh43, AlwaysCombIsProcess) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 6u);
 }
 
-TEST(SimCh43, AlwaysLatchIsProcess) {
+TEST(EventSimulationSim, AlwaysLatchIsProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -53,7 +53,7 @@ TEST(SimCh43, AlwaysLatchIsProcess) {
   EXPECT_EQ(f.ctx.FindVariable("q")->value.ToUint64(), 99u);
 }
 
-TEST(SimCh43, AlwaysFFIsProcess) {
+TEST(EventSimulationSim, AlwaysFFIsProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -74,7 +74,7 @@ TEST(SimCh43, AlwaysFFIsProcess) {
   EXPECT_EQ(f.ctx.FindVariable("q")->value.ToUint64(), 55u);
 }
 
-TEST(SimCh43, ContinuousAssignIsProcess) {
+TEST(EventSimulationSim, ContinuousAssignIsProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -90,7 +90,7 @@ TEST(SimCh43, ContinuousAssignIsProcess) {
   EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 33u);
 }
 
-TEST(SimCh43, ProceduralAssignmentInProcess) {
+TEST(EventSimulationSim, ProceduralAssignmentInProcess) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -103,7 +103,7 @@ TEST(SimCh43, ProceduralAssignmentInProcess) {
   EXPECT_EQ(result, 15u);
 }
 
-TEST(SimCh43, BlockingAssignCreatesUpdateEvent) {
+TEST(EventSimulationSim, BlockingAssignCreatesUpdateEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -119,7 +119,7 @@ TEST(SimCh43, BlockingAssignCreatesUpdateEvent) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 21u);
 }
 
-TEST(SimCh43, NonBlockingAssignCreatesUpdateEvent) {
+TEST(EventSimulationSim, NonBlockingAssignCreatesUpdateEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -136,7 +136,7 @@ TEST(SimCh43, NonBlockingAssignCreatesUpdateEvent) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 88u);
 }
 
-TEST(SimCh43, ContinuousAssignUpdateEvent) {
+TEST(EventSimulationSim, ContinuousAssignUpdateEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -154,7 +154,7 @@ TEST(SimCh43, ContinuousAssignUpdateEvent) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 6u);
 }
 
-TEST(SimCh43, EvaluationEventOnInputChange) {
+TEST(EventSimulationSim, EvaluationEventOnInputChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -173,7 +173,7 @@ TEST(SimCh43, EvaluationEventOnInputChange) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 110u);
 }
 
-TEST(SimCh43, MultipleProcessesSensitiveToSameEvent) {
+TEST(EventSimulationSim, MultipleProcessesSensitiveToSameEvent) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -191,7 +191,7 @@ TEST(SimCh43, MultipleProcessesSensitiveToSameEvent) {
   EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 7u);
 }
 
-TEST(SimCh43, MixedProcessTypesSensitiveToSameVariable) {
+TEST(EventSimulationSim, MixedProcessTypesSensitiveToSameVariable) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -209,12 +209,12 @@ TEST(SimCh43, MixedProcessTypesSensitiveToSameVariable) {
   EXPECT_EQ(f.ctx.FindVariable("via_comb")->value.ToUint64(), 30u);
 }
 
-TEST(SimCh43, SimulationTimeStartsAtZero) {
+TEST(EventSimulationSim, SimulationTimeStartsAtZero) {
   SimFixture f;
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-TEST(SimCh43, NoDelayExecutesAtTimeZero) {
+TEST(EventSimulationSim, NoDelayExecutesAtTimeZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -229,7 +229,7 @@ TEST(SimCh43, NoDelayExecutesAtTimeZero) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 1u);
 }
 
-TEST(SimCh43, DelayAdvancesSimulationTime) {
+TEST(EventSimulationSim, DelayAdvancesSimulationTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -247,7 +247,7 @@ TEST(SimCh43, DelayAdvancesSimulationTime) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 1u);
 }
 
-TEST(SimCh43, MultipleDelaysAccumulate) {
+TEST(EventSimulationSim, MultipleDelaysAccumulate) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -262,7 +262,7 @@ TEST(SimCh43, MultipleDelaysAccumulate) {
   EXPECT_EQ(result, 3u);
 }
 
-TEST(SimCh43, EventsExecuteInChronologicalOrder) {
+TEST(EventSimulationSim, EventsExecuteInChronologicalOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -283,7 +283,7 @@ TEST(SimCh43, EventsExecuteInChronologicalOrder) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 5u);
 }
 
-TEST(SimCh43, ActiveRegionBeforeNBARegion) {
+TEST(EventSimulationSim, ActiveRegionBeforeNBARegion) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -302,7 +302,7 @@ TEST(SimCh43, ActiveRegionBeforeNBARegion) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
 }
 
-TEST(SimCh43, NBAUpdateVisibleAfterActiveRegion) {
+TEST(EventSimulationSim, NBAUpdateVisibleAfterActiveRegion) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -321,7 +321,7 @@ TEST(SimCh43, NBAUpdateVisibleAfterActiveRegion) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 51u);
 }
 
-TEST(SimCh43, ProcessMaintainsStateAcrossTime) {
+TEST(EventSimulationSim, ProcessMaintainsStateAcrossTime) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -335,7 +335,7 @@ TEST(SimCh43, ProcessMaintainsStateAcrossTime) {
   EXPECT_EQ(result, 3u);
 }
 
-TEST(SimCh43, ProcessRespondsToMultipleInputChanges) {
+TEST(EventSimulationSim, ProcessRespondsToMultipleInputChanges) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -355,7 +355,7 @@ TEST(SimCh43, ProcessRespondsToMultipleInputChanges) {
   EXPECT_EQ(f.ctx.FindVariable("doubled")->value.ToUint64(), 20u);
 }
 
-TEST(SimCh43, ConcurrentProcessTypes) {
+TEST(EventSimulationSim, ConcurrentProcessTypes) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -374,7 +374,7 @@ TEST(SimCh43, ConcurrentProcessTypes) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 9u);
 }
 
-TEST(SimCh43, UpdateEventCascade) {
+TEST(EventSimulationSim, UpdateEventCascade) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -388,7 +388,7 @@ TEST(SimCh43, UpdateEventCascade) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}, {"d", 4u}});
 }
 
-TEST(SimCh43, RegionOrderingPredictableInteraction) {
+TEST(EventSimulationSim, RegionOrderingPredictableInteraction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -407,7 +407,7 @@ TEST(SimCh43, RegionOrderingPredictableInteraction) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 30u);
 }
 
-TEST(SimCh43, ProcessProducesOutputVisibleToOthers) {
+TEST(EventSimulationSim, ProcessProducesOutputVisibleToOthers) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -425,7 +425,7 @@ TEST(SimCh43, ProcessProducesOutputVisibleToOthers) {
   EXPECT_EQ(f.ctx.FindVariable("out")->value.ToUint64(), 13u);
 }
 
-TEST(SimCh43, DiscreteEventsInTimeOrder) {
+TEST(EventSimulationSim, DiscreteEventsInTimeOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -445,7 +445,7 @@ TEST(SimCh43, DiscreteEventsInTimeOrder) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 2u);
 }
 
-TEST(SimCh43, EventPoolRecycles) {
+TEST(EventSimulationSim, EventPoolRecycles) {
   Arena arena;
   EventPool pool(arena);
   Event* ev = pool.Acquire();
@@ -457,9 +457,9 @@ TEST(SimCh43, EventPoolRecycles) {
   EXPECT_EQ(pool.FreeCount(), 0u);
 }
 
-TEST(SimCh43, SameTimeAndRegionFIFO) { VerifyActiveRegionFIFO(); }
+TEST(EventSimulationSim, SameTimeAndRegionFIFO) { VerifyActiveRegionFIFO(); }
 
-TEST(SimCh43, SchedulerTimeOrdering) {
+TEST(EventSimulationSim, SchedulerTimeOrdering) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -478,7 +478,7 @@ TEST(SimCh43, SchedulerTimeOrdering) {
   EXPECT_EQ(order[1], 2);
 }
 
-TEST(SimCh43, SchedulerRegionOrdering) {
+TEST(EventSimulationSim, SchedulerRegionOrdering) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -502,7 +502,7 @@ TEST(SimCh43, SchedulerRegionOrdering) {
   EXPECT_EQ(order[2], "nba");
 }
 
-TEST(SimCh43, UpdateAndEvaluationEventKinds) {
+TEST(EventSimulationSim, UpdateAndEvaluationEventKinds) {
   Arena arena;
   Scheduler sched(arena);
   bool update_ran = false;
@@ -523,7 +523,7 @@ TEST(SimCh43, UpdateAndEvaluationEventKinds) {
   EXPECT_TRUE(eval_ran);
 }
 
-TEST(SimCh43, VariableWatcherNotifiesOnUpdate) {
+TEST(EventSimulationSim, VariableWatcherNotifiesOnUpdate) {
   Variable var;
   bool notified = false;
   var.AddWatcher([&notified]() {
@@ -534,7 +534,7 @@ TEST(SimCh43, VariableWatcherNotifiesOnUpdate) {
   EXPECT_TRUE(notified);
 }
 
-TEST(SimCh43, WatcherPersistsIfNotConsumed) {
+TEST(EventSimulationSim, WatcherPersistsIfNotConsumed) {
   Variable var;
   int count = 0;
   var.AddWatcher([&count]() {
@@ -546,7 +546,7 @@ TEST(SimCh43, WatcherPersistsIfNotConsumed) {
   EXPECT_EQ(count, 2);
 }
 
-TEST(SimCh43, WatcherRemovedIfConsumed) {
+TEST(EventSimulationSim, WatcherRemovedIfConsumed) {
   Variable var;
   int count = 0;
   var.AddWatcher([&count]() {
@@ -558,7 +558,7 @@ TEST(SimCh43, WatcherRemovedIfConsumed) {
   EXPECT_EQ(count, 1);
 }
 
-TEST(SimCh43, ProcessKindsEnumCoverage) {
+TEST(EventSimulationSim, ProcessKindsEnumCoverage) {
   EXPECT_EQ(static_cast<int>(ProcessKind::kInitial), 0);
   EXPECT_EQ(static_cast<int>(ProcessKind::kAlways), 1);
   EXPECT_EQ(static_cast<int>(ProcessKind::kAlwaysComb), 2);
@@ -568,7 +568,7 @@ TEST(SimCh43, ProcessKindsEnumCoverage) {
   EXPECT_EQ(static_cast<int>(ProcessKind::kContAssign), 6);
 }
 
-TEST(SimCh43, ProcessDefaultState) {
+TEST(EventSimulationSim, ProcessDefaultState) {
   Process proc;
   EXPECT_EQ(proc.kind, ProcessKind::kInitial);
   EXPECT_EQ(proc.home_region, Region::kActive);
@@ -577,14 +577,14 @@ TEST(SimCh43, ProcessDefaultState) {
   EXPECT_EQ(proc.id, 0u);
 }
 
-TEST(SimCh43, SchedulerInitialState) {
+TEST(EventSimulationSim, SchedulerInitialState) {
   Arena arena;
   Scheduler sched(arena);
   EXPECT_FALSE(sched.HasEvents());
   EXPECT_EQ(sched.CurrentTime().ticks, 0u);
 }
 
-TEST(SimCh43, AllRegionsDefined) {
+TEST(EventSimulationSim, AllRegionsDefined) {
   EXPECT_EQ(static_cast<int>(Region::kPreponed), 0);
   EXPECT_EQ(static_cast<int>(Region::kPreActive), 1);
   EXPECT_EQ(static_cast<int>(Region::kActive), 2);
@@ -605,7 +605,7 @@ TEST(SimCh43, AllRegionsDefined) {
   EXPECT_EQ(kRegionCount, 17u);
 }
 
-TEST(SimCh4, BehavioralAndDataflowCoexist) {
+TEST(SchedulingSemanticsSim, BehavioralAndDataflowCoexist) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -626,7 +626,7 @@ TEST(SimCh4, BehavioralAndDataflowCoexist) {
   EXPECT_EQ(vb->value.ToUint64(), 6u);
 }
 
-TEST(SimCh4, MultipleProcessesAcrossTime) {
+TEST(SchedulingSemanticsSim, MultipleProcessesAcrossTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -653,7 +653,7 @@ TEST(SimCh4, MultipleProcessesAcrossTime) {
   EXPECT_EQ(vb->value.ToUint64(), 20u);
 }
 
-TEST(SimCh4, CascadeOfProcesses) {
+TEST(SchedulingSemanticsSim, CascadeOfProcesses) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -672,7 +672,7 @@ TEST(SimCh4, CascadeOfProcesses) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 12u);
 }
 
-TEST(SimCh4, InterleavedTimeExecution) {
+TEST(SchedulingSemanticsSim, InterleavedTimeExecution) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

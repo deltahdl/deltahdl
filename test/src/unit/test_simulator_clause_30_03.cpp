@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA701, SpecifyWithAllItemKindsSimulates) {
+TEST(SpecifyBlockDeclSim, SpecifyWithAllItemKindsSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -31,7 +31,7 @@ TEST(SimA701, SpecifyWithAllItemKindsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimA701, SpecifyBlockDoesNotInterfereBehavioral) {
+TEST(SpecifyBlockDeclSim, SpecifyBlockDoesNotInterfereBehavioral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -6,79 +6,79 @@ using namespace delta;
 
 namespace {
 
-TEST(LexerClause05, Cl5_8_TimeLiteralS) {
+TEST(LexicalConventionLexing, TimeLiteralS) {
   auto r = LexOne("1s");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r.token.text, "1s");
 }
 
-TEST(LexerClause05, Cl5_8_TimeLiteralMs) {
+TEST(LexicalConventionLexing, TimeLiteralMs) {
   auto r = LexOne("1ms");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r.token.text, "1ms");
 }
 
-TEST(LexerClause05, Cl5_8_TimeLiteralUs) {
+TEST(LexicalConventionLexing, TimeLiteralUs) {
   auto r = LexOne("1us");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r.token.text, "1us");
 }
 
-TEST(LexerClause05, Cl5_8_TimeLiteralNs) {
+TEST(LexicalConventionLexing, TimeLiteralNs) {
   auto r = LexOne("1ns");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r.token.text, "1ns");
 }
 
-TEST(LexerClause05, Cl5_8_TimeLiteralPs) {
+TEST(LexicalConventionLexing, TimeLiteralPs) {
   auto r = LexOne("1ps");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r.token.text, "1ps");
 }
 
-TEST(LexerClause05, Cl5_8_TimeLiteralFs) {
+TEST(LexicalConventionLexing, TimeLiteralFs) {
   auto r = LexOne("1fs");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r.token.text, "1fs");
 }
 
-TEST(LexerClause05, Cl5_8_TimeLiteral10ns) {
+TEST(LexicalConventionLexing, TimeLiteral10ns) {
   auto r = LexOne("10ns");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r.token.text, "10ns");
 }
 
-TEST(LexerClause05, Cl5_8_TimeLiteral100ns) {
+TEST(LexicalConventionLexing, TimeLiteral100ns) {
   auto r = LexOne("100ns");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r.token.text, "100ns");
 }
 
-TEST(LexerClause05, Cl5_8_TimeLiteral40ps) {
+TEST(LexicalConventionLexing, TimeLiteral40ps) {
   auto r = LexOne("40ps");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r.token.text, "40ps");
 }
 
-TEST(LexerClause05, Cl5_8_TimeLiteralFixedPoint) {
+TEST(LexicalConventionLexing, TimeLiteralFixedPoint) {
   auto r = LexOne("2.1ns");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r.token.text, "2.1ns");
 }
 
-TEST(LexerClause05, Cl5_8_TimeLiteralFixedPointUs) {
+TEST(LexicalConventionLexing, TimeLiteralFixedPointUs) {
   auto r = LexOne("2.5us");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r.token.text, "2.5us");
 }
 
-TEST(LexerClause05, Cl5_8_TimeLiteralFixedPointFs) {
+TEST(LexicalConventionLexing, TimeLiteralFixedPointFs) {
   auto r = LexOne("0.5fs");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
   EXPECT_EQ(r.token.text, "0.5fs");
 }
 
-TEST(LexerClause05, Cl5_8_SpaceSeparatesNumberAndUnit) {
+TEST(LexicalConventionLexing, SpaceSeparatesNumberAndUnit) {
   auto tokens = Lex("10 ns");
   ASSERT_GE(tokens.size(), 3u);
 
@@ -87,7 +87,7 @@ TEST(LexerClause05, Cl5_8_SpaceSeparatesNumberAndUnit) {
   EXPECT_EQ(tokens[1].text, "ns");
 }
 
-TEST(LexerClause05, Cl5_8_NotTimeLiteralIfMoreChars) {
+TEST(LexicalConventionLexing, NotTimeLiteralIfMoreChars) {
   auto r = LexOne("1nsec ");
 
   EXPECT_NE(r.token.kind, TokenKind::kTimeLiteral);

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimClause05, Cl5_10_PositionalTwoFields) {
+TEST(LexicalConventionSim, PositionalTwoFields) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -18,7 +18,7 @@ TEST(SimClause05, Cl5_10_PositionalTwoFields) {
   EXPECT_EQ(v, 0xAABBu);
 }
 
-TEST(SimClause05, Cl5_10_PositionalThreeFields) {
+TEST(LexicalConventionSim, PositionalThreeFields) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -31,7 +31,7 @@ TEST(SimClause05, Cl5_10_PositionalThreeFields) {
   EXPECT_EQ(v, 0x112233u);
 }
 
-TEST(SimClause05, Cl5_10_MemberNameAndValue) {
+TEST(LexicalConventionSim, MemberNameAndValue) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -42,7 +42,7 @@ TEST(SimClause05, Cl5_10_MemberNameAndValue) {
   EXPECT_EQ(v, 0x1122u);
 }
 
-TEST(SimClause05, Cl5_10_MemberNameReverseOrder) {
+TEST(LexicalConventionSim, MemberNameReverseOrder) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -53,7 +53,7 @@ TEST(SimClause05, Cl5_10_MemberNameReverseOrder) {
   EXPECT_EQ(v, 0x1122u);
 }
 
-TEST(SimClause05, Cl5_10_DefaultAllOnes) {
+TEST(LexicalConventionSim, DefaultAllOnes) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -64,7 +64,7 @@ TEST(SimClause05, Cl5_10_DefaultAllOnes) {
   EXPECT_EQ(v, 0xFFFFu);
 }
 
-TEST(SimClause05, Cl5_10_DefaultZero) {
+TEST(LexicalConventionSim, DefaultZero) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -75,7 +75,7 @@ TEST(SimClause05, Cl5_10_DefaultZero) {
   EXPECT_EQ(v, 0u);
 }
 
-TEST(SimClause05, Cl5_10_DefaultDifferentFieldWidths) {
+TEST(LexicalConventionSim, DefaultDifferentFieldWidths) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [3:0] b; } ab_t;\n"
@@ -86,7 +86,7 @@ TEST(SimClause05, Cl5_10_DefaultDifferentFieldWidths) {
   EXPECT_EQ(v, 0xFFFu);
 }
 
-TEST(SimClause05, Cl5_10_VarInitPositional) {
+TEST(LexicalConventionSim, VarInitPositional) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -96,7 +96,7 @@ TEST(SimClause05, Cl5_10_VarInitPositional) {
   EXPECT_EQ(v, 0x55AAu);
 }
 
-TEST(SimClause05, Cl5_10_VarInitNamed) {
+TEST(LexicalConventionSim, VarInitNamed) {
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct packed { logic [7:0] x; logic [7:0] y; } pt_t;\n"
@@ -106,7 +106,7 @@ TEST(SimClause05, Cl5_10_VarInitNamed) {
   EXPECT_EQ(v, 0xAABBu);
 }
 
-TEST(SimClause05, Cl5_10_FieldAccessAfterAssign) {
+TEST(LexicalConventionSim, FieldAccessAfterAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

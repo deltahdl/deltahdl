@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA87, UnsignedDecimal) {
+TEST(NumberParsing, UnsignedDecimal) {
   auto r = Parse("module m; initial x = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(ParserA87, UnsignedDecimal) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, UnsignedDecimalWithUnderscore) {
+TEST(NumberParsing, UnsignedDecimalWithUnderscore) {
   auto r = Parse("module m; initial x = 1_000_000; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -23,7 +23,7 @@ TEST(ParserA87, UnsignedDecimalWithUnderscore) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, SizedDecimal) {
+TEST(NumberParsing, SizedDecimal) {
   auto r = Parse("module m; initial x = 8'd255; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -32,7 +32,7 @@ TEST(ParserA87, SizedDecimal) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, SignedDecimal) {
+TEST(NumberParsing, SignedDecimal) {
   auto r = Parse("module m; initial x = 8'sd127; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -41,7 +41,7 @@ TEST(ParserA87, SignedDecimal) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, XDigitUpper) {
+TEST(NumberParsing, XDigitUpper) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'hX; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -50,7 +50,7 @@ TEST(ParserA87, XDigitUpper) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, ZDigitLower) {
+TEST(NumberParsing, ZDigitLower) {
   auto r = Parse("module m; logic [3:0] x; initial x = 4'hz; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -59,7 +59,7 @@ TEST(ParserA87, ZDigitLower) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, DecimalBaseXDigit) {
+TEST(NumberParsing, DecimalBaseXDigit) {
   auto r = Parse("module m; initial x = 4'dx; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -68,7 +68,7 @@ TEST(ParserA87, DecimalBaseXDigit) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, DecimalBaseZDigit) {
+TEST(NumberParsing, DecimalBaseZDigit) {
   auto r = Parse("module m; initial x = 4'dz; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -77,7 +77,7 @@ TEST(ParserA87, DecimalBaseZDigit) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, DecimalBaseQuestionMark) {
+TEST(NumberParsing, DecimalBaseQuestionMark) {
   auto r = Parse("module m; initial x = 4'h?; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -86,7 +86,7 @@ TEST(ParserA87, DecimalBaseQuestionMark) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, BinaryNumber) {
+TEST(NumberParsing, BinaryNumber) {
   auto r = Parse("module m; initial x = 4'b1010; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -95,7 +95,7 @@ TEST(ParserA87, BinaryNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, SignedBinaryNumber) {
+TEST(NumberParsing, SignedBinaryNumber) {
   auto r = Parse("module m; initial x = 4'sb1010; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -104,7 +104,7 @@ TEST(ParserA87, SignedBinaryNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, BinaryWithUnderscore) {
+TEST(NumberParsing, BinaryWithUnderscore) {
   auto r = Parse("module m; initial x = 8'b1010_0101; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -113,7 +113,7 @@ TEST(ParserA87, BinaryWithUnderscore) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, BinaryWithXZ) {
+TEST(NumberParsing, BinaryWithXZ) {
   auto r = Parse("module m; initial x = 4'b10xz; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -122,7 +122,7 @@ TEST(ParserA87, BinaryWithXZ) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, OctalNumber) {
+TEST(NumberParsing, OctalNumber) {
   auto r = Parse("module m; initial x = 8'o77; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -131,7 +131,7 @@ TEST(ParserA87, OctalNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, SignedOctalNumber) {
+TEST(NumberParsing, SignedOctalNumber) {
   auto r = Parse("module m; initial x = 8'so77; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -140,7 +140,7 @@ TEST(ParserA87, SignedOctalNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, HexNumber) {
+TEST(NumberParsing, HexNumber) {
   auto r = Parse("module m; initial x = 8'hFF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -149,7 +149,7 @@ TEST(ParserA87, HexNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, SignedHexNumber) {
+TEST(NumberParsing, SignedHexNumber) {
   auto r = Parse("module m; initial x = 8'shFF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -158,7 +158,7 @@ TEST(ParserA87, SignedHexNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, HexWithUnderscore) {
+TEST(NumberParsing, HexWithUnderscore) {
   auto r = Parse("module m; initial x = 32'hDEAD_BEEF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -167,7 +167,7 @@ TEST(ParserA87, HexWithUnderscore) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, UnsizedHex) {
+TEST(NumberParsing, UnsizedHex) {
   auto r = Parse("module m; initial x = 'hAB; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -176,7 +176,7 @@ TEST(ParserA87, UnsizedHex) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, UnsizedBinary) {
+TEST(NumberParsing, UnsizedBinary) {
   auto r = Parse("module m; initial x = 'b1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -185,7 +185,7 @@ TEST(ParserA87, UnsizedBinary) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, UnsizedOctal) {
+TEST(NumberParsing, UnsizedOctal) {
   auto r = Parse("module m; initial x = 'o7; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -194,7 +194,7 @@ TEST(ParserA87, UnsizedOctal) {
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserA87, FixedPointNumber) {
+TEST(NumberParsing, FixedPointNumber) {
   auto r = Parse("module m; initial x = 3.14; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -203,7 +203,7 @@ TEST(ParserA87, FixedPointNumber) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserA87, RealWithExponent) {
+TEST(NumberParsing, RealWithExponent) {
   auto r = Parse("module m; initial x = 1e10; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -212,7 +212,7 @@ TEST(ParserA87, RealWithExponent) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserA87, RealWithNegExponent) {
+TEST(NumberParsing, RealWithNegExponent) {
   auto r = Parse("module m; initial x = 2.5e-3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -221,7 +221,7 @@ TEST(ParserA87, RealWithNegExponent) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserA87, RealWithPosExponent) {
+TEST(NumberParsing, RealWithPosExponent) {
   auto r = Parse("module m; initial x = 1.5E+6; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -230,7 +230,7 @@ TEST(ParserA87, RealWithPosExponent) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserA87, UnbasedUnsizedZero) {
+TEST(NumberParsing, UnbasedUnsizedZero) {
   auto r = Parse("module m; initial x = '0; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -239,7 +239,7 @@ TEST(ParserA87, UnbasedUnsizedZero) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(ParserA87, UnbasedUnsizedOne) {
+TEST(NumberParsing, UnbasedUnsizedOne) {
   auto r = Parse("module m; initial x = '1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -248,7 +248,7 @@ TEST(ParserA87, UnbasedUnsizedOne) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(ParserA87, UnbasedUnsizedX) {
+TEST(NumberParsing, UnbasedUnsizedX) {
   auto r = Parse("module m; initial x = 'x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -257,7 +257,7 @@ TEST(ParserA87, UnbasedUnsizedX) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(ParserA87, UnbasedUnsizedZ) {
+TEST(NumberParsing, UnbasedUnsizedZ) {
   auto r = Parse("module m; initial x = 'z; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

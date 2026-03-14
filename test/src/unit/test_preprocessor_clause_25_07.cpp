@@ -20,7 +20,7 @@ TEST(SourceText, ExternFunctionPrototypeInModule) {
   EXPECT_TRUE(mod->items[0]->func_body_stmts.empty());
 }
 
-TEST(ParserClause03, Cl3_5_FunctionsAndTasks) {
+TEST(DesignBuildingBlockParsing, FunctionsAndTasks) {
   auto r = ParseWithPreprocessor(
       "interface ifc;\n"
       "  function automatic int get_data;\n"

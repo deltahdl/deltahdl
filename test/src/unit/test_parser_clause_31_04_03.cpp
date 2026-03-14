@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA705, SystemTimingCheckFullskew) {
+TEST(SystemTimingCheckParsing, SystemTimingCheckFullskew) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -20,7 +20,7 @@ TEST(ParserA705, SystemTimingCheckFullskew) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
 }
 
-TEST(ParserA70501, FullskewWithFlags) {
+TEST(TimingCheckCommandParsing, FullskewWithFlags) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

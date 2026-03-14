@@ -91,7 +91,7 @@ TEST(EvalOpXZ, PartSelectXAddr) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(SimA83, PartSelectRange) {
+TEST(ExpressionSim, PartSelectRange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -112,7 +112,7 @@ TEST(SimA83, PartSelectRange) {
   EXPECT_EQ(var->value.ToUint64(), 0x5u);
 }
 
-TEST(SimA83, IndexedPartSelectPlus) {
+TEST(ExpressionSim, IndexedPartSelectPlus) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -133,7 +133,7 @@ TEST(SimA83, IndexedPartSelectPlus) {
   EXPECT_EQ(var->value.ToUint64(), 0x5u);
 }
 
-TEST(SimA83, IndexedPartSelectMinus) {
+TEST(ExpressionSim, IndexedPartSelectMinus) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -154,7 +154,7 @@ TEST(SimA83, IndexedPartSelectMinus) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
-TEST(SimA84, PrimaryBitSelect) {
+TEST(PrimarySim, PrimaryBitSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -172,7 +172,7 @@ TEST(SimA84, PrimaryBitSelect) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA84, PrimaryPartSelectRange) {
+TEST(PrimarySim, PrimaryPartSelectRange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -190,7 +190,7 @@ TEST(SimA84, PrimaryPartSelectRange) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(SimA84, PrimaryIndexedPartSelectPlus) {
+TEST(PrimarySim, PrimaryIndexedPartSelectPlus) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -208,7 +208,7 @@ TEST(SimA84, PrimaryIndexedPartSelectPlus) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(SimA84, PrimaryIndexedPartSelectMinus) {
+TEST(PrimarySim, PrimaryIndexedPartSelectMinus) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -226,7 +226,7 @@ TEST(SimA84, PrimaryIndexedPartSelectMinus) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(SimA85, VarLvalueBitSelect) {
+TEST(LvalueSim, VarLvalueBitSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -243,7 +243,7 @@ TEST(SimA85, VarLvalueBitSelect) {
   EXPECT_EQ(var->value.ToUint64(), 0x08u);
 }
 
-TEST(SimA85, VarLvalueIndexedPartSelectPlus) {
+TEST(LvalueSim, VarLvalueIndexedPartSelectPlus) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -260,7 +260,7 @@ TEST(SimA85, VarLvalueIndexedPartSelectPlus) {
   EXPECT_EQ(var->value.ToUint64(), 0xAB00u);
 }
 
-TEST(SimA85, VarLvalueIndexedPartSelectMinus) {
+TEST(LvalueSim, VarLvalueIndexedPartSelectMinus) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

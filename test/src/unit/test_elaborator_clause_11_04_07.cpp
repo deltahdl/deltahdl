@@ -21,7 +21,7 @@ TEST(ConstEval, Unary) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("!5", f)), 0);
 }
 
-TEST(ElabA86, UnaryLogicalNotElaborates) {
+TEST(OperatorElaboration, UnaryLogicalNotElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -33,7 +33,7 @@ TEST(ElabA86, UnaryLogicalNotElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, BinaryImplicationElaborates) {
+TEST(OperatorElaboration, BinaryImplicationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -45,7 +45,7 @@ TEST(ElabA86, BinaryImplicationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, BinaryEquivalenceElaborates) {
+TEST(OperatorElaboration, BinaryEquivalenceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -57,7 +57,7 @@ TEST(ElabA86, BinaryEquivalenceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh9, AlwaysCombLogicalOps) {
+TEST(AlwaysCombBasicSim, AlwaysCombLogicalOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -81,7 +81,7 @@ TEST(SimCh9, AlwaysCombLogicalOps) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9d, AlwaysStarLogicalNot) {
+TEST(AlwaysStarSim, AlwaysStarLogicalNot) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -106,7 +106,7 @@ TEST(SimCh9d, AlwaysStarLogicalNot) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-TEST(SimCh10, BlockingAssignUnaryOps) {
+TEST(BlockingAssignSim, BlockingAssignUnaryOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -135,7 +135,7 @@ TEST(SimCh10, BlockingAssignUnaryOps) {
   EXPECT_EQ(r_bang->value.ToUint64(), 0u);
 }
 
-TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
+TEST(BlockingAssignSim, BlockingAssignUnaryLogicalNotAndMinus) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -165,7 +165,7 @@ TEST(SimCh10, BlockingAssignUnaryLogicalNotAndMinus) {
   EXPECT_EQ(notv->value.ToUint64(), 0u);
 }
 
-TEST(SimCh10, BlockingAssignLogicalOps) {
+TEST(BlockingAssignSim, BlockingAssignLogicalOps) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection9, Sec9_2_2_2_BothFormsWithBlocksInModule) {
+TEST(ProcessParsing, BothFormsWithBlocksInModule) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] a, b, c, x, y;\n"
@@ -29,7 +29,7 @@ TEST(ParserSection9, Sec9_2_2_2_BothFormsWithBlocksInModule) {
   EXPECT_EQ(star->body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_FullComboModuleParseOk) {
+TEST(ProcessParsing, FullComboModuleParseOk) {
   EXPECT_TRUE(
       ParseOk("module combo_module;\n"
               "  logic [3:0] sel, a, b, c, d;\n"
@@ -57,7 +57,7 @@ TEST(ParserSection9, Sec9_2_2_2_FullComboModuleParseOk) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarAlwaysKind) {
+TEST(ProcessParsing, AlwaysStarAlwaysKind) {
   auto r = Parse(
       "module m;\n"
       "  always @* a = b & c;\n"
@@ -83,7 +83,7 @@ static ModuleItem* NthAlwaysItem(ParseResult& r, size_t n) {
   return nullptr;
 }
 
-TEST(ParserSection9, Sec9_2_2_2_SideBySideBothForms) {
+TEST(ProcessParsing, SideBySideBothForms) {
   auto r = Parse(
       "module m;\n"
       "  always_comb x = a & b;\n"
@@ -99,7 +99,7 @@ TEST(ParserSection9, Sec9_2_2_2_SideBySideBothForms) {
   EXPECT_EQ(second->always_kind, AlwaysKind::kAlways);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_SideBySideBodiesExist) {
+TEST(ProcessParsing, SideBySideBodiesExist) {
   auto r = Parse(
       "module m;\n"
       "  always_comb x = a;\n"

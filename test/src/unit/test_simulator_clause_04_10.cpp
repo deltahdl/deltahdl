@@ -31,7 +31,7 @@ static void ScheduleActiveEvent(Scheduler& sched,
   sched.ScheduleEvent({0}, Region::kActive, active);
 }
 
-TEST(SimCh410, ImmediateExecutionCallback) {
+TEST(PliCallbackControlSim, ImmediateExecutionCallback) {
   Arena arena;
   Scheduler sched(arena);
   bool callback_fired = false;
@@ -54,7 +54,7 @@ TEST(SimCh410, ImmediateExecutionCallback) {
   EXPECT_TRUE(callback_fired);
 }
 
-TEST(SimCh410, OneShotEvaluationEvent) {
+TEST(PliCallbackControlSim, OneShotEvaluationEvent) {
   Arena arena;
   Scheduler sched(arena);
   int fire_count = 0;
@@ -69,7 +69,7 @@ TEST(SimCh410, OneShotEvaluationEvent) {
   EXPECT_EQ(fire_count, 1);
 }
 
-TEST(SimCh410, CbAfterDelayInPreActive) {
+TEST(PliCallbackControlSim, CbAfterDelayInPreActive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -90,7 +90,7 @@ TEST(SimCh410, CbAfterDelayInPreActive) {
   EXPECT_EQ(order[1], "active_event");
 }
 
-TEST(SimCh410, CbNextSimTimeInPreActive) {
+TEST(PliCallbackControlSim, CbNextSimTimeInPreActive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -111,7 +111,7 @@ TEST(SimCh410, CbNextSimTimeInPreActive) {
   EXPECT_EQ(order[1], "active_event");
 }
 
-TEST(SimCh410, CbAtStartOfSimTimeInPreActive) {
+TEST(PliCallbackControlSim, CbAtStartOfSimTimeInPreActive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -132,7 +132,7 @@ TEST(SimCh410, CbAtStartOfSimTimeInPreActive) {
   EXPECT_EQ(order[1], "active_event");
 }
 
-TEST(SimCh410, CbNbaSynchInPreNba) {
+TEST(PliCallbackControlSim, CbNbaSynchInPreNba) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -151,7 +151,7 @@ TEST(SimCh410, CbNbaSynchInPreNba) {
   EXPECT_EQ(order[2], "nba");
 }
 
-TEST(SimCh410, CbReadWriteSynchInPreNbaOrPostNba) {
+TEST(PliCallbackControlSim, CbReadWriteSynchInPreNbaOrPostNba) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -176,7 +176,7 @@ TEST(SimCh410, CbReadWriteSynchInPreNbaOrPostNba) {
   EXPECT_EQ(order[3], "post_nba_rw");
 }
 
-TEST(SimCh410, CbAtEndOfSimTimeInPrePostponed) {
+TEST(PliCallbackControlSim, CbAtEndOfSimTimeInPrePostponed) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -200,7 +200,7 @@ TEST(SimCh410, CbAtEndOfSimTimeInPrePostponed) {
   EXPECT_EQ(order[2], "postponed");
 }
 
-TEST(SimCh410, CbReadOnlySynchInPostponed) {
+TEST(PliCallbackControlSim, CbReadOnlySynchInPostponed) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -227,7 +227,7 @@ static void ScheduleOrderEvent(Scheduler& sched, SimTime time, Region region,
   sched.ScheduleEvent(time, region, ev);
 }
 
-TEST(SimCh410, FullPliCallbackRegionOrdering) {
+TEST(PliCallbackControlSim, FullPliCallbackRegionOrdering) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;

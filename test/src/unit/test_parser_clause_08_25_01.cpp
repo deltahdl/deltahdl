@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA221, ClassTypeParameterized) {
+TEST(NetAndVariableTypeParsing, ClassTypeParameterized) {
   auto r = Parse(
       "class param_cls #(type T = int);\n"
       "  typedef T value_t;\n"
@@ -15,7 +15,7 @@ TEST(ParserA221, ClassTypeParameterized) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection13, Sec13_8_ScopeCallParsesAsExpr) {
+TEST(TaskAndFunctionParsing, ScopeCallParsesAsExpr) {
   auto r = Parse(
       "module top;\n"
       "  logic [7:0] d;\n"
@@ -26,7 +26,7 @@ TEST(ParserSection13, Sec13_8_ScopeCallParsesAsExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection13, Sec13_8_TwoSpecializations) {
+TEST(TaskAndFunctionParsing, TwoSpecializations) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] a4;\n"
@@ -40,7 +40,7 @@ TEST(ParserSection13, Sec13_8_TwoSpecializations) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection13, Sec13_8_MultiParamSpecialization) {
+TEST(TaskAndFunctionParsing, MultiParamSpecialization) {
   auto r = Parse(
       "module m;\n"
       "  logic [15:0] data;\n"
@@ -51,7 +51,7 @@ TEST(ParserSection13, Sec13_8_MultiParamSpecialization) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection13, Sec13_8_TypeParamOverrideCall) {
+TEST(TaskAndFunctionParsing, TypeParamOverrideCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic [7:0] x, y;\n"
@@ -59,7 +59,7 @@ TEST(ParserSection13, Sec13_8_TypeParamOverrideCall) {
               "endmodule\n"));
 }
 
-TEST(ParserSection13, Sec13_8_ChainedParameterizedCalls) {
+TEST(TaskAndFunctionParsing, ChainedParameterizedCalls) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic [7:0] a, b, c;\n"
@@ -67,7 +67,7 @@ TEST(ParserSection13, Sec13_8_ChainedParameterizedCalls) {
               "endmodule\n"));
 }
 
-TEST(ParserSection13, Sec13_8_ExplicitParamSpecialization) {
+TEST(TaskAndFunctionParsing, ExplicitParamSpecialization) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic [31:0] d, r;\n"
@@ -75,14 +75,14 @@ TEST(ParserSection13, Sec13_8_ExplicitParamSpecialization) {
               "endmodule\n"));
 }
 
-TEST(ParserSection13, Sec13_8_CallParamTaskFromInitial) {
+TEST(TaskAndFunctionParsing, CallParamTaskFromInitial) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial Utils#(16)::report();\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection13, Sec13_8_ParamCallInTernary) {
+TEST(TaskAndFunctionParsing, ParamCallInTernary) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic [7:0] x, y;\n"
@@ -91,7 +91,7 @@ TEST(ParserSection13, Sec13_8_ParamCallInTernary) {
               "endmodule\n"));
 }
 
-TEST(ParserSection8, ParameterizedClassScopeResolution) {
+TEST(ClassParsing, ParameterizedClassScopeResolution) {
   auto r = Parse(
       "module m;\n"
       "  class par_cls #(parameter int a = 25);\n"

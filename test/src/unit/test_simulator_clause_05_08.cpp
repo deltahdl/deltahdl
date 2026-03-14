@@ -4,61 +4,61 @@ using namespace delta;
 
 namespace {
 
-TEST(SimClause05, Cl5_8_IntegerNs) {
+TEST(LexicalConventionSim, IntegerNs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 10ns;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 10.0);
 }
 
-TEST(SimClause05, Cl5_8_FixedPointNs) {
+TEST(LexicalConventionSim, FixedPointNs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 2.1ns;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 2.1);
 }
 
-TEST(SimClause05, Cl5_8_Ps) {
+TEST(LexicalConventionSim, Ps) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 40ps;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 0.04);
 }
 
-TEST(SimClause05, Cl5_8_Fs) {
+TEST(LexicalConventionSim, Fs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 100fs;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 0.0001);
 }
 
-TEST(SimClause05, Cl5_8_Us) {
+TEST(LexicalConventionSim, Us) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 1us;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 1000.0);
 }
 
-TEST(SimClause05, Cl5_8_Ms) {
+TEST(LexicalConventionSim, Ms) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 1ms;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 1e6);
 }
 
-TEST(SimClause05, Cl5_8_S) {
+TEST(LexicalConventionSim, S) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 1s;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 1e9);
 }
 
-TEST(SimClause05, Cl5_8_FixedPointUs) {
+TEST(LexicalConventionSim, FixedPointUs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 2.5us;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 2500.0);
 }
 
-TEST(SimClause05, Cl5_8_LrmExample2p1ns) {
+TEST(LexicalConventionSim, LrmExample2p1ns) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 2.1ns;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 2.1);
 }
 
-TEST(SimClause05, Cl5_8_LrmExample40ps) {
+TEST(LexicalConventionSim, LrmExample40ps) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 40ps;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 0.04);

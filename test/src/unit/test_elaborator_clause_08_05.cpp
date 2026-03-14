@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA85, ClassWithPropertiesElaborates) {
+TEST(LvalueElaboration, ClassWithPropertiesElaborates) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  int command;\n"
@@ -15,7 +15,7 @@ TEST(ElabA85, ClassWithPropertiesElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabA85, PropertyAccessElaborates) {
+TEST(LvalueElaboration, PropertyAccessElaborates) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  int command;\n"
@@ -28,7 +28,7 @@ TEST(ElabA85, PropertyAccessElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabA85, VariousPropertyTypes) {
+TEST(LvalueElaboration, VariousPropertyTypes) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
              "  int i;\n"
@@ -42,7 +42,7 @@ TEST(ElabA85, VariousPropertyTypes) {
              "endmodule\n"));
 }
 
-TEST(ElabA85, MultiplePropertyAccess) {
+TEST(LvalueElaboration, MultiplePropertyAccess) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  int header;\n"
@@ -61,7 +61,7 @@ TEST(ElabA85, MultiplePropertyAccess) {
              "endmodule\n"));
 }
 
-TEST(ElabA85, ParameterizedClassElaborates) {
+TEST(LvalueElaboration, ParameterizedClassElaborates) {
   EXPECT_TRUE(
       ElabOk("class vector #(parameter width = 7);\n"
              "  bit [width:0] data;\n"

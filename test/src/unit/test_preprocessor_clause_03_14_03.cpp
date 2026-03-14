@@ -26,7 +26,7 @@ TEST(Preprocessor, Timescale_GlobalPrecision) {
   EXPECT_EQ(pp.GlobalPrecision(), TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_3_MultipleTimescaleDirectives) {
+TEST(DesignBuildingBlockParsing, MultipleTimescaleDirectives) {
   auto r = ParseTimescale31402(
       "`timescale 1ns / 1ns\n"
       "module a; endmodule\n"
@@ -39,7 +39,7 @@ TEST(ParserClause03, Cl3_14_3_MultipleTimescaleDirectives) {
   EXPECT_EQ(gp, TimeUnit::kPs);
 }
 
-TEST(ParserClause03, Cl3_14_3_EarlierTimescaleFinerPrecision) {
+TEST(DesignBuildingBlockParsing, EarlierTimescaleFinerPrecision) {
   auto r = ParseTimescale31402(
       "`timescale 1ns / 1fs\n"
       "module a; endmodule\n"

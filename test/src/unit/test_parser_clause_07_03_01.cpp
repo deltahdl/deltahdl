@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA221, StructUnionUnionSoft) {
+TEST(NetAndVariableTypeParsing, StructUnionUnionSoft) {
   auto r = Parse(
       "module m;\n"
       "  union soft { int a; real b; } u;\n"
@@ -16,7 +16,7 @@ TEST(ParserA221, StructUnionUnionSoft) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kUnion);
   EXPECT_TRUE(item->data_type.is_soft);
 }
-TEST(ParserSection7, UnionSoftPacked) {
+TEST(AggregateTypeParsing, UnionSoftPacked) {
   auto r = Parse(
       "module t;\n"
       "  typedef union soft packed {\n"
@@ -32,7 +32,7 @@ TEST(ParserSection7, UnionSoftPacked) {
   EXPECT_TRUE(item->typedef_type.is_packed);
 }
 
-TEST(ParserSection7, UnionPacked) {
+TEST(AggregateTypeParsing, UnionPacked) {
   auto r = Parse(
       "module t;\n"
       "  typedef union packed {\n"

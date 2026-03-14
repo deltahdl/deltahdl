@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, RestrictProperty_Basic) {
+TEST(AssertionDeclParsing, RestrictProperty_Basic) {
   auto r = Parse(
       "module m;\n"
       "  restrict property (@(posedge clk) a |-> b);\n"
@@ -16,7 +16,7 @@ TEST(ParserA210, RestrictProperty_Basic) {
   ASSERT_NE(item, nullptr);
 }
 
-TEST(ParserA210, RestrictProperty_Kind) {
+TEST(AssertionDeclParsing, RestrictProperty_Kind) {
   auto r = Parse(
       "module m;\n"
       "  restrict property (@(posedge clk) req |-> ##[1:3] ack);\n"
@@ -29,7 +29,7 @@ TEST(ParserA210, RestrictProperty_Kind) {
   EXPECT_TRUE(item->loc.IsValid());
 }
 
-TEST(ParserA210, RestrictProperty_WithDisableIff) {
+TEST(AssertionDeclParsing, RestrictProperty_WithDisableIff) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  restrict property (\n"
@@ -37,7 +37,7 @@ TEST(ParserA210, RestrictProperty_WithDisableIff) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, RestrictProperty_HasAssertExpr) {
+TEST(AssertionDeclParsing, RestrictProperty_HasAssertExpr) {
   auto r = Parse(
       "module m;\n"
       "  restrict property (@(posedge clk) a);\n"
@@ -49,7 +49,7 @@ TEST(ParserA210, RestrictProperty_HasAssertExpr) {
   EXPECT_NE(item->assert_expr, nullptr);
 }
 
-TEST(ParserA610, RestrictPropertyModule) {
+TEST(AssertionStatementSyntaxParsing, RestrictPropertyModule) {
   auto r = Parse(
       "module m;\n"
       "  restrict property (clk);\n"

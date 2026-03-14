@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA82, ConstantFunctionCallInParam) {
+TEST(SubroutineCallExprElaboration, ConstantFunctionCallInParam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(ElabA82, ConstantFunctionCallInParam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1343, ConstantFunctionInputOnlyOk) {
+TEST(FunctionRulesElaboration, ConstantFunctionInputOnlyOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -28,7 +28,7 @@ TEST(Elab1343, ConstantFunctionInputOnlyOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1343, ConstantFunctionOutputArgError) {
+TEST(FunctionRulesElaboration, ConstantFunctionOutputArgError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -42,7 +42,7 @@ TEST(Elab1343, ConstantFunctionOutputArgError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1343, ConstantFunctionInoutArgError) {
+TEST(FunctionRulesElaboration, ConstantFunctionInoutArgError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -55,7 +55,7 @@ TEST(Elab1343, ConstantFunctionInoutArgError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1343, ConstantFunctionRefArgError) {
+TEST(FunctionRulesElaboration, ConstantFunctionRefArgError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -68,7 +68,7 @@ TEST(Elab1343, ConstantFunctionRefArgError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1343, ConstantFunctionWithSysFuncOk) {
+TEST(FunctionRulesElaboration, ConstantFunctionWithSysFuncOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -80,7 +80,7 @@ TEST(Elab1343, ConstantFunctionWithSysFuncOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1343, ConstantFunctionForkError) {
+TEST(FunctionRulesElaboration, ConstantFunctionForkError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -95,7 +95,7 @@ TEST(Elab1343, ConstantFunctionForkError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1343, NonConstantContextOutputArgOk) {
+TEST(FunctionRulesElaboration, NonConstantContextOutputArgOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

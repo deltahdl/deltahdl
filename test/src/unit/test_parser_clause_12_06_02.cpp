@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA60701, PatternDotIdentifier) {
+TEST(PatternParsing, PatternDotIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -16,7 +16,7 @@ TEST(ParserA60701, PatternDotIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, PatternWildcard) {
+TEST(PatternParsing, PatternWildcard) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -27,7 +27,7 @@ TEST(ParserA60701, PatternWildcard) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA606, CondPatternMatchesConstant) {
+TEST(ConditionalSyntaxParsing, CondPatternMatchesConstant) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -45,7 +45,7 @@ TEST(ParserA606, CondPatternMatchesConstant) {
   EXPECT_EQ(stmt->condition->op, TokenKind::kKwMatches);
 }
 
-TEST(ParserA606, CondPatternMatchesWithTripleAnd) {
+TEST(ConditionalSyntaxParsing, CondPatternMatchesWithTripleAnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -60,7 +60,7 @@ TEST(ParserA606, CondPatternMatchesWithTripleAnd) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-TEST(ParserA60701, MatchesExprInIfCondition) {
+TEST(PatternParsing, MatchesExprInIfCondition) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -77,7 +77,7 @@ TEST(ParserA60701, MatchesExprInIfCondition) {
   EXPECT_EQ(stmt->condition->op, TokenKind::kKwMatches);
 }
 
-TEST(ParserA60701, MatchesWithTripleAndInIf) {
+TEST(PatternParsing, MatchesWithTripleAndInIf) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

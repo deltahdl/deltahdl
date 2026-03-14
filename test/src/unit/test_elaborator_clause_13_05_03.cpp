@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elab1353, MissingArgNoDefaultError) {
+TEST(DefaultArgumentElaboration, MissingArgNoDefaultError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -18,7 +18,7 @@ TEST(Elab1353, MissingArgNoDefaultError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1353, MissingArgWithDefaultOk) {
+TEST(DefaultArgumentElaboration, MissingArgWithDefaultOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -33,7 +33,7 @@ TEST(Elab1353, MissingArgWithDefaultOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1353, AllDefaultsNoArgsOk) {
+TEST(DefaultArgumentElaboration, AllDefaultsNoArgsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

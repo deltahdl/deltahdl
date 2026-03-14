@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, Sec11_1_StringLiteralAsExpression) {
+TEST(OperatorAndExpressionParsing, StringLiteralAsExpression) {
   auto r = Parse(
       "module t;\n"
       "  string s;\n"

@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection7, AssocArrayNumMethod) {
+TEST(AggregateTypeParsing, AssocArrayNumMethod) {
   auto r = Parse(
       "module t;\n"
       "  int aa[string];\n"

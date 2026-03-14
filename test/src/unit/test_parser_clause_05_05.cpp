@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_5_TwoCharOperators) {
+TEST(LexicalConventionParsing, TwoCharOperators) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -25,7 +25,7 @@ TEST(ParserClause05, Cl5_5_TwoCharOperators) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_5_TwoCharOperatorTokenKinds) {
+TEST(LexicalConventionParsing, TwoCharOperatorTokenKinds) {
   auto r = Parse(
       "module m;\n"
       "  initial x = (a == b);\n"
@@ -39,7 +39,7 @@ TEST(ParserClause05, Cl5_5_TwoCharOperatorTokenKinds) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEq);
 }
 
-TEST(ParserClause05, Cl5_5_ThreeCharOperators) {
+TEST(LexicalConventionParsing, ThreeCharOperators) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -53,7 +53,7 @@ TEST(ParserClause05, Cl5_5_ThreeCharOperators) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_5_UnaryOperatorsLeftOfOperand) {
+TEST(LexicalConventionParsing, UnaryOperatorsLeftOfOperand) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -77,7 +77,7 @@ TEST(ParserClause05, Cl5_5_UnaryOperatorsLeftOfOperand) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kTilde);
 }
 
-TEST(ParserClause05, Cl5_5_UnaryPrefixIncDec) {
+TEST(LexicalConventionParsing, UnaryPrefixIncDec) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -87,7 +87,7 @@ TEST(ParserClause05, Cl5_5_UnaryPrefixIncDec) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_5_BinaryOperatorBetweenOperands) {
+TEST(LexicalConventionParsing, BinaryOperatorBetweenOperands) {
   auto r = Parse(
       "module m;\n"
       "  initial x = a + b;\n"
@@ -105,7 +105,7 @@ TEST(ParserClause05, Cl5_5_BinaryOperatorBetweenOperands) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserClause05, Cl5_5_AllBinaryArithmeticOperators) {
+TEST(LexicalConventionParsing, AllBinaryArithmeticOperators) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -119,7 +119,7 @@ TEST(ParserClause05, Cl5_5_AllBinaryArithmeticOperators) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_5_AllBinaryBitwiseOperators) {
+TEST(LexicalConventionParsing, AllBinaryBitwiseOperators) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -132,7 +132,7 @@ TEST(ParserClause05, Cl5_5_AllBinaryBitwiseOperators) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_5_ShiftOperators) {
+TEST(LexicalConventionParsing, ShiftOperators) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -144,7 +144,7 @@ TEST(ParserClause05, Cl5_5_ShiftOperators) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_5_ConditionalOperatorThreeOperands) {
+TEST(LexicalConventionParsing, ConditionalOperatorThreeOperands) {
   auto r = Parse(
       "module m;\n"
       "  initial x = sel ? a : b;\n"
@@ -163,14 +163,14 @@ TEST(ParserClause05, Cl5_5_ConditionalOperatorThreeOperands) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserClause05, Cl5_5_NestedConditionalOperator) {
+TEST(LexicalConventionParsing, NestedConditionalOperator) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial x = a ? b ? c : d : e;\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_5_CompoundAssignmentOperators) {
+TEST(LexicalConventionParsing, CompoundAssignmentOperators) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -190,7 +190,7 @@ TEST(ParserClause05, Cl5_5_CompoundAssignmentOperators) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_5_SingleCharOperatorsInExpressions) {
+TEST(LexicalConventionParsing, SingleCharOperatorsInExpressions) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"

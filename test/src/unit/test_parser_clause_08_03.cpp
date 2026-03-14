@@ -15,7 +15,7 @@ TEST(SourceText, DescriptionClass) {
   EXPECT_EQ(r.cu->classes[0]->name, "C");
 }
 
-TEST(ParserSection8, ClassWithLifetime) {
+TEST(ClassParsing, ClassWithLifetime) {
   auto r = Parse(
       "class automatic MyClass;\n"
       "  int x;\n"
@@ -25,7 +25,7 @@ TEST(ParserSection8, ClassWithLifetime) {
   EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
 }
 
-TEST(ParserSection23, EndLabelClass) {
+TEST(ModuleAndHierarchyParsing, EndLabelClass) {
   auto r = Parse("class myclass; endclass : myclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1);
@@ -73,7 +73,7 @@ TEST(SourceText, ClassEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection8, EmptyClassDecl) {
+TEST(ClassParsing, EmptyClassDecl) {
   auto r = Parse("class Packet; endclass");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
@@ -81,7 +81,7 @@ TEST(ParserSection8, EmptyClassDecl) {
   EXPECT_TRUE(r.cu->classes[0]->members.empty());
 }
 
-TEST(ParserClause08_03, ImplementsSingleInterface) {
+TEST(ClassSyntaxParsing, ImplementsSingleInterface) {
   auto r = Parse(
       "class C implements IFace;\n"
       "endclass\n");
@@ -92,7 +92,7 @@ TEST(ParserClause08_03, ImplementsSingleInterface) {
   EXPECT_EQ(cls->implements_types[0], "IFace");
 }
 
-TEST(ParserClause08_03, ExtendsWithArgs) {
+TEST(ClassSyntaxParsing, ExtendsWithArgs) {
   auto r = Parse(
       "class D extends Base(5);\n"
       "endclass\n");
@@ -103,7 +103,7 @@ TEST(ParserClause08_03, ExtendsWithArgs) {
   ASSERT_EQ(cls->extends_args.size(), 1u);
 }
 
-TEST(ParserClause08_03, ConstructorDefaultArg) {
+TEST(ClassSyntaxParsing, ConstructorDefaultArg) {
   auto r = Parse(
       "class C extends Base;\n"
       "  function new(default);\n"
@@ -117,7 +117,7 @@ TEST(ParserClause08_03, ConstructorDefaultArg) {
   EXPECT_TRUE(members[0]->method->func_args[0].is_default);
 }
 
-TEST(ParserClause08_03, MethodInitialSpecifier) {
+TEST(ClassSyntaxParsing, MethodInitialSpecifier) {
   auto r = Parse(
       "class C;\n"
       "  function :initial void foo(); endfunction\n"
@@ -125,7 +125,7 @@ TEST(ParserClause08_03, MethodInitialSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause08_03, ErrorDuplicateDefaultInConstructorArgs) {
+TEST(ClassSyntaxParsing, ErrorDuplicateDefaultInConstructorArgs) {
   auto r = Parse(
       "class C extends Base;\n"
       "  function new(default, int x, default);\n"
@@ -134,7 +134,7 @@ TEST(ParserClause08_03, ErrorDuplicateDefaultInConstructorArgs) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause08_03, ErrorBothLocalAndProtected) {
+TEST(ClassSyntaxParsing, ErrorBothLocalAndProtected) {
   auto r = Parse(
       "class C;\n"
       "  local protected int x;\n"
@@ -142,7 +142,7 @@ TEST(ParserClause08_03, ErrorBothLocalAndProtected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause08_03, ErrorDuplicateStatic) {
+TEST(ClassSyntaxParsing, ErrorDuplicateStatic) {
   auto r = Parse(
       "class C;\n"
       "  static static int x;\n"

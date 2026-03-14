@@ -5,25 +5,25 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA83, ExprOperatorAssignment) {
+TEST(ExpressionParsing, ExprOperatorAssignment) {
   auto r = Parse("module m; initial x = (y += 1); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA83, IncExpression) {
+TEST(ExpressionParsing, IncExpression) {
   auto r = Parse("module m; initial begin i++; end endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA83, DecExpression) {
+TEST(ExpressionParsing, DecExpression) {
   auto r = Parse("module m; initial begin --j; end endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA83, ConditionalExpression) {
+TEST(ExpressionParsing, ConditionalExpression) {
   auto r = Parse("module m; initial x = a ? b : c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -32,7 +32,7 @@ TEST(ParserA83, ConditionalExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserA83, InsideExpression) {
+TEST(ExpressionParsing, InsideExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -43,7 +43,7 @@ TEST(ParserA83, InsideExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA83, TaggedUnionExpression) {
+TEST(ExpressionParsing, TaggedUnionExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial x = tagged Valid 42;\n"
@@ -55,7 +55,7 @@ TEST(ParserA83, TaggedUnionExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kTagged);
 }
 
-TEST(ParserA83, MintypMaxExpression) {
+TEST(ExpressionParsing, MintypMaxExpression) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -66,7 +66,7 @@ TEST(ParserA83, MintypMaxExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA83, PartSelectRange) {
+TEST(ExpressionParsing, PartSelectRange) {
   auto r = Parse("module m; initial x = a[7:4]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -75,7 +75,7 @@ TEST(ParserA83, PartSelectRange) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserA83, IndexedRangePlus) {
+TEST(ExpressionParsing, IndexedRangePlus) {
   auto r = Parse("module m; initial x = a[0+:4]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -85,7 +85,7 @@ TEST(ParserA83, IndexedRangePlus) {
   EXPECT_TRUE(rhs->is_part_select_plus);
 }
 
-TEST(ParserA83, IndexedRangeMinus) {
+TEST(ExpressionParsing, IndexedRangeMinus) {
   auto r = Parse("module m; initial x = a[7-:4]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -95,7 +95,7 @@ TEST(ParserA83, IndexedRangeMinus) {
   EXPECT_TRUE(rhs->is_part_select_minus);
 }
 
-TEST(ParserA83, UnaryOperatorExpr) {
+TEST(ExpressionParsing, UnaryOperatorExpr) {
   auto r = Parse("module m; initial x = ~a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -104,7 +104,7 @@ TEST(ParserA83, UnaryOperatorExpr) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
 }
 
-TEST(ParserA83, BinaryOperatorExpr) {
+TEST(ExpressionParsing, BinaryOperatorExpr) {
   auto r = Parse("module m; initial x = a + b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -113,7 +113,7 @@ TEST(ParserA83, BinaryOperatorExpr) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
 }
 
-TEST(ParserA83, NestedTernary) {
+TEST(ExpressionParsing, NestedTernary) {
   auto r = Parse("module m; initial x = a ? b ? c : d : e; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_04_03, WaitStatementElaborates) {
+TEST(LevelSensitiveEventElaboration, WaitStatementElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -21,7 +21,7 @@ TEST(ElabClause09_04_03, WaitStatementElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_03, WaitNullStatementElaborates) {
+TEST(LevelSensitiveEventElaboration, WaitNullStatementElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -35,7 +35,7 @@ TEST(ElabClause09_04_03, WaitNullStatementElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_03, WaitWithBlockElaborates) {
+TEST(LevelSensitiveEventElaboration, WaitWithBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -53,7 +53,7 @@ TEST(ElabClause09_04_03, WaitWithBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_03, WaitNegatedExprElaborates) {
+TEST(LevelSensitiveEventElaboration, WaitNegatedExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

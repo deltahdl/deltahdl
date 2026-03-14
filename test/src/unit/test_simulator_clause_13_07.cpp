@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Sim1370, ForwardFunctionCallSimulates) {
+TEST(TaskFunctionNameSim, ForwardFunctionCallSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -19,7 +19,7 @@ TEST(Sim1370, ForwardFunctionCallSimulates) {
   LowerRunAndCheck(f, design, {{"x", 42u}});
 }
 
-TEST(Sim1370, ForwardTaskCallSimulates) {
+TEST(TaskFunctionNameSim, ForwardTaskCallSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -36,7 +36,7 @@ TEST(Sim1370, ForwardTaskCallSimulates) {
   LowerRunAndCheck(f, design, {{"x", 99u}});
 }
 
-TEST(Sim1370, FunctionCallsForwardFunction) {
+TEST(TaskFunctionNameSim, FunctionCallsForwardFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

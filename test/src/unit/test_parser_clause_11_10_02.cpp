@@ -3,7 +3,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection1110_2, StringLiteralToWiderVector) {
+TEST(StringLiteralPaddedParsing, StringLiteralToWiderVector) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  bit [8*10:1] s;\n"
@@ -11,7 +11,7 @@ TEST(ParserSection1110_2, StringLiteralToWiderVector) {
               "endmodule\n"));
 }
 
-TEST(ParserSection1110_2, PaddedConcatCompareParses) {
+TEST(StringLiteralPaddedParsing, PaddedConcatCompareParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  bit [8*10:1] s1, s2;\n"

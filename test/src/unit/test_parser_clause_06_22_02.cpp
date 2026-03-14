@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, TypesNotEquivalentDifferentSign) {
+TEST(DataTypeParsing, TypesNotEquivalentDifferentSign) {
   DataType a;
   a.kind = DataTypeKind::kInt;
   a.is_signed = true;
@@ -15,7 +15,7 @@ TEST(ParserSection6, TypesNotEquivalentDifferentSign) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
-TEST(ParserSection6, TypesEquivalentDiffSignedness) {
+TEST(DataTypeParsing, TypesEquivalentDiffSignedness) {
   DataType a;
   a.kind = DataTypeKind::kInt;
   a.is_signed = true;
@@ -25,7 +25,7 @@ TEST(ParserSection6, TypesEquivalentDiffSignedness) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
-TEST(ParserSection6, NotEquivalentDiffWidth) {
+TEST(DataTypeParsing, NotEquivalentDiffWidth) {
   DataType a;
   a.kind = DataTypeKind::kByte;
   a.is_signed = true;
@@ -35,7 +35,7 @@ TEST(ParserSection6, NotEquivalentDiffWidth) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
-TEST(ParserSection6, TypesEquivalentPackedSameWidth) {
+TEST(DataTypeParsing, TypesEquivalentPackedSameWidth) {
   DataType a;
   a.kind = DataTypeKind::kByte;
   DataType b;
@@ -45,7 +45,7 @@ TEST(ParserSection6, TypesEquivalentPackedSameWidth) {
   EXPECT_TRUE(TypesEquivalent(a, b));
 }
 
-TEST(ParserSection6, TypesNotEquivalentDifferentState) {
+TEST(DataTypeParsing, TypesNotEquivalentDifferentState) {
   DataType a;
   a.kind = DataTypeKind::kBit;
   DataType b;
@@ -53,7 +53,7 @@ TEST(ParserSection6, TypesNotEquivalentDifferentState) {
   EXPECT_FALSE(TypesEquivalent(a, b));
 }
 
-TEST(ParserSection6, TypesEquivalentSameKind) {
+TEST(DataTypeParsing, TypesEquivalentSameKind) {
   DataType a;
   a.kind = DataTypeKind::kInt;
   a.is_signed = true;
@@ -63,7 +63,7 @@ TEST(ParserSection6, TypesEquivalentSameKind) {
   EXPECT_TRUE(TypesEquivalent(a, b));
 }
 
-TEST(ParserSection6, EquivalentMatchingImpliesEquivalent) {
+TEST(DataTypeParsing, EquivalentMatchingImpliesEquivalent) {
   DataType a;
   a.kind = DataTypeKind::kInt;
   a.is_signed = true;
@@ -74,7 +74,7 @@ TEST(ParserSection6, EquivalentMatchingImpliesEquivalent) {
   EXPECT_TRUE(TypesEquivalent(a, b));
 }
 
-TEST(ParserSection6, NotEquivalentStringToInt) {
+TEST(DataTypeParsing, NotEquivalentStringToInt) {
   DataType a;
   a.kind = DataTypeKind::kString;
   DataType b;

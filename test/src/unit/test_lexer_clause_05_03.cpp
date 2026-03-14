@@ -6,76 +6,76 @@ using namespace delta;
 
 namespace {
 
-TEST(LexerClause05, Cl5_3_SpaceIsWhitespace) {
+TEST(LexicalConventionLexing, SpaceIsWhitespace) {
   auto tokens = Lex("a b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerClause05, Cl5_3_TabIsWhitespace) {
+TEST(LexicalConventionLexing, TabIsWhitespace) {
   auto tokens = Lex("a\tb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerClause05, Cl5_3_NewlineIsWhitespace) {
+TEST(LexicalConventionLexing, NewlineIsWhitespace) {
   auto tokens = Lex("a\nb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerClause05, Cl5_3_FormfeedIsWhitespace) {
+TEST(LexicalConventionLexing, FormfeedIsWhitespace) {
   auto tokens = Lex("a\fb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerClause05, Cl5_3_VerticalTabIsWhitespace) {
+TEST(LexicalConventionLexing, VerticalTabIsWhitespace) {
   auto tokens = Lex("a\vb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerClause05, Cl5_3_CarriageReturnIsWhitespace) {
+TEST(LexicalConventionLexing, CarriageReturnIsWhitespace) {
   auto tokens = Lex("a\rb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerClause05, Cl5_3_CrlfIsWhitespace) {
+TEST(LexicalConventionLexing, CrlfIsWhitespace) {
   auto tokens = Lex("a\r\nb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerClause05, Cl5_3_EofTerminatesTokenStream) {
+TEST(LexicalConventionLexing, EofTerminatesTokenStream) {
   auto tokens = Lex("a");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
 }
 
-TEST(LexerClause05, Cl5_3_EofOnlyInput) {
+TEST(LexicalConventionLexing, EofOnlyInput) {
   auto tokens = Lex("");
   ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexerClause05, Cl5_3_WhitespaceNotEmittedAsToken) {
+TEST(LexicalConventionLexing, WhitespaceNotEmittedAsToken) {
   auto tokens = Lex("  \t\n\f\v  a  \t\n\f\v  ");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
 }
 
-TEST(LexerClause05, Cl5_3_WhitespaceOnlySeparatesTokens) {
+TEST(LexicalConventionLexing, WhitespaceOnlySeparatesTokens) {
   auto no_ws = Lex("modulem");
   ASSERT_EQ(no_ws.size(), 2u);
   EXPECT_EQ(no_ws[0].kind, TokenKind::kIdentifier);
@@ -87,14 +87,14 @@ TEST(LexerClause05, Cl5_3_WhitespaceOnlySeparatesTokens) {
   EXPECT_EQ(with_ws[1].kind, TokenKind::kIdentifier);
 }
 
-TEST(LexerClause05, Cl5_3_MixedWhitespaceCollapsesToSeparator) {
+TEST(LexicalConventionLexing, MixedWhitespaceCollapsesToSeparator) {
   auto tokens = Lex("a  \t  \n  \f  \v  b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerClause05, Cl5_3_WhitespaceVariationsProduceSameTokenKinds) {
+TEST(LexicalConventionLexing, WhitespaceVariationsProduceSameTokenKinds) {
   auto sp = Lex("a b");
   auto tab = Lex("a\tb");
   auto nl = Lex("a\nb");
@@ -110,35 +110,35 @@ TEST(LexerClause05, Cl5_3_WhitespaceVariationsProduceSameTokenKinds) {
   }
 }
 
-TEST(LexerClause05, Cl5_3_SpacesPreservedInStringLiteral) {
+TEST(LexicalConventionLexing, SpacesPreservedInStringLiteral) {
   auto r = LexOne("\"  hello   world  \"");
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
   EXPECT_NE(r.token.text.find("  hello   world  "), std::string_view::npos);
 }
 
-TEST(LexerClause05, Cl5_3_TabsPreservedInStringLiteral) {
+TEST(LexicalConventionLexing, TabsPreservedInStringLiteral) {
   auto r = LexOne("\"\thello\tworld\t\"");
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
   EXPECT_NE(r.token.text.find("\thello\tworld\t"), std::string_view::npos);
 }
 
-TEST(LexerClause05, Cl5_3_MixedSpacesAndTabsInStringLiteral) {
+TEST(LexicalConventionLexing, MixedSpacesAndTabsInStringLiteral) {
   auto r = LexOne("\" \t mixed \t \"");
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
   EXPECT_NE(r.token.text.find(" \t mixed \t "), std::string_view::npos);
 }
 
-TEST(LexerClause05, Cl5_3_StringLiteralWithOnlySpaces) {
+TEST(LexicalConventionLexing, StringLiteralWithOnlySpaces) {
   auto r = LexOne("\"   \"");
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexerClause05, Cl5_3_StringLiteralWithOnlyTabs) {
+TEST(LexicalConventionLexing, StringLiteralWithOnlyTabs) {
   auto r = LexOne("\"\t\t\t\"");
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexerClause05, Cl5_3_SourceLocationsAcrossNewlines) {
+TEST(LexicalConventionLexing, SourceLocationsAcrossNewlines) {
   auto tokens = Lex("a\nb c");
   ASSERT_GE(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].loc.line, 1u);
@@ -149,7 +149,7 @@ TEST(LexerClause05, Cl5_3_SourceLocationsAcrossNewlines) {
   EXPECT_EQ(tokens[2].loc.column, 3u);
 }
 
-TEST(LexerClause05, Cl5_3_SourceLocationsAcrossTabsAndSpaces) {
+TEST(LexicalConventionLexing, SourceLocationsAcrossTabsAndSpaces) {
   auto tokens = Lex("a\t\tb");
   ASSERT_GE(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].loc.line, 1u);
@@ -158,27 +158,27 @@ TEST(LexerClause05, Cl5_3_SourceLocationsAcrossTabsAndSpaces) {
   EXPECT_GT(tokens[1].loc.column, 1u);
 }
 
-TEST(LexerClause05, Cl5_3_WhitespaceOnlyInputProducesEof) {
+TEST(LexicalConventionLexing, WhitespaceOnlyInputProducesEof) {
   auto tokens = Lex("   \t\n\f\v\r\n   ");
   ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexerClause05, Cl5_3_LeadingWhitespaceBeforeToken) {
+TEST(LexicalConventionLexing, LeadingWhitespaceBeforeToken) {
   auto tokens = Lex("   a");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[0].text, "a");
 }
 
-TEST(LexerClause05, Cl5_3_TrailingWhitespaceAfterToken) {
+TEST(LexicalConventionLexing, TrailingWhitespaceAfterToken) {
   auto tokens = Lex("a   ");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[0].text, "a");
 }
 
-TEST(LexerClause05, Cl5_3_OperatorsDoNotNeedWhitespaceSeparation) {
+TEST(LexicalConventionLexing, OperatorsDoNotNeedWhitespaceSeparation) {
   auto tokens = Lex("a+b");
   ASSERT_EQ(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].text, "a");

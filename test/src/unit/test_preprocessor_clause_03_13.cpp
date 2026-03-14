@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_13_ModuleAndPackageInDefinitionNameSpace) {
+TEST(DesignBuildingBlockParsing, ModuleAndPackageInDefinitionNameSpace) {
   auto r = ParseWithPreprocessor(
       "package my_pkg;\n"
       "  typedef int myint;\n"
@@ -26,7 +26,7 @@ static bool HasItemOfKindAndName(const std::vector<ModuleItem*>& items,
   return false;
 }
 
-TEST(ParserClause03, Cl3_13_SameNameVarsInDifferentModules) {
+TEST(DesignBuildingBlockParsing, SameNameVarsInDifferentModules) {
   auto r = ParseWithPreprocessor(
       "module a;\n"
       "  logic [7:0] data;\n"
@@ -44,7 +44,7 @@ TEST(ParserClause03, Cl3_13_SameNameVarsInDifferentModules) {
                                    ModuleItemKind::kVarDecl, "data"));
 }
 
-TEST(ParserClause03, Cl3_13_TaskAndFunctionInSameModule) {
+TEST(DesignBuildingBlockParsing, TaskAndFunctionInSameModule) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  function int add(int a, int b);\n"
@@ -68,7 +68,7 @@ TEST(ParserClause03, Cl3_13_TaskAndFunctionInSameModule) {
   EXPECT_TRUE(found_task);
 }
 
-TEST(ParserClause03, Cl3_13_PortNamesInModuleScope) {
+TEST(DesignBuildingBlockParsing, PortNamesInModuleScope) {
   auto r = ParseWithPreprocessor(
       "module m (input logic clk, input logic rst_n, output logic [7:0] q);\n"
       "endmodule\n");
@@ -91,7 +91,7 @@ static bool HasAttrNamed(const std::vector<ModuleItem*>& items,
   return false;
 }
 
-TEST(ParserClause03, Cl3_13_AllEightNameSpaces) {
+TEST(DesignBuildingBlockParsing, AllEightNameSpaces) {
   auto r = ParseWithPreprocessor(
 
       "`define VAL 1\n"

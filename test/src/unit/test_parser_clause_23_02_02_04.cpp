@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ModuleParamsA13, AnsiPortWithDefault) {
+TEST(ModuleParamsParsing, AnsiPortWithDefault) {
   auto r = Parse(
       "module m(\n"
       "  input logic clk,\n"

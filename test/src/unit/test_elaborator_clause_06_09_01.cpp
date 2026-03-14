@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabSection6, Sec6_9_1_LittleEndianWidth) {
+TEST(VectorDeclarationElaboration, LittleEndianWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [0:7] x; endmodule\n", f);
   ASSERT_NE(design, nullptr);
@@ -18,7 +18,7 @@ TEST(ElabSection6, Sec6_9_1_LittleEndianWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-TEST(ElabSection6, Sec6_9_1_32BitVectorWidth) {
+TEST(VectorDeclarationElaboration, 32BitVectorWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [31:0] w; endmodule\n", f);
   ASSERT_NE(design, nullptr);
@@ -27,7 +27,7 @@ TEST(ElabSection6, Sec6_9_1_32BitVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 32u);
 }
 
-TEST(ElabSection6, Sec6_9_1_NetAndVarSameWidth) {
+TEST(VectorDeclarationElaboration, NetAndVarSameWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -44,7 +44,7 @@ TEST(ElabSection6, Sec6_9_1_NetAndVarSameWidth) {
   EXPECT_EQ(mod->variables[0].width, 16u);
 }
 
-TEST(ElabSection6, Sec6_9_1_VectorDefaultUnsigned) {
+TEST(VectorDeclarationElaboration, VectorDefaultUnsigned) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [7:0] data; endmodule\n", f);
   ASSERT_NE(design, nullptr);
@@ -53,7 +53,7 @@ TEST(ElabSection6, Sec6_9_1_VectorDefaultUnsigned) {
   EXPECT_FALSE(mod->variables[0].is_signed);
 }
 
-TEST(ElabSection6, Sec6_9_1_ExplicitlySigned) {
+TEST(VectorDeclarationElaboration, ExplicitlySigned) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic signed [7:0] sv; endmodule\n", f);
   ASSERT_NE(design, nullptr);

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A2ContinuousAssignWithDelay) {
+TEST(FormalSyntaxParsing, ContinuousAssignWithDelay) {
   auto r = Parse("module m; wire y; assign #5 y = a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -16,7 +16,7 @@ TEST(ParserAnnexA, A2ContinuousAssignWithDelay) {
   }
 }
 
-TEST(ParserA223, Delay3AssignSingleValue) {
+TEST(DelayParsing, Delay3AssignSingleValue) {
   auto r = Parse(
       "module m;\n"
       "  wire out, in;\n"
@@ -31,7 +31,7 @@ TEST(ParserA223, Delay3AssignSingleValue) {
   EXPECT_EQ(item->assign_delay_decay, nullptr);
 }
 
-TEST(ParserA223, Delay3AssignThreeValues) {
+TEST(DelayParsing, Delay3AssignThreeValues) {
   auto r = Parse(
       "module m;\n"
       "  wire out, in;\n"
@@ -48,7 +48,7 @@ TEST(ParserA223, Delay3AssignThreeValues) {
   EXPECT_EQ(item->assign_delay_decay->int_val, 30u);
 }
 
-TEST(ParserA223, Delay2ParenSingleValue) {
+TEST(DelayParsing, Delay2ParenSingleValue) {
   auto r = Parse(
       "module m;\n"
       "  wire out, in;\n"
@@ -60,7 +60,7 @@ TEST(ParserA223, Delay2ParenSingleValue) {
   ASSERT_NE(item->assign_delay, nullptr);
   EXPECT_EQ(item->assign_delay->int_val, 5u);
 }
-TEST(ParserA601, ContinuousAssign_DelaySingle) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssign_DelaySingle) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b;\n"
@@ -75,7 +75,7 @@ TEST(ParserA601, ContinuousAssign_DelaySingle) {
   EXPECT_EQ(cas[0]->assign_delay_decay, nullptr);
 }
 
-TEST(ParserA601, ContinuousAssign_DelayRiseFall) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssign_DelayRiseFall) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b;\n"
@@ -90,7 +90,7 @@ TEST(ParserA601, ContinuousAssign_DelayRiseFall) {
   EXPECT_EQ(cas[0]->assign_delay_decay, nullptr);
 }
 
-TEST(ParserA601, ContinuousAssign_DelayRiseFallDecay) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssign_DelayRiseFallDecay) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b;\n"
@@ -105,7 +105,7 @@ TEST(ParserA601, ContinuousAssign_DelayRiseFallDecay) {
   EXPECT_NE(cas[0]->assign_delay_decay, nullptr);
 }
 
-TEST(ParserSection6, Sec6_7_1_WireDelayWithInit) {
+TEST(DataTypeParsing, WireDelayWithInit) {
   auto r = Parse(
       "module t;\n"
       "  wire #3 w = 1'b0;\n"
@@ -119,7 +119,7 @@ TEST(ParserSection6, Sec6_7_1_WireDelayWithInit) {
   EXPECT_EQ(item->net_delay->int_val, 3u);
   ASSERT_NE(item->init_expr, nullptr);
 }
-TEST(ParserSection11, MinTypMaxInContAssign) {
+TEST(OperatorAndExpressionParsing, MinTypMaxInContAssign) {
   auto r = Parse(
       "module t;\n"
       "  wire a;\n"
@@ -140,7 +140,7 @@ static ModuleItem* FindContAssign(ParseResult& r) {
   return FindItemByKindFromResult(r, ModuleItemKind::kContAssign);
 }
 
-TEST(ParserSection4, Sec4_5_ContinuousAssignWithDelay) {
+TEST(SchedulingSemanticsParsing, ContinuousAssignWithDelay) {
   auto r = Parse(
       "module m;\n"
       "  wire y;\n"

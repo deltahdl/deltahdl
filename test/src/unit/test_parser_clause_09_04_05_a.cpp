@@ -5,14 +5,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA223, IntraAssignmentDelay) {
+TEST(DelayParsing, IntraAssignmentDelay) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  reg r;\n"
               "  initial r = #5 1'b1;\n"
               "endmodule"));
 }
-TEST(ParserA602, BlockingAssignment_WithIntraEvent) {
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_WithIntraEvent) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a = @(posedge clk) b; end\n"
@@ -26,7 +26,7 @@ TEST(ParserA602, BlockingAssignment_WithIntraEvent) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserA602, BlockingAssignment_WithRepeatEvent) {
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_WithRepeatEvent) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a = repeat(3) @(posedge clk) b; end\n"
@@ -40,7 +40,7 @@ TEST(ParserA602, BlockingAssignment_WithRepeatEvent) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
-TEST(ParserA602, BlockingAssignment_ParenthesizedIntraDelay) {
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_ParenthesizedIntraDelay) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a = #(1:2:3) b; end\n"
@@ -53,7 +53,7 @@ TEST(ParserA602, BlockingAssignment_ParenthesizedIntraDelay) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserA602, NonblockingAssignment_WithRepeatEvent) {
+TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_WithRepeatEvent) {
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= repeat(2) @(posedge clk) d; end\n"
@@ -66,7 +66,7 @@ TEST(ParserA602, NonblockingAssignment_WithRepeatEvent) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
   EXPECT_FALSE(stmt->events.empty());
 }
-TEST(ParserSection9, RepeatEventControlNonblocking) {
+TEST(ProcessParsing, RepeatEventControlNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -80,7 +80,7 @@ TEST(ParserSection9, RepeatEventControlNonblocking) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
-TEST(ParserSection10, Sec10_4_1_IntraAssignDelay) {
+TEST(AssignmentParsing, IntraAssignDelay) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -100,7 +100,7 @@ TEST(ParserSection10, Sec10_4_1_IntraAssignDelay) {
   EXPECT_EQ(stmt->rhs->text, "b");
 }
 
-TEST(ParserSection10, Sec10_4_1_IntraAssignEvent) {
+TEST(AssignmentParsing, IntraAssignEvent) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, clk;\n"
@@ -119,7 +119,7 @@ TEST(ParserSection10, Sec10_4_1_IntraAssignEvent) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_BlockingRepeatPosedge) {
+TEST(ProcessParsing, BlockingRepeatPosedge) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -135,7 +135,7 @@ TEST(ParserSection9, Sec9_4_5_BlockingRepeatPosedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-TEST(ParserSection9, Sec9_4_5_NonblockingRepeatPosedge) {
+TEST(ProcessParsing, NonblockingRepeatPosedge) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -151,7 +151,7 @@ TEST(ParserSection9, Sec9_4_5_NonblockingRepeatPosedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatNegedge) {
+TEST(ProcessParsing, RepeatNegedge) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -167,7 +167,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatNegedge) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatBareSignal) {
+TEST(ProcessParsing, RepeatBareSignal) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -183,7 +183,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatBareSignal) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatCountVariable) {
+TEST(ProcessParsing, RepeatCountVariable) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -199,7 +199,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatCountVariable) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_2_RepeatEventControl) {
+TEST(AssignmentParsing, RepeatEventControl) {
   auto r = Parse(
       "module m;\n"
       "  reg q, d, clk;\n"
@@ -219,7 +219,7 @@ TEST(ParserSection10, Sec10_4_2_RepeatEventControl) {
   EXPECT_EQ(stmt->rhs->text, "d");
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatCountExpression) {
+TEST(ProcessParsing, RepeatCountExpression) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -233,7 +233,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatCountExpression) {
   EXPECT_EQ(stmt->repeat_event_count->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatCountOne) {
+TEST(ProcessParsing, RepeatCountOne) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -249,7 +249,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatCountOne) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatCountZero) {
+TEST(ProcessParsing, RepeatCountZero) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -263,7 +263,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatCountZero) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_2_IntraAssignEventNegedge) {
+TEST(AssignmentParsing, IntraAssignEventNegedge) {
   auto r = Parse(
       "module m;\n"
       "  reg q, d, clk;\n"
@@ -281,7 +281,7 @@ TEST(ParserSection10, Sec10_4_2_IntraAssignEventNegedge) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_BlockingIntraDelay) {
+TEST(ProcessParsing, BlockingIntraDelay) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -297,7 +297,7 @@ TEST(ParserSection9, Sec9_4_5_BlockingIntraDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_NonblockingIntraDelay) {
+TEST(ProcessParsing, NonblockingIntraDelay) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -313,7 +313,7 @@ TEST(ParserSection9, Sec9_4_5_NonblockingIntraDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_BlockingIntraEventPosedge) {
+TEST(ProcessParsing, BlockingIntraEventPosedge) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -329,7 +329,7 @@ TEST(ParserSection9, Sec9_4_5_BlockingIntraEventPosedge) {
   EXPECT_EQ(stmt->repeat_event_count, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_NonblockingIntraEventNegedge) {
+TEST(ProcessParsing, NonblockingIntraEventNegedge) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -345,7 +345,7 @@ TEST(ParserSection9, Sec9_4_5_NonblockingIntraEventNegedge) {
   EXPECT_EQ(stmt->repeat_event_count, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatMultipleEventsOr) {
+TEST(ProcessParsing, RepeatMultipleEventsOr) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, rst, a, b;\n"
@@ -362,7 +362,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatMultipleEventsOr) {
   EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatMultipleEventsComma) {
+TEST(ProcessParsing, RepeatMultipleEventsComma) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, rst, a, b;\n"
@@ -389,7 +389,7 @@ static Stmt* FirstAlwaysStmt(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatInAlwaysBlock) {
+TEST(ProcessParsing, RepeatInAlwaysBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -415,7 +415,7 @@ static Stmt* FirstTaskStmt(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatInTask) {
+TEST(ProcessParsing, RepeatInTask) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -432,7 +432,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatInTask) {
   ASSERT_FALSE(stmt->events.empty());
 }
 
-TEST(ParserSection9, Sec9_4_5_IntraDelayExpression) {
+TEST(ProcessParsing, IntraDelayExpression) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -448,7 +448,7 @@ TEST(ParserSection9, Sec9_4_5_IntraDelayExpression) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_IntraDelayReal) {
+TEST(ProcessParsing, IntraDelayReal) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -462,7 +462,7 @@ TEST(ParserSection9, Sec9_4_5_IntraDelayReal) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_1_IntraAssignNegedgeEvent) {
+TEST(AssignmentParsing, IntraAssignNegedgeEvent) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, clk;\n"
@@ -480,7 +480,7 @@ TEST(ParserSection10, Sec10_4_1_IntraAssignNegedgeEvent) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_MultipleIntraAssignSequence) {
+TEST(ProcessParsing, MultipleIntraAssignSequence) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b, c, d;\n"
@@ -501,7 +501,7 @@ TEST(ParserSection9, Sec9_4_5_MultipleIntraAssignSequence) {
   ASSERT_FALSE(s1->events.empty());
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatConcatRhs) {
+TEST(ProcessParsing, RepeatConcatRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg clk;\n"
@@ -518,7 +518,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatConcatRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatFuncCallRhs) {
+TEST(ProcessParsing, RepeatFuncCallRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg clk;\n"
@@ -534,7 +534,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatFuncCallRhs) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatEdgeKeyword) {
+TEST(ProcessParsing, RepeatEdgeKeyword) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -550,7 +550,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatEdgeKeyword) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kEdge);
 }
 
-TEST(ParserSection9, Sec9_4_5_BlockingIntraDelayZero) {
+TEST(ProcessParsing, BlockingIntraDelayZero) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -564,7 +564,7 @@ TEST(ParserSection9, Sec9_4_5_BlockingIntraDelayZero) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_NonblockingIntraDelayZero) {
+TEST(ProcessParsing, NonblockingIntraDelayZero) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -578,7 +578,7 @@ TEST(ParserSection9, Sec9_4_5_NonblockingIntraDelayZero) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatComplexRhs) {
+TEST(ProcessParsing, RepeatComplexRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg clk;\n"
@@ -595,7 +595,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatComplexRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection9, Sec9_4_5_IntraEventMultipleSignals) {
+TEST(ProcessParsing, IntraEventMultipleSignals) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, rst, a, b;\n"
@@ -612,7 +612,7 @@ TEST(ParserSection9, Sec9_4_5_IntraEventMultipleSignals) {
   EXPECT_EQ(stmt->repeat_event_count, nullptr);
 }
 
-TEST(ParserSection4, Sec4_5_NonblockingAssignWithDelay) {
+TEST(SchedulingSemanticsParsing, NonblockingAssignWithDelay) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -630,7 +630,7 @@ TEST(ParserSection4, Sec4_5_NonblockingAssignWithDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_5_RepeatInAutoTask) {
+TEST(ProcessParsing, RepeatInAutoTask) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  reg clk, a, b;\n"
@@ -640,7 +640,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatInAutoTask) {
               "endmodule\n"));
 }
 
-TEST(ParserSection10, Sec10_4_2_IntraAssignEventPosedge) {
+TEST(AssignmentParsing, IntraAssignEventPosedge) {
   auto r = Parse(
       "module m;\n"
       "  reg q, d, clk;\n"
@@ -659,7 +659,7 @@ TEST(ParserSection10, Sec10_4_2_IntraAssignEventPosedge) {
   EXPECT_EQ(stmt->rhs->text, "d");
 }
 
-TEST(ParserSection4, Sec4_5_BlockingIntraAssignDelay) {
+TEST(SchedulingSemanticsParsing, BlockingIntraAssignDelay) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"

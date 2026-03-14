@@ -48,7 +48,7 @@ TEST(SourceText, ClassNestedInterfaceClass) {
   EXPECT_TRUE(members[0]->nested_class->is_interface);
 }
 
-TEST(ParserClause08_03, InterfaceClassExtendsMultiple) {
+TEST(ClassSyntaxParsing, InterfaceClassExtendsMultiple) {
   auto r = Parse(
       "interface class IFace extends IBase1, IBase2;\n"
       "  pure virtual function void do_something();\n"

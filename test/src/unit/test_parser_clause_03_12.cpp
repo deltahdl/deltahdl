@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_12_CompilationProducesAST) {
+TEST(DesignBuildingBlockParsing, CompilationProducesAST) {
   auto r = Parse(
       "module m;\n"
       "  logic x;\n"
@@ -17,7 +17,7 @@ TEST(ParserClause03, Cl3_12_CompilationProducesAST) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-TEST(ParserClause03, Cl3_12_AllDesignElementTypesCompile) {
+TEST(DesignBuildingBlockParsing, AllDesignElementTypesCompile) {
   auto r = Parse(
       "module m; endmodule\n"
       "program p; endprogram\n"
@@ -31,7 +31,7 @@ TEST(ParserClause03, Cl3_12_AllDesignElementTypesCompile) {
   EXPECT_EQ(r.cu->checkers.size(), 1u);
 }
 
-TEST(ParserClause03, Cl3_12_ParameterOverrideCompiles) {
+TEST(DesignBuildingBlockParsing, ParameterOverrideCompiles) {
   auto r = Parse(
       "module sub #(parameter W = 8);\n"
       "endmodule\n"
@@ -44,7 +44,7 @@ TEST(ParserClause03, Cl3_12_ParameterOverrideCompiles) {
       HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
 }
 
-TEST(ParserClause03, Cl3_12_PackagePrecedesImport) {
+TEST(DesignBuildingBlockParsing, PackagePrecedesImport) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -60,7 +60,7 @@ TEST(ParserClause03, Cl3_12_PackagePrecedesImport) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
 }
 
-TEST(ParserClause03, Cl3_12_OrderOfDesignElements) {
+TEST(DesignBuildingBlockParsing, OrderOfDesignElements) {
   auto r = Parse(
       "package p; endpackage\n"
       "module a; endmodule\n"

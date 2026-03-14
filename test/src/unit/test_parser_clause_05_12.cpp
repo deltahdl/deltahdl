@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_12_AttrOnModuleDefinition) {
+TEST(LexicalConventionParsing, AttrOnModuleDefinition) {
   auto r = Parse(
       "(* optimize_power *)\n"
       "module m;\n"
@@ -17,11 +17,11 @@ TEST(ParserClause05, Cl5_12_AttrOnModuleDefinition) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-TEST(ParserClause05, Cl5_12_AttrWithValueOnModuleDefinition) {
+TEST(LexicalConventionParsing, AttrWithValueOnModuleDefinition) {
   EXPECT_TRUE(ParseOk("(* optimize_power = 1 *) module m; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_12_AttrOnModuleInstantiation) {
+TEST(LexicalConventionParsing, AttrOnModuleInstantiation) {
   auto r = Parse(
       "module m;\n"
       "  (* dont_touch *)\n"
@@ -36,7 +36,7 @@ TEST(ParserClause05, Cl5_12_AttrOnModuleInstantiation) {
   EXPECT_EQ(items[0]->attrs[0].name, "dont_touch");
 }
 
-TEST(ParserClause05, Cl5_12_AttrWithValueOnInstantiation) {
+TEST(LexicalConventionParsing, AttrWithValueOnInstantiation) {
   auto r = Parse(
       "module m;\n"
       "  (* optimize_power = 0 *)\n"
@@ -50,7 +50,7 @@ TEST(ParserClause05, Cl5_12_AttrWithValueOnInstantiation) {
   EXPECT_NE(items[0]->attrs[0].value, nullptr);
 }
 
-TEST(ParserClause05, Cl5_12_AttrOnVarDecl) {
+TEST(LexicalConventionParsing, AttrOnVarDecl) {
   auto r = Parse(
       "module m;\n"
       "  (* fsm_state *)\n"
@@ -63,7 +63,7 @@ TEST(ParserClause05, Cl5_12_AttrOnVarDecl) {
   EXPECT_EQ(item->attrs[0].value, nullptr);
 }
 
-TEST(ParserClause05, Cl5_12_AttrWithValueOnVarDecl) {
+TEST(LexicalConventionParsing, AttrWithValueOnVarDecl) {
   auto r = Parse(
       "module m;\n"
       "  (* fsm_state = 1 *)\n"
@@ -75,7 +75,7 @@ TEST(ParserClause05, Cl5_12_AttrWithValueOnVarDecl) {
   EXPECT_NE(item->attrs[0].value, nullptr);
 }
 
-TEST(ParserClause05, Cl5_12_AttrOnContAssign) {
+TEST(LexicalConventionParsing, AttrOnContAssign) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b;\n"
@@ -90,7 +90,7 @@ TEST(ParserClause05, Cl5_12_AttrOnContAssign) {
   EXPECT_EQ(item->attrs[0].name, "synthesis_on");
 }
 
-TEST(ParserClause05, Cl5_12_MultipleAttrSpecs) {
+TEST(LexicalConventionParsing, MultipleAttrSpecs) {
   auto r = Parse(
       "module m;\n"
       "  (* full_case, parallel_case *)\n"
@@ -103,7 +103,7 @@ TEST(ParserClause05, Cl5_12_MultipleAttrSpecs) {
   EXPECT_EQ(item->attrs[1].name, "parallel_case");
 }
 
-TEST(ParserClause05, Cl5_12_MixedAttrWithAndWithoutValue) {
+TEST(LexicalConventionParsing, MixedAttrWithAndWithoutValue) {
   auto r = Parse(
       "module m;\n"
       "  (* full_case, parallel_case = 1 *)\n"
@@ -116,7 +116,7 @@ TEST(ParserClause05, Cl5_12_MixedAttrWithAndWithoutValue) {
   EXPECT_NE(item->attrs[1].value, nullptr);
 }
 
-TEST(ParserClause05, Cl5_12_MultipleSeparateInstances) {
+TEST(LexicalConventionParsing, MultipleSeparateInstances) {
   auto r = Parse(
       "module m;\n"
       "  (* full_case = 1 *)\n"
@@ -131,7 +131,7 @@ TEST(ParserClause05, Cl5_12_MultipleSeparateInstances) {
   EXPECT_EQ(item->attrs[1].name, "parallel_case");
 }
 
-TEST(ParserClause05, Cl5_12_AttrOnCaseStatement) {
+TEST(LexicalConventionParsing, AttrOnCaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -150,7 +150,7 @@ TEST(ParserClause05, Cl5_12_AttrOnCaseStatement) {
   EXPECT_EQ(stmt->attrs[1].name, "parallel_case");
 }
 
-TEST(ParserClause05, Cl5_12_AttrOnIfStatement) {
+TEST(LexicalConventionParsing, AttrOnIfStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -166,7 +166,7 @@ TEST(ParserClause05, Cl5_12_AttrOnIfStatement) {
   EXPECT_EQ(stmt->attrs[0].name, "synthesis_off");
 }
 
-TEST(ParserClause05, Cl5_12_AttrOnForLoop) {
+TEST(LexicalConventionParsing, AttrOnForLoop) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -176,7 +176,7 @@ TEST(ParserClause05, Cl5_12_AttrOnForLoop) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_12_AttrOnAssignment) {
+TEST(LexicalConventionParsing, AttrOnAssignment) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -191,7 +191,7 @@ TEST(ParserClause05, Cl5_12_AttrOnAssignment) {
   EXPECT_NE(stmt->attrs[0].value, nullptr);
 }
 
-TEST(ParserClause05, Cl5_12_AttrOnBinaryOperator) {
+TEST(LexicalConventionParsing, AttrOnBinaryOperator) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic a, b, c;\n"
@@ -199,7 +199,7 @@ TEST(ParserClause05, Cl5_12_AttrOnBinaryOperator) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_12_AttrOnTernaryOperator) {
+TEST(LexicalConventionParsing, AttrOnTernaryOperator) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic a, b, c, d;\n"
@@ -207,7 +207,7 @@ TEST(ParserClause05, Cl5_12_AttrOnTernaryOperator) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_12_AttrOnFunctionCall) {
+TEST(LexicalConventionParsing, AttrOnFunctionCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic a, b, c;\n"
@@ -215,7 +215,7 @@ TEST(ParserClause05, Cl5_12_AttrOnFunctionCall) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_12_AttrOnFunctionCallNoArgs) {
+TEST(LexicalConventionParsing, AttrOnFunctionCallNoArgs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic a;\n"
@@ -223,7 +223,7 @@ TEST(ParserClause05, Cl5_12_AttrOnFunctionCallNoArgs) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_12_AttrValueConstExpr) {
+TEST(LexicalConventionParsing, AttrValueConstExpr) {
   auto r = Parse(
       "module m;\n"
       "  (* depth = 3 + 1 *)\n"
@@ -237,7 +237,7 @@ TEST(ParserClause05, Cl5_12_AttrValueConstExpr) {
   EXPECT_EQ(item->attrs[0].value->kind, ExprKind::kBinary);
 }
 
-TEST(ParserClause05, Cl5_12_AttrValueString) {
+TEST(LexicalConventionParsing, AttrValueString) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  (* tool_purpose = \"synthesis\" *)\n"
@@ -245,14 +245,14 @@ TEST(ParserClause05, Cl5_12_AttrValueString) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_12_NestedAttributeError) {
+TEST(LexicalConventionParsing, NestedAttributeError) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
               "  (* foo = 1 + (* bar *) 2 *) logic x;\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_12_NonNestedConstExprOk) {
+TEST(LexicalConventionParsing, NonNestedConstExprOk) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  (* foo = 1 + 2 *) logic x;\n"

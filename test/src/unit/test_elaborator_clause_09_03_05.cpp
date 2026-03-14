@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_03_05, LabeledAssignmentElaborates) {
+TEST(StatementLabelElaboration, LabeledAssignmentElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -21,7 +21,7 @@ TEST(ElabClause09_03_05, LabeledAssignmentElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_05, LabelOnBeginBlockElaborates) {
+TEST(StatementLabelElaboration, LabelOnBeginBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -37,7 +37,7 @@ TEST(ElabClause09_03_05, LabelOnBeginBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_05, LabelOnForkBlockElaborates) {
+TEST(StatementLabelElaboration, LabelOnForkBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -54,7 +54,7 @@ TEST(ElabClause09_03_05, LabelOnForkBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_05, LabelOnIfElaborates) {
+TEST(StatementLabelElaboration, LabelOnIfElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -68,7 +68,7 @@ TEST(ElabClause09_03_05, LabelOnIfElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_05, LabelOnForLoopElaborates) {
+TEST(StatementLabelElaboration, LabelOnForLoopElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

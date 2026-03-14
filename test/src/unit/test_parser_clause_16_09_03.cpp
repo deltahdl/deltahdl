@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection16, SampledFunctionInAssert) {
+TEST(AssertionParsing, SampledFunctionInAssert) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a |-> b)\n"
@@ -15,7 +15,7 @@ TEST(ParserSection16, SampledFunctionInAssert) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection16, RoseFunctionInProperty) {
+TEST(AssertionParsing, RoseFunctionInProperty) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) $rose(req) |-> ##[1:3] ack);\n"
@@ -24,7 +24,7 @@ TEST(ParserSection16, RoseFunctionInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection16, FellFunctionInProperty) {
+TEST(AssertionParsing, FellFunctionInProperty) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) $fell(req) |-> ##1 !ack);\n"
@@ -33,7 +33,7 @@ TEST(ParserSection16, FellFunctionInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection16, StableFunctionInProperty) {
+TEST(AssertionParsing, StableFunctionInProperty) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) $stable(data) |-> valid);\n"
@@ -42,7 +42,7 @@ TEST(ParserSection16, StableFunctionInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection16, PastFunctionWithTicks) {
+TEST(AssertionParsing, PastFunctionWithTicks) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) $past(req, 2) |-> ack);\n"
@@ -51,7 +51,7 @@ TEST(ParserSection16, PastFunctionWithTicks) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection16, ChangedFunctionInProperty) {
+TEST(AssertionParsing, ChangedFunctionInProperty) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) $changed(data) |-> valid);\n"

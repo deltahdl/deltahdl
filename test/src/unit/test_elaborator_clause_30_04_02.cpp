@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA701, SpecifyBlockWithPathElaborates) {
+TEST(SpecifyBlockDeclElaboration, SpecifyBlockWithPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(ElabA701, SpecifyBlockWithPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA703, TerminalBitSelectElaborates) {
+TEST(SpecifyTerminalElaboration, TerminalBitSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(ElabA703, TerminalBitSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA703, TerminalPartSelectElaborates) {
+TEST(SpecifyTerminalElaboration, TerminalPartSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -43,7 +43,7 @@ TEST(ElabA703, TerminalPartSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA703, TerminalIndexedPartSelectElaborates) {
+TEST(SpecifyTerminalElaboration, TerminalIndexedPartSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -56,7 +56,7 @@ TEST(ElabA703, TerminalIndexedPartSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA703, TerminalDottedElaborates) {
+TEST(SpecifyTerminalElaboration, TerminalDottedElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -69,7 +69,7 @@ TEST(ElabA703, TerminalDottedElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA702, SimpleParallelPathElaborates) {
+TEST(SpecifyPathElaboration, SimpleParallelPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

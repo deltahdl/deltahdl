@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, IfdefDefined) {
+TEST(CompilerDirectiveParsing, IfdefDefined) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define FEATURE_A\n"
                               "`ifdef FEATURE_A\n"
@@ -13,7 +13,7 @@ TEST(ParserSection22, IfdefDefined) {
                               "`endif\n"));
 }
 
-TEST(ParserSection22, IfdefWithElse) {
+TEST(CompilerDirectiveParsing, IfdefWithElse) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`ifdef UNDEFINED_MACRO\n"
                               "module alt;\n"
@@ -24,7 +24,7 @@ TEST(ParserSection22, IfdefWithElse) {
                               "`endif\n"));
 }
 
-TEST(ParserSection22, IfndefUndefined) {
+TEST(CompilerDirectiveParsing, IfndefUndefined) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`ifndef GUARD\n"
                               "`define GUARD\n"
@@ -33,7 +33,7 @@ TEST(ParserSection22, IfndefUndefined) {
                               "`endif\n"));
 }
 
-TEST(ParserSection22, IfdefElsifChain) {
+TEST(CompilerDirectiveParsing, IfdefElsifChain) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define OPT_B\n"
                               "`ifdef OPT_A\n"
@@ -48,7 +48,7 @@ TEST(ParserSection22, IfdefElsifChain) {
                               "`endif\n"));
 }
 
-TEST(ParserSection22, NestedIfdef) {
+TEST(CompilerDirectiveParsing, NestedIfdef) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define OUTER\n"
                               "`define INNER\n"

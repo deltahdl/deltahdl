@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA26, FuncPrototypeExternVoid) {
+TEST(FunctionDeclParsing, FuncPrototypeExternVoid) {
   auto r = Parse(
       "module m;\n"
       "  extern function void bar();\n"
@@ -16,7 +16,7 @@ TEST(ParserA26, FuncPrototypeExternVoid) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-TEST(ParserA27, TaskPrototypeExtern) {
+TEST(TaskDeclParsing, TaskPrototypeExtern) {
   auto r = Parse(
       "module m;\n"
       "  extern task my_task(input int x);\n"
@@ -29,7 +29,7 @@ TEST(ParserA27, TaskPrototypeExtern) {
   EXPECT_EQ(item->name, "my_task");
 }
 
-TEST(ParserA27, TaskPrototypeExternNoPorts) {
+TEST(TaskDeclParsing, TaskPrototypeExternNoPorts) {
   auto r = Parse(
       "module m;\n"
       "  extern task run;\n"

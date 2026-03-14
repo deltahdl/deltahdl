@@ -59,7 +59,7 @@ TEST(SysTask, RealtobitsReinterpretsRealAsBits) {
   EXPECT_EQ(result.ToUint64(), expected_bits);
 }
 
-TEST(SimA82, SystemTfCallUnsigned) {
+TEST(SubroutineCallExprSim, SystemTfCallUnsigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -76,14 +76,14 @@ TEST(SimA82, SystemTfCallUnsigned) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(Section20, Unsigned) {
+TEST(UtilitySystemTaskTest, Unsigned) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$unsigned", {MakeInt(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-TEST(Section20, Signed) {
+TEST(UtilitySystemTaskTest, Signed) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$signed", {MakeInt(f.arena, 42)});
   auto result = EvalExpr(expr, f.ctx, f.arena);

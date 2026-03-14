@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA222, DriveStrengthContinuousAssign) {
+TEST(StrengthParsing, DriveStrengthContinuousAssign) {
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -18,7 +18,7 @@ TEST(ParserA222, DriveStrengthContinuousAssign) {
   EXPECT_EQ(item->drive_strength0, 4u);
   EXPECT_EQ(item->drive_strength1, 3u);
 }
-TEST(ParserA601, ContinuousAssign_DriveStrength) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssign_DriveStrength) {
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -32,7 +32,7 @@ TEST(ParserA601, ContinuousAssign_DriveStrength) {
   EXPECT_EQ(cas[0]->drive_strength1, 2u);
 }
 
-TEST(ParserA601, ContinuousAssign_DriveStrengthReversed) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssign_DriveStrengthReversed) {
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -46,7 +46,7 @@ TEST(ParserA601, ContinuousAssign_DriveStrengthReversed) {
   EXPECT_EQ(cas[0]->drive_strength1, 3u);
 }
 
-TEST(ParserA601, ContinuousAssign_StrengthAndDelay) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssign_StrengthAndDelay) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b;\n"
@@ -61,7 +61,7 @@ TEST(ParserA601, ContinuousAssign_StrengthAndDelay) {
   EXPECT_NE(cas[0]->assign_delay, nullptr);
 }
 
-TEST(ParserSection10, ContinuousAssignDriveStrength) {
+TEST(AssignmentParsing, ContinuousAssignDriveStrength) {
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -82,7 +82,7 @@ TEST(ParserSection10, ContinuousAssignDriveStrength) {
   EXPECT_EQ(ca->drive_strength1, 2u);
 }
 
-TEST(ParserSection10, ContinuousAssignDriveStrengthReversed) {
+TEST(AssignmentParsing, ContinuousAssignDriveStrengthReversed) {
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -102,7 +102,7 @@ TEST(ParserSection10, ContinuousAssignDriveStrengthReversed) {
   EXPECT_EQ(ca->drive_strength1, 3u);
 }
 
-TEST(ParserSection6, NetDeclDriveStrength) {
+TEST(DataTypeParsing, NetDeclDriveStrength) {
   auto r = Parse(
       "module m;\n"
       "  wire (weak0, strong1) w = 1'b1;\n"

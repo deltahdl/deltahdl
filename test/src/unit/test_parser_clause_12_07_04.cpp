@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection9, Sec9_2_2_WhileLoop) {
+TEST(ProcessParsing, WhileLoop) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] val;\n"
@@ -26,7 +26,7 @@ TEST(ParserSection9, Sec9_2_2_WhileLoop) {
   EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kWhile);
 }
 
-TEST(ParserSection12, NestedForInsideWhile) {
+TEST(ProceduralStatementParsing, NestedForInsideWhile) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -46,7 +46,7 @@ TEST(ParserSection12, NestedForInsideWhile) {
   EXPECT_EQ(stmt->body->stmts[0]->kind, StmtKind::kFor);
 }
 
-TEST(ParserSection12, WhileWithNullBody) {
+TEST(ProceduralStatementParsing, WhileWithNullBody) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -55,7 +55,7 @@ TEST(ParserSection12, WhileWithNullBody) {
               "endmodule\n"));
 }
 
-TEST(ParserA608, WhileLoop) {
+TEST(LoopSyntaxParsing, WhileLoop) {
   auto r = Parse(
       "module m;\n"
       "  initial begin while (x > 0) x = x - 1; end\n"
@@ -69,7 +69,7 @@ TEST(ParserA608, WhileLoop) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserA608, WhileNullStmt) {
+TEST(LoopSyntaxParsing, WhileNullStmt) {
   auto r = Parse(
       "module m;\n"
       "  initial begin while (x > 0) ; end\n"
@@ -81,7 +81,7 @@ TEST(ParserA608, WhileNullStmt) {
   EXPECT_EQ(stmt->kind, StmtKind::kWhile);
 }
 
-TEST(ParserSection12, WhileLoopWithBlock) {
+TEST(ProceduralStatementParsing, WhileLoopWithBlock) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"

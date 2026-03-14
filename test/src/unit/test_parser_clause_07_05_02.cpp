@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserCh513, BuiltInMethodCall_Parse) {
+TEST(BuiltInMethodParsing, BuiltInMethodCall_Parse) {
   auto r = Parse(
       "module t;\n"
       "  initial x = arr.size();\n"
@@ -19,7 +19,7 @@ TEST(ParserCh513, BuiltInMethodCall_Parse) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-TEST(ParserCh513, BuiltInMethodCall_Callee) {
+TEST(BuiltInMethodParsing, BuiltInMethodCall_Callee) {
   auto r = Parse(
       "module t;\n"
       "  initial x = arr.size();\n"
@@ -33,7 +33,7 @@ TEST(ParserCh513, BuiltInMethodCall_Callee) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserSection7c, DynamicArraySize) {
+TEST(DynamicArrayAndQueueParsing, DynamicArraySize) {
   auto r = Parse(
       "module m;\n"
       "  int dyn[];\n"
@@ -47,7 +47,7 @@ TEST(ParserSection7c, DynamicArraySize) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection7, DynamicArraySizeMethod) {
+TEST(AggregateTypeParsing, DynamicArraySizeMethod) {
   auto r = Parse(
       "module t;\n"
       "  int dyn[];\n"

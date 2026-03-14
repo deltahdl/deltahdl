@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_4_LrmExample) {
+TEST(DesignBuildingBlockParsing, LrmExample) {
   auto r = ParseWithPreprocessor(
       "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
       "  initial begin\n"
@@ -24,7 +24,7 @@ TEST(ParserClause03, Cl3_4_LrmExample) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-TEST(ParserClause03, Cl3_4_SubroutinesAndProcedures) {
+TEST(DesignBuildingBlockParsing, SubroutinesAndProcedures) {
   auto r = ParseWithPreprocessor(
       "program p;\n"
       "  function int get_val; return 42; endfunction\n"
@@ -44,7 +44,7 @@ TEST(ParserClause03, Cl3_4_SubroutinesAndProcedures) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
 }
 
-TEST(ParserClause03, Cl3_4_RejectsDisallowedItems) {
+TEST(DesignBuildingBlockParsing, RejectsDisallowedItems) {
   EXPECT_TRUE(
       ParseWithPreprocessor("program p; always @(*) begin end endprogram\n")
           .has_errors);

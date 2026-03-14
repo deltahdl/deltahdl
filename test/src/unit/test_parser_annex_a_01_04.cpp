@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ModuleItemsA14, ElabFatalTask) {
+TEST(ModuleItemsParsing, ElabFatalTask) {
   auto r = Parse(
       "module m;\n"
       "  $fatal(1, \"error message\");\n"
@@ -16,7 +16,7 @@ TEST(ModuleItemsA14, ElabFatalTask) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kElabSystemTask));
 }
 
-TEST(ModuleItemsA14, ElabErrorTask) {
+TEST(ModuleItemsParsing, ElabErrorTask) {
   auto r = Parse(
       "module m;\n"
       "  $error(\"something wrong\");\n"
@@ -25,7 +25,7 @@ TEST(ModuleItemsA14, ElabErrorTask) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleItemsA14, ElabWarningTask) {
+TEST(ModuleItemsParsing, ElabWarningTask) {
   auto r = Parse(
       "module m;\n"
       "  $warning;\n"
@@ -34,7 +34,7 @@ TEST(ModuleItemsA14, ElabWarningTask) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleItemsA14, ElabInfoTask) {
+TEST(ModuleItemsParsing, ElabInfoTask) {
   auto r = Parse(
       "module m;\n"
       "  $info(\"build info\");\n"
@@ -43,7 +43,7 @@ TEST(ModuleItemsA14, ElabInfoTask) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleItemsA14, ContinuousAssign) {
+TEST(ModuleItemsParsing, ContinuousAssign) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, y;\n"
@@ -55,7 +55,7 @@ TEST(ModuleItemsA14, ContinuousAssign) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign));
 }
 
-TEST(ModuleItemsA14, NetAlias) {
+TEST(ModuleItemsParsing, NetAlias) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b;\n"
@@ -66,7 +66,7 @@ TEST(ModuleItemsA14, NetAlias) {
   EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAlias));
 }
 
-TEST(ModuleItemsA14, InitialConstruct) {
+TEST(ModuleItemsParsing, InitialConstruct) {
   auto r = Parse(
       "module m;\n"
       "  initial begin end\n"
@@ -77,7 +77,7 @@ TEST(ModuleItemsA14, InitialConstruct) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-TEST(ModuleItemsA14, FinalConstruct) {
+TEST(ModuleItemsParsing, FinalConstruct) {
   auto r = Parse(
       "module m;\n"
       "  final begin end\n"
@@ -88,7 +88,7 @@ TEST(ModuleItemsA14, FinalConstruct) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock));
 }
 
-TEST(ModuleItemsA14, AlwaysConstructPlain) {
+TEST(ModuleItemsParsing, AlwaysConstructPlain) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk) begin end\n"
@@ -98,7 +98,7 @@ TEST(ModuleItemsA14, AlwaysConstructPlain) {
   EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlways));
 }
 
-TEST(ModuleItemsA14, AlwaysComb) {
+TEST(ModuleItemsParsing, AlwaysComb) {
   auto r = Parse(
       "module m;\n"
       "  always_comb begin end\n"
@@ -109,7 +109,7 @@ TEST(ModuleItemsA14, AlwaysComb) {
       HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysComb));
 }
 
-TEST(ModuleItemsA14, AlwaysFF) {
+TEST(ModuleItemsParsing, AlwaysFF) {
   auto r = Parse(
       "module m;\n"
       "  always_ff @(posedge clk) begin end\n"
@@ -119,7 +119,7 @@ TEST(ModuleItemsA14, AlwaysFF) {
   EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysFF));
 }
 
-TEST(ModuleItemsA14, AlwaysLatch) {
+TEST(ModuleItemsParsing, AlwaysLatch) {
   auto r = Parse(
       "module m;\n"
       "  always_latch begin end\n"
@@ -130,7 +130,7 @@ TEST(ModuleItemsA14, AlwaysLatch) {
       HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlwaysLatch));
 }
 
-TEST(ModuleItemsA14, LoopGenerateConstruct) {
+TEST(ModuleItemsParsing, LoopGenerateConstruct) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -144,7 +144,7 @@ TEST(ModuleItemsA14, LoopGenerateConstruct) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateFor));
 }
 
-TEST(ModuleItemsA14, ConditionalGenerateIf) {
+TEST(ModuleItemsParsing, ConditionalGenerateIf) {
   auto r = Parse(
       "module m;\n"
       "  if (1) begin : yes\n"
@@ -157,7 +157,7 @@ TEST(ModuleItemsA14, ConditionalGenerateIf) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateIf));
 }
 
-TEST(ModuleItemsA14, ConditionalGenerateCase) {
+TEST(ModuleItemsParsing, ConditionalGenerateCase) {
   auto r = Parse(
       "module m;\n"
       "  case (1)\n"
@@ -171,7 +171,7 @@ TEST(ModuleItemsA14, ConditionalGenerateCase) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateCase));
 }
 
-TEST(ModuleItemsA14, ParameterOverride) {
+TEST(ModuleItemsParsing, ParameterOverride) {
   auto r = Parse(
       "module m;\n"
       "  defparam u1.W = 16;\n"
@@ -182,7 +182,7 @@ TEST(ModuleItemsA14, ParameterOverride) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kDefparam));
 }
 
-TEST(ModuleItemsA14, GateInstantiation) {
+TEST(ModuleItemsParsing, GateInstantiation) {
   auto r = Parse(
       "module m;\n"
       "  and g1(y, a, b);\n"
@@ -193,7 +193,7 @@ TEST(ModuleItemsA14, GateInstantiation) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGateInst));
 }
 
-TEST(ModuleItemsA14, ModuleInstantiation) {
+TEST(ModuleItemsParsing, ModuleInstantiation) {
   auto r = Parse(
       "module m;\n"
       "  sub u1(.a(x), .b(y));\n"
@@ -204,7 +204,7 @@ TEST(ModuleItemsA14, ModuleInstantiation) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
 }
 
-TEST(ModuleItemsA14, ClockingDeclaration) {
+TEST(ModuleItemsParsing, ClockingDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -216,7 +216,7 @@ TEST(ModuleItemsA14, ClockingDeclaration) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kClockingBlock));
 }
 
-TEST(ModuleItemsA14, DefaultClocking) {
+TEST(ModuleItemsParsing, DefaultClocking) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"
@@ -227,7 +227,7 @@ TEST(ModuleItemsA14, DefaultClocking) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleItemsA14, DefaultDisableIff) {
+TEST(ModuleItemsParsing, DefaultDisableIff) {
   auto r = Parse(
       "module m;\n"
       "  default disable iff rst;\n"
@@ -238,7 +238,7 @@ TEST(ModuleItemsA14, DefaultDisableIff) {
                             ModuleItemKind::kDefaultDisableIff));
 }
 
-TEST(ModuleItemsA14, GenerateRegion) {
+TEST(ModuleItemsParsing, GenerateRegion) {
   auto r = Parse(
       "module m;\n"
       "  generate\n"
@@ -249,7 +249,7 @@ TEST(ModuleItemsA14, GenerateRegion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleItemsA14, SpecifyBlock) {
+TEST(ModuleItemsParsing, SpecifyBlock) {
   auto r = Parse(
       "module m(input a, output y);\n"
       "  specify\n"
@@ -262,7 +262,7 @@ TEST(ModuleItemsA14, SpecifyBlock) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecifyBlock));
 }
 
-TEST(ModuleItemsA14, SpecparamDeclaration) {
+TEST(ModuleItemsParsing, SpecparamDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  specparam delay = 10;\n"
@@ -273,7 +273,7 @@ TEST(ModuleItemsA14, SpecparamDeclaration) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecparam));
 }
 
-TEST(ModuleItemsA14, NestedModuleDecl) {
+TEST(ModuleItemsParsing, NestedModuleDecl) {
   auto r = Parse(
       "module outer;\n"
       "  module inner;\n"
@@ -285,7 +285,7 @@ TEST(ModuleItemsA14, NestedModuleDecl) {
                             ModuleItemKind::kNestedModuleDecl));
 }
 
-TEST(ModuleItemsA14, NestedInterfaceDecl) {
+TEST(ModuleItemsParsing, NestedInterfaceDecl) {
   auto r = Parse(
       "module outer;\n"
       "  interface inner_ifc;\n"
@@ -297,7 +297,7 @@ TEST(ModuleItemsA14, NestedInterfaceDecl) {
                             ModuleItemKind::kNestedModuleDecl));
 }
 
-TEST(ModuleItemsA14, NestedProgramDecl) {
+TEST(ModuleItemsParsing, NestedProgramDecl) {
   auto r = Parse(
       "module outer;\n"
       "  program inner_prg;\n"
@@ -309,7 +309,7 @@ TEST(ModuleItemsA14, NestedProgramDecl) {
                             ModuleItemKind::kNestedModuleDecl));
 }
 
-TEST(ModuleItemsA14, TimeunitsInModule) {
+TEST(ModuleItemsParsing, TimeunitsInModule) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 1ns;\n"
@@ -321,7 +321,7 @@ TEST(ModuleItemsA14, TimeunitsInModule) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
 }
 
-TEST(ModuleItemsA14, PortDeclAsModuleItem) {
+TEST(ModuleItemsParsing, PortDeclAsModuleItem) {
   auto r = Parse(
       "module m(a, b, y);\n"
       "  input a, b;\n"
@@ -331,7 +331,7 @@ TEST(ModuleItemsA14, PortDeclAsModuleItem) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleItemsA14, BindDirectiveInModule) {
+TEST(ModuleItemsParsing, BindDirectiveInModule) {
   auto r = Parse(
       "module target; endmodule\n"
       "module checker_m; endmodule\n"
@@ -342,7 +342,7 @@ TEST(ModuleItemsA14, BindDirectiveInModule) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleItemsA14, AssertionItem) {
+TEST(ModuleItemsParsing, AssertionItem) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a |-> b);\n"
@@ -353,7 +353,7 @@ TEST(ModuleItemsA14, AssertionItem) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ModuleItemsA14, InterfaceInstantiation) {
+TEST(ModuleItemsParsing, InterfaceInstantiation) {
   auto r = Parse(
       "module m;\n"
       "  bus_if bus_inst(.clk(clk));\n"
@@ -364,7 +364,7 @@ TEST(ModuleItemsA14, InterfaceInstantiation) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
 }
 
-TEST(ModuleItemsA14, ItemWithAttributes) {
+TEST(ModuleItemsParsing, ItemWithAttributes) {
   auto r = Parse(
       "module m;\n"
       "  (* full_case *) wire w;\n"
@@ -373,7 +373,7 @@ TEST(ModuleItemsA14, ItemWithAttributes) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleItemsA14, GenvarDeclaration) {
+TEST(ModuleItemsParsing, GenvarDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  genvar i, j;\n"

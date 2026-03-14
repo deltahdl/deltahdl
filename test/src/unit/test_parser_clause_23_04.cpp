@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection23, NestedModuleParsesOk) {
+TEST(ModuleAndHierarchyParsing, NestedModuleParsesOk) {
   EXPECT_TRUE(
       ParseOk("module outer;\n"
               "  wire w;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection23, NestedModuleParsesOk) {
               "endmodule\n"));
 }
 
-TEST(ParserSection23, NestedModuleMultiple) {
+TEST(ModuleAndHierarchyParsing, NestedModuleMultiple) {
   EXPECT_TRUE(
       ParseOk("module outer(input d, ck, output q, nq);\n"
               "  wire q1, nq1;\n"

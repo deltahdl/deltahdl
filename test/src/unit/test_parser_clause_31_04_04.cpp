@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA705, SystemTimingCheckWidth) {
+TEST(SystemTimingCheckParsing, SystemTimingCheckWidth) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -20,7 +20,7 @@ TEST(ParserA705, SystemTimingCheckWidth) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kWidth);
 }
 
-TEST(ParserA70501, WidthWithThreshold) {
+TEST(TimingCheckCommandParsing, WidthWithThreshold) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -51,7 +51,7 @@ TEST_F(SpecifyTest, WidthTimingCheck) {
   ASSERT_GE(tc.limits.size(), 1u);
 }
 
-TEST(ParserSection28, Sec28_12_TimingCheckWidth) {
+TEST(GateLevelModelingParsing, TimingCheckWidth) {
   auto sp = ParseSpecifySingle(
       "module m(input clk);\n"
       "  specify\n"
@@ -68,7 +68,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckWidth) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
-TEST(ParserA70503, ControlledTimingCheckEventWidth) {
+TEST(TimingCheckEventDefParsing, ControlledTimingCheckEventWidth) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

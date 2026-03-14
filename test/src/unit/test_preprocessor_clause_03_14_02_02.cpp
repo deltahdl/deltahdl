@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_14_TimeunitsAndTimescale) {
+TEST(DesignBuildingBlockParsing, TimeunitsAndTimescale) {
   auto r1 = ParseWithPreprocessor("module m; timeunit 1ns; endmodule\n");
   EXPECT_FALSE(r1.has_errors);
   EXPECT_TRUE(r1.cu->modules[0]->has_timeunit);
@@ -33,7 +33,7 @@ TEST(ParserClause03, Cl3_14_TimeunitsAndTimescale) {
       ParseOk("module b; timeunit 1us; timeprecision 1ns; endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_14_TimeValuesInDesignElement) {
+TEST(DesignBuildingBlockParsing, TimeValuesInDesignElement) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  timeunit 1ns;\n"

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA25, QueueDimBounded) {
+TEST(DeclarationRangeParsing, QueueDimBounded) {
   auto r = Parse("module m; int q [$:100]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -18,7 +18,7 @@ TEST(ParserA25, QueueDimBounded) {
   ASSERT_NE(item->unpacked_dims[0]->rhs, nullptr);
 }
 
-TEST(ParserSection7, QueueWithBound) {
+TEST(AggregateTypeParsing, QueueWithBound) {
   auto r = Parse(
       "module t;\n"
       "  bit q2[$:255];\n"
@@ -28,7 +28,7 @@ TEST(ParserSection7, QueueWithBound) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "q2");
 }
-TEST(ParserSection7, QueueBounded) {
+TEST(AggregateTypeParsing, QueueBounded) {
   auto r = Parse(
       "module t;\n"
       "  bit q2[$:255];\n"
@@ -40,7 +40,7 @@ TEST(ParserSection7, QueueBounded) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection7c, QueueWithMaxSize) {
+TEST(DynamicArrayAndQueueParsing, QueueWithMaxSize) {
   auto r = Parse(
       "module m;\n"
       "  int q[$:255];\n"

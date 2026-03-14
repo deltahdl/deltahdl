@@ -5,14 +5,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A2NetDeclWire) {
+TEST(FormalSyntaxParsing, NetDeclWire) {
   auto r = Parse("module m; wire [3:0] w; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kNetDecl);
 }
 
-TEST(ParserA213, NetDeclWireBasic) {
+TEST(TypeDeclParsing, NetDeclWireBasic) {
   auto r = Parse("module m; wire [7:0] data; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -21,7 +21,7 @@ TEST(ParserA213, NetDeclWireBasic) {
   EXPECT_TRUE(item->data_type.is_net);
 }
 
-TEST(ParserA213, NetDeclWithDriveStrength) {
+TEST(TypeDeclParsing, NetDeclWithDriveStrength) {
   auto r = Parse("module m; wire (strong0, weak1) w; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -30,7 +30,7 @@ TEST(ParserA213, NetDeclWithDriveStrength) {
   EXPECT_NE(item->drive_strength0, 0);
 }
 
-TEST(ParserA213, NetDeclWithDelay) {
+TEST(TypeDeclParsing, NetDeclWithDelay) {
   auto r = Parse("module m; wire #5 w; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -38,7 +38,7 @@ TEST(ParserA213, NetDeclWithDelay) {
   EXPECT_NE(item->net_delay, nullptr);
 }
 
-TEST(ParserA213, NetDeclMultipleAssign) {
+TEST(TypeDeclParsing, NetDeclMultipleAssign) {
   auto r = Parse("module m; wire a, b, c; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -49,7 +49,7 @@ TEST(ParserA213, NetDeclMultipleAssign) {
   EXPECT_GE(count, 3);
 }
 
-TEST(ParserA222, DriveStrengthOnTri) {
+TEST(StrengthParsing, DriveStrengthOnTri) {
   auto r = Parse(
       "module m;\n"
       "  tri (strong0, strong1) t;\n"
@@ -61,7 +61,7 @@ TEST(ParserA222, DriveStrengthOnTri) {
   EXPECT_EQ(item->drive_strength1, 4u);
 }
 
-TEST(ParserA222, DriveStrengthOnWand) {
+TEST(StrengthParsing, DriveStrengthOnWand) {
   auto r = Parse(
       "module m;\n"
       "  wand (pull0, pull1) w;\n"
@@ -73,7 +73,7 @@ TEST(ParserA222, DriveStrengthOnWand) {
   EXPECT_EQ(item->drive_strength1, 3u);
 }
 
-TEST(ParserA223, DelayValuePsIdentifier) {
+TEST(DelayParsing, DelayValuePsIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  parameter delay_val = 5;\n"
@@ -87,7 +87,7 @@ TEST(ParserA223, DelayValuePsIdentifier) {
   EXPECT_EQ(item->net_delay->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserA223, Delay3NetSingleValue) {
+TEST(DelayParsing, Delay3NetSingleValue) {
   auto r = Parse(
       "module m;\n"
       "  wire #5 w;\n"
@@ -101,7 +101,7 @@ TEST(ParserA223, Delay3NetSingleValue) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-TEST(ParserA223, Delay3NetMintypmax) {
+TEST(DelayParsing, Delay3NetMintypmax) {
   auto r = Parse(
       "module m;\n"
       "  wire #(1:2:3) w;\n"
@@ -113,7 +113,7 @@ TEST(ParserA223, Delay3NetMintypmax) {
   EXPECT_EQ(item->net_delay->kind, ExprKind::kMinTypMax);
 }
 
-TEST(ParserA23, ListOfNetDeclAssignmentsSingle) {
+TEST(DeclarationListParsing, ListOfNetDeclAssignmentsSingle) {
   auto r = Parse("module m; wire [7:0] data; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -124,7 +124,7 @@ TEST(ParserA23, ListOfNetDeclAssignmentsSingle) {
   EXPECT_EQ(count, 1);
 }
 
-TEST(ParserA23, ListOfNetDeclAssignmentsMultiple) {
+TEST(DeclarationListParsing, ListOfNetDeclAssignmentsMultiple) {
   auto r = Parse("module m; wire a, b, c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -135,7 +135,7 @@ TEST(ParserA23, ListOfNetDeclAssignmentsMultiple) {
   EXPECT_GE(count, 3);
 }
 
-TEST(ParserA23, ListOfNetDeclAssignmentsWithUnpackedDim) {
+TEST(DeclarationListParsing, ListOfNetDeclAssignmentsWithUnpackedDim) {
   auto r = Parse("module m; wire a [3:0], b [7:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -146,7 +146,7 @@ TEST(ParserA23, ListOfNetDeclAssignmentsWithUnpackedDim) {
   EXPECT_GE(count, 2);
 }
 
-TEST(ParserA25, NetWithUnpackedDim) {
+TEST(DeclarationRangeParsing, NetWithUnpackedDim) {
   auto r = Parse("module m; wire [7:0] bus [0:3]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -156,7 +156,7 @@ TEST(ParserA25, NetWithUnpackedDim) {
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
 }
 
-TEST(ParserSection6, Sec6_7_1_WireWithUserDefinedType) {
+TEST(DataTypeParsing, WireWithUserDefinedType) {
   auto r = Parse(
       "module t;\n"
       "  typedef logic [31:0] addressT;\n"
@@ -173,7 +173,7 @@ TEST(ParserSection6, Sec6_7_1_WireWithUserDefinedType) {
   EXPECT_EQ(items[1]->name, "w1");
 }
 
-TEST(ParserSection6, Sec6_7_1_WireDriveStrengthReversedOrder) {
+TEST(DataTypeParsing, WireDriveStrengthReversedOrder) {
   auto r = Parse(
       "module t;\n"
       "  wire (pull1, weak0) w = 1'b1;\n"
@@ -188,7 +188,7 @@ TEST(ParserSection6, Sec6_7_1_WireDriveStrengthReversedOrder) {
   EXPECT_EQ(item->drive_strength1, 3u);
 }
 
-TEST(ParserSection6, Sec6_7_1_WireWithPackedStructType) {
+TEST(DataTypeParsing, WireWithPackedStructType) {
   auto r = Parse(
       "module t;\n"
       "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
@@ -202,7 +202,7 @@ TEST(ParserSection6, Sec6_7_1_WireWithPackedStructType) {
   EXPECT_EQ(item->name, "memsig");
 }
 
-TEST(ParserSection6, Sec6_7_1_MultipleNetsExplicitType) {
+TEST(DataTypeParsing, MultipleNetsExplicitType) {
   auto r = Parse(
       "module t;\n"
       "  wire logic a, b, c;\n"
@@ -222,7 +222,7 @@ TEST(ParserSection6, Sec6_7_1_MultipleNetsExplicitType) {
   EXPECT_EQ(items[2]->name, "c");
 }
 
-TEST(ParserSection6, Sec6_7_1_NetWithExplicitBitType) {
+TEST(DataTypeParsing, NetWithExplicitBitType) {
   auto r = Parse(
       "module t;\n"
       "  tri bit [3:0] b;\n"
@@ -236,7 +236,7 @@ TEST(ParserSection6, Sec6_7_1_NetWithExplicitBitType) {
   EXPECT_EQ(item->name, "b");
 }
 
-TEST(ParserSection6, Sec6_7_1_DriveStrengthWithExplicitType) {
+TEST(DataTypeParsing, DriveStrengthWithExplicitType) {
   auto r = Parse(
       "module t;\n"
       "  wire (strong0, weak1) logic [7:0] w;\n"
@@ -250,7 +250,7 @@ TEST(ParserSection6, Sec6_7_1_DriveStrengthWithExplicitType) {
   EXPECT_EQ(item->name, "w");
 }
 
-TEST(ParserSection6, Sec6_5_WirePackedDims) {
+TEST(DataTypeParsing, WirePackedDims) {
   auto r = Parse(
       "module t;\n"
       "  wire [7:0] bus;\n"
@@ -267,7 +267,7 @@ TEST(ParserSection6, Sec6_5_WirePackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(ParserSection6, Sec6_7_1_NetImplicitSigned) {
+TEST(DataTypeParsing, NetImplicitSigned) {
   auto r = Parse(
       "module t;\n"
       "  wire signed [7:0] ws;\n"
@@ -282,7 +282,7 @@ TEST(ParserSection6, Sec6_7_1_NetImplicitSigned) {
   EXPECT_EQ(item->name, "ws");
 }
 
-TEST(ParserSection6, WireImplicitLogic) {
+TEST(DataTypeParsing, WireImplicitLogic) {
   auto r = Parse(
       "module t;\n"
       "  wire w;\n"
@@ -294,7 +294,7 @@ TEST(ParserSection6, WireImplicitLogic) {
   EXPECT_TRUE(item->data_type.is_net);
 }
 
-TEST(ParserSection6, WireWithRange) {
+TEST(DataTypeParsing, WireWithRange) {
   auto r = Parse(
       "module t;\n"
       "  wire [15:0] ww;\n"
@@ -306,7 +306,7 @@ TEST(ParserSection6, WireWithRange) {
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
 
-TEST(ParserSection6, Sec6_5_WireUnpackedDims) {
+TEST(DataTypeParsing, WireUnpackedDims) {
   auto r = Parse(
       "module t;\n"
       "  wire w [0:3];\n"
@@ -320,7 +320,7 @@ TEST(ParserSection6, Sec6_5_WireUnpackedDims) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection6, WireExplicitLogicType) {
+TEST(DataTypeParsing, WireExplicitLogicType) {
   auto r = Parse(
       "module t;\n"
       "  wire logic [7:0] w;\n"
@@ -331,7 +331,7 @@ TEST(ParserSection6, WireExplicitLogicType) {
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
 }
 
-TEST(ParserSection6, TriregDefaultInit) {
+TEST(DataTypeParsing, TriregDefaultInit) {
   auto r = Parse(
       "module t;\n"
       "  trireg t1;\n"
@@ -342,7 +342,7 @@ TEST(ParserSection6, TriregDefaultInit) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
 }
 
-TEST(ParserSection6, WireWithPackedStruct) {
+TEST(DataTypeParsing, WireWithPackedStruct) {
   auto r = Parse(
       "module t;\n"
       "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
@@ -353,7 +353,7 @@ TEST(ParserSection6, WireWithPackedStruct) {
   EXPECT_EQ(item->name, "memsig");
 }
 
-TEST(ParserSection6, WireWithTypedef) {
+TEST(DataTypeParsing, WireWithTypedef) {
   auto r = Parse(
       "module t;\n"
       "  typedef logic [31:0] addressT;\n"
@@ -365,7 +365,7 @@ TEST(ParserSection6, WireWithTypedef) {
   EXPECT_EQ(items[1]->name, "w1");
 }
 
-TEST(ParserSection6, Sec6_5_MultipleWireDecls) {
+TEST(DataTypeParsing, MultipleWireDecls) {
   auto r = Parse(
       "module t;\n"
       "  wire a, b, c;\n"
@@ -383,7 +383,7 @@ TEST(ParserSection6, Sec6_5_MultipleWireDecls) {
   EXPECT_EQ(items[2]->name, "c");
 }
 
-TEST(ParserSection6, Sec6_5_TriNetDecl) {
+TEST(DataTypeParsing, TriNetDecl) {
   auto r = Parse(
       "module t;\n"
       "  tri [3:0] bus;\n"
@@ -398,7 +398,7 @@ TEST(ParserSection6, Sec6_5_TriNetDecl) {
   EXPECT_EQ(item->name, "bus");
 }
 
-TEST(ParserSection6, WireDeclaration_Kind) {
+TEST(DataTypeParsing, WireDeclaration_Kind) {
   auto r = Parse(
       "module t;\n"
       "  wire [7:0] w;\n"
@@ -410,7 +410,7 @@ TEST(ParserSection6, WireDeclaration_Kind) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kWire);
 }
 
-TEST(ParserSection6, Sec6_7_1_WireMultipleNames) {
+TEST(DataTypeParsing, WireMultipleNames) {
   auto r = Parse(
       "module t;\n"
       "  wire a, b, c;\n"
@@ -424,7 +424,7 @@ TEST(ParserSection6, Sec6_7_1_WireMultipleNames) {
   EXPECT_EQ(items[2]->name, "c");
 }
 
-TEST(ParserSection6, WireDeclaration_Props) {
+TEST(DataTypeParsing, WireDeclaration_Props) {
   auto r = Parse(
       "module t;\n"
       "  wire [7:0] w;\n"
@@ -436,7 +436,7 @@ TEST(ParserSection6, WireDeclaration_Props) {
   EXPECT_EQ(item->name, "w");
 }
 
-TEST(ParserSection6, TriDeclaration) {
+TEST(DataTypeParsing, TriDeclaration) {
   auto r = Parse(
       "module t;\n"
       "  tri [3:0] t1;\n"
@@ -448,7 +448,7 @@ TEST(ParserSection6, TriDeclaration) {
   EXPECT_TRUE(item->data_type.is_net);
 }
 
-TEST(ParserSection6, Sec6_7_1_WireMultipleNamesAllNetDecl) {
+TEST(DataTypeParsing, WireMultipleNamesAllNetDecl) {
   auto r = Parse(
       "module t;\n"
       "  wire a, b, c;\n"
@@ -463,7 +463,7 @@ TEST(ParserSection6, Sec6_7_1_WireMultipleNamesAllNetDecl) {
   }
 }
 
-TEST(ParserSection6, Sec6_7_1_TriWithRange) {
+TEST(DataTypeParsing, TriWithRange) {
   auto r = Parse(
       "module t;\n"
       "  tri [7:0] t1;\n"
@@ -481,7 +481,7 @@ TEST(ParserSection6, Sec6_7_1_TriWithRange) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(ParserSection6, Sec6_7_1_WireExplicitLogicNoErrors) {
+TEST(DataTypeParsing, WireExplicitLogicNoErrors) {
   auto r = Parse(
       "module t;\n"
       "  wire logic [7:0] w;\n"
@@ -497,7 +497,7 @@ TEST(ParserSection6, Sec6_7_1_WireExplicitLogicNoErrors) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
 }
 
-TEST(ParserSection6, Sec6_5_WireNetDeclKind) {
+TEST(DataTypeParsing, WireNetDeclKind) {
   auto r = Parse(
       "module t;\n"
       "  wire w;\n"
@@ -512,7 +512,7 @@ TEST(ParserSection6, Sec6_5_WireNetDeclKind) {
   EXPECT_EQ(item->name, "w");
 }
 
-TEST(ParserSection6, Sec6_7_1_WireSignedQualifier) {
+TEST(DataTypeParsing, WireSignedQualifier) {
   auto r = Parse(
       "module t;\n"
       "  wire signed [7:0] s;\n"
@@ -528,7 +528,7 @@ TEST(ParserSection6, Sec6_7_1_WireSignedQualifier) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
 }
 
-TEST(ParserSection6, Sec6_7_1_WireWithBitType) {
+TEST(DataTypeParsing, WireWithBitType) {
   auto r = Parse(
       "module t;\n"
       "  wire bit [3:0] b;\n"
@@ -542,7 +542,7 @@ TEST(ParserSection6, Sec6_7_1_WireWithBitType) {
   EXPECT_EQ(item->name, "b");
 }
 
-TEST(ParserSection6, Sec6_7_1_WireWithDelay) {
+TEST(DataTypeParsing, WireWithDelay) {
   auto r = Parse(
       "module t;\n"
       "  wire #5 w;\n"
@@ -558,7 +558,7 @@ TEST(ParserSection6, Sec6_7_1_WireWithDelay) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-TEST(ParserSection6, Sec6_7_1_MixedNetTypesInModule) {
+TEST(DataTypeParsing, MixedNetTypesInModule) {
   auto r = Parse(
       "module t;\n"
       "  wire w;\n"
@@ -578,7 +578,7 @@ TEST(ParserSection6, Sec6_7_1_MixedNetTypesInModule) {
   EXPECT_EQ(items[4]->data_type.kind, DataTypeKind::kSupply1);
 }
 
-TEST(ParserSection6, Sec6_7_1_WireUnpackedDim) {
+TEST(DataTypeParsing, WireUnpackedDim) {
   auto r = Parse(
       "module t;\n"
       "  wire w [0:3];\n"
@@ -592,7 +592,7 @@ TEST(ParserSection6, Sec6_7_1_WireUnpackedDim) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection6, Sec6_7_1_WirePackedAndUnpackedDims) {
+TEST(DataTypeParsing, WirePackedAndUnpackedDims) {
   auto r = Parse(
       "module t;\n"
       "  wire [7:0] mem [0:255];\n"
@@ -607,7 +607,7 @@ TEST(ParserSection6, Sec6_7_1_WirePackedAndUnpackedDims) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection6, Sec6_7_1_WireDriveStrength) {
+TEST(DataTypeParsing, WireDriveStrength) {
   auto r = Parse(
       "module t;\n"
       "  wire (strong0, pull1) w = 1'b0;\n"
@@ -622,7 +622,7 @@ TEST(ParserSection6, Sec6_7_1_WireDriveStrength) {
   EXPECT_EQ(item->drive_strength1, 3u);
 }
 
-TEST(ParserSection6, Sec6_7_1_NetCoexistsWithVarDecl) {
+TEST(DataTypeParsing, NetCoexistsWithVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  wire [7:0] net_w;\n"
@@ -641,7 +641,7 @@ TEST(ParserSection6, Sec6_7_1_NetCoexistsWithVarDecl) {
   EXPECT_FALSE(items[2]->data_type.is_net);
 }
 
-TEST(ParserSection6, Sec6_7_1_WireRangeMultipleNames) {
+TEST(DataTypeParsing, WireRangeMultipleNames) {
   auto r = Parse(
       "module t;\n"
       "  wire [3:0] x, y, z;\n"
@@ -660,7 +660,7 @@ TEST(ParserSection6, Sec6_7_1_WireRangeMultipleNames) {
   EXPECT_EQ(items[2]->name, "z");
 }
 
-TEST(ParserSection6, Sec6_7_1_TriSignedWithRange) {
+TEST(DataTypeParsing, TriSignedWithRange) {
   auto r = Parse(
       "module t;\n"
       "  tri signed [15:0] ts;\n"
@@ -676,7 +676,7 @@ TEST(ParserSection6, Sec6_7_1_TriSignedWithRange) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 15u);
 }
 
-TEST(ParserSection6, Sec6_7_1_WandWithRange) {
+TEST(DataTypeParsing, WandWithRange) {
   auto r = Parse(
       "module t;\n"
       "  wand [31:0] bus;\n"
@@ -691,56 +691,56 @@ TEST(ParserSection6, Sec6_7_1_WandWithRange) {
   EXPECT_EQ(item->name, "bus");
 }
 
-TEST(ParserSection6, Sec6_7_1_Supply0WithRange) {
+TEST(DataTypeParsing, Supply0WithRange) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  supply0 [3:0] gnd_bus;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_7_1_Supply1WithRange) {
+TEST(DataTypeParsing, Supply1WithRange) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  supply1 [3:0] vdd_bus;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_7_1_TriRegDirectlyIsError) {
+TEST(DataTypeParsing, TriRegDirectlyIsError) {
   EXPECT_FALSE(
       ParseOk("module t;\n"
               "  tri reg r;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_7_1_WireRegDirectlyIsError) {
+TEST(DataTypeParsing, WireRegDirectlyIsError) {
   EXPECT_FALSE(
       ParseOk("module t;\n"
               "  wire reg p;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_7_1_WandRegDirectlyIsError) {
+TEST(DataTypeParsing, WandRegDirectlyIsError) {
   EXPECT_FALSE(
       ParseOk("module t;\n"
               "  wand reg w;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_7_1_WireVectoredRegOk) {
+TEST(DataTypeParsing, WireVectoredRegOk) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  wire vectored reg [7:0] r;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_7_1_WireDriveStrengthRegOk) {
+TEST(DataTypeParsing, WireDriveStrengthRegOk) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  wire (strong0, pull1) reg r = 1'b0;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_7_1_IdentifierStartingWithRegOk) {
+TEST(DataTypeParsing, IdentifierStartingWithRegOk) {
   auto r = Parse(
       "module t;\n"
       "  wire reg_name;\n"
@@ -753,7 +753,7 @@ TEST(ParserSection6, Sec6_7_1_IdentifierStartingWithRegOk) {
   EXPECT_EQ(item->name, "reg_name");
 }
 
-TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthLarge) {
+TEST(DataTypeParsing, TriregChargeStrengthLarge) {
   auto r = Parse(
       "module t;\n"
       "  trireg (large) logic #(0,0,0) cap1;\n"
@@ -768,7 +768,7 @@ TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthLarge) {
   EXPECT_EQ(item->name, "cap1");
 }
 
-TEST(ParserSection6, Sec6_7_1_Delay3RiseFallDecay) {
+TEST(DataTypeParsing, Delay3RiseFallDecay) {
   auto r = Parse(
       "module t;\n"
       "  wire #(1, 2, 3) w;\n"
@@ -782,13 +782,13 @@ TEST(ParserSection6, Sec6_7_1_Delay3RiseFallDecay) {
   EXPECT_NE(item->net_delay_decay, nullptr);
 }
 
-TEST(ParserA213, NetDeclTriregChargeStrength) {
+TEST(TypeDeclParsing, NetDeclTriregChargeStrength) {
   auto r = Parse("module m; trireg (medium) net1; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA222, ChargeStrengthMedium) {
+TEST(StrengthParsing, ChargeStrengthMedium) {
   auto r = Parse(
       "module m;\n"
       "  trireg (medium) t;\n"
@@ -799,7 +799,7 @@ TEST(ParserA222, ChargeStrengthMedium) {
   EXPECT_EQ(item->data_type.charge_strength, 2u);
 }
 
-TEST(ParserA222, ChargeStrengthNoSpecDefault) {
+TEST(StrengthParsing, ChargeStrengthNoSpecDefault) {
   auto r = Parse(
       "module m;\n"
       "  trireg t;\n"
@@ -810,7 +810,7 @@ TEST(ParserA222, ChargeStrengthNoSpecDefault) {
   EXPECT_EQ(item->data_type.charge_strength, 0u);
 }
 
-TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithLogic) {
+TEST(DataTypeParsing, TriregChargeStrengthWithLogic) {
   auto r = Parse(
       "module t;\n"
       "  trireg (large) logic cap1;\n"
@@ -824,7 +824,7 @@ TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthWithLogic) {
   EXPECT_EQ(item->name, "cap1");
 }
 
-TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthMedium) {
+TEST(DataTypeParsing, TriregChargeStrengthMedium) {
   auto r = Parse(
       "module t;\n"
       "  trireg (medium) m1;\n"
@@ -837,7 +837,7 @@ TEST(ParserSection6, Sec6_7_1_TriregChargeStrengthMedium) {
   EXPECT_EQ(item->data_type.charge_strength, 2);
 }
 
-TEST(ParserSection6, TriregChargeStrengthSmall) {
+TEST(DataTypeParsing, TriregChargeStrengthSmall) {
   auto r = Parse(
       "module t;\n"
       "  trireg (small) s1;\n"
@@ -848,7 +848,7 @@ TEST(ParserSection6, TriregChargeStrengthSmall) {
   EXPECT_EQ(item->data_type.charge_strength, 1);
 }
 
-TEST(ParserSection6, TriregChargeStrengthSignedVector) {
+TEST(DataTypeParsing, TriregChargeStrengthSignedVector) {
   auto r = Parse(
       "module t;\n"
       "  trireg (small) signed [3:0] cap2;\n"
@@ -863,7 +863,7 @@ TEST(ParserSection6, TriregChargeStrengthSignedVector) {
   EXPECT_EQ(item->name, "cap2");
 }
 
-TEST(ParserA222, DriveStrengthSupply0Weak1) {
+TEST(StrengthParsing, DriveStrengthSupply0Weak1) {
   auto r = Parse(
       "module m;\n"
       "  wire (supply0, weak1) w;\n"
@@ -876,7 +876,7 @@ TEST(ParserA222, DriveStrengthSupply0Weak1) {
   EXPECT_EQ(item->drive_strength1, 2u);
 }
 
-TEST(ParserA222, DriveStrengthWeak0Weak1) {
+TEST(StrengthParsing, DriveStrengthWeak0Weak1) {
   auto r = Parse(
       "module m;\n"
       "  wire (weak0, weak1) w;\n"
@@ -889,7 +889,7 @@ TEST(ParserA222, DriveStrengthWeak0Weak1) {
   EXPECT_EQ(item->drive_strength1, 2u);
 }
 
-TEST(ParserA222, DriveStrengthHighz0Strong1) {
+TEST(StrengthParsing, DriveStrengthHighz0Strong1) {
   auto r = Parse(
       "module m;\n"
       "  wire (highz0, strong1) w;\n"
@@ -902,7 +902,7 @@ TEST(ParserA222, DriveStrengthHighz0Strong1) {
   EXPECT_EQ(item->drive_strength1, 4u);
 }
 
-TEST(ParserA222, DriveStrengthSupply0Supply1) {
+TEST(StrengthParsing, DriveStrengthSupply0Supply1) {
   auto r = Parse(
       "module m;\n"
       "  wire (supply0, supply1) w;\n"
@@ -915,7 +915,7 @@ TEST(ParserA222, DriveStrengthSupply0Supply1) {
   EXPECT_EQ(item->drive_strength1, 5u);
 }
 
-TEST(ParserA222, DriveStrengthHighz1Pull0) {
+TEST(StrengthParsing, DriveStrengthHighz1Pull0) {
   auto r = Parse(
       "module m;\n"
       "  wire (highz1, pull0) w;\n"
@@ -928,7 +928,7 @@ TEST(ParserA222, DriveStrengthHighz1Pull0) {
   EXPECT_EQ(item->drive_strength1, 1u);
 }
 
-TEST(ParserA222, NetDeclNoDriveStrengthDefault) {
+TEST(StrengthParsing, NetDeclNoDriveStrengthDefault) {
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -941,7 +941,7 @@ TEST(ParserA222, NetDeclNoDriveStrengthDefault) {
   EXPECT_EQ(item->drive_strength1, 0u);
 }
 
-TEST(ParserSection6, Sec6_7_1_VectoredWithExplicitType) {
+TEST(DataTypeParsing, VectoredWithExplicitType) {
   auto r = Parse(
       "module t;\n"
       "  wire vectored logic [7:0] v;\n"

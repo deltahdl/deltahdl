@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection10, ProceduralAssignKind) {
+TEST(AssignmentParsing, ProceduralAssignKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg q;\n"
@@ -20,7 +20,7 @@ TEST(ParserSection10, ProceduralAssignKind) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, ProceduralAssignLhs) {
+TEST(AssignmentParsing, ProceduralAssignLhs) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg q;\n"
@@ -35,7 +35,7 @@ TEST(ParserSection10, ProceduralAssignLhs) {
   EXPECT_EQ(stmt->lhs->text, "q");
 }
 
-TEST(ParserSection10, ProceduralDeassignKind) {
+TEST(AssignmentParsing, ProceduralDeassignKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg q;\n"
@@ -50,7 +50,7 @@ TEST(ParserSection10, ProceduralDeassignKind) {
   EXPECT_EQ(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, ProceduralDeassignLhs) {
+TEST(AssignmentParsing, ProceduralDeassignLhs) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg q;\n"
@@ -64,7 +64,7 @@ TEST(ParserSection10, ProceduralDeassignLhs) {
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "q");
 }
-TEST(ParserSection10, ProceduralAssignThenDeassign) {
+TEST(AssignmentParsing, ProceduralAssignThenDeassign) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg q;\n"

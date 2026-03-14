@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA89, StaticPropertyDeclaration) {
+TEST(ClassObjectParsing, StaticPropertyDeclaration) {
   auto r = Parse(
       "class Packet;\n"
       "  static integer fileID;\n"
@@ -19,7 +19,7 @@ TEST(ParserA89, StaticPropertyDeclaration) {
   EXPECT_TRUE(cls->members[0]->is_static);
 }
 
-TEST(ParserA89, StaticPropertyWithInitializer) {
+TEST(ClassObjectParsing, StaticPropertyWithInitializer) {
   auto r = Parse(
       "class Packet;\n"
       "  static int count = 0;\n"
@@ -32,7 +32,7 @@ TEST(ParserA89, StaticPropertyWithInitializer) {
   EXPECT_NE(cls->members[0]->init_expr, nullptr);
 }
 
-TEST(ParserA89, MixedStaticAndInstanceProperties) {
+TEST(ClassObjectParsing, MixedStaticAndInstanceProperties) {
   auto r = Parse(
       "class C;\n"
       "  static int shared_val;\n"
@@ -51,7 +51,7 @@ TEST(ParserA89, MixedStaticAndInstanceProperties) {
   EXPECT_EQ(cls->members[2]->name, "name");
 }
 
-TEST(ParserA89, StaticPropertyAccessViaInstance) {
+TEST(ClassObjectParsing, StaticPropertyAccessViaInstance) {
   ParseOk(
       "class Packet;\n"
       "  static int fileID;\n"
@@ -65,7 +65,7 @@ TEST(ParserA89, StaticPropertyAccessViaInstance) {
       "endmodule\n");
 }
 
-TEST(ParserA89, StaticPropertyAccessViaScope) {
+TEST(ClassObjectParsing, StaticPropertyAccessViaScope) {
   ParseOk(
       "class Packet;\n"
       "  static int fileID;\n"

@@ -6,7 +6,7 @@
 
 using namespace delta;
 
-TEST(SimCh50603, SystemTaskDoesNotConsumeTime) {
+TEST(SystemNameSim, SystemTaskDoesNotConsumeTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -30,7 +30,7 @@ TEST(SimCh50603, SystemTaskDoesNotConsumeTime) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-TEST(SimCh50603, SystemFunctionReturnsValue) {
+TEST(SystemNameSim, SystemFunctionReturnsValue) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -40,7 +40,7 @@ TEST(SimCh50603, SystemFunctionReturnsValue) {
   EXPECT_EQ(result, 8u);
 }
 
-TEST(SimCh50603, SystemFunctionInExpression) {
+TEST(SystemNameSim, SystemFunctionInExpression) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"

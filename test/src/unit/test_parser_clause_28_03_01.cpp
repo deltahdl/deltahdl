@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_EnableWithStrengthAndDelay) {
+TEST(PrimitiveInstantiationParsing, GateInst_EnableWithStrengthAndDelay) {
   auto r = Parse(
       "module m;\n"
       "  bufif1 (weak0, weak1) #7 b1(out, in, ctrl);\n"

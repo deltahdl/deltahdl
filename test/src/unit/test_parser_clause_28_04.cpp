@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA223, Delay3GateMultipleInstances) {
+TEST(DelayParsing, Delay3GateMultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  wire y1, y2, a, b;\n"
@@ -29,7 +29,7 @@ TEST(ParserA223, Delay3GateMultipleInstances) {
   EXPECT_EQ(g2->gate_delay_fall->int_val, 6u);
 }
 
-TEST(ParserAnnexA, A3GateInstNInput) {
+TEST(FormalSyntaxParsing, GateInstNInput) {
   auto r = Parse(
       "module m;\n"
       "  and g1(y, a, b, c);\n"
@@ -45,7 +45,7 @@ TEST(ParserAnnexA, A3GateInstNInput) {
   EXPECT_EQ(gate_count, 3);
 }
 
-TEST(ParserA301, GateInst_AndBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_AndBasic) {
   auto r = Parse(
       "module m;\n"
       "  and (out, a, b);\n"
@@ -56,42 +56,42 @@ TEST(ParserA301, GateInst_AndBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA301, GateInst_NandBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_NandBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  nand (out, a, b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_OrBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_OrBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  or (out, a, b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_NorBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_NorBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  nor (out, a, b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_XorBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_XorBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  xor (out, a, b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_XnorBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_XnorBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  xnor (out, a, b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_NInputWithDelay) {
+TEST(PrimitiveInstantiationParsing, GateInst_NInputWithDelay) {
   auto r = Parse(
       "module m;\n"
       "  or #(3, 5) o1(out, a, b);\n"
@@ -103,7 +103,7 @@ TEST(ParserA301, GateInst_NInputWithDelay) {
   EXPECT_NE(g->gate_delay_fall, nullptr);
 }
 
-TEST(ParserA301, GateInst_NInputMultipleInputs) {
+TEST(PrimitiveInstantiationParsing, GateInst_NInputMultipleInputs) {
   auto r = Parse(
       "module m;\n"
       "  and (out, a, b, c, d);\n"
@@ -114,7 +114,7 @@ TEST(ParserA301, GateInst_NInputMultipleInputs) {
   EXPECT_EQ(g->gate_terminals.size(), 5u);
 }
 
-TEST(ParserA301, NInputGateInst_TwoInputs) {
+TEST(PrimitiveInstantiationParsing, NInputGateInst_TwoInputs) {
   auto r = Parse(
       "module m;\n"
       "  and a1(out, in1, in2);\n"
@@ -126,7 +126,7 @@ TEST(ParserA301, NInputGateInst_TwoInputs) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA301, NInputGateInst_FourInputs) {
+TEST(PrimitiveInstantiationParsing, NInputGateInst_FourInputs) {
   auto r = Parse(
       "module m;\n"
       "  nand n1(out, a, b, c, d);\n"
@@ -137,7 +137,7 @@ TEST(ParserA301, NInputGateInst_FourInputs) {
   EXPECT_EQ(g->gate_terminals.size(), 5u);
 }
 
-TEST(ParserA301, NInputGateInst_EightInputs) {
+TEST(PrimitiveInstantiationParsing, NInputGateInst_EightInputs) {
   auto r = Parse(
       "module m;\n"
       "  xor x1(out, a, b, c, d, e, f, g, h);\n"
@@ -148,7 +148,7 @@ TEST(ParserA301, NInputGateInst_EightInputs) {
   EXPECT_EQ(g->gate_terminals.size(), 9u);
 }
 
-TEST(ParserA301, NInputGateInst_Unnamed) {
+TEST(PrimitiveInstantiationParsing, NInputGateInst_Unnamed) {
   auto r = Parse(
       "module m;\n"
       "  or (out, a, b);\n"
@@ -159,7 +159,7 @@ TEST(ParserA301, NInputGateInst_Unnamed) {
   EXPECT_TRUE(g->gate_inst_name.empty());
 }
 
-TEST(ParserA301, GateInst_AllNInputGateTypes) {
+TEST(PrimitiveInstantiationParsing, GateInst_AllNInputGateTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  and  a1(o, i1, i2);\n"
@@ -171,7 +171,7 @@ TEST(ParserA301, GateInst_AllNInputGateTypes) {
               "endmodule\n"));
 }
 
-TEST(ParserA304, NInputGatetype_And) {
+TEST(PrimitiveGateTypeParsing, NInputGatetype_And) {
   auto r = Parse(
       "module m;\n"
       "  and (out, a, b);\n"
@@ -182,7 +182,7 @@ TEST(ParserA304, NInputGatetype_And) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, NInputGatetype_Nand) {
+TEST(PrimitiveGateTypeParsing, NInputGatetype_Nand) {
   auto r = Parse(
       "module m;\n"
       "  nand (out, a, b);\n"
@@ -193,7 +193,7 @@ TEST(ParserA304, NInputGatetype_Nand) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, NInputGatetype_Or) {
+TEST(PrimitiveGateTypeParsing, NInputGatetype_Or) {
   auto r = Parse(
       "module m;\n"
       "  or (out, a, b);\n"
@@ -204,7 +204,7 @@ TEST(ParserA304, NInputGatetype_Or) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, NInputGatetype_Nor) {
+TEST(PrimitiveGateTypeParsing, NInputGatetype_Nor) {
   auto r = Parse(
       "module m;\n"
       "  nor (out, a, b);\n"
@@ -215,7 +215,7 @@ TEST(ParserA304, NInputGatetype_Nor) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, NInputGatetype_Xor) {
+TEST(PrimitiveGateTypeParsing, NInputGatetype_Xor) {
   auto r = Parse(
       "module m;\n"
       "  xor (out, a, b);\n"
@@ -226,7 +226,7 @@ TEST(ParserA304, NInputGatetype_Xor) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, NInputGatetype_Xnor) {
+TEST(PrimitiveGateTypeParsing, NInputGatetype_Xnor) {
   auto r = Parse(
       "module m;\n"
       "  xnor (out, a, b);\n"
@@ -237,7 +237,7 @@ TEST(ParserA304, NInputGatetype_Xnor) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA223, Delay2NInputGateTwoValues) {
+TEST(DelayParsing, Delay2NInputGateTwoValues) {
   auto r = Parse(
       "module m;\n"
       "  wire y, a, b;\n"

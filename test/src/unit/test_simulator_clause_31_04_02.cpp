@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA70501, TimeskewWithFlagsSimulates) {
+TEST(TimingCheckCommandSim, TimeskewWithFlagsSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -27,7 +27,7 @@ TEST(SimA70501, TimeskewWithFlagsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SimA70502, RemainActiveFlagMinTypMaxSimulates) {
+TEST(TimingCheckArgumentSim, RemainActiveFlagMinTypMaxSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

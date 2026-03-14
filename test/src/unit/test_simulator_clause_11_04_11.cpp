@@ -61,7 +61,7 @@ TEST(EvalOpXZ, TernaryXCondDiff) {
   EXPECT_EQ(result.words[0].bval, 0b0110u);
 }
 
-TEST(SimA83, TernaryTrueBranch) {
+TEST(ExpressionSim, TernaryTrueBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -78,7 +78,7 @@ TEST(SimA83, TernaryTrueBranch) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA83, TernaryFalseBranch) {
+TEST(ExpressionSim, TernaryFalseBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -95,7 +95,7 @@ TEST(SimA83, TernaryFalseBranch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimA83, NestedTernary) {
+TEST(ExpressionSim, NestedTernary) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

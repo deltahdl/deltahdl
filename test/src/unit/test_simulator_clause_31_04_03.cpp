@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA70501, FullskewDualLimitsStored) {
+TEST(TimingCheckCommandSim, FullskewDualLimitsStored) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kFullskew;

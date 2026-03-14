@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection13, Sec13_8_TypeParameter) {
+TEST(TaskAndFunctionParsing, TypeParameter) {
   EXPECT_TRUE(
       ParseOk("virtual class Converter#(parameter type T = int);\n"
               "  static function T identity(input T val);\n"
@@ -14,7 +14,7 @@ TEST(ParserSection13, Sec13_8_TypeParameter) {
               "endclass\n"));
 }
 
-TEST(ParserSection13, Sec13_8_StaticMethodInExpr) {
+TEST(TaskAndFunctionParsing, StaticMethodInExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int val;\n"
@@ -22,7 +22,7 @@ TEST(ParserSection13, Sec13_8_StaticMethodInExpr) {
               "endmodule\n"));
 }
 
-TEST(ParserSection13, Sec13_8_VirtualClassStaticTask) {
+TEST(TaskAndFunctionParsing, VirtualClassStaticTask) {
   auto r = Parse(
       "virtual class C#(parameter W = 8);\n"
       "  static task drive(input logic [W-1:0] data);\n"
@@ -37,7 +37,7 @@ TEST(ParserSection13, Sec13_8_VirtualClassStaticTask) {
   EXPECT_EQ(r.cu->classes[0]->params[0].first, "W");
 }
 
-TEST(ParserSection13, Sec13_8_ParamInLocalVar) {
+TEST(TaskAndFunctionParsing, ParamInLocalVar) {
   EXPECT_TRUE(
       ParseOk("virtual class BitOps#(parameter W = 8);\n"
               "  static function logic [W-1:0] invert(input logic [W-1:0] x);\n"
@@ -48,7 +48,7 @@ TEST(ParserSection13, Sec13_8_ParamInLocalVar) {
               "endclass\n"));
 }
 
-TEST(ParserSection13, Sec13_8_ForLoopWithParamBound) {
+TEST(TaskAndFunctionParsing, ForLoopWithParamBound) {
   EXPECT_TRUE(
       ParseOk("virtual class Popcount#(parameter W = 8);\n"
               "  static function int count_ones(input logic [W-1:0] val);\n"
@@ -62,7 +62,7 @@ TEST(ParserSection13, Sec13_8_ForLoopWithParamBound) {
               "endclass\n"));
 }
 
-TEST(ParserSection13, Sec13_8_ReturnTypeUsesParam) {
+TEST(TaskAndFunctionParsing, ReturnTypeUsesParam) {
   EXPECT_TRUE(
       ParseOk("virtual class Pack#(parameter W = 8);\n"
               "  static function logic [2*W-1:0] double(\n"
@@ -72,7 +72,7 @@ TEST(ParserSection13, Sec13_8_ReturnTypeUsesParam) {
               "endclass\n"));
 }
 
-TEST(ParserSection13, Sec13_8_MethodsCallEachOther) {
+TEST(TaskAndFunctionParsing, MethodsCallEachOther) {
   EXPECT_TRUE(
       ParseOk("virtual class Math#(parameter W = 32);\n"
               "  static function logic [W-1:0] abs_val(\n"
@@ -86,7 +86,7 @@ TEST(ParserSection13, Sec13_8_MethodsCallEachOther) {
               "endclass\n"));
 }
 
-TEST(ParserSection13, Sec13_8_AssignParamCallResult) {
+TEST(TaskAndFunctionParsing, AssignParamCallResult) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int result;\n"
@@ -96,7 +96,7 @@ TEST(ParserSection13, Sec13_8_AssignParamCallResult) {
               "endmodule\n"));
 }
 
-TEST(ParserSection13, Sec13_8_OnlyStaticTask) {
+TEST(TaskAndFunctionParsing, OnlyStaticTask) {
   auto r = Parse(
       "virtual class Printer#(parameter int ID = 0);\n"
       "  static task print();\n"
@@ -109,7 +109,7 @@ TEST(ParserSection13, Sec13_8_OnlyStaticTask) {
   EXPECT_TRUE(r.cu->classes[0]->is_virtual);
 }
 
-TEST(ParserSection13, ParameterizedSubroutine_VirtualClassWithStaticMethod) {
+TEST(TaskAndFunctionParsing, ParameterizedSubroutine_VirtualClassWithStaticMethod) {
   auto r = Parse(
       "virtual class C#(parameter DECODE_W = 8,\n"
       "                 parameter ENCODE_W = $clog2(DECODE_W));\n"
@@ -127,7 +127,7 @@ TEST(ParserSection13, ParameterizedSubroutine_VirtualClassWithStaticMethod) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection13, ParameterizedSubroutine_ClassScopeCall) {
+TEST(TaskAndFunctionParsing, ParameterizedSubroutine_ClassScopeCall) {
   auto r = Parse(
       "module top;\n"
       "  logic [7:0] encoder_in;\n"
@@ -137,7 +137,7 @@ TEST(ParserSection13, ParameterizedSubroutine_ClassScopeCall) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection13, ParameterizedSubroutine_MultipleStaticMethods) {
+TEST(TaskAndFunctionParsing, ParameterizedSubroutine_MultipleStaticMethods) {
   auto r = Parse(
       "virtual class C#(parameter W = 4);\n"
       "  static function logic [W-1:0] encode(input logic [W-1:0] x);\n"
@@ -150,7 +150,7 @@ TEST(ParserSection13, ParameterizedSubroutine_MultipleStaticMethods) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection13, ParameterizedSubroutine_DifferentSpecializations) {
+TEST(TaskAndFunctionParsing, ParameterizedSubroutine_DifferentSpecializations) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] a;\n"

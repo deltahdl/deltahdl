@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection12, NestedIfElse) {
+TEST(ProceduralStatementParsing, NestedIfElse) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -24,7 +24,7 @@ TEST(ParserSection12, NestedIfElse) {
   EXPECT_NE(stmt->then_branch->else_branch, nullptr);
 }
 
-TEST(ParserSection12, IfWithBlockBody) {
+TEST(ProceduralStatementParsing, IfWithBlockBody) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -47,7 +47,7 @@ TEST(ParserSection12, IfWithBlockBody) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
 }
 
-TEST(ParserA606, IfOnly) {
+TEST(ConditionalSyntaxParsing, IfOnly) {
   auto r = Parse(
       "module m;\n"
       "  initial begin if (a) x = 1; end\n"
@@ -62,7 +62,7 @@ TEST(ParserA606, IfOnly) {
   EXPECT_EQ(stmt->else_branch, nullptr);
 }
 
-TEST(ParserA606, IfElse) {
+TEST(ConditionalSyntaxParsing, IfElse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin if (a) x = 1; else x = 0; end\n"
@@ -78,7 +78,7 @@ TEST(ParserA606, IfElse) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection12, IfNoElseConditionAndBranches) {
+TEST(ProceduralStatementParsing, IfNoElseConditionAndBranches) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -94,7 +94,7 @@ TEST(ParserSection12, IfNoElseConditionAndBranches) {
   EXPECT_EQ(stmt->else_branch, nullptr);
 }
 
-TEST(ParserA606, IfNullThen) {
+TEST(ConditionalSyntaxParsing, IfNullThen) {
   auto r = Parse(
       "module m;\n"
       "  initial begin if (a) ; else x = 0; end\n"
@@ -109,7 +109,7 @@ TEST(ParserA606, IfNullThen) {
   ASSERT_NE(stmt->else_branch, nullptr);
 }
 
-TEST(ParserSection12, IfWithElse) {
+TEST(ProceduralStatementParsing, IfWithElse) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -125,7 +125,7 @@ TEST(ParserSection12, IfWithElse) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-TEST(ParserA606, IfNullElse) {
+TEST(ConditionalSyntaxParsing, IfNullElse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin if (a) x = 1; else ; end\n"
@@ -139,7 +139,7 @@ TEST(ParserA606, IfNullElse) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kNull);
 }
 
-TEST(ParserA606, IfElseWithBlocks) {
+TEST(ConditionalSyntaxParsing, IfElseWithBlocks) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -163,7 +163,7 @@ TEST(ParserA606, IfElseWithBlocks) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection12, IfBlockBodyThenOnly) {
+TEST(ProceduralStatementParsing, IfBlockBodyThenOnly) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -181,7 +181,7 @@ TEST(ParserSection12, IfBlockBodyThenOnly) {
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
 }
 
-TEST(ParserA606, DanglingElse) {
+TEST(ConditionalSyntaxParsing, DanglingElse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -203,7 +203,7 @@ TEST(ParserA606, DanglingElse) {
   EXPECT_NE(stmt->then_branch->else_branch, nullptr);
 }
 
-TEST(ParserA606, ForcedElseWithBeginEnd) {
+TEST(ConditionalSyntaxParsing, ForcedElseWithBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -226,7 +226,7 @@ TEST(ParserA606, ForcedElseWithBeginEnd) {
   EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection12, PlainIfHasNoQualifier) {
+TEST(ProceduralStatementParsing, PlainIfHasNoQualifier) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -241,7 +241,7 @@ TEST(ParserSection12, PlainIfHasNoQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
 }
 
-TEST(ParserA606, NestedIfInBlock) {
+TEST(ConditionalSyntaxParsing, NestedIfInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -263,7 +263,7 @@ TEST(ParserA606, NestedIfInBlock) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlock);
 }
 
-TEST(ParserA606, ComplexCondExpression) {
+TEST(ConditionalSyntaxParsing, ComplexCondExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -278,7 +278,7 @@ TEST(ParserA606, ComplexCondExpression) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-TEST(ParserA606, IfCondFunctionCall) {
+TEST(ConditionalSyntaxParsing, IfCondFunctionCall) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -292,7 +292,7 @@ TEST(ParserA606, IfCondFunctionCall) {
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
 }
 
-TEST(ParserSection10, Sec10_4_1_NestedIfElseWithExpressions) {
+TEST(AssignmentParsing, NestedIfElseWithExpressions) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] out, a, b;\n"
@@ -322,7 +322,7 @@ TEST(ParserSection10, Sec10_4_1_NestedIfElseWithExpressions) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserA604, StmtItemConditionalStatement) {
+TEST(StatementSyntaxParsing, StmtItemConditionalStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -336,7 +336,7 @@ TEST(ParserA604, StmtItemConditionalStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
 }
 
-TEST(ParserSection12, BasicIfElse) {
+TEST(ProceduralStatementParsing, BasicIfElse) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -353,7 +353,7 @@ TEST(ParserSection12, BasicIfElse) {
   ASSERT_NE(stmt->else_branch, nullptr);
 }
 
-TEST(ParserSection12, IfWithoutElse) {
+TEST(ProceduralStatementParsing, IfWithoutElse) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -368,7 +368,7 @@ TEST(ParserSection12, IfWithoutElse) {
   EXPECT_EQ(stmt->else_branch, nullptr);
 }
 
-TEST(ParserSection9, Sec9_2_2_IfElse) {
+TEST(ProcessParsing, IfElse) {
   auto r = Parse(
       "module m;\n"
       "  logic sel, a, b, y;\n"
@@ -389,7 +389,7 @@ TEST(ParserSection9, Sec9_2_2_IfElse) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-TEST(ParserSection9, Sec9_3_1_BlockWithIfElse) {
+TEST(ProcessParsing, BlockWithIfElse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -409,7 +409,7 @@ TEST(ParserSection9, Sec9_3_1_BlockWithIfElse) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-TEST(ParserA606, CondPredicateTripleAnd) {
+TEST(ConditionalSyntaxParsing, CondPredicateTripleAnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -426,7 +426,7 @@ TEST(ParserA606, CondPredicateTripleAnd) {
   EXPECT_EQ(stmt->condition->op, TokenKind::kAmpAmpAmp);
 }
 
-TEST(ParserA606, CondPredicateChainedTripleAnd) {
+TEST(ConditionalSyntaxParsing, CondPredicateChainedTripleAnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -441,7 +441,7 @@ TEST(ParserA606, CondPredicateChainedTripleAnd) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_1_InIfElseBranches) {
+TEST(AssignmentParsing, InIfElseBranches) {
   auto r = Parse(
       "module m;\n"
       "  reg a, sel;\n"

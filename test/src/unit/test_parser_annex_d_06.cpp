@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexD, AnnexDList) {
+TEST(OptionalSystemTaskParserParsing, List) {
   auto r = Parse("module m; initial $list; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* stmt = FirstInitialStmt(r);

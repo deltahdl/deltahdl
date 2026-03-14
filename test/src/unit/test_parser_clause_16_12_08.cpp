@@ -4,14 +4,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, PropertyExpr_Implies) {
+TEST(AssertionDeclParsing, PropertyExpr_Implies) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a implies b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyExpr_Iff) {
+TEST(AssertionDeclParsing, PropertyExpr_Iff) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a iff b);\n"

@@ -9,7 +9,7 @@
 using namespace delta;
 namespace {
 
-TEST(Section21, FdisplayToFile) {
+TEST(IoSystemTaskTest, FdisplayToFile) {
   SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_fdisplay.txt";
 

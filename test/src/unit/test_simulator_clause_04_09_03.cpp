@@ -9,7 +9,7 @@
 
 using namespace delta;
 
-TEST(SimCh4093, ComputesRhsUsingCurrentValues) {
+TEST(BlockingAssignSchedulingSim, ComputesRhsUsingCurrentValues) {
   Arena arena;
   Scheduler sched(arena);
   int src = 10;
@@ -39,7 +39,7 @@ TEST(SimCh4093, ComputesRhsUsingCurrentValues) {
   EXPECT_EQ(captured_rhs, 10);
 }
 
-TEST(SimCh4093, SuspendsProcessAndSchedulesFutureEvent) {
+TEST(BlockingAssignSchedulingSim, SuspendsProcessAndSchedulesFutureEvent) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -68,7 +68,7 @@ TEST(SimCh4093, SuspendsProcessAndSchedulesFutureEvent) {
   EXPECT_EQ(order[2], "assign_complete_t10");
 }
 
-TEST(SimCh4093, ZeroDelaySchedulesInactiveEvent) {
+TEST(BlockingAssignSchedulingSim, ZeroDelaySchedulesInactiveEvent) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -97,7 +97,7 @@ TEST(SimCh4093, ZeroDelaySchedulesInactiveEvent) {
   EXPECT_EQ(order.back(), "inactive_assign");
 }
 
-TEST(SimCh4093, ZeroDelayFromReactiveSchedulesReInactive) {
+TEST(BlockingAssignSchedulingSim, ZeroDelayFromReactiveSchedulesReInactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -120,7 +120,7 @@ TEST(SimCh4093, ZeroDelayFromReactiveSchedulesReInactive) {
   EXPECT_EQ(order[1], "reinactive_assign");
 }
 
-TEST(SimCh4093, NoDelayAssignsImmediately) {
+TEST(BlockingAssignSchedulingSim, NoDelayAssignsImmediately) {
   Arena arena;
   Scheduler sched(arena);
   int dst = 0;
@@ -140,7 +140,7 @@ TEST(SimCh4093, NoDelayAssignsImmediately) {
   EXPECT_TRUE(next_stmt_executed);
 }
 
-TEST(SimCh4093, PerformsAssignmentToLhs) {
+TEST(BlockingAssignSchedulingSim, PerformsAssignmentToLhs) {
   Arena arena;
   Scheduler sched(arena);
   int dst = -1;
@@ -160,7 +160,7 @@ TEST(SimCh4093, PerformsAssignmentToLhs) {
   EXPECT_EQ(dst, 77);
 }
 
-TEST(SimCh4093, EnablesEventsOnLhsUpdate) {
+TEST(BlockingAssignSchedulingSim, EnablesEventsOnLhsUpdate) {
   Arena arena;
   Scheduler sched(arena);
   int sig = 0;
@@ -189,7 +189,7 @@ TEST(SimCh4093, EnablesEventsOnLhsUpdate) {
   EXPECT_TRUE(sensitive_triggered);
 }
 
-TEST(SimCh4093, TargetDeterminedAtResumeTime) {
+TEST(BlockingAssignSchedulingSim, TargetDeterminedAtResumeTime) {
   Arena arena;
   Scheduler sched(arena);
   int select = 0;
@@ -223,7 +223,7 @@ TEST(SimCh4093, TargetDeterminedAtResumeTime) {
   EXPECT_EQ(dst_b, 1);
 }
 
-TEST(SimCh4093, ContinuesWithNextSequentialStatement) {
+TEST(BlockingAssignSchedulingSim, ContinuesWithNextSequentialStatement) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -250,7 +250,7 @@ TEST(SimCh4093, ContinuesWithNextSequentialStatement) {
   EXPECT_EQ(order[2], "next_statement");
 }
 
-TEST(SimCh4093, ContinuesWithOtherActiveEvents) {
+TEST(BlockingAssignSchedulingSim, ContinuesWithOtherActiveEvents) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;

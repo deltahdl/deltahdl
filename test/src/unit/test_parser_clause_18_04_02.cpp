@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection18, RandcMultiDeclarator) {
+TEST(ConstrainedRandomParsing, RandcMultiDeclarator) {
   auto r = Parse(
       "class C;\n"
       "  randc bit [2:0] x, y;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection18, RandcMultiDeclarator) {
   EXPECT_GE(r.cu->classes[0]->members.size(), 2u);
 }
 
-TEST(ParserSection8, RandcQualifier) {
+TEST(ClassParsing, RandcQualifier) {
   auto r = Parse(
       "class Die;\n"
       "  randc bit [2:0] face;\n"

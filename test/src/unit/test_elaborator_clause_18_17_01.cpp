@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA612, WeightedAlternativesElaborate) {
+TEST(RandsequenceElaboration, WeightedAlternativesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

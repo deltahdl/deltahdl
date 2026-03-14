@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_04_02_01, OrSeparatedSensitivityElaborates) {
+TEST(ImplicitEventExprElaboration, OrSeparatedSensitivityElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(ElabClause09_04_02_01, OrSeparatedSensitivityElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_02_01, CommaSeparatedSensitivityElaborates) {
+TEST(ImplicitEventExprElaboration, CommaSeparatedSensitivityElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -28,7 +28,7 @@ TEST(ElabClause09_04_02_01, CommaSeparatedSensitivityElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_02_01, MixedOrAndCommaElaborates) {
+TEST(ImplicitEventExprElaboration, MixedOrAndCommaElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -40,7 +40,7 @@ TEST(ElabClause09_04_02_01, MixedOrAndCommaElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_02_01, EdgeEventsWithOrElaborates) {
+TEST(ImplicitEventExprElaboration, EdgeEventsWithOrElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -52,7 +52,7 @@ TEST(ElabClause09_04_02_01, EdgeEventsWithOrElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_02_01, SensitivityListPreservedInRtlir) {
+TEST(ImplicitEventExprElaboration, SensitivityListPreservedInRtlir) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

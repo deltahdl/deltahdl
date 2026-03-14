@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause1003, ContAssignDelayPreserved) {
+TEST(ContinuousAssignmentElaboration, ContAssignDelayPreserved) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -18,7 +18,7 @@ TEST(ElabClause1003, ContAssignDelayPreserved) {
   EXPECT_NE(mod->assigns[0].delay, nullptr);
 }
 
-TEST(ElabClause1003, ContAssignDelayRiseFall) {
+TEST(ContinuousAssignmentElaboration, ContAssignDelayRiseFall) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -34,7 +34,7 @@ TEST(ElabClause1003, ContAssignDelayRiseFall) {
   EXPECT_EQ(mod->assigns[0].delay_decay, nullptr);
 }
 
-TEST(ElabClause1003, ContAssignDelayThreeValues) {
+TEST(ContinuousAssignmentElaboration, ContAssignDelayThreeValues) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -50,7 +50,7 @@ TEST(ElabClause1003, ContAssignDelayThreeValues) {
   EXPECT_NE(mod->assigns[0].delay_decay, nullptr);
 }
 
-TEST(ElabClause100303, NettypeMultiDelay_Error) {
+TEST(AssignmentDelayElaboration, NettypeMultiDelay_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -62,7 +62,7 @@ TEST(ElabClause100303, NettypeMultiDelay_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause100303, NettypeSingleDelay_Ok) {
+TEST(AssignmentDelayElaboration, NettypeSingleDelay_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -75,7 +75,7 @@ TEST(ElabClause100303, NettypeSingleDelay_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause100303, NettypeThreeDelay_Error) {
+TEST(AssignmentDelayElaboration, NettypeThreeDelay_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -87,7 +87,7 @@ TEST(ElabClause100303, NettypeThreeDelay_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause100303, SingleDelayValue) {
+TEST(AssignmentDelayElaboration, SingleDelayValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -102,7 +102,7 @@ TEST(ElabClause100303, SingleDelayValue) {
   EXPECT_EQ(mod->assigns[0].delay->int_val, 10u);
 }
 
-TEST(ElabClause100303, RiseFallDelayValues) {
+TEST(AssignmentDelayElaboration, RiseFallDelayValues) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -119,7 +119,7 @@ TEST(ElabClause100303, RiseFallDelayValues) {
   EXPECT_EQ(mod->assigns[0].delay_fall->int_val, 10u);
 }
 
-TEST(ElabClause100303, ThreeDelayValues) {
+TEST(AssignmentDelayElaboration, ThreeDelayValues) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -138,7 +138,7 @@ TEST(ElabClause100303, ThreeDelayValues) {
   EXPECT_EQ(mod->assigns[0].delay_decay->int_val, 15u);
 }
 
-TEST(ElabClause100303, NoDelay) {
+TEST(AssignmentDelayElaboration, NoDelay) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

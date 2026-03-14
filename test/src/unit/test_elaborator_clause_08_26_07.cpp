@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA8267, VirtualClassPartialImplOk) {
+TEST(InterfaceClassExtendElaboration, VirtualClassPartialImplOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfClass;\n"
              "  pure virtual function bit funcA();\n"
@@ -20,7 +20,7 @@ TEST(ElabA8267, VirtualClassPartialImplOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA8267, ConcreteClassCompletesPartialOk) {
+TEST(InterfaceClassExtendElaboration, ConcreteClassCompletesPartialOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfClass;\n"
              "  pure virtual function bit funcA();\n"
@@ -41,7 +41,7 @@ TEST(ElabA8267, ConcreteClassCompletesPartialOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA8267, VirtualClassNoImplOk) {
+TEST(InterfaceClassExtendElaboration, VirtualClassNoImplOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfClass;\n"
              "  pure virtual function bit funcA();\n"

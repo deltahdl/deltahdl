@@ -59,7 +59,7 @@ TEST(CompiledSim, ExecuteIfElse) {
   EXPECT_EQ(out->value.ToUint64(), 0u);
 }
 
-TEST(SimA606, IfTrueTakesThenBranch) {
+TEST(ConditionalStatementSim, IfTrueTakesThenBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -79,7 +79,7 @@ TEST(SimA606, IfTrueTakesThenBranch) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA606, IfFalseTakesElseBranch) {
+TEST(ConditionalStatementSim, IfFalseTakesElseBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -99,7 +99,7 @@ TEST(SimA606, IfFalseTakesElseBranch) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimA606, IfFalseNoElse) {
+TEST(ConditionalStatementSim, IfFalseNoElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -119,7 +119,7 @@ TEST(SimA606, IfFalseNoElse) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA606, IfNonzeroIsTruthy) {
+TEST(ConditionalStatementSim, IfNonzeroIsTruthy) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -139,7 +139,7 @@ TEST(SimA606, IfNonzeroIsTruthy) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA606, NestedIfBothLevels) {
+TEST(ConditionalStatementSim, NestedIfBothLevels) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -163,7 +163,7 @@ TEST(SimA606, NestedIfBothLevels) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SimA606, NestedIfOuterTrueInnerFalse) {
+TEST(ConditionalStatementSim, NestedIfOuterTrueInnerFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -187,7 +187,7 @@ TEST(SimA606, NestedIfOuterTrueInnerFalse) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-TEST(SimA606, IfInsideForLoop) {
+TEST(ConditionalStatementSim, IfInsideForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -209,7 +209,7 @@ TEST(SimA606, IfInsideForLoop) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(SimA606, SequentialIfStatements) {
+TEST(ConditionalStatementSim, SequentialIfStatements) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -231,7 +231,7 @@ TEST(SimA606, SequentialIfStatements) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimA606, IfConditionZIsFalse) {
+TEST(ConditionalStatementSim, IfConditionZIsFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -253,7 +253,7 @@ TEST(SimA606, IfConditionZIsFalse) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA606, IfConditionXIsFalse) {
+TEST(ConditionalStatementSim, IfConditionXIsFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -275,7 +275,7 @@ TEST(SimA606, IfConditionXIsFalse) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA606, IfConditionZTakesElse) {
+TEST(ConditionalStatementSim, IfConditionZTakesElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -297,7 +297,7 @@ TEST(SimA606, IfConditionZTakesElse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimA606, IfConditionPartiallyKnownNonzeroIsTrue) {
+TEST(ConditionalStatementSim, IfConditionPartiallyKnownNonzeroIsTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -9,7 +9,7 @@
 using namespace delta;
 namespace {
 
-TEST(Section21, Ungetc) {
+TEST(IoSystemTaskTest, Ungetc) {
   SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_ungetc.txt";
   {

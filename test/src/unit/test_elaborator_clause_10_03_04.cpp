@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause1003, Validate_IllegalDriveStrengthHighz0Highz1) {
+TEST(ContinuousAssignmentElaboration, Validate_IllegalDriveStrengthHighz0Highz1) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -15,7 +15,7 @@ TEST(ElabClause1003, Validate_IllegalDriveStrengthHighz0Highz1) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ElabClause1003, Validate_IllegalDriveStrengthHighz1Highz0) {
+TEST(ContinuousAssignmentElaboration, Validate_IllegalDriveStrengthHighz1Highz0) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -26,7 +26,7 @@ TEST(ElabClause1003, Validate_IllegalDriveStrengthHighz1Highz0) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ElabClause1003, Validate_LegalDriveStrengthHighz0Strong1) {
+TEST(ContinuousAssignmentElaboration, Validate_LegalDriveStrengthHighz0Strong1) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -37,7 +37,7 @@ TEST(ElabClause1003, Validate_LegalDriveStrengthHighz0Strong1) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(ElabClause100304, DriveStrengthOnVectorNet_Error) {
+TEST(DriveStrengthElaboration, DriveStrengthOnVectorNet_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -48,7 +48,7 @@ TEST(ElabClause100304, DriveStrengthOnVectorNet_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ElabClause100304, DriveStrengthOnScalarNet_Ok) {
+TEST(DriveStrengthElaboration, DriveStrengthOnScalarNet_Ok) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -59,7 +59,7 @@ TEST(ElabClause100304, DriveStrengthOnScalarNet_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(ElabClause100304, DriveStrengthOnSupply0Net_NoError) {
+TEST(DriveStrengthElaboration, DriveStrengthOnSupply0Net_NoError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -69,7 +69,7 @@ TEST(ElabClause100304, DriveStrengthOnSupply0Net_NoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(ElabClause100304, DefaultStrengthIsZero) {
+TEST(DriveStrengthElaboration, DefaultStrengthIsZero) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -84,7 +84,7 @@ TEST(ElabClause100304, DefaultStrengthIsZero) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 0u);
 }
 
-TEST(ElabClause100304, StrengthPreservedInRtlir) {
+TEST(DriveStrengthElaboration, StrengthPreservedInRtlir) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -99,7 +99,7 @@ TEST(ElabClause100304, StrengthPreservedInRtlir) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);
 }
 
-TEST(ElabClause100304, NetDeclStrengthScalar_Ok) {
+TEST(DriveStrengthElaboration, NetDeclStrengthScalar_Ok) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -109,7 +109,7 @@ TEST(ElabClause100304, NetDeclStrengthScalar_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(ElabClause100304, NetDeclStrengthVector_Error) {
+TEST(DriveStrengthElaboration, NetDeclStrengthVector_Error) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"

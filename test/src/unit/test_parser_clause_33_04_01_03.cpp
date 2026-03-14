@@ -39,7 +39,7 @@ TEST_F(ApiParseTest, ConfigInstanceClauseLiblist) {
   EXPECT_EQ(inst_rule->liblist[0], "gateLib");
 }
 
-TEST(ParserSection34, ConfigWithInstanceAndLiblist) {
+TEST(ProtectedEnvelopeParsing, ConfigWithInstanceAndLiblist) {
   auto r = Parse(R"(
     config inst_cfg;
       design work.top;

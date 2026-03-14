@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection16, Sec16_5_1_NamedAssertInAlways) {
+TEST(AssertionParsing, NamedAssertInAlways) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  always @(posedge clk) begin\n"
@@ -14,7 +14,7 @@ TEST(ParserSection16, Sec16_5_1_NamedAssertInAlways) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, Sec16_5_1_AssertPropertyInAlwaysBlock) {
+TEST(AssertionParsing, AssertPropertyInAlwaysBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  always @(posedge clk) begin\n"

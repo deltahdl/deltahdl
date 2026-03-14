@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA824, OutOfBlockFuncOk) {
+TEST(ParameterizedClassElaboration, OutOfBlockFuncOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
              "  extern function int foo();\n"
@@ -16,7 +16,7 @@ TEST(ElabA824, OutOfBlockFuncOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA824, OutOfBlockTaskOk) {
+TEST(ParameterizedClassElaboration, OutOfBlockTaskOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
              "  extern task run();\n"
@@ -27,7 +27,7 @@ TEST(ElabA824, OutOfBlockTaskOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA824, UnknownClassError) {
+TEST(ParameterizedClassElaboration, UnknownClassError) {
   EXPECT_FALSE(
       ElabOk("function int UnknownClass::foo();\n"
              "  return 0;\n"
@@ -36,7 +36,7 @@ TEST(ElabA824, UnknownClassError) {
              "endmodule\n"));
 }
 
-TEST(ElabA824, NoMatchingExternError) {
+TEST(ParameterizedClassElaboration, NoMatchingExternError) {
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  function int bar(); endfunction\n"
@@ -48,7 +48,7 @@ TEST(ElabA824, NoMatchingExternError) {
              "endmodule\n"));
 }
 
-TEST(ElabA824, DuplicateOutOfBlockError) {
+TEST(ParameterizedClassElaboration, DuplicateOutOfBlockError) {
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  extern function int foo();\n"
@@ -63,7 +63,7 @@ TEST(ElabA824, DuplicateOutOfBlockError) {
              "endmodule\n"));
 }
 
-TEST(ElabA824, OutOfBlockConstructorOk) {
+TEST(ParameterizedClassElaboration, OutOfBlockConstructorOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
              "  extern function new();\n"
@@ -74,7 +74,7 @@ TEST(ElabA824, OutOfBlockConstructorOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA824, NoExternNoOutOfBlockOk) {
+TEST(ParameterizedClassElaboration, NoExternNoOutOfBlockOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
              "  function int foo(); endfunction\n"

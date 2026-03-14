@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA823, ScopeResolutionTypedefOk) {
+TEST(ClassScopeResolutionElaboration, ScopeResolutionTypedefOk) {
   EXPECT_TRUE(
       ElabOk("class Cfg;\n"
              "  typedef int my_type;\n"
@@ -14,7 +14,7 @@ TEST(ElabA823, ScopeResolutionTypedefOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA823, ScopeResolutionStaticMethodOk) {
+TEST(ClassScopeResolutionElaboration, ScopeResolutionStaticMethodOk) {
   EXPECT_TRUE(
       ElabOk("class Utils;\n"
              "  static function void compute();\n"
@@ -25,7 +25,7 @@ TEST(ElabA823, ScopeResolutionStaticMethodOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA823, ScopeResolutionParameterOk) {
+TEST(ClassScopeResolutionElaboration, ScopeResolutionParameterOk) {
   EXPECT_TRUE(
       ElabOk("class Cfg;\n"
              "  parameter int WIDTH = 8;\n"
@@ -35,7 +35,7 @@ TEST(ElabA823, ScopeResolutionParameterOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA823, NestedClassDeclOk) {
+TEST(ClassScopeResolutionElaboration, NestedClassDeclOk) {
   EXPECT_TRUE(
       ElabOk("class Outer;\n"
              "  class Inner;\n"
@@ -46,7 +46,7 @@ TEST(ElabA823, NestedClassDeclOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA823, SuperclassScopeAccessOk) {
+TEST(ClassScopeResolutionElaboration, SuperclassScopeAccessOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  static int count;\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, ReadmemhBasicCall) {
+TEST(IoSystemTaskParsing, ReadmemhBasicCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  reg [7:0] mem [0:255];\n"
@@ -14,7 +14,7 @@ TEST(ParserSection21, ReadmemhBasicCall) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, ReadmemhWithAddresses) {
+TEST(IoSystemTaskParsing, ReadmemhWithAddresses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  reg [7:0] mem [0:255];\n"
@@ -22,7 +22,7 @@ TEST(ParserSection21, ReadmemhWithAddresses) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, ReadmembBasicCall) {
+TEST(IoSystemTaskParsing, ReadmembBasicCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  reg [7:0] mem [0:255];\n"
@@ -30,7 +30,7 @@ TEST(ParserSection21, ReadmembBasicCall) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, ReadmembWithAddresses) {
+TEST(IoSystemTaskParsing, ReadmembWithAddresses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  reg [7:0] mem [0:255];\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA27, TaskBodyNewStyleBlockItemDecl) {
+TEST(TaskDeclParsing, TaskBodyNewStyleBlockItemDecl) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(input int x);\n"
@@ -19,7 +19,7 @@ TEST(ParserA27, TaskBodyNewStyleBlockItemDecl) {
   EXPECT_GE(item->func_body_stmts.size(), 1u);
 }
 
-TEST(ParserA27, TaskBodyWithStatements) {
+TEST(TaskDeclParsing, TaskBodyWithStatements) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(input int x);\n"
@@ -33,7 +33,7 @@ TEST(ParserA27, TaskBodyWithStatements) {
   EXPECT_GE(item->func_body_stmts.size(), 2u);
 }
 
-TEST(ParserA27, TfPortDeclOldStyleVar) {
+TEST(TaskDeclParsing, TfPortDeclOldStyleVar) {
   auto r = Parse(
       "module m;\n"
       "  task my_task;\n"
@@ -48,7 +48,7 @@ TEST(ParserA27, TfPortDeclOldStyleVar) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
 }
 
-TEST(ParserA27, TfPortItemVar) {
+TEST(TaskDeclParsing, TfPortItemVar) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(var int x);\n"

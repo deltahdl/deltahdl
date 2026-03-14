@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaborator, Sec6_6_4_2_ExplicitDecayTime) {
+TEST(Elaborator, ExplicitDecayTime) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -24,7 +24,7 @@ TEST(Elaborator, Sec6_6_4_2_ExplicitDecayTime) {
   EXPECT_TRUE(found);
 }
 
-TEST(Elaborator, Sec6_6_4_2_NoDecaySpecMeansIdeal) {
+TEST(Elaborator, NoDecaySpecMeansIdeal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -44,7 +44,7 @@ TEST(Elaborator, Sec6_6_4_2_NoDecaySpecMeansIdeal) {
   EXPECT_TRUE(found);
 }
 
-TEST(Elaborator, Sec6_6_4_2_TwoDelayNoDecayIdeal) {
+TEST(Elaborator, TwoDelayNoDecayIdeal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -64,7 +64,7 @@ TEST(Elaborator, Sec6_6_4_2_TwoDelayNoDecayIdeal) {
   EXPECT_TRUE(found);
 }
 
-TEST(Elaborator, Sec6_6_4_2_DecayTimeZeroIsIdeal) {
+TEST(Elaborator, DecayTimeZeroIsIdeal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

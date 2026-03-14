@@ -2,7 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, ProgramWithDataAndInitialElaborates) {
+TEST(DesignBuildingBlockElaboration, ProgramWithDataAndInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program p;\n"
@@ -18,7 +18,7 @@ TEST(ElabClause03, ProgramWithDataAndInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, ProgramWithSubroutinesElaborates) {
+TEST(DesignBuildingBlockElaboration, ProgramWithSubroutinesElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program p;\n"
@@ -33,7 +33,7 @@ TEST(ElabClause03, ProgramWithSubroutinesElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, ProgramWithPortsElaborates) {
+TEST(DesignBuildingBlockElaboration, ProgramWithPortsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program p(input clk, input [16:1] addr, inout [7:0] data);\n"
@@ -46,7 +46,7 @@ TEST(ElabClause03, ProgramWithPortsElaborates) {
   EXPECT_EQ(design->top_modules[0]->ports.size(), 3u);
 }
 
-TEST(ElabClause03, ProgramWithClassElaborates) {
+TEST(DesignBuildingBlockElaboration, ProgramWithClassElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program p;\n"
@@ -59,7 +59,7 @@ TEST(ElabClause03, ProgramWithClassElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, SampleProgramElaborates) {
+TEST(DesignBuildingBlockElaboration, SampleProgramElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program test (input clk, input [16:1] addr, inout [7:0] data);\n"

@@ -141,7 +141,7 @@ TEST(StructPattern, MixedPrecedence) {
   EXPECT_EQ(result.ToUint64(), expected);
 }
 
-TEST(SimA60701, NamedStructPatternWithDefault) {
+TEST(PatternSim, NamedStructPatternWithDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -162,7 +162,7 @@ TEST(SimA60701, NamedStructPatternWithDefault) {
   EXPECT_EQ(var->value.ToUint64(), 2659u);
 }
 
-TEST(SimA60701, NamedStructPatternOnlyDefault) {
+TEST(PatternSim, NamedStructPatternOnlyDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

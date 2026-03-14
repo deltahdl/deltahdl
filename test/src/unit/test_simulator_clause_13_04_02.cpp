@@ -74,7 +74,7 @@ TEST(Functions, StaticFunctionWithArgs) {
   EXPECT_EQ(EvalExpr(c3, f.ctx, f.arena).ToUint64(), 10u);
 }
 
-TEST(Sim1342, StaticFunctionVarsPersist) {
+TEST(FunctionBodySim, StaticFunctionVarsPersist) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -93,7 +93,7 @@ TEST(Sim1342, StaticFunctionVarsPersist) {
   EXPECT_EQ(val, 3u);
 }
 
-TEST(Sim1342, AutomaticFunctionVarsFresh) {
+TEST(FunctionBodySim, AutomaticFunctionVarsFresh) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -112,7 +112,7 @@ TEST(Sim1342, AutomaticFunctionVarsFresh) {
   EXPECT_EQ(val, 1u);
 }
 
-TEST(Sim1342, DefaultFunctionIsStatic) {
+TEST(FunctionBodySim, DefaultFunctionIsStatic) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -130,7 +130,7 @@ TEST(Sim1342, DefaultFunctionIsStatic) {
   EXPECT_EQ(val, 2u);
 }
 
-TEST(Sim1342, StaticVarInAutoFuncPersists) {
+TEST(FunctionBodySim, StaticVarInAutoFuncPersists) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -149,7 +149,7 @@ TEST(Sim1342, StaticVarInAutoFuncPersists) {
   EXPECT_EQ(val, 3u);
 }
 
-TEST(Sim1342, AutoVarInStaticFuncFresh) {
+TEST(FunctionBodySim, AutoVarInStaticFuncFresh) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -168,7 +168,7 @@ TEST(Sim1342, AutoVarInStaticFuncFresh) {
   EXPECT_EQ(val, 11u);
 }
 
-TEST(Sim1342, RecursiveAutoFunction) {
+TEST(FunctionBodySim, RecursiveAutoFunction) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"

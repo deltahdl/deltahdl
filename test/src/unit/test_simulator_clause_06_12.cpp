@@ -49,7 +49,7 @@ TEST(RealTypes, IsRealVariable) {
   EXPECT_FALSE(f.ctx.IsRealVariable("i"));
 }
 
-TEST(SimA87, NumberReal) {
+TEST(NumberSim, NumberReal) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

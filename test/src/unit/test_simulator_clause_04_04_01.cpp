@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh441, ActiveRegionSetMembership) {
+TEST(SchedulerRegionSetSim, ActiveRegionSetMembership) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -36,7 +36,7 @@ TEST(SimCh441, ActiveRegionSetMembership) {
   EXPECT_EQ(order[4], 5);
 }
 
-TEST(SimCh441, ReactiveRegionSetMembership) {
+TEST(SchedulerRegionSetSim, ReactiveRegionSetMembership) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -62,7 +62,7 @@ TEST(SimCh441, ReactiveRegionSetMembership) {
   EXPECT_EQ(order[4], 5);
 }
 
-TEST(SimCh441, ActiveSetBeforeReactiveSet) {
+TEST(SchedulerRegionSetSim, ActiveSetBeforeReactiveSet) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -80,7 +80,7 @@ TEST(SimCh441, ActiveSetBeforeReactiveSet) {
   EXPECT_EQ(order[3], "renba");
 }
 
-TEST(SimCh441, IterativeRegionsAre14) {
+TEST(SchedulerRegionSetSim, IterativeRegionsAre14) {
   Arena arena;
   Scheduler sched(arena);
 
@@ -103,7 +103,7 @@ TEST(SimCh441, IterativeRegionsAre14) {
   EXPECT_EQ(count, 14);
 }
 
-TEST(SimCh441, NonIterativeRegionsAre3) {
+TEST(SchedulerRegionSetSim, NonIterativeRegionsAre3) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -126,13 +126,13 @@ TEST(SimCh441, NonIterativeRegionsAre3) {
   EXPECT_EQ(order[2], 3);
 }
 
-TEST(SimCh441, IterativePlusNonIterativeEquals17) {
+TEST(SchedulerRegionSetSim, IterativePlusNonIterativeEquals17) {
   constexpr size_t kIterativeCount = 14;
   constexpr size_t kNonIterativeCount = 3;
   EXPECT_EQ(kIterativeCount + kNonIterativeCount, kRegionCount);
 }
 
-TEST(SimCh441, ActiveSetFeedbackReiterates) {
+TEST(SchedulerRegionSetSim, ActiveSetFeedbackReiterates) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -153,7 +153,7 @@ TEST(SimCh441, ActiveSetFeedbackReiterates) {
   EXPECT_EQ(order[1], "nba");
 }
 
-TEST(SimCh441, ReactiveSetFeedbackReiterates) {
+TEST(SchedulerRegionSetSim, ReactiveSetFeedbackReiterates) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -173,7 +173,7 @@ TEST(SimCh441, ReactiveSetFeedbackReiterates) {
   EXPECT_EQ(order[1], "renba");
 }
 
-TEST(SimCh441, ReactiveRestartsActiveSetIteration) {
+TEST(SchedulerRegionSetSim, ReactiveRestartsActiveSetIteration) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -198,7 +198,7 @@ TEST(SimCh441, ReactiveRestartsActiveSetIteration) {
   EXPECT_EQ(order[2], "active2");
 }
 
-TEST(SimCh441, BothSetsInSameTimeSlot) {
+TEST(SchedulerRegionSetSim, BothSetsInSameTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
   int timestep_count = 0;
@@ -217,7 +217,7 @@ TEST(SimCh441, BothSetsInSameTimeSlot) {
   EXPECT_EQ(timestep_count, 1);
 }
 
-TEST(SimCh441, ActiveSetCompletesBeforeObservedReactive) {
+TEST(SchedulerRegionSetSim, ActiveSetCompletesBeforeObservedReactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -235,7 +235,7 @@ TEST(SimCh441, ActiveSetCompletesBeforeObservedReactive) {
   EXPECT_EQ(order[3], "observed");
 }
 
-TEST(SimCh441, ObservedRegionsBridgeActivAndReactive) {
+TEST(SchedulerRegionSetSim, ObservedRegionsBridgeActivAndReactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -255,13 +255,13 @@ TEST(SimCh441, ObservedRegionsBridgeActivAndReactive) {
   EXPECT_EQ(order[4], "reactive");
 }
 
-TEST(SimCh441, PrePostponedIsLastIterativeRegion) {
+TEST(SchedulerRegionSetSim, PrePostponedIsLastIterativeRegion) {
   VerifyThreeRegionOrder({Region::kPostReNBA, "post_renba"},
                          {Region::kPrePostponed, "pre_postponed"},
                          {Region::kPostponed, "postponed"});
 }
 
-TEST(SimCh441, ProcessReactiveContextFlag) {
+TEST(SchedulerRegionSetSim, ProcessReactiveContextFlag) {
   Process proc;
 
   EXPECT_FALSE(proc.is_reactive);
@@ -270,7 +270,7 @@ TEST(SimCh441, ProcessReactiveContextFlag) {
   EXPECT_TRUE(proc.is_reactive);
 }
 
-TEST(SimCh441, AllRegionsCategorizedAndProcessed) {
+TEST(SchedulerRegionSetSim, AllRegionsCategorizedAndProcessed) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;

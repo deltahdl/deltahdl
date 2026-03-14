@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA81, ReplicationBasic) {
+TEST(ConcatenationSim, ReplicationBasic) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -24,7 +24,7 @@ TEST(SimA81, ReplicationBasic) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-TEST(SimA81, ReplicationFour) {
+TEST(ConcatenationSim, ReplicationFour) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -42,7 +42,7 @@ TEST(SimA81, ReplicationFour) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-TEST(SimA81, ReplicationMultipleInner) {
+TEST(ConcatenationSim, ReplicationMultipleInner) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -60,7 +60,7 @@ TEST(SimA81, ReplicationMultipleInner) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5A5u);
 }
 
-TEST(ElabA81, ReplicationInContAssign) {
+TEST(ConcatenationElaboration, ReplicationInContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -73,7 +73,7 @@ TEST(ElabA81, ReplicationInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA81, ReplicateInInitialBlock) {
+TEST(ConcatenationElaboration, ReplicateInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -86,7 +86,7 @@ TEST(ElabA81, ReplicateInInitialBlock) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA81, ConstantMultipleConcatInParam) {
+TEST(ConcatenationElaboration, ConstantMultipleConcatInParam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

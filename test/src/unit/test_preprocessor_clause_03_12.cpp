@@ -13,7 +13,7 @@ static const ModuleItem* FindInstByModule(const std::vector<ModuleItem*>& items,
 
 namespace {
 
-TEST(ParserClause03, Cl3_12_CompilationAndElaboration) {
+TEST(DesignBuildingBlockParsing, CompilationAndElaboration) {
   auto r = ParseWithPreprocessor(
       "package pkg; typedef logic [7:0] byte_t; endpackage\n"
       "module adder #(parameter W = 8) (\n"

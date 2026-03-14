@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabCh44, AlwaysCombInfersSensitivityFromBody) {
+TEST(StratifiedSchedulerElaboration, AlwaysCombInfersSensitivityFromBody) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(ElabCh44, AlwaysCombInfersSensitivityFromBody) {
   EXPECT_FALSE(mod->processes[0].sensitivity.empty());
 }
 
-TEST(ElabCh44, AlwaysLatchInfersSensitivityFromBody) {
+TEST(StratifiedSchedulerElaboration, AlwaysLatchInfersSensitivityFromBody) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -34,7 +34,7 @@ TEST(ElabCh44, AlwaysLatchInfersSensitivityFromBody) {
   EXPECT_FALSE(mod->processes[0].sensitivity.empty());
 }
 
-TEST(ElabCh44, AlwaysFFPreservesExplicitSensitivity) {
+TEST(StratifiedSchedulerElaboration, AlwaysFFPreservesExplicitSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -50,7 +50,7 @@ TEST(ElabCh44, AlwaysFFPreservesExplicitSensitivity) {
   EXPECT_EQ(mod->processes[0].sensitivity[0].edge, Edge::kPosedge);
 }
 
-TEST(ElabCh44, PlainAlwaysPreservesExplicitSensitivity) {
+TEST(StratifiedSchedulerElaboration, PlainAlwaysPreservesExplicitSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -66,7 +66,7 @@ TEST(ElabCh44, PlainAlwaysPreservesExplicitSensitivity) {
   EXPECT_EQ(mod->processes[0].sensitivity[0].edge, Edge::kPosedge);
 }
 
-TEST(ElabCh44, InitialHasNoSensitivity) {
+TEST(StratifiedSchedulerElaboration, InitialHasNoSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -80,7 +80,7 @@ TEST(ElabCh44, InitialHasNoSensitivity) {
   EXPECT_TRUE(mod->processes[0].sensitivity.empty());
 }
 
-TEST(ElabCh44, FinalHasNoSensitivity) {
+TEST(StratifiedSchedulerElaboration, FinalHasNoSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -93,7 +93,7 @@ TEST(ElabCh44, FinalHasNoSensitivity) {
   EXPECT_TRUE(mod->processes[0].sensitivity.empty());
 }
 
-TEST(ElabCh44, AlwaysCombMultipleReadsInferMultipleSensitivities) {
+TEST(StratifiedSchedulerElaboration, AlwaysCombMultipleReadsInferMultipleSensitivities) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -108,7 +108,7 @@ TEST(ElabCh44, AlwaysCombMultipleReadsInferMultipleSensitivities) {
   EXPECT_GE(mod->processes[0].sensitivity.size(), 2u);
 }
 
-TEST(ElabCh44, AlwaysFFNegedgeSensitivity) {
+TEST(StratifiedSchedulerElaboration, AlwaysFFNegedgeSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -124,7 +124,7 @@ TEST(ElabCh44, AlwaysFFNegedgeSensitivity) {
   EXPECT_EQ(mod->processes[0].sensitivity[0].edge, Edge::kNegedge);
 }
 
-TEST(ElabCh44, InferredSensitivityEdgeIsNone) {
+TEST(StratifiedSchedulerElaboration, InferredSensitivityEdgeIsNone) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -139,7 +139,7 @@ TEST(ElabCh44, InferredSensitivityEdgeIsNone) {
   EXPECT_EQ(mod->processes[0].sensitivity[0].edge, Edge::kNone);
 }
 
-TEST(ElabCh44, AlwaysFFWithResetSensitivity) {
+TEST(StratifiedSchedulerElaboration, AlwaysFFWithResetSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -158,7 +158,7 @@ TEST(ElabCh44, AlwaysFFWithResetSensitivity) {
   EXPECT_EQ(mod->processes[0].sensitivity[1].edge, Edge::kNegedge);
 }
 
-TEST(ElabCh44, AlwaysCombDoesNotIncludeWrittenVarsInSensitivity) {
+TEST(StratifiedSchedulerElaboration, AlwaysCombDoesNotIncludeWrittenVarsInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -175,7 +175,7 @@ TEST(ElabCh44, AlwaysCombDoesNotIncludeWrittenVarsInSensitivity) {
   EXPECT_EQ(mod->processes[0].sensitivity.size(), 1u);
 }
 
-TEST(ElabCh44, MultipleAlwaysCombProcessesIndependentSensitivity) {
+TEST(StratifiedSchedulerElaboration, MultipleAlwaysCombProcessesIndependentSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -192,7 +192,7 @@ TEST(ElabCh44, MultipleAlwaysCombProcessesIndependentSensitivity) {
   EXPECT_FALSE(mod->processes[1].sensitivity.empty());
 }
 
-TEST(ElabCh44, PlainAlwaysWithStarSensitivity) {
+TEST(StratifiedSchedulerElaboration, PlainAlwaysWithStarSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

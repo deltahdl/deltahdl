@@ -7,11 +7,11 @@
 
 using namespace delta;
 
-TEST(SimCh4091, ContinuousAssignmentCorrespondsToProcess) {
+TEST(ContinuousAssignSchedulingSim, ContinuousAssignmentCorrespondsToProcess) {
   VerifyCACorrespondsToProcess();
 }
 
-TEST(SimCh4091, SensitiveToSourceElements) {
+TEST(ContinuousAssignSchedulingSim, SensitiveToSourceElements) {
   Arena arena;
   Scheduler sched(arena);
   int a = 0;
@@ -44,11 +44,11 @@ TEST(SimCh4091, SensitiveToSourceElements) {
   EXPECT_EQ(unrelated, 99);
 }
 
-TEST(SimCh4091, SchedulesActiveUpdateEvent) {
+TEST(ContinuousAssignSchedulingSim, SchedulesActiveUpdateEvent) {
   VerifyCASchedulesActiveUpdateEvent();
 }
 
-TEST(SimCh4091, UsesCurrentValuesToDetermineTarget) {
+TEST(ContinuousAssignSchedulingSim, UsesCurrentValuesToDetermineTarget) {
   Arena arena;
   Scheduler sched(arena);
   int select = 0;
@@ -76,7 +76,7 @@ TEST(SimCh4091, UsesCurrentValuesToDetermineTarget) {
   EXPECT_EQ(dst_b, 0);
 }
 
-TEST(SimCh4091, EvaluatedAtTimeZeroForConstantPropagation) {
+TEST(ContinuousAssignSchedulingSim, EvaluatedAtTimeZeroForConstantPropagation) {
   Arena arena;
   Scheduler sched(arena);
   int dst = -1;
@@ -96,7 +96,7 @@ TEST(SimCh4091, EvaluatedAtTimeZeroForConstantPropagation) {
   EXPECT_EQ(sched.CurrentTime().ticks, 0u);
 }
 
-TEST(SimCh4091, TimeZeroEvalBeforeProceduralReads) {
+TEST(ContinuousAssignSchedulingSim, TimeZeroEvalBeforeProceduralReads) {
   Arena arena;
   Scheduler sched(arena);
   int net_val = -1;
@@ -122,7 +122,7 @@ TEST(SimCh4091, TimeZeroEvalBeforeProceduralReads) {
   EXPECT_EQ(read_val, 7);
 }
 
-TEST(SimCh4091, ImplicitContinuousAssignmentFromInputPort) {
+TEST(ContinuousAssignSchedulingSim, ImplicitContinuousAssignmentFromInputPort) {
   Arena arena;
   Scheduler sched(arena);
   int outside_sig = 0;
@@ -143,7 +143,7 @@ TEST(SimCh4091, ImplicitContinuousAssignmentFromInputPort) {
   EXPECT_EQ(local_input, 5);
 }
 
-TEST(SimCh4091, ImplicitContinuousAssignmentFromOutputPort) {
+TEST(ContinuousAssignSchedulingSim, ImplicitContinuousAssignmentFromOutputPort) {
   Arena arena;
   Scheduler sched(arena);
   int local_output = 0;
@@ -164,7 +164,7 @@ TEST(SimCh4091, ImplicitContinuousAssignmentFromOutputPort) {
   EXPECT_EQ(outside_net, 33);
 }
 
-TEST(SimCh4091, MultipleContinuousAssignmentsToSameNet) {
+TEST(ContinuousAssignSchedulingSim, MultipleContinuousAssignmentsToSameNet) {
   Arena arena;
   Scheduler sched(arena);
   int driver_a = 0;
@@ -198,7 +198,7 @@ TEST(SimCh4091, MultipleContinuousAssignmentsToSameNet) {
   EXPECT_TRUE(net == 1 || net == 2);
 }
 
-TEST(SimCh4091, NoUpdateWhenExpressionUnchanged) {
+TEST(ContinuousAssignSchedulingSim, NoUpdateWhenExpressionUnchanged) {
   Arena arena;
   Scheduler sched(arena);
   int src = 5;
@@ -240,7 +240,7 @@ TEST(SimCh4091, NoUpdateWhenExpressionUnchanged) {
   EXPECT_EQ(update_count, 1);
 }
 
-TEST(SimCh4, ContinuousAssignAsProcess) {
+TEST(SchedulingSemanticsSim, ContinuousAssignAsProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

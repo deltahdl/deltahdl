@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA051, SequentialInitialOne) {
+TEST(UdpDeclGrammar, SequentialInitialOne) {
   auto r = Parse(
       "primitive latch(output reg q, input d, input en);\n"
       "  initial q = 1'b1;\n"
@@ -22,7 +22,7 @@ TEST(ParserAnnexA051, SequentialInitialOne) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-TEST(ParserAnnexA053, InitStmt_Parsed) {
+TEST(UdpBodyGrammar, InitStmt_Parsed) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
       "  initial q = 0;\n"

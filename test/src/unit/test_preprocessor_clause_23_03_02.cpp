@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_3_DesignElementInstantiations) {
+TEST(DesignBuildingBlockParsing, DesignElementInstantiations) {
   auto r = ParseWithPreprocessor(
       "module child; endmodule\n"
       "module top;\n"

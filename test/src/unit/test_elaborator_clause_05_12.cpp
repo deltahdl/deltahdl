@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause05, Cl5_12_DefaultValueBitOne) {
+TEST(LexicalConventionElaboration, DefaultValueBitOne) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -23,7 +23,7 @@ TEST(ElabClause05, Cl5_12_DefaultValueBitOne) {
   EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 1);
 }
 
-TEST(ElabClause05, Cl5_12_AttrValueFromLiteral) {
+TEST(LexicalConventionElaboration, AttrValueFromLiteral) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -38,7 +38,7 @@ TEST(ElabClause05, Cl5_12_AttrValueFromLiteral) {
   EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 8);
 }
 
-TEST(ElabClause05, Cl5_12_AttrValueFromConstExpr) {
+TEST(LexicalConventionElaboration, AttrValueFromConstExpr) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -52,7 +52,7 @@ TEST(ElabClause05, Cl5_12_AttrValueFromConstExpr) {
   EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 8);
 }
 
-TEST(ElabClause05, Cl5_12_AttrValueZero) {
+TEST(LexicalConventionElaboration, AttrValueZero) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -66,7 +66,7 @@ TEST(ElabClause05, Cl5_12_AttrValueZero) {
   EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 0);
 }
 
-TEST(ElabClause05, Cl5_12_AttrValueString) {
+TEST(LexicalConventionElaboration, AttrValueString) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -80,7 +80,7 @@ TEST(ElabClause05, Cl5_12_AttrValueString) {
   EXPECT_EQ(mod->variables[0].attrs[0].string_value, "synthesis");
 }
 
-TEST(ElabClause05, Cl5_12_DuplicateAttrLastWins) {
+TEST(LexicalConventionElaboration, DuplicateAttrLastWins) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -100,7 +100,7 @@ TEST(ElabClause05, Cl5_12_DuplicateAttrLastWins) {
   EXPECT_EQ(depth_count, 1);
 }
 
-TEST(ElabClause05, Cl5_12_DuplicateAttrWarning) {
+TEST(LexicalConventionElaboration, DuplicateAttrWarning) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -110,7 +110,7 @@ TEST(ElabClause05, Cl5_12_DuplicateAttrWarning) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-TEST(ElabClause05, Cl5_12_DuplicateAttrAcrossInstances) {
+TEST(LexicalConventionElaboration, DuplicateAttrAcrossInstances) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -133,7 +133,7 @@ TEST(ElabClause05, Cl5_12_DuplicateAttrAcrossInstances) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-TEST(ElabClause05, Cl5_12_AttrOnVarDecl) {
+TEST(LexicalConventionElaboration, AttrOnVarDecl) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -147,7 +147,7 @@ TEST(ElabClause05, Cl5_12_AttrOnVarDecl) {
   EXPECT_EQ(mod->variables[0].attrs[0].name, "fsm_state");
 }
 
-TEST(ElabClause05, Cl5_12_AttrOnNetDecl) {
+TEST(LexicalConventionElaboration, AttrOnNetDecl) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -161,7 +161,7 @@ TEST(ElabClause05, Cl5_12_AttrOnNetDecl) {
   EXPECT_EQ(mod->nets[0].attrs[0].name, "mark");
 }
 
-TEST(ElabClause05, Cl5_12_AttrOnContAssign) {
+TEST(LexicalConventionElaboration, AttrOnContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -176,7 +176,7 @@ TEST(ElabClause05, Cl5_12_AttrOnContAssign) {
   EXPECT_EQ(mod->assigns[0].attrs[0].name, "synthesis_on");
 }
 
-TEST(ElabClause05, Cl5_12_AttrOnModuleInst) {
+TEST(LexicalConventionElaboration, AttrOnModuleInst) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module sub(input a);\n"
@@ -193,7 +193,7 @@ TEST(ElabClause05, Cl5_12_AttrOnModuleInst) {
   EXPECT_EQ(mod->children[0].attrs[0].name, "optimize_power");
 }
 
-TEST(ElabClause05, Cl5_12_AttrOnModuleDefinition) {
+TEST(LexicalConventionElaboration, AttrOnModuleDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "(* optimize_power *)\n"
@@ -206,7 +206,7 @@ TEST(ElabClause05, Cl5_12_AttrOnModuleDefinition) {
   EXPECT_EQ(mod->attrs[0].name, "optimize_power");
 }
 
-TEST(ElabClause05, Cl5_12_AttrOnProcess) {
+TEST(LexicalConventionElaboration, AttrOnProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -222,7 +222,7 @@ TEST(ElabClause05, Cl5_12_AttrOnProcess) {
   EXPECT_EQ(mod->processes[0].attrs[0].name, "synthesis");
 }
 
-TEST(ElabClause05, Cl5_12_MultipleDistinctAttrs) {
+TEST(LexicalConventionElaboration, MultipleDistinctAttrs) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

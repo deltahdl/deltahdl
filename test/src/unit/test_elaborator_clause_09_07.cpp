@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_07, ProcessVarDeclElaborates) {
+TEST(FineGrainProcessControlElaboration, ProcessVarDeclElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -18,7 +18,7 @@ TEST(ElabClause09_07, ProcessVarDeclElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_07, ProcessSelfElaborates) {
+TEST(FineGrainProcessControlElaboration, ProcessSelfElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -31,7 +31,7 @@ TEST(ElabClause09_07, ProcessSelfElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_07, ProcessMethodCallsElaborate) {
+TEST(FineGrainProcessControlElaboration, ProcessMethodCallsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -49,7 +49,7 @@ TEST(ElabClause09_07, ProcessMethodCallsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_07, ProcessStateEnumElaborates) {
+TEST(FineGrainProcessControlElaboration, ProcessStateEnumElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -65,7 +65,7 @@ TEST(ElabClause09_07, ProcessStateEnumElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_07, ProcessInForkElaborates) {
+TEST(FineGrainProcessControlElaboration, ProcessInForkElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

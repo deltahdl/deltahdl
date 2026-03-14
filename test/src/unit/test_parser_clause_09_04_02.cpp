@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA605, EdgeIdentifiers) {
+TEST(TimingControlSyntaxParsing, EdgeIdentifiers) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -22,7 +22,7 @@ TEST(ParserA605, EdgeIdentifiers) {
   EXPECT_EQ(stmt->events[2].edge, Edge::kEdge);
 }
 
-TEST(ParserSection9, EventControlEdge) {
+TEST(ProcessParsing, EventControlEdge) {
   auto r = Parse(
       "module m;\n"
       "  reg [3:0] a;\n"
@@ -36,7 +36,7 @@ TEST(ParserSection9, EventControlEdge) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kEdge);
 }
 
-TEST(ParserSection9c, EventControlAtIdentifier) {
+TEST(ProcessTimingAndControlParsing, EventControlAtIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -49,7 +49,7 @@ TEST(ParserSection9c, EventControlAtIdentifier) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
-TEST(ParserSection9, EventControlBareSignal) {
+TEST(ProcessParsing, EventControlBareSignal) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -64,7 +64,7 @@ TEST(ParserSection9, EventControlBareSignal) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
 }
 
-TEST(ParserSection4, Sec4_5_PosedgeEventControl) {
+TEST(SchedulingSemanticsParsing, PosedgeEventControl) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a;\n"
@@ -82,7 +82,7 @@ TEST(ParserSection4, Sec4_5_PosedgeEventControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserSection4, Sec4_5_NegedgeEventControl) {
+TEST(SchedulingSemanticsParsing, NegedgeEventControl) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a;\n"
@@ -100,7 +100,7 @@ TEST(ParserSection4, Sec4_5_NegedgeEventControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserSection9c, EventControlNullStatement) {
+TEST(ProcessTimingAndControlParsing, EventControlNullStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -115,7 +115,7 @@ TEST(ParserSection9c, EventControlNullStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
-TEST(ParserSection9c, BackToBackEventControls) {
+TEST(ProcessTimingAndControlParsing, BackToBackEventControls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -147,7 +147,7 @@ TEST(Parser, EventWaitWithParens) {
   EXPECT_EQ(stmt->events[0].signal->text, "ev");
 }
 
-TEST(ParserA604, StmtItemProceduralTimingControlEvent) {
+TEST(StatementSyntaxParsing, StmtItemProceduralTimingControlEvent) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -161,7 +161,7 @@ TEST(ParserA604, StmtItemProceduralTimingControlEvent) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
-TEST(ParserA605, ProceduralTimingControlEvent) {
+TEST(TimingControlSyntaxParsing, ProceduralTimingControlEvent) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -177,7 +177,7 @@ TEST(ParserA605, ProceduralTimingControlEvent) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserA605, ProceduralTimingControlEventNull) {
+TEST(TimingControlSyntaxParsing, ProceduralTimingControlEventNull) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -193,7 +193,7 @@ TEST(ParserA605, ProceduralTimingControlEventNull) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
 }
 
-TEST(ParserA605, EventControlBareIdentifier) {
+TEST(TimingControlSyntaxParsing, EventControlBareIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -210,7 +210,7 @@ TEST(ParserA605, EventControlBareIdentifier) {
   EXPECT_NE(stmt->events[0].signal, nullptr);
 }
 
-TEST(ParserA605, EventControlParenthesized) {
+TEST(TimingControlSyntaxParsing, EventControlParenthesized) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -225,7 +225,7 @@ TEST(ParserA605, EventControlParenthesized) {
   ASSERT_EQ(stmt->events.size(), 1u);
 }
 
-TEST(ParserA605, ClockingEventPosedge) {
+TEST(TimingControlSyntaxParsing, ClockingEventPosedge) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -240,7 +240,7 @@ TEST(ParserA605, ClockingEventPosedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-TEST(ParserA605, ClockingEventNegedge) {
+TEST(TimingControlSyntaxParsing, ClockingEventNegedge) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -255,7 +255,7 @@ TEST(ParserA605, ClockingEventNegedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
 }
 
-TEST(ParserA605, EventExprEdge) {
+TEST(TimingControlSyntaxParsing, EventExprEdge) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -270,7 +270,7 @@ TEST(ParserA605, EventExprEdge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kEdge);
 }
 
-TEST(ParserA605, EventExprAnyChange) {
+TEST(TimingControlSyntaxParsing, EventExprAnyChange) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -285,7 +285,7 @@ TEST(ParserA605, EventExprAnyChange) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
 }
 
-TEST(ParserA605, ProceduralTimingControlEventControl) {
+TEST(TimingControlSyntaxParsing, ProceduralTimingControlEventControl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -299,7 +299,7 @@ TEST(ParserA605, ProceduralTimingControlEventControl) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
-TEST(ParserSection15, WaitForEventBasicAt) {
+TEST(InterprocessSyncParsing, WaitForEventBasicAt) {
   auto r = Parse(
       "module m;\n"
       "  event e;\n"
@@ -313,7 +313,7 @@ TEST(ParserSection15, WaitForEventBasicAt) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
 }
 
-TEST(ParserSection15, WaitForEventParenthesized) {
+TEST(InterprocessSyncParsing, WaitForEventParenthesized) {
   auto r = Parse(
       "module m;\n"
       "  event e;\n"
@@ -328,7 +328,7 @@ TEST(ParserSection15, WaitForEventParenthesized) {
   ASSERT_EQ(stmt->events.size(), 1u);
 }
 
-TEST(ParserSection15, WaitForEventPosedge) {
+TEST(InterprocessSyncParsing, WaitForEventPosedge) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -343,7 +343,7 @@ TEST(ParserSection15, WaitForEventPosedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-TEST(ParserSection9, Sec9_3_1_BlockWithEventControl) {
+TEST(ProcessParsing, BlockWithEventControl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -379,7 +379,7 @@ TEST(Parser, EventWaitBareIdentifier) {
   EXPECT_EQ(stmt->events[0].signal->text, "ev");
 }
 
-TEST(ParserSection9, EventControlPosedgeKind) {
+TEST(ProcessParsing, EventControlPosedgeKind) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -393,7 +393,7 @@ TEST(ParserSection9, EventControlPosedgeKind) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserSection9, EventControlPosedgeEdge) {
+TEST(ProcessParsing, EventControlPosedgeEdge) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -407,7 +407,7 @@ TEST(ParserSection9, EventControlPosedgeEdge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-TEST(ParserSection9, EventControlNegedge) {
+TEST(ProcessParsing, EventControlNegedge) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

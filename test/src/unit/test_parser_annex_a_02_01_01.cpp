@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {}
 
-TEST(ParserA211, LocalparamExplicitType) {
+TEST(CovergroupDeclParsing, LocalparamExplicitType) {
   auto r = Parse("module m; localparam int X = 5; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserA211, LocalparamExplicitType) {
   EXPECT_EQ(item->name, "X");
 }
 
-TEST(ParserA211, LocalparamImplicitType) {
+TEST(CovergroupDeclParsing, LocalparamImplicitType) {
   auto r = Parse("module m; localparam X = 42; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -24,7 +24,7 @@ TEST(ParserA211, LocalparamImplicitType) {
   EXPECT_EQ(item->name, "X");
 }
 
-TEST(ParserA211, LocalparamPackedDimImplicit) {
+TEST(CovergroupDeclParsing, LocalparamPackedDimImplicit) {
   auto r = Parse("module m; localparam [7:0] MASK = 8'hFF; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -33,7 +33,7 @@ TEST(ParserA211, LocalparamPackedDimImplicit) {
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
 
-TEST(ParserA211, LocalparamTypeParam) {
+TEST(CovergroupDeclParsing, LocalparamTypeParam) {
   auto r = Parse("module m; localparam type T = int; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -42,7 +42,7 @@ TEST(ParserA211, LocalparamTypeParam) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kVoid);
 }
 
-TEST(ParserA211, ParameterExplicitType) {
+TEST(CovergroupDeclParsing, ParameterExplicitType) {
   auto r = Parse("module m; parameter int WIDTH = 8; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -51,7 +51,7 @@ TEST(ParserA211, ParameterExplicitType) {
   EXPECT_EQ(item->name, "WIDTH");
 }
 
-TEST(ParserA211, ParameterImplicitType) {
+TEST(CovergroupDeclParsing, ParameterImplicitType) {
   auto r = Parse("module m; parameter SIZE = 16; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -59,7 +59,7 @@ TEST(ParserA211, ParameterImplicitType) {
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
 }
 
-TEST(ParserA211, ParameterPackedDim) {
+TEST(CovergroupDeclParsing, ParameterPackedDim) {
   auto r = Parse("module m; parameter [31:0] ADDR = 0; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -67,7 +67,7 @@ TEST(ParserA211, ParameterPackedDim) {
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
 
-TEST(ParserA211, ParameterTypeParam) {
+TEST(CovergroupDeclParsing, ParameterTypeParam) {
   auto r = Parse("module m; parameter type BusType = logic [7:0]; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -75,19 +75,19 @@ TEST(ParserA211, ParameterTypeParam) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kVoid);
 }
 
-TEST(ParserA211, ParameterStringType) {
+TEST(CovergroupDeclParsing, ParameterStringType) {
   auto r = Parse("module m; parameter string NAME = \"hello\"; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA211, ParameterRealType) {
+TEST(CovergroupDeclParsing, ParameterRealType) {
   auto r = Parse("module m; parameter real PI = 3.14; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA211, TypeParamForwardEnum) {
+TEST(CovergroupDeclParsing, TypeParamForwardEnum) {
   auto r = Parse("module m; parameter type enum E = my_enum_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -96,28 +96,28 @@ TEST(ParserA211, TypeParamForwardEnum) {
   EXPECT_EQ(item->name, "E");
 }
 
-TEST(ParserA211, TypeParamForwardStruct) {
+TEST(CovergroupDeclParsing, TypeParamForwardStruct) {
   auto r = Parse("module m; parameter type struct S = my_struct_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "S");
 }
 
-TEST(ParserA211, TypeParamForwardUnion) {
+TEST(CovergroupDeclParsing, TypeParamForwardUnion) {
   auto r = Parse("module m; parameter type union U = my_union_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "U");
 }
 
-TEST(ParserA211, TypeParamForwardClass) {
+TEST(CovergroupDeclParsing, TypeParamForwardClass) {
   auto r = Parse("module m; parameter type class C = my_class_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "C");
 }
 
-TEST(ParserA211, TypeParamForwardInterfaceClass) {
+TEST(CovergroupDeclParsing, TypeParamForwardInterfaceClass) {
   auto r = Parse(
       "module m;\n"
       "  parameter type interface class IC = my_ifc_t;\n"
@@ -127,7 +127,7 @@ TEST(ParserA211, TypeParamForwardInterfaceClass) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "IC");
 }
 
-TEST(ParserA211, ListOfParamAssignments) {
+TEST(CovergroupDeclParsing, ListOfParamAssignments) {
   auto r = Parse("module m; parameter int A = 1, B = 2, C = 3; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -138,7 +138,7 @@ TEST(ParserA211, ListOfParamAssignments) {
   EXPECT_GE(param_count, 3);
 }
 
-TEST(ParserA211, ListOfLocalparamAssignments) {
+TEST(CovergroupDeclParsing, ListOfLocalparamAssignments) {
   auto r = Parse("module m; localparam int X = 10, Y = 20; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -149,7 +149,7 @@ TEST(ParserA211, ListOfLocalparamAssignments) {
   EXPECT_GE(param_count, 2);
 }
 
-TEST(ParserA211, ListOfTypeAssignments) {
+TEST(CovergroupDeclParsing, ListOfTypeAssignments) {
   auto r = Parse("module m; parameter type T1 = int, T2 = real; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -160,7 +160,7 @@ TEST(ParserA211, ListOfTypeAssignments) {
   EXPECT_GE(param_count, 2);
 }
 
-TEST(ParserA211, SpecparamBasic) {
+TEST(CovergroupDeclParsing, SpecparamBasic) {
   auto r = Parse(
       "module m;\n"
       "  specify specparam tRISE = 100; endspecify\n"
@@ -169,7 +169,7 @@ TEST(ParserA211, SpecparamBasic) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA211, SpecparamPackedDim) {
+TEST(CovergroupDeclParsing, SpecparamPackedDim) {
   auto r = Parse(
       "module m;\n"
       "  specify specparam [31:0] tDELAY = 50; endspecify\n"
@@ -178,7 +178,7 @@ TEST(ParserA211, SpecparamPackedDim) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA211, SpecparamMultipleAssignments) {
+TEST(CovergroupDeclParsing, SpecparamMultipleAssignments) {
   auto r = Parse(
       "module m;\n"
       "  specify specparam tRISE = 100, tFALL = 50; endspecify\n"
@@ -187,19 +187,19 @@ TEST(ParserA211, SpecparamMultipleAssignments) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA211, SpecparamOutsideSpecify) {
+TEST(CovergroupDeclParsing, SpecparamOutsideSpecify) {
   auto r = Parse("module m; specparam tPD = 10; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
 }
 
-TEST(ParserA211, ParamAssignmentNoDefault) {
+TEST(CovergroupDeclParsing, ParamAssignmentNoDefault) {
   auto r = Parse("module m #(parameter int P)(); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-TEST(ParserAnnexA, A2ParamDecl) {
+TEST(FormalSyntaxParsing, ParamDecl) {
   auto r = Parse(
       "module m;\n"
       "  parameter int WIDTH = 16;\n"

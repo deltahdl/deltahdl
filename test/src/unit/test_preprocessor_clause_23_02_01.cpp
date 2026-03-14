@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, ModuleWithoutBeginKeywords) {
+TEST(CompilerDirectiveParsing, ModuleWithoutBeginKeywords) {
   auto r = ParseWithPreprocessor(
       "module m1;\n"
       "endmodule\n");
@@ -14,7 +14,7 @@ TEST(ParserSection22, ModuleWithoutBeginKeywords) {
   EXPECT_EQ(r.cu->modules[0]->name, "m1");
 }
 
-TEST(ParserClause03, Cl3_3_ModuleEndLabel) {
+TEST(DesignBuildingBlockParsing, ModuleEndLabel) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "endmodule : m\n");
@@ -55,7 +55,7 @@ TEST(Parser, EmptyModule) {
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
-TEST(ParserSection6, ModuleLifetimeStatic) {
+TEST(DataTypeParsing, ModuleLifetimeStatic) {
   auto r = ParseWithPreprocessor("module static t; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);

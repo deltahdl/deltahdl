@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_06_02, DisableNamedBlockElaborates) {
+TEST(DisableStatementElaboration, DisableNamedBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -20,7 +20,7 @@ TEST(ElabClause09_06_02, DisableNamedBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_06_02, DisableTaskElaborates) {
+TEST(DisableStatementElaboration, DisableTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -36,7 +36,7 @@ TEST(ElabClause09_06_02, DisableTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_06_02, DisableFromOtherProcessElaborates) {
+TEST(DisableStatementElaboration, DisableFromOtherProcessElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -55,7 +55,7 @@ TEST(ElabClause09_06_02, DisableFromOtherProcessElaborates) {
   EXPECT_EQ(design->top_modules[0]->processes.size(), 2u);
 }
 
-TEST(ElabClause09_06_02, DisableConditionalElaborates) {
+TEST(DisableStatementElaboration, DisableConditionalElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -72,7 +72,7 @@ TEST(ElabClause09_06_02, DisableConditionalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_06_02, DisableInAlwaysElaborates) {
+TEST(DisableStatementElaboration, DisableInAlwaysElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

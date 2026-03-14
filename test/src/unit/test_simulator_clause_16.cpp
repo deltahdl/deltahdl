@@ -23,7 +23,7 @@ struct SimCh16Fixture {
   SvaEngine engine;
 };
 
-TEST(SimCh16, AssertPropertySimpleBooleanPass) {
+TEST(ConcurrentAssertionSim, AssertPropertySimpleBooleanPass) {
   SimCh16Fixture f;
   DeferredAssertion da;
   da.condition_val = 1;
@@ -38,7 +38,7 @@ TEST(SimCh16, AssertPropertySimpleBooleanPass) {
   EXPECT_TRUE(pass_invoked);
 }
 
-TEST(SimCh16, AssertPropertySimpleBooleanFail) {
+TEST(ConcurrentAssertionSim, AssertPropertySimpleBooleanFail) {
   SimCh16Fixture f;
   DeferredAssertion da;
   da.condition_val = 0;
@@ -53,7 +53,7 @@ TEST(SimCh16, AssertPropertySimpleBooleanFail) {
   EXPECT_TRUE(fail_invoked);
 }
 
-TEST(SimCh16, AssertPropertyWithPassActionBlock) {
+TEST(ConcurrentAssertionSim, AssertPropertyWithPassActionBlock) {
   DeferredAssertion da;
   da.condition_val = 1;
   int pass_count = 0;
@@ -63,7 +63,7 @@ TEST(SimCh16, AssertPropertyWithPassActionBlock) {
   EXPECT_EQ(pass_count, 1);
 }
 
-TEST(SimCh16, AssertPropertyWithFailActionBlock) {
+TEST(ConcurrentAssertionSim, AssertPropertyWithFailActionBlock) {
   DeferredAssertion da;
   da.condition_val = 0;
   int fail_count = 0;
@@ -73,7 +73,7 @@ TEST(SimCh16, AssertPropertyWithFailActionBlock) {
   EXPECT_EQ(fail_count, 1);
 }
 
-TEST(SimCh16, AssertPropertyWithBothPassAndFailActions) {
+TEST(ConcurrentAssertionSim, AssertPropertyWithBothPassAndFailActions) {
   bool pass_called = false;
   bool fail_called = false;
 
@@ -97,7 +97,7 @@ TEST(SimCh16, AssertPropertyWithBothPassAndFailActions) {
   EXPECT_TRUE(fail_called);
 }
 
-TEST(SimCh16, AssumePropertySimplePass) {
+TEST(ConcurrentAssertionSim, AssumePropertySimplePass) {
   DeferredAssertion da;
   da.condition_val = 1;
   da.instance_name = "assume_pass";
@@ -108,7 +108,7 @@ TEST(SimCh16, AssumePropertySimplePass) {
   EXPECT_TRUE(pass_called);
 }
 
-TEST(SimCh16, AssumePropertySimpleFail) {
+TEST(ConcurrentAssertionSim, AssumePropertySimpleFail) {
   DeferredAssertion da;
   da.condition_val = 0;
   da.instance_name = "assume_fail";
@@ -119,7 +119,7 @@ TEST(SimCh16, AssumePropertySimpleFail) {
   EXPECT_TRUE(fail_called);
 }
 
-TEST(SimCh16, CoverPropertyMatchTriggersAction) {
+TEST(ConcurrentAssertionSim, CoverPropertyMatchTriggersAction) {
   DeferredAssertion da;
   da.condition_val = 1;
   da.instance_name = "cover_match";
@@ -130,7 +130,7 @@ TEST(SimCh16, CoverPropertyMatchTriggersAction) {
   EXPECT_TRUE(action_called);
 }
 
-TEST(SimCh16, CoverPropertyNoMatchNoAction) {
+TEST(ConcurrentAssertionSim, CoverPropertyNoMatchNoAction) {
   DeferredAssertion da;
   da.condition_val = 0;
   da.instance_name = "cover_no_match";
@@ -143,12 +143,12 @@ TEST(SimCh16, CoverPropertyNoMatchNoAction) {
   EXPECT_FALSE(action_called);
 }
 
-TEST(SimCh16, AssertPropertyOverlappingImplication) {
+TEST(ConcurrentAssertionSim, AssertPropertyOverlappingImplication) {
   EXPECT_EQ(EvalImplication(true, true, false), PropertyResult::kPass);
   EXPECT_EQ(EvalImplication(true, false, false), PropertyResult::kFail);
 }
 
-TEST(SimCh16, AssertPropertyNonOverlappingImplication) {
+TEST(ConcurrentAssertionSim, AssertPropertyNonOverlappingImplication) {
   auto result = EvalImplication(true, false, true);
   EXPECT_EQ(result, PropertyResult::kPending);
 
@@ -157,21 +157,21 @@ TEST(SimCh16, AssertPropertyNonOverlappingImplication) {
   EXPECT_EQ(ResolveNonOverlapping(false), PropertyResult::kFail);
 }
 
-TEST(SimCh16, AssertPropertyVacuousPassAntecedentFalse) {
+TEST(ConcurrentAssertionSim, AssertPropertyVacuousPassAntecedentFalse) {
   EXPECT_EQ(EvalImplication(false, false, false), PropertyResult::kVacuousPass);
   EXPECT_EQ(EvalImplication(false, true, false), PropertyResult::kVacuousPass);
   EXPECT_EQ(EvalImplication(false, false, true), PropertyResult::kVacuousPass);
   EXPECT_EQ(EvalImplication(false, true, true), PropertyResult::kVacuousPass);
 }
 
-TEST(SimCh16, AssertPropertyDisableIffConditionTrue) {
+TEST(ConcurrentAssertionSim, AssertPropertyDisableIffConditionTrue) {
   EXPECT_EQ(EvalWithDisableIff(true, PropertyResult::kFail),
             PropertyResult::kVacuousPass);
   EXPECT_EQ(EvalWithDisableIff(true, PropertyResult::kPass),
             PropertyResult::kVacuousPass);
 }
 
-TEST(SimCh16, AssertPropertyDisableIffConditionFalse) {
+TEST(ConcurrentAssertionSim, AssertPropertyDisableIffConditionFalse) {
   EXPECT_EQ(EvalWithDisableIff(false, PropertyResult::kPass),
             PropertyResult::kPass);
   EXPECT_EQ(EvalWithDisableIff(false, PropertyResult::kFail),
@@ -180,7 +180,7 @@ TEST(SimCh16, AssertPropertyDisableIffConditionFalse) {
             PropertyResult::kVacuousPass);
 }
 
-TEST(SimCh16, AssertPropertySequenceDelay) {
+TEST(ConcurrentAssertionSim, AssertPropertySequenceDelay) {
   SvaSequence seq;
   seq.kind = SvaSequenceKind::kDelay;
   seq.delay_cycles = 3;
@@ -193,7 +193,7 @@ TEST(SimCh16, AssertPropertySequenceDelay) {
   EXPECT_FALSE(MatchDelaySequence(seq, vals_fail));
 }
 
-TEST(SimCh16, AssertPropertyConsecutiveRepetition) {
+TEST(ConcurrentAssertionSim, AssertPropertyConsecutiveRepetition) {
   SvaSequence seq;
   seq.kind = SvaSequenceKind::kConsecutiveRepetition;
   seq.rep_min = 4;
@@ -207,7 +207,7 @@ TEST(SimCh16, AssertPropertyConsecutiveRepetition) {
   EXPECT_FALSE(MatchRepetition(seq, {1, 1, 1}));
 }
 
-TEST(SimCh16, AssertPropertyGotoRepetition) {
+TEST(ConcurrentAssertionSim, AssertPropertyGotoRepetition) {
   SvaSequence seq;
   seq.kind = SvaSequenceKind::kGotoRepetition;
   seq.rep_min = 3;
@@ -221,7 +221,7 @@ TEST(SimCh16, AssertPropertyGotoRepetition) {
   EXPECT_FALSE(MatchGotoRepetition(seq, {0, 1, 0, 1}));
 }
 
-TEST(SimCh16, AssertPropertyNonConsecutiveRepetition) {
+TEST(ConcurrentAssertionSim, AssertPropertyNonConsecutiveRepetition) {
   SvaSequence seq;
   seq.kind = SvaSequenceKind::kNonConsecutiveRepetition;
   seq.rep_min = 3;
@@ -234,7 +234,7 @@ TEST(SimCh16, AssertPropertyNonConsecutiveRepetition) {
   EXPECT_FALSE(MatchNonConsecutiveRepetition(seq, {1, 0, 1, 0, 0}));
 }
 
-TEST(SimCh16, PropertyNotOperator) {
+TEST(ConcurrentAssertionSim, PropertyNotOperator) {
   EXPECT_EQ(EvalPropertyNot(PropertyResult::kPass), PropertyResult::kFail);
   EXPECT_EQ(EvalPropertyNot(PropertyResult::kFail), PropertyResult::kPass);
 
@@ -242,7 +242,7 @@ TEST(SimCh16, PropertyNotOperator) {
             PropertyResult::kFail);
 }
 
-TEST(SimCh16, PropertyAndOperator) {
+TEST(ConcurrentAssertionSim, PropertyAndOperator) {
   EXPECT_EQ(EvalPropertyAnd(PropertyResult::kPass, PropertyResult::kPass),
             PropertyResult::kPass);
 
@@ -252,7 +252,7 @@ TEST(SimCh16, PropertyAndOperator) {
             PropertyResult::kFail);
 }
 
-TEST(SimCh16, PropertyOrOperator) {
+TEST(ConcurrentAssertionSim, PropertyOrOperator) {
   EXPECT_EQ(EvalPropertyOr(PropertyResult::kPass, PropertyResult::kFail),
             PropertyResult::kPass);
   EXPECT_EQ(EvalPropertyOr(PropertyResult::kFail, PropertyResult::kPass),
@@ -264,21 +264,21 @@ TEST(SimCh16, PropertyOrOperator) {
             PropertyResult::kPass);
 }
 
-TEST(SimCh16, SequenceAndOperator) {
+TEST(ConcurrentAssertionSim, SequenceAndOperator) {
   EXPECT_TRUE(EvalSequenceAnd(true, true));
   EXPECT_FALSE(EvalSequenceAnd(true, false));
   EXPECT_FALSE(EvalSequenceAnd(false, true));
   EXPECT_FALSE(EvalSequenceAnd(false, false));
 }
 
-TEST(SimCh16, SequenceOrOperator) {
+TEST(ConcurrentAssertionSim, SequenceOrOperator) {
   EXPECT_TRUE(EvalSequenceOr(true, false));
   EXPECT_TRUE(EvalSequenceOr(false, true));
   EXPECT_TRUE(EvalSequenceOr(true, true));
   EXPECT_FALSE(EvalSequenceOr(false, false));
 }
 
-TEST(SimCh16, SequenceIntersectOperator) {
+TEST(ConcurrentAssertionSim, SequenceIntersectOperator) {
   EXPECT_TRUE(EvalSequenceIntersect(true, true, 5, 5));
 
   EXPECT_FALSE(EvalSequenceIntersect(true, true, 5, 6));
@@ -287,7 +287,7 @@ TEST(SimCh16, SequenceIntersectOperator) {
   EXPECT_FALSE(EvalSequenceIntersect(false, true, 5, 5));
 }
 
-TEST(SimCh16, SequenceThroughoutOperator) {
+TEST(ConcurrentAssertionSim, SequenceThroughoutOperator) {
   auto check = [](uint64_t v) { return v != 0; };
   EXPECT_TRUE(EvalThroughout(check, {1, 2, 3, 4}));
 
@@ -296,7 +296,7 @@ TEST(SimCh16, SequenceThroughoutOperator) {
   EXPECT_TRUE(EvalThroughout(check, {}));
 }
 
-TEST(SimCh16, MultipleConcurrentAssertionsQueuedAndFlushed) {
+TEST(ConcurrentAssertionSim, MultipleConcurrentAssertionsQueuedAndFlushed) {
   SimCh16Fixture f;
   int pass_count = 0;
   int fail_count = 0;
@@ -319,7 +319,7 @@ TEST(SimCh16, MultipleConcurrentAssertionsQueuedAndFlushed) {
   EXPECT_EQ(fail_count, 2);
 }
 
-TEST(SimCh16, AssertionControlAssertoffDisablesAssertion) {
+TEST(ConcurrentAssertionSim, AssertionControlAssertoffDisablesAssertion) {
   SimCh16Fixture f;
   bool executed = false;
 
@@ -336,7 +336,7 @@ TEST(SimCh16, AssertionControlAssertoffDisablesAssertion) {
   EXPECT_FALSE(f.engine.GetControl().IsEnabled("disabled_assert"));
 }
 
-TEST(SimCh16, AssertionControlAssertonReenablesAssertion) {
+TEST(ConcurrentAssertionSim, AssertionControlAssertonReenablesAssertion) {
   SimCh16Fixture f;
   bool executed = false;
 
@@ -357,7 +357,7 @@ TEST(SimCh16, AssertionControlAssertonReenablesAssertion) {
   EXPECT_TRUE(executed);
 }
 
-TEST(SimCh16, AssertionControlAssertkillRemovesPendingAssertions) {
+TEST(ConcurrentAssertionSim, AssertionControlAssertkillRemovesPendingAssertions) {
   SimCh16Fixture f;
   int count = 0;
 
@@ -378,7 +378,7 @@ TEST(SimCh16, AssertionControlAssertkillRemovesPendingAssertions) {
   EXPECT_TRUE(f.engine.GetControl().WasKilled("kill_target"));
 }
 
-TEST(SimCh16, DeferredAssertionExecutedInObservedRegion) {
+TEST(ConcurrentAssertionSim, DeferredAssertionExecutedInObservedRegion) {
   SimCh16Fixture f;
   bool observed_executed = false;
 

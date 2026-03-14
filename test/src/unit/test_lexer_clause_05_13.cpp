@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexerClause05, Cl5_13_DotNotationTokens) {
+TEST(LexicalConventionLexing, DotNotationTokens) {
   auto tokens = Lex("arr.size()");
   ASSERT_GE(tokens.size(), 5u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -14,7 +14,7 @@ TEST(LexerClause05, Cl5_13_DotNotationTokens) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kRParen);
 }
 
-TEST(LexerClause05, Cl5_13_DotNotationNoParens) {
+TEST(LexicalConventionLexing, DotNotationNoParens) {
   auto tokens = Lex("arr.size");
   ASSERT_GE(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -22,7 +22,7 @@ TEST(LexerClause05, Cl5_13_DotNotationNoParens) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
 }
 
-TEST(LexerClause05, Cl5_13_ChainedDotNotation) {
+TEST(LexicalConventionLexing, ChainedDotNotation) {
   auto tokens = Lex("obj.arr.size()");
   ASSERT_GE(tokens.size(), 7u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -32,7 +32,7 @@ TEST(LexerClause05, Cl5_13_ChainedDotNotation) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kIdentifier);
 }
 
-TEST(LexerClause05, Cl5_13_MethodWithArgTokens) {
+TEST(LexicalConventionLexing, MethodWithArgTokens) {
   auto tokens = Lex("q.push_back(8'hAA)");
   ASSERT_GE(tokens.size(), 5u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);

@@ -4,21 +4,21 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, PropertyExpr_AcceptOn) {
+TEST(AssertionDeclParsing, PropertyExpr_AcceptOn) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
       "  assert property (@(posedge clk) accept_on(done) req |-> ack);\n"
       "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyExpr_RejectOn) {
+TEST(AssertionDeclParsing, PropertyExpr_RejectOn) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) reject_on(err) req |-> ack);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyExpr_SyncAcceptOn) {
+TEST(AssertionDeclParsing, PropertyExpr_SyncAcceptOn) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (\n"
@@ -26,7 +26,7 @@ TEST(ParserA210, PropertyExpr_SyncAcceptOn) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyExpr_SyncRejectOn) {
+TEST(AssertionDeclParsing, PropertyExpr_SyncRejectOn) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (\n"

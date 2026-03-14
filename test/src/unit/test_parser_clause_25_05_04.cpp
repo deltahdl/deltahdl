@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA29, PortExprDotNotation) {
+TEST(InterfaceDeclParsing, PortExprDotNotation) {
   auto r = Parse(
       "interface bus;\n"
       "  logic [7:0] r;\n"
@@ -18,7 +18,7 @@ TEST(ParserA29, PortExprDotNotation) {
   EXPECT_NE(mp->ports[0].expr, nullptr);
 }
 
-TEST(ParserA29, PortExprEmpty) {
+TEST(InterfaceDeclParsing, PortExprEmpty) {
   auto r = Parse(
       "interface bus;\n"
       "  modport A(input .P());\n"
@@ -31,7 +31,7 @@ TEST(ParserA29, PortExprEmpty) {
   EXPECT_EQ(mp->ports[0].expr, nullptr);
 }
 
-TEST(ParserA29, PortExprMixedWithSimple) {
+TEST(InterfaceDeclParsing, PortExprMixedWithSimple) {
   auto r = Parse(
       "interface I;\n"
       "  logic [7:0] r;\n"
@@ -47,7 +47,7 @@ TEST(ParserA29, PortExprMixedWithSimple) {
   EXPECT_EQ(mp->ports[1].name, "R");
 }
 
-TEST(ParserSection25, ModportPortExpressionName) {
+TEST(InterfaceParsing, ModportPortExpressionName) {
   auto r = Parse(
       "interface bus;\n"
       "  logic [7:0] bus_data;\n"
@@ -60,7 +60,7 @@ TEST(ParserSection25, ModportPortExpressionName) {
   EXPECT_EQ(mp->name, "target");
 }
 
-TEST(ParserSection25, ModportPortExpressionPort) {
+TEST(InterfaceParsing, ModportPortExpressionPort) {
   auto r = Parse(
       "interface bus;\n"
       "  logic [7:0] bus_data;\n"
@@ -73,7 +73,7 @@ TEST(ParserSection25, ModportPortExpressionPort) {
   EXPECT_NE(mp->ports[0].expr, nullptr);
 }
 
-TEST(ParserSection25, ModportPortExpressionPartSelect) {
+TEST(InterfaceParsing, ModportPortExpressionPartSelect) {
   auto r = Parse(
       "interface bus;\n"
       "  logic [7:0] bus_data;\n"
@@ -86,7 +86,7 @@ TEST(ParserSection25, ModportPortExpressionPartSelect) {
   EXPECT_NE(mp->ports[0].expr, nullptr);
 }
 
-TEST(ParserSection25, ModportMixedDirectionAndExprFirst) {
+TEST(InterfaceParsing, ModportMixedDirectionAndExprFirst) {
   auto r = Parse(
       "interface bus;\n"
       "  logic [7:0] bus_data;\n"
@@ -101,7 +101,7 @@ TEST(ParserSection25, ModportMixedDirectionAndExprFirst) {
   EXPECT_EQ(mp->ports[0].expr, nullptr);
 }
 
-TEST(ParserSection25, ModportMixedDirectionAndExprSecond) {
+TEST(InterfaceParsing, ModportMixedDirectionAndExprSecond) {
   auto r = Parse(
       "interface bus;\n"
       "  logic [7:0] bus_data;\n"

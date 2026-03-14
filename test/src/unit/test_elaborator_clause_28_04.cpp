@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection28, ElaborateAndGate) {
+TEST(GateLevelModelingParsing, ElaborateAndGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -24,7 +24,7 @@ TEST(ParserSection28, ElaborateAndGate) {
   EXPECT_EQ(ca.rhs->op, TokenKind::kAmp);
 }
 
-TEST(ParserSection28, ElaborateOrGate) {
+TEST(GateLevelModelingParsing, ElaborateOrGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -38,7 +38,7 @@ TEST(ParserSection28, ElaborateOrGate) {
   EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kPipe);
 }
 
-TEST(ParserSection28, ElaborateNandGate) {
+TEST(GateLevelModelingParsing, ElaborateNandGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -56,7 +56,7 @@ TEST(ParserSection28, ElaborateNandGate) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kAmp);
 }
 
-TEST(ParserSection28, ElaborateXorGate) {
+TEST(GateLevelModelingParsing, ElaborateXorGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -70,7 +70,7 @@ TEST(ParserSection28, ElaborateXorGate) {
   EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kCaret);
 }
 
-TEST(ParserSection28, ElaborateMultiInputAnd) {
+TEST(GateLevelModelingParsing, ElaborateMultiInputAnd) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"

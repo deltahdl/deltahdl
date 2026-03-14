@@ -4,7 +4,7 @@
 
 using namespace delta;
 
-TEST(Preprocessor, Clause22_5_1_SimpleDefineAndSubstitute) {
+TEST(Preprocessor, SimpleDefineAndSubstitute) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define WORDSIZE 8\n"
@@ -14,7 +14,7 @@ TEST(Preprocessor, Clause22_5_1_SimpleDefineAndSubstitute) {
   EXPECT_NE(result.find('8'), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_EmptyMacroBody) {
+TEST(Preprocessor, EmptyMacroBody) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define EMPTY\n"
@@ -25,7 +25,7 @@ TEST(Preprocessor, Clause22_5_1_EmptyMacroBody) {
   EXPECT_NE(result.find("int x = ;"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_MacroRedefineLatestPrevails) {
+TEST(Preprocessor, MacroRedefineLatestPrevails) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define VAL 1\n"
@@ -36,25 +36,25 @@ TEST(Preprocessor, Clause22_5_1_MacroRedefineLatestPrevails) {
   EXPECT_NE(result.find('2'), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_RedefineCompilerDirectiveError) {
+TEST(Preprocessor, RedefineCompilerDirectiveError) {
   PreprocFixture f;
   Preprocess("`define ifdef 1\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_1_RedefineDefineError) {
+TEST(Preprocessor, RedefineDefineError) {
   PreprocFixture f;
   Preprocess("`define define 1\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_1_RedefineIncludeError) {
+TEST(Preprocessor, RedefineIncludeError) {
   PreprocFixture f;
   Preprocess("`define include 1\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_1_MacroNameReuseOrdinaryIdentifier) {
+TEST(Preprocessor, MacroNameReuseOrdinaryIdentifier) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define data 42\n"
@@ -65,7 +65,7 @@ TEST(Preprocessor, Clause22_5_1_MacroNameReuseOrdinaryIdentifier) {
   EXPECT_NE(result.find("int data = 42;"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_MultiLineBackslashContinuation) {
+TEST(Preprocessor, MultiLineBackslashContinuation) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define MULTI a + \\\n"
@@ -79,13 +79,13 @@ TEST(Preprocessor, Clause22_5_1_MultiLineBackslashContinuation) {
   EXPECT_NE(result.find('c'), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_UnterminatedStringInBody) {
+TEST(Preprocessor, UnterminatedStringInBody) {
   PreprocFixture f;
   Preprocess("`define BAD \"unterminated\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_1_FunctionLikeMacroSingleArg) {
+TEST(Preprocessor, FunctionLikeMacroSingleArg) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define NAND(dly) nand #dly\n"
@@ -95,7 +95,7 @@ TEST(Preprocessor, Clause22_5_1_FunctionLikeMacroSingleArg) {
   EXPECT_NE(result.find("nand #2"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_FunctionLikeMacroMultipleArgs) {
+TEST(Preprocessor, FunctionLikeMacroMultipleArgs) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define D(x,y) initial $display(\"start\", x , y, \"end\");\n"
@@ -106,7 +106,7 @@ TEST(Preprocessor, Clause22_5_1_FunctionLikeMacroMultipleArgs) {
   EXPECT_NE(result.find("\"msg2\""), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_FunctionLikeMacroEmptyArgs) {
+TEST(Preprocessor, FunctionLikeMacroEmptyArgs) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define D(x,y) initial $display(x, y);\n"
@@ -117,7 +117,7 @@ TEST(Preprocessor, Clause22_5_1_FunctionLikeMacroEmptyArgs) {
   EXPECT_NE(result.find("initial $display(, );"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_SpaceBetweenNameAndParenNotFunctionLike) {
+TEST(Preprocessor, SpaceBetweenNameAndParenNotFunctionLike) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define NOT_FUNC (a, b)\n"
@@ -128,7 +128,7 @@ TEST(Preprocessor, Clause22_5_1_SpaceBetweenNameAndParenNotFunctionLike) {
   EXPECT_NE(result.find("(a, b)"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_DefaultArgUsedWhenOmitted) {
+TEST(Preprocessor, DefaultArgUsedWhenOmitted) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define MACRO1(a=5,b=\"B\",c) $display(a,,b,,c);\n"
@@ -139,7 +139,7 @@ TEST(Preprocessor, Clause22_5_1_DefaultArgUsedWhenOmitted) {
   EXPECT_NE(result.find("$display(5,,2,,3);"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_DefaultArgMiddleOmitted) {
+TEST(Preprocessor, DefaultArgMiddleOmitted) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define MACRO1(a=5,b=\"B\",c) $display(a,,b,,c);\n"
@@ -150,7 +150,7 @@ TEST(Preprocessor, Clause22_5_1_DefaultArgMiddleOmitted) {
   EXPECT_NE(result.find("$display(1,,\"B\",,3);"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_DefaultArgLastOmittedNoDefault) {
+TEST(Preprocessor, DefaultArgLastOmittedNoDefault) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define MACRO1(a=5,b=\"B\",c) $display(a,,b,,c);\n"
@@ -161,7 +161,7 @@ TEST(Preprocessor, Clause22_5_1_DefaultArgLastOmittedNoDefault) {
   EXPECT_NE(result.find("$display(5,,2,,);"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_TrailingArgsWithDefaultsFilled) {
+TEST(Preprocessor, TrailingArgsWithDefaultsFilled) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define MACRO2(a=5, b, c=\"C\") $display(a,,b,,c);\n"
@@ -172,7 +172,7 @@ TEST(Preprocessor, Clause22_5_1_TrailingArgsWithDefaultsFilled) {
   EXPECT_NE(result.find("$display(5,,2,,\"C\");"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_TooFewArgsNoDefaultError) {
+TEST(Preprocessor, TooFewArgsNoDefaultError) {
   PreprocFixture f;
   Preprocess(
       "`define MACRO1(a=5,b=\"B\",c) $display(a,,b,,c);\n"
@@ -182,7 +182,7 @@ TEST(Preprocessor, Clause22_5_1_TooFewArgsNoDefaultError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_1_TooManyArgsError) {
+TEST(Preprocessor, TooManyArgsError) {
   PreprocFixture f;
   Preprocess(
       "`define D(x,y) x + y\n"
@@ -191,7 +191,7 @@ TEST(Preprocessor, Clause22_5_1_TooManyArgsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_1_WhiteSpaceBetweenNameAndParenInUsage) {
+TEST(Preprocessor, WhiteSpaceBetweenNameAndParenInUsage) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define ADD(a,b) a + b\n"
@@ -201,7 +201,7 @@ TEST(Preprocessor, Clause22_5_1_WhiteSpaceBetweenNameAndParenInUsage) {
   EXPECT_NE(result.find("1 + 2"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_BacktickQuoteStringConstruction) {
+TEST(Preprocessor, BacktickQuoteStringConstruction) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define MAKE_STR(x) `\"x`\"\n"
@@ -211,7 +211,7 @@ TEST(Preprocessor, Clause22_5_1_BacktickQuoteStringConstruction) {
   EXPECT_NE(result.find("\"hello\""), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_BacktickEscapedQuote) {
+TEST(Preprocessor, BacktickEscapedQuote) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define MSG(x,y) `\"x: `\\`\"y`\\`\"`\"\n"
@@ -221,7 +221,7 @@ TEST(Preprocessor, Clause22_5_1_BacktickEscapedQuote) {
   EXPECT_NE(result.find("\"left: \\\"right\\\"\""), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_TokenConcatenation) {
+TEST(Preprocessor, TokenConcatenation) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define APPEND(f) f``_primary\n"
@@ -231,7 +231,7 @@ TEST(Preprocessor, Clause22_5_1_TokenConcatenation) {
   EXPECT_NE(result.find("clock_primary"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_NoSubstitutionInStringLiteral) {
+TEST(Preprocessor, NoSubstitutionInStringLiteral) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define HI Hello\n"
@@ -242,7 +242,7 @@ TEST(Preprocessor, Clause22_5_1_NoSubstitutionInStringLiteral) {
   EXPECT_NE(result.find("`HI, world"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_MacroUsageInBodyExpandedAtUse) {
+TEST(Preprocessor, MacroUsageInBodyExpandedAtUse) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define A 10\n"
@@ -253,7 +253,7 @@ TEST(Preprocessor, Clause22_5_1_MacroUsageInBodyExpandedAtUse) {
   EXPECT_NE(result.find("10 + 1"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_MacroUsageExpandedAfterOuterSubstitution) {
+TEST(Preprocessor, MacroUsageExpandedAfterOuterSubstitution) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define INNER 42\n"
@@ -264,7 +264,7 @@ TEST(Preprocessor, Clause22_5_1_MacroUsageExpandedAfterOuterSubstitution) {
   EXPECT_NE(result.find("1 + 42"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_ExpressionArgumentLiteralSubstitution) {
+TEST(Preprocessor, ExpressionArgumentLiteralSubstitution) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define MAX(a,b) ((a) > (b) ? (a) : (b))\n"
@@ -274,7 +274,7 @@ TEST(Preprocessor, Clause22_5_1_ExpressionArgumentLiteralSubstitution) {
   EXPECT_NE(result.find("((p+q) > (r+s) ? (p+q) : (r+s))"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_NestedMacroCallsAsArguments) {
+TEST(Preprocessor, NestedMacroCallsAsArguments) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define TOP(a,b) a + b\n"
@@ -285,7 +285,7 @@ TEST(Preprocessor, Clause22_5_1_NestedMacroCallsAsArguments) {
   EXPECT_NE(result.find("b + 1 + 42 + a"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_DirectiveInMacroTextProcessedOnExpansion) {
+TEST(Preprocessor, DirectiveInMacroTextProcessedOnExpansion) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid = f.mgr.AddFile("<test>",
@@ -296,7 +296,7 @@ TEST(Preprocessor, Clause22_5_1_DirectiveInMacroTextProcessedOnExpansion) {
   EXPECT_TRUE(pp.HasTimescale());
 }
 
-TEST(Preprocessor, Clause22_5_1_DefineInInactiveConditionalSkipped) {
+TEST(Preprocessor, DefineInInactiveConditionalSkipped) {
   PreprocFixture f;
   auto result = Preprocess(
       "`ifdef UNDEF\n"
@@ -310,7 +310,7 @@ TEST(Preprocessor, Clause22_5_1_DefineInInactiveConditionalSkipped) {
   EXPECT_EQ(result.find("visible"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_MacroUsedAcrossFiles) {
+TEST(Preprocessor, MacroUsedAcrossFiles) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
   auto fid1 = f.mgr.AddFile("<file1>", "`define SHARED 77\n");
@@ -321,7 +321,7 @@ TEST(Preprocessor, Clause22_5_1_MacroUsedAcrossFiles) {
   EXPECT_NE(result.find("77"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_CommandLineDefines) {
+TEST(Preprocessor, CommandLineDefines) {
   PreprocFixture f;
   PreprocConfig cfg;
   cfg.defines = {{"CMDLINE", "42"}};
@@ -330,7 +330,7 @@ TEST(Preprocessor, Clause22_5_1_CommandLineDefines) {
   EXPECT_NE(result.find("42"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_BalancedParensInActualArgument) {
+TEST(Preprocessor, BalancedParensInActualArgument) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define APPLY(f) f\n"
@@ -340,7 +340,7 @@ TEST(Preprocessor, Clause22_5_1_BalancedParensInActualArgument) {
   EXPECT_NE(result.find("foo(1,2)"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_EmptyMacroOverridesNonEmptyDefault) {
+TEST(Preprocessor, EmptyMacroOverridesNonEmptyDefault) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define EMPTY\n"
@@ -352,7 +352,7 @@ TEST(Preprocessor, Clause22_5_1_EmptyMacroOverridesNonEmptyDefault) {
   EXPECT_NE(result.find("val=;"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_LineCommentInBodyStripped) {
+TEST(Preprocessor, LineCommentInBodyStripped) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO 42 // this is a comment\n"
@@ -364,7 +364,7 @@ TEST(Preprocessor, Clause22_5_1_LineCommentInBodyStripped) {
   EXPECT_EQ(result.find("this is a comment"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_BlockCommentInBodyStripped) {
+TEST(Preprocessor, BlockCommentInBodyStripped) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO 42 /* block comment */ + 1\n"
@@ -376,7 +376,7 @@ TEST(Preprocessor, Clause22_5_1_BlockCommentInBodyStripped) {
   EXPECT_EQ(result.find("block comment"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_SingleEmptyArgNoDefault) {
+TEST(Preprocessor, SingleEmptyArgNoDefault) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define WRAP(x) [x]\n"
@@ -386,7 +386,7 @@ TEST(Preprocessor, Clause22_5_1_SingleEmptyArgNoDefault) {
   EXPECT_NE(result.find("[]"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_DefineInsideModule) {
+TEST(Preprocessor, DefineInsideModule) {
   PreprocFixture f;
   auto result = Preprocess(
       "module m;\n"
@@ -398,7 +398,7 @@ TEST(Preprocessor, Clause22_5_1_DefineInsideModule) {
   EXPECT_NE(result.find('7'), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_DefineOutsideModule) {
+TEST(Preprocessor, DefineOutsideModule) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define GLOBAL 8\n"
@@ -410,7 +410,7 @@ TEST(Preprocessor, Clause22_5_1_DefineOutsideModule) {
   EXPECT_NE(result.find('8'), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_ResetallDoesNotAffectMacros) {
+TEST(Preprocessor, ResetallDoesNotAffectMacros) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define PERSIST 99\n"
@@ -421,7 +421,7 @@ TEST(Preprocessor, Clause22_5_1_ResetallDoesNotAffectMacros) {
   EXPECT_NE(result.find("99"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_DirectRecursiveMacroError) {
+TEST(Preprocessor, DirectRecursiveMacroError) {
   PreprocFixture f;
   Preprocess(
       "`define REC `REC\n"
@@ -430,7 +430,7 @@ TEST(Preprocessor, Clause22_5_1_DirectRecursiveMacroError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_1_IndirectRecursiveMacroError) {
+TEST(Preprocessor, IndirectRecursiveMacroError) {
   PreprocFixture f;
   Preprocess(
       "`define A `B\n"
@@ -440,7 +440,7 @@ TEST(Preprocessor, Clause22_5_1_IndirectRecursiveMacroError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_1_MacroArgContainingSelfIsLegal) {
+TEST(Preprocessor, MacroArgContainingSelfIsLegal) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define TOP(a,b) a + b\n"
@@ -450,7 +450,7 @@ TEST(Preprocessor, Clause22_5_1_MacroArgContainingSelfIsLegal) {
   EXPECT_NE(result.find("b + 1 + 42 + a"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_SquareBracketsInActualArgument) {
+TEST(Preprocessor, SquareBracketsInActualArgument) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define APPLY(x) x\n"
@@ -460,7 +460,7 @@ TEST(Preprocessor, Clause22_5_1_SquareBracketsInActualArgument) {
   EXPECT_NE(result.find("a[1,2]"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_BracesInActualArgument) {
+TEST(Preprocessor, BracesInActualArgument) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define APPLY(x) x\n"
@@ -470,7 +470,7 @@ TEST(Preprocessor, Clause22_5_1_BracesInActualArgument) {
   EXPECT_NE(result.find("{a,b}"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_QuotedStringInActualArgument) {
+TEST(Preprocessor, QuotedStringInActualArgument) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define APPLY(x) x\n"
@@ -480,7 +480,7 @@ TEST(Preprocessor, Clause22_5_1_QuotedStringInActualArgument) {
   EXPECT_NE(result.find("\"a,b\""), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_FunctionLikeMacroWithoutParensError) {
+TEST(Preprocessor, FunctionLikeMacroWithoutParensError) {
   PreprocFixture f;
   Preprocess(
       "`define FUNC(a=5) a\n"
@@ -489,7 +489,7 @@ TEST(Preprocessor, Clause22_5_1_FunctionLikeMacroWithoutParensError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_1_EscapedIdentifierMacroName) {
+TEST(Preprocessor, EscapedIdentifierMacroName) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define \\M@CRO (a=5, b=0) a + b\n"
@@ -499,7 +499,7 @@ TEST(Preprocessor, Clause22_5_1_EscapedIdentifierMacroName) {
   EXPECT_NE(result.find("1 + 2"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_EscapedIdentifierAllDefaults) {
+TEST(Preprocessor, EscapedIdentifierAllDefaults) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define \\M@CRO (a=5, b=0) a + b\n"
@@ -509,7 +509,7 @@ TEST(Preprocessor, Clause22_5_1_EscapedIdentifierAllDefaults) {
   EXPECT_NE(result.find("5 + 0"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_TripleQuotedStringInMacroBody) {
+TEST(Preprocessor, TripleQuotedStringInMacroBody) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define TEST \"\"\"\n"
@@ -522,7 +522,7 @@ TEST(Preprocessor, Clause22_5_1_TripleQuotedStringInMacroBody) {
   EXPECT_NE(result.find("lines"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_BlockCommentInMultiLineMacro) {
+TEST(Preprocessor, BlockCommentInMultiLineMacro) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO nand /* block comment\n"
@@ -536,7 +536,7 @@ TEST(Preprocessor, Clause22_5_1_BlockCommentInMultiLineMacro) {
   EXPECT_EQ(result.find("block comment"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_DefaultContainsMacroUsage) {
+TEST(Preprocessor, DefaultContainsMacroUsage) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define VAL 42\n"
@@ -547,7 +547,7 @@ TEST(Preprocessor, Clause22_5_1_DefaultContainsMacroUsage) {
   EXPECT_NE(result.find("42"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_LineCommentBeforeBackslashContinuation) {
+TEST(Preprocessor, LineCommentBeforeBackslashContinuation) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define FOO nand // comment \\\n"
@@ -559,7 +559,7 @@ TEST(Preprocessor, Clause22_5_1_LineCommentBeforeBackslashContinuation) {
   EXPECT_NE(result.find("#5"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_TwoArgMacroWithSingleArgError) {
+TEST(Preprocessor, TwoArgMacroWithSingleArgError) {
   PreprocFixture f;
   Preprocess(
       "`define D(x,y) initial $display(x, y);\n"
@@ -568,7 +568,7 @@ TEST(Preprocessor, Clause22_5_1_TwoArgMacroWithSingleArgError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_1_TwoArgMacroWithEmptyParensError) {
+TEST(Preprocessor, TwoArgMacroWithEmptyParensError) {
   PreprocFixture f;
   Preprocess(
       "`define D(x,y) initial $display(x, y);\n"
@@ -577,7 +577,7 @@ TEST(Preprocessor, Clause22_5_1_TwoArgMacroWithEmptyParensError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_1_ExplicitEmptyDefault) {
+TEST(Preprocessor, ExplicitEmptyDefault) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define M(a=,b=1) [a][b]\n"
@@ -588,13 +588,13 @@ TEST(Preprocessor, Clause22_5_1_ExplicitEmptyDefault) {
   EXPECT_NE(result.find("[][1]"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_MacroBodySplitAcrossStringLiteral) {
+TEST(Preprocessor, MacroBodySplitAcrossStringLiteral) {
   PreprocFixture f;
   Preprocess("`define first_half \"start of string\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, Clause22_5_1_ArgExpansionDoesNotIntroduceFormals) {
+TEST(Preprocessor, ArgExpansionDoesNotIntroduceFormals) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define TOP(a,b) a + b\n"
@@ -605,7 +605,7 @@ TEST(Preprocessor, Clause22_5_1_ArgExpansionDoesNotIntroduceFormals) {
   EXPECT_NE(result.find("b + 1 + 42 + a"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_NoSubstitutionInsideStringLiteral2) {
+TEST(Preprocessor, NoSubstitutionInsideStringLiteral2) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define HI Hello\n"
@@ -617,7 +617,7 @@ TEST(Preprocessor, Clause22_5_1_NoSubstitutionInsideStringLiteral2) {
   EXPECT_NE(result.find("`HI, world"), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_FormalArgInStringLiteralNotSubstituted) {
+TEST(Preprocessor, FormalArgInStringLiteralNotSubstituted) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define H(x) \"Hello, x\"\n"
@@ -628,7 +628,7 @@ TEST(Preprocessor, Clause22_5_1_FormalArgInStringLiteralNotSubstituted) {
   EXPECT_NE(result.find("\"Hello, x\""), std::string::npos);
 }
 
-TEST(Preprocessor, Clause22_5_1_IncludeWithMacroFilename) {
+TEST(Preprocessor, IncludeWithMacroFilename) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define HOME(fn) `\"/tmp/fn`\"\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimClause09_02_02_01, ClockOscillatorWithDelay) {
+TEST(AlwaysCombSchedulingSim, ClockOscillatorWithDelay) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -25,7 +25,7 @@ TEST(SimClause09_02_02_01, ClockOscillatorWithDelay) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(SimClause09_02_02_01, TwoPhaseClockBeginEnd) {
+TEST(AlwaysCombSchedulingSim, TwoPhaseClockBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -47,7 +47,7 @@ TEST(SimClause09_02_02_01, TwoPhaseClockBeginEnd) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimClause09_02_02_01, AlwaysRepeatsContinuously) {
+TEST(AlwaysCombSchedulingSim, AlwaysRepeatsContinuously) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

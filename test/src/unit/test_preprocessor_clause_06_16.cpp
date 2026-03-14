@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, AssignCompatibleStringLiteral) {
+TEST(DataTypeParsing, AssignCompatibleStringLiteral) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  string s;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection6, AssignCompatibleStringLiteral) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, StringDeclModule) {
+TEST(DataTypeParsing, StringDeclModule) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  string name;\n"
@@ -28,7 +28,7 @@ TEST(ParserSection6, StringDeclModule) {
   EXPECT_EQ(item->name, "name");
 }
 
-TEST(ParserSection6, StringDeclWithInit) {
+TEST(DataTypeParsing, StringDeclWithInit) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  string msg = \"hello\";\n"

@@ -4,7 +4,7 @@
 
 using namespace delta;
 
-TEST(SimCh505, OperatorSingleCharInExpr) {
+TEST(OperatorTokenSim, OperatorSingleCharInExpr) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -14,7 +14,7 @@ TEST(SimCh505, OperatorSingleCharInExpr) {
   EXPECT_EQ(result, 30u);
 }
 
-TEST(SimCh505, OperatorDoubleCharInExpr) {
+TEST(OperatorTokenSim, OperatorDoubleCharInExpr) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -24,7 +24,7 @@ TEST(SimCh505, OperatorDoubleCharInExpr) {
   EXPECT_EQ(result, 8u);
 }
 
-TEST(SimCh505, OperatorTripleCharInExpr) {
+TEST(OperatorTokenSim, OperatorTripleCharInExpr) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -34,7 +34,7 @@ TEST(SimCh505, OperatorTripleCharInExpr) {
   EXPECT_EQ(result, 12u);
 }
 
-TEST(SimCh505, OperatorUnaryLeftOfOperand) {
+TEST(OperatorTokenSim, OperatorUnaryLeftOfOperand) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -44,7 +44,7 @@ TEST(SimCh505, OperatorUnaryLeftOfOperand) {
   EXPECT_EQ(result & 0xFF, 251u);
 }
 
-TEST(SimCh505, OperatorBinaryBetweenOperands) {
+TEST(OperatorTokenSim, OperatorBinaryBetweenOperands) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -54,7 +54,7 @@ TEST(SimCh505, OperatorBinaryBetweenOperands) {
   EXPECT_EQ(result, 35u);
 }
 
-TEST(SimCh505, OperatorConditionalThreeOperands) {
+TEST(OperatorTokenSim, OperatorConditionalThreeOperands) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -64,7 +64,7 @@ TEST(SimCh505, OperatorConditionalThreeOperands) {
   EXPECT_EQ(result, 42u);
 }
 
-TEST(SimCh505, OperatorConditionalFalseBranch) {
+TEST(OperatorTokenSim, OperatorConditionalFalseBranch) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -74,7 +74,7 @@ TEST(SimCh505, OperatorConditionalFalseBranch) {
   EXPECT_EQ(result, 99u);
 }
 
-TEST(SimCh505, OperatorMixedInExpression) {
+TEST(OperatorTokenSim, OperatorMixedInExpression) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -84,7 +84,7 @@ TEST(SimCh505, OperatorMixedInExpression) {
   EXPECT_EQ(result, 16u);
 }
 
-TEST(SimCh505, OperatorUnaryNegation) {
+TEST(OperatorTokenSim, OperatorUnaryNegation) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -94,7 +94,7 @@ TEST(SimCh505, OperatorUnaryNegation) {
   EXPECT_EQ(result, 1u);
 }
 
-TEST(SimCh505, OperatorNoWhitespace) {
+TEST(OperatorTokenSim, OperatorNoWhitespace) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"

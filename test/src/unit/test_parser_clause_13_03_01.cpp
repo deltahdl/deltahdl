@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A2TaskDecl) {
+TEST(FormalSyntaxParsing, TaskDecl) {
   auto r = Parse(
       "module m;\n"
       "  task automatic drive(input logic [7:0] val);\n"
@@ -19,7 +19,7 @@ TEST(ParserAnnexA, A2TaskDecl) {
   EXPECT_EQ(item->name, "drive");
 }
 
-TEST(ParserA27, TaskLifetimeAutomatic) {
+TEST(TaskDeclParsing, TaskLifetimeAutomatic) {
   auto r = Parse(
       "module m;\n"
       "  task automatic my_task();\n"
@@ -33,7 +33,7 @@ TEST(ParserA27, TaskLifetimeAutomatic) {
   EXPECT_FALSE(item->is_static);
 }
 
-TEST(ParserA27, TaskLifetimeStatic) {
+TEST(TaskDeclParsing, TaskLifetimeStatic) {
   auto r = Parse(
       "module m;\n"
       "  task static my_task();\n"
@@ -46,7 +46,7 @@ TEST(ParserA27, TaskLifetimeStatic) {
   EXPECT_TRUE(item->is_static);
 }
 
-TEST(ParserA27, TaskLifetimeDefault) {
+TEST(TaskDeclParsing, TaskLifetimeDefault) {
   auto r = Parse(
       "module m;\n"
       "  task my_task();\n"
@@ -59,7 +59,7 @@ TEST(ParserA27, TaskLifetimeDefault) {
   EXPECT_FALSE(item->is_static);
 }
 
-TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithDelay) {
+TEST(SchedulingSemanticsParsing, AutomaticTaskWithDelay) {
   auto r = Parse(
       "module m;\n"
       "  task automatic delayed_write(input int val);\n"
@@ -77,7 +77,7 @@ TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithDelay) {
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kDelay);
 }
 
-TEST(ParserSection4, Sec4_9_3_AutoTaskWithEventControl) {
+TEST(SchedulingSemanticsParsing, AutoTaskWithEventControl) {
   auto r = Parse(
       "module m;\n"
       "  task automatic wait_clk(input logic clk);\n"
@@ -97,7 +97,7 @@ TEST(ParserSection4, Sec4_9_3_AutoTaskWithEventControl) {
   EXPECT_EQ(item->func_body_stmts[0]->events[0].edge, Edge::kPosedge);
 }
 
-TEST(ParserSection4, Sec4_9_3_TaskNoLifetimeQualifier) {
+TEST(SchedulingSemanticsParsing, TaskNoLifetimeQualifier) {
   auto r = Parse(
       "module m;\n"
       "  task plain_task();\n"
@@ -113,7 +113,7 @@ TEST(ParserSection4, Sec4_9_3_TaskNoLifetimeQualifier) {
   EXPECT_FALSE(item->is_static);
 }
 
-TEST(ParserSection4, Sec4_9_3_AutomaticTaskDecl) {
+TEST(SchedulingSemanticsParsing, AutomaticTaskDecl) {
   auto r = Parse(
       "module m;\n"
       "  task automatic do_work(input int n);\n"
@@ -130,7 +130,7 @@ TEST(ParserSection4, Sec4_9_3_AutomaticTaskDecl) {
   EXPECT_EQ(item->name, "do_work");
 }
 
-TEST(ParserSection4, Sec4_9_3_StaticTaskDecl) {
+TEST(SchedulingSemanticsParsing, StaticTaskDeclWithRepeatDelay) {
   auto r = Parse(
       "module m;\n"
       "  task static wait_cycles(input int n);\n"
@@ -158,7 +158,7 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
   return nullptr;
 }
 
-TEST(ParserSection13, StaticTask) {
+TEST(TaskAndFunctionParsing, StaticTask) {
   auto r = Parse(
       "module m;\n"
       "  task static do_stuff();\n"
@@ -171,7 +171,7 @@ TEST(ParserSection13, StaticTask) {
   EXPECT_FALSE(tk->is_automatic);
 }
 
-TEST(ParserSection6, AutomaticTaskDecl) {
+TEST(DataTypeParsing, AutomaticTaskDecl) {
   auto r = Parse(
       "module t;\n"
       "  task automatic my_task();\n"
@@ -184,7 +184,7 @@ TEST(ParserSection6, AutomaticTaskDecl) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-TEST(ParserSection6, StaticTaskDecl) {
+TEST(DataTypeParsing, StaticTaskDecl) {
   auto r = Parse(
       "module t;\n"
       "  task static my_task();\n"
@@ -207,7 +207,7 @@ static ModuleItem* FirstFuncOrTask(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection4, Sec4_9_4_StaticTaskDecl) {
+TEST(SchedulingSemanticsParsing, StaticTaskDeclWithDisplayCall) {
   auto r = Parse(
       "module m;\n"
       "  task static log_event(input int code);\n"
@@ -224,7 +224,7 @@ TEST(ParserSection4, Sec4_9_4_StaticTaskDecl) {
   EXPECT_EQ(t->name, "log_event");
 }
 
-TEST(ParserSection4, Sec4_9_4_AutoTaskWithVariousTypes) {
+TEST(SchedulingSemanticsParsing, AutoTaskWithVariousTypes) {
   auto r = Parse(
       "module m;\n"
       "  task automatic process();\n"
@@ -253,7 +253,7 @@ TEST(ParserSection4, Sec4_9_4_AutoTaskWithVariousTypes) {
   EXPECT_EQ(t->func_body_stmts[2]->var_decl_type.kind, DataTypeKind::kReal);
 }
 
-TEST(ParserSection4, Sec4_9_4_AutoTaskExplicitAutoLocals) {
+TEST(SchedulingSemanticsParsing, AutoTaskExplicitAutoLocals) {
   auto r = Parse(
       "module m;\n"
       "  task automatic run(input int seed);\n"
@@ -273,7 +273,7 @@ TEST(ParserSection4, Sec4_9_4_AutoTaskExplicitAutoLocals) {
   EXPECT_NE(t->func_body_stmts[0]->var_init, nullptr);
 }
 
-TEST(ParserSection13, StaticVarInAutoTask) {
+TEST(TaskAndFunctionParsing, StaticVarInAutoTask) {
   auto r = Parse(
       "module m;\n"
       "  task automatic count();\n"
@@ -291,7 +291,7 @@ TEST(ParserSection13, StaticVarInAutoTask) {
   EXPECT_TRUE(t->func_body_stmts[0]->var_is_static);
 }
 
-TEST(ParserSection13, AutoVarInStaticTask) {
+TEST(TaskAndFunctionParsing, AutoVarInStaticTask) {
   auto r = Parse(
       "module m;\n"
       "  task static proc();\n"

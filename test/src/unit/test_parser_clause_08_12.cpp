@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA24, ClassNewCopy) {
+TEST(DeclarationAssignmentParsing, ClassNewCopy) {
   auto r = Parse(
       "class C;\n"
       "endclass\n"
@@ -16,7 +16,7 @@ TEST(ParserA24, ClassNewCopy) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection8, ShallowCopy) {
+TEST(ClassParsing, ShallowCopy) {
   auto r = Parse(
       "module m;\n"
       "  class Packet;\n"
@@ -32,7 +32,7 @@ TEST(ParserSection8, ShallowCopy) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserA812, HandleAssignment) {
+TEST(ClassAssignRenameParsing, HandleAssignment) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
               "  int data;\n"
@@ -46,7 +46,7 @@ TEST(ParserA812, HandleAssignment) {
               "endmodule\n"));
 }
 
-TEST(ParserA812, ShallowCopyNewIdentifier) {
+TEST(ClassAssignRenameParsing, ShallowCopyNewIdentifier) {
   auto r = Parse(
       "class C;\n"
       "  int x;\n"
@@ -62,7 +62,7 @@ TEST(ParserA812, ShallowCopyNewIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA812, ChainedMemberAccess) {
+TEST(ClassAssignRenameParsing, ChainedMemberAccess) {
   EXPECT_TRUE(
       ParseOk("class A;\n"
               "  int j;\n"
@@ -81,7 +81,7 @@ TEST(ParserA812, ChainedMemberAccess) {
               "endmodule\n"));
 }
 
-TEST(ParserA812, PropertyInitInClassBody) {
+TEST(ClassAssignRenameParsing, PropertyInitInClassBody) {
   auto r = Parse(
       "class baseA;\n"
       "  integer j = 5;\n"
@@ -91,7 +91,7 @@ TEST(ParserA812, PropertyInitInClassBody) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserA812, ClassContainingClassProperty) {
+TEST(ClassAssignRenameParsing, ClassContainingClassProperty) {
   EXPECT_TRUE(
       ParseOk("class baseA;\n"
               "  integer j = 5;\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection23, Sec23_2_2_AnsiPortDirections) {
+TEST(ModuleAndHierarchyParsing, AnsiPortDirections) {
   auto r = Parse(
       "module m (input logic a, output logic y,\n"
       "          inout wire [7:0] data, ref logic [3:0] r);\n"
@@ -24,7 +24,7 @@ TEST(ParserSection23, Sec23_2_2_AnsiPortDirections) {
   EXPECT_EQ(r.cu->modules[0]->ports[3].name, "r");
 }
 
-TEST(ParserSection23, Sec23_2_2_EmptyPortsAndMiscVariants) {
+TEST(ModuleAndHierarchyParsing, EmptyPortsAndMiscVariants) {
   auto r1 = Parse("module m (); endmodule\n");
   ASSERT_NE(r1.cu, nullptr);
   EXPECT_FALSE(r1.has_errors);
@@ -43,7 +43,7 @@ TEST(ParserSection23, Sec23_2_2_EmptyPortsAndMiscVariants) {
   EXPECT_TRUE(ParseOk("macromodule mm; endmodule\n"));
 }
 
-TEST(ParserSection23, AnsiPortsInputOutput) {
+TEST(ModuleAndHierarchyParsing, AnsiPortsInputOutput) {
   auto r = Parse(
       "module m(input logic clk, input logic rst, output logic q);\n"
       "endmodule\n");
@@ -56,7 +56,7 @@ TEST(ParserSection23, AnsiPortsInputOutput) {
   EXPECT_EQ(mod->ports[2].name, "q");
 }
 
-TEST(ParserSection23, AnsiPortsInout) {
+TEST(ModuleAndHierarchyParsing, AnsiPortsInout) {
   auto r = Parse(
       "module m(inout wire [7:0] data);\n"
       "endmodule\n");
@@ -67,7 +67,7 @@ TEST(ParserSection23, AnsiPortsInout) {
   EXPECT_EQ(mod->ports[0].name, "data");
 }
 
-TEST(ParserSection23, AnsiHeaderWithParams) {
+TEST(ModuleAndHierarchyParsing, AnsiHeaderWithParams) {
   auto r = Parse(
       "module m #(parameter N = 8) (input logic [N-1:0] data);\n"
       "endmodule\n");
@@ -81,7 +81,7 @@ TEST(ParserSection23, AnsiHeaderWithParams) {
   EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
 }
 
-TEST(ModuleParamsA13, AnsiPortDeclarations) {
+TEST(ModuleParamsParsing, AnsiPortDeclarations) {
   auto r = Parse(
       "module m(\n"
       "  input  logic       clk,\n"
@@ -93,7 +93,7 @@ TEST(ModuleParamsA13, AnsiPortDeclarations) {
   EXPECT_EQ(r.cu->modules[0]->ports.size(), 3u);
 }
 
-TEST(ModuleParamsA13, AllPortDirections) {
+TEST(ModuleParamsParsing, AllPortDirections) {
   auto r = Parse(
       "module m(\n"
       "  input  logic a,\n"
@@ -111,7 +111,7 @@ TEST(ModuleParamsA13, AllPortDirections) {
   EXPECT_EQ(ports[3].direction, Direction::kRef);
 }
 
-TEST(ModuleParamsA13, AnsiPortUnpackedDim) {
+TEST(ModuleParamsParsing, AnsiPortUnpackedDim) {
   auto r = Parse(
       "module m(\n"
       "  input logic [7:0] data [4]\n"
@@ -120,7 +120,7 @@ TEST(ModuleParamsA13, AnsiPortUnpackedDim) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleParamsA13, InterfacePortHeader) {
+TEST(ModuleParamsParsing, InterfacePortHeader) {
   auto r = Parse(
       "module m(bus_if.master bus);\n"
       "endmodule\n");
@@ -128,7 +128,7 @@ TEST(ModuleParamsA13, InterfacePortHeader) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection23, ModuleWithPortsAndAssign) {
+TEST(ModuleAndHierarchyParsing, ModuleWithPortsAndAssign) {
   auto r = Parse(
       "module mux(input logic a, input logic b, input logic sel, output logic "
       "y);\n"
@@ -153,7 +153,7 @@ TEST(ParserSection23, ModuleWithPortsAndAssign) {
   }
 }
 
-TEST(ParserSection23, VariablePortHeader) {
+TEST(ModuleAndHierarchyParsing, VariablePortHeader) {
   auto r = Parse("module m(input logic [3:0] sel); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -162,7 +162,7 @@ TEST(ParserSection23, VariablePortHeader) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].name, "sel");
 }
 
-TEST(ParserSection23, InputVariablePortTypeVar) {
+TEST(ModuleAndHierarchyParsing, InputVariablePortTypeVar) {
   auto r = Parse("module m(input var logic d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

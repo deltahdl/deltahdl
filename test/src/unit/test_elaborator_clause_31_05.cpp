@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA70503, EdgeControlSpecifierXTransitionsElaborates) {
+TEST(TimingCheckEventDefElaboration, EdgeControlSpecifierXTransitionsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(ElabA70503, EdgeControlSpecifierXTransitionsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70503, EdgeControlSpecifier01_10Elaborates) {
+TEST(TimingCheckEventDefElaboration, EdgeControlSpecifier01_10Elaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(ElabA70503, EdgeControlSpecifier01_10Elaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA70503, TimingCheckEventEdgeKeywordElaborates) {
+TEST(TimingCheckEventDefElaboration, TimingCheckEventEdgeKeywordElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

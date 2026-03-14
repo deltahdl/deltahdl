@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0413, ProgramInstArray) {
+TEST(ProgramInstantiationGrammar, ProgramInstArray) {
   auto r = Parse(
       "program my_prog(input logic clk);\n"
       "endprogram\n"

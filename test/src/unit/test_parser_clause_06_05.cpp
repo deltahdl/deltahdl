@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, NetsCantBeProcAssigned) {
+TEST(DataTypeParsing, NetsCantBeProcAssigned) {
   auto r = Parse(
       "module t;\n"
       "  wire a;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection6, NetsCantBeProcAssigned) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 4u);
 }
 
-TEST(ParserSection6, Sec6_5_VarDrivenByInitialBlock) {
+TEST(DataTypeParsing, VarDrivenByInitialBlock) {
   auto r = Parse(
       "module t;\n"
       "  logic q;\n"
@@ -32,7 +32,7 @@ TEST(ParserSection6, Sec6_5_VarDrivenByInitialBlock) {
   ASSERT_NE(items[1]->body, nullptr);
 }
 
-TEST(ParserSection6, Sec6_5_MixedNetAndVarDecls) {
+TEST(DataTypeParsing, MixedNetAndVarDecls) {
   auto r = Parse(
       "module t;\n"
       "  wire [7:0] net_a;\n"
@@ -59,7 +59,7 @@ TEST(ParserSection6, Sec6_5_MixedNetAndVarDecls) {
   EXPECT_FALSE(items[4]->data_type.is_net);
 }
 
-TEST(ParserSection6, Sec6_5_LogicVarDeclKind) {
+TEST(DataTypeParsing, LogicVarDeclKind) {
   auto r = Parse(
       "module t;\n"
       "  logic v;\n"
@@ -74,7 +74,7 @@ TEST(ParserSection6, Sec6_5_LogicVarDeclKind) {
   EXPECT_EQ(item->name, "v");
 }
 
-TEST(ParserSection6, Sec6_5_NetAndVarSameWidthVectors) {
+TEST(DataTypeParsing, NetAndVarSameWidthVectors) {
   auto r = Parse(
       "module t;\n"
       "  wire [31:0] net_data;\n"

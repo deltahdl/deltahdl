@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, TypeRefInBitsCast) {
+TEST(DataTypeParsing, TypeRefInBitsCast) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  initial begin\n"

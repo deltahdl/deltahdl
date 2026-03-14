@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, PropertyExpr_ClockingEventPropertyExpr) {
+TEST(AssertionDeclParsing, PropertyExpr_ClockingEventPropertyExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (\n"
@@ -13,7 +13,7 @@ TEST(ParserA210, PropertyExpr_ClockingEventPropertyExpr) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, MultichannelAssertPropertyInline) {
+TEST(AssertionParsing, MultichannelAssertPropertyInline) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"
@@ -24,7 +24,7 @@ TEST(ParserSection16, MultichannelAssertPropertyInline) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection16, MulticlockPropertyDeclImplication) {
+TEST(AssertionParsing, MulticlockPropertyDeclImplication) {
   auto r = Parse(
       "module m;\n"
       "  property p_multi;\n"

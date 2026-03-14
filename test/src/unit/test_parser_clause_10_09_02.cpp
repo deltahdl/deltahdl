@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7, Sec7_2_2_ArrayOfStructsPattern) {
+TEST(AggregateTypeParsing, ArrayOfStructsPattern) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; int b; } pair_t;\n"
@@ -18,7 +18,7 @@ TEST(ParserSection7, Sec7_2_2_ArrayOfStructsPattern) {
               "endmodule\n"));
 }
 
-TEST(ParserA60701, PatternAssignmentNamed) {
+TEST(PatternParsing, PatternAssignmentNamed) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -29,7 +29,7 @@ TEST(ParserA60701, PatternAssignmentNamed) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection10, AssignmentPatternStruct) {
+TEST(AssignmentParsing, AssignmentPatternStruct) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct { int x; int y; } point_t;\n"
@@ -40,7 +40,7 @@ TEST(ParserSection10, AssignmentPatternStruct) {
   ASSERT_GE(mod->items.size(), 2u);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedAssignFromPattern) {
+TEST(AggregateTypeParsing, PackedAssignFromPattern) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -59,7 +59,7 @@ TEST(ParserSection7, Sec7_2_1_PackedAssignFromPattern) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-TEST(ParserSection7, Sec7_2_2_AssignInForLoop) {
+TEST(AggregateTypeParsing, AssignInForLoop) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int idx; int val; } entry_t;\n"
@@ -72,7 +72,7 @@ TEST(ParserSection7, Sec7_2_2_AssignInForLoop) {
               "endmodule\n"));
 }
 
-TEST(ParserA60701, StructurePatternKeyMemberAndDefault) {
+TEST(PatternParsing, StructurePatternKeyMemberAndDefault) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -83,7 +83,7 @@ TEST(ParserA60701, StructurePatternKeyMemberAndDefault) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection7, Sec7_2_2_PositionalPatternElements) {
+TEST(AggregateTypeParsing, PositionalPatternElements) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int a; int b; int c; } tri_t;\n"
@@ -100,7 +100,7 @@ TEST(ParserSection7, Sec7_2_2_PositionalPatternElements) {
   EXPECT_TRUE(stmt->rhs->pattern_keys.empty());
 }
 
-TEST(ParserSection7, Sec7_2_2_NamedPatternKeysThreeMembers) {
+TEST(AggregateTypeParsing, NamedPatternKeysThreeMembers) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int x; int y; int z; } vec3_t;\n"
@@ -121,7 +121,7 @@ TEST(ParserSection7, Sec7_2_2_NamedPatternKeysThreeMembers) {
   EXPECT_EQ(stmt->rhs->elements[0]->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserSection7, Sec7_2_2_MultipleVarsWithInit) {
+TEST(AggregateTypeParsing, MultipleVarsWithInit) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; int b; } pair_t;\n"
@@ -131,7 +131,7 @@ TEST(ParserSection7, Sec7_2_2_MultipleVarsWithInit) {
               "endmodule\n"));
 }
 
-TEST(ParserA60701, AssignmentPatternKeysPopulated) {
+TEST(PatternParsing, AssignmentPatternKeysPopulated) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -151,7 +151,7 @@ TEST(ParserA60701, AssignmentPatternKeysPopulated) {
   EXPECT_EQ(rhs->elements.size(), 2u);
 }
 
-TEST(ParserSection7, StructAssignmentPattern) {
+TEST(AggregateTypeParsing, StructAssignmentPattern) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int a; int b; } pair;\n"
@@ -167,7 +167,7 @@ TEST(ParserSection7, StructAssignmentPattern) {
   EXPECT_EQ(stmt->var_init->kind, ExprKind::kAssignmentPattern);
 }
 
-TEST(ParserSection7, Sec7_2_2_NamedAssignmentPattern) {
+TEST(AggregateTypeParsing, NamedAssignmentPattern) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int a; int b; } pair_t;\n"
@@ -187,7 +187,7 @@ TEST(ParserSection7, Sec7_2_2_NamedAssignmentPattern) {
   EXPECT_EQ(stmt->rhs->pattern_keys[1], "b");
 }
 
-TEST(ParserSection7, Sec7_2_2_DefaultAssignmentPattern) {
+TEST(AggregateTypeParsing, DefaultAssignmentPattern) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int a; int b; int c; } triple_t;\n"
@@ -204,7 +204,7 @@ TEST(ParserSection7, Sec7_2_2_DefaultAssignmentPattern) {
   EXPECT_EQ(stmt->rhs->pattern_keys[0], "default");
 }
 
-TEST(ParserSection7, Sec7_2_2_NamedWithDefault) {
+TEST(AggregateTypeParsing, NamedWithDefault) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int a; int b; int c; } s_t;\n"
@@ -221,7 +221,7 @@ TEST(ParserSection7, Sec7_2_2_NamedWithDefault) {
   EXPECT_EQ(stmt->rhs->pattern_keys.size(), 2u);
 }
 
-TEST(ParserSection7, Sec7_2_2_ReplicationPattern) {
+TEST(AggregateTypeParsing, ReplicationPattern) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { byte a; byte b; byte c; byte d; } quad_t;\n"
@@ -236,7 +236,7 @@ TEST(ParserSection7, Sec7_2_2_ReplicationPattern) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
 }
 
-TEST(ParserSection7, Sec7_2_2_AssignInInitialBlock) {
+TEST(AggregateTypeParsing, AssignInInitialBlock) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; int b; } s_t;\n"
@@ -258,7 +258,7 @@ TEST(StructAssignmentPatterns, NestedStructPattern) {
   VerifyNestedPatternElements(r, 2u);
 }
 
-TEST(ParserCh510, AssignmentPatternNamed) {
+TEST(StructureLiteralParsing, AssignmentPatternNamed) {
   auto r = Parse(
       "module t;\n"
       "  initial x = '{a: 0, b: 1};\n"
@@ -274,7 +274,7 @@ TEST(ParserCh510, AssignmentPatternNamed) {
   VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
 }
 
-TEST(ParserCh510, AssignmentPattern_TypeKey) {
+TEST(StructureLiteralParsing, AssignmentPattern_TypeKey) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct { int x; int y; } ms_t;\n"
@@ -282,7 +282,7 @@ TEST(ParserCh510, AssignmentPattern_TypeKey) {
               "endmodule"));
 }
 
-TEST(ParserCh510, AssignmentPattern_DefaultKey) {
+TEST(StructureLiteralParsing, AssignmentPattern_DefaultKey) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct { int x; int y; } ms_t;\n"
@@ -290,7 +290,7 @@ TEST(ParserCh510, AssignmentPattern_DefaultKey) {
               "endmodule"));
 }
 
-TEST(ParserCh510, StructLiteral_Positional) {
+TEST(StructureLiteralParsing, StructLiteral_Positional) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -299,7 +299,7 @@ TEST(ParserCh510, StructLiteral_Positional) {
               "endmodule"));
 }
 
-TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
+TEST(StructureLiteralParsing, StructLiteral_MemberNameAndValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -309,7 +309,7 @@ TEST(ParserCh510, StructLiteral_MemberNameAndValue) {
 }
 
 }  // namespace
-TEST(PositionalStructAssignmentPattern, Cl5_10_PositionalStructLiteral) {
+TEST(PositionalStructAssignmentPattern, PositionalStructLiteral) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int a; shortreal b;} ab;\n"
@@ -326,7 +326,7 @@ TEST(PositionalStructAssignmentPattern, Cl5_10_PositionalStructLiteral) {
   EXPECT_TRUE(stmt->rhs->pattern_keys.empty());
 }
 
-TEST(StructureAssignmentPatternMemberKey, Cl5_10_MemberNameAndValue) {
+TEST(StructureAssignmentPatternMemberKey, MemberNameAndValue) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int a; shortreal b;} ab;\n"
@@ -344,7 +344,7 @@ TEST(StructureAssignmentPatternMemberKey, Cl5_10_MemberNameAndValue) {
   EXPECT_EQ(stmt->rhs->pattern_keys[1], "b");
 }
 
-TEST(StructureAssignmentPatternDefault, Cl5_10_DefaultValue) {
+TEST(StructureAssignmentPatternDefault, DefaultValue) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int a; int b;} ab;\n"
@@ -361,7 +361,7 @@ TEST(StructureAssignmentPatternDefault, Cl5_10_DefaultValue) {
   EXPECT_EQ(stmt->rhs->pattern_keys[0], "default");
 }
 
-TEST(TypePrefixedPattern, Cl5_10_TypePrefixedPattern) {
+TEST(TypePrefixedPattern, TypePrefixedPattern) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -370,7 +370,7 @@ TEST(TypePrefixedPattern, Cl5_10_TypePrefixedPattern) {
               "endmodule\n"));
 }
 
-TEST(ReplicationPattern, Cl5_10_ReplicationPattern) {
+TEST(ReplicationPattern, ReplicationPattern) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int X; int Y; int Z;} xyz_t;\n"
@@ -385,7 +385,7 @@ TEST(ReplicationPattern, Cl5_10_ReplicationPattern) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
 }
 
-TEST(StructAssignmentPattern, Cl5_10_StructLiteralInVarDecl) {
+TEST(StructAssignmentPattern, StructLiteralInVarDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; int b;} ab;\n"
@@ -393,7 +393,7 @@ TEST(StructAssignmentPattern, Cl5_10_StructLiteralInVarDecl) {
               "endmodule\n"));
 }
 
-TEST(StructureAssignmentPatternDefault, Cl5_10_MemberNameWithDefault) {
+TEST(StructureAssignmentPatternDefault, MemberNameWithDefault) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct {int a; int b; int c;} s_t;\n"

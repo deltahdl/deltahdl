@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA609, SystemCallElaborates) {
+TEST(SubroutineCallElaborationSyntax, SystemCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -15,7 +15,7 @@ TEST(ElabA609, SystemCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA82, SystemTaskDisplayElaborates) {
+TEST(SubroutineCallExprElaboration, SystemTaskDisplayElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

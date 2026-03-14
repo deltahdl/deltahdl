@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA605, DelayControlHash) {
+TEST(TimingControlSyntaxParsing, DelayControlHash) {
   auto r = Parse(
       "module m;\n"
       "  initial #10 a = 1;\n"
@@ -17,7 +17,7 @@ TEST(ParserA605, DelayControlHash) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
-TEST(ParserA605, DelayControlParenExpr) {
+TEST(TimingControlSyntaxParsing, DelayControlParenExpr) {
   auto r = Parse(
       "module m;\n"
       "  initial #(5 + 3) a = 1;\n"
@@ -29,7 +29,7 @@ TEST(ParserA605, DelayControlParenExpr) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
-TEST(ParserA605, EventControlPosedge) {
+TEST(TimingControlSyntaxParsing, EventControlPosedge) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk) q <= d;\n"
@@ -41,7 +41,7 @@ TEST(ParserA605, EventControlPosedge) {
   EXPECT_NE(item->body, nullptr);
 }
 
-TEST(ParserA605, EventControlNegedge) {
+TEST(TimingControlSyntaxParsing, EventControlNegedge) {
   auto r = Parse(
       "module m;\n"
       "  always @(negedge clk) q <= d;\n"
@@ -50,7 +50,7 @@ TEST(ParserA605, EventControlNegedge) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA605, EventControlStar) {
+TEST(TimingControlSyntaxParsing, EventControlStar) {
   auto r = Parse(
       "module m;\n"
       "  always @* a = b;\n"
@@ -59,7 +59,7 @@ TEST(ParserA605, EventControlStar) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA605, EventControlStarParen) {
+TEST(TimingControlSyntaxParsing, EventControlStarParen) {
   auto r = Parse(
       "module m;\n"
       "  always @(*) a = b;\n"
@@ -68,7 +68,7 @@ TEST(ParserA605, EventControlStarParen) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA605, EventExpressionOr) {
+TEST(TimingControlSyntaxParsing, EventExpressionOr) {
   auto r = Parse(
       "module m;\n"
       "  always @(a or b) c = a & b;\n"
@@ -77,7 +77,7 @@ TEST(ParserA605, EventExpressionOr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA605, EventExpressionComma) {
+TEST(TimingControlSyntaxParsing, EventExpressionComma) {
   auto r = Parse(
       "module m;\n"
       "  always @(a, b) c = a & b;\n"
@@ -86,7 +86,7 @@ TEST(ParserA605, EventExpressionComma) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA605, EventExpressionWithIff) {
+TEST(TimingControlSyntaxParsing, EventExpressionWithIff) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff en) q <= d;\n"
@@ -95,7 +95,7 @@ TEST(ParserA605, EventExpressionWithIff) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA605, ProceduralTimingControlDelay) {
+TEST(TimingControlSyntaxParsing, ProceduralTimingControlDelay) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -106,7 +106,7 @@ TEST(ParserA605, ProceduralTimingControlDelay) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA605, JumpReturnExpr) {
+TEST(TimingControlSyntaxParsing, JumpReturnExpr) {
   auto r = Parse(
       "module m;\n"
       "  function int f();\n"
@@ -117,7 +117,7 @@ TEST(ParserA605, JumpReturnExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA605, JumpReturnVoid) {
+TEST(TimingControlSyntaxParsing, JumpReturnVoid) {
   auto r = Parse(
       "module m;\n"
       "  function void f();\n"
@@ -128,7 +128,7 @@ TEST(ParserA605, JumpReturnVoid) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA605, JumpBreak) {
+TEST(TimingControlSyntaxParsing, JumpBreak) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -141,7 +141,7 @@ TEST(ParserA605, JumpBreak) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA605, JumpContinue) {
+TEST(TimingControlSyntaxParsing, JumpContinue) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -154,7 +154,7 @@ TEST(ParserA605, JumpContinue) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA605, WaitStatement) {
+TEST(TimingControlSyntaxParsing, WaitStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -169,7 +169,7 @@ TEST(ParserA605, WaitStatement) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-TEST(ParserA605, WaitFork) {
+TEST(TimingControlSyntaxParsing, WaitFork) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -183,7 +183,7 @@ TEST(ParserA605, WaitFork) {
   EXPECT_EQ(stmt->kind, StmtKind::kWaitFork);
 }
 
-TEST(ParserA605, WaitOrder) {
+TEST(TimingControlSyntaxParsing, WaitOrder) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -198,7 +198,7 @@ TEST(ParserA605, WaitOrder) {
   ASSERT_GE(stmt->wait_order_events.size(), 3u);
 }
 
-TEST(ParserA605, EventTrigger) {
+TEST(TimingControlSyntaxParsing, EventTrigger) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -212,7 +212,7 @@ TEST(ParserA605, EventTrigger) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
 }
 
-TEST(ParserA605, NonblockingEventTrigger) {
+TEST(TimingControlSyntaxParsing, NonblockingEventTrigger) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -226,7 +226,7 @@ TEST(ParserA605, NonblockingEventTrigger) {
   EXPECT_EQ(stmt->kind, StmtKind::kNbEventTrigger);
 }
 
-TEST(ParserA605, DisableTask) {
+TEST(TimingControlSyntaxParsing, DisableTask) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -240,7 +240,7 @@ TEST(ParserA605, DisableTask) {
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
 }
 
-TEST(ParserA605, DisableFork) {
+TEST(TimingControlSyntaxParsing, DisableFork) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -254,7 +254,7 @@ TEST(ParserA605, DisableFork) {
   EXPECT_EQ(stmt->kind, StmtKind::kDisableFork);
 }
 
-TEST(ParserA605, RepeatEventControl) {
+TEST(TimingControlSyntaxParsing, RepeatEventControl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

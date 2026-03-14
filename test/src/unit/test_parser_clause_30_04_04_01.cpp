@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, UnaryModulePathNot) {
+TEST(OperatorParsing, UnaryModulePathNot) {
   auto r = Parse(
       "module m(input a, output y);\n"
       "  specify\n"
@@ -15,7 +15,7 @@ TEST(ParserA86, UnaryModulePathNot) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, UnaryModulePathBitwiseNot) {
+TEST(OperatorParsing, UnaryModulePathBitwiseNot) {
   auto r = Parse(
       "module m(input a, output y);\n"
       "  specify\n"
@@ -26,7 +26,7 @@ TEST(ParserA86, UnaryModulePathBitwiseNot) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, BinaryModulePathNeq) {
+TEST(OperatorParsing, BinaryModulePathNeq) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
@@ -37,7 +37,7 @@ TEST(ParserA86, BinaryModulePathNeq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, BinaryModulePathLogicalOr) {
+TEST(OperatorParsing, BinaryModulePathLogicalOr) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
@@ -48,7 +48,7 @@ TEST(ParserA86, BinaryModulePathLogicalOr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, BinaryModulePathXnorAlt) {
+TEST(OperatorParsing, BinaryModulePathXnorAlt) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
@@ -59,7 +59,7 @@ TEST(ParserA86, BinaryModulePathXnorAlt) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, BinaryModulePathEq) {
+TEST(OperatorParsing, BinaryModulePathEq) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
@@ -70,7 +70,7 @@ TEST(ParserA86, BinaryModulePathEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, BinaryModulePathNotEq) {
+TEST(OperatorParsing, BinaryModulePathNotEq) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
@@ -81,7 +81,7 @@ TEST(ParserA86, BinaryModulePathNotEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, BinaryModulePathLogicalAnd) {
+TEST(OperatorParsing, BinaryModulePathLogicalAnd) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
@@ -92,7 +92,7 @@ TEST(ParserA86, BinaryModulePathLogicalAnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, BinaryModulePathBitwiseAnd) {
+TEST(OperatorParsing, BinaryModulePathBitwiseAnd) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
@@ -103,7 +103,7 @@ TEST(ParserA86, BinaryModulePathBitwiseAnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, BinaryModulePathBitwiseOr) {
+TEST(OperatorParsing, BinaryModulePathBitwiseOr) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
@@ -114,7 +114,7 @@ TEST(ParserA86, BinaryModulePathBitwiseOr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, BinaryModulePathXor) {
+TEST(OperatorParsing, BinaryModulePathXor) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
@@ -125,7 +125,7 @@ TEST(ParserA86, BinaryModulePathXor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, BinaryModulePathXnor) {
+TEST(OperatorParsing, BinaryModulePathXnor) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
@@ -136,7 +136,7 @@ TEST(ParserA86, BinaryModulePathXnor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, UnaryModulePathReductionAnd) {
+TEST(OperatorParsing, UnaryModulePathReductionAnd) {
   auto r = Parse(
       "module m(input [3:0] a, output y);\n"
       "  specify\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, BinaryWildcardEq) {
+TEST(OperatorParsing, BinaryWildcardEq) {
   auto r = Parse("module m; initial x = (a ==? b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserA86, BinaryWildcardEq) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEqQuestion);
 }
 
-TEST(ParserA86, BinaryWildcardNeq) {
+TEST(OperatorParsing, BinaryWildcardNeq) {
   auto r = Parse("module m; initial x = (a !=? b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -25,7 +25,7 @@ TEST(ParserA86, BinaryWildcardNeq) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
 }
 
-TEST(ParserSection11, WildcardEq) {
+TEST(OperatorAndExpressionParsing, WildcardEq) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a ==? b);\n"
@@ -35,7 +35,7 @@ TEST(ParserSection11, WildcardEq) {
   EXPECT_EQ(rhs->op, TokenKind::kEqEqQuestion);
 }
 
-TEST(ParserSection11, WildcardNeq) {
+TEST(OperatorAndExpressionParsing, WildcardNeq) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a !=? b);\n"
@@ -45,7 +45,7 @@ TEST(ParserSection11, WildcardNeq) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
 }
 
-TEST(ParserSection11, WildcardEqInIfCondition) {
+TEST(OperatorAndExpressionParsing, WildcardEqInIfCondition) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -57,7 +57,7 @@ TEST(ParserSection11, WildcardEqInIfCondition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserCh501, Sec5_1_ThreeCharOperatorWildcardInequality) {
+TEST(LexicalOverviewParsing, ThreeCharOperatorWildcardInequality) {
   auto r = Parse(
       "module m;\n"
       "  initial x = (a !=? b);\n"
@@ -71,11 +71,11 @@ TEST(ParserCh501, Sec5_1_ThreeCharOperatorWildcardInequality) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
 }
 
-TEST(ParserCh505, Operator_WildcardEquality) {
+TEST(OperatorTokenParserParsing, Operator_WildcardEquality) {
   EXPECT_TRUE(ParseOk("module m; initial x = (a ==? b); endmodule"));
 }
 
-TEST(ParserA86, BinaryWildcardNotEq) {
+TEST(OperatorParsing, BinaryWildcardNotEq) {
   auto r = Parse("module m; initial x = a !=? b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

@@ -79,7 +79,7 @@ TEST(EvalOpXZ, InsideXOperand) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(SimA83, InsideValueMatch) {
+TEST(ExpressionSim, InsideValueMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

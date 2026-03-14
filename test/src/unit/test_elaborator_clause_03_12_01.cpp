@@ -2,7 +2,7 @@
 
 using namespace delta;
 
-TEST(ElabClause03, Cl3_12_1_ElabModuleWithCuFunction) {
+TEST(DesignBuildingBlockElaboration, ElabModuleWithCuFunction) {
   EXPECT_TRUE(
       ElabOk("function int cu_func(int x); return x; endfunction\n"
              "module m;\n"
@@ -10,7 +10,7 @@ TEST(ElabClause03, Cl3_12_1_ElabModuleWithCuFunction) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_12_1_CuScopeFunctionInDesign) {
+TEST(DesignBuildingBlockElaboration, CuScopeFunctionInDesign) {
   ElabFixture f;
   auto* design = Elaborate(
       "function int helper(int x); return x + 1; endfunction\n"
@@ -26,7 +26,7 @@ TEST(ElabClause03, Cl3_12_1_CuScopeFunctionInDesign) {
   EXPECT_EQ(design->cu_function_decls[1]->name, "auto_task");
 }
 
-TEST(ElabClause03, Cl3_12_1_CuScopeTypedefVisibleInModule) {
+TEST(DesignBuildingBlockElaboration, CuScopeTypedefVisibleInModule) {
   ElabFixture f;
   auto* design = Elaborate(
       "typedef logic [15:0] word_t;\n"
@@ -43,7 +43,7 @@ TEST(ElabClause03, Cl3_12_1_CuScopeTypedefVisibleInModule) {
   EXPECT_EQ(mod->variables[0].width, 16u);
 }
 
-TEST(ElabClause03, Cl3_12_1_CuScopeTypedefTypeWidth) {
+TEST(DesignBuildingBlockElaboration, CuScopeTypedefTypeWidth) {
   ElabFixture f;
   auto* design = Elaborate(
       "typedef logic [7:0] byte_t;\n"
@@ -56,7 +56,7 @@ TEST(ElabClause03, Cl3_12_1_CuScopeTypedefTypeWidth) {
   EXPECT_EQ(it->second, 8u);
 }
 
-TEST(ElabClause03, Cl3_12_1_CuScopeLocalparamElaborates) {
+TEST(DesignBuildingBlockElaboration, CuScopeLocalparamElaborates) {
   EXPECT_TRUE(
       ElabOk("localparam int WIDTH = 8;\n"
              "module m;\n"
@@ -64,7 +64,7 @@ TEST(ElabClause03, Cl3_12_1_CuScopeLocalparamElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_12_1_DollarUnitScopeExprElaborates) {
+TEST(DesignBuildingBlockElaboration, DollarUnitScopeExprElaborates) {
   EXPECT_TRUE(
       ElabOk("bit b;\n"
              "module m;\n"
@@ -72,7 +72,7 @@ TEST(ElabClause03, Cl3_12_1_DollarUnitScopeExprElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_12_1_CuScopeClassVisibleInModule) {
+TEST(DesignBuildingBlockElaboration, CuScopeClassVisibleInModule) {
   EXPECT_TRUE(
       ElabOk("class my_class;\n"
              "  int x;\n"
@@ -82,7 +82,7 @@ TEST(ElabClause03, Cl3_12_1_CuScopeClassVisibleInModule) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_12_1_CuScopeItemsInSourceOrder) {
+TEST(DesignBuildingBlockElaboration, CuScopeItemsInSourceOrder) {
   ElabFixture f;
   auto* design = Elaborate(
       "typedef int first_t;\n"
@@ -94,7 +94,7 @@ TEST(ElabClause03, Cl3_12_1_CuScopeItemsInSourceOrder) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_12_1_MultipleCuScopeTypedefs) {
+TEST(DesignBuildingBlockElaboration, MultipleCuScopeTypedefs) {
   ElabFixture f;
   auto* design = Elaborate(
       "typedef logic [7:0] byte_t;\n"

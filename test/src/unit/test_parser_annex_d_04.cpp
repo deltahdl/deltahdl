@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexD2, AnnexDInput) {
+TEST(OptionalSystemTaskExtendedParsing, Input) {
   auto r = Parse(
       "module m;\n"
       "  initial $input(\"commands.txt\");\n"

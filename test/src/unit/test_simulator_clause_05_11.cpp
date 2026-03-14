@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimClause05, Cl5_11_PositionalAssignment) {
+TEST(LexicalConventionSim, PositionalAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -23,7 +23,7 @@ TEST(SimClause05, Cl5_11_PositionalAssignment) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xCC);
 }
 
-TEST(SimClause05, Cl5_11_PositionalVarInit) {
+TEST(LexicalConventionSim, PositionalVarInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -39,7 +39,7 @@ TEST(SimClause05, Cl5_11_PositionalVarInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x33);
 }
 
-TEST(SimClause05, Cl5_11_ReplicationAssignment) {
+TEST(LexicalConventionSim, ReplicationAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -56,7 +56,7 @@ TEST(SimClause05, Cl5_11_ReplicationAssignment) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xFF);
 }
 
-TEST(SimClause05, Cl5_11_ReplicationVarInit) {
+TEST(LexicalConventionSim, ReplicationVarInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -72,7 +72,7 @@ TEST(SimClause05, Cl5_11_ReplicationVarInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
 }
 
-TEST(SimClause05, Cl5_11_DefaultAssignment) {
+TEST(LexicalConventionSim, DefaultAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -89,7 +89,7 @@ TEST(SimClause05, Cl5_11_DefaultAssignment) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x42);
 }
 
-TEST(SimClause05, Cl5_11_DefaultVarInit) {
+TEST(LexicalConventionSim, DefaultVarInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -105,7 +105,7 @@ TEST(SimClause05, Cl5_11_DefaultVarInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x99);
 }
 
-TEST(SimClause05, Cl5_11_IndexKeyWithDefault) {
+TEST(LexicalConventionSim, IndexKeyWithDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -122,7 +122,7 @@ TEST(SimClause05, Cl5_11_IndexKeyWithDefault) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x00);
 }
 
-TEST(SimClause05, Cl5_11_IndexKeyVarInit) {
+TEST(LexicalConventionSim, IndexKeyVarInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -138,7 +138,7 @@ TEST(SimClause05, Cl5_11_IndexKeyVarInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xCC);
 }
 
-TEST(SimClause05, Cl5_11_DescendingRange) {
+TEST(LexicalConventionSim, DescendingRange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -154,7 +154,7 @@ TEST(SimClause05, Cl5_11_DescendingRange) {
   EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0xCC);
 }
 
-TEST(SimClause05, Cl5_11_TypeFromContext) {
+TEST(LexicalConventionSim, TypeFromContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

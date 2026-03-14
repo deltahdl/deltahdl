@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA703, DottedTerminalWithRangeElaborates) {
+TEST(SpecifyTerminalElaboration, DottedTerminalWithRangeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

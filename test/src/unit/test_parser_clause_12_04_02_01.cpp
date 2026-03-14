@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection12, UniqueIfChainNoElse) {
+TEST(ProceduralStatementParsing, UniqueIfChainNoElse) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"

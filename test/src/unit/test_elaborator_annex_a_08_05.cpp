@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {}
 
-TEST(ElabA85, NetLvalueSimpleContAssign) {
+TEST(LvalueElaboration, NetLvalueSimpleContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(ElabA85, NetLvalueSimpleContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA85, NetLvalueBitSelectContAssign) {
+TEST(LvalueElaboration, NetLvalueBitSelectContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -29,7 +29,7 @@ TEST(ElabA85, NetLvalueBitSelectContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA85, NetLvalueConcatContAssign) {
+TEST(LvalueElaboration, NetLvalueConcatContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -42,7 +42,7 @@ TEST(ElabA85, NetLvalueConcatContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA85, VarLvalueSimpleProceduralAssign) {
+TEST(LvalueElaboration, VarLvalueSimpleProceduralAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -54,7 +54,7 @@ TEST(ElabA85, VarLvalueSimpleProceduralAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA85, VarLvalueBitSelectProcedural) {
+TEST(LvalueElaboration, VarLvalueBitSelectProcedural) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -66,7 +66,7 @@ TEST(ElabA85, VarLvalueBitSelectProcedural) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA85, VarLvaluePartSelectProcedural) {
+TEST(LvalueElaboration, VarLvaluePartSelectProcedural) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -78,7 +78,7 @@ TEST(ElabA85, VarLvaluePartSelectProcedural) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA85, VarLvalueConcatProcedural) {
+TEST(LvalueElaboration, VarLvalueConcatProcedural) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -91,7 +91,7 @@ TEST(ElabA85, VarLvalueConcatProcedural) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA85, VarLvalueMemberAccessProcedural) {
+TEST(LvalueElaboration, VarLvalueMemberAccessProcedural) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -104,7 +104,7 @@ TEST(ElabA85, VarLvalueMemberAccessProcedural) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA85, VarLvalueNonblockingElaborates) {
+TEST(LvalueElaboration, VarLvalueNonblockingElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -116,7 +116,7 @@ TEST(ElabA85, VarLvalueNonblockingElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA85, VarLvalueForceReleaseElaborates) {
+TEST(LvalueElaboration, VarLvalueForceReleaseElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -128,7 +128,7 @@ TEST(ElabA85, VarLvalueForceReleaseElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA85, VarLvalueStreamingConcatElaborates) {
+TEST(LvalueElaboration, VarLvalueStreamingConcatElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -140,7 +140,7 @@ TEST(ElabA85, VarLvalueStreamingConcatElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA85, NonrangeVarLvalueElaborates) {
+TEST(LvalueElaboration, NonrangeVarLvalueElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

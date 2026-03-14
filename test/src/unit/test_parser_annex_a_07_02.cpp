@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA702, PolarityWithEdgeFullPath) {
+TEST(SpecifyPathParsing, PolarityWithEdgeFullPath) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -22,7 +22,7 @@ TEST(ParserA702, PolarityWithEdgeFullPath) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-TEST(ParserA702, FullPathPositivePolarity) {
+TEST(SpecifyPathParsing, FullPathPositivePolarity) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

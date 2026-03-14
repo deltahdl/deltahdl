@@ -41,7 +41,7 @@ TEST(SourceText, AllDescriptionTypes) {
   EXPECT_EQ(r.cu->bind_directives.size(), 1u);
 }
 
-TEST(ParserAnnexA, A1ProgramDecl) {
+TEST(FormalSyntaxParsing, ProgramDecl) {
   auto r = Parse(
       "program test_prog(input logic clk);\n"
       "  initial $display(\"Hello\");\n"
@@ -52,7 +52,7 @@ TEST(ParserAnnexA, A1ProgramDecl) {
   EXPECT_EQ(r.cu->programs[0]->name, "test_prog");
 }
 
-TEST(ParserAnnexA, A1CompilationUnitMultipleItems) {
+TEST(FormalSyntaxParsing, CompilationUnitMultipleItems) {
   auto r = Parse(
       "package p; endpackage\n"
       "module m; endmodule\n"
@@ -64,7 +64,7 @@ TEST(ParserAnnexA, A1CompilationUnitMultipleItems) {
   EXPECT_EQ(r.cu->interfaces.size(), 1u);
 }
 
-TEST(ParserAnnexA051, UdpWithModule) {
+TEST(UdpDeclGrammar, UdpWithModule) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table\n"
@@ -80,7 +80,7 @@ TEST(ParserAnnexA051, UdpWithModule) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection29, UdpCoexistsWithModule) {
+TEST(UserDefinedPrimitiveParsing, UdpCoexistsWithModule) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table\n"
@@ -152,7 +152,7 @@ TEST(SourceText, InterfaceEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserAnnexA, A2ClassDecl) {
+TEST(FormalSyntaxParsing, ClassDecl) {
   auto r = Parse(
       "class Packet;\n"
       "  rand bit [7:0] payload;\n"
@@ -167,7 +167,7 @@ TEST(ParserAnnexA, A2ClassDecl) {
   EXPECT_EQ(r.cu->classes[0]->members.size(), 2u);
 }
 
-TEST(ParserCh501, Sec5_1_EmptyCuCompletelyEmpty) {
+TEST(LexicalOverviewParsing, EmptyCuCompletelyEmpty) {
   auto r = Parse("");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(r.cu->modules.empty());

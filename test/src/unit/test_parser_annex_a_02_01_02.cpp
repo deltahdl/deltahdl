@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, InputNetPortType) {
+TEST(ConstraintDeclParsing, InputNetPortType) {
   auto r = Parse("module m(input wire [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -13,7 +13,7 @@ TEST(ParserA212, InputNetPortType) {
   EXPECT_NE(port.data_type.packed_dim_left, nullptr);
 }
 
-TEST(ParserA212, InputVariablePortTypeLogic) {
+TEST(ConstraintDeclParsing, InputVariablePortTypeLogic) {
   auto r = Parse("module m(input logic [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

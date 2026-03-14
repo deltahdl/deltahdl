@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, PropertyExpr_Case) {
+TEST(AssertionDeclParsing, PropertyExpr_Case) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"
@@ -18,7 +18,7 @@ TEST(ParserA210, PropertyExpr_Case) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyCaseItem_MultiExpr) {
+TEST(AssertionDeclParsing, PropertyCaseItem_MultiExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"
@@ -29,7 +29,7 @@ TEST(ParserA210, PropertyCaseItem_MultiExpr) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyCaseItem_DefaultOnly) {
+TEST(AssertionDeclParsing, PropertyCaseItem_DefaultOnly) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"
@@ -39,7 +39,7 @@ TEST(ParserA210, PropertyCaseItem_DefaultOnly) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyCaseItem_DefaultNoColon) {
+TEST(AssertionDeclParsing, PropertyCaseItem_DefaultNoColon) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"
@@ -50,7 +50,7 @@ TEST(ParserA210, PropertyCaseItem_DefaultNoColon) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, PropertyCaseWithDefaultOnly) {
+TEST(AssertionParsing, PropertyCaseWithDefaultOnly) {
   auto r = Parse(
       "module m;\n"
       "  property p_mode;\n"
@@ -63,7 +63,7 @@ TEST(ParserSection16, PropertyCaseWithDefaultOnly) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection16, PropertyCaseBasic) {
+TEST(AssertionParsing, PropertyCaseBasic) {
   auto r = Parse(
       "module m;\n"
       "  property p_delay(logic [1:0] delay);\n"
@@ -79,7 +79,7 @@ TEST(ParserSection16, PropertyCaseBasic) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, PropertyCaseInAssert) {
+TEST(AssertionParsing, PropertyCaseInAssert) {
   auto r = Parse(
       "module m;\n"
       "  property p1;\n"

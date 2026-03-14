@@ -20,7 +20,7 @@ TEST(Parser, DoWhileStatement) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-TEST(ParserSection12, DoWhileComplexCondition) {
+TEST(ProceduralStatementParsing, DoWhileComplexCondition) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -38,7 +38,7 @@ TEST(ParserSection12, DoWhileComplexCondition) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserA608, DoWhileLoop) {
+TEST(LoopSyntaxParsing, DoWhileLoop) {
   auto r = Parse(
       "module m;\n"
       "  initial begin do x = x - 1; while (x > 0); end\n"
@@ -52,7 +52,7 @@ TEST(ParserA608, DoWhileLoop) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserA608, DoWhileNullStmt) {
+TEST(LoopSyntaxParsing, DoWhileNullStmt) {
   auto r = Parse(
       "module m;\n"
       "  initial begin do ; while (x > 0); end\n"
@@ -64,7 +64,7 @@ TEST(ParserA608, DoWhileNullStmt) {
   EXPECT_EQ(stmt->kind, StmtKind::kDoWhile);
 }
 
-TEST(ParserA608, DoWhileBlockBody) {
+TEST(LoopSyntaxParsing, DoWhileBlockBody) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -79,7 +79,7 @@ TEST(ParserA608, DoWhileBlockBody) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection12, DoWhileLoopWithBlock) {
+TEST(ProceduralStatementParsing, DoWhileLoopWithBlock) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection4, Sec4_6_BlockingAssignOrdering) {
+TEST(SchedulingSemanticsParsing, BlockingAssignOrdering) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

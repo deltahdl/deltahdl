@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_10_ConfigEnclosedByKeywords) {
+TEST(DesignBuildingBlockParsing, ConfigEnclosedByKeywords) {
   auto r = Parse(
       "module m; endmodule\n"
       "config cfg;\n"
@@ -16,7 +16,7 @@ TEST(ParserClause03, Cl3_10_ConfigEnclosedByKeywords) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-TEST(ParserClause03, Cl3_10_ConfigWithDesignCell) {
+TEST(DesignBuildingBlockParsing, ConfigWithDesignCell) {
   auto r = Parse(
       "module top; endmodule\n"
       "config cfg;\n"
@@ -27,7 +27,7 @@ TEST(ParserClause03, Cl3_10_ConfigWithDesignCell) {
   EXPECT_FALSE(r.cu->configs[0]->design_cells.empty());
 }
 
-TEST(ParserClause03, Cl3_10_ConfigWithDefaultRule) {
+TEST(DesignBuildingBlockParsing, ConfigWithDefaultRule) {
   EXPECT_TRUE(
       ParseOk("module m; endmodule\n"
               "config cfg;\n"
@@ -36,7 +36,7 @@ TEST(ParserClause03, Cl3_10_ConfigWithDefaultRule) {
               "endconfig\n"));
 }
 
-TEST(ParserClause03, Cl3_10_LibraryDeclaration) {
+TEST(DesignBuildingBlockParsing, LibraryDeclaration) {
   auto r = ParseLibrary("library work \"*.sv\";\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -44,7 +44,7 @@ TEST(ParserClause03, Cl3_10_LibraryDeclaration) {
   EXPECT_EQ(r.cu->libraries[0]->name, "work");
 }
 
-TEST(ParserClause03, Cl3_10_ConfigAndModuleCoexist) {
+TEST(DesignBuildingBlockParsing, ConfigAndModuleCoexist) {
   auto r = Parse(
       "module a; endmodule\n"
       "module b; endmodule\n"

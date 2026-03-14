@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause1002, ProceduralAssignToNet_Blocking_Error) {
+TEST(AssignmentOverviewElaboration, ProceduralAssignToNet_Blocking_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -17,7 +17,7 @@ TEST(ElabClause1002, ProceduralAssignToNet_Blocking_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause1002, ProceduralAssignToNet_Nonblocking_Error) {
+TEST(AssignmentOverviewElaboration, ProceduralAssignToNet_Nonblocking_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -30,7 +30,7 @@ TEST(ElabClause1002, ProceduralAssignToNet_Nonblocking_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause1002, ProceduralAssignToNet_AlwaysBlock_Error) {
+TEST(AssignmentOverviewElaboration, ProceduralAssignToNet_AlwaysBlock_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -44,7 +44,7 @@ TEST(ElabClause1002, ProceduralAssignToNet_AlwaysBlock_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause1002, ProceduralAssignToVariable_Ok) {
+TEST(AssignmentOverviewElaboration, ProceduralAssignToVariable_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -58,7 +58,7 @@ TEST(ElabClause1002, ProceduralAssignToVariable_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause1002, ProceduralAssignToRegVariable_Ok) {
+TEST(AssignmentOverviewElaboration, ProceduralAssignToRegVariable_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -72,7 +72,7 @@ TEST(ElabClause1002, ProceduralAssignToRegVariable_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause1002, ProceduralAssignToIntVariable_Ok) {
+TEST(AssignmentOverviewElaboration, ProceduralAssignToIntVariable_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -86,7 +86,7 @@ TEST(ElabClause1002, ProceduralAssignToIntVariable_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause1002, ContinuousAssignToNet_Ok) {
+TEST(AssignmentOverviewElaboration, ContinuousAssignToNet_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -98,7 +98,7 @@ TEST(ElabClause1002, ContinuousAssignToNet_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause1002, ContinuousAssignToVariable_Ok) {
+TEST(AssignmentOverviewElaboration, ContinuousAssignToVariable_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -110,7 +110,7 @@ TEST(ElabClause1002, ContinuousAssignToVariable_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause1002, ContAssignConstBitSelect_Ok) {
+TEST(AssignmentOverviewElaboration, ContAssignConstBitSelect_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -122,7 +122,7 @@ TEST(ElabClause1002, ContAssignConstBitSelect_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause1002, ContAssignNonConstBitSelect_Error) {
+TEST(AssignmentOverviewElaboration, ContAssignNonConstBitSelect_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -134,7 +134,7 @@ TEST(ElabClause1002, ContAssignNonConstBitSelect_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause1002, ContAssignConstPartSelect_Ok) {
+TEST(AssignmentOverviewElaboration, ContAssignConstPartSelect_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -146,7 +146,7 @@ TEST(ElabClause1002, ContAssignConstPartSelect_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause1002, ContAssignNonConstPartSelect_Error) {
+TEST(AssignmentOverviewElaboration, ContAssignNonConstPartSelect_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -158,7 +158,7 @@ TEST(ElabClause1002, ContAssignNonConstPartSelect_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause1002, ContAssignConcatenation_Ok) {
+TEST(AssignmentOverviewElaboration, ContAssignConcatenation_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -170,7 +170,7 @@ TEST(ElabClause1002, ContAssignConcatenation_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause1002, ProceduralNonConstBitSelect_Ok) {
+TEST(AssignmentOverviewElaboration, ProceduralNonConstBitSelect_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -186,7 +186,7 @@ TEST(ElabClause1002, ProceduralNonConstBitSelect_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause1002, ProceduralNonConstPartSelect_Ok) {
+TEST(AssignmentOverviewElaboration, ProceduralNonConstPartSelect_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -202,7 +202,7 @@ TEST(ElabClause1002, ProceduralNonConstPartSelect_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause1002, ProceduralAssignToTriNet_Error) {
+TEST(AssignmentOverviewElaboration, ProceduralAssignToTriNet_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -213,7 +213,7 @@ TEST(ElabClause1002, ProceduralAssignToTriNet_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause1002, ProceduralAssignToWandNet_Error) {
+TEST(AssignmentOverviewElaboration, ProceduralAssignToWandNet_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -224,7 +224,7 @@ TEST(ElabClause1002, ProceduralAssignToWandNet_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause1002, ProceduralAssignToWorNet_Error) {
+TEST(AssignmentOverviewElaboration, ProceduralAssignToWorNet_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"

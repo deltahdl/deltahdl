@@ -22,7 +22,7 @@ static void VerifyUdpTableSpotChecks(const UdpDecl* udp,
 
 namespace {
 
-TEST(ParserSection29, MixedLevelEdgeSensitive) {
+TEST(UserDefinedPrimitiveParsing, MixedLevelEdgeSensitive) {
   auto r = Parse(
       "primitive jk_edge_ff(output reg q, input clock, j, k, preset, clear);\n"
       "  table\n"

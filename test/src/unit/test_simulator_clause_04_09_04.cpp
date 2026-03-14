@@ -17,7 +17,7 @@ static void ScheduleNbaAssign(Scheduler& sched, const int& src, int& dst) {
   sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
 }
 
-TEST(SimCh4094, AlwaysComputesUpdatedValue) {
+TEST(NonblockingAssignSchedulingSim, AlwaysComputesUpdatedValue) {
   Arena arena;
   Scheduler sched(arena);
   int src = 42;
@@ -32,7 +32,7 @@ TEST(SimCh4094, AlwaysComputesUpdatedValue) {
   EXPECT_EQ(dst, 42);
 }
 
-TEST(SimCh4094, SchedulesUpdateAsNbaEvent) {
+TEST(NonblockingAssignSchedulingSim, SchedulesUpdateAsNbaEvent) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -58,7 +58,7 @@ TEST(SimCh4094, SchedulesUpdateAsNbaEvent) {
   EXPECT_EQ(order[1], "nba_update");
 }
 
-TEST(SimCh4094, ZeroDelaySchedulesNbaInCurrentTimestep) {
+TEST(NonblockingAssignSchedulingSim, ZeroDelaySchedulesNbaInCurrentTimestep) {
   Arena arena;
   Scheduler sched(arena);
   int dst = 0;
@@ -83,7 +83,7 @@ TEST(SimCh4094, ZeroDelaySchedulesNbaInCurrentTimestep) {
   EXPECT_TRUE(nba_executed_at_time_zero);
 }
 
-TEST(SimCh4094, NonzeroDelaySchedulesNbaAsFutureEvent) {
+TEST(NonblockingAssignSchedulingSim, NonzeroDelaySchedulesNbaAsFutureEvent) {
   Arena arena;
   Scheduler sched(arena);
   int dst = 0;
@@ -108,7 +108,7 @@ TEST(SimCh4094, NonzeroDelaySchedulesNbaAsFutureEvent) {
   EXPECT_EQ(nba_time, 10u);
 }
 
-TEST(SimCh4094, RhsComputedAtScheduleTime) {
+TEST(NonblockingAssignSchedulingSim, RhsComputedAtScheduleTime) {
   Arena arena;
   Scheduler sched(arena);
   int src = 10;
@@ -128,7 +128,7 @@ TEST(SimCh4094, RhsComputedAtScheduleTime) {
   EXPECT_EQ(dst, 10);
 }
 
-TEST(SimCh4094, LhsTargetDeterminedAtScheduleTime) {
+TEST(NonblockingAssignSchedulingSim, LhsTargetDeterminedAtScheduleTime) {
   Arena arena;
   Scheduler sched(arena);
   int select = 0;
@@ -160,7 +160,7 @@ TEST(SimCh4094, LhsTargetDeterminedAtScheduleTime) {
   EXPECT_EQ(dst_b, 0);
 }
 
-TEST(SimCh4094, MultipleNbasAllScheduleInNbaRegion) {
+TEST(NonblockingAssignSchedulingSim, MultipleNbasAllScheduleInNbaRegion) {
   Arena arena;
   Scheduler sched(arena);
   int a = 0;
@@ -193,7 +193,7 @@ TEST(SimCh4094, MultipleNbasAllScheduleInNbaRegion) {
   EXPECT_EQ(c, 3);
 }
 
-TEST(SimCh4094, NbaDoesNotBlockProcess) {
+TEST(NonblockingAssignSchedulingSim, NbaDoesNotBlockProcess) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -219,7 +219,7 @@ TEST(SimCh4094, NbaDoesNotBlockProcess) {
   EXPECT_EQ(order[2], "nba_update");
 }
 
-TEST(SimCh4094, NbaExecutesAfterActiveAndInactive) {
+TEST(NonblockingAssignSchedulingSim, NbaExecutesAfterActiveAndInactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -248,7 +248,7 @@ TEST(SimCh4094, NbaExecutesAfterActiveAndInactive) {
   EXPECT_EQ(order[2], "nba");
 }
 
-TEST(SimCh4094, SwapPatternBothRhsComputedBeforeUpdate) {
+TEST(NonblockingAssignSchedulingSim, SwapPatternBothRhsComputedBeforeUpdate) {
   Arena arena;
   Scheduler sched(arena);
   int x = 1;

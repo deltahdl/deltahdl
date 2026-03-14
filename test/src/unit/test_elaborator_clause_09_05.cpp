@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_05, InitialCreatesProcess) {
+TEST(ProcessExecutionThreadElaboration, InitialCreatesProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(ElabClause09_05, InitialCreatesProcess) {
             RtlirProcessKind::kInitial);
 }
 
-TEST(ElabClause09_05, FinalCreatesProcess) {
+TEST(ProcessExecutionThreadElaboration, FinalCreatesProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -34,7 +34,7 @@ TEST(ElabClause09_05, FinalCreatesProcess) {
             RtlirProcessKind::kFinal);
 }
 
-TEST(ElabClause09_05, AlwaysCreatesProcess) {
+TEST(ProcessExecutionThreadElaboration, AlwaysCreatesProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -49,7 +49,7 @@ TEST(ElabClause09_05, AlwaysCreatesProcess) {
             RtlirProcessKind::kAlways);
 }
 
-TEST(ElabClause09_05, AlwaysCombCreatesProcess) {
+TEST(ProcessExecutionThreadElaboration, AlwaysCombCreatesProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -64,7 +64,7 @@ TEST(ElabClause09_05, AlwaysCombCreatesProcess) {
             RtlirProcessKind::kAlwaysComb);
 }
 
-TEST(ElabClause09_05, AlwaysLatchCreatesProcess) {
+TEST(ProcessExecutionThreadElaboration, AlwaysLatchCreatesProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -79,7 +79,7 @@ TEST(ElabClause09_05, AlwaysLatchCreatesProcess) {
             RtlirProcessKind::kAlwaysLatch);
 }
 
-TEST(ElabClause09_05, AlwaysFFCreatesProcess) {
+TEST(ProcessExecutionThreadElaboration, AlwaysFFCreatesProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -94,7 +94,7 @@ TEST(ElabClause09_05, AlwaysFFCreatesProcess) {
             RtlirProcessKind::kAlwaysFF);
 }
 
-TEST(ElabClause09_05, MultipleProceduresCreateMultipleProcesses) {
+TEST(ProcessExecutionThreadElaboration, MultipleProceduresCreateMultipleProcesses) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -110,7 +110,7 @@ TEST(ElabClause09_05, MultipleProceduresCreateMultipleProcesses) {
   EXPECT_EQ(design->top_modules[0]->processes.size(), 4u);
 }
 
-TEST(ElabClause09_05, ContAssignSeparateFromProcesses) {
+TEST(ProcessExecutionThreadElaboration, ContAssignSeparateFromProcesses) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

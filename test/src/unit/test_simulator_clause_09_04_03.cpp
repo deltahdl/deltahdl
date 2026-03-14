@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA605, WaitConditionBlocks) {
+TEST(TimingControlSim, WaitConditionBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -30,7 +30,7 @@ TEST(SimA605, WaitConditionBlocks) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-TEST(SimA605, WaitAlreadyTrue) {
+TEST(TimingControlSim, WaitAlreadyTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

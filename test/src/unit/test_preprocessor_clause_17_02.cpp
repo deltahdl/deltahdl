@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_6_AssertionsInChecker) {
+TEST(DesignBuildingBlockParsing, AssertionsInChecker) {
   auto r = ParseWithPreprocessor(
       "checker req_ack_chk(logic clk, req, ack);\n"
       "  property req_followed_by_ack;\n"
@@ -27,7 +27,7 @@ TEST(ParserClause03, Cl3_6_AssertionsInChecker) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kCoverProperty));
 }
 
-TEST(ParserClause03, Cl3_6_ModelingCodeInChecker) {
+TEST(DesignBuildingBlockParsing, ModelingCodeInChecker) {
   auto r = ParseWithPreprocessor(
       "checker model_chk;\n"
       "  logic flag;\n"

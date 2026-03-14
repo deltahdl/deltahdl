@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA701, SpecifyBlockWithShowcancelledElaborates) {
+TEST(SpecifyBlockDeclElaboration, SpecifyBlockWithShowcancelledElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

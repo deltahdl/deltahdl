@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA60701, PatternConstantExpr) {
+TEST(PatternParsing, PatternConstantExpr) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -20,7 +20,7 @@ TEST(ParserA60701, PatternConstantExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, PatternTagged) {
+TEST(PatternParsing, PatternTagged) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -35,7 +35,7 @@ TEST(ParserA60701, PatternTagged) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, PatternTaggedWithAssignmentPattern) {
+TEST(PatternParsing, PatternTaggedWithAssignmentPattern) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -49,7 +49,7 @@ TEST(ParserA60701, PatternTaggedWithAssignmentPattern) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, PatternTaggedNested) {
+TEST(PatternParsing, PatternTaggedNested) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -63,7 +63,7 @@ TEST(ParserA60701, PatternTaggedNested) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, PatternTaggedVoidMember) {
+TEST(PatternParsing, PatternTaggedVoidMember) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -80,7 +80,7 @@ TEST(ParserA60701, PatternTaggedVoidMember) {
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
 }
 
-TEST(ParserA60701, PatternAssignmentWithDotBindings) {
+TEST(PatternParsing, PatternAssignmentWithDotBindings) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -94,7 +94,7 @@ TEST(ParserA60701, PatternAssignmentWithDotBindings) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, CasePatternItemWithGuard) {
+TEST(PatternParsing, CasePatternItemWithGuard) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -108,7 +108,7 @@ TEST(ParserA60701, CasePatternItemWithGuard) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, CasePatternTaggedWithGuard) {
+TEST(PatternParsing, CasePatternTaggedWithGuard) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -122,7 +122,7 @@ TEST(ParserA60701, CasePatternTaggedWithGuard) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA607, CaseMatchesParse) {
+TEST(CaseSyntaxParsing, CaseMatchesParse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -139,7 +139,7 @@ TEST(ParserA607, CaseMatchesParse) {
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
 }
 
-TEST(ParserA60701, CaseMatchesDefault) {
+TEST(PatternParsing, CaseMatchesDefault) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -158,7 +158,7 @@ TEST(ParserA60701, CaseMatchesDefault) {
   EXPECT_TRUE(stmt->case_items[1].is_default);
 }
 
-TEST(ParserA60701, CaseMatchesMultipleItems) {
+TEST(PatternParsing, CaseMatchesMultipleItems) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

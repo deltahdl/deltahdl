@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA85, NetLvalueSimpleContAssign) {
+TEST(LvalueSim, NetLvalueSimpleContAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -24,7 +24,7 @@ TEST(SimA85, NetLvalueSimpleContAssign) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(SimCh4, MultipleContinuousAssignments) {
+TEST(SchedulingSemanticsSim, MultipleContinuousAssignments) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -42,7 +42,7 @@ TEST(SimCh4, MultipleContinuousAssignments) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 12u);
 }
 
-TEST(SimCh4, ContinuousAssignChain) {
+TEST(SchedulingSemanticsSim, ContinuousAssignChain) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

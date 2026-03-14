@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, FdisplayFwrite) {
+TEST(IoSystemTaskParsing, FdisplayFwrite) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  integer fd;\n"
@@ -23,7 +23,7 @@ TEST(ParserSection21, FdisplayFwrite) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, FstrobeAndFmonitor) {
+TEST(IoSystemTaskParsing, FstrobeAndFmonitor) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  integer fd;\n"

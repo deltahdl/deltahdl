@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA70501, WidthThresholdAsLimit2) {
+TEST(TimingCheckCommandSim, WidthThresholdAsLimit2) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kWidth;

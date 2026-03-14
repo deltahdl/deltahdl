@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA83, PrecedenceMulBeforeAdd) {
+TEST(ExpressionSim, PrecedenceMulBeforeAdd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -12,7 +12,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserAnnexF, AnnexFPropertyAnd) {
+TEST(AssertionSemanticsParsing, PropertyAnd) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"
@@ -23,7 +23,7 @@ TEST(ParserAnnexF, AnnexFPropertyAnd) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserSection16, PropertyConjunction) {
+TEST(AssertionParsing, PropertyConjunction) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"

@@ -6,14 +6,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, PropertyExpr_Not) {
+TEST(AssertionDeclParsing, PropertyExpr_Not) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) not a);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection16, Sec16_5_1_PropertyNot) {
+TEST(AssertionParsing, PropertyNot) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) not (a ##1 b));\n"
@@ -27,7 +27,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-TEST(ParserAnnexF, AnnexFPropertyNot) {
+TEST(AssertionSemanticsParsing, PropertyNot) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) not (a |-> b));\n"
@@ -37,7 +37,7 @@ TEST(ParserAnnexF, AnnexFPropertyNot) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserSection16, PropertyNegation) {
+TEST(AssertionParsing, PropertyNegation) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) not (a ##1 b));\n"
@@ -46,7 +46,7 @@ TEST(ParserSection16, PropertyNegation) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, PropertyNegationStrong) {
+TEST(AssertionParsing, PropertyNegationStrong) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) not strong(a ##1 b));\n"

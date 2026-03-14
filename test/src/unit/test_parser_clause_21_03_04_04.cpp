@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, FreadBasicCall) {
+TEST(IoSystemTaskParsing, FreadBasicCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  integer fd;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection21, FreadBasicCall) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, FreadWithStartCount) {
+TEST(IoSystemTaskParsing, FreadWithStartCount) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  integer fd;\n"

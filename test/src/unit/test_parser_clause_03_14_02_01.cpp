@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_14_2_TimescaleWithoutKeywords) {
+TEST(DesignBuildingBlockParsing, TimescaleWithoutKeywords) {
   auto r = ParseTimescale31402(
       "`timescale 1ns / 1ps\n"
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(ParserClause03, Cl3_14_2_TimescaleWithoutKeywords) {
   EXPECT_FALSE(mod->has_timeprecision);
 }
 
-TEST(ParserClause03, Cl3_14_2_1_KeywordsOverrideTimescale) {
+TEST(DesignBuildingBlockParsing, KeywordsOverrideTimescale) {
   auto r = ParseTimescale31402(
       "`timescale 1ns / 1ps\n"
       "module m;\n"
@@ -36,7 +36,7 @@ TEST(ParserClause03, Cl3_14_2_1_KeywordsOverrideTimescale) {
   EXPECT_EQ(mod->time_prec, TimeUnit::kNs);
 }
 
-TEST(ParserClause03, Cl3_14_TimeScaleTwoComponents) {
+TEST(DesignBuildingBlockParsing, TimeScaleTwoComponents) {
   TimeScale ts;
   ts.unit = TimeUnit::kNs;
   ts.magnitude = 1;

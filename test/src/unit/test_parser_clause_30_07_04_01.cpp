@@ -6,7 +6,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA701, SpecifyItemPulsestyleDecl) {
+TEST(SpecifyBlockDeclParsing, SpecifyItemPulsestyleDecl) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -21,7 +21,7 @@ TEST(ParserA701, SpecifyItemPulsestyleDecl) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPulsestyle);
 }
 
-TEST(ParserA701, PulsestyleOneventSingleOutput) {
+TEST(SpecifyBlockDeclParsing, PulsestyleOneventSingleOutput) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -39,7 +39,7 @@ TEST(ParserA701, PulsestyleOneventSingleOutput) {
   EXPECT_EQ(item->signal_list[0], "out1");
 }
 
-TEST(ParserA701, PulsestyleOneventMultipleOutputs) {
+TEST(SpecifyBlockDeclParsing, PulsestyleOneventMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -59,7 +59,7 @@ TEST(ParserA701, PulsestyleOneventMultipleOutputs) {
   EXPECT_EQ(item->signal_list[2], "out3");
 }
 
-TEST(ParserA701, PulsestyleOndetectSingleOutput) {
+TEST(SpecifyBlockDeclParsing, PulsestyleOndetectSingleOutput) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -77,7 +77,7 @@ TEST(ParserA701, PulsestyleOndetectSingleOutput) {
   EXPECT_EQ(item->signal_list[0], "q");
 }
 
-TEST(ParserA701, PulsestyleOndetectMultipleOutputs) {
+TEST(SpecifyBlockDeclParsing, PulsestyleOndetectMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -124,7 +124,7 @@ TEST_F(SpecifyTest, PulsestyleOndetect) {
   EXPECT_TRUE(spec->specify_items[0]->is_ondetect);
 }
 
-TEST(ParserSection28, Sec28_12_PulsestyleOnevent) {
+TEST(GateLevelModelingParsing, PulsestyleOnevent) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b);\n"
       "  specify\n"
@@ -141,7 +141,7 @@ TEST(ParserSection28, Sec28_12_PulsestyleOnevent) {
   EXPECT_EQ(si->signal_list[0], "b");
 }
 
-TEST(ParserSection28, Sec28_12_PulsestyleOndetect) {
+TEST(GateLevelModelingParsing, PulsestyleOndetect) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b, c);\n"
       "  specify\n"
@@ -159,7 +159,7 @@ TEST(ParserSection28, Sec28_12_PulsestyleOndetect) {
   EXPECT_EQ(si->signal_list[1], "c");
 }
 
-TEST(ParserA701, SpecifyItemPulsestyleOnevent) {
+TEST(SpecifyBlockDeclParsing, SpecifyItemPulsestyleOnevent) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -178,7 +178,7 @@ TEST(ParserA701, SpecifyItemPulsestyleOnevent) {
   EXPECT_EQ(si->signal_list[0], "out1");
 }
 
-TEST(ParserA701, SpecifyItemPulsestyleOndetect) {
+TEST(SpecifyBlockDeclParsing, SpecifyItemPulsestyleOndetect) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -195,7 +195,7 @@ TEST(ParserA701, SpecifyItemPulsestyleOndetect) {
   EXPECT_TRUE(si->is_ondetect);
 }
 
-TEST(ParserA701, PulsestyleMultipleOutputs) {
+TEST(SpecifyBlockDeclParsing, PulsestyleMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

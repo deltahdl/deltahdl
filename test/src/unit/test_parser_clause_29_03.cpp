@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA051, ExternThenDefinition) {
+TEST(UdpDeclGrammar, ExternThenDefinition) {
   auto r = Parse(
       "extern primitive inv(output out, input in);\n"
       "primitive inv(output out, input in);\n"
@@ -26,7 +26,7 @@ TEST(ParserAnnexA051, ExternThenDefinition) {
   EXPECT_EQ(r.cu->udps[1]->table.size(), 2u);
 }
 
-TEST(ParserAnnexA051, WildcardPortSequential) {
+TEST(UdpDeclGrammar, WildcardPortSequential) {
   auto r = Parse(
       "primitive dff(.*);\n"
       "  output reg q;\n"
@@ -47,7 +47,7 @@ TEST(ParserAnnexA051, WildcardPortSequential) {
   ASSERT_EQ(udp->input_names.size(), 2u);
 }
 
-TEST(ParserA504, UdpInst_ExternUdp) {
+TEST(UdpInstantiationParsing, UdpInst_ExternUdp) {
   auto r = Parse(
       "extern primitive my_udp(output y, input a, input b);\n"
       "module m;\n"

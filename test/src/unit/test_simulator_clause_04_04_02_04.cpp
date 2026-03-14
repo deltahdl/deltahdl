@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4424, NBARegionExecutesEvents) {
+TEST(NbaRegionSim, NBARegionExecutesEvents) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,11 +23,11 @@ TEST(SimCh4424, NBARegionExecutesEvents) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4424, NBAExecutesAfterInactive) {
+TEST(NbaRegionSim, NBAExecutesAfterInactive) {
   VerifyTwoRegionOrder({Region::kInactive, "inactive"}, {Region::kNBA, "nba"});
 }
 
-TEST(SimCh4424, AllInactiveEventsCompleteBeforeNBA) {
+TEST(NbaRegionSim, AllInactiveEventsCompleteBeforeNBA) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -50,7 +50,7 @@ TEST(SimCh4424, AllInactiveEventsCompleteBeforeNBA) {
   EXPECT_EQ(order[3], "nba");
 }
 
-TEST(SimCh4424, NonblockingAssignmentSchedulesNBACurrentTime) {
+TEST(NbaRegionSim, NonblockingAssignmentSchedulesNBACurrentTime) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -71,7 +71,7 @@ TEST(SimCh4424, NonblockingAssignmentSchedulesNBACurrentTime) {
   EXPECT_EQ(order[1], "nba");
 }
 
-TEST(SimCh4424, NonblockingAssignmentSchedulesNBALaterTime) {
+TEST(NbaRegionSim, NonblockingAssignmentSchedulesNBALaterTime) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> nba_times;
@@ -91,17 +91,17 @@ TEST(SimCh4424, NonblockingAssignmentSchedulesNBALaterTime) {
   EXPECT_EQ(nba_times[0], 5u);
 }
 
-TEST(SimCh4424, NBAToActiveIteration) {
+TEST(NbaRegionSim, NBAToActiveIteration) {
   VerifyIterationChain(Region::kActive, "active", Region::kNBA, "nba");
 }
 
-TEST(SimCh4424, NBAExecutesAfterActiveAndInactiveBeforeObserved) {
+TEST(NbaRegionSim, NBAExecutesAfterActiveAndInactiveBeforeObserved) {
   VerifyFourRegionOrder({Region::kActive, "active"},
                         {Region::kInactive, "inactive"}, {Region::kNBA, "nba"},
                         {Region::kObserved, "observed"});
 }
 
-TEST(SimCh4424, NBAIsWithinActiveRegionSet) {
+TEST(NbaRegionSim, NBAIsWithinActiveRegionSet) {
   auto nba_ord = static_cast<int>(Region::kNBA);
   auto inactive_ord = static_cast<int>(Region::kInactive);
   auto post_nba_ord = static_cast<int>(Region::kPostNBA);
@@ -109,11 +109,11 @@ TEST(SimCh4424, NBAIsWithinActiveRegionSet) {
   EXPECT_LT(nba_ord, post_nba_ord);
 }
 
-TEST(SimCh4424, NBAEventsAcrossMultipleTimeSlots) {
+TEST(NbaRegionSim, NBAEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kNBA);
 }
 
-TEST(SimCh4424, NBAExecutesBeforeReNBA) {
+TEST(NbaRegionSim, NBAExecutesBeforeReNBA) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -132,7 +132,7 @@ TEST(SimCh4424, NBAExecutesBeforeReNBA) {
   EXPECT_EQ(order[1], 2);
 }
 
-TEST(SimCh4424, NBARegionHoldsMultipleEvents) {
+TEST(NbaRegionSim, NBARegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;

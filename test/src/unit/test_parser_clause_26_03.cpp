@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA213, DataDeclPackageImport) {
+TEST(TypeDeclParsing, DataDeclPackageImport) {
   auto r = Parse(
       "package pkg; endpackage\n"
       "module m; import pkg::*; endmodule");
@@ -14,7 +14,7 @@ TEST(ParserA213, DataDeclPackageImport) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA213, PackageImportMultiple) {
+TEST(TypeDeclParsing, PackageImportMultiple) {
   auto r = Parse(
       "package p1; endpackage\n"
       "package p2; endpackage\n"
@@ -28,7 +28,7 @@ TEST(ParserA213, PackageImportMultiple) {
   EXPECT_GE(import_count, 2);
 }
 
-TEST(ParserA213, PackageImportSingle) {
+TEST(TypeDeclParsing, PackageImportSingle) {
   auto r = Parse(
       "package pkg; endpackage\n"
       "module m; import pkg::foo; endmodule");
@@ -40,7 +40,7 @@ TEST(ParserA213, PackageImportSingle) {
   EXPECT_EQ(item->import_item.item_name, "foo");
 }
 
-TEST(ParserSection26, ModuleImportPackage) {
+TEST(PackageParsing, ModuleImportPackage) {
   auto r = Parse(
       "package p;\n"
       "endpackage\n"
@@ -54,7 +54,7 @@ TEST(ParserSection26, ModuleImportPackage) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
 }
 
-TEST(ParserSection26, ModuleImportSpecific) {
+TEST(PackageParsing, ModuleImportSpecific) {
   auto r = Parse(
       "package p;\n"
       "  parameter int X = 1;\n"
@@ -83,7 +83,7 @@ TEST_F(DpiParseTest, PackageImportStillWorks) {
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kImportDecl);
 }
 
-TEST(ParserSection26, ModuleMultipleImports) {
+TEST(PackageParsing, ModuleMultipleImports) {
   auto r = Parse(
       "package p1;\n"
       "endpackage\n"
@@ -102,7 +102,7 @@ TEST(ParserSection26, ModuleMultipleImports) {
   EXPECT_EQ(import_count, 2u);
 }
 
-TEST(ParserA84, ClassQualifierScope) {
+TEST(PrimaryParsing, ClassQualifierScope) {
   auto r = Parse("module m; initial x = pkg::my_const; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -111,7 +111,7 @@ TEST(ParserA84, ClassQualifierScope) {
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserSection26, ImportWildcardField) {
+TEST(PackageParsing, ImportWildcardField) {
   auto r = Parse(
       "package p;\n"
       "endpackage\n"
@@ -143,7 +143,7 @@ TEST_F(AnnexHParseTest, AnnexGStdRandomizePackageImport) {
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kImportDecl);
 }
 
-TEST(ParserSection26, ImportSpecificNotWildcard) {
+TEST(PackageParsing, ImportSpecificNotWildcard) {
   auto r = Parse(
       "package p;\n"
       "  parameter int X = 1;\n"
@@ -158,7 +158,7 @@ TEST(ParserSection26, ImportSpecificNotWildcard) {
   EXPECT_FALSE(imp->import_item.is_wildcard);
   EXPECT_EQ(imp->import_item.item_name, "X");
 }
-TEST(ParserSection23, MultiItemImport) {
+TEST(ModuleAndHierarchyParsing, MultiItemImport) {
   auto r = Parse(
       "module m;\n"
       "  import pkg::a, pkg::b;\n"
@@ -170,7 +170,7 @@ TEST(ParserSection23, MultiItemImport) {
   VerifyImportItem(mod->items[1], "pkg", "b");
 }
 
-TEST(ParserSection23, MultiItemImportWithWildcardFirst) {
+TEST(ModuleAndHierarchyParsing, MultiItemImportWithWildcardFirst) {
   auto r = Parse(
       "module m;\n"
       "  import pkg::*, other::func;\n"
@@ -182,7 +182,7 @@ TEST(ParserSection23, MultiItemImportWithWildcardFirst) {
   EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
 }
 
-TEST(ParserSection23, MultiItemImportWithWildcardSecond) {
+TEST(ModuleAndHierarchyParsing, MultiItemImportWithWildcardSecond) {
   auto r = Parse(
       "module m;\n"
       "  import pkg::*, other::func;\n"
@@ -194,7 +194,7 @@ TEST(ParserSection23, MultiItemImportWithWildcardSecond) {
   EXPECT_EQ(mod->items[1]->import_item.item_name, "func");
 }
 
-TEST(ParserSection6, ScopeResolutionType) {
+TEST(DataTypeParsing, ScopeResolutionType) {
   auto r = Parse(
       "module t;\n"
       "  import pkg::mytype;\n"
@@ -216,7 +216,7 @@ TEST(ParserSection6, ScopeResolutionType) {
   EXPECT_EQ(var_item->data_type.type_name, "mytype");
 }
 
-TEST(ParserClause03, Cl3_13_PackageImportExplicit) {
+TEST(DesignBuildingBlockParsing, PackageImportExplicit) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -235,7 +235,7 @@ TEST(ParserClause03, Cl3_13_PackageImportExplicit) {
   EXPECT_FALSE(item->import_item.is_wildcard);
 }
 
-TEST(ParserClause03, Cl3_13_PackageWildcardImport) {
+TEST(DesignBuildingBlockParsing, PackageWildcardImport) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -253,7 +253,7 @@ TEST(ParserClause03, Cl3_13_PackageWildcardImport) {
   EXPECT_TRUE(item->import_item.is_wildcard);
 }
 
-TEST(ParserClause03, Cl3_13_MultiplePackageImports) {
+TEST(DesignBuildingBlockParsing, MultiplePackageImports) {
   auto r = Parse(
       "package alpha;\n"
       "  typedef int alpha_t;\n"
@@ -276,7 +276,7 @@ TEST(ParserClause03, Cl3_13_MultiplePackageImports) {
   EXPECT_EQ(import_count, 2);
 }
 
-TEST(ParserClause03, Cl3_13_PackageScopeResolution) {
+TEST(DesignBuildingBlockParsing, PackageScopeResolution) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
               "  parameter int WIDTH = 8;\n"
@@ -286,7 +286,7 @@ TEST(ParserClause03, Cl3_13_PackageScopeResolution) {
               "endmodule\n"));
 }
 
-TEST(ParserA213, PackageImportItemStar) {
+TEST(TypeDeclParsing, PackageImportItemStar) {
   auto r = Parse(
       "package pkg; endpackage\n"
       "module m; import pkg::*; endmodule");
@@ -297,7 +297,7 @@ TEST(ParserA213, PackageImportItemStar) {
   EXPECT_TRUE(item->import_item.is_wildcard);
 }
 
-TEST(ParserA28, ImportInTask) {
+TEST(BlockItemDeclParsing, ImportInTask) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
               "  int val = 1;\n"
@@ -309,7 +309,7 @@ TEST(ParserA28, ImportInTask) {
               "endmodule\n"));
 }
 
-TEST(ParserA28, ImportMultipleInBlock) {
+TEST(BlockItemDeclParsing, ImportMultipleInBlock) {
   EXPECT_TRUE(
       ParseOk("package p1; int a; endpackage\n"
               "package p2; int b; endpackage\n"

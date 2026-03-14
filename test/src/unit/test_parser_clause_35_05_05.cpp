@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA26, DpiImportFunctionVoid) {
+TEST(FunctionDeclParsing, DpiImportFunctionVoid) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" function void c_print(input int x);\n"

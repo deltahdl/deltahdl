@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, CompatibleTypesParseLogicVectors) {
+TEST(DataTypeParsing, CompatibleTypesParseLogicVectors) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  logic [7:0] a;\n"

@@ -19,7 +19,7 @@ TEST(SourceText, NetAlias) {
   EXPECT_EQ(alias_item->alias_nets.size(), 3u);
 }
 
-TEST(ParserSection10, NetAliasTwoNets) {
+TEST(AssignmentParsing, NetAliasTwoNets) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire a, b;\n"
@@ -40,7 +40,7 @@ TEST(ParserSection10, NetAliasTwoNets) {
   ASSERT_EQ(alias_item->alias_nets.size(), 2u);
 }
 
-TEST(ParserSection10, NetAliasThreeNets) {
+TEST(AssignmentParsing, NetAliasThreeNets) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire a, b, c;\n"

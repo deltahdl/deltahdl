@@ -6,12 +6,12 @@ using namespace delta;
 
 namespace {
 
-TEST(LexerClause05, Cl5_10_ApostropheLBraceToken) {
+TEST(LexicalConventionLexing, ApostropheLBraceToken) {
   auto r = LexOne("'{");
   EXPECT_EQ(r.token.kind, TokenKind::kApostropheLBrace);
 }
 
-TEST(LexerClause05, Cl5_10_PositionalStructLiteralTokens) {
+TEST(LexicalConventionLexing, PositionalStructLiteralTokens) {
   auto tokens = Lex("'{0, 0.0}");
   ASSERT_GE(tokens.size(), 5u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
@@ -21,7 +21,7 @@ TEST(LexerClause05, Cl5_10_PositionalStructLiteralTokens) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kRBrace);
 }
 
-TEST(LexerClause05, Cl5_10_NamedMemberTokens) {
+TEST(LexicalConventionLexing, NamedMemberTokens) {
   auto tokens = Lex("'{a:0, b:1}");
   ASSERT_GE(tokens.size(), 9u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
@@ -31,7 +31,7 @@ TEST(LexerClause05, Cl5_10_NamedMemberTokens) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kComma);
 }
 
-TEST(LexerClause05, Cl5_10_DefaultKeyTokens) {
+TEST(LexicalConventionLexing, DefaultKeyTokens) {
   auto tokens = Lex("'{default:0}");
   ASSERT_GE(tokens.size(), 5u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
@@ -41,14 +41,14 @@ TEST(LexerClause05, Cl5_10_DefaultKeyTokens) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kRBrace);
 }
 
-TEST(LexerClause05, Cl5_10_NestedBraces) {
+TEST(LexicalConventionLexing, NestedBraces) {
   auto tokens = Lex("'{'{1, 1.0}, '{2, 2.0}}");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
   EXPECT_EQ(tokens[1].kind, TokenKind::kApostropheLBrace);
 }
 
-TEST(LexerClause05, Cl5_10_TypePrefixedTokens) {
+TEST(LexicalConventionLexing, TypePrefixedTokens) {
   auto tokens = Lex("ab'{int:1, shortreal:1.0}");
   ASSERT_GE(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);

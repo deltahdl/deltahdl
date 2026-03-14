@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParseA88, StringLiteralQuotedStringAsPrimary) {
+TEST(StringLiteralSyntaxParsing, StringLiteralQuotedStringAsPrimary) {
   auto r = Parse(
       "module m;\n"
       "  string s;\n"
@@ -15,7 +15,7 @@ TEST(ParseA88, StringLiteralQuotedStringAsPrimary) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParseA88, StringLiteralTripleQuotedStringAsPrimary) {
+TEST(StringLiteralSyntaxParsing, StringLiteralTripleQuotedStringAsPrimary) {
   auto r = Parse(
       "module m;\n"
       "  string s;\n"
@@ -25,7 +25,7 @@ TEST(ParseA88, StringLiteralTripleQuotedStringAsPrimary) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParseA88, QuotedStringWithQuotedStringItems) {
+TEST(StringLiteralSyntaxParsing, QuotedStringWithQuotedStringItems) {
   auto r = Parse(
       "module m;\n"
       "  string s;\n"
@@ -35,7 +35,7 @@ TEST(ParseA88, QuotedStringWithQuotedStringItems) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParseA88, QuotedStringWithEscapeSeqAnyAscii) {
+TEST(StringLiteralSyntaxParsing, QuotedStringWithEscapeSeqAnyAscii) {
   auto r = Parse(
       "module m;\n"
       "  string s;\n"
@@ -45,7 +45,7 @@ TEST(ParseA88, QuotedStringWithEscapeSeqAnyAscii) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParseA88, QuotedStringWithEscapeSeqOctal) {
+TEST(StringLiteralSyntaxParsing, QuotedStringWithEscapeSeqOctal) {
   auto r = Parse(
       "module m;\n"
       "  byte c;\n"
@@ -55,7 +55,7 @@ TEST(ParseA88, QuotedStringWithEscapeSeqOctal) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParseA88, QuotedStringWithEscapeSeqHex) {
+TEST(StringLiteralSyntaxParsing, QuotedStringWithEscapeSeqHex) {
   auto r = Parse(
       "module m;\n"
       "  byte c;\n"
@@ -65,7 +65,7 @@ TEST(ParseA88, QuotedStringWithEscapeSeqHex) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParseA88, TripleQuotedStringItemIncludingNewline) {
+TEST(StringLiteralSyntaxParsing, TripleQuotedStringItemIncludingNewline) {
   auto r = Parse(
       "module m;\n"
       "  string s;\n"
@@ -75,7 +75,7 @@ TEST(ParseA88, TripleQuotedStringItemIncludingNewline) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParseA88, TripleQuotedStringItemIncludingDoubleQuote) {
+TEST(StringLiteralSyntaxParsing, TripleQuotedStringItemIncludingDoubleQuote) {
   auto r = Parse(
       "module m;\n"
       "  string s;\n"
@@ -85,7 +85,7 @@ TEST(ParseA88, TripleQuotedStringItemIncludingDoubleQuote) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParseA88, TripleQuotedStringWithEscapeSeq) {
+TEST(StringLiteralSyntaxParsing, TripleQuotedStringWithEscapeSeq) {
   auto r = Parse(
       "module m;\n"
       "  string s;\n"
@@ -95,7 +95,7 @@ TEST(ParseA88, TripleQuotedStringWithEscapeSeq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParseA88, StringLiteralInSystemTaskArg) {
+TEST(StringLiteralSyntaxParsing, StringLiteralInSystemTaskArg) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"hello world\");\n"
@@ -104,7 +104,7 @@ TEST(ParseA88, StringLiteralInSystemTaskArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParseA88, TripleQuotedStringInSystemTaskArg) {
+TEST(StringLiteralSyntaxParsing, TripleQuotedStringInSystemTaskArg) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"\"\"hello world\"\"\");\n"

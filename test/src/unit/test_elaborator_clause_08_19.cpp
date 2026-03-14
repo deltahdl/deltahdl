@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA819, GlobalConstantOk) {
+TEST(ConstantClassPropertyElaboration, GlobalConstantOk) {
   EXPECT_TRUE(
       ElabOk("class Jumbo_Packet;\n"
              "  const int max_size = 9 * 1024;\n"
@@ -14,7 +14,7 @@ TEST(ElabA819, GlobalConstantOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA819, StaticConstGlobalOk) {
+TEST(ConstantClassPropertyElaboration, StaticConstGlobalOk) {
   EXPECT_TRUE(
       ElabOk("class Config;\n"
              "  static const int VERSION = 3;\n"
@@ -24,7 +24,7 @@ TEST(ElabA819, StaticConstGlobalOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA819, InstanceConstantOk) {
+TEST(ConstantClassPropertyElaboration, InstanceConstantOk) {
   EXPECT_TRUE(
       ElabOk("class Big_Packet;\n"
              "  const int size;\n"
@@ -37,7 +37,7 @@ TEST(ElabA819, InstanceConstantOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA819, InstanceConstStaticError) {
+TEST(ConstantClassPropertyElaboration, InstanceConstStaticError) {
   EXPECT_FALSE(
       ElabOk("class Bad;\n"
              "  static const int size;\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA609, TaskCallNoParens) {
+TEST(SubroutineCallSim, TaskCallNoParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -29,7 +29,7 @@ TEST(SimA609, TaskCallNoParens) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-TEST(Sim1355, TaskCallEmptyParens) {
+TEST(ArgumentBindingSim, TaskCallEmptyParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -52,7 +52,7 @@ TEST(Sim1355, TaskCallEmptyParens) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(Sim1355, VoidFunctionNoParens) {
+TEST(ArgumentBindingSim, VoidFunctionNoParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

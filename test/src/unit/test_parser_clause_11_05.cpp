@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, Sec11_1_IdentifierAsExpression) {
+TEST(OperatorAndExpressionParsing, IdentifierAsExpression) {
   auto r = Parse(
       "module t;\n"
       "  initial x = foo;\n"
@@ -14,7 +14,7 @@ TEST(ParserSection11, Sec11_1_IdentifierAsExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserSection11, Sec11_1_SystemFunctionCallExpression) {
+TEST(OperatorAndExpressionParsing, SystemFunctionCallExpression) {
   auto r = Parse(
       "module t;\n"
       "  initial x = $clog2(256);\n"
@@ -25,7 +25,7 @@ TEST(ParserSection11, Sec11_1_SystemFunctionCallExpression) {
   EXPECT_EQ(rhs->callee, "$clog2");
 }
 
-TEST(ParserSection11, Sec11_1_FunctionCallExpression) {
+TEST(OperatorAndExpressionParsing, FunctionCallExpression) {
   auto r = Parse(
       "module t;\n"
       "  initial x = my_func(a, b);\n"

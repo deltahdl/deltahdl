@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection7, AssocArrayIntIndex_DimExpr) {
+TEST(AggregateTypeParsing, AssocArrayIntIndex_DimExpr) {
   auto r = Parse(
       "module t;\n"
       "  byte lookup[int];\n"

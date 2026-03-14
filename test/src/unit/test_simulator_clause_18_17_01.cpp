@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA612, WeightedAlternativesReachable) {
+TEST(RandsequenceSim, WeightedAlternativesReachable) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

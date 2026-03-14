@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, SequenceMethodCall_Triggered) {
+TEST(AssertionDeclParsing, SequenceMethodCall_Triggered) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s; a ##1 b; endsequence\n"
@@ -14,14 +14,14 @@ TEST(ParserA210, SequenceMethodCall_Triggered) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceMethodCall_Matched) {
+TEST(AssertionDeclParsing, SequenceMethodCall_Matched) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s; a ##1 b; endsequence\n"
               "  assert property (@(posedge clk) s.matched |-> c);\n"
               "endmodule\n"));
 }
-TEST(ParserSection9, WaitSequenceTriggeredIfCheck) {
+TEST(ProcessParsing, WaitSequenceTriggeredIfCheck) {
   auto r = Parse(
       "module m;\n"
       "  sequence abc;\n"
@@ -36,7 +36,7 @@ TEST(ParserSection9, WaitSequenceTriggeredIfCheck) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection16, Sec16_5_1_SequenceTriggeredMethod) {
+TEST(AssertionParsing, SequenceTriggeredMethod) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s1;\n"
@@ -48,7 +48,7 @@ TEST(ParserSection16, Sec16_5_1_SequenceTriggeredMethod) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, Sec16_5_1_SequenceMatchedMethod) {
+TEST(AssertionParsing, SequenceMatchedMethod) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence e1;\n"
@@ -60,7 +60,7 @@ TEST(ParserSection16, Sec16_5_1_SequenceMatchedMethod) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, SequenceTriggeredMethod) {
+TEST(AssertionParsing, SequenceTriggeredMethodChained) {
   auto r = Parse(
       "module m;\n"
       "  sequence e1;\n"
@@ -74,7 +74,7 @@ TEST(ParserSection16, SequenceTriggeredMethod) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, SequenceMatchedMethod) {
+TEST(AssertionParsing, SequenceMatchedMethodWithReset) {
   auto r = Parse(
       "module m;\n"
       "  sequence e1;\n"

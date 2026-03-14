@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, SequenceExpr_FirstMatch) {
+TEST(AssertionDeclParsing, SequenceExpr_FirstMatch) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"
@@ -19,7 +19,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-TEST(ParserAnnexF, AnnexFFirstMatch) {
+TEST(AssertionSemanticsParsing, FirstMatch) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"

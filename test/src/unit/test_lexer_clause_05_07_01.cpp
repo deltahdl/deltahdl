@@ -7,188 +7,188 @@ using namespace delta;
 
 namespace {
 
-TEST(LexerClause05, Cl5_7_1_UnsizedDecimal) {
+TEST(LexicalConventionLexing, UnsizedDecimal) {
   auto r = LexOne("659 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "659");
 }
 
-TEST(LexerClause05, Cl5_7_1_UnsizedDecimalZero) {
+TEST(LexicalConventionLexing, UnsizedDecimalZero) {
   auto r = LexOne("0 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "0");
 }
 
-TEST(LexerClause05, Cl5_7_1_UnsizedHex) {
+TEST(LexicalConventionLexing, UnsizedHex) {
   auto r = LexOne("'h837FF ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "'h837FF");
 }
 
-TEST(LexerClause05, Cl5_7_1_UnsizedOctal) {
+TEST(LexicalConventionLexing, UnsizedOctal) {
   auto r = LexOne("'o7460 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "'o7460");
 }
 
-TEST(LexerClause05, Cl5_7_1_SizedBinary) {
+TEST(LexicalConventionLexing, SizedBinary) {
   auto r = LexOne("4'b1001 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "4'b1001");
 }
 
-TEST(LexerClause05, Cl5_7_1_SizedDecimal) {
+TEST(LexicalConventionLexing, SizedDecimal) {
   auto r = LexOne("5'D3 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "5'D3");
 }
 
-TEST(LexerClause05, Cl5_7_1_SizedHex) {
+TEST(LexicalConventionLexing, SizedHex) {
   auto r = LexOne("8'hFF ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "8'hFF");
 }
 
-TEST(LexerClause05, Cl5_7_1_SizedOctal) {
+TEST(LexicalConventionLexing, SizedOctal) {
   auto r = LexOne("8'o77 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "8'o77");
 }
 
-TEST(LexerClause05, Cl5_7_1_SignedHex) {
+TEST(LexicalConventionLexing, SignedHex) {
   auto r = LexOne("4'shf ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "4'shf");
 }
 
-TEST(LexerClause05, Cl5_7_1_SignedDecimal) {
+TEST(LexicalConventionLexing, SignedDecimal) {
   auto r = LexOne("8'sd99 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "8'sd99");
 }
 
-TEST(LexerClause05, Cl5_7_1_SignedUpperS) {
+TEST(LexicalConventionLexing, SignedUpperS) {
   auto r = LexOne("4'Shf ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "4'Shf");
 }
 
-TEST(LexerClause05, Cl5_7_1_BaseUpperH) {
+TEST(LexicalConventionLexing, BaseUpperH) {
   auto r = LexOne("8'HAB ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_BaseUpperB) {
+TEST(LexicalConventionLexing, BaseUpperB) {
   auto r = LexOne("4'B1010 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_BaseUpperO) {
+TEST(LexicalConventionLexing, BaseUpperO) {
   auto r = LexOne("8'O77 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_WhitespaceSizeAndBase) {
+TEST(LexicalConventionLexing, WhitespaceSizeAndBase) {
   auto r = LexOne("5 'D 3 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_WhitespaceBaseAndDigits) {
+TEST(LexicalConventionLexing, WhitespaceBaseAndDigits) {
   auto r = LexOne("32 'h 12ab_f001 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_XValueInHex) {
+TEST(LexicalConventionLexing, XValueInHex) {
   auto r = LexOne("12'hx ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_ZValueInHex) {
+TEST(LexicalConventionLexing, ZValueInHex) {
   auto r = LexOne("16'hz ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_QuestionMarkInBinary) {
+TEST(LexicalConventionLexing, QuestionMarkInBinary) {
   auto r = LexOne("4'b? ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_QuestionMarkSigned) {
+TEST(LexicalConventionLexing, QuestionMarkSigned) {
   auto r = LexOne("16'sd? ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_UnderscoreInDecimal) {
+TEST(LexicalConventionLexing, UnderscoreInDecimal) {
   auto r = LexOne("27_195_000 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r.token.text, "27_195_000");
 }
 
-TEST(LexerClause05, Cl5_7_1_UnderscoreInBinary) {
+TEST(LexicalConventionLexing, UnderscoreInBinary) {
   auto r = LexOne("16'b0011_0101_0001_1111 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_UnderscoreInHex) {
+TEST(LexicalConventionLexing, UnderscoreInHex) {
   auto r = LexOne("32'h12ab_f001 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedZero) {
+TEST(LexicalConventionLexing, UnbasedUnsizedZero) {
   auto r = LexOne("'0 ");
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
   EXPECT_EQ(r.token.text, "'0");
 }
 
-TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedOne) {
+TEST(LexicalConventionLexing, UnbasedUnsizedOne) {
   auto r = LexOne("'1 ");
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
   EXPECT_EQ(r.token.text, "'1");
 }
 
-TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedX) {
+TEST(LexicalConventionLexing, UnbasedUnsizedX) {
   auto r = LexOne("'x ");
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedZ) {
+TEST(LexicalConventionLexing, UnbasedUnsizedZ) {
   auto r = LexOne("'z ");
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedUpperX) {
+TEST(LexicalConventionLexing, UnbasedUnsizedUpperX) {
   auto r = LexOne("'X ");
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_UnbasedUnsizedUpperZ) {
+TEST(LexicalConventionLexing, UnbasedUnsizedUpperZ) {
   auto r = LexOne("'Z ");
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_NoDigitsAfterBaseError) {
+TEST(LexicalConventionLexing, NoDigitsAfterBaseError) {
   auto [tokens, errors] = LexWithDiag("8'd-6");
   EXPECT_TRUE(errors);
 }
 
-TEST(LexerClause05, Cl5_7_1_DecimalXZMixedError) {
+TEST(LexicalConventionLexing, DecimalXZMixedError) {
   auto [tokens, errors] = LexWithDiag("8'd1x");
   EXPECT_TRUE(errors);
 }
 
-TEST(LexerClause05, Cl5_7_1_DecimalXZMultiError) {
+TEST(LexicalConventionLexing, DecimalXZMultiError) {
   auto [tokens, errors] = LexWithDiag("8'dxz");
   EXPECT_TRUE(errors);
 }
 
-TEST(LexerClause05, Cl5_7_1_HexDigitsCaseInsensitive) {
+TEST(LexicalConventionLexing, HexDigitsCaseInsensitive) {
   auto r1 = LexOne("8'habcd ");
   auto r2 = LexOne("8'hABCD ");
   EXPECT_EQ(r1.token.kind, TokenKind::kIntLiteral);
   EXPECT_EQ(r2.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_7_1_LargeUnsizedHex) {
+TEST(LexicalConventionLexing, LargeUnsizedHex) {
   auto r = LexOne("'h7_0000_0000 ");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }

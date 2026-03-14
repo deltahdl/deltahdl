@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA8264, InterfaceDeclaredBeforeUseOk) {
+TEST(InterfaceClassDiamondElaboration, InterfaceDeclaredBeforeUseOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
              "  pure virtual function void foo();\n"
@@ -17,7 +17,7 @@ TEST(ElabA8264, InterfaceDeclaredBeforeUseOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA8264, ParameterizedInterfaceOk) {
+TEST(InterfaceClassDiamondElaboration, ParameterizedInterfaceOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC #(type T = int);\n"
              "  pure virtual function void foo();\n"

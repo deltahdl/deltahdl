@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA051, TableEdgeSymbols) {
+TEST(UdpDeclGrammar, TableEdgeSymbols) {
   auto r = Parse(
       "primitive edge_det(output reg q, input d, input clk);\n"
       "  table\n"
@@ -27,7 +27,7 @@ TEST(ParserAnnexA051, TableEdgeSymbols) {
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
-TEST(ParserAnnexA051, TableWildcardSymbols) {
+TEST(UdpDeclGrammar, TableWildcardSymbols) {
   auto r = Parse(
       "primitive wild(output out, input a, input b);\n"
       "  table\n"
@@ -45,7 +45,7 @@ TEST(ParserAnnexA051, TableWildcardSymbols) {
   EXPECT_EQ(udp->table[1].inputs[1], 'b');
 }
 
-TEST(ParserAnnexA051, SimCombinationalWildcard) {
+TEST(UdpDeclGrammar, SimCombinationalWildcard) {
   auto r = Parse(
       "primitive mux(output out, input a, b, sel);\n"
       "  table\n"
@@ -66,7 +66,7 @@ TEST(ParserAnnexA051, SimCombinationalWildcard) {
   EXPECT_EQ(state.Evaluate({'1', '1', '1'}), '1');
 }
 
-TEST(ParserAnnexA053, NextState_Dash) {
+TEST(UdpBodyGrammar, NextState_Dash) {
   auto r = Parse(
       "primitive p(output reg q, input d, en);\n"
       "  table\n"
@@ -77,7 +77,7 @@ TEST(ParserAnnexA053, NextState_Dash) {
   EXPECT_EQ(r.cu->udps[0]->table[0].output, '-');
 }
 
-TEST(ParserAnnexA053, NextState_SimDashKeepsState) {
+TEST(UdpBodyGrammar, NextState_SimDashKeepsState) {
   auto r = Parse(
       "primitive latch(output reg q, input d, en);\n"
       "  initial q = 1;\n"
@@ -103,7 +103,7 @@ TEST(ParserAnnexA053, NextState_SimDashKeepsState) {
   EXPECT_EQ(eval.GetOutput(), '0');
 }
 
-TEST(ParserAnnexA053, OutputSymbol_SimValues) {
+TEST(UdpBodyGrammar, OutputSymbol_SimValues) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
       "  table\n"
@@ -120,7 +120,7 @@ TEST(ParserAnnexA053, OutputSymbol_SimValues) {
   EXPECT_EQ(eval.Evaluate({'x'}), 'x');
 }
 
-TEST(ParserAnnexA053, LevelSymbol_SimQuestion) {
+TEST(UdpBodyGrammar, LevelSymbol_SimQuestion) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
       "  table\n"
@@ -135,7 +135,7 @@ TEST(ParserAnnexA053, LevelSymbol_SimQuestion) {
   EXPECT_EQ(eval.Evaluate({'x'}), '1');
 }
 
-TEST(ParserAnnexA053, LevelSymbol_SimB) {
+TEST(UdpBodyGrammar, LevelSymbol_SimB) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
       "  table\n"
@@ -151,7 +151,7 @@ TEST(ParserAnnexA053, LevelSymbol_SimB) {
   EXPECT_EQ(eval.Evaluate({'x'}), 'x');
 }
 
-TEST(ParserAnnexA053, EdgeSymbol_SimF) {
+TEST(UdpBodyGrammar, EdgeSymbol_SimF) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
       "  initial q = 0;\n"
@@ -171,7 +171,7 @@ TEST(ParserAnnexA053, EdgeSymbol_SimF) {
   EXPECT_EQ(eval.EvaluateWithEdge({'1', '0'}, 1, '1'), '1');
 }
 
-TEST(ParserAnnexA053, EdgeSymbol_SimP) {
+TEST(UdpBodyGrammar, EdgeSymbol_SimP) {
   auto r = Parse(
       "primitive p_udp(output reg q, input a);\n"
       "  initial q = 0;\n"
@@ -187,7 +187,7 @@ TEST(ParserAnnexA053, EdgeSymbol_SimP) {
   EXPECT_EQ(eval.EvaluateWithEdge({'1'}, 0, '0'), '1');
 }
 
-TEST(ParserAnnexA053, EdgeSymbol_SimN) {
+TEST(UdpBodyGrammar, EdgeSymbol_SimN) {
   auto r = Parse(
       "primitive n_udp(output reg q, input a);\n"
       "  initial q = 1;\n"
@@ -203,7 +203,7 @@ TEST(ParserAnnexA053, EdgeSymbol_SimN) {
   EXPECT_EQ(eval.EvaluateWithEdge({'0'}, 0, '1'), '0');
 }
 
-TEST(ParserAnnexA053, EdgeSymbol_SimStar) {
+TEST(UdpBodyGrammar, EdgeSymbol_SimStar) {
   auto r = Parse(
       "primitive star_udp(output reg q, input a);\n"
       "  initial q = 0;\n"
@@ -221,7 +221,7 @@ TEST(ParserAnnexA053, EdgeSymbol_SimStar) {
   EXPECT_EQ(eval.EvaluateWithEdge({'0'}, 0, '1'), '1');
 }
 
-TEST(ParserSection29, UdpTableSpecialChars) {
+TEST(UserDefinedPrimitiveParsing, UdpTableSpecialChars) {
   auto r = Parse(
       "primitive edge_detect(output reg q, input d, clk);\n"
       "  table\n"
@@ -246,7 +246,7 @@ TEST(ParserSection29, UdpTableSpecialChars) {
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
-TEST(ParserSection29, TableSymbol0And1) {
+TEST(UserDefinedPrimitiveParsing, TableSymbol0And1) {
   auto r = Parse(
       "primitive and_gate(output out, input a, b);\n"
       "  table\n"
@@ -271,7 +271,7 @@ TEST(ParserSection29, TableSymbol0And1) {
   EXPECT_EQ(udp->table[3].output, '1');
 }
 
-TEST(ParserSection29, TableSymbolQuestionMark) {
+TEST(UserDefinedPrimitiveParsing, TableSymbolQuestionMark) {
   auto r = Parse(
       "primitive buf_udp(output out, input in);\n"
       "  table\n"
@@ -288,7 +288,7 @@ TEST(ParserSection29, TableSymbolQuestionMark) {
   EXPECT_EQ(r.cu->udps[0]->table[2].output, 'x');
 }
 
-TEST(ParserSection29, TableSymbolX) {
+TEST(UserDefinedPrimitiveParsing, TableSymbolX) {
   auto r = Parse(
       "primitive xor_udp(output out, input a, b);\n"
       "  table\n"
@@ -309,7 +309,7 @@ TEST(ParserSection29, TableSymbolX) {
   EXPECT_EQ(udp->table[4].output, 'x');
 }
 
-TEST(ParserSection29, TableSymbolB) {
+TEST(UserDefinedPrimitiveParsing, TableSymbolB) {
   auto r = Parse(
       "primitive or_udp(output out, input a, b);\n"
       "  table\n"
@@ -326,7 +326,7 @@ TEST(ParserSection29, TableSymbolB) {
   EXPECT_EQ(udp->table[1].inputs[1], 'b');
 }
 
-TEST(ParserSection29, TableSymbolDashNoChange) {
+TEST(UserDefinedPrimitiveParsing, TableSymbolDashNoChange) {
   auto r = Parse(
       "primitive latch(output reg q, input d, en);\n"
       "  table\n"
@@ -345,7 +345,7 @@ TEST(ParserSection29, TableSymbolDashNoChange) {
   EXPECT_EQ(udp->table[2].current_state, '?');
 }
 
-TEST(ParserSection29, TableEdgeSymbolsRAndF) {
+TEST(UserDefinedPrimitiveParsing, TableEdgeSymbolsRAndF) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
       "  table\n"
@@ -364,7 +364,7 @@ TEST(ParserSection29, TableEdgeSymbolsRAndF) {
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
-TEST(ParserSection29, TableEdgeSymbolStar) {
+TEST(UserDefinedPrimitiveParsing, TableEdgeSymbolStar) {
   auto r = Parse(
       "primitive any_change(output reg q, input d, clk);\n"
       "  table\n"
@@ -380,7 +380,7 @@ TEST(ParserSection29, TableEdgeSymbolStar) {
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
-TEST(ParserSection29, TableEdgeSymbolsPAndN) {
+TEST(UserDefinedPrimitiveParsing, TableEdgeSymbolsPAndN) {
   EXPECT_TRUE(
       ParseOk("primitive pos_neg(output reg q, input d, clk);\n"
               "  table\n"
@@ -391,7 +391,7 @@ TEST(ParserSection29, TableEdgeSymbolsPAndN) {
               "endprimitive\n"));
 }
 
-TEST(ParserSection29, TableEdgeNotationParenthesized) {
+TEST(UserDefinedPrimitiveParsing, TableEdgeNotationParenthesized) {
   EXPECT_TRUE(
       ParseOk("primitive edge_udp(output reg q, input d, clk);\n"
               "  table\n"

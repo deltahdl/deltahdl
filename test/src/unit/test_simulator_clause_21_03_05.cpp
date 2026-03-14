@@ -75,7 +75,7 @@ TEST(SysTask, RewindResetsPosition) {
   std::remove(tmp.c_str());
 }
 
-TEST(Section21, Rewind) {
+TEST(IoSystemTaskTest, Rewind) {
   SimFixture f;
   std::string tmp_path = "/tmp/deltahdl_test_rewind.txt";
   {

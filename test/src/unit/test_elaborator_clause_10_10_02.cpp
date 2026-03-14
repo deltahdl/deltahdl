@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabCh10j, ConcatBracesDisambiguateByTarget) {
+TEST(UnpackedArrayConcatElaboration, ConcatBracesDisambiguateByTarget) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

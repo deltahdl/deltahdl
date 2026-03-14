@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection10, NetDeclAssignment) {
+TEST(AssignmentParsing, NetDeclAssignment) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire a = 1'b0;\n"

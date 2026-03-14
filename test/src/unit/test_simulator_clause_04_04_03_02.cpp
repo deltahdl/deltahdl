@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4432, PreActiveRegionExecutesPLICallbacks) {
+TEST(PliPreActiveSim, PreActiveRegionExecutesPLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,7 +23,7 @@ TEST(SimCh4432, PreActiveRegionExecutesPLICallbacks) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4432, PreActiveCanReadValues) {
+TEST(PliPreActiveSim, PreActiveCanReadValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 42;
@@ -37,7 +37,7 @@ TEST(SimCh4432, PreActiveCanReadValues) {
   EXPECT_EQ(sampled, 42);
 }
 
-TEST(SimCh4432, PreActiveCanWriteValues) {
+TEST(PliPreActiveSim, PreActiveCanWriteValues) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -55,7 +55,7 @@ TEST(SimCh4432, PreActiveCanWriteValues) {
   EXPECT_EQ(sampled_in_active, 99);
 }
 
-TEST(SimCh4432, PreActiveCanCreateEvents) {
+TEST(PliPreActiveSim, PreActiveCanCreateEvents) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -76,7 +76,7 @@ TEST(SimCh4432, PreActiveCanCreateEvents) {
   EXPECT_EQ(order[1], "created_active");
 }
 
-TEST(SimCh4432, PreActiveExecutesBeforeActive) {
+TEST(PliPreActiveSim, PreActiveExecutesBeforeActive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -95,13 +95,13 @@ TEST(SimCh4432, PreActiveExecutesBeforeActive) {
   EXPECT_EQ(order[1], "active");
 }
 
-TEST(SimCh4432, PreActiveExecutesAfterPreponedBeforeActive) {
+TEST(PliPreActiveSim, PreActiveExecutesAfterPreponedBeforeActive) {
   VerifyThreeRegionOrder({Region::kPreponed, "preponed"},
                          {Region::kPreActive, "pre_active"},
                          {Region::kActive, "active"});
 }
 
-TEST(SimCh4432, PreActiveIsWithinActiveRegionSet) {
+TEST(PliPreActiveSim, PreActiveIsWithinActiveRegionSet) {
   auto pre_active_ord = static_cast<int>(Region::kPreActive);
   auto preponed_ord = static_cast<int>(Region::kPreponed);
   auto active_ord = static_cast<int>(Region::kActive);
@@ -109,7 +109,7 @@ TEST(SimCh4432, PreActiveIsWithinActiveRegionSet) {
   EXPECT_LT(pre_active_ord, active_ord);
 }
 
-TEST(SimCh4432, PreActiveRegionHoldsMultiplePLICallbacks) {
+TEST(PliPreActiveSim, PreActiveRegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -124,7 +124,7 @@ TEST(SimCh4432, PreActiveRegionHoldsMultiplePLICallbacks) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh4432, PreActiveEventsAcrossMultipleTimeSlots) {
+TEST(PliPreActiveSim, PreActiveEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;
@@ -144,7 +144,7 @@ TEST(SimCh4432, PreActiveEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-TEST(SimCh4432, PreActiveReadWriteContrastWithPreponed) {
+TEST(PliPreActiveSim, PreActiveReadWriteContrastWithPreponed) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;

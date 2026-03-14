@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection9, WaitStatementWithBlock) {
+TEST(ProcessParsing, WaitStatementWithBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -23,7 +23,7 @@ TEST(ParserSection9, WaitStatementWithBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection4, Sec4_5_WaitStatement) {
+TEST(SchedulingSemanticsParsing, WaitStatement) {
   auto r = Parse(
       "module m;\n"
       "  reg done, a;\n"
@@ -40,7 +40,7 @@ TEST(ParserSection4, Sec4_5_WaitStatement) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserSection15, WaitOnEvent) {
+TEST(InterprocessSyncParsing, WaitOnEvent) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -53,7 +53,7 @@ TEST(ParserSection15, WaitOnEvent) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-TEST(ParserSection9b, WaitStatementBasic) {
+TEST(ProceduralAssignAndControlParsing, WaitStatementBasic) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -67,7 +67,7 @@ TEST(ParserSection9b, WaitStatementBasic) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-TEST(ParserSection9b, WaitStatementExpression) {
+TEST(ProceduralAssignAndControlParsing, WaitStatementExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -82,7 +82,7 @@ TEST(ParserSection9b, WaitStatementExpression) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-TEST(ParserA604, StmtItemWaitStatement) {
+TEST(StatementSyntaxParsing, StmtItemWaitStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -96,7 +96,7 @@ TEST(ParserA604, StmtItemWaitStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-TEST(ParserA605, WaitConditionStatement) {
+TEST(TimingControlSyntaxParsing, WaitConditionStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -112,7 +112,7 @@ TEST(ParserA605, WaitConditionStatement) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserA605, WaitConditionNull) {
+TEST(TimingControlSyntaxParsing, WaitConditionNull) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -142,7 +142,7 @@ TEST(Parser, WaitStatement) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserSection9, WaitExprStillWorks) {
+TEST(ProcessParsing, WaitExprStillWorks) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

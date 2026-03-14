@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection9c, EventControlMultipleOrExpressions) {
+TEST(ProcessTimingAndControlParsing, EventControlMultipleOrExpressions) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -19,7 +19,7 @@ TEST(ParserSection9c, EventControlMultipleOrExpressions) {
   EXPECT_GE(stmt->events.size(), 3u);
 }
 
-TEST(ParserSection9c, EventControlMixedEdgesComma) {
+TEST(ProcessTimingAndControlParsing, EventControlMixedEdgesComma) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -36,7 +36,7 @@ TEST(ParserSection9c, EventControlMixedEdgesComma) {
   EXPECT_EQ(stmt->events[2].edge, Edge::kNone);
 }
 
-TEST(ParserSection4, Sec4_5_MultipleEventControlInAlways) {
+TEST(SchedulingSemanticsParsing, MultipleEventControlInAlways) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, rst, a;\n"
@@ -56,7 +56,7 @@ TEST(ParserSection4, Sec4_5_MultipleEventControlInAlways) {
   EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
 }
 
-TEST(ParserA605, EventExprOr) {
+TEST(TimingControlSyntaxParsing, EventExprOr) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -72,7 +72,7 @@ TEST(ParserA605, EventExprOr) {
   EXPECT_EQ(stmt->events[1].edge, Edge::kPosedge);
 }
 
-TEST(ParserA605, EventExprComma) {
+TEST(TimingControlSyntaxParsing, EventExprComma) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -86,7 +86,7 @@ TEST(ParserA605, EventExprComma) {
   ASSERT_EQ(stmt->events.size(), 3u);
 }
 
-TEST(ParserA605, EventExprMixedOrComma) {
+TEST(TimingControlSyntaxParsing, EventExprMixedOrComma) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -100,7 +100,7 @@ TEST(ParserA605, EventExprMixedOrComma) {
   ASSERT_EQ(stmt->events.size(), 3u);
 }
 
-TEST(ParserA605, EventExprPosedgeComma) {
+TEST(TimingControlSyntaxParsing, EventExprPosedgeComma) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -117,7 +117,7 @@ TEST(ParserA605, EventExprPosedgeComma) {
   EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
 }
 
-TEST(ParserSection15, WaitForEventOrExpr) {
+TEST(InterprocessSyncParsing, WaitForEventOrExpr) {
   auto r = Parse(
       "module m;\n"
       "  event e1, e2;\n"
@@ -131,7 +131,7 @@ TEST(ParserSection15, WaitForEventOrExpr) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   EXPECT_GE(stmt->events.size(), 2u);
 }
-TEST(ParserSection9, EventControlMultiple) {
+TEST(ProcessParsing, EventControlMultiple) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -149,7 +149,7 @@ TEST(ParserSection9, EventControlMultiple) {
   }
 }
 
-TEST(ParserSection9, EventControlComma) {
+TEST(ProcessParsing, EventControlComma) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

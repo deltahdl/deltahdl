@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection7, StructMemberInit) {
+TEST(AggregateTypeParsing, StructMemberInit) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct {\n"
@@ -20,7 +20,7 @@ TEST(ParserSection7, StructMemberInit) {
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
 
-TEST(ParserSection7, Sec7_2_2_VarDeclWithInit) {
+TEST(AggregateTypeParsing, VarDeclWithInit) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int a; int b; } pair_t;\n"
@@ -38,7 +38,7 @@ TEST(ParserSection7, Sec7_2_2_VarDeclWithInit) {
   EXPECT_EQ(stmt->var_init->kind, ExprKind::kAssignmentPattern);
 }
 
-TEST(ParserSection7, Sec7_2_2_PackedArrayMemberAssign) {
+TEST(AggregateTypeParsing, PackedArrayMemberAssign) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct {\n"
@@ -63,7 +63,7 @@ TEST(ParserSection7, Sec7_2_2_PackedArrayMemberAssign) {
   EXPECT_EQ(s1->lhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedMemberDefaultInit) {
+TEST(AggregateTypeParsing, PackedMemberDefaultInit) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -81,7 +81,7 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberDefaultInit) {
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
 
-TEST(ParserSection7, Sec7_2_2_AssignFromStructVar) {
+TEST(AggregateTypeParsing, AssignFromStructVar) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int x; int y; } point_t;\n"
@@ -101,7 +101,7 @@ TEST(ParserSection7, Sec7_2_2_AssignFromStructVar) {
   EXPECT_EQ(stmt->rhs->text, "a");
 }
 
-TEST(ParserSection7, Sec7_2_2_DefaultMemberValues) {
+TEST(AggregateTypeParsing, DefaultMemberValues) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct {\n"
@@ -121,7 +121,7 @@ TEST(ParserSection7, Sec7_2_2_DefaultMemberValues) {
   EXPECT_NE(item->typedef_type.struct_members[2].init_expr, nullptr);
 }
 
-TEST(ParserSection7, Sec7_2_2_FunctionArgStruct) {
+TEST(AggregateTypeParsing, FunctionArgStruct) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; int b; } pair_t;\n"
@@ -132,7 +132,7 @@ TEST(ParserSection7, Sec7_2_2_FunctionArgStruct) {
               "endmodule\n"));
 }
 
-TEST(ParserSection7, StructWholeAssignment) {
+TEST(AggregateTypeParsing, StructWholeAssignment) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int a; int b; } pair_t;\n"
@@ -144,7 +144,7 @@ TEST(ParserSection7, StructWholeAssignment) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
-TEST(ParserSection7, StructMemberDefaultInit) {
+TEST(AggregateTypeParsing, StructMemberDefaultInit) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct {\n"

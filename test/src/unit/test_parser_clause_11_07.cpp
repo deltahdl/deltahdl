@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, SignedSystemCall) {
+TEST(OperatorAndExpressionParsing, SignedSystemCall) {
   auto r = Parse(
       "module t;\n"
       "  initial x = $signed(a);\n"
@@ -17,7 +17,7 @@ TEST(ParserSection11, SignedSystemCall) {
   EXPECT_EQ(rhs->callee, "$signed");
 }
 
-TEST(ParserSection11, UnsignedSystemCall) {
+TEST(OperatorAndExpressionParsing, UnsignedSystemCall) {
   auto r = Parse(
       "module t;\n"
       "  initial x = $unsigned(a);\n"

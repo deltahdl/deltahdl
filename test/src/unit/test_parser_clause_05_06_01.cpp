@@ -4,35 +4,35 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_6_1_EscapedIdentifierAsName) {
+TEST(LexicalConventionParsing, EscapedIdentifierAsName) {
   EXPECT_TRUE(ParseOk("module t; wire \\bus+index ; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_6_1_EscapedKeywordAsIdentifier) {
+TEST(LexicalConventionParsing, EscapedKeywordAsIdentifier) {
   EXPECT_TRUE(ParseOk("module t; wire \\module ; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_6_1_EscapedIdentBasic) {
+TEST(LexicalConventionParsing, EscapedIdentBasic) {
   EXPECT_TRUE(ParseOk("module m; wire \\busa+index ; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_6_1_EscapedIdentKeyword) {
+TEST(LexicalConventionParsing, EscapedIdentKeyword) {
   EXPECT_TRUE(ParseOk("module m; wire \\net ; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_6_1_EscapedIdentSpecialChars) {
+TEST(LexicalConventionParsing, EscapedIdentSpecialChars) {
   EXPECT_TRUE(ParseOk("module m; wire \\***error-condition*** ; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_6_1_EscapedIdentForwardSlash) {
+TEST(LexicalConventionParsing, EscapedIdentForwardSlash) {
   EXPECT_TRUE(ParseOk("module m; wire \\net1/\\net2 ; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_6_1_EscapedIdentBraces) {
+TEST(LexicalConventionParsing, EscapedIdentBraces) {
   EXPECT_TRUE(ParseOk("module m; wire \\{a,b} ; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_6_1_EscapedIdentInExpression) {
+TEST(LexicalConventionParsing, EscapedIdentInExpression) {
   auto r = Parse(
       "module m;\n"
       "  logic \\my-signal ;\n"
@@ -42,7 +42,7 @@ TEST(ParserClause05, Cl5_6_1_EscapedIdentInExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause05, Cl5_6_1_EscapedIdentInLetDecl) {
+TEST(LexicalConventionParsing, EscapedIdentInLetDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let \\my+let = 1;\n"

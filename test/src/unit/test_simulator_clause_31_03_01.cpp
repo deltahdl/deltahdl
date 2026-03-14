@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA705, RuntimeTimingCheckEntrySetup) {
+TEST(SystemTimingCheckSim, RuntimeTimingCheckEntrySetup) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kSetup;
@@ -19,7 +19,7 @@ TEST(SimA705, RuntimeTimingCheckEntrySetup) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].kind, TimingCheckKind::kSetup);
 }
 
-TEST(SimA705, SetupTimingCheckSimulates) {
+TEST(SystemTimingCheckSim, SetupTimingCheckSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -39,7 +39,7 @@ TEST(SimA705, SetupTimingCheckSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA705, TimingChecksWithPathsSimulate) {
+TEST(SystemTimingCheckSim, TimingChecksWithPathsSimulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

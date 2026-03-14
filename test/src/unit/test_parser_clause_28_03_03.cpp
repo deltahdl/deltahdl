@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_NOutputWithDelay) {
+TEST(PrimitiveInstantiationParsing, GateInst_NOutputWithDelay) {
   auto r = Parse(
       "module m;\n"
       "  not #(4, 6) n1(out, in);\n"
@@ -18,7 +18,7 @@ TEST(ParserA301, GateInst_NOutputWithDelay) {
   EXPECT_NE(g->gate_delay_fall, nullptr);
 }
 
-TEST(ParserA301, GateInst_SharedDelayAcrossInstances) {
+TEST(PrimitiveInstantiationParsing, GateInst_SharedDelayAcrossInstances) {
   auto r = Parse(
       "module m;\n"
       "  or #5 o1(out1, a, b), o2(out2, c, d);\n"

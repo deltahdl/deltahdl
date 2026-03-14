@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, BinsOrOptions_WildcardBins) {
+TEST(CovergroupDeclParsing, BinsOrOptions_WildcardBins) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"

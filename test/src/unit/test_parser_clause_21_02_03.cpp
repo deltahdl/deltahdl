@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, MonitorOnOff) {
+TEST(IoSystemTaskParsing, MonitorOnOff) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -15,7 +15,7 @@ TEST(ParserSection21, MonitorOnOff) {
               "endmodule\n"));
 }
 
-TEST(ParserSection4, Sec4_5_MonitorSystemCall) {
+TEST(SchedulingSemanticsParsing, MonitorSystemCall) {
   auto r = Parse(
       "module m;\n"
       "  reg a;\n"
@@ -33,14 +33,14 @@ TEST(ParserSection4, Sec4_5_MonitorSystemCall) {
   EXPECT_EQ(stmt->expr->callee, "$monitor");
 }
 
-TEST(ParserSection21, MonitorBasicCall) {
+TEST(IoSystemTaskParsing, MonitorBasicCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $monitor(\"a=%b b=%b\", a, b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection21, MonitorbHexOctal) {
+TEST(IoSystemTaskParsing, MonitorbHexOctal) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"

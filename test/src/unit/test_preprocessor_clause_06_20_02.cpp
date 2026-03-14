@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, ParameterWithExplicitType) {
+TEST(DataTypeParsing, ParameterWithExplicitType) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  parameter int WIDTH = 8;\n"

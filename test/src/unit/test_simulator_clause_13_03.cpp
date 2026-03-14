@@ -53,7 +53,7 @@ TEST(TaskCall, SetupReturnsNullForUnknown) {
   EXPECT_EQ(result, nullptr);
 }
 
-TEST(Sim1303, TaskInputArg) {
+TEST(TaskSim, TaskInputArg) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -69,7 +69,7 @@ TEST(Sim1303, TaskInputArg) {
   EXPECT_EQ(val, 99u);
 }
 
-TEST(Sim1303, TaskInoutArg) {
+TEST(TaskSim, TaskInoutArg) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -85,7 +85,7 @@ TEST(Sim1303, TaskInoutArg) {
   EXPECT_EQ(val, 14u);
 }
 
-TEST(Sim1303, TaskMultipleOutputArgs) {
+TEST(TaskSim, TaskMultipleOutputArgs) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] a, b;\n"
@@ -101,7 +101,7 @@ TEST(Sim1303, TaskMultipleOutputArgs) {
   EXPECT_EQ(val, 7u);
 }
 
-TEST(Sim1303, TaskCallsTask) {
+TEST(TaskSim, TaskCallsTask) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -120,7 +120,7 @@ TEST(Sim1303, TaskCallsTask) {
   EXPECT_EQ(val, 42u);
 }
 
-TEST(Sim1303, TaskEmptyBody) {
+TEST(TaskSim, TaskEmptyBody) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"

@@ -22,7 +22,7 @@ TEST_F(VerifyParseTest, CheckerContextInferenceImplicit) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-TEST(ParserSection16, InferredClockInProperty) {
+TEST(AssertionParsing, InferredClockInProperty) {
   auto r = Parse(
       "module m;\n"
       "  default clocking @(posedge clk); endclocking\n"
@@ -34,7 +34,7 @@ TEST(ParserSection16, InferredClockInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection16, InferredDisableInProperty) {
+TEST(AssertionParsing, InferredDisableInProperty) {
   auto r = Parse(
       "module m;\n"
       "  default disable iff rst;\n"
@@ -46,7 +46,7 @@ TEST(ParserSection16, InferredDisableInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection16, InferredClockAndDisableTogether) {
+TEST(AssertionParsing, InferredClockAndDisableTogether) {
   auto r = Parse(
       "module m;\n"
       "  default clocking @(negedge clk); endclocking\n"

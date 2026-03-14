@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A4ModuleInstPositional) {
+TEST(FormalSyntaxParsing, ModuleInstPositional) {
   auto r = Parse("module m; sub u0(a, b, c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserAnnexA, A4ModuleInstPositional) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-TEST(ParserAnnexA0411, OrderedPortConnections) {
+TEST(ModuleInstantiationGrammar, OrderedPortConnections) {
   auto r = Parse("module m; sub u0(a, b, c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -27,7 +27,7 @@ TEST(ParserAnnexA0411, OrderedPortConnections) {
   EXPECT_EQ(item->inst_ports[2].first, "");
 }
 
-TEST(ParserAnnexA0411, OrderedPortBlankPosition) {
+TEST(ModuleInstantiationGrammar, OrderedPortBlankPosition) {
   auto r = Parse("module m; sub u0(a, , c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -38,7 +38,7 @@ TEST(ParserAnnexA0411, OrderedPortBlankPosition) {
   EXPECT_NE(item->inst_ports[2].second, nullptr);
 }
 
-TEST(ParserAnnexA0412, InterfaceInstOrderedPorts) {
+TEST(InterfaceInstantiationGrammar, InterfaceInstOrderedPorts) {
   auto r = Parse("module m; my_if u0(a, b, c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -46,7 +46,7 @@ TEST(ParserAnnexA0412, InterfaceInstOrderedPorts) {
   EXPECT_EQ(item->inst_ports.size(), 3u);
 }
 
-TEST(ParserAnnexA0413, ProgramInstOrderedPorts) {
+TEST(ProgramInstantiationGrammar, ProgramInstOrderedPorts) {
   auto r = Parse(
       "program my_prog(input logic a, input logic b, input logic c);\n"
       "endprogram\n"
@@ -57,7 +57,7 @@ TEST(ParserAnnexA0413, ProgramInstOrderedPorts) {
   EXPECT_EQ(item->inst_ports.size(), 3u);
 }
 
-TEST(ParserSection4, Sec4_6_OrderedPortConnections) {
+TEST(SchedulingSemanticsParsing, OrderedPortConnections) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (a, b, c);\n"
@@ -77,7 +77,7 @@ TEST(ParserSection4, Sec4_6_OrderedPortConnections) {
   EXPECT_NE(item->inst_ports[2].second, nullptr);
 }
 
-TEST(ParserSection23, PortConnectionPositional) {
+TEST(ModuleAndHierarchyParsing, PortConnectionPositional) {
   auto r = Parse(
       "module top;\n"
       "  sub u1(a, b, c);\n"
@@ -89,7 +89,7 @@ TEST(ParserSection23, PortConnectionPositional) {
   ASSERT_EQ(item->inst_ports.size(), 3u);
 }
 
-TEST(ParserSection23, PositionalPortConnections) {
+TEST(ModuleAndHierarchyParsing, PositionalPortConnections) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (a, b, c);\n"
@@ -105,7 +105,7 @@ TEST(ParserSection23, PositionalPortConnections) {
   }
 }
 
-TEST(ParserSection23, PositionalPortWithExpression) {
+TEST(ModuleAndHierarchyParsing, PositionalPortWithExpression) {
   auto r = Parse(
       "module top;\n"
       "  sub u1 (a & b, c | d);\n"

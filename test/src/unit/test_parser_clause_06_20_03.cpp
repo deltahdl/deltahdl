@@ -12,33 +12,33 @@ TEST(SourceText, ParamPortTypeParameter) {
   EXPECT_EQ(r.cu->modules[0]->params[0].first, "T");
 }
 
-TEST(ParserA24, TypeAssignmentNoDefault) {
+TEST(DeclarationAssignmentParsing, TypeAssignmentNoDefault) {
   auto r = Parse("module m #(parameter type T); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA24, TypeAssignmentComplexType) {
+TEST(DeclarationAssignmentParsing, TypeAssignmentComplexType) {
   auto r = Parse("module m; parameter type T = logic [7:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection8, TypeParameterModule) {
+TEST(ClassParsing, TypeParameterModule) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter type T = int);\n"
               "  T data;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection8, TypeParameterLogicVector) {
+TEST(ClassParsing, TypeParameterLogicVector) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter type T = logic [7:0]);\n"
               "  T bus;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeParamDefaultLogicVector) {
+TEST(DataTypeParsing, TypeParamDefaultLogicVector) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter type DATA_T = logic [15:0])\n"
               "  ();\n"
@@ -46,11 +46,11 @@ TEST(ParserSection6, TypeParamDefaultLogicVector) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeParamPort) {
+TEST(DataTypeParsing, TypeParamPort) {
   EXPECT_TRUE(ParseOk6("module top #(type T = real); endmodule\n"));
 }
 
-TEST(ParserSection6, LocalparamTypeDecl) {
+TEST(DataTypeParsing, LocalparamTypeDecl) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
                "  localparam type testtype = logic;\n"
@@ -58,7 +58,7 @@ TEST(ParserSection6, LocalparamTypeDecl) {
                "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeParameterWithMultipleParams) {
+TEST(DataTypeParsing, TypeParameterWithMultipleParams) {
   EXPECT_TRUE(
       ParseOk6("module m #(parameter type T = int, parameter type U = real)\n"
                "  ();\n"
@@ -67,7 +67,7 @@ TEST(ParserSection6, TypeParameterWithMultipleParams) {
                "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeParameterDefaultShortint) {
+TEST(DataTypeParsing, TypeParameterDefaultShortint) {
   EXPECT_TRUE(
       ParseOk6("module ma #(parameter p1 = 1, parameter type p2 = shortint)\n"
                "  (input logic [p1:0] i, output logic [p1:0] o);\n"
@@ -75,13 +75,13 @@ TEST(ParserSection6, TypeParameterDefaultShortint) {
                "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeParamWithForwardType) {
+TEST(DataTypeParsing, TypeParamWithForwardType) {
   EXPECT_TRUE(
       ParseOk6("module m #(type enum T = logic);\n"
                "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeParamWithStructRestriction) {
+TEST(DataTypeParsing, TypeParamWithStructRestriction) {
   EXPECT_TRUE(
       ParseOk6("module m #(type struct T);\n"
                "endmodule\n"));

@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA84, PrimarySystemCallBits) {
+TEST(PrimarySim, PrimarySystemCallBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -26,7 +26,7 @@ TEST(SimA84, PrimarySystemCallBits) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-TEST(Section20, BitsOfVariable) {
+TEST(UtilitySystemTaskTest, BitsOfVariable) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("wide_var", 64);
   var->value = MakeLogic4VecVal(f.arena, 64, 0);

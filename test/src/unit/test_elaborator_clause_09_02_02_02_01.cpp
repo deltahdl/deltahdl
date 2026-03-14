@@ -52,7 +52,7 @@ TEST(Elaborator, AlwaysCombSensitivityInferred) {
   EXPECT_TRUE(found_a);
 }
 
-TEST(SimCh4, AlwaysCombReEvaluatesOnChange) {
+TEST(SchedulingSemanticsSim, AlwaysCombReEvaluatesOnChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -81,7 +81,7 @@ TEST(SimCh4, AlwaysCombReEvaluatesOnChange) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimCh9, AlwaysCombFunctionCall) {
+TEST(AlwaysCombBasicSim, AlwaysCombFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -104,7 +104,7 @@ TEST(SimCh9, AlwaysCombFunctionCall) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimCh9b, AlwaysCombConcatenation) {
+TEST(AlwaysCombExtendedSim, AlwaysCombConcatenation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -129,7 +129,7 @@ TEST(SimCh9b, AlwaysCombConcatenation) {
   EXPECT_EQ(y->value.ToUint64(), 0xA5u);
 }
 
-TEST(SimCh9b, AlwaysCombRetriggersOnChange) {
+TEST(AlwaysCombExtendedSim, AlwaysCombRetriggersOnChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -152,7 +152,7 @@ TEST(SimCh9b, AlwaysCombRetriggersOnChange) {
   EXPECT_EQ(y->value.ToUint64(), 11u);
 }
 
-TEST(SimCh9b, AlwaysCombSensitivityRegistered) {
+TEST(AlwaysCombExtendedSim, AlwaysCombSensitivityRegistered) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -170,7 +170,7 @@ TEST(SimCh9b, AlwaysCombSensitivityRegistered) {
   EXPECT_FALSE(procs.empty());
 }
 
-TEST(ElabClause09_02_02_02_01, WrittenVarsExcludedFromSensitivity) {
+TEST(AlwaysLatchSensitivityElaboration, WrittenVarsExcludedFromSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -195,7 +195,7 @@ TEST(ElabClause09_02_02_02_01, WrittenVarsExcludedFromSensitivity) {
   EXPECT_FALSE(found_temp);
 }
 
-TEST(ElabClause09_02_02_02_01, BlockLocalVarsExcludedFromSensitivity) {
+TEST(AlwaysLatchSensitivityElaboration, BlockLocalVarsExcludedFromSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -220,7 +220,7 @@ TEST(ElabClause09_02_02_02_01, BlockLocalVarsExcludedFromSensitivity) {
   EXPECT_FALSE(found_local);
 }
 
-TEST(ElabClause09_02_02_02_01, MultipleReadsInSensitivity) {
+TEST(AlwaysLatchSensitivityElaboration, MultipleReadsInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -242,7 +242,7 @@ TEST(ElabClause09_02_02_02_01, MultipleReadsInSensitivity) {
   EXPECT_TRUE(found_c);
 }
 
-TEST(ElabClause09_02_02_02_01, OutputOnlyVarNotInSensitivity) {
+TEST(AlwaysLatchSensitivityElaboration, OutputOnlyVarNotInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -260,7 +260,7 @@ TEST(ElabClause09_02_02_02_01, OutputOnlyVarNotInSensitivity) {
   EXPECT_FALSE(found_y);
 }
 
-TEST(ElabClause09_02_02_02_01, ArrayAccessLongestStaticPrefix) {
+TEST(AlwaysLatchSensitivityElaboration, ArrayAccessLongestStaticPrefix) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -282,7 +282,7 @@ TEST(ElabClause09_02_02_02_01, ArrayAccessLongestStaticPrefix) {
   EXPECT_TRUE(found_addr);
 }
 
-TEST(ElabClause09_02_02_02_01, IfConditionInSensitivity) {
+TEST(AlwaysLatchSensitivityElaboration, IfConditionInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -298,7 +298,7 @@ TEST(ElabClause09_02_02_02_01, IfConditionInSensitivity) {
                             {"sel", "a", "b"});
 }
 
-TEST(ElabClause09_02_02_02_01, SensitivityEdgesAreNone) {
+TEST(AlwaysLatchSensitivityElaboration, SensitivityEdgesAreNone) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

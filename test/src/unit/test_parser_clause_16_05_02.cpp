@@ -12,7 +12,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
 
 namespace {
 
-TEST(ParserAnnexF, AnnexFNegedgeClocking) {
+TEST(AssertionSemanticsParsing, NegedgeClocking) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(negedge clk) a |-> ##1 b);\n"

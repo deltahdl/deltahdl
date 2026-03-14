@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA605, DelayControlAdvancesTime) {
+TEST(TimingControlSim, DelayControlAdvancesTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -26,7 +26,7 @@ TEST(SimA605, DelayControlAdvancesTime) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA605, DelayControlChained) {
+TEST(TimingControlSim, DelayControlChained) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -45,7 +45,7 @@ TEST(SimA605, DelayControlChained) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
 }
 
-TEST(SimCh4, SimulationTimeAdvances) {
+TEST(SchedulingSemanticsSim, SimulationTimeAdvances) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

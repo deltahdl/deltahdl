@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, BinaryLogicalAnd) {
+TEST(OperatorParsing, BinaryLogicalAnd) {
   auto r = Parse("module m; initial x = (a && b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserA86, BinaryLogicalAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
 
-TEST(ParserA86, BinaryLogicalOr) {
+TEST(OperatorParsing, BinaryLogicalOr) {
   auto r = Parse("module m; initial x = (a || b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -25,7 +25,7 @@ TEST(ParserA86, BinaryLogicalOr) {
   EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
 }
 
-TEST(ParserA86, BinaryImplication) {
+TEST(OperatorParsing, BinaryImplication) {
   auto r = Parse("module m; initial x = (a -> b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -35,7 +35,7 @@ TEST(ParserA86, BinaryImplication) {
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
 }
 
-TEST(ParserA86, BinaryEquivalence) {
+TEST(OperatorParsing, BinaryEquivalence) {
   auto r = Parse("module m; initial x = (a <-> b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -45,7 +45,7 @@ TEST(ParserA86, BinaryEquivalence) {
   EXPECT_EQ(rhs->op, TokenKind::kLtDashGt);
 }
 
-TEST(ParserSection11, ImplicationParsed) {
+TEST(OperatorAndExpressionParsing, ImplicationParsed) {
   auto r = Parse(
       "module t;\n"
       "  logic a, b, c;\n"
@@ -59,7 +59,7 @@ TEST(ParserSection11, ImplicationParsed) {
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
 }
 
-TEST(ParserSection11, EquivalenceParsed) {
+TEST(OperatorAndExpressionParsing, EquivalenceParsed) {
   auto r = Parse(
       "module t;\n"
       "  logic a, b, c;\n"
@@ -73,7 +73,7 @@ TEST(ParserSection11, EquivalenceParsed) {
   EXPECT_EQ(rhs->op, TokenKind::kLtDashGt);
 }
 
-TEST(ParserA83, ExprUnaryNot) {
+TEST(ExpressionParsing, ExprUnaryNot) {
   auto r = Parse("module m; initial x = !a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -83,7 +83,7 @@ TEST(ParserA83, ExprUnaryNot) {
   EXPECT_EQ(rhs->op, TokenKind::kBang);
 }
 
-TEST(ParserSection11, ImplicationRightAssocStructure) {
+TEST(OperatorAndExpressionParsing, ImplicationRightAssocStructure) {
   auto r = Parse(
       "module t;\n"
       "  logic a, b, c, d;\n"
@@ -97,7 +97,7 @@ TEST(ParserSection11, ImplicationRightAssocStructure) {
   EXPECT_EQ(rhs->rhs->op, TokenKind::kArrow);
 }
 
-TEST(ParserA83, ExprBinaryLogicalAnd) {
+TEST(ExpressionParsing, ExprBinaryLogicalAnd) {
   auto r = Parse("module m; initial x = a && b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -107,7 +107,7 @@ TEST(ParserA83, ExprBinaryLogicalAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
 
-TEST(ParserA86, UnaryLogicalNot) {
+TEST(OperatorParsing, UnaryLogicalNot) {
   auto r = Parse("module m; initial x = !a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -116,7 +116,7 @@ TEST(ParserA86, UnaryLogicalNot) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
   EXPECT_EQ(rhs->op, TokenKind::kBang);
 }
-TEST(ParserSection11, Sec11_1_UnaryLogicalNot) {
+TEST(OperatorAndExpressionParsing, UnaryLogicalNot) {
   auto r = Parse(
       "module t;\n"
       "  initial x = !flag;\n"
@@ -127,7 +127,7 @@ TEST(ParserSection11, Sec11_1_UnaryLogicalNot) {
   EXPECT_EQ(rhs->op, TokenKind::kBang);
 }
 
-TEST(ParserSection11, LogicalAnd) {
+TEST(OperatorAndExpressionParsing, LogicalAnd) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a && b);\n"
@@ -137,7 +137,7 @@ TEST(ParserSection11, LogicalAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmpAmp);
 }
 
-TEST(ParserSection11, LogicalOr) {
+TEST(OperatorAndExpressionParsing, LogicalOr) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a || b);\n"
@@ -147,7 +147,7 @@ TEST(ParserSection11, LogicalOr) {
   EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
 }
 
-TEST(ParserSection11, LogicalNot) {
+TEST(OperatorAndExpressionParsing, LogicalNot) {
   auto r = Parse(
       "module t;\n"
       "  initial x = !a;\n"
@@ -158,7 +158,7 @@ TEST(ParserSection11, LogicalNot) {
   EXPECT_EQ(rhs->op, TokenKind::kBang);
 }
 
-TEST(ParserSection11, ShortCircuitAnd) {
+TEST(OperatorAndExpressionParsing, ShortCircuitAnd) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a != 0) && (b / a > 1);\n"

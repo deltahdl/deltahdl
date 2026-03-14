@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, InoutImplicitType) {
+TEST(ConstraintDeclParsing, InoutImplicitType) {
   auto r = Parse("module m(inout a); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -13,7 +13,7 @@ TEST(ParserA212, InoutImplicitType) {
   EXPECT_EQ(port.direction, Direction::kInout);
 }
 
-TEST(ParserA212, InterfacePortParsedAsNonAnsi) {
+TEST(ConstraintDeclParsing, InterfacePortParsedAsNonAnsi) {
   auto r = Parse("module m(a); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -22,7 +22,7 @@ TEST(ParserA212, InterfacePortParsedAsNonAnsi) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kNone);
 }
 
-TEST(ParserA212, RefUnpackedDim) {
+TEST(ConstraintDeclParsing, RefUnpackedDim) {
   auto r = Parse("module m(ref int arr [4]); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -31,7 +31,7 @@ TEST(ParserA212, RefUnpackedDim) {
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
 
-TEST(ParserSection6, Sec6_5_NetAsInputPort) {
+TEST(DataTypeParsing, NetAsInputPort) {
   auto r = Parse(
       "module t(input wire [7:0] data_in);\n"
       "endmodule\n");
@@ -47,7 +47,7 @@ TEST(ParserSection6, Sec6_5_NetAsInputPort) {
   EXPECT_EQ(ports[0].data_type.packed_dim_left->int_val, 7u);
 }
 
-TEST(ParserSection6, Sec6_5_VarAsOutputPort) {
+TEST(DataTypeParsing, VarAsOutputPort) {
   auto r = Parse(
       "module t(output logic [15:0] result);\n"
       "endmodule\n");
@@ -62,7 +62,7 @@ TEST(ParserSection6, Sec6_5_VarAsOutputPort) {
   EXPECT_EQ(ports[0].data_type.packed_dim_left->int_val, 15u);
 }
 
-TEST(ParserSection6, ParsePortDecl_ImplicitType) {
+TEST(DataTypeParsing, ParsePortDecl_ImplicitType) {
   auto r = Parse("module m(input [3:0] a, output [7:0] b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_FALSE(r.cu->modules.empty());
@@ -74,7 +74,7 @@ TEST(ParserSection6, ParsePortDecl_ImplicitType) {
     EXPECT_EQ(ports[i].data_type.kind, DataTypeKind::kLogic) << "port " << i;
   }
 }
-TEST(ParserSection23, AnsiPortsWithDefaultType) {
+TEST(ModuleAndHierarchyParsing, AnsiPortsWithDefaultType) {
   auto r = Parse(
       "module m(input a, output b);\n"
       "endmodule\n");
@@ -85,7 +85,7 @@ TEST(ParserSection23, AnsiPortsWithDefaultType) {
   EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
 }
 
-TEST(ParserSection6, Sec6_11_IntegerTypesAsPortDecls) {
+TEST(DataTypeParsing, IntegerTypesAsPortDecls) {
   auto r = Parse(
       "module m(input int a, output byte b);\n"
       "endmodule\n");
@@ -102,7 +102,7 @@ TEST(ParserSection6, Sec6_11_IntegerTypesAsPortDecls) {
   EXPECT_EQ(ports[1].name, "b");
 }
 
-TEST(ParserSection6, Sec6_11_LongintShortintAsPorts) {
+TEST(DataTypeParsing, LongintShortintAsPorts) {
   auto r = Parse(
       "module m(input longint addr, output shortint result);\n"
       "endmodule\n");
@@ -116,7 +116,7 @@ TEST(ParserSection6, Sec6_11_LongintShortintAsPorts) {
   EXPECT_EQ(ports[1].name, "result");
 }
 
-TEST(ParserSection6, Sec6_11_LogicPackedDimsAsPort) {
+TEST(DataTypeParsing, LogicPackedDimsAsPort) {
   auto r = Parse(
       "module m(input logic [7:0] data, output logic [15:0] addr);\n"
       "endmodule\n");
@@ -132,7 +132,7 @@ TEST(ParserSection6, Sec6_11_LogicPackedDimsAsPort) {
   EXPECT_EQ(ports[1].data_type.packed_dim_left->int_val, 15u);
 }
 
-TEST(ParserSection6, Sec6_11_IntegerAsPort) {
+TEST(DataTypeParsing, IntegerAsPort) {
   auto r = Parse(
       "module m(input integer idx);\n"
       "endmodule\n");
@@ -144,13 +144,13 @@ TEST(ParserSection6, Sec6_11_IntegerAsPort) {
   EXPECT_EQ(ports[0].direction, Direction::kInput);
 }
 
-TEST(ParserSection6, VarImplicitInPort) {
+TEST(DataTypeParsing, VarImplicitInPort) {
   EXPECT_TRUE(
       ParseOk("module t(input var [7:0] data_in);\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, ShortrealInPort) {
+TEST(DataTypeParsing, ShortrealInPort) {
   EXPECT_TRUE(
       ParseOk("module m (input var shortreal in_val,\n"
               "          output var shortreal out_val);\n"

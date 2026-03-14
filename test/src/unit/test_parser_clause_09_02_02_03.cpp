@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, AlwaysConstruct_AlwaysLatch) {
+TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_AlwaysLatch) {
   auto r = Parse(
       "module m;\n"
       "  always_latch\n"
@@ -18,7 +18,7 @@ TEST(ParserA602, AlwaysConstruct_AlwaysLatch) {
   EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
 }
 
-TEST(ParserSection9, Sec9_2_3_ThreeAlwaysLatchBlocks) {
+TEST(ProcessParsing, ThreeAlwaysLatchBlocks) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d1, d2, d3, q1, q2, q3;\n"
@@ -50,7 +50,7 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection9, Sec9_2_3_SimpleIfElseLatch) {
+TEST(ProcessParsing, SimpleIfElseLatch) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d, q;\n"
@@ -70,7 +70,7 @@ TEST(ParserSection9, Sec9_2_3_SimpleIfElseLatch) {
   EXPECT_NE(item->body->else_branch, nullptr);
 }
 
-TEST(ParserSection9, Sec9_2_3_BeginEndBlock) {
+TEST(ProcessParsing, BeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d, q;\n"
@@ -89,7 +89,7 @@ TEST(ParserSection9, Sec9_2_3_BeginEndBlock) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
 }
 
-TEST(ParserSection9, Sec9_2_3_IfWithoutElse) {
+TEST(ProcessParsing, IfWithoutElse) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d, q;\n"
@@ -107,7 +107,7 @@ TEST(ParserSection9, Sec9_2_3_IfWithoutElse) {
   EXPECT_EQ(item->body->else_branch, nullptr);
 }
 
-TEST(ParserSection9, Sec9_2_3_CaseStatement) {
+TEST(ProcessParsing, CaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -129,7 +129,7 @@ TEST(ParserSection9, Sec9_2_3_CaseStatement) {
   EXPECT_GE(item->body->case_items.size(), 3u);
 }
 
-TEST(ParserSection9, Sec9_2_3_MultipleAssignments) {
+TEST(ProcessParsing, MultipleAssignments) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d1, d2, q1, q2;\n"
@@ -154,7 +154,7 @@ TEST(ParserSection9, Sec9_2_3_MultipleAssignments) {
   EXPECT_EQ(if_stmt->then_branch->stmts.size(), 2u);
 }
 
-TEST(ParserSection9, Sec9_2_3_ComplexConditions) {
+TEST(ProcessParsing, ComplexConditions) {
   auto r = Parse(
       "module m;\n"
       "  logic en, valid, d, q;\n"
@@ -171,7 +171,7 @@ TEST(ParserSection9, Sec9_2_3_ComplexConditions) {
   EXPECT_EQ(item->body->condition->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection4, Sec4_6_AlwaysLatchIfNoElse) {
+TEST(SchedulingSemanticsParsing, AlwaysLatchIfNoElse) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d, q;\n"
@@ -188,7 +188,7 @@ TEST(ParserSection4, Sec4_6_AlwaysLatchIfNoElse) {
   EXPECT_EQ(item->body->else_branch, nullptr);
 }
 
-TEST(ParserSection9, Sec9_2_3_BitSelect) {
+TEST(ProcessParsing, BitSelect) {
   auto r = Parse(
       "module m;\n"
       "  logic en;\n"
@@ -209,7 +209,7 @@ TEST(ParserSection9, Sec9_2_3_BitSelect) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserSection9, Sec9_2_3_PartSelect) {
+TEST(ProcessParsing, PartSelect) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic en;\n"
@@ -219,7 +219,7 @@ TEST(ParserSection9, Sec9_2_3_PartSelect) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_2_3_StructMemberAccess) {
+TEST(ProcessParsing, StructMemberAccess) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct packed {\n"
@@ -234,7 +234,7 @@ TEST(ParserSection9, Sec9_2_3_StructMemberAccess) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_2_3_FunctionCallRHS) {
+TEST(ProcessParsing, FunctionCallRHS) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function logic [7:0] compute(input logic [7:0] x);\n"
@@ -247,7 +247,7 @@ TEST(ParserSection9, Sec9_2_3_FunctionCallRHS) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9b, AlwaysLatchMultipleOutputs) {
+TEST(ProceduralAssignAndControlParsing, AlwaysLatchMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
       "  always_latch begin\n"
@@ -261,7 +261,7 @@ TEST(ParserSection9b, AlwaysLatchMultipleOutputs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection4, Sec4_5_AlwaysLatch) {
+TEST(SchedulingSemanticsParsing, AlwaysLatch) {
   auto r = Parse(
       "module m;\n"
       "  reg q, d, en;\n"
@@ -277,7 +277,7 @@ TEST(ParserSection4, Sec4_5_AlwaysLatch) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ParserSection9, Sec9_2_3_ModuleItemKindIsAlwaysLatchBlock) {
+TEST(ProcessParsing, ModuleItemKindIsAlwaysLatchBlock) {
   auto r = Parse(
       "module m;\n"
       "  always_latch\n"
@@ -295,7 +295,7 @@ TEST(ParserSection9, Sec9_2_3_ModuleItemKindIsAlwaysLatchBlock) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserSection9, Sec9_2_3_NoSensitivityList) {
+TEST(ProcessParsing, NoSensitivityList) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d, q;\n"
@@ -320,7 +320,7 @@ static ModuleItem* NthAlwaysLatchItem(ParseResult& r, size_t n) {
   return nullptr;
 }
 
-TEST(ParserSection9, Sec9_2_3_MultipleAlwaysLatchBlocks) {
+TEST(ProcessParsing, MultipleAlwaysLatchBlocks) {
   auto r = Parse(
       "module m;\n"
       "  logic en1, en2, d1, d2, q1, q2;\n"
@@ -339,7 +339,7 @@ TEST(ParserSection9, Sec9_2_3_MultipleAlwaysLatchBlocks) {
   EXPECT_EQ(second->kind, ModuleItemKind::kAlwaysLatchBlock);
 }
 
-TEST(ParserSection9, Sec9_2_3_BodyVerificationIfCondition) {
+TEST(ProcessParsing, BodyVerificationIfCondition) {
   auto r = Parse(
       "module m;\n"
       "  logic gate, d, q;\n"
@@ -360,7 +360,7 @@ TEST(ParserSection9, Sec9_2_3_BodyVerificationIfCondition) {
   EXPECT_NE(body->then_branch->rhs, nullptr);
 }
 
-TEST(ParserSection9, Sec9_2_3_BlockingAssignment) {
+TEST(ProcessParsing, BlockingAssignment) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d, q;\n"
@@ -378,7 +378,7 @@ TEST(ParserSection9, Sec9_2_3_BlockingAssignment) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, Sec9_2_3_TernaryInCondition) {
+TEST(ProcessParsing, TernaryInCondition) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic sel, en_a, en_b, d, q;\n"
@@ -387,7 +387,7 @@ TEST(ParserSection9, Sec9_2_3_TernaryInCondition) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_2_3_ConcatenationLHS) {
+TEST(ProcessParsing, ConcatenationLHS) {
   auto r = Parse(
       "module m;\n"
       "  logic en;\n"
@@ -407,7 +407,7 @@ TEST(ParserSection9, Sec9_2_3_ConcatenationLHS) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserSection9, Sec9_2_3_DeepIfElseIfChain) {
+TEST(ProcessParsing, DeepIfElseIfChain) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, c, d, q;\n"
@@ -441,7 +441,7 @@ TEST(ParserSection9, Sec9_2_3_DeepIfElseIfChain) {
   EXPECT_EQ(inner_if->else_branch->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserSection9, Sec9_2_3_SystemFunctionCall) {
+TEST(ProcessParsing, SystemFunctionCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic en;\n"
@@ -455,7 +455,7 @@ TEST(ParserSection9, Sec9_2_3_SystemFunctionCall) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_2_3_CaseWithBeginEndItems) {
+TEST(ProcessParsing, CaseWithBeginEndItems) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -486,7 +486,7 @@ TEST(ParserSection9, Sec9_2_3_CaseWithBeginEndItems) {
   }
 }
 
-TEST(ParserSection9c, AlwaysLatchWithBeginEnd) {
+TEST(ProcessTimingAndControlParsing, AlwaysLatchWithBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  logic ck, d, q;\n"
@@ -502,7 +502,7 @@ TEST(ParserSection9c, AlwaysLatchWithBeginEnd) {
   ASSERT_NE(item->body, nullptr);
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
-TEST(ParserSection9, AlwaysLatch) {
+TEST(ProcessParsing, AlwaysLatch) {
   auto r = Parse(
       "module m;\n"
       "  always_latch\n"
@@ -515,7 +515,7 @@ TEST(ParserSection9, AlwaysLatch) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ParserSection4, Sec4_6_AlwaysLatchLatch) {
+TEST(SchedulingSemanticsParsing, AlwaysLatchLatch) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d, q;\n"

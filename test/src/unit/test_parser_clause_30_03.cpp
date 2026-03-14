@@ -9,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA705, TimingCheckMixedWithPaths) {
+TEST(SystemTimingCheckParsing, TimingCheckMixedWithPaths) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -27,7 +27,7 @@ TEST(ParserA705, TimingCheckMixedWithPaths) {
   EXPECT_EQ(spec->specify_items[2]->kind, SpecifyItemKind::kPathDecl);
 }
 
-TEST(ParserA701, SpecifyBlockEmpty) {
+TEST(SpecifyBlockDeclParsing, SpecifyBlockEmpty) {
   auto r = Parse("module m; specify endspecify endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -37,7 +37,7 @@ TEST(ParserA701, SpecifyBlockEmpty) {
   EXPECT_EQ(spec->specify_items.size(), 0u);
 }
 
-TEST(ParserA701, SpecifyBlockMultipleItems) {
+TEST(SpecifyBlockDeclParsing, SpecifyBlockMultipleItems) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -53,7 +53,7 @@ TEST(ParserA701, SpecifyBlockMultipleItems) {
   ASSERT_EQ(spec->specify_items.size(), 3u);
 }
 
-TEST(ParserA701, SpecifyItemAllFiveKinds) {
+TEST(SpecifyBlockDeclParsing, SpecifyItemAllFiveKinds) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -76,7 +76,7 @@ TEST(ParserA701, SpecifyItemAllFiveKinds) {
   EXPECT_EQ(spec->specify_items[4]->kind, SpecifyItemKind::kTimingCheck);
 }
 
-TEST(ParserA701, SpecifyBlockCoexistsWithModuleItems) {
+TEST(SpecifyBlockDeclParsing, SpecifyBlockCoexistsWithModuleItems) {
   auto r = Parse(
       "module m;\n"
       "  logic a;\n"
@@ -94,7 +94,7 @@ TEST(ParserA701, SpecifyBlockCoexistsWithModuleItems) {
   EXPECT_EQ(items[2]->kind, ModuleItemKind::kContAssign);
 }
 
-TEST(ParserSection28, Sec28_12_MixedPathsAndTimingChecks) {
+TEST(GateLevelModelingParsing, MixedPathsAndTimingChecks) {
   EXPECT_TRUE(
       ParseOk("module m(input a, d, clk, output b);\n"
               "  specify\n"
@@ -108,7 +108,7 @@ TEST(ParserSection28, Sec28_12_MixedPathsAndTimingChecks) {
               "endmodule\n"));
 }
 
-TEST(ParserA701, MultipleSpecifyBlocksInModule) {
+TEST(SpecifyBlockDeclParsing, MultipleSpecifyBlocksInModule) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

@@ -8,25 +8,25 @@ using namespace delta;
 
 namespace {
 
-TEST(LexerClause05, Cl5_1_TokenStreamEndsWithEof) {
+TEST(LexicalConventionLexing, TokenStreamEndsWithEof) {
   auto tokens = Lex("module m; endmodule");
   ASSERT_FALSE(tokens.empty());
   EXPECT_EQ(tokens.back().kind, TokenKind::kEof);
 }
 
-TEST(LexerClause05, Cl5_1_EmptySourceProducesOnlyEof) {
+TEST(LexicalConventionLexing, EmptySourceProducesOnlyEof) {
   auto tokens = Lex("");
   ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexerClause05, Cl5_1_WhitespaceOnlyProducesEof) {
+TEST(LexicalConventionLexing, WhitespaceOnlyProducesEof) {
   auto tokens = Lex("   \t\n\n  ");
   ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexerClause05, Cl5_1_WhitespaceIsNotEmittedAsToken) {
+TEST(LexicalConventionLexing, WhitespaceIsNotEmittedAsToken) {
   auto tokens = Lex("a  b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -34,21 +34,21 @@ TEST(LexerClause05, Cl5_1_WhitespaceIsNotEmittedAsToken) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
 }
 
-TEST(LexerClause05, Cl5_1_LineCommentIsStripped) {
+TEST(LexicalConventionLexing, LineCommentIsStripped) {
   auto tokens = Lex("a // comment\nb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerClause05, Cl5_1_BlockCommentIsStripped) {
+TEST(LexicalConventionLexing, BlockCommentIsStripped) {
   auto tokens = Lex("a /* block */ b");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexerClause05, Cl5_1_OperatorTokensRecognized) {
+TEST(LexicalConventionLexing, OperatorTokensRecognized) {
   auto tokens = Lex("+ - * / % ** && ||");
   EXPECT_EQ(tokens[0].kind, TokenKind::kPlus);
   EXPECT_EQ(tokens[1].kind, TokenKind::kMinus);
@@ -60,7 +60,7 @@ TEST(LexerClause05, Cl5_1_OperatorTokensRecognized) {
   EXPECT_EQ(tokens[7].kind, TokenKind::kPipePipe);
 }
 
-TEST(LexerClause05, Cl5_1_KeywordDistinctFromIdentifier) {
+TEST(LexicalConventionLexing, KeywordDistinctFromIdentifier) {
   auto kw = LexOne("module");
   EXPECT_EQ(kw.token.kind, TokenKind::kKwModule);
 
@@ -68,58 +68,58 @@ TEST(LexerClause05, Cl5_1_KeywordDistinctFromIdentifier) {
   EXPECT_EQ(id.token.kind, TokenKind::kIdentifier);
 }
 
-TEST(LexerClause05, Cl5_1_IntegerLiteralRecognized) {
+TEST(LexicalConventionLexing, IntegerLiteralRecognized) {
   auto r = LexOne("32'd100");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexerClause05, Cl5_1_RealLiteralRecognized) {
+TEST(LexicalConventionLexing, RealLiteralRecognized) {
   auto r = LexOne("3.14");
   EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
 }
 
-TEST(LexerClause05, Cl5_1_StringLiteralRecognized) {
+TEST(LexicalConventionLexing, StringLiteralRecognized) {
   auto r = LexOne("\"hello world\"");
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexerClause05, Cl5_1_TimeLiteralRecognized) {
+TEST(LexicalConventionLexing, TimeLiteralRecognized) {
   auto r = LexOne("10ns");
   EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
 }
 
-TEST(LexerClause05, Cl5_1_UnbasedUnsizedLiteralRecognized) {
+TEST(LexicalConventionLexing, UnbasedUnsizedLiteralRecognized) {
   auto r = LexOne("'1");
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(LexerClause05, Cl5_1_ArrayStructLiteralTokenRecognized) {
+TEST(LexicalConventionLexing, ArrayStructLiteralTokenRecognized) {
   auto r = LexOne("'{");
   EXPECT_EQ(r.token.kind, TokenKind::kApostropheLBrace);
 }
 
-TEST(LexerClause05, Cl5_1_TripleQuotedStringLiteralRecognized) {
+TEST(LexicalConventionLexing, TripleQuotedStringLiteralRecognized) {
   auto r = LexOne("\"\"\"hello\"\"\"");
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexerClause05, Cl5_1_EscapedIdentifierRecognized) {
+TEST(LexicalConventionLexing, EscapedIdentifierRecognized) {
   auto r = LexOne("\\busa+index ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
 }
 
-TEST(LexerClause05, Cl5_1_SystemIdentifierRecognized) {
+TEST(LexicalConventionLexing, SystemIdentifierRecognized) {
   auto r = LexOne("$display");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
 }
 
-TEST(LexerClause05, Cl5_1_SystemIdentifierPreservesDollarPrefix) {
+TEST(LexicalConventionLexing, SystemIdentifierPreservesDollarPrefix) {
   auto r = LexOne("$finish");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(r.token.text, "$finish");
 }
 
-TEST(LexerClause05, Cl5_1_DotTokenForBuiltinMethodCalls) {
+TEST(LexicalConventionLexing, DotTokenForBuiltinMethodCalls) {
   auto tokens = Lex("arr.size");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
@@ -127,12 +127,12 @@ TEST(LexerClause05, Cl5_1_DotTokenForBuiltinMethodCalls) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
 }
 
-TEST(LexerClause05, Cl5_1_AttributeStartTokenRecognized) {
+TEST(LexicalConventionLexing, AttributeStartTokenRecognized) {
   auto r = LexOne("(*");
   EXPECT_EQ(r.token.kind, TokenKind::kAttrStart);
 }
 
-TEST(LexerClause05, Cl5_1_AttributeEndTokenRecognized) {
+TEST(LexicalConventionLexing, AttributeEndTokenRecognized) {
   auto tokens = Lex("(* foo *)");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
@@ -140,7 +140,7 @@ TEST(LexerClause05, Cl5_1_AttributeEndTokenRecognized) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kAttrEnd);
 }
 
-TEST(LexerClause05, Cl5_1_AllFourAreasInOneStream) {
+TEST(LexicalConventionLexing, AllFourAreasInOneStream) {
   auto tokens =
       Lex("(* full_case *) module t; // comment\n"
           "  logic [7:0] x = 8'hFF + 1;\n"
@@ -163,12 +163,12 @@ TEST(LexerClause05, Cl5_1_AllFourAreasInOneStream) {
   EXPECT_TRUE(kinds.count(TokenKind::kIdentifier));
 }
 
-TEST(LexerClause05, Cl5_1_UnterminatedBlockCommentIsError) {
+TEST(LexicalConventionLexing, UnterminatedBlockCommentIsError) {
   auto r = LexWithDiag("a /* unterminated");
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(LexerClause05, Cl5_1_UnterminatedStringIsError) {
+TEST(LexicalConventionLexing, UnterminatedStringIsError) {
   auto r = LexWithDiag("\"unterminated");
   EXPECT_TRUE(r.has_errors);
 }

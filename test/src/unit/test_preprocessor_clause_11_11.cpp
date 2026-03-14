@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA24, DefparamAssignmentMintypmax) {
+TEST(DeclarationAssignmentParsing, DefparamAssignmentMintypmax) {
   auto r = ParseWithPreprocessor(
       "module top;\n"
       "  defparam u0.DELAY = 1:2:3;\n"

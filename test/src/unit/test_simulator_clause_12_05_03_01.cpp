@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA605301, DeferredUniqueCaseOverlapReported) {
+TEST(TimingControlDelayExprSim, DeferredUniqueCaseOverlapReported) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -30,7 +30,7 @@ TEST(SimA605301, DeferredUniqueCaseOverlapReported) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA605301, DeferredPriorityCaseNoMatchReported) {
+TEST(TimingControlDelayExprSim, DeferredPriorityCaseNoMatchReported) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -52,7 +52,7 @@ TEST(SimA605301, DeferredPriorityCaseNoMatchReported) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA605301, DeferredUniqueCaseNoMatchReported) {
+TEST(TimingControlDelayExprSim, DeferredUniqueCaseNoMatchReported) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -74,7 +74,7 @@ TEST(SimA605301, DeferredUniqueCaseNoMatchReported) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA605301, FlushClearsPendingCaseViolations) {
+TEST(TimingControlDelayExprSim, FlushClearsPendingCaseViolations) {
   SimFixture f;
 
   Process proc;
@@ -93,7 +93,7 @@ TEST(SimA605301, FlushClearsPendingCaseViolations) {
   f.ctx.SetCurrentProcess(nullptr);
 }
 
-TEST(SimA605301, MultipleCaseViolationsMature) {
+TEST(TimingControlDelayExprSim, MultipleCaseViolationsMature) {
   SimFixture f;
 
   Process proc;
@@ -110,7 +110,7 @@ TEST(SimA605301, MultipleCaseViolationsMature) {
   f.ctx.SetCurrentProcess(nullptr);
 }
 
-TEST(SimA605301, Unique0CaseNoMatchNoDeferredViolation) {
+TEST(TimingControlDelayExprSim, Unique0CaseNoMatchNoDeferredViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

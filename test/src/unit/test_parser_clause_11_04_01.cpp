@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, OperatorAssignment_PlusEq) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_PlusEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a += 1; end\n"
@@ -19,7 +19,7 @@ TEST(ParserA602, OperatorAssignment_PlusEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kPlusEq);
 }
 
-TEST(ParserA602, OperatorAssignment_MinusEq) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_MinusEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a -= 1; end\n"
@@ -32,7 +32,7 @@ TEST(ParserA602, OperatorAssignment_MinusEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kMinusEq);
 }
 
-TEST(ParserA602, OperatorAssignment_StarEq) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_StarEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a *= 2; end\n"
@@ -45,7 +45,7 @@ TEST(ParserA602, OperatorAssignment_StarEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kStarEq);
 }
 
-TEST(ParserA602, OperatorAssignment_SlashEq) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_SlashEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a /= 2; end\n"
@@ -58,7 +58,7 @@ TEST(ParserA602, OperatorAssignment_SlashEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kSlashEq);
 }
 
-TEST(ParserA602, OperatorAssignment_PercentEq) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_PercentEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a %= 3; end\n"
@@ -71,7 +71,7 @@ TEST(ParserA602, OperatorAssignment_PercentEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kPercentEq);
 }
 
-TEST(ParserA602, OperatorAssignment_AmpEq) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_AmpEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a &= 8'hFF; end\n"
@@ -84,7 +84,7 @@ TEST(ParserA602, OperatorAssignment_AmpEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kAmpEq);
 }
 
-TEST(ParserA602, OperatorAssignment_PipeEq) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_PipeEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a |= 8'h01; end\n"
@@ -97,7 +97,7 @@ TEST(ParserA602, OperatorAssignment_PipeEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kPipeEq);
 }
 
-TEST(ParserA602, OperatorAssignment_CaretEq) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_CaretEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a ^= 8'hAA; end\n"
@@ -110,7 +110,7 @@ TEST(ParserA602, OperatorAssignment_CaretEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kCaretEq);
 }
 
-TEST(ParserA602, OperatorAssignment_LeftShiftEq) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_LeftShiftEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a <<= 2; end\n"
@@ -123,7 +123,7 @@ TEST(ParserA602, OperatorAssignment_LeftShiftEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kLtLtEq);
 }
 
-TEST(ParserA602, OperatorAssignment_RightShiftEq) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_RightShiftEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a >>= 2; end\n"
@@ -136,7 +136,7 @@ TEST(ParserA602, OperatorAssignment_RightShiftEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kGtGtEq);
 }
 
-TEST(ParserA602, OperatorAssignment_ArithLeftShiftEq) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_ArithLeftShiftEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a <<<= 1; end\n"
@@ -149,7 +149,7 @@ TEST(ParserA602, OperatorAssignment_ArithLeftShiftEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kLtLtLtEq);
 }
 
-TEST(ParserA602, OperatorAssignment_ArithRightShiftEq) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_ArithRightShiftEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a >>>= 1; end\n"
@@ -162,7 +162,7 @@ TEST(ParserA602, OperatorAssignment_ArithRightShiftEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kGtGtGtEq);
 }
 
-TEST(ParserA602, OperatorAssignment_WithSelectLhs) {
+TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_WithSelectLhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin mem[0] += 1; end\n"
@@ -175,7 +175,7 @@ TEST(ParserA602, OperatorAssignment_WithSelectLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserA602, AssignmentOperator_AllThirteen) {
+TEST(ProceduralBlockSyntaxParsing, AssignmentOperator_AllThirteen) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -204,7 +204,7 @@ TEST(ParserA602, AssignmentOperator_AllThirteen) {
   }
 }
 
-TEST(ParserA602, Integration_AlwaysCombWithOperatorAssign) {
+TEST(ProceduralBlockSyntaxParsing, Integration_AlwaysCombWithOperatorAssign) {
   auto r = Parse(
       "module m;\n"
       "  always_comb begin\n"
@@ -222,7 +222,7 @@ TEST(ParserA602, Integration_AlwaysCombWithOperatorAssign) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
-TEST(ParserSection10, OperatorAssignSlashEq) {
+TEST(AssignmentParsing, OperatorAssignSlashEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -235,7 +235,7 @@ TEST(ParserSection10, OperatorAssignSlashEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection10, OperatorAssignPercentEq) {
+TEST(AssignmentParsing, OperatorAssignPercentEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -248,7 +248,7 @@ TEST(ParserSection10, OperatorAssignPercentEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection10, OperatorAssignAmpEq) {
+TEST(AssignmentParsing, OperatorAssignAmpEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -261,7 +261,7 @@ TEST(ParserSection10, OperatorAssignAmpEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection10, OperatorAssignPipeEq) {
+TEST(AssignmentParsing, OperatorAssignPipeEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -274,7 +274,7 @@ TEST(ParserSection10, OperatorAssignPipeEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection10, OperatorAssignCaretEq) {
+TEST(AssignmentParsing, OperatorAssignCaretEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -287,7 +287,7 @@ TEST(ParserSection10, OperatorAssignCaretEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection10, OperatorAssignLtLtEq) {
+TEST(AssignmentParsing, OperatorAssignLtLtEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -300,7 +300,7 @@ TEST(ParserSection10, OperatorAssignLtLtEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection10, OperatorAssignGtGtEq) {
+TEST(AssignmentParsing, OperatorAssignGtGtEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -313,7 +313,7 @@ TEST(ParserSection10, OperatorAssignGtGtEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection10, OperatorAssignLtLtLtEq) {
+TEST(AssignmentParsing, OperatorAssignLtLtLtEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -326,7 +326,7 @@ TEST(ParserSection10, OperatorAssignLtLtLtEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection10, OperatorAssignGtGtGtEq) {
+TEST(AssignmentParsing, OperatorAssignGtGtGtEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -339,7 +339,7 @@ TEST(ParserSection10, OperatorAssignGtGtGtEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection10, Sec10_4_1_CompoundPlusEq) {
+TEST(AssignmentParsing, CompoundPlusEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -356,7 +356,7 @@ TEST(ParserSection10, Sec10_4_1_CompoundPlusEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kPlusEq);
 }
 
-TEST(ParserSection10, Sec10_4_1_CompoundMinusEq) {
+TEST(AssignmentParsing, CompoundMinusEq) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -373,7 +373,7 @@ TEST(ParserSection10, Sec10_4_1_CompoundMinusEq) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kMinusEq);
 }
 
-TEST(ParserSection10, Sec10_4_1_CompoundMulDivMod) {
+TEST(AssignmentParsing, CompoundMulDivMod) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -384,7 +384,7 @@ TEST(ParserSection10, Sec10_4_1_CompoundMulDivMod) {
               "endmodule\n"));
 }
 
-TEST(ParserSection10, Sec10_4_1_CompoundBitwise) {
+TEST(AssignmentParsing, CompoundBitwise) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -406,7 +406,7 @@ TEST(ParserSection10, Sec10_4_1_CompoundBitwise) {
   EXPECT_EQ(s2->rhs->op, TokenKind::kCaretEq);
 }
 
-TEST(ParserSection10, Sec10_4_1_CompoundShifts) {
+TEST(AssignmentParsing, CompoundShifts) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -432,7 +432,7 @@ TEST(ParserSection10, Sec10_4_1_CompoundShifts) {
   EXPECT_EQ(s3->rhs->op, TokenKind::kGtGtGtEq);
 }
 
-TEST(ParserA85, VarLvalueCompoundAdd) {
+TEST(LvalueParsing, VarLvalueCompoundAdd) {
   auto r = Parse("module m; int x; initial x += 5; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -442,7 +442,7 @@ TEST(ParserA85, VarLvalueCompoundAdd) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserA85, VarLvalueCompoundBitSelect) {
+TEST(LvalueParsing, VarLvalueCompoundBitSelect) {
   auto r = Parse("module m; logic [7:0] x; initial x[3] |= 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -452,7 +452,7 @@ TEST(ParserA85, VarLvalueCompoundBitSelect) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserSection11, CompoundAssignPlusEq) {
+TEST(OperatorAndExpressionParsing, CompoundAssignPlusEq) {
   auto r = Parse(
       "module t;\n"
       "  initial a += 1;\n"
@@ -464,7 +464,7 @@ TEST(ParserSection11, CompoundAssignPlusEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection11, CompoundAssignMinusEq) {
+TEST(OperatorAndExpressionParsing, CompoundAssignMinusEq) {
   auto r = Parse(
       "module t;\n"
       "  initial a -= 1;\n"
@@ -475,7 +475,7 @@ TEST(ParserSection11, CompoundAssignMinusEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection11, CompoundAssignStarEq) {
+TEST(OperatorAndExpressionParsing, CompoundAssignStarEq) {
   auto r = Parse(
       "module t;\n"
       "  initial a *= 2;\n"
@@ -484,7 +484,7 @@ TEST(ParserSection11, CompoundAssignStarEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, CompoundAssignSlashEq) {
+TEST(OperatorAndExpressionParsing, CompoundAssignSlashEq) {
   auto r = Parse(
       "module t;\n"
       "  initial a /= 2;\n"
@@ -493,7 +493,7 @@ TEST(ParserSection11, CompoundAssignSlashEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, CompoundAssignPercentEq) {
+TEST(OperatorAndExpressionParsing, CompoundAssignPercentEq) {
   auto r = Parse(
       "module t;\n"
       "  initial a %= 3;\n"
@@ -502,7 +502,7 @@ TEST(ParserSection11, CompoundAssignPercentEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, CompoundAssignAmpEq) {
+TEST(OperatorAndExpressionParsing, CompoundAssignAmpEq) {
   auto r = Parse(
       "module t;\n"
       "  initial a &= 8'hFF;\n"
@@ -511,7 +511,7 @@ TEST(ParserSection11, CompoundAssignAmpEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, CompoundAssignPipeEq) {
+TEST(OperatorAndExpressionParsing, CompoundAssignPipeEq) {
   auto r = Parse(
       "module t;\n"
       "  initial a |= 8'h0F;\n"
@@ -520,7 +520,7 @@ TEST(ParserSection11, CompoundAssignPipeEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, CompoundAssignCaretEq) {
+TEST(OperatorAndExpressionParsing, CompoundAssignCaretEq) {
   auto r = Parse(
       "module t;\n"
       "  initial a ^= b;\n"
@@ -529,7 +529,7 @@ TEST(ParserSection11, CompoundAssignCaretEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, CompoundAssignLtLtEq) {
+TEST(OperatorAndExpressionParsing, CompoundAssignLtLtEq) {
   auto r = Parse(
       "module t;\n"
       "  initial a <<= 2;\n"
@@ -538,7 +538,7 @@ TEST(ParserSection11, CompoundAssignLtLtEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, CompoundAssignGtGtEq) {
+TEST(OperatorAndExpressionParsing, CompoundAssignGtGtEq) {
   auto r = Parse(
       "module t;\n"
       "  initial a >>= 2;\n"
@@ -547,7 +547,7 @@ TEST(ParserSection11, CompoundAssignGtGtEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, CompoundAssignLtLtLtEq) {
+TEST(OperatorAndExpressionParsing, CompoundAssignLtLtLtEq) {
   auto r = Parse(
       "module t;\n"
       "  initial a <<<= 1;\n"
@@ -556,7 +556,7 @@ TEST(ParserSection11, CompoundAssignLtLtLtEq) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, CompoundAssignGtGtGtEq) {
+TEST(OperatorAndExpressionParsing, CompoundAssignGtGtGtEq) {
   auto r = Parse(
       "module t;\n"
       "  initial a >>>= 1;\n"
@@ -564,7 +564,7 @@ TEST(ParserSection11, CompoundAssignGtGtGtEq) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-TEST(ParserSection9b, BlockingAssignCompound) {
+TEST(ProceduralAssignAndControlParsing, BlockingAssignCompound) {
   auto r = Parse(
       "module m;\n"
       "  initial x += 1;\n"

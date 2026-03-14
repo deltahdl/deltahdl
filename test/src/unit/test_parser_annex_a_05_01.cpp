@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA051, EndLabel) {
+TEST(UdpDeclGrammar, EndLabel) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table\n"
@@ -31,17 +31,17 @@ static void VerifyExternInvPrimitive(ParseResult& r) {
   EXPECT_TRUE(udp->table.empty());
 }
 
-TEST(ParserAnnexA051, ExternAnsi) {
+TEST(UdpDeclGrammar, ExternAnsi) {
   auto r = Parse("extern primitive inv(output out, input in);\n");
   VerifyExternInvPrimitive(r);
 }
 
-TEST(ParserAnnexA051, ExternNonAnsi) {
+TEST(UdpDeclGrammar, ExternNonAnsi) {
   auto r = Parse("extern primitive inv(out, in);\n");
   VerifyExternInvPrimitive(r);
 }
 
-TEST(ParserAnnexA051, ExternAnsiSequential) {
+TEST(UdpDeclGrammar, ExternAnsiSequential) {
   auto r = Parse("extern primitive dff(output reg q, input d, input clk);\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -53,7 +53,7 @@ TEST(ParserAnnexA051, ExternAnsiSequential) {
   ASSERT_EQ(udp->input_names.size(), 2u);
 }
 
-TEST(ParserAnnexA051, ManyInputs) {
+TEST(UdpDeclGrammar, ManyInputs) {
   auto r = Parse(
       "primitive gate5(output out, input a, b, c, d, e);\n"
       "  table\n"
@@ -69,7 +69,7 @@ TEST(ParserAnnexA051, ManyInputs) {
   ASSERT_EQ(udp->table[0].inputs.size(), 5u);
 }
 
-TEST(ParserAnnexA051, EndLabelSequential) {
+TEST(UdpDeclGrammar, EndLabelSequential) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
       "  table\n"

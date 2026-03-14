@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection7, AssocArrayFirstMethodIntKey) {
+TEST(AggregateTypeParsing, AssocArrayFirstMethodIntKey) {
   auto r = Parse(
       "module t;\n"
       "  int aa[int];\n"
@@ -20,7 +20,7 @@ TEST(ParserSection7, AssocArrayFirstMethodIntKey) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-TEST(ParserSection7, AssocArrayFirstMethodStringKey) {
+TEST(AggregateTypeParsing, AssocArrayFirstMethodStringKey) {
   auto r = Parse(
       "module t;\n"
       "  int aa[string];\n"
@@ -36,7 +36,7 @@ TEST(ParserSection7, AssocArrayFirstMethodStringKey) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-TEST(ParserSection7, AssocArrayFirstInIfCondition) {
+TEST(AggregateTypeParsing, AssocArrayFirstInIfCondition) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int aa[string];\n"
@@ -45,7 +45,7 @@ TEST(ParserSection7, AssocArrayFirstInIfCondition) {
               "endmodule\n"));
 }
 
-TEST(ParserSection7, AssocArrayFirstReturnAssigned) {
+TEST(AggregateTypeParsing, AssocArrayFirstReturnAssigned) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int aa[int];\n"

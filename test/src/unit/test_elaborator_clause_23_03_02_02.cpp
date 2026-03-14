@@ -75,7 +75,7 @@ TEST(Elaboration, PortBinding_PortMismatch) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-TEST(ParserAnnexA0412, ElaborationInterfaceInstPortBindings) {
+TEST(InterfaceInstantiationGrammar, ElaborationInterfaceInstPortBindings) {
   ElabFixture f;
   auto* design = Elaborate(
       "interface simple_if(input logic data);\n"

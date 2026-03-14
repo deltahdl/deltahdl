@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA702, SimpleFullPathElaborates) {
+TEST(SpecifyPathElaboration, SimpleFullPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

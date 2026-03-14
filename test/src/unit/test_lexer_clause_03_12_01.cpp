@@ -11,7 +11,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
+TEST(DesignBuildingBlockParsing, DollarUnitScopeResolution) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -27,7 +27,7 @@ TEST(ParserClause03, Cl3_12_1_DollarUnitScopeResolution) {
   EXPECT_EQ(t3.text, "b");
 }
 
-TEST(LexerClause03, Cl3_12_1_DollarUnitNotScopeResolution) {
+TEST(DesignBuildingBlockLexing, DollarUnitNotScopeResolution) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -40,7 +40,7 @@ TEST(LexerClause03, Cl3_12_1_DollarUnitNotScopeResolution) {
   EXPECT_EQ(t2.kind, TokenKind::kLParen);
 }
 
-TEST(LexerClause03, Cl3_12_1_DollarUnitWithWhitespace) {
+TEST(DesignBuildingBlockLexing, DollarUnitWithWhitespace) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);

@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, AlwaysConstruct_PlainAlways) {
+TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_PlainAlways) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk) q <= d;\n"
@@ -17,7 +17,7 @@ TEST(ParserA602, AlwaysConstruct_PlainAlways) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ParserSection9, AlwaysBlock) {
+TEST(ProcessParsing, AlwaysBlock) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk) q <= d;\n"
@@ -30,7 +30,7 @@ TEST(ParserSection9, AlwaysBlock) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
 }
 
-TEST(ParserClause09_02_02_01, AlwaysWithDelayControl) {
+TEST(AlwaysCombParsing, AlwaysWithDelayControl) {
   auto r = Parse(
       "module m;\n"
       "  always #5 clk = ~clk;\n"
@@ -43,7 +43,7 @@ TEST(ParserClause09_02_02_01, AlwaysWithDelayControl) {
   EXPECT_TRUE(item->sensitivity.empty());
 }
 
-TEST(ParserClause09_02_02_01, AlwaysBeginEndBlock) {
+TEST(AlwaysCombParsing, AlwaysBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  always begin\n"
@@ -60,7 +60,7 @@ TEST(ParserClause09_02_02_01, AlwaysBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserClause09_02_02_01, AlwaysWithoutTimingControl) {
+TEST(AlwaysCombParsing, AlwaysWithoutTimingControl) {
   auto r = Parse(
       "module m;\n"
       "  always areg = ~areg;\n"
@@ -71,7 +71,7 @@ TEST(ParserClause09_02_02_01, AlwaysWithoutTimingControl) {
   ASSERT_NE(item, nullptr);
 }
 
-TEST(ParserClause09_02_02_01, AlwaysParameterizedDelay) {
+TEST(AlwaysCombParsing, AlwaysParameterizedDelay) {
   auto r = Parse(
       "module m;\n"
       "  parameter half_period = 50;\n"

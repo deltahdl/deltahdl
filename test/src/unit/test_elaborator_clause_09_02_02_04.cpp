@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_02_02_04, MissingEventControlErrors) {
+TEST(AlwaysBlockElaboration, MissingEventControlErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -15,7 +15,7 @@ TEST(ElabClause09_02_02_04, MissingEventControlErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_04, BlockingTimingControlInBodyErrors) {
+TEST(AlwaysBlockElaboration, BlockingTimingControlInBodyErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -26,7 +26,7 @@ TEST(ElabClause09_02_02_04, BlockingTimingControlInBodyErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_04, ForkJoinInAlwaysFFErrors) {
+TEST(AlwaysBlockElaboration, ForkJoinInAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -42,7 +42,7 @@ TEST(ElabClause09_02_02_04, ForkJoinInAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_04, ValidPosedgeClockNoErrors) {
+TEST(AlwaysBlockElaboration, ValidPosedgeClockNoErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -54,7 +54,7 @@ TEST(ElabClause09_02_02_04, ValidPosedgeClockNoErrors) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_04, ElaboratesToCorrectKind) {
+TEST(AlwaysBlockElaboration, ElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -72,7 +72,7 @@ TEST(ElabClause09_02_02_04, ElaboratesToCorrectKind) {
   EXPECT_TRUE(found);
 }
 
-TEST(ElabClause09_02_02_04, SensitivityListPreserved) {
+TEST(AlwaysBlockElaboration, SensitivityListPreserved) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -98,7 +98,7 @@ TEST(ElabClause09_02_02_04, SensitivityListPreserved) {
   EXPECT_TRUE(found);
 }
 
-TEST(ElabClause09_02_02_04, NoEdgeWarnsNotSequential) {
+TEST(AlwaysBlockElaboration, NoEdgeWarnsNotSequential) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -111,7 +111,7 @@ TEST(ElabClause09_02_02_04, NoEdgeWarnsNotSequential) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(ElabClause09_02_02_04, PosedgeClockNoWarning) {
+TEST(AlwaysBlockElaboration, PosedgeClockNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -124,7 +124,7 @@ TEST(ElabClause09_02_02_04, PosedgeClockNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(ElabClause09_02_02_04, MultiDriverTwoAlwaysFFErrors) {
+TEST(AlwaysBlockElaboration, MultiDriverTwoAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -136,7 +136,7 @@ TEST(ElabClause09_02_02_04, MultiDriverTwoAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_04, MultiDriverFFAndContAssignErrors) {
+TEST(AlwaysBlockElaboration, MultiDriverFFAndContAssignErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -148,7 +148,7 @@ TEST(ElabClause09_02_02_04, MultiDriverFFAndContAssignErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_04, MultiDriverFFAndCombErrors) {
+TEST(AlwaysBlockElaboration, MultiDriverFFAndCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -160,7 +160,7 @@ TEST(ElabClause09_02_02_04, MultiDriverFFAndCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_04, DifferentVarsInSeparateFFOk) {
+TEST(AlwaysBlockElaboration, DifferentVarsInSeparateFFOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -173,7 +173,7 @@ TEST(ElabClause09_02_02_04, DifferentVarsInSeparateFFOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_03_02, ForkInAlwaysFFErrors) {
+TEST(ParallelBlockElaboration, ForkInAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -189,7 +189,7 @@ TEST(ElabClause09_03_02, ForkInAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_06_01, WaitForkInAlwaysFFErrors) {
+TEST(WaitForkElaboration, WaitForkInAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"

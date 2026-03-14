@@ -2,7 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, Cl3_9_PackageImportedIntoModule) {
+TEST(DesignBuildingBlockElaboration, PackageImportedIntoModule) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
              "  typedef logic [7:0] byte_t;\n"
@@ -13,7 +13,7 @@ TEST(ElabClause03, Cl3_9_PackageImportedIntoModule) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_9_PackageWithFunctionElaborates) {
+TEST(DesignBuildingBlockElaboration, PackageWithFunctionElaborates) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
              "  function int add(int a, int b); return a + b; endfunction\n"
@@ -23,7 +23,7 @@ TEST(ElabClause03, Cl3_9_PackageWithFunctionElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, Cl3_9_LocalScopesDoNotConflict) {
+TEST(DesignBuildingBlockElaboration, LocalScopesDoNotConflict) {
   EXPECT_TRUE(
       ElabOk("module a; logic x; endmodule\n"
              "module b; logic x; endmodule\n"));

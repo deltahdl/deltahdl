@@ -17,7 +17,7 @@ TEST(Parser, NettypeUsedInDecl) {
   EXPECT_EQ(item->name, "x");
 }
 
-TEST(ParserSection6, Sec6_6_7_NettypeUsedForNetDecl) {
+TEST(DataTypeParsing, NettypeUsedForNetDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct { real field1; bit field2; } T;\n"
@@ -26,7 +26,7 @@ TEST(ParserSection6, Sec6_6_7_NettypeUsedForNetDecl) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_7_2_NettypeArrayDecl) {
+TEST(DataTypeParsing, NettypeArrayDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  nettype logic [7:0] mynet;\n"
@@ -34,7 +34,7 @@ TEST(ParserSection6, Sec6_7_2_NettypeArrayDecl) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_7_2_ResolvedNettypeDecl) {
+TEST(DataTypeParsing, ResolvedNettypeDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct { real r; bit [7:0] data; } T;\n"
@@ -47,7 +47,7 @@ TEST(ParserSection6, Sec6_7_2_ResolvedNettypeDecl) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_7_2_MultipleNettypeInstances) {
+TEST(DataTypeParsing, MultipleNettypeInstances) {
   auto r = Parse(
       "module m;\n"
       "  nettype logic [7:0] mynet;\n"
@@ -63,7 +63,7 @@ TEST(ParserSection6, Sec6_7_2_MultipleNettypeInstances) {
   EXPECT_EQ(items[3]->name, "c");
 }
 
-TEST(ParserSection6, Sec6_7_2_UnresolvedNettypeDecl) {
+TEST(DataTypeParsing, UnresolvedNettypeDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct { real field1; bit field2; } T;\n"
@@ -72,7 +72,7 @@ TEST(ParserSection6, Sec6_7_2_UnresolvedNettypeDecl) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_7_2_NettypeAlias) {
+TEST(DataTypeParsing, NettypeAlias) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct { real r; bit [7:0] data; } T;\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7, ArraySumMethod) {
+TEST(AggregateTypeParsing, ArraySumMethod) {
   auto r = Parse(
       "module t;\n"
       "  int arr[4];\n"
@@ -18,7 +18,7 @@ TEST(ParserSection7, ArraySumMethod) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserSection7, ArraySumWithClause) {
+TEST(AggregateTypeParsing, ArraySumWithClause) {
   auto r = Parse(
       "module t;\n"
       "  int arr[4];\n"
@@ -30,7 +30,7 @@ TEST(ParserSection7, ArraySumWithClause) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection7, ArrayProductMethod) {
+TEST(AggregateTypeParsing, ArrayProductMethod) {
   auto r = Parse(
       "module t;\n"
       "  int arr[4];\n"
@@ -42,7 +42,7 @@ TEST(ParserSection7, ArrayProductMethod) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection7, ArrayReductionAnd) {
+TEST(AggregateTypeParsing, ArrayReductionAnd) {
   auto r = Parse(
       "module t;\n"
       "  byte b[] = '{1, 3, 5, 7};\n"
@@ -55,7 +55,7 @@ TEST(ParserSection7, ArrayReductionAnd) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserSection7, ArrayReductionOr) {
+TEST(AggregateTypeParsing, ArrayReductionOr) {
   auto r = Parse(
       "module t;\n"
       "  byte b[] = '{1, 2, 3, 4};\n"
@@ -68,7 +68,7 @@ TEST(ParserSection7, ArrayReductionOr) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserSection7, ArrayReductionXor) {
+TEST(AggregateTypeParsing, ArrayReductionXor) {
   auto r = Parse(
       "module t;\n"
       "  byte b[] = '{1, 2, 3, 4};\n"
@@ -81,7 +81,7 @@ TEST(ParserSection7, ArrayReductionXor) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserSection7, ArrayReductionSum) {
+TEST(AggregateTypeParsing, ArrayReductionSum) {
   auto r = Parse(
       "module t;\n"
       "  int arr[] = '{1, 2, 3};\n"
@@ -94,7 +94,7 @@ TEST(ParserSection7, ArrayReductionSum) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserA609, ArrayMethodAnd) {
+TEST(SubroutineCallSyntaxParsing, ArrayMethodAnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin arr.and(); end\n"
@@ -106,7 +106,7 @@ TEST(ParserA609, ArrayMethodAnd) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-TEST(ParserA609, ArrayMethodOr) {
+TEST(SubroutineCallSyntaxParsing, ArrayMethodOr) {
   auto r = Parse(
       "module m;\n"
       "  initial begin arr.or(); end\n"
@@ -118,7 +118,7 @@ TEST(ParserA609, ArrayMethodOr) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-TEST(ParserA609, ArrayMethodXor) {
+TEST(SubroutineCallSyntaxParsing, ArrayMethodXor) {
   auto r = Parse(
       "module m;\n"
       "  initial begin arr.xor(); end\n"
@@ -130,7 +130,7 @@ TEST(ParserA609, ArrayMethodXor) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-TEST(ParserA82, ArrayManipCallSum) {
+TEST(SubroutineCallExprParsing, ArrayManipCallSum) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = arr.sum(); end\n"
@@ -143,7 +143,7 @@ TEST(ParserA82, ArrayManipCallSum) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-TEST(ParserA82, ArrayMethodNameAnd) {
+TEST(SubroutineCallExprParsing, ArrayMethodNameAnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = arr.and(); end\n"
@@ -152,7 +152,7 @@ TEST(ParserA82, ArrayMethodNameAnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA82, ArrayMethodNameOr) {
+TEST(SubroutineCallExprParsing, ArrayMethodNameOr) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = arr.or(); end\n"
@@ -161,7 +161,7 @@ TEST(ParserA82, ArrayMethodNameOr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA82, ArrayMethodNameXor) {
+TEST(SubroutineCallExprParsing, ArrayMethodNameXor) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = arr.xor(); end\n"

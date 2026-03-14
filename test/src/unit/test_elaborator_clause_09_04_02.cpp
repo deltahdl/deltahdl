@@ -9,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_04_02, PosedgeEventControlElaborates) {
+TEST(EventControlElaboration, PosedgeEventControlElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -21,7 +21,7 @@ TEST(ElabClause09_04_02, PosedgeEventControlElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_02, NegedgeEventControlElaborates) {
+TEST(EventControlElaboration, NegedgeEventControlElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -33,7 +33,7 @@ TEST(ElabClause09_04_02, NegedgeEventControlElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_02, AnyChangeEventControlElaborates) {
+TEST(EventControlElaboration, AnyChangeEventControlElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -45,7 +45,7 @@ TEST(ElabClause09_04_02, AnyChangeEventControlElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_02, EdgeSensitivityPreservedInRtlir) {
+TEST(EventControlElaboration, EdgeSensitivityPreservedInRtlir) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

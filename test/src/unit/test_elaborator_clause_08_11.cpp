@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA811, ThisInModuleInitialBlockError) {
+TEST(ThisElaboration, ThisInModuleInitialBlockError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  initial begin\n"
@@ -14,7 +14,7 @@ TEST(ElabA811, ThisInModuleInitialBlockError) {
              "endmodule\n"));
 }
 
-TEST(ElabA811, ThisInModuleAlwaysBlockError) {
+TEST(ThisElaboration, ThisInModuleAlwaysBlockError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -25,7 +25,7 @@ TEST(ElabA811, ThisInModuleAlwaysBlockError) {
              "endmodule\n"));
 }
 
-TEST(ElabA811, ThisInModuleFunctionError) {
+TEST(ThisElaboration, ThisInModuleFunctionError) {
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  function int get_val();\n"
@@ -34,7 +34,7 @@ TEST(ElabA811, ThisInModuleFunctionError) {
              "endmodule\n"));
 }
 
-TEST(ElabA811, ThisInNonStaticClassMethodOk) {
+TEST(ThisElaboration, ThisInNonStaticClassMethodOk) {
   EXPECT_TRUE(
       ElabOk("class Demo;\n"
              "  integer x;\n"
@@ -47,7 +47,7 @@ TEST(ElabA811, ThisInNonStaticClassMethodOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA811, ThisInRegularMethodOk) {
+TEST(ThisElaboration, ThisInRegularMethodOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
              "  int data;\n"
@@ -60,7 +60,7 @@ TEST(ElabA811, ThisInRegularMethodOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA811, NoThisReferencesOk) {
+TEST(ThisElaboration, NoThisReferencesOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  initial begin\n"

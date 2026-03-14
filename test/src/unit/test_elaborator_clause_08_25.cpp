@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA825, ValueParamClassOk) {
+TEST(InterfaceClassElaboration, ValueParamClassOk) {
   EXPECT_TRUE(
       ElabOk("class stack #(parameter int DEPTH = 8);\n"
              "  int data;\n"
@@ -14,7 +14,7 @@ TEST(ElabA825, ValueParamClassOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA825, TypeParamClassOk) {
+TEST(InterfaceClassElaboration, TypeParamClassOk) {
   EXPECT_TRUE(
       ElabOk("class container #(type T = int);\n"
              "  T data;\n"
@@ -24,7 +24,7 @@ TEST(ElabA825, TypeParamClassOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA825, MultipleParamsOk) {
+TEST(InterfaceClassElaboration, MultipleParamsOk) {
   EXPECT_TRUE(ElabOk(
       "class fifo #(parameter int WIDTH = 8, parameter int DEPTH = 16);\n"
       "  bit [WIDTH-1:0] data;\n"
@@ -34,7 +34,7 @@ TEST(ElabA825, MultipleParamsOk) {
       "endmodule\n"));
 }
 
-TEST(ElabA825, ExplicitSpecializationOk) {
+TEST(InterfaceClassElaboration, ExplicitSpecializationOk) {
   EXPECT_TRUE(
       ElabOk("class vector #(int size = 1);\n"
              "  bit [size-1:0] a;\n"
@@ -44,7 +44,7 @@ TEST(ElabA825, ExplicitSpecializationOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA825, ParamClassExtendsBaseOk) {
+TEST(InterfaceClassElaboration, ParamClassExtendsBaseOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
              "  int x;\n"
@@ -57,7 +57,7 @@ TEST(ElabA825, ParamClassExtendsBaseOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA825, ParamClassExtendsParamBaseOk) {
+TEST(InterfaceClassElaboration, ParamClassExtendsParamBaseOk) {
   EXPECT_TRUE(
       ElabOk("class C #(type T = int);\n"
              "  T data;\n"
@@ -70,7 +70,7 @@ TEST(ElabA825, ParamClassExtendsParamBaseOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA825, DefaultSpecializationOk) {
+TEST(InterfaceClassElaboration, DefaultSpecializationOk) {
   EXPECT_TRUE(
       ElabOk("class stack #(type T = int);\n"
              "  T items;\n"

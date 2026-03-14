@@ -11,7 +11,7 @@ using ApiParseTest = ProgramTestParse;
 
 namespace {
 
-TEST(ParserSection38, DpiImportForVpiAccess) {
+TEST(DpiParsing, DpiImportForVpiAccess) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" context function void\n"
@@ -25,7 +25,7 @@ TEST(ParserSection38, DpiImportForVpiAccess) {
   EXPECT_TRUE(dpi->dpi_is_context);
 }
 
-TEST(ParserSection38, DpiImportContextCallbackWithArgs) {
+TEST(DpiParsing, DpiImportContextCallbackWithArgs) {
   auto r = Parse(R"(
     module m;
       import "DPI-C" context function int register_cb_wrapper(
@@ -54,7 +54,7 @@ TEST_F(DpiParseTest, ImportContextFunction) {
   EXPECT_EQ(items[0]->name, "set_val");
 }
 
-TEST(ParserSection13, DpiImportContextTask) {
+TEST(TaskAndFunctionParsing, DpiImportContextTask) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" context task c_display(input int x);\n"

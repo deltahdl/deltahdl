@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70501, RecoveryTimingCheck) {
+TEST(TimingCheckCommandParsing, RecoveryTimingCheck) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -20,7 +20,7 @@ TEST(ParserA70501, RecoveryTimingCheck) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-TEST(ParserSection28, Sec28_12_TimingCheckRecovery) {
+TEST(GateLevelModelingParsing, TimingCheckRecovery) {
   auto sp = ParseSpecifySingle(
       "module m(input rst, clk);\n"
       "  specify\n"
@@ -37,7 +37,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckRecovery) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "rst");
 }
 
-TEST(ParserA705, SystemTimingCheckRecovery) {
+TEST(SystemTimingCheckParsing, SystemTimingCheckRecovery) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

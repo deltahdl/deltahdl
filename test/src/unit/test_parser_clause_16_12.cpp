@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, PropertyListOfArguments_Positional) {
+TEST(AssertionDeclParsing, PropertyListOfArguments_Positional) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p(x, y, z); x |-> y ##1 z; endproperty\n"
@@ -14,7 +14,7 @@ TEST(ParserA210, PropertyListOfArguments_Positional) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, AssertionItemDecl_PropertyDecl) {
+TEST(AssertionDeclParsing, AssertionItemDecl_PropertyDecl) {
   auto r = Parse(
       "module m;\n"
       "  property p_req;\n"
@@ -28,7 +28,7 @@ TEST(ParserA210, AssertionItemDecl_PropertyDecl) {
   EXPECT_EQ(item->name, "p_req");
 }
 
-TEST(ParserA210, PropertyDecl_WithEndLabel) {
+TEST(AssertionDeclParsing, PropertyDecl_WithEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  property p_req;\n"
@@ -42,7 +42,7 @@ TEST(ParserA210, PropertyDecl_WithEndLabel) {
   EXPECT_EQ(item->name, "p_req");
 }
 
-TEST(ParserA210, PropertyDecl_WithPortList) {
+TEST(AssertionDeclParsing, PropertyDecl_WithPortList) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p(a, b);\n"
@@ -51,7 +51,7 @@ TEST(ParserA210, PropertyDecl_WithPortList) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyDecl_SourceLoc) {
+TEST(AssertionDeclParsing, PropertyDecl_SourceLoc) {
   auto r = Parse(
       "module m;\n"
       "  property my_prop;\n"
@@ -65,7 +65,7 @@ TEST(ParserA210, PropertyDecl_SourceLoc) {
   EXPECT_TRUE(item->loc.IsValid());
 }
 
-TEST(ParserA210, PropertyPortItem_DefaultValue) {
+TEST(AssertionDeclParsing, PropertyPortItem_DefaultValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p(x, y = 1'b1);\n"
@@ -74,14 +74,14 @@ TEST(ParserA210, PropertyPortItem_DefaultValue) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertySpec_ClockingEvent) {
+TEST(AssertionDeclParsing, PropertySpec_ClockingEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk) a);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertySpec_DisableIff) {
+TEST(AssertionDeclParsing, PropertySpec_DisableIff) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (\n"
@@ -89,7 +89,7 @@ TEST(ParserA210, PropertySpec_DisableIff) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertySpec_DisableIff_ComplexExpr) {
+TEST(AssertionDeclParsing, PropertySpec_DisableIff_ComplexExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (\n"
@@ -97,14 +97,14 @@ TEST(ParserA210, PropertySpec_DisableIff_ComplexExpr) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertySpec_NoClockNoDisable) {
+TEST(AssertionDeclParsing, PropertySpec_NoClockNoDisable) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (a |-> b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, PropertyPortList_Empty) {
+TEST(AssertionDeclParsing, PropertyPortList_Empty) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p();\n"
@@ -113,7 +113,7 @@ TEST(ParserA210, PropertyPortList_Empty) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, PropertyDeclaration) {
+TEST(AssertionParsing, PropertyDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  property p_req_ack;\n"
@@ -132,7 +132,7 @@ TEST(ParserSection16, PropertyDeclaration) {
 }
 using VerifyParseTest = ProgramTestParse;
 
-TEST(ParserSection16, Sec16_5_1_AssertPropertyDisableIff) {
+TEST(AssertionParsing, AssertPropertyDisableIff) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"
@@ -146,7 +146,7 @@ TEST(ParserSection16, Sec16_5_1_AssertPropertyDisableIff) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
-TEST(ParserAnnexF, AnnexFPropertyDecl) {
+TEST(AssertionSemanticsParsing, PropertyDecl) {
   auto r = Parse(
       "module m;\n"
       "  property p1;\n"
@@ -165,7 +165,7 @@ TEST(ParserAnnexF, AnnexFPropertyDecl) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserSection16, PropertyDeclWithFormals) {
+TEST(AssertionParsing, PropertyDeclWithFormals) {
   auto r = Parse(
       "module m;\n"
       "  property p_req_ack(req, ack);\n"
@@ -179,7 +179,7 @@ TEST(ParserSection16, PropertyDeclWithFormals) {
   EXPECT_EQ(pd->name, "p_req_ack");
 }
 
-TEST(ParserSection16, PropertyDeclWithEndLabel) {
+TEST(AssertionParsing, PropertyDeclWithEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  property p1;\n"
@@ -190,7 +190,7 @@ TEST(ParserSection16, PropertyDeclWithEndLabel) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, DisableIffInAssertProperty) {
+TEST(AssertionParsing, DisableIffInAssertProperty) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"
@@ -200,7 +200,7 @@ TEST(ParserSection16, DisableIffInAssertProperty) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, DisableIffInPropertyDecl) {
+TEST(AssertionParsing, DisableIffInPropertyDecl) {
   auto r = Parse(
       "module m;\n"
       "  property p1;\n"
@@ -212,7 +212,7 @@ TEST(ParserSection16, DisableIffInPropertyDecl) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, DisableIffWithComplexExpr) {
+TEST(AssertionParsing, DisableIffWithComplexExpr) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"
@@ -223,7 +223,7 @@ TEST(ParserSection16, DisableIffWithComplexExpr) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(ParserSection16, PropertyWithDisableIffDecl) {
+TEST(AssertionParsing, PropertyWithDisableIffDecl) {
   auto r = Parse(
       "module m;\n"
       "  property p_req_ack;\n"
@@ -235,7 +235,7 @@ TEST(ParserSection16, PropertyWithDisableIffDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection16, PropertyWithFormalArgsDecl) {
+TEST(AssertionParsing, PropertyWithFormalArgsDecl) {
   auto r = Parse(
       "module m;\n"
       "  property p_valid(signal, valid);\n"

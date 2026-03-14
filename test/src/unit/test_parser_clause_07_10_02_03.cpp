@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserCh513, BuiltInMethod_Delete) {
+TEST(BuiltInMethodParsing, BuiltInMethod_Delete) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q[$];\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection10, OperatorAssignPlusEq) {
+TEST(AssignmentParsing, OperatorAssignPlusEq) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  initial begin\n"
@@ -19,7 +19,7 @@ TEST(ParserSection10, OperatorAssignPlusEq) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, OperatorAssignMinusEq) {
+TEST(AssignmentParsing, OperatorAssignMinusEq) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  initial begin\n"
@@ -32,7 +32,7 @@ TEST(ParserSection10, OperatorAssignMinusEq) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection10, OperatorAssignStarEq) {
+TEST(AssignmentParsing, OperatorAssignStarEq) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  initial begin\n"

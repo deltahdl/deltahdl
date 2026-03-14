@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, SequenceExpr_Throughout) {
+TEST(AssertionDeclParsing, SequenceExpr_Throughout) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"
@@ -14,7 +14,7 @@ TEST(ParserA210, SequenceExpr_Throughout) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, Sec16_5_1_SequenceThroughout) {
+TEST(AssertionParsing, SequenceThroughout) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (\n"
@@ -22,7 +22,7 @@ TEST(ParserSection16, Sec16_5_1_SequenceThroughout) {
               "endmodule\n"));
 }
 
-TEST(ParserSection16, SequenceThroughoutBasic) {
+TEST(AssertionParsing, SequenceThroughoutBasic) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"
@@ -39,7 +39,7 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-TEST(ParserAnnexF, AnnexFThroughout) {
+TEST(AssertionSemanticsParsing, Throughout) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"
@@ -50,7 +50,7 @@ TEST(ParserAnnexF, AnnexFThroughout) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserSection16, SequenceThroughoutInSeqDecl) {
+TEST(AssertionParsing, SequenceThroughoutInSeqDecl) {
   auto r = Parse(
       "module m;\n"
       "  sequence burst_rule;\n"
@@ -64,7 +64,7 @@ TEST(ParserSection16, SequenceThroughoutInSeqDecl) {
   ASSERT_NE(sq, nullptr);
 }
 
-TEST(ParserSection16, SequenceThroughoutWithImplication) {
+TEST(AssertionParsing, SequenceThroughoutWithImplication) {
   auto r = Parse(
       "module m;\n"
       "  assert property (\n"

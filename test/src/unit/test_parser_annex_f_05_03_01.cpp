@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexF, AnnexFAssertPropertySimple) {
+TEST(AssertionSemanticsParsing, AssertPropertySimple) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a |-> b);\n"

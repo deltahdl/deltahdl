@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection20, IsUnboundedInConditional) {
+TEST(UtilitySystemTaskParsing, IsUnboundedInConditional) {
   auto r = Parse(
       "module m #(parameter int N = $);\n"
       "  generate\n"
@@ -18,7 +18,7 @@ TEST(ParserSection20, IsUnboundedInConditional) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection20, IsUnboundedWithBoundedParam) {
+TEST(UtilitySystemTaskParsing, IsUnboundedWithBoundedParam) {
   auto r = Parse(
       "module m #(parameter int P = 42);\n"
       "  initial begin\n"

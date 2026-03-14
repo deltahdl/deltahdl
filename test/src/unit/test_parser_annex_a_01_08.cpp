@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA042, GenerateItemInChecker) {
+TEST(GenerateInstantiationGrammar, GenerateItemInChecker) {
   auto r = Parse(
       "checker my_chk;\n"
       "  if (W > 0)\n"
@@ -21,7 +21,7 @@ TEST(ParserAnnexA042, GenerateItemInChecker) {
   EXPECT_TRUE(found_if);
 }
 
-TEST(CheckerItemsA18, CheckerWithPorts) {
+TEST(CheckerItemsParsing, CheckerWithPorts) {
   auto r = Parse(
       "checker my_chk(input clk, output logic valid);\n"
       "endchecker\n");
@@ -30,7 +30,7 @@ TEST(CheckerItemsA18, CheckerWithPorts) {
   ASSERT_EQ(r.cu->checkers.size(), 1u);
 }
 
-TEST(CheckerItemsA18, CheckerInitial) {
+TEST(CheckerItemsParsing, CheckerInitial) {
   auto r = Parse(
       "checker my_chk;\n"
       "  initial begin end\n"
@@ -41,7 +41,7 @@ TEST(CheckerItemsA18, CheckerInitial) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-TEST(CheckerItemsA18, CheckerAlways) {
+TEST(CheckerItemsParsing, CheckerAlways) {
   auto r = Parse(
       "checker my_chk;\n"
       "  always_ff @(posedge clk) begin end\n"
@@ -50,7 +50,7 @@ TEST(CheckerItemsA18, CheckerAlways) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CheckerItemsA18, CheckerFinal) {
+TEST(CheckerItemsParsing, CheckerFinal) {
   auto r = Parse(
       "checker my_chk;\n"
       "  final $display(\"done\");\n"
@@ -61,7 +61,7 @@ TEST(CheckerItemsA18, CheckerFinal) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kFinalBlock));
 }
 
-TEST(CheckerItemsA18, CheckerAssertion) {
+TEST(CheckerItemsParsing, CheckerAssertion) {
   auto r = Parse(
       "checker my_chk;\n"
       "  assert property (@(posedge clk) req |-> ack);\n"
@@ -70,7 +70,7 @@ TEST(CheckerItemsA18, CheckerAssertion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CheckerItemsA18, CheckerContAssign) {
+TEST(CheckerItemsParsing, CheckerContAssign) {
   auto r = Parse(
       "checker my_chk;\n"
       "  wire a, b;\n"
@@ -80,7 +80,7 @@ TEST(CheckerItemsA18, CheckerContAssign) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CheckerItemsA18, CheckerRandDataDecl) {
+TEST(CheckerItemsParsing, CheckerRandDataDecl) {
   auto r = Parse(
       "checker my_chk;\n"
       "  rand logic [7:0] data;\n"
@@ -89,7 +89,7 @@ TEST(CheckerItemsA18, CheckerRandDataDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CheckerItemsA18, CheckerFuncDecl) {
+TEST(CheckerItemsParsing, CheckerFuncDecl) {
   auto r = Parse(
       "checker my_chk;\n"
       "  function int add(int a, int b);\n"
@@ -102,7 +102,7 @@ TEST(CheckerItemsA18, CheckerFuncDecl) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
-TEST(CheckerItemsA18, CheckerNestedChecker) {
+TEST(CheckerItemsParsing, CheckerNestedChecker) {
   auto r = Parse(
       "checker outer;\n"
       "  checker inner;\n"
@@ -112,7 +112,7 @@ TEST(CheckerItemsA18, CheckerNestedChecker) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CheckerItemsA18, CheckerGenvar) {
+TEST(CheckerItemsParsing, CheckerGenvar) {
   auto r = Parse(
       "checker my_chk;\n"
       "  genvar i;\n"
@@ -121,7 +121,7 @@ TEST(CheckerItemsA18, CheckerGenvar) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CheckerItemsA18, CheckerClocking) {
+TEST(CheckerItemsParsing, CheckerClocking) {
   auto r = Parse(
       "checker my_chk;\n"
       "  clocking cb @(posedge clk);\n"
@@ -131,7 +131,7 @@ TEST(CheckerItemsA18, CheckerClocking) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CheckerItemsA18, CheckerDefaultClocking) {
+TEST(CheckerItemsParsing, CheckerDefaultClocking) {
   auto r = Parse(
       "checker my_chk;\n"
       "  clocking cb @(posedge clk);\n"
@@ -142,7 +142,7 @@ TEST(CheckerItemsA18, CheckerDefaultClocking) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CheckerItemsA18, CheckerDefaultDisableIff) {
+TEST(CheckerItemsParsing, CheckerDefaultDisableIff) {
   auto r = Parse(
       "checker my_chk;\n"
       "  default disable iff rst;\n"
@@ -151,7 +151,7 @@ TEST(CheckerItemsA18, CheckerDefaultDisableIff) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CheckerItemsA18, CheckerNullItem) {
+TEST(CheckerItemsParsing, CheckerNullItem) {
   auto r = Parse(
       "checker my_chk;\n"
       "  ;\n"
@@ -160,7 +160,7 @@ TEST(CheckerItemsA18, CheckerNullItem) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CheckerItemsA18, CheckerGenFor) {
+TEST(CheckerItemsParsing, CheckerGenFor) {
   auto r = Parse(
       "checker my_chk;\n"
       "  genvar i;\n"
@@ -174,7 +174,7 @@ TEST(CheckerItemsA18, CheckerGenFor) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kGenerateFor));
 }
 
-TEST(CheckerItemsA18, CheckerGenerateRegion) {
+TEST(CheckerItemsParsing, CheckerGenerateRegion) {
   auto r = Parse(
       "checker my_chk;\n"
       "  generate\n"
@@ -185,7 +185,7 @@ TEST(CheckerItemsA18, CheckerGenerateRegion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CheckerItemsA18, CheckerElabTask) {
+TEST(CheckerItemsParsing, CheckerElabTask) {
   auto r = Parse(
       "checker my_chk;\n"
       "  $warning(\"check this\");\n"
@@ -194,7 +194,7 @@ TEST(CheckerItemsA18, CheckerElabTask) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CheckerItemsA18, CheckerEndLabel) {
+TEST(CheckerItemsParsing, CheckerEndLabel) {
   auto r = Parse(
       "checker my_chk;\n"
       "endchecker : my_chk\n");

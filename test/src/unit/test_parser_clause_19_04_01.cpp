@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CovergroupDecl_WithExtends) {
+TEST(CovergroupDeclParsing, CovergroupDecl_WithExtends) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup child extends parent;\n"
@@ -13,7 +13,7 @@ TEST(ParserA211, CovergroupDecl_WithExtends) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_ExtendsWithBody) {
+TEST(CovergroupDeclParsing, CoverGroup_ExtendsWithBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup child extends parent;\n"
@@ -22,7 +22,7 @@ TEST(ParserA211, CoverGroup_ExtendsWithBody) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_ExtendsASTVerification) {
+TEST(CovergroupDeclParsing, CoverGroup_ExtendsASTVerification) {
   auto r = Parse(
       "module m;\n"
       "  covergroup child_cg extends parent_cg;\n"

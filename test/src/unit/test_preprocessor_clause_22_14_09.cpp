@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, BeginKeywordsModuleNamePreserved) {
+TEST(CompilerDirectiveParsing, BeginKeywordsModuleNamePreserved) {
   auto r = ParseWithPreprocessor(
       "`begin_keywords \"1800-2017\"\n"
       "module bar;\n"

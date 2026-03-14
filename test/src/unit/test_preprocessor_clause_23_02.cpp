@@ -13,7 +13,7 @@ TEST(SourceText, ModuleKeywordMacromodule) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-TEST(ParserSection23, MacromoduleDefinition) {
+TEST(ModuleAndHierarchyParsing, MacromoduleDefinition) {
   auto r = ParseWithPreprocessor(
       "macromodule top;\n"
       "  wire a;\n"

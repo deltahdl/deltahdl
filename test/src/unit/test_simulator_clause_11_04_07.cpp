@@ -219,7 +219,7 @@ TEST(EvalOpXZ, EquivX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(SimA83, LogicalAnd) {
+TEST(ExpressionSim, LogicalAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -236,7 +236,7 @@ TEST(SimA83, LogicalAnd) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA83, LogicalOr) {
+TEST(ExpressionSim, LogicalOr) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -253,7 +253,7 @@ TEST(SimA83, LogicalOr) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, UnaryLogicalNot) {
+TEST(OperatorSim, UnaryLogicalNot) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -270,7 +270,7 @@ TEST(SimA86, UnaryLogicalNot) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, BinaryLogicalAnd) {
+TEST(OperatorSim, BinaryLogicalAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -287,7 +287,7 @@ TEST(SimA86, BinaryLogicalAnd) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, BinaryLogicalOr) {
+TEST(OperatorSim, BinaryLogicalOr) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -304,7 +304,7 @@ TEST(SimA86, BinaryLogicalOr) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, BinaryImplication) {
+TEST(OperatorSim, BinaryImplication) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -321,7 +321,7 @@ TEST(SimA86, BinaryImplication) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, BinaryEquivalence) {
+TEST(OperatorSim, BinaryEquivalence) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

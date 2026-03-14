@@ -37,7 +37,7 @@ TEST_F(AnnexHParseTest, AnnexGProcessScopeResolution) {
   EXPECT_EQ(items[0]->data_type.type_name, "state_e");
 }
 
-TEST(ParserSection9c, ProcessSelfAssignment) {
+TEST(ProcessTimingAndControlParsing, ProcessSelfAssignment) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -47,7 +47,7 @@ TEST(ParserSection9c, ProcessSelfAssignment) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9c, ProcessKillCall) {
+TEST(ProcessTimingAndControlParsing, ProcessKillCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -63,7 +63,7 @@ TEST(ParserSection9c, ProcessKillCall) {
               "endmodule\n"));
 }
 
-TEST(ParserAnnexG, AnnexGProcessDecl) {
+TEST(StdPackageParsing, ProcessDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -74,7 +74,7 @@ TEST(ParserAnnexG, AnnexGProcessDecl) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection9c, ProcessStatusCheck) {
+TEST(ProcessTimingAndControlParsing, ProcessStatusCheck) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"

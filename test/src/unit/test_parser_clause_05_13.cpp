@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_13_MethodCallWithParens) {
+TEST(LexicalConventionParsing, MethodCallWithParens) {
   auto r = Parse(
       "module m;\n"
       "  int arr [0:3];\n"
@@ -19,7 +19,7 @@ TEST(ParserClause05, Cl5_13_MethodCallWithParens) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-TEST(ParserClause05, Cl5_13_MethodCallNoParens) {
+TEST(LexicalConventionParsing, MethodCallNoParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q[$];\n"
@@ -27,7 +27,7 @@ TEST(ParserClause05, Cl5_13_MethodCallNoParens) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_13_ChainedAccess) {
+TEST(LexicalConventionParsing, ChainedAccess) {
   auto r = Parse(
       "module m;\n"
       "  initial x = obj.arr.size();\n"
@@ -39,7 +39,7 @@ TEST(ParserClause05, Cl5_13_ChainedAccess) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-TEST(ParserClause05, Cl5_13_MethodWithArg) {
+TEST(LexicalConventionParsing, MethodWithArg) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic [7:0] q [$];\n"
@@ -47,7 +47,7 @@ TEST(ParserClause05, Cl5_13_MethodWithArg) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_13_MethodInExpression) {
+TEST(LexicalConventionParsing, MethodInExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int arr [0:3];\n"
@@ -56,7 +56,7 @@ TEST(ParserClause05, Cl5_13_MethodInExpression) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_13_MutatingMethodStatement) {
+TEST(LexicalConventionParsing, MutatingMethodStatement) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int arr [0:2];\n"
@@ -64,7 +64,7 @@ TEST(ParserClause05, Cl5_13_MutatingMethodStatement) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_13_MutatingMethodStatementNoParens) {
+TEST(LexicalConventionParsing, MutatingMethodStatementNoParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int arr [0:2];\n"
@@ -72,7 +72,7 @@ TEST(ParserClause05, Cl5_13_MutatingMethodStatementNoParens) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_13_QueueDelete) {
+TEST(LexicalConventionParsing, QueueDelete) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q [$];\n"
@@ -80,7 +80,7 @@ TEST(ParserClause05, Cl5_13_QueueDelete) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_13_QueuePopFront) {
+TEST(LexicalConventionParsing, QueuePopFront) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q [$];\n"
@@ -89,7 +89,7 @@ TEST(ParserClause05, Cl5_13_QueuePopFront) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_13_ReductionSum) {
+TEST(LexicalConventionParsing, ReductionSum) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int arr [0:2];\n"
@@ -98,7 +98,7 @@ TEST(ParserClause05, Cl5_13_ReductionSum) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_13_DynArraySize) {
+TEST(LexicalConventionParsing, DynArraySize) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int dyn [];\n"

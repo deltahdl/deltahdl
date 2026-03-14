@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh47, ActiveRegionProcessesAllEvents) {
+TEST(NondeterminismSim, ActiveRegionProcessesAllEvents) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -25,7 +25,7 @@ TEST(SimCh47, ActiveRegionProcessesAllEvents) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh47, ReactiveRegionProcessesAllEvents) {
+TEST(NondeterminismSim, ReactiveRegionProcessesAllEvents) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -40,7 +40,7 @@ TEST(SimCh47, ReactiveRegionProcessesAllEvents) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh47, IndependentActiveProcessesInterleave) {
+TEST(NondeterminismSim, IndependentActiveProcessesInterleave) {
   Arena arena;
   Scheduler sched(arena);
   int a = 0;
@@ -60,7 +60,7 @@ TEST(SimCh47, IndependentActiveProcessesInterleave) {
   EXPECT_EQ(b, 2);
 }
 
-TEST(SimCh47, IndependentReactiveProcessesInterleave) {
+TEST(NondeterminismSim, IndependentReactiveProcessesInterleave) {
   Arena arena;
   Scheduler sched(arena);
   int a = 0;
@@ -79,7 +79,7 @@ TEST(SimCh47, IndependentReactiveProcessesInterleave) {
   EXPECT_EQ(b, 20);
 }
 
-TEST(SimCh47, ProcessSuspensionViaPendingEvent) {
+TEST(NondeterminismSim, ProcessSuspensionViaPendingEvent) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -105,7 +105,7 @@ TEST(SimCh47, ProcessSuspensionViaPendingEvent) {
   EXPECT_EQ(order[2], "A_part2");
 }
 
-TEST(SimCh47, MultipleProcessInterleaving) {
+TEST(NondeterminismSim, MultipleProcessInterleaving) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -143,7 +143,7 @@ TEST(SimCh47, MultipleProcessInterleaving) {
   EXPECT_EQ(order[4], "C2");
 }
 
-TEST(SimCh47, ConflictingWritesInActiveRegion) {
+TEST(NondeterminismSim, ConflictingWritesInActiveRegion) {
   Arena arena;
   Scheduler sched(arena);
   int x = 0;
@@ -161,7 +161,7 @@ TEST(SimCh47, ConflictingWritesInActiveRegion) {
   EXPECT_TRUE(x == 10 || x == 20);
 }
 
-TEST(SimCh47, DynamicallyGeneratedActiveEventsExecute) {
+TEST(NondeterminismSim, DynamicallyGeneratedActiveEventsExecute) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -186,7 +186,7 @@ TEST(SimCh47, DynamicallyGeneratedActiveEventsExecute) {
   EXPECT_EQ(order[3], 3);
 }
 
-TEST(SimCh47, ReactiveProcessSuspensionViaReInactive) {
+TEST(NondeterminismSim, ReactiveProcessSuspensionViaReInactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -212,7 +212,7 @@ TEST(SimCh47, ReactiveProcessSuspensionViaReInactive) {
   EXPECT_EQ(order[2], "RA2");
 }
 
-TEST(SimCh47, NondeterminismAcrossTimeSlots) {
+TEST(NondeterminismSim, NondeterminismAcrossTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;

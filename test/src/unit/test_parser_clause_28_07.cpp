@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_NmosBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_NmosBasic) {
   auto r = Parse(
       "module m;\n"
       "  nmos (out, in, ctrl);\n"
@@ -17,7 +17,7 @@ TEST(ParserA301, GateInst_NmosBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA301, GateInst_PmosBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_PmosBasic) {
   auto r = Parse(
       "module m;\n"
       "  pmos (out, in, ctrl);\n"
@@ -28,21 +28,21 @@ TEST(ParserA301, GateInst_PmosBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA301, GateInst_RnmosBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_RnmosBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  rnmos (out, in, ctrl);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_RpmosBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_RpmosBasic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  rpmos (out, in, ctrl);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA301, GateInst_MosWithDelay) {
+TEST(PrimitiveInstantiationParsing, GateInst_MosWithDelay) {
   auto r = Parse(
       "module m;\n"
       "  nmos #10 n1(out, in, ctrl);\n"
@@ -54,7 +54,7 @@ TEST(ParserA301, GateInst_MosWithDelay) {
   EXPECT_EQ(g->gate_inst_name, "n1");
 }
 
-TEST(ParserA301, MosSwitchInst_Unnamed) {
+TEST(PrimitiveInstantiationParsing, MosSwitchInst_Unnamed) {
   auto r = Parse(
       "module m;\n"
       "  nmos (out, in, gate);\n"
@@ -65,7 +65,7 @@ TEST(ParserA301, MosSwitchInst_Unnamed) {
   EXPECT_TRUE(g->gate_inst_name.empty());
 }
 
-TEST(ParserA301, MosSwitchInst_Named) {
+TEST(PrimitiveInstantiationParsing, MosSwitchInst_Named) {
   auto r = Parse(
       "module m;\n"
       "  pmos p1(out, in, gate);\n"
@@ -76,7 +76,7 @@ TEST(ParserA301, MosSwitchInst_Named) {
   EXPECT_EQ(g->gate_inst_name, "p1");
 }
 
-TEST(ParserA301, GateInst_AllMosSwitchTypes) {
+TEST(PrimitiveInstantiationParsing, GateInst_AllMosSwitchTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  nmos  n1(o, i, g);\n"
@@ -86,7 +86,7 @@ TEST(ParserA301, GateInst_AllMosSwitchTypes) {
               "endmodule\n"));
 }
 
-TEST(ParserA304, MosSwitchtype_Nmos) {
+TEST(PrimitiveGateTypeParsing, MosSwitchtype_Nmos) {
   auto r = Parse(
       "module m;\n"
       "  nmos (out, in, ctrl);\n"
@@ -97,7 +97,7 @@ TEST(ParserA304, MosSwitchtype_Nmos) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, MosSwitchtype_Pmos) {
+TEST(PrimitiveGateTypeParsing, MosSwitchtype_Pmos) {
   auto r = Parse(
       "module m;\n"
       "  pmos (out, in, ctrl);\n"
@@ -108,7 +108,7 @@ TEST(ParserA304, MosSwitchtype_Pmos) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, MosSwitchtype_Rnmos) {
+TEST(PrimitiveGateTypeParsing, MosSwitchtype_Rnmos) {
   auto r = Parse(
       "module m;\n"
       "  rnmos (out, in, ctrl);\n"
@@ -119,7 +119,7 @@ TEST(ParserA304, MosSwitchtype_Rnmos) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(ParserA304, MosSwitchtype_Rpmos) {
+TEST(PrimitiveGateTypeParsing, MosSwitchtype_Rpmos) {
   auto r = Parse(
       "module m;\n"
       "  rpmos (out, in, ctrl);\n"

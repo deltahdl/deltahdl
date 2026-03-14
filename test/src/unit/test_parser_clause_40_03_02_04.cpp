@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection40, CoverageMergeSystemCall) {
+TEST(DataReadApiParsing, CoverageMergeSystemCall) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
       initial $coverage_merge("database.ucdb");

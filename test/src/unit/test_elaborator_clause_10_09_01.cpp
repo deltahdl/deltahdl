@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabCh511, ArrayInitPattern_SimpleArrayOk) {
+TEST(ArrayPatternElaboration, ArrayInitPattern_SimpleArrayOk) {
   SimFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -14,7 +14,7 @@ TEST(ElabCh511, ArrayInitPattern_SimpleArrayOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(SimA60701, PositionalPatternPacksMSBFirst) {
+TEST(PatternSim, PositionalPatternPacksMSBFirst) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -32,7 +32,7 @@ TEST(SimA60701, PositionalPatternPacksMSBFirst) {
   EXPECT_EQ(var->value.ToUint64(), 258u);
 }
 
-TEST(SimA60701, SingleElementPositionalPattern) {
+TEST(PatternSim, SingleElementPositionalPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -49,7 +49,7 @@ TEST(SimA60701, SingleElementPositionalPattern) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA60701, FourElementPositionalPattern) {
+TEST(PatternSim, FourElementPositionalPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -67,7 +67,7 @@ TEST(SimA60701, FourElementPositionalPattern) {
   EXPECT_EQ(var->value.ToUint64(), 0x01020304u);
 }
 
-TEST(SimA60701, PatternInConditionalBranch) {
+TEST(PatternSim, PatternInConditionalBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -86,7 +86,7 @@ TEST(SimA60701, PatternInConditionalBranch) {
   EXPECT_EQ(var->value.ToUint64(), 1286u);
 }
 
-TEST(SimA60701, PatternInCaseItemBody) {
+TEST(PatternSim, PatternInCaseItemBody) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -110,7 +110,7 @@ TEST(SimA60701, PatternInCaseItemBody) {
   EXPECT_EQ(var->value.ToUint64(), 2580u);
 }
 
-TEST(SimA60701, PatternInForLoop) {
+TEST(PatternSim, PatternInForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -131,7 +131,7 @@ TEST(SimA60701, PatternInForLoop) {
   EXPECT_EQ(var->value.ToUint64(), 1800u);
 }
 
-TEST(ElabCh511, ArrayInitPattern_NestedOk) {
+TEST(ArrayPatternElaboration, ArrayInitPattern_NestedOk) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -142,7 +142,7 @@ TEST(ElabCh511, ArrayInitPattern_NestedOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(ElabCh511, ArrayInitPattern_SizeMismatch) {
+TEST(ArrayPatternElaboration, ArrayInitPattern_SizeMismatch) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -152,7 +152,7 @@ TEST(ElabCh511, ArrayInitPattern_SizeMismatch) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ElabA60701, PatternDefaultKeyElaborates) {
+TEST(PatternElaboration, PatternDefaultKeyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -165,7 +165,7 @@ TEST(ElabA60701, PatternDefaultKeyElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-TEST(ElabCh511, ArrayInitPattern_DuplicateIndex) {
+TEST(ArrayPatternElaboration, ArrayInitPattern_DuplicateIndex) {
   ElabFixture f;
   ElaborateSrc(
       "module top();\n"
@@ -175,7 +175,7 @@ TEST(ElabCh511, ArrayInitPattern_DuplicateIndex) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(SimCh10i, ArrayPositionalPatternInit) {
+TEST(AssignmentPatternSim, ArrayPositionalPatternInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -195,7 +195,7 @@ TEST(SimCh10i, ArrayPositionalPatternInit) {
   EXPECT_EQ(e1->value.ToUint64(), 20u);
 }
 
-TEST(SimCh10i, ArrayDefaultKeyFillsAllElements) {
+TEST(AssignmentPatternSim, ArrayDefaultKeyFillsAllElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -215,7 +215,7 @@ TEST(SimCh10i, ArrayDefaultKeyFillsAllElements) {
   }
 }
 
-TEST(SimCh10i, ArrayReplicationPatternFills) {
+TEST(AssignmentPatternSim, ArrayReplicationPatternFills) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -235,7 +235,7 @@ TEST(SimCh10i, ArrayReplicationPatternFills) {
   }
 }
 
-TEST(SimCh10i, ArrayIndexKeyWithDefault) {
+TEST(AssignmentPatternSim, ArrayIndexKeyWithDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -258,7 +258,7 @@ TEST(SimCh10i, ArrayIndexKeyWithDefault) {
   EXPECT_EQ(e2->value.ToUint64(), 200u);
 }
 
-TEST(SimCh10i, ArrayDescendingRangePositional) {
+TEST(AssignmentPatternSim, ArrayDescendingRangePositional) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -278,7 +278,7 @@ TEST(SimCh10i, ArrayDescendingRangePositional) {
   EXPECT_EQ(e0->value.ToUint64(), 40u);
 }
 
-TEST(SimCh10i, ArrayVarDeclPatternInit) {
+TEST(AssignmentPatternSim, ArrayVarDeclPatternInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA607, RandcaseParse) {
+TEST(CaseSyntaxParsing, RandcaseParse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -25,7 +25,7 @@ TEST(ParserA607, RandcaseParse) {
   EXPECT_EQ(stmt->randcase_items.size(), 3u);
 }
 
-TEST(ParserA607, RandcaseWithBlocks) {
+TEST(CaseSyntaxParsing, RandcaseWithBlocks) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -43,7 +43,7 @@ TEST(ParserA607, RandcaseWithBlocks) {
   EXPECT_EQ(stmt->randcase_items.size(), 2u);
 }
 
-TEST(ParserA604, StmtItemRandcaseStatement) {
+TEST(StatementSyntaxParsing, StmtItemRandcaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -60,7 +60,7 @@ TEST(ParserA604, StmtItemRandcaseStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
 }
 
-TEST(ParserSection18, RandcaseStmt) {
+TEST(ConstrainedRandomParsing, RandcaseStmt) {
   auto r = Parse(
       "module top;\n"
       "  initial begin\n"

@@ -27,7 +27,7 @@ void RunAndExpectArray(
   }
 }
 
-TEST(SimCh10j, ConcatAndPatternEquivalent) {
+TEST(UnpackedArrayConcatSim, ConcatAndPatternEquivalent) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -54,7 +54,7 @@ TEST(SimCh10j, ConcatAndPatternEquivalent) {
   }
 }
 
-TEST(SimCh10j, UnpackedArrayConcatScalarElements) {
+TEST(UnpackedArrayConcatSim, UnpackedArrayConcatScalarElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -11,7 +11,7 @@ TEST(SourceText, CheckerEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA603, SeqBlockNamed) {
+TEST(BlockStatementSyntaxParsing, SeqBlockNamed) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : my_block\n"
@@ -26,7 +26,7 @@ TEST(ParserA603, SeqBlockNamed) {
   EXPECT_EQ(body->label, "my_block");
 }
 
-TEST(ParserA603, SeqBlockNamedWithEndLabel) {
+TEST(BlockStatementSyntaxParsing, SeqBlockNamedWithEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : blockB\n"
@@ -41,7 +41,7 @@ TEST(ParserA603, SeqBlockNamedWithEndLabel) {
   EXPECT_EQ(body->label, "blockB");
 }
 
-TEST(ParserA603, ForkNamed) {
+TEST(BlockStatementSyntaxParsing, ForkNamed) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -58,7 +58,7 @@ TEST(ParserA603, ForkNamed) {
   EXPECT_EQ(stmt->label, "my_fork");
 }
 
-TEST(ParserA603, ForkNamedWithEndLabel) {
+TEST(BlockStatementSyntaxParsing, ForkNamedWithEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -74,7 +74,7 @@ TEST(ParserA603, ForkNamedWithEndLabel) {
   EXPECT_EQ(stmt->label, "my_fork");
 }
 
-TEST(ParserA603, ForkNamedJoinAnyWithEndLabel) {
+TEST(BlockStatementSyntaxParsing, ForkNamedJoinAnyWithEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -91,7 +91,7 @@ TEST(ParserA603, ForkNamedJoinAnyWithEndLabel) {
   EXPECT_EQ(stmt->label, "f1");
 }
 
-TEST(ParserA603, ForkNamedJoinNoneWithEndLabel) {
+TEST(BlockStatementSyntaxParsing, ForkNamedJoinNoneWithEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -107,7 +107,7 @@ TEST(ParserA603, ForkNamedJoinNoneWithEndLabel) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
   EXPECT_EQ(stmt->label, "f2");
 }
-TEST(ParserSection9c, SequentialBlockNamedWithDecls) {
+TEST(ProcessTimingAndControlParsing, SequentialBlockNamedWithDecls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : my_block\n"
@@ -123,7 +123,7 @@ TEST(ParserSection9c, SequentialBlockNamedWithDecls) {
   EXPECT_EQ(body->label, "my_block");
 }
 
-TEST(ParserSection4, Sec4_6_NamedBeginEndScope) {
+TEST(SchedulingSemanticsParsing, NamedBeginEndScope) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : seq_blk\n"
@@ -139,7 +139,7 @@ TEST(ParserSection4, Sec4_6_NamedBeginEndScope) {
   EXPECT_EQ(body->label, "seq_blk");
 }
 
-TEST(ParserSection9, SequentialBlockNamedBeginEnd) {
+TEST(ProcessParsing, SequentialBlockNamedBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : my_seq\n"
@@ -155,7 +155,7 @@ TEST(ParserSection9, SequentialBlockNamedBeginEnd) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserClause03, Cl3_13_NamedBeginEndBlock) {
+TEST(DesignBuildingBlockParsing, NamedBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : my_block\n"
@@ -174,7 +174,7 @@ TEST(ParserClause03, Cl3_13_NamedBeginEndBlock) {
   EXPECT_EQ(item->body->label, "my_block");
 }
 
-TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
+TEST(DesignBuildingBlockParsing, NestedNamedBlocks) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : outer\n"
@@ -193,7 +193,7 @@ TEST(ParserClause03, Cl3_13_NestedNamedBlocks) {
   EXPECT_EQ(item->body->stmts[0]->label, "inner");
 }
 
-TEST(ParserSection12, NamedBeginEnd) {
+TEST(ProceduralStatementParsing, NamedBeginEnd) {
   auto r = Parse(
       "module t;\n"
       "  initial begin : my_block\n"
@@ -207,7 +207,7 @@ TEST(ParserSection12, NamedBeginEnd) {
   EXPECT_EQ(body->label, "my_block");
 }
 
-TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
+TEST(DesignBuildingBlockParsing, AnonymousBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -224,7 +224,7 @@ TEST(ParserClause03, Cl3_13_AnonymousBeginEndBlock) {
   EXPECT_TRUE(item->body->label.empty());
 }
 
-TEST(ParserSection12, NamedBeginEndNoEndLabel) {
+TEST(ProceduralStatementParsing, NamedBeginEndNoEndLabel) {
   auto r = Parse(
       "module t;\n"
       "  initial begin : blk\n"
@@ -238,7 +238,7 @@ TEST(ParserSection12, NamedBeginEndNoEndLabel) {
   EXPECT_EQ(body->label, "blk");
 }
 
-TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
+TEST(DesignBuildingBlockParsing, MultipleNamedBlocksSameLevel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -261,7 +261,7 @@ TEST(ParserClause03, Cl3_13_MultipleNamedBlocksSameLevel) {
   EXPECT_EQ(body->stmts[1]->label, "block_b");
 }
 
-TEST(ParserSection9, Sec9_3_2_NamedForkJoinMatchingLabels) {
+TEST(ProcessParsing, NamedForkJoinMatchingLabels) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -280,7 +280,7 @@ TEST(ParserSection9, Sec9_3_2_NamedForkJoinMatchingLabels) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
 }
 
-TEST(ParserSection12, NamedForkJoin) {
+TEST(ProceduralStatementParsing, NamedForkJoin) {
   auto r = Parse(
       "module t;\n"
       "  initial fork : my_fork\n"
@@ -294,7 +294,7 @@ TEST(ParserSection12, NamedForkJoin) {
   EXPECT_EQ(body->label, "my_fork");
 }
 
-TEST(ParserSection9c, NestedNamedSequentialBlocks) {
+TEST(ProcessTimingAndControlParsing, NestedNamedSequentialBlocks) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : outer\n"
@@ -313,7 +313,7 @@ TEST(ParserSection9c, NestedNamedSequentialBlocks) {
   EXPECT_EQ(body->stmts[0]->label, "inner");
 }
 
-TEST(ParserSection12, NamedForkJoinAny) {
+TEST(ProceduralStatementParsing, NamedForkJoinAny) {
   auto r = Parse(
       "module t;\n"
       "  initial fork : par_blk\n"
@@ -327,14 +327,14 @@ TEST(ParserSection12, NamedForkJoinAny) {
   EXPECT_EQ(body->label, "par_blk");
   EXPECT_EQ(body->join_kind, TokenKind::kKwJoinAny);
 }
-TEST(ParserSection23, EndLabelInterface) {
+TEST(ModuleAndHierarchyParsing, EndLabelInterface) {
   auto r = Parse("interface myif; endinterface : myif\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->interfaces.size(), 1);
   EXPECT_EQ(r.cu->interfaces[0]->name, "myif");
 }
 
-TEST(ParserSection9, Sec9_3_2_NamedForkJoinNone) {
+TEST(ProcessParsing, NamedForkJoinNone) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -352,7 +352,7 @@ TEST(ParserSection9, Sec9_3_2_NamedForkJoinNone) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
 }
 
-TEST(ParserSection12, UnlabeledBlockHasEmptyLabel) {
+TEST(ProceduralStatementParsing, UnlabeledBlockHasEmptyLabel) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -366,14 +366,14 @@ TEST(ParserSection12, UnlabeledBlockHasEmptyLabel) {
   EXPECT_TRUE(body->label.empty());
 }
 
-TEST(ParserSection23, EndLabelProgram) {
+TEST(ModuleAndHierarchyParsing, EndLabelProgram) {
   auto r = Parse("program myprog; endprogram : myprog\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->programs.size(), 1);
   EXPECT_EQ(r.cu->programs[0]->name, "myprog");
 }
 
-TEST(ParserClause03, Cl3_13_NamedForkJoinBlock) {
+TEST(DesignBuildingBlockParsing, NamedForkJoinBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -392,7 +392,7 @@ TEST(ParserClause03, Cl3_13_NamedForkJoinBlock) {
   EXPECT_EQ(fork_stmt->kind, StmtKind::kFork);
   EXPECT_EQ(fork_stmt->label, "my_fork");
 }
-TEST(ParserSection9, Sec9_3_1_NamedBeginEndMatchingLabel) {
+TEST(ProcessParsing, NamedBeginEndMatchingLabel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : seq_block\n"
@@ -408,7 +408,7 @@ TEST(ParserSection9, Sec9_3_1_NamedBeginEndMatchingLabel) {
   EXPECT_EQ(body->stmts.size(), 1u);
 }
 
-TEST(ParserA28, NamedBlockWithDecls) {
+TEST(BlockItemDeclParsing, NamedBlockWithDecls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : my_block\n"
@@ -425,7 +425,7 @@ TEST(ParserA28, NamedBlockWithDecls) {
   EXPECT_EQ(body->label, "my_block");
 }
 
-TEST(ParserSection9, Sec9_3_1_NamedBeginEndNoEndLabel) {
+TEST(ProcessParsing, NamedBeginEndNoEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : blk_no_end\n"
@@ -440,7 +440,7 @@ TEST(ParserSection9, Sec9_3_1_NamedBeginEndNoEndLabel) {
   EXPECT_EQ(body->label, "blk_no_end");
 }
 
-TEST(ParserSection12, NestedNamedBlocks) {
+TEST(ProceduralStatementParsing, NestedNamedBlocks) {
   auto r = Parse(
       "module t;\n"
       "  initial begin : outer\n"
@@ -457,7 +457,7 @@ TEST(ParserSection12, NestedNamedBlocks) {
   EXPECT_EQ(body->stmts[0]->label, "inner");
 }
 
-TEST(ParserSection9, ParallelBlockNamedForkJoin) {
+TEST(ProcessParsing, ParallelBlockNamedForkJoin) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -475,7 +475,7 @@ TEST(ParserSection9, ParallelBlockNamedForkJoin) {
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoin);
 }
 
-TEST(ParserClause09_03_04, MatchingEndLabelBeginEnd) {
+TEST(BlockNameParsing, MatchingEndLabelBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : myblk\n"
@@ -486,7 +486,7 @@ TEST(ParserClause09_03_04, MatchingEndLabelBeginEnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause09_03_04, MismatchedEndLabelBeginEndErrors) {
+TEST(BlockNameParsing, MismatchedEndLabelBeginEndErrors) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : blk_a\n"
@@ -496,7 +496,7 @@ TEST(ParserClause09_03_04, MismatchedEndLabelBeginEndErrors) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause09_03_04, MatchingEndLabelForkJoin) {
+TEST(BlockNameParsing, MatchingEndLabelForkJoin) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -509,7 +509,7 @@ TEST(ParserClause09_03_04, MatchingEndLabelForkJoin) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause09_03_04, MismatchedEndLabelForkJoinErrors) {
+TEST(BlockNameParsing, MismatchedEndLabelForkJoinErrors) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -521,7 +521,7 @@ TEST(ParserClause09_03_04, MismatchedEndLabelForkJoinErrors) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause09_03_04, EndLabelWithoutStartLabelOk) {
+TEST(BlockNameParsing, EndLabelWithoutStartLabelOk) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -533,7 +533,7 @@ TEST(ParserClause09_03_04, EndLabelWithoutStartLabelOk) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause09_03_04, NamedBlockWithoutEndLabelOk) {
+TEST(BlockNameParsing, NamedBlockWithoutEndLabelOk) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : myblk\n"

@@ -21,7 +21,7 @@ TEST(EvalOpXZ, WildcardEqLeftX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(SimA86, BinaryWildcardEq) {
+TEST(OperatorSim, BinaryWildcardEq) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -38,7 +38,7 @@ TEST(SimA86, BinaryWildcardEq) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA86, BinaryWildcardNeq) {
+TEST(OperatorSim, BinaryWildcardNeq) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

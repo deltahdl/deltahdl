@@ -55,7 +55,7 @@ TEST(Elaboration, WidthInference_Concatenation) {
   EXPECT_EQ(InferExprWidth(&concat, typedefs), 64);
 }
 
-TEST(SimCh9, AlwaysCombResultWidth32) {
+TEST(AlwaysCombBasicSim, AlwaysCombResultWidth32) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

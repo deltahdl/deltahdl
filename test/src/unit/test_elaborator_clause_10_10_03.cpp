@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabCh10j, NestedConcatInUnpackedArrayConcatError) {
+TEST(UnpackedArrayConcatElaboration, NestedConcatInUnpackedArrayConcatError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(ElabCh10j, NestedConcatInUnpackedArrayConcatError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabCh10j, TypedAssignPatternInArrayConcatOk) {
+TEST(UnpackedArrayConcatElaboration, TypedAssignPatternInArrayConcatOk) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -33,7 +33,7 @@ TEST(ElabCh10j, TypedAssignPatternInArrayConcatOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabCh10j, StringConcatInStringArrayConcatOk) {
+TEST(UnpackedArrayConcatElaboration, StringConcatInStringArrayConcatOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -47,7 +47,7 @@ TEST(ElabCh10j, StringConcatInStringArrayConcatOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabCh10j, AssignPatternWithArrayConcatOk) {
+TEST(UnpackedArrayConcatElaboration, AssignPatternWithArrayConcatOk) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -60,7 +60,7 @@ TEST(ElabCh10j, AssignPatternWithArrayConcatOk) {
   ASSERT_NE(design, nullptr);
 }
 
-TEST(ElabCh10j, ScalarElementsSelfDetermined) {
+TEST(UnpackedArrayConcatElaboration, ScalarElementsSelfDetermined) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -72,7 +72,7 @@ TEST(ElabCh10j, ScalarElementsSelfDetermined) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabCh10j, ArrayIdentifierSelfDetermined) {
+TEST(UnpackedArrayConcatElaboration, ArrayIdentifierSelfDetermined) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -85,7 +85,7 @@ TEST(ElabCh10j, ArrayIdentifierSelfDetermined) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabCh10j, MultipleNestedConcatsError) {
+TEST(UnpackedArrayConcatElaboration, MultipleNestedConcatsError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

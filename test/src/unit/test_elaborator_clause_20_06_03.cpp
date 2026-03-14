@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh6, IsunboundedTrue) {
+TEST(DataTypeSim, IsunboundedTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -26,7 +26,7 @@ TEST(SimCh6, IsunboundedTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh6, IsunboundedFalse) {
+TEST(DataTypeSim, IsunboundedFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

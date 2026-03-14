@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA702, StateDependentIfEdgeSensitive) {
+TEST(SpecifyPathParsing, StateDependentIfEdgeSensitive) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

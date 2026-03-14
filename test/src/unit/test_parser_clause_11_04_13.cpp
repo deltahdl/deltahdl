@@ -6,7 +6,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, InsideBasicListCondition) {
+TEST(OperatorAndExpressionParsing, InsideBasicListCondition) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -21,7 +21,7 @@ TEST(ParserSection11, InsideBasicListCondition) {
   EXPECT_EQ(cond->elements.size(), 3u);
 }
 
-TEST(ParserSection11, InsideBasicListLhs) {
+TEST(OperatorAndExpressionParsing, InsideBasicListLhs) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -36,7 +36,7 @@ TEST(ParserSection11, InsideBasicListLhs) {
   EXPECT_EQ(cond->lhs->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserSection11, InsideWithRange) {
+TEST(OperatorAndExpressionParsing, InsideWithRange) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -52,7 +52,7 @@ TEST(ParserSection11, InsideWithRange) {
   EXPECT_EQ(cond->kind, ExprKind::kInside);
 }
 
-TEST(ParserSection11, InsideWithRangeElements) {
+TEST(OperatorAndExpressionParsing, InsideWithRangeElements) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -66,7 +66,7 @@ TEST(ParserSection11, InsideWithRangeElements) {
   EXPECT_EQ(cond->elements.size(), 2u);
 }
 
-TEST(ParserSection11, InsideInAssign) {
+TEST(OperatorAndExpressionParsing, InsideInAssign) {
   auto r = Parse(
       "module t;\n"
       "  wire r;\n"
@@ -76,7 +76,7 @@ TEST(ParserSection11, InsideInAssign) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, InsideWithWildcardBits) {
+TEST(OperatorAndExpressionParsing, InsideWithWildcardBits) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic [2:0] val;\n"
@@ -86,7 +86,7 @@ TEST(ParserSection11, InsideWithWildcardBits) {
               "endmodule\n"));
 }
 
-TEST(ParserSection11, InsideWithDollarRange) {
+TEST(OperatorAndExpressionParsing, InsideWithDollarRange) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  int a;\n"
@@ -95,7 +95,7 @@ TEST(ParserSection11, InsideWithDollarRange) {
               "  end\n"
               "endmodule\n"));
 }
-TEST(ParserSection11, InsideMixedValuesAndRanges) {
+TEST(OperatorAndExpressionParsing, InsideMixedValuesAndRanges) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -112,7 +112,7 @@ TEST(ParserSection11, InsideMixedValuesAndRanges) {
   EXPECT_EQ(cond->elements.size(), 4u);
 }
 
-TEST(ParserA83, InsideExprSingleValue) {
+TEST(ExpressionParsing, InsideExprSingleValue) {
   auto r = Parse("module m; initial x = a inside {3}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -122,7 +122,7 @@ TEST(ParserA83, InsideExprSingleValue) {
   EXPECT_EQ(rhs->elements.size(), 1u);
 }
 
-TEST(ParserA83, InsideExprMultipleValues) {
+TEST(ExpressionParsing, InsideExprMultipleValues) {
   auto r = Parse("module m; initial x = a inside {1, 2, 3}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -132,7 +132,7 @@ TEST(ParserA83, InsideExprMultipleValues) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-TEST(ParserA83, InsideExprWithRange) {
+TEST(ExpressionParsing, InsideExprWithRange) {
   auto r = Parse("module m; initial x = a inside {[1:10]}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -144,7 +144,7 @@ TEST(ParserA83, InsideExprWithRange) {
   EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kSelect);
 }
 
-TEST(ParserA83, InsideExprMixedValuesAndRanges) {
+TEST(ExpressionParsing, InsideExprMixedValuesAndRanges) {
   auto r =
       Parse("module m; initial x = a inside {5, [10:20], 30}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -155,7 +155,7 @@ TEST(ParserA83, InsideExprMixedValuesAndRanges) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-TEST(ParserSection11, Sec11_1_InsideExpressionWithLhsAndElements) {
+TEST(OperatorAndExpressionParsing, InsideExpressionWithLhsAndElements) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -172,7 +172,7 @@ TEST(ParserSection11, Sec11_1_InsideExpressionWithLhsAndElements) {
   EXPECT_EQ(cond->elements.size(), 3u);
 }
 
-TEST(ParserSection11, InsideBasicListParses) {
+TEST(OperatorAndExpressionParsing, InsideBasicListParses) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"

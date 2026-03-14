@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection9, Sec9_4_5_RepeatEventSignalField) {
+TEST(ProcessParsing, RepeatEventSignalField) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -19,7 +19,7 @@ TEST(ParserSection9, Sec9_4_5_RepeatEventSignalField) {
   EXPECT_EQ(stmt->events[0].signal->text, "clk");
 }
 
-TEST(ParserSection9, Sec9_4_5_ParseOkRepeatEvent) {
+TEST(ProcessParsing, ParseOkRepeatEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  reg clk, a, b;\n"
@@ -30,7 +30,7 @@ TEST(ParserSection9, Sec9_4_5_ParseOkRepeatEvent) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_4_5_IntraDelayNoEventsField) {
+TEST(ProcessParsing, IntraDelayNoEventsField) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -44,7 +44,7 @@ TEST(ParserSection9, Sec9_4_5_IntraDelayNoEventsField) {
   EXPECT_EQ(stmt->repeat_event_count, nullptr);
 }
 
-TEST(ParserA605, IntraAssignDelayBlocking) {
+TEST(TimingControlSyntaxParsing, IntraAssignDelayBlocking) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -60,7 +60,7 @@ TEST(ParserA605, IntraAssignDelayBlocking) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserA605, IntraAssignEventBlocking) {
+TEST(TimingControlSyntaxParsing, IntraAssignEventBlocking) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -76,7 +76,7 @@ TEST(ParserA605, IntraAssignEventBlocking) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-TEST(ParserA605, IntraAssignRepeatEventBlocking) {
+TEST(TimingControlSyntaxParsing, IntraAssignRepeatEventBlocking) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -92,7 +92,7 @@ TEST(ParserA605, IntraAssignRepeatEventBlocking) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
-TEST(ParserA605, IntraAssignDelayNonblocking) {
+TEST(TimingControlSyntaxParsing, IntraAssignDelayNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -107,7 +107,7 @@ TEST(ParserA605, IntraAssignDelayNonblocking) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserA605, IntraAssignEventNonblocking) {
+TEST(TimingControlSyntaxParsing, IntraAssignEventNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -122,7 +122,7 @@ TEST(ParserA605, IntraAssignEventNonblocking) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
-TEST(ParserA605, IntraAssignRepeatEventNonblocking) {
+TEST(TimingControlSyntaxParsing, IntraAssignRepeatEventNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -137,7 +137,7 @@ TEST(ParserA605, IntraAssignRepeatEventNonblocking) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
   EXPECT_FALSE(stmt->events.empty());
 }
-TEST(ParserSection9b, NonblockingAssignWithDelay) {
+TEST(ProceduralAssignAndControlParsing, NonblockingAssignWithDelay) {
   auto r = Parse(
       "module m;\n"
       "  initial q <= #5 d;\n"
@@ -149,7 +149,7 @@ TEST(ParserSection9b, NonblockingAssignWithDelay) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserSection9b, NonblockingAssignWithEventControl) {
+TEST(ProceduralAssignAndControlParsing, NonblockingAssignWithEventControl) {
   auto r = Parse(
       "module m;\n"
       "  initial a <= @(posedge clk) b;\n"
@@ -160,7 +160,7 @@ TEST(ParserSection9b, NonblockingAssignWithEventControl) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserSection9, RepeatEventControl) {
+TEST(ProcessParsing, RepeatEventControl) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, a, b;\n"
@@ -174,7 +174,7 @@ TEST(ParserSection9, RepeatEventControl) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
-TEST(ParserA602, BlockingAssignment_WithIntraDelay) {
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_WithIntraDelay) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a = #10 b; end\n"
@@ -188,7 +188,7 @@ TEST(ParserA602, BlockingAssignment_WithIntraDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_1_IntraAssignEventControl) {
+TEST(AssignmentParsing, IntraAssignEventControl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

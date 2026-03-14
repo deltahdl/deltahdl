@@ -6,7 +6,7 @@
 
 using namespace delta;
 
-TEST(SimCh502, LexicalTokenFreeFormatIdenticalResult) {
+TEST(LexicalTokenSim, LexicalTokenFreeFormatIdenticalResult) {
   auto compact = RunAndGet(
       "module t;logic [7:0] result;initial result=8'd42;endmodule", "result");
   auto spread = RunAndGet(
@@ -17,7 +17,7 @@ TEST(SimCh502, LexicalTokenFreeFormatIdenticalResult) {
   EXPECT_EQ(compact, 42u);
 }
 
-TEST(SimCh502, LexicalTokenCommentsDoNotAffectSimulation) {
+TEST(LexicalTokenSim, LexicalTokenCommentsDoNotAffectSimulation) {
   auto result = RunAndGet(
       "module /* block */ t; // line\n"
       "  logic [7:0] /* type */ result /* name */;\n"
@@ -29,7 +29,7 @@ TEST(SimCh502, LexicalTokenCommentsDoNotAffectSimulation) {
   EXPECT_EQ(result, 88u);
 }
 
-TEST(SimCh502, LexicalTokenAllCategoriesInSimulation) {
+TEST(LexicalTokenSim, LexicalTokenAllCategoriesInSimulation) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] a, b, result;\n"
@@ -43,7 +43,7 @@ TEST(SimCh502, LexicalTokenAllCategoriesInSimulation) {
   EXPECT_EQ(result, 20u);
 }
 
-TEST(SimCh502, LexicalTokenMultilineExpression) {
+TEST(LexicalTokenSim, LexicalTokenMultilineExpression) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] result;\n"
@@ -59,7 +59,7 @@ TEST(SimCh502, LexicalTokenMultilineExpression) {
   EXPECT_EQ(result, 10u);
 }
 
-TEST(SimCh502, LexicalTokenMultipleStatementsOneLine) {
+TEST(LexicalTokenSim, LexicalTokenMultipleStatementsOneLine) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -76,7 +76,7 @@ TEST(SimCh502, LexicalTokenMultipleStatementsOneLine) {
   EXPECT_EQ(c->value.ToUint64(), 3u);
 }
 
-TEST(SimCh502, LexicalTokenBlockCommentAsSeparator) {
+TEST(LexicalTokenSim, LexicalTokenBlockCommentAsSeparator) {
   auto result = RunAndGet(
       "module/**/t;logic/**/[7:0]/**/result;initial/**/result=8'd66;"
       "endmodule",
@@ -84,7 +84,7 @@ TEST(SimCh502, LexicalTokenBlockCommentAsSeparator) {
   EXPECT_EQ(result, 66u);
 }
 
-TEST(SimCh502, LexicalTokenLineCommentTerminatesAtNewline) {
+TEST(LexicalTokenSim, LexicalTokenLineCommentTerminatesAtNewline) {
   auto result = RunAndGet(
       "module t; // this is a comment\n"
       "  logic [7:0] result; // another comment\n"
@@ -94,7 +94,7 @@ TEST(SimCh502, LexicalTokenLineCommentTerminatesAtNewline) {
   EXPECT_EQ(result, 44u);
 }
 
-TEST(SimCh502, LexicalTokenFreeFormatAlwaysComb) {
+TEST(LexicalTokenSim, LexicalTokenFreeFormatAlwaysComb) {
   auto result = RunAndGet(
       "module t; logic [7:0] a, result;\n"
       "initial a = 8'd5;\n"

@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA604, NullStatementNoEffect) {
+TEST(StatementSimSyntax, NullStatementNoEffect) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

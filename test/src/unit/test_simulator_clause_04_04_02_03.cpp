@@ -7,7 +7,7 @@
 
 using namespace delta;
 
-TEST(SimCh4423, InactiveRegionExecutesEvents) {
+TEST(InactiveRegionSim, InactiveRegionExecutesEvents) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -20,12 +20,12 @@ TEST(SimCh4423, InactiveRegionExecutesEvents) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4423, InactiveExecutesAfterActive) {
+TEST(InactiveRegionSim, InactiveExecutesAfterActive) {
   VerifyTwoRegionOrder({Region::kActive, "active"},
                        {Region::kInactive, "inactive"});
 }
 
-TEST(SimCh4423, AllActiveEventsCompleteBeforeInactive) {
+TEST(InactiveRegionSim, AllActiveEventsCompleteBeforeInactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -48,7 +48,7 @@ TEST(SimCh4423, AllActiveEventsCompleteBeforeInactive) {
   EXPECT_EQ(order[3], "inactive");
 }
 
-TEST(SimCh4423, ZeroDelaySchedulesIntoInactive) {
+TEST(InactiveRegionSim, ZeroDelaySchedulesIntoInactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -69,7 +69,7 @@ TEST(SimCh4423, ZeroDelaySchedulesIntoInactive) {
   EXPECT_EQ(order[1], "after_zero_delay");
 }
 
-TEST(SimCh4423, InactiveToActiveIteration) {
+TEST(InactiveRegionSim, InactiveToActiveIteration) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -96,7 +96,7 @@ TEST(SimCh4423, InactiveToActiveIteration) {
   EXPECT_EQ(order[2], "active2");
 }
 
-TEST(SimCh4423, ChainedZeroDelayIteration) {
+TEST(InactiveRegionSim, ChainedZeroDelayIteration) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -131,7 +131,7 @@ TEST(SimCh4423, ChainedZeroDelayIteration) {
   EXPECT_EQ(order, expected);
 }
 
-TEST(SimCh4423, InactiveIsWithinActiveRegionSet) {
+TEST(InactiveRegionSim, InactiveIsWithinActiveRegionSet) {
   auto inactive_ord = static_cast<int>(Region::kInactive);
   auto active_ord = static_cast<int>(Region::kActive);
   auto post_nba_ord = static_cast<int>(Region::kPostNBA);
@@ -139,11 +139,11 @@ TEST(SimCh4423, InactiveIsWithinActiveRegionSet) {
   EXPECT_LT(inactive_ord, post_nba_ord);
 }
 
-TEST(SimCh4423, InactiveExecutesBeforeNBA) {
+TEST(InactiveRegionSim, InactiveExecutesBeforeNBA) {
   VerifyTwoRegionOrder({Region::kInactive, "inactive"}, {Region::kNBA, "nba"});
 }
 
-TEST(SimCh4423, InactiveEventsAcrossMultipleTimeSlots) {
+TEST(InactiveRegionSim, InactiveEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;
@@ -163,7 +163,7 @@ TEST(SimCh4423, InactiveEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-TEST(SimCh4423, InactiveExecutesBeforeReInactive) {
+TEST(InactiveRegionSim, InactiveExecutesBeforeReInactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -182,7 +182,7 @@ TEST(SimCh4423, InactiveExecutesBeforeReInactive) {
   EXPECT_EQ(order[1], 2);
 }
 
-TEST(SimCh4423, InactiveRegionHoldsMultipleEvents) {
+TEST(InactiveRegionSim, InactiveRegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -197,7 +197,7 @@ TEST(SimCh4423, InactiveRegionHoldsMultipleEvents) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimA605, DelayControlZero) {
+TEST(TimingControlSim, DelayControlZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

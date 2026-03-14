@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection8, ClassInsideModule) {
+TEST(ClassParsing, ClassInsideModule) {
   auto r = Parse(
       "module m;\n"
       "  class inner_cls;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection8, ClassInsideModule) {
   ASSERT_NE(cls, nullptr);
   EXPECT_EQ(cls->name, "inner_cls");
 }
-TEST(ParserSection23, ModuleDefinitionWithBody) {
+TEST(ModuleAndHierarchyParsing, ModuleDefinitionWithBody) {
   auto r = Parse(
       "module m;\n"
       "  wire a;\n"
@@ -35,7 +35,7 @@ static bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-TEST(ParserSection9c, MixedProcedureTypes) {
+TEST(ProcessTimingAndControlParsing, MixedProcedureTypes) {
   auto r = Parse(
       "module m;\n"
       "  initial a = 0;\n"

@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA609, TaskCallSimple) {
+TEST(SubroutineCallSim, TaskCallSimple) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -31,7 +31,7 @@ TEST(SimA609, TaskCallSimple) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA609, VoidCastFunctionCall) {
+TEST(SubroutineCallSim, VoidCastFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -49,7 +49,7 @@ TEST(SimA609, VoidCastFunctionCall) {
   LowerRunAndCheck(f, design, {{"x", 55u}});
 }
 
-TEST(SimA609, NestedFunctionCalls) {
+TEST(SubroutineCallSim, NestedFunctionCalls) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -74,7 +74,7 @@ TEST(SimA609, NestedFunctionCalls) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-TEST(SimA609, TaskOutputArg) {
+TEST(SubroutineCallSim, TaskOutputArg) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -97,7 +97,7 @@ TEST(SimA609, TaskOutputArg) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-TEST(SimA82, TfCallTaskModifiesVar) {
+TEST(SubroutineCallExprSim, TfCallTaskModifiesVar) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -120,7 +120,7 @@ TEST(SimA82, TfCallTaskModifiesVar) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA82, FunctionCallInBinaryExpr) {
+TEST(SubroutineCallExprSim, FunctionCallInBinaryExpr) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

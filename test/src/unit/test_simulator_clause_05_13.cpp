@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimClause05, Cl5_13_ArraySizeWithParens) {
+TEST(LexicalConventionSim, ArraySizeWithParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -22,7 +22,7 @@ TEST(SimClause05, Cl5_13_ArraySizeWithParens) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 4u);
 }
 
-TEST(SimClause05, Cl5_13_ArraySizeNoParens) {
+TEST(LexicalConventionSim, ArraySizeNoParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -38,7 +38,7 @@ TEST(SimClause05, Cl5_13_ArraySizeNoParens) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 3u);
 }
 
-TEST(SimClause05, Cl5_13_MethodInExpression) {
+TEST(LexicalConventionSim, MethodInExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -54,7 +54,7 @@ TEST(SimClause05, Cl5_13_MethodInExpression) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 6u);
 }
 
-TEST(SimClause05, Cl5_13_QueuePushBackAndSize) {
+TEST(LexicalConventionSim, QueuePushBackAndSize) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -74,7 +74,7 @@ TEST(SimClause05, Cl5_13_QueuePushBackAndSize) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 2u);
 }
 
-TEST(SimClause05, Cl5_13_QueuePushBackElements) {
+TEST(LexicalConventionSim, QueuePushBackElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -98,7 +98,7 @@ TEST(SimClause05, Cl5_13_QueuePushBackElements) {
   EXPECT_EQ(q->elements[2].ToUint64(), 0x44u);
 }
 
-TEST(SimClause05, Cl5_13_QueuePopFront) {
+TEST(LexicalConventionSim, QueuePopFront) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -124,7 +124,7 @@ TEST(SimClause05, Cl5_13_QueuePopFront) {
   EXPECT_EQ(q->elements[1].ToUint64(), 0x30u);
 }
 
-TEST(SimClause05, Cl5_13_ArraySum) {
+TEST(LexicalConventionSim, ArraySum) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -140,7 +140,7 @@ TEST(SimClause05, Cl5_13_ArraySum) {
   EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
 }
 
-TEST(SimClause05, Cl5_13_ArrayReverseWithParens) {
+TEST(LexicalConventionSim, ArrayReverseWithParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -157,7 +157,7 @@ TEST(SimClause05, Cl5_13_ArrayReverseWithParens) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
 }
 
-TEST(SimClause05, Cl5_13_ArrayReverseNoParens) {
+TEST(LexicalConventionSim, ArrayReverseNoParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -174,7 +174,7 @@ TEST(SimClause05, Cl5_13_ArrayReverseNoParens) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x11);
 }
 
-TEST(SimClause05, Cl5_13_DynArraySize) {
+TEST(LexicalConventionSim, DynArraySize) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

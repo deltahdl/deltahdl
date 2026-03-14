@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A4ModuleInstWithParams) {
+TEST(FormalSyntaxParsing, ModuleInstWithParams) {
   auto r = Parse("module m; sub #(8, 4) u0(.clk(clk)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(ParserAnnexA, A4ModuleInstWithParams) {
   EXPECT_EQ(item->inst_params.size(), 2u);
 }
 
-TEST(ParserAnnexA0411, OrderedParamsNamedPorts) {
+TEST(ModuleInstantiationGrammar, OrderedParamsNamedPorts) {
   auto r = Parse("module m; sub #(8) u0(.clk(clk)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -31,7 +31,7 @@ ModuleItem* FindModuleInst(const std::vector<ModuleItem*>& items) {
   return nullptr;
 }
 
-TEST(ParserAnnexA0411, ElaborationParamOverrideOrdered) {
+TEST(ModuleInstantiationGrammar, ElaborationParamOverrideOrdered) {
   auto r = Parse(
       "module sub #(parameter W = 1)(input [W-1:0] d);\n"
       "endmodule\n"
@@ -46,7 +46,7 @@ TEST(ParserAnnexA0411, ElaborationParamOverrideOrdered) {
   EXPECT_EQ(inst->inst_params[0].first, "");
   EXPECT_NE(inst->inst_params[0].second, nullptr);
 }
-TEST(ParserSection23, ModuleInstWithParamOverride) {
+TEST(ModuleAndHierarchyParsing, ModuleInstWithParamOverride) {
   auto r = Parse(
       "module top;\n"
       "  sub #(8, 16) u1(.a(w1));\n"
@@ -58,7 +58,7 @@ TEST(ParserSection23, ModuleInstWithParamOverride) {
   ASSERT_EQ(item->inst_params.size(), 2u);
 }
 
-TEST(ParserSection23, ModuleInstanceWithParameters) {
+TEST(ModuleAndHierarchyParsing, ModuleInstanceWithParameters) {
   auto r = Parse(
       "module top;\n"
       "  sub #(8, 16) u1 (.a(x));\n"

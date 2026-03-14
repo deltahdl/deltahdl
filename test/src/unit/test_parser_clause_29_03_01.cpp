@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA051, WildcardPort) {
+TEST(UdpDeclGrammar, WildcardPort) {
   auto r = Parse(
       "primitive inv(.*);\n"
       "  output out;\n"
@@ -26,7 +26,7 @@ TEST(ParserAnnexA051, WildcardPort) {
   ASSERT_EQ(udp->table.size(), 2u);
 }
 
-TEST(ParserAnnexA051, NonAnsiWithPortDecls) {
+TEST(UdpDeclGrammar, NonAnsiWithPortDecls) {
   auto r = Parse(
       "primitive inv(out, in);\n"
       "  output out;\n"
@@ -46,7 +46,7 @@ TEST(ParserAnnexA051, NonAnsiWithPortDecls) {
   EXPECT_EQ(udp->input_names[0], "in");
 }
 
-TEST(ParserAnnexA052, NonAnsiPortList_TwoInputs) {
+TEST(UdpPortGrammar, NonAnsiPortList_TwoInputs) {
   auto r = Parse(
       "primitive and_gate(out, a, b);\n"
       "  output out;\n"
@@ -71,7 +71,7 @@ TEST(ParserAnnexA052, NonAnsiPortList_TwoInputs) {
   ASSERT_EQ(udp->table.size(), 4u);
 }
 
-TEST(ParserAnnexA052, NonAnsiPortList_FiveInputs) {
+TEST(UdpPortGrammar, NonAnsiPortList_FiveInputs) {
   auto r = Parse(
       "primitive gate5(out, a, b, c, d, e);\n"
       "  output out;\n"

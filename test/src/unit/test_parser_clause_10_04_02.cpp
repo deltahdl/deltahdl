@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, NonblockingAssignment_Simple) {
+TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_Simple) {
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= d; end\n"
@@ -18,7 +18,7 @@ TEST(ParserA602, NonblockingAssignment_Simple) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserA602, NonblockingAssignment_WithIntraDelay) {
+TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_WithIntraDelay) {
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= #5 d; end\n"
@@ -32,7 +32,7 @@ TEST(ParserA602, NonblockingAssignment_WithIntraDelay) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserA602, NonblockingAssignment_WithIntraEvent) {
+TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_WithIntraEvent) {
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= @(posedge clk) d; end\n"
@@ -45,7 +45,7 @@ TEST(ParserA602, NonblockingAssignment_WithIntraEvent) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
-TEST(ParserA602, NonblockingAssignment_ConcatLhs) {
+TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_ConcatLhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin {q, r} <= {d, e}; end\n"
@@ -58,7 +58,7 @@ TEST(ParserA602, NonblockingAssignment_ConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserA602, NonblockingAssignment_BitSelectLhs) {
+TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_BitSelectLhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin mem[0] <= 8'hFF; end\n"
@@ -71,7 +71,7 @@ TEST(ParserA602, NonblockingAssignment_BitSelectLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserA602, NonblockingAssignment_ParenthesizedIntraDelay) {
+TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_ParenthesizedIntraDelay) {
   auto r = Parse(
       "module m;\n"
       "  initial begin q <= #(5:10:15) d; end\n"
@@ -84,7 +84,7 @@ TEST(ParserA602, NonblockingAssignment_ParenthesizedIntraDelay) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_2_ConcatenationLhsRhs) {
+TEST(AssignmentParsing, ConcatenationLhsRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg q1, q2, d1, d2;\n"
@@ -105,7 +105,7 @@ TEST(ParserSection10, Sec10_4_2_ConcatenationLhsRhs) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-TEST(ParserSection10, Sec10_4_2_TernaryRhs) {
+TEST(AssignmentParsing, TernaryRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg q, sel, a, b;\n"
@@ -122,7 +122,7 @@ TEST(ParserSection10, Sec10_4_2_TernaryRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection10, Sec10_4_2_InBeginEndBlock) {
+TEST(AssignmentParsing, InBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg q, d;\n"
@@ -139,7 +139,7 @@ TEST(ParserSection10, Sec10_4_2_InBeginEndBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserSection10, Sec10_4_2_IfElseMuxPattern) {
+TEST(AssignmentParsing, IfElseMuxPattern) {
   auto r = Parse(
       "module m;\n"
       "  reg q, sel, a, b;\n"
@@ -161,7 +161,7 @@ TEST(ParserSection10, Sec10_4_2_IfElseMuxPattern) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserSection9, Sec9_3_1_BlockWithNonblockingAssigns) {
+TEST(ProcessParsing, BlockWithNonblockingAssigns) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -180,7 +180,7 @@ TEST(ParserSection9, Sec9_3_1_BlockWithNonblockingAssigns) {
   }
 }
 
-TEST(ParserSection10, Sec10_4_2_MultipleInSameBlock) {
+TEST(AssignmentParsing, MultipleInSameBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c, d;\n"
@@ -206,7 +206,7 @@ TEST(ParserSection10, Sec10_4_2_MultipleInSameBlock) {
   EXPECT_EQ(s2->lhs->text, "b");
 }
 
-TEST(ParserSection10, Sec10_4_2_FunctionCallRhs) {
+TEST(AssignmentParsing, FunctionCallRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] q;\n"
@@ -223,7 +223,7 @@ TEST(ParserSection10, Sec10_4_2_FunctionCallRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-TEST(ParserSection10, Sec10_4_2_SystemCallRhs) {
+TEST(AssignmentParsing, SystemCallRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [31:0] q;\n"
@@ -240,7 +240,7 @@ TEST(ParserSection10, Sec10_4_2_SystemCallRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-TEST(ParserSection4, Sec4_6_NonblockingAssignOrdering) {
+TEST(SchedulingSemanticsParsing, NonblockingAssignOrdering) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -258,7 +258,7 @@ TEST(ParserSection4, Sec4_6_NonblockingAssignOrdering) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserSection4, Sec4_5_NonblockingAssignInAlways) {
+TEST(SchedulingSemanticsParsing, NonblockingAssignInAlways) {
   auto r = Parse(
       "module m;\n"
       "  reg q, d, clk;\n"
@@ -274,7 +274,7 @@ TEST(ParserSection4, Sec4_5_NonblockingAssignInAlways) {
   EXPECT_NE(item->body->rhs, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_2_StructMemberLhs) {
+TEST(AssignmentParsing, StructMemberLhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -291,7 +291,7 @@ TEST(ParserSection10, Sec10_4_2_StructMemberLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_2_ArrayElementLhs) {
+TEST(AssignmentParsing, ArrayElementLhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] mem [0:255];\n"
@@ -309,7 +309,7 @@ TEST(ParserSection10, Sec10_4_2_ArrayElementLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_2_ReplicationRhs) {
+TEST(AssignmentParsing, ReplicationRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] q;\n"
@@ -326,7 +326,7 @@ TEST(ParserSection10, Sec10_4_2_ReplicationRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kReplicate);
 }
 
-TEST(ParserSection10, Sec10_4_2_MixedBlockingNonblocking) {
+TEST(AssignmentParsing, MixedBlockingNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  reg q, d, a, b;\n"
@@ -361,7 +361,7 @@ static ModuleItem* FindInitialBlock(ParseResult& r) {
   return FindItemByKind(r, ModuleItemKind::kInitialBlock);
 }
 
-TEST(ParserSection4, Sec4_5_MultipleNonblockingAssigns) {
+TEST(SchedulingSemanticsParsing, MultipleNonblockingAssigns) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c, d;\n"
@@ -381,7 +381,7 @@ TEST(ParserSection4, Sec4_5_MultipleNonblockingAssigns) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserSection10, Sec10_4_2_ComplexExpressionRhs) {
+TEST(AssignmentParsing, ComplexExpressionRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] q, data;\n"
@@ -398,7 +398,7 @@ TEST(ParserSection10, Sec10_4_2_ComplexExpressionRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection11, Sec11_4_1_BitSelectOnLhsNonblocking) {
+TEST(OperatorAndExpressionParsing, BitSelectOnLhsNonblocking) {
   auto r = Parse(
       "module t;\n"
       "  reg [7:0] vec;\n"
@@ -414,7 +414,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectOnLhsNonblocking) {
   EXPECT_EQ(stmt->lhs->index_end, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_2_IndexedPartSelectLhs) {
+TEST(AssignmentParsing, IndexedPartSelectLhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [31:0] q;\n"
@@ -432,7 +432,7 @@ TEST(ParserSection10, Sec10_4_2_IndexedPartSelectLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_2_NamedBlockNonblocking) {
+TEST(AssignmentParsing, NamedBlockNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  reg q, d;\n"
@@ -450,7 +450,7 @@ TEST(ParserSection10, Sec10_4_2_NamedBlockNonblocking) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserSection10, Sec10_4_2_PipelinePattern) {
+TEST(AssignmentParsing, PipelinePattern) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  reg [7:0] stage1, stage2, stage3, d;\n"
@@ -462,7 +462,7 @@ TEST(ParserSection10, Sec10_4_2_PipelinePattern) {
               "endmodule\n"));
 }
 
-TEST(ParserSection10, Sec10_4_2_SwapPattern) {
+TEST(AssignmentParsing, SwapPattern) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] a, b;\n"
@@ -485,7 +485,7 @@ TEST(ParserSection10, Sec10_4_2_SwapPattern) {
   EXPECT_EQ(s1->rhs->text, "a");
 }
 
-TEST(ParserA604, StmtItemNonblockingAssignment) {
+TEST(StatementSyntaxParsing, StmtItemNonblockingAssignment) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -499,7 +499,7 @@ TEST(ParserA604, StmtItemNonblockingAssignment) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserSection10, Sec10_4_2_SimpleNonblocking) {
+TEST(AssignmentParsing, SimpleNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  reg q, d;\n"
@@ -520,7 +520,7 @@ TEST(ParserSection10, Sec10_4_2_SimpleNonblocking) {
   EXPECT_EQ(stmt->rhs->text, "d");
 }
 
-TEST(ParserSection10, Sec10_4_2_IntraAssignDelay) {
+TEST(AssignmentParsing, IntraAssignDelay) {
   auto r = Parse(
       "module m;\n"
       "  reg q, d;\n"
@@ -546,7 +546,7 @@ static Stmt* FirstAlwaysStmt(ParseResult& r) {
   return item->body;
 }
 
-TEST(ParserSection10, Sec10_4_2_AlwaysFFNonblocking) {
+TEST(AssignmentParsing, AlwaysFFNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  always_ff @(posedge clk)\n"
@@ -563,7 +563,7 @@ TEST(ParserSection10, Sec10_4_2_AlwaysFFNonblocking) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserA85, VarLvalueNonblocking) {
+TEST(LvalueParsing, VarLvalueNonblocking) {
   auto r = Parse("module m; logic x; initial x <= 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -574,7 +574,7 @@ TEST(ParserA85, VarLvalueNonblocking) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserSection10, Sec10_4_2_RegisterFilePattern) {
+TEST(AssignmentParsing, RegisterFilePattern) {
   auto r = Parse(
       "module m;\n"
       "  always_ff @(posedge clk) begin\n"
@@ -598,7 +598,7 @@ TEST(ParserSection10, Sec10_4_2_RegisterFilePattern) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserSection10, Sec10_4_2_AlwaysPosedgeNonblocking) {
+TEST(AssignmentParsing, AlwaysPosedgeNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk)\n"
@@ -617,7 +617,7 @@ TEST(ParserSection10, Sec10_4_2_AlwaysPosedgeNonblocking) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserSection10, Sec10_4_2_ExpressionRhs) {
+TEST(AssignmentParsing, ExpressionRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] q, a, b;\n"
@@ -634,7 +634,7 @@ TEST(ParserSection10, Sec10_4_2_ExpressionRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection10, Sec10_4_2_BitSelectLhs) {
+TEST(AssignmentParsing, BitSelectLhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] q;\n"
@@ -652,7 +652,7 @@ TEST(ParserSection10, Sec10_4_2_BitSelectLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_2_PartSelectLhs) {
+TEST(AssignmentParsing, PartSelectLhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] q;\n"
@@ -670,7 +670,7 @@ TEST(ParserSection10, Sec10_4_2_PartSelectLhs) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection9b, NonblockingAssignSimple) {
+TEST(ProceduralAssignAndControlParsing, NonblockingAssignSimple) {
   auto r = Parse(
       "module m;\n"
       "  initial q <= d;\n"
@@ -681,7 +681,7 @@ TEST(ParserSection9b, NonblockingAssignSimple) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserSection9b, NonblockingAssignMultiple) {
+TEST(ProceduralAssignAndControlParsing, NonblockingAssignMultiple) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

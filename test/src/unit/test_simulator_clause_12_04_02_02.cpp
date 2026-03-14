@@ -9,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA604222, TwoProcessesBothViolateReportedTwice) {
+TEST(StatementTimingDetailSim, TwoProcessesBothViolateReportedTwice) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -32,7 +32,7 @@ TEST(SimA604222, TwoProcessesBothViolateReportedTwice) {
   EXPECT_GE(f.diag.WarningCount(), 2u);
 }
 
-TEST(SimA604222, OneProcessViolatesOtherDoesNot) {
+TEST(StatementTimingDetailSim, OneProcessViolatesOtherDoesNot) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -55,7 +55,7 @@ TEST(SimA604222, OneProcessViolatesOtherDoesNot) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA604222, FlushIsPerProcess) {
+TEST(StatementTimingDetailSim, FlushIsPerProcess) {
   SimFixture f;
 
   Process proc_a;
@@ -82,7 +82,7 @@ TEST(SimA604222, FlushIsPerProcess) {
   f.ctx.SetCurrentProcess(nullptr);
 }
 
-TEST(SimA604222, TwoProcessesNoMatchBothReport) {
+TEST(StatementTimingDetailSim, TwoProcessesNoMatchBothReport) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

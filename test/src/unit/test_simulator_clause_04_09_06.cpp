@@ -9,7 +9,7 @@
 
 using namespace delta;
 
-TEST(SimCh4096, PortsConnectViaImplicitContinuousAssignment) {
+TEST(PortConnectionSchedulingSim, PortsConnectViaImplicitContinuousAssignment) {
   Arena arena;
   Scheduler sched(arena);
   int outside_net = 0;
@@ -32,7 +32,7 @@ TEST(SimCh4096, PortsConnectViaImplicitContinuousAssignment) {
   EXPECT_EQ(local_input_net, 42);
 }
 
-TEST(SimCh4096, ImplicitBidirectionalConnection) {
+TEST(PortConnectionSchedulingSim, ImplicitBidirectionalConnection) {
   Arena arena;
   Scheduler sched(arena);
   int local_net = 0;
@@ -67,7 +67,7 @@ TEST(SimCh4096, ImplicitBidirectionalConnection) {
   EXPECT_EQ(outside_net, 99);
 }
 
-TEST(SimCh4096, BidirectionalNoStrengthReduction) {
+TEST(PortConnectionSchedulingSim, BidirectionalNoStrengthReduction) {
   Arena arena;
   Scheduler sched(arena);
 
@@ -97,7 +97,7 @@ TEST(SimCh4096, BidirectionalNoStrengthReduction) {
   EXPECT_EQ(net_b_strength, 7);
 }
 
-TEST(SimCh4096, InputPortContinuousAssignmentOutsideToLocal) {
+TEST(PortConnectionSchedulingSim, InputPortContinuousAssignmentOutsideToLocal) {
   Arena arena;
   Scheduler sched(arena);
   int outside_expr = 10;
@@ -133,7 +133,7 @@ TEST(SimCh4096, InputPortContinuousAssignmentOutsideToLocal) {
   EXPECT_EQ(local_history[1], 20);
 }
 
-TEST(SimCh4096, OutputPortContinuousAssignmentLocalToOutside) {
+TEST(PortConnectionSchedulingSim, OutputPortContinuousAssignmentLocalToOutside) {
   Arena arena;
   Scheduler sched(arena);
   int local_output_expr = 0;
@@ -156,7 +156,7 @@ TEST(SimCh4096, OutputPortContinuousAssignmentLocalToOutside) {
   EXPECT_EQ(outside_net, 55);
 }
 
-TEST(SimCh4096, InoutPortNonStrengthReducingTransistor) {
+TEST(PortConnectionSchedulingSim, InoutPortNonStrengthReducingTransistor) {
   Arena arena;
   Scheduler sched(arena);
   int local_val = 0;
@@ -200,7 +200,7 @@ TEST(SimCh4096, InoutPortNonStrengthReducingTransistor) {
   EXPECT_EQ(local_val, 0);
 }
 
-TEST(SimCh4096, PrimitiveTerminalsDirectConnection) {
+TEST(PortConnectionSchedulingSim, PrimitiveTerminalsDirectConnection) {
   Arena arena;
   Scheduler sched(arena);
   int net_bit = -1;
@@ -223,7 +223,7 @@ TEST(SimCh4096, PrimitiveTerminalsDirectConnection) {
   EXPECT_EQ(net_bit, 1);
 }
 
-TEST(SimCh4096, PrimitiveOutputNoStrengthAlteration) {
+TEST(PortConnectionSchedulingSim, PrimitiveOutputNoStrengthAlteration) {
   Arena arena;
   Scheduler sched(arena);
   int net_val = -1;
@@ -250,7 +250,7 @@ TEST(SimCh4096, PrimitiveOutputNoStrengthAlteration) {
   EXPECT_EQ(net_strength, 6);
 }
 
-TEST(SimCh4096, PrimitiveChangesScheduledAsActiveUpdateEvents) {
+TEST(PortConnectionSchedulingSim, PrimitiveChangesScheduledAsActiveUpdateEvents) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -276,7 +276,7 @@ TEST(SimCh4096, PrimitiveChangesScheduledAsActiveUpdateEvents) {
   EXPECT_EQ(order[1], "nba_event");
 }
 
-TEST(SimCh4096, PrimitiveInputExprImplicitContinuousAssignment) {
+TEST(PortConnectionSchedulingSim, PrimitiveInputExprImplicitContinuousAssignment) {
   Arena arena;
   Scheduler sched(arena);
   int a = 1;

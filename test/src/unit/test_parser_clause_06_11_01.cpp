@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, Sec6_11_BitPackedDims) {
+TEST(DataTypeParsing, BitPackedDims) {
   auto r = Parse(
       "module t;\n"
       "  bit [31:0] word;\n"
@@ -23,7 +23,7 @@ TEST(ParserSection6, Sec6_11_BitPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(ParserSection6, Sec6_11_RegPackedDims) {
+TEST(DataTypeParsing, RegPackedDims) {
   auto r = Parse(
       "module t;\n"
       "  reg [3:0] nibble;\n"

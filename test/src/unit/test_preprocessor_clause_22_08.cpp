@@ -42,7 +42,7 @@ TEST(Preprocessor, DefaultNettypeTrireg) {
   Preprocess("`default_nettype trireg\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
-TEST(ParserSection6, DefaultNettypeAffectsImplicit) {
+TEST(DataTypeParsing, DefaultNettypeAffectsImplicit) {
   auto r = ParseWithPreprocessor(
       "`default_nettype none\n"
       "module m;\n"
@@ -52,7 +52,7 @@ TEST(ParserSection6, DefaultNettypeAffectsImplicit) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection22, DefaultNettypeModuleCount) {
+TEST(CompilerDirectiveParsing, DefaultNettypeModuleCount) {
   auto r = ParseWithPreprocessor(
       "`default_nettype wire\n"
       "module m1;\n"
@@ -66,7 +66,7 @@ TEST(ParserSection22, DefaultNettypeModuleCount) {
   EXPECT_EQ(r.cu->modules[1]->name, "m2");
 }
 
-TEST(ParserSection6, DefaultNettypeWire) {
+TEST(DataTypeParsing, DefaultNettypeWire) {
   auto r = ParseWithPreprocessor(
       "`default_nettype wire\n"
       "module t;\n"
@@ -75,7 +75,7 @@ TEST(ParserSection6, DefaultNettypeWire) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->default_nettype, NetType::kWire);
 }
-TEST(ParserSection6, DefaultNettypeNone) {
+TEST(DataTypeParsing, DefaultNettypeNone) {
   auto r = ParseWithPreprocessor(
       "`default_nettype none\n"
       "module t;\n"

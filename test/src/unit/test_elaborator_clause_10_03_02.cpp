@@ -27,7 +27,7 @@ TEST(Elaboration, VarSingleContAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(ElabClause1003, MultipleContAssigns) {
+TEST(ContinuousAssignmentElaboration, MultipleContAssigns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -40,7 +40,7 @@ TEST(ElabClause1003, MultipleContAssigns) {
   ASSERT_GE(mod->assigns.size(), 2u);
 }
 
-TEST(ElabClause100302, VarWithInitAndContAssign_Error) {
+TEST(NetAssignmentElaboration, VarWithInitAndContAssign_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -51,7 +51,7 @@ TEST(ElabClause100302, VarWithInitAndContAssign_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause100302, VarNoInitAndContAssign_Ok) {
+TEST(NetAssignmentElaboration, VarNoInitAndContAssign_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -63,7 +63,7 @@ TEST(ElabClause100302, VarNoInitAndContAssign_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause100302, NetMultipleContAssign_Ok) {
+TEST(NetAssignmentElaboration, NetMultipleContAssign_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -76,7 +76,7 @@ TEST(ElabClause100302, NetMultipleContAssign_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause100302, VarMultiContAssign_Error) {
+TEST(NetAssignmentElaboration, VarMultiContAssign_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -88,7 +88,7 @@ TEST(ElabClause100302, VarMultiContAssign_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause100302, NettypeLhsWithSelect_Error) {
+TEST(NetAssignmentElaboration, NettypeLhsWithSelect_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -100,7 +100,7 @@ TEST(ElabClause100302, NettypeLhsWithSelect_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause100302, NettypeLhsNoSelect_Ok) {
+TEST(NetAssignmentElaboration, NettypeLhsNoSelect_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -113,7 +113,7 @@ TEST(ElabClause100302, NettypeLhsNoSelect_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause100302, VarContAndProcAssign_Error) {
+TEST(NetAssignmentElaboration, VarContAndProcAssign_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA223, DelayValueUnsignedNumber) {
+TEST(DelayParsing, DelayValueUnsignedNumber) {
   auto r = Parse(
       "module m;\n"
       "  wire #10 w;\n"
@@ -18,7 +18,7 @@ TEST(ParserA223, DelayValueUnsignedNumber) {
   EXPECT_EQ(item->net_delay->int_val, 10u);
 }
 
-TEST(ParserA223, DelayValueRealNumber) {
+TEST(DelayParsing, DelayValueRealNumber) {
   auto r = Parse(
       "module m;\n"
       "  wire #1.5 w;\n"
@@ -30,7 +30,7 @@ TEST(ParserA223, DelayValueRealNumber) {
   EXPECT_EQ(item->net_delay->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserA223, Delay3NetTwoValues) {
+TEST(DelayParsing, Delay3NetTwoValues) {
   auto r = Parse(
       "module m;\n"
       "  wire #(10, 20) w;\n"
@@ -45,7 +45,7 @@ TEST(ParserA223, Delay3NetTwoValues) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-TEST(ParserA223, Delay3NetThreeValues) {
+TEST(DelayParsing, Delay3NetThreeValues) {
   auto r = Parse(
       "module m;\n"
       "  wire #(10, 20, 30) w;\n"
@@ -61,7 +61,7 @@ TEST(ParserA223, Delay3NetThreeValues) {
   EXPECT_EQ(item->net_delay_decay->int_val, 30u);
 }
 
-TEST(ParserA223, Delay3GateSingleValue) {
+TEST(DelayParsing, Delay3GateSingleValue) {
   auto r = Parse(
       "module m;\n"
       "  wire y, a, b;\n"
@@ -77,7 +77,7 @@ TEST(ParserA223, Delay3GateSingleValue) {
   EXPECT_EQ(item->gate_delay_decay, nullptr);
 }
 
-TEST(ParserA223, Delay3GateTwoValues) {
+TEST(DelayParsing, Delay3GateTwoValues) {
   auto r = Parse(
       "module m;\n"
       "  wire y, a, b;\n"
@@ -93,7 +93,7 @@ TEST(ParserA223, Delay3GateTwoValues) {
   EXPECT_EQ(item->gate_delay_decay, nullptr);
 }
 
-TEST(ParserA223, Delay3AssignTwoValues) {
+TEST(DelayParsing, Delay3AssignTwoValues) {
   auto r = Parse(
       "module m;\n"
       "  wire out, in;\n"
@@ -109,7 +109,7 @@ TEST(ParserA223, Delay3AssignTwoValues) {
   EXPECT_EQ(item->assign_delay_decay, nullptr);
 }
 
-TEST(ParserA223, Delay2NInputGateSingleValue) {
+TEST(DelayParsing, Delay2NInputGateSingleValue) {
   auto r = Parse(
       "module m;\n"
       "  wire y, a, b;\n"
@@ -122,7 +122,7 @@ TEST(ParserA223, Delay2NInputGateSingleValue) {
   EXPECT_EQ(item->gate_delay->int_val, 7u);
 }
 
-TEST(ParserA223, NoDelayDefault) {
+TEST(DelayParsing, NoDelayDefault) {
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -135,7 +135,7 @@ TEST(ParserA223, NoDelayDefault) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-TEST(ParserA223, DelayValueTimeLiteral) {
+TEST(DelayParsing, DelayValueTimeLiteral) {
   auto r = Parse(
       "module m;\n"
       "  wire #10ns w;\n"

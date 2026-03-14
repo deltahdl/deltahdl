@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA213, TypedefBasic) {
+TEST(TypeDeclParsing, TypedefBasic) {
   auto r = Parse("module m; typedef logic [7:0] byte_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(ParserA213, TypedefBasic) {
   EXPECT_EQ(item->name, "byte_t");
 }
 
-TEST(ParserA213, ForwardTypedefClass) {
+TEST(TypeDeclParsing, ForwardTypedefClass) {
   auto r = Parse("module m; typedef class my_class; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -23,7 +23,7 @@ TEST(ParserA213, ForwardTypedefClass) {
   EXPECT_EQ(item->name, "my_class");
 }
 
-TEST(ParserA213, ForwardTypedefInterfaceClass) {
+TEST(TypeDeclParsing, ForwardTypedefInterfaceClass) {
   auto r = Parse("module m; typedef interface class my_ifc; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -31,7 +31,7 @@ TEST(ParserA213, ForwardTypedefInterfaceClass) {
   EXPECT_EQ(item->name, "my_ifc");
 }
 
-TEST(ParserA213, ForwardTypedefEnum) {
+TEST(TypeDeclParsing, ForwardTypedefEnum) {
   auto r = Parse("module m; typedef enum color_e; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -40,7 +40,7 @@ TEST(ParserA213, ForwardTypedefEnum) {
   EXPECT_EQ(item->name, "color_e");
 }
 
-TEST(ParserA213, ForwardTypedefStruct) {
+TEST(TypeDeclParsing, ForwardTypedefStruct) {
   auto r = Parse("module m; typedef struct my_struct; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -49,7 +49,7 @@ TEST(ParserA213, ForwardTypedefStruct) {
   EXPECT_EQ(item->name, "my_struct");
 }
 
-TEST(ParserA213, ForwardTypedefUnion) {
+TEST(TypeDeclParsing, ForwardTypedefUnion) {
   auto r = Parse("module m; typedef union my_union; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -58,7 +58,7 @@ TEST(ParserA213, ForwardTypedefUnion) {
   EXPECT_EQ(item->name, "my_union");
 }
 
-TEST(ParserA28, TypedefInBlock) {
+TEST(BlockItemDeclParsing, TypedefInBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -68,7 +68,7 @@ TEST(ParserA28, TypedefInBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserA213, TypedefStruct) {
+TEST(TypeDeclParsing, TypedefStruct) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct { int a; int b; } pair_t;\n"
@@ -79,7 +79,7 @@ TEST(ParserA213, TypedefStruct) {
   EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kStruct);
 }
 
-TEST(ParserA213, TypedefWithDims) {
+TEST(TypeDeclParsing, TypedefWithDims) {
   auto r = Parse("module m; typedef int arr_t [4]; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -88,7 +88,7 @@ TEST(ParserA213, TypedefWithDims) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserA28, TypedefInFunction) {
+TEST(BlockItemDeclParsing, TypedefInFunction) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function void foo();\n"
@@ -97,7 +97,7 @@ TEST(ParserA28, TypedefInFunction) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, TypeCompatibilityTypedefParsing) {
+TEST(DataTypeParsing, TypeCompatibilityTypedefParsing) {
   auto r = Parse(
       "module m;\n"
       "  typedef bit node;\n"
@@ -108,7 +108,7 @@ TEST(ParserSection6, TypeCompatibilityTypedefParsing) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-TEST(ParserClause03, Cl3_13_TypedefInPackageScope) {
+TEST(DesignBuildingBlockParsing, TypedefInPackageScope) {
   auto r = Parse(
       "package types_pkg;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -125,7 +125,7 @@ TEST(ParserClause03, Cl3_13_TypedefInPackageScope) {
   EXPECT_EQ(typedef_count, 2);
 }
 
-TEST(ParserSection26, PackageWithTypedef) {
+TEST(PackageParsing, PackageWithTypedef) {
   auto r = Parse(
       "package types_pkg;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -136,7 +136,7 @@ TEST(ParserSection26, PackageWithTypedef) {
   EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kTypedef);
 }
 
-TEST(ParserSection8, TypedefSimpleBuiltin) {
+TEST(ClassParsing, TypedefSimpleBuiltin) {
   auto r = Parse(
       "module m;\n"
       "  typedef int my_int;\n"
@@ -150,7 +150,7 @@ TEST(ParserSection8, TypedefSimpleBuiltin) {
   EXPECT_EQ(items[0]->name, "my_int");
 }
 
-TEST(ParserSection8, TypedefForwardEnum) {
+TEST(ClassParsing, TypedefForwardEnum) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef enum my_enum;\n"
@@ -158,7 +158,7 @@ TEST(ParserSection8, TypedefForwardEnum) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, TypedefInt) {
+TEST(DataTypeParsing, TypedefInt) {
   auto r = Parse(
       "module t;\n"
       "  typedef int myint;\n"
@@ -182,11 +182,11 @@ static bool ParseOk5(const std::string& src) {
   return !diag.HasErrors();
 }
 
-TEST(ParserCh5, UnpackedDim_Typedef) {
+TEST(DataObjectParsing, UnpackedDim_Typedef) {
   EXPECT_TRUE(ParseOk5("module m; typedef int triple[1:3]; endmodule"));
 }
 
-TEST(ParserSection6, BareForwardTypedef) {
+TEST(DataTypeParsing, BareForwardTypedef) {
   auto r = Parse(
       "module m;\n"
       "  typedef my_type;\n"
@@ -196,7 +196,7 @@ TEST(ParserSection6, BareForwardTypedef) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, ForwardTypedefThenDefinition) {
+TEST(DataTypeParsing, ForwardTypedefThenDefinition) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum color_e;\n"
@@ -206,7 +206,7 @@ TEST(ParserSection6, ForwardTypedefThenDefinition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, MultipleForwardTypedefs) {
+TEST(DataTypeParsing, MultipleForwardTypedefs) {
   auto r = Parse(
       "module m;\n"
       "  typedef class myclass;\n"
@@ -216,7 +216,7 @@ TEST(ParserSection6, MultipleForwardTypedefs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, ForwardTypedefAfterDefinition) {
+TEST(DataTypeParsing, ForwardTypedefAfterDefinition) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum {X, Y} my_enum;\n"
@@ -226,7 +226,7 @@ TEST(ParserSection6, ForwardTypedefAfterDefinition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, TypedefForCastingUse) {
+TEST(DataTypeParsing, TypedefForCastingUse) {
   auto r = Parse(
       "module m;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -237,7 +237,7 @@ TEST(ParserSection6, TypedefForCastingUse) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, TypedefEnum) {
+TEST(DataTypeParsing, TypedefEnum) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum {A, B, C} my_enum;\n"

@@ -2,7 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, CheckerWithModelingCodeElaborates) {
+TEST(DesignBuildingBlockElaboration, CheckerWithModelingCodeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk;\n"
@@ -14,7 +14,7 @@ TEST(ElabClause03, CheckerWithModelingCodeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, CheckerWithPortsElaborates) {
+TEST(DesignBuildingBlockElaboration, CheckerWithPortsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic clk, input logic rst);\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA814, SubclassOverriddenPropertyOk) {
+TEST(OverriddenMemberElaboration, SubclassOverriddenPropertyOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  integer i = 1;\n"
@@ -23,7 +23,7 @@ TEST(ElabA814, SubclassOverriddenPropertyOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA814, SubclassHandleToBaseVariableOk) {
+TEST(OverriddenMemberElaboration, SubclassHandleToBaseVariableOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  integer i;\n"
@@ -41,7 +41,7 @@ TEST(ElabA814, SubclassHandleToBaseVariableOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA814, BaseClassMemberAccessOk) {
+TEST(OverriddenMemberElaboration, BaseClassMemberAccessOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  integer i = 1;\n"

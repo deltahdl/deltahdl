@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA60701, PatternParenthesized) {
+TEST(PatternParsing, PatternParenthesized) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

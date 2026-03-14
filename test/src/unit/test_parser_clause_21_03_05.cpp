@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, FtellFseek) {
+TEST(IoSystemTaskParsing, FtellFseek) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  integer fd, pos;\n"

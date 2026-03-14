@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4426, ReactiveRegionExecutesEvents) {
+TEST(ReactiveRegionSim, ReactiveRegionExecutesEvents) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,7 +23,7 @@ TEST(SimCh4426, ReactiveRegionExecutesEvents) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4426, ReactiveRegionHoldsMultipleEvents) {
+TEST(ReactiveRegionSim, ReactiveRegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -38,7 +38,7 @@ TEST(SimCh4426, ReactiveRegionHoldsMultipleEvents) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh4426, ReactiveEventsProcessedInAnyValidOrder) {
+TEST(ReactiveRegionSim, ReactiveEventsProcessedInAnyValidOrder) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -57,7 +57,7 @@ TEST(SimCh4426, ReactiveEventsProcessedInAnyValidOrder) {
   EXPECT_EQ(sorted, (std::vector<int>{0, 1, 2, 3}));
 }
 
-TEST(SimCh4426, ReactiveSelfLoopSchedulesMoreReactiveEvents) {
+TEST(ReactiveRegionSim, ReactiveSelfLoopSchedulesMoreReactiveEvents) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -77,12 +77,12 @@ TEST(SimCh4426, ReactiveSelfLoopSchedulesMoreReactiveEvents) {
   EXPECT_EQ(order[1], 2);
 }
 
-TEST(SimCh4426, ReactiveExecutesBeforeReInactive) {
+TEST(ReactiveRegionSim, ReactiveExecutesBeforeReInactive) {
   VerifyTwoRegionOrder({Region::kReactive, "reactive"},
                        {Region::kReInactive, "reinactive"});
 }
 
-TEST(SimCh4426, ReactiveIsWithinReactiveRegionSet) {
+TEST(ReactiveRegionSim, ReactiveIsWithinReactiveRegionSet) {
   auto reactive_ord = static_cast<int>(Region::kReactive);
   auto post_observed_ord = static_cast<int>(Region::kPostObserved);
   auto pre_postponed_ord = static_cast<int>(Region::kPrePostponed);
@@ -90,21 +90,21 @@ TEST(SimCh4426, ReactiveIsWithinReactiveRegionSet) {
   EXPECT_LT(reactive_ord, pre_postponed_ord);
 }
 
-TEST(SimCh4426, ReactiveExecutesAfterObservedAndPostObserved) {
+TEST(ReactiveRegionSim, ReactiveExecutesAfterObservedAndPostObserved) {
   VerifyThreeRegionOrder({Region::kObserved, "observed"},
                          {Region::kPostObserved, "post_observed"},
                          {Region::kReactive, "reactive"});
 }
 
-TEST(SimCh4426, ReactiveEventsAcrossMultipleTimeSlots) {
+TEST(ReactiveRegionSim, ReactiveEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kReactive);
 }
 
-TEST(SimCh4426, ReactiveParticipatesInReNBAIteration) {
+TEST(ReactiveRegionSim, ReactiveParticipatesInReNBAIteration) {
   VerifyIterationChain(Region::kReactive, "reactive", Region::kReNBA, "renba");
 }
 
-TEST(SimCh4426, ReactiveSchedulesActiveRestart) {
+TEST(ReactiveRegionSim, ReactiveSchedulesActiveRestart) {
   VerifyRegionRestart({Region::kActive, "active1"},
                       {Region::kReactive, "reactive"},
                       {Region::kActive, "active2"});

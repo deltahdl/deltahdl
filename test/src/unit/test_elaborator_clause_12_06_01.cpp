@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA60701, CaseMatchesElaborates) {
+TEST(PatternElaboration, CaseMatchesElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA10, ImportInHeaderFollowedByPorts) {
+TEST(TopLevelGrammarParsing, ImportInHeaderFollowedByPorts) {
   auto r = Parse(
       "module m import pkg::*; (input a, output b);\n"
       "endmodule\n");
@@ -13,7 +13,7 @@ TEST(ParserA10, ImportInHeaderFollowedByPorts) {
   EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
 }
 
-TEST(ParserA10, ImportInHeaderFollowedByParams) {
+TEST(TopLevelGrammarParsing, ImportInHeaderFollowedByParams) {
   auto r = Parse(
       "module m import pkg::*; #(parameter int W = 8) (input a);\n"
       "endmodule\n");
@@ -21,7 +21,7 @@ TEST(ParserA10, ImportInHeaderFollowedByParams) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA10, ImportInHeaderFollowedByBoth) {
+TEST(TopLevelGrammarParsing, ImportInHeaderFollowedByBoth) {
   auto r = Parse(
       "module m import pkg::*; #(parameter int W = 8) (input a, output b);\n"
       "endmodule\n");
@@ -29,7 +29,7 @@ TEST(ParserA10, ImportInHeaderFollowedByBoth) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA10, AutomaticInProceduralBlockOk) {
+TEST(TopLevelGrammarParsing, AutomaticInProceduralBlockOk) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -38,7 +38,7 @@ TEST(ParserA10, AutomaticInProceduralBlockOk) {
               "endmodule\n"));
 }
 
-TEST(ParserA10, ParamOmitValueInPortList) {
+TEST(TopLevelGrammarParsing, ParamOmitValueInPortList) {
   auto r = Parse(
       "module m #(parameter int W) (input [W-1:0] d);\n"
       "endmodule\n");
@@ -46,7 +46,7 @@ TEST(ParserA10, ParamOmitValueInPortList) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA10, TypeParamOmitTypeInPortList) {
+TEST(TopLevelGrammarParsing, TypeParamOmitTypeInPortList) {
   auto r = Parse(
       "module m #(parameter type T) ();\n"
       "endmodule\n");
@@ -54,7 +54,7 @@ TEST(ParserA10, TypeParamOmitTypeInPortList) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA10, MatchesPrecedenceOverLogicalAnd) {
+TEST(TopLevelGrammarParsing, MatchesPrecedenceOverLogicalAnd) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -64,7 +64,7 @@ TEST(ParserA10, MatchesPrecedenceOverLogicalAnd) {
               "endmodule\n"));
 }
 
-TEST(ParserA10, DotStarOnceInPortConnections) {
+TEST(TopLevelGrammarParsing, DotStarOnceInPortConnections) {
   auto r = Parse(
       "module sub(input a, input b, output c);\n"
       "endmodule\n"
@@ -76,7 +76,7 @@ TEST(ParserA10, DotStarOnceInPortConnections) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA10, DotStarWithNamedPorts) {
+TEST(TopLevelGrammarParsing, DotStarWithNamedPorts) {
   auto r = Parse(
       "module sub(input a, input b, output c);\n"
       "endmodule\n"
@@ -88,7 +88,7 @@ TEST(ParserA10, DotStarWithNamedPorts) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA10, EventExprInParensOk) {
+TEST(TopLevelGrammarParsing, EventExprInParensOk) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  event e1, e2;\n"
@@ -96,7 +96,7 @@ TEST(ParserA10, EventExprInParensOk) {
               "endmodule\n"));
 }
 
-TEST(ParserA10, EmptyUnpackedArrayConcat) {
+TEST(TopLevelGrammarParsing, EmptyUnpackedArrayConcat) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q[$];\n"
@@ -104,7 +104,7 @@ TEST(ParserA10, EmptyUnpackedArrayConcat) {
               "endmodule\n"));
 }
 
-TEST(ParserA10, TaskCallWithoutParens) {
+TEST(TopLevelGrammarParsing, TaskCallWithoutParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  task my_task; endtask\n"
@@ -112,7 +112,7 @@ TEST(ParserA10, TaskCallWithoutParens) {
               "endmodule\n"));
 }
 
-TEST(ParserA10, VoidFunctionCallWithParens) {
+TEST(TopLevelGrammarParsing, VoidFunctionCallWithParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function void my_func(); endfunction\n"
@@ -120,7 +120,7 @@ TEST(ParserA10, VoidFunctionCallWithParens) {
               "endmodule\n"));
 }
 
-TEST(ParserA10, DollarInQueueSelect) {
+TEST(TopLevelGrammarParsing, DollarInQueueSelect) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q[$];\n"
@@ -128,21 +128,21 @@ TEST(ParserA10, DollarInQueueSelect) {
               "endmodule\n"));
 }
 
-TEST(ParserA10, ParameterInClassItem) {
+TEST(TopLevelGrammarParsing, ParameterInClassItem) {
   EXPECT_TRUE(
       ParseOk("class my_class;\n"
               "  parameter int WIDTH = 8;\n"
               "endclass\n"));
 }
 
-TEST(ParserA10, LocalparamInClassItem) {
+TEST(TopLevelGrammarParsing, LocalparamInClassItem) {
   EXPECT_TRUE(
       ParseOk("class my_class;\n"
               "  localparam int WIDTH = 8;\n"
               "endclass\n"));
 }
 
-TEST(ParserA10, ClassNewWithDefaultArg) {
+TEST(TopLevelGrammarParsing, ClassNewWithDefaultArg) {
   EXPECT_TRUE(
       ParseOk("class my_class;\n"
               "  int x;\n"
@@ -152,7 +152,7 @@ TEST(ParserA10, ClassNewWithDefaultArg) {
               "endclass\n"));
 }
 
-TEST(ParserA10, StructPackedOk) {
+TEST(TopLevelGrammarParsing, StructPackedOk) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct packed {\n"
@@ -162,7 +162,7 @@ TEST(ParserA10, StructPackedOk) {
               "endmodule\n"));
 }
 
-TEST(ParserA10, TypeRefInNetDecl) {
+TEST(TopLevelGrammarParsing, TypeRefInNetDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire x;\n"
@@ -170,7 +170,7 @@ TEST(ParserA10, TypeRefInNetDecl) {
               "endmodule\n"));
 }
 
-TEST(ParserA10, TypeRefInVarDeclWithVar) {
+TEST(TopLevelGrammarParsing, TypeRefInVarDeclWithVar) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int x;\n"
@@ -178,7 +178,7 @@ TEST(ParserA10, TypeRefInVarDeclWithVar) {
               "endmodule\n"));
 }
 
-TEST(ParserA10, CovergroupInClass) {
+TEST(TopLevelGrammarParsing, CovergroupInClass) {
   EXPECT_TRUE(
       ParseOk("class my_class;\n"
               "  covergroup cg;\n"

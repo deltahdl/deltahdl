@@ -16,7 +16,7 @@ TEST(SourceText, InterfaceNonAnsiHeader) {
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
 }
 
-TEST(ParserAnnexA0412, BasicInterfaceInst) {
+TEST(InterfaceInstantiationGrammar, BasicInterfaceInst) {
   auto r = Parse("module m; my_if u0(.a(a), .b(b)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -26,7 +26,7 @@ TEST(ParserAnnexA0412, BasicInterfaceInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-TEST(ParserAnnexA0412, InterfaceInstWithParams) {
+TEST(InterfaceInstantiationGrammar, InterfaceInstWithParams) {
   auto r = Parse("module m; my_if #(8) u0(.a(a)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -37,7 +37,7 @@ TEST(ParserAnnexA0412, InterfaceInstWithParams) {
   ASSERT_EQ(item->inst_params.size(), 1u);
 }
 
-TEST(ParserSection25, EndinterfaceLabel) {
+TEST(InterfaceParsing, EndinterfaceLabel) {
   auto r = Parse(
       "interface simple_bus;\n"
       "endinterface : simple_bus\n");
@@ -46,7 +46,7 @@ TEST(ParserSection25, EndinterfaceLabel) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "simple_bus");
 }
 
-TEST(ParserSection25, EndinterfaceNoLabel) {
+TEST(InterfaceParsing, EndinterfaceNoLabel) {
   auto r = Parse(
       "interface my_if;\n"
       "endinterface\n");
@@ -55,7 +55,7 @@ TEST(ParserSection25, EndinterfaceNoLabel) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "my_if");
 }
 
-TEST(ParserSection25, MultipleModportItems) {
+TEST(InterfaceParsing, MultipleModportItems) {
   auto r = Parse(
       "interface bus;\n"
       "  logic a;\n"
@@ -69,7 +69,7 @@ TEST(ParserSection25, MultipleModportItems) {
   VerifyModportItem(iface->modports[1], "m2", Direction::kOutput, "b");
 }
 
-TEST(ParserSection25, MultipleModportThreeItems) {
+TEST(InterfaceParsing, MultipleModportThreeItems) {
   auto r = Parse(
       "interface bus;\n"
       "  logic a;\n"
@@ -219,14 +219,14 @@ TEST(SourceText, NonPortInterfaceItemModport) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
 }
 
-TEST(ParserA29, AttrOnSimplePorts) {
+TEST(InterfaceDeclParsing, AttrOnSimplePorts) {
   EXPECT_TRUE(
       ParseOk("interface bus;\n"
               "  logic a;\n"
               "  modport target((* synthesis *) input a);\n"
               "endinterface\n"));
 }
-TEST(ParserSection23, InterfaceLifetimeAutomatic) {
+TEST(ModuleAndHierarchyParsing, InterfaceLifetimeAutomatic) {
   auto r = Parse("interface automatic myif; endinterface\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->interfaces.size(), 1);

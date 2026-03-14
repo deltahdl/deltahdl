@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA704, PathDelayValueBare) {
+TEST(SpecifyPathDelayParsing, PathDelayValueBare) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -19,7 +19,7 @@ TEST(ParserA704, PathDelayValueBare) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
-TEST(ParserA704, PathDelayValueParenthesized) {
+TEST(SpecifyPathDelayParsing, PathDelayValueParenthesized) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -33,7 +33,7 @@ TEST(ParserA704, PathDelayValueParenthesized) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
-TEST(ParserA704, PathDelayWithSpecparam) {
+TEST(SpecifyPathDelayParsing, PathDelayWithSpecparam) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -51,7 +51,7 @@ TEST(ParserA704, PathDelayWithSpecparam) {
   ASSERT_EQ(path_item->path.delays.size(), 1u);
 }
 
-TEST(ParserAnnexA, A7SpecparamInSpecify) {
+TEST(FormalSyntaxParsing, SpecparamInSpecify) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

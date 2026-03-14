@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA23, ListOfGenvarIdentifiersMultiple) {
+TEST(DeclarationListParsing, ListOfGenvarIdentifiersMultiple) {
   auto r = Parse("module m; genvar i, j, k; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserA23, ListOfGenvarIdentifiersMultiple) {
   EXPECT_EQ(r.cu->modules[0]->items[2]->name, "k");
 }
 
-TEST(ParserAnnexA, A4GenerateRegion) {
+TEST(FormalSyntaxParsing, GenerateRegion) {
   auto r = Parse(
       "module m;\n"
       "  generate\n"
@@ -26,7 +26,7 @@ TEST(ParserAnnexA, A4GenerateRegion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserAnnexA042, GenerateRegionBasic) {
+TEST(GenerateInstantiationGrammar, GenerateRegionBasic) {
   auto r = Parse(
       "module m;\n"
       "  generate\n"
@@ -38,7 +38,7 @@ TEST(ParserAnnexA042, GenerateRegionBasic) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 1u);
 }
 
-TEST(ParserAnnexA042, GenerateRegionEmpty) {
+TEST(GenerateInstantiationGrammar, GenerateRegionEmpty) {
   auto r = Parse(
       "module m;\n"
       "  generate\n"
@@ -49,7 +49,7 @@ TEST(ParserAnnexA042, GenerateRegionEmpty) {
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
-TEST(ParserAnnexA042, GenerateRegionMultipleItems) {
+TEST(GenerateInstantiationGrammar, GenerateRegionMultipleItems) {
   auto r = Parse(
       "module m;\n"
       "  generate\n"
@@ -62,7 +62,7 @@ TEST(ParserAnnexA042, GenerateRegionMultipleItems) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
-TEST(ParserAnnexA042, GenerateBlockLabeled) {
+TEST(GenerateInstantiationGrammar, GenerateBlockLabeled) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i++) begin : gen_blk\n"
@@ -76,7 +76,7 @@ TEST(ParserAnnexA042, GenerateBlockLabeled) {
   ASSERT_EQ(gen->gen_body.size(), 1u);
 }
 
-TEST(ParserAnnexA042, GenerateBlockMultipleItems) {
+TEST(GenerateInstantiationGrammar, GenerateBlockMultipleItems) {
   auto r = Parse(
       "module m;\n"
       "  if (W > 0) begin\n"
@@ -98,7 +98,7 @@ bool HasItemOfKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
   return false;
 }
 
-TEST(ParserAnnexA042, GenerateRegionMixedConstructs) {
+TEST(GenerateInstantiationGrammar, GenerateRegionMixedConstructs) {
   auto r = Parse(
       "module m;\n"
       "  generate\n"
@@ -121,7 +121,7 @@ TEST(ParserAnnexA042, GenerateRegionMixedConstructs) {
   EXPECT_TRUE(HasItemOfKind(mod->items, ModuleItemKind::kGenerateCase));
 }
 
-TEST(ParserSection27, MultipleGenerateConstructs) {
+TEST(GenerateConstructParsing, MultipleGenerateConstructs) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i++) begin : g1\n"
@@ -143,7 +143,7 @@ TEST(ParserSection27, MultipleGenerateConstructs) {
   EXPECT_EQ(mod->items[2]->kind, ModuleItemKind::kGenerateCase);
 }
 
-TEST(ParserSection27, GenerateRegion) {
+TEST(GenerateConstructParsing, GenerateRegion) {
   auto r = Parse(
       "module m;\n"
       "  generate\n"
@@ -161,7 +161,7 @@ TEST(ParserSection27, GenerateRegion) {
   EXPECT_TRUE(found_gen_for);
 }
 
-TEST(ParserSection27, GenerateOverview) {
+TEST(GenerateConstructParsing, GenerateOverview) {
   auto r = Parse(
       "module m;\n"
       "  generate\n"
@@ -178,7 +178,7 @@ TEST(ParserSection27, GenerateOverview) {
   EXPECT_EQ(gen_if_count, 2u);
 }
 
-TEST(ParserSection27, GenerateRegionWithMultipleKinds) {
+TEST(GenerateConstructParsing, GenerateRegionWithMultipleKinds) {
   auto r = Parse(
       "module m;\n"
       "  generate\n"

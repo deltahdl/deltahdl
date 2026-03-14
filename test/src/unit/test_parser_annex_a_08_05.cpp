@@ -12,7 +12,7 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA85, NetLvalueSimpleIdent) {
+TEST(LvalueParsing, NetLvalueSimpleIdent) {
   auto r = Parse("module m; wire a, b; assign a = b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -23,7 +23,7 @@ TEST(ParserA85, NetLvalueSimpleIdent) {
   EXPECT_EQ(ca->assign_lhs->text, "a");
 }
 
-TEST(ParserA85, NetLvalueConstBitSelect) {
+TEST(LvalueParsing, NetLvalueConstBitSelect) {
   auto r =
       Parse("module m; wire [7:0] a; wire b; assign a[3] = b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -36,7 +36,7 @@ TEST(ParserA85, NetLvalueConstBitSelect) {
   EXPECT_EQ(ca->assign_lhs->base->text, "a");
 }
 
-TEST(ParserA85, NetLvalueConstPartSelect) {
+TEST(LvalueParsing, NetLvalueConstPartSelect) {
   auto r = Parse(
       "module m; wire [7:0] a; wire [3:0] b; assign a[7:4] = b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -48,7 +48,7 @@ TEST(ParserA85, NetLvalueConstPartSelect) {
   ASSERT_NE(ca->assign_lhs->index_end, nullptr);
 }
 
-TEST(ParserA85, NetLvalueConcatenation) {
+TEST(LvalueParsing, NetLvalueConcatenation) {
   auto r = Parse(
       "module m; wire [7:0] a; wire [3:0] b, c; assign {b, c} = a; "
       "endmodule\n");
@@ -61,7 +61,7 @@ TEST(ParserA85, NetLvalueConcatenation) {
   EXPECT_EQ(ca->assign_lhs->elements.size(), 2u);
 }
 
-TEST(ParserA85, NetLvalueNestedConcatenation) {
+TEST(LvalueParsing, NetLvalueNestedConcatenation) {
   auto r = Parse(
       "module m; wire a, b, c, d;\n"
       "  assign {{a, b}, {c, d}} = 4'hF;\n"
@@ -76,7 +76,7 @@ TEST(ParserA85, NetLvalueNestedConcatenation) {
   EXPECT_EQ(ca->assign_lhs->elements[0]->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserA85, NetLvalueConcatWithSelects) {
+TEST(LvalueParsing, NetLvalueConcatWithSelects) {
   auto r = Parse(
       "module m; wire [7:0] a; wire [3:0] b;\n"
       "  assign {a[7:4], b} = 8'hFF;\n"
@@ -90,7 +90,7 @@ TEST(ParserA85, NetLvalueConcatWithSelects) {
   EXPECT_EQ(ca->assign_lhs->elements[0]->kind, ExprKind::kSelect);
 }
 
-TEST(ParserA85, VarLvalueSimpleIdent) {
+TEST(LvalueParsing, VarLvalueSimpleIdent) {
   auto r = Parse("module m; logic x; initial x = 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -101,7 +101,7 @@ TEST(ParserA85, VarLvalueSimpleIdent) {
   EXPECT_EQ(stmt->lhs->text, "x");
 }
 
-TEST(ParserA85, VarLvalueBitSelect) {
+TEST(LvalueParsing, VarLvalueBitSelect) {
   auto r = Parse("module m; logic [7:0] x; initial x[3] = 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -115,7 +115,7 @@ TEST(ParserA85, VarLvalueBitSelect) {
   EXPECT_EQ(stmt->lhs->index_end, nullptr);
 }
 
-TEST(ParserA85, VarLvaluePartSelect) {
+TEST(LvalueParsing, VarLvaluePartSelect) {
   auto r = Parse("module m; logic [7:0] x; initial x[7:4] = 4'hF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -127,7 +127,7 @@ TEST(ParserA85, VarLvaluePartSelect) {
   ASSERT_NE(stmt->lhs->index_end, nullptr);
 }
 
-TEST(ParserA85, VarLvalueIndexedPartSelectPlus) {
+TEST(LvalueParsing, VarLvalueIndexedPartSelectPlus) {
   auto r =
       Parse("module m; logic [15:0] x; initial x[4+:4] = 4'hF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -139,7 +139,7 @@ TEST(ParserA85, VarLvalueIndexedPartSelectPlus) {
   EXPECT_TRUE(stmt->lhs->is_part_select_plus);
 }
 
-TEST(ParserA85, VarLvalueIndexedPartSelectMinus) {
+TEST(LvalueParsing, VarLvalueIndexedPartSelectMinus) {
   auto r =
       Parse("module m; logic [15:0] x; initial x[7-:4] = 4'hF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -151,7 +151,7 @@ TEST(ParserA85, VarLvalueIndexedPartSelectMinus) {
   EXPECT_TRUE(stmt->lhs->is_part_select_minus);
 }
 
-TEST(ParserA85, VarLvalueMemberAccess) {
+TEST(LvalueParsing, VarLvalueMemberAccess) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
@@ -166,7 +166,7 @@ TEST(ParserA85, VarLvalueMemberAccess) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserA85, VarLvalueConcatenation) {
+TEST(LvalueParsing, VarLvalueConcatenation) {
   auto r = Parse(
       "module m; logic [3:0] a, b; logic [7:0] c;\n"
       "  initial {a, b} = c;\n"
@@ -180,7 +180,7 @@ TEST(ParserA85, VarLvalueConcatenation) {
   EXPECT_EQ(stmt->lhs->elements.size(), 2u);
 }
 
-TEST(ParserA85, VarLvalueNestedConcatenation) {
+TEST(LvalueParsing, VarLvalueNestedConcatenation) {
   auto r = Parse(
       "module m; logic a, b, c, d;\n"
       "  initial {{a, b}, {c, d}} = 4'hF;\n"
@@ -194,7 +194,7 @@ TEST(ParserA85, VarLvalueNestedConcatenation) {
   EXPECT_EQ(stmt->lhs->elements[0]->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserA85, VarLvalueStreamingConcat) {
+TEST(LvalueParsing, VarLvalueStreamingConcat) {
   auto r = Parse(
       "module m; logic [31:0] a, b;\n"
       "  initial {>> {a}} = b;\n"
@@ -207,7 +207,7 @@ TEST(ParserA85, VarLvalueStreamingConcat) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(ParserA85, NonrangeVarLvalueSimple) {
+TEST(LvalueParsing, NonrangeVarLvalueSimple) {
   auto r = Parse("module m; int x; initial x = 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -218,7 +218,7 @@ TEST(ParserA85, NonrangeVarLvalueSimple) {
   EXPECT_EQ(stmt->lhs->text, "x");
 }
 
-TEST(ParserA85, NonrangeVarLvalueMemberAccess) {
+TEST(LvalueParsing, NonrangeVarLvalueMemberAccess) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } s_t;\n"

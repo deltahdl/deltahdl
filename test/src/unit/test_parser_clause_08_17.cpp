@@ -3,7 +3,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection8, ExtendsWithArgs) {
+TEST(ClassParsing, ExtendsWithArgs) {
   auto r = Parse(
       "class Base;\n"
       "endclass\n"
@@ -14,7 +14,7 @@ TEST(ParserSection8, ExtendsWithArgs) {
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
 
-TEST(ParserSection8, ConstructorSuperNew) {
+TEST(ClassParsing, ConstructorSuperNew) {
   auto r = Parse(
       "class Base;\n"
       "  function new();\n"
@@ -29,7 +29,7 @@ TEST(ParserSection8, ConstructorSuperNew) {
   ASSERT_EQ(r.cu->classes.size(), 2u);
 }
 
-TEST(ParserSection8, SuperNewExpression) {
+TEST(ClassParsing, SuperNewExpression) {
   auto r = Parse(
       "class Base;\n"
       "  function new(int x);\n"
@@ -44,7 +44,7 @@ TEST(ParserSection8, SuperNewExpression) {
   ASSERT_EQ(r.cu->classes.size(), 2u);
 }
 
-TEST(ParserSection8, ConstructorChainingDefault) {
+TEST(ClassParsing, ConstructorChainingDefault) {
   auto r = Parse(
       "class Base;\n"
       "  function new(int x = 0);\n"
@@ -59,7 +59,7 @@ TEST(ParserSection8, ConstructorChainingDefault) {
   ASSERT_EQ(r.cu->classes.size(), 2u);
 }
 
-TEST(ParserA817, ExtendsArgsStored) {
+TEST(ChainedConstructorParsing, ExtendsArgsStored) {
   auto r = Parse(
       "class Base;\n"
       "  function new(int x);\n"
@@ -72,7 +72,7 @@ TEST(ParserA817, ExtendsArgsStored) {
   EXPECT_EQ(r.cu->classes[1]->extends_args.size(), 1u);
 }
 
-TEST(ParserA817, ThreeLevelChaining) {
+TEST(ChainedConstructorParsing, ThreeLevelChaining) {
   EXPECT_TRUE(
       ParseOk("class A;\n"
               "  function new();\n"
@@ -90,7 +90,7 @@ TEST(ParserA817, ThreeLevelChaining) {
               "endclass\n"));
 }
 
-TEST(ParserA817, SuperNewWithMultipleArgs) {
+TEST(ChainedConstructorParsing, SuperNewWithMultipleArgs) {
   EXPECT_TRUE(
       ParseOk("class Base;\n"
               "  function new(string name, int id);\n"
@@ -103,7 +103,7 @@ TEST(ParserA817, SuperNewWithMultipleArgs) {
               "endclass\n"));
 }
 
-TEST(ParserA817, ExtendsWithDefault) {
+TEST(ChainedConstructorParsing, ExtendsWithDefault) {
   auto r = Parse(
       "class Base;\n"
       "  function new(int x);\n"
@@ -118,7 +118,7 @@ TEST(ParserA817, ExtendsWithDefault) {
   EXPECT_TRUE(r.cu->classes[1]->extends_has_default);
 }
 
-TEST(ParserA817, ImplicitSuperNewNoConstructor) {
+TEST(ChainedConstructorParsing, ImplicitSuperNewNoConstructor) {
   EXPECT_TRUE(
       ParseOk("class Base;\n"
               "  function new();\n"
@@ -129,7 +129,7 @@ TEST(ParserA817, ImplicitSuperNewNoConstructor) {
               "endclass\n"));
 }
 
-TEST(ParserClause08_03, ConstructorMixedArgsWithDefault) {
+TEST(ClassSyntaxParsing, ConstructorMixedArgsWithDefault) {
   auto r = Parse(
       "class C extends Base;\n"
       "  function new(int size, default);\n"
@@ -144,7 +144,7 @@ TEST(ParserClause08_03, ConstructorMixedArgsWithDefault) {
   EXPECT_TRUE(args[1].is_default);
 }
 
-TEST(ParserClause08_03, ConstructorDefaultBeforeArgs) {
+TEST(ClassSyntaxParsing, ConstructorDefaultBeforeArgs) {
   auto r = Parse(
       "class C extends Base;\n"
       "  function new(default, bit enable);\n"

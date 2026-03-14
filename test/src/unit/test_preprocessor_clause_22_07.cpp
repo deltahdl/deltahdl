@@ -52,7 +52,7 @@ TEST(Preprocessor, DelayToTicks_Magnitude) {
   EXPECT_EQ(DelayToTicks(5, ts, TimeUnit::kNs), 500000);
 }
 
-TEST(ParserClause03, Cl3_14_2_1_NoTimescaleDefault) {
+TEST(DesignBuildingBlockParsing, NoTimescaleDefault) {
   auto r = Preprocess("// no directives\n");
   EXPECT_FALSE(r.has_errors);
   EXPECT_FALSE(r.has_timescale);
@@ -61,12 +61,12 @@ TEST(ParserClause03, Cl3_14_2_1_NoTimescaleDefault) {
   EXPECT_EQ(r.timescale.precision, TimeUnit::kNs);
 }
 
-TEST(ParserClause03, Cl3_14_2_1_ErrorInvalidUnit) {
+TEST(DesignBuildingBlockParsing, ErrorInvalidUnit) {
   auto r = Preprocess("`timescale 1xx / 1ps\n");
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_14_2_1_DelayConversionWithTimescale) {
+TEST(DesignBuildingBlockParsing, DelayConversionWithTimescale) {
   auto r = Preprocess("`timescale 10ns / 1ns\n");
   EXPECT_FALSE(r.has_errors);
 
@@ -75,7 +75,7 @@ TEST(ParserClause03, Cl3_14_2_1_DelayConversionWithTimescale) {
   EXPECT_EQ(RealDelayToTicks(1.5, r.timescale, r.global_precision), 15u);
 }
 
-TEST(ParserSection22, TimescaleModuleNamePreserved) {
+TEST(CompilerDirectiveParsing, TimescaleModuleNamePreserved) {
   auto r = ParseWithPreprocessor(
       "`timescale 1ns/1ps\n"
       "module foo;\n"

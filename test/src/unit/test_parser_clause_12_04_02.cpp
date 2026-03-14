@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection4, Sec4_6_UniqueIf) {
+TEST(SchedulingSemanticsParsing, UniqueIf) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -21,7 +21,7 @@ TEST(ParserSection4, Sec4_6_UniqueIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-TEST(ParserSection4, Sec4_6_Unique0If) {
+TEST(SchedulingSemanticsParsing, Unique0If) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -37,7 +37,7 @@ TEST(ParserSection4, Sec4_6_Unique0If) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-TEST(ParserSection4, Sec4_6_PriorityIf) {
+TEST(SchedulingSemanticsParsing, PriorityIf) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -54,7 +54,7 @@ TEST(ParserSection4, Sec4_6_PriorityIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-TEST(ParserSection12, Unique0IfChainElseIf) {
+TEST(ProceduralStatementParsing, Unique0IfChainElseIf) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -70,7 +70,7 @@ TEST(ParserSection12, Unique0IfChainElseIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-TEST(ParserA606, UniqueIf) {
+TEST(ConditionalSyntaxParsing, UniqueIf) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -86,7 +86,7 @@ TEST(ParserA606, UniqueIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-TEST(ParserSection12, PriorityIfWithElse) {
+TEST(ProceduralStatementParsing, PriorityIfWithElse) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -105,7 +105,7 @@ TEST(ParserSection12, PriorityIfWithElse) {
   ASSERT_NE(stmt->else_branch->else_branch, nullptr);
 }
 
-TEST(ParserA606, Unique0If) {
+TEST(ConditionalSyntaxParsing, Unique0If) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -121,7 +121,7 @@ TEST(ParserA606, Unique0If) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-TEST(ParserA606, PriorityIf) {
+TEST(ConditionalSyntaxParsing, PriorityIf) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -138,7 +138,7 @@ TEST(ParserA606, PriorityIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-TEST(ParserA606, UniqueIfElseIfElse) {
+TEST(ConditionalSyntaxParsing, UniqueIfElseIfElse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -160,7 +160,7 @@ TEST(ParserA606, UniqueIfElseIfElse) {
   EXPECT_EQ(stmt->else_branch->qualifier, CaseQualifier::kNone);
 }
 
-TEST(ParserSection9, Sec9_2_2_UniqueIf) {
+TEST(ProcessParsing, UniqueIf) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"

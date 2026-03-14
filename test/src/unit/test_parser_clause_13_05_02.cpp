@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA26, FuncBodyNewStyleConstRef) {
+TEST(FunctionDeclParsing, FuncBodyNewStyleConstRef) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(const ref int x);\n"
@@ -20,7 +20,7 @@ TEST(ParserA26, FuncBodyNewStyleConstRef) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
-TEST(ParserA27, TaskBodyNewStyleConstRef) {
+TEST(TaskDeclParsing, TaskBodyNewStyleConstRef) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(const ref int x);\n"
@@ -34,7 +34,7 @@ TEST(ParserA27, TaskBodyNewStyleConstRef) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
-TEST(ParserA27, TfPortDirectionConstRefStatic) {
+TEST(TaskDeclParsing, TfPortDirectionConstRefStatic) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(const ref static int x);\n"
@@ -48,7 +48,7 @@ TEST(ParserA27, TfPortDirectionConstRefStatic) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
-TEST(ParserA27, TfPortDeclOldStyleConstRef) {
+TEST(TaskDeclParsing, TfPortDeclOldStyleConstRef) {
   auto r = Parse(
       "module m;\n"
       "  task my_task;\n"
@@ -64,7 +64,7 @@ TEST(ParserA27, TfPortDeclOldStyleConstRef) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
-TEST(ParserSection4, Sec4_9_3_AutoFuncWithRefArg) {
+TEST(SchedulingSemanticsParsing, AutoFuncWithRefArg) {
   auto r = Parse(
       "module m;\n"
       "  function automatic void swap(ref int x, ref int y);\n"
@@ -86,7 +86,7 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithRefArg) {
   EXPECT_EQ(item->func_args[1].name, "y");
 }
 
-TEST(ParserA27, TfPortDirectionRefStatic) {
+TEST(TaskDeclParsing, TfPortDirectionRefStatic) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(ref static int x);\n"
@@ -99,7 +99,7 @@ TEST(ParserA27, TfPortDirectionRefStatic) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
-TEST(ParserSection13, AutomaticFunctionWithRef) {
+TEST(TaskAndFunctionParsing, AutomaticFunctionWithRef) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int crc(ref byte packet[]);\n"
@@ -117,7 +117,7 @@ TEST(ParserSection13, AutomaticFunctionWithRef) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
 }
 
-TEST(ParserSection4, Sec4_9_3_AutoFuncWithConstRefArg) {
+TEST(SchedulingSemanticsParsing, AutoFuncWithConstRefArg) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int read_only(const ref int data);\n"
@@ -135,7 +135,7 @@ TEST(ParserSection4, Sec4_9_3_AutoFuncWithConstRefArg) {
   EXPECT_EQ(item->func_args[0].name, "data");
 }
 
-TEST(ParserSection13, ConstRefArg) {
+TEST(TaskAndFunctionParsing, ConstRefArg) {
   auto r = Parse(
       "module m;\n"
       "  function void bar(const ref int arr);\n"
@@ -149,7 +149,7 @@ TEST(ParserSection13, ConstRefArg) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
 }
 
-TEST(ParserSection13, RefWithoutConst) {
+TEST(TaskAndFunctionParsing, RefWithoutConst) {
   auto r = Parse(
       "module m;\n"
       "  function void baz(ref int x);\n"
@@ -163,7 +163,7 @@ TEST(ParserSection13, RefWithoutConst) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
 }
 
-TEST(ParserSection13, ConstRefArgOnTask) {
+TEST(TaskAndFunctionParsing, ConstRefArgOnTask) {
   auto r = Parse(
       "module m;\n"
       "  task process_data(const ref int data[]);\n"
@@ -177,7 +177,7 @@ TEST(ParserSection13, ConstRefArgOnTask) {
   EXPECT_EQ(tk->func_args[0].direction, Direction::kRef);
 }
 
-TEST(ParserSection13, ConstRefMixedWithOtherDirections) {
+TEST(TaskAndFunctionParsing, ConstRefMixedWithOtherDirections) {
   auto r = Parse(
       "module m;\n"
       "  function void compute(input int a, const ref int b, output int c);\n"
@@ -194,7 +194,7 @@ TEST(ParserSection13, ConstRefMixedWithOtherDirections) {
   EXPECT_EQ(fn->func_args[2].direction, Direction::kOutput);
 }
 
-TEST(ParserSection13, RefArgOnFunction) {
+TEST(TaskAndFunctionParsing, RefArgOnFunction) {
   auto r = Parse(
       "module m;\n"
       "  function void swap(ref int a, ref int b);\n"

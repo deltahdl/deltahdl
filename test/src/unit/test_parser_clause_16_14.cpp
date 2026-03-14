@@ -8,7 +8,7 @@ using VerifyParseTest = ProgramTestParse;
 
 namespace {
 
-TEST(ParserSection16, Sec16_5_1_MultipleConcurrentAssertions) {
+TEST(AssertionParsing, MultipleConcurrentAssertions) {
   auto r = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a |-> b);\n"

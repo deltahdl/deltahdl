@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA705, MultipleTimingChecksSimulate) {
+TEST(SystemTimingCheckSim, MultipleTimingChecksSimulate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, UndefineallDirective) {
+TEST(CompilerDirectiveParsing, UndefineallDirective) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define A 1\n"
                               "`define B 2\n"

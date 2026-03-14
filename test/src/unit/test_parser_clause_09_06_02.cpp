@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA605, DisableBlock) {
+TEST(TimingControlSyntaxParsing, DisableBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -20,7 +20,7 @@ TEST(ParserA605, DisableBlock) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-TEST(ParserSection9, Sec9_3_1_BlockWithDisableOwnName) {
+TEST(ProcessParsing, BlockWithDisableOwnName) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : my_blk\n"
@@ -40,7 +40,7 @@ TEST(ParserSection9, Sec9_3_1_BlockWithDisableOwnName) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, Sec9_3_2_NamedForkDisabledByName) {
+TEST(ProcessParsing, NamedForkDisabledByName) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -61,7 +61,7 @@ TEST(ParserSection9, Sec9_3_2_NamedForkDisabledByName) {
   EXPECT_EQ(fork_stmt->label, "my_fork");
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kDisable);
 }
-TEST(ParserSection9c, DisableLabeledBlock) {
+TEST(ProcessTimingAndControlParsing, DisableLabeledBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : block_name\n"
@@ -79,7 +79,7 @@ TEST(ParserSection9c, DisableLabeledBlock) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDisable);
 }
 
-TEST(ParserSection9, DisableNamedBlock) {
+TEST(ProcessParsing, DisableNamedBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : blk\n"
@@ -92,7 +92,7 @@ TEST(ParserSection9, DisableNamedBlock) {
   ASSERT_GE(body->stmts.size(), 1u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kDisable);
 }
-TEST(ParserSection9, DisableTaskName) {
+TEST(ProcessParsing, DisableTaskName) {
   auto r = Parse(
       "module m;\n"
       "  task my_task;\n"
@@ -107,7 +107,7 @@ TEST(ParserSection9, DisableTaskName) {
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
 }
 
-TEST(ParserSection9c, DisableBlockFromOutside) {
+TEST(ProcessTimingAndControlParsing, DisableBlockFromOutside) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : outer\n"
@@ -130,7 +130,7 @@ TEST(ParserSection9c, DisableBlockFromOutside) {
   EXPECT_EQ(second_init->body->stmts[1]->kind, StmtKind::kDisable);
 }
 
-TEST(ParserSection9c, DisableWithIfCondition) {
+TEST(ProcessTimingAndControlParsing, DisableWithIfCondition) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : block_name\n"
@@ -150,7 +150,7 @@ TEST(ParserSection9c, DisableWithIfCondition) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kIf);
 }
 
-TEST(ParserSection9c, DisableHierarchicalTaskName) {
+TEST(ProcessTimingAndControlParsing, DisableHierarchicalTaskName) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  task my_task;\n"
@@ -167,7 +167,7 @@ TEST(ParserSection9c, DisableHierarchicalTaskName) {
               "endmodule\n"));
 }
 
-TEST(ParserA604, StmtItemDisableStatement) {
+TEST(StatementSyntaxParsing, StmtItemDisableStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -194,7 +194,7 @@ TEST(Parser, DisableStatement) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-TEST(ParserSection9, DisableIdentStillWorks) {
+TEST(ProcessParsing, DisableIdentStillWorks) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -207,7 +207,7 @@ TEST(ParserSection9, DisableIdentStillWorks) {
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
 }
 
-TEST(ParserSection4, Sec4_5_DisableStatement) {
+TEST(SchedulingSemanticsParsing, DisableStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : blk\n"

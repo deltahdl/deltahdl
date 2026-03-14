@@ -27,7 +27,7 @@ TEST(ConstEval, Comparison) {
   }
 }
 
-TEST(SimCh9, AlwaysCombComparison) {
+TEST(AlwaysCombBasicSim, AlwaysCombComparison) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA23, ListOfSpecparamAssignmentsMultiple) {
+TEST(DeclarationListParsing, ListOfSpecparamAssignmentsMultiple) {
   auto r = Parse(
       "module m;\n"
       "  specify specparam tRISE = 100, tFALL = 50, tHOLD = 10; endspecify\n"
@@ -36,7 +36,7 @@ TEST(SourceText, ParamPortMixedForms) {
   EXPECT_EQ(r.cu->modules[0]->params[3].first, "C");
 }
 
-TEST(ParserA83, ParamExprBinaryOp) {
+TEST(ExpressionParsing, ParamExprBinaryOp) {
   auto r = Parse(
       "module m #(parameter int P = 2 * 8);\n"
       "endmodule\n");
@@ -45,14 +45,14 @@ TEST(ParserA83, ParamExprBinaryOp) {
   EXPECT_EQ(r.cu->modules[0]->params[0].second->kind, ExprKind::kBinary);
 }
 
-TEST(ParserA23, ListOfParamAssignmentsSingle) {
+TEST(DeclarationListParsing, ListOfParamAssignmentsSingle) {
   auto r = Parse("module m; parameter int A = 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
 }
 
-TEST(ParserA23, ListOfParamAssignmentsMultiple) {
+TEST(DeclarationListParsing, ListOfParamAssignmentsMultiple) {
   auto r = Parse("module m; parameter int A = 1, B = 2, C = 3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -63,13 +63,13 @@ TEST(ParserA23, ListOfParamAssignmentsMultiple) {
   EXPECT_GE(count, 3);
 }
 
-TEST(ParserA24, ParamAssignmentNoDefault) {
+TEST(DeclarationAssignmentParsing, ParamAssignmentNoDefault) {
   auto r = Parse("module m #(parameter int P); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA24, TypeAssignmentWithDefault) {
+TEST(DeclarationAssignmentParsing, TypeAssignmentWithDefault) {
   auto r = Parse("module m; parameter type T = int; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -78,7 +78,7 @@ TEST(ParserA24, TypeAssignmentWithDefault) {
   EXPECT_EQ(item->name, "T");
 }
 
-TEST(ParserA23, ListOfTypeAssignmentsSingle) {
+TEST(DeclarationListParsing, ListOfTypeAssignmentsSingle) {
   auto r = Parse("module m; parameter type T = int; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -93,7 +93,7 @@ TEST(SourceText, ParamPortLocalparam) {
   EXPECT_EQ(r.cu->modules[0]->params[0].first, "X");
 }
 
-TEST(ModuleParamsA13, TypedParamPort) {
+TEST(ModuleParamsParsing, TypedParamPort) {
   auto r = Parse(
       "module m #(parameter int W = 8, int D = 4)(\n"
       "  input logic [W-1:0] data\n"
@@ -103,7 +103,7 @@ TEST(ModuleParamsA13, TypedParamPort) {
   EXPECT_EQ(r.cu->modules[0]->params.size(), 2u);
 }
 
-TEST(ParserA23, ListOfSpecparamAssignmentsSingle) {
+TEST(DeclarationListParsing, ListOfSpecparamAssignmentsSingle) {
   auto r = Parse(
       "module m;\n"
       "  specify specparam tRISE = 100; endspecify\n"

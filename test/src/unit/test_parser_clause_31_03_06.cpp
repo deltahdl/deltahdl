@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70501, RecremFullArgs) {
+TEST(TimingCheckCommandParsing, RecremFullArgs) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -38,7 +38,7 @@ TEST_F(SpecifyTest, RecremTimingCheck) {
   ASSERT_GE(tc.limits.size(), 2u);
 }
 
-TEST(ParserSection28, Sec28_12_TimingCheckRecrem) {
+TEST(GateLevelModelingParsing, TimingCheckRecrem) {
   auto sp = ParseSpecifySingle(
       "module m(input rst, clk);\n"
       "  specify\n"
@@ -55,7 +55,7 @@ TEST(ParserSection28, Sec28_12_TimingCheckRecrem) {
   ASSERT_EQ(si->timing_check.limits.size(), 2u);
 }
 
-TEST(ParserA705, SystemTimingCheckRecrem) {
+TEST(SystemTimingCheckParsing, SystemTimingCheckRecrem) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

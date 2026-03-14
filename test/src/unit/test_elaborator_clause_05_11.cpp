@@ -4,14 +4,14 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause05, Cl5_11_SimpleArrayOk) {
+TEST(LexicalConventionElaboration, SimpleArrayOk) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  int arr[1:0] = '{10, 20};\n"
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_11_NestedBracesOk) {
+TEST(LexicalConventionElaboration, NestedBracesOk) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct { int a; int b; } ms_t;\n"
@@ -19,7 +19,7 @@ TEST(ElabClause05, Cl5_11_NestedBracesOk) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_11_DefaultKeyOk) {
+TEST(LexicalConventionElaboration, DefaultKeyOk) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  logic [7:0] arr [0:3];\n"
@@ -27,7 +27,7 @@ TEST(ElabClause05, Cl5_11_DefaultKeyOk) {
              "endmodule\n"));
 }
 
-TEST(ElabClause05, Cl5_11_SizeMismatchError) {
+TEST(LexicalConventionElaboration, SizeMismatchError) {
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -37,7 +37,7 @@ TEST(ElabClause05, Cl5_11_SizeMismatchError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ElabClause05, Cl5_11_FlatInitIllegal) {
+TEST(LexicalConventionElaboration, FlatInitIllegal) {
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"

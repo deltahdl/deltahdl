@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection12, RepeatWithExpression) {
+TEST(ProceduralStatementParsing, RepeatWithExpression) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -22,7 +22,7 @@ TEST(ParserSection12, RepeatWithExpression) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserA608, RepeatLoop) {
+TEST(LoopSyntaxParsing, RepeatLoop) {
   auto r = Parse(
       "module m;\n"
       "  initial begin repeat (10) @(posedge clk); end\n"
@@ -35,7 +35,7 @@ TEST(ParserA608, RepeatLoop) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-TEST(ParserA608, RepeatNullStmt) {
+TEST(LoopSyntaxParsing, RepeatNullStmt) {
   auto r = Parse(
       "module m;\n"
       "  initial begin repeat (5) ; end\n"

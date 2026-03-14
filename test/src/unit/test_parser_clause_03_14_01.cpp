@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_14_1_PerElementAccuracy) {
+TEST(DesignBuildingBlockParsing, PerElementAccuracy) {
   TimeScale ts_a{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
 
   TimeScale ts_b{TimeUnit::kNs, 1, TimeUnit::kPs, 1};
@@ -18,7 +18,7 @@ TEST(ParserClause03, Cl3_14_1_PerElementAccuracy) {
             RealDelayToTicks(2.756, ts_b, TimeUnit::kPs));
 }
 
-TEST(ParserClause03, Cl3_14_1_MagnitudeRounding) {
+TEST(DesignBuildingBlockParsing, MagnitudeRounding) {
   TimeScale ts{TimeUnit::kNs, 10, TimeUnit::kNs, 1};
 
   EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kNs), 28u);
@@ -26,13 +26,13 @@ TEST(ParserClause03, Cl3_14_1_MagnitudeRounding) {
   EXPECT_EQ(RealDelayToTicks(1.0, ts, TimeUnit::kNs), 10u);
 }
 
-TEST(ParserClause03, Cl3_14_1_FinerGlobalPrecision) {
+TEST(DesignBuildingBlockParsing, FinerGlobalPrecision) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
 
   EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kFs), 2800000u);
 }
 
-TEST(ParserClause03, Cl3_14_1_SamePrecisionRoundsToInteger) {
+TEST(DesignBuildingBlockParsing, SamePrecisionRoundsToInteger) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kNs, 1};
 
   EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kNs), 3u);
@@ -42,7 +42,7 @@ TEST(ParserClause03, Cl3_14_1_SamePrecisionRoundsToInteger) {
   EXPECT_EQ(RealDelayToTicks(2.5, ts, TimeUnit::kNs), 3u);
 }
 
-TEST(ParserClause03, Cl3_14_1_OneOrderSmallerRoundsToOneDecimal) {
+TEST(DesignBuildingBlockParsing, OneOrderSmallerRoundsToOneDecimal) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
 
   EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kPs), 2800u);
@@ -50,7 +50,7 @@ TEST(ParserClause03, Cl3_14_1_OneOrderSmallerRoundsToOneDecimal) {
   EXPECT_EQ(RealDelayToTicks(2.73, ts, TimeUnit::kPs), 2700u);
 }
 
-TEST(ParserClause03, Cl3_14_1_LrmExample_2_75ns) {
+TEST(DesignBuildingBlockParsing, LrmExample_2_75ns) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
 
   EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kPs), 2800u);
@@ -58,7 +58,7 @@ TEST(ParserClause03, Cl3_14_1_LrmExample_2_75ns) {
   EXPECT_EQ(RealDelayToTicks(2.75, ts, TimeUnit::kPs), 2800u);
 }
 
-TEST(ParserClause03, Cl3_14_1_TwoOrdersSmaller) {
+TEST(DesignBuildingBlockParsing, TwoOrdersSmaller) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 10};
 
   EXPECT_EQ(RealDelayToTicks(2.756, ts, TimeUnit::kPs), 2760u);
@@ -66,18 +66,18 @@ TEST(ParserClause03, Cl3_14_1_TwoOrdersSmaller) {
   EXPECT_EQ(RealDelayToTicks(2.754, ts, TimeUnit::kPs), 2750u);
 }
 
-TEST(ParserClause03, Cl3_14_1_ThreeOrdersNoRounding) {
+TEST(DesignBuildingBlockParsing, ThreeOrdersNoRounding) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 1};
 
   EXPECT_EQ(RealDelayToTicks(2.756, ts, TimeUnit::kPs), 2756u);
 }
 
-TEST(ParserClause03, Cl3_14_1_ZeroDelay) {
+TEST(DesignBuildingBlockParsing, ZeroDelay) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
   EXPECT_EQ(RealDelayToTicks(0.0, ts, TimeUnit::kPs), 0u);
 }
 
-TEST(ParserClause03, Cl3_14_1_ExactIntegerPassThrough) {
+TEST(DesignBuildingBlockParsing, ExactIntegerPassThrough) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kPs, 100};
 
   EXPECT_EQ(RealDelayToTicks(5.0, ts, TimeUnit::kPs), 5000u);

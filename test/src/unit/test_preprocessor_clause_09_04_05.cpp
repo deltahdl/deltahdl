@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection10, BlockingIntraAssignDelayKind) {
+TEST(AssignmentParsing, BlockingIntraAssignDelayKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b;\n"
@@ -20,7 +20,7 @@ TEST(ParserSection10, BlockingIntraAssignDelayKind) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserSection10, BlockingIntraAssignDelayOperands) {
+TEST(AssignmentParsing, BlockingIntraAssignDelayOperands) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b;\n"
@@ -35,7 +35,7 @@ TEST(ParserSection10, BlockingIntraAssignDelayOperands) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, NonblockingIntraAssignDelayKind) {
+TEST(AssignmentParsing, NonblockingIntraAssignDelayKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b;\n"
@@ -50,7 +50,7 @@ TEST(ParserSection10, NonblockingIntraAssignDelayKind) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(ParserSection10, NonblockingIntraAssignDelayOperands) {
+TEST(AssignmentParsing, NonblockingIntraAssignDelayOperands) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b;\n"
@@ -65,7 +65,7 @@ TEST(ParserSection10, NonblockingIntraAssignDelayOperands) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, BlockingIntraAssignEventKind) {
+TEST(AssignmentParsing, BlockingIntraAssignEventKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b, clk;\n"
@@ -81,7 +81,7 @@ TEST(ParserSection10, BlockingIntraAssignEventKind) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, BlockingIntraAssignEventEdge) {
+TEST(AssignmentParsing, BlockingIntraAssignEventEdge) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b, clk;\n"
@@ -96,7 +96,7 @@ TEST(ParserSection10, BlockingIntraAssignEventEdge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-TEST(ParserSection10, NonblockingIntraAssignEventKind) {
+TEST(AssignmentParsing, NonblockingIntraAssignEventKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b, clk;\n"
@@ -112,7 +112,7 @@ TEST(ParserSection10, NonblockingIntraAssignEventKind) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection10, NonblockingIntraAssignEventEdge) {
+TEST(AssignmentParsing, NonblockingIntraAssignEventEdge) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b, clk;\n"

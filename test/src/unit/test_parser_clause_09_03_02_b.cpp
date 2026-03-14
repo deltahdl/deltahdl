@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection4, Sec4_9_4_AutoVarInForkBlock) {
+TEST(SchedulingSemanticsParsing, AutoVarInForkBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -33,7 +33,7 @@ TEST(ParserSection4, Sec4_9_4_AutoVarInForkBlock) {
   EXPECT_TRUE(branch0->stmts[0]->var_is_automatic);
 }
 
-TEST(ParserA604, StmtItemParBlock) {
+TEST(StatementSyntaxParsing, StmtItemParBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -49,7 +49,7 @@ TEST(ParserA604, StmtItemParBlock) {
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
 }
 
-TEST(ParserSection9, Sec9_3_2_EmptyForkJoin) {
+TEST(ProcessParsing, EmptyForkJoin) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -66,7 +66,7 @@ TEST(ParserSection9, Sec9_3_2_EmptyForkJoin) {
   EXPECT_TRUE(stmt->fork_stmts.empty());
 }
 
-TEST(ParserSection9, Sec9_3_2_ForkInTaskBody) {
+TEST(ProcessParsing, ForkInTaskBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  task automatic run_parallel;\n"
@@ -79,7 +79,7 @@ TEST(ParserSection9, Sec9_3_2_ForkInTaskBody) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_3_2_ForkInAlwaysBlock) {
+TEST(ProcessParsing, ForkInAlwaysBlock) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk) begin\n"
@@ -100,7 +100,7 @@ TEST(ParserSection9, Sec9_3_2_ForkInAlwaysBlock) {
   EXPECT_EQ(item->body->stmts[0]->join_kind, TokenKind::kKwJoinNone);
 }
 
-TEST(ParserSection9, Sec9_3_2_ForkWithNonblockingAssigns) {
+TEST(ProcessParsing, ForkWithNonblockingAssigns) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -120,7 +120,7 @@ TEST(ParserSection9, Sec9_3_2_ForkWithNonblockingAssigns) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserSection9, Sec9_3_2_MultipleSequentialForks) {
+TEST(ProcessParsing, MultipleSequentialForks) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -148,7 +148,7 @@ TEST(ParserSection9, Sec9_3_2_MultipleSequentialForks) {
   EXPECT_EQ(body->stmts[2]->join_kind, TokenKind::kKwJoinAny);
 }
 
-TEST(ParserSection9, Sec9_3_2_ForkWithSystemCalls) {
+TEST(ProcessParsing, ForkWithSystemCalls) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -160,7 +160,7 @@ TEST(ParserSection9, Sec9_3_2_ForkWithSystemCalls) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_3_2_ForkJoinSingleBeginEnd) {
+TEST(ProcessParsing, ForkJoinSingleBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -183,7 +183,7 @@ TEST(ParserSection9, Sec9_3_2_ForkJoinSingleBeginEnd) {
   EXPECT_EQ(stmt->fork_stmts[0]->stmts.size(), 3u);
 }
 
-TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithForkJoin) {
+TEST(SchedulingSemanticsParsing, AutomaticTaskWithForkJoin) {
   auto r = Parse(
       "module m;\n"
       "  task automatic parallel_work(input int a, input int b);\n"
@@ -206,7 +206,7 @@ TEST(ParserSection4, Sec4_9_3_AutomaticTaskWithForkJoin) {
   EXPECT_GE(fork_stmt->fork_stmts.size(), 2u);
 }
 
-TEST(ParserA28, BlockItemInForkJoin) {
+TEST(BlockItemDeclParsing, BlockItemInForkJoin) {
   auto r = Parse(
       "module m;\n"
       "  initial fork\n"
@@ -223,7 +223,7 @@ TEST(ParserA28, BlockItemInForkJoin) {
   EXPECT_EQ(body->fork_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserSection9, Sec9_3_2_MultipleVarDeclsInFork) {
+TEST(ProcessParsing, MultipleVarDeclsInFork) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -244,7 +244,7 @@ TEST(ParserSection9, Sec9_3_2_MultipleVarDeclsInFork) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserA28, TypedefInForkJoin) {
+TEST(BlockItemDeclParsing, TypedefInForkJoin) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial fork\n"
@@ -253,7 +253,7 @@ TEST(ParserA28, TypedefInForkJoin) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_3_2_AutomaticVarInForkBlock) {
+TEST(ProcessParsing, AutomaticVarInForkBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -275,7 +275,7 @@ TEST(ParserSection9, Sec9_3_2_AutomaticVarInForkBlock) {
   EXPECT_TRUE(stmt->fork_stmts[0]->var_is_automatic);
 }
 
-TEST(ParserSection10, Sec10_4_1_InForkJoinBlock) {
+TEST(AssignmentParsing, InForkJoinBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial fork\n"

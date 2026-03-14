@@ -5,7 +5,7 @@
 
 using namespace delta;
 
-TEST(SimCh506, IdentifierWithDollarSign) {
+TEST(IdentifierSim, IdentifierWithDollarSign) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] n$657;\n"
@@ -15,7 +15,7 @@ TEST(SimCh506, IdentifierWithDollarSign) {
   EXPECT_EQ(result, 42u);
 }
 
-TEST(SimCh506, IdentifierStartingWithUnderscore) {
+TEST(IdentifierSim, IdentifierStartingWithUnderscore) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] _bus3;\n"
@@ -25,7 +25,7 @@ TEST(SimCh506, IdentifierStartingWithUnderscore) {
   EXPECT_EQ(result, 55u);
 }
 
-TEST(SimCh506, IdentifiersCaseSensitive) {
+TEST(IdentifierSim, IdentifiersCaseSensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -52,7 +52,7 @@ TEST(SimCh506, IdentifiersCaseSensitive) {
   EXPECT_EQ(v3->value.ToUint64(), 30u);
 }
 
-TEST(SimCh506, LongIdentifier1024Chars) {
+TEST(IdentifierSim, LongIdentifier1024Chars) {
   std::string long_id(1024, 'a');
   auto result = RunAndGet(
       "module t;\n"
@@ -67,7 +67,7 @@ TEST(SimCh506, LongIdentifier1024Chars) {
   EXPECT_EQ(result, 77u);
 }
 
-TEST(SimCh506, IdentifierWithDigits) {
+TEST(IdentifierSim, IdentifierWithDigits) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] abc123;\n"
@@ -77,7 +77,7 @@ TEST(SimCh506, IdentifierWithDigits) {
   EXPECT_EQ(result, 88u);
 }
 
-TEST(SimCh506, IdentifierReferencesObject) {
+TEST(IdentifierSim, IdentifierReferencesObject) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -97,7 +97,7 @@ TEST(SimCh506, IdentifierReferencesObject) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-TEST(SimCh506, IdentifierMixedCharClasses) {
+TEST(IdentifierSim, IdentifierMixedCharClasses) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -112,7 +112,7 @@ TEST(StmtExec, CaseMultiplePatterns) {
   EXPECT_EQ(result_var->value.ToUint64(), 111u);
 }
 
-TEST(SimA607, CaseFirstMatch) {
+TEST(CaseStatementSim, CaseFirstMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -136,7 +136,7 @@ TEST(SimA607, CaseFirstMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimA607, CaseDefaultFallthrough) {
+TEST(CaseStatementSim, CaseDefaultFallthrough) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -160,7 +160,7 @@ TEST(SimA607, CaseDefaultFallthrough) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimA607, CaseNoDefaultNoMatch) {
+TEST(CaseStatementSim, CaseNoDefaultNoMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -184,7 +184,7 @@ TEST(SimA607, CaseNoDefaultNoMatch) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA607, CaseInsideForLoop) {
+TEST(CaseStatementSim, CaseInsideForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -210,7 +210,7 @@ TEST(SimA607, CaseInsideForLoop) {
   EXPECT_EQ(var->value.ToUint64(), 111u);
 }
 
-TEST(SimA607, NestedCaseExecution) {
+TEST(CaseStatementSim, NestedCaseExecution) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -238,7 +238,7 @@ TEST(SimA607, NestedCaseExecution) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimA607, CaseWithBlockBody) {
+TEST(CaseStatementSim, CaseWithBlockBody) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -263,7 +263,7 @@ TEST(SimA607, CaseWithBlockBody) {
   EXPECT_EQ(y->value.ToUint64(), 6u);
 }
 
-TEST(SimA607, CaseExactXMatchesX) {
+TEST(CaseStatementSim, CaseExactXMatchesX) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -287,7 +287,7 @@ TEST(SimA607, CaseExactXMatchesX) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimA607, CaseExactZMatchesZ) {
+TEST(CaseStatementSim, CaseExactZMatchesZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -311,7 +311,7 @@ TEST(SimA607, CaseExactZMatchesZ) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-TEST(SimA607, CaseXDoesNotMatchZero) {
+TEST(CaseStatementSim, CaseXDoesNotMatchZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -336,7 +336,7 @@ TEST(SimA607, CaseXDoesNotMatchZero) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA607, CaseLinearSearchFirstMatch) {
+TEST(CaseStatementSim, CaseLinearSearchFirstMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

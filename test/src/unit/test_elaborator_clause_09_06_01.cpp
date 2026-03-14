@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_06_01, WaitForkInInitialElaborates) {
+TEST(WaitForkElaboration, WaitForkInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -23,7 +23,7 @@ TEST(ElabClause09_06_01, WaitForkInInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_06_01, WaitForkStandaloneElaborates) {
+TEST(WaitForkElaboration, WaitForkStandaloneElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_14_TimeUnitEnumValues) {
+TEST(DesignBuildingBlockParsing, TimeUnitEnumValues) {
   EXPECT_EQ(static_cast<int8_t>(TimeUnit::kS), 0);
   EXPECT_EQ(static_cast<int8_t>(TimeUnit::kMs), -3);
   EXPECT_EQ(static_cast<int8_t>(TimeUnit::kUs), -6);
@@ -13,7 +13,7 @@ TEST(ParserClause03, Cl3_14_TimeUnitEnumValues) {
   EXPECT_EQ(static_cast<int8_t>(TimeUnit::kFs), -15);
 }
 
-TEST(ParserClause03, Cl3_14_Table3_1_AllUnitStrings) {
+TEST(DesignBuildingBlockParsing, Table3_1_AllUnitStrings) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_TRUE(ParseTimeUnitStr("s", u));
   EXPECT_EQ(u, TimeUnit::kS);
@@ -29,7 +29,7 @@ TEST(ParserClause03, Cl3_14_Table3_1_AllUnitStrings) {
   EXPECT_EQ(u, TimeUnit::kFs);
 }
 
-TEST(ParserClause03, Cl3_14_Table3_1_InvalidStrings) {
+TEST(DesignBuildingBlockParsing, Table3_1_InvalidStrings) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_FALSE(ParseTimeUnitStr("", u));
   EXPECT_FALSE(ParseTimeUnitStr("xs", u));
@@ -37,14 +37,14 @@ TEST(ParserClause03, Cl3_14_Table3_1_InvalidStrings) {
   EXPECT_FALSE(ParseTimeUnitStr("NS", u));
 }
 
-TEST(ParserClause03, Cl3_14_UsForMicroseconds) {
+TEST(DesignBuildingBlockParsing, UsForMicroseconds) {
   TimeUnit u = TimeUnit::kNs;
   EXPECT_TRUE(ParseTimeUnitStr("us", u));
   EXPECT_EQ(u, TimeUnit::kUs);
   EXPECT_EQ(static_cast<int8_t>(u), -6);
 }
 
-TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
+TEST(DesignBuildingBlockParsing, PrecisionAtLeastAsPreciseAsUnit) {
   EXPECT_LE(static_cast<int8_t>(TimeUnit::kFs),
             static_cast<int8_t>(TimeUnit::kPs));
   EXPECT_LE(static_cast<int8_t>(TimeUnit::kPs),
@@ -57,15 +57,15 @@ TEST(ParserClause03, Cl3_14_PrecisionAtLeastAsPreciseAsUnit) {
             static_cast<int8_t>(TimeUnit::kS));
 }
 
-TEST(ParserClause03, Cl3_14_SlashPrecisionLessPreciseThanUnit) {
+TEST(DesignBuildingBlockParsing, SlashPrecisionLessPreciseThanUnit) {
   EXPECT_FALSE(ParseOk("module m; timeunit 1ps / 1ns; endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_14_SlashPrecisionValid) {
+TEST(DesignBuildingBlockParsing, SlashPrecisionValid) {
   EXPECT_TRUE(ParseOk("module m; timeunit 1ns / 1ps; endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_14_SlashPrecisionEqualToUnit) {
+TEST(DesignBuildingBlockParsing, SlashPrecisionEqualToUnit) {
   EXPECT_TRUE(ParseOk("module m; timeunit 1ns / 1ns; endmodule\n"));
 }
 

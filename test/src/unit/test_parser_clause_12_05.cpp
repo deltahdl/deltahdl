@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection9, Sec9_3_1_BlockWithCaseStatement) {
+TEST(ProcessParsing, BlockWithCaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -23,7 +23,7 @@ TEST(ParserSection9, Sec9_3_1_BlockWithCaseStatement) {
   EXPECT_GE(stmt->case_items.size(), 3u);
 }
 
-TEST(ParserSection10, Sec10_4_2_CaseDecoderPattern) {
+TEST(AssignmentParsing, CaseDecoderPattern) {
   auto r = Parse(
       "module m;\n"
       "  reg [1:0] sel;\n"
@@ -49,7 +49,7 @@ TEST(ParserSection10, Sec10_4_2_CaseDecoderPattern) {
   EXPECT_EQ(stmt->case_items[3].body->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ParserSection12, CaseMultipleExprsPerItem) {
+TEST(ProceduralStatementParsing, CaseMultipleExprsPerItem) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -69,7 +69,7 @@ TEST(ParserSection12, CaseMultipleExprsPerItem) {
   EXPECT_EQ(stmt->case_items[0].patterns.size(), 2u);
 }
 
-TEST(ParserSection12, CaseWithOnlyDefault) {
+TEST(ProceduralStatementParsing, CaseWithOnlyDefault) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -86,7 +86,7 @@ TEST(ParserSection12, CaseWithOnlyDefault) {
   EXPECT_TRUE(stmt->case_items[0].is_default);
 }
 
-TEST(ParserA607, CaseStmtItems) {
+TEST(CaseSyntaxParsing, CaseStmtItems) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -101,7 +101,7 @@ TEST(ParserA607, CaseStmtItems) {
   EXPECT_TRUE(stmt->case_items[1].is_default);
 }
 
-TEST(ParserA607, CaseMultipleItemExprs) {
+TEST(CaseSyntaxParsing, CaseMultipleItemExprs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -122,7 +122,7 @@ TEST(ParserA607, CaseMultipleItemExprs) {
   EXPECT_TRUE(stmt->case_items[2].is_default);
 }
 
-TEST(ParserA607, CaseDefaultNoColon) {
+TEST(CaseSyntaxParsing, CaseDefaultNoColon) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -137,7 +137,7 @@ TEST(ParserA607, CaseDefaultNoColon) {
   EXPECT_TRUE(stmt->case_items[1].is_default);
 }
 
-TEST(ParserA607, CaseNoDefault) {
+TEST(CaseSyntaxParsing, CaseNoDefault) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -153,7 +153,7 @@ TEST(ParserA607, CaseNoDefault) {
   EXPECT_FALSE(stmt->case_items[1].is_default);
 }
 
-TEST(ParserA607, CaseItemWithBlock) {
+TEST(CaseSyntaxParsing, CaseItemWithBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -170,7 +170,7 @@ TEST(ParserA607, CaseItemWithBlock) {
   EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection12, PlainCaseHasNoQualifier) {
+TEST(ProceduralStatementParsing, PlainCaseHasNoQualifier) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -186,7 +186,7 @@ TEST(ParserSection12, PlainCaseHasNoQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
 }
 
-TEST(ParserSection12, CaseInsideForLoop) {
+TEST(ProceduralStatementParsing, CaseInsideForLoop) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -201,7 +201,7 @@ TEST(ParserSection12, CaseInsideForLoop) {
               "endmodule\n"));
 }
 
-TEST(ParserSection12, PlainCaseIsNotInside) {
+TEST(ProceduralStatementParsing, PlainCaseIsNotInside) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -217,7 +217,7 @@ TEST(ParserSection12, PlainCaseIsNotInside) {
   EXPECT_FALSE(stmt->case_inside);
 }
 
-TEST(ParserA604, StmtItemCaseStatement) {
+TEST(StatementSyntaxParsing, StmtItemCaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -234,7 +234,7 @@ TEST(ParserA604, StmtItemCaseStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
 }
 
-TEST(ParserA607, NestedCaseStmt) {
+TEST(CaseSyntaxParsing, NestedCaseStmt) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -255,7 +255,7 @@ TEST(ParserA607, NestedCaseStmt) {
   EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kCase);
 }
 
-TEST(ParserA607, CaseStmtParse) {
+TEST(CaseSyntaxParsing, CaseStmtParse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -270,7 +270,7 @@ TEST(ParserA607, CaseStmtParse) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCase);
 }
 
-TEST(ParserA607, CaseItemNullBody) {
+TEST(CaseSyntaxParsing, CaseItemNullBody) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -288,7 +288,7 @@ TEST(ParserA607, CaseItemNullBody) {
   ASSERT_EQ(stmt->case_items.size(), 3u);
 }
 
-TEST(ParserA607, CaseComplexExpr) {
+TEST(CaseSyntaxParsing, CaseComplexExpr) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -306,7 +306,7 @@ TEST(ParserA607, CaseComplexExpr) {
   EXPECT_EQ(stmt->condition->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection9, Sec9_2_2_CaseStatement) {
+TEST(ProcessParsing, CaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -330,7 +330,7 @@ TEST(ParserSection9, Sec9_2_2_CaseStatement) {
   EXPECT_TRUE(stmt->case_items[3].is_default);
 }
 
-TEST(ParserSection10, Sec10_4_1_InCaseItems) {
+TEST(AssignmentParsing, InCaseItems) {
   auto r = Parse(
       "module m;\n"
       "  reg [1:0] sel;\n"

@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, BareTypeKeywordInExpr) {
+TEST(DataTypeParsing, BareTypeKeywordInExpr) {
   auto r = Parse(
       "module t;\n"
       "  initial $display($typename(logic));\n"

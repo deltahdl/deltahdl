@@ -535,7 +535,7 @@ TEST(Preprocessor, IfdefMacroDefinedEmpty) {
   EXPECT_NE(result.find("visible"), std::string::npos);
 }
 
-TEST(ParserSection22, IfdefSelectsCorrectModule) {
+TEST(CompilerDirectiveParsing, IfdefSelectsCorrectModule) {
   auto r = ParseWithPreprocessor(
       "`define USE_A\n"
       "`ifdef USE_A\n"
@@ -550,7 +550,7 @@ TEST(ParserSection22, IfdefSelectsCorrectModule) {
   EXPECT_EQ(r.cu->modules[0]->name, "a");
 }
 
-TEST(ParserSection22, IfndefSelectsElseBranch) {
+TEST(CompilerDirectiveParsing, IfndefSelectsElseBranch) {
   auto r = ParseWithPreprocessor(
       "`define GUARD\n"
       "`ifndef GUARD\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, FgetcCall) {
+TEST(IoSystemTaskParsing, FgetcCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  integer fd, c;\n"
@@ -15,7 +15,7 @@ TEST(ParserSection21, FgetcCall) {
               "endmodule\n"));
 }
 
-TEST(ParserSection21, UngetcCall) {
+TEST(IoSystemTaskParsing, UngetcCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  integer fd, code;\n"

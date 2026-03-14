@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA212, InoutWireNetType) {
+TEST(ConstraintDeclParsing, InoutWireNetType) {
   auto r = ParseWithPreprocessor("module m(inout wire a); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserA212, InoutWireNetType) {
   EXPECT_EQ(port.name, "a");
 }
 
-TEST(ParserA212, InoutPackedDim) {
+TEST(ConstraintDeclParsing, InoutPackedDim) {
   auto r = ParseWithPreprocessor("module m(inout [7:0] a); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -24,21 +24,21 @@ TEST(ParserA212, InoutPackedDim) {
   EXPECT_NE(port.data_type.packed_dim_left, nullptr);
 }
 
-TEST(ParserA212, OutputVariablePortTypeReg) {
+TEST(ConstraintDeclParsing, OutputVariablePortTypeReg) {
   auto r = ParseWithPreprocessor("module m(output reg q); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kOutput);
 }
 
-TEST(ParserA212, RefDeclaration) {
+TEST(ConstraintDeclParsing, RefDeclaration) {
   auto r = ParseWithPreprocessor("module m(ref logic [7:0] d); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kRef);
 }
 
-TEST(ParserA212, VarDataTypeExplicit) {
+TEST(ConstraintDeclParsing, VarDataTypeExplicit) {
   auto r = ParseWithPreprocessor(
       "module m(input logic signed [15:0] val); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -46,7 +46,7 @@ TEST(ParserA212, VarDataTypeExplicit) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
 }
 
-TEST(ParserA212, VarDataTypeInt) {
+TEST(ConstraintDeclParsing, VarDataTypeInt) {
   auto r = ParseWithPreprocessor("module m(input int count); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

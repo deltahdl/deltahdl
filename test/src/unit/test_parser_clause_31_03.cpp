@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, Sec28_12_MultipleTimingChecksInSpecifyBlock) {
+TEST(GateLevelModelingParsing, MultipleTimingChecksInSpecifyBlock) {
   auto r = Parse(
       "module m(input d, clk, rst);\n"
       "  specify\n"

@@ -99,7 +99,7 @@ TEST(EvalOpXZ, ArithPowX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(SimA83, BinaryAddition) {
+TEST(ExpressionSim, BinaryAddition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -116,7 +116,7 @@ TEST(SimA83, BinaryAddition) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA83, BinarySubtraction) {
+TEST(ExpressionSim, BinarySubtraction) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -133,7 +133,7 @@ TEST(SimA83, BinarySubtraction) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-TEST(SimA83, BinaryMultiplication) {
+TEST(ExpressionSim, BinaryMultiplication) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -150,7 +150,7 @@ TEST(SimA83, BinaryMultiplication) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-TEST(SimA83, UnaryNegate) {
+TEST(ExpressionSim, UnaryNegate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -167,7 +167,7 @@ TEST(SimA83, UnaryNegate) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimA86, UnaryPlus) {
+TEST(OperatorSim, UnaryPlus) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -184,7 +184,7 @@ TEST(SimA86, UnaryPlus) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA86, UnaryMinus) {
+TEST(OperatorSim, UnaryMinus) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -201,7 +201,7 @@ TEST(SimA86, UnaryMinus) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimA86, BinaryAdd) {
+TEST(OperatorSim, BinaryAdd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -218,7 +218,7 @@ TEST(SimA86, BinaryAdd) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-TEST(SimA86, BinarySub) {
+TEST(OperatorSim, BinarySub) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -235,7 +235,7 @@ TEST(SimA86, BinarySub) {
   EXPECT_EQ(var->value.ToUint64(), 18u);
 }
 
-TEST(SimA86, BinaryMul) {
+TEST(OperatorSim, BinaryMul) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -252,7 +252,7 @@ TEST(SimA86, BinaryMul) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA86, BinaryDiv) {
+TEST(OperatorSim, BinaryDiv) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -269,7 +269,7 @@ TEST(SimA86, BinaryDiv) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimA86, BinaryMod) {
+TEST(OperatorSim, BinaryMod) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -286,7 +286,7 @@ TEST(SimA86, BinaryMod) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(SimA86, BinaryPower) {
+TEST(OperatorSim, BinaryPower) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

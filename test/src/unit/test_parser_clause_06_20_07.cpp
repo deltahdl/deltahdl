@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA84, PrimaryDollar) {
+TEST(PrimaryParsing, PrimaryDollar) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] q [$];\n"
@@ -14,7 +14,7 @@ TEST(ParserA84, PrimaryDollar) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection20, IsUnboundedBasic) {
+TEST(UtilitySystemTaskParsing, IsUnboundedBasic) {
   auto r = Parse(
       "module m #(parameter int P = $);\n"
       "  initial begin\n"
@@ -25,7 +25,7 @@ TEST(ParserSection20, IsUnboundedBasic) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, DollarConstant_ParamAssign) {
+TEST(DataTypeParsing, DollarConstant_ParamAssign) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
                "  parameter p = $;\n"

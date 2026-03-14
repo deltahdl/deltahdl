@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA28, AttrOnDataDeclInBlock) {
+TEST(BlockItemDeclParsing, AttrOnDataDeclInBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -14,7 +14,7 @@ TEST(ParserA28, AttrOnDataDeclInBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserA28, AttrOnLocalparamInBlock) {
+TEST(BlockItemDeclParsing, AttrOnLocalparamInBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -23,7 +23,7 @@ TEST(ParserA28, AttrOnLocalparamInBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserA28, DataDeclBasicInBlock) {
+TEST(BlockItemDeclParsing, DataDeclBasicInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -39,7 +39,7 @@ TEST(ParserA28, DataDeclBasicInBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(body->stmts[0]->var_name, "x");
 }
-TEST(ParserA602, InitialConstruct_BeginEnd) {
+TEST(ProceduralBlockSyntaxParsing, InitialConstruct_BeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -55,7 +55,7 @@ TEST(ParserA602, InitialConstruct_BeginEnd) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
-TEST(ParserA602, AlwaysConstruct_WithBeginEnd) {
+TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_WithBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk) begin\n"
@@ -72,7 +72,7 @@ TEST(ParserA602, AlwaysConstruct_WithBeginEnd) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserA602, Integration_InitialWithTimingAndAssign) {
+TEST(ProceduralBlockSyntaxParsing, Integration_InitialWithTimingAndAssign) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -92,7 +92,7 @@ TEST(ParserA602, Integration_InitialWithTimingAndAssign) {
   EXPECT_EQ(stmts[3]->kind, StmtKind::kEventControl);
 }
 
-TEST(ParserA603, SeqBlockBasic) {
+TEST(BlockStatementSyntaxParsing, SeqBlockBasic) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -108,7 +108,7 @@ TEST(ParserA603, SeqBlockBasic) {
   EXPECT_EQ(body->stmts.size(), 2u);
 }
 
-TEST(ParserA603, SeqBlockEmpty) {
+TEST(BlockStatementSyntaxParsing, SeqBlockEmpty) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -122,7 +122,7 @@ TEST(ParserA603, SeqBlockEmpty) {
   EXPECT_EQ(body->stmts.size(), 0u);
 }
 
-TEST(ParserA603, SeqBlockWithVarDecl) {
+TEST(BlockStatementSyntaxParsing, SeqBlockWithVarDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -139,7 +139,7 @@ TEST(ParserA603, SeqBlockWithVarDecl) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserA603, SeqBlockNested) {
+TEST(BlockStatementSyntaxParsing, SeqBlockNested) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -160,7 +160,7 @@ TEST(ParserA603, SeqBlockNested) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlock);
 }
 
-TEST(ParserA603, SeqBlockWithParamDecl) {
+TEST(BlockStatementSyntaxParsing, SeqBlockWithParamDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -175,7 +175,7 @@ TEST(ParserA603, SeqBlockWithParamDecl) {
   EXPECT_GE(body->stmts.size(), 2u);
 }
 
-TEST(ParserSection9c, SequentialBlockWithLocalVarDecl) {
+TEST(ProcessTimingAndControlParsing, SequentialBlockWithLocalVarDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -193,7 +193,7 @@ TEST(ParserSection9c, SequentialBlockWithLocalVarDecl) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserSection9c, SequentialBlockMultipleLocalVars) {
+TEST(ProcessTimingAndControlParsing, SequentialBlockMultipleLocalVars) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -212,7 +212,7 @@ TEST(ParserSection9c, SequentialBlockMultipleLocalVars) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserSection9, Sec9_3_1_BlockWithSystemCalls) {
+TEST(ProcessParsing, BlockWithSystemCalls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -231,7 +231,7 @@ TEST(ParserSection9, Sec9_3_1_BlockWithSystemCalls) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kExprStmt);
 }
 
-TEST(ParserSection9, Sec9_3_1_BlockWithMixedBlockingNonblocking) {
+TEST(ProcessParsing, BlockWithMixedBlockingNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -247,7 +247,7 @@ TEST(ParserSection9, Sec9_3_1_BlockWithMixedBlockingNonblocking) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
-TEST(ParserCh90301, BlockVarDecl_BuiltinType_Block) {
+TEST(BlockVarDeclParsing, BlockVarDecl_BuiltinType_Block) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -263,7 +263,7 @@ TEST(ParserCh90301, BlockVarDecl_BuiltinType_Block) {
   ASSERT_EQ(blk->stmts.size(), 1u);
 }
 
-TEST(ParserSection9, Sec9_3_1_StaticVarDeclInBlock) {
+TEST(ProcessParsing, StaticVarDeclInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -282,7 +282,7 @@ TEST(ParserSection9, Sec9_3_1_StaticVarDeclInBlock) {
   EXPECT_EQ(body->stmts[0]->var_name, "call_count");
 }
 
-TEST(ParserCh90301, BlockVarDecl_BuiltinType_Stmt) {
+TEST(BlockVarDeclParsing, BlockVarDecl_BuiltinType_Stmt) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -298,7 +298,7 @@ TEST(ParserCh90301, BlockVarDecl_BuiltinType_Stmt) {
   EXPECT_EQ(blk->stmts[0]->var_name, "x");
 }
 
-TEST(ParserCh90301, BlockVarDecl_UserDefinedType) {
+TEST(BlockVarDeclParsing, BlockVarDecl_UserDefinedType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a, b[4];} ab_t;\n"
@@ -318,7 +318,7 @@ static void VerifyBlockVarDecls(const Stmt* blk,
   }
 }
 
-TEST(ParserCh90301, BlockVarDecl_CommaSeparated) {
+TEST(BlockVarDeclParsing, BlockVarDecl_CommaSeparated) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -332,7 +332,7 @@ TEST(ParserCh90301, BlockVarDecl_CommaSeparated) {
   VerifyBlockVarDecls(blk, expected_names, std::size(expected_names));
 }
 
-TEST(ParserSection9, Sec9_3_1_BlockWithOnlyVarDecls) {
+TEST(ProcessParsing, BlockWithOnlyVarDecls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -349,7 +349,7 @@ TEST(ParserSection9, Sec9_3_1_BlockWithOnlyVarDecls) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
 }
-TEST(ParserSection9, SequentialBlockVarDecl) {
+TEST(ProcessParsing, SequentialBlockVarDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -365,7 +365,7 @@ TEST(ParserSection9, SequentialBlockVarDecl) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserSection9, Sec9_3_1_MultipleSequentialBlocksInSameInitial) {
+TEST(ProcessParsing, MultipleSequentialBlocksInSameInitial) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -393,7 +393,7 @@ TEST(ParserSection9, Sec9_3_1_MultipleSequentialBlocksInSameInitial) {
   EXPECT_EQ(body->stmts[2]->label, "third");
 }
 
-TEST(ParserSection9, SequentialBlockNestedBeginEnd) {
+TEST(ProcessParsing, SequentialBlockNestedBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -413,7 +413,7 @@ TEST(ParserSection9, SequentialBlockNestedBeginEnd) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection9, Sec9_2_2_LocalVarDecl) {
+TEST(ProcessParsing, LocalVarDecl) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] a, b, result;\n"
@@ -436,7 +436,7 @@ TEST(ParserSection9, Sec9_2_2_LocalVarDecl) {
   EXPECT_EQ(item->body->stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, SequentialBlockMultipleVarDecls) {
+TEST(ProcessParsing, SequentialBlockMultipleVarDecls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin int x; logic [7:0] y; x = 1; end\n"
@@ -449,7 +449,7 @@ TEST(ParserSection9, SequentialBlockMultipleVarDecls) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserA28, ParameterInBlock) {
+TEST(BlockItemDeclParsing, ParameterInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -464,7 +464,7 @@ TEST(ParserA28, ParameterInBlock) {
   EXPECT_EQ(body->stmts[0]->var_name, "Y");
 }
 
-TEST(ParserA28, MixedBlockItems) {
+TEST(BlockItemDeclParsing, MixedBlockItems) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -476,7 +476,7 @@ TEST(ParserA28, MixedBlockItems) {
               "endmodule\n"));
 }
 
-TEST(ParserA28, NestedBlocksWithDecls) {
+TEST(BlockItemDeclParsing, NestedBlocksWithDecls) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -495,7 +495,7 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection9, Sec9_2_3_VarDeclInBlock) {
+TEST(ProcessParsing, VarDeclInBlock) {
   auto r = Parse(
       "module m;\n"
       "  logic en;\n"
@@ -516,7 +516,7 @@ TEST(ParserSection9, Sec9_2_3_VarDeclInBlock) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserSection9, Sec9_3_1_EmptyBeginEnd) {
+TEST(ProcessParsing, EmptyBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -530,7 +530,7 @@ TEST(ParserSection9, Sec9_3_1_EmptyBeginEnd) {
   EXPECT_TRUE(body->stmts.empty());
 }
 
-TEST(ParserSection9, Sec9_3_1_SingleStatementInBlock) {
+TEST(ProcessParsing, SingleStatementInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -546,7 +546,7 @@ TEST(ParserSection9, Sec9_3_1_SingleStatementInBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, Sec9_3_1_MultipleAssignmentsInBlock) {
+TEST(ProcessParsing, MultipleAssignmentsInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -565,7 +565,7 @@ TEST(ParserSection9, Sec9_3_1_MultipleAssignmentsInBlock) {
   }
 }
 
-TEST(ParserA604, StmtItemSeqBlock) {
+TEST(StatementSyntaxParsing, StmtItemSeqBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -581,7 +581,7 @@ TEST(ParserA604, StmtItemSeqBlock) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlock);
 }
 
-TEST(ParserA28, ImportInBlock) {
+TEST(BlockItemDeclParsing, ImportInBlock) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
               "  int x = 5;\n"
@@ -593,7 +593,7 @@ TEST(ParserA28, ImportInBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_3_1_VarDeclAsFirstStatement) {
+TEST(ProcessParsing, VarDeclAsFirstStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -611,7 +611,7 @@ TEST(ParserSection9, Sec9_3_1_VarDeclAsFirstStatement) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, Sec9_3_1_MultipleDifferentTypeVarDecls) {
+TEST(ProcessParsing, MultipleDifferentTypeVarDecls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -632,7 +632,7 @@ TEST(ParserSection9, Sec9_3_1_MultipleDifferentTypeVarDecls) {
   EXPECT_EQ(body->stmts[3]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, Sec9_3_1_VarDeclWithInitializer) {
+TEST(ProcessParsing, VarDeclWithInitializer) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -650,7 +650,7 @@ TEST(ParserSection9, Sec9_3_1_VarDeclWithInitializer) {
   EXPECT_NE(body->stmts[0]->var_init, nullptr);
 }
 
-TEST(ParserSection9, Sec9_3_1_NestedBeginEndTwoLevels) {
+TEST(ProcessParsing, NestedBeginEndTwoLevels) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -673,7 +673,7 @@ TEST(ParserSection9, Sec9_3_1_NestedBeginEndTwoLevels) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, Sec9_3_1_DeeplyNestedBeginEndThreeLevels) {
+TEST(ProcessParsing, DeeplyNestedBeginEndThreeLevels) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -698,7 +698,7 @@ TEST(ParserSection9, Sec9_3_1_DeeplyNestedBeginEndThreeLevels) {
   EXPECT_EQ(inner->stmts[0]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, Sec9_3_1_NamedNestedBlocks) {
+TEST(ProcessParsing, NamedNestedBlocks) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : outer\n"
@@ -720,7 +720,7 @@ TEST(ParserSection9, Sec9_3_1_NamedNestedBlocks) {
   EXPECT_EQ(body->stmts[0]->stmts[0]->label, "inner");
 }
 
-TEST(ParserSection6, BlockLevelParameter) {
+TEST(DataTypeParsing, BlockLevelParameter) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -731,7 +731,7 @@ TEST(ParserSection6, BlockLevelParameter) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection6, BlockLevelLocalparam) {
+TEST(DataTypeParsing, BlockLevelLocalparam) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"

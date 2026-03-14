@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA8301, WeakReferenceDeclOk) {
+TEST(ClassConstraintElaboration, WeakReferenceDeclOk) {
   EXPECT_TRUE(
       ElabOk("class my_obj;\n"
              "  int x;\n"

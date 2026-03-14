@@ -29,7 +29,7 @@ TEST(TypeEval, LogicAndRegBoth4State) {
             Is4stateType(DataTypeKind::kReg));
 }
 
-TEST(SimCh10, VerifyWidthAndToUint64_32bit) {
+TEST(BlockingAssignSim, VerifyWidthAndToUint64_32bit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

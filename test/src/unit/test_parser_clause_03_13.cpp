@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserClause03, Cl3_13_AttributeNameSpace) {
+TEST(DesignBuildingBlockParsing, AttributeNameSpace) {
   auto r = Parse(
       "module m;\n"
       "  (* synthesis *) logic flag;\n"
@@ -17,7 +17,7 @@ TEST(ParserClause03, Cl3_13_AttributeNameSpace) {
   EXPECT_TRUE(HasAttrNamed(r.cu->modules[0]->items, "full_case"));
 }
 
-TEST(ParserClause03, Cl3_13_FunctionWithLocalVarsSubscope) {
+TEST(DesignBuildingBlockParsing, FunctionWithLocalVarsSubscope) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int compute(int a, int b);\n"
@@ -37,14 +37,14 @@ TEST(ParserClause03, Cl3_13_FunctionWithLocalVarsSubscope) {
   EXPECT_FALSE(func->func_body_stmts.empty());
 }
 
-TEST(ParserClause03, Cl3_13_VarNameSameAsModuleName) {
+TEST(DesignBuildingBlockParsing, VarNameSameAsModuleName) {
   EXPECT_TRUE(
       ParseOk("module top;\n"
               "  logic top;\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_13_ForkJoinBlockSubscope) {
+TEST(DesignBuildingBlockParsing, ForkJoinBlockSubscope) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -56,7 +56,7 @@ TEST(ParserClause03, Cl3_13_ForkJoinBlockSubscope) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
+TEST(DesignBuildingBlockParsing, TextMacroNameSpace) {
   auto r = ParseWithPreprocessor(
       "`define WIDTH 8\n"
       "`define DEPTH 16\n"
@@ -73,7 +73,7 @@ TEST(ParserClause03, Cl3_13_TextMacroNameSpace) {
                               "module m; logic [7:0] data; endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_13_NestedClassInModule) {
+TEST(DesignBuildingBlockParsing, NestedClassInModule) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  class inner_cls;\n"
@@ -85,7 +85,7 @@ TEST(ParserClause03, Cl3_13_NestedClassInModule) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_13_NamedBlockSubscope) {
+TEST(DesignBuildingBlockParsing, NamedBlockSubscope) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : blk1\n"
@@ -101,13 +101,13 @@ TEST(ParserClause03, Cl3_13_NamedBlockSubscope) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_13_PortOverlapsModuleScope) {
+TEST(DesignBuildingBlockParsing, PortOverlapsModuleScope) {
   EXPECT_TRUE(
       ParseOk("module m (input logic data);\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_13_AttributeNameSameAsVar) {
+TEST(DesignBuildingBlockParsing, AttributeNameSameAsVar) {
   auto r = Parse(
       "module m;\n"
       "  (* flag *) logic flag;\n"
@@ -116,7 +116,7 @@ TEST(ParserClause03, Cl3_13_AttributeNameSameAsVar) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_13_CuScopeFunction) {
+TEST(DesignBuildingBlockParsing, CuScopeFunction) {
   auto r = ParseWithPreprocessor(
       "function automatic int helper(int x); return x + 1; endfunction\n"
       "module m; endmodule\n");
@@ -126,7 +126,7 @@ TEST(ParserClause03, Cl3_13_CuScopeFunction) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "helper");
 }
 
-TEST(ParserClause03, Cl3_13_MacroRedefinition) {
+TEST(DesignBuildingBlockParsing, MacroRedefinition) {
   auto r = ParseWithPreprocessor(
       "`define VAL 1\n"
       "`define VAL 2\n"

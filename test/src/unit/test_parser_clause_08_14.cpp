@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA814, SubclassOverridesProperty) {
+TEST(OverriddenMemberParsing, SubclassOverridesProperty) {
   auto r = Parse(
       "class Packet;\n"
       "  integer i = 1;\n"
@@ -24,7 +24,7 @@ TEST(ParserA814, SubclassOverridesProperty) {
   EXPECT_EQ(r.cu->classes[1]->base_class, "Packet");
 }
 
-TEST(ParserA814, SubclassAssignedToBaseVariable) {
+TEST(OverriddenMemberParsing, SubclassAssignedToBaseVariable) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
               "  integer i;\n"
@@ -42,7 +42,7 @@ TEST(ParserA814, SubclassAssignedToBaseVariable) {
               "endmodule\n"));
 }
 
-TEST(ParserA814, AccessThroughBaseClassVariable) {
+TEST(OverriddenMemberParsing, AccessThroughBaseClassVariable) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
               "  integer i = 1;\n"
@@ -69,7 +69,7 @@ TEST(ParserA814, AccessThroughBaseClassVariable) {
               "endmodule\n"));
 }
 
-TEST(ParserA814, SubclassAdditionalMembers) {
+TEST(OverriddenMemberParsing, SubclassAdditionalMembers) {
   auto r = Parse(
       "class Base;\n"
       "  int x;\n"

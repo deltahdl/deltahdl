@@ -7,7 +7,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, VoidFunctionReturn) {
+TEST(DataTypeParsing, VoidFunctionReturn) {
   auto r = Parse(
       "module t;\n"
       "  function void do_nothing();\n"
@@ -20,7 +20,7 @@ TEST(ParserSection6, VoidFunctionReturn) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-TEST(ParserSection6, VoidFunctionWithBody) {
+TEST(DataTypeParsing, VoidFunctionWithBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function void greet();\n"
@@ -29,7 +29,7 @@ TEST(ParserSection6, VoidFunctionWithBody) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, VoidFunctionWithArgs) {
+TEST(DataTypeParsing, VoidFunctionWithArgs) {
   auto r = Parse(
       "module m;\n"
       "  function void set_val(input int x);\n"

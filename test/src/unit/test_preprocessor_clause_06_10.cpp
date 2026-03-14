@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, ImplicitNetInPortList) {
+TEST(DataTypeParsing, ImplicitNetInPortList) {
   auto r = ParseWithPreprocessor(
       "module m(a, b);\n"
       "  input a;\n"
@@ -16,7 +16,7 @@ TEST(ParserSection6, ImplicitNetInPortList) {
   EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
 }
 
-TEST(ParserSection6, ImplicitNetInContAssign) {
+TEST(DataTypeParsing, ImplicitNetInContAssign) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  assign out = in1 & in2;\n"
@@ -25,7 +25,7 @@ TEST(ParserSection6, ImplicitNetInContAssign) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, ImplicitNetInModuleInst) {
+TEST(DataTypeParsing, ImplicitNetInModuleInst) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  sub u1(.a(w1), .b(w2));\n"
@@ -34,7 +34,7 @@ TEST(ParserSection6, ImplicitNetInModuleInst) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, DefaultNettypeNoneRejectsImplicit) {
+TEST(DataTypeParsing, DefaultNettypeNoneRejectsImplicit) {
   auto r = ParseWithPreprocessor(
       "`default_nettype none\n"
       "module m;\n"

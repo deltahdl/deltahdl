@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA70502, SetupholdMinTypMaxConditionsSimulates) {
+TEST(TimingCheckArgumentSim, SetupholdMinTypMaxConditionsSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

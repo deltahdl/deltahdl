@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA607, CaseBasic) {
+TEST(CaseSyntaxParsing, CaseBasic) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -26,7 +26,7 @@ TEST(ParserA607, CaseBasic) {
   EXPECT_TRUE(stmt->case_items[2].is_default);
 }
 
-TEST(ParserA607, CasezStatement) {
+TEST(CaseSyntaxParsing, CasezStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -43,7 +43,7 @@ TEST(ParserA607, CasezStatement) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
 }
 
-TEST(ParserA607, CasexStatement) {
+TEST(CaseSyntaxParsing, CasexStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -60,7 +60,7 @@ TEST(ParserA607, CasexStatement) {
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
 }
 
-TEST(ParserA607, CaseInside) {
+TEST(CaseSyntaxParsing, CaseInside) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -79,7 +79,7 @@ TEST(ParserA607, CaseInside) {
   EXPECT_TRUE(stmt->case_inside);
 }
 
-TEST(ParserA607, UniqueCase) {
+TEST(CaseSyntaxParsing, UniqueCase) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -96,7 +96,7 @@ TEST(ParserA607, UniqueCase) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-TEST(ParserA607, PriorityCase) {
+TEST(CaseSyntaxParsing, PriorityCase) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -113,7 +113,7 @@ TEST(ParserA607, PriorityCase) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-TEST(ParserA607, CaseMultipleExprs) {
+TEST(CaseSyntaxParsing, CaseMultipleExprs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -131,7 +131,7 @@ TEST(ParserA607, CaseMultipleExprs) {
   EXPECT_EQ(stmt->case_items[0].patterns.size(), 3u);
 }
 
-TEST(ParserA607, CaseDefaultNoColon) {
+TEST(CaseSyntaxParsing, CaseDefaultNoColon) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -148,7 +148,7 @@ TEST(ParserA607, CaseDefaultNoColon) {
   EXPECT_TRUE(HasDefaultCaseItem(stmt));
 }
 
-TEST(ParserA607, Randcase) {
+TEST(CaseSyntaxParsing, Randcase) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -167,7 +167,7 @@ TEST(ParserA607, Randcase) {
   ASSERT_EQ(stmt->randcase_items.size(), 3u);
 }
 
-TEST(ParserA607, CaseWithBeginEnd) {
+TEST(CaseSyntaxParsing, CaseWithBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

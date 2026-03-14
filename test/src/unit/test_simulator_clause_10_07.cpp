@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh10e, TruncationDiscardsMSBs) {
+TEST(AssignmentExtensionTruncationSim, TruncationDiscardsMSBs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -26,7 +26,7 @@ TEST(SimCh10e, TruncationDiscardsMSBs) {
   EXPECT_EQ(a->value.ToUint64(), 0x3Fu);
 }
 
-TEST(SimCh10e, TruncationSignedIntoNarrowerSigned) {
+TEST(AssignmentExtensionTruncationSim, TruncationSignedIntoNarrowerSigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -46,7 +46,7 @@ TEST(SimCh10e, TruncationSignedIntoNarrowerSigned) {
   EXPECT_EQ(b->value.ToUint64(), 0x1Fu);
 }
 
-TEST(SimCh10e, ExtensionZeroPadUnsigned) {
+TEST(AssignmentExtensionTruncationSim, ExtensionZeroPadUnsigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -67,7 +67,7 @@ TEST(SimCh10e, ExtensionZeroPadUnsigned) {
   EXPECT_EQ(wide->value.width, 16u);
 }
 
-TEST(SimCh10e, TruncationTo4Bit) {
+TEST(AssignmentExtensionTruncationSim, TruncationTo4Bit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -87,7 +87,7 @@ TEST(SimCh10e, TruncationTo4Bit) {
   EXPECT_EQ(var->value.ToUint64(), 0xDu);
 }
 
-TEST(SimCh10e, NBATruncation) {
+TEST(AssignmentExtensionTruncationSim, NBATruncation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -106,7 +106,7 @@ TEST(SimCh10e, NBATruncation) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-TEST(SimCh10e, NBAExtension) {
+TEST(AssignmentExtensionTruncationSim, NBAExtension) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -126,7 +126,7 @@ TEST(SimCh10e, NBAExtension) {
   EXPECT_EQ(var->value.width, 32u);
 }
 
-TEST(SimCh10e, ContAssignTruncation) {
+TEST(AssignmentExtensionTruncationSim, ContAssignTruncation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -144,7 +144,7 @@ TEST(SimCh10e, ContAssignTruncation) {
   EXPECT_EQ(var->value.ToUint64(), 0xBu);
 }
 
-TEST(SimCh10e, ContAssignExtension) {
+TEST(AssignmentExtensionTruncationSim, ContAssignExtension) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -162,7 +162,7 @@ TEST(SimCh10e, ContAssignExtension) {
   EXPECT_EQ(var->value.ToUint64(), 0x000Au);
 }
 
-TEST(SimCh10e, SameWidthNoChange) {
+TEST(AssignmentExtensionTruncationSim, SameWidthNoChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

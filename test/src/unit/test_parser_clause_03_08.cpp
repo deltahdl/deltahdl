@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_8_TaskDeclaration) {
+TEST(DesignBuildingBlockParsing, TaskDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  task do_work;\n"
@@ -16,7 +16,7 @@ TEST(ParserClause03, Cl3_8_TaskDeclaration) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
 }
 
-TEST(ParserClause03, Cl3_8_TaskWithAllArgDirections) {
+TEST(DesignBuildingBlockParsing, TaskWithAllArgDirections) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
       "  task xfer(input int a, output int b, inout int c, ref int d);\n"
@@ -26,7 +26,7 @@ TEST(ParserClause03, Cl3_8_TaskWithAllArgDirections) {
       "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_8_TaskCalledAsStatement) {
+TEST(DesignBuildingBlockParsing, TaskCalledAsStatement) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  task greet; endtask\n"
@@ -34,7 +34,7 @@ TEST(ParserClause03, Cl3_8_TaskCalledAsStatement) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_8_FunctionWithReturnValue) {
+TEST(DesignBuildingBlockParsing, FunctionWithReturnValue) {
   auto r = Parse(
       "module m;\n"
       "  function int add(int a, int b);\n"
@@ -46,7 +46,7 @@ TEST(ParserClause03, Cl3_8_FunctionWithReturnValue) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
 }
 
-TEST(ParserClause03, Cl3_8_VoidFunction) {
+TEST(DesignBuildingBlockParsing, VoidFunction) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function void log(int val);\n"
@@ -55,7 +55,7 @@ TEST(ParserClause03, Cl3_8_VoidFunction) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_8_NonVoidFunctionUsedAsOperand) {
+TEST(DesignBuildingBlockParsing, NonVoidFunctionUsedAsOperand) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function int twice(int v); return v * 2; endfunction\n"
@@ -64,7 +64,7 @@ TEST(ParserClause03, Cl3_8_NonVoidFunctionUsedAsOperand) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_8_VoidFunctionCalledAsStatement) {
+TEST(DesignBuildingBlockParsing, VoidFunctionCalledAsStatement) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function void log(int v); $display(\"%0d\", v); endfunction\n"
@@ -72,7 +72,7 @@ TEST(ParserClause03, Cl3_8_VoidFunctionCalledAsStatement) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_8_FunctionWithAllArgDirections) {
+TEST(DesignBuildingBlockParsing, FunctionWithAllArgDirections) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function int compute(input int a, output int b,\n"
@@ -84,7 +84,7 @@ TEST(ParserClause03, Cl3_8_FunctionWithAllArgDirections) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_8_TaskAndFunctionCoexist) {
+TEST(DesignBuildingBlockParsing, TaskAndFunctionCoexist) {
   auto r = Parse(
       "module m;\n"
       "  function int add(int a, int b); return a + b; endfunction\n"

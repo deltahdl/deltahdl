@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, TypedefForwardClass) {
+TEST(DataTypeParsing, TypedefForwardClass) {
   auto r = ParseWithPreprocessor(
       "typedef class MyClass;\n"
       "class MyClass;\n"
@@ -17,7 +17,7 @@ TEST(ParserSection6, TypedefForwardClass) {
   ASSERT_GE(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection6, TypedefForwardStruct) {
+TEST(DataTypeParsing, TypedefForwardStruct) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  typedef struct my_struct;\n"
@@ -26,7 +26,7 @@ TEST(ParserSection6, TypedefForwardStruct) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, TypedefUnion) {
+TEST(DataTypeParsing, TypedefUnion) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  typedef union { int i; real r; } num_t;\n"
@@ -35,7 +35,7 @@ TEST(ParserSection6, TypedefUnion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, TypedefLogicVector) {
+TEST(DataTypeParsing, TypedefLogicVector) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -47,7 +47,7 @@ TEST(ParserSection6, TypedefLogicVector) {
   EXPECT_EQ(item->name, "byte_t");
 }
 
-TEST(ParserSection6, TypedefUsedInVarDecl) {
+TEST(DataTypeParsing, TypedefUsedInVarDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  typedef int counter_t;\n"
@@ -60,7 +60,7 @@ TEST(ParserSection6, TypedefUsedInVarDecl) {
   EXPECT_EQ(var->data_type.type_name, "counter_t");
 }
 
-TEST(ParserSection6, InterfaceBasedTypedef) {
+TEST(DataTypeParsing, InterfaceBasedTypedef) {
   auto r = ParseWithPreprocessor(
       "interface intf_i;\n"
       "  typedef int data_t;\n"
@@ -69,7 +69,7 @@ TEST(ParserSection6, InterfaceBasedTypedef) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, TypedefChainPreprocessor) {
+TEST(DataTypeParsing, TypedefChainPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  typedef logic [15:0] halfword_t;\n"

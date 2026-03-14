@@ -59,7 +59,7 @@ TEST(EvalOpXZ, BinaryXnorWithX) {
   EXPECT_EQ(result.words[0].bval, 0b0100u);
 }
 
-TEST(SimA86, UnaryBitwiseNot) {
+TEST(OperatorSim, UnaryBitwiseNot) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -76,7 +76,7 @@ TEST(SimA86, UnaryBitwiseNot) {
   EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0xF0u);
 }
 
-TEST(SimA86, BinaryBitwiseAnd) {
+TEST(OperatorSim, BinaryBitwiseAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -93,7 +93,7 @@ TEST(SimA86, BinaryBitwiseAnd) {
   EXPECT_EQ(var->value.ToUint64(), 0x30u);
 }
 
-TEST(SimA86, BinaryBitwiseOr) {
+TEST(OperatorSim, BinaryBitwiseOr) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -110,7 +110,7 @@ TEST(SimA86, BinaryBitwiseOr) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimA86, BinaryBitwiseXor) {
+TEST(OperatorSim, BinaryBitwiseXor) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -127,7 +127,7 @@ TEST(SimA86, BinaryBitwiseXor) {
   EXPECT_EQ(var->value.ToUint64(), 0xF0u);
 }
 
-TEST(SimA86, BinaryBitwiseXnor) {
+TEST(OperatorSim, BinaryBitwiseXnor) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

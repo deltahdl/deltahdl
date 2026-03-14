@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA812, ClassVariableDeclarationOk) {
+TEST(ClassAssignRenameElaboration, ClassVariableDeclarationOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  int data;\n"
@@ -14,7 +14,7 @@ TEST(ElabA812, ClassVariableDeclarationOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA812, HandleAssignmentOk) {
+TEST(ClassAssignRenameElaboration, HandleAssignmentOk) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  int data;\n"
@@ -28,7 +28,7 @@ TEST(ElabA812, HandleAssignmentOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA812, ShallowCopyOk) {
+TEST(ClassAssignRenameElaboration, ShallowCopyOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
              "  int x;\n"
@@ -42,7 +42,7 @@ TEST(ElabA812, ShallowCopyOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA812, ChainedMemberAccessOk) {
+TEST(ClassAssignRenameElaboration, ChainedMemberAccessOk) {
   EXPECT_TRUE(
       ElabOk("class A;\n"
              "  int j;\n"

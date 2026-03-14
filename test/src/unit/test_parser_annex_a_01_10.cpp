@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ConstraintsA110, BasicConstraint) {
+TEST(ConstraintItemsParsing, BasicConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -14,7 +14,7 @@ TEST(ConstraintsA110, BasicConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, SolveBefore) {
+TEST(ConstraintItemsParsing, SolveBefore) {
   auto r = Parse(
       "class C;\n"
       "  rand int x, y;\n"
@@ -24,7 +24,7 @@ TEST(ConstraintsA110, SolveBefore) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, SoftConstraint) {
+TEST(ConstraintItemsParsing, SoftConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -34,7 +34,7 @@ TEST(ConstraintsA110, SoftConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, ImplicationConstraint) {
+TEST(ConstraintItemsParsing, ImplicationConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int x, y;\n"
@@ -44,7 +44,7 @@ TEST(ConstraintsA110, ImplicationConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, IfElseConstraint) {
+TEST(ConstraintItemsParsing, IfElseConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int x, mode;\n"
@@ -57,7 +57,7 @@ TEST(ConstraintsA110, IfElseConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, ForeachConstraint) {
+TEST(ConstraintItemsParsing, ForeachConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int arr[10];\n"
@@ -69,7 +69,7 @@ TEST(ConstraintsA110, ForeachConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, DisableSoft) {
+TEST(ConstraintItemsParsing, DisableSoft) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -80,7 +80,7 @@ TEST(ConstraintsA110, DisableSoft) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, UniquenessConstraint) {
+TEST(ConstraintItemsParsing, UniquenessConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int a, b, c;\n"
@@ -90,7 +90,7 @@ TEST(ConstraintsA110, UniquenessConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, DistConstraint) {
+TEST(ConstraintItemsParsing, DistConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -102,7 +102,7 @@ TEST(ConstraintsA110, DistConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, ConstraintPrototype) {
+TEST(ConstraintItemsParsing, ConstraintPrototype) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -112,7 +112,7 @@ TEST(ConstraintsA110, ConstraintPrototype) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, ExternConstraint) {
+TEST(ConstraintItemsParsing, ExternConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -122,7 +122,7 @@ TEST(ConstraintsA110, ExternConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, StaticConstraint) {
+TEST(ConstraintItemsParsing, StaticConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"
@@ -132,7 +132,7 @@ TEST(ConstraintsA110, StaticConstraint) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, MultipleConstraints) {
+TEST(ConstraintItemsParsing, MultipleConstraints) {
   auto r = Parse(
       "class C;\n"
       "  rand int x, y;\n"
@@ -144,7 +144,7 @@ TEST(ConstraintsA110, MultipleConstraints) {
   EXPECT_GE(r.cu->classes[0]->members.size(), 4u);
 }
 
-TEST(ConstraintsA110, EmptyConstraintBlock) {
+TEST(ConstraintItemsParsing, EmptyConstraintBlock) {
   auto r = Parse(
       "class C;\n"
       "  constraint c_empty { }\n"
@@ -153,7 +153,7 @@ TEST(ConstraintsA110, EmptyConstraintBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConstraintsA110, InsideConstraint) {
+TEST(ConstraintItemsParsing, InsideConstraint) {
   auto r = Parse(
       "class C;\n"
       "  rand int x;\n"

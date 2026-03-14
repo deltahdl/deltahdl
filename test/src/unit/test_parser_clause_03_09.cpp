@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_9_PackageEnclosedByKeywords) {
+TEST(DesignBuildingBlockParsing, PackageEnclosedByKeywords) {
   auto r = Parse("package pkg; endpackage");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -13,7 +13,7 @@ TEST(ParserClause03, Cl3_9_PackageEnclosedByKeywords) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
-TEST(ParserClause03, Cl3_9_PackageWithTypedef) {
+TEST(DesignBuildingBlockParsing, PackageWithTypedef) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef logic [7:0] byte_t;\n"
@@ -23,14 +23,14 @@ TEST(ParserClause03, Cl3_9_PackageWithTypedef) {
   EXPECT_FALSE(r.cu->packages[0]->items.empty());
 }
 
-TEST(ParserClause03, Cl3_9_PackageWithFunction) {
+TEST(DesignBuildingBlockParsing, PackageWithFunction) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
               "  function int add(int a, int b); return a + b; endfunction\n"
               "endpackage\n"));
 }
 
-TEST(ParserClause03, Cl3_9_ImportIntoModule) {
+TEST(DesignBuildingBlockParsing, ImportIntoModule) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef int myint;\n"
@@ -44,7 +44,7 @@ TEST(ParserClause03, Cl3_9_ImportIntoModule) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
 }
 
-TEST(ParserClause03, Cl3_9_ImportIntoInterface) {
+TEST(DesignBuildingBlockParsing, ImportIntoInterface) {
   EXPECT_TRUE(
       ParseOk("package pkg; typedef int myint; endpackage\n"
               "interface ifc;\n"
@@ -52,7 +52,7 @@ TEST(ParserClause03, Cl3_9_ImportIntoInterface) {
               "endinterface\n"));
 }
 
-TEST(ParserClause03, Cl3_9_ImportIntoProgram) {
+TEST(DesignBuildingBlockParsing, ImportIntoProgram) {
   EXPECT_TRUE(
       ParseOk("package pkg; typedef int myint; endpackage\n"
               "program p;\n"
@@ -60,7 +60,7 @@ TEST(ParserClause03, Cl3_9_ImportIntoProgram) {
               "endprogram\n"));
 }
 
-TEST(ParserClause03, Cl3_9_ImportIntoPackage) {
+TEST(DesignBuildingBlockParsing, ImportIntoPackage) {
   EXPECT_TRUE(
       ParseOk("package a; typedef int myint; endpackage\n"
               "package b;\n"
@@ -68,7 +68,7 @@ TEST(ParserClause03, Cl3_9_ImportIntoPackage) {
               "endpackage\n"));
 }
 
-TEST(ParserClause03, Cl3_9_NamedImport) {
+TEST(DesignBuildingBlockParsing, NamedImport) {
   auto r = Parse(
       "package pkg; typedef int myint; endpackage\n"
       "module m;\n"
@@ -78,7 +78,7 @@ TEST(ParserClause03, Cl3_9_NamedImport) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause03, Cl3_9_ComplexPkgExample) {
+TEST(DesignBuildingBlockParsing, ComplexPkgExample) {
   auto r = Parse(
       "package ComplexPkg;\n"
       "  typedef struct {\n"
@@ -99,7 +99,7 @@ TEST(ParserClause03, Cl3_9_ComplexPkgExample) {
   EXPECT_EQ(r.cu->packages[0]->name, "ComplexPkg");
 }
 
-TEST(ParserClause03, Cl3_9_LocalScopesDoNotConflict) {
+TEST(DesignBuildingBlockParsing, LocalScopesDoNotConflict) {
   EXPECT_TRUE(
       ParseOk("module a; logic x; endmodule\n"
               "module b; logic x; endmodule\n"));

@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA6053202, TwoProcessesBothOverlapReportedTwice) {
+TEST(TimingControlEventDetailSim, TwoProcessesBothOverlapReportedTwice) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -37,7 +37,7 @@ TEST(SimA6053202, TwoProcessesBothOverlapReportedTwice) {
   EXPECT_GE(f.diag.WarningCount(), 2u);
 }
 
-TEST(SimA6053202, OneProcessViolatesOtherDoesNot) {
+TEST(TimingControlEventDetailSim, OneProcessViolatesOtherDoesNot) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -64,7 +64,7 @@ TEST(SimA6053202, OneProcessViolatesOtherDoesNot) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA6053202, FlushIsPerProcess) {
+TEST(TimingControlEventDetailSim, FlushIsPerProcess) {
   SimFixture f;
 
   Process proc_a;
@@ -90,7 +90,7 @@ TEST(SimA6053202, FlushIsPerProcess) {
   f.ctx.SetCurrentProcess(nullptr);
 }
 
-TEST(SimA6053202, TwoProcessesNoMatchBothReport) {
+TEST(TimingControlEventDetailSim, TwoProcessesNoMatchBothReport) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA25, UnsizedDimWithInitInferSize) {
+TEST(DeclarationRangeParsing, UnsizedDimWithInitInferSize) {
   ElabFixture f;
   auto* design = Elaborate("module m; int d [] = '{1,2,3}; endmodule\n", f);
   ASSERT_NE(design, nullptr);

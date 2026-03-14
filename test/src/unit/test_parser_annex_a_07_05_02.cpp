@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70502, DelayedDataWithBracketExpr) {
+TEST(TimingCheckArgumentParsing, DelayedDataWithBracketExpr) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -19,7 +19,7 @@ TEST(ParserA70502, DelayedDataWithBracketExpr) {
   EXPECT_NE(tc->delayed_data_expr, nullptr);
 }
 
-TEST(ParserA70502, DelayedReferenceWithBracketExpr) {
+TEST(TimingCheckArgumentParsing, DelayedReferenceWithBracketExpr) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -34,7 +34,7 @@ TEST(ParserA70502, DelayedReferenceWithBracketExpr) {
   EXPECT_EQ(tc->delayed_ref_expr->kind, ExprKind::kMinTypMax);
 }
 
-TEST(ParserA70502, ThresholdExpression) {
+TEST(TimingCheckArgumentParsing, ThresholdExpression) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ConfigA15, BasicConfig) {
+TEST(ConfigParsing, BasicConfig) {
   auto r = Parse(
       "config cfg;\n"
       "  design work.top;\n"
@@ -15,7 +15,7 @@ TEST(ConfigA15, BasicConfig) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-TEST(ConfigA15, ConfigWithEndLabel) {
+TEST(ConfigParsing, ConfigWithEndLabel) {
   auto r = Parse(
       "config cfg;\n"
       "  design work.top;\n"
@@ -24,7 +24,7 @@ TEST(ConfigA15, ConfigWithEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConfigA15, DesignMultipleCells) {
+TEST(ConfigParsing, DesignMultipleCells) {
   auto r = Parse(
       "config cfg;\n"
       "  design work.top lib2.sub;\n"
@@ -34,7 +34,7 @@ TEST(ConfigA15, DesignMultipleCells) {
   EXPECT_EQ(r.cu->configs[0]->design_cells.size(), 2u);
 }
 
-TEST(ConfigA15, DefaultLiblist) {
+TEST(ConfigParsing, DefaultLiblist) {
   auto r = Parse(
       "config cfg;\n"
       "  design work.top;\n"
@@ -47,7 +47,7 @@ TEST(ConfigA15, DefaultLiblist) {
   EXPECT_EQ(r.cu->configs[0]->rules[0]->liblist.size(), 2u);
 }
 
-TEST(ConfigA15, InstLiblist) {
+TEST(ConfigParsing, InstLiblist) {
   auto r = Parse(
       "config cfg;\n"
       "  design work.top;\n"
@@ -59,7 +59,7 @@ TEST(ConfigA15, InstLiblist) {
   EXPECT_EQ(r.cu->configs[0]->rules[0]->kind, ConfigRuleKind::kInstance);
 }
 
-TEST(ConfigA15, InstUseClause) {
+TEST(ConfigParsing, InstUseClause) {
   auto r = Parse(
       "config cfg;\n"
       "  design work.top;\n"
@@ -73,7 +73,7 @@ TEST(ConfigA15, InstUseClause) {
   EXPECT_EQ(rule->use_cell, "alt_cell");
 }
 
-TEST(ConfigA15, CellLiblist) {
+TEST(ConfigParsing, CellLiblist) {
   auto r = Parse(
       "config cfg;\n"
       "  design work.top;\n"
@@ -86,7 +86,7 @@ TEST(ConfigA15, CellLiblist) {
   EXPECT_EQ(rule->cell_name, "adder");
 }
 
-TEST(ConfigA15, CellLibQualified) {
+TEST(ConfigParsing, CellLibQualified) {
   auto r = Parse(
       "config cfg;\n"
       "  design work.top;\n"
@@ -99,7 +99,7 @@ TEST(ConfigA15, CellLibQualified) {
   EXPECT_EQ(rule->cell_name, "and2");
 }
 
-TEST(ConfigA15, UseClauseConfig) {
+TEST(ConfigParsing, UseClauseConfig) {
   auto r = Parse(
       "config cfg;\n"
       "  design work.top;\n"
@@ -111,7 +111,7 @@ TEST(ConfigA15, UseClauseConfig) {
   EXPECT_TRUE(rule->use_config);
 }
 
-TEST(ConfigA15, UseClauseWithParams) {
+TEST(ConfigParsing, UseClauseWithParams) {
   auto r = Parse(
       "config cfg;\n"
       "  design work.top;\n"
@@ -123,7 +123,7 @@ TEST(ConfigA15, UseClauseWithParams) {
   EXPECT_EQ(rule->use_params.size(), 2u);
 }
 
-TEST(ConfigA15, ConfigWithLocalparam) {
+TEST(ConfigParsing, ConfigWithLocalparam) {
   auto r = Parse(
       "config cfg;\n"
       "  localparam W = 8;\n"
@@ -134,7 +134,7 @@ TEST(ConfigA15, ConfigWithLocalparam) {
   EXPECT_EQ(r.cu->configs[0]->local_params.size(), 1u);
 }
 
-TEST(ConfigA15, MultipleRules) {
+TEST(ConfigParsing, MultipleRules) {
   auto r = Parse(
       "config cfg;\n"
       "  design work.top;\n"

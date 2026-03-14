@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA601, ContinuousAssign_Basic) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssign_Basic) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b;\n"
@@ -19,7 +19,7 @@ TEST(ParserA601, ContinuousAssign_Basic) {
   ASSERT_NE(cas[0]->assign_rhs, nullptr);
 }
 
-TEST(ParserA601, ListOfNetAssignments_Two) {
+TEST(ContinuousAssignSyntaxParsing, ListOfNetAssignments_Two) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, c, d;\n"
@@ -33,7 +33,7 @@ TEST(ParserA601, ListOfNetAssignments_Two) {
   EXPECT_EQ(cas[1]->assign_lhs->text, "c");
 }
 
-TEST(ParserA601, ListOfNetAssignments_Three) {
+TEST(ContinuousAssignSyntaxParsing, ListOfNetAssignments_Three) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, c, d, e, f;\n"
@@ -48,7 +48,7 @@ TEST(ParserA601, ListOfNetAssignments_Three) {
   EXPECT_EQ(cas[2]->assign_lhs->text, "e");
 }
 
-TEST(ParserA601, ListOfNetAssignments_SharedStrengthAndDelay) {
+TEST(ContinuousAssignSyntaxParsing, ListOfNetAssignments_SharedStrengthAndDelay) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, c, d;\n"
@@ -66,7 +66,7 @@ TEST(ParserA601, ListOfNetAssignments_SharedStrengthAndDelay) {
   EXPECT_NE(cas[1]->assign_delay, nullptr);
 }
 
-TEST(ParserA601, NetAssignment_ConcatLhs) {
+TEST(ContinuousAssignSyntaxParsing, NetAssignment_ConcatLhs) {
   auto r = Parse(
       "module m;\n"
       "  wire [3:0] sum;\n"
@@ -80,7 +80,7 @@ TEST(ParserA601, NetAssignment_ConcatLhs) {
   EXPECT_EQ(cas[0]->assign_lhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserA601, NetAssignment_ExprRhs) {
+TEST(ContinuousAssignSyntaxParsing, NetAssignment_ExprRhs) {
   auto r = Parse(
       "module m;\n"
       "  wire [3:0] a, b, sum;\n"
@@ -92,7 +92,7 @@ TEST(ParserA601, NetAssignment_ExprRhs) {
   ASSERT_EQ(cas.size(), 1u);
   EXPECT_EQ(cas[0]->assign_rhs->kind, ExprKind::kBinary);
 }
-TEST(ParserSection6, VariableContinuousAssign) {
+TEST(DataTypeParsing, VariableContinuousAssign) {
   auto r = Parse(
       "module t;\n"
       "  logic vw;\n"
@@ -107,7 +107,7 @@ TEST(ParserSection6, VariableContinuousAssign) {
   EXPECT_TRUE(found_ca);
 }
 
-TEST(ParserSection10, ContinuousAssignMultipleTargets) {
+TEST(AssignmentParsing, ContinuousAssignMultipleTargets) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, c, d;\n"
@@ -133,7 +133,7 @@ static ModuleItem* FindContAssign(ParseResult& r) {
   return FindItemByKindFromResult(r, ModuleItemKind::kContAssign);
 }
 
-TEST(ParserSection4, Sec4_5_ContinuousAssign) {
+TEST(SchedulingSemanticsParsing, ContinuousAssign) {
   auto r = Parse(
       "module m;\n"
       "  wire y;\n"
@@ -148,7 +148,7 @@ TEST(ParserSection4, Sec4_5_ContinuousAssign) {
   EXPECT_NE(ca->assign_rhs, nullptr);
 }
 
-TEST(ParserSection6, RealVariableContinuousAssign) {
+TEST(DataTypeParsing, RealVariableContinuousAssign) {
   auto r = Parse(
       "module t;\n"
       "  real circ;\n"
@@ -163,7 +163,7 @@ TEST(ParserSection6, RealVariableContinuousAssign) {
   EXPECT_TRUE(found_ca);
 }
 
-TEST(ParserSection10, ContinuousAssignExpression) {
+TEST(AssignmentParsing, ContinuousAssignExpression) {
   auto r = Parse(
       "module m;\n"
       "  wire [3:0] a, b, sum;\n"
@@ -177,7 +177,7 @@ TEST(ParserSection10, ContinuousAssignExpression) {
   EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kBinary);
 }
 
-TEST(ParserSection10, ContinuousAssignTernary) {
+TEST(AssignmentParsing, ContinuousAssignTernary) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, sel, y;\n"
@@ -190,7 +190,7 @@ TEST(ParserSection10, ContinuousAssignTernary) {
   ASSERT_NE(ca->assign_rhs, nullptr);
 }
 
-TEST(ParserSection6, Sec6_5_NetDrivenByContAssign) {
+TEST(DataTypeParsing, NetDrivenByContAssign) {
   auto r = Parse(
       "module t;\n"
       "  wire out;\n"
@@ -206,7 +206,7 @@ TEST(ParserSection6, Sec6_5_NetDrivenByContAssign) {
   ASSERT_NE(items[1]->assign_rhs, nullptr);
 }
 
-TEST(ParserSection6, Sec6_5_VarWithContAssign) {
+TEST(DataTypeParsing, VarWithContAssign) {
   auto r = Parse(
       "module t;\n"
       "  logic y;\n"
@@ -228,7 +228,7 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserA82, TfCallInContAssign) {
+TEST(SubroutineCallExprParsing, TfCallInContAssign) {
   auto r = Parse(
       "module m;\n"
       "  wire [7:0] y;\n"
@@ -245,7 +245,7 @@ TEST(ParserA82, TfCallInContAssign) {
   EXPECT_EQ(rhs->callee, "compute");
 }
 
-TEST(ParserA83, ExprInContAssign) {
+TEST(ExpressionParsing, ExprInContAssign) {
   auto r = Parse(
       "module m;\n"
       "  wire [7:0] y;\n"
@@ -266,7 +266,7 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection11, Sec11_4_1_BitSelectInContAssignLhs) {
+TEST(OperatorAndExpressionParsing, BitSelectInContAssignLhs) {
   auto r = Parse(
       "module t;\n"
       "  wire [7:0] vec;\n"
@@ -282,7 +282,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectInContAssignLhs) {
   EXPECT_EQ(ca->assign_lhs->index_end, nullptr);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedContAssign) {
+TEST(AggregateTypeParsing, PackedContAssign) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct packed {\n"
@@ -299,7 +299,7 @@ static ModuleItem* NthItem(ParseResult& r, size_t n) {
   return r.cu->modules[0]->items[n];
 }
 
-TEST(ParserSection7, Sec7_2_2_ContinuousAssign) {
+TEST(AggregateTypeParsing, ContinuousAssign) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed { logic [3:0] a; logic [3:0] b; } s_t;\n"

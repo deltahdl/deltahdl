@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_PulldownBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_PulldownBasic) {
   auto r = Parse(
       "module m;\n"
       "  pulldown (out);\n"
@@ -17,7 +17,7 @@ TEST(ParserA301, GateInst_PulldownBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
 
-TEST(ParserA301, GateInst_PullupBasic) {
+TEST(PrimitiveInstantiationParsing, GateInst_PullupBasic) {
   auto r = Parse(
       "module m;\n"
       "  pullup (out);\n"
@@ -28,7 +28,7 @@ TEST(ParserA301, GateInst_PullupBasic) {
   EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
 
-TEST(ParserA301, PullGateInst_PullupNamed) {
+TEST(PrimitiveInstantiationParsing, PullGateInst_PullupNamed) {
   auto r = Parse(
       "module m;\n"
       "  pullup pu1(net1);\n"
@@ -40,7 +40,7 @@ TEST(ParserA301, PullGateInst_PullupNamed) {
   EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
 
-TEST(ParserA301, PullGateInst_PulldownNamed) {
+TEST(PrimitiveInstantiationParsing, PullGateInst_PulldownNamed) {
   auto r = Parse(
       "module m;\n"
       "  pulldown pd1(net1);\n"
@@ -52,7 +52,7 @@ TEST(ParserA301, PullGateInst_PulldownNamed) {
   EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
 
-TEST(ParserA301, PullGateInst_PullupUnnamed) {
+TEST(PrimitiveInstantiationParsing, PullGateInst_PullupUnnamed) {
   auto r = Parse(
       "module m;\n"
       "  pullup (net1);\n"

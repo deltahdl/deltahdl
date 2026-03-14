@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA221, ClassScope) {
+TEST(NetAndVariableTypeParsing, ClassScope) {
   auto r = Parse(
       "class base_cls;\n"
       "  typedef int inner_t;\n"
@@ -29,7 +29,7 @@ TEST(SourceText, ClassNestedClass) {
   EXPECT_EQ(members[0]->nested_class->name, "Inner");
 }
 
-TEST(ParserSection8, ClassWithTypedef) {
+TEST(ClassParsing, ClassWithTypedef) {
   auto r = Parse(
       "class test_cls;\n"
       "  typedef enum {A = 10, B = 20} e_type;\n"
@@ -39,7 +39,7 @@ TEST(ParserSection8, ClassWithTypedef) {
   EXPECT_EQ(r.cu->classes[0]->name, "test_cls");
 }
 
-TEST(ParserSection8, NestedClass) {
+TEST(ClassParsing, NestedClass) {
   auto r = Parse(
       "class Outer;\n"
       "  class Inner;\n"
@@ -52,7 +52,7 @@ TEST(ParserSection8, NestedClass) {
   EXPECT_EQ(r.cu->classes[0]->name, "Outer");
 }
 
-TEST(ParserSection8, ClassScopeResolutionStaticMethod) {
+TEST(ClassParsing, ClassScopeResolutionStaticMethod) {
   auto r = Parse(
       "class Base;\n"
       "  static function void display();\n"
@@ -65,7 +65,7 @@ TEST(ParserSection8, ClassScopeResolutionStaticMethod) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection8, ClassScopeResolutionEnum) {
+TEST(ClassParsing, ClassScopeResolutionEnum) {
   auto r = Parse(
       "class Base;\n"
       "  typedef enum {bin, oct, dec, hex} radix;\n"
@@ -77,7 +77,7 @@ TEST(ParserSection8, ClassScopeResolutionEnum) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection8, ClassScopeResolutionTypedef) {
+TEST(ClassParsing, ClassScopeResolutionTypedef) {
   auto r = Parse(
       "class Outer;\n"
       "  typedef int my_type;\n"
@@ -89,7 +89,7 @@ TEST(ParserSection8, ClassScopeResolutionTypedef) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection8, ClassScopeResolutionParameter) {
+TEST(ClassParsing, ClassScopeResolutionParameter) {
   auto r = Parse(
       "class Cfg;\n"
       "  parameter int WIDTH = 8;\n"
@@ -101,7 +101,7 @@ TEST(ParserSection8, ClassScopeResolutionParameter) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
+TEST(DesignBuildingBlockParsing, ClassScopeResolution) {
   EXPECT_TRUE(
       ParseOk("class base;\n"
               "  typedef int my_type;\n"
@@ -111,7 +111,7 @@ TEST(ParserClause03, Cl3_13_ClassScopeResolution) {
               "endmodule\n"));
 }
 
-TEST(ParserSection8_23, ChainedClassScope) {
+TEST(ClassScopeResolutionParsing, ChainedClassScope) {
   auto r = Parse(
       "class Outer;\n"
       "  class Inner;\n"
@@ -125,7 +125,7 @@ TEST(ParserSection8_23, ChainedClassScope) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection8_23, SuperclassScopeAccess) {
+TEST(ClassScopeResolutionParsing, SuperclassScopeAccess) {
   auto r = Parse(
       "class Base;\n"
       "  static int count;\n"

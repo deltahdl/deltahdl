@@ -12,7 +12,7 @@
 
 using namespace delta;
 
-TEST(SimCh4422, ActiveRegionExecutesEvents) {
+TEST(ActiveRegionSim, ActiveRegionExecutesEvents) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -25,7 +25,7 @@ TEST(SimCh4422, ActiveRegionExecutesEvents) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4422, ActiveRegionHoldsMultipleEvents) {
+TEST(ActiveRegionSim, ActiveRegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -40,7 +40,7 @@ TEST(SimCh4422, ActiveRegionHoldsMultipleEvents) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh4422, ActiveEventsProcessedInAnyValidOrder) {
+TEST(ActiveRegionSim, ActiveEventsProcessedInAnyValidOrder) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -59,7 +59,7 @@ TEST(SimCh4422, ActiveEventsProcessedInAnyValidOrder) {
   EXPECT_EQ(sorted, (std::vector<int>{0, 1, 2, 3}));
 }
 
-TEST(SimCh4422, ActiveSelfLoopSchedulesMoreActiveEvents) {
+TEST(ActiveRegionSim, ActiveSelfLoopSchedulesMoreActiveEvents) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -79,12 +79,12 @@ TEST(SimCh4422, ActiveSelfLoopSchedulesMoreActiveEvents) {
   EXPECT_EQ(order[1], 2);
 }
 
-TEST(SimCh4422, ActiveExecutesBeforeInactive) {
+TEST(ActiveRegionSim, ActiveExecutesBeforeInactive) {
   VerifyTwoRegionOrder({Region::kActive, "active"},
                        {Region::kInactive, "inactive"});
 }
 
-TEST(SimCh4422, ActiveIsWithinActiveRegionSet) {
+TEST(ActiveRegionSim, ActiveIsWithinActiveRegionSet) {
   auto active_ord = static_cast<int>(Region::kActive);
   auto pre_active_ord = static_cast<int>(Region::kPreActive);
   auto post_nba_ord = static_cast<int>(Region::kPostNBA);
@@ -92,21 +92,21 @@ TEST(SimCh4422, ActiveIsWithinActiveRegionSet) {
   EXPECT_LT(active_ord, post_nba_ord);
 }
 
-TEST(SimCh4422, ActiveExecutesAfterPreponedAndPreActive) {
+TEST(ActiveRegionSim, ActiveExecutesAfterPreponedAndPreActive) {
   VerifyThreeRegionOrder({Region::kPreponed, "preponed"},
                          {Region::kPreActive, "preactive"},
                          {Region::kActive, "active"});
 }
 
-TEST(SimCh4422, ActiveEventsAcrossMultipleTimeSlots) {
+TEST(ActiveRegionSim, ActiveEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kActive);
 }
 
-TEST(SimCh4422, ActiveParticipatesInNBAIteration) {
+TEST(ActiveRegionSim, ActiveParticipatesInNBAIteration) {
   VerifyIterationChain(Region::kActive, "active", Region::kNBA, "nba");
 }
 
-TEST(SimCh4422, ActiveRestartsFromReactiveRegion) {
+TEST(ActiveRegionSim, ActiveRestartsFromReactiveRegion) {
   VerifyRegionRestart({Region::kActive, "active1"},
                       {Region::kReactive, "reactive"},
                       {Region::kActive, "active2"});

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, ProgramLifetimeAutomatic) {
+TEST(DataTypeParsing, ProgramLifetimeAutomatic) {
   auto r = ParseWithPreprocessor("program automatic test_prog; endprogram\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->programs.size(), 1u);

@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4431, PreponedRegionExecutesPLICallbacks) {
+TEST(PliPreponedSim, PreponedRegionExecutesPLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,7 +23,7 @@ TEST(SimCh4431, PreponedRegionExecutesPLICallbacks) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4431, PreponedAccessesDataBeforeAnyStateChange) {
+TEST(PliPreponedSim, PreponedAccessesDataBeforeAnyStateChange) {
   Arena arena;
   Scheduler sched(arena);
   int value = 42;
@@ -41,7 +41,7 @@ TEST(SimCh4431, PreponedAccessesDataBeforeAnyStateChange) {
   EXPECT_EQ(sampled_in_preponed, 42);
 }
 
-TEST(SimCh4431, PreponedSeesStateBeforeAllSimulationRegions) {
+TEST(PliPreponedSim, PreponedSeesStateBeforeAllSimulationRegions) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -67,7 +67,7 @@ TEST(SimCh4431, PreponedSeesStateBeforeAllSimulationRegions) {
   EXPECT_EQ(sampled, 0);
 }
 
-TEST(SimCh4431, PreponedExecutesBeforePreActive) {
+TEST(PliPreponedSim, PreponedExecutesBeforePreActive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -86,11 +86,11 @@ TEST(SimCh4431, PreponedExecutesBeforePreActive) {
   EXPECT_EQ(order[1], "pre_active");
 }
 
-TEST(SimCh4431, PreponedIsFirstRegionOrdinal) {
+TEST(PliPreponedSim, PreponedIsFirstRegionOrdinal) {
   EXPECT_EQ(static_cast<int>(Region::kPreponed), 0);
 }
 
-TEST(SimCh4431, PreponedRegionHoldsMultiplePLICallbacks) {
+TEST(PliPreponedSim, PreponedRegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -105,7 +105,7 @@ TEST(SimCh4431, PreponedRegionHoldsMultiplePLICallbacks) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh4431, PreponedSeesStatefromPreviousTimeSlot) {
+TEST(PliPreponedSim, PreponedSeesStatefromPreviousTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -123,7 +123,7 @@ TEST(SimCh4431, PreponedSeesStatefromPreviousTimeSlot) {
   EXPECT_EQ(sampled_t1, 77);
 }
 
-TEST(SimCh4431, PreponedExecutesBeforeAllOtherRegions) {
+TEST(PliPreponedSim, PreponedExecutesBeforeAllOtherRegions) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -139,7 +139,7 @@ TEST(SimCh4431, PreponedExecutesBeforeAllOtherRegions) {
   EXPECT_EQ(order[0], "preponed");
 }
 
-TEST(SimCh4431, PreponedEventsAcrossMultipleTimeSlots) {
+TEST(PliPreponedSim, PreponedEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;
@@ -159,7 +159,7 @@ TEST(SimCh4431, PreponedEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-TEST(SimCh4431, PreponedProvidesConsistentReadOnlySnapshot) {
+TEST(PliPreponedSim, PreponedProvidesConsistentReadOnlySnapshot) {
   Arena arena;
   Scheduler sched(arena);
   int a = 1;

@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, AutomaticFunctionReturnType) {
+TEST(DataTypeParsing, AutomaticFunctionReturnType) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  function automatic int get_value();\n"

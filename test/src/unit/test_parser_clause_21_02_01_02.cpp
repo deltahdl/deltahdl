@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection21, DisplayWithFormatSpecifiers) {
+TEST(IoSystemTaskParsing, DisplayWithFormatSpecifiers) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  reg [7:0] a;\n"

@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, AssignInExprParenthesized) {
+TEST(OperatorAndExpressionParsing, AssignInExprParenthesized) {
   auto r = Parse(
       "module t;\n"
       "  initial if ((a = b)) x = 1;\n"
@@ -13,7 +13,7 @@ TEST(ParserSection11, AssignInExprParenthesized) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, CompoundAssignInExpr) {
+TEST(OperatorAndExpressionParsing, CompoundAssignInExpr) {
   auto r = Parse(
       "module t;\n"
       "  initial b = (a += 1);\n"

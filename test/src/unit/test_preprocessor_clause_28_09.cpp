@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, CmosSwitchCmos) {
+TEST(GateLevelModelingParsing, CmosSwitchCmos) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  cmos c1(out, data, ncontrol, pcontrol);\n"

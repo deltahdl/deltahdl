@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection8, InterfaceClassWithTypedef) {
+TEST(ClassParsing, InterfaceClassWithTypedef) {
   auto r = Parse(
       "interface class ihello;\n"
       "  typedef int int_t;\n"

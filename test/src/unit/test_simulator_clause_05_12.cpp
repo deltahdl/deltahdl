@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimClause05, Cl5_12_AttrOnVarDecl) {
+TEST(LexicalConventionSim, AttrOnVarDecl) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -20,7 +20,7 @@ TEST(SimClause05, Cl5_12_AttrOnVarDecl) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0xAB);
 }
 
-TEST(SimClause05, Cl5_12_AttrWithValueOnDecl) {
+TEST(LexicalConventionSim, AttrWithValueOnDecl) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -34,7 +34,7 @@ TEST(SimClause05, Cl5_12_AttrWithValueOnDecl) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 0xCD);
 }
 
-TEST(SimClause05, Cl5_12_MultipleAttrSpecs) {
+TEST(LexicalConventionSim, MultipleAttrSpecs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -48,7 +48,7 @@ TEST(SimClause05, Cl5_12_MultipleAttrSpecs) {
   EXPECT_EQ(f.ctx.FindVariable("z")->value.ToUint64(), 0xEF);
 }
 
-TEST(SimClause05, Cl5_12_MultipleSeparateInstances) {
+TEST(LexicalConventionSim, MultipleSeparateInstances) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -64,7 +64,7 @@ TEST(SimClause05, Cl5_12_MultipleSeparateInstances) {
   EXPECT_EQ(f.ctx.FindVariable("w")->value.ToUint64(), 0x77);
 }
 
-TEST(SimClause05, Cl5_12_AttrOnInitialBlock) {
+TEST(LexicalConventionSim, AttrOnInitialBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -81,7 +81,7 @@ TEST(SimClause05, Cl5_12_AttrOnInitialBlock) {
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0x55);
 }
 
-TEST(SimClause05, Cl5_12_AttrOnAssignStmt) {
+TEST(LexicalConventionSim, AttrOnAssignStmt) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -98,7 +98,7 @@ TEST(SimClause05, Cl5_12_AttrOnAssignStmt) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xDD);
 }
 
-TEST(SimClause05, Cl5_12_AttrOnIfStmt) {
+TEST(LexicalConventionSim, AttrOnIfStmt) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -116,7 +116,7 @@ TEST(SimClause05, Cl5_12_AttrOnIfStmt) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 0xAA);
 }
 
-TEST(SimClause05, Cl5_12_AttrOnCaseStmt) {
+TEST(LexicalConventionSim, AttrOnCaseStmt) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -138,7 +138,7 @@ TEST(SimClause05, Cl5_12_AttrOnCaseStmt) {
   EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 0x22);
 }
 
-TEST(SimClause05, Cl5_12_AttrOnForLoop) {
+TEST(LexicalConventionSim, AttrOnForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -157,7 +157,7 @@ TEST(SimClause05, Cl5_12_AttrOnForLoop) {
   EXPECT_EQ(f.ctx.FindVariable("e")->value.ToUint64(), 3);
 }
 
-TEST(SimClause05, Cl5_12_AttrWithStringValue) {
+TEST(LexicalConventionSim, AttrWithStringValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

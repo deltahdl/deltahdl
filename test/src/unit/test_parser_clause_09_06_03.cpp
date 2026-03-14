@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA605, DisableFork) {
+TEST(TimingControlSyntaxParsing, DisableFork) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -18,7 +18,7 @@ TEST(ParserA605, DisableFork) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDisableFork);
 }
-TEST(ParserSection9, DisableForkAfterJoinNone) {
+TEST(ProcessParsing, DisableForkAfterJoinNone) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -36,7 +36,7 @@ TEST(ParserSection9, DisableForkAfterJoinNone) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kDisableFork);
 }
 
-TEST(ParserSection9b, DisableForkStatement) {
+TEST(ProceduralAssignAndControlParsing, DisableForkStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -55,7 +55,7 @@ TEST(ParserSection9b, DisableForkStatement) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDisableFork);
 }
 
-TEST(ParserSection9b, ForkJoinAnyWithDisableFork) {
+TEST(ProceduralAssignAndControlParsing, ForkJoinAnyWithDisableFork) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -75,7 +75,7 @@ TEST(ParserSection9b, ForkJoinAnyWithDisableFork) {
   EXPECT_EQ(fork_stmt->join_kind, TokenKind::kKwJoinAny);
 }
 
-TEST(ParserSection9, Sec9_3_2_ForkJoinNoneThenDisableFork) {
+TEST(ProcessParsing, ForkJoinNoneThenDisableFork) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

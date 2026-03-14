@@ -9,7 +9,7 @@
 using namespace delta;
 namespace {
 
-TEST(Section21, FopenFclose) {
+TEST(IoSystemTaskTest, FopenFclose) {
   SimFixture f;
 
   std::string tmp_path = "/tmp/deltahdl_test_fopen.txt";
@@ -30,7 +30,7 @@ TEST(Section21, FopenFclose) {
   std::remove(tmp_path.c_str());
 }
 
-TEST(Section21, FopenInvalidFile) {
+TEST(IoSystemTaskTest, FopenInvalidFile) {
   SimFixture f;
   auto* expr = MakeSysCall(
       f.arena, "$fopen",

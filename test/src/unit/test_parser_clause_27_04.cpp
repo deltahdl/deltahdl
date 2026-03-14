@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A4GenerateForBlock) {
+TEST(FormalSyntaxParsing, GenerateForBlock) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -23,7 +23,7 @@ TEST(ParserAnnexA, A4GenerateForBlock) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserAnnexA042, LoopGenerateBasic) {
+TEST(GenerateInstantiationGrammar, LoopGenerateBasic) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
@@ -40,7 +40,7 @@ TEST(ParserAnnexA042, LoopGenerateBasic) {
   ASSERT_EQ(gen->gen_body.size(), 1u);
 }
 
-TEST(ParserAnnexA042, GenvarInitWithoutGenvarKeyword) {
+TEST(GenerateInstantiationGrammar, GenvarInitWithoutGenvarKeyword) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -57,7 +57,7 @@ TEST(ParserAnnexA042, GenvarInitWithoutGenvarKeyword) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserAnnexA042, GenvarIterationAssignment) {
+TEST(GenerateInstantiationGrammar, GenvarIterationAssignment) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
@@ -70,7 +70,7 @@ TEST(ParserAnnexA042, GenvarIterationAssignment) {
   ASSERT_NE(gen->gen_step, nullptr);
 }
 
-TEST(ParserAnnexA042, GenvarIterationPostIncrement) {
+TEST(GenerateInstantiationGrammar, GenvarIterationPostIncrement) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i++) begin\n"
@@ -83,7 +83,7 @@ TEST(ParserAnnexA042, GenvarIterationPostIncrement) {
   ASSERT_NE(gen->gen_step, nullptr);
 }
 
-TEST(ParserAnnexA042, GenvarIterationPostDecrement) {
+TEST(GenerateInstantiationGrammar, GenvarIterationPostDecrement) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 3; i >= 0; i--) begin\n"
@@ -96,7 +96,7 @@ TEST(ParserAnnexA042, GenvarIterationPostDecrement) {
   ASSERT_NE(gen->gen_step, nullptr);
 }
 
-TEST(ParserAnnexA042, GenerateBlockSingleItem) {
+TEST(GenerateInstantiationGrammar, GenerateBlockSingleItem) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i++)\n"
@@ -110,7 +110,7 @@ TEST(ParserAnnexA042, GenerateBlockSingleItem) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
 }
 
-TEST(ParserAnnexA042, GenerateItemModuleInst) {
+TEST(GenerateInstantiationGrammar, GenerateItemModuleInst) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i++) begin : blk\n"
@@ -124,7 +124,7 @@ TEST(ParserAnnexA042, GenerateItemModuleInst) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
 
-TEST(ParserAnnexA042, NestedForInsideFor) {
+TEST(GenerateInstantiationGrammar, NestedForInsideFor) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 2; i++) begin : outer\n"
@@ -141,7 +141,7 @@ TEST(ParserAnnexA042, NestedForInsideFor) {
   EXPECT_EQ(outer->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
 }
 
-TEST(ParserSection27, GenerateForWithModuleInst2) {
+TEST(GenerateConstructParsing, GenerateForWithModuleInst2) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i++) begin : gen_inst\n"
@@ -157,7 +157,7 @@ TEST(ParserSection27, GenerateForWithModuleInst2) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
 
-TEST(ParserSection23, GenerateRegionWithFor) {
+TEST(ModuleAndHierarchyParsing, GenerateRegionWithFor) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -175,7 +175,7 @@ TEST(ParserSection23, GenerateRegionWithFor) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserSection27, GenerateForWithAlwaysBlock) {
+TEST(GenerateConstructParsing, GenerateForWithAlwaysBlock) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i++) begin : gen_alw\n"
@@ -190,7 +190,7 @@ TEST(ParserSection27, GenerateForWithAlwaysBlock) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kAlwaysBlock);
 }
 
-TEST(ParserSection23, GenerateBlockNamedBeginEnd) {
+TEST(ModuleAndHierarchyParsing, GenerateBlockNamedBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -228,7 +228,7 @@ TEST(Parser, GenerateFor) {
   EXPECT_FALSE(gen->gen_body.empty());
 }
 
-TEST(ParserClause03, Cl3_3_GenerateBlocks) {
+TEST(DesignBuildingBlockParsing, GenerateBlocks) {
   EXPECT_TRUE(
       ParseOk("module m #(parameter N = 4) ();\n"
               "  genvar i;\n"
@@ -240,7 +240,7 @@ TEST(ParserClause03, Cl3_3_GenerateBlocks) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_13_GenerateForBlockScope) {
+TEST(DesignBuildingBlockParsing, GenerateForBlockScope) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -261,7 +261,7 @@ TEST(ParserClause03, Cl3_13_GenerateForBlockScope) {
   EXPECT_TRUE(found_gen);
 }
 
-TEST(ParserSection23, LoopGenerateForStructure) {
+TEST(ModuleAndHierarchyParsing, LoopGenerateForStructure) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -278,7 +278,7 @@ TEST(ParserSection23, LoopGenerateForStructure) {
   EXPECT_FALSE(gen->gen_body.empty());
 }
 
-TEST(ParserSection23, LoopGenerateInlineGenvar) {
+TEST(ModuleAndHierarchyParsing, LoopGenerateInlineGenvar) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i = i + 1) begin : g\n"
@@ -291,7 +291,7 @@ TEST(ParserSection23, LoopGenerateInlineGenvar) {
   EXPECT_NE(gen->gen_init, nullptr);
 }
 
-TEST(ParserSection23, LoopGenerateWithModuleInst) {
+TEST(ModuleAndHierarchyParsing, LoopGenerateWithModuleInst) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -306,7 +306,7 @@ TEST(ParserSection23, LoopGenerateWithModuleInst) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
 
-TEST(ParserSection23, GenvarDeclaration) {
+TEST(ModuleAndHierarchyParsing, GenvarDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -318,14 +318,14 @@ TEST(ParserSection23, GenvarDeclaration) {
   EXPECT_EQ(mod->items[0]->name, "i");
 }
 
-TEST(ParserA213, GenvarDeclMultiple) {
+TEST(TypeDeclParsing, GenvarDeclMultiple) {
   auto r = Parse("module m; genvar i, j, k; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-TEST(ParserA23, ListOfGenvarIdentifiersSingle) {
+TEST(DeclarationListParsing, ListOfGenvarIdentifiersSingle) {
   auto r = Parse("module m; genvar i; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -333,7 +333,7 @@ TEST(ParserA23, ListOfGenvarIdentifiersSingle) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "i");
 }
 
-TEST(ParserSection23, GenvarMultipleDeclarations) {
+TEST(ModuleAndHierarchyParsing, GenvarMultipleDeclarations) {
   auto r = Parse(
       "module m;\n"
       "  genvar i, j, k;\n"
@@ -346,7 +346,7 @@ TEST(ParserSection23, GenvarMultipleDeclarations) {
   EXPECT_EQ(mod->items[2]->name, "k");
 }
 
-TEST(ParserSection23, GenvarExprInLoopBound) {
+TEST(ModuleAndHierarchyParsing, GenvarExprInLoopBound) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -364,7 +364,7 @@ TEST(ParserSection23, GenvarExprInLoopBound) {
   EXPECT_NE(gen->gen_step, nullptr);
 }
 
-TEST(ParserSection23, GenvarPostIncrementStep) {
+TEST(ModuleAndHierarchyParsing, GenvarPostIncrementStep) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  for (genvar i = 0; i < 4; i++) begin : blk\n"
@@ -373,7 +373,7 @@ TEST(ParserSection23, GenvarPostIncrementStep) {
               "endmodule\n"));
 }
 
-TEST(ParserSection23, IndexedGenerateBlockName) {
+TEST(ModuleAndHierarchyParsing, IndexedGenerateBlockName) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -390,7 +390,7 @@ TEST(ParserSection23, IndexedGenerateBlockName) {
   EXPECT_FALSE(gen->gen_body.empty());
 }
 
-TEST(ParserSection23, EndLabelOnGenerateBlock) {
+TEST(ModuleAndHierarchyParsing, EndLabelOnGenerateBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  genvar i;\n"
@@ -400,7 +400,7 @@ TEST(ParserSection23, EndLabelOnGenerateBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserSection23, ParameterizedModuleWithGenerate) {
+TEST(ModuleAndHierarchyParsing, ParameterizedModuleWithGenerate) {
   auto r = Parse(
       "module gray2bin #(parameter SIZE = 8) (\n"
       "  output [SIZE-1:0] bin,\n"
@@ -420,7 +420,7 @@ TEST(ParserSection23, ParameterizedModuleWithGenerate) {
   ASSERT_EQ(mod->ports.size(), 2);
 }
 
-TEST(ParserSection23, GenerateNestedLoops) {
+TEST(ModuleAndHierarchyParsing, GenerateNestedLoops) {
   auto r = Parse(
       "module m;\n"
       "  genvar i, j;\n"
@@ -443,7 +443,7 @@ TEST(ParserSection23, GenerateNestedLoops) {
   EXPECT_TRUE(has_inner);
 }
 
-TEST(ParserSection23, GenerateIfInsideForLoop) {
+TEST(ModuleAndHierarchyParsing, GenerateIfInsideForLoop) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -466,7 +466,7 @@ TEST(ParserSection23, GenerateIfInsideForLoop) {
   EXPECT_TRUE(has_if);
 }
 
-TEST(ParserA83, GenvarExprInGenerateFor) {
+TEST(ExpressionParsing, GenvarExprInGenerateFor) {
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -480,7 +480,7 @@ TEST(ParserA83, GenvarExprInGenerateFor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection27, GenerateForSingleItem) {
+TEST(GenerateConstructParsing, GenerateForSingleItem) {
   auto r = Parse(
       "module m;\n"
       "  for (i = 0; i < 4; i = i + 1)\n"
@@ -495,7 +495,7 @@ TEST(ParserSection27, GenerateForSingleItem) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
 }
 
-TEST(ParserSection27, InlineGenvarInForInitParse) {
+TEST(GenerateConstructParsing, InlineGenvarInForInitParse) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
@@ -510,7 +510,7 @@ TEST(ParserSection27, InlineGenvarInForInitParse) {
   ASSERT_NE(gen->gen_init, nullptr);
 }
 
-TEST(ParserSection27, InlineGenvarInForInitBody) {
+TEST(GenerateConstructParsing, InlineGenvarInForInitBody) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i = i + 1) begin\n"
@@ -523,7 +523,7 @@ TEST(ParserSection27, InlineGenvarInForInitBody) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kContAssign);
 }
 
-TEST(ParserSection27, GenerateForPostIncrement) {
+TEST(GenerateConstructParsing, GenerateForPostIncrement) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i++) begin\n"
@@ -539,7 +539,7 @@ TEST(ParserSection27, GenerateForPostIncrement) {
   ASSERT_EQ(gen->gen_body.size(), 1);
 }
 
-TEST(ParserSection27, GenerateForLabeled) {
+TEST(GenerateConstructParsing, GenerateForLabeled) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i++) begin : gen_blk\n"
@@ -554,7 +554,7 @@ TEST(ParserSection27, GenerateForLabeled) {
   ASSERT_EQ(gen->gen_body.size(), 1u);
 }
 
-TEST(ParserSection27, GenerateForCompoundAssign) {
+TEST(GenerateConstructParsing, GenerateForCompoundAssign) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i += 1) begin\n"
@@ -570,7 +570,7 @@ TEST(ParserSection27, GenerateForCompoundAssign) {
   ASSERT_EQ(gen->gen_body.size(), 1);
 }
 
-TEST(ParserSection27, GenerateForWithModuleInst) {
+TEST(GenerateConstructParsing, GenerateForWithModuleInst) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 4; i++) begin : blk\n"
@@ -584,7 +584,7 @@ TEST(ParserSection27, GenerateForWithModuleInst) {
   EXPECT_EQ(gen->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
 
-TEST(ParserSection27, GenerateForNestedBeginEnd) {
+TEST(GenerateConstructParsing, GenerateForNestedBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 0; i < 2; i++) begin : outer\n"
@@ -600,7 +600,7 @@ TEST(ParserSection27, GenerateForNestedBeginEnd) {
   EXPECT_EQ(outer->gen_body[0]->kind, ModuleItemKind::kGenerateFor);
 }
 
-TEST(ParserSection27, GenerateForPreDecrement) {
+TEST(GenerateConstructParsing, GenerateForPreDecrement) {
   auto r = Parse(
       "module m;\n"
       "  for (genvar i = 3; i >= 0; i--) begin\n"
@@ -635,7 +635,7 @@ TEST(SourceText, ProgramGenerateLoop) {
       HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateFor));
 }
 
-TEST(ParserSection23, GenerateForInstantiation) {
+TEST(ModuleAndHierarchyParsing, GenerateForInstantiation) {
   auto r = Parse(
       "module top;\n"
       "  for (genvar i = 0; i < 4; i++) begin : gen_blk\n"
@@ -650,7 +650,7 @@ TEST(ParserSection23, GenerateForInstantiation) {
   EXPECT_EQ(mod->items[0]->gen_body[0]->kind, ModuleItemKind::kModuleInst);
 }
 
-TEST(ParserSection6, Sec6_11_IntegerTypesInGenerateBlock) {
+TEST(DataTypeParsing, IntegerTypesInGenerateBlock) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  generate\n"

@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection23, ModuleHeaderMultipleImportsSecond) {
+TEST(ModuleAndHierarchyParsing, ModuleHeaderMultipleImportsSecond) {
   auto r = Parse(
       "module m import A::*, B::foo; ();\n"
       "endmodule\n");

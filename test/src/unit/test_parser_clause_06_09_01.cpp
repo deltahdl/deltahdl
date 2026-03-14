@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, Sec6_11_LogicPackedDims) {
+TEST(DataTypeParsing, LogicPackedDimsEightBit) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] data;\n"
@@ -24,7 +24,7 @@ TEST(ParserSection6, Sec6_11_LogicPackedDims) {
   EXPECT_EQ(item->name, "data");
 }
 
-TEST(ParserSection6, Sec6_5_LogicPackedDims) {
+TEST(DataTypeParsing, LogicPackedDimsSixteenBit) {
   auto r = Parse(
       "module t;\n"
       "  logic [15:0] addr;\n"
@@ -41,7 +41,7 @@ TEST(ParserSection6, Sec6_5_LogicPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(ParserSection6, Sec6_9_1_LittleEndianRange) {
+TEST(DataTypeParsing, LittleEndianRange) {
   auto r = Parse(
       "module t;\n"
       "  logic [0:7] data;\n"
@@ -56,14 +56,14 @@ TEST(ParserSection6, Sec6_9_1_LittleEndianRange) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 7u);
 }
 
-TEST(ParserSection6, Sec6_9_1_NegativeRange) {
+TEST(DataTypeParsing, NegativeRange) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic [-1:4] b;\n"
               "endmodule\n"));
 }
 
-TEST(ParserSection6, Sec6_9_1_MultipleVectors) {
+TEST(DataTypeParsing, MultipleVectors) {
   auto r = Parse(
       "module t;\n"
       "  logic [4:0] x, y, z;\n"
@@ -80,7 +80,7 @@ TEST(ParserSection6, Sec6_9_1_MultipleVectors) {
   }
 }
 
-TEST(ParserSection6, Sec6_9_1_RegVectorUnsignedDefault) {
+TEST(DataTypeParsing, RegVectorUnsignedDefault) {
   auto r = Parse(
       "module t;\n"
       "  reg [7:0] r;\n"
@@ -93,7 +93,7 @@ TEST(ParserSection6, Sec6_9_1_RegVectorUnsignedDefault) {
   EXPECT_FALSE(item->data_type.is_signed);
 }
 
-TEST(ParserSection6, Sec6_9_1_LogicSignedVector) {
+TEST(DataTypeParsing, LogicSignedVector) {
   auto r = Parse(
       "module t;\n"
       "  logic signed [3:0] signed_reg;\n"
@@ -107,7 +107,7 @@ TEST(ParserSection6, Sec6_9_1_LogicSignedVector) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 3u);
 }
 
-TEST(ParserSection6, Sec6_9_LrmExamplesScalarAndVector) {
+TEST(DataTypeParsing, LrmExamplesScalarAndVector) {
   auto r = Parse(
       "module t;\n"
       "  logic a;\n"

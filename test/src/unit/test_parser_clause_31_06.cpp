@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70502, NotifierVariable) {
+TEST(TimingCheckArgumentParsing, NotifierVariable) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -32,7 +32,7 @@ TEST_F(SpecifyTest, TimingCheckWithNotifier) {
   EXPECT_EQ(spec->specify_items[0]->timing_check.notifier, "ntfr");
 }
 
-TEST(ParserSection28, Sec28_12_TimingCheckWithNotifier) {
+TEST(GateLevelModelingParsing, TimingCheckWithNotifier) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
       "  reg notif_reg;\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA301, GateInst_CmosMultipleInstances) {
+TEST(PrimitiveInstantiationParsing, GateInst_CmosMultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  cmos c1(o1, i1, n1, p1), c2(o2, i2, n2, p2);\n"
@@ -18,7 +18,7 @@ TEST(ParserA301, GateInst_CmosMultipleInstances) {
   EXPECT_EQ(gates[1]->gate_inst_name, "c2");
 }
 
-TEST(ParserA301, GateInst_MosMultipleInstances) {
+TEST(PrimitiveInstantiationParsing, GateInst_MosMultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  pmos p1(o1, i1, c1), p2(o2, i2, c2);\n"
@@ -28,7 +28,7 @@ TEST(ParserA301, GateInst_MosMultipleInstances) {
   EXPECT_EQ(gates.size(), 2u);
 }
 
-TEST(ParserA301, GateInst_EnableMultipleInstances) {
+TEST(PrimitiveInstantiationParsing, GateInst_EnableMultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  bufif0 b1(o1, i1, c1), b2(o2, i2, c2);\n"
@@ -38,7 +38,7 @@ TEST(ParserA301, GateInst_EnableMultipleInstances) {
   EXPECT_EQ(gates.size(), 2u);
 }
 
-TEST(ParserA301, GateInst_NInputMultipleInstances) {
+TEST(PrimitiveInstantiationParsing, GateInst_NInputMultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  and a1(o1, i1, i2), a2(o2, i3, i4);\n"
@@ -50,7 +50,7 @@ TEST(ParserA301, GateInst_NInputMultipleInstances) {
   EXPECT_EQ(gates[1]->gate_inst_name, "a2");
 }
 
-TEST(ParserA301, GateInst_NOutputMultipleInstances) {
+TEST(PrimitiveInstantiationParsing, GateInst_NOutputMultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  buf b1(o1, i1), b2(o2, i2);\n"
@@ -60,7 +60,7 @@ TEST(ParserA301, GateInst_NOutputMultipleInstances) {
   EXPECT_EQ(gates.size(), 2u);
 }
 
-TEST(ParserA301, GateInst_PassEnMultipleInstances) {
+TEST(PrimitiveInstantiationParsing, GateInst_PassEnMultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  tranif1 t1(a1, b1, c1), t2(a2, b2, c2);\n"
@@ -70,7 +70,7 @@ TEST(ParserA301, GateInst_PassEnMultipleInstances) {
   EXPECT_EQ(gates.size(), 2u);
 }
 
-TEST(ParserA301, GateInst_PassSwitchMultipleInstances) {
+TEST(PrimitiveInstantiationParsing, GateInst_PassSwitchMultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  tran t1(a1, b1), t2(a2, b2);\n"
@@ -80,7 +80,7 @@ TEST(ParserA301, GateInst_PassSwitchMultipleInstances) {
   EXPECT_EQ(gates.size(), 2u);
 }
 
-TEST(ParserA301, GateInst_PulldownMultipleInstances) {
+TEST(PrimitiveInstantiationParsing, GateInst_PulldownMultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  pulldown pd1(a), pd2(b);\n"
@@ -90,7 +90,7 @@ TEST(ParserA301, GateInst_PulldownMultipleInstances) {
   EXPECT_EQ(gates.size(), 2u);
 }
 
-TEST(ParserA301, GateInst_PullupMultipleInstances) {
+TEST(PrimitiveInstantiationParsing, GateInst_PullupMultipleInstances) {
   auto r = Parse(
       "module m;\n"
       "  pullup pu1(a), pu2(b);\n"
@@ -100,7 +100,7 @@ TEST(ParserA301, GateInst_PullupMultipleInstances) {
   EXPECT_EQ(gates.size(), 2u);
 }
 
-TEST(ParserA304, AllGateAndSwitchTypes) {
+TEST(PrimitiveGateTypeParsing, AllGateAndSwitchTypes) {
   auto r = Parse(
       "module m;\n"
       "  // cmos_switchtype\n"

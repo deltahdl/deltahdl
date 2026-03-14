@@ -7,7 +7,7 @@
 using namespace delta;
 namespace {
 
-TEST(Section20, SformatfBasic) {
+TEST(UtilitySystemTaskTest, SformatfBasic) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$sformatf",
                            {MkStr(f.arena, "val=%d"), MakeInt(f.arena, 42)});

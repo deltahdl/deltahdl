@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection28, BasicAndGate) {
+TEST(GateLevelModelingParsing, BasicAndGate) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and g1(out, a, b);\n"
@@ -19,7 +19,7 @@ TEST(ParserSection28, BasicAndGate) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
-TEST(ParserSection28, BasicOrGate) {
+TEST(GateLevelModelingParsing, BasicOrGate) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  or (out, a, b, c);\n"
@@ -31,7 +31,7 @@ TEST(ParserSection28, BasicOrGate) {
   ASSERT_EQ(item->gate_terminals.size(), 4);
 }
 
-TEST(ParserSection28, AllNInputGates) {
+TEST(GateLevelModelingParsing, AllNInputGates) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and (o, a, b);\n"
@@ -72,7 +72,7 @@ TEST(Parser, GateNandWithDelay) {
   EXPECT_EQ(item->gate_terminals.size(), 3u);
 }
 
-TEST(ParserSection28, GateWithTwoDelays) {
+TEST(GateLevelModelingParsing, GateWithTwoDelays) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and #(10, 12) a2(out, in1, in2);\n"

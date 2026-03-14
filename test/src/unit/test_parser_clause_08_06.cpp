@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA609, MethodCallNoArgs) {
+TEST(SubroutineCallSyntaxParsing, MethodCallNoArgs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin obj.method(); end\n"
@@ -19,7 +19,7 @@ TEST(ParserA609, MethodCallNoArgs) {
   EXPECT_EQ(expr->lhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserA82, MethodCallBasic) {
+TEST(SubroutineCallExprParsing, MethodCallBasic) {
   auto r = Parse(
       "module m;\n"
       "  initial begin obj.method(); end\n"
@@ -67,7 +67,7 @@ TEST(SourceText, ClassMethods) {
   EXPECT_TRUE(members[3]->is_virtual);
 }
 
-TEST(ParserClause03, Cl3_13_ClassMethodsAndProperties) {
+TEST(DesignBuildingBlockParsing, ClassMethodsAndProperties) {
   auto r = Parse(
       "class my_cls;\n"
       "  int count;\n"
@@ -101,7 +101,7 @@ static ClassMember* FindMethodMember(ClassDecl* cls) {
   return nullptr;
 }
 
-TEST(ParserSection8, ClassWithTask) {
+TEST(ClassParsing, ClassWithTask) {
   auto r = Parse(
       "class MyClass;\n"
       "  task do_stuff();\n"
@@ -115,7 +115,7 @@ TEST(ParserSection8, ClassWithTask) {
   EXPECT_EQ(m->method->kind, ModuleItemKind::kTaskDecl);
 }
 
-TEST(ParserA86, MethodCallDotNotation) {
+TEST(OperatorParsing, MethodCallDotNotation) {
   auto r = Parse(
       "class Packet;\n"
       "  function int current_status();\n"
@@ -134,7 +134,7 @@ TEST(ParserA86, MethodCallDotNotation) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, MethodAutomaticLifetimeLegal) {
+TEST(OperatorParsing, MethodAutomaticLifetimeLegal) {
   ParseOk(
       "class C;\n"
       "  function automatic void foo();\n"
@@ -142,7 +142,7 @@ TEST(ParserA86, MethodAutomaticLifetimeLegal) {
       "endclass\n");
 }
 
-TEST(ParserA86, MethodNoLifetimeLegal) {
+TEST(OperatorParsing, MethodNoLifetimeLegal) {
   ParseOk(
       "class C;\n"
       "  function void foo();\n"
@@ -150,7 +150,7 @@ TEST(ParserA86, MethodNoLifetimeLegal) {
       "endclass\n");
 }
 
-TEST(ParserA86, FunctionStaticLifetimeError) {
+TEST(OperatorParsing, FunctionStaticLifetimeError) {
   auto r = Parse(
       "class C;\n"
       "  function static void foo();\n"
@@ -159,7 +159,7 @@ TEST(ParserA86, FunctionStaticLifetimeError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserA86, TaskStaticLifetimeError) {
+TEST(OperatorParsing, TaskStaticLifetimeError) {
   auto r = Parse(
       "class C;\n"
       "  task static do_stuff();\n"
@@ -168,7 +168,7 @@ TEST(ParserA86, TaskStaticLifetimeError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserA86, StaticClassQualifierLegal) {
+TEST(OperatorParsing, StaticClassQualifierLegal) {
   ParseOk(
       "class C;\n"
       "  static function void foo();\n"
@@ -176,7 +176,7 @@ TEST(ParserA86, StaticClassQualifierLegal) {
       "endclass\n");
 }
 
-TEST(ParserA86, StaticQualifierAutoLifetimeLegal) {
+TEST(OperatorParsing, StaticQualifierAutoLifetimeLegal) {
   ParseOk(
       "class C;\n"
       "  static function automatic void foo();\n"

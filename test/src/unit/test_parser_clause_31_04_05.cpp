@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA705, SystemTimingCheckPeriod) {
+TEST(SystemTimingCheckParsing, SystemTimingCheckPeriod) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -19,7 +19,7 @@ TEST(ParserA705, SystemTimingCheckPeriod) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kPeriod);
 }
 
-TEST(ParserA70501, PeriodTimingCheck) {
+TEST(TimingCheckCommandParsing, PeriodTimingCheck) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -35,7 +35,7 @@ TEST(ParserA70501, PeriodTimingCheck) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-TEST(ParserA70502, ControlledReferenceEvent) {
+TEST(TimingCheckArgumentParsing, ControlledReferenceEvent) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -48,7 +48,7 @@ TEST(ParserA70502, ControlledReferenceEvent) {
   EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
 }
 
-TEST(ParserSection28, Sec28_12_TimingCheckPeriod) {
+TEST(GateLevelModelingParsing, TimingCheckPeriod) {
   auto sp = ParseSpecifySingle(
       "module m(input clk);\n"
       "  specify\n"

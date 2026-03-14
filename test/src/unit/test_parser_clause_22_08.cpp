@@ -4,70 +4,70 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection22, DefaultNettypeTri) {
+TEST(CompilerDirectiveParsing, DefaultNettypeTri) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype tri\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, DefaultNettypeWand) {
+TEST(CompilerDirectiveParsing, DefaultNettypeWand) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype wand\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, DefaultNettypeWor) {
+TEST(CompilerDirectiveParsing, DefaultNettypeWor) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype wor\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, DefaultNettypeTri0) {
+TEST(CompilerDirectiveParsing, DefaultNettypeTri0) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype tri0\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, DefaultNettypeTri1) {
+TEST(CompilerDirectiveParsing, DefaultNettypeTri1) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype tri1\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, DefaultNettypeTriand) {
+TEST(CompilerDirectiveParsing, DefaultNettypeTriand) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype triand\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, DefaultNettypeTrior) {
+TEST(CompilerDirectiveParsing, DefaultNettypeTrior) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype trior\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, DefaultNettypeTrireg) {
+TEST(CompilerDirectiveParsing, DefaultNettypeTrireg) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype trireg\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, DefaultNettypeUwire) {
+TEST(CompilerDirectiveParsing, DefaultNettypeUwire) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype uwire\n"
                               "module t;\n"
                               "endmodule\n"));
 }
 
-TEST(ParserSection22, DefaultNettypeBeforeAndAfterModule) {
+TEST(CompilerDirectiveParsing, DefaultNettypeBeforeAndAfterModule) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype none\n"
                               "module t;\n"
@@ -75,7 +75,7 @@ TEST(ParserSection22, DefaultNettypeBeforeAndAfterModule) {
                               "`default_nettype wire\n"));
 }
 
-TEST(ParserSection22, MultipleDefaultNettypeDirectives) {
+TEST(CompilerDirectiveParsing, MultipleDefaultNettypeDirectives) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype wire\n"
                               "module m1;\n"

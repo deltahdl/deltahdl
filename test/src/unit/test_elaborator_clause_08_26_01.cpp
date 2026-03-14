@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA8261, InterfaceClassDeclOk) {
+TEST(InterfaceClassImplElaboration, InterfaceClassDeclOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
              "  pure virtual function void do_thing();\n"
@@ -13,7 +13,7 @@ TEST(ElabA8261, InterfaceClassDeclOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA8261, InterfaceClassTypeAndParamOk) {
+TEST(InterfaceClassImplElaboration, InterfaceClassTypeAndParamOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
              "  typedef int my_int;\n"
@@ -23,7 +23,7 @@ TEST(ElabA8261, InterfaceClassTypeAndParamOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA8261, InterfaceClassNonPureVirtualError) {
+TEST(InterfaceClassImplElaboration, InterfaceClassNonPureVirtualError) {
   EXPECT_FALSE(
       ElabOk("interface class IC;\n"
              "  virtual function void foo();\n"
@@ -33,7 +33,7 @@ TEST(ElabA8261, InterfaceClassNonPureVirtualError) {
              "endmodule\n"));
 }
 
-TEST(ElabA8261, InterfaceClassDataMemberError) {
+TEST(InterfaceClassImplElaboration, InterfaceClassDataMemberError) {
   EXPECT_FALSE(
       ElabOk("interface class IC;\n"
              "  int data;\n"
@@ -42,7 +42,7 @@ TEST(ElabA8261, InterfaceClassDataMemberError) {
              "endmodule\n"));
 }
 
-TEST(ElabA8261, InterfaceClassMultiplePureVirtualsOk) {
+TEST(InterfaceClassImplElaboration, InterfaceClassMultiplePureVirtualsOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
              "  pure virtual function void foo();\n"
@@ -53,7 +53,7 @@ TEST(ElabA8261, InterfaceClassMultiplePureVirtualsOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA8263, InterfaceClassWithParamOk) {
+TEST(InterfaceClassParamElaboration, InterfaceClassWithParamOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
              "  pure virtual function void foo();\n"

@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection23, ExternModuleHeader) {
+TEST(ModuleAndHierarchyParsing, ExternModuleHeader) {
   auto r = Parse("extern module foo(input logic a, output logic b);\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
@@ -15,12 +15,12 @@ TEST(ParserSection23, ExternModuleHeader) {
   EXPECT_TRUE(mod->items.empty());
 }
 
-TEST(ParserSection23, ExternModulePorts) {
+TEST(ModuleAndHierarchyParsing, ExternModulePorts) {
   auto r = Parse("extern module foo(input logic a, output logic b);\n");
   VerifyTwoPortModule(r, "a", Direction::kInput, "b", Direction::kOutput);
 }
 
-TEST(ParserSection23, ExternModuleNoBody) {
+TEST(ModuleAndHierarchyParsing, ExternModuleNoBody) {
   auto r = Parse(
       "extern module bar(input logic x);\n"
       "module baz; endmodule\n");
@@ -37,7 +37,7 @@ TEST(ParserSection23, ExternModuleNoBody) {
   }
 }
 
-TEST(ParserSection23, ExternModuleNonAnsiPorts) {
+TEST(ModuleAndHierarchyParsing, ExternModuleNonAnsiPorts) {
   auto r = Parse("extern module m (a, b, c);\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1);
@@ -47,7 +47,7 @@ TEST(ParserSection23, ExternModuleNonAnsiPorts) {
   EXPECT_TRUE(mod->items.empty());
 }
 
-TEST(ParserSection23, ExternModuleWithParams) {
+TEST(ModuleAndHierarchyParsing, ExternModuleWithParams) {
   auto r = Parse(
       "extern module a #(parameter size = 8)\n"
       "  (input [size:0] x, output logic y);\n");
@@ -61,7 +61,7 @@ TEST(ParserSection23, ExternModuleWithParams) {
   ASSERT_EQ(mod->ports.size(), 2);
 }
 
-TEST(ParserSection23, ExternModuleFollowedByDefinition) {
+TEST(ModuleAndHierarchyParsing, ExternModuleFollowedByDefinition) {
   auto r = Parse(
       "extern module ext (input a, output b);\n"
       "module other (input x);\n"

@@ -30,21 +30,21 @@ constexpr size_t kPLIRegionCount = 8;
 
 }  // namespace
 
-TEST(SimCh442, SimulationRegionCountIs9) {
+TEST(SimAndPliRegionSim, SimulationRegionCountIs9) {
   EXPECT_EQ(kSimulationRegionCount, 9u);
   EXPECT_EQ(sizeof(kSimulationRegions) / sizeof(kSimulationRegions[0]), 9u);
 }
 
-TEST(SimCh442, PLIRegionCountIs8) {
+TEST(SimAndPliRegionSim, PLIRegionCountIs8) {
   EXPECT_EQ(kPLIRegionCount, 8u);
   EXPECT_EQ(sizeof(kPLIRegions) / sizeof(kPLIRegions[0]), 8u);
 }
 
-TEST(SimCh442, SimPlusPLIEqualsTotal) {
+TEST(SimAndPliRegionSim, SimPlusPLIEqualsTotal) {
   EXPECT_EQ(kSimulationRegionCount + kPLIRegionCount, kRegionCount);
 }
 
-TEST(SimCh442, SimAndPLIAreDisjoint) {
+TEST(SimAndPliRegionSim, SimAndPLIAreDisjoint) {
   std::set<Region> sim_set(std::begin(kSimulationRegions),
                            std::end(kSimulationRegions));
   std::set<Region> pli_set(std::begin(kPLIRegions), std::end(kPLIRegions));
@@ -54,14 +54,14 @@ TEST(SimCh442, SimAndPLIAreDisjoint) {
   }
 }
 
-TEST(SimCh442, SimAndPLICoverAllRegions) {
+TEST(SimAndPliRegionSim, SimAndPLICoverAllRegions) {
   std::set<Region> all;
   for (auto r : kSimulationRegions) all.insert(r);
   for (auto r : kPLIRegions) all.insert(r);
   EXPECT_EQ(all.size(), kRegionCount);
 }
 
-TEST(SimCh442, AllSimulationRegionsExecute) {
+TEST(SimAndPliRegionSim, AllSimulationRegionsExecute) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -76,7 +76,7 @@ TEST(SimCh442, AllSimulationRegionsExecute) {
   EXPECT_EQ(count, 9);
 }
 
-TEST(SimCh442, AllPLIRegionsExecute) {
+TEST(SimAndPliRegionSim, AllPLIRegionsExecute) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -91,7 +91,7 @@ TEST(SimCh442, AllPLIRegionsExecute) {
   EXPECT_EQ(count, 8);
 }
 
-TEST(SimCh442, SimulationRegionsExecuteInOrder) {
+TEST(SimAndPliRegionSim, SimulationRegionsExecuteInOrder) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -110,12 +110,12 @@ TEST(SimCh442, SimulationRegionsExecuteInOrder) {
   }
 }
 
-TEST(SimCh442, PreponedIsFirstPostponedIsLast) {
+TEST(SimAndPliRegionSim, PreponedIsFirstPostponedIsLast) {
   EXPECT_EQ(static_cast<int>(Region::kPreponed), 0);
   EXPECT_EQ(static_cast<int>(Region::kPostponed),
             static_cast<int>(Region::kCOUNT) - 1);
 }
 
-TEST(SimCh442, MixedSimAndPLIRegionsExecuteInOrder) {
+TEST(SimAndPliRegionSim, MixedSimAndPLIRegionsExecuteInOrder) {
   VerifyAllRegionsExecuteInOrder();
 }

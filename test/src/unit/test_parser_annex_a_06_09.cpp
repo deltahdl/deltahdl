@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA609, TfCallSingleArg) {
+TEST(SubroutineCallSyntaxParsing, TfCallSingleArg) {
   auto r = Parse(
       "module m;\n"
       "  initial begin foo(42); end\n"
@@ -18,7 +18,7 @@ TEST(ParserA609, TfCallSingleArg) {
   EXPECT_EQ(expr->args.size(), 1u);
 }
 
-TEST(ParserA609, MethodCallChained) {
+TEST(SubroutineCallSyntaxParsing, MethodCallChained) {
   auto r = Parse(
       "module m;\n"
       "  initial begin a.b.c(); end\n"

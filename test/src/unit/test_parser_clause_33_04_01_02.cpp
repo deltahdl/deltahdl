@@ -39,7 +39,7 @@ TEST_F(ConfigTest, DefaultLiblistSingleLib) {
   EXPECT_EQ(rule->liblist[0], "mylib");
 }
 
-TEST(ParserSection34, ConfigCoexistsWithModuleAndProtected) {
+TEST(ProtectedEnvelopeParsing, ConfigCoexistsWithModuleAndProtected) {
   auto r = Parse(R"(
     module protected_ip;
       logic [7:0] data;

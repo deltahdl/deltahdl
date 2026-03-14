@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_8_IntegerNs) {
+TEST(LexicalConventionParsing, IntegerNs) {
   auto r = Parse(
       "module m;\n"
       "  initial #40ns;\n"
@@ -17,35 +17,35 @@ TEST(ParserClause05, Cl5_8_IntegerNs) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
 }
 
-TEST(ParserClause05, Cl5_8_FixedPointNs) {
+TEST(LexicalConventionParsing, FixedPointNs) {
   EXPECT_TRUE(ParseOk("module m; initial #2.1ns; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_8_Ps) {
+TEST(LexicalConventionParsing, Ps) {
   EXPECT_TRUE(ParseOk("module m; initial #40ps; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_8_Us) {
+TEST(LexicalConventionParsing, Us) {
   EXPECT_TRUE(ParseOk("module m; initial #100us; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_8_Ms) {
+TEST(LexicalConventionParsing, Ms) {
   EXPECT_TRUE(ParseOk("module m; initial #1ms; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_8_Fs) {
+TEST(LexicalConventionParsing, Fs) {
   EXPECT_TRUE(ParseOk("module m; initial #500fs; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_8_S) {
+TEST(LexicalConventionParsing, S) {
   EXPECT_TRUE(ParseOk("module m; initial #1s; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_8_FixedPointUs) {
+TEST(LexicalConventionParsing, FixedPointUs) {
   EXPECT_TRUE(ParseOk("module m; initial #1.5ns; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_8_AllUnitsInWireDelay) {
+TEST(LexicalConventionParsing, AllUnitsInWireDelay) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire #1fs w1;\n"
@@ -57,7 +57,7 @@ TEST(ParserClause05, Cl5_8_AllUnitsInWireDelay) {
               "endmodule"));
 }
 
-TEST(ParserClause05, Cl5_8_TimeunitAllSixUnits) {
+TEST(LexicalConventionParsing, TimeunitAllSixUnits) {
   EXPECT_EQ(ParseTimescale31402("module m; timeunit 1s; endmodule")
                 .cu->modules[0]
                 ->time_unit,

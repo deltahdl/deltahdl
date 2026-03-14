@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA84, PrimaryNullElaborates) {
+TEST(PrimaryElaboration, PrimaryNullElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -18,7 +18,7 @@ TEST(ElabA84, PrimaryNullElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA84, ClassHandleAssignNull) {
+TEST(PrimaryElaboration, ClassHandleAssignNull) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
              "module m;\n"
@@ -27,7 +27,7 @@ TEST(ElabA84, ClassHandleAssignNull) {
              "endmodule\n"));
 }
 
-TEST(ElabA84, ClassHandleAssignHandle) {
+TEST(PrimaryElaboration, ClassHandleAssignHandle) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
              "module m;\n"
@@ -36,7 +36,7 @@ TEST(ElabA84, ClassHandleAssignHandle) {
              "endmodule\n"));
 }
 
-TEST(ElabA84, ClassHandleEqualityAllowed) {
+TEST(PrimaryElaboration, ClassHandleEqualityAllowed) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
              "module m;\n"
@@ -48,7 +48,7 @@ TEST(ElabA84, ClassHandleEqualityAllowed) {
              "endmodule\n"));
 }
 
-TEST(ElabA84, ClassHandleCaseEqualityAllowed) {
+TEST(PrimaryElaboration, ClassHandleCaseEqualityAllowed) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
              "module m;\n"
@@ -60,7 +60,7 @@ TEST(ElabA84, ClassHandleCaseEqualityAllowed) {
              "endmodule\n"));
 }
 
-TEST(ElabA84, ClassHandleInequalityAllowed) {
+TEST(PrimaryElaboration, ClassHandleInequalityAllowed) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
              "module m;\n"
@@ -72,7 +72,7 @@ TEST(ElabA84, ClassHandleInequalityAllowed) {
              "endmodule\n"));
 }
 
-TEST(ElabA84, ClassHandleConditionalAllowed) {
+TEST(PrimaryElaboration, ClassHandleConditionalAllowed) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
              "module m;\n"
@@ -84,7 +84,7 @@ TEST(ElabA84, ClassHandleConditionalAllowed) {
              "endmodule\n"));
 }
 
-TEST(ElabA84, ClassHandleArithmeticError) {
+TEST(PrimaryElaboration, ClassHandleArithmeticError) {
   ElabFixture f;
   ElaborateSrc(
       "class C; endclass\n"
@@ -99,7 +99,7 @@ TEST(ElabA84, ClassHandleArithmeticError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabA84, ClassHandleRelationalError) {
+TEST(PrimaryElaboration, ClassHandleRelationalError) {
   ElabFixture f;
   ElaborateSrc(
       "class C; endclass\n"
@@ -114,7 +114,7 @@ TEST(ElabA84, ClassHandleRelationalError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabA84, ClassHandleBitwiseError) {
+TEST(PrimaryElaboration, ClassHandleBitwiseError) {
   ElabFixture f;
   ElaborateSrc(
       "class C; endclass\n"
@@ -129,7 +129,7 @@ TEST(ElabA84, ClassHandleBitwiseError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabA84, ClassHandleLogicalNegationError) {
+TEST(PrimaryElaboration, ClassHandleLogicalNegationError) {
   ElabFixture f;
   ElaborateSrc(
       "class C; endclass\n"
@@ -144,7 +144,7 @@ TEST(ElabA84, ClassHandleLogicalNegationError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabA84, ClassHandleIncrementError) {
+TEST(PrimaryElaboration, ClassHandleIncrementError) {
   ElabFixture f;
   ElaborateSrc(
       "class C; endclass\n"
@@ -156,7 +156,7 @@ TEST(ElabA84, ClassHandleIncrementError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabA84, ClassHandleShiftError) {
+TEST(PrimaryElaboration, ClassHandleShiftError) {
   ElabFixture f;
   ElaborateSrc(
       "class C; endclass\n"
@@ -171,7 +171,7 @@ TEST(ElabA84, ClassHandleShiftError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabA84, ClassHandleCompoundAssignError) {
+TEST(PrimaryElaboration, ClassHandleCompoundAssignError) {
   ElabFixture f;
   ElaborateSrc(
       "class C; endclass\n"
@@ -183,7 +183,7 @@ TEST(ElabA84, ClassHandleCompoundAssignError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabA84, ClassHandleBitSelectError) {
+TEST(PrimaryElaboration, ClassHandleBitSelectError) {
   ElabFixture f;
   ElaborateSrc(
       "class C; endclass\n"
@@ -198,7 +198,7 @@ TEST(ElabA84, ClassHandleBitSelectError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabA84, ClassHandleContAssignError) {
+TEST(PrimaryElaboration, ClassHandleContAssignError) {
   ElabFixture f;
   ElaborateSrc(
       "class C; endclass\n"

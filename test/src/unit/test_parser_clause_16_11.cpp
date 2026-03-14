@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, SequenceMatchItem_SubroutineCall) {
+TEST(AssertionDeclParsing, SequenceMatchItem_SubroutineCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"

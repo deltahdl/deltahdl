@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA608, ForBasic) {
+TEST(LoopStatementSim, ForBasic) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -28,7 +28,7 @@ TEST(SimA608, ForBasic) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(SimA608, ForTypedInit) {
+TEST(LoopStatementSim, ForTypedInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -50,7 +50,7 @@ TEST(SimA608, ForTypedInit) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA608, ForAllEmptyWithBreak) {
+TEST(LoopStatementSim, ForAllEmptyWithBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -73,7 +73,7 @@ TEST(SimA608, ForAllEmptyWithBreak) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-TEST(SimA608, ForStepIncrement) {
+TEST(LoopStatementSim, ForStepIncrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -94,7 +94,7 @@ TEST(SimA608, ForStepIncrement) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimCh4, ProcessWithLoop) {
+TEST(SchedulingSemanticsSim, ProcessWithLoop) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [15:0] sum;\n"
@@ -110,7 +110,7 @@ TEST(SimCh4, ProcessWithLoop) {
   EXPECT_EQ(result, 15u);
 }
 
-TEST(SimA608, ForContinue) {
+TEST(LoopStatementSim, ForContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -134,7 +134,7 @@ TEST(SimA608, ForContinue) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(SimA608, ForNested) {
+TEST(LoopStatementSim, ForNested) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -156,7 +156,7 @@ TEST(SimA608, ForNested) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-TEST(SimA608, ForZeroIterations) {
+TEST(LoopStatementSim, ForZeroIterations) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -177,7 +177,7 @@ TEST(SimA608, ForZeroIterations) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA608, ForDecrement) {
+TEST(LoopStatementSim, ForDecrement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

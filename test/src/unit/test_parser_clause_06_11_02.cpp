@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, Sec6_5_RegVarDeclKind) {
+TEST(DataTypeParsing, RegVarDeclKind) {
   auto r = Parse(
       "module t;\n"
       "  reg r;\n"
@@ -18,7 +18,7 @@ TEST(ParserSection6, Sec6_5_RegVarDeclKind) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReg);
   EXPECT_FALSE(item->data_type.is_net);
 }
-TEST(ParserSection6, IntegerTypeShortintDecl) {
+TEST(DataTypeParsing, IntegerTypeShortintDecl) {
   auto r = Parse(
       "module m;\n"
       "  shortint si;\n"
@@ -31,7 +31,7 @@ TEST(ParserSection6, IntegerTypeShortintDecl) {
   EXPECT_EQ(item->name, "si");
 }
 
-TEST(ParserSection6, IntegerTypeIntDecl) {
+TEST(DataTypeParsing, IntegerTypeIntDecl) {
   auto r = Parse(
       "module m;\n"
       "  int i;\n"
@@ -44,7 +44,7 @@ TEST(ParserSection6, IntegerTypeIntDecl) {
   EXPECT_EQ(item->name, "i");
 }
 
-TEST(ParserSection6, IntegerTypeLongintDecl) {
+TEST(DataTypeParsing, IntegerTypeLongintDecl) {
   auto r = Parse(
       "module m;\n"
       "  longint li;\n"
@@ -57,7 +57,7 @@ TEST(ParserSection6, IntegerTypeLongintDecl) {
   EXPECT_EQ(item->name, "li");
 }
 
-TEST(ParserSection6, IntegerTypeIntegerDecl) {
+TEST(DataTypeParsing, IntegerTypeIntegerDecl) {
   auto r = Parse(
       "module m;\n"
       "  integer x;\n"
@@ -70,7 +70,7 @@ TEST(ParserSection6, IntegerTypeIntegerDecl) {
   EXPECT_EQ(item->name, "x");
 }
 
-TEST(ParserSection6, IntegerTypeLogicDecl) {
+TEST(DataTypeParsing, IntegerTypeLogicDecl) {
   auto r = Parse(
       "module m;\n"
       "  logic [15:0] data;\n"
@@ -83,7 +83,7 @@ TEST(ParserSection6, IntegerTypeLogicDecl) {
   EXPECT_EQ(item->name, "data");
 }
 
-TEST(ParserSection6, IntegerTypeRegDecl) {
+TEST(DataTypeParsing, IntegerTypeRegDecl) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] r;\n"
@@ -96,7 +96,7 @@ TEST(ParserSection6, IntegerTypeRegDecl) {
   EXPECT_EQ(item->name, "r");
 }
 
-TEST(ParserSection6, IntegerTypeBitDecl) {
+TEST(DataTypeParsing, IntegerTypeBitDecl) {
   auto r = Parse(
       "module m;\n"
       "  bit [31:0] val;\n"
@@ -109,7 +109,7 @@ TEST(ParserSection6, IntegerTypeBitDecl) {
   EXPECT_EQ(item->name, "val");
 }
 
-TEST(ParserSection6, Sec6_11_ShortintWithNegativeInit) {
+TEST(DataTypeParsing, ShortintWithNegativeInit) {
   auto r = Parse(
       "module t;\n"
       "  shortint s = -1;\n"
@@ -122,7 +122,7 @@ TEST(ParserSection6, Sec6_11_ShortintWithNegativeInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection6, Sec6_11_ShortintFunctionReturnType) {
+TEST(DataTypeParsing, ShortintFunctionReturnType) {
   auto r = Parse(
       "module t;\n"
       "  function shortint get_short();\n"
@@ -136,7 +136,7 @@ TEST(ParserSection6, Sec6_11_ShortintFunctionReturnType) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kShortint);
 }
 
-TEST(ParserSection6, All2StateTypes) {
+TEST(DataTypeParsing, All2StateTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  byte b;\n"
@@ -147,7 +147,7 @@ TEST(ParserSection6, All2StateTypes) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, All4StateTypes) {
+TEST(DataTypeParsing, All4StateTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic l;\n"
@@ -157,7 +157,7 @@ TEST(ParserSection6, All4StateTypes) {
               "endmodule\n"));
 }
 
-TEST(ParserSection8, DataTypeSyntaxIntegerVector) {
+TEST(ClassParsing, DataTypeSyntaxIntegerVector) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] data;\n"
@@ -176,7 +176,7 @@ TEST(ParserSection8, DataTypeSyntaxIntegerVector) {
   EXPECT_EQ(items[2]->name, "nibble");
 }
 
-TEST(ParserSection8, DataTypeSyntaxIntegerAtom) {
+TEST(ClassParsing, DataTypeSyntaxIntegerAtom) {
   auto r = Parse(
       "module m;\n"
       "  byte b;\n"
@@ -195,7 +195,7 @@ TEST(ParserSection8, DataTypeSyntaxIntegerAtom) {
   EXPECT_EQ(items[4]->data_type.kind, DataTypeKind::kInteger);
 }
 
-TEST(ParserSection6, Sec6_5_RegInAlwaysBlock) {
+TEST(DataTypeParsing, RegInAlwaysBlock) {
   auto r = Parse(
       "module t;\n"
       "  reg clk;\n"
@@ -211,7 +211,7 @@ TEST(ParserSection6, Sec6_5_RegInAlwaysBlock) {
   ASSERT_NE(items[1]->body, nullptr);
 }
 
-TEST(ParserSection6, Sec6_11_2_RegAndLogicDistinctKinds) {
+TEST(DataTypeParsing, RegAndLogicDistinctKinds) {
   auto r = Parse(
       "module t;\n"
       "  reg r;\n"
@@ -227,7 +227,7 @@ TEST(ParserSection6, Sec6_11_2_RegAndLogicDistinctKinds) {
   EXPECT_EQ(items[1]->name, "l");
 }
 
-TEST(ParserSection6, Sec6_11_IntegerTypesInPackage) {
+TEST(DataTypeParsing, IntegerTypesInPackage) {
   auto r = Parse(
       "package pkg;\n"
       "  int pkg_count;\n"
@@ -247,7 +247,7 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInPackage) {
   EXPECT_EQ(items[2]->name, "pkg_id");
 }
 
-TEST(ParserSection6, Sec6_11_IntegerTypesInClassMembers) {
+TEST(DataTypeParsing, IntegerTypesInClassMembers) {
   auto r = Parse(
       "class Counter;\n"
       "  int value;\n"
@@ -267,7 +267,7 @@ TEST(ParserSection6, Sec6_11_IntegerTypesInClassMembers) {
   EXPECT_EQ(members[2]->name, "timestamp");
 }
 
-TEST(ParserSection6, Sec6_11_IntegerWithInit) {
+TEST(DataTypeParsing, IntegerWithInit) {
   auto r = Parse(
       "module t;\n"
       "  integer idx = 0;\n"
@@ -280,7 +280,7 @@ TEST(ParserSection6, Sec6_11_IntegerWithInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection6, Sec6_11_LongintFunctionReturnType) {
+TEST(DataTypeParsing, LongintFunctionReturnType) {
   auto r = Parse(
       "module t;\n"
       "  function longint get_id();\n"
@@ -294,7 +294,7 @@ TEST(ParserSection6, Sec6_11_LongintFunctionReturnType) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kLongint);
 }
 
-TEST(ParserSection6, Sec6_11_IntegerFunctionReturnType) {
+TEST(DataTypeParsing, IntegerFunctionReturnType) {
   auto r = Parse(
       "module t;\n"
       "  function integer get_count();\n"
@@ -308,7 +308,7 @@ TEST(ParserSection6, Sec6_11_IntegerFunctionReturnType) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInteger);
 }
 
-TEST(ParserSection6, Sec6_11_MixedIntegerFuncParams) {
+TEST(DataTypeParsing, MixedIntegerFuncParams) {
   auto r = Parse(
       "module t;\n"
       "  function void process(input byte cmd, input int data,\n"
@@ -327,7 +327,7 @@ TEST(ParserSection6, Sec6_11_MixedIntegerFuncParams) {
   EXPECT_EQ(item->func_args[2].direction, Direction::kOutput);
 }
 
-TEST(ParserSection6, Sec6_11_TimeUnpackedArray) {
+TEST(DataTypeParsing, TimeUnpackedArray) {
   auto r = Parse(
       "module t;\n"
       "  time timestamps[10];\n"
@@ -341,14 +341,14 @@ TEST(ParserSection6, Sec6_11_TimeUnpackedArray) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection6, ValueSet_IntegerIs4State) {
+TEST(DataTypeParsing, ValueSet_IntegerIs4State) {
   EXPECT_TRUE(Is4stateType(DataTypeKind::kInteger));
 }
 
-TEST(ParserSection6, ValueSet_IntIs2State) {
+TEST(DataTypeParsing, ValueSet_IntIs2State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kInt));
 }
-TEST(ParserSection6, ByteVarDecl) {
+TEST(DataTypeParsing, ByteVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  byte b;\n"
@@ -359,7 +359,7 @@ TEST(ParserSection6, ByteVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kByte);
 }
 
-TEST(ParserSection6, LongintVarDecl) {
+TEST(DataTypeParsing, LongintVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  longint li;\n"
@@ -370,7 +370,7 @@ TEST(ParserSection6, LongintVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLongint);
 }
 
-TEST(ParserSection6, IntegerTypeByteDecl) {
+TEST(DataTypeParsing, IntegerTypeByteDecl) {
   auto r = Parse(
       "module m;\n"
       "  byte b;\n"
@@ -383,7 +383,7 @@ TEST(ParserSection6, IntegerTypeByteDecl) {
   EXPECT_EQ(item->name, "b");
 }
 
-TEST(ParserSection6, LogicVarDecl) {
+TEST(DataTypeParsing, LogicVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  logic [15:0] data;\n"
@@ -395,7 +395,7 @@ TEST(ParserSection6, LogicVarDecl) {
   EXPECT_EQ(item->name, "data");
 }
 
-TEST(ParserSection6, Sec6_11_2_RegWithPackedDims) {
+TEST(DataTypeParsing, RegWithPackedDims) {
   auto r = Parse(
       "module t;\n"
       "  reg [15:0] wide_reg;\n"

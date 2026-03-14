@@ -11,7 +11,7 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
 
 namespace {
 
-TEST(ParserA702, ParallelPathPositivePolarity) {
+TEST(SpecifyPathParsing, ParallelPathPositivePolarity) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

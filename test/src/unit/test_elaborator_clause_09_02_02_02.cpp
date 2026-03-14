@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_02_02_02, TimingControlInAlwaysCombErrors) {
+TEST(AlwaysLatchElaboration, TimingControlInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(ElabClause09_02_02_02, TimingControlInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_02, EventControlInAlwaysCombErrors) {
+TEST(AlwaysLatchElaboration, EventControlInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(ElabClause09_02_02_02, EventControlInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_02, WaitInAlwaysCombErrors) {
+TEST(AlwaysLatchElaboration, WaitInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -43,7 +43,7 @@ TEST(ElabClause09_02_02_02, WaitInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_02, ForkJoinInAlwaysCombErrors) {
+TEST(AlwaysLatchElaboration, ForkJoinInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -59,7 +59,7 @@ TEST(ElabClause09_02_02_02, ForkJoinInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_02, IncompleteIfWarnsLatch) {
+TEST(AlwaysLatchElaboration, IncompleteIfWarnsLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -72,7 +72,7 @@ TEST(ElabClause09_02_02_02, IncompleteIfWarnsLatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(ElabClause09_02_02_02, CompleteIfElseNoWarning) {
+TEST(AlwaysLatchElaboration, CompleteIfElseNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -87,7 +87,7 @@ TEST(ElabClause09_02_02_02, CompleteIfElseNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(ElabClause09_02_02_02, CaseWithoutDefaultWarnsLatch) {
+TEST(AlwaysLatchElaboration, CaseWithoutDefaultWarnsLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -104,7 +104,7 @@ TEST(ElabClause09_02_02_02, CaseWithoutDefaultWarnsLatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(ElabClause09_02_02_02, CaseWithDefaultNoWarning) {
+TEST(AlwaysLatchElaboration, CaseWithDefaultNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -123,7 +123,7 @@ TEST(ElabClause09_02_02_02, CaseWithDefaultNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(ElabClause09_02_02_02, MultiDriverTwoAlwaysCombErrors) {
+TEST(AlwaysLatchElaboration, MultiDriverTwoAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -135,7 +135,7 @@ TEST(ElabClause09_02_02_02, MultiDriverTwoAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_02, MultiDriverCombAndContAssignErrors) {
+TEST(AlwaysLatchElaboration, MultiDriverCombAndContAssignErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -147,7 +147,7 @@ TEST(ElabClause09_02_02_02, MultiDriverCombAndContAssignErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_02, DifferentVarsInSeparateCombOk) {
+TEST(AlwaysLatchElaboration, DifferentVarsInSeparateCombOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -160,7 +160,7 @@ TEST(ElabClause09_02_02_02, DifferentVarsInSeparateCombOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_02_02_02, AlwaysCombElaboratesToCorrectKind) {
+TEST(AlwaysLatchElaboration, AlwaysCombElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -178,7 +178,7 @@ TEST(ElabClause09_02_02_02, AlwaysCombElaboratesToCorrectKind) {
   EXPECT_TRUE(found);
 }
 
-TEST(ElabClause09_02_02_02, AlwaysCombNoTimingControlNoZeroDelayWarning) {
+TEST(AlwaysLatchElaboration, AlwaysCombNoTimingControlNoZeroDelayWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -191,7 +191,7 @@ TEST(ElabClause09_02_02_02, AlwaysCombNoTimingControlNoZeroDelayWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(SimCh9, MultipleAlwaysCombBlocks) {
+TEST(AlwaysCombBasicSim, MultipleAlwaysCombBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -220,7 +220,7 @@ TEST(SimCh9, MultipleAlwaysCombBlocks) {
   EXPECT_EQ(d->value.ToUint64(), 10u);
 }
 
-TEST(SimCh9, AlwaysCombMultipleOutputs) {
+TEST(AlwaysCombBasicSim, AlwaysCombMultipleOutputs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -245,7 +245,7 @@ TEST(SimCh9, AlwaysCombMultipleOutputs) {
   EXPECT_EQ(inc->value.ToUint64(), 26u);
 }
 
-TEST(SimCh9, AlwaysCombExplicitZeros) {
+TEST(AlwaysCombBasicSim, AlwaysCombExplicitZeros) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -270,7 +270,7 @@ TEST(SimCh9, AlwaysCombExplicitZeros) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9b, MultipleAlwaysCombTime0) {
+TEST(AlwaysCombExtendedSim, MultipleAlwaysCombTime0) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -283,7 +283,7 @@ TEST(SimCh9b, MultipleAlwaysCombTime0) {
   LowerRunAndCheck(f, design, {{"x", 0x11u}, {"y", 0x22u}});
 }
 
-TEST(SimCh9b, AlwaysCombMultiBitAdd) {
+TEST(AlwaysCombExtendedSim, AlwaysCombMultiBitAdd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -307,7 +307,7 @@ TEST(SimCh9b, AlwaysCombMultiBitAdd) {
   EXPECT_EQ(y->value.ToUint64(), 0x5555u);
 }
 
-TEST(SimCh9b, AlwaysCombBlockMultipleOutputs) {
+TEST(AlwaysCombExtendedSim, AlwaysCombBlockMultipleOutputs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -337,7 +337,7 @@ TEST(SimCh9b, AlwaysCombBlockMultipleOutputs) {
   EXPECT_EQ(diff->value.ToUint64(), 0x1Bu);
 }
 
-TEST(ElabClause09_03_02, ForkInAlwaysCombErrors) {
+TEST(ParallelBlockElaboration, ForkInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -353,7 +353,7 @@ TEST(ElabClause09_03_02, ForkInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause09_04_01, DelayInAlwaysCombErrors) {
+TEST(DelayControlElaboration, DelayInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"

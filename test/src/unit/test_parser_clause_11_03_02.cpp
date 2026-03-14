@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, NestedParenthesizedExpression) {
+TEST(OperatorAndExpressionParsing, NestedParenthesizedExpression) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ((a + b) * (c - d));\n"
@@ -17,7 +17,7 @@ TEST(ParserSection11, NestedParenthesizedExpression) {
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
 
-TEST(ParserSection11, ChainedAdditiveLeftAssoc) {
+TEST(OperatorAndExpressionParsing, ChainedAdditiveLeftAssoc) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a + b - c + d;\n"
@@ -37,7 +37,7 @@ TEST(Parser, ExpressionPrecedence) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
 }
-TEST(ParserSection11, ImplicationRightAssocParses) {
+TEST(OperatorAndExpressionParsing, ImplicationRightAssocParses) {
   auto r = Parse(
       "module t;\n"
       "  logic a, b, c, d;\n"
@@ -51,7 +51,7 @@ TEST(ParserSection11, ImplicationRightAssocParses) {
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
 }
 
-TEST(ParserA83, ExprPrecedenceChain) {
+TEST(ExpressionParsing, ExprPrecedenceChain) {
   auto r = Parse("module m; initial x = a + b * c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -65,7 +65,7 @@ TEST(ParserA83, ExprPrecedenceChain) {
   EXPECT_EQ(rhs->rhs->op, TokenKind::kStar);
 }
 
-TEST(ParserA83, ChainedBinaryOps) {
+TEST(ExpressionParsing, ChainedBinaryOps) {
   auto r = Parse("module m; initial x = a | b & c ^ d; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -74,7 +74,7 @@ TEST(ParserA83, ChainedBinaryOps) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
 }
 
-TEST(ParserA83, ParenthesizedExpr) {
+TEST(ExpressionParsing, ParenthesizedExpr) {
   auto r = Parse("module m; initial x = (a + b) * c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -87,7 +87,7 @@ TEST(ParserA83, ParenthesizedExpr) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kPlus);
 }
 
-TEST(ParserSection11, Sec11_1_ParenthesizedExprPreservesSemantics) {
+TEST(OperatorAndExpressionParsing, ParenthesizedExprPreservesSemantics) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a + b) * c;\n"
@@ -101,7 +101,7 @@ TEST(ParserSection11, Sec11_1_ParenthesizedExprPreservesSemantics) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kPlus);
 }
 
-TEST(ParserSection11, Sec11_1_ExprInInitialBlock) {
+TEST(OperatorAndExpressionParsing, ExprInInitialBlock) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a | b) & c;\n"
@@ -114,7 +114,7 @@ TEST(ParserSection11, Sec11_1_ExprInInitialBlock) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-TEST(ParserSection11, OperatorPrecedenceMixedArithParses) {
+TEST(OperatorAndExpressionParsing, OperatorPrecedenceMixedArithParses) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a + b * c;\n"
@@ -128,7 +128,7 @@ TEST(ParserSection11, OperatorPrecedenceMixedArithParses) {
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
 
-TEST(ParserSection11, OperatorPrecedenceMixedArithRhs) {
+TEST(OperatorAndExpressionParsing, OperatorPrecedenceMixedArithRhs) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a + b * c;\n"
@@ -139,7 +139,7 @@ TEST(ParserSection11, OperatorPrecedenceMixedArithRhs) {
   EXPECT_EQ(rhs->rhs->op, TokenKind::kStar);
 }
 
-TEST(ParserSection11, OperatorPrecedenceCompareAndLogical) {
+TEST(OperatorAndExpressionParsing, OperatorPrecedenceCompareAndLogical) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a > 0) && (b < 10);\n"

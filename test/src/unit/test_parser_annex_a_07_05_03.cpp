@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70503, ScalarTimingCheckCondNegation) {
+TEST(TimingCheckEventDefParsing, ScalarTimingCheckCondNegation) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -18,7 +18,7 @@ TEST(ParserA70503, ScalarTimingCheckCondNegation) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-TEST(ParserA70503, ScalarTimingCheckCondEquality) {
+TEST(TimingCheckEventDefParsing, ScalarTimingCheckCondEquality) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -31,7 +31,7 @@ TEST(ParserA70503, ScalarTimingCheckCondEquality) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-TEST(ParserA70503, ScalarTimingCheckCondInequality) {
+TEST(TimingCheckEventDefParsing, ScalarTimingCheckCondInequality) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -44,7 +44,7 @@ TEST(ParserA70503, ScalarTimingCheckCondInequality) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-TEST(ParserA70503, ScalarConstantUnsized_b0) {
+TEST(TimingCheckEventDefParsing, ScalarConstantUnsized_b0) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -54,7 +54,7 @@ TEST(ParserA70503, ScalarConstantUnsized_b0) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA70503, ScalarConstantUnsized_b1) {
+TEST(TimingCheckEventDefParsing, ScalarConstantUnsized_b1) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -64,7 +64,7 @@ TEST(ParserA70503, ScalarConstantUnsized_b1) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA70503, TimingCheckEventPosedge) {
+TEST(TimingCheckEventDefParsing, TimingCheckEventPosedge) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -78,7 +78,7 @@ TEST(ParserA70503, TimingCheckEventPosedge) {
   EXPECT_EQ(tc->data_terminal.name, "clk");
 }
 
-TEST(ParserA70503, TimingCheckEventNegedge) {
+TEST(TimingCheckEventDefParsing, TimingCheckEventNegedge) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -92,7 +92,7 @@ TEST(ParserA70503, TimingCheckEventNegedge) {
   EXPECT_EQ(tc->ref_terminal.name, "clk");
 }
 
-TEST(ParserA70503, TimingCheckEventEdgeKeyword) {
+TEST(TimingCheckEventDefParsing, TimingCheckEventEdgeKeyword) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -106,7 +106,7 @@ TEST(ParserA70503, TimingCheckEventEdgeKeyword) {
   EXPECT_EQ(tc->data_terminal.name, "clk");
 }
 
-TEST(ParserA70503, ControlledTimingCheckEventPeriod) {
+TEST(TimingCheckEventDefParsing, ControlledTimingCheckEventPeriod) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -120,7 +120,7 @@ TEST(ParserA70503, ControlledTimingCheckEventPeriod) {
   EXPECT_EQ(tc->ref_terminal.name, "clk");
 }
 
-TEST(ParserA70503, TerminalPartSelect) {
+TEST(TimingCheckEventDefParsing, TerminalPartSelect) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -136,7 +136,7 @@ TEST(ParserA70503, TerminalPartSelect) {
   EXPECT_NE(tc->ref_terminal.range_right, nullptr);
 }
 
-TEST(ParserA70503, TerminalInterfaceDotPort) {
+TEST(TimingCheckEventDefParsing, TerminalInterfaceDotPort) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -150,7 +150,7 @@ TEST(ParserA70503, TerminalInterfaceDotPort) {
   EXPECT_EQ(tc->ref_terminal.name, "data");
 }
 
-TEST(ParserA70503, TimingCheckConditionBare) {
+TEST(TimingCheckEventDefParsing, TimingCheckConditionBare) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -163,7 +163,7 @@ TEST(ParserA70503, TimingCheckConditionBare) {
   EXPECT_NE(tc->ref_condition, nullptr);
 }
 
-TEST(ParserA70503, TimingCheckConditionParenthesized) {
+TEST(TimingCheckEventDefParsing, TimingCheckConditionParenthesized) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

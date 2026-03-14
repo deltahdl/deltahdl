@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh4, AlwaysCombReactsToDelayedChange) {
+TEST(SchedulingSemanticsSim, AlwaysCombReactsToDelayedChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -27,7 +27,7 @@ TEST(SimCh4, AlwaysCombReactsToDelayedChange) {
   EXPECT_EQ(var->value.ToUint64(), 14u);
 }
 
-TEST(SimClause09_02_02_02_01, SensitivityTriggersOnAllInputs) {
+TEST(AlwaysLatchSensitivitySim, SensitivityTriggersOnAllInputs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -50,7 +50,7 @@ TEST(SimClause09_02_02_02_01, SensitivityTriggersOnAllInputs) {
   EXPECT_EQ(y->value.ToUint64(), 11u);
 }
 
-TEST(SimClause09_02_02_02_01, WrittenOnlyVarNoRetrigger) {
+TEST(AlwaysLatchSensitivitySim, WrittenOnlyVarNoRetrigger) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -71,7 +71,7 @@ TEST(SimClause09_02_02_02_01, WrittenOnlyVarNoRetrigger) {
   EXPECT_EQ(y->value.ToUint64(), 6u);
 }
 
-TEST(SimClause09_02_02_02_01, TernaryAllInputsSensitive) {
+TEST(AlwaysLatchSensitivitySim, TernaryAllInputsSensitive) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

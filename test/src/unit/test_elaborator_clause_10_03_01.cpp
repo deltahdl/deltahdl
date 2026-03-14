@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause100301, NetDeclAssign_CreatesContAssign) {
+TEST(ContinuousAssignDeclElaboration, NetDeclAssign_CreatesContAssign) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -21,7 +21,7 @@ TEST(ElabClause100301, NetDeclAssign_CreatesContAssign) {
   EXPECT_NE(mod->assigns[0].rhs, nullptr);
 }
 
-TEST(ElabClause100301, NetDeclAssign_LhsIsNetName) {
+TEST(ContinuousAssignDeclElaboration, NetDeclAssign_LhsIsNetName) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -38,7 +38,7 @@ TEST(ElabClause100301, NetDeclAssign_LhsIsNetName) {
   EXPECT_EQ(ca.lhs->text, "mynet");
 }
 
-TEST(ElabClause100301, NetDeclAssign_Width) {
+TEST(ContinuousAssignDeclElaboration, NetDeclAssign_Width) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -52,7 +52,7 @@ TEST(ElabClause100301, NetDeclAssign_Width) {
   EXPECT_EQ(mod->assigns[0].width, 8u);
 }
 
-TEST(ElabClause100301, NetDeclAssign_DriveStrength) {
+TEST(ContinuousAssignDeclElaboration, NetDeclAssign_DriveStrength) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -67,7 +67,7 @@ TEST(ElabClause100301, NetDeclAssign_DriveStrength) {
   EXPECT_NE(mod->assigns[0].drive_strength1, 0);
 }
 
-TEST(ElabClause100301, NetDeclNoInit_NoContAssign) {
+TEST(ContinuousAssignDeclElaboration, NetDeclNoInit_NoContAssign) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -80,7 +80,7 @@ TEST(ElabClause100301, NetDeclNoInit_NoContAssign) {
   EXPECT_EQ(mod->assigns.size(), 0u);
 }
 
-TEST(ElabClause100301, MultiNetDeclAssign) {
+TEST(ContinuousAssignDeclElaboration, MultiNetDeclAssign) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -93,7 +93,7 @@ TEST(ElabClause100301, MultiNetDeclAssign) {
   ASSERT_GE(mod->assigns.size(), 2u);
 }
 
-TEST(ElabClause100301, InterconnectWithInit_Error) {
+TEST(ContinuousAssignDeclElaboration, InterconnectWithInit_Error) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -103,7 +103,7 @@ TEST(ElabClause100301, InterconnectWithInit_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ElabClause100301, InterconnectNoInit_Ok) {
+TEST(ContinuousAssignDeclElaboration, InterconnectNoInit_Ok) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -114,7 +114,7 @@ TEST(ElabClause100301, InterconnectNoInit_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause100301, NetDeclAssignConflictsWithProcAssign) {
+TEST(ContinuousAssignDeclElaboration, NetDeclAssignConflictsWithProcAssign) {
   ElabFixture f;
   Elaborate(
       "module t;\n"

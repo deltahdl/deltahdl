@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4436, PostObservedRegionExecutesPLICallbacks) {
+TEST(PliPostObservedSim, PostObservedRegionExecutesPLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int executed = 0;
@@ -23,11 +23,11 @@ TEST(SimCh4436, PostObservedRegionExecutesPLICallbacks) {
   EXPECT_EQ(executed, 1);
 }
 
-TEST(SimCh4436, PostObservedCanReadValues) {
+TEST(PliPostObservedSim, PostObservedCanReadValues) {
   VerifyRegionCanReadActiveValue(Region::kPostObserved);
 }
 
-TEST(SimCh4436, PostObservedReadsAfterObservedRegion) {
+TEST(PliPostObservedSim, PostObservedReadsAfterObservedRegion) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -45,13 +45,13 @@ TEST(SimCh4436, PostObservedReadsAfterObservedRegion) {
   EXPECT_EQ(sampled, 77);
 }
 
-TEST(SimCh4436, PostObservedExecutesAfterObservedBeforeReactive) {
+TEST(PliPostObservedSim, PostObservedExecutesAfterObservedBeforeReactive) {
   VerifyThreeRegionOrder({Region::kObserved, "observed"},
                          {Region::kPostObserved, "post_observed"},
                          {Region::kReactive, "reactive"});
 }
 
-TEST(SimCh4436, PostObservedExecutesAfterEntireChainThroughObserved) {
+TEST(PliPostObservedSim, PostObservedExecutesAfterEntireChainThroughObserved) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -69,7 +69,7 @@ TEST(SimCh4436, PostObservedExecutesAfterEntireChainThroughObserved) {
   EXPECT_EQ(order[3], "post_observed");
 }
 
-TEST(SimCh4436, PostObservedIsAfterObservedBeforeReactive) {
+TEST(PliPostObservedSim, PostObservedIsAfterObservedBeforeReactive) {
   auto post_observed_ord = static_cast<int>(Region::kPostObserved);
   auto observed_ord = static_cast<int>(Region::kObserved);
   auto reactive_ord = static_cast<int>(Region::kReactive);
@@ -77,7 +77,7 @@ TEST(SimCh4436, PostObservedIsAfterObservedBeforeReactive) {
   EXPECT_LT(post_observed_ord, reactive_ord);
 }
 
-TEST(SimCh4436, PostObservedRegionHoldsMultiplePLICallbacks) {
+TEST(PliPostObservedSim, PostObservedRegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -92,7 +92,7 @@ TEST(SimCh4436, PostObservedRegionHoldsMultiplePLICallbacks) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(SimCh4436, PostObservedEventsAcrossMultipleTimeSlots) {
+TEST(PliPostObservedSim, PostObservedEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;
@@ -112,7 +112,7 @@ TEST(SimCh4436, PostObservedEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-TEST(SimCh4436, PostObservedProvidesReadOnlySnapshotAfterObserved) {
+TEST(PliPostObservedSim, PostObservedProvidesReadOnlySnapshotAfterObserved) {
   Arena arena;
   Scheduler sched(arena);
   int a = 0;
@@ -138,7 +138,7 @@ TEST(SimCh4436, PostObservedProvidesReadOnlySnapshotAfterObserved) {
   EXPECT_EQ(sum_in_post_observed, 40);
 }
 
-TEST(SimCh4436, PostObservedInfrastructureWorksEvenIfCurrentlyUnused) {
+TEST(PliPostObservedSim, PostObservedInfrastructureWorksEvenIfCurrentlyUnused) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;

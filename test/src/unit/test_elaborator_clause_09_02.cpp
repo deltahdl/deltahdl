@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_02, AllSixProcedureTypesElaborate) {
+TEST(StructuredProcedureElaboration, AllSixProcedureTypesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -55,7 +55,7 @@ TEST(ElabClause09_02, AllSixProcedureTypesElaborate) {
   EXPECT_TRUE(has_final);
 }
 
-TEST(ElabClause09_02, MultipleProcessesElaborate) {
+TEST(StructuredProcedureElaboration, MultipleProcessesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -79,7 +79,7 @@ TEST(ElabClause09_02, MultipleProcessesElaborate) {
   EXPECT_EQ(always_count, 2);
 }
 
-TEST(ElabClause09_02, ProcessBodiesNotNull) {
+TEST(StructuredProcedureElaboration, ProcessBodiesNotNull) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

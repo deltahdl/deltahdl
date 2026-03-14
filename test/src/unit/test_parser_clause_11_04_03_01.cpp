@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection11, RealMultiplication) {
+TEST(OperatorAndExpressionParsing, RealMultiplication) {
   auto r = Parse(
       "module t;\n"
       "  real r;\n"
@@ -22,7 +22,7 @@ TEST(ParserSection11, RealMultiplication) {
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
 
-TEST(ParserA86, BinaryMul) {
+TEST(OperatorParsing, BinaryMul) {
   auto r = Parse("module m; initial x = a * b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -32,7 +32,7 @@ TEST(ParserA86, BinaryMul) {
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
 
-TEST(ParserSection11, ArithmeticDiv) {
+TEST(OperatorAndExpressionParsing, ArithmeticDiv) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a / b;\n"
@@ -42,7 +42,7 @@ TEST(ParserSection11, ArithmeticDiv) {
   EXPECT_EQ(rhs->op, TokenKind::kSlash);
 }
 
-TEST(ParserSection6, RealInExpression) {
+TEST(DataTypeParsing, RealInExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real a, b, c;\n"
@@ -54,7 +54,7 @@ TEST(ParserSection6, RealInExpression) {
               "endmodule\n"));
 }
 
-TEST(ParserCh505, Operator_BinaryAdd) {
+TEST(OperatorTokenParserParsing, Operator_BinaryAdd) {
   auto r = Parse(
       "module m;\n"
       "  initial x = a + b;\n"

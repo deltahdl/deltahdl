@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, BlockingAssignment_ClassNew) {
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_ClassNew) {
   auto r = Parse(
       "module m;\n"
       "  initial begin obj = new; end\n"
@@ -16,7 +16,7 @@ TEST(ParserA602, BlockingAssignment_ClassNew) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserA602, BlockingAssignment_ClassNewWithArgs) {
+TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_ClassNewWithArgs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin obj = new(1, 2); end\n"
@@ -28,7 +28,7 @@ TEST(ParserA602, BlockingAssignment_ClassNewWithArgs) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection8, ClassConstructor) {
+TEST(ClassParsing, ClassConstructor) {
   auto r = Parse(
       "class Packet;\n"
       "  int data;\n"
@@ -44,7 +44,7 @@ TEST(ParserSection8, ClassConstructor) {
   EXPECT_EQ(m->method->name, "new");
 }
 
-TEST(ParserSection8, ClassConstructorWithParams) {
+TEST(ClassParsing, ClassConstructorWithParams) {
   auto r = Parse(
       "class Packet;\n"
       "  int data;\n"
@@ -56,7 +56,7 @@ TEST(ParserSection8, ClassConstructorWithParams) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection8, NewExpression) {
+TEST(ClassParsing, NewExpression) {
   auto r = Parse(
       "module m;\n"
       "  class test_cls;\n"
@@ -71,7 +71,7 @@ TEST(ParserSection8, NewExpression) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection8, NewWithArgs) {
+TEST(ClassParsing, NewWithArgs) {
   auto r = Parse(
       "module m;\n"
       "  class test_cls;\n"
@@ -103,7 +103,7 @@ TEST(SourceText, ClassConstructorDecl) {
   EXPECT_EQ(members[0]->method->name, "new");
 }
 
-TEST(ParserA24, ClassNewWithArgs) {
+TEST(DeclarationAssignmentParsing, ClassNewWithArgs) {
   auto r = Parse(
       "class C;\n"
       "  function new(int a, int b);\n"
@@ -116,7 +116,7 @@ TEST(ParserA24, ClassNewWithArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA26, FuncBodyConstructorNew) {
+TEST(FunctionDeclParsing, FuncBodyConstructorNew) {
   auto r = Parse(
       "class C;\n"
       "  function new();\n"
@@ -126,7 +126,7 @@ TEST(ParserA26, FuncBodyConstructorNew) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA26, FuncBodyConstructorNewEndLabel) {
+TEST(FunctionDeclParsing, FuncBodyConstructorNewEndLabel) {
   auto r = Parse(
       "class C;\n"
       "  function new(int x);\n"
@@ -136,7 +136,7 @@ TEST(ParserA26, FuncBodyConstructorNewEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection8, ClassWithInitializer) {
+TEST(ClassParsing, ClassWithInitializer) {
   auto r = Parse(
       "class WithInit;\n"
       "  int x = 42;\n"
@@ -148,7 +148,7 @@ TEST(ParserSection8, ClassWithInitializer) {
   EXPECT_NE(cls->members[0]->init_expr, nullptr);
 }
 
-TEST(ParserA87, ConstructorLocalQualifierLegal) {
+TEST(NumberParsing, ConstructorLocalQualifierLegal) {
   ParseOk(
       "class C;\n"
       "  local function new();\n"
@@ -156,7 +156,7 @@ TEST(ParserA87, ConstructorLocalQualifierLegal) {
       "endclass\n");
 }
 
-TEST(ParserA87, ConstructorProtectedQualifierLegal) {
+TEST(NumberParsing, ConstructorProtectedQualifierLegal) {
   ParseOk(
       "class C;\n"
       "  protected function new(int x);\n"
@@ -164,7 +164,7 @@ TEST(ParserA87, ConstructorProtectedQualifierLegal) {
       "endclass\n");
 }
 
-TEST(ParserA87, ConstructorStaticError) {
+TEST(NumberParsing, ConstructorStaticError) {
   auto r = Parse(
       "class C;\n"
       "  static function new();\n"
@@ -173,7 +173,7 @@ TEST(ParserA87, ConstructorStaticError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserA87, ConstructorVirtualError) {
+TEST(NumberParsing, ConstructorVirtualError) {
   auto r = Parse(
       "class C;\n"
       "  virtual function new();\n"
@@ -182,7 +182,7 @@ TEST(ParserA87, ConstructorVirtualError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserA87, ConstructorDefaultArgs) {
+TEST(NumberParsing, ConstructorDefaultArgs) {
   auto r = Parse(
       "class Packet;\n"
       "  int command;\n"
@@ -203,7 +203,7 @@ TEST(ParserA87, ConstructorDefaultArgs) {
   EXPECT_NE(m->method->func_args[1].default_value, nullptr);
 }
 
-TEST(ParserA87, ImplicitConstructor) {
+TEST(NumberParsing, ImplicitConstructor) {
   auto r = Parse(
       "class C;\n"
       "  int x;\n"
@@ -216,7 +216,7 @@ TEST(ParserA87, ImplicitConstructor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA87, ConstructorSuperNewCall) {
+TEST(NumberParsing, ConstructorSuperNewCall) {
   ParseOk(
       "class Base;\n"
       "  function new();\n"
@@ -229,7 +229,7 @@ TEST(ParserA87, ConstructorSuperNewCall) {
       "endclass\n");
 }
 
-TEST(ParserA87, ConstructorSuperNewWithArgs) {
+TEST(NumberParsing, ConstructorSuperNewWithArgs) {
   ParseOk(
       "class Base;\n"
       "  int x;\n"
@@ -244,7 +244,7 @@ TEST(ParserA87, ConstructorSuperNewWithArgs) {
       "endclass\n");
 }
 
-TEST(ParserSection8, ConstructorEndLabel) {
+TEST(ClassParsing, ConstructorEndLabel) {
   auto r = Parse(
       "class Base;\n"
       "  function new();\n"

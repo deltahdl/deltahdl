@@ -18,14 +18,14 @@ TEST(Parser, EventDeclaration) {
   EXPECT_EQ(item->name, "ev");
 }
 
-TEST(ParserA221, DataTypeEvent) {
+TEST(NetAndVariableTypeParsing, DataTypeEvent) {
   auto r = Parse("module m; event ev; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kEvent);
 }
 
-TEST(ParserSection6, Sec6_5_EventVarDecl) {
+TEST(DataTypeParsing, EventVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  event done;\n"
@@ -40,7 +40,7 @@ TEST(ParserSection6, Sec6_5_EventVarDecl) {
   EXPECT_EQ(item->name, "done");
 }
 
-TEST(ParserSection6, EventVarDecl) {
+TEST(DataTypeParsing, EventVarDeclSimple) {
   auto r = Parse(
       "module t;\n"
       "  event e;\n"
@@ -51,17 +51,17 @@ TEST(ParserSection6, EventVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
 }
 
-TEST(ParserSection6, EventTypeWidthZero) {
+TEST(DataTypeParsing, EventTypeWidthZero) {
   DataType dt;
   dt.kind = DataTypeKind::kEvent;
   EXPECT_EQ(EvalTypeWidth(dt), 0u);
 }
 
-TEST(ParserSection6, EventNotIntegral) {
+TEST(DataTypeParsing, EventNotIntegral) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kEvent));
 }
 
-TEST(ParserSection6, EventNot4State) {
+TEST(DataTypeParsing, EventNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kEvent));
 }
 

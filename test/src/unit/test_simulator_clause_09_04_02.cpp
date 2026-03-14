@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA605, EventControlPosedge) {
+TEST(TimingControlSim, EventControlPosedge) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -30,7 +30,7 @@ TEST(SimA605, EventControlPosedge) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimA605, EventControlNegedge) {
+TEST(TimingControlSim, EventControlNegedge) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -54,7 +54,7 @@ TEST(SimA605, EventControlNegedge) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SimA605, EventControlAnyChange) {
+TEST(TimingControlSim, EventControlAnyChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -78,7 +78,7 @@ TEST(SimA605, EventControlAnyChange) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-TEST(SimA605, MultipleTimingControls) {
+TEST(TimingControlSim, MultipleTimingControls) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

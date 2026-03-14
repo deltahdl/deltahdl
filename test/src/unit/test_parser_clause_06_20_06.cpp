@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA213, DataDeclConstVar) {
+TEST(TypeDeclParsing, DataDeclConstVar) {
   auto r = Parse("module m; const int MAX = 100; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(ParserA213, DataDeclConstVar) {
   EXPECT_TRUE(item->data_type.is_const);
 }
 
-TEST(ParserA28, DataDeclConstInBlock) {
+TEST(BlockItemDeclParsing, DataDeclConstInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -30,7 +30,7 @@ TEST(ParserA28, DataDeclConstInBlock) {
   EXPECT_EQ(body->stmts[0]->var_name, "x");
 }
 
-TEST(ParserA28, DataDeclConstVarInBlock) {
+TEST(BlockItemDeclParsing, DataDeclConstVarInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -45,7 +45,7 @@ TEST(ParserA28, DataDeclConstVarInBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserA28, ConstWithLifetimeInBlock) {
+TEST(BlockItemDeclParsing, ConstWithLifetimeInBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -54,7 +54,7 @@ TEST(ParserA28, ConstWithLifetimeInBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, ConstRealDecl) {
+TEST(DataTypeParsing, ConstRealDecl) {
   auto r = Parse(
       "module t;\n"
       "  const real PI = 3.14159;\n"
@@ -66,7 +66,7 @@ TEST(ParserSection6, ConstRealDecl) {
   EXPECT_TRUE(item->data_type.is_const);
 }
 
-TEST(ParserSection6, ConstStringDecl) {
+TEST(DataTypeParsing, ConstStringDecl) {
   auto r = Parse(
       "module t;\n"
       "  const string GREETING = \"Hi\";\n"
@@ -78,7 +78,7 @@ TEST(ParserSection6, ConstStringDecl) {
   EXPECT_TRUE(item->data_type.is_const);
 }
 
-TEST(ParserSection6, ConstVarDecl) {
+TEST(DataTypeParsing, ConstVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  const logic [7:0] MAX = 8'hFF;\n"
@@ -90,7 +90,7 @@ TEST(ParserSection6, ConstVarDecl) {
   EXPECT_TRUE(item->data_type.is_const);
 }
 
-TEST(ParserSection6, ConstVarDecl_NameAndInit) {
+TEST(DataTypeParsing, ConstVarDecl_NameAndInit) {
   auto r = Parse(
       "module t;\n"
       "  const logic [7:0] MAX = 8'hFF;\n"
@@ -102,7 +102,7 @@ TEST(ParserSection6, ConstVarDecl_NameAndInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection6, ConstIntDecl) {
+TEST(DataTypeParsing, ConstIntDecl) {
   auto r = Parse(
       "module t;\n"
       "  const int LIMIT = 100;\n"

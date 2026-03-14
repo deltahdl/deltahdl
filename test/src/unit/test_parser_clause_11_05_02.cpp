@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7, ArrayElementSelect) {
+TEST(AggregateTypeParsing, ArrayElementSelect) {
   auto r = Parse(
       "module t;\n"
       "  int arr[8];\n"
@@ -18,7 +18,7 @@ TEST(ParserSection7, ArrayElementSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserSection7, MultiDimSelect) {
+TEST(AggregateTypeParsing, MultiDimSelect) {
   auto r = Parse(
       "module t;\n"
       "  int arr[4][8];\n"
@@ -31,7 +31,7 @@ TEST(ParserSection7, MultiDimSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserSection11, Sec11_4_1_NestedBitSelects) {
+TEST(OperatorAndExpressionParsing, NestedBitSelects) {
   auto r = Parse(
       "module t;\n"
       "  logic [3:0] [7:0] packed_arr;\n"
@@ -47,7 +47,7 @@ TEST(ParserSection11, Sec11_4_1_NestedBitSelects) {
   EXPECT_EQ(rhs->base->kind, ExprKind::kSelect);
   EXPECT_EQ(rhs->base->index_end, nullptr);
 }
-TEST(ParserSection11, BitSelectChained) {
+TEST(OperatorAndExpressionParsing, BitSelectChained) {
   auto r = Parse(
       "module t;\n"
       "  initial x = mem[i][j];\n"
@@ -59,7 +59,7 @@ TEST(ParserSection11, BitSelectChained) {
   EXPECT_EQ(rhs->base->kind, ExprKind::kSelect);
 }
 
-TEST(ParserA85, VarLvalueMultiDimSelect) {
+TEST(LvalueParsing, VarLvalueMultiDimSelect) {
   auto r = Parse(
       "module m; logic [7:0] mem [0:3][0:3];\n"
       "  initial mem[1][2] = 8'hAB;\n"
@@ -72,7 +72,7 @@ TEST(ParserA85, VarLvalueMultiDimSelect) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserSection11, ArrayThenPartSelect) {
+TEST(OperatorAndExpressionParsing, ArrayThenPartSelect) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] twod[0:255][0:255];\n"

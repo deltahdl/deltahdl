@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA610, DeferredAssertHash0) {
+TEST(AssertionStatementSim, DeferredAssertHash0) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

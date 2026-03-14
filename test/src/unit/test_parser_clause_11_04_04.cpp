@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, BinaryLessThan) {
+TEST(OperatorParsing, BinaryLessThan) {
   auto r = Parse("module m; initial x = (a < b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -17,7 +17,7 @@ TEST(ParserA86, BinaryLessThan) {
   EXPECT_EQ(rhs->op, TokenKind::kLt);
 }
 
-TEST(ParserA86, BinaryLessOrEqual) {
+TEST(OperatorParsing, BinaryLessOrEqual) {
   auto r = Parse("module m; initial x = (a <= b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -27,7 +27,7 @@ TEST(ParserA86, BinaryLessOrEqual) {
   EXPECT_EQ(rhs->op, TokenKind::kLtEq);
 }
 
-TEST(ParserA86, BinaryGreaterThan) {
+TEST(OperatorParsing, BinaryGreaterThan) {
   auto r = Parse("module m; initial x = (a > b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -37,7 +37,7 @@ TEST(ParserA86, BinaryGreaterThan) {
   EXPECT_EQ(rhs->op, TokenKind::kGt);
 }
 
-TEST(ParserA86, BinaryGreaterOrEqual) {
+TEST(OperatorParsing, BinaryGreaterOrEqual) {
   auto r = Parse("module m; initial x = (a >= b); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -47,7 +47,7 @@ TEST(ParserA86, BinaryGreaterOrEqual) {
   EXPECT_EQ(rhs->op, TokenKind::kGtEq);
 }
 
-TEST(ParserSection11, RelationalLt) {
+TEST(OperatorAndExpressionParsing, RelationalLt) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a < b);\n"
@@ -57,7 +57,7 @@ TEST(ParserSection11, RelationalLt) {
   EXPECT_EQ(rhs->op, TokenKind::kLt);
 }
 
-TEST(ParserSection11, RelationalGt) {
+TEST(OperatorAndExpressionParsing, RelationalGt) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a > b);\n"
@@ -67,7 +67,7 @@ TEST(ParserSection11, RelationalGt) {
   EXPECT_EQ(rhs->op, TokenKind::kGt);
 }
 
-TEST(ParserSection11, RelationalLtEq) {
+TEST(OperatorAndExpressionParsing, RelationalLtEq) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a <= b);\n"
@@ -77,7 +77,7 @@ TEST(ParserSection11, RelationalLtEq) {
   EXPECT_EQ(rhs->op, TokenKind::kLtEq);
 }
 
-TEST(ParserSection11, RelationalGtEq) {
+TEST(OperatorAndExpressionParsing, RelationalGtEq) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a >= b);\n"
@@ -94,13 +94,13 @@ TEST(Eval, Comparison) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(ParserA86, BinaryLessEq) {
+TEST(OperatorParsing, BinaryLessEq) {
   auto r = Parse("module m; initial x = a <= b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA86, BinaryGreaterEq) {
+TEST(OperatorParsing, BinaryGreaterEq) {
   auto r = Parse("module m; initial x = a >= b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA612, ControlFlowProdsElaborate) {
+TEST(RandsequenceElaboration, ControlFlowProdsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -22,7 +22,7 @@ TEST(ElabA612, ControlFlowProdsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA612, BasicRandsequenceElaborates) {
+TEST(RandsequenceElaboration, BasicRandsequenceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

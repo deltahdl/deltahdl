@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA607, CaseInsideMatch) {
+TEST(CaseStatementSim, CaseInsideMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -32,7 +32,7 @@ TEST(SimA607, CaseInsideMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimA607, CaseInsideDefault) {
+TEST(CaseStatementSim, CaseInsideDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -56,7 +56,7 @@ TEST(SimA607, CaseInsideDefault) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-TEST(SimA607, CaseInsideCommaValues) {
+TEST(CaseStatementSim, CaseInsideCommaValues) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -79,7 +79,7 @@ TEST(SimA607, CaseInsideCommaValues) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA607, CaseInsideRangeMatch) {
+TEST(CaseStatementSim, CaseInsideRangeMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -102,7 +102,7 @@ TEST(SimA607, CaseInsideRangeMatch) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimA607, CaseInsideRangeNoMatch) {
+TEST(CaseStatementSim, CaseInsideRangeNoMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -125,7 +125,7 @@ TEST(SimA607, CaseInsideRangeNoMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimA607, CaseInsideWildcardInPattern) {
+TEST(CaseStatementSim, CaseInsideWildcardInPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -148,7 +148,7 @@ TEST(SimA607, CaseInsideWildcardInPattern) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA607, CaseInsideXInSelectorNoMatch) {
+TEST(CaseStatementSim, CaseInsideXInSelectorNoMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -174,7 +174,7 @@ TEST(SimA607, CaseInsideXInSelectorNoMatch) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimA607, UniqueCaseInsideOverlapViolation) {
+TEST(CaseStatementSim, UniqueCaseInsideOverlapViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -200,7 +200,7 @@ TEST(SimA607, UniqueCaseInsideOverlapViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA607, PriorityCaseInsideNoMatchViolation) {
+TEST(CaseStatementSim, PriorityCaseInsideNoMatchViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -222,7 +222,7 @@ TEST(SimA607, PriorityCaseInsideNoMatchViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA607, CaseInsideLRMExample) {
+TEST(CaseStatementSim, CaseInsideLRMExample) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

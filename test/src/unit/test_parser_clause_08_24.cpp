@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection8, OutOfBlockMethod) {
+TEST(ClassParsing, OutOfBlockMethod) {
   auto r = Parse(
       "module m;\n"
       "  class test_cls;\n"
@@ -19,7 +19,7 @@ TEST(ParserSection8, OutOfBlockMethod) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserA26, FuncPrototypeExtern) {
+TEST(FunctionDeclParsing, FuncPrototypeExtern) {
   auto r = Parse(
       "module m;\n"
       "  extern function int foo(input int x);\n"
@@ -49,7 +49,7 @@ TEST(SourceText, ClassMethodPrototype) {
   EXPECT_TRUE(members[1]->method->is_extern);
 }
 
-TEST(ParserA26, FuncBodyClassScope) {
+TEST(FunctionDeclParsing, FuncBodyClassScope) {
   auto r = Parse(
       "class C;\n"
       "  extern function int foo();\n"
@@ -63,7 +63,7 @@ TEST(ParserA26, FuncBodyClassScope) {
   ASSERT_GE(r.cu->modules.size() + r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection8_24, FuncBodyMethodClassStored) {
+TEST(ParameterizedClassParsing, FuncBodyMethodClassStored) {
   auto r = Parse(
       "class C;\n"
       "  extern function int foo();\n"
@@ -84,7 +84,7 @@ TEST(ParserSection8_24, FuncBodyMethodClassStored) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserA26, FuncBodyOutOfBlockConstructor) {
+TEST(FunctionDeclParsing, FuncBodyOutOfBlockConstructor) {
   auto r = Parse(
       "class C;\n"
       "  extern function new();\n"
@@ -95,7 +95,7 @@ TEST(ParserA26, FuncBodyOutOfBlockConstructor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA27, TaskBodyClassScope) {
+TEST(TaskDeclParsing, TaskBodyClassScope) {
   auto r = Parse(
       "class C;\n"
       "  extern task my_task(input int x);\n"
@@ -107,7 +107,7 @@ TEST(ParserA27, TaskBodyClassScope) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection8_24, TaskBodyMethodClassStored) {
+TEST(ParameterizedClassParsing, TaskBodyMethodClassStored) {
   auto r = Parse(
       "class C;\n"
       "  extern task run();\n"
@@ -126,7 +126,7 @@ TEST(ParserSection8_24, TaskBodyMethodClassStored) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserSection8_24, RegularFuncNoMethodClass) {
+TEST(ParameterizedClassParsing, RegularFuncNoMethodClass) {
   auto r = Parse(
       "function int bar();\n"
       "  return 0;\n"
@@ -142,7 +142,7 @@ TEST(ParserSection8_24, RegularFuncNoMethodClass) {
   EXPECT_TRUE(found);
 }
 
-TEST(ParserClause08_03, ExternConstructorPrototype) {
+TEST(ClassSyntaxParsing, ExternConstructorPrototype) {
   auto r = Parse(
       "class C;\n"
       "  extern function new(int x);\n"

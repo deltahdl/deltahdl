@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA86, UnaryReductionAndElaborates) {
+TEST(OperatorElaboration, UnaryReductionAndElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -18,7 +18,7 @@ TEST(ElabA86, UnaryReductionAndElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, UnaryReductionNandElaborates) {
+TEST(OperatorElaboration, UnaryReductionNandElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -31,7 +31,7 @@ TEST(ElabA86, UnaryReductionNandElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, UnaryReductionOrElaborates) {
+TEST(OperatorElaboration, UnaryReductionOrElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -44,7 +44,7 @@ TEST(ElabA86, UnaryReductionOrElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, UnaryReductionNorElaborates) {
+TEST(OperatorElaboration, UnaryReductionNorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -57,7 +57,7 @@ TEST(ElabA86, UnaryReductionNorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, UnaryReductionXorElaborates) {
+TEST(OperatorElaboration, UnaryReductionXorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -70,7 +70,7 @@ TEST(ElabA86, UnaryReductionXorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, UnaryReductionXnorElaborates) {
+TEST(OperatorElaboration, UnaryReductionXnorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -83,7 +83,7 @@ TEST(ElabA86, UnaryReductionXnorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, UnaryReductionXnorAltElaborates) {
+TEST(OperatorElaboration, UnaryReductionXnorAltElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -96,7 +96,7 @@ TEST(ElabA86, UnaryReductionXnorAltElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimCh9, AlwaysCombReductionAnd) {
+TEST(AlwaysCombBasicSim, AlwaysCombReductionAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -118,7 +118,7 @@ TEST(SimCh9, AlwaysCombReductionAnd) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9b, AlwaysCombReductionOr) {
+TEST(AlwaysCombExtendedSim, AlwaysCombReductionOr) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

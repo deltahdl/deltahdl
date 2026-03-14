@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA29, ImportThenDirectionPorts) {
+TEST(InterfaceDeclParsing, ImportThenDirectionPorts) {
   auto r = Parse(
       "interface bus;\n"
       "  logic data;\n"

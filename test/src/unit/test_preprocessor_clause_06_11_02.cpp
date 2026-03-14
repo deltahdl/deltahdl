@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, ValueSet_2StateBitDecl) {
+TEST(DataTypeParsing, ValueSet_2StateBitDecl) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  bit [7:0] val;\n"

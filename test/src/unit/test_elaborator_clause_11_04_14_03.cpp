@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA81, StreamingConcatAsLhsRightShiftElab) {
+TEST(ConcatenationElaboration, StreamingConcatAsLhsRightShiftElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -18,7 +18,7 @@ TEST(ElabA81, StreamingConcatAsLhsRightShiftElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA81, StreamingConcatAsLhsLeftShiftElab) {
+TEST(ConcatenationElaboration, StreamingConcatAsLhsLeftShiftElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(ElabA81, StreamingConcatAsLhsLeftShiftElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA81, StreamingConcatAsLhsWithSliceSizeElab) {
+TEST(ConcatenationElaboration, StreamingConcatAsLhsWithSliceSizeElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -42,7 +42,7 @@ TEST(ElabA81, StreamingConcatAsLhsWithSliceSizeElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA81, StreamingConcatAsLhsFromStreamingRhsElab) {
+TEST(ConcatenationElaboration, StreamingConcatAsLhsFromStreamingRhsElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -54,7 +54,7 @@ TEST(ElabA81, StreamingConcatAsLhsFromStreamingRhsElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SimA81, StreamingUnpackRightShift) {
+TEST(ConcatenationSim, StreamingUnpackRightShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -74,7 +74,7 @@ TEST(SimA81, StreamingUnpackRightShift) {
   EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
 }
 
-TEST(SimA81, StreamingUnpackLeftShiftByte) {
+TEST(ConcatenationSim, StreamingUnpackLeftShiftByte) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -94,7 +94,7 @@ TEST(SimA81, StreamingUnpackLeftShiftByte) {
   EXPECT_EQ(vb->value.ToUint64(), 0xABu);
 }
 
-TEST(SimA81, StreamingUnpackSingleElement) {
+TEST(ConcatenationSim, StreamingUnpackSingleElement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, AssumeProperty_WithElseAction) {
+TEST(AssertionDeclParsing, AssumeProperty_WithElseAction) {
   auto r = Parse(
       "module m;\n"
       "  assume property (@(posedge clk) req)\n"
@@ -20,7 +20,7 @@ TEST(ParserA210, AssumeProperty_WithElseAction) {
   EXPECT_NE(item->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserA210, AssumeProperty_NoActionBlock) {
+TEST(AssertionDeclParsing, AssumeProperty_NoActionBlock) {
   auto r = Parse(
       "module m;\n"
       "  assume property (@(posedge clk) req |-> ack);\n"
@@ -33,7 +33,7 @@ TEST(ParserA210, AssumeProperty_NoActionBlock) {
   EXPECT_EQ(item->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserSection16, AssumePropertyModuleLevel) {
+TEST(AssertionParsing, AssumePropertyModuleLevel) {
   auto r = Parse(
       "module m;\n"
       "  assume property (@(posedge clk) valid);\n"
@@ -49,7 +49,7 @@ TEST(ParserSection16, AssumePropertyModuleLevel) {
 }
 using VerifyParseTest = ProgramTestParse;
 
-TEST(ParserSection16, Sec16_5_1_AssumePropertySimple) {
+TEST(AssertionParsing, AssumePropertySimple) {
   auto r = Parse(
       "module m;\n"
       "  assume property (@(posedge clk) valid);\n"
@@ -62,7 +62,7 @@ TEST(ParserSection16, Sec16_5_1_AssumePropertySimple) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
-TEST(ParserSection16, Sec16_5_1_AssumePropertyClocked) {
+TEST(AssertionParsing, AssumePropertyClocked) {
   auto r = Parse(
       "module m;\n"
       "  assume property (@(posedge clk) req |-> gnt);\n"
@@ -75,7 +75,7 @@ TEST(ParserSection16, Sec16_5_1_AssumePropertyClocked) {
   EXPECT_NE(ap->assert_expr, nullptr);
 }
 
-TEST(ParserSection16, Sec16_5_1_AssumePropertyElseAction) {
+TEST(AssertionParsing, AssumePropertyElseAction) {
   auto r = Parse(
       "module m;\n"
       "  assume property (@(posedge clk) en |-> ready)\n"
@@ -90,7 +90,7 @@ TEST(ParserSection16, Sec16_5_1_AssumePropertyElseAction) {
   EXPECT_NE(ap->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserSection16, ConcurrentAssumePropertyWithAction) {
+TEST(AssertionParsing, ConcurrentAssumePropertyWithAction) {
   auto r = Parse(
       "module m;\n"
       "  assume property (@(posedge clk) req |-> gnt)\n"
@@ -103,7 +103,7 @@ TEST(ParserSection16, ConcurrentAssumePropertyWithAction) {
   EXPECT_NE(ap->assert_fail_stmt, nullptr);
 }
 
-TEST(ParserAnnexF, AnnexFAssumeProperty) {
+TEST(AssertionSemanticsParsing, AssumeProperty) {
   auto r = Parse(
       "module m;\n"
       "  assume property (@(posedge clk) req |-> ##[1:3] ack);\n"
@@ -124,7 +124,7 @@ using DpiParseTest = ProgramTestParse;
 
 using ApiParseTest = ProgramTestParse;
 
-TEST(ParserSection39, AssumePropertyStatement) {
+TEST(AssertionApiParsing, AssumePropertyStatement) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, req, gnt;
@@ -133,7 +133,7 @@ TEST(ParserSection39, AssumePropertyStatement) {
   )"));
 }
 
-TEST(ParserA610, AssumePropertyModule) {
+TEST(AssertionStatementSyntaxParsing, AssumePropertyModule) {
   auto r = Parse(
       "module m;\n"
       "  assume property (req |-> ack);\n"

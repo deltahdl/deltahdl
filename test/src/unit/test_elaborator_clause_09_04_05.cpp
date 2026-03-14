@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_04_05, BlockingIntraDelayElaborates) {
+TEST(EventWaitElaboration, BlockingIntraDelayElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -18,7 +18,7 @@ TEST(ElabClause09_04_05, BlockingIntraDelayElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_05, NonblockingIntraDelayElaborates) {
+TEST(EventWaitElaboration, NonblockingIntraDelayElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(ElabClause09_04_05, NonblockingIntraDelayElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_05, BlockingIntraEventElaborates) {
+TEST(EventWaitElaboration, BlockingIntraEventElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -42,7 +42,7 @@ TEST(ElabClause09_04_05, BlockingIntraEventElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_05, NonblockingIntraEventElaborates) {
+TEST(EventWaitElaboration, NonblockingIntraEventElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -54,7 +54,7 @@ TEST(ElabClause09_04_05, NonblockingIntraEventElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_05, RepeatEventBlockingElaborates) {
+TEST(EventWaitElaboration, RepeatEventBlockingElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -66,7 +66,7 @@ TEST(ElabClause09_04_05, RepeatEventBlockingElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_05, RepeatEventNonblockingElaborates) {
+TEST(EventWaitElaboration, RepeatEventNonblockingElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

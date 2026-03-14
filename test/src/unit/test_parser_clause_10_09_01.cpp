@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA84, PrimaryAssignmentPattern) {
+TEST(PrimaryParsing, PrimaryAssignmentPattern) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -17,7 +17,7 @@ TEST(ParserA84, PrimaryAssignmentPattern) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, PatternAssignment) {
+TEST(PatternParsing, PatternAssignment) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -28,7 +28,7 @@ TEST(ParserA60701, PatternAssignment) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, AssignmentPatternReplication) {
+TEST(PatternParsing, AssignmentPatternReplication) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -39,7 +39,7 @@ TEST(ParserA60701, AssignmentPatternReplication) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, AssignmentPatternReplicationMultiElem) {
+TEST(PatternParsing, AssignmentPatternReplicationMultiElem) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -50,7 +50,7 @@ TEST(ParserA60701, AssignmentPatternReplicationMultiElem) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, ArrayPatternKeyConstExpr) {
+TEST(PatternParsing, ArrayPatternKeyConstExpr) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -61,7 +61,7 @@ TEST(ParserA60701, ArrayPatternKeyConstExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA60701, ReplicationPatternRepeatCount) {
+TEST(PatternParsing, ReplicationPatternRepeatCount) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -82,7 +82,7 @@ TEST(ParserA60701, ReplicationPatternRepeatCount) {
   EXPECT_NE(rep->repeat_count, nullptr);
 }
 
-TEST(ParserCh510, AssignmentPatternPositional_Parse) {
+TEST(StructureLiteralParsing, AssignmentPatternPositional_Parse) {
   auto r = Parse(
       "module t;\n"
       "  initial x = '{1, 2, 3};\n"
@@ -96,7 +96,7 @@ TEST(ParserCh510, AssignmentPatternPositional_Parse) {
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
 }
 
-TEST(ParserA84, ConstantPrimaryAssignmentPattern) {
+TEST(PrimaryParsing, ConstantPrimaryAssignmentPattern) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -107,7 +107,7 @@ TEST(ParserA84, ConstantPrimaryAssignmentPattern) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, Sec11_1_AssignmentPatternExpression) {
+TEST(OperatorAndExpressionParsing, AssignmentPatternExpression) {
   auto r = Parse(
       "module t;\n"
       "  int arr[3];\n"
@@ -119,7 +119,7 @@ TEST(ParserSection11, Sec11_1_AssignmentPatternExpression) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-TEST(ParserSection7, AssignmentPatternPositional) {
+TEST(AggregateTypeParsing, AssignmentPatternPositional) {
   auto r = Parse(
       "module t;\n"
       "  int C[3] = '{10, 20, 30};\n"
@@ -131,7 +131,7 @@ TEST(ParserSection7, AssignmentPatternPositional) {
   EXPECT_EQ(item->init_expr->kind, ExprKind::kAssignmentPattern);
 }
 
-TEST(ParserCh510, AssignmentPattern_IntKey) {
+TEST(StructureLiteralParsing, AssignmentPattern_IntKey) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef int triple[1:3];\n"
@@ -139,21 +139,21 @@ TEST(ParserCh510, AssignmentPattern_IntKey) {
               "endmodule"));
 }
 
-TEST(ParserCh510, AssignmentPattern_Replication) {
+TEST(StructureLiteralParsing, AssignmentPattern_Replication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int a[1:3] = '{3{1}};\n"
               "endmodule"));
 }
 
-TEST(ParserCh510, AssignmentPattern_NestedReplication) {
+TEST(StructureLiteralParsing, AssignmentPattern_NestedReplication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
               "endmodule"));
 }
 
-TEST(ParserCh510, StructLiteral_NestedBraces) {
+TEST(StructureLiteralParsing, StructLiteral_NestedBraces) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -161,28 +161,28 @@ TEST(ParserCh510, StructLiteral_NestedBraces) {
               "endmodule"));
 }
 
-TEST(ParserCh511, ArrayLiteral_Nested) {
+TEST(ArrayLiteralParsing, ArrayLiteral_Nested) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};\n"
               "endmodule"));
 }
 
-TEST(ParserCh511, ArrayLiteral_Simple) {
+TEST(ArrayLiteralParsing, ArrayLiteral_Simple) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int arr[0:2] = '{10, 20, 30};\n"
               "endmodule"));
 }
 
-TEST(ParserCh511, ArrayLiteral_DefaultValue) {
+TEST(ArrayLiteralParsing, ArrayLiteral_DefaultValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int arr[0:3] = '{default:0};\n"
               "endmodule"));
 }
 
-TEST(NestedBracesArrayOfStructs, Cl5_10_NestedBracesArrayOfStructs) {
+TEST(NestedBracesArrayOfStructs, NestedBracesArrayOfStructs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
@@ -200,7 +200,7 @@ TEST(ArrayAssignmentPatterns, NestedStructPatternElements) {
   VerifyNestedPatternElements(r, 2u);
 }
 
-TEST(NestedReplication, Cl5_10_NestedReplication) {
+TEST(NestedReplication, NestedReplication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; int b[4];} ab_t;\n"
@@ -210,7 +210,7 @@ TEST(NestedReplication, Cl5_10_NestedReplication) {
               "endmodule\n"));
 }
 
-TEST(EmptyAssignmentPattern, Cl5_10_EmptyAssignmentPattern) {
+TEST(EmptyAssignmentPattern, EmptyAssignmentPattern) {
   auto r = Parse(
       "module m;\n"
       "  initial x = '{};\n"

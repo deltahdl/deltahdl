@@ -48,7 +48,7 @@ TEST_F(ConfigTest, CellClauseLiblist) {
   EXPECT_EQ(rule->liblist[1], "lib3");
 }
 
-TEST(ParserSection34, ConfigWithDefaultLiblist) {
+TEST(ProtectedEnvelopeParsing, ConfigWithDefaultLiblist) {
   auto r = Parse(R"(
     config cfg1;
       design mylib.top;
@@ -60,7 +60,7 @@ TEST(ParserSection34, ConfigWithDefaultLiblist) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg1");
 }
 
-TEST(ParserSection34, ConfigWithMultipleLibraries) {
+TEST(ProtectedEnvelopeParsing, ConfigWithMultipleLibraries) {
   auto r = Parse(R"(
     config design_cfg;
       design lib1.chip_top;

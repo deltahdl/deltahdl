@@ -10,7 +10,7 @@ TEST(Parser, VirtualClass) {
   EXPECT_TRUE(r.cu->classes[0]->is_virtual);
 }
 
-TEST(ParserSection8, PureVirtualFunction) {
+TEST(ClassParsing, PureVirtualFunction) {
   auto r = Parse(
       "virtual class Base;\n"
       "  pure virtual function void display();\n"
@@ -24,7 +24,7 @@ TEST(ParserSection8, PureVirtualFunction) {
   EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
 }
 
-TEST(ParserA26, FuncPrototypePureVirtual) {
+TEST(FunctionDeclParsing, FuncPrototypePureVirtual) {
   auto r = Parse(
       "class C;\n"
       "  pure virtual function int compute(input int x);\n"
@@ -35,7 +35,7 @@ TEST(ParserA26, FuncPrototypePureVirtual) {
   EXPECT_TRUE(m->is_pure_virtual);
 }
 
-TEST(ParserA27, TaskPrototypePureVirtual) {
+TEST(TaskDeclParsing, TaskPrototypePureVirtual) {
   auto r = Parse(
       "class C;\n"
       "  pure virtual task do_work(input int x);\n"
@@ -46,7 +46,7 @@ TEST(ParserA27, TaskPrototypePureVirtual) {
   EXPECT_TRUE(m->is_pure_virtual);
 }
 
-TEST(ParserSection8_21, NonPureVirtualNotFlagged) {
+TEST(AbstractClassParsing, NonPureVirtualNotFlagged) {
   auto r = Parse(
       "class Base;\n"
       "  virtual function void display(); endfunction\n"
@@ -57,7 +57,7 @@ TEST(ParserSection8_21, NonPureVirtualNotFlagged) {
   EXPECT_FALSE(m->is_pure_virtual);
 }
 
-TEST(ParserSection8_21, AbstractExtendsAbstract) {
+TEST(AbstractClassParsing, AbstractExtendsAbstract) {
   auto r = Parse(
       "virtual class Shape;\n"
       "  pure virtual function int area();\n"
@@ -72,7 +72,7 @@ TEST(ParserSection8_21, AbstractExtendsAbstract) {
   EXPECT_TRUE(r.cu->classes[1]->members[0]->is_pure_virtual);
 }
 
-TEST(ParserSection8_21, ConcreteOverridesPureVirtual) {
+TEST(AbstractClassParsing, ConcreteOverridesPureVirtual) {
   auto r = Parse(
       "virtual class Base;\n"
       "  pure virtual function void display();\n"

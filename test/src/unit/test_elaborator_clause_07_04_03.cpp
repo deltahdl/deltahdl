@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA25, PackedAndUnpackedElaboration) {
+TEST(DeclarationRangeParsing, PackedAndUnpackedElaboration) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [7:0] mem [0:3]; endmodule\n", f);
   ASSERT_NE(design, nullptr);

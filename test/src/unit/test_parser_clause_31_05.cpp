@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA70503, EdgeControlSpecifier01_10) {
+TEST(TimingCheckEventDefParsing, EdgeControlSpecifier01_10) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -23,7 +23,7 @@ TEST(ParserA70503, EdgeControlSpecifier01_10) {
   EXPECT_EQ(tc->data_edge_descriptors[1].second, '0');
 }
 
-TEST(ParserA70503, EdgeControlSpecifierSingle01) {
+TEST(TimingCheckEventDefParsing, EdgeControlSpecifierSingle01) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -39,7 +39,7 @@ TEST(ParserA70503, EdgeControlSpecifierSingle01) {
   EXPECT_EQ(tc->data_edge_descriptors[0].second, '1');
 }
 
-TEST(ParserA70503, EdgeControlSpecifierXTransitions) {
+TEST(TimingCheckEventDefParsing, EdgeControlSpecifierXTransitions) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -56,7 +56,7 @@ TEST(ParserA70503, EdgeControlSpecifierXTransitions) {
   EXPECT_EQ(tc->data_edge_descriptors[1].second, '1');
 }
 
-TEST(ParserA70503, EdgeControlSpecifierZTransitions) {
+TEST(TimingCheckEventDefParsing, EdgeControlSpecifierZTransitions) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -73,7 +73,7 @@ TEST(ParserA70503, EdgeControlSpecifierZTransitions) {
   EXPECT_EQ(tc->ref_edge_descriptors[1].second, '1');
 }
 
-TEST(ParserA70503, EdgeControlSpecifierToXTransitions) {
+TEST(TimingCheckEventDefParsing, EdgeControlSpecifierToXTransitions) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -90,7 +90,7 @@ TEST(ParserA70503, EdgeControlSpecifierToXTransitions) {
   EXPECT_EQ(tc->data_edge_descriptors[1].second, 'x');
 }
 
-TEST(ParserA70503, EdgeKeywordWithoutBrackets) {
+TEST(TimingCheckEventDefParsing, EdgeKeywordWithoutBrackets) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -104,7 +104,7 @@ TEST(ParserA70503, EdgeKeywordWithoutBrackets) {
   EXPECT_TRUE(tc->data_edge_descriptors.empty());
 }
 
-TEST(ParserA70503, EdgeControlSpecifierOnRefEvent) {
+TEST(TimingCheckEventDefParsing, EdgeControlSpecifierOnRefEvent) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

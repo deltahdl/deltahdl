@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA810, StaticMethodThisError) {
+TEST(StaticMethodElaboration, StaticMethodThisError) {
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  int x;\n"
@@ -17,7 +17,7 @@ TEST(ElabA810, StaticMethodThisError) {
              "endmodule\n"));
 }
 
-TEST(ElabA810, StaticMethodSuperError) {
+TEST(StaticMethodElaboration, StaticMethodSuperError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  function void foo(); endfunction\n"
@@ -32,7 +32,7 @@ TEST(ElabA810, StaticMethodSuperError) {
              "endmodule\n"));
 }
 
-TEST(ElabA810, StaticMethodAccessingStaticPropertyOk) {
+TEST(StaticMethodElaboration, StaticMethodAccessingStaticPropertyOk) {
   EXPECT_TRUE(
       ElabOk("class id;\n"
              "  static int current;\n"
@@ -45,7 +45,7 @@ TEST(ElabA810, StaticMethodAccessingStaticPropertyOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA810, NonStaticMethodThisOk) {
+TEST(StaticMethodElaboration, NonStaticMethodThisOk) {
   EXPECT_TRUE(
       ElabOk("class Demo;\n"
              "  int x;\n"
@@ -58,7 +58,7 @@ TEST(ElabA810, NonStaticMethodThisOk) {
              "endmodule\n"));
 }
 
-TEST(ElabA810, StaticMethodNoThisSuperOk) {
+TEST(StaticMethodElaboration, StaticMethodNoThisSuperOk) {
   EXPECT_TRUE(
       ElabOk("class Util;\n"
              "  static function int add(int a, int b);\n"

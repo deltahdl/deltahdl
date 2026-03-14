@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA84, ConstantPrimaryRealLiteral) {
+TEST(PrimarySim, ConstantPrimaryRealLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -24,7 +24,7 @@ TEST(SimA84, ConstantPrimaryRealLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-TEST(SimA84, PrimaryStringLiteral) {
+TEST(PrimarySim, PrimaryStringLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -38,7 +38,7 @@ TEST(SimA84, PrimaryStringLiteral) {
   f.scheduler.Run();
 }
 
-TEST(SimA84, PrimaryIdentifier) {
+TEST(PrimarySim, PrimaryIdentifier) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -55,7 +55,7 @@ TEST(SimA84, PrimaryIdentifier) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimA84, PrimaryFunctionCall) {
+TEST(PrimarySim, PrimaryFunctionCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -73,7 +73,7 @@ TEST(SimA84, PrimaryFunctionCall) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-TEST(SimA84, PrimaryParenthesizedExpr) {
+TEST(PrimarySim, PrimaryParenthesizedExpr) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -90,7 +90,7 @@ TEST(SimA84, PrimaryParenthesizedExpr) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-TEST(SimA84, PrimaryOctalLiteral) {
+TEST(PrimarySim, PrimaryOctalLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

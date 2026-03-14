@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA612, RsProductionListRandJoin) {
+TEST(RandsequenceSyntaxParsing, RsProductionListRandJoin) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -20,7 +20,7 @@ TEST(ParserA612, RsProductionListRandJoin) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsProductionListRandJoinWithExpr) {
+TEST(RandsequenceSyntaxParsing, RsProductionListRandJoinWithExpr) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

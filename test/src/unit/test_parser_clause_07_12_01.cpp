@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection7, ArrayFindWithClause) {
+TEST(AggregateTypeParsing, ArrayFindWithClause) {
   auto r = Parse(
       "module t;\n"
       "  int d[] = '{1,2,3,4,5};\n"
@@ -18,7 +18,7 @@ TEST(ParserSection7, ArrayFindWithClause) {
   ASSERT_NE(rhs, nullptr);
 }
 
-TEST(ParserSection7, ArrayFindIndexMethod) {
+TEST(AggregateTypeParsing, ArrayFindIndexMethod) {
   auto r = Parse(
       "module t;\n"
       "  int arr[8];\n"
@@ -30,7 +30,7 @@ TEST(ParserSection7, ArrayFindIndexMethod) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection7, ArrayLocatorUnique) {
+TEST(AggregateTypeParsing, ArrayLocatorUnique) {
   auto r = Parse(
       "module t;\n"
       "  int s[] = '{10, 10, 3, 20, 20, 10};\n"
@@ -44,7 +44,7 @@ TEST(ParserSection7, ArrayLocatorUnique) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserSection7, ArrayLocatorFindWithClause) {
+TEST(AggregateTypeParsing, ArrayLocatorFindWithClause) {
   auto r = Parse(
       "module t;\n"
       "  int arr[] = '{1, 2, 3, 4, 5};\n"
@@ -58,7 +58,7 @@ TEST(ParserSection7, ArrayLocatorFindWithClause) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(ParserSection7, ArrayLocatorFindIndex) {
+TEST(AggregateTypeParsing, ArrayLocatorFindIndex) {
   auto r = Parse(
       "module t;\n"
       "  int arr[] = '{10, 20, 30};\n"
@@ -70,7 +70,7 @@ TEST(ParserSection7, ArrayLocatorFindIndex) {
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
 }
-TEST(ParserSection7, ArrayMethodMin) {
+TEST(AggregateTypeParsing, ArrayMethodMin) {
   auto r = Parse(
       "module t;\n"
       "  initial y = arr.min;\n"
@@ -84,7 +84,7 @@ TEST(ParserSection7, ArrayMethodMin) {
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserA609, ArrayMethodUnique) {
+TEST(SubroutineCallSyntaxParsing, ArrayMethodUnique) {
   auto r = Parse(
       "module m;\n"
       "  initial begin arr.unique(); end\n"
@@ -96,7 +96,7 @@ TEST(ParserA609, ArrayMethodUnique) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-TEST(ParserA609, ArrayMethodWithClause) {
+TEST(SubroutineCallSyntaxParsing, ArrayMethodWithClause) {
   auto r = Parse(
       "module m;\n"
       "  int arr[4];\n"
@@ -107,7 +107,7 @@ TEST(ParserA609, ArrayMethodWithClause) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA82, ArrayManipCallWithClause) {
+TEST(SubroutineCallExprParsing, ArrayManipCallWithClause) {
   auto r = Parse(
       "module m;\n"
       "  int arr[4];\n"
@@ -118,7 +118,7 @@ TEST(ParserA82, ArrayManipCallWithClause) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA82, ArrayMethodNameUnique) {
+TEST(SubroutineCallExprParsing, ArrayMethodNameUnique) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = arr.unique(); end\n"
@@ -127,7 +127,7 @@ TEST(ParserA82, ArrayMethodNameUnique) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection7, ArrayMethodMax) {
+TEST(AggregateTypeParsing, ArrayMethodMax) {
   auto r = Parse(
       "module t;\n"
       "  int arr[] = '{5, 1, 3};\n"
@@ -141,7 +141,7 @@ TEST(ParserSection7, ArrayMethodMax) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserSection7, ArrayMethodUniqueIndex) {
+TEST(AggregateTypeParsing, ArrayMethodUniqueIndex) {
   auto r = Parse(
       "module t;\n"
       "  int arr[] = '{1, 2, 1, 3};\n"

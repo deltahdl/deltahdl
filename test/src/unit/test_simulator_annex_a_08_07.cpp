@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA87, OctalNumber) {
+TEST(NumberSim, OctalNumber) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -24,7 +24,7 @@ TEST(SimA87, OctalNumber) {
   EXPECT_EQ(var->value.ToUint64(), 077u);
 }
 
-TEST(SimA87, Size1Bit) {
+TEST(NumberSim, Size1Bit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -41,7 +41,7 @@ TEST(SimA87, Size1Bit) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimA87, FixedPointNumber) {
+TEST(NumberSim, FixedPointNumber) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -58,7 +58,7 @@ TEST(SimA87, FixedPointNumber) {
   EXPECT_DOUBLE_EQ(ToDouble(var), 2.718);
 }
 
-TEST(SimA87, HexDigitLowercase) {
+TEST(NumberSim, HexDigitLowercase) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -75,7 +75,7 @@ TEST(SimA87, HexDigitLowercase) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDEFu);
 }
 
-TEST(SimA87, BinaryXDigit) {
+TEST(NumberSim, BinaryXDigit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

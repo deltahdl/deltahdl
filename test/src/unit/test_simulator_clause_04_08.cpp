@@ -23,7 +23,7 @@ static void ScheduleAssignAndDisplay(Scheduler& sched, int& q, int& p,
   sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, display);
 }
 
-TEST(SimCh48, EvalAndUpdateEventsIntermingleInActive) {
+TEST(RaceConditionSim, EvalAndUpdateEventsIntermingleInActive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -45,7 +45,7 @@ TEST(SimCh48, EvalAndUpdateEventsIntermingleInActive) {
               (order[0] == "update" && order[1] == "eval"));
 }
 
-TEST(SimCh48, BlockingAssignmentTriggersUpdateEvent) {
+TEST(RaceConditionSim, BlockingAssignmentTriggersUpdateEvent) {
   Arena arena;
   Scheduler sched(arena);
   int q = 1;
@@ -68,7 +68,7 @@ TEST(SimCh48, BlockingAssignmentTriggersUpdateEvent) {
   EXPECT_EQ(p, 0);
 }
 
-TEST(SimCh48, UpdateEventRacesWithProcessContinuation) {
+TEST(RaceConditionSim, UpdateEventRacesWithProcessContinuation) {
   Arena arena;
   Scheduler sched(arena);
   int p = 1;
@@ -87,7 +87,7 @@ TEST(SimCh48, UpdateEventRacesWithProcessContinuation) {
   EXPECT_TRUE(display_value == 0 || display_value == 1);
 }
 
-TEST(SimCh48, BothRaceOutcomesAreValid) {
+TEST(RaceConditionSim, BothRaceOutcomesAreValid) {
   Arena arena;
   Scheduler sched(arena);
   int p = 1;
@@ -109,7 +109,7 @@ TEST(SimCh48, BothRaceOutcomesAreValid) {
   EXPECT_TRUE(observed_p[0] == 0 || observed_p[0] == 1);
 }
 
-TEST(SimCh48, LRMExampleAssignPEqualsQ) {
+TEST(RaceConditionSim, LRMExampleAssignPEqualsQ) {
   Arena arena;
   Scheduler sched(arena);
   int q = 0;
@@ -140,7 +140,7 @@ TEST(SimCh48, LRMExampleAssignPEqualsQ) {
   EXPECT_TRUE(display_result == 0 || display_result == 1);
 }
 
-TEST(SimCh48, MultipleUpdateEventsRaceWithEachOther) {
+TEST(RaceConditionSim, MultipleUpdateEventsRaceWithEachOther) {
   Arena arena;
   Scheduler sched(arena);
   int a = 0;
@@ -169,7 +169,7 @@ TEST(SimCh48, MultipleUpdateEventsRaceWithEachOther) {
   EXPECT_EQ(c, 3);
 }
 
-TEST(SimCh48, RaceConditionAcrossMultipleNets) {
+TEST(RaceConditionSim, RaceConditionAcrossMultipleNets) {
   Arena arena;
   Scheduler sched(arena);
   int x = 0;
@@ -214,7 +214,7 @@ TEST(SimCh48, RaceConditionAcrossMultipleNets) {
   EXPECT_TRUE(observed_net_y == 0 || observed_net_y == 20);
 }
 
-TEST(SimCh48, EvalAndUpdateEventKindsDistinct) {
+TEST(RaceConditionSim, EvalAndUpdateEventKindsDistinct) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<EventKind> kinds;
@@ -237,7 +237,7 @@ TEST(SimCh48, EvalAndUpdateEventKindsDistinct) {
   EXPECT_EQ(kinds[1], EventKind::kUpdate);
 }
 
-TEST(SimCh48, NoRaceBetweenDifferentRegions) {
+TEST(RaceConditionSim, NoRaceBetweenDifferentRegions) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;
@@ -258,7 +258,7 @@ TEST(SimCh48, NoRaceBetweenDifferentRegions) {
   EXPECT_EQ(observed, 42);
 }
 
-TEST(SimCh48, NBAEliminatesActiveRegionRace) {
+TEST(RaceConditionSim, NBAEliminatesActiveRegionRace) {
   Arena arena;
   Scheduler sched(arena);
   int q = 1;

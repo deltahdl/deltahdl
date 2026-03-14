@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Mux2to1LrmExample) {
+TEST(DesignBuildingBlockParsing, Mux2to1LrmExample) {
   auto r = ParseWithPreprocessor(
       "module mux2to1 (input wire a, b, sel,\n"
       "                output logic y);\n"
@@ -26,7 +26,7 @@ TEST(ParserClause03, Mux2to1LrmExample) {
   EXPECT_EQ(blk->always_kind, AlwaysKind::kAlwaysComb);
 }
 
-TEST(ParserClause03, ModuleDeclarations) {
+TEST(DesignBuildingBlockParsing, ModuleDeclarations) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire [7:0] w;\n"
@@ -48,7 +48,7 @@ TEST(ParserClause03, ModuleDeclarations) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 7u);
 }
 
-TEST(ParserClause03, SubroutinesAndProceduralBlocks) {
+TEST(DesignBuildingBlockParsing, SubroutinesAndProceduralBlocks) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  logic clk, a, b;\n"

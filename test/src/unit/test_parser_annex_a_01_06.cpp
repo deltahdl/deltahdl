@@ -26,7 +26,7 @@ TEST(SourceText, InterfaceMultipleItemTypes) {
       HasItemKindNamed(ifc->items, ModuleItemKind::kTaskDecl, "run_parallel"));
 }
 
-TEST(InterfaceItemsA16, InterfaceContinuousAssign) {
+TEST(InterfaceItemsParsing, InterfaceContinuousAssign) {
   auto r = Parse(
       "interface ifc;\n"
       "  wire a, b;\n"
@@ -38,7 +38,7 @@ TEST(InterfaceItemsA16, InterfaceContinuousAssign) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kContAssign));
 }
 
-TEST(InterfaceItemsA16, ExternMethodPrototype) {
+TEST(InterfaceItemsParsing, ExternMethodPrototype) {
   auto r = Parse(
       "interface ifc;\n"
       "  extern function void work();\n"
@@ -51,7 +51,7 @@ TEST(InterfaceItemsA16, ExternMethodPrototype) {
   EXPECT_TRUE(func->is_extern);
 }
 
-TEST(InterfaceItemsA16, ExternForkjoinTask) {
+TEST(InterfaceItemsParsing, ExternForkjoinTask) {
   auto r = Parse(
       "interface ifc;\n"
       "  extern forkjoin task parallel_run();\n"
@@ -65,7 +65,7 @@ TEST(InterfaceItemsA16, ExternForkjoinTask) {
   EXPECT_TRUE(task->is_forkjoin);
 }
 
-TEST(InterfaceItemsA16, InterfaceGenerateRegion) {
+TEST(InterfaceItemsParsing, InterfaceGenerateRegion) {
   auto r = Parse(
       "interface ifc;\n"
       "  generate\n"
@@ -76,7 +76,7 @@ TEST(InterfaceItemsA16, InterfaceGenerateRegion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(InterfaceItemsA16, InterfaceNestedProgram) {
+TEST(InterfaceItemsParsing, InterfaceNestedProgram) {
   auto r = Parse(
       "interface ifc;\n"
       "  program prg;\n"
@@ -86,7 +86,7 @@ TEST(InterfaceItemsA16, InterfaceNestedProgram) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(InterfaceItemsA16, ModportDeclaration) {
+TEST(InterfaceItemsParsing, ModportDeclaration) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic data;\n"
@@ -98,7 +98,7 @@ TEST(InterfaceItemsA16, ModportDeclaration) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
 }
 
-TEST(InterfaceItemsA16, InterfaceNestedInterface) {
+TEST(InterfaceItemsParsing, InterfaceNestedInterface) {
   auto r = Parse(
       "interface outer_ifc;\n"
       "  interface inner_ifc;\n"
@@ -108,7 +108,7 @@ TEST(InterfaceItemsA16, InterfaceNestedInterface) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(InterfaceItemsA16, InterfaceTimeunits) {
+TEST(InterfaceItemsParsing, InterfaceTimeunits) {
   auto r = Parse(
       "interface ifc;\n"
       "  timeunit 1ns;\n"
@@ -118,7 +118,7 @@ TEST(InterfaceItemsA16, InterfaceTimeunits) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(InterfaceItemsA16, InterfacePortDecl) {
+TEST(InterfaceItemsParsing, InterfacePortDecl) {
   auto r = Parse(
       "interface ifc(a, b);\n"
       "  input a;\n"
@@ -128,7 +128,7 @@ TEST(InterfaceItemsA16, InterfacePortDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(InterfaceItemsA16, InterfaceAlways) {
+TEST(InterfaceItemsParsing, InterfaceAlways) {
   auto r = Parse(
       "interface ifc;\n"
       "  logic clk;\n"
@@ -138,7 +138,7 @@ TEST(InterfaceItemsA16, InterfaceAlways) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(InterfaceItemsA16, InterfaceInitial) {
+TEST(InterfaceItemsParsing, InterfaceInitial) {
   auto r = Parse(
       "interface ifc;\n"
       "  initial begin end\n"
@@ -149,7 +149,7 @@ TEST(InterfaceItemsA16, InterfaceInitial) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-TEST(InterfaceItemsA16, InterfaceAssertProperty) {
+TEST(InterfaceItemsParsing, InterfaceAssertProperty) {
   auto r = Parse(
       "interface ifc;\n"
       "  assert property (@(posedge clk) req |-> ack);\n"

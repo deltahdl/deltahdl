@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, ClassVarDecl_VarType) {
+TEST(DataTypeParsing, ClassVarDecl_VarType) {
   auto r = Parse(
       "class MyClass;\n"
       "  int x;\n"
@@ -28,7 +28,7 @@ TEST(ParserSection6, ClassVarDecl_VarType) {
   EXPECT_EQ(var_item->data_type.type_name, "MyClass");
 }
 
-TEST(ParserSection8, NullExpression) {
+TEST(ClassParsing, NullExpression) {
   auto r = Parse(
       "module m;\n"
       "  class test_cls;\n"
@@ -43,7 +43,7 @@ TEST(ParserSection8, NullExpression) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParserSection6, ClassVarDecl_ClassParsed) {
+TEST(DataTypeParsing, ClassVarDecl_ClassParsed) {
   auto r = Parse(
       "class MyClass;\n"
       "  int x;\n"

@@ -67,7 +67,7 @@ TEST(Lowerer, SensitivityMapPopulated) {
   EXPECT_FALSE(procs.empty());
 }
 
-TEST(SimCh4, InitialAndAlwaysCombConcurrent) {
+TEST(SchedulingSemanticsSim, InitialAndAlwaysCombConcurrent) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -85,7 +85,7 @@ TEST(SimCh4, InitialAndAlwaysCombConcurrent) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-TEST(SimCh4, CombAndSequentialAbstractions) {
+TEST(SchedulingSemanticsSim, CombAndSequentialAbstractions) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -106,7 +106,7 @@ TEST(SimCh4, CombAndSequentialAbstractions) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-TEST(SimCh4, ConcurrentAlwaysCombBlocks) {
+TEST(SchedulingSemanticsSim, ConcurrentAlwaysCombBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -124,7 +124,7 @@ TEST(SimCh4, ConcurrentAlwaysCombBlocks) {
   EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 12u);
 }
 
-TEST(SimCh4, AlwaysCombWithBeginEnd) {
+TEST(SchedulingSemanticsSim, AlwaysCombWithBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -145,7 +145,7 @@ TEST(SimCh4, AlwaysCombWithBeginEnd) {
   EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 7u);
 }
 
-TEST(SimClause09_02_02_02, AlwaysCombTriggersAfterInitial) {
+TEST(AlwaysLatchSim, AlwaysCombTriggersAfterInitial) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -164,7 +164,7 @@ TEST(SimClause09_02_02_02, AlwaysCombTriggersAfterInitial) {
   EXPECT_EQ(b->value.ToUint64(), 99u);
 }
 
-TEST(SimClause09_02_02_02, AlwaysCombRetriggersOnChange) {
+TEST(AlwaysLatchSim, AlwaysCombRetriggersOnChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -186,7 +186,7 @@ TEST(SimClause09_02_02_02, AlwaysCombRetriggersOnChange) {
   EXPECT_EQ(b->value.ToUint64(), 11u);
 }
 
-TEST(SimClause09_02_02_02, AlwaysCombMuxPattern) {
+TEST(AlwaysLatchSim, AlwaysCombMuxPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

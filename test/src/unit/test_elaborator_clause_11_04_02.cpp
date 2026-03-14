@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA83, PrefixIncrementElaborates) {
+TEST(ExpressionElaboration, PrefixIncrementElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(ElabA83, PrefixIncrementElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA83, PostfixDecrementElaborates) {
+TEST(ExpressionElaboration, PostfixDecrementElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -28,7 +28,7 @@ TEST(ElabA83, PostfixDecrementElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA86, IncOrDecElaborates) {
+TEST(OperatorElaboration, IncOrDecElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

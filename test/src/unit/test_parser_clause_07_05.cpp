@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA25, UnsizedDimDynamicArray) {
+TEST(DeclarationRangeParsing, UnsizedDimDynamicArray) {
   auto r = Parse("module m; int d []; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -16,7 +16,7 @@ TEST(ParserA25, UnsizedDimDynamicArray) {
   EXPECT_EQ(item->unpacked_dims[0], nullptr);
 }
 
-TEST(ParserSection7, DynamicArrayDecl) {
+TEST(AggregateTypeParsing, DynamicArrayDecl) {
   auto r = Parse(
       "module t;\n"
       "  int dyn[];\n"
@@ -28,7 +28,7 @@ TEST(ParserSection7, DynamicArrayDecl) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(ParserSection7, DynamicArrayMultiDim) {
+TEST(AggregateTypeParsing, DynamicArrayMultiDim) {
   auto r = Parse(
       "module t;\n"
       "  integer mem[2][];\n"

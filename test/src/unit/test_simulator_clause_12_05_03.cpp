@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA607, UniqueCaseQualifier) {
+TEST(CaseStatementSim, UniqueCaseQualifier) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -29,7 +29,7 @@ TEST(SimA607, UniqueCaseQualifier) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimA607, PriorityCaseFirstMatch) {
+TEST(CaseStatementSim, PriorityCaseFirstMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -53,7 +53,7 @@ TEST(SimA607, PriorityCaseFirstMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(SimA607, UniqueCaseOverlapViolation) {
+TEST(CaseStatementSim, UniqueCaseOverlapViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -79,7 +79,7 @@ TEST(SimA607, UniqueCaseOverlapViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA607, Unique0CaseOverlapViolation) {
+TEST(CaseStatementSim, Unique0CaseOverlapViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -103,7 +103,7 @@ TEST(SimA607, Unique0CaseOverlapViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA607, UniqueCaseNoMatchNoDefaultViolation) {
+TEST(CaseStatementSim, UniqueCaseNoMatchNoDefaultViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -125,7 +125,7 @@ TEST(SimA607, UniqueCaseNoMatchNoDefaultViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA607, Unique0CaseNoMatchNoDefaultNoViolation) {
+TEST(CaseStatementSim, Unique0CaseNoMatchNoDefaultNoViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -147,7 +147,7 @@ TEST(SimA607, Unique0CaseNoMatchNoDefaultNoViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(SimA607, PriorityCaseNoMatchNoDefaultViolation) {
+TEST(CaseStatementSim, PriorityCaseNoMatchNoDefaultViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -169,7 +169,7 @@ TEST(SimA607, PriorityCaseNoMatchNoDefaultViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(SimA607, UniqueCaseSingleMatchNoViolation) {
+TEST(CaseStatementSim, UniqueCaseSingleMatchNoViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -194,7 +194,7 @@ TEST(SimA607, UniqueCaseSingleMatchNoViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(SimA607, UniqueCaseNoMatchWithDefaultNoViolation) {
+TEST(CaseStatementSim, UniqueCaseNoMatchWithDefaultNoViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

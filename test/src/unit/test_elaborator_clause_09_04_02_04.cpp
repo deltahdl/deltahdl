@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_04_02_04, SequenceEventElaborates) {
+TEST(SequentialEventControlElaboration, SequenceEventElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(ElabClause09_04_02_04, SequenceEventElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause09_04_02_04, SequenceDeclarationAndUsage) {
+TEST(SequentialEventControlElaboration, SequenceDeclarationAndUsage) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

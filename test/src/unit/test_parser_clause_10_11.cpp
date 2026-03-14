@@ -11,7 +11,7 @@ static ModuleItem* FindAlias(const std::vector<ModuleItem*>& items) {
 }
 namespace {
 
-TEST(ParserA601, NetAlias_TwoNets) {
+TEST(ContinuousAssignSyntaxParsing, NetAlias_TwoNets) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b;\n"
@@ -24,7 +24,7 @@ TEST(ParserA601, NetAlias_TwoNets) {
   ASSERT_EQ(alias->alias_nets.size(), 2u);
 }
 
-TEST(ParserA601, NetAlias_ThreeNets) {
+TEST(ContinuousAssignSyntaxParsing, NetAlias_ThreeNets) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, c;\n"
@@ -37,7 +37,7 @@ TEST(ParserA601, NetAlias_ThreeNets) {
   ASSERT_EQ(alias->alias_nets.size(), 3u);
 }
 
-TEST(ParserA601, NetAlias_FourNets) {
+TEST(ContinuousAssignSyntaxParsing, NetAlias_FourNets) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, c, d;\n"
@@ -50,7 +50,7 @@ TEST(ParserA601, NetAlias_FourNets) {
   ASSERT_EQ(alias->alias_nets.size(), 4u);
 }
 
-TEST(ParserA601, NetAlias_BitSelect) {
+TEST(ContinuousAssignSyntaxParsing, NetAlias_BitSelect) {
   auto r = Parse(
       "module m;\n"
       "  wire [31:0] A, B;\n"

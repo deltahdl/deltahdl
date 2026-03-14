@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityStar) {
+TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_ImplicitSensitivityStar) {
   auto r = Parse(
       "module m;\n"
       "  always @* y = a + b;\n"
@@ -15,7 +15,7 @@ TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityStar) {
   ASSERT_NE(item, nullptr);
 }
 
-TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityParenStar) {
+TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_ImplicitSensitivityParenStar) {
   auto r = Parse(
       "module m;\n"
       "  always @(*) y = a + b;\n"
@@ -26,7 +26,7 @@ TEST(ParserA602, AlwaysConstruct_ImplicitSensitivityParenStar) {
   ASSERT_NE(item, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSimple) {
+TEST(ProcessParsing, AtStarAlwaysSimple) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -42,7 +42,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSimple) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSimple) {
+TEST(ProcessParsing, AtStarParenAlwaysSimple) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -58,7 +58,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSimple) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelInitial) {
+TEST(ProcessParsing, AtStarStmtLevelInitial) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -75,7 +75,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelInitial) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarVarDecls) {
+TEST(ProcessParsing, AlwaysStarVarDecls) {
   auto r = Parse(
       "module m;\n"
       "  always @* begin\n"
@@ -87,7 +87,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarVarDecls) {
   VerifyAlwaysVarDecl(r);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarParenStmtLevel) {
+TEST(ProcessParsing, AtStarParenStmtLevel) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -104,7 +104,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenStmtLevel) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarBeginEndBlock) {
+TEST(ProcessParsing, AtStarBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -123,7 +123,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarParenBeginEndBlock) {
+TEST(ProcessParsing, AtStarParenBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -142,7 +142,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarFunctionCall) {
+TEST(ProcessParsing, AlwaysStarFunctionCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function logic [3:0] mux2(input logic sel,\n"
@@ -155,7 +155,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarFunctionCall) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarIfElseBody) {
+TEST(ProcessParsing, AtStarIfElseBody) {
   auto r = Parse(
       "module m;\n"
       "  reg sel, a, b, out;\n"
@@ -173,7 +173,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarIfElseBody) {
   EXPECT_NE(item->body->else_branch, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarCaseBody) {
+TEST(ProcessParsing, AtStarCaseBody) {
   auto r = Parse(
       "module m;\n"
       "  reg [1:0] sel;\n"
@@ -194,7 +194,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarCaseBody) {
   EXPECT_EQ(item->body->case_items.size(), 3u);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarMultipleAssigns) {
+TEST(ProcessParsing, AlwaysStarMultipleAssigns) {
   auto r = Parse(
       "module m;\n"
       "  always @* begin\n"
@@ -206,7 +206,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarMultipleAssigns) {
   VerifyAlwaysMultiAssigns(r);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarParenMultipleAssignments) {
+TEST(ProcessParsing, AtStarParenMultipleAssignments) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c, d, x, y, z;\n"
@@ -238,7 +238,7 @@ static void VerifyStarEventControl(ParseResult& r) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarEventIsStarTrue) {
+TEST(ProcessParsing, StmtLevelStarEventIsStarTrue) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -248,7 +248,7 @@ TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarEventIsStarTrue) {
   VerifyStarEventControl(r);
 }
 
-TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarParenEventIsStarTrue) {
+TEST(ProcessParsing, StmtLevelStarParenEventIsStarTrue) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -258,7 +258,7 @@ TEST(ParserSection9, Sec9_2_2_2_StmtLevelStarParenEventIsStarTrue) {
   VerifyStarEventControl(r);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarInInitialBlock) {
+TEST(ProcessParsing, AtStarInInitialBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -276,7 +276,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarInInitialBlock) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarParenInInitialBlock) {
+TEST(ProcessParsing, AtStarParenInInitialBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -291,7 +291,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenInInitialBlock) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarNestedIfElseInBlock) {
+TEST(ProcessParsing, AlwaysStarNestedIfElseInBlock) {
   auto r = Parse(
       "module m;\n"
       "  always @* begin\n"
@@ -305,7 +305,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarNestedIfElseInBlock) {
   VerifyAlwaysNestedIfElse(r);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSensitivityEmpty) {
+TEST(ProcessParsing, AtStarAlwaysSensitivityEmpty) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -319,7 +319,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarAlwaysSensitivityEmpty) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSensitivityEmpty) {
+TEST(ProcessParsing, AtStarParenAlwaysSensitivityEmpty) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -333,7 +333,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenAlwaysSensitivityEmpty) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarNestedBlocks) {
+TEST(ProcessParsing, AtStarNestedBlocks) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -358,7 +358,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarNestedBlocks) {
   EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarVarDeclInBody) {
+TEST(ProcessParsing, AtStarVarDeclInBody) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -378,7 +378,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarVarDeclInBody) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarParenComplexCombLogic) {
+TEST(ProcessParsing, AtStarParenComplexCombLogic) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] a, b, c, sum, product;\n"
@@ -397,7 +397,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarParenComplexCombLogic) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarFunctionCalls) {
+TEST(ProcessParsing, AtStarFunctionCalls) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] a, result;\n"
@@ -414,7 +414,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarFunctionCalls) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarForLoop) {
+TEST(ProcessParsing, AtStarForLoop) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] data [0:3];\n"
@@ -445,7 +445,7 @@ static ModuleItem* NthAlwaysItem(ParseResult& r, size_t n) {
   return nullptr;
 }
 
-TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarBlocks) {
+TEST(ProcessParsing, MultipleAtStarBlocks) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c, x, y;\n"
@@ -464,7 +464,7 @@ TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarBlocks) {
   ASSERT_NE(item1->body, nullptr);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarCaseInside) {
+TEST(ProcessParsing, AtStarCaseInside) {
   auto r = Parse(
       "module m;\n"
       "  reg [1:0] sel;\n"
@@ -483,7 +483,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarCaseInside) {
   EXPECT_EQ(case_stmt->case_items.size(), 4u);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarPriorityCase) {
+TEST(ProcessParsing, AtStarPriorityCase) {
   auto r = Parse(
       "module m;\n"
       "  reg [1:0] sel;\n"
@@ -500,7 +500,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarPriorityCase) {
   EXPECT_EQ(case_stmt->qualifier, CaseQualifier::kPriority);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarConcatenation) {
+TEST(ProcessParsing, AtStarConcatenation) {
   auto r = Parse(
       "module m;\n"
       "  reg [3:0] a, b;\n"
@@ -518,7 +518,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarConcatenation) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarTernary) {
+TEST(ProcessParsing, AtStarTernary) {
   auto r = Parse(
       "module m;\n"
       "  reg sel, a, b, out;\n"
@@ -535,7 +535,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarTernary) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_IsStarEventTrueAtStarParen) {
+TEST(ProcessParsing, IsStarEventTrueAtStarParen) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -552,7 +552,7 @@ TEST(ParserSection9, Sec9_4_2_3_IsStarEventTrueAtStarParen) {
   EXPECT_EQ(stmt->events.size(), 0u);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarStmtBodyPresent) {
+TEST(ProcessParsing, AtStarStmtBodyPresent) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -569,7 +569,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarStmtBodyPresent) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelBeginEnd) {
+TEST(ProcessParsing, AtStarStmtLevelBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -591,7 +591,7 @@ TEST(ParserSection9, Sec9_4_2_3_AtStarStmtLevelBeginEnd) {
   EXPECT_EQ(stmt->body->stmts.size(), 2u);
 }
 
-TEST(ParserSection4, Sec4_5_StarEventControl) {
+TEST(SchedulingSemanticsParsing, StarEventControl) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -608,7 +608,7 @@ TEST(ParserSection4, Sec4_5_StarEventControl) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarInInitial) {
+TEST(ProcessParsing, MultipleAtStarInInitial) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c, d;\n"
@@ -629,7 +629,7 @@ TEST(ParserSection9, Sec9_4_2_3_MultipleAtStarInInitial) {
   EXPECT_TRUE(s1->is_star_event);
 }
 
-TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarCombiModule) {
+TEST(ProcessParsing, ParseOkAtStarCombiModule) {
   EXPECT_TRUE(
       ParseOk("module mux4(\n"
               "  input [1:0] sel,\n"
@@ -647,7 +647,7 @@ TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarCombiModule) {
               "endmodule\n"));
 }
 
-TEST(ParserSection4, Sec4_5_ParenStarEventControl) {
+TEST(SchedulingSemanticsParsing, ParenStarEventControl) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -664,7 +664,7 @@ TEST(ParserSection4, Sec4_5_ParenStarEventControl) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarParenCombiModule) {
+TEST(ProcessParsing, ParseOkAtStarParenCombiModule) {
   EXPECT_TRUE(
       ParseOk("module adder(\n"
               "  input [7:0] a, b,\n"
@@ -676,7 +676,7 @@ TEST(ParserSection9, Sec9_4_2_3_ParseOkAtStarParenCombiModule) {
               "endmodule\n"));
 }
 
-TEST(ParserSection10, Sec10_4_1_FullPatternAlwaysComb) {
+TEST(AssignmentParsing, FullPatternAlwaysComb) {
   EXPECT_TRUE(
       ParseOk("module m(\n"
               "  input [7:0] a, b,\n"
@@ -693,7 +693,7 @@ TEST(ParserSection10, Sec10_4_1_FullPatternAlwaysComb) {
               "endmodule\n"));
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarEmptySensitivity) {
+TEST(ProcessParsing, AlwaysStarEmptySensitivity) {
   auto r = Parse(
       "module m;\n"
       "  always @* y = a | b;\n"
@@ -705,7 +705,7 @@ TEST(ParserSection9, Sec9_2_2_2_AlwaysStarEmptySensitivity) {
   EXPECT_TRUE(item->sensitivity.empty());
 }
 
-TEST(ParserSection9, Sec9_2_2_2_AlwaysStarParenEquivalent) {
+TEST(ProcessParsing, AlwaysStarParenEquivalent) {
   auto r = Parse(
       "module m;\n"
       "  always @(*) y = a & b;\n"

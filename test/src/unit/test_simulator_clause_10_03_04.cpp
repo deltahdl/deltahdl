@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimClause100304, DefaultStrengthDrivesValue) {
+TEST(DriveStrengthSim, DefaultStrengthDrivesValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -23,7 +23,7 @@ TEST(SimClause100304, DefaultStrengthDrivesValue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimClause100304, ExplicitStrengthDrivesValue) {
+TEST(DriveStrengthSim, ExplicitStrengthDrivesValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -40,7 +40,7 @@ TEST(SimClause100304, ExplicitStrengthDrivesValue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimClause100304, StrongerDriverWins) {
+TEST(DriveStrengthSim, StrongerDriverWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -58,7 +58,7 @@ TEST(SimClause100304, StrongerDriverWins) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimClause100304, EqualStrengthConflictProducesX) {
+TEST(DriveStrengthSim, EqualStrengthConflictProducesX) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -77,7 +77,7 @@ TEST(SimClause100304, EqualStrengthConflictProducesX) {
   EXPECT_FALSE(var->value.IsKnown());
 }
 
-TEST(SimClause100304, HighzStrengthAllowsOtherDriver) {
+TEST(DriveStrengthSim, HighzStrengthAllowsOtherDriver) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -95,7 +95,7 @@ TEST(SimClause100304, HighzStrengthAllowsOtherDriver) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimClause100304, NetDeclWithStrength) {
+TEST(DriveStrengthSim, NetDeclWithStrength) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

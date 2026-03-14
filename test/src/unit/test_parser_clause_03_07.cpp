@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_7_BuiltInNInputGates) {
+TEST(DesignBuildingBlockParsing, BuiltInNInputGates) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, y;\n"
@@ -22,7 +22,7 @@ TEST(ParserClause03, Cl3_7_BuiltInNInputGates) {
   EXPECT_EQ(gates.size(), 6u);
 }
 
-TEST(ParserClause03, Cl3_7_BuiltInNOutputGates) {
+TEST(DesignBuildingBlockParsing, BuiltInNOutputGates) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire a, y1, y2;\n"
@@ -31,7 +31,7 @@ TEST(ParserClause03, Cl3_7_BuiltInNOutputGates) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_7_BuiltInEnableGates) {
+TEST(DesignBuildingBlockParsing, BuiltInEnableGates) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire a, en, y;\n"
@@ -42,7 +42,7 @@ TEST(ParserClause03, Cl3_7_BuiltInEnableGates) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_7_BuiltInPassGates) {
+TEST(DesignBuildingBlockParsing, BuiltInPassGates) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire a, b;\n"
@@ -51,7 +51,7 @@ TEST(ParserClause03, Cl3_7_BuiltInPassGates) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_7_BuiltInPassEnableGates) {
+TEST(DesignBuildingBlockParsing, BuiltInPassEnableGates) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire a, b, en;\n"
@@ -62,7 +62,7 @@ TEST(ParserClause03, Cl3_7_BuiltInPassEnableGates) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_7_BuiltInMosSwitches) {
+TEST(DesignBuildingBlockParsing, BuiltInMosSwitches) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire out, in, gate;\n"
@@ -73,7 +73,7 @@ TEST(ParserClause03, Cl3_7_BuiltInMosSwitches) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_7_BuiltInCmosSwitches) {
+TEST(DesignBuildingBlockParsing, BuiltInCmosSwitches) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire out, in, nctrl, pctrl;\n"
@@ -82,7 +82,7 @@ TEST(ParserClause03, Cl3_7_BuiltInCmosSwitches) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_7_BuiltInPullGates) {
+TEST(DesignBuildingBlockParsing, BuiltInPullGates) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire a, b;\n"
@@ -91,7 +91,7 @@ TEST(ParserClause03, Cl3_7_BuiltInPullGates) {
               "endmodule\n"));
 }
 
-TEST(ParserClause03, Cl3_7_UdpEnclosedByKeywords) {
+TEST(DesignBuildingBlockParsing, UdpEnclosedByKeywords) {
   auto r = Parse(
       "primitive udp_buf (output out, input in);\n"
       "  table 0 : 0; 1 : 1; endtable\n"
@@ -102,7 +102,7 @@ TEST(ParserClause03, Cl3_7_UdpEnclosedByKeywords) {
   EXPECT_EQ(r.cu->udps[0]->name, "udp_buf");
 }
 
-TEST(ParserClause03, Cl3_7_UdpInstantiationInModule) {
+TEST(DesignBuildingBlockParsing, UdpInstantiationInModule) {
   auto r = Parse(
       "primitive udp_and (output out, input a, b);\n"
       "  table 0 0 : 0; 0 1 : 0; 1 0 : 0; 1 1 : 1; endtable\n"
@@ -116,7 +116,7 @@ TEST(ParserClause03, Cl3_7_UdpInstantiationInModule) {
   EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
 }
 
-TEST(ParserClause03, Cl3_7_BuiltInAndUdpCoexist) {
+TEST(DesignBuildingBlockParsing, BuiltInAndUdpCoexist) {
   auto r = Parse(
       "primitive udp_inv (output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"

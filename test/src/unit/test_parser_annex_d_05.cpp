@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexD2, AnnexDKeyNokey) {
+TEST(OptionalSystemTaskExtendedParsing, KeyNokey) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

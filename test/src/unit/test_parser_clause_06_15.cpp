@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, ClassVariableDecl) {
+TEST(DataTypeParsing, ClassVariableDecl) {
   auto r = Parse(
       "class Packet;\n"
       "  int payload;\n"
@@ -27,7 +27,7 @@ TEST(ParserSection6, ClassVariableDecl) {
   EXPECT_EQ(var_item->data_type.type_name, "Packet");
 }
 
-TEST(ParserSection6, ClassVariableNullCheck) {
+TEST(DataTypeParsing, ClassVariableNullCheck) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
               "  int x;\n"
@@ -39,7 +39,7 @@ TEST(ParserSection6, ClassVariableNullCheck) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, ClassVariableNew) {
+TEST(DataTypeParsing, ClassVariableNew) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
               "  int x;\n"
@@ -50,7 +50,7 @@ TEST(ParserSection6, ClassVariableNew) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, ClassHandleAssignment) {
+TEST(DataTypeParsing, ClassHandleAssignment) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
               "  int x;\n"

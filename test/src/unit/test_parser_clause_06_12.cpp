@@ -6,7 +6,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection6, RealtimeWithInit) {
+TEST(DataTypeParsing, RealtimeWithInit) {
   auto r = Parse(
       "module t;\n"
       "  realtime ts = 100.0;\n"
@@ -18,7 +18,7 @@ TEST(ParserSection6, RealtimeWithInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection6, Sec6_5_RealVarDeclKind) {
+TEST(DataTypeParsing, RealVarDeclKind) {
   auto r = Parse(
       "module t;\n"
       "  real voltage;\n"
@@ -32,7 +32,7 @@ TEST(ParserSection6, Sec6_5_RealVarDeclKind) {
   EXPECT_FALSE(item->data_type.is_net);
 }
 
-TEST(ParserSection8, DataTypeSyntaxNonInteger) {
+TEST(ClassParsing, DataTypeSyntaxNonInteger) {
   auto r = Parse(
       "module m;\n"
       "  real r;\n"
@@ -47,7 +47,7 @@ TEST(ParserSection8, DataTypeSyntaxNonInteger) {
   EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kRealtime);
 }
 
-TEST(ParserSection6, RealVarDecl) {
+TEST(DataTypeParsing, RealVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  real r;\n"
@@ -58,7 +58,7 @@ TEST(ParserSection6, RealVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
 }
 
-TEST(ParserSection6, ShortrealVarDecl) {
+TEST(DataTypeParsing, ShortrealVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  shortreal sr;\n"
@@ -69,7 +69,7 @@ TEST(ParserSection6, ShortrealVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
 }
 
-TEST(ParserSection6, RealtimeVarDecl) {
+TEST(DataTypeParsing, RealtimeVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  realtime rt;\n"
@@ -80,7 +80,7 @@ TEST(ParserSection6, RealtimeVarDecl) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kRealtime);
 }
 
-TEST(ParserSection6, RealTypesInProcedural) {
+TEST(DataTypeParsing, RealTypesInProcedural) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -91,7 +91,7 @@ TEST(ParserSection6, RealTypesInProcedural) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, RealDecl) {
+TEST(DataTypeParsing, RealDecl) {
   auto r = Parse(
       "module m;\n"
       "  real r;\n"
@@ -104,7 +104,7 @@ TEST(ParserSection6, RealDecl) {
   EXPECT_EQ(item->name, "r");
 }
 
-TEST(ParserSection6, ShortrealDecl) {
+TEST(DataTypeParsing, ShortrealDecl) {
   auto r = Parse(
       "module m;\n"
       "  shortreal sr;\n"
@@ -117,7 +117,7 @@ TEST(ParserSection6, ShortrealDecl) {
   EXPECT_EQ(item->name, "sr");
 }
 
-TEST(ParserSection6, RealtimeDecl) {
+TEST(DataTypeParsing, RealtimeDecl) {
   auto r = Parse(
       "module m;\n"
       "  realtime rt;\n"
@@ -130,7 +130,7 @@ TEST(ParserSection6, RealtimeDecl) {
   EXPECT_EQ(item->name, "rt");
 }
 
-TEST(ParserSection6, MultipleRealDecls) {
+TEST(DataTypeParsing, MultipleRealDecls) {
   auto r = Parse(
       "module m;\n"
       "  real a, b, c;\n"
@@ -140,7 +140,7 @@ TEST(ParserSection6, MultipleRealDecls) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-TEST(ParserSection6, AllRealTypes) {
+TEST(DataTypeParsing, AllRealTypes) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r;\n"
@@ -149,7 +149,7 @@ TEST(ParserSection6, AllRealTypes) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, ShortrealInModule) {
+TEST(DataTypeParsing, ShortrealInModule) {
   auto r = Parse(
       "module m;\n"
       "  shortreal x = 1.0;\n"
@@ -161,7 +161,7 @@ TEST(ParserSection6, ShortrealInModule) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
 }
 
-TEST(ParserSection6, ShortrealInFunctionArg) {
+TEST(DataTypeParsing, ShortrealInFunctionArg) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function shortreal scale(shortreal val, shortreal factor);\n"
@@ -170,7 +170,7 @@ TEST(ParserSection6, ShortrealInFunctionArg) {
               "endmodule\n"));
 }
 
-TEST(ParserA221, NonIntegerTypes) {
+TEST(NetAndVariableTypeParsing, NonIntegerTypes) {
   auto r = Parse(
       "module m;\n"
       "  shortreal a;\n"

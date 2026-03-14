@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_02_02, FourAlwaysVariantsElaborate) {
+TEST(AlwaysProcedureElaboration, FourAlwaysVariantsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -45,7 +45,7 @@ TEST(ElabClause09_02_02, FourAlwaysVariantsElaborate) {
   EXPECT_TRUE(has_ff);
 }
 
-TEST(ElabClause09_02_02, MultipleAlwaysCombElaborate) {
+TEST(AlwaysProcedureElaboration, MultipleAlwaysCombElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

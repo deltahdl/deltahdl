@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA601, ContinuousAssignBasic) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssignBasic) {
   auto r = Parse(
       "module m;\n"
       "  assign a = b;\n"
@@ -18,7 +18,7 @@ TEST(ParserA601, ContinuousAssignBasic) {
   EXPECT_NE(item->assign_rhs, nullptr);
 }
 
-TEST(ParserA601, ContinuousAssignWithDriveStrength) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssignWithDriveStrength) {
   auto r = Parse(
       "module m;\n"
       "  assign (strong1, weak0) a = b;\n"
@@ -31,7 +31,7 @@ TEST(ParserA601, ContinuousAssignWithDriveStrength) {
   EXPECT_NE(item->drive_strength1, 0);
 }
 
-TEST(ParserA601, ContinuousAssignWithDelay3) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssignWithDelay3) {
   auto r = Parse(
       "module m;\n"
       "  assign #5 a = b;\n"
@@ -43,7 +43,7 @@ TEST(ParserA601, ContinuousAssignWithDelay3) {
   EXPECT_NE(item->assign_delay, nullptr);
 }
 
-TEST(ParserA601, ContinuousAssignWithDelay3TwoValues) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssignWithDelay3TwoValues) {
   auto r = Parse(
       "module m;\n"
       "  assign #(5, 10) a = b;\n"
@@ -55,7 +55,7 @@ TEST(ParserA601, ContinuousAssignWithDelay3TwoValues) {
   EXPECT_NE(item->assign_delay, nullptr);
 }
 
-TEST(ParserA601, ContinuousAssignWithDelay3ThreeValues) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssignWithDelay3ThreeValues) {
   auto r = Parse(
       "module m;\n"
       "  assign #(5, 10, 15) a = b;\n"
@@ -67,7 +67,7 @@ TEST(ParserA601, ContinuousAssignWithDelay3ThreeValues) {
   EXPECT_NE(item->assign_delay, nullptr);
 }
 
-TEST(ParserA601, ContinuousAssignStrengthAndDelay) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssignStrengthAndDelay) {
   auto r = Parse(
       "module m;\n"
       "  assign (strong1, pull0) #10 a = b;\n"
@@ -80,7 +80,7 @@ TEST(ParserA601, ContinuousAssignStrengthAndDelay) {
   EXPECT_NE(item->assign_delay, nullptr);
 }
 
-TEST(ParserA601, ListOfNetAssignments) {
+TEST(ContinuousAssignSyntaxParsing, ListOfNetAssignments) {
   auto r = Parse(
       "module m;\n"
       "  assign a = b, c = d;\n"
@@ -94,7 +94,7 @@ TEST(ParserA601, ListOfNetAssignments) {
   EXPECT_GE(count, 2);
 }
 
-TEST(ParserA601, NetAliasTwoNets) {
+TEST(ContinuousAssignSyntaxParsing, NetAliasTwoNets) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b;\n"
@@ -107,7 +107,7 @@ TEST(ParserA601, NetAliasTwoNets) {
   ASSERT_EQ(alias->alias_nets.size(), 2u);
 }
 
-TEST(ParserA601, NetAliasThreeNets) {
+TEST(ContinuousAssignSyntaxParsing, NetAliasThreeNets) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, c;\n"
@@ -120,7 +120,7 @@ TEST(ParserA601, NetAliasThreeNets) {
   ASSERT_EQ(alias->alias_nets.size(), 3u);
 }
 
-TEST(ParserA601, NetAssignmentWithExpression) {
+TEST(ContinuousAssignSyntaxParsing, NetAssignmentWithExpression) {
   auto r = Parse(
       "module m;\n"
       "  assign y = a & b | c;\n"
@@ -133,7 +133,7 @@ TEST(ParserA601, NetAssignmentWithExpression) {
   EXPECT_EQ(item->assign_rhs->kind, ExprKind::kBinary);
 }
 
-TEST(ParserA601, ContinuousAssignConcatLhs) {
+TEST(ContinuousAssignSyntaxParsing, ContinuousAssignConcatLhs) {
   auto r = Parse(
       "module m;\n"
       "  assign {a, b} = c;\n"

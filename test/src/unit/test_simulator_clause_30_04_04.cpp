@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA702, StateDependentPathSimulates) {
+TEST(SpecifyPathSim, StateDependentPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

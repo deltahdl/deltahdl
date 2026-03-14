@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA608, ForeverLoop) {
+TEST(LoopSyntaxParsing, ForeverLoop) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -20,7 +20,7 @@ TEST(ParserA608, ForeverLoop) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserA608, RepeatLoop) {
+TEST(LoopSyntaxParsing, RepeatLoop) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -36,7 +36,7 @@ TEST(ParserA608, RepeatLoop) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserA608, WhileLoop) {
+TEST(LoopSyntaxParsing, WhileLoop) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -52,7 +52,7 @@ TEST(ParserA608, WhileLoop) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ParserA608, ForLoop) {
+TEST(LoopSyntaxParsing, ForLoop) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -67,7 +67,7 @@ TEST(ParserA608, ForLoop) {
   EXPECT_NE(stmt->for_body, nullptr);
 }
 
-TEST(ParserA608, ForLoopNoInit) {
+TEST(LoopSyntaxParsing, ForLoopNoInit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -81,7 +81,7 @@ TEST(ParserA608, ForLoopNoInit) {
   EXPECT_EQ(stmt->kind, StmtKind::kFor);
 }
 
-TEST(ParserA608, ForLoopNoCondition) {
+TEST(LoopSyntaxParsing, ForLoopNoCondition) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -94,7 +94,7 @@ TEST(ParserA608, ForLoopNoCondition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA608, DoWhileLoop) {
+TEST(LoopSyntaxParsing, DoWhileLoop) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -111,7 +111,7 @@ TEST(ParserA608, DoWhileLoop) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-TEST(ParserA608, ForeachLoop) {
+TEST(LoopSyntaxParsing, ForeachLoop) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -126,7 +126,7 @@ TEST(ParserA608, ForeachLoop) {
   ASSERT_GE(stmt->foreach_vars.size(), 1u);
 }
 
-TEST(ParserA608, ForeachMultiDim) {
+TEST(LoopSyntaxParsing, ForeachMultiDim) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -141,7 +141,7 @@ TEST(ParserA608, ForeachMultiDim) {
   ASSERT_GE(stmt->foreach_vars.size(), 2u);
 }
 
-TEST(ParserA608, ForeachSkippedIndex) {
+TEST(LoopSyntaxParsing, ForeachSkippedIndex) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -155,7 +155,7 @@ TEST(ParserA608, ForeachSkippedIndex) {
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
 }
 
-TEST(ParserA608, ForWithMultipleVarDecls) {
+TEST(LoopSyntaxParsing, ForWithMultipleVarDecls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -167,7 +167,7 @@ TEST(ParserA608, ForWithMultipleVarDecls) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA608, RepeatWithBlock) {
+TEST(LoopSyntaxParsing, RepeatWithBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

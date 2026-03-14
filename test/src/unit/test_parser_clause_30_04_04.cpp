@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA86, BinaryModulePathLogicalAnd) {
+TEST(OperatorParsing, BinaryModulePathLogicalAnd) {
   auto r = Parse(
       "module m(input a, input b, output y);\n"
       "  specify\n"
@@ -22,7 +22,7 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
   return spec->specify_items[0];
 }
 
-TEST(ParserA702, StateDependentIfSimpleParallel) {
+TEST(SpecifyPathParsing, StateDependentIfSimpleParallel) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

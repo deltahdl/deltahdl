@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_7_2_DecimalNotation) {
+TEST(LexicalConventionParsing, DecimalNotation) {
   auto r = Parse(
       "module m;\n"
       "  initial x = 14.72;\n"
@@ -18,14 +18,14 @@ TEST(ParserClause05, Cl5_7_2_DecimalNotation) {
   EXPECT_DOUBLE_EQ(rhs->real_val, 14.72);
 }
 
-TEST(ParserClause05, Cl5_7_2_ZeroPointSomething) {
+TEST(LexicalConventionParsing, ZeroPointSomething) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 0.123;\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_7_2_FixedPointValue) {
+TEST(LexicalConventionParsing, FixedPointValue) {
   auto r = Parse("module m; real x; initial x = 2.718; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* rhs = FirstInitialRHS(r);
@@ -33,7 +33,7 @@ TEST(ParserClause05, Cl5_7_2_FixedPointValue) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserClause05, Cl5_7_2_PointFive) {
+TEST(LexicalConventionParsing, PointFive) {
   auto r = Parse("module m; real x; initial x = 0.5; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* rhs = FirstInitialRHS(r);
@@ -41,7 +41,7 @@ TEST(ParserClause05, Cl5_7_2_PointFive) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserClause05, Cl5_7_2_ScientificNotation) {
+TEST(LexicalConventionParsing, ScientificNotation) {
   auto r = Parse(
       "module m;\n"
       "  initial x = 1.30e-2;\n"
@@ -53,7 +53,7 @@ TEST(ParserClause05, Cl5_7_2_ScientificNotation) {
   EXPECT_DOUBLE_EQ(rhs->real_val, 0.013);
 }
 
-TEST(ParserClause05, Cl5_7_2_ExponentOnly) {
+TEST(LexicalConventionParsing, ExponentOnly) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r;\n"
@@ -61,7 +61,7 @@ TEST(ParserClause05, Cl5_7_2_ExponentOnly) {
               "endmodule"));
 }
 
-TEST(ParserClause05, Cl5_7_2_ExponentPositiveSign) {
+TEST(LexicalConventionParsing, ExponentPositiveSign) {
   auto r = Parse("module m; real x; initial x = 1.0e+2; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* rhs = FirstInitialRHS(r);
@@ -69,7 +69,7 @@ TEST(ParserClause05, Cl5_7_2_ExponentPositiveSign) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserClause05, Cl5_7_2_ExponentNegativeSign) {
+TEST(LexicalConventionParsing, ExponentNegativeSign) {
   auto r = Parse("module m; real x; initial x = 1.0e-2; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* rhs = FirstInitialRHS(r);
@@ -77,7 +77,7 @@ TEST(ParserClause05, Cl5_7_2_ExponentNegativeSign) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserClause05, Cl5_7_2_ScientificFull) {
+TEST(LexicalConventionParsing, ScientificFull) {
   auto r = Parse("module m; real x; initial x = 1.5e+3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* rhs = FirstInitialRHS(r);
@@ -85,7 +85,7 @@ TEST(ParserClause05, Cl5_7_2_ScientificFull) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserClause05, Cl5_7_2_ExpLowercase) {
+TEST(LexicalConventionParsing, ExpLowercase) {
   auto r = Parse("module m; real x; initial x = 2.5e2; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* rhs = FirstInitialRHS(r);
@@ -93,7 +93,7 @@ TEST(ParserClause05, Cl5_7_2_ExpLowercase) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserClause05, Cl5_7_2_ExpUppercase) {
+TEST(LexicalConventionParsing, ExpUppercase) {
   auto r = Parse("module m; real x; initial x = 2.5E2; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* rhs = FirstInitialRHS(r);
@@ -101,14 +101,14 @@ TEST(ParserClause05, Cl5_7_2_ExpUppercase) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserClause05, Cl5_7_2_UnderscoresInValue) {
+TEST(LexicalConventionParsing, UnderscoresInValue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 1_000.000_1;\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_7_2_WithExponent) {
+TEST(LexicalConventionParsing, WithExponent) {
   auto r = Parse(
       "module t;\n"
       "  real r;\n"
@@ -118,7 +118,7 @@ TEST(ParserClause05, Cl5_7_2_WithExponent) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserClause05, Cl5_7_2_ConstantPrimaryReal) {
+TEST(LexicalConventionParsing, ConstantPrimaryReal) {
   auto r = Parse("module m; parameter real R = 3.14; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* param = r.cu->modules[0]->items[0];
@@ -126,21 +126,21 @@ TEST(ParserClause05, Cl5_7_2_ConstantPrimaryReal) {
   EXPECT_EQ(param->init_expr->kind, ExprKind::kRealLiteral);
 }
 
-TEST(ParserClause05, Cl5_7_2_RealDeclarationInit) {
+TEST(LexicalConventionParsing, RealDeclarationInit) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 1.5;\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_7_2_RealNegativeExponent) {
+TEST(LexicalConventionParsing, RealNegativeExponent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 1.0e-3;\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_7_2_RealPositiveExponent) {
+TEST(LexicalConventionParsing, RealPositiveExponent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 2.5E+4;\n"
@@ -155,7 +155,7 @@ TEST(ConstEvalReal, RealLiteralEval) {
   EXPECT_NEAR(val.value_or(0.0), 3.14, 1e-6);
 }
 
-TEST(ParserSection11, RealLiteralAddition) {
+TEST(OperatorAndExpressionParsing, RealLiteralAddition) {
   auto r = Parse(
       "module t;\n"
       "  real r;\n"

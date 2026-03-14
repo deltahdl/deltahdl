@@ -17,103 +17,103 @@ static bool LexHasErrors(const std::string& src) {
   return diag.HasErrors();
 }
 
-TEST(LexA88, StringLiteralQuotedString) {
+TEST(StringLiteralLexing, StringLiteralQuotedString) {
   auto tokens = Lex("\"hello\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
   EXPECT_EQ(tokens[0].text, "\"hello\"");
 }
 
-TEST(LexA88, StringLiteralTripleQuotedString) {
+TEST(StringLiteralLexing, StringLiteralTripleQuotedString) {
   auto tokens = Lex(R"("""hello""")");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
   EXPECT_EQ(tokens[0].text, "\"\"\"hello\"\"\"");
 }
 
-TEST(LexA88, QuotedStringItemRegularAscii) {
+TEST(StringLiteralLexing, QuotedStringItemRegularAscii) {
   auto tokens = Lex("\"ABC xyz 123 !@#\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
   EXPECT_EQ(tokens[0].text, "\"ABC xyz 123 !@#\"");
 }
 
-TEST(LexA88, QuotedStringEmpty) {
+TEST(StringLiteralLexing, QuotedStringEmpty) {
   auto tokens = Lex("\"\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
   EXPECT_EQ(tokens[0].text, "\"\"");
 }
 
-TEST(LexA88, TripleQuotedStringItemNewline) {
+TEST(StringLiteralLexing, TripleQuotedStringItemNewline) {
   auto tokens = Lex("\"\"\"line1\nline2\"\"\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexA88, TripleQuotedStringItemDoubleQuote) {
+TEST(StringLiteralLexing, TripleQuotedStringItemDoubleQuote) {
   auto tokens = Lex("\"\"\"say \\\"hi\\\"\"\"\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexA88, StringEscapeSeqAnyAsciiNamed) {
+TEST(StringLiteralLexing, StringEscapeSeqAnyAsciiNamed) {
   auto tokens = Lex("\"\\n\\t\\\\\\\"\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexA88, StringEscapeSeqAnyAsciiUnknown) {
+TEST(StringLiteralLexing, StringEscapeSeqAnyAsciiUnknown) {
   auto tokens = Lex("\"\\b\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexA88, StringEscapeSeqOctalOneDigit) {
+TEST(StringLiteralLexing, StringEscapeSeqOctalOneDigit) {
   auto tokens = Lex("\"\\7\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexA88, StringEscapeSeqOctalTwoDigits) {
+TEST(StringLiteralLexing, StringEscapeSeqOctalTwoDigits) {
   auto tokens = Lex("\"\\77\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexA88, StringEscapeSeqOctalThreeDigits) {
+TEST(StringLiteralLexing, StringEscapeSeqOctalThreeDigits) {
   auto tokens = Lex("\"\\101\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexA88, StringEscapeSeqHexOneDigit) {
+TEST(StringLiteralLexing, StringEscapeSeqHexOneDigit) {
   auto tokens = Lex("\"\\xA\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexA88, StringEscapeSeqHexTwoDigits) {
+TEST(StringLiteralLexing, StringEscapeSeqHexTwoDigits) {
   auto tokens = Lex("\"\\x41\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexA88, TripleQuotedStringEscapeSeq) {
+TEST(StringLiteralLexing, TripleQuotedStringEscapeSeq) {
   auto tokens = Lex("\"\"\"\\n\\x41\\101\"\"\"");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexA88, QuotedStringUnterminatedError) {
+TEST(StringLiteralLexing, QuotedStringUnterminatedError) {
   EXPECT_TRUE(LexHasErrors("\"no closing quote\n"));
 }
 
-TEST(LexA88, TripleQuotedStringUnterminatedError) {
+TEST(StringLiteralLexing, TripleQuotedStringUnterminatedError) {
   EXPECT_TRUE(LexHasErrors("\"\"\"no closing triple"));
 }
 
-TEST(LexA88, TwoConsecutiveStringLiterals) {
+TEST(StringLiteralLexing, TwoConsecutiveStringLiterals) {
   auto tokens = Lex("\"a\" \"b\"");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);

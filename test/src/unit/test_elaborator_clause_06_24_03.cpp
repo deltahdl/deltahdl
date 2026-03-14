@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh6, BitStreamArrayToInt) {
+TEST(DataTypeSim, BitStreamArrayToInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -33,7 +33,7 @@ TEST(SimCh6, BitStreamArrayToInt) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
-TEST(SimCh6, BitStreamShortArrayToInt) {
+TEST(DataTypeSim, BitStreamShortArrayToInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -58,7 +58,7 @@ TEST(SimCh6, BitStreamShortArrayToInt) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEu);
 }
 
-TEST(SimCh6, BitStreamStructRoundTrip) {
+TEST(DataTypeSim, BitStreamStructRoundTrip) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

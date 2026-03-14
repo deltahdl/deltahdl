@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh45, ExecuteSimulationStartsAtTimeZero) {
+TEST(SimulationAlgorithmSim, ExecuteSimulationStartsAtTimeZero) {
   Arena arena;
   Scheduler sched(arena);
   uint64_t observed_time = UINT64_MAX;
@@ -23,7 +23,7 @@ TEST(SimCh45, ExecuteSimulationStartsAtTimeZero) {
   EXPECT_EQ(observed_time, 0u);
 }
 
-TEST(SimCh45, ExecuteSimulationAdvancesThroughNonemptyTimeSlots) {
+TEST(SimulationAlgorithmSim, ExecuteSimulationAdvancesThroughNonemptyTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<uint64_t> times;
@@ -43,7 +43,7 @@ TEST(SimCh45, ExecuteSimulationAdvancesThroughNonemptyTimeSlots) {
   EXPECT_EQ(times[2], 10u);
 }
 
-TEST(SimCh45, ExecuteSimulationStopsWhenAllTimeSlotsEmpty) {
+TEST(SimulationAlgorithmSim, ExecuteSimulationStopsWhenAllTimeSlotsEmpty) {
   Arena arena;
   Scheduler sched(arena);
   int count = 0;
@@ -58,9 +58,9 @@ TEST(SimCh45, ExecuteSimulationStopsWhenAllTimeSlotsEmpty) {
   EXPECT_FALSE(sched.HasEvents());
 }
 
-TEST(SimCh45, ExecuteTimeSlotFullRegionOrdering) { VerifyAllRegionOrder(); }
+TEST(SimulationAlgorithmSim, ExecuteTimeSlotFullRegionOrdering) { VerifyAllRegionOrder(); }
 
-TEST(SimCh45, ActiveSetIterationReExecutesActiveAfterInactive) {
+TEST(SimulationAlgorithmSim, ActiveSetIterationReExecutesActiveAfterInactive) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -80,7 +80,7 @@ TEST(SimCh45, ActiveSetIterationReExecutesActiveAfterInactive) {
   EXPECT_EQ(order[1], "active_from_inactive");
 }
 
-TEST(SimCh45, ActiveSetReIteratesWhenNBAGeneratesActiveEvent) {
+TEST(SimulationAlgorithmSim, ActiveSetReIteratesWhenNBAGeneratesActiveEvent) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -100,13 +100,13 @@ TEST(SimCh45, ActiveSetReIteratesWhenNBAGeneratesActiveEvent) {
   EXPECT_EQ(order[1], "active_from_nba");
 }
 
-TEST(SimCh45, PrePostponedOnlyAfterActiveAndReactiveSetsEmpty) {
+TEST(SimulationAlgorithmSim, PrePostponedOnlyAfterActiveAndReactiveSetsEmpty) {
   VerifyThreeRegionOrder({Region::kActive, "active"},
                          {Region::kReactive, "reactive"},
                          {Region::kPrePostponed, "pre_postponed"});
 }
 
-TEST(SimCh45, ReactiveRestartsActiveSetBeforePrePostponed) {
+TEST(SimulationAlgorithmSim, ReactiveRestartsActiveSetBeforePrePostponed) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -131,7 +131,7 @@ TEST(SimCh45, ReactiveRestartsActiveSetBeforePrePostponed) {
   EXPECT_EQ(order[2], "pre_postponed");
 }
 
-TEST(SimCh45, ExecuteRegionDrainsAllEventsInFIFOOrder) {
+TEST(SimulationAlgorithmSim, ExecuteRegionDrainsAllEventsInFIFOOrder) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
@@ -149,7 +149,7 @@ TEST(SimCh45, ExecuteRegionDrainsAllEventsInFIFOOrder) {
   }
 }
 
-TEST(SimCh45, IterativeRegionOrderMatchesAlgorithm) {
+TEST(SimulationAlgorithmSim, IterativeRegionOrderMatchesAlgorithm) {
   constexpr Region kIterativeRegions[] = {
       Region::kActive,     Region::kInactive,     Region::kPreNBA,
       Region::kNBA,        Region::kPostNBA,      Region::kPreObserved,

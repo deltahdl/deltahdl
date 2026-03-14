@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA603, NestedSeqBlockExecution) {
+TEST(BlockStatementSimSyntax, NestedSeqBlockExecution) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

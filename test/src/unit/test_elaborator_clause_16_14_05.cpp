@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA610, AssertPropertyElaborates) {
+TEST(AssertionStatementElaboration, AssertPropertyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

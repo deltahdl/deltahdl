@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA84, PrimaryCast) {
+TEST(PrimarySim, PrimaryCast) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

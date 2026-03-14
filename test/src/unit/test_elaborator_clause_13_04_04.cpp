@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA603, ForkJoinNoneAllowedInFunction) {
+TEST(BlockStatementElaboration, ForkJoinNoneAllowedInFunction) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(ElabA603, ForkJoinNoneAllowedInFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabA603, ForkJoinAnyIllegalInFunction) {
+TEST(BlockStatementElaboration, ForkJoinAnyIllegalInFunction) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -33,7 +33,7 @@ TEST(ElabA603, ForkJoinAnyIllegalInFunction) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1344, ForkJoinNotAllowedInFunction) {
+TEST(FunctionSideEffectsElaboration, ForkJoinNotAllowedInFunction) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -47,7 +47,7 @@ TEST(Elab1344, ForkJoinNotAllowedInFunction) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elab1344, NonblockingAssignAllowedInFunction) {
+TEST(FunctionSideEffectsElaboration, NonblockingAssignAllowedInFunction) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -61,7 +61,7 @@ TEST(Elab1344, NonblockingAssignAllowedInFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1344, EventTriggerAllowedInFunction) {
+TEST(FunctionSideEffectsElaboration, EventTriggerAllowedInFunction) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -75,7 +75,7 @@ TEST(Elab1344, EventTriggerAllowedInFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1344, ForkJoinNoneWithDelayInFunction) {
+TEST(FunctionSideEffectsElaboration, ForkJoinNoneWithDelayInFunction) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

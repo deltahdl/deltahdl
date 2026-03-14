@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_5_ProcessesAndContinuousAssign) {
+TEST(DesignBuildingBlockParsing, ProcessesAndContinuousAssign) {
   auto r = ParseWithPreprocessor(
       "interface ifc;\n"
       "  logic sig_a, sig_b;\n"

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh9, AlwaysCombStructAssign) {
+TEST(AlwaysCombBasicSim, AlwaysCombStructAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

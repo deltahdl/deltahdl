@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA28, LetDeclInFunction) {
+TEST(BlockItemDeclParsing, LetDeclInFunction) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function void foo();\n"
@@ -14,7 +14,7 @@ TEST(ParserA28, LetDeclInFunction) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetDecl_NoArgs) {
+TEST(ConstraintDeclParsing, LetDecl_NoArgs) {
   auto r = Parse(
       "module m;\n"
       "  let addr = base + offset;\n"
@@ -26,7 +26,7 @@ TEST(ParserA212, LetDecl_NoArgs) {
   EXPECT_EQ(item->name, "addr");
 }
 
-TEST(ParserA212, LetDecl_EmptyParens) {
+TEST(ConstraintDeclParsing, LetDecl_EmptyParens) {
   auto r = Parse(
       "module m;\n"
       "  let my_val() = 42;\n"
@@ -39,7 +39,7 @@ TEST(ParserA212, LetDecl_EmptyParens) {
   EXPECT_TRUE(item->func_args.empty());
 }
 
-TEST(ParserA212, LetDecl_WithArgs) {
+TEST(ConstraintDeclParsing, LetDecl_WithArgs) {
   auto r = Parse(
       "module m;\n"
       "  let op(x, y, z) = |((x | y) & z);\n"
@@ -52,7 +52,7 @@ TEST(ParserA212, LetDecl_WithArgs) {
   ASSERT_EQ(item->func_args.size(), 3u);
 }
 
-TEST(ParserA212, LetDecl_HasBodyExpr) {
+TEST(ConstraintDeclParsing, LetDecl_HasBodyExpr) {
   auto r = Parse(
       "module m;\n"
       "  let sum(a, b) = a + b;\n"
@@ -64,42 +64,42 @@ TEST(ParserA212, LetDecl_HasBodyExpr) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserA212, LetDecl_ComplexExpr) {
+TEST(ConstraintDeclParsing, LetDecl_ComplexExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let max(a, b) = (a > b) ? a : b;\n"
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetDecl_InPackage) {
+TEST(ConstraintDeclParsing, LetDecl_InPackage) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
               "  let my_op(x, y) = x & y;\n"
               "endpackage\n"));
 }
 
-TEST(ParserA212, LetDecl_InInterface) {
+TEST(ConstraintDeclParsing, LetDecl_InInterface) {
   EXPECT_TRUE(
       ParseOk("interface ifc;\n"
               "  let bus_ok(req, ack) = req & ack;\n"
               "endinterface\n"));
 }
 
-TEST(ParserA212, LetDecl_InProgram) {
+TEST(ConstraintDeclParsing, LetDecl_InProgram) {
   EXPECT_TRUE(
       ParseOk("program p;\n"
               "  let tval(x) = x + 1;\n"
               "endprogram\n"));
 }
 
-TEST(ParserA212, LetDecl_InChecker) {
+TEST(ConstraintDeclParsing, LetDecl_InChecker) {
   EXPECT_TRUE(
       ParseOk("checker chk;\n"
               "  let valid(a, b) = a | b;\n"
               "endchecker\n"));
 }
 
-TEST(ParserA212, LetDecl_AsBlockItem) {
+TEST(ConstraintDeclParsing, LetDecl_AsBlockItem) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -108,7 +108,7 @@ TEST(ParserA212, LetDecl_AsBlockItem) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetDecl_Multiple) {
+TEST(ConstraintDeclParsing, LetDecl_Multiple) {
   auto r = Parse(
       "module m;\n"
       "  let add(a, b) = a + b;\n"
@@ -122,7 +122,7 @@ TEST(ParserA212, LetDecl_Multiple) {
   EXPECT_EQ(count, 2);
 }
 
-TEST(ParserA212, LetIdentifier_Simple) {
+TEST(ConstraintDeclParsing, LetIdentifier_Simple) {
   auto r = Parse(
       "module m;\n"
       "  let foo = 1;\n"
@@ -134,7 +134,7 @@ TEST(ParserA212, LetIdentifier_Simple) {
   EXPECT_EQ(item->name, "foo");
 }
 
-TEST(ParserA212, LetPortList_Single) {
+TEST(ConstraintDeclParsing, LetPortList_Single) {
   auto r = Parse(
       "module m;\n"
       "  let f(x) = x;\n"
@@ -147,7 +147,7 @@ TEST(ParserA212, LetPortList_Single) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-TEST(ParserA212, LetPortList_Multiple) {
+TEST(ConstraintDeclParsing, LetPortList_Multiple) {
   auto r = Parse(
       "module m;\n"
       "  let f(a, b, c, d) = a + b + c + d;\n"
@@ -163,7 +163,7 @@ TEST(ParserA212, LetPortList_Multiple) {
   EXPECT_EQ(item->func_args[3].name, "d");
 }
 
-TEST(ParserA212, LetPortList_MixedTypes) {
+TEST(ConstraintDeclParsing, LetPortList_MixedTypes) {
   auto r = Parse(
       "module m;\n"
       "  let f(logic [7:0] a, int b, c) = a + b + c;\n"
@@ -175,7 +175,7 @@ TEST(ParserA212, LetPortList_MixedTypes) {
   ASSERT_EQ(item->func_args.size(), 3u);
 }
 
-TEST(ParserA212, LetPortItem_ImplicitType) {
+TEST(ConstraintDeclParsing, LetPortItem_ImplicitType) {
   auto r = Parse(
       "module m;\n"
       "  let f(x) = x;\n"
@@ -188,7 +188,7 @@ TEST(ParserA212, LetPortItem_ImplicitType) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-TEST(ParserA212, LetFormalType_Untyped) {
+TEST(ConstraintDeclParsing, LetFormalType_Untyped) {
   auto r = Parse(
       "module m;\n"
       "  let f(untyped a) = a;\n"
@@ -201,7 +201,7 @@ TEST(ParserA212, LetFormalType_Untyped) {
   EXPECT_EQ(item->func_args[0].name, "a");
 }
 
-TEST(ParserA212, LetExpr_SimpleCall) {
+TEST(ConstraintDeclParsing, LetExpr_SimpleCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let op(x, y) = x + y;\n"
@@ -212,7 +212,7 @@ TEST(ParserA212, LetExpr_SimpleCall) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetExpr_NoArgs) {
+TEST(ConstraintDeclParsing, LetExpr_NoArgs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let val = 42;\n"
@@ -223,7 +223,7 @@ TEST(ParserA212, LetExpr_NoArgs) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetExpr_EmptyParens) {
+TEST(ConstraintDeclParsing, LetExpr_EmptyParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let val() = 42;\n"
@@ -234,7 +234,7 @@ TEST(ParserA212, LetExpr_EmptyParens) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetExpr_PackageScope) {
+TEST(ConstraintDeclParsing, LetExpr_PackageScope) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
               "  let add(x, y) = x + y;\n"
@@ -247,7 +247,7 @@ TEST(ParserA212, LetExpr_PackageScope) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetExpr_InAssign) {
+TEST(ConstraintDeclParsing, LetExpr_InAssign) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let add(a, b) = a + b;\n"
@@ -256,7 +256,7 @@ TEST(ParserA212, LetExpr_InAssign) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetExpr_Nested) {
+TEST(ConstraintDeclParsing, LetExpr_Nested) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let inc(x) = x + 1;\n"
@@ -268,7 +268,7 @@ TEST(ParserA212, LetExpr_Nested) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetExpr_InConditional) {
+TEST(ConstraintDeclParsing, LetExpr_InConditional) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let valid(x) = x != 0;\n"
@@ -279,7 +279,7 @@ TEST(ParserA212, LetExpr_InConditional) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetArgs_SinglePositional) {
+TEST(ConstraintDeclParsing, LetArgs_SinglePositional) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(x) = x;\n"
@@ -290,7 +290,7 @@ TEST(ParserA212, LetArgs_SinglePositional) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetArgs_MultiplePositional) {
+TEST(ConstraintDeclParsing, LetArgs_MultiplePositional) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(a, b, c) = a + b + c;\n"
@@ -301,7 +301,7 @@ TEST(ParserA212, LetArgs_MultiplePositional) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetArgs_Named) {
+TEST(ConstraintDeclParsing, LetArgs_Named) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(a, b) = a + b;\n"
@@ -312,7 +312,7 @@ TEST(ParserA212, LetArgs_Named) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetArgs_DefaultOmitted) {
+TEST(ConstraintDeclParsing, LetArgs_DefaultOmitted) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(a, b = 10) = a + b;\n"
@@ -323,7 +323,7 @@ TEST(ParserA212, LetArgs_DefaultOmitted) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetArgs_AllNamed) {
+TEST(ConstraintDeclParsing, LetArgs_AllNamed) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let arb(request, valid, override) = "
@@ -336,7 +336,7 @@ TEST(ParserA212, LetArgs_AllNamed) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetArgs_ExprInArgs) {
+TEST(ConstraintDeclParsing, LetArgs_ExprInArgs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(x, y) = x + y;\n"
@@ -347,7 +347,7 @@ TEST(ParserA212, LetArgs_ExprInArgs) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetActualArg_Literal) {
+TEST(ConstraintDeclParsing, LetActualArg_Literal) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(x) = x;\n"
@@ -358,7 +358,7 @@ TEST(ParserA212, LetActualArg_Literal) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetActualArg_Variable) {
+TEST(ConstraintDeclParsing, LetActualArg_Variable) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(x) = x;\n"
@@ -369,7 +369,7 @@ TEST(ParserA212, LetActualArg_Variable) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetActualArg_BinaryExpr) {
+TEST(ConstraintDeclParsing, LetActualArg_BinaryExpr) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(x) = x;\n"
@@ -380,7 +380,7 @@ TEST(ParserA212, LetActualArg_BinaryExpr) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetActualArg_Ternary) {
+TEST(ConstraintDeclParsing, LetActualArg_Ternary) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(x) = x;\n"
@@ -391,7 +391,7 @@ TEST(ParserA212, LetActualArg_Ternary) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetActualArg_Concatenation) {
+TEST(ConstraintDeclParsing, LetActualArg_Concatenation) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let f(x) = x;\n"
@@ -402,7 +402,7 @@ TEST(ParserA212, LetActualArg_Concatenation) {
               "endmodule\n"));
 }
 
-TEST(ParserA212, LetActualArg_FunctionCall) {
+TEST(ConstraintDeclParsing, LetActualArg_FunctionCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function int inc(int x); return x + 1; endfunction\n"
@@ -551,7 +551,7 @@ TEST(ParserLet, DeclEmptyParens) {
   EXPECT_TRUE(let_item->func_args.empty());
 }
 
-TEST(ParserA84, ConstantLetExpression) {
+TEST(PrimaryParsing, ConstantLetExpression) {
   auto r = Parse(
       "module m;\n"
       "  let my_let(a) = a + 1;\n"
@@ -611,7 +611,7 @@ TEST(ParserLet, DeclInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA28, LetDeclInBlock) {
+TEST(BlockItemDeclParsing, LetDeclInBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -620,7 +620,7 @@ TEST(ParserA28, LetDeclInBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserA28, LetDeclNoArgsInBlock) {
+TEST(BlockItemDeclParsing, LetDeclNoArgsInBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -629,7 +629,7 @@ TEST(ParserA28, LetDeclNoArgsInBlock) {
               "endmodule\n"));
 }
 
-TEST(ParserA28, LetDeclInTask) {
+TEST(BlockItemDeclParsing, LetDeclInTask) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  task my_task();\n"
@@ -638,7 +638,7 @@ TEST(ParserA28, LetDeclInTask) {
               "endmodule\n"));
 }
 
-TEST(ParserA28, LetDeclInForkJoin) {
+TEST(BlockItemDeclParsing, LetDeclInForkJoin) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial fork\n"
@@ -647,7 +647,7 @@ TEST(ParserA28, LetDeclInForkJoin) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, AssertionItemDecl_LetDecl) {
+TEST(AssertionDeclParsing, AssertionItemDecl_LetDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  let max(a, b) = (a > b) ? a : b;\n"

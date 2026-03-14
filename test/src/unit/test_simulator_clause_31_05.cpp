@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA70503, RuntimeTimingCheckEntryNegedge) {
+TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryNegedge) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kHold;
@@ -19,7 +19,7 @@ TEST(SimA70503, RuntimeTimingCheckEntryNegedge) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].ref_edge, SpecifyEdge::kNegedge);
 }
 
-TEST(SimA70503, EdgeKeywordSimulates) {
+TEST(TimingCheckEventDefSim, EdgeKeywordSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -39,7 +39,7 @@ TEST(SimA70503, EdgeKeywordSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimA70503, EdgeControlSpecifierSimulates) {
+TEST(TimingCheckEventDefSim, EdgeControlSpecifierSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

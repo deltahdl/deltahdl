@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh9e, PosedgeIffEnableTrue) {
+TEST(ConditionalEventIffSim, PosedgeIffEnableTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -33,7 +33,7 @@ TEST(SimCh9e, PosedgeIffEnableTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9e, PosedgeIffEnableFalse) {
+TEST(ConditionalEventIffSim, PosedgeIffEnableFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -59,7 +59,7 @@ TEST(SimCh9e, PosedgeIffEnableFalse) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9e, NegedgeIffEnableTrue) {
+TEST(ConditionalEventIffSim, NegedgeIffEnableTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -85,7 +85,7 @@ TEST(SimCh9e, NegedgeIffEnableTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9e, NegedgeIffEnableFalse) {
+TEST(ConditionalEventIffSim, NegedgeIffEnableFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -111,7 +111,7 @@ TEST(SimCh9e, NegedgeIffEnableFalse) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9e, IffComplexAndCondition) {
+TEST(ConditionalEventIffSim, IffComplexAndCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -137,7 +137,7 @@ TEST(SimCh9e, IffComplexAndCondition) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9e, IffComplexAndConditionOneFalse) {
+TEST(ConditionalEventIffSim, IffComplexAndConditionOneFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -163,7 +163,7 @@ TEST(SimCh9e, IffComplexAndConditionOneFalse) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9e, IffComparisonGreaterThanZero) {
+TEST(ConditionalEventIffSim, IffComparisonGreaterThanZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -189,7 +189,7 @@ TEST(SimCh9e, IffComparisonGreaterThanZero) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimCh9e, IffComparisonZeroSuppresses) {
+TEST(ConditionalEventIffSim, IffComparisonZeroSuppresses) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -215,7 +215,7 @@ TEST(SimCh9e, IffComparisonZeroSuppresses) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9e, IffBitwiseAndCondition) {
+TEST(ConditionalEventIffSim, IffBitwiseAndCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -242,7 +242,7 @@ TEST(SimCh9e, IffBitwiseAndCondition) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(SimCh9e, IffLogicalNegation) {
+TEST(ConditionalEventIffSim, IffLogicalNegation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -268,7 +268,7 @@ TEST(SimCh9e, IffLogicalNegation) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SimCh9e, IffLogicalNegationSuppresses) {
+TEST(ConditionalEventIffSim, IffLogicalNegationSuppresses) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -294,7 +294,7 @@ TEST(SimCh9e, IffLogicalNegationSuppresses) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9e, MultipleEventsWithDifferentIff) {
+TEST(ConditionalEventIffSim, MultipleEventsWithDifferentIff) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -321,7 +321,7 @@ TEST(SimCh9e, MultipleEventsWithDifferentIff) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9e, IffOnBothEdgesInList) {
+TEST(ConditionalEventIffSim, IffOnBothEdgesInList) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -349,7 +349,7 @@ TEST(SimCh9e, IffOnBothEdgesInList) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(SimCh9e, IffPosedgeFiresNegedgeSuppressed) {
+TEST(ConditionalEventIffSim, IffPosedgeFiresNegedgeSuppressed) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -377,7 +377,7 @@ TEST(SimCh9e, IffPosedgeFiresNegedgeSuppressed) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9e, IffConditionChanges) {
+TEST(ConditionalEventIffSim, IffConditionChanges) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -407,7 +407,7 @@ TEST(SimCh9e, IffConditionChanges) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9e, AlwaysFFIffRegisterUpdate) {
+TEST(ConditionalEventIffSim, AlwaysFFIffRegisterUpdate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -433,7 +433,7 @@ TEST(SimCh9e, AlwaysFFIffRegisterUpdate) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-TEST(SimCh9e, AlwaysFFIffSuppressed) {
+TEST(ConditionalEventIffSim, AlwaysFFIffSuppressed) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -460,7 +460,7 @@ TEST(SimCh9e, AlwaysFFIffSuppressed) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9e, IffGuardAlwaysBlockBeginEnd) {
+TEST(ConditionalEventIffSim, IffGuardAlwaysBlockBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -480,7 +480,7 @@ TEST(SimCh9e, IffGuardAlwaysBlockBeginEnd) {
   LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
 }
 
-TEST(SimCh9e, IffEdgeOnDataSignal) {
+TEST(ConditionalEventIffSim, IffEdgeOnDataSignal) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -506,7 +506,7 @@ TEST(SimCh9e, IffEdgeOnDataSignal) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-TEST(SimCh9e, IffConditionEvaluatedAtEdgeTime) {
+TEST(ConditionalEventIffSim, IffConditionEvaluatedAtEdgeTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -534,7 +534,7 @@ TEST(SimCh9e, IffConditionEvaluatedAtEdgeTime) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9e, IffEqualityComparison) {
+TEST(ConditionalEventIffSim, IffEqualityComparison) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -560,7 +560,7 @@ TEST(SimCh9e, IffEqualityComparison) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-TEST(SimCh9e, MixedIffAndNoIff) {
+TEST(ConditionalEventIffSim, MixedIffAndNoIff) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -587,7 +587,7 @@ TEST(SimCh9e, MixedIffAndNoIff) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh9e, IffBitSelectCondition) {
+TEST(ConditionalEventIffSim, IffBitSelectCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -614,7 +614,7 @@ TEST(SimCh9e, IffBitSelectCondition) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-TEST(SimCh9e, IffBitSelectZeroSuppresses) {
+TEST(ConditionalEventIffSim, IffBitSelectZeroSuppresses) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -642,7 +642,7 @@ TEST(SimCh9e, IffBitSelectZeroSuppresses) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(SimCh9e, IffPreservesPreviousValueWhenSuppressed) {
+TEST(ConditionalEventIffSim, IffPreservesPreviousValueWhenSuppressed) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -672,7 +672,7 @@ TEST(SimCh9e, IffPreservesPreviousValueWhenSuppressed) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimCh9e, ResultWidthAfterIffUpdate) {
+TEST(ConditionalEventIffSim, ResultWidthAfterIffUpdate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -699,7 +699,7 @@ TEST(SimCh9e, ResultWidthAfterIffUpdate) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
-TEST(SimCh9e, ResultWidth8BitAfterIffUpdate) {
+TEST(ConditionalEventIffSim, ResultWidth8BitAfterIffUpdate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -726,7 +726,7 @@ TEST(SimCh9e, ResultWidth8BitAfterIffUpdate) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(SimCh9e, IffLogicalOrCondition) {
+TEST(ConditionalEventIffSim, IffLogicalOrCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -752,7 +752,7 @@ TEST(SimCh9e, IffLogicalOrCondition) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-TEST(SimCh9e, IffNotEqualComparison) {
+TEST(ConditionalEventIffSim, IffNotEqualComparison) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -779,7 +779,7 @@ TEST(SimCh9e, IffNotEqualComparison) {
   EXPECT_EQ(var->value.ToUint64(), 22u);
 }
 
-TEST(SimCh9e, IffAlwaysBlockNba) {
+TEST(ConditionalEventIffSim, IffAlwaysBlockNba) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

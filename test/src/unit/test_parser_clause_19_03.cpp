@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CovergroupDecl_Basic) {
+TEST(CovergroupDeclParsing, CovergroupDecl_Basic) {
   auto r = Parse(
       "module m;\n"
       "  covergroup cg;\n"
@@ -21,7 +21,7 @@ TEST(ParserA211, CovergroupDecl_Basic) {
   EXPECT_TRUE(item->loc.IsValid());
 }
 
-TEST(ParserA211, CovergroupDecl_WithClockingEvent) {
+TEST(CovergroupDeclParsing, CovergroupDecl_WithClockingEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @(posedge clk);\n"
@@ -29,7 +29,7 @@ TEST(ParserA211, CovergroupDecl_WithClockingEvent) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CovergroupDecl_WithPortList) {
+TEST(CovergroupDeclParsing, CovergroupDecl_WithPortList) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg(ref int x, input bit [3:0] y);\n"
@@ -37,7 +37,7 @@ TEST(ParserA211, CovergroupDecl_WithPortList) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CovergroupDecl_WithPortsAndEvent) {
+TEST(CovergroupDeclParsing, CovergroupDecl_WithPortsAndEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg(ref int x) @(posedge clk);\n"
@@ -45,7 +45,7 @@ TEST(ParserA211, CovergroupDecl_WithPortsAndEvent) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CovergroupDecl_WithBlockEvent) {
+TEST(CovergroupDeclParsing, CovergroupDecl_WithBlockEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @@(begin test_phase or end test_phase);\n"
@@ -53,7 +53,7 @@ TEST(ParserA211, CovergroupDecl_WithBlockEvent) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CovergroupDecl_WithEndLabel) {
+TEST(CovergroupDeclParsing, CovergroupDecl_WithEndLabel) {
   auto r = Parse(
       "module m;\n"
       "  covergroup cg;\n"
@@ -66,7 +66,7 @@ TEST(ParserA211, CovergroupDecl_WithEndLabel) {
   EXPECT_EQ(item->name, "cg");
 }
 
-TEST(ParserA211, CoverageEvent_ClockingEvent) {
+TEST(CovergroupDeclParsing, CoverageEvent_ClockingEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @(posedge clk);\n"
@@ -75,7 +75,7 @@ TEST(ParserA211, CoverageEvent_ClockingEvent) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverageEvent_NegedgeClocking) {
+TEST(CovergroupDeclParsing, CoverageEvent_NegedgeClocking) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @(negedge clk);\n"
@@ -84,7 +84,7 @@ TEST(ParserA211, CoverageEvent_NegedgeClocking) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverageEvent_BlockEventBegin) {
+TEST(CovergroupDeclParsing, CoverageEvent_BlockEventBegin) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @@(begin test_phase);\n"
@@ -93,7 +93,7 @@ TEST(ParserA211, CoverageEvent_BlockEventBegin) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverageEvent_BlockEventEnd) {
+TEST(CovergroupDeclParsing, CoverageEvent_BlockEventEnd) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @@(end test_phase);\n"
@@ -102,7 +102,7 @@ TEST(ParserA211, CoverageEvent_BlockEventEnd) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, BlockEventExpression_BeginHierarchical) {
+TEST(CovergroupDeclParsing, BlockEventExpression_BeginHierarchical) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @@(begin top.test.run_phase);\n"
@@ -111,7 +111,7 @@ TEST(ParserA211, BlockEventExpression_BeginHierarchical) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, BlockEventExpression_Or) {
+TEST(CovergroupDeclParsing, BlockEventExpression_Or) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @@(begin phase1 or end phase2);\n"
@@ -120,7 +120,7 @@ TEST(ParserA211, BlockEventExpression_Or) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, HierarchicalBtfIdentifier_Simple) {
+TEST(CovergroupDeclParsing, HierarchicalBtfIdentifier_Simple) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @@(begin my_task);\n"
@@ -129,7 +129,7 @@ TEST(ParserA211, HierarchicalBtfIdentifier_Simple) {
               "endmodule\n"));
 }
 
-TEST(ParserAnnexA, A2CovergroupDecl) {
+TEST(FormalSyntaxParsing, CovergroupDecl) {
   auto r = Parse(
       "module m;\n"
       "  covergroup cg @(posedge clk);\n"
@@ -140,7 +140,7 @@ TEST(ParserAnnexA, A2CovergroupDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA211, CovergroupDecl_WithEmptyPortList) {
+TEST(CovergroupDeclParsing, CovergroupDecl_WithEmptyPortList) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg();\n"
@@ -148,7 +148,7 @@ TEST(ParserA211, CovergroupDecl_WithEmptyPortList) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverageSpecOrOption_CoverSpec) {
+TEST(CovergroupDeclParsing, CoverageSpecOrOption_CoverSpec) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg;\n"
@@ -157,7 +157,7 @@ TEST(ParserA211, CoverageSpecOrOption_CoverSpec) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, FullCovergroup_MultipleElements) {
+TEST(CovergroupDeclParsing, FullCovergroup_MultipleElements) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @(posedge clk);\n"
@@ -173,7 +173,7 @@ TEST(ParserA211, FullCovergroup_MultipleElements) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_MultipleCoverpoints) {
+TEST(CovergroupDeclParsing, CoverGroup_MultipleCoverpoints) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @(posedge clk);\n"
@@ -188,7 +188,7 @@ TEST(ParserA211, CoverGroup_MultipleCoverpoints) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_PortsWithBody) {
+TEST(CovergroupDeclParsing, CoverGroup_PortsWithBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg(ref int x, input int threshold);\n"
@@ -199,7 +199,7 @@ TEST(ParserA211, CoverGroup_PortsWithBody) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_InPackage) {
+TEST(CovergroupDeclParsing, CoverGroup_InPackage) {
   EXPECT_TRUE(
       ParseOk("package p;\n"
               "  covergroup cg;\n"
@@ -208,7 +208,7 @@ TEST(ParserA211, CoverGroup_InPackage) {
               "endpackage\n"));
 }
 
-TEST(ParserA211, CoverGroup_NegedgeEvent) {
+TEST(CovergroupDeclParsing, CoverGroup_NegedgeEvent) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg @(negedge rst_n);\n"
@@ -217,7 +217,7 @@ TEST(ParserA211, CoverGroup_NegedgeEvent) {
               "endmodule\n"));
 }
 
-TEST(ParserA211, CoverGroup_ASTVerification) {
+TEST(CovergroupDeclParsing, CoverGroup_ASTVerification) {
   auto r = Parse(
       "module m;\n"
       "  covergroup my_cg @(posedge clk);\n"
@@ -237,7 +237,7 @@ using DpiParseTest = ProgramTestParse;
 
 using ApiParseTest = ProgramTestParse;
 
-TEST(ParserSection40, CovergroupWithCoverpoint) {
+TEST(DataReadApiParsing, CovergroupWithCoverpoint) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic [2:0] addr;

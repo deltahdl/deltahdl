@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA702, PolarityPathSimulates) {
+TEST(SpecifyPathSim, PolarityPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA84, ConstantPrimaryEnumIdentifier) {
+TEST(PrimaryParsing, ConstantPrimaryEnumIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum {RED, GREEN, BLUE} color_t;\n"
@@ -14,7 +14,7 @@ TEST(ParserA84, ConstantPrimaryEnumIdentifier) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, EnumAsParameterValue) {
+TEST(DataTypeParsing, EnumAsParameterValue) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum {RED, GREEN, BLUE} color_t;\n"
@@ -24,7 +24,7 @@ TEST(ParserSection6, EnumAsParameterValue) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection6, EnumMultipleVars) {
+TEST(DataTypeParsing, EnumMultipleVars) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum { red, green, blue, yellow, white, black } Colors;\n"

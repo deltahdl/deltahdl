@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_11_PositionalArrayLiteral) {
+TEST(LexicalConventionParsing, PositionalArrayLiteral) {
   auto r = Parse(
       "module m;\n"
       "  int arr [0:2] = '{10, 20, 30};\n"
@@ -20,7 +20,7 @@ TEST(ParserClause05, Cl5_11_PositionalArrayLiteral) {
   EXPECT_TRUE(item->init_expr->pattern_keys.empty());
 }
 
-TEST(ParserClause05, Cl5_11_NestedMultidimensional) {
+TEST(LexicalConventionParsing, NestedMultidimensional) {
   auto r = Parse(
       "module m;\n"
       "  int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};\n"
@@ -36,7 +36,7 @@ TEST(ParserClause05, Cl5_11_NestedMultidimensional) {
   EXPECT_EQ(item->init_expr->elements[1]->kind, ExprKind::kAssignmentPattern);
 }
 
-TEST(ParserClause05, Cl5_11_ReplicationSingleElement) {
+TEST(LexicalConventionParsing, ReplicationSingleElement) {
   auto r = Parse(
       "module m;\n"
       "  int arr [0:2];\n"
@@ -53,7 +53,7 @@ TEST(ParserClause05, Cl5_11_ReplicationSingleElement) {
   EXPECT_NE(stmt->rhs->elements[0]->repeat_count, nullptr);
 }
 
-TEST(ParserClause05, Cl5_11_ReplicationMultiElement) {
+TEST(LexicalConventionParsing, ReplicationMultiElement) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int a, b;\n"
@@ -62,14 +62,14 @@ TEST(ParserClause05, Cl5_11_ReplicationMultiElement) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_11_NestedReplication) {
+TEST(LexicalConventionParsing, NestedReplication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_11_TypePrefixed) {
+TEST(LexicalConventionParsing, TypePrefixed) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef int triple [1:3];\n"
@@ -77,7 +77,7 @@ TEST(ParserClause05, Cl5_11_TypePrefixed) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_11_IndexKeyWithDefault) {
+TEST(LexicalConventionParsing, IndexKeyWithDefault) {
   auto r = Parse(
       "module m;\n"
       "  typedef int triple [1:3];\n"
@@ -92,14 +92,14 @@ TEST(ParserClause05, Cl5_11_IndexKeyWithDefault) {
   ASSERT_EQ(item->init_expr->pattern_keys.size(), 2u);
 }
 
-TEST(ParserClause05, Cl5_11_DefaultOnlyArray) {
+TEST(LexicalConventionParsing, DefaultOnlyArray) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int arr [0:3] = '{default: 0};\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_11_ArrayLiteralAssignment) {
+TEST(LexicalConventionParsing, ArrayLiteralAssignment) {
   auto r = Parse(
       "module m;\n"
       "  int arr [0:2];\n"

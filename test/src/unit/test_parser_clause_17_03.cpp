@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0414, BasicCheckerInst) {
+TEST(CheckerInstantiationGrammar, BasicCheckerInst) {
   auto r = Parse(
       "checker my_chk(input logic clk, input logic data);\n"
       "endchecker\n"
@@ -19,7 +19,7 @@ TEST(ParserAnnexA0414, BasicCheckerInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-TEST(ParserAnnexA0414, CheckerInstWildcardPort) {
+TEST(CheckerInstantiationGrammar, CheckerInstWildcardPort) {
   auto r = Parse(
       "checker my_chk(input logic clk);\n"
       "endchecker\n"
@@ -30,7 +30,7 @@ TEST(ParserAnnexA0414, CheckerInstWildcardPort) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
-TEST(ParserAnnexA0414, CheckerInstEmptyPorts) {
+TEST(CheckerInstantiationGrammar, CheckerInstEmptyPorts) {
   auto r = Parse(
       "checker my_chk;\n"
       "endchecker\n"
@@ -42,7 +42,7 @@ TEST(ParserAnnexA0414, CheckerInstEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-TEST(ParserAnnexA0414, CheckerInstArray) {
+TEST(CheckerInstantiationGrammar, CheckerInstArray) {
   auto r = Parse(
       "checker my_chk(input logic clk);\n"
       "endchecker\n"
@@ -55,7 +55,7 @@ TEST(ParserAnnexA0414, CheckerInstArray) {
   EXPECT_NE(item->inst_range_right, nullptr);
 }
 
-TEST(ParserAnnexA0414, CheckerInstInsideChecker) {
+TEST(CheckerInstantiationGrammar, CheckerInstInsideChecker) {
   auto r = Parse(
       "checker inner_chk(input logic sig);\n"
       "endchecker\n"

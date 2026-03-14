@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0414, CheckerInstOrderedPorts) {
+TEST(CheckerInstantiationGrammar, CheckerInstOrderedPorts) {
   auto r = Parse(
       "checker my_chk(input logic a, input logic b, input logic c);\n"
       "endchecker\n"
@@ -15,7 +15,7 @@ TEST(ParserAnnexA0414, CheckerInstOrderedPorts) {
   EXPECT_EQ(item->inst_ports.size(), 3u);
 }
 
-TEST(ParserAnnexA0414, CheckerInstNamedPorts) {
+TEST(CheckerInstantiationGrammar, CheckerInstNamedPorts) {
   auto r = Parse(
       "checker my_chk(input logic clk, input logic rst);\n"
       "endchecker\n"
@@ -28,7 +28,7 @@ TEST(ParserAnnexA0414, CheckerInstNamedPorts) {
   EXPECT_EQ(item->inst_ports[1].first, "rst");
 }
 
-TEST(ParserAnnexA0414, CheckerInstNamedPortNoParens) {
+TEST(CheckerInstantiationGrammar, CheckerInstNamedPortNoParens) {
   auto r = Parse(
       "checker my_chk(input logic clk, input logic rst);\n"
       "endchecker\n"

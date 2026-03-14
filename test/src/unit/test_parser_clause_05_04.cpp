@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_4_CommentDoesNotProduceTokens) {
+TEST(LexicalConventionParsing, CommentDoesNotProduceTokens) {
   auto r = Parse(
       "module m;\n"
       "  // line comment\n"
@@ -16,11 +16,11 @@ TEST(ParserClause05, Cl5_4_CommentDoesNotProduceTokens) {
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
-TEST(ParserClause05, Cl5_4_LineCommentAtEofNoNewline) {
+TEST(LexicalConventionParsing, LineCommentAtEofNoNewline) {
   EXPECT_TRUE(ParseOk("module t; endmodule // trailing comment"));
 }
 
-TEST(ParserClause05, Cl5_4_AdjacentLineComments) {
+TEST(LexicalConventionParsing, AdjacentLineComments) {
   auto r = Parse(
       "module m;\n"
       "  // first comment\n"
@@ -35,7 +35,7 @@ TEST(ParserClause05, Cl5_4_AdjacentLineComments) {
   EXPECT_EQ(item->name, "a");
 }
 
-TEST(ParserClause05, Cl5_4_OneLineCommentEndsAtNewline) {
+TEST(LexicalConventionParsing, OneLineCommentEndsAtNewline) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic a; // comment\n"
@@ -43,11 +43,11 @@ TEST(ParserClause05, Cl5_4_OneLineCommentEndsAtNewline) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_4_BlockCommentBetweenTokens) {
+TEST(LexicalConventionParsing, BlockCommentBetweenTokens) {
   EXPECT_TRUE(ParseOk("module/* comment */t;/* another */endmodule"));
 }
 
-TEST(ParserClause05, Cl5_4_BlockCommentInsideExpression) {
+TEST(LexicalConventionParsing, BlockCommentInsideExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic a, b, c;\n"
@@ -55,7 +55,7 @@ TEST(ParserClause05, Cl5_4_BlockCommentInsideExpression) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_4_BlockCommentSpanningLines) {
+TEST(LexicalConventionParsing, BlockCommentSpanningLines) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  /* this comment\n"
@@ -65,7 +65,7 @@ TEST(ParserClause05, Cl5_4_BlockCommentSpanningLines) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_4_BlockCommentInLibraryText) {
+TEST(LexicalConventionParsing, BlockCommentInLibraryText) {
   auto r = ParseLibrary(
       "/* Multi-line\n"
       "   comment */\n"
@@ -75,14 +75,14 @@ TEST(ParserClause05, Cl5_4_BlockCommentInLibraryText) {
   ASSERT_EQ(r.cu->libraries.size(), 1u);
 }
 
-TEST(ParserClause05, Cl5_4_LineCommentTokenInsideBlockComment) {
+TEST(LexicalConventionParsing, LineCommentTokenInsideBlockComment) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  /* // not special */ logic a;\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_4_BlockCommentStartInsideLineComment) {
+TEST(LexicalConventionParsing, BlockCommentStartInsideLineComment) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  // this /* is not special\n"
@@ -90,14 +90,14 @@ TEST(ParserClause05, Cl5_4_BlockCommentStartInsideLineComment) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_4_NestedBlockCommentClosesAtFirstEnd) {
+TEST(LexicalConventionParsing, NestedBlockCommentClosesAtFirstEnd) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic /* outer /* inner */ a;\n"
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_4_EmptyCuCommentsOnly) {
+TEST(LexicalConventionParsing, EmptyCuCommentsOnly) {
   auto r = Parse(
       "// line comment\n"
       "/* block\n"

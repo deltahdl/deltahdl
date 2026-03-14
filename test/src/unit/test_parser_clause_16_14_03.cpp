@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, ConcurrentAssertionItem_CoverProperty) {
+TEST(AssertionDeclParsing, ConcurrentAssertionItem_CoverProperty) {
   auto r = Parse(
       "module m;\n"
       "  cover property (@(posedge clk) a ##1 b);\n"
@@ -17,7 +17,7 @@ TEST(ParserA210, ConcurrentAssertionItem_CoverProperty) {
   ASSERT_NE(item, nullptr);
 }
 
-TEST(ParserA210, CoverSequence_Basic) {
+TEST(AssertionDeclParsing, CoverSequence_Basic) {
   auto r = Parse(
       "module m;\n"
       "  cover sequence (@(posedge clk) a ##1 b);\n"
@@ -28,7 +28,7 @@ TEST(ParserA210, CoverSequence_Basic) {
   ASSERT_NE(item, nullptr);
 }
 
-TEST(ParserA210, CoverSequence_WithPassAction) {
+TEST(AssertionDeclParsing, CoverSequence_WithPassAction) {
   auto r = Parse(
       "module m;\n"
       "  cover sequence (@(posedge clk) a ##2 b ##1 c)\n"
@@ -41,14 +41,14 @@ TEST(ParserA210, CoverSequence_WithPassAction) {
   EXPECT_NE(item->assert_pass_stmt, nullptr);
 }
 
-TEST(ParserA210, CoverSequence_WithDisableIff) {
+TEST(AssertionDeclParsing, CoverSequence_WithDisableIff) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  cover sequence (@(posedge clk) disable iff (rst) a ##1 b);\n"
               "endmodule\n"));
 }
 
-TEST(ParserA210, CoverSequence_Kind) {
+TEST(AssertionDeclParsing, CoverSequence_Kind) {
   auto r = Parse(
       "module m;\n"
       "  cover sequence (a ##1 b);\n"
@@ -60,7 +60,7 @@ TEST(ParserA210, CoverSequence_Kind) {
   EXPECT_EQ(item->kind, ModuleItemKind::kCoverSequence);
 }
 
-TEST(ParserA210, CoverProperty_WithPassStmt) {
+TEST(AssertionDeclParsing, CoverProperty_WithPassStmt) {
   auto r = Parse(
       "module m;\n"
       "  cover property (@(posedge clk) a ##1 b)\n"
@@ -73,7 +73,7 @@ TEST(ParserA210, CoverProperty_WithPassStmt) {
   EXPECT_NE(item->assert_pass_stmt, nullptr);
 }
 
-TEST(ParserA210, CoverSequence_HasAssertExpr) {
+TEST(AssertionDeclParsing, CoverSequence_HasAssertExpr) {
   auto r = Parse(
       "module m;\n"
       "  cover sequence (@(posedge clk) a ##1 b);\n"
@@ -85,7 +85,7 @@ TEST(ParserA210, CoverSequence_HasAssertExpr) {
   EXPECT_NE(item->assert_expr, nullptr);
 }
 
-TEST(ParserSection16, CoverPropertyModuleLevel) {
+TEST(AssertionParsing, CoverPropertyModuleLevel) {
   auto r = Parse(
       "module m;\n"
       "  cover property (@(posedge clk) a && b);\n"
@@ -101,7 +101,7 @@ TEST(ParserSection16, CoverPropertyModuleLevel) {
 }
 using VerifyParseTest = ProgramTestParse;
 
-TEST(ParserSection16, Sec16_5_1_CoverPropertySimple) {
+TEST(AssertionParsing, CoverPropertySimple) {
   auto r = Parse(
       "module m;\n"
       "  cover property (@(posedge clk) a && b);\n"
@@ -114,7 +114,7 @@ TEST(ParserSection16, Sec16_5_1_CoverPropertySimple) {
   EXPECT_NE(cp->assert_expr, nullptr);
 }
 
-TEST(ParserSection16, Sec16_5_1_CoverPropertyClocked) {
+TEST(AssertionParsing, CoverPropertyClocked) {
   auto r = Parse(
       "module m;\n"
       "  cover property (@(posedge clk) a ##1 b);\n"
@@ -127,7 +127,7 @@ TEST(ParserSection16, Sec16_5_1_CoverPropertyClocked) {
   EXPECT_NE(cp->assert_expr, nullptr);
 }
 
-TEST(ParserSection16, Sec16_5_1_CoverPropertyPassAction) {
+TEST(AssertionParsing, CoverPropertyPassAction) {
   auto r = Parse(
       "module m;\n"
       "  cover property (@(posedge clk) a ##1 b)\n"
@@ -141,7 +141,7 @@ TEST(ParserSection16, Sec16_5_1_CoverPropertyPassAction) {
   EXPECT_NE(cp->assert_pass_stmt, nullptr);
 }
 
-TEST(ParserSection16, Sec16_5_1_CoverSequenceWithPassAction) {
+TEST(AssertionParsing, CoverSequenceWithPassAction) {
   auto r = Parse(
       "module m;\n"
       "  cover property (@(posedge clk) a ##2 b ##1 c)\n"
@@ -155,7 +155,7 @@ TEST(ParserSection16, Sec16_5_1_CoverSequenceWithPassAction) {
   EXPECT_NE(cp->assert_pass_stmt, nullptr);
 }
 
-TEST(ParserSection16, ConcurrentCoverPropertyWithStmt) {
+TEST(AssertionParsing, ConcurrentCoverPropertyWithStmt) {
   auto r = Parse(
       "module m;\n"
       "  cover property (@(posedge clk) a ##1 b)\n"
@@ -167,7 +167,7 @@ TEST(ParserSection16, ConcurrentCoverPropertyWithStmt) {
   ASSERT_NE(cp, nullptr);
 }
 
-TEST(ParserAnnexF, AnnexFCoverProperty) {
+TEST(AssertionSemanticsParsing, CoverProperty) {
   auto r = Parse(
       "module m;\n"
       "  cover property (@(posedge clk) a ##1 b);\n"
@@ -188,7 +188,7 @@ using DpiParseTest = ProgramTestParse;
 
 using ApiParseTest = ProgramTestParse;
 
-TEST(ParserSection39, CoverPropertyStatement) {
+TEST(AssertionApiParsing, CoverPropertyStatement) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, a, b;
@@ -197,7 +197,7 @@ TEST(ParserSection39, CoverPropertyStatement) {
   )"));
 }
 
-TEST(ParserSection40, CoverPropertyForAssertionCoverage) {
+TEST(DataReadApiParsing, CoverPropertyForAssertionCoverage) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
       logic clk, a, b;
@@ -206,7 +206,7 @@ TEST(ParserSection40, CoverPropertyForAssertionCoverage) {
   )"));
 }
 
-TEST(ParserA610, CoverPropertyModule) {
+TEST(AssertionStatementSyntaxParsing, CoverPropertyModule) {
   auto r = Parse(
       "module m;\n"
       "  cover property (a && b);\n"
@@ -217,7 +217,7 @@ TEST(ParserA610, CoverPropertyModule) {
   ASSERT_NE(item, nullptr);
 }
 
-TEST(ParserA610, CoverSequenceModule) {
+TEST(AssertionStatementSyntaxParsing, CoverSequenceModule) {
   auto r = Parse(
       "module m;\n"
       "  cover sequence (a ##1 b);\n"
@@ -228,7 +228,7 @@ TEST(ParserA610, CoverSequenceModule) {
   ASSERT_NE(item, nullptr);
 }
 
-TEST(ParserA610, CoverPropertyPassAction) {
+TEST(AssertionStatementSyntaxParsing, CoverPropertyPassAction) {
   auto r = Parse(
       "module m;\n"
       "  cover property (a) $display(\"covered\");\n"

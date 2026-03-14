@@ -12,7 +12,7 @@ ModuleItem* FindModuleInst(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-TEST(ParserAnnexA0411, ElaborationParamOverrideNamed) {
+TEST(ModuleInstantiationGrammar, ElaborationParamOverrideNamed) {
   auto r = Parse(
       "module sub #(parameter W = 1)(input [W-1:0] d);\n"
       "endmodule\n"
@@ -28,7 +28,7 @@ TEST(ParserAnnexA0411, ElaborationParamOverrideNamed) {
   EXPECT_NE(inst->inst_params[0].second, nullptr);
 }
 
-TEST(ParserAnnexA0413, ProgramInstWithNamedParams) {
+TEST(ProgramInstantiationGrammar, ProgramInstWithNamedParams) {
   auto r = Parse(
       "program my_prog #(parameter int W = 8)(input logic [W-1:0] data);\n"
       "endprogram\n"
@@ -40,7 +40,7 @@ TEST(ParserAnnexA0413, ProgramInstWithNamedParams) {
   ASSERT_EQ(item->inst_params.size(), 1u);
   EXPECT_EQ(item->inst_params[0].first, "W");
 }
-TEST(ParserSection23, ModuleInstNamedParamOverride) {
+TEST(ModuleAndHierarchyParsing, ModuleInstNamedParamOverride) {
   auto r = Parse(
       "module top;\n"
       "  sub #(.WIDTH(8), .DEPTH(16)) u1(.a(w1));\n"

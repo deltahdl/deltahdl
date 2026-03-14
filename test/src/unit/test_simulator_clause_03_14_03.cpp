@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_14_ThreeMagnitudes) {
+TEST(DesignBuildingBlockParsing, ThreeMagnitudes) {
   TimeScale ts1{TimeUnit::kNs, 1, TimeUnit::kPs, 1};
   TimeScale ts10{TimeUnit::kNs, 10, TimeUnit::kPs, 1};
   TimeScale ts100{TimeUnit::kNs, 100, TimeUnit::kPs, 1};

@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA602, AlwaysKeyword_AllFourVariants) {
+TEST(ProceduralBlockSyntaxParsing, AlwaysKeyword_AllFourVariants) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk) a = 1;\n"
@@ -21,7 +21,7 @@ TEST(ParserA602, AlwaysKeyword_AllFourVariants) {
   EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysFFBlock));
 }
 
-TEST(ParserClause09_02_02, AlwaysKindPreserved) {
+TEST(AlwaysProcedureParsing, AlwaysKindPreserved) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk) a = 1;\n"
@@ -46,7 +46,7 @@ TEST(ParserClause09_02_02, AlwaysKindPreserved) {
   EXPECT_EQ(af->always_kind, AlwaysKind::kAlwaysFF);
 }
 
-TEST(ParserClause09_02_02, AlwaysFormsHaveBodies) {
+TEST(AlwaysProcedureParsing, AlwaysFormsHaveBodies) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk) a = 1;\n"

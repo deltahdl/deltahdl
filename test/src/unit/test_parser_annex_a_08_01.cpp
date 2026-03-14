@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA81, ModulePathConcatenation) {
+TEST(ConcatenationParsing, ModulePathConcatenation) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -16,7 +16,7 @@ TEST(ParserA81, ModulePathConcatenation) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA81, ConcatenationBasic) {
+TEST(ConcatenationParsing, ConcatenationBasic) {
   auto r = Parse(
       "module m;\n"
       "  initial x = {a, b, c};\n"
@@ -29,7 +29,7 @@ TEST(ParserA81, ConcatenationBasic) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-TEST(ParserA81, MultipleConcatenation) {
+TEST(ConcatenationParsing, MultipleConcatenation) {
   auto r = Parse(
       "module m;\n"
       "  initial x = {3{a}};\n"
@@ -41,7 +41,7 @@ TEST(ParserA81, MultipleConcatenation) {
   EXPECT_EQ(rhs->kind, ExprKind::kReplicate);
 }
 
-TEST(ParserA81, StreamingConcatRight) {
+TEST(ConcatenationParsing, StreamingConcatRight) {
   auto r = Parse(
       "module m;\n"
       "  initial x = {>> {a, b}};\n"
@@ -53,7 +53,7 @@ TEST(ParserA81, StreamingConcatRight) {
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(ParserA81, StreamingConcatLeft) {
+TEST(ConcatenationParsing, StreamingConcatLeft) {
   auto r = Parse(
       "module m;\n"
       "  initial x = {<< {a, b}};\n"
@@ -65,7 +65,7 @@ TEST(ParserA81, StreamingConcatLeft) {
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(ParserA81, StreamingConcatWithSliceSize) {
+TEST(ConcatenationParsing, StreamingConcatWithSliceSize) {
   auto r = Parse(
       "module m;\n"
       "  initial x = {>> byte {a, b}};\n"
@@ -74,7 +74,7 @@ TEST(ParserA81, StreamingConcatWithSliceSize) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA81, StreamingConcatWithNumericSlice) {
+TEST(ConcatenationParsing, StreamingConcatWithNumericSlice) {
   auto r = Parse(
       "module m;\n"
       "  initial x = {>> 8 {a, b}};\n"
@@ -83,7 +83,7 @@ TEST(ParserA81, StreamingConcatWithNumericSlice) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA81, EmptyUnpackedArrayConcat) {
+TEST(ConcatenationParsing, EmptyUnpackedArrayConcat) {
   auto r = Parse(
       "module m;\n"
       "  int q[$];\n"
@@ -93,7 +93,7 @@ TEST(ParserA81, EmptyUnpackedArrayConcat) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA81, ConcatenationNested) {
+TEST(ConcatenationParsing, ConcatenationNested) {
   auto r = Parse(
       "module m;\n"
       "  initial x = {{a, b}, {c, d}};\n"
@@ -106,7 +106,7 @@ TEST(ParserA81, ConcatenationNested) {
   EXPECT_EQ(rhs->elements.size(), 2u);
 }
 
-TEST(ParserA81, StreamExpressionWithRange) {
+TEST(ConcatenationParsing, StreamExpressionWithRange) {
   auto r = Parse(
       "module m;\n"
       "  initial x = {>> {a with [0:3]}};\n"

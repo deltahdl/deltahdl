@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection6, ParameterizedDataType_VirtualClassDef) {
+TEST(DataTypeParsing, ParameterizedDataType_VirtualClassDef) {
   auto r = Parse(
       "virtual class C #(parameter type T = logic, parameter SIZE = 1);\n"
       "  typedef logic [SIZE-1:0] t_vector;\n"
@@ -24,7 +24,7 @@ TEST(ParserSection6, ParameterizedDataType_VirtualClassDef) {
   EXPECT_EQ(cls->params[1].first, "SIZE");
 }
 
-TEST(ParserSection6, ParameterizedDataType_ScopeResolution) {
+TEST(DataTypeParsing, ParameterizedDataType_ScopeResolution) {
   EXPECT_TRUE(ParseOk(
       "virtual class C #(parameter type T = logic, parameter SIZE = 1);\n"
       "  typedef logic [SIZE-1:0] t_vector;\n"
@@ -35,7 +35,7 @@ TEST(ParserSection6, ParameterizedDataType_ScopeResolution) {
       "endmodule\n"));
 }
 
-TEST(ParserSection6, ParameterizedDataType_MultipleSpecializations) {
+TEST(DataTypeParsing, ParameterizedDataType_MultipleSpecializations) {
   EXPECT_TRUE(ParseOk(
       "virtual class C #(parameter type T = logic, parameter SIZE = 1);\n"
       "  typedef T t_array [SIZE-1:0];\n"
@@ -51,7 +51,7 @@ TEST(ParserSection6, ParameterizedDataType_MultipleSpecializations) {
       "endmodule\n"));
 }
 
-TEST(ParserSection6, ParameterizedDataType_DefaultTypeParam) {
+TEST(DataTypeParsing, ParameterizedDataType_DefaultTypeParam) {
   EXPECT_TRUE(
       ParseOk("class container #(type T = int);\n"
               "  typedef T elem_t;\n"
@@ -61,7 +61,7 @@ TEST(ParserSection6, ParameterizedDataType_DefaultTypeParam) {
               "endmodule\n"));
 }
 
-TEST(ParserSection6, ParameterizedDataType_ValueParamOnly) {
+TEST(DataTypeParsing, ParameterizedDataType_ValueParamOnly) {
   EXPECT_TRUE(
       ParseOk("virtual class bus_def #(parameter WIDTH = 8);\n"
               "  typedef logic [WIDTH-1:0] data_t;\n"

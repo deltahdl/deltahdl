@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserSection11, Sec11_4_1_BitSelectConstantIndex) {
+TEST(OperatorAndExpressionParsing, BitSelectConstantIndex) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] vec;\n"
@@ -24,7 +24,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectConstantIndex) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
-TEST(ParserSection11, Sec11_4_1_BitSelectVariableIndex) {
+TEST(OperatorAndExpressionParsing, BitSelectVariableIndex) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] vec;\n"
@@ -40,7 +40,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectVariableIndex) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-TEST(ParserSection11, Sec11_4_1_BitSelectExpressionIndex) {
+TEST(OperatorAndExpressionParsing, BitSelectExpressionIndex) {
   auto r = Parse(
       "module t;\n"
       "  logic [15:0] vec;\n"
@@ -57,7 +57,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectExpressionIndex) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-TEST(ParserSection10, Sec10_4_1_PartSelect) {
+TEST(AssignmentParsing, PartSelect) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] a;\n"
@@ -75,7 +75,7 @@ TEST(ParserSection10, Sec10_4_1_PartSelect) {
   ASSERT_NE(stmt->lhs->index_end, nullptr);
 }
 
-TEST(ParserSection11, Sec11_4_1_ConstPartSelectDescending) {
+TEST(OperatorAndExpressionParsing, ConstPartSelectDescending) {
   auto r = Parse(
       "module t;\n"
       "  logic [15:0] vec;\n"
@@ -94,7 +94,7 @@ TEST(ParserSection11, Sec11_4_1_ConstPartSelectDescending) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
-TEST(ParserSection11, Sec11_4_1_ConstPartSelectAscending) {
+TEST(OperatorAndExpressionParsing, ConstPartSelectAscending) {
   auto r = Parse(
       "module t;\n"
       "  logic [0:15] vec;\n"
@@ -111,7 +111,7 @@ TEST(ParserSection11, Sec11_4_1_ConstPartSelectAscending) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
-TEST(ParserSection11, Sec11_4_1_IndexedPartSelectUpVariableBase) {
+TEST(OperatorAndExpressionParsing, IndexedPartSelectUpVariableBase) {
   auto r = Parse(
       "module t;\n"
       "  logic [31:0] vec;\n"
@@ -130,7 +130,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectUpVariableBase) {
   EXPECT_EQ(rhs->index_end->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownVariableBase) {
+TEST(OperatorAndExpressionParsing, IndexedPartSelectDownVariableBase) {
   auto r = Parse(
       "module t;\n"
       "  logic [31:0] vec;\n"
@@ -148,7 +148,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownVariableBase) {
   ASSERT_NE(rhs->index_end, nullptr);
 }
 
-TEST(ParserSection9, Sec9_2_2_BitSelectLHS) {
+TEST(ProcessParsing, BitSelectLHS) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] data;\n"
@@ -165,7 +165,7 @@ TEST(ParserSection9, Sec9_2_2_BitSelectLHS) {
   EXPECT_EQ(item->body->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserA84, RangeExpressionSimpleIndex) {
+TEST(PrimaryParsing, RangeExpressionSimpleIndex) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] data;\n"
@@ -179,7 +179,7 @@ TEST(ParserA84, RangeExpressionSimpleIndex) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserA84, RangeExpressionPartSelect) {
+TEST(PrimaryParsing, RangeExpressionPartSelect) {
   auto r = Parse(
       "module m;\n"
       "  logic [15:0] data;\n"
@@ -194,7 +194,7 @@ TEST(ParserA84, RangeExpressionPartSelect) {
   EXPECT_NE(rhs->index_end, nullptr);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedBitSelect) {
+TEST(AggregateTypeParsing, PackedBitSelect) {
   auto r = Parse(
       "module t;\n"
       "  struct packed {\n"
@@ -211,7 +211,7 @@ TEST(ParserSection7, Sec7_2_1_PackedBitSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ParserSection9, Sec9_2_2_PartSelectLHS) {
+TEST(ProcessParsing, PartSelectLHS) {
   auto r = Parse(
       "module m;\n"
       "  logic [15:0] bus;\n"
@@ -235,7 +235,7 @@ static Expr* FirstAssignLhs(ParseResult& r) {
   return stmt->lhs;
 }
 
-TEST(ParserSection11, Sec11_4_1_PartSelectOnLhsBlocking) {
+TEST(OperatorAndExpressionParsing, PartSelectOnLhsBlocking) {
   auto r = Parse(
       "module t;\n"
       "  logic [15:0] vec;\n"
@@ -252,7 +252,7 @@ TEST(ParserSection11, Sec11_4_1_PartSelectOnLhsBlocking) {
   EXPECT_FALSE(lhs->is_part_select_minus);
 }
 
-TEST(ParserSection11, Sec11_4_1_IndexedPartSelectOnLhs) {
+TEST(OperatorAndExpressionParsing, IndexedPartSelectOnLhs) {
   auto r = Parse(
       "module t;\n"
       "  logic [31:0] vec;\n"
@@ -275,7 +275,7 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ParserSection11, Sec11_4_1_PartSelectInContAssignRhs) {
+TEST(OperatorAndExpressionParsing, PartSelectInContAssignRhs) {
   auto r = Parse(
       "module t;\n"
       "  wire [15:0] data;\n"
@@ -292,7 +292,7 @@ TEST(ParserSection11, Sec11_4_1_PartSelectInContAssignRhs) {
   ASSERT_NE(ca->assign_rhs->index_end, nullptr);
 }
 
-TEST(ParserA83, ConstantRangeExprBitSelect) {
+TEST(ExpressionParsing, ConstantRangeExprBitSelect) {
   auto r = Parse("module m; initial x = data[3]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -303,7 +303,7 @@ TEST(ParserA83, ConstantRangeExprBitSelect) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-TEST(ParserA83, ConstantRangePartSelect) {
+TEST(ExpressionParsing, ConstantRangePartSelect) {
   auto r = Parse("module m; initial x = data[7:4]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -313,7 +313,7 @@ TEST(ParserA83, ConstantRangePartSelect) {
   ASSERT_NE(rhs->index, nullptr);
   ASSERT_NE(rhs->index_end, nullptr);
 }
-TEST(ParserSection7, IndexedPartSelectPlus) {
+TEST(AggregateTypeParsing, IndexedPartSelectPlus) {
   auto r = Parse(
       "module t;\n"
       "  initial x = data[3 +: 4];\n"
@@ -327,7 +327,7 @@ TEST(ParserSection7, IndexedPartSelectPlus) {
   EXPECT_TRUE(rhs->is_part_select_plus);
 }
 
-TEST(ParserSection7, IndexedPartSelectMinus) {
+TEST(AggregateTypeParsing, IndexedPartSelectMinus) {
   auto r = Parse(
       "module t;\n"
       "  initial x = data[7 -: 4];\n"
@@ -341,7 +341,7 @@ TEST(ParserSection7, IndexedPartSelectMinus) {
   EXPECT_TRUE(rhs->is_part_select_minus);
 }
 
-TEST(ParserA83, IndexedRangePlusColon) {
+TEST(ExpressionParsing, IndexedRangePlusColon) {
   auto r = Parse("module m; initial x = data[2+:4]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -352,7 +352,7 @@ TEST(ParserA83, IndexedRangePlusColon) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
-TEST(ParserA83, IndexedRangeMinusColon) {
+TEST(ExpressionParsing, IndexedRangeMinusColon) {
   auto r = Parse("module m; initial x = data[7-:4]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -363,7 +363,7 @@ TEST(ParserA83, IndexedRangeMinusColon) {
   EXPECT_TRUE(rhs->is_part_select_minus);
 }
 
-TEST(ParserSection11, Sec11_4_1_PartSelectAfterBitSelect) {
+TEST(OperatorAndExpressionParsing, PartSelectAfterBitSelect) {
   auto r = Parse(
       "module t;\n"
       "  logic [3:0] [7:0] packed_arr;\n"
@@ -381,7 +381,7 @@ TEST(ParserSection11, Sec11_4_1_PartSelectAfterBitSelect) {
   EXPECT_EQ(rhs->base->index_end, nullptr);
 }
 
-TEST(ParserA83, IndexedRangeVariableBase) {
+TEST(ExpressionParsing, IndexedRangeVariableBase) {
   auto r = Parse("module m; initial x = data[i+:8]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -392,7 +392,7 @@ TEST(ParserA83, IndexedRangeVariableBase) {
   EXPECT_EQ(rhs->index->kind, ExprKind::kIdentifier);
 }
 
-TEST(ParserSection11, BitSelectOnConcat) {
+TEST(OperatorAndExpressionParsing, BitSelectOnConcat) {
   auto r = Parse(
       "module t;\n"
       "  logic [3:0] a, b, c;\n"
@@ -402,7 +402,7 @@ TEST(ParserSection11, BitSelectOnConcat) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, Sec11_4_1_SelectOnMemberAccess) {
+TEST(OperatorAndExpressionParsing, SelectOnMemberAccess) {
   auto r = Parse(
       "module t;\n"
       "  initial x = s.field[2];\n"
@@ -418,7 +418,7 @@ TEST(ParserSection11, Sec11_4_1_SelectOnMemberAccess) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-TEST(ParserSection11, Sec11_4_1_IndexedPartSelectInAlwaysComb) {
+TEST(OperatorAndExpressionParsing, IndexedPartSelectInAlwaysComb) {
   auto r = Parse(
       "module t;\n"
       "  logic [31:0] vec;\n"
@@ -437,7 +437,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectInAlwaysComb) {
   EXPECT_TRUE(item->body->rhs->is_part_select_plus);
 }
 
-TEST(ParserAnnexA, A8BitAndPartSelect) {
+TEST(FormalSyntaxParsing, BitAndPartSelect) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = data[3]; y = data[7:4]; end\n"
@@ -446,7 +446,7 @@ TEST(ParserAnnexA, A8BitAndPartSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, Sec11_4_1_PartSelectWithSysFuncIndex) {
+TEST(OperatorAndExpressionParsing, PartSelectWithSysFuncIndex) {
   auto r = Parse(
       "module t;\n"
       "  logic [31:0] vec;\n"
@@ -462,7 +462,7 @@ TEST(ParserSection11, Sec11_4_1_PartSelectWithSysFuncIndex) {
   ASSERT_NE(rhs->index_end, nullptr);
 }
 
-TEST(ParserSection11, Sec11_4_1_MultiplePartSelectsInExpr) {
+TEST(OperatorAndExpressionParsing, MultiplePartSelectsInExpr) {
   auto r = Parse(
       "module t;\n"
       "  logic [15:0] a, b;\n"
@@ -482,7 +482,7 @@ TEST(ParserSection11, Sec11_4_1_MultiplePartSelectsInExpr) {
   ASSERT_NE(rhs->rhs->index_end, nullptr);
 }
 
-TEST(ParserSection11, Sec11_4_1_IndexedPartSelectComplexBase) {
+TEST(OperatorAndExpressionParsing, IndexedPartSelectComplexBase) {
   auto r = Parse(
       "module t;\n"
       "  logic [63:0] vec;\n"
@@ -499,7 +499,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectComplexBase) {
   EXPECT_EQ(rhs->index->op, TokenKind::kStar);
 }
 
-TEST(ParserSection11, BitSelectWithExprIndex) {
+TEST(OperatorAndExpressionParsing, BitSelectWithExprIndex) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a[i + 1];\n"
@@ -511,7 +511,7 @@ TEST(ParserSection11, BitSelectWithExprIndex) {
   EXPECT_EQ(rhs->index->kind, ExprKind::kBinary);
 }
 
-TEST(ParserA84, BitSelectSingleDim) {
+TEST(PrimaryParsing, BitSelectSingleDim) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] data;\n"
@@ -527,7 +527,7 @@ TEST(ParserA84, BitSelectSingleDim) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-TEST(ParserSection11, Sec11_4_1_PartSelectInIfCondition) {
+TEST(OperatorAndExpressionParsing, PartSelectInIfCondition) {
   auto r = Parse(
       "module t;\n"
       "  logic [15:0] data;\n"
@@ -547,7 +547,7 @@ TEST(ParserSection11, Sec11_4_1_PartSelectInIfCondition) {
   ASSERT_NE(stmt->condition->lhs->index_end, nullptr);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedIndexedPartSelectPlus) {
+TEST(AggregateTypeParsing, PackedIndexedPartSelectPlus) {
   auto r = Parse(
       "module t;\n"
       "  struct packed {\n"
@@ -567,7 +567,7 @@ TEST(ParserSection7, Sec7_2_1_PackedIndexedPartSelectPlus) {
   EXPECT_TRUE(stmt->rhs->is_part_select_plus);
 }
 
-TEST(ParserA84, SelectBitWithPartSelect) {
+TEST(PrimaryParsing, SelectBitWithPartSelect) {
   auto r = Parse(
       "module m;\n"
       "  logic [31:0] data;\n"
@@ -583,7 +583,7 @@ TEST(ParserA84, SelectBitWithPartSelect) {
   ASSERT_NE(rhs->index_end, nullptr);
 }
 
-TEST(ParserSection11, PartSelectHasIndexEnd) {
+TEST(OperatorAndExpressionParsing, PartSelectHasIndexEnd) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a[15:8];\n"
@@ -595,7 +595,7 @@ TEST(ParserSection11, PartSelectHasIndexEnd) {
   EXPECT_NE(rhs->index_end, nullptr);
 }
 
-TEST(ParserA83, PartSelectConstantRange) {
+TEST(ExpressionParsing, PartSelectConstantRange) {
   auto r = Parse("module m; initial x = data[15:8]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -608,7 +608,7 @@ TEST(ParserA83, PartSelectConstantRange) {
   EXPECT_FALSE(rhs->is_part_select_minus);
 }
 
-TEST(ParserA83, PartSelectIndexedPlus) {
+TEST(ExpressionParsing, PartSelectIndexedPlus) {
   auto r = Parse("module m; initial x = data[0+:8]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -618,7 +618,7 @@ TEST(ParserA83, PartSelectIndexedPlus) {
   EXPECT_TRUE(rhs->is_part_select_plus);
 }
 
-TEST(ParserA83, PartSelectIndexedMinus) {
+TEST(ExpressionParsing, PartSelectIndexedMinus) {
   auto r = Parse("module m; initial x = data[7-:8]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -628,7 +628,7 @@ TEST(ParserA83, PartSelectIndexedMinus) {
   EXPECT_TRUE(rhs->is_part_select_minus);
 }
 
-TEST(ParserA84, NonrangeSelectBitSelect) {
+TEST(PrimaryParsing, NonrangeSelectBitSelect) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] data;\n"
@@ -638,7 +638,7 @@ TEST(ParserA84, NonrangeSelectBitSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection11, Sec11_4_1_BitSelectAssignedFromFuncCall) {
+TEST(OperatorAndExpressionParsing, BitSelectAssignedFromFuncCall) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] vec;\n"
@@ -655,7 +655,7 @@ TEST(ParserSection11, Sec11_4_1_BitSelectAssignedFromFuncCall) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-TEST(ParserSection11, Sec11_4_1_IndexedPartSelectInForLoop) {
+TEST(OperatorAndExpressionParsing, IndexedPartSelectInForLoop) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic [31:0] data;\n"
@@ -667,7 +667,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectInForLoop) {
               "endmodule\n"));
 }
 
-TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownOnLhs) {
+TEST(OperatorAndExpressionParsing, IndexedPartSelectDownOnLhs) {
   auto r = Parse(
       "module t;\n"
       "  logic [31:0] vec;\n"
@@ -684,7 +684,7 @@ TEST(ParserSection11, Sec11_4_1_IndexedPartSelectDownOnLhs) {
   ASSERT_NE(lhs->index_end, nullptr);
 }
 
-TEST(ParserSection11, Sec11_4_1_SelectOnFuncReturnValue) {
+TEST(OperatorAndExpressionParsing, SelectOnFuncReturnValue) {
   auto r = Parse(
       "module t;\n"
       "  initial x = get_data()[7:0];\n"
@@ -700,7 +700,7 @@ TEST(ParserSection11, Sec11_4_1_SelectOnFuncReturnValue) {
   ASSERT_NE(rhs->index_end, nullptr);
 }
 
-TEST(ParserSection11, Sec11_4_1_SelectOnSystemFuncResult) {
+TEST(OperatorAndExpressionParsing, SelectOnSystemFuncResult) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial x = $random[3:0];\n"

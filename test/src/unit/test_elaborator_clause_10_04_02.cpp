@@ -45,7 +45,7 @@ TEST(Lowerer, NbaAppliesToValue) {
   LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
 }
 
-TEST(SimCh10b, SimpleNBA) {
+TEST(NonblockingAssignSim, SimpleNBA) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -66,7 +66,7 @@ TEST(SimCh10b, SimpleNBA) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(SimCh10b, NBADeferredUpdate) {
+TEST(NonblockingAssignSim, NBADeferredUpdate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -95,7 +95,7 @@ TEST(SimCh10b, NBADeferredUpdate) {
   EXPECT_EQ(a->value.ToUint64(), 20u);
 }
 
-TEST(SimCh10b, MultipleNBASameVarLastWins) {
+TEST(NonblockingAssignSim, MultipleNBASameVarLastWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -118,7 +118,7 @@ TEST(SimCh10b, MultipleNBASameVarLastWins) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(SimCh10b, NBASwapPattern) {
+TEST(NonblockingAssignSim, NBASwapPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -147,7 +147,7 @@ TEST(SimCh10b, NBASwapPattern) {
   EXPECT_EQ(b->value.ToUint64(), 10u);
 }
 
-TEST(SimCh10b, NBAExpressionRHS) {
+TEST(NonblockingAssignSim, NBAExpressionRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -170,7 +170,7 @@ TEST(SimCh10b, NBAExpressionRHS) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(SimCh10b, NBABitSelectLHS) {
+TEST(NonblockingAssignSim, NBABitSelectLHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -193,7 +193,7 @@ TEST(SimCh10b, NBABitSelectLHS) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-TEST(SimCh10b, NBAPartSelectLHS) {
+TEST(NonblockingAssignSim, NBAPartSelectLHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -216,7 +216,7 @@ TEST(SimCh10b, NBAPartSelectLHS) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-TEST(SimCh10b, NBAConcatenationRHS) {
+TEST(NonblockingAssignSim, NBAConcatenationRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -241,7 +241,7 @@ TEST(SimCh10b, NBAConcatenationRHS) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-TEST(SimCh10b, NBATernaryRHS) {
+TEST(NonblockingAssignSim, NBATernaryRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -264,7 +264,7 @@ TEST(SimCh10b, NBATernaryRHS) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimCh10b, NBAInAlwaysFF) {
+TEST(NonblockingAssignSim, NBAInAlwaysFF) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -292,7 +292,7 @@ TEST(SimCh10b, NBAInAlwaysFF) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SimCh10b, NBAInInitialBlock) {
+TEST(NonblockingAssignSim, NBAInInitialBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -313,7 +313,7 @@ TEST(SimCh10b, NBAInInitialBlock) {
   EXPECT_EQ(var->value.ToUint64(), 123u);
 }
 
-TEST(SimCh10b, NBAWithIfElse) {
+TEST(NonblockingAssignSim, NBAWithIfElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -350,7 +350,7 @@ TEST(SimCh10b, NBAWithIfElse) {
   EXPECT_EQ(b->value.ToUint64(), 300u);
 }
 
-TEST(SimCh10b, NBAWithCase) {
+TEST(NonblockingAssignSim, NBAWithCase) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -378,7 +378,7 @@ TEST(SimCh10b, NBAWithCase) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-TEST(SimCh10b, NBAInForLoop) {
+TEST(NonblockingAssignSim, NBAInForLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -403,7 +403,7 @@ TEST(SimCh10b, NBAInForLoop) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(SimCh10b, NBAFunctionCallRHS) {
+TEST(NonblockingAssignSim, NBAFunctionCallRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -427,7 +427,7 @@ TEST(SimCh10b, NBAFunctionCallRHS) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimCh10b, NBAPipelinePattern) {
+TEST(NonblockingAssignSim, NBAPipelinePattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -458,7 +458,7 @@ TEST(SimCh10b, NBAPipelinePattern) {
   EXPECT_EQ(s1->value.ToUint64(), 99u);
 }
 
-TEST(SimCh10b, NBAWidthTruncation) {
+TEST(NonblockingAssignSim, NBAWidthTruncation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -480,7 +480,7 @@ TEST(SimCh10b, NBAWidthTruncation) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-TEST(SimCh10b, NBAArithmeticExpression) {
+TEST(NonblockingAssignSim, NBAArithmeticExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -505,7 +505,7 @@ TEST(SimCh10b, NBAArithmeticExpression) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SimCh10b, NBABitwiseOperators) {
+TEST(NonblockingAssignSim, NBABitwiseOperators) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -527,7 +527,7 @@ TEST(SimCh10b, NBABitwiseOperators) {
                    {{"r_and", 0x30u}, {"r_or", 0xFCu}, {"r_xor", 0xCCu}});
 }
 
-TEST(SimCh10b, NBAShiftOperators) {
+TEST(NonblockingAssignSim, NBAShiftOperators) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -557,7 +557,7 @@ TEST(SimCh10b, NBAShiftOperators) {
   EXPECT_EQ(r_shr->value.ToUint64(), 0x07u);
 }
 
-TEST(SimCh10b, NBAComparisonResult) {
+TEST(NonblockingAssignSim, NBAComparisonResult) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -592,7 +592,7 @@ TEST(SimCh10b, NBAComparisonResult) {
   EXPECT_EQ(r_gt->value.ToUint64(), 0u);
 }
 
-TEST(SimCh10b, MixedBlockingAndNBA) {
+TEST(NonblockingAssignSim, MixedBlockingAndNBA) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -608,7 +608,7 @@ TEST(SimCh10b, MixedBlockingAndNBA) {
   LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 6u}});
 }
 
-TEST(SimCh10b, MultipleNBAsInSequence) {
+TEST(NonblockingAssignSim, MultipleNBAsInSequence) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -638,7 +638,7 @@ TEST(SimCh10b, MultipleNBAsInSequence) {
   EXPECT_EQ(c->value.ToUint64(), 2u);
 }
 
-TEST(SimCh10b, NBARegisterFilePattern) {
+TEST(NonblockingAssignSim, NBARegisterFilePattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -671,7 +671,7 @@ TEST(SimCh10b, NBARegisterFilePattern) {
   EXPECT_EQ(r3->value.ToUint64(), 400u);
 }
 
-TEST(SimCh10b, NBAWidthAndToUint64) {
+TEST(NonblockingAssignSim, NBAWidthAndToUint64) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -705,7 +705,7 @@ TEST(SimCh10b, NBAWidthAndToUint64) {
   EXPECT_EQ(word->value.ToUint64(), 0xDEADCAFEu);
 }
 
-TEST(SimCh10b, NBACaseDefaultBranch) {
+TEST(NonblockingAssignSim, NBACaseDefaultBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -732,7 +732,7 @@ TEST(SimCh10b, NBACaseDefaultBranch) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SimCh10b, NBABitwiseNot) {
+TEST(NonblockingAssignSim, NBABitwiseNot) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -756,7 +756,7 @@ TEST(SimCh10b, NBABitwiseNot) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-TEST(SimCh10b, NBAReplicationRHS) {
+TEST(NonblockingAssignSim, NBAReplicationRHS) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

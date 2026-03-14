@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexD, AnnexDScope) {
+TEST(OptionalSystemTaskParserParsing, Scope) {
   auto r = Parse(
       "module m;\n"
       "  initial begin $scope(m); $showscopes; end\n"

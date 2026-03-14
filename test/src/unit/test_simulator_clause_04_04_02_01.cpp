@@ -10,7 +10,7 @@
 
 using namespace delta;
 
-TEST(SimCh4421, PreponedExecutesBeforeAllOtherRegions) {
+TEST(PreponedRegionSim, PreponedExecutesBeforeAllOtherRegions) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -27,7 +27,7 @@ TEST(SimCh4421, PreponedExecutesBeforeAllOtherRegions) {
   EXPECT_EQ(order[0], "preponed");
 }
 
-TEST(SimCh4421, PreponedSamplesBeforeActiveModifications) {
+TEST(PreponedRegionSim, PreponedSamplesBeforeActiveModifications) {
   Arena arena;
   Scheduler sched(arena);
   int shared_value = 0;
@@ -50,7 +50,7 @@ TEST(SimCh4421, PreponedSamplesBeforeActiveModifications) {
   EXPECT_EQ(sampled_in_active, 42);
 }
 
-TEST(SimCh4421, PreponedEquivalentToPreviousPostponed) {
+TEST(PreponedRegionSim, PreponedEquivalentToPreviousPostponed) {
   Arena arena;
   Scheduler sched(arena);
   int shared_value = 0;
@@ -78,7 +78,7 @@ TEST(SimCh4421, PreponedEquivalentToPreviousPostponed) {
   EXPECT_EQ(sampled_in_preponed, 100);
 }
 
-TEST(SimCh4421, PreponedDoesNotReExecuteDuringIteration) {
+TEST(PreponedRegionSim, PreponedDoesNotReExecuteDuringIteration) {
   Arena arena;
   Scheduler sched(arena);
   int preponed_count = 0;
@@ -99,7 +99,7 @@ TEST(SimCh4421, PreponedDoesNotReExecuteDuringIteration) {
   EXPECT_EQ(preponed_count, 1);
 }
 
-TEST(SimCh4421, PreponedPLIEventsExecuteInRegion) {
+TEST(PreponedRegionSim, PreponedPLIEventsExecuteInRegion) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -118,7 +118,7 @@ TEST(SimCh4421, PreponedPLIEventsExecuteInRegion) {
   EXPECT_EQ(order[1], "sim");
 }
 
-TEST(SimCh4421, PreponedRunsOncePerTimeSlot) {
+TEST(PreponedRegionSim, PreponedRunsOncePerTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
   int preponed_count = 0;
@@ -133,7 +133,7 @@ TEST(SimCh4421, PreponedRunsOncePerTimeSlot) {
   EXPECT_EQ(preponed_count, 3);
 }
 
-TEST(SimCh4421, OneStepDelayMechanismViaPreponedRegion) {
+TEST(PreponedRegionSim, OneStepDelayMechanismViaPreponedRegion) {
   Arena arena;
   Scheduler sched(arena);
   int value = 10;
@@ -156,7 +156,7 @@ TEST(SimCh4421, OneStepDelayMechanismViaPreponedRegion) {
   EXPECT_EQ(value, 30);
 }
 
-TEST(SimCh4421, PreponedNotReExecutedByReactiveToActiveRestart) {
+TEST(PreponedRegionSim, PreponedNotReExecutedByReactiveToActiveRestart) {
   Arena arena;
   Scheduler sched(arena);
   int preponed_count = 0;
@@ -177,11 +177,11 @@ TEST(SimCh4421, PreponedNotReExecutedByReactiveToActiveRestart) {
   EXPECT_EQ(preponed_count, 1);
 }
 
-TEST(SimCh4421, PreponedIsOrdinalZero) {
+TEST(PreponedRegionSim, PreponedIsOrdinalZero) {
   EXPECT_EQ(static_cast<int>(Region::kPreponed), 0);
 }
 
-TEST(SimCh4421, PreponedSeesCorrectStateAcrossMultipleTimeSlots) {
+TEST(PreponedRegionSim, PreponedSeesCorrectStateAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);
   int value = 0;

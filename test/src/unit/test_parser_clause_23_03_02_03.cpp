@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA0411, NamedPortWithoutParens) {
+TEST(ModuleInstantiationGrammar, NamedPortWithoutParens) {
   auto r = Parse("module m; sub u0(.clk, .data); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(ParserAnnexA0411, NamedPortWithoutParens) {
   EXPECT_EQ(item->inst_ports[1].first, "data");
 }
 
-TEST(ParserAnnexA0412, InterfaceInstNamedPortNoParens) {
+TEST(InterfaceInstantiationGrammar, InterfaceInstNamedPortNoParens) {
   auto r = Parse("module m; my_if u0(.clk, .rst); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -25,7 +25,7 @@ TEST(ParserAnnexA0412, InterfaceInstNamedPortNoParens) {
   EXPECT_EQ(item->inst_ports[1].first, "rst");
 }
 
-TEST(ParserAnnexA0413, ProgramInstNamedPortNoParens) {
+TEST(ProgramInstantiationGrammar, ProgramInstNamedPortNoParens) {
   auto r = Parse(
       "program my_prog(input logic clk, input logic rst);\n"
       "endprogram\n"

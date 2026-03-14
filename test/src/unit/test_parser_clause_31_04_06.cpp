@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA705, SystemTimingCheckNochange) {
+TEST(SystemTimingCheckParsing, SystemTimingCheckNochange) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -18,7 +18,7 @@ TEST(ParserA705, SystemTimingCheckNochange) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kNochange);
 }
 
-TEST(ParserA70501, NochangeTimingCheck) {
+TEST(TimingCheckCommandParsing, NochangeTimingCheck) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -32,7 +32,7 @@ TEST(ParserA70501, NochangeTimingCheck) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-TEST(ParserA70501, NochangeWithNotifier) {
+TEST(TimingCheckCommandParsing, NochangeWithNotifier) {
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -45,7 +45,7 @@ TEST(ParserA70501, NochangeWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-TEST(ParserA70502, StartEndEdgeOffsetMinTypMax) {
+TEST(TimingCheckArgumentParsing, StartEndEdgeOffsetMinTypMax) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

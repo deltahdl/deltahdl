@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA612, ComplexMixedProds) {
+TEST(RandsequenceSyntaxParsing, ComplexMixedProds) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -22,7 +22,7 @@ TEST(ParserA612, ComplexMixedProds) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, NestedRandsequence) {
+TEST(RandsequenceSyntaxParsing, NestedRandsequence) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -39,7 +39,7 @@ TEST(ParserA612, NestedRandsequence) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RandsequenceStmtWithName) {
+TEST(RandsequenceSyntaxParsing, RandsequenceStmtWithName) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -57,7 +57,7 @@ TEST(ParserA612, RandsequenceStmtWithName) {
   EXPECT_EQ(stmt->kind, StmtKind::kRandsequence);
 }
 
-TEST(ParserA612, RandsequenceStmtNoName) {
+TEST(RandsequenceSyntaxParsing, RandsequenceStmtNoName) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -74,7 +74,7 @@ TEST(ParserA612, RandsequenceStmtNoName) {
   EXPECT_EQ(stmt->kind, StmtKind::kRandsequence);
 }
 
-TEST(ParserA612, RsProductionListSequence) {
+TEST(RandsequenceSyntaxParsing, RsProductionListSequence) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -90,7 +90,7 @@ TEST(ParserA612, RsProductionListSequence) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsCodeBlockWithDataDecl) {
+TEST(RandsequenceSyntaxParsing, RsCodeBlockWithDataDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -103,7 +103,7 @@ TEST(ParserA612, RsCodeBlockWithDataDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsProdAsProductionItem) {
+TEST(RandsequenceSyntaxParsing, RsProdAsProductionItem) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -117,7 +117,7 @@ TEST(ParserA612, RsProdAsProductionItem) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsProdAsCodeBlock) {
+TEST(RandsequenceSyntaxParsing, RsProdAsCodeBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -130,7 +130,7 @@ TEST(ParserA612, RsProdAsCodeBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserA612, RsProductionItemBare) {
+TEST(RandsequenceSyntaxParsing, RsProductionItemBare) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -144,7 +144,7 @@ TEST(ParserA612, RsProductionItemBare) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ParserSection18, RandsequenceStmt) {
+TEST(ConstrainedRandomParsing, RandsequenceStmt) {
   auto r = Parse(
       "module top;\n"
       "  initial begin\n"

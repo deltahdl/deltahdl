@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserAnnexA, A2TypedefStructPacked) {
+TEST(FormalSyntaxParsing, TypedefStructPacked) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct packed {\n"
@@ -18,7 +18,7 @@ TEST(ParserAnnexA, A2TypedefStructPacked) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
 }
 
-TEST(ParserA221, DataTypeStructPacked) {
+TEST(NetAndVariableTypeParsing, DataTypeStructPacked) {
   auto r = Parse(
       "module m;\n"
       "  struct packed signed { logic [7:0] a; logic [7:0] b; } pair;\n"
@@ -31,7 +31,7 @@ TEST(ParserA221, DataTypeStructPacked) {
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedTypedefLogicWidths) {
+TEST(AggregateTypeParsing, PackedTypedefLogicWidths) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -53,7 +53,7 @@ TEST(ParserSection7, Sec7_2_1_PackedTypedefLogicWidths) {
   EXPECT_EQ(item->typedef_type.struct_members[2].name, "valid");
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedTypedefBitMembers) {
+TEST(AggregateTypeParsing, PackedTypedefBitMembers) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -73,7 +73,7 @@ TEST(ParserSection7, Sec7_2_1_PackedTypedefBitMembers) {
   EXPECT_NE(item->typedef_type.struct_members[0].packed_dim_right, nullptr);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedIntegerTypes) {
+TEST(AggregateTypeParsing, PackedIntegerTypes) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -98,7 +98,7 @@ TEST(ParserSection7, Sec7_2_1_PackedIntegerTypes) {
             DataTypeKind::kLongint);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedSignedTypedef) {
+TEST(AggregateTypeParsing, PackedSignedTypedef) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed signed {\n"
@@ -117,7 +117,7 @@ TEST(ParserSection7, Sec7_2_1_PackedSignedTypedef) {
   EXPECT_EQ(item->typedef_type.struct_members[1].name, "imag_part");
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedVarDecl) {
+TEST(AggregateTypeParsing, PackedVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  struct packed {\n"
@@ -141,7 +141,7 @@ static ModuleItem* NthItem(ParseResult& r, size_t n) {
   return r.cu->modules[0]->items[n];
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedVarWithInit) {
+TEST(AggregateTypeParsing, PackedVarWithInit) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -158,7 +158,7 @@ TEST(ParserSection7, Sec7_2_1_PackedVarWithInit) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedMemberAccessRead) {
+TEST(AggregateTypeParsing, PackedMemberAccessRead) {
   auto r = Parse(
       "module t;\n"
       "  struct packed {\n"
@@ -189,7 +189,7 @@ TEST(Parser, TypedefStructPacked) {
   ASSERT_EQ(item->typedef_type.struct_members.size(), 2);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedMemberAccessWrite) {
+TEST(AggregateTypeParsing, PackedMemberAccessWrite) {
   auto r = Parse(
       "module t;\n"
       "  struct packed {\n"
@@ -206,7 +206,7 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberAccessWrite) {
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
-TEST(ParserSection7, StructPackedSigned) {
+TEST(AggregateTypeParsing, StructPackedSigned) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed signed {\n"
@@ -221,7 +221,7 @@ TEST(ParserSection7, StructPackedSigned) {
   EXPECT_TRUE(item->typedef_type.is_signed);
 }
 
-TEST(ParserSection7, Sec7_2_2_PackedStructBitwise) {
+TEST(AggregateTypeParsing, PackedStructBitwise) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } w_t;\n"
@@ -237,7 +237,7 @@ TEST(ParserSection7, Sec7_2_2_PackedStructBitwise) {
   EXPECT_EQ(stmt->rhs->op, TokenKind::kAmp);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedAssignFromConcat) {
+TEST(AggregateTypeParsing, PackedAssignFromConcat) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -257,7 +257,7 @@ TEST(ParserSection7, Sec7_2_1_PackedAssignFromConcat) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-TEST(ParserSection9, Sec9_2_2_StructMemberAccess) {
+TEST(ProcessParsing, StructMemberAccess) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct packed {\n"
@@ -283,7 +283,7 @@ TEST(ParserSection9, Sec9_2_2_StructMemberAccess) {
   EXPECT_EQ(item->body->stmts[1]->lhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedWithPackedArrayMember) {
+TEST(AggregateTypeParsing, PackedWithPackedArrayMember) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -302,7 +302,7 @@ TEST(ParserSection7, Sec7_2_1_PackedWithPackedArrayMember) {
   EXPECT_FALSE(item->typedef_type.struct_members[0].extra_packed_dims.empty());
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedMemberMultiPackedDims) {
+TEST(AggregateTypeParsing, PackedMemberMultiPackedDims) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -322,7 +322,7 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberMultiPackedDims) {
   EXPECT_GE(member.extra_packed_dims.size(), 1u);
 }
 
-TEST(ParserSection7, Sec7_2_2_StructOutputPort) {
+TEST(AggregateTypeParsing, StructOutputPort) {
   EXPECT_TRUE(
       ParseOk("module t(\n"
               "  output logic [15:0] result\n"
@@ -334,7 +334,7 @@ TEST(ParserSection7, Sec7_2_2_StructOutputPort) {
               "endmodule\n"));
 }
 
-TEST(ParserSection7, Sec7_2_1_NestedPackedStruct) {
+TEST(AggregateTypeParsing, NestedPackedStruct) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct packed {\n"
@@ -347,7 +347,7 @@ TEST(ParserSection7, Sec7_2_1_NestedPackedStruct) {
               "endmodule\n"));
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedStructWithPackedUnion) {
+TEST(AggregateTypeParsing, PackedStructWithPackedUnion) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct packed {\n"
@@ -360,7 +360,7 @@ TEST(ParserSection7, Sec7_2_1_PackedStructWithPackedUnion) {
               "endmodule\n"));
 }
 
-TEST(ParserSection7, Sec7_2_2_PackedStructBitVector) {
+TEST(AggregateTypeParsing, PackedStructBitVector) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -383,7 +383,7 @@ TEST(ParserSection7, Sec7_2_2_PackedStructBitVector) {
   EXPECT_EQ(s0->rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedWithEnumMember) {
+TEST(AggregateTypeParsing, PackedWithEnumMember) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef enum logic [1:0] { IDLE, RUN, STOP } state_e;\n"
@@ -394,7 +394,7 @@ TEST(ParserSection7, Sec7_2_1_PackedWithEnumMember) {
               "endmodule\n"));
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedInPackage) {
+TEST(AggregateTypeParsing, PackedInPackage) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef struct packed {\n"
@@ -412,7 +412,7 @@ TEST(ParserSection7, Sec7_2_1_PackedInPackage) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
-TEST(ParserSection7, Sec7_2_1_TypedefUsedInVarDecl) {
+TEST(AggregateTypeParsing, TypedefUsedInVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -431,7 +431,7 @@ TEST(ParserSection7, Sec7_2_1_TypedefUsedInVarDecl) {
   EXPECT_EQ(item->data_type.type_name, "pair_t");
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedSingleBitMember) {
+TEST(AggregateTypeParsing, PackedSingleBitMember) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -452,7 +452,7 @@ TEST(ParserSection7, Sec7_2_1_PackedSingleBitMember) {
   EXPECT_EQ(parity.packed_dim_right, nullptr);
 }
 
-TEST(ParserSection7, StructPackedUnsigned) {
+TEST(AggregateTypeParsing, StructPackedUnsigned) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed unsigned {\n"
@@ -469,7 +469,7 @@ TEST(ParserSection7, StructPackedUnsigned) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 3u);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedMemberSignedType) {
+TEST(AggregateTypeParsing, PackedMemberSignedType) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -487,7 +487,7 @@ TEST(ParserSection7, Sec7_2_1_PackedMemberSignedType) {
   EXPECT_FALSE(item->typedef_type.struct_members[1].is_signed);
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedAsPortType) {
+TEST(AggregateTypeParsing, PackedAsPortType) {
   EXPECT_TRUE(ParseOk(
       "module inner(\n"
       "  input struct packed { logic [7:0] a; logic [7:0] b; } data_in,\n"
@@ -497,7 +497,7 @@ TEST(ParserSection7, Sec7_2_1_PackedAsPortType) {
       "endmodule\n"));
 }
 
-TEST(ParserSection7, Sec7_2_1_AtmCellHeader) {
+TEST(AggregateTypeParsing, AtmCellHeader) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -521,7 +521,7 @@ TEST(ParserSection7, Sec7_2_1_AtmCellHeader) {
   EXPECT_EQ(item->typedef_type.struct_members[6].name, "Payload");
 }
 
-TEST(ParserSection7, Sec7_2_1_PackedMultiMembersSameType) {
+TEST(AggregateTypeParsing, PackedMultiMembersSameType) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -539,7 +539,7 @@ TEST(ParserSection7, Sec7_2_1_PackedMultiMembersSameType) {
   EXPECT_EQ(item->typedef_type.struct_members[2].name, "b");
 }
 
-TEST(ParserSection7, Sec7_2_2_PackedStructFromInteger) {
+TEST(AggregateTypeParsing, PackedStructFromInteger) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } word_t;\n"
@@ -555,7 +555,7 @@ TEST(ParserSection7, Sec7_2_2_PackedStructFromInteger) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(ParserSection7, Sec7_2_2_PackedStructFromConcat) {
+TEST(AggregateTypeParsing, PackedStructFromConcat) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } w_t;\n"
@@ -571,7 +571,7 @@ TEST(ParserSection7, Sec7_2_2_PackedStructFromConcat) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-TEST(ParserSection7, PackedStructSigned2State) {
+TEST(AggregateTypeParsing, PackedStructSigned2State) {
   auto r = Parse(
       "module t;\n"
       "  struct packed signed {\n"
@@ -589,7 +589,7 @@ TEST(ParserSection7, PackedStructSigned2State) {
   EXPECT_EQ(item->data_type.struct_members.size(), 4u);
 }
 
-TEST(ParserSection7, PackedStructUnsigned4State) {
+TEST(AggregateTypeParsing, PackedStructUnsigned4State) {
   auto r = Parse(
       "module t;\n"
       "  struct packed unsigned {\n"
@@ -606,7 +606,7 @@ TEST(ParserSection7, PackedStructUnsigned4State) {
   EXPECT_EQ(item->data_type.struct_members.size(), 3u);
 }
 
-TEST(ParserSection7, PackedStructDefaultUnsigned) {
+TEST(AggregateTypeParsing, PackedStructDefaultUnsigned) {
   auto r = Parse(
       "module t;\n"
       "  struct packed {\n"
@@ -620,7 +620,7 @@ TEST(ParserSection7, PackedStructDefaultUnsigned) {
   EXPECT_FALSE(item->data_type.is_signed);
 }
 
-TEST(ParserSection7, PackedStructWithTypedef) {
+TEST(AggregateTypeParsing, PackedStructWithTypedef) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -639,7 +639,7 @@ TEST(ParserSection7, PackedStructWithTypedef) {
   EXPECT_TRUE(item->typedef_type.is_packed);
   EXPECT_EQ(item->typedef_type.struct_members.size(), 6u);
 }
-TEST(ParserSection7, PackedStructPartSelect) {
+TEST(AggregateTypeParsing, PackedStructPartSelect) {
   auto r = Parse(
       "module t;\n"
       "  struct packed {\n"

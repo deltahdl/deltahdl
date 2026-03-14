@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elab1380, VirtualClassStaticFunctionElaborates) {
+TEST(ParameterizedSubroutineElaboration, VirtualClassStaticFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "virtual class C#(parameter W = 8);\n"
@@ -21,7 +21,7 @@ TEST(Elab1380, VirtualClassStaticFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1380, VirtualClassStaticTaskElaborates) {
+TEST(ParameterizedSubroutineElaboration, VirtualClassStaticTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "virtual class Printer#(parameter int ID = 0);\n"
@@ -37,7 +37,7 @@ TEST(Elab1380, VirtualClassStaticTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1380, MultipleStaticMethods) {
+TEST(ParameterizedSubroutineElaboration, MultipleStaticMethods) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "virtual class C#(parameter W = 4);\n"
@@ -58,7 +58,7 @@ TEST(Elab1380, MultipleStaticMethods) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1380, DifferentSpecializations) {
+TEST(ParameterizedSubroutineElaboration, DifferentSpecializations) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "virtual class C#(parameter W = 8);\n"
@@ -77,7 +77,7 @@ TEST(Elab1380, DifferentSpecializations) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1380, TypeParameterElaborates) {
+TEST(ParameterizedSubroutineElaboration, TypeParameterElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "virtual class Converter#(parameter type T = int);\n"
@@ -90,7 +90,7 @@ TEST(Elab1380, TypeParameterElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1380, ParamInForLoopBound) {
+TEST(ParameterizedSubroutineElaboration, ParamInForLoopBound) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "virtual class Popcount#(parameter W = 8);\n"

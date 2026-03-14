@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elab1360, DpiImportFunctionElaborates) {
+TEST(ImportExportElaboration, DpiImportFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -17,7 +17,7 @@ TEST(Elab1360, DpiImportFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1360, DpiImportTaskElaborates) {
+TEST(ImportExportElaboration, DpiImportTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -29,7 +29,7 @@ TEST(Elab1360, DpiImportTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1360, DpiExportFunctionElaborates) {
+TEST(ImportExportElaboration, DpiExportFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -41,7 +41,7 @@ TEST(Elab1360, DpiExportFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1360, DpiImportContextElaborates) {
+TEST(ImportExportElaboration, DpiImportContextElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -52,7 +52,7 @@ TEST(Elab1360, DpiImportContextElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1360, DpiImportPureElaborates) {
+TEST(ImportExportElaboration, DpiImportPureElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -63,7 +63,7 @@ TEST(Elab1360, DpiImportPureElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elab1360, DpiImportWithCNameElaborates) {
+TEST(ImportExportElaboration, DpiImportWithCNameElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

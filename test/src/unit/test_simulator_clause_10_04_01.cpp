@@ -11,7 +11,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh4, BlockingOverwriteInOrder) {
+TEST(SchedulingSemanticsSim, BlockingOverwriteInOrder) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"

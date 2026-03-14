@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA211, CovergroupDecl_InClass) {
+TEST(CovergroupDeclParsing, CovergroupDecl_InClass) {
   EXPECT_TRUE(
       ParseOk("class c;\n"
               "  covergroup cg;\n"
@@ -14,7 +14,7 @@ TEST(ParserA211, CovergroupDecl_InClass) {
               "endclass\n"));
 }
 
-TEST(ParserSection8, CovergroupInClass) {
+TEST(ClassParsing, CovergroupInClass) {
   auto r = Parse(
       "class CoveredClass;\n"
       "  int x;\n"

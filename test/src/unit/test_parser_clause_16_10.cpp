@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, SequenceMatchItem_Assignment) {
+TEST(AssertionDeclParsing, SequenceMatchItem_Assignment) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"
@@ -12,7 +12,7 @@ TEST(ParserA210, SequenceMatchItem_Assignment) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, AssertionVariableDecl_InProperty) {
+TEST(AssertionDeclParsing, AssertionVariableDecl_InProperty) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p;\n"
@@ -22,7 +22,7 @@ TEST(ParserA210, AssertionVariableDecl_InProperty) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, AssertionVariableDecl_InSequence) {
+TEST(AssertionDeclParsing, AssertionVariableDecl_InSequence) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  sequence s;\n"
@@ -32,7 +32,7 @@ TEST(ParserA210, AssertionVariableDecl_InSequence) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, SequenceMatchItem_IncDec) {
+TEST(AssertionDeclParsing, SequenceMatchItem_IncDec) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (@(posedge clk)\n"
@@ -40,7 +40,7 @@ TEST(ParserA210, SequenceMatchItem_IncDec) {
               "endmodule\n"));
 }
 
-TEST(ParserA210, AssertionVariableDecl_MultipleVars) {
+TEST(AssertionDeclParsing, AssertionVariableDecl_MultipleVars) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p;\n"

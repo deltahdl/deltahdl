@@ -2,7 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, Mux2to1ExampleElaborates) {
+TEST(DesignBuildingBlockElaboration, Mux2to1ExampleElaborates) {
   EXPECT_TRUE(
       ElabOk("module mux2to1 (input wire a, b, sel,\n"
              "                output logic y);\n"
@@ -13,7 +13,7 @@ TEST(ElabClause03, Mux2to1ExampleElaborates) {
              "endmodule: mux2to1\n"));
 }
 
-TEST(ElabClause03, Mux2to1HasCorrectPorts) {
+TEST(DesignBuildingBlockElaboration, Mux2to1HasCorrectPorts) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module mux2to1 (input wire a, b, sel,\n"
@@ -31,7 +31,7 @@ TEST(ElabClause03, Mux2to1HasCorrectPorts) {
   EXPECT_EQ(top->ports.size(), 4u);
 }
 
-TEST(ElabClause03, ModuleWithMixedContents) {
+TEST(DesignBuildingBlockElaboration, ModuleWithMixedContents) {
   EXPECT_TRUE(
       ElabOk("module m (input logic clk, output logic [7:0] q);\n"
              "  wire [7:0] net;\n"
@@ -43,7 +43,7 @@ TEST(ElabClause03, ModuleWithMixedContents) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, ModuleWithSubroutineElaborates) {
+TEST(DesignBuildingBlockElaboration, ModuleWithSubroutineElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  function int add(int a, int b);\n"
@@ -54,7 +54,7 @@ TEST(ElabClause03, ModuleWithSubroutineElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, ModuleWithModuleInstElaborates) {
+TEST(DesignBuildingBlockElaboration, ModuleWithModuleInstElaborates) {
   EXPECT_TRUE(
       ElabOk("module sub(input logic a, output logic b);\n"
              "  assign b = a;\n"
@@ -65,7 +65,7 @@ TEST(ElabClause03, ModuleWithModuleInstElaborates) {
              "endmodule\n"));
 }
 
-TEST(ElabClause03, ModuleWithGenerateElaborates) {
+TEST(DesignBuildingBlockElaboration, ModuleWithGenerateElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  parameter int P = 1;\n"

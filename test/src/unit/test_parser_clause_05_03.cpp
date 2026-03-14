@@ -5,11 +5,11 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause05, Cl5_3_TabDelimiter) {
+TEST(LexicalConventionParsing, TabDelimiter) {
   EXPECT_TRUE(ParseOk("module\tt;\tlogic\ta;\tendmodule"));
 }
 
-TEST(ParserClause05, Cl5_3_NewlineDelimiter) {
+TEST(LexicalConventionParsing, NewlineDelimiter) {
   EXPECT_TRUE(
       ParseOk("module\n"
               "t\n"
@@ -20,47 +20,47 @@ TEST(ParserClause05, Cl5_3_NewlineDelimiter) {
               "endmodule\n"));
 }
 
-TEST(ParserClause05, Cl5_3_SpaceDelimiter) {
+TEST(LexicalConventionParsing, SpaceDelimiter) {
   EXPECT_TRUE(ParseOk("module t ; logic a ; endmodule"));
 }
 
-TEST(ParserClause05, Cl5_3_FormfeedDelimiter) {
+TEST(LexicalConventionParsing, FormfeedDelimiter) {
   EXPECT_TRUE(ParseOk("module\ft\f;\flogic\fa\f;\fendmodule"));
 }
 
-TEST(ParserClause05, Cl5_3_CarriageReturnLineFeed) {
+TEST(LexicalConventionParsing, CarriageReturnLineFeed) {
   EXPECT_TRUE(
       ParseOk("module t;\r\n"
               "  logic a;\r\n"
               "endmodule\r\n"));
 }
 
-TEST(ParserClause05, Cl5_3_MultipleConsecutiveWhitespace) {
+TEST(LexicalConventionParsing, MultipleConsecutiveWhitespace) {
   EXPECT_TRUE(
       ParseOk("module   \t\t   t  \n\n\n ;   logic   a  ;   endmodule"));
 }
 
-TEST(ParserClause05, Cl5_3_MinimalWhitespace) {
+TEST(LexicalConventionParsing, MinimalWhitespace) {
   EXPECT_TRUE(ParseOk("module t;endmodule"));
 }
 
-TEST(ParserClause05, Cl5_3_ExcessiveWhitespace) {
+TEST(LexicalConventionParsing, ExcessiveWhitespace) {
   EXPECT_TRUE(
       ParseOk("  \t\n  module  \t  t  \n  ;  \n\n\t  endmodule  \n\n  "));
 }
 
-TEST(ParserClause05, Cl5_3_WhitespaceOnlyInputParsesEmpty) {
+TEST(LexicalConventionParsing, WhitespaceOnlyInputParsesEmpty) {
   auto r = Parse("   \t\n\n  \t  ");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(r.cu->modules.empty());
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
-TEST(ParserClause05, Cl5_3_MixedTokensNoWhitespace) {
+TEST(LexicalConventionParsing, MixedTokensNoWhitespace) {
   EXPECT_TRUE(ParseOk("module m;logic a;assign a=1'b0;endmodule"));
 }
 
-TEST(ParserClause05, Cl5_3_WhitespaceInsideStringPreserved) {
+TEST(LexicalConventionParsing, WhitespaceInsideStringPreserved) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"  hello   world  \");\n"
@@ -75,7 +75,7 @@ TEST(ParserClause05, Cl5_3_WhitespaceInsideStringPreserved) {
             std::string_view::npos);
 }
 
-TEST(ParserClause05, Cl5_3_OperatorFollowedByNumber) {
+TEST(LexicalConventionParsing, OperatorFollowedByNumber) {
   auto r = Parse(
       "module m;\n"
       "  initial x = a+1;\n"
@@ -92,7 +92,7 @@ TEST(ParserClause05, Cl5_3_OperatorFollowedByNumber) {
   EXPECT_EQ(rhs->rhs->int_val, 1u);
 }
 
-TEST(ParserClause05, Cl5_3_MultipleStatementsOnOneLine) {
+TEST(LexicalConventionParsing, MultipleStatementsOnOneLine) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = 1; y = 2; z = 3; end\n"
@@ -105,7 +105,7 @@ TEST(ParserClause05, Cl5_3_MultipleStatementsOnOneLine) {
   EXPECT_EQ(item->body->stmts.size(), 3u);
 }
 
-TEST(ParserClause05, Cl5_3_StatementSpanningManyLines) {
+TEST(LexicalConventionParsing, StatementSpanningManyLines) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, c, d;\n"
@@ -126,7 +126,7 @@ TEST(ParserClause05, Cl5_3_StatementSpanningManyLines) {
   EXPECT_EQ(assign_item->kind, ModuleItemKind::kContAssign);
 }
 
-TEST(ParserClause05, Cl5_3_TabCharactersInDeclarations) {
+TEST(LexicalConventionParsing, TabCharactersInDeclarations) {
   EXPECT_TRUE(
       ParseOk("module\tm;\n"
               "\tlogic\ta;\n"

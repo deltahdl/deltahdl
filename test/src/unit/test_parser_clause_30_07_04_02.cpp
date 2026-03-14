@@ -6,7 +6,7 @@
 using namespace delta;
 namespace {
 
-TEST(ParserA701, SpecifyItemShowcancelledDecl) {
+TEST(SpecifyBlockDeclParsing, SpecifyItemShowcancelledDecl) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -21,7 +21,7 @@ TEST(ParserA701, SpecifyItemShowcancelledDecl) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kShowcancelled);
 }
 
-TEST(ParserA701, ShowcancelledSingleOutput) {
+TEST(SpecifyBlockDeclParsing, ShowcancelledSingleOutput) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -39,7 +39,7 @@ TEST(ParserA701, ShowcancelledSingleOutput) {
   EXPECT_EQ(item->signal_list[0], "out1");
 }
 
-TEST(ParserA701, NoshowcancelledSingleOutput) {
+TEST(SpecifyBlockDeclParsing, NoshowcancelledSingleOutput) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -57,7 +57,7 @@ TEST(ParserA701, NoshowcancelledSingleOutput) {
   EXPECT_EQ(item->signal_list[0], "out1");
 }
 
-TEST(ParserA701, NoshowcancelledMultipleOutputs) {
+TEST(SpecifyBlockDeclParsing, NoshowcancelledMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -102,7 +102,7 @@ TEST_F(SpecifyTest, Noshowcancelled) {
   EXPECT_TRUE(spec->specify_items[0]->is_noshowcancelled);
 }
 
-TEST(ParserSection28, Sec28_12_Showcancelled) {
+TEST(GateLevelModelingParsing, Showcancelled) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b);\n"
       "  specify\n"
@@ -119,7 +119,7 @@ TEST(ParserSection28, Sec28_12_Showcancelled) {
   EXPECT_EQ(si->signal_list[0], "b");
 }
 
-TEST(ParserSection28, Sec28_12_Noshowcancelled) {
+TEST(GateLevelModelingParsing, Noshowcancelled) {
   auto sp = ParseSpecifySingle(
       "module m(input a, output b, c);\n"
       "  specify\n"
@@ -135,7 +135,7 @@ TEST(ParserSection28, Sec28_12_Noshowcancelled) {
   ASSERT_EQ(si->signal_list.size(), 2u);
 }
 
-TEST(ParserA701, ShowcancelledMultipleOutputs) {
+TEST(SpecifyBlockDeclParsing, ShowcancelledMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -154,7 +154,7 @@ TEST(ParserA701, ShowcancelledMultipleOutputs) {
   EXPECT_EQ(item->signal_list[2], "out3");
 }
 
-TEST(ParserA701, SpecifyItemShowcancelled) {
+TEST(SpecifyBlockDeclParsing, SpecifyItemShowcancelled) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -171,7 +171,7 @@ TEST(ParserA701, SpecifyItemShowcancelled) {
   EXPECT_FALSE(si->is_noshowcancelled);
 }
 
-TEST(ParserA701, SpecifyItemNoshowcancelled) {
+TEST(SpecifyBlockDeclParsing, SpecifyItemNoshowcancelled) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"

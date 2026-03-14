@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabClause09_02_01, InitialElaboratesToCorrectKind) {
+TEST(InitialProcedureElaboration, InitialElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -23,7 +23,7 @@ TEST(ElabClause09_02_01, InitialElaboratesToCorrectKind) {
   EXPECT_NE(procs[0].body, nullptr);
 }
 
-TEST(ElabClause09_02_01, InitialHasNoSensitivity) {
+TEST(InitialProcedureElaboration, InitialHasNoSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -40,7 +40,7 @@ TEST(ElabClause09_02_01, InitialHasNoSensitivity) {
   EXPECT_TRUE(procs[0].sensitivity.empty());
 }
 
-TEST(ElabClause09_02_01, MultipleInitialsElaborate) {
+TEST(InitialProcedureElaboration, MultipleInitialsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

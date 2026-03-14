@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserA210, ConcurrentAssertionItem_AssumeProperty) {
+TEST(AssertionDeclParsing, ConcurrentAssertionItem_AssumeProperty) {
   auto r = Parse(
       "module m;\n"
       "  assume property (@(posedge clk) req |-> ack);\n"
@@ -16,7 +16,7 @@ TEST(ParserA210, ConcurrentAssertionItem_AssumeProperty) {
   ASSERT_NE(item, nullptr);
 }
 
-TEST(ParserA210, AllFiveConcurrentAssertionTypes) {
+TEST(AssertionDeclParsing, AllFiveConcurrentAssertionTypes) {
   auto r = Parse(
       "module m;\n"
       "  assert property (a |-> b);\n"
@@ -43,7 +43,7 @@ TEST(ParserA210, AllFiveConcurrentAssertionTypes) {
             nullptr);
 }
 
-TEST(ParserSection16, PropertyDeclAndAssertProperty) {
+TEST(AssertionParsing, PropertyDeclAndAssertProperty) {
   auto r = Parse(
       "module m;\n"
       "  property p1;\n"

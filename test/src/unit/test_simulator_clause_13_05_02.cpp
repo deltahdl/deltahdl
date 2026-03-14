@@ -65,7 +65,7 @@ TEST(QueueRef, RefReadsCurrentValue) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 20u);
 }
 
-TEST(Sim1352, RefImmediateVisibility) {
+TEST(ArgumentByNameSim, RefImmediateVisibility) {
   FuncFixture f;
 
   auto* x_var = f.ctx.CreateVariable("x", 32);

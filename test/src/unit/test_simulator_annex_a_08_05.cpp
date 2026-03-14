@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimA85, VarLvalueSimpleBlocking) {
+TEST(LvalueSim, VarLvalueSimpleBlocking) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -23,7 +23,7 @@ TEST(SimA85, VarLvalueSimpleBlocking) {
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
 
-TEST(SimA85, NonrangeVarLvalueSimple) {
+TEST(LvalueSim, NonrangeVarLvalueSimple) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

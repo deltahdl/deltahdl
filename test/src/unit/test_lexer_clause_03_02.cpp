@@ -4,82 +4,82 @@ using namespace delta;
 
 namespace {
 
-TEST(LexerClause03, ModuleKeyword) {
+TEST(DesignBuildingBlockLexing, ModuleKeyword) {
   auto r = LexOne("module");
   EXPECT_EQ(r.token.kind, TokenKind::kKwModule);
 }
 
-TEST(LexerClause03, EndmoduleKeyword) {
+TEST(DesignBuildingBlockLexing, EndmoduleKeyword) {
   auto r = LexOne("endmodule");
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndmodule);
 }
 
-TEST(LexerClause03, MacromoduleKeyword) {
+TEST(DesignBuildingBlockLexing, MacromoduleKeyword) {
   auto r = LexOne("macromodule");
   EXPECT_EQ(r.token.kind, TokenKind::kKwMacromodule);
 }
 
-TEST(LexerClause03, ProgramKeyword) {
+TEST(DesignBuildingBlockLexing, ProgramKeyword) {
   auto r = LexOne("program");
   EXPECT_EQ(r.token.kind, TokenKind::kKwProgram);
 }
 
-TEST(LexerClause03, EndprogramKeyword) {
+TEST(DesignBuildingBlockLexing, EndprogramKeyword) {
   auto r = LexOne("endprogram");
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndprogram);
 }
 
-TEST(LexerClause03, InterfaceKeyword) {
+TEST(DesignBuildingBlockLexing, InterfaceKeyword) {
   auto r = LexOne("interface");
   EXPECT_EQ(r.token.kind, TokenKind::kKwInterface);
 }
 
-TEST(LexerClause03, EndinterfaceKeyword) {
+TEST(DesignBuildingBlockLexing, EndinterfaceKeyword) {
   auto r = LexOne("endinterface");
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndinterface);
 }
 
-TEST(LexerClause03, CheckerKeyword) {
+TEST(DesignBuildingBlockLexing, CheckerKeyword) {
   auto r = LexOne("checker");
   EXPECT_EQ(r.token.kind, TokenKind::kKwChecker);
 }
 
-TEST(LexerClause03, EndcheckerKeyword) {
+TEST(DesignBuildingBlockLexing, EndcheckerKeyword) {
   auto r = LexOne("endchecker");
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndchecker);
 }
 
-TEST(LexerClause03, PackageKeyword) {
+TEST(DesignBuildingBlockLexing, PackageKeyword) {
   auto r = LexOne("package");
   EXPECT_EQ(r.token.kind, TokenKind::kKwPackage);
 }
 
-TEST(LexerClause03, EndpackageKeyword) {
+TEST(DesignBuildingBlockLexing, EndpackageKeyword) {
   auto r = LexOne("endpackage");
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndpackage);
 }
 
-TEST(LexerClause03, PrimitiveKeyword) {
+TEST(DesignBuildingBlockLexing, PrimitiveKeyword) {
   auto r = LexOne("primitive");
   EXPECT_EQ(r.token.kind, TokenKind::kKwPrimitive);
 }
 
-TEST(LexerClause03, EndprimitiveKeyword) {
+TEST(DesignBuildingBlockLexing, EndprimitiveKeyword) {
   auto r = LexOne("endprimitive");
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndprimitive);
 }
 
-TEST(LexerClause03, ConfigKeyword) {
+TEST(DesignBuildingBlockLexing, ConfigKeyword) {
   auto r = LexOne("config");
   EXPECT_EQ(r.token.kind, TokenKind::kKwConfig);
 }
 
-TEST(LexerClause03, EndconfigKeyword) {
+TEST(DesignBuildingBlockLexing, EndconfigKeyword) {
   auto r = LexOne("endconfig");
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndconfig);
 }
 
-TEST(LexerClause03, DesignElementKeywordsAreNotIdentifiers) {
+TEST(DesignBuildingBlockLexing, DesignElementKeywordsAreNotIdentifiers) {
   const char* keywords[] = {"module",    "program",   "interface",
                             "checker",   "package",   "primitive",
                             "config",    "macromodule"};

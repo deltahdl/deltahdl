@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, ParametersConstantsVariables) {
+TEST(DesignBuildingBlockParsing, ParametersConstantsVariables) {
   auto r = ParseWithPreprocessor(
       "interface ifc #(parameter WIDTH = 8);\n"
       "  localparam DEPTH = 16;\n"

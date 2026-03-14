@@ -6,7 +6,7 @@
 
 using namespace delta;
 
-TEST(SimCh50601, EscapedIdentAsVariable) {
+TEST(EscapedIdentifierSim, EscapedIdentAsVariable) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] \\myvar ;\n"
@@ -16,7 +16,7 @@ TEST(SimCh50601, EscapedIdentAsVariable) {
   EXPECT_EQ(result, 55u);
 }
 
-TEST(SimCh50601, EscapedIdentSpecialChars) {
+TEST(EscapedIdentifierSim, EscapedIdentSpecialChars) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] \\data+bus ;\n"
@@ -26,7 +26,7 @@ TEST(SimCh50601, EscapedIdentSpecialChars) {
   EXPECT_EQ(result, 77u);
 }
 
-TEST(SimCh50601, EscapedKeywordAsVariable) {
+TEST(EscapedIdentifierSim, EscapedKeywordAsVariable) {
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] \\module ;\n"
@@ -36,7 +36,7 @@ TEST(SimCh50601, EscapedKeywordAsVariable) {
   EXPECT_EQ(result, 99u);
 }
 
-TEST(SimCh50601, EscapedIdentMultipleVars) {
+TEST(EscapedIdentifierSim, EscapedIdentMultipleVars) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -59,7 +59,7 @@ TEST(SimCh50601, EscapedIdentMultipleVars) {
   EXPECT_EQ(v2->value.ToUint64(), 20u);
 }
 
-TEST(SimCh50601, EscapedIdentInExpression) {
+TEST(EscapedIdentifierSim, EscapedIdentInExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

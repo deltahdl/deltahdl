@@ -35,7 +35,7 @@ TEST_F(SpecifyTest, NegedgePath) {
   EXPECT_EQ(spec->specify_items[0]->path.edge, SpecifyEdge::kNegedge);
 }
 
-TEST(ParserA702, DataSourceWithOutputPolarity) {
+TEST(SpecifyPathParsing, DataSourceWithOutputPolarity) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -50,7 +50,7 @@ TEST(ParserA702, DataSourceWithOutputPolarity) {
   EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kPositive);
 }
 
-TEST(ParserA702, DataSourceWithNegativeOutputPolarity) {
+TEST(SpecifyPathParsing, DataSourceWithNegativeOutputPolarity) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -71,7 +71,7 @@ SpecifyItem* GetSolePathItem(ParseResult& r) {
   return spec->specify_items[0];
 }
 
-TEST(ParserA702, PathDeclEdgeSensitiveParallel) {
+TEST(SpecifyPathParsing, PathDeclEdgeSensitiveParallel) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -86,7 +86,7 @@ TEST(ParserA702, PathDeclEdgeSensitiveParallel) {
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
 }
 
-TEST(ParserA702, PathDeclEdgeSensitiveFull) {
+TEST(SpecifyPathParsing, PathDeclEdgeSensitiveFull) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -102,7 +102,7 @@ TEST(ParserA702, PathDeclEdgeSensitiveFull) {
   ASSERT_EQ(si->path.dst_ports.size(), 2u);
 }
 
-TEST(ParserA703, TerminalWithEdgeSensitivePath) {
+TEST(SpecifyTerminalParsing, TerminalWithEdgeSensitivePath) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -120,7 +120,7 @@ TEST(ParserA703, TerminalWithEdgeSensitivePath) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-TEST(ParserA702, EdgeIdentifierPosedge) {
+TEST(SpecifyPathParsing, EdgeIdentifierPosedge) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -134,7 +134,7 @@ TEST(ParserA702, EdgeIdentifierPosedge) {
   EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
 }
 
-TEST(ParserA702, EdgeIdentifierNegedge) {
+TEST(SpecifyPathParsing, EdgeIdentifierNegedge) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -148,7 +148,7 @@ TEST(ParserA702, EdgeIdentifierNegedge) {
   EXPECT_EQ(si->path.edge, SpecifyEdge::kNegedge);
 }
 
-TEST(ParserA702, EdgeIdentifierEdge) {
+TEST(SpecifyPathParsing, EdgeIdentifierEdge) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -162,7 +162,7 @@ TEST(ParserA702, EdgeIdentifierEdge) {
   EXPECT_EQ(si->path.edge, SpecifyEdge::kEdge);
 }
 
-TEST(ParserA702, EdgeSensitiveParallelWithDataSource) {
+TEST(SpecifyPathParsing, EdgeSensitiveParallelWithDataSource) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -180,7 +180,7 @@ TEST(ParserA702, EdgeSensitiveParallelWithDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-TEST(ParserA702, EdgeSensitiveParallelWithoutDataSource) {
+TEST(SpecifyPathParsing, EdgeSensitiveParallelWithoutDataSource) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -195,7 +195,7 @@ TEST(ParserA702, EdgeSensitiveParallelWithoutDataSource) {
   EXPECT_EQ(si->path.data_source, nullptr);
 }
 
-TEST(ParserA702, EdgeSensitiveParallelPolarityAndDataSource) {
+TEST(SpecifyPathParsing, EdgeSensitiveParallelPolarityAndDataSource) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -211,7 +211,7 @@ TEST(ParserA702, EdgeSensitiveParallelPolarityAndDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-TEST(ParserA702, EdgeSensitiveFullWithDataSource) {
+TEST(SpecifyPathParsing, EdgeSensitiveFullWithDataSource) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -227,7 +227,7 @@ TEST(ParserA702, EdgeSensitiveFullWithDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-TEST(ParserA702, EdgeSensitiveFullWithoutDataSource) {
+TEST(SpecifyPathParsing, EdgeSensitiveFullWithoutDataSource) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -243,7 +243,7 @@ TEST(ParserA702, EdgeSensitiveFullWithoutDataSource) {
   EXPECT_EQ(si->path.data_source, nullptr);
 }
 
-TEST(ParserA702, EdgeSensitiveFullEdgeKeywordWithDataSource) {
+TEST(SpecifyPathParsing, EdgeSensitiveFullEdgeKeywordWithDataSource) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -259,7 +259,7 @@ TEST(ParserA702, EdgeSensitiveFullEdgeKeywordWithDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-TEST(ParserSection28, Sec28_12_PosedgeSensitivePath) {
+TEST(GateLevelModelingParsing, PosedgeSensitivePath) {
   auto sp = ParseSpecifySingle(
       "module m(input clk, output q);\n"
       "  specify\n"
@@ -279,7 +279,7 @@ TEST(ParserSection28, Sec28_12_PosedgeSensitivePath) {
   EXPECT_EQ(si->path.dst_ports[0].name, "q");
 }
 
-TEST(ParserSection28, Sec28_12_NegedgeSensitivePath) {
+TEST(GateLevelModelingParsing, NegedgeSensitivePath) {
   auto sp = ParseSpecifySingle(
       "module m(input clk, output q);\n"
       "  specify\n"
@@ -296,7 +296,7 @@ TEST(ParserSection28, Sec28_12_NegedgeSensitivePath) {
   EXPECT_EQ(si->path.src_ports[0].name, "clk");
 }
 
-TEST(ParserSection28, Sec28_12_PosedgeFullPath) {
+TEST(GateLevelModelingParsing, PosedgeFullPath) {
   EXPECT_TRUE(
       ParseOk("module m(input clk, output q, qb);\n"
               "  specify\n"

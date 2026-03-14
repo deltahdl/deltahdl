@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserSection13, Sec13_8_MixedStaticFuncAndTask) {
+TEST(TaskAndFunctionParsing, MixedStaticFuncAndTask) {
   auto r = Parse(
       "virtual class Utils#(parameter N = 4);\n"
       "  static function int max_val();\n"
@@ -19,7 +19,7 @@ TEST(ParserSection13, Sec13_8_MixedStaticFuncAndTask) {
   ASSERT_EQ(r.cu->classes[0]->members.size(), 2u);
 }
 
-TEST(ParserSection13, Sec13_8_StaticMethodNoArgs) {
+TEST(TaskAndFunctionParsing, StaticMethodNoArgs) {
   auto r = Parse(
       "virtual class Constants#(parameter N = 32);\n"
       "  static function int zero();\n"
@@ -31,7 +31,7 @@ TEST(ParserSection13, Sec13_8_StaticMethodNoArgs) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(ParserSection13, Sec13_8_MultiArgParameterizedWidth) {
+TEST(TaskAndFunctionParsing, MultiArgParameterizedWidth) {
   EXPECT_TRUE(
       ParseOk("virtual class Arith#(parameter W = 16);\n"
               "  static function logic [W-1:0] add(\n"
@@ -42,7 +42,7 @@ TEST(ParserSection13, Sec13_8_MultiArgParameterizedWidth) {
               "endclass\n"));
 }
 
-TEST(ParserA810, StaticFunctionDeclaration) {
+TEST(StaticMethodParsing, StaticFunctionDeclaration) {
   auto r = Parse(
       "class id;\n"
       "  static int current;\n"
@@ -60,7 +60,7 @@ TEST(ParserA810, StaticFunctionDeclaration) {
   EXPECT_EQ(m->method->name, "next_id");
 }
 
-TEST(ParserA810, StaticTaskDeclaration) {
+TEST(StaticMethodParsing, StaticTaskDeclaration) {
   auto r = Parse(
       "class Logger;\n"
       "  static task log_msg();\n"
@@ -74,7 +74,7 @@ TEST(ParserA810, StaticTaskDeclaration) {
   EXPECT_TRUE(cls->members[0]->is_static);
 }
 
-TEST(ParserA810, StaticVirtualFunctionError) {
+TEST(StaticMethodParsing, StaticVirtualFunctionError) {
   auto r = Parse(
       "class C;\n"
       "  static virtual function int foo();\n"
@@ -84,7 +84,7 @@ TEST(ParserA810, StaticVirtualFunctionError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserA810, StaticVirtualTaskError) {
+TEST(StaticMethodParsing, StaticVirtualTaskError) {
   auto r = Parse(
       "class C;\n"
       "  virtual static task bar();\n"
@@ -93,7 +93,7 @@ TEST(ParserA810, StaticVirtualTaskError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ParserA810, StaticMethodClassScopeCall) {
+TEST(StaticMethodParsing, StaticMethodClassScopeCall) {
   ParseOk(
       "class id;\n"
       "  static function int next_id();\n"
@@ -108,7 +108,7 @@ TEST(ParserA810, StaticMethodClassScopeCall) {
       "endmodule\n");
 }
 
-TEST(ParserA810, StaticMethodInstanceDotCall) {
+TEST(StaticMethodParsing, StaticMethodInstanceDotCall) {
   ParseOk(
       "class C;\n"
       "  static function int helper();\n"
@@ -124,7 +124,7 @@ TEST(ParserA810, StaticMethodInstanceDotCall) {
       "endmodule\n");
 }
 
-TEST(ParserA810, StaticMethodVsStaticLifetime) {
+TEST(StaticMethodParsing, StaticMethodVsStaticLifetime) {
   auto r = Parse(
       "class TwoTasks;\n"
       "  static task t1();\n"

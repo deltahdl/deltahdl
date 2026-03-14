@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ElabA83, ConstantTernaryInParamElaborates) {
+TEST(ExpressionElaboration, ConstantTernaryInParamElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

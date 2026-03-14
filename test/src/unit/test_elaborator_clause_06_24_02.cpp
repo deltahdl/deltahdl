@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SimCh6, CastEnumSuccess) {
+TEST(DataTypeSim, CastEnumSuccess) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -32,7 +32,7 @@ TEST(SimCh6, CastEnumSuccess) {
   EXPECT_EQ(c->value.ToUint64(), 1u);
 }
 
-TEST(SimCh6, CastEnumFailure) {
+TEST(DataTypeSim, CastEnumFailure) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -59,7 +59,7 @@ TEST(SimCh6, CastEnumFailure) {
   EXPECT_EQ(c->value.ToUint64(), 0u);
 }
 
-TEST(SimCh6, CastEnumTaskValid) {
+TEST(DataTypeSim, CastEnumTaskValid) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -81,7 +81,7 @@ TEST(SimCh6, CastEnumTaskValid) {
   EXPECT_EQ(c->value.ToUint64(), 2u);
 }
 
-TEST(SimCh6, CastEnumInCondition) {
+TEST(DataTypeSim, CastEnumInCondition) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
