@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, PackageEndLabel) {
-  auto r = Parse("package bar; endpackage : bar\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "bar");
-}
-
 TEST(CompilationUnitStructure, InterfaceEndLabel) {
   auto r = Parse("interface baz; endinterface : baz\n");
   ASSERT_NE(r.cu, nullptr);

@@ -289,4 +289,12 @@ TEST(DataObjectParsing, ModuleBody_NullItem) {
   EXPECT_TRUE(ParseOk5("module m; ; endmodule"));
 }
 
+TEST(PackageDeclaration, PackageEndLabel) {
+  auto r = Parse("package bar; endpackage : bar\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "bar");
+}
+
 }  // namespace
