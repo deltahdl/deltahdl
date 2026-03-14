@@ -90,7 +90,7 @@ def build_steps(
     else:
         read_ctx = (
             f"Read §{subclause} in the LRM at {lrm}."
-            " Also read any General or Overview sibling subclauses."
+            " Also read any General or Overview child subclauses."
         )
 
     examples = [
@@ -120,9 +120,12 @@ def build_steps(
          " Report what aligns with the LRM and what is missing."
          + constraints),
         ("Auditing tests",
-         f"Search test/src/unit/ for existing tests that cover §{subclause}."
-         f" The correct test files are: {filenames}."
-         " Report what is covered and what is missing."
+         f"Search all files in test/src/unit/ for any tests that cover"
+         f" §{subclause} requirements."
+         " Tests may be misplaced in files belonging to other subclauses."
+         " Report what is covered, what is missing, and any tests"
+         f" found in the wrong files."
+         f" The correct files for §{subclause} tests are: {filenames}."
          + constraints),
         ("Deleting duplicate tests",
          f"Delete any duplicate tests related to §{subclause}."
