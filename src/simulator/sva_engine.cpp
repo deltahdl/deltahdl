@@ -243,13 +243,11 @@ void SvaEngine::FlushDeferredAssertions(Scheduler& sched, SimTime time) {
   auto queue = std::move(deferred_queue_);
   deferred_queue_.clear();
   for (auto& da : queue) {
-    // §16.4.1: Observed (#0) → Reactive; final → Postponed.
-    Region region = da.is_final ? Region::kPostponed : Region::kReactive;
     auto* event = sched.GetEventPool().Acquire();
     event->callback = [da_copy = std::move(da)]() {
       ExecuteDeferredAssertionAction(da_copy);
     };
-    sched.ScheduleEvent(time, region, event);
+    sched.ScheduleEvent(time, Region::kObserved, event);
   }
 }
 
@@ -258,7 +256,6 @@ void SvaEngine::FlushDeferredAssertionsRespectingControl(Scheduler& sched,
   auto queue = std::move(deferred_queue_);
   deferred_queue_.clear();
   for (auto& da : queue) {
-    Region region = da.is_final ? Region::kPostponed : Region::kReactive;
     auto* event = sched.GetEventPool().Acquire();
     event->callback = [this, da_copy = std::move(da)]() {
       bool is_pass = (da_copy.condition_val != 0);
@@ -266,7 +263,7 @@ void SvaEngine::FlushDeferredAssertionsRespectingControl(Scheduler& sched,
       if (!is_pass && !control_.IsFailEnabled(da_copy.instance_name)) return;
       ExecuteDeferredAssertionAction(da_copy);
     };
-    sched.ScheduleEvent(time, region, event);
+    sched.ScheduleEvent(time, Region::kObserved, event);
   }
 }
 
@@ -278,29 +275,8 @@ void SvaEngine::KillAssertionsForInstance(std::string_view inst) {
   });
 }
 
-void SvaEngine::ClearQueueForProcess(uint32_t process_id) {
-  std::erase_if(deferred_queue_, [process_id](const DeferredAssertion& da) {
-    return da.process_id == process_id;
-  });
-}
-
-void SvaEngine::CancelReportsForAssertion(std::string_view inst) {
-  std::string inst_str(inst);
-  std::erase_if(deferred_queue_, [&inst_str](const DeferredAssertion& da) {
-    return da.instance_name == inst_str;
-  });
-}
-
 uint32_t SvaEngine::DeferredQueueSize() const {
   return static_cast<uint32_t>(deferred_queue_.size());
-}
-
-uint32_t SvaEngine::DeferredQueueSizeForProcess(uint32_t process_id) const {
-  uint32_t count = 0;
-  for (const auto& da : deferred_queue_) {
-    if (da.process_id == process_id) ++count;
-  }
-  return count;
 }
 
 }  // namespace delta

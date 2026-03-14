@@ -367,8 +367,7 @@ struct Stmt {
   Expr* assert_expr = nullptr;       // The assertion condition
   Stmt* assert_pass_stmt = nullptr;  // Optional pass action
   Stmt* assert_fail_stmt = nullptr;  // Optional else (fail) action
-  bool is_deferred = false;          // #0 or final deferred assertion
-  bool is_final_deferred = false;    // final deferred (vs #0 observed)
+  bool is_deferred = false;          // #0 deferred assertion
 
   // wait_order (§15.5.4)
   std::vector<Expr*> wait_order_events;

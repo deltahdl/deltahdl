@@ -197,8 +197,6 @@ def _parse_action_summary(stdout: str) -> str:
     """Search raw stdout and the JSON envelope result for ACTION_SUMMARY."""
     summary = _extract_action_summary(stdout)
     if not summary:
-        summary = _extract_action_summary(stdout.replace("\\n", "\n"))
-    if not summary:
         try:
             envelope = json.loads(stdout)
             if isinstance(envelope, dict) and "result" in envelope:
@@ -260,7 +258,6 @@ def invoke_claude(
     if not summary:
         print("Retrying for ACTION_SUMMARY...", file=sys.stderr)
         retry_cmd = ["claude", "-p", "--model", model,
-                     "--effort", "high",
                      "--output-format", "json", "--continue"]
         retry_result = run_claude_cli(
             retry_cmd,

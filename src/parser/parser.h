@@ -278,8 +278,7 @@ class Parser {
   Stmt* ParseImmediateAssert();
   Stmt* ParseImmediateAssume();
   Stmt* ParseImmediateAssertLike(StmtKind kind, TokenKind keyword);
-  ModuleItem* ParseDeferredImmediateItem(SourceLoc loc,
-                                          StmtKind kind = StmtKind::kAssertImmediate);
+  ModuleItem* ParseDeferredImmediateItem(SourceLoc loc);
   Stmt* ParseExpectStmt();
   Stmt* ParseImmediateCover();
   ModuleItem* ParseAssertProperty();

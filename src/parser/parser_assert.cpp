@@ -19,7 +19,6 @@ Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
     stmt->is_deferred = true;
   } else if (Match(TokenKind::kKwFinal)) {
     stmt->is_deferred = true;
-    stmt->is_final_deferred = true;
   }
 
   Expect(TokenKind::kLParen);
@@ -63,7 +62,6 @@ Stmt* Parser::ParseImmediateCover() {
     stmt->is_deferred = true;
   } else if (Match(TokenKind::kKwFinal)) {
     stmt->is_deferred = true;
-    stmt->is_final_deferred = true;
   }
 
   Expect(TokenKind::kLParen);
@@ -124,16 +122,13 @@ static ModuleItem* WrapStmtAsItem(Arena& arena, Stmt* stmt, SourceLoc loc) {
 }
 
 // Parse a §16.4 deferred immediate assertion at module level.
-ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
+ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc) {
   auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = kind;
+  stmt->kind = StmtKind::kAssertImmediate;
   stmt->range.start = loc;
   stmt->is_deferred = true;
-  if (Match(TokenKind::kHash)) {
-    Expect(TokenKind::kIntLiteral);
-  } else if (Match(TokenKind::kKwFinal)) {
-    stmt->is_final_deferred = true;
-  }
+  if (Match(TokenKind::kHash)) Expect(TokenKind::kIntLiteral);
+  Match(TokenKind::kKwFinal);
   Expect(TokenKind::kLParen);
   stmt->assert_expr = ParseExpr();
   Expect(TokenKind::kRParen);
@@ -156,12 +151,7 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
   Expect(keyword);
 
   // §16.4: deferred immediate assertions at module level
-  if (IsDeferredImmediate(lexer_)) {
-    StmtKind stmt_kind = (keyword == TokenKind::kKwAssume)
-                              ? StmtKind::kAssumeImmediate
-                              : StmtKind::kAssertImmediate;
-    return ParseDeferredImmediateItem(item->loc, stmt_kind);
-  }
+  if (IsDeferredImmediate(lexer_)) return ParseDeferredImmediateItem(item->loc);
 
   Expect(TokenKind::kKwProperty);
   Expect(TokenKind::kLParen);
@@ -206,11 +196,8 @@ ModuleItem* Parser::ParseCoverProperty() {
     stmt->kind = StmtKind::kCoverImmediate;
     stmt->range.start = item->loc;
     stmt->is_deferred = true;
-    if (Match(TokenKind::kHash)) {
-      Expect(TokenKind::kIntLiteral);
-    } else if (Match(TokenKind::kKwFinal)) {
-      stmt->is_final_deferred = true;
-    }
+    if (Match(TokenKind::kHash)) Expect(TokenKind::kIntLiteral);
+    Match(TokenKind::kKwFinal);
     Expect(TokenKind::kLParen);
     stmt->assert_expr = ParseExpr();
     Expect(TokenKind::kRParen);
