@@ -9,6 +9,7 @@ import pytest
 from lib.python.github import (
     build_subclause_table,
     build_synced_body,
+    create_issue,
     parse_subclause_rows,
     sync_subclause_table,
     update_subclause_status,
@@ -561,3 +562,26 @@ def test_sync_subclause_table_adds_new() -> None:
         _REVIEWED_TABLE, {"3.1": "General", "3.2": "Design", "3.3": "Modules"},
     )
     assert "| §3.3 | Modules | Unreviewed | |" in result
+
+
+# ---- create_issue -----------------------------------------------------------
+
+
+def test_create_issue_returns_number(monkeypatch) -> None:
+    """create_issue returns the issue number from the API response."""
+    mock_result = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='{"number": 42}', stderr="",
+    )
+    monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
+    assert create_issue("org", "repo", "title", "body") == 42
+
+
+def test_create_issue_exits_on_failure(monkeypatch) -> None:
+    """create_issue exits when the API call fails."""
+    mock_result = subprocess.CompletedProcess(
+        args=[], returncode=1, stdout="", stderr="err",
+    )
+    monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
+    with pytest.raises(SystemExit):
+        create_issue("org", "repo", "title", "body")

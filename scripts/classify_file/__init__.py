@@ -1,13 +1,16 @@
 """Batch-classify all tests in a file by invoking classify_test per test."""
 
 import argparse
-import json
 import re
 import subprocess
 import sys
 from pathlib import Path
 
-from lib.python.github import fetch_issue_body, update_issue_body
+from lib.python.github import (
+    create_issue as _create_gh_issue,
+    fetch_issue_body,
+    update_issue_body,
+)
 from lib.python.classify import (
     add_github_args,
     add_output_args,
@@ -47,28 +50,11 @@ def create_issue(
     args: argparse.Namespace,
     test_pairs: list[tuple[str, str]],
 ) -> int:
-    """Create a GitHub issue and return its number."""
+    """Create a GitHub issue for classifying tests and return its number."""
     filename = Path(args.file).name
     title = f"Classify tests in {filename}"
     body = build_issue_body(test_pairs)
-    print(f"Creating issue for {filename}...")
-    payload = json.dumps({"title": title, "body": body})
-    result = subprocess.run(
-        ["gh", "api",
-         f"repos/{args.organization}/{args.repo}/issues",
-         "-X", "POST", "--input", "-"],
-        input=payload,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to create issue:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    issue_number = json.loads(result.stdout)["number"]
-    print(f"Created issue #{issue_number}")
-    return issue_number
+    return _create_gh_issue(args.organization, args.repo, title, body)
 
 
 def _parse_existing_rows(

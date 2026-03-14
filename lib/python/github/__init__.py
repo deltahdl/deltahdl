@@ -119,6 +119,29 @@ def fetch_issue_title(organization: str, repo: str, issue: int) -> str:
     return result.stdout.strip()
 
 
+def create_issue(
+    organization: str, repo: str, title: str, body: str,
+) -> int:
+    """Create a GitHub issue and return its number."""
+    print(f"Creating issue on {organization}/{repo}...")
+    payload = json.dumps({"title": title, "body": body})
+    result = subprocess.run(
+        ["gh", "api", f"repos/{organization}/{repo}/issues",
+         "-X", "POST", "--input", "-"],
+        input=payload,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(f"ERROR: Failed to create issue:"
+              f"\n{result.stderr}", file=sys.stderr)
+        sys.exit(1)
+    issue_number = json.loads(result.stdout)["number"]
+    print(f"Created issue #{issue_number}")
+    return issue_number
+
+
 def update_issue_body(
     organization: str, repo: str, issue: int, body: str,
 ) -> None:
