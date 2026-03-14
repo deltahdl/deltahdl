@@ -4,9 +4,9 @@
 namespace delta {
 namespace {
 
-class VcdClause21070103Test : public VcdTestBase {};
+class VcdWriterControlSim : public VcdTestBase {};
 
-TEST_F(VcdClause21070103Test, DisabledWriterSkipsOutput) {
+TEST_F(VcdWriterControlSim, DisabledWriterSkipsOutput) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
@@ -19,7 +19,7 @@ TEST_F(VcdClause21070103Test, DisabledWriterSkipsOutput) {
   EXPECT_EQ(content.find("#100"), std::string::npos);
 }
 
-TEST_F(VcdClause21070103Test, ReEnableAfterDisable) {
+TEST_F(VcdWriterControlSim, ReEnableAfterDisable) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");

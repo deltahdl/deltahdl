@@ -10,7 +10,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3818Test : public ::testing::Test {
+class VpiHandleSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -23,7 +23,7 @@ class VpiClause3818Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3818Test, HandleReturnsParentModule) {
+TEST_F(VpiHandleSim, HandleReturnsParentModule) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   auto* port = vpi_ctx_.CreatePort("clk", kVpiInput, mod);
 
@@ -32,12 +32,12 @@ TEST_F(VpiClause3818Test, HandleReturnsParentModule) {
   EXPECT_EQ(result, mod);
 }
 
-TEST_F(VpiClause3818Test, HandleReturnsNullptrForNullRef) {
+TEST_F(VpiHandleSim, HandleReturnsNullptrForNullRef) {
   vpiHandle result = VpiHandleC(vpiModule, nullptr);
   EXPECT_EQ(result, nullptr);
 }
 
-TEST_F(VpiClause3818Test, HandleReturnsNullptrForNoMatch) {
+TEST_F(VpiHandleSim, HandleReturnsNullptrForNoMatch) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
 
   vpiHandle result = VpiHandleC(vpiNet, mod);

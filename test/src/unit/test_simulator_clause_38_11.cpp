@@ -10,7 +10,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3811Test : public ::testing::Test {
+class VpiGetStringSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -23,7 +23,7 @@ class VpiClause3811Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3811Test, GetStrNameForModule) {
+TEST_F(VpiGetStringSim, GetStrNameForModule) {
   vpi_ctx_.CreateModule("top_mod", "lib.top_mod");
   vpiHandle h = vpi_handle_by_name("top_mod", nullptr);
   ASSERT_NE(h, nullptr);
@@ -33,7 +33,7 @@ TEST_F(VpiClause3811Test, GetStrNameForModule) {
   EXPECT_STREQ(name, "top_mod");
 }
 
-TEST_F(VpiClause3811Test, GetStrFullNameForModule) {
+TEST_F(VpiGetStringSim, GetStrFullNameForModule) {
   vpi_ctx_.CreateModule("top_mod", "lib.top_mod");
   vpiHandle h = vpi_handle_by_name("top_mod", nullptr);
   ASSERT_NE(h, nullptr);
@@ -43,7 +43,7 @@ TEST_F(VpiClause3811Test, GetStrFullNameForModule) {
   EXPECT_STREQ(full, "lib.top_mod");
 }
 
-TEST_F(VpiClause3811Test, GetStrDefNameForModule) {
+TEST_F(VpiGetStringSim, GetStrDefNameForModule) {
   vpi_ctx_.CreateModule("dut", "dut");
   vpiHandle h = vpi_handle_by_name("dut", nullptr);
   ASSERT_NE(h, nullptr);
@@ -52,7 +52,7 @@ TEST_F(VpiClause3811Test, GetStrDefNameForModule) {
   EXPECT_STREQ(def, "dut");
 }
 
-TEST_F(VpiClause3811Test, GetStrReturnsNullForNullHandle) {
+TEST_F(VpiGetStringSim, GetStrReturnsNullForNullHandle) {
   EXPECT_EQ(vpi_get_str(vpiName, nullptr), nullptr);
 }
 

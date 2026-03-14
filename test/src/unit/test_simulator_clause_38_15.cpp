@@ -12,7 +12,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3815Test : public ::testing::Test {
+class VpiGetValueSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -25,7 +25,7 @@ class VpiClause3815Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3815Test, GetValueIntFormat) {
+TEST_F(VpiGetValueSim, GetValueIntFormat) {
   auto* var = sim_ctx_.CreateVariable("x", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 123);
   vpi_ctx_.Attach(sim_ctx_);
@@ -39,7 +39,7 @@ TEST_F(VpiClause3815Test, GetValueIntFormat) {
   EXPECT_EQ(val.value.integer, 123);
 }
 
-TEST_F(VpiClause3815Test, GetValueRealFormat) {
+TEST_F(VpiGetValueSim, GetValueRealFormat) {
   auto* var = sim_ctx_.CreateVariable("r", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 42);
   vpi_ctx_.Attach(sim_ctx_);
@@ -53,7 +53,7 @@ TEST_F(VpiClause3815Test, GetValueRealFormat) {
   EXPECT_DOUBLE_EQ(val.value.real, 42.0);
 }
 
-TEST_F(VpiClause3815Test, GetValueScalarFormatZero) {
+TEST_F(VpiGetValueSim, GetValueScalarFormatZero) {
   auto* var = sim_ctx_.CreateVariable("s", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
@@ -67,7 +67,7 @@ TEST_F(VpiClause3815Test, GetValueScalarFormatZero) {
   EXPECT_EQ(val.value.scalar, vpi0);
 }
 
-TEST_F(VpiClause3815Test, GetValueScalarFormatOne) {
+TEST_F(VpiGetValueSim, GetValueScalarFormatOne) {
   auto* var = sim_ctx_.CreateVariable("s1", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 1);
   vpi_ctx_.Attach(sim_ctx_);
@@ -81,7 +81,7 @@ TEST_F(VpiClause3815Test, GetValueScalarFormatOne) {
   EXPECT_EQ(val.value.scalar, vpi1);
 }
 
-TEST_F(VpiClause3815Test, GetValueBinStrFormat) {
+TEST_F(VpiGetValueSim, GetValueBinStrFormat) {
   auto* var = sim_ctx_.CreateVariable("b", 4);
   var->value = MakeLogic4VecVal(arena_, 4, 0b1010);
   vpi_ctx_.Attach(sim_ctx_);
@@ -96,7 +96,7 @@ TEST_F(VpiClause3815Test, GetValueBinStrFormat) {
   EXPECT_STREQ(val.value.str, "1010");
 }
 
-TEST_F(VpiClause3815Test, GetValueHexStrFormat) {
+TEST_F(VpiGetValueSim, GetValueHexStrFormat) {
   auto* var = sim_ctx_.CreateVariable("hx", 8);
   var->value = MakeLogic4VecVal(arena_, 8, 0xAB);
   vpi_ctx_.Attach(sim_ctx_);
@@ -111,7 +111,7 @@ TEST_F(VpiClause3815Test, GetValueHexStrFormat) {
   EXPECT_STREQ(val.value.str, "ab");
 }
 
-TEST_F(VpiClause3815Test, GetValueOctStrFormat) {
+TEST_F(VpiGetValueSim, GetValueOctStrFormat) {
   auto* var = sim_ctx_.CreateVariable("oc", 6);
   var->value = MakeLogic4VecVal(arena_, 6, 075);
   vpi_ctx_.Attach(sim_ctx_);
@@ -126,7 +126,7 @@ TEST_F(VpiClause3815Test, GetValueOctStrFormat) {
   EXPECT_STREQ(val.value.str, "75");
 }
 
-TEST_F(VpiClause3815Test, GetValueStringFormat) {
+TEST_F(VpiGetValueSim, GetValueStringFormat) {
   auto* var = sim_ctx_.CreateVariable("sv", 32);
 
   var->value = MakeLogic4VecVal(arena_, 32, 0x00004142);
@@ -142,7 +142,7 @@ TEST_F(VpiClause3815Test, GetValueStringFormat) {
   EXPECT_STREQ(val.value.str, "AB");
 }
 
-TEST_F(VpiClause3815Test, GetValueTimeFormat) {
+TEST_F(VpiGetValueSim, GetValueTimeFormat) {
   auto* var = sim_ctx_.CreateVariable("t", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 500);
   vpi_ctx_.Attach(sim_ctx_);

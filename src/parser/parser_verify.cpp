@@ -22,7 +22,7 @@ ModuleDecl* Parser::ParseCheckerDecl() {
   }
   current_module_ = prev_module;
   Expect(TokenKind::kKwEndchecker);
-  if (Match(TokenKind::kColon)) ExpectIdentifier();
+  MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;
 }

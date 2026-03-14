@@ -10,7 +10,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3823Test : public ::testing::Test {
+class VpiIterateSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -23,7 +23,7 @@ class VpiClause3823Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3823Test, IterateModuleChildPorts) {
+TEST_F(VpiIterateSim, IterateModuleChildPorts) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
   vpi_ctx_.CreatePort("p1", kVpiOutput, mod);
@@ -38,7 +38,7 @@ TEST_F(VpiClause3823Test, IterateModuleChildPorts) {
   EXPECT_EQ(count, 2);
 }
 
-TEST_F(VpiClause3823Test, IterateGlobalRegsAfterAttach) {
+TEST_F(VpiIterateSim, IterateGlobalRegsAfterAttach) {
   sim_ctx_.CreateVariable("v1", 8);
   sim_ctx_.CreateVariable("v2", 16);
   vpi_ctx_.Attach(sim_ctx_);
@@ -53,7 +53,7 @@ TEST_F(VpiClause3823Test, IterateGlobalRegsAfterAttach) {
   EXPECT_EQ(count, 2);
 }
 
-TEST_F(VpiClause3823Test, ScanNullIteratorReturnsNull) {
+TEST_F(VpiIterateSim, ScanNullIteratorReturnsNull) {
   EXPECT_EQ(vpi_scan(nullptr), nullptr);
 }
 

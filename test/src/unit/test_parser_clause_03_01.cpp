@@ -494,4 +494,102 @@ TEST(CompilationUnitStructure, ManyModulesAccumulate) {
   EXPECT_EQ(r.cu->modules.size(), 50u);
 }
 
+TEST(CompilationUnitStructure, TimeunitDeclarationSetsFlag) {
+  auto r = Parse(
+      "timeunit 1ns;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->has_cu_timeunit);
+}
+
+TEST(CompilationUnitStructure, TimeprecisionDeclarationSetsFlag) {
+  auto r = Parse(
+      "timeprecision 1ps;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->has_cu_timeprecision);
+}
+
+TEST(CompilationUnitStructure, TimeunitAndTimeprecisionBothSet) {
+  auto r = Parse(
+      "timeunit 1ns;\n"
+      "timeprecision 1ps;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->has_cu_timeunit);
+  EXPECT_TRUE(r.cu->has_cu_timeprecision);
+}
+
+TEST(CompilationUnitStructure, CuScopeLocalparamGoesToCuItems) {
+  auto r = Parse(
+      "localparam int WIDTH = 8;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_GE(r.cu->cu_items.size(), 1u);
+}
+
+TEST(CompilationUnitStructure, ModuleWithEmptyPortListParens) {
+  auto r = Parse("module m(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+}
+
+TEST(CompilationUnitStructure, BindDirectiveGoesToBindDirectives) {
+  auto r = Parse(
+      "module target; endmodule\n"
+      "module binder; endmodule\n"
+      "bind target binder b1();\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->bind_directives.empty());
+}
+
+TEST(CompilationUnitStructure, ConfigWithEndLabel) {
+  auto r = Parse(
+      "module m; endmodule\n"
+      "config cfg;\n"
+      "  design m;\n"
+      "endconfig : cfg\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg");
+}
+
+TEST(CompilationUnitStructure, PrimitiveWithEndLabel) {
+  auto r = Parse(
+      "primitive inv(output y, input a);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive : inv\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  EXPECT_EQ(r.cu->udps[0]->name, "inv");
+}
+
+TEST(CompilationUnitStructure, MissingEndconfigIsError) {
+  EXPECT_FALSE(ParseOk(
+      "module m; endmodule\n"
+      "config c;\n"
+      "  design m;"));
+}
+
+TEST(CompilationUnitStructure, MissingEndprimitiveIsError) {
+  EXPECT_FALSE(ParseOk(
+      "primitive inv(output y, input a);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"));
+}
+
 }  // namespace

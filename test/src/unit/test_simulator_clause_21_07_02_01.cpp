@@ -5,9 +5,9 @@
 namespace delta {
 namespace {
 
-class VcdClause21070201Test : public VcdTestBase {};
+class VcdTimestampSim : public VcdTestBase {};
 
-TEST_F(VcdClause21070201Test, WritesTimestamp) {
+TEST_F(VcdTimestampSim, WritesTimestamp) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
@@ -18,7 +18,7 @@ TEST_F(VcdClause21070201Test, WritesTimestamp) {
   EXPECT_NE(content.find("#42"), std::string::npos);
 }
 
-TEST_F(VcdClause21070201Test, IdentifierWrapsAround) {
+TEST_F(VcdTimestampSim, IdentifierWrapsAround) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");

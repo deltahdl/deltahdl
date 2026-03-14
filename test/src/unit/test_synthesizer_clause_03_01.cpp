@@ -1,68 +1,8 @@
 #include "fixture_synthesizer.h"
-#include "synthesizer/synth_lower.h"
 
 namespace {
 
-// §3.1 General — synthesis of basic design elements.
-
-TEST(DesignElementSynth, MinimalModuleSynthesizes) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(f, "module m; endmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-}
-
-TEST(DesignElementSynth, ModuleWithPassthroughAssign) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(f,
-      "module m(input a, output y);\n"
-      "  assign y = a;\n"
-      "endmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-  EXPECT_EQ(aig->inputs.size(), 1);
-  EXPECT_EQ(aig->outputs.size(), 1);
-}
-
-TEST(DesignElementSynth, ModuleWithConstantAssign) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(f,
-      "module m(output y);\n"
-      "  assign y = 1'b0;\n"
-      "endmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-  EXPECT_EQ(aig->outputs.size(), 1);
-}
-
-TEST(DesignElementSynth, ModuleWithMultiplePorts) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(f,
-      "module m(input a, input b, output y);\n"
-      "  assign y = a & b;\n"
-      "endmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-  EXPECT_EQ(aig->inputs.size(), 2);
-  EXPECT_EQ(aig->outputs.size(), 1);
-}
-
-TEST(DesignElementSynth, RejectInitialBlock) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(f, "module m; initial begin end endmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  EXPECT_EQ(aig, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
+// §3.1 General — overview clause with no synthesizer-testable requirements.
+// Design element synthesis tests are in test_synthesizer_clause_03_02.cpp.
 
 }  // namespace

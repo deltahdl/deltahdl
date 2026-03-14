@@ -347,6 +347,7 @@ class Parser {
   std::string_view ParseDottedPath();
   Token Expect(TokenKind kind);
   Token ExpectIdentifier();
+  void MatchEndLabel(std::string_view name);
   bool CheckIdentifier();
   bool Match(TokenKind kind);
   Token Consume();

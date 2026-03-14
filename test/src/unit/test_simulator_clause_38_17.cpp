@@ -10,7 +10,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3817Test : public ::testing::Test {
+class VpiVlogInfoSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -23,7 +23,7 @@ class VpiClause3817Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3817Test, GetVlogInfoReturnsProductAndVersion) {
+TEST_F(VpiVlogInfoSim, GetVlogInfoReturnsProductAndVersion) {
   SVpiVlogInfo info = {};
   vpi_get_vlog_info(&info);
   ASSERT_NE(info.product, nullptr);
@@ -33,7 +33,7 @@ TEST_F(VpiClause3817Test, GetVlogInfoReturnsProductAndVersion) {
   EXPECT_EQ(info.argc, 0);
 }
 
-TEST_F(VpiClause3817Test, GetVlogInfoNullDoesNotCrash) {
+TEST_F(VpiVlogInfoSim, GetVlogInfoNullDoesNotCrash) {
   vpi_get_vlog_info(nullptr);
 }
 

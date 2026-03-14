@@ -5,7 +5,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3837Test : public ::testing::Test {
+class VpiSystfRegistrationSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -13,7 +13,7 @@ class VpiClause3837Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3837Test, RegisterSystfStoresTask) {
+TEST_F(VpiSystfRegistrationSim, RegisterSystfStoresTask) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
   data.tfname = "$hello";
@@ -24,7 +24,7 @@ TEST_F(VpiClause3837Test, RegisterSystfStoresTask) {
   EXPECT_STREQ(vpi_ctx_.RegisteredSystfs()[0].tfname, "$hello");
 }
 
-TEST_F(VpiClause3837Test, RegisterMultipleSystfs) {
+TEST_F(VpiSystfRegistrationSim, RegisterMultipleSystfs) {
   s_vpi_systf_data data1 = {};
   data1.type = vpiSysTask;
   data1.tfname = "$task_a";
@@ -42,7 +42,7 @@ TEST_F(VpiClause3837Test, RegisterMultipleSystfs) {
   EXPECT_EQ(vpi_ctx_.RegisteredSystfs()[1].type, vpiSysFunc);
 }
 
-TEST_F(VpiClause3837Test, RegisterSystfNullptrDoesNotCrash) {
+TEST_F(VpiSystfRegistrationSim, RegisterSystfNullptrDoesNotCrash) {
   vpiHandle h = vpi_register_systf(nullptr);
   EXPECT_EQ(h, nullptr);
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());

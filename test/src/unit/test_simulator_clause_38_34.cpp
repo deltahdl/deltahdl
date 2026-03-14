@@ -10,7 +10,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3834Test : public ::testing::Test {
+class VpiPutValueSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -23,7 +23,7 @@ class VpiClause3834Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3834Test, PutValueNoDelay) {
+TEST_F(VpiPutValueSim, PutValueNoDelay) {
   auto* var = sim_ctx_.CreateVariable("d", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
@@ -39,7 +39,7 @@ TEST_F(VpiClause3834Test, PutValueNoDelay) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST_F(VpiClause3834Test, PutValueInertialDelay) {
+TEST_F(VpiPutValueSim, PutValueInertialDelay) {
   auto* var = sim_ctx_.CreateVariable("di", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
@@ -56,7 +56,7 @@ TEST_F(VpiClause3834Test, PutValueInertialDelay) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-TEST_F(VpiClause3834Test, PutValueTransportDelay) {
+TEST_F(VpiPutValueSim, PutValueTransportDelay) {
   auto* var = sim_ctx_.CreateVariable("dt", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
@@ -71,7 +71,7 @@ TEST_F(VpiClause3834Test, PutValueTransportDelay) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST_F(VpiClause3834Test, PutValuePureTransportDelay) {
+TEST_F(VpiPutValueSim, PutValuePureTransportDelay) {
   auto* var = sim_ctx_.CreateVariable("dpt", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
@@ -84,7 +84,7 @@ TEST_F(VpiClause3834Test, PutValuePureTransportDelay) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-TEST_F(VpiClause3834Test, PutValueRealFormat) {
+TEST_F(VpiPutValueSim, PutValueRealFormat) {
   auto* var = sim_ctx_.CreateVariable("rf", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
   vpi_ctx_.Attach(sim_ctx_);
@@ -97,7 +97,7 @@ TEST_F(VpiClause3834Test, PutValueRealFormat) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-TEST_F(VpiClause3834Test, PutValueScalarFormat) {
+TEST_F(VpiPutValueSim, PutValueScalarFormat) {
   auto* var = sim_ctx_.CreateVariable("sf", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);

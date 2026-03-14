@@ -491,7 +491,7 @@ ModuleDecl* Parser::ParseModuleDecl() {
   ParseParamsPortsAndSemicolon(*mod);
   ParseModuleBody(*mod);
   Expect(TokenKind::kKwEndmodule);
-  if (Match(TokenKind::kColon)) ExpectIdentifier();
+  MatchEndLabel(mod->name);
   mod->range.end = CurrentLoc();
   return mod;
 }
@@ -544,7 +544,7 @@ PackageDecl* Parser::ParsePackageDecl() {
     }
   }
   Expect(TokenKind::kKwEndpackage);
-  if (Match(TokenKind::kColon)) ExpectIdentifier();
+  MatchEndLabel(pkg->name);
   pkg->range.end = CurrentLoc();
   return pkg;
 }

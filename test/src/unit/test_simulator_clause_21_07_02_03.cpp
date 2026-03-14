@@ -5,9 +5,9 @@
 namespace delta {
 namespace {
 
-class VcdClause21070203Test : public VcdTestBase {};
+class VcdHeaderAndScopeSim : public VcdTestBase {};
 
-TEST_F(VcdClause21070203Test, WritesHeader) {
+TEST_F(VcdHeaderAndScopeSim, WritesHeader) {
   {
     VcdWriter vcd(tmp_path_);
     ASSERT_TRUE(vcd.IsOpen());
@@ -21,7 +21,7 @@ TEST_F(VcdClause21070203Test, WritesHeader) {
   EXPECT_NE(content.find("$enddefinitions"), std::string::npos);
 }
 
-TEST_F(VcdClause21070203Test, WritesScope) {
+TEST_F(VcdHeaderAndScopeSim, WritesScope) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
@@ -34,7 +34,7 @@ TEST_F(VcdClause21070203Test, WritesScope) {
   EXPECT_NE(content.find("$upscope $end"), std::string::npos);
 }
 
-TEST_F(VcdClause21070203Test, RegistersSignal) {
+TEST_F(VcdHeaderAndScopeSim, RegistersSignal) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");

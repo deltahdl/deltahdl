@@ -13,7 +13,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3804Test : public ::testing::Test {
+class VpiSimControlSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -26,21 +26,21 @@ class VpiClause3804Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3804Test, ControlFinish) {
+TEST_F(VpiSimControlSim, ControlFinish) {
   EXPECT_FALSE(vpi_ctx_.FinishRequested());
   int result = VpiControlC(vpiFinish, 0);
   EXPECT_EQ(result, 1);
   EXPECT_TRUE(vpi_ctx_.FinishRequested());
 }
 
-TEST_F(VpiClause3804Test, ControlStop) {
+TEST_F(VpiSimControlSim, ControlStop) {
   EXPECT_FALSE(vpi_ctx_.StopRequested());
   int result = VpiControlC(vpiStop, 0);
   EXPECT_EQ(result, 1);
   EXPECT_TRUE(vpi_ctx_.StopRequested());
 }
 
-TEST_F(VpiClause3804Test, ControlUnknownOpReturnsZero) {
+TEST_F(VpiSimControlSim, ControlUnknownOpReturnsZero) {
   int result = VpiControlC(999, 0);
   EXPECT_EQ(result, 0);
 }

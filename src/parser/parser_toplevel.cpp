@@ -512,9 +512,7 @@ UdpDecl* Parser::ParseUdpDecl() {
 
   ParseUdpTable(udp);
   Expect(TokenKind::kKwEndprimitive);
-  if (Match(TokenKind::kColon)) {
-    Expect(TokenKind::kIdentifier);
-  }
+  MatchEndLabel(udp->name);
   udp->range.end = CurrentLoc();
   return udp;
 }

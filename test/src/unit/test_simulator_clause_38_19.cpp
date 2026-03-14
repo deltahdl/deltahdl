@@ -10,7 +10,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3819Test : public ::testing::Test {
+class VpiHandleByIndexSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -23,7 +23,7 @@ class VpiClause3819Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3819Test, HandleByIndexReturnCorrectChild) {
+TEST_F(VpiHandleByIndexSim, HandleByIndexReturnCorrectChild) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("a", kVpiInput, mod);
   auto* port_b = vpi_ctx_.CreatePort("b", kVpiOutput, mod);
@@ -33,12 +33,12 @@ TEST_F(VpiClause3819Test, HandleByIndexReturnCorrectChild) {
   EXPECT_EQ(result, port_b);
 }
 
-TEST_F(VpiClause3819Test, HandleByIndexNullParentReturnsNullptr) {
+TEST_F(VpiHandleByIndexSim, HandleByIndexNullParentReturnsNullptr) {
   vpiHandle result = VpiHandleByIndexC(nullptr, 0);
   EXPECT_EQ(result, nullptr);
 }
 
-TEST_F(VpiClause3819Test, HandleByIndexOutOfRangeReturnsNullptr) {
+TEST_F(VpiHandleByIndexSim, HandleByIndexOutOfRangeReturnsNullptr) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpiHandle result = VpiHandleByIndexC(mod, 99);
   EXPECT_EQ(result, nullptr);

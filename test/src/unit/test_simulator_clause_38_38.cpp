@@ -10,7 +10,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3838Test : public ::testing::Test {
+class VpiFreeObjectSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -23,7 +23,7 @@ class VpiClause3838Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3838Test, FreeObjectReturnsZero) {
+TEST_F(VpiFreeObjectSim, FreeObjectReturnsZero) {
   auto* mod = vpi_ctx_.CreateModule("tmp", "tmp");
   int result = vpi_free_object(mod);
   EXPECT_EQ(result, 0);

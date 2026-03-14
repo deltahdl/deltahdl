@@ -32,7 +32,7 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
   }
   current_module_ = prev_module;
   Expect(TokenKind::kKwEndinterface);
-  if (Match(TokenKind::kColon)) ExpectIdentifier();
+  MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;
 }
@@ -175,7 +175,7 @@ ModuleDecl* Parser::ParseProgramDecl() {
   }
   current_module_ = prev_module;
   Expect(TokenKind::kKwEndprogram);
-  if (Match(TokenKind::kColon)) ExpectIdentifier();
+  MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;
 }

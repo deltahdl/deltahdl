@@ -128,7 +128,7 @@ ConfigDecl* Parser::ParseConfigDecl() {
   }
 
   Expect(TokenKind::kKwEndconfig);
-  if (Match(TokenKind::kColon)) ExpectIdentifier();
+  MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;
 }

@@ -10,7 +10,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3821Test : public ::testing::Test {
+class VpiHandleByNameSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -23,14 +23,14 @@ class VpiClause3821Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3821Test, HandleByNameFindsModule) {
+TEST_F(VpiHandleByNameSim, HandleByNameFindsModule) {
   vpi_ctx_.CreateModule("dut", "dut");
   vpiHandle h = vpi_handle_by_name("dut", nullptr);
   ASSERT_NE(h, nullptr);
   EXPECT_EQ(vpi_get(vpiType, h), vpiModule);
 }
 
-TEST_F(VpiClause3821Test, HandleByNameNullReturnsNullptr) {
+TEST_F(VpiHandleByNameSim, HandleByNameNullReturnsNullptr) {
   vpiHandle h = vpi_handle_by_name(nullptr, nullptr);
   EXPECT_EQ(h, nullptr);
 }

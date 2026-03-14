@@ -5,9 +5,9 @@
 namespace delta {
 namespace {
 
-class VcdClause21070102Test : public VcdTestBase {};
+class VcdValueChangeSim : public VcdTestBase {};
 
-TEST_F(VcdClause21070102Test, ScalarValueChange) {
+TEST_F(VcdValueChangeSim, ScalarValueChange) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");
@@ -23,7 +23,7 @@ TEST_F(VcdClause21070102Test, ScalarValueChange) {
   EXPECT_NE(content.find("1!"), std::string::npos);
 }
 
-TEST_F(VcdClause21070102Test, VectorValueChange) {
+TEST_F(VcdValueChangeSim, VectorValueChange) {
   {
     VcdWriter vcd(tmp_path_);
     vcd.WriteHeader("1ns");

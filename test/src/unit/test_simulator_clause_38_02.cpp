@@ -13,7 +13,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3802Test : public ::testing::Test {
+class VpiErrorCheckSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -26,14 +26,14 @@ class VpiClause3802Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3802Test, ChkErrorNoErrorReturnsZero) {
+TEST_F(VpiErrorCheckSim, ChkErrorNoErrorReturnsZero) {
   SVpiErrorInfo info = {};
   int result = VpiChkErrorC(&info);
   EXPECT_EQ(result, 0);
   EXPECT_EQ(info.level, 0);
 }
 
-TEST_F(VpiClause3802Test, ChkErrorNullDoesNotCrash) {
+TEST_F(VpiErrorCheckSim, ChkErrorNullDoesNotCrash) {
   int result = VpiChkErrorC(nullptr);
 
   EXPECT_EQ(result, 0);

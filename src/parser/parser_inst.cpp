@@ -297,6 +297,17 @@ Token Parser::ExpectIdentifier() {
   return tok;
 }
 
+void Parser::MatchEndLabel(std::string_view name) {
+  if (Match(TokenKind::kColon)) {
+    auto end_id = ExpectIdentifier();
+    if (!name.empty() && end_id.text != name) {
+      diag_.Error(end_id.loc, "end label '" + std::string(end_id.text) +
+                                  "' does not match '" + std::string(name) +
+                                  "'");
+    }
+  }
+}
+
 bool Parser::CheckIdentifier() {
   return Check(TokenKind::kIdentifier) || Check(TokenKind::kEscapedIdentifier);
 }

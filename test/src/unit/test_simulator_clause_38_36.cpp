@@ -10,7 +10,7 @@
 namespace delta {
 namespace {
 
-class VpiClause3836Test : public ::testing::Test {
+class VpiCallbackSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
@@ -23,14 +23,14 @@ class VpiClause3836Test : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-TEST_F(VpiClause3836Test, RegisterCbReturnsHandle) {
+TEST_F(VpiCallbackSim, RegisterCbReturnsHandle) {
   s_cb_data cb = {};
   cb.reason = cbEndOfSimulation;
   vpiHandle h = vpi_register_cb(&cb);
   EXPECT_NE(h, nullptr);
 }
 
-TEST_F(VpiClause3836Test, RegisterCbStmt) {
+TEST_F(VpiCallbackSim, RegisterCbStmt) {
   s_cb_data cb = {};
   cb.reason = cbStmt;
   vpiHandle h = vpi_register_cb(&cb);
@@ -38,7 +38,7 @@ TEST_F(VpiClause3836Test, RegisterCbStmt) {
   EXPECT_EQ(vpi_ctx_.RegisteredCallbacks().back().reason, cbStmt);
 }
 
-TEST_F(VpiClause3836Test, RegisterCbAtStartOfSimTime) {
+TEST_F(VpiCallbackSim, RegisterCbAtStartOfSimTime) {
   s_cb_data cb = {};
   cb.reason = cbAtStartOfSimTime;
   vpiHandle h = vpi_register_cb(&cb);
@@ -46,7 +46,7 @@ TEST_F(VpiClause3836Test, RegisterCbAtStartOfSimTime) {
   EXPECT_EQ(vpi_ctx_.RegisteredCallbacks().back().reason, cbAtStartOfSimTime);
 }
 
-TEST_F(VpiClause3836Test, RemoveCbMarksRemoved) {
+TEST_F(VpiCallbackSim, RemoveCbMarksRemoved) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;
   vpiHandle h = vpi_register_cb(&cb);
@@ -58,11 +58,11 @@ TEST_F(VpiClause3836Test, RemoveCbMarksRemoved) {
   EXPECT_EQ(vpi_ctx_.RegisteredCallbacks()[0].reason, -1);
 }
 
-TEST_F(VpiClause3836Test, RemoveCbNullReturnsZero) {
+TEST_F(VpiCallbackSim, RemoveCbNullReturnsZero) {
   EXPECT_EQ(VpiRemoveCbC(nullptr), 0);
 }
 
-TEST_F(VpiClause3836Test, CbValueChangeWithWatcherFires) {
+TEST_F(VpiCallbackSim, CbValueChangeWithWatcherFires) {
   auto* var = sim_ctx_.CreateVariable("sig", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
   vpi_ctx_.Attach(sim_ctx_);
