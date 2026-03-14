@@ -1,6 +1,7 @@
 #include "simulator/stmt_exec.h"
 
 #include <cstdint>
+#include <iostream>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -900,6 +901,10 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
     // Fail action.
     if (stmt->assert_fail_stmt) {
       co_return co_await ExecStmt(stmt->assert_fail_stmt, ctx, arena);
+    } else if (stmt->kind != StmtKind::kCoverImmediate) {
+      // §16.3: Default $error when assert/assume fails with no else clause.
+      ctx.IncrementAssertionFailCount();
+      std::cerr << "ERROR: Assertion failed.\n";
     }
   }
   co_return StmtResult::kDone;

@@ -281,6 +281,10 @@ class SimContext {
   void PopThis();
   ClassObject* CurrentThis() const;
 
+  // §16.3: Immediate assertion failure tracking.
+  void IncrementAssertionFailCount() { ++assertion_fail_count_; }
+  int AssertionFailCount() const { return assertion_fail_count_; }
+
   // §14: Clocking manager access.
   void SetClockingManager(class ClockingManager* mgr) { clocking_mgr_ = mgr; }
   class ClockingManager* GetClockingManager() { return clocking_mgr_; }
@@ -352,6 +356,8 @@ class SimContext {
   std::vector<std::vector<QueueRefBinding>> queue_ref_stack_;
   // §20.6.2: Type name → bit width for $bits(type).
   std::unordered_map<std::string_view, uint32_t> type_widths_;
+  // §16.3: Immediate assertion failure counter.
+  int assertion_fail_count_ = 0;
   // §14: Clocking manager.
   class ClockingManager* clocking_mgr_ = nullptr;
   // §19: Coverage database.
