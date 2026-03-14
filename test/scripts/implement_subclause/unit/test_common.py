@@ -163,15 +163,20 @@ def _mock_run_ok():
     )
 
 
-def test_run_steps_call_count(isc):
-    """run_steps calls run_with_dots 10 times (once per step)."""
+def _run_steps_and_capture(isc):
+    """Build steps, mock run_with_dots, run, return mock."""
     steps = isc.build_steps("4.1", "~/LRM.txt")
     mock_rwd = MagicMock(
         return_value=MagicMock(returncode=0, stdout=_OK_STDOUT, stderr=""),
     )
     with patch("implement_subclause.run_with_dots", mock_rwd):
         isc.run_steps(steps, model="opus")
-    assert mock_rwd.call_count == 10
+    return mock_rwd
+
+
+def test_run_steps_call_count(isc):
+    """run_steps calls run_with_dots 10 times (once per step)."""
+    assert _run_steps_and_capture(isc).call_count == 10
 
 
 def test_run_steps_returns_action_summary(isc):
@@ -221,23 +226,11 @@ def test_run_steps_exits_on_missing_summary(mock_exit, isc):
 
 def test_run_steps_first_no_continue(isc):
     """First step does not use --continue."""
-    steps = isc.build_steps("4.1", "~/LRM.txt")
-    mock_rwd = MagicMock(
-        return_value=MagicMock(returncode=0, stdout=_OK_STDOUT, stderr=""),
-    )
-    with patch("implement_subclause.run_with_dots", mock_rwd):
-        isc.run_steps(steps, model="opus")
-    first_cmd = mock_rwd.call_args_list[0][0][1]
-    assert "--continue" not in first_cmd
+    mock_rwd = _run_steps_and_capture(isc)
+    assert "--continue" not in mock_rwd.call_args_list[0][0][1]
 
 
 def test_run_steps_second_uses_continue(isc):
     """Second step uses --continue."""
-    steps = isc.build_steps("4.1", "~/LRM.txt")
-    mock_rwd = MagicMock(
-        return_value=MagicMock(returncode=0, stdout=_OK_STDOUT, stderr=""),
-    )
-    with patch("implement_subclause.run_with_dots", mock_rwd):
-        isc.run_steps(steps, model="opus")
-    second_cmd = mock_rwd.call_args_list[1][0][1]
-    assert "--continue" in second_cmd
+    mock_rwd = _run_steps_and_capture(isc)
+    assert "--continue" in mock_rwd.call_args_list[1][0][1]
