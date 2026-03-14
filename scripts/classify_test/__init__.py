@@ -817,6 +817,9 @@ def _update_source(filepath, parsed, ctx):
                       == ctx["suite"]
                       and getattr(t, "original_test_name", t.test_name)
                       == ctx["test"])]
+    print(f"DEBUG _update_source: {len(others)} others:"
+          f" {[(t.suite_name, t.test_name) for t in others]}",
+          file=sys.stderr)
     source_is_target = ctx["source_is_target"]
     if source_is_target and others:
         content = generate_file("non-lrm", "", parsed, others)
