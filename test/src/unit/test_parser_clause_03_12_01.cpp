@@ -512,4 +512,19 @@ TEST(CompilationUnitStructure, CommentsInterspersedBetweenDesignElements) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
+// §3.1 — Design elements and CU-scope items interleaved.
+TEST(CompilationUnitStructure, DesignElementsAndCuItemsInterleaved) {
+  auto r = Parse(
+      "function void f1; endfunction\n"
+      "module m1; endmodule\n"
+      "task t1; endtask\n"
+      "package p1; endpackage\n"
+      "function void f2; endfunction\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_GE(r.cu->cu_items.size(), 3u);
+}
+
 }  // namespace
