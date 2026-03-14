@@ -2,7 +2,10 @@
 
 import argparse
 import inspect
+import json
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 # ---- build_hierarchy --------------------------------------------------------
@@ -266,7 +269,6 @@ def test_invoke_claude_failure_exits(mock_run, mock_exit, isc):
 
 def test_invoke_claude_returns_action_summary(isc):
     """invoke_claude extracts and returns action summary from response."""
-    import json
     envelope = json.dumps({
         "result": (
             "Done.\n"
@@ -282,7 +284,8 @@ def test_invoke_claude_returns_action_summary(isc):
         assert isc.invoke_claude("prompt") == "- Added foo.cpp"
 
 
-def test_invoke_claude_returns_empty_when_no_summary(isc, run_ok):
+@pytest.mark.usefixtures("run_ok")
+def test_invoke_claude_returns_empty_when_no_summary(isc):
     """invoke_claude returns empty string when no ACTION_SUMMARY block."""
     assert isc.invoke_claude("test prompt", model="opus") == ""
 

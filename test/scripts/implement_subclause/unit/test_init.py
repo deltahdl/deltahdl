@@ -238,6 +238,7 @@ def test_parse_args_rejects_tables_flag(isc, tmp_path):
 
 def test_extract_action_summary_found(isc):
     """Returns content between ACTION_SUMMARY delimiters."""
+    extract = getattr(isc, "_extract_action_summary")
     text = (
         "Some preamble.\n"
         "ACTION_SUMMARY_START\n"
@@ -246,22 +247,24 @@ def test_extract_action_summary_found(isc):
         "ACTION_SUMMARY_END\n"
         "Trailing text."
     )
-    assert isc._extract_action_summary(text) == "- Added foo.cpp\n- Modified bar.cpp"
+    assert extract(text) == "- Added foo.cpp\n- Modified bar.cpp"
 
 
 def test_extract_action_summary_not_found(isc):
     """Returns empty string when no ACTION_SUMMARY block is present."""
-    assert isc._extract_action_summary("No summary here.") == ""
+    extract = getattr(isc, "_extract_action_summary")
+    assert extract("No summary here.") == ""
 
 
 def test_extract_action_summary_strips_whitespace(isc):
     """Strips leading/trailing whitespace from extracted summary."""
+    extract = getattr(isc, "_extract_action_summary")
     text = (
         "ACTION_SUMMARY_START\n"
         "  - Did something  \n"
         "ACTION_SUMMARY_END"
     )
-    assert isc._extract_action_summary(text) == "- Did something"
+    assert extract(text) == "- Did something"
 
 
 # ---- get_unstaged_files -----------------------------------------------------

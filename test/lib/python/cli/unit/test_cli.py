@@ -23,6 +23,7 @@ from lib.python.cli import (
     validate_lrm,
 )
 from lib.python.test_fixtures.subprocess_stubs import (
+    spy_subprocess_run,
     stub_subprocess_failure,
     stub_subprocess_success,
 )
@@ -416,17 +417,9 @@ def test_run_claude_cli_calls_subprocess_run(monkeypatch):
 
 def test_run_claude_cli_passes_timeout(monkeypatch):
     """run_claude_cli forwards the timeout parameter."""
-    import subprocess
-    calls = []
-    original_run = subprocess.run
-
-    def spy(*args, **kwargs):
-        calls.append(kwargs)
-        return original_run(*args, **kwargs)
-
-    monkeypatch.setattr(subprocess, "run", spy)
+    kwargs_log = spy_subprocess_run(monkeypatch)
     run_claude_cli(["true"], "", env={}, timeout=600)
-    assert calls[0]["timeout"] == 600
+    assert kwargs_log[0]["timeout"] == 600
 
 
 def test_run_claude_cli_returns_completed_process(monkeypatch):
