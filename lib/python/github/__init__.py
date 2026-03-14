@@ -69,7 +69,8 @@ def sync_subclause_table(body: str, items: dict[str, str]) -> str:
 
 
 def update_subclause_status(body: str, label: str, status: str, *,
-                            action: str = "") -> str:
+                            action: str = "",
+                            commit_url: str = "") -> str:
     """Update the Status and Action columns for *label* in the table."""
     row_re = re.compile(
         r"^(\| " + re.escape(label) + r" \|[^|]*)\|[^|]*\|[^|]*\|$",
@@ -80,7 +81,11 @@ def update_subclause_status(body: str, label: str, status: str, *,
         print(f"ERROR: Row for {label!r} not found in issue body",
               file=sys.stderr)
         sys.exit(1)
-    action_cell = f" {action} " if action else " "
+    if action and commit_url:
+        action_text = f"[{action}]({commit_url})"
+    else:
+        action_text = action
+    action_cell = f" {action_text} " if action_text else " "
     new_row = f"{match.group(1)}| {status} |{action_cell}|"
     return body[:match.start()] + new_row + body[match.end():]
 

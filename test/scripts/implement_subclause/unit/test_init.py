@@ -337,10 +337,9 @@ def _commit_impl_and_capture(isc, *, subclause="6.6.1", action="",
               return_value="abc123") as m_cap,
         patch("implement_subclause.get_remote_repo",
               return_value=("org", "repo")) as m_repo,
-        patch("implement_subclause.mark_subclause_complete") as m_mark,
     ):
         isc.commit_implementation(subclause, 8, action=action)
-    return {"files": m_files, "cap": m_cap, "repo": m_repo, "mark": m_mark}
+    return {"files": m_files, "cap": m_cap, "repo": m_repo}
 
 
 def test_commit_implementation_calls_commit_and_push(isc):
@@ -362,23 +361,6 @@ def test_commit_implementation_message_annex_prefix(isc):
 def test_commit_implementation_message_no_co_authored_by(isc):
     """Commit message does not contain Co-Authored-By trailer."""
     assert "Co-Authored-By" not in _commit_impl_and_capture(isc)["cap"].call_args[0][2]
-
-
-def test_commit_implementation_calls_mark_subclause_complete(isc):
-    """commit_implementation marks the subclause complete on the issue."""
-    mocks = _commit_impl_and_capture(isc)
-    assert mocks["mark"].call_args[0] == ("org", "repo", 8, "6.6.1", "abc123")
-
-
-@patch("implement_subclause.mark_subclause_complete")
-@patch("implement_subclause.commit_and_push", return_value=None)
-@patch("implement_subclause.get_porcelain_changes", return_value=([], [], []))
-def test_commit_implementation_skips_mark_when_no_sha(
-    _mock_files, _mock_cap, mock_mark, isc,
-):
-    """commit_implementation does not mark when commit_and_push returns None."""
-    isc.commit_implementation("6.6.1", 8)
-    assert not mock_mark.called
 
 
 def test_commit_implementation_message_has_action(isc):
@@ -405,20 +387,41 @@ def test_commit_implementation_changed_includes_added_and_modified(isc):
 @patch("implement_subclause.update_subclause_status",
        return_value="updated body")
 @patch("implement_subclause.fetch_issue_body", return_value="table body")
-@patch("implement_subclause.mark_subclause_complete")
 @patch("implement_subclause.get_remote_repo", return_value=("org", "repo"))
 @patch("implement_subclause.commit_and_push", return_value="abc123")
 @patch("implement_subclause.get_porcelain_changes",
        return_value=(["a.cpp"], [], []))
 def test_commit_implementation_updates_issue_with_predefined_action(
-    _m_files, _m_cap, _m_repo, _m_mark, _m_fetch,
+    _m_files, _m_cap, _m_repo, _m_fetch,
     mock_update_status, _mock_update_body, isc,
 ):
-    """commit_implementation updates the issue row with the predefined action."""
+    """commit_implementation updates the issue row with linked action."""
     isc.commit_implementation(
-        "6.6.1", 8, action="summary", predefined_action="Deemed not implementable",
+        "6.6.1", 8,
+        action="summary",
+        predefined_action="Deemed not implementable",
     )
-    assert mock_update_status.called
+    assert "commit/abc123" in mock_update_status.call_args[1]["commit_url"]
+
+
+@patch("implement_subclause.update_issue_body")
+@patch("implement_subclause.update_subclause_status",
+       return_value="updated body")
+@patch("implement_subclause.fetch_issue_body", return_value="table body")
+@patch("implement_subclause.get_remote_repo", return_value=("org", "repo"))
+@patch("implement_subclause.commit_and_push", return_value=None)
+@patch("implement_subclause.get_porcelain_changes",
+       return_value=([], [], []))
+def test_commit_implementation_no_link_when_no_sha(
+    _m_files, _m_cap, _m_repo, _m_fetch,
+    mock_update_status, _mock_update_body, isc,
+):
+    """No commit_url when commit_and_push returns None."""
+    isc.commit_implementation(
+        "6.6.1", 8,
+        predefined_action="Deemed not implementable",
+    )
+    assert mock_update_status.call_args[1]["commit_url"] == ""
 
 
 # ---- __main__ guard --------------------------------------------------------

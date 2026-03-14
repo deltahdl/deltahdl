@@ -28,7 +28,6 @@ from lib.python.git import (
 from lib.python.github import (
     fetch_issue_body,
     format_subclause_label,
-    mark_subclause_complete,
     update_issue_body,
     update_subclause_status,
 )
@@ -342,15 +341,18 @@ def commit_implementation(subclause, issue, *,
     else:
         message = f"Implement {label}\n"
     sha = commit_and_push(added + modified, deleted, message)
-    if sha:
-        organization, repo = get_remote_repo()
-        mark_subclause_complete(organization, repo, issue, subclause, sha)
     if predefined_action:
         organization, repo = get_remote_repo()
+        commit_url = ""
+        if sha:
+            commit_url = (
+                f"https://github.com/{organization}/{repo}/commit/{sha}"
+            )
         body = fetch_issue_body(organization, repo, issue)
         table_label = format_subclause_label(subclause)
         body = update_subclause_status(
-            body, table_label, "Reviewed", action=predefined_action,
+            body, table_label, "Reviewed",
+            action=predefined_action, commit_url=commit_url,
         )
         update_issue_body(organization, repo, issue, body)
 

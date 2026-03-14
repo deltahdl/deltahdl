@@ -511,6 +511,25 @@ def test_update_subclause_status_preserves_other_rows() -> None:
     assert "| §3.2 | Design | Unreviewed | |" in result
 
 
+def test_update_subclause_status_links_action_to_commit() -> None:
+    """Wraps action in a markdown link when commit_url is provided."""
+    result = update_subclause_status(
+        _SUBCLAUSE_TABLE, "§3.1", "Reviewed",
+        action="Deemed not implementable",
+        commit_url="https://github.com/org/repo/commit/abc123",
+    )
+    assert "[Deemed not implementable](https://github.com/org/repo/commit/abc123)" in result
+
+
+def test_update_subclause_status_no_link_without_url() -> None:
+    """Action is plain text when commit_url is empty."""
+    result = update_subclause_status(
+        _SUBCLAUSE_TABLE, "§3.1", "Reviewed",
+        action="Deemed not implementable",
+    )
+    assert "| Deemed not implementable |" in result
+
+
 # ---- parse_subclause_rows --------------------------------------------------
 
 _REVIEWED_TABLE = (
