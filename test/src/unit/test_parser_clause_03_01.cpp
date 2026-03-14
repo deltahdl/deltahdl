@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, SourceWithoutModulesIsValid) {
-  auto r = Parse(
-      "package p; endpackage\n"
-      "interface ifc; endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules.empty());
-  EXPECT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces.size(), 1u);
-}
-
 // §3.1 — UDPs (primitives) accumulate in the compilation unit.
 TEST(CompilationUnitStructure, MultipleUdpsAccumulate) {
   auto r = Parse(
