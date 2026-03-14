@@ -241,4 +241,8 @@ TEST(InterfaceEndLabel, EndLabelMatchesInterfaceName) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "baz");
 }
 
+TEST(InterfaceDeclaration, MissingEndinterfaceIsError) {
+  EXPECT_FALSE(ParseOk("interface i;"));
+}
+
 }  // namespace
