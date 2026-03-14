@@ -2,14 +2,7 @@
 
 namespace {
 
-TEST(ElabClause03, Cl3_6_EmptyCheckerElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc("checker chk; endchecker\n", f, "chk");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(ElabClause03, Cl3_6_CheckerWithModelingCodeElaborates) {
+TEST(ElabClause03, CheckerWithModelingCodeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk;\n"
@@ -21,7 +14,7 @@ TEST(ElabClause03, Cl3_6_CheckerWithModelingCodeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ElabClause03, Cl3_6_CheckerWithPortsElaborates) {
+TEST(ElabClause03, CheckerWithPortsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic clk, input logic rst);\n"

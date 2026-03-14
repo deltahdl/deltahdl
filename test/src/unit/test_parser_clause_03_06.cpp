@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ParserClause03, Cl3_6_CheckerEnclosedByKeywords) {
+TEST(ParserClause03, CheckerEnclosedByKeywords) {
   auto r = Parse("checker chk; endchecker");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(ParserClause03, Cl3_6_CheckerEnclosedByKeywords) {
   EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
 }
 
-TEST(ParserClause03, Cl3_6_CheckerWithAssertion) {
+TEST(ParserClause03, CheckerWithAssertion) {
   auto r = Parse(
       "checker chk(input logic clk, input logic req, input logic gnt);\n"
       "  assert property (@(posedge clk) req |-> ##[1:3] gnt);\n"
@@ -25,7 +25,7 @@ TEST(ParserClause03, Cl3_6_CheckerWithAssertion) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kAssertProperty));
 }
 
-TEST(ParserClause03, Cl3_6_CheckerWithModelingCode) {
+TEST(ParserClause03, CheckerWithModelingCode) {
   auto r = Parse(
       "checker chk;\n"
       "  logic flag;\n"
@@ -39,7 +39,7 @@ TEST(ParserClause03, Cl3_6_CheckerWithModelingCode) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-TEST(ParserClause03, Cl3_6_CheckerWithPorts) {
+TEST(ParserClause03, CheckerWithPorts) {
   auto r = Parse(
       "checker chk(input logic clk, input logic rst);\n"
       "endchecker\n");
@@ -48,7 +48,7 @@ TEST(ParserClause03, Cl3_6_CheckerWithPorts) {
   ASSERT_GE(r.cu->checkers[0]->ports.size(), 2u);
 }
 
-TEST(ParserClause03, Cl3_6_CheckerWithMixedContent) {
+TEST(ParserClause03, CheckerWithMixedContent) {
   EXPECT_TRUE(
       ParseOk("checker chk(input logic clk, input logic a, input logic b);\n"
               "  logic internal;\n"
