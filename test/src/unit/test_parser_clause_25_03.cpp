@@ -233,4 +233,12 @@ TEST(ModuleAndHierarchyParsing, InterfaceLifetimeAutomatic) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "myif");
 }
 
+TEST(InterfaceEndLabel, EndLabelMatchesInterfaceName) {
+  auto r = Parse("interface baz; endinterface : baz\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "baz");
+}
+
 }  // namespace
