@@ -157,17 +157,17 @@ _MOCK_PROMPT_RESULT = "- Added foo.cpp"
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value="summary")
+@patch("implement_subclause.run_steps", return_value="summary")
 def test_main_dispatches_depth_1(mock_run, _mock_commit, isc, tmp_path):
-    """main() passes args namespace to run_prompt."""
+    """main() passes model to run_steps."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     isc.main(["--lrm", str(lrm), "--subclause", "4", "--issue", "6", "--model", "opus"])
-    assert mock_run.call_args[0][1].model == "opus"
+    assert mock_run.call_args[1]["model"] == "opus"
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value="summary")
+@patch("implement_subclause.run_steps", return_value="summary")
 def test_main_calls_commit_implementation_subclause(
     _mock_run, mock_commit, isc, tmp_path,
 ):
@@ -179,7 +179,7 @@ def test_main_calls_commit_implementation_subclause(
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value="summary")
+@patch("implement_subclause.run_steps", return_value="summary")
 def test_main_calls_commit_implementation_issue(
     _mock_run, mock_commit, isc, tmp_path,
 ):
@@ -191,7 +191,7 @@ def test_main_calls_commit_implementation_issue(
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value=_MOCK_PROMPT_RESULT)
+@patch("implement_subclause.run_steps", return_value=_MOCK_PROMPT_RESULT)
 def test_main_passes_action_to_commit(
     _mock_run, mock_commit, isc, tmp_path,
 ):
@@ -203,7 +203,7 @@ def test_main_passes_action_to_commit(
 
 
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_prompt", return_value=_MOCK_PROMPT_RESULT)
+@patch("implement_subclause.run_steps", return_value=_MOCK_PROMPT_RESULT)
 def test_main_prints_action_summary(
     _mock_run, _mock_commit, isc, tmp_path, capsys,
 ):

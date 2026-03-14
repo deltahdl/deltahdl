@@ -1,7 +1,6 @@
 """Shared fixtures for implement_subclause unit tests."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -15,21 +14,3 @@ def isc(module_loader):
         "implement_subclause",
         SCRIPTS_DIR / "implement_subclause" / "__init__.py",
     )
-
-
-_RUN_OK_STDOUT = (
-    '{"result":"ACTION_SUMMARY_START\\n- Done because needed\\n'
-    'ACTION_SUMMARY_END"}'
-)
-
-
-@pytest.fixture()
-def run_ok():
-    """Patch run_claude_cli with a successful mock result containing an ACTION_SUMMARY."""
-    with patch("implement_subclause.run_claude_cli") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=_RUN_OK_STDOUT,
-            stderr="",
-        )
-        yield mock_run

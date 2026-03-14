@@ -112,247 +112,46 @@ class TestBuildHierarchyAnnex:
         }
 
 
-# ---- format_prompt --------------------------------------------------------
+# ---- build_steps -----------------------------------------------------------
 
 
-def test_format_prompt_forbids_building(isc):
-    """Prompt tells Claude not to build or run tests."""
-    result = isc.format_prompt("4.1", "~/LRM.txt")
-    assert "Do not build or run tests" in result
+def test_build_steps_returns_list(isc):
+    """build_steps returns a list of (description, prompt) tuples."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    assert isinstance(steps, list)
 
 
-def test_format_prompt_no_supplementary_param(isc):
-    """format_prompt does not accept a supplementary parameter."""
-    sig = inspect.signature(isc.format_prompt)
-    assert "supplementary" not in sig.parameters
+def test_build_steps_has_10_steps(isc):
+    """build_steps returns exactly 10 steps."""
+    assert len(isc.build_steps("4.1", "~/LRM.txt")) == 10
 
 
-def test_format_prompt_mentions_general(isc):
-    """Prompt instructs Claude to read General sections."""
-    result = isc.format_prompt("4.4.3", "~/LRM.txt")
-    assert "General" in result
+def test_build_steps_first_mentions_lrm(isc):
+    """First step prompt mentions the LRM."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    assert "LRM" in steps[0][1]
 
 
-def test_format_prompt_mentions_overview(isc):
-    """Prompt instructs Claude to read Overview sections."""
-    result = isc.format_prompt("4.4.3", "~/LRM.txt")
-    assert "Overview" in result
+def test_build_steps_last_mentions_action_summary(isc):
+    """Last step prompt mentions ACTION_SUMMARY."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    assert "ACTION_SUMMARY" in steps[-1][1]
 
 
-def test_format_prompt_scope_constraint(isc):
-    """Prompt constrains Claude to only implement the requested subclause."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "Only implement §10.10.2" in result
+def test_build_steps_each_has_description(isc):
+    """Each step has a non-empty description."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    assert all(desc for desc, _ in steps)
 
 
-def test_format_prompt_elaborator_test_filename(isc):
-    """Prompt includes elaborator subclause-specific test filename."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "test_elaborator_clause_10_10_02.cpp" in result
+def test_build_steps_exclude_appears_in_step(isc):
+    """Exclude subclauses appear in a step prompt."""
+    steps = isc.build_steps("15.3", "~/LRM.txt", exclude="15.3.1")
+    prompts = " ".join(p for _, p in steps)
+    assert "15.3.1" in prompts
 
 
-def test_format_prompt_simulator_test_filename(isc):
-    """Prompt includes simulator subclause-specific test filename."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "test_simulator_clause_10_10_02.cpp" in result
-
-
-def test_format_prompt_forbids_parent_file(isc):
-    """Prompt forbids putting tests in parent clause file."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "parent clause file" in result
-
-
-def test_format_prompt_search_for_misplaced_tests(isc):
-    """Prompt instructs Claude to search test/src/unit/ for misplaced tests."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "Search test/src/unit/" in result
-
-
-def test_format_prompt_search_mentions_subclause(isc):
-    """Misplaced-test search instruction references the target subclause."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "§10.10.2" in result
-
-
-def test_format_prompt_forbids_git_commits(isc):
-    """Prompt forbids making git commits."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "Do not make git commits" in result
-
-
-def test_format_prompt_exclude_lists_subclauses(isc):
-    """Prompt lists excluded subclauses when exclude is non-empty."""
-    result = isc.format_prompt(
-        "15.3", "~/LRM.txt", exclude="15.3.1,15.3.2",
-    )
-    assert "§15.3.1" in result
-
-
-def test_format_prompt_exclude_says_separately(isc):
-    """Prompt says excluded subclauses are implemented separately."""
-    result = isc.format_prompt(
-        "15.3", "~/LRM.txt", exclude="15.3.1,15.3.2",
-    )
-    assert "separately" in result
-
-
-def test_format_prompt_exclude_empty_no_exclusion(isc):
-    """Prompt has no exclusion text when exclude is empty."""
-    result = isc.format_prompt("15.3", "~/LRM.txt")
-    assert "implemented separately" not in result
-
-
-def test_format_prompt_includes_action_summary_instruction(isc):
-    """Prompt instructs Claude to output an ACTION_SUMMARY block."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "ACTION_SUMMARY_START" in result
-
-
-def test_format_prompt_demands_rationale(isc):
-    """Prompt demands categorical rationale with 'because' for every action."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "because" in result
-
-
-def test_format_prompt_no_predefined_actions(isc):
-    """Prompt does not include predefined action choices."""
-    result = isc.format_prompt("10.10.2", "~/LRM.txt")
-    assert "ONE_LINE_PREDEFINED_ACTION" not in result
-
-
-# ---- invoke_claude --------------------------------------------------------
-
-
-def test_invoke_claude_passes_verbose(isc, run_ok):
-    """invoke_claude includes --verbose in the CLI command."""
-    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
-    assert "--verbose" in run_ok.call_args[0][0]
-
-
-def test_invoke_claude_uses_print_mode(isc, run_ok):
-    """invoke_claude uses -p (print mode)."""
-    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
-    assert "-p" in run_ok.call_args[0][0]
-
-
-def test_invoke_claude_uses_json_output_format(isc, run_ok):
-    """invoke_claude uses --output-format json to capture output."""
-    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
-    cmd = run_ok.call_args[0][0]
-    idx = cmd.index("--output-format")
-    assert cmd[idx + 1] == "json"
-
-
-def test_invoke_claude_uses_dangerously_skip_permissions(isc, run_ok):
-    """invoke_claude uses --dangerously-skip-permissions."""
-    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
-    assert "--dangerously-skip-permissions" in run_ok.call_args[0][0]
-
-
-def test_invoke_claude_no_continue_by_default(isc, run_ok):
-    """invoke_claude does not include --continue by default."""
-    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
-    assert "--continue" not in run_ok.call_args[0][0]
-
-
-def test_invoke_claude_uses_continue_when_set(isc, run_ok):
-    """invoke_claude includes --continue when continue_session=True."""
-    isc.invoke_claude("test prompt", subclause="4.1", model="opus", continue_session=True)
-    assert "--continue" in run_ok.call_args[0][0]
-
-
-def test_invoke_claude_success(isc, run_ok):
-    """invoke_claude calls subprocess.run on success."""
-    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
-    assert run_ok.called
-
-
-@patch("implement_subclause.sys.exit")
-@patch("implement_subclause.run_claude_cli")
-def test_invoke_claude_failure_exits(mock_run, mock_exit, isc):
-    """invoke_claude calls sys.exit on non-zero return code."""
-    mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="err")
-    isc.invoke_claude("test prompt", subclause="4.1")
-    assert mock_exit.called
-
-
-def test_invoke_claude_returns_action_summary(isc):
-    """invoke_claude extracts and returns action summary from response."""
-    envelope = json.dumps({
-        "result": (
-            "Done.\n"
-            "ACTION_SUMMARY_START\n"
-            "- Added foo.cpp\n"
-            "ACTION_SUMMARY_END"
-        ),
-    })
-    with patch("implement_subclause.run_claude_cli") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout=envelope, stderr="",
-        )
-        result = isc.invoke_claude("prompt", subclause="4.1")
-    assert result == "- Added foo.cpp"
-
-
-def test_invoke_claude_finds_summary_in_raw_stdout(isc):
-    """invoke_claude finds ACTION_SUMMARY in raw stdout even when not in result field."""
-    raw_stdout = (
-        '{"result":"All done."}\n'
-        "some other output\n"
-        "ACTION_SUMMARY_START\n"
-        "- Modified eval_expr.cpp\n"
-        "ACTION_SUMMARY_END\n"
-    )
-    with patch("implement_subclause.run_claude_cli") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout=raw_stdout, stderr="",
-        )
-        result = isc.invoke_claude("prompt", subclause="4.1")
-    assert result == "- Modified eval_expr.cpp"
-
-
-def _invoke_with_retry(isc):
-    """Call invoke_claude with a mock that fails then succeeds; return mock_run."""
-    no_summary = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
-    with_summary = MagicMock(
-        returncode=0,
-        stdout='ACTION_SUMMARY_START\n- Did X because Y\nACTION_SUMMARY_END',
-        stderr="",
-    )
-    with patch("implement_subclause.run_claude_cli",
-               side_effect=[no_summary, with_summary]) as mock_run:
-        result = isc.invoke_claude("prompt", subclause="4.1")
-    return mock_run, result
-
-
-def test_invoke_claude_retries_on_missing_rationale(isc):
-    """invoke_claude retries once when ACTION_SUMMARY is missing."""
-    mock_run, _ = _invoke_with_retry(isc)
-    assert mock_run.call_count == 2
-
-
-def test_invoke_claude_retry_returns_rationale(isc):
-    """invoke_claude returns the rationale from the retry call."""
-    _, result = _invoke_with_retry(isc)
-    assert result == "- Did X because Y"
-
-
-def test_invoke_claude_retry_uses_dangerously_skip_permissions(isc):
-    """Retry command includes --dangerously-skip-permissions."""
-    mock_run, _ = _invoke_with_retry(isc)
-    retry_cmd = mock_run.call_args_list[1][0][0]
-    assert "--dangerously-skip-permissions" in retry_cmd
-
-
-@patch("implement_subclause.sys.exit")
-def test_invoke_claude_exits_after_retry_with_no_rationale(mock_exit, isc):
-    """invoke_claude exits when both attempts fail to produce rationale."""
-    no_summary = MagicMock(returncode=0, stdout='{"result":"done"}', stderr="")
-    with patch("implement_subclause.run_claude_cli",
-               return_value=no_summary):
-        isc.invoke_claude("prompt", subclause="4.1")
-    assert mock_exit.called
+# ---- run_steps -------------------------------------------------------------
 
 
 _OK_STDOUT = (
@@ -360,103 +159,88 @@ _OK_STDOUT = (
 )
 
 
-@patch("implement_subclause.run_claude_cli")
-def test_invoke_claude_prints_implementing_numeric(_mock_run, isc, capsys):
-    """invoke_claude prints Implementing with section sign for numeric subclauses."""
-    _mock_run.return_value = MagicMock(returncode=0, stdout=_OK_STDOUT, stderr="")
-    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
-    assert "Implementing §4.1 via Claude..." in capsys.readouterr().out
+def _mock_run_ok():
+    """Return a MagicMock for run_claude_cli that always succeeds."""
+    return MagicMock(
+        return_value=MagicMock(returncode=0, stdout=_OK_STDOUT, stderr=""),
+    )
 
 
-@patch("implement_subclause.run_claude_cli")
-def test_invoke_claude_prints_implementing_annex(_mock_run, isc, capsys):
-    """invoke_claude prints Implementing Annex for annex subclauses."""
-    _mock_run.return_value = MagicMock(returncode=0, stdout=_OK_STDOUT, stderr="")
-    isc.invoke_claude("test prompt", subclause="A.8", model="opus")
-    assert "Implementing Annex A.8 via Claude..." in capsys.readouterr().out
-
-
-def test_invoke_claude_uses_run_with_dots(isc):
-    """invoke_claude calls run_with_dots for progress feedback."""
+def test_run_steps_call_count(isc):
+    """run_steps calls run_with_dots 10 times (once per step)."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
     mock_rwd = MagicMock(
         return_value=MagicMock(returncode=0, stdout=_OK_STDOUT, stderr=""),
     )
     with patch("implement_subclause.run_with_dots", mock_rwd):
-        isc.invoke_claude("prompt", subclause="4.1")
-    assert mock_rwd.called
+        isc.run_steps(steps, model="opus")
+    assert mock_rwd.call_count == 10
 
 
-# ---- run_prompt -----------------------------------------------------------
+def test_run_steps_returns_action_summary(isc):
+    """run_steps returns the ACTION_SUMMARY from the last step."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    with patch("implement_subclause.run_claude_cli", _mock_run_ok()), \
+         patch("implement_subclause.run_with_dots",
+               side_effect=lambda f, *a, **kw: f(*a, **kw)):
+        result = isc.run_steps(steps, model="opus")
+    assert result == "- Done because needed"
 
 
-def _run_prompt_and_capture(isc, tmp_path, *, exclude=""):
-    """Helper: invoke run_prompt with a mock build_fn and return (mock_invoke, build_fn, result)."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    build_fn = MagicMock(return_value="generated prompt")
-    args = argparse.Namespace(
-        lrm=lrm, subclause="4.1",
-        model="opus", continue_session=False, exclude=exclude,
+def test_run_steps_prints_step_numbers(isc, capsys):
+    """run_steps prints step numbers in stdout."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    with patch("implement_subclause.run_claude_cli", _mock_run_ok()), \
+         patch("implement_subclause.run_with_dots",
+               side_effect=lambda f, *a, **kw: f(*a, **kw)):
+        isc.run_steps(steps, model="opus")
+    out = capsys.readouterr().out
+    assert "Step 1/10:" in out
+
+
+@patch("implement_subclause.sys.exit")
+def test_run_steps_exits_on_failure(mock_exit, isc):
+    """run_steps exits when a step fails."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    fail = MagicMock(
+        return_value=MagicMock(returncode=1, stdout="", stderr="err"),
     )
-    with patch("implement_subclause.invoke_claude",
-               return_value="- Did something") as mock_invoke:
-        result = isc.run_prompt(build_fn, args)
-    return mock_invoke, build_fn, result
+    with patch("implement_subclause.run_with_dots", fail):
+        isc.run_steps(steps, model="opus")
+    assert mock_exit.called
 
 
-def test_run_prompt_calls_invoke(isc, tmp_path):
-    """run_prompt builds prompt and invokes Claude."""
-    mock_invoke, _, _ = _run_prompt_and_capture(isc, tmp_path)
-    assert mock_invoke.call_args[0][0] == "generated prompt"
-
-
-def test_run_prompt_does_not_load_titles(isc, tmp_path):
-    """run_prompt passes only positional args (subclause, lrm_path)."""
-    _, build_fn, _ = _run_prompt_and_capture(isc, tmp_path)
-    assert len(build_fn.call_args[0]) == 2  # subclause, lrm_path
-
-
-def test_run_prompt_passes_subclause(isc, tmp_path):
-    """run_prompt passes the subclause as the first positional arg."""
-    _, build_fn, _ = _run_prompt_and_capture(isc, tmp_path)
-    assert build_fn.call_args[0][0] == "4.1"
-
-
-def test_run_prompt_passes_exclude(isc, tmp_path):
-    """run_prompt passes exclude to build_fn."""
-    _, build_fn, _ = _run_prompt_and_capture(isc, tmp_path, exclude="4.1.1,4.1.2")
-    assert build_fn.call_args[1]["exclude"] == "4.1.1,4.1.2"
-
-
-def test_run_prompt_returns_action_summary(isc, tmp_path):
-    """run_prompt returns the action summary from invoke_claude."""
-    _, _, result = _run_prompt_and_capture(isc, tmp_path)
-    assert result == "- Did something"
-
-
-def test_run_prompt_passes_subclause_to_invoke(isc, tmp_path):
-    """run_prompt passes subclause to invoke_claude."""
-    mock_invoke, _, _ = _run_prompt_and_capture(isc, tmp_path)
-    assert mock_invoke.call_args[1]["subclause"] == "4.1"
-
-
-@patch("implement_subclause.invoke_claude")
-def test_run_prompt_passes_continue_session(mock_invoke, isc, tmp_path):
-    """run_prompt passes continue_session to invoke_claude."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    build_fn = MagicMock(return_value="generated prompt")
-    args = argparse.Namespace(
-        lrm=lrm, subclause="4.1",
-        model="opus", continue_session=True, exclude="",
+@patch("implement_subclause.sys.exit")
+def test_run_steps_exits_on_missing_summary(mock_exit, isc):
+    """run_steps exits when the last step has no ACTION_SUMMARY."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    no_summary = MagicMock(
+        return_value=MagicMock(returncode=0, stdout='{"result":"done"}', stderr=""),
     )
-    isc.run_prompt(build_fn, args)
-    assert mock_invoke.call_args[1]["continue_session"] is True
+    with patch("implement_subclause.run_with_dots", no_summary):
+        isc.run_steps(steps, model="opus")
+    assert mock_exit.called
 
 
-def test_invoke_claude_passes_effort_high(isc, run_ok):
-    """invoke_claude includes --effort high in the CLI command."""
-    isc.invoke_claude("test prompt", subclause="4.1", model="opus")
-    cmd = run_ok.call_args[0][0]
-    idx = cmd.index("--effort")
-    assert cmd[idx + 1] == "high"
+def test_run_steps_first_no_continue(isc):
+    """First step does not use --continue."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    mock_rwd = MagicMock(
+        return_value=MagicMock(returncode=0, stdout=_OK_STDOUT, stderr=""),
+    )
+    with patch("implement_subclause.run_with_dots", mock_rwd):
+        isc.run_steps(steps, model="opus")
+    first_cmd = mock_rwd.call_args_list[0][0][1]
+    assert "--continue" not in first_cmd
+
+
+def test_run_steps_second_uses_continue(isc):
+    """Second step uses --continue."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    mock_rwd = MagicMock(
+        return_value=MagicMock(returncode=0, stdout=_OK_STDOUT, stderr=""),
+    )
+    with patch("implement_subclause.run_with_dots", mock_rwd):
+        isc.run_steps(steps, model="opus")
+    second_cmd = mock_rwd.call_args_list[1][0][1]
+    assert "--continue" in second_cmd

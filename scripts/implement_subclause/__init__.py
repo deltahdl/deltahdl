@@ -7,7 +7,6 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -73,110 +72,99 @@ def build_hierarchy(clause: str) -> dict:
 # Prompt formatting
 # ---------------------------------------------------------------------------
 
-def format_prompt(
+def build_steps(
     subclause: str,
     lrm: str,
     *,
     exclude: str = "",
-) -> str:
-    """Assemble the implementation prompt from structured inputs."""
+) -> list[tuple[str, str]]:
+    """Build the list of (description, prompt) tuples for each atomic step."""
     h = build_hierarchy(subclause)
-    lines = [f"Implement §{subclause} from the LRM at {lrm}.\n"]
-
     if h["ancestors"]:
         ancestors_str = ", ".join(f"§{a}" for a in h["ancestors"])
-        lines.append(
+        read_ctx = (
             f"Read §{subclause} and its ancestor subclauses"
-            f" ({ancestors_str}) for context."
-            " Also read any General or Overview subclauses"
-            " at each level.",
+            f" ({ancestors_str}) in the LRM at {lrm}."
+            " Also read any General or Overview subclauses at each level."
         )
     else:
-        lines.append(
-            f"Read §{subclause} for context."
-            " Also read any General or Overview sibling subclauses.",
-        )
-
-    lines.append(
-        "Search the codebase for existing related code"
-        " before writing anything new.",
-    )
-
-    lines.append(
-        "Search test/src/unit/ for any existing tests"
-        f" that cover §{subclause} requirements."
-        " If found in files other than the ones listed below,"
-        " move them to the correct file.",
-    )
-
-    lines.append(
-        "If any pre-existing tests have unintuitive suite or test names"
-        " (e.g., names containing clause numbers like Cl5_7_1_),"
-        " rename BOTH the suite name AND the test name to PascalCase"
-        " names that intuitively describe what is being tested."
-        " Do NOT include clause or annex numbers in suite or test names.",
-    )
-
-    lines.append(
-        "Use strict test-driven development:"
-        f" for each requirement in §{subclause},"
-        " write a failing unit test, then implement."
-        " Cover all affected pipeline stages."
-        " Include error conditions and edge cases.",
-    )
-
-    lines.append(
-        f"Only implement §{subclause}."
-        " Do not implement any other subclauses.",
-    )
-
-    if exclude:
-        excluded = [f"§{s.strip()}" for s in exclude.split(",")]
-        lines.append(
-            f"{', '.join(excluded)} will be implemented separately."
-            " Do NOT implement their requirements."
-            " Do NOT place tests for them in your files."
-            f" Only implement requirements stated directly in §{subclause}.",
+        read_ctx = (
+            f"Read §{subclause} in the LRM at {lrm}."
+            " Also read any General or Overview sibling subclauses."
         )
 
     examples = [
         clause_to_filename(prefix, subclause) + ".cpp"
         for _stage, prefix in sorted(STAGE_TO_PREFIX.items())
     ]
-    lines.append(
-        "Place tests in the subclause-specific test file."
-        f" The correct filenames by stage are: {', '.join(examples)}."
-        " Do NOT put tests in a parent clause file.",
+    filenames = ", ".join(examples)
+
+    exclude_note = ""
+    if exclude:
+        excluded = [f"§{s.strip()}" for s in exclude.split(",")]
+        exclude_note = (
+            f" {', '.join(excluded)} will be implemented separately."
+            " Do NOT touch their tests or functionality."
+        )
+
+    constraints = (
+        " Do not make git commits or push."
+        " Do not copy LRM prose into source comments."
+        " Do not build or run tests."
     )
 
-    lines.append("Do not make git commits or push.")
-    lines.append("Do not copy LRM prose into source comments.")
-    lines.append("Do not build or run tests.")
-
-    lines.append(
-        "At the very end of your response, output an action summary."
-        " Every line MUST include 'because' with a categorical rationale"
-        " explaining why the action was necessary"
-        " (what was missing, wrong, or misplaced).\n"
-        "ACTION_SUMMARY_START\n"
-        "- Added <file> because <what was missing or needed>\n"
-        "- Moved <TestName> from <file> because <why it was misplaced>\n"
-        "- Deleted <file> because <why it was no longer needed>\n"
-        "- Modified <file> because <what capability was missing>\n"
-        "ACTION_SUMMARY_END",
-    )
-
-    return "\n".join(lines) + "\n"
-
-
-def build_prompt(
-    clause: str,
-    lrm: str,
-    *,
-    exclude: str = "",
-) -> str:
-    """Build the implementation prompt for any clause depth."""
-    return format_prompt(clause, lrm, exclude=exclude)
+    return [
+        ("Reading LRM", read_ctx),
+        ("Auditing src",
+         f"Search src/ for existing code that implements §{subclause}."
+         " Report what aligns with the LRM and what is missing."
+         + constraints),
+        ("Auditing tests",
+         f"Search test/src/unit/ for existing tests that cover §{subclause}."
+         f" The correct test files are: {filenames}."
+         " Report what is covered and what is missing."
+         + constraints),
+        ("Deleting duplicate tests",
+         f"Delete any duplicate tests related to §{subclause}."
+         " Only delete exact duplicates."
+         + constraints),
+        ("Moving misplaced tests",
+         f"Move any tests for §{subclause} that are in the wrong files"
+         f" to the correct files: {filenames}."
+         " Do NOT put tests in a parent clause file."
+         + exclude_note + constraints),
+        ("Renaming test suites",
+         "Rename any test suites with unintuitive names"
+         " (e.g., containing clause numbers like Cl5_7_1_)"
+         " to PascalCase names that describe what is being tested."
+         " Do NOT include clause or annex numbers."
+         + constraints),
+        ("Renaming test names",
+         "Rename any test names with unintuitive names"
+         " (e.g., containing clause numbers like Cl5_7_1_)"
+         " to PascalCase names that describe what is being tested."
+         " Do NOT include clause or annex numbers."
+         + constraints),
+        ("Implementing missing tests",
+         f"Write missing unit tests for §{subclause} requirements."
+         f" Place them in: {filenames}."
+         " Cover all affected pipeline stages."
+         " Include error conditions and edge cases."
+         + exclude_note + constraints),
+        ("Implementing missing functionality",
+         f"Implement any missing functionality for §{subclause}."
+         f" Only implement §{subclause}, no other subclauses."
+         + exclude_note + constraints),
+        ("Summarizing actions",
+         "Output an action summary of everything you did."
+         " Every line MUST include 'because' with a categorical rationale.\n"
+         "ACTION_SUMMARY_START\n"
+         "- Added <file> because <what was missing or needed>\n"
+         "- Moved <TestName> from <file> because <why it was misplaced>\n"
+         "- Deleted <file> because <why it was no longer needed>\n"
+         "- Modified <file> because <what capability was missing>\n"
+         "ACTION_SUMMARY_END"),
+    ]
 
 
 _ACTION_SUMMARY_RE = re.compile(
@@ -215,64 +203,49 @@ def _format_subclause_label(subclause):
     return f"§{subclause}"
 
 
-def invoke_claude(
-    prompt: str, *, subclause: str,
-    model: str = "opus", continue_session: bool = False,
-) -> str:
-    """Invoke Claude CLI and return the extracted action summary.
-
-    Uses ``--output-format json`` so the response can be parsed for the
-    ACTION_SUMMARY block.  Returns the action summary string, or ``""``
-    if none was found.
-    """
+def run_steps(steps, *, model="opus",
+              continue_session=False) -> str:
+    """Run each step as a separate Claude call, return ACTION_SUMMARY."""
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
 
-    cmd = [
-        "claude", "-p",
-        "--model", model,
-        "--effort", "high",
-        "--verbose",
-        "--output-format", "json",
-        "--dangerously-skip-permissions",
-    ]
+    total = len(steps)
+    summary = ""
 
-    if continue_session:
-        cmd.append("--continue")
+    for i, (description, prompt) in enumerate(steps):
+        step_num = i + 1
+        use_continue = continue_session if i == 0 else True
 
-    label = _format_subclause_label(subclause)
-    print(f"Implementing {label} via Claude...", end="", flush=True)
+        cmd = [
+            "claude", "-p",
+            "--model", model,
+            "--effort", "high",
+            "--verbose",
+            "--output-format", "json",
+            "--dangerously-skip-permissions",
+        ]
+        if use_continue:
+            cmd.append("--continue")
 
-    result = run_with_dots(run_claude_cli, cmd, prompt, env=env)
+        print(f"Step {step_num}/{total}: {description}...",
+              end="", flush=True)
 
-    if result.returncode != 0:
-        print(
-            f"\nERROR: Claude exited with code {result.returncode}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        result = run_with_dots(run_claude_cli, cmd, prompt, env=env)
 
-    summary = _parse_action_summary(result.stdout)
-    if not summary:
-        print("Retrying for ACTION_SUMMARY...", file=sys.stderr)
-        retry_cmd = ["claude", "-p", "--model", model,
-                     "--output-format", "json",
-                     "--dangerously-skip-permissions", "--continue"]
-        retry_result = run_claude_cli(
-            retry_cmd,
-            "You did not provide an ACTION_SUMMARY block."
-            " Output one now using this exact format:\n"
-            "ACTION_SUMMARY_START\n"
-            "- <action> because <rationale>\n"
-            "ACTION_SUMMARY_END",
-            env=env,
-        )
-        if retry_result.returncode == 0:
-            summary = _parse_action_summary(retry_result.stdout)
-    if not summary:
-        print("ERROR: Claude did not provide an ACTION_SUMMARY"
-              " after retry.", file=sys.stderr)
-        sys.exit(1)
+        if result.returncode != 0:
+            print(
+                f"\nERROR: Step {step_num} failed"
+                f" (code {result.returncode})",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        if step_num == total:
+            summary = _parse_action_summary(result.stdout)
+            if not summary:
+                print("ERROR: Final step did not produce"
+                      " an ACTION_SUMMARY.", file=sys.stderr)
+                sys.exit(1)
 
     return summary
 
@@ -288,19 +261,6 @@ def commit_implementation(subclause, issue, *, action=""):
     parts.append(f"Closes #{issue}")
     message = "\n\n".join(parts) + "\n"
     commit_and_push(added + modified, deleted, message)
-
-
-def run_prompt(build_fn, args: argparse.Namespace) -> str:
-    """Build a prompt via *build_fn*, invoke Claude, return action summary."""
-    prompt = build_fn(
-        args.subclause, str(args.lrm), exclude=args.exclude,
-    )
-    print(f"Built prompt ({len(prompt)} characters)")
-    return invoke_claude(
-        prompt, subclause=args.subclause,
-        model=args.model,
-        continue_session=args.continue_session,
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -353,7 +313,7 @@ def clause_depth(clause: str) -> int:
 
 
 def main(argv=None):
-    """Parse args, build prompt, and invoke Claude."""
+    """Parse args, run steps, and commit."""
     args = parse_args(argv)
     depth = clause_depth(args.subclause)
     print(
@@ -361,6 +321,12 @@ def main(argv=None):
         f" issue #{args.issue}, model {args.model}",
     )
 
-    action = run_prompt(build_prompt, args)
+    steps = build_steps(
+        args.subclause, str(args.lrm), exclude=args.exclude,
+    )
+    action = run_steps(
+        steps, model=args.model,
+        continue_session=args.continue_session,
+    )
     print(f"Action summary:\n{action}")
     commit_implementation(args.subclause, args.issue, action=action)
