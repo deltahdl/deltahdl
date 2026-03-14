@@ -447,4 +447,8 @@ TEST(CheckerDeclaration, EndLabelMatchesCheckerName) {
   EXPECT_EQ(r.cu->checkers[0]->name, "ck");
 }
 
+TEST(CheckerDeclaration, MissingEndcheckerIsError) {
+  EXPECT_FALSE(ParseOk("checker c;"));
+}
+
 }  // namespace

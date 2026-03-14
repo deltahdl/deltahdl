@@ -6,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, MissingEndcheckerIsError) {
-  EXPECT_FALSE(ParseOk("checker c;"));
-}
-
 // §3.1 — Error: mismatched end label.
 TEST(CompilationUnitStructure, MismatchedEndLabelIsError) {
   EXPECT_FALSE(ParseOk("module foo; endmodule : bar\n"));
