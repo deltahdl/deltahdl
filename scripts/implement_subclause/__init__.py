@@ -253,8 +253,8 @@ def _format_subclause_label(subclause):
 def invoke_claude(
     prompt: str, *, subclause: str,
     model: str = "opus", continue_session: bool = False,
-) -> str:
-    """Invoke Claude CLI and return the extracted action summary.
+) -> tuple[str, str]:
+    """Invoke Claude CLI and return ``(action_summary, predefined_action)``.
 
     Uses ``--output-format json`` so the response can be parsed for the
     ACTION_SUMMARY block.  Returns the action summary string, or ``""``
