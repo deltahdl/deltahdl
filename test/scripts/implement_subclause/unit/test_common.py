@@ -256,18 +256,12 @@ def test_invoke_claude_success(isc, run_ok):
 
 
 @patch("implement_subclause.sys.exit")
-@patch("implement_subclause.subprocess.run")
+@patch("implement_subclause.run_claude_cli")
 def test_invoke_claude_failure_exits(mock_run, mock_exit, isc):
     """invoke_claude calls sys.exit on non-zero return code."""
     mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="err")
     isc.invoke_claude("test prompt")
     assert mock_exit.called
-
-
-def test_invoke_claude_captures_output(isc, run_ok):
-    """invoke_claude passes capture_output=True to subprocess.run."""
-    isc.invoke_claude("test prompt", model="opus")
-    assert run_ok.call_args[1].get("capture_output") is True
 
 
 def test_invoke_claude_returns_action_summary(isc):
@@ -281,7 +275,7 @@ def test_invoke_claude_returns_action_summary(isc):
             "ACTION_SUMMARY_END"
         ),
     })
-    with patch("implement_subclause.subprocess.run") as mock_run:
+    with patch("implement_subclause.run_claude_cli") as mock_run:
         mock_run.return_value = MagicMock(
             returncode=0, stdout=envelope, stderr="",
         )

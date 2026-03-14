@@ -152,11 +152,10 @@ def run_claude_cli(cmd, prompt, *, env, timeout=None):
         "capture_output": True,
         "text": True,
         "env": env,
-        "check": False,
     }
     if timeout is not None:
         kwargs["timeout"] = timeout
-    return subprocess.run(cmd, **kwargs)
+    return subprocess.run(cmd, check=False, **kwargs)
 
 
 def invoke_implement_subclause(
