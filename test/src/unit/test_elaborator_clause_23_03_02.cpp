@@ -37,4 +37,20 @@ TEST(BuildingBlockElaboration, ModuleWithChildInstanceElaborates) {
   EXPECT_FALSE(design->top_modules[0]->children.empty());
 }
 
+TEST(BuildingBlockElaboration, NestedHierarchyTwoLevelsDeep) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module leaf; endmodule\n"
+      "module mid;\n"
+      "  leaf l1();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  mid m1();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(design->top_modules[0]->name, "top");
+}
+
 }  // namespace
