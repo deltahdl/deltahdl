@@ -984,8 +984,6 @@ def test_rename_preserves_original_test_name(ct):
     assert t.original_test_name == "First"
 
 
-# ---- extract_clause_hint --------------------------------------------------
-
 
 def test_extract_clause_hint_numeric(ct):
     """Extracts clause number from numeric filename."""
