@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -21,7 +22,6 @@ from lib.python.cli import (
     run_with_dots,
     validate_lrm,
 )
-from lib.python.github import delete_issue
 from lib.python.git import (
     commit_and_push,
     get_porcelain_changes,
@@ -322,8 +322,12 @@ def main(argv=None):
         continue_session=args.continue_session,
     )
     if action is None:
-        print("Not implementable — deleting issue.")
-        delete_issue(args.issue)
+        print("Not implementable — closing issue.")
+        subprocess.run(
+            ["gh", "issue", "close", str(args.issue),
+             "--comment", "Deemed not implementable."],
+            check=True,
+        )
         return
     print(f"Action summary:\n{action}")
     commit_implementation(args.subclause, args.issue, action=action)

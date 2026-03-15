@@ -2,7 +2,7 @@
 
 import json
 import runpy
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -216,25 +216,44 @@ def test_main_prints_action_summary(
 
 
 
-@patch("implement_subclause.delete_issue")
+@patch("implement_subclause.subprocess.run",
+       return_value=MagicMock(returncode=0))
 @patch("implement_subclause.commit_implementation")
 @patch("implement_subclause.run_steps", return_value=None)
-def test_main_deletes_issue_when_not_implementable(
-    _mock_run, _mock_commit, mock_delete, isc, tmp_path,
+def test_main_closes_issue_when_not_implementable(
+    _mock_run, _mock_commit, mock_gh, isc, tmp_path,
 ):
-    """main() deletes issue when run_steps returns None."""
+    """main() closes issue with comment when not implementable."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     isc.main(["--lrm", str(lrm), "--subclause", "6.6.1",
               "--issue", "8", "--model", "opus"])
-    assert mock_delete.call_args[0][0] == 8
+    cmd = mock_gh.call_args[0][0]
+    assert "close" in cmd
 
 
-@patch("implement_subclause.delete_issue")
+@patch("implement_subclause.subprocess.run",
+       return_value=MagicMock(returncode=0))
+@patch("implement_subclause.commit_implementation")
+@patch("implement_subclause.run_steps", return_value=None)
+def test_main_close_comment_deemed_not_implementable(
+    _mock_run, _mock_commit, mock_gh, isc, tmp_path,
+):
+    """main() passes 'Deemed not implementable.' comment."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1",
+              "--issue", "8", "--model", "opus"])
+    cmd = mock_gh.call_args[0][0]
+    assert "Deemed not implementable." in cmd
+
+
+@patch("implement_subclause.subprocess.run",
+       return_value=MagicMock(returncode=0))
 @patch("implement_subclause.commit_implementation")
 @patch("implement_subclause.run_steps", return_value=None)
 def test_main_skips_commit_when_not_implementable(
-    _mock_run, mock_commit, _mock_delete, isc, tmp_path,
+    _mock_run, mock_commit, _mock_gh, isc, tmp_path,
 ):
     """main() does not call commit_implementation when not implementable."""
     lrm = tmp_path / "lrm.pdf"
