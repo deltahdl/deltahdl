@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, BuiltInCmosSwitches) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire out, in, nctrl, pctrl;\n"
-              "  cmos  g1(out, in, nctrl, pctrl);\n"
-              "  rcmos g2(out, in, nctrl, pctrl);\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, BuiltInPullGates) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

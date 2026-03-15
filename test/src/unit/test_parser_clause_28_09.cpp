@@ -94,4 +94,13 @@ TEST(PrimitiveGateTypeParsing, CmosSwitchtype_Rcmos) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
+TEST(CmosSwitches, CmosAndRcmos) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire out, in, nctrl, pctrl;\n"
+              "  cmos  g1(out, in, nctrl, pctrl);\n"
+              "  rcmos g2(out, in, nctrl, pctrl);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
