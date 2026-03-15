@@ -51,4 +51,9 @@ TEST(Keywords, EndcheckerKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndchecker);
 }
 
+TEST(Keywords, PackageKeyword) {
+  auto r = LexOne("package");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwPackage);
+}
+
 }  // namespace
