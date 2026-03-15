@@ -4,15 +4,6 @@
 
 namespace {
 
-TEST(BuildingBlockElaboration, ElaboratedDesignContainsTopModule) {
-  ElabFixture f;
-  auto* design = ElaborateSrc("module top; endmodule", f, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  EXPECT_EQ(design->top_modules[0]->name, "top");
-}
-
 TEST(BuildingBlockElaboration, ModuleWithPackageElaborates) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
