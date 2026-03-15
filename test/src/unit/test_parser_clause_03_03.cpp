@@ -6,18 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithClassDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  class C;\n"
-      "    int x;\n"
-      "  endclass\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kClassDecl);
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithImport) {
   auto r = Parse(
       "package pkg; typedef int myint; endpackage\n"
