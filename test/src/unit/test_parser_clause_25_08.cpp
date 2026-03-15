@@ -16,4 +16,14 @@ TEST(InterfaceInstantiationGrammar, InterfaceInstWithNamedParams) {
   EXPECT_EQ(item->inst_params[0].first, "W");
 }
 
+TEST(ParameterizedInterface, WithParameters) {
+  auto r = Parse(
+      "interface ifc #(parameter int WIDTH = 8);\n"
+      "  logic [WIDTH-1:0] data;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->interfaces[0]->params.empty());
+}
+
 }  // namespace
