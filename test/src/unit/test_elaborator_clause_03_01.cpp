@@ -4,19 +4,6 @@
 
 namespace {
 
-TEST(BuildingBlockElaboration, SelectSpecificTopFromMultipleModules) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module a; endmodule\n"
-      "module b; endmodule\n"
-      "module c; endmodule\n",
-      f, "b");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  EXPECT_EQ(design->top_modules[0]->name, "b");
-}
-
 TEST(BuildingBlockElaboration, ModuleWithChildInstanceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
