@@ -1,10 +1,12 @@
+// §3.2
+
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleDeclKindDistinctValues) {
+TEST(DesignElements, ModuleDeclKindDistinctValues) {
   EXPECT_NE(ModuleDeclKind::kModule, ModuleDeclKind::kInterface);
   EXPECT_NE(ModuleDeclKind::kModule, ModuleDeclKind::kProgram);
   EXPECT_NE(ModuleDeclKind::kModule, ModuleDeclKind::kChecker);
