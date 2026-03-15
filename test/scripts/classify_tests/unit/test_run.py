@@ -6,12 +6,12 @@ from types import SimpleNamespace
 
 import pytest
 
+from classify_tests.test_helpers import make_args as _make_args
 from lib.python.test_fixtures import (
     CLASSIFY_BASE_ARGV,
     argv_without_flag,
     main_enables_line_buffering,
     capture_help_output,
-    make_classify_args,
 )
 from lib.python.test_fixtures.subprocess_stubs import (
     stub_subprocess_failure,
@@ -27,16 +27,6 @@ _BASE_ARGV = [
     "--tests", "S.A,S.B",
     *CLASSIFY_BASE_ARGV,
 ]
-
-
-def _make_args(**overrides):
-    """Build args with classify_tests-specific defaults."""
-    defaults = {
-        "tests": "S.A,S.B,S.C", "issue": None,
-        "continue_session": False,
-    }
-    defaults.update(overrides)
-    return make_classify_args(**defaults)
 
 
 # ---- _parse_args -----------------------------------------------------------

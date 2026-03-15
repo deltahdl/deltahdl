@@ -5,24 +5,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lib.python.test_fixtures import make_classify_args
+from classify_tests.test_helpers import make_args as _pipeline_args
 from lib.python.test_fixtures.subprocess_stubs import (
     stub_subprocess_failure,
     stub_subprocess_success,
 )
-
-
-# ---- Helpers ---------------------------------------------------------------
-
-
-def _pipeline_args(**overrides):
-    """Build args for _run."""
-    defaults = {
-        "tests": "S.A,S.B,S.C", "issue": None,
-        "continue_session": False,
-    }
-    defaults.update(overrides)
-    return make_classify_args(**defaults)
 
 
 # ---- Batch processing ------------------------------------------------------
