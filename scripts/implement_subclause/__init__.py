@@ -102,7 +102,8 @@ def build_steps(
          " Only delete exact duplicates."
          + constraints),
         ("Moving misplaced tests",
-         f"Move any tests for §{subclause} that are in the wrong files"
+         f"Search ALL files in test/src/unit/ for tests that belong to"
+         f" §{subclause}. Move any that are in the wrong files"
          f" to the correct files: {filenames}."
          " Do NOT put tests in a parent clause file."
          + exclude_note + constraints),
