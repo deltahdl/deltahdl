@@ -46,4 +46,9 @@ TEST(Keywords, CheckerKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwChecker);
 }
 
+TEST(Keywords, EndcheckerKeyword) {
+  auto r = LexOne("endchecker");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwEndchecker);
+}
+
 }  // namespace
