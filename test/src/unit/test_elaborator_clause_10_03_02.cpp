@@ -141,4 +141,17 @@ TEST(Elaborator, DriveStrengthOnContAssign) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 2u);
 }
 
+TEST(ContinuousAssign, ModuleWithContinuousAssignElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  assign b = a;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_FALSE(design->top_modules[0]->assigns.empty());
+}
+
 }  // namespace
