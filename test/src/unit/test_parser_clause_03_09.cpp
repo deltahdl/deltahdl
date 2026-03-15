@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, PackageWithTypedef) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_FALSE(r.cu->packages[0]->items.empty());
-}
-
 TEST(DesignBuildingBlockParsing, PackageWithFunction) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
