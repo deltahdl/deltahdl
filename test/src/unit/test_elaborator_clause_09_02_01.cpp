@@ -81,6 +81,23 @@ TEST(InitialProcedure, TimeZeroSemantics) {
   EXPECT_EQ(vb->value.ToUint64(), 2u);
 }
 
+TEST(InitialBlock, BlockingAssignment) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'd42;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* v = f.ctx.FindVariable("x");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 42u);
+}
+
 }  // namespace
 TEST(InitialProcedures, MultipleInitialsAllExecute) {
   SimFixture f;
