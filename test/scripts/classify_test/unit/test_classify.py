@@ -651,7 +651,7 @@ def test_classify_block_skips_preamble_when_continue(
     _tb = ct_helpers.make_test_block
     prompts = []
 
-    def capturing_claude(prompt, schema=None, **_kw):
+    def capturing_claude(prompt, _schema=None, **_kw):
         prompts.append(prompt)
         return {"clause": "6.1", "rationale": "r",
                 "suite_name": "S", "test_name": "T"}

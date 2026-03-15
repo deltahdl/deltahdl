@@ -11,7 +11,7 @@ from lib.python.classify import build_hierarchy
 class TestBuildHierarchyNumeric:
     """Tests for numeric (non-annex) clauses."""
 
-    def test_depth_1(self, isc):
+    def test_depth_1(self):
         """Clause '4' produces depth-1 numeric hierarchy."""
         assert build_hierarchy("4") == {
             "is_annex": False,
@@ -20,7 +20,7 @@ class TestBuildHierarchyNumeric:
             "subclause": "4",
         }
 
-    def test_depth_2(self, isc):
+    def test_depth_2(self):
         """Clause '4.1' produces depth-2 numeric hierarchy."""
         assert build_hierarchy("4.1") == {
             "is_annex": False,
@@ -29,7 +29,7 @@ class TestBuildHierarchyNumeric:
             "subclause": "4.1",
         }
 
-    def test_depth_3(self, isc):
+    def test_depth_3(self):
         """Clause '6.24.1' produces depth-3 numeric hierarchy."""
         assert build_hierarchy("6.24.1") == {
             "is_annex": False,
@@ -38,7 +38,7 @@ class TestBuildHierarchyNumeric:
             "subclause": "6.24.1",
         }
 
-    def test_depth_4(self, isc):
+    def test_depth_4(self):
         """Clause '4.4.3.1' produces depth-4 numeric hierarchy."""
         assert build_hierarchy("4.4.3.1") == {
             "is_annex": False,
@@ -47,7 +47,7 @@ class TestBuildHierarchyNumeric:
             "subclause": "4.4.3.1",
         }
 
-    def test_depth_5(self, isc):
+    def test_depth_5(self):
         """Clause '4.4.3.1.2' produces depth-5 numeric hierarchy."""
         assert build_hierarchy("4.4.3.1.2") == {
             "is_annex": False,
@@ -60,7 +60,7 @@ class TestBuildHierarchyNumeric:
 class TestBuildHierarchyAnnex:
     """Tests for annex (uppercase letter) clauses."""
 
-    def test_depth_1(self, isc):
+    def test_depth_1(self):
         """Clause 'B' produces depth-1 annex hierarchy."""
         assert build_hierarchy("B") == {
             "is_annex": True,
@@ -70,7 +70,7 @@ class TestBuildHierarchyAnnex:
             "subclause": "B",
         }
 
-    def test_depth_2(self, isc):
+    def test_depth_2(self):
         """Clause 'A.8' produces depth-2 annex hierarchy."""
         assert build_hierarchy("A.8") == {
             "is_annex": True,
@@ -80,7 +80,7 @@ class TestBuildHierarchyAnnex:
             "subclause": "A.8",
         }
 
-    def test_depth_3(self, isc):
+    def test_depth_3(self):
         """Clause 'A.8.1' produces depth-3 annex hierarchy."""
         assert build_hierarchy("A.8.1") == {
             "is_annex": True,
@@ -90,7 +90,7 @@ class TestBuildHierarchyAnnex:
             "subclause": "A.8.1",
         }
 
-    def test_depth_4(self, isc):
+    def test_depth_4(self):
         """Clause 'A.7.5.3' produces depth-4 annex hierarchy."""
         assert build_hierarchy("A.7.5.3") == {
             "is_annex": True,
@@ -100,7 +100,7 @@ class TestBuildHierarchyAnnex:
             "subclause": "A.7.5.3",
         }
 
-    def test_depth_5(self, isc):
+    def test_depth_5(self):
         """Clause 'A.7.5.3.1' produces depth-5 annex hierarchy."""
         assert build_hierarchy("A.7.5.3.1") == {
             "is_annex": True,
