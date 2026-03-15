@@ -28,33 +28,6 @@ TEST(LexicalConventionParsing, ArrayLiteralParses) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, StructureLiteralParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  typedef struct { int a; int b; } ab_t;\n"
-              "  ab_t s;\n"
-              "  initial s = '{0, 1};\n"
-              "endmodule\n"));
-}
-
-TEST(LexicalConventionParsing, StructureLiteralWithNamedMembersParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  typedef struct { int a; int b; } ab_t;\n"
-              "  ab_t s;\n"
-              "  initial s = '{a:0, b:1};\n"
-              "endmodule\n"));
-}
-
-TEST(LexicalConventionParsing, StructureLiteralWithDefaultParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  typedef struct { int a; int b; } ab_t;\n"
-              "  ab_t s;\n"
-              "  initial s = '{default:0};\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, BuiltinMethodCallParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

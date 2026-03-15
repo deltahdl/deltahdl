@@ -4,6 +4,15 @@ using namespace delta;
 
 namespace {
 
+TEST(LexicalConventionElaboration, ModuleWithStructureLiteralElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  typedef struct { int a; int b; } ab_t;\n"
+             "  ab_t s;\n"
+             "  initial s = '{0, 1};\n"
+             "endmodule\n"));
+}
+
 TEST(LexicalConventionElaboration, PositionalStructLiteral) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -68,6 +77,24 @@ TEST(LexicalConventionElaboration, DuplicateMemberKey) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(LexicalConventionElaboration, NestedBracesArrayOfStructs) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
+             "  ab_t arr [0:1];\n"
+             "  initial arr = '{'{8'h11, 8'h22}, '{8'h33, 8'h44}};\n"
+             "endmodule\n"));
+}
+
+TEST(LexicalConventionElaboration, ReplicationStructLiteral) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  typedef struct packed { logic [7:0] x; logic [7:0] y; logic [7:0] z; } xyz_t;\n"
+             "  xyz_t s;\n"
+             "  initial s = '{3{8'hAA}};\n"
+             "endmodule\n"));
 }
 
 }  // namespace

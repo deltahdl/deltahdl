@@ -30,11 +30,6 @@ TEST(LexicalConventionLexing, UnbasedUnsizedLiteralRecognized) {
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(LexicalConventionLexing, ArrayStructLiteralTokenRecognized) {
-  auto r = LexOne("'{");
-  EXPECT_EQ(r.token.kind, TokenKind::kApostropheLBrace);
-}
-
 TEST(LexicalConventionLexing, DotTokenForBuiltinMethodCalls) {
   auto tokens = Lex("arr.size");
   ASSERT_GE(tokens.size(), 4u);

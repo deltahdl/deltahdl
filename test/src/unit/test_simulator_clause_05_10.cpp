@@ -134,4 +134,56 @@ TEST(LexicalConventionSim, FieldAccessAfterAssign) {
   EXPECT_EQ(vry->value.ToUint64(), 0xADu);
 }
 
+TEST(LexicalConventionSim, TypePrefixedStructLiteral) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
+      "  ab_t c;\n"
+      "  initial c = ab_t'{8'hDE, 8'hAD};\n"
+      "endmodule\n",
+      "c");
+  EXPECT_EQ(v, 0xDEADu);
+}
+
+TEST(LexicalConventionSim, ReplicationStructLiteral) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] x; logic [7:0] y; logic [7:0] z;\n"
+      "  } xyz_t;\n"
+      "  xyz_t s;\n"
+      "  initial s = '{3{8'hAA}};\n"
+      "endmodule\n",
+      "s");
+  EXPECT_EQ(v, 0xAAAAAAu);
+}
+
+TEST(LexicalConventionSim, NestedBracesArrayOfStructs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
+      "  ab_t arr [0:1];\n"
+      "  logic [15:0] r0, r1;\n"
+      "  initial begin\n"
+      "    arr = '{'{8'h11, 8'h22}, '{8'h33, 8'h44}};\n"
+      "    r0 = arr[0];\n"
+      "    r1 = arr[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(design, nullptr);
+  if (!design) return;
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* vr0 = f.ctx.FindVariable("r0");
+  auto* vr1 = f.ctx.FindVariable("r1");
+  EXPECT_NE(vr0, nullptr);
+  EXPECT_NE(vr1, nullptr);
+  if (!vr0 || !vr1) return;
+  EXPECT_EQ(vr0->value.ToUint64(), 0x1122u);
+  EXPECT_EQ(vr1->value.ToUint64(), 0x3344u);
+}
+
 }  // namespace

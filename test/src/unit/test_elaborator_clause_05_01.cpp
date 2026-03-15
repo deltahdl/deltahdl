@@ -32,15 +32,6 @@ TEST(LexicalConventionElaboration, ModuleWithArrayLiteralElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, ModuleWithStructureLiteralElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  typedef struct { int a; int b; } ab_t;\n"
-             "  ab_t s;\n"
-             "  initial s = '{0, 1};\n"
-             "endmodule\n"));
-}
-
 TEST(LexicalConventionElaboration, ModuleWithBuiltinMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
