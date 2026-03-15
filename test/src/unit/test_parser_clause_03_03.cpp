@@ -6,18 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithTask) {
   auto r = Parse(
       "module m;\n"

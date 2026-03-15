@@ -467,4 +467,16 @@ TEST(TaskAndFunctionParsing, FunctionRefArg) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
 }
 
+TEST(FunctionDeclarations, IntReturnWithArgs) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
+}
+
 }  // namespace
