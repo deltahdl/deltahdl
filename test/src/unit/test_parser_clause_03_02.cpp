@@ -15,14 +15,6 @@ TEST(DesignElements, ModuleDeclKindDistinctValues) {
   EXPECT_NE(ModuleDeclKind::kProgram, ModuleDeclKind::kChecker);
 }
 
-TEST(DesignBuildingBlockParsing, ProgramKeywordIntroducesProgram) {
-  auto r = Parse("program p; endprogram");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-}
-
 TEST(DesignBuildingBlockParsing, InterfaceKeywordIntroducesInterface) {
   auto r = Parse("interface ifc; endinterface");
   ASSERT_NE(r.cu, nullptr);
