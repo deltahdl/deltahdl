@@ -752,4 +752,13 @@ TEST(ProgramDeclaration, CannotContainAlwaysFF) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(ProgramDeclaration, CannotContainAlwaysLatch) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic en, d, q;\n"
+      "  always_latch if (en) q <= d;\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

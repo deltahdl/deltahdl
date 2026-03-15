@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ProgramCannotContainAlwaysLatch) {
-  auto r = Parse(
-      "program p;\n"
-      "  logic en, d, q;\n"
-      "  always_latch if (en) q <= d;\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(DesignBuildingBlockParsing, ProgramCannotContainModuleInst) {
   auto r = Parse(
       "module sub; endmodule\n"
