@@ -66,4 +66,9 @@ TEST(Keywords, PrimitiveKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwPrimitive);
 }
 
+TEST(Keywords, EndprimitiveKeyword) {
+  auto r = LexOne("endprimitive");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwEndprimitive);
+}
+
 }  // namespace
