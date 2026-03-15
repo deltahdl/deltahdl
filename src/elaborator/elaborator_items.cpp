@@ -402,8 +402,8 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
 
 // --- Generate expansion ---
 
-ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) {
-  ScopeMap scope;
+ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
+  ScopeMap scope = cu_param_scope_;
   for (const auto& p : mod->params) {
     if (p.is_resolved) {
       scope[p.name] = p.resolved_value;

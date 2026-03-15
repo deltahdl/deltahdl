@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SourceText, DescriptionPackageItemTask) {
+TEST(CompilationUnitParsing, CuScopeTaskParsed) {
   auto r = Parse("task my_task; endtask\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -20,7 +20,7 @@ TEST(DesignBuildingBlockParsing, ForwardRefSyntaxValid) {
               "endmodule\n"));
 }
 
-TEST(Parser, PackageAndModule) {
+TEST(CompilationUnitParsing, PackageAndModule) {
   auto r = Parse(
       "package pkg; endpackage\n"
       "module top; endmodule\n");
@@ -30,7 +30,7 @@ TEST(Parser, PackageAndModule) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
   EXPECT_EQ(r.cu->modules[0]->name, "top");
 }
-TEST(ConstrainedRandomParsing, TopLevelFunction) {
+TEST(CompilationUnitParsing, TopLevelFunction) {
   auto r = Parse(
       "function int my_func(int x);\n"
       "  return x + 1;\n"
@@ -502,6 +502,44 @@ TEST(CompilationUnitStructure, ManyModulesAccumulate) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules.size(), 50u);
+}
+
+TEST(CompilationUnitParsing, CuScopeSelectiveImport) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef int myint;\n"
+      "endpackage\n"
+      "import pkg::myint;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kImportDecl);
+}
+
+TEST(CompilationUnitParsing, OnlyCuScopeItemsNoDesignElements) {
+  auto r = Parse(
+      "typedef int myint;\n"
+      "function int helper(int x); return x; endfunction\n"
+      "task my_task; endtask\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules.empty());
+  EXPECT_TRUE(r.cu->packages.empty());
+  EXPECT_TRUE(r.cu->interfaces.empty());
+  EXPECT_TRUE(r.cu->programs.empty());
+  ASSERT_EQ(r.cu->cu_items.size(), 3u);
+}
+
+TEST(CompilationUnitParsing, DollarUnitInSubexpression) {
+  auto r = Parse(
+      "int x;\n"
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = $unit::x + 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

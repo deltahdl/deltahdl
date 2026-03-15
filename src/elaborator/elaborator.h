@@ -81,8 +81,8 @@ class Elaborator {
   void BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                  RtlirModule* parent_mod);
 
-  /// Build a scope map from resolved module parameters.
-  static ScopeMap BuildParamScope(const RtlirModule* mod);
+  /// Build a scope map from CU-scope and module parameters.
+  ScopeMap BuildParamScope(const RtlirModule* mod) const;
 
   /// Expand a generate-if block using constant evaluation.
   void ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
@@ -320,6 +320,7 @@ class Elaborator {
   std::string gen_prefix_;
   TypedefMap typedefs_;
   std::unordered_set<std::string_view> cu_scope_names_;  // §3.12.1
+  ScopeMap cu_param_scope_;  // §3.12.1
 
   /// §7.6: Per-variable array metadata for assignment compatibility checks.
   struct VarArrayInfo {

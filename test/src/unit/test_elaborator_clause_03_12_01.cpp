@@ -124,10 +124,43 @@ TEST(CompilationUnitScope, CuScopeFunctionVisibleInDesign) {
   EXPECT_FALSE(design->cu_function_decls.empty());
 }
 
-TEST(BuildingBlockElaboration, CuScopeTaskElaboratesSuccessfully) {
+TEST(DesignBuildingBlockElaboration, CuScopeTaskElaboratesSuccessfully) {
   EXPECT_TRUE(
       ElabOk("task my_task;\n"
              "endtask\n"
              "module m; endmodule\n"));
+}
+
+TEST(DesignBuildingBlockElaboration, LocalScopeShadowsCuScopeLocalparam) {
+  EXPECT_TRUE(
+      ElabOk("localparam int WIDTH = 8;\n"
+             "module m;\n"
+             "  localparam int WIDTH = 16;\n"
+             "  logic [WIDTH-1:0] data;\n"
+             "endmodule\n"));
+}
+
+TEST(DesignBuildingBlockElaboration, CuScopeLocalparamVisibleInMultipleModules) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "localparam int WIDTH = 8;\n"
+      "module sub;\n"
+      "  logic [WIDTH-1:0] b;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [WIDTH-1:0] a;\n"
+      "  sub u1();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DesignBuildingBlockElaboration, CuScopeVarDeclElaborates) {
+  EXPECT_TRUE(
+      ElabOk("int global_counter;\n"
+             "module m;\n"
+             "  logic sig;\n"
+             "endmodule\n"));
 }
 

@@ -196,6 +196,11 @@ void Elaborator::RegisterCuScopeItems() {
       typedefs_[item->name] = item->typedef_type;
     } else if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
       class_names_.insert(item->class_decl->name);
+    } else if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
+      auto val = ConstEvalInt(item->init_expr, cu_param_scope_);
+      if (val) {
+        cu_param_scope_[item->name] = *val;
+      }
     }
   }
   for (auto* cls : unit_->classes) {

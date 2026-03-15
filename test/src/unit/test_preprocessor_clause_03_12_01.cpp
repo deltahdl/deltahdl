@@ -248,7 +248,7 @@ TEST(DesignBuildingBlockParsing, ForwardRefOnlyDefinedNames) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "later_var");
 }
 
-TEST(SourceText, EmptySourceText) {
+TEST(CompilationUnitPreprocessing, EmptySourceText) {
   auto r = ParseWithPreprocessor("");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -274,7 +274,7 @@ TEST(DesignBuildingBlockParsing, UnitScopeDeclarations) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(Parser, MultipleModules) {
+TEST(CompilationUnitPreprocessing, MultipleModules) {
   auto r = ParseWithPreprocessor(
       "module a; endmodule\n"
       "module b; endmodule\n"
@@ -284,6 +284,47 @@ TEST(Parser, MultipleModules) {
   EXPECT_EQ(r.cu->modules[0]->name, "a");
   EXPECT_EQ(r.cu->modules[1]->name, "b");
   EXPECT_EQ(r.cu->modules[2]->name, "c");
+}
+
+TEST(DesignBuildingBlockParsing, DirectivePersistsAcrossMultipleModules) {
+  auto r = ParseWithPreprocessor(
+      "`define WIDTH 8\n"
+      "module m1;\n"
+      "  localparam W1 = `WIDTH;\n"
+      "endmodule\n"
+      "module m2;\n"
+      "  localparam W2 = `WIDTH;\n"
+      "endmodule\n"
+      "module m3;\n"
+      "  localparam W3 = `WIDTH;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 3u);
+}
+
+TEST(DesignBuildingBlockParsing, CuScopeItemWithMacroExpansion) {
+  auto r = ParseWithPreprocessor(
+      "`define DEFAULT_WIDTH 16\n"
+      "localparam int WIDTH = `DEFAULT_WIDTH;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "WIDTH");
+}
+
+TEST(DesignBuildingBlockParsing, DirectiveDefinedBetweenModules) {
+  auto r = ParseWithPreprocessor(
+      "module m1; endmodule\n"
+      "`define DEPTH 4\n"
+      "module m2;\n"
+      "  localparam D = `DEPTH;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 2u);
 }
 
 }  // namespace

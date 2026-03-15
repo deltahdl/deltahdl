@@ -11,7 +11,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, DollarUnitScopeResolution) {
+TEST(CompilationUnitLexing, DollarUnitScopeResolution) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -54,6 +54,19 @@ TEST(DesignBuildingBlockLexing, DollarUnitWithWhitespace) {
   auto t3 = lexer.Next();
   EXPECT_EQ(t3.kind, TokenKind::kIdentifier);
   EXPECT_EQ(t3.text, "name");
+}
+
+TEST(CompilationUnitLexing, DollarUnitFollowedByDot) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", "$unit.foo");
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  auto t1 = lexer.Next();
+  EXPECT_EQ(t1.kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(t1.text, "$unit");
+  auto t2 = lexer.Next();
+  EXPECT_EQ(t2.kind, TokenKind::kDot);
 }
 
 }  // namespace
