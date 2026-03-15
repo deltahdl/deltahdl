@@ -157,4 +157,13 @@ TEST(FunctionReturnValues, ReturnStatementElaborates) {
              "endmodule\n"));
 }
 
+TEST(FunctionReturnValues, VoidFunctionElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  function void log(int v);\n"
+             "    $display(\"%0d\", v);\n"
+             "  endfunction\n"
+             "endmodule\n"));
+}
+
 }  // namespace

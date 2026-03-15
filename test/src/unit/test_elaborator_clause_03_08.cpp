@@ -4,15 +4,6 @@
 
 namespace {
 
-TEST(DesignBuildingBlockElaboration, VoidFunctionElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  function void log(int v);\n"
-             "    $display(\"%0d\", v);\n"
-             "  endfunction\n"
-             "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockElaboration, TaskElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
