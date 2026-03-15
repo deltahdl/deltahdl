@@ -4,14 +4,6 @@
 
 namespace {
 
-TEST(DesignBuildingBlockElaboration, TaskElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  task do_work;\n"
-             "  endtask\n"
-             "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockElaboration, TaskAndFunctionCoexistElaborate) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

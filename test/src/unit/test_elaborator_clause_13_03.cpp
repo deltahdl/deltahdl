@@ -70,4 +70,12 @@ TEST(TaskElaboration, TaskEnablesTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(TaskDeclarations, EmptyTaskElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  task do_work;\n"
+             "  endtask\n"
+             "endmodule\n"));
+}
+
 }  // namespace
