@@ -21,7 +21,7 @@ def _make_classifier(*triples):
     """Build per-test classifier from (test_name, clause) triples."""
     lookup = dict(triples)
 
-    def classifier(prompt, _schema=None):
+    def classifier(prompt, _schema=None, **_kw):
         for name, clause in lookup.items():
             if name in prompt:
                 return {"clause": clause, "rationale": "r",
@@ -34,7 +34,7 @@ def _make_classifier(*triples):
 
 def _make_classifier_with_topic(_name, clause, topic):
     """Build per-test classifier that returns clause then topic."""
-    def classifier(_prompt, schema=None):
+    def classifier(_prompt, schema=None, **_kw):
         if schema and "non_lrm_topic" in schema:
             return {"non_lrm_topic": topic, "rationale": "r",
                     "suite_name": "S", "test_name": _name}
@@ -77,6 +77,7 @@ def _run_pipeline(ct, tmp_path, test, suite="S", dry_run=False):
         no_commit=False,
         repo="test-repo",
         max_lines=1000,
+        continue_session=False,
     ))
 
 
@@ -234,7 +235,7 @@ def test_self_named_source_not_treated_as_duplicate(ct, tmp_path, monkeypatch):
         file=str(src), output_dir=str(tmp_path), dry_run=False,
         lrm=str(tmp_path / "lrm.txt"), suite="S", test="Keeper",
         issue=1, organization="test-org", repo="test-repo",
-        no_commit=False, max_lines=1000,
+        no_commit=False, max_lines=1000, continue_session=False,
     ))
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
@@ -370,7 +371,7 @@ def test_named_ns_output_contains_test(ct, tmp_path, monkeypatch):
 
 def _make_classifier_with_prefix(name, clause, stage):
     """Build classifier that returns clause, then pipeline stage on fallback."""
-    def classifier(prompt, _schema=None):
+    def classifier(prompt, _schema=None, **_kw):
         if "pipeline stage" in prompt.lower():
             return {"pipeline_stage": stage, "rationale": "r"}
         if name in prompt:
