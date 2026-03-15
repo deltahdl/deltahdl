@@ -39,4 +39,14 @@ TEST(BuildingBlockElaboration, SelectSpecificTopFromMultipleModules) {
   EXPECT_EQ(design->top_modules[0]->name, "b");
 }
 
+TEST(TopLevelModules, NonexistentTopIsError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module a; endmodule\n"
+      "module b; endmodule\n",
+      f, "nonexistent");
+  EXPECT_EQ(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace

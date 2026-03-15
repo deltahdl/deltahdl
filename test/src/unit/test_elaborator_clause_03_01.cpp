@@ -4,16 +4,6 @@
 
 namespace {
 
-TEST(BuildingBlockElaboration, PopulatedDesignWrongTopIsError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module a; endmodule\n"
-      "module b; endmodule\n",
-      f, "nonexistent");
-  EXPECT_EQ(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(BuildingBlockElaboration, CuScopeTaskElaboratesSuccessfully) {
   EXPECT_TRUE(
       ElabOk("task my_task;\n"
