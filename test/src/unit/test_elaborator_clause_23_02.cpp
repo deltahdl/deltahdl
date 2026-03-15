@@ -12,4 +12,8 @@ TEST(ModuleDefinition, MinimalModuleElaboratesSuccessfully) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(ModuleDefinitions, EmptyModuleElaborates) {
+  EXPECT_TRUE(ElabOk("module m; endmodule\n"));
+}
+
 }  // namespace
