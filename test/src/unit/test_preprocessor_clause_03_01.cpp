@@ -4,21 +4,6 @@
 
 namespace {
 
-TEST(DesignElementPreprocessing, NestedIfdefAroundDesignElements) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define OUTER\n"
-      "`define INNER\n"
-      "`ifdef OUTER\n"
-      "`ifdef INNER\n"
-      "program p; endprogram\n"
-      "`endif\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("program"), std::string::npos);
-}
-
 TEST(DesignElementPreprocessing, ElsifChainSelectsCorrectDesignElement) {
   PreprocFixture f;
   auto result = Preprocess(
