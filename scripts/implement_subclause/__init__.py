@@ -234,7 +234,7 @@ def _format_subclause_label(subclause):
 
 
 def run_steps(steps, *, model="opus",
-              continue_session=False) -> str:
+              continue_session=False) -> str | None:
     """Run each step as a separate Claude call, return ACTION_SUMMARY."""
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
