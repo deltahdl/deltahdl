@@ -1,17 +1,8 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 
 namespace {
-
-TEST(DesignBuildingBlockElaboration, Mux2to1ExampleElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module mux2to1 (input wire a, b, sel,\n"
-             "                output logic y);\n"
-             "  always_comb begin\n"
-             "    if (sel) y = a;\n"
-             "    else     y = b;\n"
-             "  end\n"
-             "endmodule: mux2to1\n"));
-}
 
 TEST(DesignBuildingBlockElaboration, Mux2to1HasCorrectPorts) {
   ElabFixture f;

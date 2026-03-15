@@ -730,4 +730,15 @@ TEST(AlwaysComb, ModuleWithAlwaysCombElaborates) {
   EXPECT_FALSE(design->top_modules[0]->processes.empty());
 }
 
+TEST(AlwaysComb, Mux2to1Elaborates) {
+  EXPECT_TRUE(
+      ElabOk("module mux2to1 (input wire a, b, sel,\n"
+             "                output logic y);\n"
+             "  always_comb begin\n"
+             "    if (sel) y = a;\n"
+             "    else     y = b;\n"
+             "  end\n"
+             "endmodule: mux2to1\n"));
+}
+
 }  // namespace
