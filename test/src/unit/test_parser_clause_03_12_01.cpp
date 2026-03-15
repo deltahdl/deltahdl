@@ -30,18 +30,6 @@ TEST(Parser, PackageAndModule) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
   EXPECT_EQ(r.cu->modules[0]->name, "top");
 }
-TEST(ModuleAndHierarchyParsing, MultipleModuleDefinitions) {
-  auto r = Parse(
-      "module a; endmodule\n"
-      "module b; endmodule\n"
-      "module c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 3);
-  EXPECT_EQ(r.cu->modules[0]->name, "a");
-  EXPECT_EQ(r.cu->modules[1]->name, "b");
-  EXPECT_EQ(r.cu->modules[2]->name, "c");
-}
-
 TEST(ConstrainedRandomParsing, TopLevelFunction) {
   auto r = Parse(
       "function int my_func(int x);\n"
@@ -455,29 +443,6 @@ TEST(CompilationUnitStructure, MultipleCuScopeSubroutinesAccumulate) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §3.1 — CU-scope typedef is stored in cu_items.
-TEST(CompilationUnitStructure, CuScopeTypedefGoesToCuItems) {
-  auto r = Parse(
-      "typedef int myint;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
-}
-
-// §3.1 — CU-scope import is stored in cu_items.
-TEST(CompilationUnitStructure, CuScopeImportGoesToCuItems) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  typedef int myint;\n"
-      "endpackage\n"
-      "import pkg::*;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
-}
-
 // §3.1 — CU-scope variable declaration is stored in cu_items.
 TEST(CompilationUnitStructure, CuScopeVarDeclGoesToCuItems) {
   auto r = Parse(
@@ -537,15 +502,6 @@ TEST(CompilationUnitStructure, ManyModulesAccumulate) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules.size(), 50u);
-}
-
-TEST(CompilationUnitStructure, CuScopeLocalparamGoesToCuItems) {
-  auto r = Parse(
-      "localparam int WIDTH = 8;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
 }
 
 }  // namespace

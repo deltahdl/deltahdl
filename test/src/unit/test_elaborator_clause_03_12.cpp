@@ -64,4 +64,116 @@ TEST(DesignBuildingBlockElaboration, PackageImportElaborates) {
              "endmodule\n"));
 }
 
+TEST(DesignBuildingBlockElaboration, ElaborationComputesParameterValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub #(parameter W = 8)(input [W-1:0] a, output [W-1:0] y);\n"
+      "  assign y = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [15:0] x, y;\n"
+      "  sub #(16) u0 (.a(x), .y(y));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 1u);
+  auto* child = top->children[0].resolved;
+  ASSERT_NE(child, nullptr);
+  ASSERT_FALSE(child->params.empty());
+  EXPECT_EQ(child->params[0].resolved_value, 16);
+  EXPECT_TRUE(child->params[0].is_resolved);
+}
+
+TEST(DesignBuildingBlockElaboration, MultiLevelHierarchyElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module leaf(input logic a, output logic y);\n"
+      "  assign y = ~a;\n"
+      "endmodule\n"
+      "module mid(input logic a, output logic y);\n"
+      "  leaf u0(.a(a), .y(y));\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic x, y;\n"
+      "  mid u0(.a(x), .y(y));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 1u);
+  EXPECT_EQ(top->children[0].module_name, "mid");
+  auto* mid = top->children[0].resolved;
+  ASSERT_NE(mid, nullptr);
+  ASSERT_EQ(mid->children.size(), 1u);
+  EXPECT_EQ(mid->children[0].module_name, "leaf");
+}
+
+TEST(DesignBuildingBlockElaboration, ElaborationEstablishesPortBindings) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub(input logic a, b, output logic y);\n"
+      "  assign y = a & b;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic x1, x2, out;\n"
+      "  sub u0(.a(x1), .b(x2), .y(out));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 1u);
+  EXPECT_EQ(top->children[0].port_bindings.size(), 3u);
+}
+
+TEST(DesignBuildingBlockElaboration, UnresolvedModuleIsError) {
+  EXPECT_FALSE(
+      ElabOk("module top;\n"
+             "  nonexistent u0();\n"
+             "endmodule\n"));
+}
+
+TEST(DesignBuildingBlockElaboration, MultipleTopLevelModulesElaborate) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module a;\n"
+      "  logic x;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  logic y;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_GE(design->top_modules.size(), 1u);
+}
+
+TEST(DesignBuildingBlockElaboration, ParameterDefaultValueElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub #(parameter W = 8)(input [W-1:0] a, output [W-1:0] y);\n"
+      "  assign y = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [7:0] x, y;\n"
+      "  sub u0 (.a(x), .y(y));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 1u);
+  auto* child = top->children[0].resolved;
+  ASSERT_NE(child, nullptr);
+  ASSERT_FALSE(child->params.empty());
+  EXPECT_EQ(child->params[0].resolved_value, 8);
+}
+
 }  // namespace
