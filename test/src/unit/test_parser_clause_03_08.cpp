@@ -1,20 +1,11 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(DesignBuildingBlockParsing, TaskDeclaration) {
-  auto r = Parse(
-      "module m;\n"
-      "  task do_work;\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
-}
 
 TEST(DesignBuildingBlockParsing, TaskWithAllArgDirections) {
   EXPECT_TRUE(ParseOk(
