@@ -15,17 +15,6 @@ TEST(DesignElements, ModuleDeclKindDistinctValues) {
   EXPECT_NE(ModuleDeclKind::kProgram, ModuleDeclKind::kChecker);
 }
 
-TEST(DesignBuildingBlockParsing, ProgramContainsDeclarationsAndCode) {
-  auto r = Parse(
-      "program p;\n"
-      "  logic a;\n"
-      "  initial a = 1;\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_FALSE(r.cu->programs[0]->items.empty());
-}
-
 TEST(DesignBuildingBlockParsing, InterfaceContainsDeclarations) {
   auto r = Parse(
       "interface ifc;\n"

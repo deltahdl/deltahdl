@@ -618,4 +618,15 @@ TEST(ProgramDeclarations, ProgramKeywordIntroducesProgram) {
   EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
 }
 
+TEST(ProgramDeclarations, ProgramContainsDeclarationsAndCode) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic a;\n"
+      "  initial a = 1;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->programs[0]->items.empty());
+}
+
 }  // namespace
