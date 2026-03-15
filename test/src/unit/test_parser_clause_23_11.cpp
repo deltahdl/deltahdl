@@ -45,4 +45,14 @@ TEST(SourceText, BindMixedWithOtherDescriptions) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
+TEST(BindDirective, CuScopeBindGoesToBindDirectives) {
+  auto r = Parse(
+      "module target; endmodule\n"
+      "module binder; endmodule\n"
+      "bind target binder b1();\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->bind_directives.empty());
+}
+
 }  // namespace

@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, BindDirectiveGoesToBindDirectives) {
-  auto r = Parse(
-      "module target; endmodule\n"
-      "module binder; endmodule\n"
-      "bind target binder b1();\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_FALSE(r.cu->bind_directives.empty());
-}
-
 TEST(CompilationUnitStructure, ConfigWithEndLabel) {
   auto r = Parse(
       "module m; endmodule\n"
