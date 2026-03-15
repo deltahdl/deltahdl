@@ -554,4 +554,14 @@ TEST(ModuleAndHierarchyParsing, ConditionalGenerateCase) {
   ASSERT_EQ(gen->gen_case_items.size(), 3u);
 }
 
+TEST(GenerateIf, NamedBlockWithWire) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  parameter int P = 1;\n"
+              "  if (P) begin : gen\n"
+              "    wire w;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

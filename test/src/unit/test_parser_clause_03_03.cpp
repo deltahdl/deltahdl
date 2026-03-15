@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithGenerateIf) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  parameter int P = 1;\n"
-              "  if (P) begin : gen\n"
-              "    wire w;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithSpecifyBlock) {
   auto r = Parse(
       "module m(input a, output y);\n"
