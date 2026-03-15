@@ -378,4 +378,15 @@ TEST(TaskAndFunctionParsing, TaskReturnStatement) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(TaskDeclarations, EmptyTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task do_nothing;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
+}
+
 }  // namespace
