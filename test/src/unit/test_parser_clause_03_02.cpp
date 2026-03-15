@@ -15,14 +15,6 @@ TEST(DesignElements, ModuleDeclKindDistinctValues) {
   EXPECT_NE(ModuleDeclKind::kProgram, ModuleDeclKind::kChecker);
 }
 
-TEST(DesignBuildingBlockParsing, CheckerKeywordIntroducesChecker) {
-  auto r = Parse("checker chk; endchecker");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
-}
-
 TEST(DesignBuildingBlockParsing, PackageKeywordIntroducesPackage) {
   auto r = Parse("package pkg; endpackage");
   ASSERT_NE(r.cu, nullptr);

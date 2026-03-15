@@ -451,4 +451,12 @@ TEST(CheckerDeclaration, MissingEndcheckerIsError) {
   EXPECT_FALSE(ParseOk("checker c;"));
 }
 
+TEST(CheckerDeclarations, CheckerKeywordIntroducesChecker) {
+  auto r = Parse("checker chk; endchecker");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
+}
+
 }  // namespace
