@@ -285,4 +285,12 @@ TEST(InterfaceDeclaration, WithInitialBlock) {
       HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kInitialBlock));
 }
 
+TEST(InterfaceDeclaration, WithAlwaysBlock) {
+  EXPECT_TRUE(
+      ParseOk("interface ifc;\n"
+              "  logic clk, gnt, req;\n"
+              "  always @(posedge clk) gnt <= req;\n"
+              "endinterface\n"));
+}
+
 }  // namespace

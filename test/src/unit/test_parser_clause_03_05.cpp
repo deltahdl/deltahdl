@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, InterfaceWithAlwaysBlock) {
-  EXPECT_TRUE(
-      ParseOk("interface ifc;\n"
-              "  logic clk, gnt, req;\n"
-              "  always @(posedge clk) gnt <= req;\n"
-              "endinterface\n"));
-}
-
 TEST(DesignBuildingBlockParsing, InterfaceWithContAssign) {
   auto r = Parse(
       "interface ifc;\n"
