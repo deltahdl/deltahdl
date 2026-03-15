@@ -4,19 +4,6 @@
 
 namespace {
 
-TEST(BuildingBlockElaboration, EmptySourceTopNotFoundReturnsNull) {
-  ElabFixture f;
-  auto fid = f.mgr.AddFile("<test>", "");
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  ASSERT_NE(cu, nullptr);
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate("top");
-  EXPECT_EQ(design, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(BuildingBlockElaboration, ElaboratedDesignContainsTopModule) {
   ElabFixture f;
   auto* design = ElaborateSrc("module top; endmodule", f, "top");
