@@ -71,4 +71,11 @@ TEST(DesignBuildingBlockElaboration, SampleProgramElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(ProgramDefinitions, EmptyProgramElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc("program p; endprogram\n", f, "p");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

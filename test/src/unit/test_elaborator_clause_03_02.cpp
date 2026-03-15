@@ -4,13 +4,6 @@
 
 namespace {
 
-TEST(DesignBuildingBlockElaboration, EmptyProgramElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc("program p; endprogram\n", f, "p");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(DesignBuildingBlockElaboration, EmptyInterfaceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc("interface ifc; endinterface\n", f, "ifc");
