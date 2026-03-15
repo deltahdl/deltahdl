@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, TaskWithAllArgDirections) {
-  EXPECT_TRUE(ParseOk(
-      "module m;\n"
-      "  task xfer(input int a, output int b, inout int c, ref int d);\n"
-      "    b = a;\n"
-      "    c = c + 1;\n"
-      "  endtask\n"
-      "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, TaskCalledAsStatement) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

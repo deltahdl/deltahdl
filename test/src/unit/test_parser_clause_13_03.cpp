@@ -400,4 +400,14 @@ TEST(TaskDeclaration, EmptyTaskInModule) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTaskDecl);
 }
 
+TEST(TaskDeclaration, AllArgDirections) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  task xfer(input int a, output int b, inout int c, ref int d);\n"
+      "    b = a;\n"
+      "    c = c + 1;\n"
+      "  endtask\n"
+      "endmodule\n"));
+}
+
 }  // namespace
