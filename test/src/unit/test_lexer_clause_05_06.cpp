@@ -179,7 +179,7 @@ TEST(LexicalConventionLexing, SimpleAndEscapedInStream) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[0].text, "abc");
   EXPECT_EQ(tokens[1].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[1].text, "\\def");
+  EXPECT_EQ(tokens[1].text, "def");
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[2].text, "ghi");
 }

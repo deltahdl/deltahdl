@@ -194,35 +194,35 @@ TEST(WhiteSpaceLexing, EscapedIdentTerminatedBySpace) {
   auto tokens = Lex("\\esc_id ");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "\\esc_id");
+  EXPECT_EQ(tokens[0].text, "esc_id");
 }
 
 TEST(WhiteSpaceLexing, EscapedIdentTerminatedByTab) {
   auto tokens = Lex("\\esc_id\t");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "\\esc_id");
+  EXPECT_EQ(tokens[0].text, "esc_id");
 }
 
 TEST(WhiteSpaceLexing, EscapedIdentTerminatedByNewline) {
   auto tokens = Lex("\\esc_id\n");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "\\esc_id");
+  EXPECT_EQ(tokens[0].text, "esc_id");
 }
 
 TEST(WhiteSpaceLexing, EscapedIdentTerminatedByFormfeed) {
   auto tokens = Lex("\\esc_id\f");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "\\esc_id");
+  EXPECT_EQ(tokens[0].text, "esc_id");
 }
 
 TEST(WhiteSpaceLexing, EscapedIdentTerminatedByEof) {
   auto tokens = Lex("\\esc_id");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "\\esc_id");
+  EXPECT_EQ(tokens[0].text, "esc_id");
 }
 
 TEST(WhiteSpaceLexing, StringLiteralPreservesSpaces) {

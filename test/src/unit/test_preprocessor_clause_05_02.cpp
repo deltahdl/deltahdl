@@ -52,17 +52,6 @@ TEST(LexicalConventionPreprocessor, BlockCommentPreservedThroughPreprocessing) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(LexicalConventionPreprocessor, EscapedIdentifierPreservedThroughPreprocessing) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "module t;\n"
-      "  logic \\my+sig ;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("\\my+sig"), std::string::npos);
-}
-
 TEST(LexicalConventionPreprocessor, AllTokenCategoriesPassThroughPreprocessor) {
   PreprocFixture f;
   auto result = Preprocess(

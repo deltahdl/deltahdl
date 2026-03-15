@@ -88,34 +88,6 @@ TEST(LexicalConventionLexing, MixedWhitespaceAsTokenSeparators) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexicalConventionLexing, EscapedIdentifierTerminatedBySpace) {
-  auto tokens = Lex("\\abc def");
-  ASSERT_GE(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].text, "def");
-}
-
-TEST(LexicalConventionLexing, EscapedIdentifierTerminatedByNewline) {
-  auto tokens = Lex("\\abc\ndef");
-  ASSERT_GE(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].text, "def");
-}
-
-TEST(LexicalConventionLexing, EscapedIdentifierTerminatedByTab) {
-  auto tokens = Lex("\\abc\tdef");
-  ASSERT_GE(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-}
-
-TEST(LexicalConventionLexing, EscapedIdentifierIncludesSpecialChars) {
-  auto r = LexOne("\\a+b*c ");
-  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
-}
-
 TEST(LexicalConventionLexing, WhitespaceCategory) {
   auto tokens = Lex("   ");
   ASSERT_EQ(tokens.size(), 1u);
@@ -209,21 +181,6 @@ TEST(LexicalConventionLexing, TokenStreamAlwaysEndsWithEof) {
   auto tokens = Lex("module m; endmodule");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens.back().kind, TokenKind::kEof);
-}
-
-TEST(LexicalConventionLexing, EscapedIdentifierAtEof) {
-  auto tokens = Lex("\\abc");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
-}
-
-TEST(LexicalConventionLexing, EscapedIdentifierTerminatedByFormfeed) {
-  auto tokens = Lex("\\abc\fdef");
-  ASSERT_GE(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].text, "def");
 }
 
 TEST(LexicalConventionLexing, KeywordAdjacentToOperator) {

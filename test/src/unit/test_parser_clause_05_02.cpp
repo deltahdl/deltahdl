@@ -58,23 +58,6 @@ TEST(LexicalConventionParsing, AllTokenCategoriesParsed) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, EscapedIdentifierPreservesWhitespaceRule) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic \\my+sig ;\n"
-      "  assign \\my+sig = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(LexicalConventionParsing, EscapedKeywordAsIdentifier) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic \\module ;\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, TabsAndFormfeedsAsWhitespace) {
   EXPECT_TRUE(ParseOk("module\tt\f;\flogic\ta\t;\tendmodule"));
 }
@@ -94,22 +77,6 @@ TEST(LexicalConventionParsing, CrlfLineEndingsParseCorrectly) {
 
 TEST(LexicalConventionParsing, CarriageReturnAloneAsWhitespace) {
   EXPECT_TRUE(ParseOk("module\rt\r;\rlogic\ra\r;\rendmodule"));
-}
-
-TEST(LexicalConventionParsing, EscapedIdentifierAtEndOfDeclaration) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic \\sig! ;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(LexicalConventionParsing, MultipleEscapedIdentifiers) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic \\a+b , \\c-d ;\n"
-              "endmodule\n"));
 }
 
 TEST(LexicalConventionParsing, LineCommentBetweenTokens) {

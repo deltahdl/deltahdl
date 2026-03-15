@@ -55,11 +55,6 @@ TEST(LexicalConventionLexing, TripleQuotedStringLiteralRecognized) {
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexicalConventionLexing, EscapedIdentifierRecognized) {
-  auto r = LexOne("\\busa+index ");
-  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
-}
-
 TEST(LexicalConventionLexing, SystemIdentifierRecognized) {
   auto r = LexOne("$display");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);

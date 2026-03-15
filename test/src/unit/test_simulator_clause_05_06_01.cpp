@@ -1,6 +1,5 @@
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
-#include "preprocessor/preprocessor.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -12,7 +11,7 @@ TEST(EscapedIdentifierSim, EscapedIdentAsVariable) {
       "  logic [7:0] \\myvar ;\n"
       "  initial \\myvar = 8'd55;\n"
       "endmodule\n",
-      "\\myvar");
+      "myvar");
   EXPECT_EQ(result, 55u);
 }
 
@@ -22,7 +21,7 @@ TEST(EscapedIdentifierSim, EscapedIdentSpecialChars) {
       "  logic [7:0] \\data+bus ;\n"
       "  initial \\data+bus = 8'd77;\n"
       "endmodule\n",
-      "\\data+bus");
+      "data+bus");
   EXPECT_EQ(result, 77u);
 }
 
@@ -32,7 +31,7 @@ TEST(EscapedIdentifierSim, EscapedKeywordAsVariable) {
       "  logic [7:0] \\module ;\n"
       "  initial \\module = 8'd99;\n"
       "endmodule\n",
-      "\\module");
+      "module");
   EXPECT_EQ(result, 99u);
 }
 
@@ -51,12 +50,32 @@ TEST(EscapedIdentifierSim, EscapedIdentMultipleVars) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* v1 = f.ctx.FindVariable("\\a+b");
-  auto* v2 = f.ctx.FindVariable("\\c-d");
+  auto* v1 = f.ctx.FindVariable("a+b");
+  auto* v2 = f.ctx.FindVariable("c-d");
   ASSERT_NE(v1, nullptr);
   ASSERT_NE(v2, nullptr);
   EXPECT_EQ(v1->value.ToUint64(), 10u);
   EXPECT_EQ(v2->value.ToUint64(), 20u);
+}
+
+TEST(EscapedIdentifierSim, EscapedIdentMatchesSimpleIdent) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] cpu3;\n"
+      "  initial \\cpu3 = 8'd42;\n"
+      "endmodule\n",
+      "cpu3");
+  EXPECT_EQ(result, 42u);
+}
+
+TEST(EscapedIdentifierSim, EscapedIdentDashClock) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] \\-clock ;\n"
+      "  initial \\-clock = 8'd11;\n"
+      "endmodule\n",
+      "-clock");
+  EXPECT_EQ(result, 11u);
 }
 
 TEST(EscapedIdentifierSim, EscapedIdentInExpression) {

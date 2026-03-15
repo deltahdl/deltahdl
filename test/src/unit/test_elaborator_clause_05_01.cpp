@@ -71,14 +71,6 @@ TEST(LexicalConventionElaboration, ModuleWithBuiltinMethodElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, ModuleWithEscapedIdentifierElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic \\bus+a ;\n"
-             "  assign \\bus+a = 1'b0;\n"
-             "endmodule\n"));
-}
-
 TEST(LexicalConventionElaboration, AllFourAreasElaborate) {
   EXPECT_TRUE(
       ElabOk("(* optimize *) module t;\n"

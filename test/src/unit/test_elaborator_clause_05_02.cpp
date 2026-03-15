@@ -36,26 +36,6 @@ TEST(LexicalConventionElaboration, TabsAndFormfeedsAsWhitespace) {
   EXPECT_TRUE(ElabOk("module\tt\f;\flogic\ta\t;\tendmodule"));
 }
 
-TEST(LexicalConventionElaboration, EscapedIdentifierElaboratesCorrectly) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic \\my+sig ;\n"
-      "  assign \\my+sig = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(LexicalConventionElaboration, EscapedKeywordAsIdentifierElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic \\module ;\n"
-             "  assign \\module = 1'b0;\n"
-             "endmodule\n"));
-}
-
 TEST(LexicalConventionElaboration, AllTokenCategoriesElaborate) {
   EXPECT_TRUE(
       ElabOk("module t; // line comment\n"

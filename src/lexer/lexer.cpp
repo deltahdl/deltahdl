@@ -473,8 +473,8 @@ Token Lexer::LexSystemIdentifier() {
 
 Token Lexer::LexEscapedIdentifier() {
   auto loc = MakeLoc();
-  uint32_t start = pos_;
   Advance();  // skip backslash
+  uint32_t start = pos_;
   while (!AtEnd() && !std::isspace(static_cast<unsigned char>(Current()))) {
     Advance();
   }

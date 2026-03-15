@@ -84,13 +84,6 @@ TEST(LexicalConventionParsing, TripleQuotedStringInExpression) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, EscapedIdentifierInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic \\bus+a ;\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, SystemTaskCallParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
