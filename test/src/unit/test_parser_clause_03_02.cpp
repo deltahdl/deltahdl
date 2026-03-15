@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §3.2
 
 #include "fixture_parser.h"
 
@@ -15,7 +15,7 @@ TEST(DesignElements, ModuleDeclKindDistinctValues) {
   EXPECT_NE(ModuleDeclKind::kProgram, ModuleDeclKind::kChecker);
 }
 
-TEST(DesignBuildingBlockParsing, TopLevelClassIsNotDesignElement) {
+TEST(DesignElements, TopLevelClassIsNotDesignElement) {
   auto r = Parse(
       "class C;\n"
       "  int x;\n"
