@@ -28,7 +28,7 @@ TEST(ModuleOverview, Mux2to1Example) {
   EXPECT_EQ(blk->always_kind, AlwaysKind::kAlwaysComb);
 }
 
-TEST(DesignBuildingBlockParsing, ModuleDeclarations) {
+TEST(ModuleOverview, VariousItemKinds) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire [7:0] w;\n"
