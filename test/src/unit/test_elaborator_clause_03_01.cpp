@@ -4,19 +4,6 @@
 
 namespace {
 
-TEST(BuildingBlockElaboration, CuScopeFunctionVisibleInDesign) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "function int add(int a, int b);\n"
-      "  return a + b;\n"
-      "endfunction\n"
-      "module m; endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_FALSE(design->cu_function_decls.empty());
-}
-
 TEST(BuildingBlockElaboration, ModuleWithPortsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

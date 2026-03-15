@@ -111,3 +111,16 @@ TEST(DesignBuildingBlockElaboration, MultipleCuScopeTypedefs) {
   EXPECT_EQ(mod->variables[0].width, 8u);
   EXPECT_EQ(mod->variables[1].width, 32u);
 }
+TEST(CompilationUnitScope, CuScopeFunctionVisibleInDesign) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "function int add(int a, int b);\n"
+      "  return a + b;\n"
+      "endfunction\n"
+      "module m; endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_FALSE(design->cu_function_decls.empty());
+}
+
