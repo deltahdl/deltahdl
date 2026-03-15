@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, TaskCalledAsStatement) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  task greet; endtask\n"
-              "  initial greet();\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, FunctionWithReturnValue) {
   auto r = Parse(
       "module m;\n"

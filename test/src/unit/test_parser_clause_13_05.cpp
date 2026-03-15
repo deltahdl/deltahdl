@@ -101,4 +101,12 @@ TEST(OperatorAndExpressionParsing, ExprAsFunctionArgument) {
               "endmodule\n"));
 }
 
+TEST(TaskDeclaration, TaskCalledAsStatement) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task greet; endtask\n"
+              "  initial greet();\n"
+              "endmodule\n"));
+}
+
 }  // namespace
