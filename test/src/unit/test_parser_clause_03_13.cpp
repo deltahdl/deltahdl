@@ -137,4 +137,10 @@ TEST(DesignBuildingBlockParsing, MacroRedefinition) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(NameSpaces, LocalScopesDoNotConflict) {
+  EXPECT_TRUE(
+      ParseOk("module a; logic x; endmodule\n"
+              "module b; logic x; endmodule\n"));
+}
+
 }  // namespace
