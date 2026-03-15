@@ -87,6 +87,24 @@ TEST(LexicalConventionLexing, SpaceSeparatesNumberAndUnit) {
   EXPECT_EQ(tokens[1].text, "ns");
 }
 
+TEST(LexicalConventionLexing, TimeLiteralFixedPointMs) {
+  auto r = LexOne("1.5ms");
+  EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
+  EXPECT_EQ(r.token.text, "1.5ms");
+}
+
+TEST(LexicalConventionLexing, TimeLiteralFixedPointS) {
+  auto r = LexOne("0.001s");
+  EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
+  EXPECT_EQ(r.token.text, "0.001s");
+}
+
+TEST(LexicalConventionLexing, TimeLiteralFixedPointPs) {
+  auto r = LexOne("3.7ps");
+  EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
+  EXPECT_EQ(r.token.text, "3.7ps");
+}
+
 TEST(LexicalConventionLexing, NotTimeLiteralIfMoreChars) {
   auto r = LexOne("1nsec ");
 

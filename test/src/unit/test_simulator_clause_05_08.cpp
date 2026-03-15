@@ -16,31 +16,31 @@ TEST(LexicalConventionSim, FixedPointNs) {
   EXPECT_DOUBLE_EQ(v, 2.1);
 }
 
-TEST(LexicalConventionSim, Ps) {
+TEST(LexicalConventionSim, ScalePs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 40ps;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 0.04);
 }
 
-TEST(LexicalConventionSim, Fs) {
+TEST(LexicalConventionSim, ScaleFs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 100fs;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 0.0001);
 }
 
-TEST(LexicalConventionSim, Us) {
+TEST(LexicalConventionSim, ScaleUs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 1us;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 1000.0);
 }
 
-TEST(LexicalConventionSim, Ms) {
+TEST(LexicalConventionSim, ScaleMs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 1ms;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 1e6);
 }
 
-TEST(LexicalConventionSim, S) {
+TEST(LexicalConventionSim, ScaleS) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 1s;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 1e9);
@@ -52,16 +52,28 @@ TEST(LexicalConventionSim, FixedPointUs) {
   EXPECT_DOUBLE_EQ(v, 2500.0);
 }
 
-TEST(LexicalConventionSim, LrmExample2p1ns) {
+TEST(LexicalConventionSim, FixedPointMs) {
   auto v = RunAndGetReal(
-      "module t;\n  realtime r;\n  initial r = 2.1ns;\nendmodule\n", "r");
-  EXPECT_DOUBLE_EQ(v, 2.1);
+      "module t;\n  realtime r;\n  initial r = 1.5ms;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 1.5e6);
 }
 
-TEST(LexicalConventionSim, LrmExample40ps) {
+TEST(LexicalConventionSim, FixedPointS) {
   auto v = RunAndGetReal(
-      "module t;\n  realtime r;\n  initial r = 40ps;\nendmodule\n", "r");
-  EXPECT_DOUBLE_EQ(v, 0.04);
+      "module t;\n  realtime r;\n  initial r = 0.5s;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 0.5e9);
+}
+
+TEST(LexicalConventionSim, FixedPointFs) {
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 500.0fs;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 0.5);
+}
+
+TEST(LexicalConventionSim, FixedPointPs) {
+  auto v = RunAndGetReal(
+      "module t;\n  realtime r;\n  initial r = 3.5ps;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 0.0035);
 }
 
 }  // namespace

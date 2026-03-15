@@ -23,13 +23,6 @@ TEST(LexicalConventionElaboration, ModuleWithAttributeElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, ModuleWithTimeLiteralElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  initial #10ns;\n"
-             "endmodule\n"));
-}
-
 TEST(LexicalConventionElaboration, ModuleWithUnbasedUnsizedLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"

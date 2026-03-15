@@ -21,23 +21,23 @@ TEST(LexicalConventionParsing, FixedPointNs) {
   EXPECT_TRUE(ParseOk("module m; initial #2.1ns; endmodule"));
 }
 
-TEST(LexicalConventionParsing, Ps) {
+TEST(LexicalConventionParsing, DelayPs) {
   EXPECT_TRUE(ParseOk("module m; initial #40ps; endmodule"));
 }
 
-TEST(LexicalConventionParsing, Us) {
+TEST(LexicalConventionParsing, DelayUs) {
   EXPECT_TRUE(ParseOk("module m; initial #100us; endmodule"));
 }
 
-TEST(LexicalConventionParsing, Ms) {
+TEST(LexicalConventionParsing, DelayMs) {
   EXPECT_TRUE(ParseOk("module m; initial #1ms; endmodule"));
 }
 
-TEST(LexicalConventionParsing, Fs) {
+TEST(LexicalConventionParsing, DelayFs) {
   EXPECT_TRUE(ParseOk("module m; initial #500fs; endmodule"));
 }
 
-TEST(LexicalConventionParsing, S) {
+TEST(LexicalConventionParsing, DelayS) {
   EXPECT_TRUE(ParseOk("module m; initial #1s; endmodule"));
 }
 
@@ -82,6 +82,50 @@ TEST(LexicalConventionParsing, TimeunitAllSixUnits) {
                 .cu->modules[0]
                 ->time_unit,
             TimeUnit::kFs);
+}
+
+TEST(LexicalConventionParsing, TimeLiteralExprKind) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial #10ns;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->kind, StmtKind::kDelay);
+  ASSERT_NE(stmt->delay, nullptr);
+  EXPECT_EQ(stmt->delay->kind, ExprKind::kTimeLiteral);
+}
+
+TEST(LexicalConventionParsing, TimeLiteralRealVal) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial #2.5us;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->delay, nullptr);
+  EXPECT_DOUBLE_EQ(stmt->delay->real_val, 2.5);
+}
+
+TEST(LexicalConventionParsing, TimeLiteralTextIncludesUnit) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial #40ps;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->delay, nullptr);
+  EXPECT_EQ(stmt->delay->text, "40ps");
+}
+
+TEST(LexicalConventionParsing, TimeLiteralInExpression) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial #10ns;\n"
+              "endmodule\n"));
 }
 
 }  // namespace

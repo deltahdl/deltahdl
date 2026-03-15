@@ -19,13 +19,6 @@ TEST(LexicalConventionParsing, StringLiteralInExpression) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, TimeLiteralInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial #10ns;\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, UnbasedUnsizedLiteralInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

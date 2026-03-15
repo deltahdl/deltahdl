@@ -30,11 +30,6 @@ TEST(LexicalConventionLexing, StringLiteralRecognized) {
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexicalConventionLexing, TimeLiteralRecognized) {
-  auto r = LexOne("10ns");
-  EXPECT_EQ(r.token.kind, TokenKind::kTimeLiteral);
-}
-
 TEST(LexicalConventionLexing, UnbasedUnsizedLiteralRecognized) {
   auto r = LexOne("'1");
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
