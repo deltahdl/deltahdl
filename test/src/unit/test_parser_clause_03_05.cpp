@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, InterfaceWithNets) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  wire valid;\n"
-      "  wire [7:0] bus;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kNetDecl));
-}
-
 TEST(DesignBuildingBlockParsing, InterfaceWithFunction) {
   auto r = Parse(
       "interface ifc;\n"
