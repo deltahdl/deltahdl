@@ -10,9 +10,10 @@ from lib.python.classify import (
     add_run_mode_args,
     append_classify_cmd_flags,
 )
+from lib.python.cli import add_continue_arg
 
 
-def _build_command(args, test_entry):
+def _build_command(args, test_entry, *, continue_session=False):
     """Build the subprocess command list for classify_test."""
     suite, test = test_entry.split(".", 1)
     cmd = [
@@ -24,13 +25,19 @@ def _build_command(args, test_entry):
     if args.issue is not None:
         cmd += ["--issue", str(args.issue)]
     append_classify_cmd_flags(cmd, args)
+    if continue_session:
+        cmd.append("--continue")
     return cmd
 
 
-def run_classify_test(args, test_name, index, total):
+def run_classify_test(args, test_name, index, total, *,
+                      continue_session=False):
     """Invoke classify_test for a single test. Returns True on success."""
     print(f"Processing test {index}/{total}: {test_name}")
-    result = subprocess.run(_build_command(args, test_name), check=False)
+    cmd = _build_command(
+        args, test_name, continue_session=continue_session,
+    )
+    result = subprocess.run(cmd, check=False)
     return result.returncode == 0
 
 
@@ -55,6 +62,7 @@ def _parse_args():
     add_output_args(parser)
     add_github_args(parser)
     add_run_mode_args(parser)
+    add_continue_arg(parser)
     return parser.parse_args()
 
 
@@ -63,7 +71,9 @@ def _run(args):
     names = [n.strip() for n in args.tests.split(",")]
     total = len(names)
     for i, name in enumerate(names, 1):
-        if not run_classify_test(args, name, i, total):
+        use_continue = i > 1 and args.continue_session
+        if not run_classify_test(args, name, i, total,
+                                 continue_session=use_continue):
             sys.exit(1)
 
 

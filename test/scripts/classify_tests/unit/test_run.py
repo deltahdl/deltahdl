@@ -31,7 +31,10 @@ _BASE_ARGV = [
 
 def _make_args(**overrides):
     """Build args with classify_tests-specific defaults."""
-    defaults = {"tests": "S.A,S.B,S.C", "issue": None}
+    defaults = {
+        "tests": "S.A,S.B,S.C", "issue": None,
+        "continue_session": False,
+    }
     defaults.update(overrides)
     return make_classify_args(**defaults)
 
@@ -79,6 +82,20 @@ def test_parse_args_file_required(monkeypatch, cts):
     )
     with pytest.raises(SystemExit):
         getattr(cts, "_parse_args")()
+
+
+def test_parse_args_continue_default(monkeypatch, cts):
+    """--continue defaults to False."""
+    monkeypatch.setattr(sys, "argv", _BASE_ARGV)
+    assert getattr(cts, "_parse_args")().continue_session is False
+
+
+def test_parse_args_continue_flag(monkeypatch, cts):
+    """--continue sets continue_session to True."""
+    monkeypatch.setattr(
+        sys, "argv", [*_BASE_ARGV, "--continue"],
+    )
+    assert getattr(cts, "_parse_args")().continue_session is True
 
 
 def test_parse_args_tests_required(monkeypatch, cts):
@@ -183,6 +200,22 @@ def test_build_command_no_commit_omitted(cts):
     assert "--no-commit" not in cmd
 
 
+def test_build_command_continue_included(cts):
+    """Command includes --continue when continue_session is True."""
+    cmd = getattr(cts, "_build_command")(
+        _make_args(), "S.T", continue_session=True,
+    )
+    assert "--continue" in cmd
+
+
+def test_build_command_continue_omitted(cts):
+    """Command omits --continue when continue_session is False."""
+    cmd = getattr(cts, "_build_command")(
+        _make_args(), "S.T", continue_session=False,
+    )
+    assert "--continue" not in cmd
+
+
 # ---- run_classify_test -----------------------------------------------------
 
 
@@ -220,6 +253,33 @@ def test_run_exits_on_failure(monkeypatch, cts):
     stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
         getattr(cts, "_run")(_make_args(tests="S.A,S.B"))
+
+
+def test_run_continue_first_omits(monkeypatch, cts):
+    """First subprocess omits --continue even when flag is set."""
+    captured = stub_subprocess_success(monkeypatch)
+    getattr(cts, "_run")(
+        _make_args(tests="S.A,S.B", continue_session=True),
+    )
+    assert "--continue" not in captured[0]
+
+
+def test_run_continue_subsequent_includes(monkeypatch, cts):
+    """Subsequent subprocesses include --continue when flag is set."""
+    captured = stub_subprocess_success(monkeypatch)
+    getattr(cts, "_run")(
+        _make_args(tests="S.A,S.B,S.C", continue_session=True),
+    )
+    assert "--continue" in captured[1]
+
+
+def test_run_no_continue_omits_all(monkeypatch, cts):
+    """No subprocess gets --continue when flag is not set."""
+    captured = stub_subprocess_success(monkeypatch)
+    getattr(cts, "_run")(
+        _make_args(tests="S.A,S.B", continue_session=False),
+    )
+    assert all("--continue" not in c for c in captured)
 
 
 def test_run_stops_after_failure(monkeypatch, cts):
