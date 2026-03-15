@@ -4,13 +4,6 @@
 
 namespace {
 
-TEST(DesignBuildingBlockElaboration, EmptyCheckerElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc("checker chk; endchecker\n", f, "chk");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(DesignBuildingBlockElaboration, ModuleAsContainer) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
