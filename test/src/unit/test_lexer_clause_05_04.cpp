@@ -289,4 +289,22 @@ TEST(LexicalConventionLexing, NoErrorsForValidComments) {
   EXPECT_FALSE(errors);
 }
 
+TEST(LexicalConventionLexing, BlockCloseWithoutOpenIsOperators) {
+  auto tokens = Lex("a */ b");
+  ASSERT_EQ(tokens.size(), 5u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kStar);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kSlash);
+  EXPECT_EQ(tokens[3].text, "b");
+  EXPECT_EQ(tokens[4].kind, TokenKind::kEof);
+}
+
+TEST(LexicalConventionLexing, LineCommentEndedByCrlf) {
+  auto tokens = Lex("a // comment\r\nb");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
+}
+
 }  // namespace

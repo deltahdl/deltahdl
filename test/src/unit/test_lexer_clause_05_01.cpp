@@ -20,20 +20,6 @@ TEST(LexicalConventionLexing, EmptySourceProducesOnlyEof) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexicalConventionLexing, LineCommentIsStripped) {
-  auto tokens = Lex("a // comment\nb");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(LexicalConventionLexing, BlockCommentIsStripped) {
-  auto tokens = Lex("a /* block */ b");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
 TEST(LexicalConventionLexing, OperatorTokensRecognized) {
   auto tokens = Lex("+ - * / % ** && ||");
   EXPECT_EQ(tokens[0].kind, TokenKind::kPlus);
@@ -147,11 +133,6 @@ TEST(LexicalConventionLexing, AllFourAreasInOneStream) {
   EXPECT_TRUE(kinds.count(TokenKind::kStringLiteral));
   EXPECT_TRUE(kinds.count(TokenKind::kSystemIdentifier));
   EXPECT_TRUE(kinds.count(TokenKind::kIdentifier));
-}
-
-TEST(LexicalConventionLexing, UnterminatedBlockCommentIsError) {
-  auto r = LexWithDiag("a /* unterminated");
-  EXPECT_TRUE(r.has_errors);
 }
 
 TEST(LexicalConventionLexing, UnterminatedStringIsError) {

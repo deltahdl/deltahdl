@@ -107,4 +107,33 @@ TEST(LexicalConventionParsing, EmptyCuCommentsOnly) {
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
+TEST(LexicalConventionParsing, CommentsDoNotAffectParseResult) {
+  auto with = Parse(
+      "module /* block */ t; // line\n"
+      "  logic a;\n"
+      "endmodule\n");
+  auto without = Parse(
+      "module t;\n"
+      "  logic a;\n"
+      "endmodule\n");
+  ASSERT_NE(with.cu, nullptr);
+  ASSERT_NE(without.cu, nullptr);
+  EXPECT_FALSE(with.has_errors);
+  EXPECT_FALSE(without.has_errors);
+  ASSERT_EQ(with.cu->modules.size(), 1u);
+  ASSERT_EQ(without.cu->modules.size(), 1u);
+  EXPECT_EQ(with.cu->modules[0]->name, without.cu->modules[0]->name);
+}
+
+TEST(LexicalConventionParsing, UnterminatedBlockCommentCausesParseError) {
+  EXPECT_FALSE(ParseOk("module t; /* unterminated comment endmodule"));
+}
+
+TEST(LexicalConventionParsing, CommentsInPackageDeclaration) {
+  EXPECT_TRUE(
+      ParseOk("package /* block */ p; // line\n"
+              "  typedef logic [7:0] byte_t; // type\n"
+              "endpackage /* end */\n"));
+}
+
 }  // namespace

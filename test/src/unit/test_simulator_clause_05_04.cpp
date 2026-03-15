@@ -95,3 +95,35 @@ TEST(CommentSim, CommentBlockAsSeparator) {
       "result");
   EXPECT_EQ(result, 71u);
 }
+
+TEST(CommentSim, CommentLineCommentAtEofNoNewline) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = 8'd44;\n"
+      "endmodule // no newline at end",
+      "result");
+  EXPECT_EQ(result, 44u);
+}
+
+TEST(CommentSim, CommentEmptyBlockComment) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = /**/ 8'd88;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 88u);
+}
+
+TEST(CommentSim, CommentLineFollowedByBlock) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  // line comment\n"
+      "  /* block comment */\n"
+      "  initial result = 8'd66;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 66u);
+}

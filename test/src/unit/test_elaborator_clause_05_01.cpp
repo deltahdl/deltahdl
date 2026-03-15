@@ -88,12 +88,4 @@ TEST(LexicalConventionElaboration, AllFourAreasElaborate) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, CommentsDoNotAffectElaboration) {
-  EXPECT_TRUE(
-      ElabOk("module /* block */ t; // line comment\n"
-             "  logic /* type */ a; // declaration\n"
-             "  assign /* continuous */ a = /* rhs */ 1'b1;\n"
-             "endmodule /* end */\n"));
-}
-
 }  // namespace
