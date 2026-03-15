@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithAlwaysLatch) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic en, d, q;\n"
-              "  always_latch if (en) q <= d;\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithGenerateFor) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

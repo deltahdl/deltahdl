@@ -532,4 +532,12 @@ TEST(SchedulingSemanticsParsing, AlwaysLatchLatch) {
   ASSERT_NE(item->body, nullptr);
 }
 
+TEST(AlwaysLatch, ConditionalLatch) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic en, d, q;\n"
+              "  always_latch if (en) q <= d;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
