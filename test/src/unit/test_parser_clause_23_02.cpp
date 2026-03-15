@@ -20,4 +20,12 @@ TEST(ModuleDefinitions, MissingEndmoduleIsError) {
   EXPECT_FALSE(ParseOk("module m;"));
 }
 
+TEST(ModuleDeclarations, ModuleKeywordIntroducesModule) {
+  auto r = Parse("module m; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->decl_kind, ModuleDeclKind::kModule);
+}
+
 }  // namespace
