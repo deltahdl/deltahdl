@@ -78,8 +78,12 @@ def build_steps(
          f"Does §{subclause} define any requirements that can be"
          " implemented as software (syntax to parse, semantics to"
          " simulate, behavior to enforce, constraints to check)?"
-         " A subclause that only lists topics covered elsewhere or"
-         " provides a general overview is NOT implementable."
+         " A subclause that merely introduces a topic or provides"
+         " a general overview without any concrete requirements"
+         " is NOT implementable. A subclause that defines concrete"
+         " items (e.g., which methods exist, which formats are valid)"
+         " IS implementable even if it references other sections"
+         " for additional details."
          " Respond with exactly IMPLEMENTABLE: yes or IMPLEMENTABLE: no"),
         ("Auditing src",
          f"Search src/ for existing code that implements §{subclause}."
