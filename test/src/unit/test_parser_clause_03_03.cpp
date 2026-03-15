@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithInitialBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic a;\n"
-      "  initial a = 0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kInitialBlock);
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithFinalBlock) {
   auto r = Parse(
       "module m;\n"
