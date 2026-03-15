@@ -82,4 +82,8 @@ TEST(ModuleDefinition, MixedContents) {
       "endmodule\n"));
 }
 
+TEST(ModuleDefinition, MismatchedEndKeyword) {
+  EXPECT_FALSE(ParseOk("module m; endprogram"));
+}
+
 }  // namespace
