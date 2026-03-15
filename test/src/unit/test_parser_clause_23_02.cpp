@@ -28,4 +28,13 @@ TEST(ModuleDeclarations, ModuleKeywordIntroducesModule) {
   EXPECT_EQ(r.cu->modules[0]->decl_kind, ModuleDeclKind::kModule);
 }
 
+TEST(ModuleDeclarations, MacromoduleKeywordIntroducesModule) {
+  auto r = Parse("macromodule mm; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->decl_kind, ModuleDeclKind::kModule);
+  EXPECT_EQ(r.cu->modules[0]->name, "mm");
+}
+
 }  // namespace
