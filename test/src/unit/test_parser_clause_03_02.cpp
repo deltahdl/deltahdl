@@ -15,16 +15,6 @@ TEST(DesignElements, ModuleDeclKindDistinctValues) {
   EXPECT_NE(ModuleDeclKind::kProgram, ModuleDeclKind::kChecker);
 }
 
-TEST(DesignBuildingBlockParsing, ConfigKeywordIntroducesConfig) {
-  auto r = Parse(
-      "module m; endmodule\n"
-      "config cfg; design m; endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->configs.size(), 1u);
-  EXPECT_EQ(r.cu->configs[0]->name, "cfg");
-}
-
 TEST(DesignBuildingBlockParsing, ModuleContainsDeclarationsAndCode) {
   auto r = Parse(
       "module m;\n"

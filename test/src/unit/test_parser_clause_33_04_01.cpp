@@ -227,4 +227,14 @@ TEST(ConfigDeclaration, MissingEndconfigIsError) {
       "  design m;"));
 }
 
+TEST(Configurations, ConfigKeywordIntroducesConfig) {
+  auto r = Parse(
+      "module m; endmodule\n"
+      "config cfg; design m; endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg");
+}
+
 }  // namespace
