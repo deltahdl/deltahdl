@@ -16,4 +16,9 @@ TEST(Keywords, EndmoduleKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndmodule);
 }
 
+TEST(Keywords, MacromoduleKeyword) {
+  auto r = LexOne("macromodule");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwMacromodule);
+}
+
 }  // namespace
