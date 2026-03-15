@@ -419,4 +419,14 @@ TEST(PackageImport, WildcardIntoPackage) {
               "endpackage\n"));
 }
 
+TEST(PackageImport, ExplicitNamedImport) {
+  auto r = Parse(
+      "package pkg; typedef int myint; endpackage\n"
+      "module m;\n"
+      "  import pkg::myint;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
