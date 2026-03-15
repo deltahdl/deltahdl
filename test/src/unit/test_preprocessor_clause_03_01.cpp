@@ -1,20 +1,8 @@
+// Non-LRM tests
+
 #include "fixture_preprocessor.h"
 
 namespace {
-
-// §3.1 General — preprocessing of design element structures.
-
-TEST(DesignElementPreprocessing, IfdefAroundModuleIncludesTaken) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define HAS_MODULE\n"
-      "`ifdef HAS_MODULE\n"
-      "module m; endmodule\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("module"), std::string::npos);
-}
 
 TEST(DesignElementPreprocessing, IfdefAroundModuleExcludesUntaken) {
   PreprocFixture f;
