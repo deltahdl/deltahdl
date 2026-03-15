@@ -177,4 +177,14 @@ TEST(ModuleDeclaration, EmptyPortListParens) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
+TEST(ModulePortDeclarations, ModuleWithAnsiPortDeclarations) {
+  auto r = Parse(
+      "module m(input wire a, b, sel, output logic y);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_FALSE(r.cu->modules[0]->ports.empty());
+}
+
 }  // namespace
