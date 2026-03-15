@@ -1,18 +1,11 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(DesignBuildingBlockParsing, InterfaceEnclosedByKeywords) {
-  auto r = Parse("interface ifc; endinterface");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
-  EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
-}
 
 TEST(DesignBuildingBlockParsing, InterfaceWithParameters) {
   auto r = Parse(

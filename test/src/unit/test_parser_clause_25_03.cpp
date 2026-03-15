@@ -264,4 +264,13 @@ TEST(InterfaceDeclarations, InterfaceContainsDeclarations) {
   EXPECT_FALSE(r.cu->interfaces[0]->items.empty());
 }
 
+TEST(InterfaceDeclaration, EnclosedByKeywords) {
+  auto r = Parse("interface ifc; endinterface");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
+  EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
+}
+
 }  // namespace
