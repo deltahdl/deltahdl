@@ -252,4 +252,19 @@ TEST(DelayParsing, Delay2NInputGateTwoValues) {
   EXPECT_EQ(item->gate_delay_fall->int_val, 5u);
 }
 
+TEST(NandGate, BasicInstantiation) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b, y;\n"
+      "  nand g1(y, a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool has_gate = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kGateInst) has_gate = true;
+  }
+  EXPECT_TRUE(has_gate);
+}
+
 }  // namespace
