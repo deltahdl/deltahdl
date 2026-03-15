@@ -618,3 +618,17 @@ TEST(IfdefElse, UndefinedMacroSelectsElseBranch) {
   EXPECT_NE(result.find("module b"), std::string::npos);
 }
 
+TEST(IfdefConditionalCompilation, MultipleDesignElementsWithConditional) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "module always_present; endmodule\n"
+      "`define INCLUDE_PKG\n"
+      "`ifdef INCLUDE_PKG\n"
+      "package pkg; endpackage\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("always_present"), std::string::npos);
+  EXPECT_NE(result.find("package"), std::string::npos);
+}
+
