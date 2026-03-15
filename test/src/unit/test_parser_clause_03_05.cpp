@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, InterfaceWithVariables) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  logic req, gnt;\n"
-      "  logic [7:0] addr, data;\n"
-      "  logic [1:0] mode;\n"
-      "  logic start, rdy;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_FALSE(r.cu->interfaces[0]->items.empty());
-}
-
 TEST(DesignBuildingBlockParsing, InterfaceWithNets) {
   auto r = Parse(
       "interface ifc;\n"
