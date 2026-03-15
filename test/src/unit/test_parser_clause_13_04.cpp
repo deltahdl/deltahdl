@@ -479,4 +479,16 @@ TEST(FunctionDeclarations, IntReturnWithArgs) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFunctionDecl);
 }
 
+TEST(FunctionDeclaration, AllArgDirections) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function int compute(input int a, output int b,\n"
+              "                       inout int c, ref int d);\n"
+              "    b = a;\n"
+              "    c = c + 1;\n"
+              "    return a + d;\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
 }  // namespace

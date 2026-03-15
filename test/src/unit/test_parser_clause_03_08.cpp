@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, FunctionWithAllArgDirections) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function int compute(input int a, output int b,\n"
-              "                       inout int c, ref int d);\n"
-              "    b = a;\n"
-              "    c = c + 1;\n"
-              "    return a + d;\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, TaskAndFunctionCoexist) {
   auto r = Parse(
       "module m;\n"
