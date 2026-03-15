@@ -17,7 +17,10 @@ from lib.python.test_fixtures.subprocess_stubs import (
 
 def _pipeline_args(**overrides):
     """Build args for _run."""
-    defaults = {"tests": "S.A,S.B,S.C", "issue": None}
+    defaults = {
+        "tests": "S.A,S.B,S.C", "issue": None,
+        "continue_session": False,
+    }
     defaults.update(overrides)
     return make_classify_args(**defaults)
 
