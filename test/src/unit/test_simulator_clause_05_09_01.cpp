@@ -82,4 +82,36 @@ TEST(LexicalConventionSim, MultipleEscapes) {
   EXPECT_EQ(v, 0x410A42u);
 }
 
+TEST(LexicalConventionSim, OctalTwoDigit) {
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\77\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x3Fu);
+}
+
+TEST(LexicalConventionSim, OctalMaxValid) {
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\377\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0xFFu);
+}
+
+TEST(LexicalConventionSim, HexUpperCase) {
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\xFF\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0xFFu);
+}
+
+TEST(LexicalConventionSim, NullByteOctal) {
+  auto v = RunAndGet(
+      "module t;\n  byte c;\n  initial c = \"\\0\";\nendmodule\n", "c");
+  EXPECT_EQ(v, 0x00u);
+}
+
+TEST(LexicalConventionSim, DoubleBackslashBeforeNewline) {
+  auto v = RunAndGet(
+      "module t;\n  bit [23:0] s;\n"
+      "  initial s = \"A\\\\\\\nB\";\nendmodule\n",
+      "s");
+  EXPECT_EQ(v, 0x415C42u);
+}
+
 }  // namespace

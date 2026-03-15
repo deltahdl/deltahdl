@@ -97,11 +97,6 @@ TEST(LexicalConventionLexing, EmptyTripleQuoted) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexicalConventionLexing, StringWithEscapeSequences) {
-  auto r = LexOne("\"line1\\nline2\" ");
-  EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
-}
-
 TEST(LexicalConventionLexing, MultipleStrings) {
   auto tokens = Lex("\"abc\" \"def\"");
   ASSERT_GE(tokens.size(), 3u);

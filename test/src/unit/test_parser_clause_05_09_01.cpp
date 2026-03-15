@@ -39,4 +39,25 @@ TEST(LexicalConventionParsing, StringWithHexEscape) {
               "endmodule"));
 }
 
+TEST(LexicalConventionParsing, StringWithUnknownEscape) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial $display(\"\\b\");\n"
+              "endmodule"));
+}
+
+TEST(LexicalConventionParsing, StringWithBackslashEscape) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial $display(\"\\\\\");\n"
+              "endmodule"));
+}
+
+TEST(LexicalConventionParsing, StringWithLineContinuation) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial $display(\"AB\\\nCD\");\n"
+              "endmodule"));
+}
+
 }  // namespace

@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "fixture_lexer.h"
 #include "lexer/string_escape.h"
 
 using namespace delta;
@@ -87,6 +88,19 @@ TEST(LexicalConventionLexing, MultipleEscapes) {
 
 TEST(LexicalConventionLexing, MixedEscapeTypes) {
   EXPECT_EQ(InterpretStringEscapes(R"(\x41\101\n)"), "AA\n");
+}
+
+TEST(LexicalConventionLexing, LineContinuationCrLf) {
+  EXPECT_EQ(InterpretStringEscapes("\\\r\n"), "");
+}
+
+TEST(LexicalConventionLexing, OctalMaxValid) {
+  EXPECT_EQ(InterpretStringEscapes(R"(\377)"), "\xFF");
+}
+
+TEST(LexicalConventionLexing, StringWithEscapeSequences) {
+  auto r = LexOne("\"line1\\nline2\" ");
+  EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
 }
 
 }  // namespace
