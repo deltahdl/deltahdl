@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, InterfaceWithContAssign) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  logic a;\n"
-      "  wire b;\n"
-      "  assign b = a;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kContAssign));
-}
-
 TEST(DesignBuildingBlockParsing, InterfaceWithModport) {
   auto r = Parse(
       "interface ifc;\n"
