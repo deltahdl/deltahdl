@@ -6,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockLexing, ConfigKeyword) {
-  auto r = LexOne("config");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwConfig);
-}
-
 TEST(DesignBuildingBlockLexing, EndconfigKeyword) {
   auto r = LexOne("endconfig");
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndconfig);
