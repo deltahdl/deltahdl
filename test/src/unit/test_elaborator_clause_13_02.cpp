@@ -213,4 +213,15 @@ TEST(SubroutineOverviewElaboration, TaskWithEventControlIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(Subroutines, FunctionAndTaskElaborate) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  function int add(int a, int b);\n"
+             "    return a + b;\n"
+             "  endfunction\n"
+             "  task do_nothing;\n"
+             "  endtask\n"
+             "endmodule\n"));
+}
+
 }  // namespace
