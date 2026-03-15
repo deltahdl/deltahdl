@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithUnionDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  union packed { logic [7:0] a; logic [7:0] b; } u;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithParamDecl) {
   auto r = Parse(
       "module m;\n"

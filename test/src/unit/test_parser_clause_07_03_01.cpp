@@ -48,4 +48,13 @@ TEST(AggregateTypeParsing, UnionPacked) {
   EXPECT_EQ(item->typedef_type.struct_members.size(), 2u);
 }
 
+TEST(PackedUnions, TwoLogicMembers) {
+  auto r = Parse(
+      "module m;\n"
+      "  union packed { logic [7:0] a; logic [7:0] b; } u;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
