@@ -25,11 +25,6 @@ TEST(LexicalConventionLexing, IntegerLiteralRecognized) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexicalConventionLexing, StringLiteralRecognized) {
-  auto r = LexOne("\"hello world\"");
-  EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
-}
-
 TEST(LexicalConventionLexing, UnbasedUnsizedLiteralRecognized) {
   auto r = LexOne("'1");
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
@@ -38,11 +33,6 @@ TEST(LexicalConventionLexing, UnbasedUnsizedLiteralRecognized) {
 TEST(LexicalConventionLexing, ArrayStructLiteralTokenRecognized) {
   auto r = LexOne("'{");
   EXPECT_EQ(r.token.kind, TokenKind::kApostropheLBrace);
-}
-
-TEST(LexicalConventionLexing, TripleQuotedStringLiteralRecognized) {
-  auto r = LexOne("\"\"\"hello\"\"\"");
-  EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
 }
 
 TEST(LexicalConventionLexing, DotTokenForBuiltinMethodCalls) {
@@ -87,11 +77,6 @@ TEST(LexicalConventionLexing, AllFourAreasInOneStream) {
   EXPECT_TRUE(kinds.count(TokenKind::kStringLiteral));
   EXPECT_TRUE(kinds.count(TokenKind::kSystemIdentifier));
   EXPECT_TRUE(kinds.count(TokenKind::kIdentifier));
-}
-
-TEST(LexicalConventionLexing, UnterminatedStringIsError) {
-  auto r = LexWithDiag("\"unterminated");
-  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace

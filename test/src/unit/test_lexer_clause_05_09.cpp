@@ -8,6 +8,16 @@ using namespace delta;
 
 namespace {
 
+TEST(LexicalConventionLexing, StringLiteralRecognized) {
+  auto r = LexOne("\"hello world\"");
+  EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
+}
+
+TEST(LexicalConventionLexing, TripleQuotedStringLiteralRecognized) {
+  auto r = LexOne("\"\"\"hello\"\"\"");
+  EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
+}
+
 TEST(LexicalConventionLexing, EmptyString) {
   auto tokens = Lex("\"\"");
   ASSERT_GE(tokens.size(), 2u);

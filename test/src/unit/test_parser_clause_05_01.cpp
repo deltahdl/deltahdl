@@ -12,13 +12,6 @@ TEST(LexicalConventionParsing, IntegerLiteralInExpression) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, StringLiteralInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $display(\"hello world\");\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, UnbasedUnsizedLiteralInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -59,13 +52,6 @@ TEST(LexicalConventionParsing, StructureLiteralWithDefaultParses) {
               "  typedef struct { int a; int b; } ab_t;\n"
               "  ab_t s;\n"
               "  initial s = '{default:0};\n"
-              "endmodule\n"));
-}
-
-TEST(LexicalConventionParsing, TripleQuotedStringInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial $display(\"\"\"hello\"\"\");\n"
               "endmodule\n"));
 }
 

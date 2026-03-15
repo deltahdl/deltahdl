@@ -68,4 +68,49 @@ TEST(LexicalConventionParsing, StringWithWorld) {
   EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
 }
 
+TEST(LexicalConventionParsing, TripleQuotedStringExprKind) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = \"\"\"hello\"\"\";\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
+}
+
+TEST(LexicalConventionParsing, QuotedStringTextPreserved) {
+  auto r = Parse("module m; initial x = \"ABC\"; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->text, "\"ABC\"");
+}
+
+TEST(LexicalConventionParsing, TripleQuotedStringTextPreserved) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = \"\"\"hello\"\"\";\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->text, "\"\"\"hello\"\"\"");
+}
+
+TEST(LexicalConventionParsing, StringLiteralInExpression) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $display(\"hello world\");\n"
+              "endmodule\n"));
+}
+
+TEST(LexicalConventionParsing, TripleQuotedStringInExpression) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $display(\"\"\"hello\"\"\");\n"
+              "endmodule\n"));
+}
+
 }  // namespace

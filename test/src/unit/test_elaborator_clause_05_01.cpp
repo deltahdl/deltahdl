@@ -9,13 +9,6 @@ TEST(LexicalConventionElaboration, ModuleWithIntegerLiteralElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, ModuleWithStringLiteralElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  initial $display(\"hello\");\n"
-             "endmodule\n"));
-}
-
 TEST(LexicalConventionElaboration, ModuleWithAttributeElaborates) {
   EXPECT_TRUE(
       ElabOk("(* synthesis *) module t;\n"
