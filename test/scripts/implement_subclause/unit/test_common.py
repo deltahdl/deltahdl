@@ -231,32 +231,8 @@ def test_run_steps_prints_step_numbers(isc, capsys):
     assert "Step 1/11:" in out
 
 
-def test_run_steps_skips_when_not_implementable(isc):
-    """run_steps skips implementation steps when subclause is not implementable."""
-    not_impl = MagicMock(
-        returncode=0, stdout="IMPLEMENTABLE: no", stderr="",
-    )
-    summary_result = MagicMock(
-        returncode=0, stdout=_OK_STDOUT, stderr="",
-    )
-
-    def fake_run(_func, *_args, **_kwargs):
-        """Return not-implementable for step 2, summary for last."""
-        fake_run.count += 1
-        if fake_run.count == 2:
-            return not_impl
-        return summary_result
-
-    fake_run.count = 0
-
-    steps = isc.build_steps("4.1", "~/LRM.txt")
-    with patch("implement_subclause.run_with_dots", side_effect=fake_run):
-        isc.run_steps(steps, model="opus")
-    assert fake_run.count == 3  # read, check, summary
-
-
-def test_run_steps_returns_none_when_not_implementable(isc):
-    """run_steps returns None when subclause is not implementable."""
+def _run_not_implementable(isc):
+    """Run steps with a not-implementable verdict, return (result, count)."""
     not_impl = MagicMock(
         returncode=0, stdout="IMPLEMENTABLE: no", stderr="",
     )
@@ -276,6 +252,18 @@ def test_run_steps_returns_none_when_not_implementable(isc):
     steps = isc.build_steps("4.1", "~/LRM.txt")
     with patch("implement_subclause.run_with_dots", side_effect=fake_run):
         result = isc.run_steps(steps, model="opus")
+    return result, fake_run.count
+
+
+def test_run_steps_skips_when_not_implementable(isc):
+    """run_steps skips implementation steps when subclause is not implementable."""
+    _, count = _run_not_implementable(isc)
+    assert count == 3  # read, check, summary
+
+
+def test_run_steps_returns_none_when_not_implementable(isc):
+    """run_steps returns None when subclause is not implementable."""
+    result, _ = _run_not_implementable(isc)
     assert result is None
 
 
