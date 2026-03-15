@@ -31,4 +31,9 @@ TEST(Keywords, EndprogramKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndprogram);
 }
 
+TEST(Keywords, InterfaceKeyword) {
+  auto r = LexOne("interface");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwInterface);
+}
+
 }  // namespace
