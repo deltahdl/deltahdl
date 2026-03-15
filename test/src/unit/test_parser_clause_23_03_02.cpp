@@ -140,4 +140,15 @@ TEST(ModuleAndHierarchyParsing, ModuleInstanceEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
+TEST(ModuleInstantiation, SimpleInstanceNoConnections) {
+  auto r = Parse(
+      "module sub; endmodule\n"
+      "module m;\n"
+      "  sub u0();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[1]->items[0]->kind, ModuleItemKind::kModuleInst);
+}
+
 }  // namespace

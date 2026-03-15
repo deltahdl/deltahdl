@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithModuleInst) {
-  auto r = Parse(
-      "module sub; endmodule\n"
-      "module m;\n"
-      "  sub u0();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[1]->items[0]->kind, ModuleItemKind::kModuleInst);
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithGateInst) {
   auto r = Parse(
       "module m;\n"
