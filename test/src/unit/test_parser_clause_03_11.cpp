@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleInstantiatesInterface) {
-  EXPECT_TRUE(
-      ParseOk("interface ifc; logic req; endinterface\n"
-              "module m;\n"
-              "  ifc u0();\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, PortConnections) {
   auto r = Parse(
       "module sub(input logic a, output logic b);\n"

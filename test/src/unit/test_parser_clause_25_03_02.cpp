@@ -73,4 +73,12 @@ TEST(InterfaceDeclaration, InstantiationInModule) {
               "endmodule\n"));
 }
 
+TEST(InterfaceInstantiation, ModuleInstantiatesInterface) {
+  EXPECT_TRUE(
+      ParseOk("interface ifc; logic req; endinterface\n"
+              "module m;\n"
+              "  ifc u0();\n"
+              "endmodule\n"));
+}
+
 }  // namespace
