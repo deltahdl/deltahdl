@@ -92,8 +92,45 @@ TEST(Keywords, DesignElementKeywordsAreNotIdentifiers) {
   }
 }
 
+TEST(Keywords, UppercaseNotKeyword) {
+  auto r = LexOne("Module ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+  EXPECT_EQ(r.token.text, "Module");
+}
+
+TEST(Keywords, AllUppercaseNotKeyword) {
+  auto r = LexOne("MODULE ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+  EXPECT_EQ(r.token.text, "MODULE");
+}
+
+TEST(Keywords, MixedCaseVariantsNotKeywords) {
+  const char* const mixed[] = {"Module", "BEGIN", "Logic", "WIRE", "AlwayS"};
+  for (const char* m : mixed) {
+    std::string input = std::string(m) + " ";
+    auto r = LexOne(input);
+    EXPECT_EQ(r.token.kind, TokenKind::kIdentifier)
+        << m << " should be an identifier, not a keyword";
+  }
+}
+
+TEST(Keywords, DataTypeKeywordRecognized) {
+  auto r = LexOne("logic");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwLogic);
+}
+
+TEST(Keywords, ControlFlowKeywordRecognized) {
+  auto r = LexOne("if");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwIf);
+}
+
 TEST(Keywords, KeywordPrefixIsIdentifier) {
   auto r = LexOne("module_name");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+}
+
+TEST(Keywords, KeywordSuffixIsIdentifier) {
+  auto r = LexOne("endmodule_x");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
 }
 

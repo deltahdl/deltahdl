@@ -92,16 +92,6 @@ TEST(LexicalConventionLexing, CaseSensitive) {
   EXPECT_EQ(tokens[2].text, "Abc");
 }
 
-TEST(LexicalConventionLexing, KeywordRecognized) {
-  auto r = LexOne("module ");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwModule);
-}
-
-TEST(LexicalConventionLexing, UppercaseNotKeyword) {
-  auto r = LexOne("Module ");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-  EXPECT_EQ(r.token.text, "Module");
-}
 
 TEST(LexicalConventionLexing, MaxLength1024Ok) {
   std::string id(1024, 'a');
@@ -125,13 +115,6 @@ TEST(LexicalConventionLexing, EscapedMaxLength1025Error) {
   EXPECT_TRUE(errors);
 }
 
-TEST(LexicalConventionLexing, KeywordDistinctFromIdentifier) {
-  auto kw = LexOne("module");
-  EXPECT_EQ(kw.token.kind, TokenKind::kKwModule);
-
-  auto id = LexOne("my_module");
-  EXPECT_EQ(id.token.kind, TokenKind::kIdentifier);
-}
 
 TEST(LexicalConventionLexing, SingleCharIdentifier) {
   auto r = LexOne("a ");

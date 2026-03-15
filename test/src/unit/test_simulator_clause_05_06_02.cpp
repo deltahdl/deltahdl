@@ -1,6 +1,5 @@
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
-#include "preprocessor/preprocessor.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -29,8 +28,18 @@ TEST(KeywordIdentifierSim, EscapedKeywordCoexistsWithKeyword) {
       "    \\begin = 8'd42;\n"
       "  end\n"
       "endmodule\n",
-      "\\begin");
+      "begin");
   EXPECT_EQ(result, 42u);
+}
+
+TEST(KeywordIdentifierSim, AllUppercaseUsedAsVariable) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] MODULE;\n"
+      "  initial MODULE = 8'd88;\n"
+      "endmodule\n",
+      "MODULE");
+  EXPECT_EQ(result, 88u);
 }
 
 TEST(KeywordIdentifierSim, KeywordLowercaseOnly) {
