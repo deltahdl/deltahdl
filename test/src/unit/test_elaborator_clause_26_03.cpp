@@ -29,4 +29,18 @@ TEST(WildcardPackageImport, ModuleWithPackageImportAndUsage) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(WildcardImport, MultiplePackages) {
+  EXPECT_TRUE(
+      ElabOk("package p1;\n"
+             "  typedef int t1;\n"
+             "endpackage\n"
+             "package p2;\n"
+             "  typedef int t2;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import p1::*;\n"
+             "  import p2::*;\n"
+             "endmodule\n"));
+}
+
 }  // namespace
