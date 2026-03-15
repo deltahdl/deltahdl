@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §23.3.1
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, MultipleTopLevelModules) {
+TEST(TopLevelModules, MultipleTopLevelModules) {
   auto r = Parse(
       "module top_a; endmodule\n"
       "module top_b; endmodule\n");
