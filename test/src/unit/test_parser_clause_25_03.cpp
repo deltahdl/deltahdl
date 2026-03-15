@@ -253,4 +253,15 @@ TEST(InterfaceDeclarations, InterfaceKeywordIntroducesInterface) {
   EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
 }
 
+TEST(InterfaceDeclarations, InterfaceContainsDeclarations) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  logic req, gnt;\n"
+      "  logic [7:0] data;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->interfaces[0]->items.empty());
+}
+
 }  // namespace
