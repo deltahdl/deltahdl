@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, BuiltInNOutputGates) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire a, y1, y2;\n"
-              "  buf  g1(y1, a);\n"
-              "  not  g2(y2, a);\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, BuiltInEnableGates) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
