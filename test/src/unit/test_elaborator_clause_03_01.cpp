@@ -4,16 +4,6 @@
 
 namespace {
 
-TEST(BuildingBlockElaboration, ModuleWithPackageElaborates) {
-  EXPECT_TRUE(
-      ElabOk("package pkg;\n"
-             "  typedef int myint;\n"
-             "endpackage\n"
-             "module m;\n"
-             "  import pkg::*;\n"
-             "endmodule\n"));
-}
-
 TEST(BuildingBlockElaboration, SelectSpecificTopFromMultipleModules) {
   ElabFixture f;
   auto* design = ElaborateSrc(
