@@ -8,23 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignElementSim, TwoInitialBlocks) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial a = 8'd10;\n"
-      "  initial b = 8'd20;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 10u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
-}
-
 TEST(DesignElementSim, ModuleWithContinuousAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(

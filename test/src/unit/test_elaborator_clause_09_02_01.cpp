@@ -98,6 +98,23 @@ TEST(InitialBlock, BlockingAssignment) {
   EXPECT_EQ(v->value.ToUint64(), 42u);
 }
 
+TEST(InitialBlock, MultipleInitialBlocks) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial a = 8'd10;\n"
+      "  initial b = 8'd20;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 10u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
+}
+
 }  // namespace
 TEST(InitialProcedures, MultipleInitialsAllExecute) {
   SimFixture f;
