@@ -650,3 +650,14 @@ TEST(DesignElementPreprocessing, MacroExpandsInsideModule) {
   EXPECT_NE(result.find("8"), std::string::npos);
 }
 
+TEST(DesignElementPreprocessing, MacroExpandsToDesignElement) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define EMPTY_MOD(name) module name; endmodule\n"
+      "`EMPTY_MOD(foo)\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("module"), std::string::npos);
+  EXPECT_NE(result.find("foo"), std::string::npos);
+}
+
