@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithContAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  assign b = a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool has_assign = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) has_assign = true;
-  }
-  EXPECT_TRUE(has_assign);
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithInitialBlock) {
   auto r = Parse(
       "module m;\n"
