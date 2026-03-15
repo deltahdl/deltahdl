@@ -20,20 +20,6 @@ TEST(LexicalConventionLexing, EmptySourceProducesOnlyEof) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexicalConventionLexing, WhitespaceOnlyProducesEof) {
-  auto tokens = Lex("   \t\n\n  ");
-  ASSERT_EQ(tokens.size(), 1u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
-}
-
-TEST(LexicalConventionLexing, WhitespaceIsNotEmittedAsToken) {
-  auto tokens = Lex("a  b");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
-}
-
 TEST(LexicalConventionLexing, LineCommentIsStripped) {
   auto tokens = Lex("a // comment\nb");
   ASSERT_EQ(tokens.size(), 3u);

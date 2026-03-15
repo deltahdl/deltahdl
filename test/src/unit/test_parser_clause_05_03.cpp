@@ -134,4 +134,29 @@ TEST(LexicalConventionParsing, TabCharactersInDeclarations) {
               "endmodule\n"));
 }
 
+TEST(LexicalConventionParsing, VerticalTabDelimiter) {
+  EXPECT_TRUE(ParseOk("module\vt\v;\vlogic\va\v;\vendmodule"));
+}
+
+TEST(LexicalConventionParsing, TabInsideStringPreservedInParse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial $display(\"\thello\t\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->expr, nullptr);
+  ASSERT_GE(stmt->expr->args.size(), 1u);
+  EXPECT_EQ(stmt->expr->args[0]->kind, ExprKind::kStringLiteral);
+  EXPECT_NE(stmt->expr->args[0]->text.find("\thello\t"),
+            std::string_view::npos);
+}
+
+TEST(LexicalConventionParsing, AllWhitespaceTypesInputParsesEmpty) {
+  auto r = Parse(" \t\n\f\v\r\n ");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.cu->modules.empty());
+}
+
 }  // namespace

@@ -1,6 +1,5 @@
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
-#include "preprocessor/preprocessor.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -192,6 +191,26 @@ TEST(WhiteSpaceSim, WhitespaceAroundTernary) {
       "endmodule\n",
       "result");
   EXPECT_EQ(result, 100u);
+}
+
+TEST(WhiteSpaceSim, WhitespaceVerticalTabInSource) {
+  auto result = RunAndGet(
+      "module t;\v"
+      "logic [7:0] result;\v"
+      "initial result = 8'd11;\v"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 11u);
+}
+
+TEST(WhiteSpaceSim, WhitespaceCrlfLineEndings) {
+  auto result = RunAndGet(
+      "module t;\r\n"
+      "  logic [7:0] result;\r\n"
+      "  initial result = 8'd22;\r\n"
+      "endmodule\r\n",
+      "result");
+  EXPECT_EQ(result, 22u);
 }
 
 TEST(WhiteSpaceSim, WhitespaceMultipleStatements) {

@@ -178,6 +178,41 @@ TEST(LexicalConventionLexing, TrailingWhitespaceAfterToken) {
   EXPECT_EQ(tokens[0].text, "a");
 }
 
+TEST(LexicalConventionLexing, WhitespaceOnlyProducesEof) {
+  auto tokens = Lex("   \t\n\n  ");
+  ASSERT_EQ(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
+}
+
+TEST(LexicalConventionLexing, WhitespaceIsNotEmittedAsToken) {
+  auto tokens = Lex("a  b");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
+}
+
+TEST(LexicalConventionLexing, FormfeedSeparatesKeywords) {
+  auto tokens = Lex("module\fm");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+}
+
+TEST(LexicalConventionLexing, VerticalTabSeparatesKeywords) {
+  auto tokens = Lex("module\vm");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+}
+
+TEST(LexicalConventionLexing, EofAfterWhitespace) {
+  auto tokens = Lex("a   ");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
+}
+
 TEST(LexicalConventionLexing, OperatorsDoNotNeedWhitespaceSeparation) {
   auto tokens = Lex("a+b");
   ASSERT_EQ(tokens.size(), 4u);

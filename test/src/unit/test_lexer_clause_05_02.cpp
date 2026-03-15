@@ -205,26 +205,6 @@ TEST(LexicalConventionLexing, BlockCommentActsAsTokenSeparator) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexicalConventionLexing, CrlfAsTokenSeparator) {
-  auto tokens = Lex("a\r\nb");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(LexicalConventionLexing, CarriageReturnAloneAsTokenSeparator) {
-  auto tokens = Lex("a\rb");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
-TEST(LexicalConventionLexing, EmptyInputProducesOnlyEof) {
-  auto tokens = Lex("");
-  ASSERT_EQ(tokens.size(), 1u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
-}
-
 TEST(LexicalConventionLexing, TokenStreamAlwaysEndsWithEof) {
   auto tokens = Lex("module m; endmodule");
   ASSERT_GE(tokens.size(), 2u);
