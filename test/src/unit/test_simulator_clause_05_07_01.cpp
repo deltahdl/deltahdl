@@ -19,7 +19,7 @@ static bool RunSim(SimFixture& f, const std::string& src) {
   return true;
 }
 
-TEST(IntegerLiteralSim, PrimaryIntegerLiteral) {
+TEST(IntegerLiteralSim, HexLiteralAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -36,7 +36,7 @@ TEST(IntegerLiteralSim, PrimaryIntegerLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-TEST(IntegerLiteralSim, PrimaryUnbasedUnsized1) {
+TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsByte) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -53,7 +53,7 @@ TEST(IntegerLiteralSim, PrimaryUnbasedUnsized1) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(IntegerLiteralSim, PrimaryUnbasedUnsized0) {
+TEST(IntegerLiteralSim, UnbasedUnsizedZeroClearsByte) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -70,7 +70,7 @@ TEST(IntegerLiteralSim, PrimaryUnbasedUnsized0) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(IntegerLiteralSim, PrimaryHexLiteral) {
+TEST(IntegerLiteralSim, HexLiteralDistinctNibbles) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -87,7 +87,7 @@ TEST(IntegerLiteralSim, PrimaryHexLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-TEST(IntegerLiteralSim, PrimaryBinaryLiteral) {
+TEST(IntegerLiteralSim, BinaryLiteralByte) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -104,7 +104,7 @@ TEST(IntegerLiteralSim, PrimaryBinaryLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 0xCCu);
 }
 
-TEST(IntegerLiteralSim, NumberIntegral) {
+TEST(IntegerLiteralSim, UnsizedDecimalLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -438,23 +438,6 @@ TEST(IntegerLiteralSim, QuestionMarkAsZ) {
   EXPECT_NE(bval & 0x5u, 0u);
 }
 
-TEST(IntegerLiteralSim, UnbasedUnsizedZero) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = '0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0u);
-}
-
 TEST(IntegerLiteralSim, UnbasedUnsizedOne) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -637,34 +620,34 @@ TEST(IntegerLiteralSim, SizeConstantNonzero) {
   EXPECT_EQ(result, 1u);
 }
 
-TEST(IntegerLiteralSim, NumberIntegralDecimal) {
+TEST(IntegerLiteralSim, UnsizedDecimalSimValue) {
   auto v = RunAndGet(
       "module t;\n  logic [31:0] x;\n  initial x = 100;\nendmodule\n", "x");
   EXPECT_EQ(v, 100u);
 }
 
-TEST(IntegerLiteralSim, NumberIntegralBinary) {
+TEST(IntegerLiteralSim, BinaryLiteralWithUnderscore) {
   auto v = RunAndGet(
       "module t;\n  logic [7:0] x;\n  initial x = 8'b1010_0101;\nendmodule\n",
       "x");
   EXPECT_EQ(v, 0xA5u);
 }
 
-TEST(IntegerLiteralSim, NumberIntegralOctal) {
+TEST(IntegerLiteralSim, OctalLiteralFourDigit) {
   auto v = RunAndGet(
       "module t;\n  logic [11:0] x;\n  initial x = 12'o7654;\nendmodule\n",
       "x");
   EXPECT_EQ(v, 07654u);
 }
 
-TEST(IntegerLiteralSim, NumberIntegralHex) {
+TEST(IntegerLiteralSim, HexLiteralFourDigit) {
   auto v = RunAndGet(
       "module t;\n  logic [15:0] x;\n  initial x = 16'hCAFE;\nendmodule\n",
       "x");
   EXPECT_EQ(v, 0xCAFEu);
 }
 
-TEST(IntegerLiteralSim, NumberAllIntegralBases) {
+TEST(IntegerLiteralSim, AllBasesProduceSameValue) {
   SimFixture f;
   ASSERT_TRUE(RunSim(f,
                      "module t;\n"
@@ -684,7 +667,7 @@ TEST(IntegerLiteralSim, NumberAllIntegralBases) {
   }
 }
 
-TEST(IntegerLiteralSim, NumberAsPrimaryLiteralInTernary) {
+TEST(IntegerLiteralSim, LiteralInTernaryCondition) {
   auto v = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -694,13 +677,7 @@ TEST(IntegerLiteralSim, NumberAsPrimaryLiteralInTernary) {
   EXPECT_EQ(v, 99u);
 }
 
-TEST(IntegerLiteralSim, NumberSizedDecimalBase) {
-  auto v = RunAndGet(
-      "module t;\n  logic [7:0] x;\n  initial x = 8'd200;\nendmodule\n", "x");
-  EXPECT_EQ(v, 200u);
-}
-
-TEST(IntegerLiteralSim, NumberUnderscoreInIntegral) {
+TEST(IntegerLiteralSim, UnsizedDecimalWithUnderscore) {
   auto v = RunAndGet(
       "module t;\n  logic [31:0] x;\n  initial x = 1_000_000;\nendmodule\n",
       "x");
@@ -836,6 +813,33 @@ TEST(IntegerLiteralSim, DecimalXDigitFillsAllBits) {
   ASSERT_NE(var, nullptr);
   uint8_t mask = 0xFF;
   EXPECT_EQ(var->value.words[0].bval & mask, mask);
+}
+
+TEST(IntegerLiteralSim, OctalLiteralValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'o77;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 63u);
+}
+
+TEST(IntegerLiteralSim, SizedHexLiteralValue) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 20'h837FF;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0x837FFu);
 }
 
 }  // namespace

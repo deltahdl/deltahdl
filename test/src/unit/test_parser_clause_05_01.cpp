@@ -4,22 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionParsing, IntegerLiteralInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic [31:0] x;\n"
-              "  initial x = 32'd42;\n"
-              "endmodule\n"));
-}
-
-TEST(LexicalConventionParsing, UnbasedUnsizedLiteralInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic [15:0] x;\n"
-              "  assign x = '1;\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, ArrayLiteralParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

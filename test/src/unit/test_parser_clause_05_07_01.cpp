@@ -1,3 +1,4 @@
+#include "fixture_evaluator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -730,6 +731,71 @@ TEST(IntegerLiteralParsing, DecimalValueWithUnderscores) {
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->int_val, 27195000u);
+}
+
+TEST(IntegerLiteralParsing, UnsizedUnbasedLiteral) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = 12;\n"
+      "endmodule\n");
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 12u);
+}
+
+TEST(IntegerLiteralParsing, UnsizedBasedLiteral) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = 'd12;\n"
+      "endmodule\n");
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+TEST(IntegerLiteralParsing, SizedBasedLiteral) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = 16'd12;\n"
+      "endmodule\n");
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+}
+
+TEST(IntegerLiteralParsing, NegativeUnsizedIsTwosComplement) {
+  EvalFixture f;
+  auto val = ConstEvalInt(ParseExprFrom("-12 / 3", f));
+  ASSERT_TRUE(val.has_value());
+  EXPECT_EQ(val.value_or(0), -4);
+}
+
+TEST(IntegerLiteralParsing, BinaryLiteral) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = 4'b1010;\n"
+      "endmodule\n");
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
+  EXPECT_EQ(rhs->int_val, 0xAu);
+}
+
+TEST(IntegerLiteralParsing, IntegerLiteralInExpression) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic [31:0] x;\n"
+              "  initial x = 32'd42;\n"
+              "endmodule\n"));
+}
+
+TEST(IntegerLiteralParsing, UnbasedUnsizedLiteralInExpression) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic [15:0] x;\n"
+              "  assign x = '1;\n"
+              "endmodule\n"));
 }
 
 }  // namespace

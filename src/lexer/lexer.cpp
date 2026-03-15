@@ -250,6 +250,38 @@ void Lexer::ValidateDecimalXZ(SourceLoc loc, char base_letter,
   }
 }
 
+void Lexer::ValidateBaseDigits(SourceLoc loc, char base_letter,
+                               uint32_t digit_start) {
+  for (uint32_t i = digit_start; i < pos_; ++i) {
+    char c = source_[i];
+    if (c == '_' || c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?')
+      continue;
+    bool valid = false;
+    switch (base_letter) {
+      case 'b':
+      case 'B':
+        valid = (c == '0' || c == '1');
+        break;
+      case 'o':
+      case 'O':
+        valid = (c >= '0' && c <= '7');
+        break;
+      case 'd':
+      case 'D':
+        valid = (c >= '0' && c <= '9');
+        break;
+      case 'h':
+      case 'H':
+        valid = std::isxdigit(static_cast<unsigned char>(c));
+        break;
+    }
+    if (!valid) {
+      diag_.Error(loc, "illegal digit for specified base");
+      return;
+    }
+  }
+}
+
 Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   Advance();  // skip '
   // Optional signed specifier: 's' or 'S'.
@@ -275,6 +307,10 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   if (pos_ == before_digits) {
     diag_.Error(loc, "missing value digits after base specifier");
   }
+  if (pos_ > before_digits && source_[before_digits] == '_') {
+    diag_.Error(loc, "underscore cannot be first character of number value");
+  }
+  ValidateBaseDigits(loc, base_letter, before_digits);
   ValidateDecimalXZ(loc, base_letter, before_digits);
   Token tok;
   tok.kind = TokenKind::kIntLiteral;
@@ -300,7 +336,8 @@ void Lexer::LexExponentPart() {
   if (!AtEnd() && (Current() == '+' || Current() == '-')) {
     Advance();
   }
-  while (!AtEnd() && std::isdigit(static_cast<unsigned char>(Current()))) {
+  while (!AtEnd() && (std::isdigit(static_cast<unsigned char>(Current())) ||
+                      Current() == '_')) {
     Advance();
   }
 }

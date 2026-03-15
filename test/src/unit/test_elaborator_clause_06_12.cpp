@@ -90,16 +90,4 @@ TEST(Elaboration, RealAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(NumberElaboration, NumberRealElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  real x;\n"
-      "  initial x = 3.14;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }  // namespace

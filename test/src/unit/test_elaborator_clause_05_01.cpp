@@ -2,21 +2,6 @@
 
 namespace {
 
-TEST(LexicalConventionElaboration, ModuleWithIntegerLiteralElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic [7:0] x = 8'hFF;\n"
-             "endmodule\n"));
-}
-
-TEST(LexicalConventionElaboration, ModuleWithUnbasedUnsizedLiteralElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic [15:0] x;\n"
-             "  assign x = '1;\n"
-             "endmodule\n"));
-}
-
 TEST(LexicalConventionElaboration, ModuleWithArrayLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"

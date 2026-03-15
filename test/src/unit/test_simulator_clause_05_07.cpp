@@ -19,7 +19,7 @@ static bool LowerRunAndFindIR(SimFixture& f, RtlirDesign* design,
   return vi_out && vr_out;
 }
 
-TEST(NumberLiteralSim, NumberBothFormsCoexist) {
+TEST(NumberLiteralSim, IntegerAndRealCoexist) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -43,19 +43,19 @@ TEST(NumberLiteralSim, NumberBothFormsCoexist) {
   EXPECT_DOUBLE_EQ(d, 3.14);
 }
 
-TEST(NumberLiteralSim, NumberRealFixedPoint) {
+TEST(NumberLiteralSim, RealFixedPointLiteral) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 42.5;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 42.5);
 }
 
-TEST(NumberLiteralSim, NumberRealScientific) {
+TEST(NumberLiteralSim, RealScientificLiteral) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 5.0e3;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 5000.0);
 }
 
-TEST(NumberLiteralSim, NumberMixedInExpression) {
+TEST(NumberLiteralSim, IntegerAndRealInExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -77,5 +77,45 @@ TEST(NumberLiteralSim, NumberMixedInExpression) {
   uint64_t bits = vr->value.ToUint64();
   std::memcpy(&d, &bits, sizeof(double));
   EXPECT_DOUBLE_EQ(d, 4.0);
+}
+
+TEST(NumberLiteralSim, UnsizedHexExceeds32Bits) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [63:0] x;\n"
+      "  initial x = 'h7_0000_0000;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0x700000000ULL);
+}
+
+TEST(NumberLiteralSim, UnsizedDecimalExceeds32Bits) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [63:0] x;\n"
+      "  initial x = 4294967296;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0x100000000ULL);
+}
+
+TEST(NumberLiteralSim, SignedLiteralNegativeSignExtended) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 4'shF;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0xFFu);
+}
+
+TEST(NumberLiteralSim, SignedLiteralPositiveZeroExtended) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 4'sh7;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 0x07u);
 }
 

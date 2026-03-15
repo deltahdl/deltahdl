@@ -592,24 +592,6 @@ TEST(IntegerLiteralElaboration, LeftPadKnownHexWithXDigit) {
   EXPECT_EQ(var->value.words[0].bval & 0xF00, 0x000u);
 }
 
-TEST(IntegerLiteralElaboration, SingleDigitXFillsAllBits) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'dx;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  uint8_t mask = 0xFF;
-  EXPECT_EQ(var->value.words[0].bval & mask, mask);
-}
-
 TEST(IntegerLiteralElaboration, SignedBaseLiteralIsSigned) {
   SimFixture f;
   auto* lit = MakeSizedLiteral(f.arena, "4'sd3", 3);
@@ -645,26 +627,6 @@ TEST(IntegerLiteralElaboration, LeftPadWithZeros) {
       "endmodule\n",
       "x");
   EXPECT_EQ(result, 0x0Fu);
-}
-
-TEST(IntegerLiteralElaboration, WhitespaceBetweenSizeAndBase) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 5 'd 3;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 3u);
-}
-
-TEST(IntegerLiteralElaboration, SizeConstantNonzero) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 1'b1;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 1u);
 }
 
 TEST(IntegerLiteralElaboration, ZDigitInBinaryLiteral) {
@@ -752,6 +714,21 @@ TEST(IntegerLiteralElaboration, OctalXZCaseInsensitive) {
       f);
   ASSERT_NE(design, nullptr);
   LowerRunAndCompareBitPatterns(f, design, 0x3F);
+}
+
+TEST(IntegerLiteralElaboration, ModuleWithIntegerLiteralElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic [7:0] x = 8'hFF;\n"
+             "endmodule\n"));
+}
+
+TEST(IntegerLiteralElaboration, ModuleWithUnbasedUnsizedLiteralElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic [15:0] x;\n"
+             "  assign x = '1;\n"
+             "endmodule\n"));
 }
 
 }  // namespace

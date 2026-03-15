@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
-#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -193,26 +192,17 @@ TEST(IntegerLiteralLexing, LargeUnsizedHex) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(IntegerLiteralLexing, SizedHexLiteralValue) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 20'h837FF;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 0x837FFu);
+TEST(IntegerLiteralLexing, IntegerLiteralRecognized) {
+  auto r = LexOne("32'd100");
+  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
+}
+
+TEST(IntegerLiteralLexing, UnbasedUnsizedLiteralRecognized) {
+  auto r = LexOne("'1");
+  EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
 }  // namespace
-TEST(IntegerLiteralLexing, WhitespaceBetweenSizeAndBase) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 5 'd 3;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 3u);
-}
 
 TEST(IntegerLiteralLexing, NoSpacesInDecimalNumber) {
   auto tokens = Lex("123");

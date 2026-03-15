@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionElaboration, FixedPointElaborates) {
+TEST(RealLiteralElaboration, FixedPointElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(LexicalConventionElaboration, FixedPointElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(LexicalConventionElaboration, ScientificNotationElaborates) {
+TEST(RealLiteralElaboration, ScientificNotationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -28,7 +28,7 @@ TEST(LexicalConventionElaboration, ScientificNotationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(LexicalConventionElaboration, ExponentOnlyElaborates) {
+TEST(RealLiteralElaboration, ExponentOnlyElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -40,7 +40,7 @@ TEST(LexicalConventionElaboration, ExponentOnlyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(LexicalConventionElaboration, NegativeExponentElaborates) {
+TEST(RealLiteralElaboration, NegativeExponentElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -52,18 +52,30 @@ TEST(LexicalConventionElaboration, NegativeExponentElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(LexicalConventionElaboration, ModuleWithRealLiteralElaborates) {
+TEST(RealLiteralElaboration, ModuleWithRealLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  real r = 3.14;\n"
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, UnderscoreRealElaborates) {
+TEST(RealLiteralElaboration, UnderscoreRealElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  real r = 236.123_763_e-12;\n"
              "endmodule\n"));
+}
+
+TEST(RealLiteralElaboration, RealLiteralElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  real x;\n"
+      "  initial x = 3.14;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

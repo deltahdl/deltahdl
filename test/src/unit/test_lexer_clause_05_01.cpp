@@ -20,16 +20,6 @@ TEST(LexicalConventionLexing, EmptySourceProducesOnlyEof) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexicalConventionLexing, IntegerLiteralRecognized) {
-  auto r = LexOne("32'd100");
-  EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
-}
-
-TEST(LexicalConventionLexing, UnbasedUnsizedLiteralRecognized) {
-  auto r = LexOne("'1");
-  EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
-}
-
 TEST(LexicalConventionLexing, DotTokenForBuiltinMethodCalls) {
   auto tokens = Lex("arr.size");
   ASSERT_GE(tokens.size(), 4u);
