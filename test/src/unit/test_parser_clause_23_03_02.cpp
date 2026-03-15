@@ -151,4 +151,16 @@ TEST(ModuleInstantiation, SimpleInstanceNoConnections) {
   EXPECT_EQ(r.cu->modules[1]->items[0]->kind, ModuleItemKind::kModuleInst);
 }
 
+TEST(ModuleInstantiation, ModuleInstantiatesModule) {
+  auto r = Parse(
+      "module sub; endmodule\n"
+      "module top;\n"
+      "  sub u0();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
+}
+
 }  // namespace
