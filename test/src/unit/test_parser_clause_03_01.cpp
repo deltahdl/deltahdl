@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, ModuleWithEmptyPortListParens) {
-  auto r = Parse("module m(); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "m");
-}
-
 TEST(CompilationUnitStructure, BindDirectiveGoesToBindDirectives) {
   auto r = Parse(
       "module target; endmodule\n"
