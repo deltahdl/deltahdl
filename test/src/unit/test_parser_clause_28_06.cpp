@@ -116,4 +116,15 @@ TEST(PrimitiveGateTypeParsing, EnableGatetype_Notif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
+TEST(BuiltInEnableGates, ThreeStateGates) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire a, en, y;\n"
+              "  bufif0 g1(y, a, en);\n"
+              "  bufif1 g2(y, a, en);\n"
+              "  notif0 g3(y, a, en);\n"
+              "  notif1 g4(y, a, en);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
