@@ -33,10 +33,6 @@ TEST(DesignElements, TopLevelClassIsNotDesignElement) {
   EXPECT_TRUE(r.cu->configs.empty());
 }
 
-TEST(DesignBuildingBlockParsing, UnrecognizedTopLevelTokenIsError) {
-  EXPECT_FALSE(ParseOk("always_comb begin end"));
-}
-
 TEST(DesignBuildingBlockParsing, BareStatementAtTopLevelIsError) {
   EXPECT_FALSE(ParseOk("assign x = 1;"));
 }

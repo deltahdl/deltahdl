@@ -564,4 +564,8 @@ TEST(CompilationUnits, CuScopeParamIsNotDesignElement) {
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
+TEST(CompilationUnits, UnrecognizedTopLevelTokenIsError) {
+  EXPECT_FALSE(ParseOk("always_comb begin end"));
+}
+
 }  // namespace
