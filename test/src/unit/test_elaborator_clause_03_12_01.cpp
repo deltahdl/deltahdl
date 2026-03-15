@@ -124,3 +124,10 @@ TEST(CompilationUnitScope, CuScopeFunctionVisibleInDesign) {
   EXPECT_FALSE(design->cu_function_decls.empty());
 }
 
+TEST(BuildingBlockElaboration, CuScopeTaskElaboratesSuccessfully) {
+  EXPECT_TRUE(
+      ElabOk("task my_task;\n"
+             "endtask\n"
+             "module m; endmodule\n"));
+}
+

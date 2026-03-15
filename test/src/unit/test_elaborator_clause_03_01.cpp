@@ -4,13 +4,6 @@
 
 namespace {
 
-TEST(BuildingBlockElaboration, CuScopeTaskElaboratesSuccessfully) {
-  EXPECT_TRUE(
-      ElabOk("task my_task;\n"
-             "endtask\n"
-             "module m; endmodule\n"));
-}
-
 TEST(BuildingBlockElaboration, MultipleSameChildInstancesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
