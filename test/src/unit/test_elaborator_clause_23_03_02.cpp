@@ -89,4 +89,21 @@ TEST(BuildingBlockElaboration, DiamondInstantiationElaborates) {
   EXPECT_EQ(design->top_modules[0]->children.size(), 2u);
 }
 
+TEST(ModuleInstantiation, TwoLevelHierarchyElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub(input logic a, output logic b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic x, y;\n"
+      "  sub u0(.a(x), .b(y));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  EXPECT_FALSE(design->top_modules[0]->children.empty());
+}
+
 }  // namespace
