@@ -154,4 +154,17 @@ TEST(ContinuousAssign, ModuleWithContinuousAssignElaborates) {
   EXPECT_FALSE(design->top_modules[0]->assigns.empty());
 }
 
+TEST(InterfaceContinuousAssign, ContAssignInInterfaceElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface ifc;\n"
+      "  logic a;\n"
+      "  wire b;\n"
+      "  assign b = a;\n"
+      "endinterface\n",
+      f, "ifc");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

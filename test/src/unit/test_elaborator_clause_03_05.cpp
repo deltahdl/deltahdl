@@ -4,19 +4,6 @@
 
 namespace {
 
-TEST(DesignBuildingBlockElaboration, InterfaceWithContAssignElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "interface ifc;\n"
-      "  logic a;\n"
-      "  wire b;\n"
-      "  assign b = a;\n"
-      "endinterface\n",
-      f, "ifc");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(DesignBuildingBlockElaboration, SimpleBusExampleElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
