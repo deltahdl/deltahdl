@@ -26,7 +26,7 @@ from lib.python.classify import (
     add_run_mode_args,
     clause_to_filename,
 )
-from lib.python.cli import add_continue_arg, run_claude_cli
+from lib.python.cli import add_continue_arg, run_claude_cli, run_with_dots
 from ._github import (
     _validate_issue_args,
     build_action_remark,
@@ -365,7 +365,8 @@ def _detect_prefix(test, clause, lrm_path):
             test.prefix_rationale = f"body contains '{pattern}'"
             return prefix
     print(f"Calling Claude to detect pipeline stage for {test.test_name}"
-          " because body does not match any known pattern...")
+          " because body does not match any known pattern...",
+          end="", flush=True)
     prompt = _PREFIX_PROMPT_TEMPLATE.format(
         lrm_path=lrm_path,
         suite=test.suite_name,
@@ -373,6 +374,7 @@ def _detect_prefix(test, clause, lrm_path):
         test_body=body,
     )
     resp = _call_claude(prompt, _PREFIX_SCHEMA, continue_session=True)
+    print()
     stage = resp.get("pipeline_stage", "")
     prefix = _STAGE_TO_PREFIX.get(stage)
     if prefix:
@@ -464,7 +466,9 @@ def _call_claude(prompt, schema=None, continue_session=False):
     delays = [5, 10]
     for attempt in range(len(delays) + 1):  # pragma: no branch
         try:
-            result = run_claude_cli(cmd, prompt, env=env, timeout=600)
+            result = run_with_dots(
+                run_claude_cli, cmd, prompt, env=env, timeout=600,
+            )
         except subprocess.TimeoutExpired:
             if attempt < len(delays):
                 print(f"WARNING: Claude CLI timed out (attempt"
@@ -565,22 +569,26 @@ def _apply_classification(test, clause_resp, topic_resp=None,
 def classify_test_block(test, test_dir, lrm_path, *,
                         continue_session=False):
     """Use Claude to classify a single test's prefix and clause."""
-    print(f"Calling Claude to classify clause for {test.test_name}...")
+    print(f"Calling Claude to classify clause for {test.test_name}...",
+          end="", flush=True)
     clause_prompt = _build_clause_prompt(test, lrm_path)
     clause_resp = _call_claude(
         clause_prompt, _CLAUSE_SCHEMA,
         continue_session=continue_session,
     )
+    print()
     topic_resp = None
     clause = clause_resp.get("clause", "")
     if clause.replace("_", "-") == "non-lrm":
         print(f"Calling Claude to classify topic for"
-              f" {test.test_name} because clause is non-lrm...")
+              f" {test.test_name} because clause is non-lrm...",
+              end="", flush=True)
         topic_prompt = _build_topic_prompt(test, test_dir)
         topic_resp = _call_claude(
             topic_prompt, _TOPIC_SCHEMA,
             continue_session=True,
         )
+        print()
     _apply_classification(test, clause_resp, topic_resp,
                           lrm_path=lrm_path)
     return test
