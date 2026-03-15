@@ -153,7 +153,7 @@ def test_detect_prefix_no_match_fallback(ct, ct_helpers, monkeypatch):
     _detect_prefix = getattr(ct, "_detect_prefix")
     monkeypatch.setattr(
         ct, "_call_claude",
-        lambda _p, _s=None: {
+        lambda _p, _s=None, **_kw: {
             "pipeline_stage": "simulator", "rationale": "r",
         },
     )
@@ -167,7 +167,7 @@ def test_detect_prefix_fallback_stores_rationale(ct, ct_helpers, monkeypatch):
     _detect_prefix = getattr(ct, "_detect_prefix")
     monkeypatch.setattr(
         ct, "_call_claude",
-        lambda _p, _s=None: {
+        lambda _p, _s=None, **_kw: {
             "pipeline_stage": "simulator",
             "rationale": "timing checks",
         },
@@ -192,7 +192,7 @@ def test_detect_prefix_fallback_calls_claude(ct, ct_helpers, monkeypatch):
     _detect_prefix = getattr(ct, "_detect_prefix")
     calls = []
 
-    def spy(prompt, _schema=None):
+    def spy(prompt, _schema=None, **_kw):
         calls.append(prompt)
         return {"pipeline_stage": "simulator", "rationale": "r"}
 
@@ -208,7 +208,7 @@ def test_detect_prefix_fallback_invalid_stage_exits(ct, ct_helpers, monkeypatch)
     _detect_prefix = getattr(ct, "_detect_prefix")
     monkeypatch.setattr(
         ct, "_call_claude",
-        lambda _p, _s=None: {
+        lambda _p, _s=None, **_kw: {
             "pipeline_stage": "bogus", "rationale": "r",
         },
     )
@@ -384,7 +384,8 @@ def test_call_claude_failure(ct, ct_helpers, monkeypatch):
         _call_claude("prompt")
 
 
-def _capture_claude_cmd(ct, monkeypatch, schema=None):
+def _capture_claude_cmd(ct, monkeypatch, schema=None,
+                        continue_session=False):
     """Run _call_claude and return the captured subprocess command."""
     _call_claude = getattr(ct, "_call_claude")
     captured_cmd = []
@@ -398,7 +399,8 @@ def _capture_claude_cmd(ct, monkeypatch, schema=None):
         return mock_result
 
     monkeypatch.setattr(subprocess, "run", capture_run)
-    _call_claude("prompt", schema=schema)
+    _call_claude("prompt", schema=schema,
+                 continue_session=continue_session)
     return captured_cmd
 
 
@@ -441,6 +443,18 @@ def test_call_claude_no_json_schema_by_default(ct, monkeypatch):
     """CLI command omits --json-schema when no schema is provided."""
     cmd = _capture_claude_cmd(ct, monkeypatch)
     assert "--json-schema" not in cmd
+
+
+def test_call_claude_no_continue_by_default(ct, monkeypatch):
+    """CLI command omits --continue by default."""
+    cmd = _capture_claude_cmd(ct, monkeypatch)
+    assert "--continue" not in cmd
+
+
+def test_call_claude_with_continue(ct, monkeypatch):
+    """CLI command includes --continue when continue_session=True."""
+    cmd = _capture_claude_cmd(ct, monkeypatch, continue_session=True)
+    assert "--continue" in cmd
 
 
 def test_call_claude_timeout_retries_then_succeeds(ct, monkeypatch):
@@ -614,7 +628,7 @@ def test_classify_tests_matching(ct, ct_helpers, monkeypatch, tmp_path):
                    "suite_name": "Parsing", "test_name": "T"}
     monkeypatch.setattr(
         ct, "_call_claude",
-        lambda p, schema=None: clause_resp,
+        lambda p, schema=None, **_kw: clause_resp,
     )
     t = _tb("T", body=["  auto r = Parse(src);"])
     ct.classify_tests(
@@ -628,7 +642,7 @@ def test_classify_tests_per_test(ct, ct_helpers, monkeypatch, tmp_path):
     _tb = ct_helpers.make_test_block
     call_count = [0]
 
-    def counting_claude(_prompt, _schema=None):
+    def counting_claude(_prompt, _schema=None, **_kw):
         call_count[0] += 1
         return {"clause": "6.1", "rationale": "r",
                 "suite_name": "S", "test_name": "T"}
@@ -652,7 +666,7 @@ def _do_non_lrm_two_calls(ct, ct_helpers, monkeypatch, tmp_path):
     _tb = ct_helpers.make_test_block
     call_count = [0]
 
-    def two_call_claude(_prompt, _schema=None):
+    def two_call_claude(_prompt, _schema=None, **_kw):
         call_count[0] += 1
         if call_count[0] == 1:
             return {"clause": "non-lrm", "rationale": "r",
@@ -845,8 +859,9 @@ def test_classify_tests_propagates_validation_error(ct, ct_helpers, monkeypatch,
     _tb = ct_helpers.make_test_block
     monkeypatch.setattr(
         ct, "_call_claude",
-        lambda _p, schema=None: _valid_clause(clause="abc",
-                                               suite_name="S", test_name="T"),
+        lambda _p, schema=None, **_kw: _valid_clause(clause="abc",
+                                                      suite_name="S",
+                                                      test_name="T"),
     )
     with pytest.raises(SystemExit):
         ct.classify_tests(

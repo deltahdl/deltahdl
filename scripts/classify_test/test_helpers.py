@@ -68,6 +68,6 @@ def stub_classifier(monkeypatch, response):
     """Stub _call_claude and side-effect functions for _run tests."""
     monkeypatch.setattr(
         classify_test, "_call_claude",
-        lambda p, schema=None: response,
+        lambda p, schema=None, **_kw: response,
     )
     stub_side_effects(monkeypatch)

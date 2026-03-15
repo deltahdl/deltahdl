@@ -30,7 +30,7 @@ def _run_args(tmp_path, **overrides):
         "output_dir": str(tmp_path), "dry_run": False,
         "lrm": str(tmp_path / "lrm.txt"), "max_lines": 1000,
         "suite": "S", "test": "T", "issue": None, "organization": None,
-        "repo": None, "no_commit": False,
+        "repo": None, "no_commit": False, "continue_session": False,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -601,7 +601,7 @@ def test_run_live_merge_prints_rationale(tmp_path, monkeypatch, capsys, ct,
     assert "because" in capsys.readouterr().out
 
 
-def _mixed_classifier(prompt, schema=None):
+def _mixed_classifier(prompt, schema=None, **_kw):
     """Return different classifications based on which test is in prompt."""
     if "Stay" in prompt:
         if schema and "non_lrm_topic" in schema:
@@ -629,7 +629,7 @@ def _run_live_non_lrm(ct, tmp_path, monkeypatch, *, src_body, test="T"):
     _run(_run_args(tmp_path, file=str(src), test=test))
 
 
-def _self_named_classifier(_prompt, schema=None):
+def _self_named_classifier(_prompt, schema=None, **_kw):
     """Classify single test as non-lrm with topic aig."""
     if schema and "non_lrm_topic" in schema:
         return {"non_lrm_topic": "aig", "rationale": "r",
@@ -662,7 +662,7 @@ def test_run_live_self_named(tmp_path, monkeypatch, ct, ct_helpers):
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 
 
-def _no_rename_classifier(_prompt, schema=None):
+def _no_rename_classifier(_prompt, schema=None, **_kw):
     """Classify single test as non-lrm/aig without renaming."""
     if schema and "non_lrm_topic" in schema:
         return {"non_lrm_topic": "aig", "rationale": "r",
@@ -879,7 +879,7 @@ def test_run_no_commit_skips_commit(tmp_path, monkeypatch, ct, ct_helpers):
 # ---- rename in place -------------------------------------------------------
 
 
-def _rename_classifier(_prompt, schema=None):
+def _rename_classifier(_prompt, schema=None, **_kw):
     """Classify single test as non-lrm:aig and rename to Renamed."""
     if schema and "non_lrm_topic" in schema:
         return {"non_lrm_topic": "aig", "rationale": "r",

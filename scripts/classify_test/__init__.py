@@ -26,7 +26,7 @@ from lib.python.classify import (
     add_run_mode_args,
     clause_to_filename,
 )
-from lib.python.cli import run_claude_cli
+from lib.python.cli import add_continue_arg, run_claude_cli
 from ._github import (
     _validate_issue_args,
     build_action_remark,
@@ -370,7 +370,7 @@ def _detect_prefix(test, clause, lrm_path):
         test_name=test.test_name,
         test_body=body,
     )
-    resp = _call_claude(prompt, _PREFIX_SCHEMA)
+    resp = _call_claude(prompt, _PREFIX_SCHEMA, continue_session=True)
     stage = resp.get("pipeline_stage", "")
     prefix = _STAGE_TO_PREFIX.get(stage)
     if prefix:
@@ -449,12 +449,14 @@ def _extract_json(text):
     sys.exit(1)
 
 
-def _call_claude(prompt, schema=None):
+def _call_claude(prompt, schema=None, continue_session=False):
     """Call Claude CLI and return parsed JSON response."""
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
     cmd = ["claude", "-p", "--model", "opus", "--effort", "high",
            "--output-format", "json", "--dangerously-skip-permissions"]
+    if continue_session:
+        cmd.append("--continue")
     if schema:
         cmd.extend(["--json-schema", schema])
     delays = [5, 10]
@@ -557,19 +559,26 @@ def _apply_classification(test, clause_resp, topic_resp=None,
     _rename_test_macro(test, suite, name)
 
 
-def classify_tests(tests, test_dir, lrm_path):
+def classify_tests(tests, test_dir, lrm_path, *,
+                    continue_session=False):
     """Use Claude to classify each test's prefix and clause."""
     for test in tests:
         print(f"Calling Claude to classify clause for {test.test_name}...")
         clause_prompt = _build_clause_prompt(test, lrm_path)
-        clause_resp = _call_claude(clause_prompt, _CLAUSE_SCHEMA)
+        clause_resp = _call_claude(
+            clause_prompt, _CLAUSE_SCHEMA,
+            continue_session=continue_session,
+        )
         topic_resp = None
         clause = clause_resp.get("clause", "")
         if clause.replace("_", "-") == "non-lrm":
             print(f"Calling Claude to classify topic for"
                   f" {test.test_name} because clause is non-lrm...")
             topic_prompt = _build_topic_prompt(test, test_dir)
-            topic_resp = _call_claude(topic_prompt, _TOPIC_SCHEMA)
+            topic_resp = _call_claude(
+                topic_prompt, _TOPIC_SCHEMA,
+                continue_session=True,
+            )
         _apply_classification(test, clause_resp, topic_resp,
                               lrm_path=lrm_path)
     return tests
@@ -691,6 +700,7 @@ def _parse_args():
                         help="GitHub issue number to update")
     add_github_args(parser)
     add_run_mode_args(parser)
+    add_continue_arg(parser)
     return parser.parse_args()
 
 
@@ -900,6 +910,7 @@ def _run(args):
     classify_tests(
         target, Path(args.output_dir).resolve(),
         Path(args.lrm).resolve(),
+        continue_session=args.continue_session,
     )
     print_classification_table(target)
     groups = _group_tests(target)
