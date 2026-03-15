@@ -6,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockLexing, KeywordPrefixIsIdentifier) {
-  auto r = LexOne("module_name");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-}
-
 TEST(DesignBuildingBlockLexing, AllDesignElementKeywordsInSequence) {
   auto tokens = Lex(
       "module endmodule interface endinterface "

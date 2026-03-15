@@ -92,4 +92,9 @@ TEST(Keywords, DesignElementKeywordsAreNotIdentifiers) {
   }
 }
 
+TEST(Keywords, KeywordPrefixIsIdentifier) {
+  auto r = LexOne("module_name");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+}
+
 }  // namespace
