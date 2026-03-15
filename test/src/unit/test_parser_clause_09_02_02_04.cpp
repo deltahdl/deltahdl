@@ -223,4 +223,12 @@ TEST(SchedulingSemanticsParsing, AlwaysFfFlipFlop) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
+TEST(AlwaysFf, PosedgeTriggered) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic clk, d, q;\n"
+              "  always_ff @(posedge clk) q <= d;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
