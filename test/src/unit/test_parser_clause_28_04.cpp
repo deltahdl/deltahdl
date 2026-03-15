@@ -284,4 +284,12 @@ TEST(BuiltInNInputGates, AllSixGateTypes) {
   EXPECT_EQ(gates.size(), 6u);
 }
 
+TEST(GateInstantiation, ModuleInstantiatesPrimitive) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire a, b, y;\n"
+              "  and g1(y, a, b);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
