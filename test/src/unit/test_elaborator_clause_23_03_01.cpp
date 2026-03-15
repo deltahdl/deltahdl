@@ -49,4 +49,11 @@ TEST(TopLevelModules, NonexistentTopIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(TopLevelModules, UnknownTopIsError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc("module m; endmodule\n", f, "nonexistent");
+  EXPECT_EQ(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace
