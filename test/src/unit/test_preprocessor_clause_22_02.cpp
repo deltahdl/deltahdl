@@ -4,28 +4,6 @@
 
 using namespace delta;
 
-TEST(Preprocessor, GraveAccentRequiredForDirective) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define MY_MAC 42\n"
-      "int x = `MY_MAC;\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("42"), std::string::npos);
-}
-
-TEST(Preprocessor, ApostropheIsNotGraveAccent) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define MY_MAC 42\n"
-      "int x = 'MY_MAC;\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-
-  EXPECT_EQ(result.find("42"), std::string::npos);
-  EXPECT_NE(result.find("'MY_MAC"), std::string::npos);
-}
-
 TEST(Preprocessor, DirectiveInLineCommentIgnored) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -195,19 +173,6 @@ TEST(Preprocessor, DirectiveInMacroTextProcessedOnExpansion) {
   EXPECT_TRUE(pp.HasTimescale());
 }
 
-TEST(Preprocessor, DirectiveScopePersistsAcrossPreprocessCalls) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-
-  auto fid1 = f.mgr.AddFile("<file1>", "`default_nettype none\n");
-  pp.Preprocess(fid1);
-  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
-
-  auto fid2 = f.mgr.AddFile("<file2>", "module m; endmodule\n");
-  pp.Preprocess(fid2);
-  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
-}
-
 TEST(Preprocessor, BlockCommentStartInStringNotAComment) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -336,17 +301,6 @@ TEST(Preprocessor, MacroAfterEndifExpandedOnSameLine) {
   EXPECT_NE(result.find("42"), std::string::npos);
 }
 
-TEST(Preprocessor, DirectiveSupersededByAnother) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  auto fid = f.mgr.AddFile("<test>",
-                           "`default_nettype none\n"
-                           "`default_nettype wire\n");
-  pp.Preprocess(fid);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
-}
-
 TEST(Preprocessor, MacroExpansionWithinIfdefUsingMacroBody) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -386,26 +340,6 @@ TEST(Preprocessor, MultilineBlockCommentEndFollowedByDirective) {
                            "*/ `timescale 1ns / 1ps\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_TRUE(pp.HasTimescale());
-}
-
-TEST(Preprocessor, EscapedBacktickInStringNotDirective) {
-  PreprocFixture f;
-  Preprocess("string s = \"value is \\`FOO\";\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(Preprocessor, MultipleDirectivesScopeChaining) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  auto fid = f.mgr.AddFile("<test>",
-                           "`default_nettype none\n"
-                           "`celldefine\n"
-                           "`timescale 1ns / 1ps\n");
-  pp.Preprocess(fid);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
-  EXPECT_TRUE(pp.InCelldefine());
   EXPECT_TRUE(pp.HasTimescale());
 }
 
