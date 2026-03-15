@@ -216,6 +216,34 @@ def test_main_prints_action_summary(
 
 
 
+@patch("implement_subclause.delete_issue")
+@patch("implement_subclause.commit_implementation")
+@patch("implement_subclause.run_steps", return_value=None)
+def test_main_deletes_issue_when_not_implementable(
+    _mock_run, mock_commit, mock_delete, isc, tmp_path,
+):
+    """main() deletes issue when run_steps returns None."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1",
+              "--issue", "8", "--model", "opus"])
+    assert mock_delete.call_args[0][0] == 8
+
+
+@patch("implement_subclause.delete_issue")
+@patch("implement_subclause.commit_implementation")
+@patch("implement_subclause.run_steps", return_value=None)
+def test_main_skips_commit_when_not_implementable(
+    _mock_run, mock_commit, _mock_delete, isc, tmp_path,
+):
+    """main() does not call commit_implementation when not implementable."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1",
+              "--issue", "8", "--model", "opus"])
+    assert not mock_commit.called
+
+
 def test_parse_args_rejects_figures_flag(isc, tmp_path):
     """--figures flag is no longer accepted."""
     lrm = tmp_path / "lrm.pdf"

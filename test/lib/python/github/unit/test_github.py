@@ -14,6 +14,7 @@ from lib.python.github import (
     sync_subclause_table,
     update_subclause_status,
     close_issue,
+    delete_issue,
     fetch_issue_body,
     fetch_issue_title,
     format_subclause_label,
@@ -155,6 +156,46 @@ def test_close_issue_failure() -> None:
     with patch("lib.python.github.subprocess.run", return_value=cp):
         with pytest.raises(SystemExit):
             close_issue("org", "repo", 1, "reason")
+
+
+# --- delete_issue ---
+
+
+def test_delete_issue_calls_gh_delete() -> None:
+    """Calls gh issue delete with correct issue number."""
+    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
+    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
+        delete_issue(42)
+    cmd = mock_run.call_args[0][0]
+    assert "delete" in cmd
+
+
+def test_delete_issue_passes_yes_flag() -> None:
+    """Passes --yes to skip confirmation."""
+    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
+    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
+        delete_issue(42)
+    cmd = mock_run.call_args[0][0]
+    assert "--yes" in cmd
+
+
+def test_delete_issue_passes_issue_number() -> None:
+    """Passes the issue number as a string argument."""
+    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
+    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
+        delete_issue(99)
+    cmd = mock_run.call_args[0][0]
+    assert "99" in cmd
+
+
+def test_delete_issue_failure() -> None:
+    """SystemExit raised on delete failure."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=1, stdout="", stderr="err",
+    )
+    with patch("lib.python.github.subprocess.run", return_value=cp):
+        with pytest.raises(SystemExit):
+            delete_issue(1)
 
 
 # --- build_synced_body ---

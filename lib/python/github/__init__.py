@@ -186,6 +186,22 @@ def close_issue(
     print(f"Closed issue #{issue}.")
 
 
+def delete_issue(issue: int) -> None:
+    """Delete a GitHub issue using ``gh issue delete``."""
+    print(f"Deleting issue #{issue}...")
+    result = subprocess.run(
+        ["gh", "issue", "delete", str(issue), "--yes"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(f"ERROR: Failed to delete issue #{issue}:"
+              f"\n{result.stderr}", file=sys.stderr)
+        sys.exit(1)
+    print(f"Deleted issue #{issue}.")
+
+
 def build_synced_body(body: str, items: dict[str, str]) -> str:
     """Return issue body with subclauses checklist synced to *items*."""
     checked = {

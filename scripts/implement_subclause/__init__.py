@@ -19,6 +19,7 @@ from lib.python.cli import (
     run_with_dots,
     validate_lrm,
 )
+from lib.python.github import delete_issue
 from lib.python.git import (
     commit_and_push,
     get_porcelain_changes,
@@ -285,6 +286,8 @@ def run_steps(steps, *, model="opus",
                       " an ACTION_SUMMARY.", file=sys.stderr)
                 sys.exit(1)
 
+    if skip_to_summary:
+        return None
     return summary
 
 
@@ -366,5 +369,9 @@ def main(argv=None):
         steps, model=args.model,
         continue_session=args.continue_session,
     )
+    if action is None:
+        print("Not implementable — deleting issue.")
+        delete_issue(args.issue)
+        return
     print(f"Action summary:\n{action}")
     commit_implementation(args.subclause, args.issue, action=action)
