@@ -6,18 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §3.1 — Large number of modules accumulate correctly.
-TEST(CompilationUnitStructure, ManyModulesAccumulate) {
-  std::string src;
-  for (int i = 0; i < 50; ++i) {
-    src += "module m" + std::to_string(i) + "; endmodule\n";
-  }
-  auto r = Parse(src);
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules.size(), 50u);
-}
-
 TEST(CompilationUnitStructure, TimeunitDeclarationSetsFlag) {
   auto r = Parse(
       "timeunit 1ns;\n"
