@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, VoidFunction) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function void log(int val);\n"
-              "    $display(\"%0d\", val);\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, NonVoidFunctionUsedAsOperand) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

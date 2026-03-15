@@ -367,4 +367,13 @@ TEST(AssignmentParsing, SystemCallRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
+TEST(FunctionDeclaration, VoidFunction) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function void log(int val);\n"
+              "    $display(\"%0d\", val);\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
 }  // namespace
