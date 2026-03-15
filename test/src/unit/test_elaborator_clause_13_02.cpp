@@ -224,4 +224,12 @@ TEST(Subroutines, FunctionAndTaskElaborate) {
              "endmodule\n"));
 }
 
+TEST(Subroutines, TaskAndFunctionCoexistElaborate) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  function int add(int a, int b); return a + b; endfunction\n"
+             "  task do_nothing; endtask\n"
+             "endmodule\n"));
+}
+
 }  // namespace
