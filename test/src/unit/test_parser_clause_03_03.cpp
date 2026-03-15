@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithNetDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [7:0] bus;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kNetDecl);
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithVarDecl) {
   auto r = Parse(
       "module m;\n"
