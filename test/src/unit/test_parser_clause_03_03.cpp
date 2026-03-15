@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithAlwaysComb) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic a, y;\n"
-      "  always_comb y = a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[2]->kind, ModuleItemKind::kAlwaysCombBlock);
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithAlwaysFF) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

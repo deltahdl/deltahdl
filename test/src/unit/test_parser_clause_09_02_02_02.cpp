@@ -548,4 +548,15 @@ TEST(SchedulingSemanticsParsing, AlwaysCombCombinational) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
+TEST(AlwaysComb, SimpleAssignment) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, y;\n"
+      "  always_comb y = a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[2]->kind, ModuleItemKind::kAlwaysCombBlock);
+}
+
 }  // namespace
