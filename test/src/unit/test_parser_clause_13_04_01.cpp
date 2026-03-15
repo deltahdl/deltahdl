@@ -385,4 +385,12 @@ TEST(FunctionDeclaration, NonVoidFunctionUsedAsOperand) {
               "endmodule\n"));
 }
 
+TEST(FunctionDeclaration, VoidFunctionCalledAsStatement) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function void log(int v); $display(\"%0d\", v); endfunction\n"
+              "  initial log(42);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
