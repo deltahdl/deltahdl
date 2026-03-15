@@ -163,4 +163,11 @@ TEST(ModuleInstantiation, ModuleInstantiatesModule) {
       HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
 }
 
+TEST(ModuleInstantiation, MultipleLevelsOfHierarchy) {
+  EXPECT_TRUE(
+      ParseOk("module leaf; endmodule\n"
+              "module mid; leaf u0(); endmodule\n"
+              "module top; mid u0(); endmodule\n"));
+}
+
 }  // namespace

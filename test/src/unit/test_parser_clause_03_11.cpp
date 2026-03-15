@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, MultipleLevelsOfHierarchy) {
-  EXPECT_TRUE(
-      ParseOk("module leaf; endmodule\n"
-              "module mid; leaf u0(); endmodule\n"
-              "module top; mid u0(); endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, MultipleTopLevelModules) {
   auto r = Parse(
       "module top_a; endmodule\n"
