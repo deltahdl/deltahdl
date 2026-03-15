@@ -779,8 +779,6 @@ def test_run_live_keeps_non_duplicates_when_removing(tmp_path, monkeypatch,
     assert "Keep" in src
 
 
-# ---- _rewrite_source / _update_source --------------------------------------
-
 
 def _rewrite_source_fixture(ct, ct_helpers, tmp_path):
     """Create parsed file, groups, and temp file for rewrite tests."""
