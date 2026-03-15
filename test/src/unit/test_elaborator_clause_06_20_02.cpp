@@ -94,4 +94,15 @@ TEST(PrimaryElaboration, RealParameter) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(ValueParameters, ModuleWithTypedParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m #(parameter int WIDTH = 8);\n"
+      "  logic [WIDTH-1:0] data;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
