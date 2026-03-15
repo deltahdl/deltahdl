@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithTypedef) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "  byte_t data;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithClassDecl) {
   auto r = Parse(
       "module m;\n"

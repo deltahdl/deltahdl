@@ -253,4 +253,15 @@ TEST(DataTypeParsing, TypedefEnum) {
   EXPECT_EQ(var->data_type.type_name, "my_enum");
 }
 
+TEST(UserDefinedTypes, TypedefLogicVector) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  byte_t data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
+}
+
 }  // namespace
