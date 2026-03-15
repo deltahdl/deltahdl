@@ -85,4 +85,10 @@ TEST(Elaboration, ModuleAutomaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(ModuleScope, LocalScopesDoNotConflict) {
+  EXPECT_TRUE(
+      ElabOk("module a; logic x; endmodule\n"
+             "module b; logic x; endmodule\n"));
+}
+
 }  // namespace
