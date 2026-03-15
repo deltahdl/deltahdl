@@ -403,4 +403,12 @@ TEST(PackageImport, WildcardIntoInterface) {
               "endinterface\n"));
 }
 
+TEST(PackageImport, WildcardIntoProgram) {
+  EXPECT_TRUE(
+      ParseOk("package pkg; typedef int myint; endpackage\n"
+              "program p;\n"
+              "  import pkg::*;\n"
+              "endprogram\n"));
+}
+
 }  // namespace

@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ImportIntoProgram) {
-  EXPECT_TRUE(
-      ParseOk("package pkg; typedef int myint; endpackage\n"
-              "program p;\n"
-              "  import pkg::*;\n"
-              "endprogram\n"));
-}
-
 TEST(DesignBuildingBlockParsing, ImportIntoPackage) {
   EXPECT_TRUE(
       ParseOk("package a; typedef int myint; endpackage\n"
