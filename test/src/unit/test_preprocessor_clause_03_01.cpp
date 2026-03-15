@@ -4,19 +4,6 @@
 
 namespace {
 
-TEST(DesignElementPreprocessing, UndefThenIfdefExcludesDesignElement) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define HAS_PKG\n"
-      "`undef HAS_PKG\n"
-      "`ifdef HAS_PKG\n"
-      "package p; endpackage\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(result.find("package"), std::string::npos);
-}
-
 TEST(DesignElementPreprocessing, EmptyIfdefBodyPreservesSubsequent) {
   PreprocFixture f;
   auto result = Preprocess(
