@@ -220,4 +220,11 @@ TEST(ConfigDeclaration, ConfigWithEndLabel) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
+TEST(ConfigDeclaration, MissingEndconfigIsError) {
+  EXPECT_FALSE(ParseOk(
+      "module m; endmodule\n"
+      "config c;\n"
+      "  design m;"));
+}
+
 }  // namespace

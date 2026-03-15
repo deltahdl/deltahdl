@@ -6,13 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, MissingEndconfigIsError) {
-  EXPECT_FALSE(ParseOk(
-      "module m; endmodule\n"
-      "config c;\n"
-      "  design m;"));
-}
-
 TEST(CompilationUnitStructure, MissingEndprimitiveIsError) {
   EXPECT_FALSE(ParseOk(
       "primitive inv(output y, input a);\n"
