@@ -24,7 +24,6 @@ from lib.python.classify import (
     add_github_args,
     add_output_args,
     add_run_mode_args,
-    build_lrm_read_instruction,
     clause_to_filename,
 )
 from lib.python.cli import add_continue_arg, run_claude_cli
@@ -60,6 +59,7 @@ from ._split import (
     _write_overflow_file,
     append_tests_to_file,
     extract_clause_hint,
+    send_lrm_preamble,
     strip_lrm_quotes,
 )
 
@@ -567,12 +567,7 @@ def classify_test_block(test, test_dir, lrm_path, *,
                         continue_session=False, clause_hint=""):
     """Use Claude to classify a single test's prefix and clause."""
     if not continue_session and clause_hint:
-        preamble = (
-            build_lrm_read_instruction(clause_hint, str(lrm_path))
-            + " Keep this context — you will classify tests next."
-        )
-        print("Reading LRM context...")
-        _call_claude(preamble)
+        send_lrm_preamble(clause_hint, lrm_path)
     print(f"Calling Claude to classify clause for {test.test_name}...")
     clause_prompt = _build_clause_prompt(test, lrm_path)
     use_continue = continue_session or bool(clause_hint)

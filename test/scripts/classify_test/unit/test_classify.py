@@ -621,48 +621,45 @@ def test_apply_classification_non_lrm_prefix_override(ct, ct_helpers):
 # ---- classify_test_block ----------------------------------------------------
 
 
+def _run_preamble_test(ct, ct_helpers, monkeypatch, tmp_path, **kw):
+    """Classify with preamble stubs, return preamble call list."""
+    calls = []
+    monkeypatch.setattr(
+        ct, "send_lrm_preamble",
+        lambda hint, path: calls.append(hint),
+    )
+    monkeypatch.setattr(
+        ct, "_call_claude",
+        lambda p, _s=None, **_kw: {"clause": "6.1", "rationale": "r",
+                                    "suite_name": "S", "test_name": "T"},
+    )
+    t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
+    ct.classify_test_block(
+        t, tmp_path, tmp_path / "lrm.txt", clause_hint="6", **kw,
+    )
+    return calls
+
+
 def test_classify_block_sends_preamble_when_no_continue(
     ct, ct_helpers, monkeypatch, tmp_path,
 ):
-    """classify_test_block sends LRM preamble when continue_session=False."""
-    _tb = ct_helpers.make_test_block
-    prompts = []
-
-    def capturing_claude(prompt, schema=None, **_kw):
-        prompts.append(prompt)
-        if schema:
-            return {"clause": "6.1", "rationale": "r",
-                    "suite_name": "S", "test_name": "T"}
-        return "ok"
-
-    monkeypatch.setattr(ct, "_call_claude", capturing_claude)
-    t = _tb("T", body=["  auto r = Parse(src);"])
-    ct.classify_test_block(
-        t, tmp_path, tmp_path / "lrm.txt",
-        continue_session=False, clause_hint="6",
-    )
-    assert "General or Overview" in prompts[0]
+    """classify_test_block calls send_lrm_preamble when no --continue."""
+    assert _run_preamble_test(
+        ct, ct_helpers, monkeypatch, tmp_path,
+        continue_session=False,
+    ) == ["6"]
 
 
 def test_classify_block_skips_preamble_when_continue(
     ct, ct_helpers, monkeypatch, tmp_path,
 ):
     """classify_test_block skips preamble when continue_session=True."""
-    _tb = ct_helpers.make_test_block
-    prompts = []
-
-    def capturing_claude(prompt, _schema=None, **_kw):
-        prompts.append(prompt)
-        return {"clause": "6.1", "rationale": "r",
-                "suite_name": "S", "test_name": "T"}
-
-    monkeypatch.setattr(ct, "_call_claude", capturing_claude)
-    t = _tb("T", body=["  auto r = Parse(src);"])
-    ct.classify_test_block(
-        t, tmp_path, tmp_path / "lrm.txt",
-        continue_session=True, clause_hint="6",
+    assert not _run_preamble_test(
+        ct, ct_helpers, monkeypatch, tmp_path,
+        continue_session=True,
     )
-    assert "General or Overview" not in prompts[0]
+
+
 
 
 def test_classify_tests_matching(ct, ct_helpers, monkeypatch, tmp_path):
