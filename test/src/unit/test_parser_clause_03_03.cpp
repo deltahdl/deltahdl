@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithParamDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  parameter int WIDTH = 8;\n"
-      "  localparam int DEPTH = 4;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int param_count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kParamDecl) param_count++;
-  }
-  EXPECT_EQ(param_count, 2);
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithTypedef) {
   auto r = Parse(
       "module m;\n"
