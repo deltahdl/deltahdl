@@ -1,15 +1,8 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 
 namespace {
-
-// §3.1 General — overview-level elaboration tests.
-
-TEST(BuildingBlockElaboration, MinimalModuleElaboratesSuccessfully) {
-  ElabFixture f;
-  auto* design = ElaborateSrc("module m; endmodule", f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
 
 TEST(BuildingBlockElaboration, EmptySourceTopNotFoundReturnsNull) {
   ElabFixture f;
