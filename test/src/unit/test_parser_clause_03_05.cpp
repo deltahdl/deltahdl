@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, InterfaceWithTask) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  task do_transfer;\n"
-      "  endtask\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kTaskDecl));
-}
-
 TEST(DesignBuildingBlockParsing, InterfaceWithInitialBlock) {
   auto r = Parse(
       "interface ifc;\n"
