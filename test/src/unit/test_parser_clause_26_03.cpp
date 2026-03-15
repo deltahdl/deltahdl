@@ -370,4 +370,15 @@ TEST_F(ProgramParseTest, ProgramWithImportStatement) {
   EXPECT_TRUE(unit->programs[0]->items[0]->import_item.is_wildcard);
 }
 
+TEST(PackageImports, WildcardImport) {
+  auto r = Parse(
+      "package pkg; typedef int myint; endpackage\n"
+      "module m;\n"
+      "  import pkg::*;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kImportDecl);
+}
+
 }  // namespace
