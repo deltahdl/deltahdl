@@ -170,4 +170,18 @@ TEST(InterfaceDeclParsing, ModportDeclHasSourceLoc) {
   EXPECT_TRUE(mp->loc.IsValid());
 }
 
+TEST(InterfaceModport, MasterSlaveDirections) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  logic req, gnt;\n"
+      "  modport master(output req, input gnt);\n"
+      "  modport slave(input req, output gnt);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 2u);
+  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
+  EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
+}
+
 }  // namespace
