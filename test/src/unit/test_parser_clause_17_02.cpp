@@ -469,4 +469,13 @@ TEST(CheckerDeclarations, CheckerContainsDeclarations) {
   EXPECT_FALSE(r.cu->checkers[0]->items.empty());
 }
 
+TEST(CheckerDeclaration, EmptyChecker) {
+  auto r = Parse("checker chk; endchecker");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
+  EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
+}
+
 }  // namespace
