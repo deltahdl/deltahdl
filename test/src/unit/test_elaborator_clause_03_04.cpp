@@ -4,19 +4,6 @@
 
 namespace {
 
-TEST(DesignBuildingBlockElaboration, ProgramWithClassElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "program p;\n"
-      "  class my_trans;\n"
-      "    int data;\n"
-      "  endclass\n"
-      "endprogram\n",
-      f, "p");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(DesignBuildingBlockElaboration, SampleProgramElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

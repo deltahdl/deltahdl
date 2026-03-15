@@ -106,4 +106,17 @@ TEST(ProgramConstruct, ProgramWithPortsElaborates) {
   EXPECT_EQ(design->top_modules[0]->ports.size(), 3u);
 }
 
+TEST(ProgramConstruct, ProgramWithClassElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program p;\n"
+      "  class my_trans;\n"
+      "    int data;\n"
+      "  endclass\n"
+      "endprogram\n",
+      f, "p");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
