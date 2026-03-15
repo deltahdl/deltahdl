@@ -761,4 +761,13 @@ TEST(ProgramDeclaration, CannotContainAlwaysLatch) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(ProgramDeclaration, CannotContainModuleInst) {
+  auto r = Parse(
+      "module sub; endmodule\n"
+      "program p;\n"
+      "  sub u0();\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

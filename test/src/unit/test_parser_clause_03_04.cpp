@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ProgramCannotContainModuleInst) {
-  auto r = Parse(
-      "module sub; endmodule\n"
-      "program p;\n"
-      "  sub u0();\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(DesignBuildingBlockParsing, ProgramCannotContainGateInst) {
   auto r = Parse(
       "program p;\n"
