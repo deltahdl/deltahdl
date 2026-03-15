@@ -650,4 +650,17 @@ TEST(ProgramDeclaration, WithDataDeclarations) {
   EXPECT_GE(r.cu->programs[0]->items.size(), 3u);
 }
 
+TEST(ProgramDeclaration, WithClassDefinition) {
+  auto r = Parse(
+      "program p;\n"
+      "  class my_trans;\n"
+      "    int data;\n"
+      "  endclass\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kClassDecl));
+}
+
 }  // namespace
