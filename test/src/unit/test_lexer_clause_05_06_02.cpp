@@ -81,4 +81,15 @@ TEST(Keywords, EndconfigKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndconfig);
 }
 
+TEST(Keywords, DesignElementKeywordsAreNotIdentifiers) {
+  const char* keywords[] = {"module",    "program",   "interface",
+                            "checker",   "package",   "primitive",
+                            "config",    "macromodule"};
+  for (const auto* kw : keywords) {
+    auto r = LexOne(kw);
+    EXPECT_NE(r.token.kind, TokenKind::kIdentifier)
+        << kw << " should be a keyword, not an identifier";
+  }
+}
+
 }  // namespace

@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockLexing, DesignElementKeywordsAreNotIdentifiers) {
-  const char* keywords[] = {"module",    "program",   "interface",
-                            "checker",   "package",   "primitive",
-                            "config",    "macromodule"};
-  for (const auto* kw : keywords) {
-    auto r = LexOne(kw);
-    EXPECT_NE(r.token.kind, TokenKind::kIdentifier)
-        << kw << " should be a keyword, not an identifier";
-  }
-}
-
 TEST(DesignBuildingBlockLexing, KeywordPrefixIsIdentifier) {
   auto r = LexOne("module_name");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
