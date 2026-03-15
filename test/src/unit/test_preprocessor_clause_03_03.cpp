@@ -1,3 +1,5 @@
+// §3.3
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -5,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, Mux2to1LrmExample) {
+TEST(ModuleOverview, Mux2to1Example) {
   auto r = ParseWithPreprocessor(
       "module mux2to1 (input wire a, b, sel,\n"
       "                output logic y);\n"
