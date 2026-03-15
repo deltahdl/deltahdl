@@ -982,3 +982,21 @@ def test_rename_preserves_original_test_name(ct):
     _rename(t, "A", "Second")
     _rename(t, "B", "Third")
     assert t.original_test_name == "First"
+
+
+# ---- extract_clause_hint --------------------------------------------------
+
+
+def test_extract_clause_hint_numeric(ct):
+    """Extracts clause number from numeric filename."""
+    assert ct.extract_clause_hint("test_parser_clause_06_03") == "6"
+
+
+def test_extract_clause_hint_annex(ct):
+    """Extracts annex letter from annex filename."""
+    assert ct.extract_clause_hint("test_parser_annex_a_08") == "A"
+
+
+def test_extract_clause_hint_no_match(ct):
+    """Returns empty string when no clause pattern matches."""
+    assert ct.extract_clause_hint("test_input") == ""
