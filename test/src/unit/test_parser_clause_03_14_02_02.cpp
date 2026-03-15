@@ -360,4 +360,13 @@ TEST(DesignBuildingBlockParsing, CUTimeunitSlashSyntax) {
   EXPECT_EQ(r.cu->cu_time_prec, TimeUnit::kFs);
 }
 
+TEST(CompilationUnitStructure, TimeunitDeclarationSetsFlag) {
+  auto r = Parse(
+      "timeunit 1ns;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->has_cu_timeunit);
+}
+
 }  // namespace
