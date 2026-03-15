@@ -1,22 +1,8 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 
 namespace {
-
-TEST(DesignBuildingBlockElaboration, ProgramWithDataAndInitialElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "program p;\n"
-      "  logic [7:0] count;\n"
-      "  int status;\n"
-      "  initial begin\n"
-      "    count = 0;\n"
-      "    status = 1;\n"
-      "  end\n"
-      "endprogram\n",
-      f, "p");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
 
 TEST(DesignBuildingBlockElaboration, ProgramWithSubroutinesElaborates) {
   ElabFixture f;
