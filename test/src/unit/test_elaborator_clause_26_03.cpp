@@ -43,4 +43,15 @@ TEST(WildcardImport, MultiplePackages) {
              "endmodule\n"));
 }
 
+TEST(PackageImport, WildcardImportedIntoModule) {
+  EXPECT_TRUE(
+      ElabOk("package pkg;\n"
+             "  typedef logic [7:0] byte_t;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import pkg::*;\n"
+             "  byte_t data;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

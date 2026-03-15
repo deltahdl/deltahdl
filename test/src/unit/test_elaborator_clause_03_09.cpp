@@ -1,17 +1,8 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 
 namespace {
-
-TEST(DesignBuildingBlockElaboration, PackageImportedIntoModule) {
-  EXPECT_TRUE(
-      ElabOk("package pkg;\n"
-             "  typedef logic [7:0] byte_t;\n"
-             "endpackage\n"
-             "module m;\n"
-             "  import pkg::*;\n"
-             "  byte_t data;\n"
-             "endmodule\n"));
-}
 
 TEST(DesignBuildingBlockElaboration, PackageWithFunctionElaborates) {
   EXPECT_TRUE(
