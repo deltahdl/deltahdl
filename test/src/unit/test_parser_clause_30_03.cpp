@@ -168,4 +168,21 @@ TEST_F(SpecifyTest, MixedSpecifyBlockItems) {
   EXPECT_EQ(spec->specify_items[4]->kind, SpecifyItemKind::kTimingCheck);
 }
 
+TEST(SpecifyBlock, SimplePathDelay) {
+  auto r = Parse(
+      "module m(input a, output y);\n"
+      "  assign y = a;\n"
+      "  specify\n"
+      "    (a => y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  bool has_specify = false;
+  for (auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kSpecifyBlock) has_specify = true;
+  }
+  EXPECT_TRUE(has_specify);
+}
+
 }  // namespace
