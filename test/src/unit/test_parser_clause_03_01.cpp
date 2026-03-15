@@ -6,18 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, ConfigWithEndLabel) {
-  auto r = Parse(
-      "module m; endmodule\n"
-      "config cfg;\n"
-      "  design m;\n"
-      "endconfig : cfg\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->configs.size(), 1u);
-  EXPECT_EQ(r.cu->configs[0]->name, "cfg");
-}
-
 TEST(CompilationUnitStructure, PrimitiveWithEndLabel) {
   auto r = Parse(
       "primitive inv(output y, input a);\n"

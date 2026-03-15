@@ -208,4 +208,16 @@ TEST_F(ConfigParseTest, ConfigWithEndLabel) {
   EXPECT_EQ(unit->configs[0]->name, "cfg");
 }
 
+TEST(ConfigDeclaration, ConfigWithEndLabel) {
+  auto r = Parse(
+      "module m; endmodule\n"
+      "config cfg;\n"
+      "  design m;\n"
+      "endconfig : cfg\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg");
+}
+
 }  // namespace
