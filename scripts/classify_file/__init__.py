@@ -120,6 +120,7 @@ def _build_command(
         "--issue", str(args.issue),
     ]
     append_classify_cmd_flags(cmd, args)
+    cmd.append("--continue")
     return cmd
 
 

@@ -281,6 +281,12 @@ def test_build_command_max_lines_value(cf):
     assert cmd[cmd.index("--max-lines") + 1] == "500"
 
 
+def test_build_command_always_includes_continue(cf):
+    """Command always includes --continue for session reuse."""
+    cmd = getattr(cf, "_build_command")(_make_args(), [("S", "T")])
+    assert "--continue" in cmd
+
+
 # ---- run_classify_tests ----------------------------------------------------
 
 
