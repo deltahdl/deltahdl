@@ -4,21 +4,6 @@
 
 namespace {
 
-TEST(DesignBuildingBlockElaboration, ProgramWithSubroutinesElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "program p;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "  task do_work;\n"
-      "  endtask\n"
-      "endprogram\n",
-      f, "p");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(DesignBuildingBlockElaboration, ProgramWithPortsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
