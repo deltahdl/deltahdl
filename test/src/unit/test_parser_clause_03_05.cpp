@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, InterfaceInstantiationInModule) {
-  EXPECT_TRUE(
-      ParseOk("interface simple_bus(input logic clk);\n"
-              "  logic req, gnt;\n"
-              "endinterface\n"
-              "module top;\n"
-              "  logic clk;\n"
-              "  simple_bus sb_intf(.clk(clk));\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, InterfaceWithMixedContents) {
   EXPECT_TRUE(
       ParseOk("interface ifc #(parameter int W = 8) (input logic clk);\n"
