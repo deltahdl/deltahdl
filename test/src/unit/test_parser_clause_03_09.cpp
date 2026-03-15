@@ -1,17 +1,11 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(DesignBuildingBlockParsing, PackageEnclosedByKeywords) {
-  auto r = Parse("package pkg; endpackage");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
-}
 
 TEST(DesignBuildingBlockParsing, PackageWithTypedef) {
   auto r = Parse(
