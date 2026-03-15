@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, UdpInstantiationInModule) {
-  auto r = Parse(
-      "primitive udp_and (output out, input a, b);\n"
-      "  table 0 0 : 0; 0 1 : 0; 1 0 : 0; 1 1 : 1; endtable\n"
-      "endprimitive\n"
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  udp_and u1(y, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
-}
-
 TEST(DesignBuildingBlockParsing, BuiltInAndUdpCoexist) {
   auto r = Parse(
       "primitive udp_inv (output out, input in);\n"
