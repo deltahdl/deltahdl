@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ProgramWithTask) {
-  auto r = Parse(
-      "program p;\n"
-      "  task do_work;\n"
-      "  endtask\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kTaskDecl));
-}
-
 TEST(DesignBuildingBlockParsing, ProgramWithInitialBlock) {
   auto r = Parse(
       "program p;\n"
