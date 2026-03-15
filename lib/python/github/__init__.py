@@ -107,6 +107,20 @@ def fetch_issue_body(organization: str, repo: str, issue: int) -> str:
     return result.stdout
 
 
+_SUBCLAUSE_RE = re.compile(r"§(\d+(?:\.\d+)*)|(\b[A-Z](?:\.\d+)+)")
+
+
+def extract_subclause_from_title(title: str) -> str:
+    """Extract the subclause number from an issue title.
+
+    Handles both ``§3.1`` and ``A.1`` formats.
+    """
+    m = _SUBCLAUSE_RE.search(title)
+    if not m:
+        return ""
+    return m.group(1) or m.group(2)
+
+
 def fetch_issue_title(organization: str, repo: str, issue: int) -> str:
     """Fetch the title of a GitHub issue using ``gh api``."""
     print(f"Fetching title for issue #{issue} from {organization}/{repo}...")

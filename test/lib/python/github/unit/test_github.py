@@ -15,6 +15,7 @@ from lib.python.github import (
     update_subclause_status,
     close_issue,
     delete_issue,
+    extract_subclause_from_title,
     fetch_issue_body,
     fetch_issue_title,
     format_subclause_label,
@@ -156,6 +157,24 @@ def test_close_issue_failure() -> None:
     with patch("lib.python.github.subprocess.run", return_value=cp):
         with pytest.raises(SystemExit):
             close_issue("org", "repo", 1, "reason")
+
+
+# --- extract_subclause_from_title ---
+
+
+def test_extract_subclause_numeric() -> None:
+    """Extracts numeric subclause from title."""
+    assert extract_subclause_from_title("... §3.12.1 ...") == "3.12.1"
+
+
+def test_extract_subclause_annex() -> None:
+    """Extracts annex subclause from title."""
+    assert extract_subclause_from_title("... A.1.1 ...") == "A.1.1"
+
+
+def test_extract_subclause_not_found() -> None:
+    """Returns empty string when no subclause found."""
+    assert extract_subclause_from_title("Random title") == ""
 
 
 # --- delete_issue ---

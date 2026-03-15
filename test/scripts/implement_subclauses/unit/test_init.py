@@ -11,7 +11,7 @@ import pytest
 
 def test_extract_subclause_numeric(iscs):
     """Extracts numeric subclause from title."""
-    extract = getattr(iscs, "_extract_subclause_from_title")
+    extract = iscs.extract_subclause_from_title
     title = (
         "Ensure IEEE 1800-2023 §3.1"
         " functionalities and tests are implemented"
@@ -21,7 +21,7 @@ def test_extract_subclause_numeric(iscs):
 
 def test_extract_subclause_annex(iscs):
     """Extracts annex subclause from title."""
-    extract = getattr(iscs, "_extract_subclause_from_title")
+    extract = iscs.extract_subclause_from_title
     title = (
         "Ensure IEEE 1800-2023 A.1.1"
         " functionalities and tests are implemented"
@@ -31,7 +31,7 @@ def test_extract_subclause_annex(iscs):
 
 def test_extract_subclause_not_found(iscs):
     """Returns empty string when no subclause found."""
-    extract = getattr(iscs, "_extract_subclause_from_title")
+    extract = iscs.extract_subclause_from_title
     assert extract("Some other title") == ""
 
 

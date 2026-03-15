@@ -20,6 +20,7 @@ from lib.python.cli import (
 from lib.python.github import (
     close_issue,
     create_issue,
+    extract_subclause_from_title,
     fetch_issue_body,
     fetch_issue_title,
     format_subclause_label,
@@ -101,17 +102,6 @@ def _parse_issue_refs(body: str) -> list[int]:
     return [int(m.group(1)) for m in re.finditer(r"^- #(\d+)", body, re.MULTILINE)]
 
 
-_SUBCLAUSE_RE = re.compile(r"§(\d+(?:\.\d+)*)|(\b[A-Z](?:\.\d+)+)")
-
-
-def _subclause_from_title(title: str) -> str:
-    """Extract the subclause number from an issue title."""
-    m = _SUBCLAUSE_RE.search(title)
-    if not m:
-        return ""
-    return m.group(1) or m.group(2)
-
-
 def _ensure_subclause_issues(
     organization, repo, discovered, existing_issues,
 ):
@@ -119,7 +109,7 @@ def _ensure_subclause_issues(
     covered = set()
     for issue_num in existing_issues:
         title = fetch_issue_title(organization, repo, issue_num)
-        sc = _subclause_from_title(title)
+        sc = extract_subclause_from_title(title)
         if sc:
             covered.add(sc)
 

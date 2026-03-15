@@ -271,7 +271,7 @@ def test_parse_issue_refs_empty(ic) -> None:
 
 def test_subclause_from_title_no_match(ic) -> None:
     """Returns empty string when title has no subclause."""
-    assert getattr(ic, "_subclause_from_title")("Random title") == ""
+    assert ic.extract_subclause_from_title("Random title") == ""
 
 
 def test_ensure_skips_unrecognized_existing(ic, monkeypatch) -> None:

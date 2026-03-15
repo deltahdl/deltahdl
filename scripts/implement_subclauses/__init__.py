@@ -5,7 +5,6 @@ subclause number, and invokes implement_subclause for each one.
 """
 
 import argparse
-import re
 
 from lib.python.cli import (
     add_lrm_arg,
@@ -13,21 +12,10 @@ from lib.python.cli import (
     invoke_implement_subclause,
     parse_and_validate,
 )
-from lib.python.github import fetch_issue_title
-
-
-_SUBCLAUSE_RE = re.compile(r"§(\d+(?:\.\d+)*)|(\b[A-Z](?:\.\d+)+)")
-
-
-def _extract_subclause_from_title(title: str) -> str:
-    """Extract the subclause number from an issue title.
-
-    Handles both ``§3.1`` and ``A.1`` formats.
-    """
-    m = _SUBCLAUSE_RE.search(title)
-    if not m:
-        return ""
-    return m.group(1) or m.group(2)
+from lib.python.github import (
+    extract_subclause_from_title,
+    fetch_issue_title,
+)
 
 
 def _parse_issues(raw: str) -> list[int]:
@@ -76,7 +64,7 @@ def main(argv: list[str] | None = None) -> None:
     subclauses = []
     for issue_num in args.issues:
         title = fetch_issue_title(args.organization, args.repo, issue_num)
-        subclause = _extract_subclause_from_title(title)
+        subclause = extract_subclause_from_title(title)
         if not subclause:
             print(f"WARNING: Could not extract subclause from issue"
                   f" #{issue_num} title: {title!r}")
