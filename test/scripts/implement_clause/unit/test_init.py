@@ -9,7 +9,8 @@ import pytest
 
 def _patch_main_no_subclauses(monkeypatch, ic):
     """Patch dependencies for the no-subclauses main() path."""
-    monkeypatch.setattr(ic, "discover_subclauses", lambda *_a: {})
+    monkeypatch.setattr(ic, "discover_subclauses", lambda *_a, **_kw: {})
+    monkeypatch.setattr(ic, "create_issue", MagicMock(return_value=50))
 
 
 _ISSUE_COUNTER = iter(range(100, 200))
@@ -20,7 +21,10 @@ def _patch_main_with_subclauses(monkeypatch, ic, *, subclauses=None):
     if subclauses is None:
         subclauses = {"4.1": "General", "4.2": "Exec"}
 
-    monkeypatch.setattr(ic, "discover_subclauses", lambda *_a: subclauses)
+    monkeypatch.setattr(
+        ic, "discover_subclauses", lambda *_a, **_kw: subclauses,
+    )
+    monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: "")
 
     mock_create = MagicMock(side_effect=lambda *_a, **_kw: next(_ISSUE_COUNTER))
     monkeypatch.setattr(ic, "create_issue", mock_create)
@@ -192,10 +196,24 @@ def test_main_sets_clause_issue_body(
     assert mocks["update"].called
 
 
-def test_main_invokes_with_issue(ic, monkeypatch, clause_argv) -> None:
-    """main() calls invoke_implement_subclauses when --issue is provided."""
+def _patch_main_with_issue(monkeypatch, ic):
+    """Stub all deps for main() with --issue path."""
+    monkeypatch.setattr(
+        ic, "discover_subclauses",
+        lambda *_a, **_kw: {"4.1": "General", "4.2": "Exec"},
+    )
     monkeypatch.setattr(ic, "fetch_issue_body",
                         lambda *_a: "- #100\n- #101\n")
+    monkeypatch.setattr(
+        ic, "fetch_issue_title",
+        lambda _o, _r, i: f"Ensure IEEE 1800-2023 §4.{i - 99} ...",
+    )
+    monkeypatch.setattr(ic, "update_issue_body", MagicMock())
+
+
+def test_main_invokes_with_issue(ic, monkeypatch, clause_argv) -> None:
+    """main() calls invoke_implement_subclauses when --issue is provided."""
+    _patch_main_with_issue(monkeypatch, ic)
     mock_inv = MagicMock()
     monkeypatch.setattr(ic, "invoke_implement_subclauses", mock_inv)
     monkeypatch.setattr(ic, "close_issue", MagicMock())
@@ -205,8 +223,7 @@ def test_main_invokes_with_issue(ic, monkeypatch, clause_argv) -> None:
 
 def test_main_closes_clause_issue(ic, monkeypatch, clause_argv) -> None:
     """main() closes the clause issue after all subclauses."""
-    monkeypatch.setattr(ic, "fetch_issue_body",
-                        lambda *_a: "- #100\n- #101\n")
+    _patch_main_with_issue(monkeypatch, ic)
     monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
     mock_close = MagicMock()
     monkeypatch.setattr(ic, "close_issue", mock_close)
@@ -225,6 +242,7 @@ def test_main_annex(ic, monkeypatch, tmp_path) -> None:
     mock_ds = MagicMock(return_value={"A.1": "General"})
     monkeypatch.setattr(ic, "discover_subclauses", mock_ds)
     monkeypatch.setattr(ic, "create_issue", MagicMock(return_value=50))
+    monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: "")
     monkeypatch.setattr(ic, "update_issue_body", MagicMock())
     monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
     monkeypatch.setattr(ic, "close_issue", MagicMock())
@@ -248,21 +266,106 @@ def test_parse_issue_refs_empty(ic) -> None:
     assert parse("no refs here") == []
 
 
-# --- main with --issue (skip discovery) ---
+# --- _ensure_subclause_issues ---
 
 
-def test_main_skips_discovery_when_issue_provided(
+def test_subclause_from_title_no_match(ic) -> None:
+    """Returns empty string when title has no subclause."""
+    assert getattr(ic, "_subclause_from_title")("Random title") == ""
+
+
+def test_ensure_skips_unrecognized_existing(ic, monkeypatch) -> None:
+    """Ignores existing issues whose titles have no subclause number."""
+    ensure = getattr(ic, "_ensure_subclause_issues")
+    monkeypatch.setattr(
+        ic, "fetch_issue_title",
+        lambda _o, _r, _i: "Random title without subclause",
+    )
+    mock_create = MagicMock(return_value=11)
+    monkeypatch.setattr(ic, "create_issue", mock_create)
+    result = ensure("o", "r", {"4.1": "General"}, [10])
+    assert mock_create.call_count == 1
+
+
+def test_ensure_creates_all_when_no_existing(ic, monkeypatch) -> None:
+    """Creates issues for all discovered subclauses when none exist."""
+    ensure = getattr(ic, "_ensure_subclause_issues")
+    mock_create = MagicMock(side_effect=[10, 11])
+    monkeypatch.setattr(ic, "create_issue", mock_create)
+    result = ensure(
+        "o", "r",
+        {"4.1": "General", "4.2": "Exec"}, [],
+    )
+    assert mock_create.call_count == 2
+
+
+def test_ensure_skips_existing(ic, monkeypatch) -> None:
+    """Does not create issues for subclauses that already have one."""
+    ensure = getattr(ic, "_ensure_subclause_issues")
+    monkeypatch.setattr(
+        ic, "fetch_issue_title",
+        lambda _o, _r, _i: "Ensure IEEE 1800-2023 §4.1 functionalities...",
+    )
+    mock_create = MagicMock(return_value=11)
+    monkeypatch.setattr(ic, "create_issue", mock_create)
+    result = ensure(
+        "o", "r",
+        {"4.1": "General", "4.2": "Exec"}, [10],
+    )
+    assert mock_create.call_count == 1
+
+
+def test_ensure_returns_combined_list(ic, monkeypatch) -> None:
+    """Returns existing + newly created issue numbers."""
+    ensure = getattr(ic, "_ensure_subclause_issues")
+    monkeypatch.setattr(
+        ic, "fetch_issue_title",
+        lambda _o, _r, _i: "Ensure IEEE 1800-2023 §4.1 functionalities...",
+    )
+    monkeypatch.setattr(ic, "create_issue", MagicMock(return_value=11))
+    result = ensure(
+        "o", "r",
+        {"4.1": "General", "4.2": "Exec"}, [10],
+    )
+    assert sorted(result) == [10, 11]
+
+
+# --- main with --issue ---
+
+
+def test_main_discovers_when_issue_has_empty_body(
     ic, monkeypatch, clause_argv,
 ) -> None:
-    """main() does not call discover_subclauses when --issue is provided."""
-    mock_ds = MagicMock()
+    """main() runs discovery when --issue body is empty."""
+    mock_ds = MagicMock(return_value={"4.1": "General"})
     monkeypatch.setattr(ic, "discover_subclauses", mock_ds)
-    monkeypatch.setattr(ic, "fetch_issue_body",
-                        lambda *_a: "- #100\n- #101\n")
+    monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: "")
+    monkeypatch.setattr(ic, "create_issue", MagicMock(return_value=50))
+    monkeypatch.setattr(ic, "update_issue_body", MagicMock())
     monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
     monkeypatch.setattr(ic, "close_issue", MagicMock())
     ic.main(clause_argv)
-    assert not mock_ds.called
+    assert mock_ds.called
+
+
+def test_main_discovers_when_issue_has_partial_refs(
+    ic, monkeypatch, clause_argv,
+) -> None:
+    """main() runs discovery even when --issue already has some refs."""
+    mock_ds = MagicMock(return_value={"4.1": "G", "4.2": "E"})
+    monkeypatch.setattr(ic, "discover_subclauses", mock_ds)
+    monkeypatch.setattr(ic, "fetch_issue_body",
+                        lambda *_a: "- #100\n")
+    monkeypatch.setattr(
+        ic, "fetch_issue_title",
+        lambda _o, _r, _i: "Ensure IEEE 1800-2023 §4.1 ...",
+    )
+    monkeypatch.setattr(ic, "create_issue", MagicMock(return_value=101))
+    monkeypatch.setattr(ic, "update_issue_body", MagicMock())
+    monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
+    monkeypatch.setattr(ic, "close_issue", MagicMock())
+    ic.main(clause_argv)
+    assert mock_ds.called
 
 
 # --- discover_subclauses ---
