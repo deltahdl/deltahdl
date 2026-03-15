@@ -252,6 +252,11 @@ def test_build_hierarchy_numeric_not_annex() -> None:
     assert build_hierarchy("4")["is_annex"] is False
 
 
+def test_build_hierarchy_annex_ancestors() -> None:
+    """Annex 'A.8.1' has one ancestor."""
+    assert build_hierarchy("A.8.1")["ancestors"] == ["A.8"]
+
+
 # --- build_lrm_read_instruction ---
 
 
