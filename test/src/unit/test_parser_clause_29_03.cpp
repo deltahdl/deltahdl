@@ -88,4 +88,13 @@ TEST(PrimitiveWithEndLabel, CombinationalUdpEndLabel) {
   EXPECT_EQ(r.cu->udps[0]->name, "inv");
 }
 
+TEST(CombinationalUdp, MissingEndprimitiveIsError) {
+  EXPECT_FALSE(ParseOk(
+      "primitive inv(output y, input a);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"));
+}
+
 }  // namespace
