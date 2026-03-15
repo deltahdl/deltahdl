@@ -969,6 +969,7 @@ def test_run_against_none_skips(tmp_path, monkeypatch, ct, ct_helpers):
     })
     args = _run_args(tmp_path, against="23.2.1")
     getattr(ct, "_run")(args)
+    assert (tmp_path / "test_input.cpp").exists()
 
 
 def _stub_main(monkeypatch, ct, run_fn):
