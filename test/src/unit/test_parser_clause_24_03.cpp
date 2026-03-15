@@ -743,4 +743,13 @@ TEST(ProgramDeclaration, CannotContainAlwaysComb) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(ProgramDeclaration, CannotContainAlwaysFF) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic clk, d, q;\n"
+      "  always_ff @(posedge clk) q <= d;\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
