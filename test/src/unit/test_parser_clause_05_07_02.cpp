@@ -18,7 +18,7 @@ TEST(LexicalConventionParsing, DecimalNotation) {
   EXPECT_DOUBLE_EQ(rhs->real_val, 14.72);
 }
 
-TEST(LexicalConventionParsing, ZeroPointSomething) {
+TEST(LexicalConventionParsing, LeadingZeroDecimal) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r = 0.123;\n"
@@ -77,7 +77,7 @@ TEST(LexicalConventionParsing, ExponentNegativeSign) {
   EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
 }
 
-TEST(LexicalConventionParsing, ScientificFull) {
+TEST(LexicalConventionParsing, ScientificWithPositiveSign) {
   auto r = Parse("module m; real x; initial x = 1.5e+3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   auto* rhs = FirstInitialRHS(r);
@@ -108,7 +108,7 @@ TEST(LexicalConventionParsing, UnderscoresInValue) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, WithExponent) {
+TEST(LexicalConventionParsing, ExponentInAddition) {
   auto r = Parse(
       "module t;\n"
       "  real r;\n"
@@ -147,12 +147,46 @@ TEST(LexicalConventionParsing, RealPositiveExponent) {
               "endmodule\n"));
 }
 
+TEST(LexicalConventionParsing, UnderscoreStrippedInValue) {
+  auto r = Parse("module m; real x; initial x = 1_000.000_1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+  EXPECT_DOUBLE_EQ(rhs->real_val, 1000.0001);
+}
+
+TEST(LexicalConventionParsing, ExponentOnlyValue) {
+  auto r = Parse("module m; real x; initial x = 39e8; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kRealLiteral);
+  EXPECT_DOUBLE_EQ(rhs->real_val, 39e8);
+}
+
 TEST(ConstEvalReal, RealLiteralEval) {
   EvalFixture f;
   auto* e = ParseExprFrom("3.14", f);
   auto val = ConstEvalReal(e);
   ASSERT_TRUE(val.has_value());
   EXPECT_NEAR(val.value_or(0.0), 3.14, 1e-6);
+}
+
+TEST(ConstEvalReal, ScientificNotation) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("1.5e3", f);
+  auto val = ConstEvalReal(e);
+  ASSERT_TRUE(val.has_value());
+  EXPECT_DOUBLE_EQ(val.value_or(0.0), 1500.0);
+}
+
+TEST(ConstEvalReal, ExponentOnly) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("39e8", f);
+  auto val = ConstEvalReal(e);
+  ASSERT_TRUE(val.has_value());
+  EXPECT_DOUBLE_EQ(val.value_or(0.0), 39e8);
 }
 
 TEST(OperatorAndExpressionParsing, RealLiteralAddition) {
@@ -167,6 +201,14 @@ TEST(OperatorAndExpressionParsing, RealLiteralAddition) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kRealLiteral);
+}
+
+TEST(LexicalConventionParsing, RealLiteralInExpression) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  real r;\n"
+              "  initial r = 3.14;\n"
+              "endmodule\n"));
 }
 
 }  // namespace

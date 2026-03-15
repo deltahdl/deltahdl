@@ -12,14 +12,6 @@ TEST(LexicalConventionParsing, IntegerLiteralInExpression) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, RealLiteralInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  real r;\n"
-              "  initial r = 3.14;\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, StringLiteralInExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

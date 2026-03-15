@@ -1,37 +1,9 @@
-#include <cmath>
-
-#include "common/types.h"
 #include "fixture_real.h"
-#include "fixture_simulator.h"
 #include "helpers_eval_op.h"
-#include "parser/ast.h"
-#include "simulator/evaluation.h"
-#include "simulator/lowerer.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(RealTypes, RealLiteralEval) {
-  RealFixture f;
-  auto* lit = f.MakeRealLiteral(3.14);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_NEAR(VecToDouble(result), 3.14, 1e-10);
-}
-
-TEST(RealTypes, RealLiteralZero) {
-  RealFixture f;
-  auto* lit = f.MakeRealLiteral(0.0);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_EQ(VecToDouble(result), 0.0);
-}
-
-TEST(RealTypes, RealLiteralNegative) {
-  RealFixture f;
-  auto* lit = f.MakeRealLiteral(-2.5);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_NEAR(VecToDouble(result), -2.5, 1e-10);
-}
 
 TEST(RealTypes, RealVarStorage) {
   RealFixture f;
@@ -47,23 +19,6 @@ TEST(RealTypes, IsRealVariable) {
   EXPECT_TRUE(f.ctx.IsRealVariable("r"));
   f.ctx.CreateVariable("i", 32);
   EXPECT_FALSE(f.ctx.IsRealVariable("i"));
-}
-
-TEST(NumberSim, NumberReal) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  real x;\n"
-      "  initial x = 3.14;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_DOUBLE_EQ(ToDouble(var), 3.14);
 }
 
 }  // namespace

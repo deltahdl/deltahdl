@@ -52,4 +52,18 @@ TEST(LexicalConventionElaboration, NegativeExponentElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(LexicalConventionElaboration, ModuleWithRealLiteralElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  real r = 3.14;\n"
+             "endmodule\n"));
+}
+
+TEST(LexicalConventionElaboration, UnderscoreRealElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  real r = 236.123_763_e-12;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

@@ -25,11 +25,6 @@ TEST(LexicalConventionLexing, IntegerLiteralRecognized) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-TEST(LexicalConventionLexing, RealLiteralRecognized) {
-  auto r = LexOne("3.14");
-  EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
-}
-
 TEST(LexicalConventionLexing, StringLiteralRecognized) {
   auto r = LexOne("\"hello world\"");
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);

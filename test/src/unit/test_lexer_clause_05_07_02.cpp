@@ -81,4 +81,33 @@ TEST(LexicalConventionLexing, IntegerExponentE) {
   EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
 }
 
+TEST(LexicalConventionLexing, RealLiteralRecognized) {
+  auto r = LexOne("3.14");
+  EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
+}
+
+TEST(LexicalConventionLexing, LeadingDotNotRealLiteral) {
+  auto tokens = Lex(".12 ");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kDot);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
+}
+
+TEST(LexicalConventionLexing, TrailingDotNotRealLiteral) {
+  auto tokens = Lex("9.; ");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "9");
+}
+
+TEST(LexicalConventionLexing, DotBeforeExponentNotRealLiteral) {
+  auto tokens = Lex("4.E3 ");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[0].text, "4");
+}
+
+TEST(LexicalConventionLexing, LeadingDotWithExponentNotRealLiteral) {
+  auto tokens = Lex(".2e-7 ");
+  EXPECT_EQ(tokens[0].kind, TokenKind::kDot);
+}
+
 }  // namespace
