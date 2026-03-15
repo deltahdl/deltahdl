@@ -4,6 +4,11 @@ using namespace delta;
 
 namespace {
 
+TEST(LexicalConventionLexing, AttributeStartTokenRecognized) {
+  auto r = LexOne("(*");
+  EXPECT_EQ(r.token.kind, TokenKind::kAttrStart);
+}
+
 TEST(LexicalConventionLexing, AttrStartEndTokens) {
   auto tokens = Lex("(* foo *)");
   ASSERT_GE(tokens.size(), 3u);
@@ -53,6 +58,35 @@ TEST(LexicalConventionLexing, AttrWithStringValue) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
   EXPECT_EQ(tokens[3].kind, TokenKind::kStringLiteral);
   EXPECT_EQ(tokens[4].kind, TokenKind::kAttrEnd);
+}
+
+TEST(LexicalConventionLexing, MultipleSeparateInstancesTokens) {
+  auto tokens = Lex("(* foo *) (* bar *)");
+  ASSERT_GE(tokens.size(), 6u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kAttrEnd);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kAttrStart);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[5].kind, TokenKind::kAttrEnd);
+}
+
+TEST(LexicalConventionLexing, AttrFollowedByMultiply) {
+  auto tokens = Lex("(* mark *) a * b");
+  ASSERT_GE(tokens.size(), 6u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kAttrEnd);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kStar);
+}
+
+TEST(LexicalConventionLexing, AttrWithExprValueTokens) {
+  auto tokens = Lex("(* depth = 3 + 1 *)");
+  ASSERT_GE(tokens.size(), 7u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kPlus);
+  EXPECT_EQ(tokens[5].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[6].kind, TokenKind::kAttrEnd);
 }
 
 }  // namespace

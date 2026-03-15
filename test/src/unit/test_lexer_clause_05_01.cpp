@@ -38,19 +38,6 @@ TEST(LexicalConventionLexing, DotTokenForBuiltinMethodCalls) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
 }
 
-TEST(LexicalConventionLexing, AttributeStartTokenRecognized) {
-  auto r = LexOne("(*");
-  EXPECT_EQ(r.token.kind, TokenKind::kAttrStart);
-}
-
-TEST(LexicalConventionLexing, AttributeEndTokenRecognized) {
-  auto tokens = Lex("(* foo *)");
-  ASSERT_GE(tokens.size(), 4u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kAttrStart);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kAttrEnd);
-}
-
 TEST(LexicalConventionLexing, AllFourAreasInOneStream) {
   auto tokens =
       Lex("(* full_case *) module t; // comment\n"

@@ -236,4 +236,44 @@ TEST(LexicalConventionElaboration, MultipleDistinctAttrs) {
   EXPECT_EQ(mod->variables[0].attrs[1].name, "optimize");
 }
 
+TEST(LexicalConventionElaboration, DuplicateLastNoValueDefaultsToOne) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  (* depth = 99, depth *) logic [7:0] mem;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto& attrs = design->top_modules[0]->variables[0].attrs;
+  int depth_count = 0;
+  for (auto& a : attrs) {
+    if (a.name == "depth") {
+      ++depth_count;
+      ASSERT_NE(a.resolved_value, std::nullopt);
+      EXPECT_EQ(a.resolved_value.value_or(INT64_MIN), 1);
+    }
+  }
+  EXPECT_EQ(depth_count, 1);
+}
+
+TEST(LexicalConventionElaboration, NoErrorsWithAttributePresent) {
+  ElabFixture f;
+  ElaborateSrc(
+      "(* optimize_power *)\n"
+      "module m;\n"
+      "  (* fsm_state *) logic [7:0] state;\n"
+      "  logic a, b;\n"
+      "  (* synthesis_on *) assign a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LexicalConventionElaboration, ModuleWithAttributeElaborates) {
+  EXPECT_TRUE(
+      ElabOk("(* synthesis *) module t;\n"
+             "  logic a;\n"
+             "endmodule\n"));
+}
+
 }  // namespace
