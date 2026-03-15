@@ -762,6 +762,14 @@ def test_validate_clause_response_valid(ct):
     assert _validate_clause_response(_valid_clause(), "T") is None
 
 
+def test_validate_clause_response_strips_section_sign(ct):
+    """Strips § prefix from clause value."""
+    _validate_clause_response = getattr(ct, "_validate_clause_response")
+    resp = _valid_clause(clause="§28.3")
+    _validate_clause_response(resp, "T")
+    assert resp["clause"] == "28.3"
+
+
 # ---- _validate_topic_response ----------------------------------------------
 
 

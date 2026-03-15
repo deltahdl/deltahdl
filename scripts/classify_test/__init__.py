@@ -510,7 +510,8 @@ def _validate_clause_response(response, test_name):
         print(f"ERROR: Classification for test {test_name} is missing"
               " required key: clause")
         sys.exit(1)
-    clause = response["clause"]
+    clause = response["clause"].lstrip("§")
+    response["clause"] = clause
     if not _CLAUSE_RE.match(clause):
         print(f'ERROR: Invalid clause "{clause}" for test {test_name}.'
               "\n  Expected: numeric (6.1.2), annex (A.6.3),"
