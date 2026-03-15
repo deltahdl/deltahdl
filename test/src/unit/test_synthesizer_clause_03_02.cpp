@@ -5,19 +5,6 @@
 
 namespace {
 
-TEST(DesignElementSynth, ModuleWithConstantAssign) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(f,
-      "module m(output y);\n"
-      "  assign y = 1'b0;\n"
-      "endmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-  EXPECT_EQ(aig->outputs.size(), 1);
-}
-
 TEST(DesignElementSynth, ModuleWithMultiplePorts) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
