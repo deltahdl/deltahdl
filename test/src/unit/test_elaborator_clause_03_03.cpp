@@ -4,17 +4,6 @@
 
 namespace {
 
-TEST(DesignBuildingBlockElaboration, ModuleWithModuleInstElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module sub(input logic a, output logic b);\n"
-             "  assign b = a;\n"
-             "endmodule\n"
-             "module top;\n"
-             "  logic x, y;\n"
-             "  sub u0(.a(x), .b(y));\n"
-             "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockElaboration, ModuleWithGenerateElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

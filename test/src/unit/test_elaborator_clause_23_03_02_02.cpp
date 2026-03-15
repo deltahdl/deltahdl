@@ -92,4 +92,15 @@ TEST(InterfaceInstantiationGrammar, ElaborationInterfaceInstPortBindings) {
   EXPECT_EQ(top->children[0].port_bindings[0].port_name, "data");
 }
 
+TEST(ModuleInstantiation, NamedPortConnection) {
+  EXPECT_TRUE(
+      ElabOk("module sub(input logic a, output logic b);\n"
+             "  assign b = a;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  logic x, y;\n"
+             "  sub u0(.a(x), .b(y));\n"
+             "endmodule\n"));
+}
+
 }  // namespace
