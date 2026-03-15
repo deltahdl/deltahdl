@@ -27,4 +27,11 @@ TEST(CheckerDeclaration, WithInputPorts) {
   EXPECT_GE(design->top_modules[0]->ports.size(), 2u);
 }
 
+TEST(CheckerDeclaration, EmptyCheckerElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc("checker chk; endchecker\n", f, "chk");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
