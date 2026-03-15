@@ -167,4 +167,21 @@ TEST(InterfaceContinuousAssign, ContAssignInInterfaceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(ContinuousAssignment, SimpleAssignStatement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial a = 8'd5;\n"
+      "  assign b = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 5u);
+}
+
 }  // namespace
