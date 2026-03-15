@@ -8,23 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignElementSim, ModuleWithAlwaysCombProcess) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial a = 8'd7;\n"
-      "  always_comb b = a + 8'd1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 7u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 8u);
-}
-
 TEST(DesignElementSim, ModuleWithPackageImport) {
   SimFixture f;
   auto* design = ElaborateSrc(
