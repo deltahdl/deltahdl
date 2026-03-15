@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionParsing, PositionalArrayLiteral) {
+TEST(ArrayLiteralParsing, PositionalArrayLiteral) {
   auto r = Parse(
       "module m;\n"
       "  int arr [0:2] = '{10, 20, 30};\n"
@@ -20,7 +20,7 @@ TEST(LexicalConventionParsing, PositionalArrayLiteral) {
   EXPECT_TRUE(item->init_expr->pattern_keys.empty());
 }
 
-TEST(LexicalConventionParsing, NestedMultidimensional) {
+TEST(ArrayLiteralParsing, NestedMultidimensional) {
   auto r = Parse(
       "module m;\n"
       "  int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};\n"
@@ -36,7 +36,7 @@ TEST(LexicalConventionParsing, NestedMultidimensional) {
   EXPECT_EQ(item->init_expr->elements[1]->kind, ExprKind::kAssignmentPattern);
 }
 
-TEST(LexicalConventionParsing, ReplicationSingleElement) {
+TEST(ArrayLiteralParsing, ReplicationSingleElement) {
   auto r = Parse(
       "module m;\n"
       "  int arr [0:2];\n"
@@ -53,7 +53,7 @@ TEST(LexicalConventionParsing, ReplicationSingleElement) {
   EXPECT_NE(stmt->rhs->elements[0]->repeat_count, nullptr);
 }
 
-TEST(LexicalConventionParsing, ReplicationMultiElement) {
+TEST(ArrayLiteralParsing, ReplicationMultiElement) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int a, b;\n"
@@ -62,14 +62,14 @@ TEST(LexicalConventionParsing, ReplicationMultiElement) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, NestedReplication) {
+TEST(ArrayLiteralParsing, NestedReplication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, TypePrefixed) {
+TEST(ArrayLiteralParsing, TypePrefixed) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef int triple [1:3];\n"
@@ -77,7 +77,7 @@ TEST(LexicalConventionParsing, TypePrefixed) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, IndexKeyWithDefault) {
+TEST(ArrayLiteralParsing, IndexKeyWithDefault) {
   auto r = Parse(
       "module m;\n"
       "  typedef int triple [1:3];\n"
@@ -92,14 +92,14 @@ TEST(LexicalConventionParsing, IndexKeyWithDefault) {
   ASSERT_EQ(item->init_expr->pattern_keys.size(), 2u);
 }
 
-TEST(LexicalConventionParsing, DefaultOnlyArray) {
+TEST(ArrayLiteralParsing, DefaultOnlyArray) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int arr [0:3] = '{default: 0};\n"
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, ArrayLiteralAssignment) {
+TEST(ArrayLiteralParsing, ArrayLiteralAssignment) {
   auto r = Parse(
       "module m;\n"
       "  int arr [0:2];\n"
@@ -111,6 +111,42 @@ TEST(LexicalConventionParsing, ArrayLiteralAssignment) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
   EXPECT_EQ(rhs->elements.size(), 3u);
+}
+
+TEST(ArrayLiteralParsing, SimplePositionalParses) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  int arr [0:1];\n"
+              "  initial arr = '{0, 1};\n"
+              "endmodule\n"));
+}
+
+TEST(ArrayLiteralParsing, SingleElementArray) {
+  auto r = Parse(
+      "module m;\n"
+      "  int arr [0:0] = '{42};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->init_expr, nullptr);
+  EXPECT_EQ(item->init_expr->kind, ExprKind::kAssignmentPattern);
+  EXPECT_EQ(item->init_expr->elements.size(), 1u);
+}
+
+TEST(ArrayLiteralParsing, IndexKeyOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  int arr [0:2] = '{0: 10, 1: 20, 2: 30};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->init_expr, nullptr);
+  EXPECT_EQ(item->init_expr->kind, ExprKind::kAssignmentPattern);
+  ASSERT_EQ(item->init_expr->pattern_keys.size(), 3u);
 }
 
 }  // namespace

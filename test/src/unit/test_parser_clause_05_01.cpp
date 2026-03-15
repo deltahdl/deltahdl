@@ -4,14 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionParsing, ArrayLiteralParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  int arr [0:1];\n"
-              "  initial arr = '{0, 1};\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, BuiltinMethodCallParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

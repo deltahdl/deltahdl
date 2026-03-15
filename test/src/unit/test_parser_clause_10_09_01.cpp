@@ -146,39 +146,11 @@ TEST(StructureLiteralParsing, AssignmentPattern_Replication) {
               "endmodule"));
 }
 
-TEST(StructureLiteralParsing, AssignmentPattern_NestedReplication) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int n[1:2][1:6] = '{2{'{3{4, 5}}}};\n"
-              "endmodule"));
-}
-
 TEST(StructureLiteralParsing, StructLiteral_NestedBraces) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a; shortreal b;} ab;\n"
               "  ab abarr[1:0] = '{'{1, 1.0}, '{2, 2.0}};\n"
-              "endmodule"));
-}
-
-TEST(ArrayLiteralParsing, ArrayLiteral_Nested) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};\n"
-              "endmodule"));
-}
-
-TEST(ArrayLiteralParsing, ArrayLiteral_Simple) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int arr[0:2] = '{10, 20, 30};\n"
-              "endmodule"));
-}
-
-TEST(ArrayLiteralParsing, ArrayLiteral_DefaultValue) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int arr[0:3] = '{default:0};\n"
               "endmodule"));
 }
 

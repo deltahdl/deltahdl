@@ -4,14 +4,14 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionElaboration, SimpleArrayOk) {
+TEST(ArrayLiteralElaboration, SimpleArrayOk) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  int arr[1:0] = '{10, 20};\n"
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, NestedBracesOk) {
+TEST(ArrayLiteralElaboration, NestedBracesOk) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  typedef struct { int a; int b; } ms_t;\n"
@@ -19,7 +19,7 @@ TEST(LexicalConventionElaboration, NestedBracesOk) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, DefaultKeyOk) {
+TEST(ArrayLiteralElaboration, DefaultKeyOk) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  logic [7:0] arr [0:3];\n"
@@ -27,7 +27,7 @@ TEST(LexicalConventionElaboration, DefaultKeyOk) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, SizeMismatchError) {
+TEST(ArrayLiteralElaboration, SizeMismatchError) {
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -37,12 +37,54 @@ TEST(LexicalConventionElaboration, SizeMismatchError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(LexicalConventionElaboration, FlatInitIllegal) {
+TEST(ArrayLiteralElaboration, FlatInitIllegal) {
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
       "  typedef struct { int a; int b; } ms_t;\n"
       "  ms_t ms[1:0] = '{0, 0, 1, 1};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ArrayLiteralElaboration, SimplePositionalOk) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int arr [0:1];\n"
+             "  initial arr = '{0, 1};\n"
+             "endmodule\n"));
+}
+
+TEST(ArrayLiteralElaboration, DuplicateIndexError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  int arr[0:2] = '{0: 1, 1: 2, 0: 3};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ArrayLiteralElaboration, ReplicationOk) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int arr[0:2] = '{3{0}};\n"
+             "endmodule\n"));
+}
+
+TEST(ArrayLiteralElaboration, IndexKeyOk) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int arr[0:2] = '{0: 10, 1: 20, 2: 30};\n"
+             "endmodule\n"));
+}
+
+TEST(ArrayLiteralElaboration, TooFewElementsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int arr[0:2] = '{10, 20};\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());

@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionSim, PositionalAssignment) {
+TEST(ArrayLiteralSim, PositionalAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -23,7 +23,7 @@ TEST(LexicalConventionSim, PositionalAssignment) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xCC);
 }
 
-TEST(LexicalConventionSim, PositionalVarInit) {
+TEST(ArrayLiteralSim, PositionalVarInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -39,7 +39,7 @@ TEST(LexicalConventionSim, PositionalVarInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x33);
 }
 
-TEST(LexicalConventionSim, ReplicationAssignment) {
+TEST(ArrayLiteralSim, ReplicationAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -56,7 +56,7 @@ TEST(LexicalConventionSim, ReplicationAssignment) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xFF);
 }
 
-TEST(LexicalConventionSim, ReplicationVarInit) {
+TEST(ArrayLiteralSim, ReplicationVarInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -72,7 +72,7 @@ TEST(LexicalConventionSim, ReplicationVarInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
 }
 
-TEST(LexicalConventionSim, DefaultAssignment) {
+TEST(ArrayLiteralSim, DefaultAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -89,7 +89,7 @@ TEST(LexicalConventionSim, DefaultAssignment) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x42);
 }
 
-TEST(LexicalConventionSim, DefaultVarInit) {
+TEST(ArrayLiteralSim, DefaultVarInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -105,7 +105,7 @@ TEST(LexicalConventionSim, DefaultVarInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x99);
 }
 
-TEST(LexicalConventionSim, IndexKeyWithDefault) {
+TEST(ArrayLiteralSim, IndexKeyWithDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -122,7 +122,7 @@ TEST(LexicalConventionSim, IndexKeyWithDefault) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x00);
 }
 
-TEST(LexicalConventionSim, IndexKeyVarInit) {
+TEST(ArrayLiteralSim, IndexKeyVarInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -138,7 +138,7 @@ TEST(LexicalConventionSim, IndexKeyVarInit) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xCC);
 }
 
-TEST(LexicalConventionSim, DescendingRange) {
+TEST(ArrayLiteralSim, DescendingRange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -154,7 +154,7 @@ TEST(LexicalConventionSim, DescendingRange) {
   EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0xCC);
 }
 
-TEST(LexicalConventionSim, TypeFromContext) {
+TEST(ArrayLiteralSim, TypeFromContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -168,6 +168,188 @@ TEST(LexicalConventionSim, TypeFromContext) {
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0xDE);
   EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0xAD);
+}
+
+TEST(ArrayLiteralSim, PositionalPatternInit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr [0:1];\n"
+      "  initial begin\n"
+      "    arr = '{10, 20};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* e0 = f.ctx.FindVariable("arr[0]");
+  auto* e1 = f.ctx.FindVariable("arr[1]");
+  ASSERT_NE(e0, nullptr);
+  ASSERT_NE(e1, nullptr);
+  EXPECT_EQ(e0->value.ToUint64(), 10u);
+  EXPECT_EQ(e1->value.ToUint64(), 20u);
+}
+
+TEST(ArrayLiteralSim, DefaultKeyFillsAll) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [0:3];\n"
+      "  initial begin\n"
+      "    arr = '{default: 8'd42};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  for (int i = 0; i < 4; ++i) {
+    auto name = "arr[" + std::to_string(i) + "]";
+    auto* elem = f.ctx.FindVariable(name);
+    ASSERT_NE(elem, nullptr) << name;
+    EXPECT_EQ(elem->value.ToUint64(), 42u) << name;
+  }
+}
+
+TEST(ArrayLiteralSim, ReplicationFillsAll) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr [0:3];\n"
+      "  initial begin\n"
+      "    arr = '{4{7}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  for (int i = 0; i < 4; ++i) {
+    auto name = "arr[" + std::to_string(i) + "]";
+    auto* elem = f.ctx.FindVariable(name);
+    ASSERT_NE(elem, nullptr) << name;
+    EXPECT_EQ(elem->value.ToUint64(), 7u) << name;
+  }
+}
+
+TEST(ArrayLiteralSim, MultipleIndexKeysWithDefault) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr [0:2];\n"
+      "  initial begin\n"
+      "    arr = '{0: 100, 2: 200, default: 0};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* e0 = f.ctx.FindVariable("arr[0]");
+  auto* e1 = f.ctx.FindVariable("arr[1]");
+  auto* e2 = f.ctx.FindVariable("arr[2]");
+  ASSERT_NE(e0, nullptr);
+  ASSERT_NE(e1, nullptr);
+  ASSERT_NE(e2, nullptr);
+  EXPECT_EQ(e0->value.ToUint64(), 100u);
+  EXPECT_EQ(e1->value.ToUint64(), 0u);
+  EXPECT_EQ(e2->value.ToUint64(), 200u);
+}
+
+TEST(ArrayLiteralSim, DescendingRangeAssignment) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr [1:0];\n"
+      "  initial begin\n"
+      "    arr = '{30, 40};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* e0 = f.ctx.FindVariable("arr[0]");
+  auto* e1 = f.ctx.FindVariable("arr[1]");
+  ASSERT_NE(e0, nullptr);
+  ASSERT_NE(e1, nullptr);
+  EXPECT_EQ(e1->value.ToUint64(), 30u);
+  EXPECT_EQ(e0->value.ToUint64(), 40u);
+}
+
+TEST(ArrayLiteralSim, VarDeclPatternInit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr [0:2] = '{5, 10, 15};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* e0 = f.ctx.FindVariable("arr[0]");
+  auto* e1 = f.ctx.FindVariable("arr[1]");
+  auto* e2 = f.ctx.FindVariable("arr[2]");
+  ASSERT_NE(e0, nullptr);
+  ASSERT_NE(e1, nullptr);
+  ASSERT_NE(e2, nullptr);
+  EXPECT_EQ(e0->value.ToUint64(), 5u);
+  EXPECT_EQ(e1->value.ToUint64(), 10u);
+  EXPECT_EQ(e2->value.ToUint64(), 15u);
+}
+
+TEST(ArrayLiteralSim, ReplicationMultiElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int arr [0:3];\n"
+      "  initial arr = '{2{5, 10}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* e0 = f.ctx.FindVariable("arr[0]");
+  auto* e1 = f.ctx.FindVariable("arr[1]");
+  auto* e2 = f.ctx.FindVariable("arr[2]");
+  auto* e3 = f.ctx.FindVariable("arr[3]");
+  ASSERT_NE(e0, nullptr);
+  ASSERT_NE(e1, nullptr);
+  ASSERT_NE(e2, nullptr);
+  ASSERT_NE(e3, nullptr);
+  EXPECT_EQ(e0->value.ToUint64(), 5u);
+  EXPECT_EQ(e1->value.ToUint64(), 10u);
+  EXPECT_EQ(e2->value.ToUint64(), 5u);
+  EXPECT_EQ(e3->value.ToUint64(), 10u);
+}
+
+TEST(ArrayLiteralSim, SingleElementInit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int arr [0:0] = '{42};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* e0 = f.ctx.FindVariable("arr[0]");
+  ASSERT_NE(e0, nullptr);
+  EXPECT_EQ(e0->value.ToUint64(), 42u);
+}
+
+TEST(ArrayLiteralSim, IndexKeyOnlyAssignment) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int arr [0:2];\n"
+      "  initial arr = '{0: 10, 1: 20, 2: 30};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* e0 = f.ctx.FindVariable("arr[0]");
+  auto* e1 = f.ctx.FindVariable("arr[1]");
+  auto* e2 = f.ctx.FindVariable("arr[2]");
+  ASSERT_NE(e0, nullptr);
+  ASSERT_NE(e1, nullptr);
+  ASSERT_NE(e2, nullptr);
+  EXPECT_EQ(e0->value.ToUint64(), 10u);
+  EXPECT_EQ(e1->value.ToUint64(), 20u);
+  EXPECT_EQ(e2->value.ToUint64(), 30u);
 }
 
 }  // namespace

@@ -2,14 +2,6 @@
 
 namespace {
 
-TEST(LexicalConventionElaboration, ModuleWithArrayLiteralElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  int arr [0:1];\n"
-             "  initial arr = '{0, 1};\n"
-             "endmodule\n"));
-}
-
 TEST(LexicalConventionElaboration, ModuleWithBuiltinMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
