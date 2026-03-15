@@ -131,47 +131,29 @@ def build_steps(
          f" Only implement §{subclause}, no other subclauses."
          + exclude_note + constraints),
         ("Summarizing actions",
-         "Output an action summary of everything you did."
-         " Every line MUST include 'because' with a categorical rationale.\n"
-         "ACTION_SUMMARY_START\n"
-         "- Added <file> because <what was missing or needed>\n"
-         "- Moved <TestName> from <file> because <why it was misplaced>\n"
-         "- Deleted <file> because <why it was no longer needed>\n"
-         "- Modified <file> because <what capability was missing>\n"
-         "ACTION_SUMMARY_END"),
+         "Summarize everything you did as a bullet list."
+         " Every line MUST include 'because' with a categorical"
+         " rationale. Example format:\n"
+         "- Added <file> because <reason>\n"
+         "- Moved <TestName> from <file> because <reason>\n"
+         "- Deleted <file> because <reason>\n"
+         "- Modified <file> because <reason>"),
     ]
 
 
-_ACTION_SUMMARY_RE = re.compile(
-    r"ACTION_SUMMARY_START\n(.*?)\nACTION_SUMMARY_END",
-    re.DOTALL,
-)
-
-
-def _extract_action_summary(text: str) -> str:
-    """Extract the action summary block from Claude's response text."""
-    m = _ACTION_SUMMARY_RE.search(text)
-    return m.group(1).strip() if m else ""
-
-
-def _parse_action_summary(stdout: str) -> str:
-    """Search raw stdout and the JSON envelope result for ACTION_SUMMARY."""
-    summary = _extract_action_summary(stdout)
-    if not summary:
-        summary = _extract_action_summary(stdout.replace("\\n", "\n"))
-    if not summary:
-        try:
-            envelope = json.loads(stdout)
-            if isinstance(envelope, list):
-                for item in reversed(envelope):
-                    if isinstance(item, dict) and "result" in item:
-                        envelope = item
-                        break
-            if isinstance(envelope, dict) and "result" in envelope:
-                summary = _extract_action_summary(envelope["result"])
-        except (json.JSONDecodeError, TypeError):
-            pass
-    return summary
+def _extract_result_text(stdout: str) -> str:
+    """Extract the result text from Claude's JSON envelope."""
+    try:
+        envelope = json.loads(stdout)
+        if isinstance(envelope, list):
+            for item in reversed(envelope):
+                if isinstance(item, dict) and "result" in item:
+                    return item["result"]
+        if isinstance(envelope, dict) and "result" in envelope:
+            return envelope["result"]
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return stdout.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +169,7 @@ def _format_subclause_label(subclause):
 
 def run_steps(steps, *, model="opus",
               continue_session=False) -> str | None:
-    """Run each step as a separate Claude call, return ACTION_SUMMARY."""
+    """Run each step as a separate Claude call, return summary text."""
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
 
@@ -232,11 +214,7 @@ def run_steps(steps, *, model="opus",
             skip_to_summary = True
 
         if step_num == total:
-            summary = _parse_action_summary(result.stdout)
-            if not summary:
-                print("ERROR: Final step did not produce"
-                      " an ACTION_SUMMARY.", file=sys.stderr)
-                sys.exit(1)
+            summary = _extract_result_text(result.stdout)
 
     if skip_to_summary:
         return None

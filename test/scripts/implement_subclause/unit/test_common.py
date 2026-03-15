@@ -131,10 +131,10 @@ def test_build_steps_first_mentions_lrm(isc):
     assert "LRM" in steps[0][1]
 
 
-def test_build_steps_last_mentions_action_summary(isc):
-    """Last step prompt mentions ACTION_SUMMARY."""
+def test_build_steps_last_mentions_summarize(isc):
+    """Last step prompt asks for a summary."""
     steps = isc.build_steps("4.1", "~/LRM.txt")
-    assert "ACTION_SUMMARY" in steps[-1][1]
+    assert "Summarize" in steps[-1][1]
 
 
 def test_build_steps_second_checks_implementability(isc):
@@ -184,9 +184,7 @@ def test_build_steps_constraints_include_directly_defined(isc):
 # ---- run_steps -------------------------------------------------------------
 
 
-_OK_STDOUT = (
-    'ACTION_SUMMARY_START\n- Done because needed\nACTION_SUMMARY_END'
-)
+_OK_STDOUT = '{"result": "- Done because needed"}'
 
 
 def _mock_run_ok():
@@ -212,8 +210,8 @@ def test_run_steps_call_count(isc):
     assert _run_steps_and_capture(isc).call_count == 11
 
 
-def test_run_steps_returns_action_summary(isc):
-    """run_steps returns the ACTION_SUMMARY from the last step."""
+def test_run_steps_returns_summary(isc):
+    """run_steps returns the result text from the last step."""
     steps = isc.build_steps("4.1", "~/LRM.txt")
     with patch("implement_subclause.run_claude_cli", _mock_run_ok()), \
          patch("implement_subclause.run_with_dots",
@@ -280,17 +278,6 @@ def test_run_steps_exits_on_failure(mock_exit, isc):
         isc.run_steps(steps, model="opus")
     assert mock_exit.called
 
-
-@patch("implement_subclause.sys.exit")
-def test_run_steps_exits_on_missing_summary(mock_exit, isc):
-    """run_steps exits when the last step has no ACTION_SUMMARY."""
-    steps = isc.build_steps("4.1", "~/LRM.txt")
-    no_summary = MagicMock(
-        return_value=MagicMock(returncode=0, stdout='{"result":"done"}', stderr=""),
-    )
-    with patch("implement_subclause.run_with_dots", no_summary):
-        isc.run_steps(steps, model="opus")
-    assert mock_exit.called
 
 
 def test_run_steps_first_no_continue(isc):
