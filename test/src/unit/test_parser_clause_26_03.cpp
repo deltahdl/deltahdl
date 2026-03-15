@@ -411,4 +411,12 @@ TEST(PackageImport, WildcardIntoProgram) {
               "endprogram\n"));
 }
 
+TEST(PackageImport, WildcardIntoPackage) {
+  EXPECT_TRUE(
+      ParseOk("package a; typedef int myint; endpackage\n"
+              "package b;\n"
+              "  import a::*;\n"
+              "endpackage\n"));
+}
+
 }  // namespace
