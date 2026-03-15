@@ -629,4 +629,13 @@ TEST(ProgramDeclarations, ProgramContainsDeclarationsAndCode) {
   EXPECT_FALSE(r.cu->programs[0]->items.empty());
 }
 
+TEST(ProgramDeclaration, EnclosedByKeywords) {
+  auto r = Parse("program p; endprogram");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "p");
+  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+}
+
 }  // namespace
