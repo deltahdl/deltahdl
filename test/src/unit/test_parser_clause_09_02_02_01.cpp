@@ -81,4 +81,12 @@ TEST(AlwaysCombParsing, AlwaysParameterizedDelay) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(AlwaysBlock, PosedgeTriggered) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic clk, q, d;\n"
+              "  always @(posedge clk) q <= d;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

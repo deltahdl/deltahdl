@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithAlwaysBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic clk, q, d;\n"
-              "  always @(posedge clk) q <= d;\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithAlwaysComb) {
   auto r = Parse(
       "module m;\n"
