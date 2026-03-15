@@ -662,4 +662,14 @@ TEST(DataTypeParsing, IntegerTypesInGenerateBlock) {
               "endmodule\n"));
 }
 
+TEST(GenerateFor, NamedBlockWithWire) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  genvar i;\n"
+              "  for (i = 0; i < 4; i = i + 1) begin : gen\n"
+              "    wire w;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithGenerateFor) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  genvar i;\n"
-              "  for (i = 0; i < 4; i = i + 1) begin : gen\n"
-              "    wire w;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithGenerateIf) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
