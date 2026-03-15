@@ -106,4 +106,15 @@ TEST(ModuleInstantiation, TwoLevelHierarchyElaborates) {
   EXPECT_FALSE(design->top_modules[0]->children.empty());
 }
 
+TEST(ModuleInstantiation, ThreeLevelHierarchyElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module leaf; endmodule\n"
+      "module mid; leaf u0(); endmodule\n"
+      "module top; mid u0(); endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

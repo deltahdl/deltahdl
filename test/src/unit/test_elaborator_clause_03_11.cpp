@@ -4,17 +4,6 @@
 
 namespace {
 
-TEST(DesignBuildingBlockElaboration, ThreeLevelHierarchyElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module leaf; endmodule\n"
-      "module mid; leaf u0(); endmodule\n"
-      "module top; mid u0(); endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(DesignBuildingBlockElaboration, GateLevelMux2to1Elaborates) {
   EXPECT_TRUE(
       ElabOk("module mux2to1 (input wire a, b, sel,\n"
