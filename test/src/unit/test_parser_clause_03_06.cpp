@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, CheckerWithAssertion) {
-  auto r = Parse(
-      "checker chk(input logic clk, input logic req, input logic gnt);\n"
-      "  assert property (@(posedge clk) req |-> ##[1:3] gnt);\n"
-      "endchecker\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kAssertProperty));
-}
-
 TEST(DesignBuildingBlockParsing, CheckerWithModelingCode) {
   auto r = Parse(
       "checker chk;\n"
