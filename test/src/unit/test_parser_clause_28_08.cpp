@@ -272,4 +272,15 @@ TEST(BidirectionalPassSwitches, TranAndRtran) {
               "endmodule\n"));
 }
 
+TEST(BidirectionalPassSwitches, ConditionalPassEnables) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire a, b, en;\n"
+              "  tranif0  g1(a, b, en);\n"
+              "  tranif1  g2(a, b, en);\n"
+              "  rtranif0 g3(a, b, en);\n"
+              "  rtranif1 g4(a, b, en);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
