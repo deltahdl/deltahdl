@@ -2,15 +2,6 @@
 
 namespace {
 
-TEST(LexicalConventionElaboration, ModuleWithBuiltinMethodElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  int q[$];\n"
-             "  int sz;\n"
-             "  initial sz = q.size();\n"
-             "endmodule\n"));
-}
-
 TEST(LexicalConventionElaboration, AllFourAreasElaborate) {
   EXPECT_TRUE(
       ElabOk("(* optimize *) module t;\n"

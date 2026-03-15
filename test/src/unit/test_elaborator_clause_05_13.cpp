@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionElaboration, ArraySizeMethodElaborates) {
+TEST(BuiltinMethodElaboration, ArraySizeMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int arr [0:3];\n"
@@ -13,7 +13,7 @@ TEST(LexicalConventionElaboration, ArraySizeMethodElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, ArraySizeNoParensElaborates) {
+TEST(BuiltinMethodElaboration, ArraySizeNoParensElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int arr [0:2];\n"
@@ -22,7 +22,7 @@ TEST(LexicalConventionElaboration, ArraySizeNoParensElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, QueueMethodElaborates) {
+TEST(BuiltinMethodElaboration, QueuePushBackOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int q [$];\n"
@@ -32,7 +32,7 @@ TEST(LexicalConventionElaboration, QueueMethodElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, QueueSizeElaborates) {
+TEST(BuiltinMethodElaboration, QueueSizeElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int q [$];\n"
@@ -41,7 +41,7 @@ TEST(LexicalConventionElaboration, QueueSizeElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, DynArraySizeElaborates) {
+TEST(BuiltinMethodElaboration, DynArraySizeElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int dyn [];\n"
@@ -50,7 +50,7 @@ TEST(LexicalConventionElaboration, DynArraySizeElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, MutatingMethodElaborates) {
+TEST(BuiltinMethodElaboration, ArrayReverseOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int arr [0:2];\n"
@@ -58,12 +58,49 @@ TEST(LexicalConventionElaboration, MutatingMethodElaborates) {
              "endmodule\n"));
 }
 
-TEST(LexicalConventionElaboration, ReductionMethodElaborates) {
+TEST(BuiltinMethodElaboration, ArraySumOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int arr [0:2] = '{1, 2, 3};\n"
              "  int total;\n"
              "  initial total = arr.sum();\n"
+             "endmodule\n"));
+}
+
+TEST(BuiltinMethodElaboration, StringLenOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  string s;\n"
+             "  int n;\n"
+             "  initial n = s.len();\n"
+             "endmodule\n"));
+}
+
+TEST(BuiltinMethodElaboration, AssocArrayNumOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int assoc [string];\n"
+             "  int n;\n"
+             "  initial n = assoc.num();\n"
+             "endmodule\n"));
+}
+
+TEST(BuiltinMethodElaboration, QueueSizeNoParensOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int q [$];\n"
+             "  int sz;\n"
+             "  initial sz = q.size;\n"
+             "endmodule\n"));
+}
+
+TEST(BuiltinMethodElaboration, EnumNumOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  typedef enum {RED, GREEN, BLUE} color_e;\n"
+             "  color_e c;\n"
+             "  int n;\n"
+             "  initial n = c.num();\n"
              "endmodule\n"));
 }
 

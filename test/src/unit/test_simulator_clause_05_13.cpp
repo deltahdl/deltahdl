@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionSim, ArraySizeWithParens) {
+TEST(BuiltinMethodSim, ArraySizeWithParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -22,7 +22,7 @@ TEST(LexicalConventionSim, ArraySizeWithParens) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 4u);
 }
 
-TEST(LexicalConventionSim, ArraySizeNoParens) {
+TEST(BuiltinMethodSim, ArraySizeNoParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -38,7 +38,7 @@ TEST(LexicalConventionSim, ArraySizeNoParens) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 3u);
 }
 
-TEST(LexicalConventionSim, MethodInExpression) {
+TEST(BuiltinMethodSim, MethodInExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -54,7 +54,7 @@ TEST(LexicalConventionSim, MethodInExpression) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 6u);
 }
 
-TEST(LexicalConventionSim, QueuePushBackAndSize) {
+TEST(BuiltinMethodSim, QueuePushBackAndSize) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -74,7 +74,7 @@ TEST(LexicalConventionSim, QueuePushBackAndSize) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 2u);
 }
 
-TEST(LexicalConventionSim, QueuePushBackElements) {
+TEST(BuiltinMethodSim, QueuePushBackElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -98,7 +98,7 @@ TEST(LexicalConventionSim, QueuePushBackElements) {
   EXPECT_EQ(q->elements[2].ToUint64(), 0x44u);
 }
 
-TEST(LexicalConventionSim, QueuePopFront) {
+TEST(BuiltinMethodSim, QueuePopFront) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -124,7 +124,7 @@ TEST(LexicalConventionSim, QueuePopFront) {
   EXPECT_EQ(q->elements[1].ToUint64(), 0x30u);
 }
 
-TEST(LexicalConventionSim, ArraySum) {
+TEST(BuiltinMethodSim, ArraySum) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -140,7 +140,7 @@ TEST(LexicalConventionSim, ArraySum) {
   EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
 }
 
-TEST(LexicalConventionSim, ArrayReverseWithParens) {
+TEST(BuiltinMethodSim, ArrayReverseWithParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -157,7 +157,7 @@ TEST(LexicalConventionSim, ArrayReverseWithParens) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
 }
 
-TEST(LexicalConventionSim, ArrayReverseNoParens) {
+TEST(BuiltinMethodSim, ArrayReverseNoParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -174,7 +174,7 @@ TEST(LexicalConventionSim, ArrayReverseNoParens) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x11);
 }
 
-TEST(LexicalConventionSim, DynArraySize) {
+TEST(BuiltinMethodSim, DynArraySize) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -188,6 +188,102 @@ TEST(LexicalConventionSim, DynArraySize) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 2u);
+}
+
+TEST(BuiltinMethodSim, StringLen) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s = \"hello\";\n"
+      "  logic [31:0] n;\n"
+      "  initial n = s.len();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 5u);
+}
+
+TEST(BuiltinMethodSim, AssocArrayNum) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int assoc [string];\n"
+      "  logic [31:0] n;\n"
+      "  initial begin\n"
+      "    assoc[\"a\"] = 1;\n"
+      "    assoc[\"b\"] = 2;\n"
+      "    n = assoc.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 2u);
+}
+
+TEST(BuiltinMethodSim, QueueSizeNoParens) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] q [$];\n"
+      "  logic [31:0] s;\n"
+      "  initial begin\n"
+      "    q.push_back(8'h01);\n"
+      "    q.push_back(8'h02);\n"
+      "    q.push_back(8'h03);\n"
+      "    s = q.size;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 3u);
+}
+
+TEST(BuiltinMethodSim, EnumNum) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_e;\n"
+      "  color_e c;\n"
+      "  logic [31:0] n;\n"
+      "  initial n = c.num();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 3u);
+}
+
+TEST(BuiltinMethodSim, MethodResultInConditional) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] q [$];\n"
+      "  logic [31:0] r;\n"
+      "  initial begin\n"
+      "    q.push_back(8'hFF);\n"
+      "    if (q.size() > 0)\n"
+      "      r = 32'd1;\n"
+      "    else\n"
+      "      r = 32'd0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 1u);
 }
 
 }  // namespace

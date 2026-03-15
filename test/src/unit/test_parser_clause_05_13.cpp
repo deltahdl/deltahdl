@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionParsing, MethodCallWithParens) {
+TEST(BuiltinMethodParsing, MethodCallWithParens) {
   auto r = Parse(
       "module m;\n"
       "  int arr [0:3];\n"
@@ -19,7 +19,7 @@ TEST(LexicalConventionParsing, MethodCallWithParens) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-TEST(LexicalConventionParsing, MethodCallNoParens) {
+TEST(BuiltinMethodParsing, MethodCallNoParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q[$];\n"
@@ -27,7 +27,7 @@ TEST(LexicalConventionParsing, MethodCallNoParens) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, ChainedAccess) {
+TEST(BuiltinMethodParsing, ChainedAccess) {
   auto r = Parse(
       "module m;\n"
       "  initial x = obj.arr.size();\n"
@@ -39,7 +39,7 @@ TEST(LexicalConventionParsing, ChainedAccess) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-TEST(LexicalConventionParsing, MethodWithArg) {
+TEST(BuiltinMethodParsing, MethodWithArg) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic [7:0] q [$];\n"
@@ -47,7 +47,7 @@ TEST(LexicalConventionParsing, MethodWithArg) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, MethodInExpression) {
+TEST(BuiltinMethodParsing, MethodInExpression) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int arr [0:3];\n"
@@ -56,7 +56,7 @@ TEST(LexicalConventionParsing, MethodInExpression) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, MutatingMethodStatement) {
+TEST(BuiltinMethodParsing, MutatingMethodStatement) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int arr [0:2];\n"
@@ -64,7 +64,7 @@ TEST(LexicalConventionParsing, MutatingMethodStatement) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, MutatingMethodStatementNoParens) {
+TEST(BuiltinMethodParsing, MutatingMethodStatementNoParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int arr [0:2];\n"
@@ -72,7 +72,7 @@ TEST(LexicalConventionParsing, MutatingMethodStatementNoParens) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, QueueDelete) {
+TEST(BuiltinMethodParsing, QueueDelete) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q [$];\n"
@@ -80,7 +80,7 @@ TEST(LexicalConventionParsing, QueueDelete) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, QueuePopFront) {
+TEST(BuiltinMethodParsing, QueuePopFront) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q [$];\n"
@@ -89,7 +89,7 @@ TEST(LexicalConventionParsing, QueuePopFront) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, ReductionSum) {
+TEST(BuiltinMethodParsing, ReductionSum) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int arr [0:2];\n"
@@ -98,12 +98,66 @@ TEST(LexicalConventionParsing, ReductionSum) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, DynArraySize) {
+TEST(BuiltinMethodParsing, DynArraySize) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int dyn [];\n"
               "  int s;\n"
               "  initial s = dyn.size();\n"
+              "endmodule\n"));
+}
+
+TEST(BuiltinMethodParsing, QueueSizeWithParens) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  int q[$];\n"
+              "  int sz;\n"
+              "  initial sz = q.size();\n"
+              "endmodule\n"));
+}
+
+TEST(BuiltinMethodParsing, QueueSizeWithoutParens) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  int q[$];\n"
+              "  int sz;\n"
+              "  initial sz = q.size;\n"
+              "endmodule\n"));
+}
+
+TEST(BuiltinMethodParsing, StringMethodParses) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string s;\n"
+              "  int n;\n"
+              "  initial n = s.len();\n"
+              "endmodule\n"));
+}
+
+TEST(BuiltinMethodParsing, AssocArrayMethodParses) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int assoc [string];\n"
+              "  int n;\n"
+              "  initial n = assoc.num();\n"
+              "endmodule\n"));
+}
+
+TEST(BuiltinMethodParsing, EnumMethodParses) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef enum {A, B, C} abc_e;\n"
+              "  abc_e e;\n"
+              "  int n;\n"
+              "  initial n = e.num();\n"
+              "endmodule\n"));
+}
+
+TEST(BuiltinMethodParsing, MethodCallWithMultipleArgs) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int q [$];\n"
+              "  initial q.insert(0, 42);\n"
               "endmodule\n"));
 }
 

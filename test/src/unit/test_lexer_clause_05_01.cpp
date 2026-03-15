@@ -20,14 +20,6 @@ TEST(LexicalConventionLexing, EmptySourceProducesOnlyEof) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexicalConventionLexing, DotTokenForBuiltinMethodCalls) {
-  auto tokens = Lex("arr.size");
-  ASSERT_GE(tokens.size(), 4u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kDot);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
-}
-
 TEST(LexicalConventionLexing, AllFourAreasInOneStream) {
   auto tokens =
       Lex("(* full_case *) module t; // comment\n"

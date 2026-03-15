@@ -4,24 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionParsing, BuiltinMethodCallParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  int q[$];\n"
-              "  int sz;\n"
-              "  initial sz = q.size();\n"
-              "endmodule\n"));
-}
-
-TEST(LexicalConventionParsing, BuiltinMethodCallWithoutParensParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  int q[$];\n"
-              "  int sz;\n"
-              "  initial sz = q.size;\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, AllFourAreasInOneParse) {
   EXPECT_TRUE(
       ParseOk("(* optimize *) module t;\n"
