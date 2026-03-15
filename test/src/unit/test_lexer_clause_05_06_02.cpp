@@ -21,4 +21,9 @@ TEST(Keywords, MacromoduleKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwMacromodule);
 }
 
+TEST(Keywords, ProgramKeyword) {
+  auto r = LexOne("program");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwProgram);
+}
+
 }  // namespace
