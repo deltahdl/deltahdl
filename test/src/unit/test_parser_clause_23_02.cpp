@@ -37,4 +37,17 @@ TEST(ModuleDeclarations, MacromoduleKeywordIntroducesModule) {
   EXPECT_EQ(r.cu->modules[0]->name, "mm");
 }
 
+TEST(ModuleDeclarations, ModuleContainsDeclarationsAndCode) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a;\n"
+      "  wire b;\n"
+      "  assign b = a;\n"
+      "  always_comb a = 0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->modules[0]->items.empty());
+}
+
 }  // namespace

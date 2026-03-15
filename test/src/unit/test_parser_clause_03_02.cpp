@@ -15,19 +15,6 @@ TEST(DesignElements, ModuleDeclKindDistinctValues) {
   EXPECT_NE(ModuleDeclKind::kProgram, ModuleDeclKind::kChecker);
 }
 
-TEST(DesignBuildingBlockParsing, ModuleContainsDeclarationsAndCode) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic a;\n"
-      "  wire b;\n"
-      "  assign b = a;\n"
-      "  always_comb a = 0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_FALSE(r.cu->modules[0]->items.empty());
-}
-
 TEST(DesignBuildingBlockParsing, ProgramContainsDeclarationsAndCode) {
   auto r = Parse(
       "program p;\n"
