@@ -67,4 +67,19 @@ TEST(ModuleDefinition, Mux2to1WithAnsiPorts) {
   EXPECT_FALSE(r.cu->modules[0]->items.empty());
 }
 
+TEST(ModuleDefinition, MixedContents) {
+  EXPECT_TRUE(ParseOk(
+      "module m #(parameter int W = 8) (input logic clk, output logic [W-1:0] "
+      "q);\n"
+      "  typedef logic [W-1:0] data_t;\n"
+      "  wire [W-1:0] net;\n"
+      "  logic [W-1:0] var;\n"
+      "  localparam int HALF = W / 2;\n"
+      "  function automatic data_t invert(data_t d); return ~d; endfunction\n"
+      "  assign net = var;\n"
+      "  always_comb var = invert(q);\n"
+      "  always_ff @(posedge clk) q <= net;\n"
+      "endmodule\n"));
+}
+
 }  // namespace
