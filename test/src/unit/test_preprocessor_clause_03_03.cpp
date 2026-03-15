@@ -50,7 +50,7 @@ TEST(ModuleOverview, VariousItemKinds) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 7u);
 }
 
-TEST(DesignBuildingBlockParsing, SubroutinesAndProceduralBlocks) {
+TEST(ModuleOverview, SubroutinesAndProceduralBlocks) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  logic clk, a, b;\n"
