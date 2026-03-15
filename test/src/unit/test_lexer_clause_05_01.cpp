@@ -20,14 +20,6 @@ TEST(LexicalConventionLexing, EmptySourceProducesOnlyEof) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexicalConventionLexing, KeywordDistinctFromIdentifier) {
-  auto kw = LexOne("module");
-  EXPECT_EQ(kw.token.kind, TokenKind::kKwModule);
-
-  auto id = LexOne("my_module");
-  EXPECT_EQ(id.token.kind, TokenKind::kIdentifier);
-}
-
 TEST(LexicalConventionLexing, IntegerLiteralRecognized) {
   auto r = LexOne("32'd100");
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);

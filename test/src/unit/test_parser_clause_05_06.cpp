@@ -1,3 +1,5 @@
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -81,6 +83,53 @@ TEST(LexicalConventionParsing, SimpleWithUnderscore) {
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "_bus3");
+}
+
+TEST(LexicalConventionParsing, IdentifierAsModuleName) {
+  auto r = Parse("module my_mod_99; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "my_mod_99");
+}
+
+TEST(LexicalConventionParsing, IdentifierAsPortName) {
+  auto r = Parse("module m(input logic _data_in); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(LexicalConventionParsing, MaxLengthIdentifierParses) {
+  std::string long_id(1024, 'z');
+  auto r = Parse("module m; logic " + long_id + "; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(LexicalConventionParsing, SingleCharIdentifierParses) {
+  auto r = Parse("module m; logic x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "x");
+}
+
+TEST(LexicalConventionParsing, UnderscoreOnlyIdentifierParses) {
+  auto r = Parse("module m; logic _; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "_");
+}
+
+TEST(LexicalConventionParsing, IdentifierInAssignExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  assign a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 // §3.1 — Module with design element name containing underscores and digits.

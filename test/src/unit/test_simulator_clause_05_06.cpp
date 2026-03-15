@@ -97,6 +97,36 @@ TEST(IdentifierSim, IdentifierReferencesObject) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
+TEST(IdentifierSim, SingleCharIdentifier) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'd99;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 99u);
+}
+
+TEST(IdentifierSim, UnderscoreOnlyIdentifier) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] _;\n"
+      "  initial _ = 8'd44;\n"
+      "endmodule\n",
+      "_");
+  EXPECT_EQ(result, 44u);
+}
+
+TEST(IdentifierSim, IdentifierAllUppercase) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] ALLCAPS;\n"
+      "  initial ALLCAPS = 8'd33;\n"
+      "endmodule\n",
+      "ALLCAPS");
+  EXPECT_EQ(result, 33u);
+}
+
 TEST(IdentifierSim, IdentifierMixedCharClasses) {
   SimFixture f;
   auto* design = ElaborateSrc(

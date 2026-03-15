@@ -38,31 +38,31 @@ TEST(LexicalConventionLexing, SimpleIdentMixed) {
   EXPECT_EQ(r.token.text, "abc_123$xyz");
 }
 
-TEST(LexicalConventionLexing, LrmExampleShiftreg) {
+TEST(LexicalConventionLexing, SimpleIdentShiftregA) {
   auto r = LexOne("shiftreg_a ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "shiftreg_a");
 }
 
-TEST(LexicalConventionLexing, LrmExampleBusaIndex) {
+TEST(LexicalConventionLexing, SimpleIdentBusaIndex) {
   auto r = LexOne("busa_index ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "busa_index");
 }
 
-TEST(LexicalConventionLexing, LrmExampleError_condition) {
+TEST(LexicalConventionLexing, SimpleIdentErrorCondition) {
   auto r = LexOne("error_condition ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "error_condition");
 }
 
-TEST(LexicalConventionLexing, LrmExampleMerge_ab) {
+TEST(LexicalConventionLexing, SimpleIdentMergeAb) {
   auto r = LexOne("merge_ab ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "merge_ab");
 }
 
-TEST(LexicalConventionLexing, LrmExampleData0) {
+TEST(LexicalConventionLexing, SimpleIdentLeadingTrailingUnderscore) {
   auto r = LexOne("_data_3_ ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
   EXPECT_EQ(r.token.text, "_data_3_");
@@ -123,6 +123,54 @@ TEST(LexicalConventionLexing, EscapedMaxLength1025Error) {
   std::string id = "\\" + std::string(1025, 'a') + " ";
   auto [tokens, errors] = LexWithDiag(id);
   EXPECT_TRUE(errors);
+}
+
+TEST(LexicalConventionLexing, KeywordDistinctFromIdentifier) {
+  auto kw = LexOne("module");
+  EXPECT_EQ(kw.token.kind, TokenKind::kKwModule);
+
+  auto id = LexOne("my_module");
+  EXPECT_EQ(id.token.kind, TokenKind::kIdentifier);
+}
+
+TEST(LexicalConventionLexing, SingleCharIdentifier) {
+  auto r = LexOne("a ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+  EXPECT_EQ(r.token.text, "a");
+}
+
+TEST(LexicalConventionLexing, UnderscoreOnlyIdentifier) {
+  auto r = LexOne("_ ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+  EXPECT_EQ(r.token.text, "_");
+}
+
+TEST(LexicalConventionLexing, IdentifierFollowedByOperator) {
+  auto tokens = Lex("abc+def");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "abc");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kPlus);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[2].text, "def");
+}
+
+TEST(LexicalConventionLexing, ConsecutiveUnderscores) {
+  auto r = LexOne("a__b ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+  EXPECT_EQ(r.token.text, "a__b");
+}
+
+TEST(LexicalConventionLexing, AllUppercaseIdentifier) {
+  auto r = LexOne("ALLCAPS ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+  EXPECT_EQ(r.token.text, "ALLCAPS");
+}
+
+TEST(LexicalConventionLexing, IdentifierAllDigitsAfterFirst) {
+  auto r = LexOne("x12345 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+  EXPECT_EQ(r.token.text, "x12345");
 }
 
 TEST(LexicalConventionLexing, SimpleAndEscapedInStream) {
