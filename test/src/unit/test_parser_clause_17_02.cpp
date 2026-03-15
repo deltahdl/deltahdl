@@ -503,4 +503,13 @@ TEST(CheckerDeclaration, WithModelingCode) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
 }
 
+TEST(CheckerDeclaration, WithPorts) {
+  auto r = Parse(
+      "checker chk(input logic clk, input logic rst);\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->checkers[0]->ports.size(), 2u);
+}
+
 }  // namespace

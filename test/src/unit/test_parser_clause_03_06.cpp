@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, CheckerWithPorts) {
-  auto r = Parse(
-      "checker chk(input logic clk, input logic rst);\n"
-      "endchecker\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->checkers[0]->ports.size(), 2u);
-}
-
 TEST(DesignBuildingBlockParsing, CheckerWithMixedContent) {
   EXPECT_TRUE(
       ParseOk("checker chk(input logic clk, input logic a, input logic b);\n"
