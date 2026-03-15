@@ -148,4 +148,13 @@ TEST(Lowerer, FunctionCallReturnsValue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
+TEST(FunctionReturnValues, ReturnStatementElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  function int add(int a, int b);\n"
+             "    return a + b;\n"
+             "  endfunction\n"
+             "endmodule\n"));
+}
+
 }  // namespace

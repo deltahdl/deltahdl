@@ -1,15 +1,8 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 
 namespace {
-
-TEST(DesignBuildingBlockElaboration, FunctionWithReturnElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  function int add(int a, int b);\n"
-             "    return a + b;\n"
-             "  endfunction\n"
-             "endmodule\n"));
-}
 
 TEST(DesignBuildingBlockElaboration, VoidFunctionElaborates) {
   EXPECT_TRUE(
