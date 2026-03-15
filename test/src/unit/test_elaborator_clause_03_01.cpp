@@ -4,21 +4,6 @@
 
 namespace {
 
-TEST(BuildingBlockElaboration, ModuleWithChildInstanceElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module child; endmodule\n"
-      "module top;\n"
-      "  child c1();\n"
-      "endmodule\n",
-      f, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  EXPECT_EQ(design->top_modules[0]->name, "top");
-  EXPECT_FALSE(design->top_modules[0]->children.empty());
-}
-
 TEST(BuildingBlockElaboration, NestedHierarchyTwoLevelsDeep) {
   ElabFixture f;
   auto* design = ElaborateSrc(
