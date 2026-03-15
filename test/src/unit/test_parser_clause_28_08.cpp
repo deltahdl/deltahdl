@@ -263,4 +263,13 @@ TEST(PrimitiveGateTypeParsing, PassSwitchtype_Rtran) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
+TEST(BidirectionalPassSwitches, TranAndRtran) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire a, b;\n"
+              "  tran  g1(a, b);\n"
+              "  rtran g2(a, b);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
