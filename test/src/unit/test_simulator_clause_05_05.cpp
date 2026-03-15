@@ -1,6 +1,5 @@
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
-#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 
@@ -102,4 +101,37 @@ TEST(OperatorTokenSim, OperatorNoWhitespace) {
       "endmodule\n",
       "result");
   EXPECT_EQ(result, 10u);
+}
+
+TEST(OperatorTokenSim, OperatorBitwiseUnary) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = ~8'd0;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 255u);
+}
+
+TEST(OperatorTokenSim, OperatorChainedBinary) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = 8'd10 + 8'd20 - 8'd5;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 25u);
+}
+
+TEST(OperatorTokenSim, OperatorCompoundAssignment) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    result = 8'd10;\n"
+      "    result += 8'd5;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 15u);
 }

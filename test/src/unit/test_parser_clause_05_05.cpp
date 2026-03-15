@@ -208,4 +208,34 @@ TEST(LexicalConventionParsing, SingleCharOperatorsInExpressions) {
               "endmodule\n"));
 }
 
+TEST(LexicalConventionParsing, PostfixIncrementDecrement) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    x++;\n"
+              "    x--;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(LexicalConventionParsing, ChainedUnaryOperators) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    x = ~~a;\n"
+              "    x = !!a;\n"
+              "    x = -~a;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(LexicalConventionParsing, OperatorInContinuousAssign) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic a, b, c;\n"
+              "  assign a = b & c;\n"
+              "  assign c = ~b;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

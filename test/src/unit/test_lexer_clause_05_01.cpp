@@ -20,18 +20,6 @@ TEST(LexicalConventionLexing, EmptySourceProducesOnlyEof) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexicalConventionLexing, OperatorTokensRecognized) {
-  auto tokens = Lex("+ - * / % ** && ||");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kPlus);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kMinus);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kStar);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kSlash);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kPercent);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kPower);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kAmpAmp);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kPipePipe);
-}
-
 TEST(LexicalConventionLexing, KeywordDistinctFromIdentifier) {
   auto kw = LexOne("module");
   EXPECT_EQ(kw.token.kind, TokenKind::kKwModule);
