@@ -6,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockLexing, EndprogramKeyword) {
-  auto r = LexOne("endprogram");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwEndprogram);
-}
-
 TEST(DesignBuildingBlockLexing, InterfaceKeyword) {
   auto r = LexOne("interface");
   EXPECT_EQ(r.token.kind, TokenKind::kKwInterface);

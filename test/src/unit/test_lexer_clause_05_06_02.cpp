@@ -26,4 +26,9 @@ TEST(Keywords, ProgramKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwProgram);
 }
 
+TEST(Keywords, EndprogramKeyword) {
+  auto r = LexOne("endprogram");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwEndprogram);
+}
+
 }  // namespace
