@@ -376,4 +376,13 @@ TEST(FunctionDeclaration, VoidFunction) {
               "endmodule\n"));
 }
 
+TEST(FunctionDeclaration, NonVoidFunctionUsedAsOperand) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function int twice(int v); return v * 2; endfunction\n"
+              "  logic [31:0] result;\n"
+              "  initial result = twice(5);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

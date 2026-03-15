@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, NonVoidFunctionUsedAsOperand) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function int twice(int v); return v * 2; endfunction\n"
-              "  logic [31:0] result;\n"
-              "  initial result = twice(5);\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, VoidFunctionCalledAsStatement) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
