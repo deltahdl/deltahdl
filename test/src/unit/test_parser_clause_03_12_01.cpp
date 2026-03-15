@@ -568,4 +568,8 @@ TEST(CompilationUnits, UnrecognizedTopLevelTokenIsError) {
   EXPECT_FALSE(ParseOk("always_comb begin end"));
 }
 
+TEST(CompilationUnits, BareStatementAtTopLevelIsError) {
+  EXPECT_FALSE(ParseOk("assign x = 1;"));
+}
+
 }  // namespace

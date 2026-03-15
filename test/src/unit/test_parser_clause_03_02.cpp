@@ -33,10 +33,6 @@ TEST(DesignElements, TopLevelClassIsNotDesignElement) {
   EXPECT_TRUE(r.cu->configs.empty());
 }
 
-TEST(DesignBuildingBlockParsing, BareStatementAtTopLevelIsError) {
-  EXPECT_FALSE(ParseOk("assign x = 1;"));
-}
-
 TEST(DesignBuildingBlockParsing, AllSevenDesignElementsCoexist) {
   auto r = Parse(
       "module m; endmodule\n"
