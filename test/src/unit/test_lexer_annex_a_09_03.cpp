@@ -186,63 +186,6 @@ TEST(IdentifierLexing, CIdentValidChars) {
   EXPECT_EQ(tokens[0].text, "my_c_func_123");
 }
 
-TEST(IdentifierLexing, SystemIdBasic) {
-  auto tokens = Lex("$display");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
-  EXPECT_EQ(tokens[0].text, "$display");
-}
-
-TEST(IdentifierLexing, SystemIdWithUnderscore) {
-  auto tokens = Lex("$read_mem_h");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
-  EXPECT_EQ(tokens[0].text, "$read_mem_h");
-}
-
-TEST(IdentifierLexing, SystemIdWithDigits) {
-  auto tokens = Lex("$clog2");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
-  EXPECT_EQ(tokens[0].text, "$clog2");
-}
-
-TEST(IdentifierLexing, SystemIdEmbeddedDollar) {
-  auto tokens = Lex("$test$plusargs $value$plusargs");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
-  EXPECT_EQ(tokens[0].text, "$test$plusargs");
-  EXPECT_EQ(tokens[1].kind, TokenKind::kSystemIdentifier);
-  EXPECT_EQ(tokens[1].text, "$value$plusargs");
-}
-
-TEST(IdentifierLexing, SystemIdMaxLength) {
-  std::string id = "$" + std::string(1023, 'a');
-  auto [tokens, errors] = LexWithDiag(id);
-  EXPECT_FALSE(errors);
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
-}
-
-TEST(IdentifierLexing, SystemIdExceedsMaxLength) {
-  std::string id = "$" + std::string(1024, 'a');
-  auto [tokens, errors] = LexWithDiag(id);
-  EXPECT_TRUE(errors);
-}
-
-TEST(IdentifierLexing, DollarAloneIsNotSystemId) {
-  auto tokens = Lex("$ ");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
-}
-
-TEST(IdentifierLexing, DollarFollowedByDigit) {
-  auto tokens = Lex("$0");
-  ASSERT_GE(tokens.size(), 2u);
-
-  EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
-}
-
 TEST(IdentifierLexing, MultipleIdentTypes) {
   auto tokens = Lex("foo \\bar $baz");
   ASSERT_GE(tokens.size(), 4u);

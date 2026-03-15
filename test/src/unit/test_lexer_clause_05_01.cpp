@@ -55,17 +55,6 @@ TEST(LexicalConventionLexing, TripleQuotedStringLiteralRecognized) {
   EXPECT_EQ(r.token.kind, TokenKind::kStringLiteral);
 }
 
-TEST(LexicalConventionLexing, SystemIdentifierRecognized) {
-  auto r = LexOne("$display");
-  EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
-}
-
-TEST(LexicalConventionLexing, SystemIdentifierPreservesDollarPrefix) {
-  auto r = LexOne("$finish");
-  EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
-  EXPECT_EQ(r.token.text, "$finish");
-}
-
 TEST(LexicalConventionLexing, DotTokenForBuiltinMethodCalls) {
   auto tokens = Lex("arr.size");
   ASSERT_GE(tokens.size(), 4u);

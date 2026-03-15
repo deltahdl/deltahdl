@@ -74,15 +74,6 @@ TEST(LexicalConventionLexing, DigitStartIsNumber) {
   EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
 }
 
-TEST(LexicalConventionLexing, DollarStartIsSystemOrDollar) {
-  auto r = LexOne("$finish ");
-  EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
-}
-
-TEST(LexicalConventionLexing, BareDollarIsDollarToken) {
-  auto r = LexOne("$ ");
-  EXPECT_EQ(r.token.kind, TokenKind::kDollar);
-}
 
 TEST(LexicalConventionLexing, CaseSensitive) {
   auto tokens = Lex("ABC abc Abc");

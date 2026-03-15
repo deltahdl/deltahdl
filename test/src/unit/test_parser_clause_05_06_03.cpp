@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionParsing, SystemTaskDisplay) {
+TEST(SystemNameParsing, SystemTaskDisplay) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(\"hello\");\n"
@@ -18,7 +18,7 @@ TEST(LexicalConventionParsing, SystemTaskDisplay) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-TEST(LexicalConventionParsing, SystemTfCallEmptyParens) {
+TEST(SystemNameParsing, SystemTfCallEmptyParens) {
   auto r = Parse(
       "module m;\n"
       "  initial $finish();\n"
@@ -32,7 +32,7 @@ TEST(LexicalConventionParsing, SystemTfCallEmptyParens) {
   EXPECT_TRUE(expr->args.empty());
 }
 
-TEST(LexicalConventionParsing, SystemTfCallWithArgs) {
+TEST(SystemNameParsing, SystemTfCallWithArgs) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] x;\n"
@@ -47,7 +47,7 @@ TEST(LexicalConventionParsing, SystemTfCallWithArgs) {
   EXPECT_EQ(expr->args.size(), 2u);
 }
 
-TEST(LexicalConventionParsing, SystemTfCallEmptyArgs) {
+TEST(SystemNameParsing, SystemTfCallEmptyArgs) {
   auto r = Parse(
       "module m;\n"
       "  initial $display(,,1);\n"
@@ -63,7 +63,7 @@ TEST(LexicalConventionParsing, SystemTfCallEmptyArgs) {
   ASSERT_NE(expr->args[2], nullptr);
 }
 
-TEST(LexicalConventionParsing, SystemDeposit) {
+TEST(SystemNameParsing, SystemDeposit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -74,13 +74,77 @@ TEST(LexicalConventionParsing, SystemDeposit) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(LexicalConventionParsing, SystemFunctionInExpression) {
+TEST(SystemNameParsing, SystemFunctionInExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial x = $time;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SystemNameParsing, SystemTaskNoParens) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial $finish;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(expr->callee, "$finish");
+}
+
+TEST(SystemNameParsing, SystemFunctionInAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [31:0] w;\n"
+      "  assign w = $clog2(16);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SystemNameParsing, SystemFunctionWithDataTypeArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [31:0] w;\n"
+      "  assign w = $bits(logic [7:0]);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SystemNameParsing, SystemTaskInTaskBody) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task t;\n"
+              "    $display(\"in task\");\n"
+              "  endtask\n"
+              "endmodule\n"));
+}
+
+TEST(SystemNameParsing, SystemTaskInFunctionBody) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function void f;\n"
+              "    $display(\"in func\");\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
+TEST(SystemNameParsing, EmbeddedDollarSystemCallParses) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial $test$plusargs(\"flag\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(expr->callee, "$test$plusargs");
 }
 
 }  // namespace

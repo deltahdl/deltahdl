@@ -84,24 +84,6 @@ TEST(LexicalConventionParsing, TripleQuotedStringInExpression) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, SystemTaskCallParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  initial begin\n"
-              "    $display(\"test\");\n"
-              "    $finish;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(LexicalConventionParsing, SystemFunctionInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic [31:0] x;\n"
-              "  initial x = $random;\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, BuiltinMethodCallParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

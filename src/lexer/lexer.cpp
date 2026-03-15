@@ -134,7 +134,7 @@ Token Lexer::Next() {
   char c = Current();
   if (c == '$') {
     char next = PeekChar();
-    if (std::isalpha(static_cast<unsigned char>(next)) || next == '_') {
+    if (std::isalnum(static_cast<unsigned char>(next)) || next == '_') {
       return LexSystemIdentifier();
     }
     auto loc = MakeLoc();
@@ -453,12 +453,9 @@ Token Lexer::LexSystemIdentifier() {
   Advance();  // skip leading $
   while (!AtEnd()) {
     char ch = Current();
-    bool is_word = std::isalnum(static_cast<unsigned char>(ch)) || ch == '_';
-    bool is_inner_dollar =
-        (ch == '$') && (pos_ + 1 < source_.size()) &&
-        (std::isalpha(static_cast<unsigned char>(source_[pos_ + 1])) ||
-         source_[pos_ + 1] == '_');
-    if (!is_word && !is_inner_dollar) break;
+    bool is_word =
+        std::isalnum(static_cast<unsigned char>(ch)) || ch == '_' || ch == '$';
+    if (!is_word) break;
     Advance();
   }
   Token tok;
