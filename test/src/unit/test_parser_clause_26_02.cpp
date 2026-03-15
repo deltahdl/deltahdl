@@ -309,4 +309,15 @@ TEST(PackageDeclarations, PackageKeywordIntroducesPackage) {
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
 }
 
+TEST(PackageDeclarations, PackageContainsDeclarations) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef int myint;\n"
+      "  function int add(int a, int b); return a + b; endfunction\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->packages[0]->items.empty());
+}
+
 }  // namespace

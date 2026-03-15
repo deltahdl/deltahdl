@@ -15,17 +15,6 @@ TEST(DesignElements, ModuleDeclKindDistinctValues) {
   EXPECT_NE(ModuleDeclKind::kProgram, ModuleDeclKind::kChecker);
 }
 
-TEST(DesignBuildingBlockParsing, PackageContainsDeclarations) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  typedef int myint;\n"
-      "  function int add(int a, int b); return a + b; endfunction\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_FALSE(r.cu->packages[0]->items.empty());
-}
-
 TEST(DesignBuildingBlockParsing, TopLevelClassIsNotDesignElement) {
   auto r = Parse(
       "class C;\n"
