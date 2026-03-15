@@ -725,4 +725,13 @@ TEST(ProgramDeclaration, WithMultipleInitials) {
       2u);
 }
 
+TEST(ProgramDeclaration, CannotContainAlways) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic clk, d, q;\n"
+      "  always @(posedge clk) q <= d;\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
