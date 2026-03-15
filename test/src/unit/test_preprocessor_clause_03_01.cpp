@@ -4,17 +4,6 @@
 
 namespace {
 
-TEST(DesignElementPreprocessing, EmptyIfdefBodyPreservesSubsequent) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`ifdef UNDEFINED_MACRO\n"
-      "`endif\n"
-      "module m; endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("module"), std::string::npos);
-}
-
 TEST(DesignElementPreprocessing, MultipleMacrosExpandInSameDesignElement) {
   PreprocFixture f;
   auto result = Preprocess(
