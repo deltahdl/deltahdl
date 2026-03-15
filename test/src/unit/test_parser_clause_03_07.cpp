@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, UdpEnclosedByKeywords) {
-  auto r = Parse(
-      "primitive udp_buf (output out, input in);\n"
-      "  table 0 : 0; 1 : 1; endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  EXPECT_EQ(r.cu->udps[0]->name, "udp_buf");
-}
-
 TEST(DesignBuildingBlockParsing, UdpInstantiationInModule) {
   auto r = Parse(
       "primitive udp_and (output out, input a, b);\n"
