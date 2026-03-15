@@ -293,6 +293,11 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
   if (kind == ExprKind::kIntegerLiteral) {
     lit->int_val = ParseIntText(tok.text);
     WarnSizedOverflow(tok);
+  } else if (kind == ExprKind::kUnbasedUnsizedLiteral) {
+    // §5.7.1: '1 fills all bits with 1; '0/'x/'z stay 0 in int_val.
+    if (tok.text.size() >= 2 && tok.text[1] == '1') {
+      lit->int_val = ~uint64_t{0};
+    }
   } else if (kind == ExprKind::kRealLiteral || kind == ExprKind::kTimeLiteral) {
     lit->real_val = ParseRealText(tok.text);
   }
@@ -301,7 +306,15 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
 
 void Parser::WarnSizedOverflow(const Token& tok) {
   uint32_t size = ExtractLiteralSize(tok.text);
-  if (size == 0 || size >= 64) return;
+  if (size == 0) {
+    // §5.7.1: Size constant shall be nonzero.
+    auto tick = tok.text.find('\'');
+    if (tick != std::string_view::npos && tick > 0) {
+      diag_.Error(tok.loc, "size of integer literal shall be nonzero");
+    }
+    return;
+  }
+  if (size >= 64) return;
   if (HasXZDigits(tok.text)) return;
   uint64_t val = ParseIntText(tok.text);
   if (val >= (1ULL << size)) {

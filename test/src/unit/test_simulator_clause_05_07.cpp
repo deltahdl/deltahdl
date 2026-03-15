@@ -7,15 +7,6 @@
 
 using namespace delta;
 
-static bool RunSim(SimFixture& f, const std::string& src) {
-  auto* design = ElaborateSrc(src, f);
-  if (!design) return false;
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  return true;
-}
-
 static bool LowerRunAndFindIR(SimFixture& f, RtlirDesign* design,
                               Variable*& vi_out, Variable*& vr_out) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -52,33 +43,6 @@ TEST(NumberLiteralSim, NumberBothFormsCoexist) {
   EXPECT_DOUBLE_EQ(d, 3.14);
 }
 
-TEST(NumberLiteralSim, NumberIntegralDecimal) {
-  auto v = RunAndGet(
-      "module t;\n  logic [31:0] x;\n  initial x = 100;\nendmodule\n", "x");
-  EXPECT_EQ(v, 100u);
-}
-
-TEST(NumberLiteralSim, NumberIntegralBinary) {
-  auto v = RunAndGet(
-      "module t;\n  logic [7:0] x;\n  initial x = 8'b1010_0101;\nendmodule\n",
-      "x");
-  EXPECT_EQ(v, 0xA5u);
-}
-
-TEST(NumberLiteralSim, NumberIntegralOctal) {
-  auto v = RunAndGet(
-      "module t;\n  logic [11:0] x;\n  initial x = 12'o7654;\nendmodule\n",
-      "x");
-  EXPECT_EQ(v, 07654u);
-}
-
-TEST(NumberLiteralSim, NumberIntegralHex) {
-  auto v = RunAndGet(
-      "module t;\n  logic [15:0] x;\n  initial x = 16'hCAFE;\nendmodule\n",
-      "x");
-  EXPECT_EQ(v, 0xCAFEu);
-}
-
 TEST(NumberLiteralSim, NumberRealFixedPoint) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 42.5;\nendmodule\n", "x");
@@ -89,26 +53,6 @@ TEST(NumberLiteralSim, NumberRealScientific) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 5.0e3;\nendmodule\n", "x");
   EXPECT_DOUBLE_EQ(v, 5000.0);
-}
-
-TEST(NumberLiteralSim, NumberAllIntegralBases) {
-  SimFixture f;
-  ASSERT_TRUE(RunSim(f,
-                     "module t;\n"
-                     "  logic [7:0] a, b, c, d;\n"
-                     "  initial begin\n"
-                     "    a = 255;\n"
-                     "    b = 8'hFF;\n"
-                     "    c = 8'o377;\n"
-                     "    d = 8'b1111_1111;\n"
-                     "  end\n"
-                     "endmodule\n"));
-  const char* const kNames[] = {"a", "b", "c", "d"};
-  for (const char* name : kNames) {
-    auto* v = f.ctx.FindVariable(name);
-    ASSERT_NE(v, nullptr) << name;
-    EXPECT_EQ(v->value.ToUint64(), 255u) << name;
-  }
 }
 
 TEST(NumberLiteralSim, NumberMixedInExpression) {
@@ -135,25 +79,3 @@ TEST(NumberLiteralSim, NumberMixedInExpression) {
   EXPECT_DOUBLE_EQ(d, 4.0);
 }
 
-TEST(NumberLiteralSim, NumberAsPrimaryLiteralInTernary) {
-  auto v = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 1 ? 8'd99 : 8'd0;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(v, 99u);
-}
-
-TEST(NumberLiteralSim, NumberSizedDecimalBase) {
-  auto v = RunAndGet(
-      "module t;\n  logic [7:0] x;\n  initial x = 8'd200;\nendmodule\n", "x");
-  EXPECT_EQ(v, 200u);
-}
-
-TEST(NumberLiteralSim, NumberUnderscoreInIntegral) {
-  auto v = RunAndGet(
-      "module t;\n  logic [31:0] x;\n  initial x = 1_000_000;\nendmodule\n",
-      "x");
-  EXPECT_EQ(v, 1000000u);
-}

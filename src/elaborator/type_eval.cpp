@@ -274,8 +274,19 @@ static bool IsShiftOp(TokenKind op) {
 uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
   if (!expr) return 0;
   switch (expr->kind) {
-    case ExprKind::kIntegerLiteral:
-      return 32;  // Unsized integer defaults to 32 bits.
+    case ExprKind::kIntegerLiteral: {
+      // §5.7.1: Sized literals use their declared width; unsized default to 32.
+      auto tick = expr->text.find('\'');
+      if (tick != std::string_view::npos && tick > 0) {
+        uint32_t w = 0;
+        for (size_t i = 0; i < tick; ++i) {
+          char c = expr->text[i];
+          if (c >= '0' && c <= '9') w = w * 10 + (c - '0');
+        }
+        if (w > 0) return w;
+      }
+      return 32;
+    }
     case ExprKind::kRealLiteral:
     case ExprKind::kTimeLiteral:
       return 64;

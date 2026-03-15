@@ -137,7 +137,8 @@ static Logic4Vec ParseBasedXZLiteral(std::string_view text, uint32_t width,
 }
 static bool IsSignedLiteral(std::string_view text) {
   auto tick = text.find('\'');
-  if (tick == std::string_view::npos || tick + 1 >= text.size()) return false;
+  if (tick == std::string_view::npos) return true;  // Simple decimal is signed.
+  if (tick + 1 >= text.size()) return false;
   char c = text[tick + 1];
   return c == 's' || c == 'S';
 }

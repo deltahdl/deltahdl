@@ -8,31 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(TopLevelGrammarLexing, NoSpacesInDecimalNumber) {
-  auto tokens = Lex("123");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
-}
-
-TEST(TopLevelGrammarLexing, SpaceBreaksNumberIntoTwo) {
-  auto tokens = Lex("12 34");
-  ASSERT_GE(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
-}
-
-TEST(TopLevelGrammarLexing, NoSpaceInSizedNumber) {
-  auto tokens = Lex("8'hFF");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
-}
-
-TEST(TopLevelGrammarLexing, UnderscoreInNumberOk) {
-  auto tokens = Lex("32'hDEAD_BEEF");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
-}
-
 TEST(TopLevelGrammarLexing, NoSpaceInRealNumber) {
   auto tokens = Lex("3.14");
   ASSERT_GE(tokens.size(), 2u);
@@ -76,30 +51,6 @@ TEST(TopLevelGrammarLexing, TimeLiteralFixedPoint) {
   auto tokens = Lex("1.5ns");
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kTimeLiteral);
-}
-
-TEST(TopLevelGrammarLexing, UnbasedUnsizedNoSpace) {
-  auto tokens = Lex("'0");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
-}
-
-TEST(TopLevelGrammarLexing, UnbasedUnsizedOneNoSpace) {
-  auto tokens = Lex("'1");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
-}
-
-TEST(TopLevelGrammarLexing, UnbasedUnsizedXNoSpace) {
-  auto tokens = Lex("'x");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
-}
-
-TEST(TopLevelGrammarLexing, UnbasedUnsizedZNoSpace) {
-  auto tokens = Lex("'z");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kUnbasedUnsizedLiteral);
 }
 
 TEST(TopLevelGrammarLexing, SimpleIdentStartsWithAlpha) {
