@@ -1,10 +1,12 @@
+// §25.8
+
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ParametersConstantsVariables) {
+TEST(ParameterizedInterfaces, ParametersConstantsVariables) {
   auto r = ParseWithPreprocessor(
       "interface ifc #(parameter WIDTH = 8);\n"
       "  localparam DEPTH = 16;\n"
