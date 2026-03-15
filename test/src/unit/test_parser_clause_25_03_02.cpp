@@ -48,4 +48,18 @@ TEST(InterfaceDeclaration, SimpleBusExample) {
   EXPECT_FALSE(r.cu->interfaces[0]->items.empty());
 }
 
+TEST(InterfaceDeclaration, SimpleBusUsageInModules) {
+  EXPECT_TRUE(
+      ParseOk("interface simple_bus(input logic clk);\n"
+              "  logic req, gnt;\n"
+              "  logic [7:0] addr, data;\n"
+              "  logic [1:0] mode;\n"
+              "  logic start, rdy;\n"
+              "endinterface: simple_bus\n"
+              "module memMod(simple_bus a);\n"
+              "  logic avail;\n"
+              "  always @(posedge a.clk) a.gnt <= a.req & avail;\n"
+              "endmodule\n"));
+}
+
 }  // namespace
