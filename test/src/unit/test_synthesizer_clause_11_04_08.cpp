@@ -24,4 +24,18 @@ TEST(SynthLower, MultiBitAndGate) {
   EXPECT_EQ(aig->outputs.size(), 2);
 }
 
+TEST(BitwiseOperators, AndGate) {
+  SynthFixture f;
+  auto* mod = ElaborateSrc(f,
+      "module m(input a, input b, output y);\n"
+      "  assign y = a & b;\n"
+      "endmodule");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto* aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+  EXPECT_EQ(aig->inputs.size(), 2);
+  EXPECT_EQ(aig->outputs.size(), 1);
+}
+
 }  // namespace
