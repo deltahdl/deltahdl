@@ -582,3 +582,14 @@ TEST(IfdefConditionalCompilation, DefinedMacroTakesTrueBranch) {
   EXPECT_NE(result.find("module"), std::string::npos);
 }
 
+TEST(DesignElementPreprocessing, IfdefAroundModuleExcludesUntaken) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`ifdef UNDEFINED_MACRO\n"
+      "module m; endmodule\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("module"), std::string::npos);
+}
+
