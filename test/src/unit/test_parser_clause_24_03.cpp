@@ -663,4 +663,17 @@ TEST(ProgramDeclaration, WithClassDefinition) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kClassDecl));
 }
 
+TEST(ProgramDeclaration, WithFunction) {
+  auto r = Parse(
+      "program p;\n"
+      "  function int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFunctionDecl));
+}
+
 }  // namespace
