@@ -553,4 +553,15 @@ TEST(CompilationUnits, CuScopeTypedefIsNotDesignElement) {
   EXPECT_TRUE(r.cu->packages.empty());
 }
 
+TEST(CompilationUnits, CuScopeParamIsNotDesignElement) {
+  auto r = Parse(
+      "parameter int P = 42;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_GE(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->packages.empty());
+}
+
 }  // namespace

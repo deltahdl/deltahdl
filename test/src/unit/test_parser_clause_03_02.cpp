@@ -33,17 +33,6 @@ TEST(DesignElements, TopLevelClassIsNotDesignElement) {
   EXPECT_TRUE(r.cu->configs.empty());
 }
 
-TEST(DesignBuildingBlockParsing, CuScopeParamIsNotDesignElement) {
-  auto r = Parse(
-      "parameter int P = 42;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->packages.empty());
-}
-
 TEST(DesignBuildingBlockParsing, UnrecognizedTopLevelTokenIsError) {
   EXPECT_FALSE(ParseOk("always_comb begin end"));
 }
