@@ -395,4 +395,12 @@ TEST(PackageImport, WildcardIntoModule) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
 }
 
+TEST(PackageImport, WildcardIntoInterface) {
+  EXPECT_TRUE(
+      ParseOk("package pkg; typedef int myint; endpackage\n"
+              "interface ifc;\n"
+              "  import pkg::*;\n"
+              "endinterface\n"));
+}
+
 }  // namespace
