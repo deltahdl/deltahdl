@@ -1,18 +1,9 @@
+// Non-LRM tests
+
 #include "fixture_synthesizer.h"
 #include "synthesizer/synth_lower.h"
 
 namespace {
-
-// §3.2 Design elements — synthesis of design element building blocks.
-
-TEST(DesignElementSynth, MinimalModuleSynthesizes) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(f, "module m; endmodule");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-}
 
 TEST(DesignElementSynth, ModuleWithPassthroughAssign) {
   SynthFixture f;
