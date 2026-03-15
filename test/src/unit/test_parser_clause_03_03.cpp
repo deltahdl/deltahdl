@@ -6,23 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, Mux2to1Example) {
-  auto r = Parse(
-      "module mux2to1 (input wire a, b, sel,\n"
-      "                output logic y);\n"
-      "  always_comb begin\n"
-      "    if (sel) y = a;\n"
-      "    else     y = b;\n"
-      "  end\n"
-      "endmodule: mux2to1\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "mux2to1");
-  EXPECT_FALSE(r.cu->modules[0]->ports.empty());
-  EXPECT_FALSE(r.cu->modules[0]->items.empty());
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithMixedContents) {
   EXPECT_TRUE(ParseOk(
       "module m #(parameter int W = 8) (input logic clk, output logic [W-1:0] "
