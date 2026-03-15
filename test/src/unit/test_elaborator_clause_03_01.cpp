@@ -4,19 +4,6 @@
 
 namespace {
 
-TEST(BuildingBlockElaboration, ModuleWithAlwaysCombElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb b = a;\n"
-      "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_FALSE(design->top_modules[0]->processes.empty());
-}
-
 TEST(BuildingBlockElaboration, InterfaceWithModportElaborates) {
   EXPECT_TRUE(
       ElabOk("interface bus;\n"

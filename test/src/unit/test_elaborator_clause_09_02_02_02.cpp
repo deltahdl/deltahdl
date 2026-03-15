@@ -717,4 +717,17 @@ TEST(AlwaysCombTimeZeroExecution, AlwaysCombTimeZeroExecution) {
   EXPECT_EQ(y->value.ToUint64(), 77u);
 }
 
+TEST(AlwaysComb, ModuleWithAlwaysCombElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb b = a;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_FALSE(design->top_modules[0]->processes.empty());
+}
+
 }  // namespace
