@@ -79,6 +79,22 @@ def test_parse_args_repo_required(monkeypatch, ct):
         _parse_args()
 
 
+def test_parse_args_against(monkeypatch, ct):
+    """Parses --against flag."""
+    _parse_args = getattr(ct, "_parse_args")
+    monkeypatch.setattr(
+        sys, "argv", [*_ALL_FLAGS, "--against", "23.2.1"],
+    )
+    assert _parse_args().against == "23.2.1"
+
+
+def test_parse_args_against_default(monkeypatch, ct):
+    """--against defaults to empty string."""
+    _parse_args = getattr(ct, "_parse_args")
+    monkeypatch.setattr(sys, "argv", _ALL_FLAGS)
+    assert _parse_args().against == ""
+
+
 # ---- update_test_status ----------------------------------------------------
 
 

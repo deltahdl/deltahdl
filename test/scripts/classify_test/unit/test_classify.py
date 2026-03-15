@@ -7,6 +7,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from classify_test._patterns import CLAUSE_PROMPT_TEMPLATE
+
 
 # ---- existing_non_lrm_topics ----------------------------------------------
 
@@ -223,7 +225,7 @@ def test_detect_prefix_fallback_invalid_stage_exits(ct, ct_helpers, monkeypatch)
 def test_build_clause_prompt_contains_lrm_path(ct, ct_helpers, tmp_path):
     """Clause prompt includes the LRM file path."""
     _tb = ct_helpers.make_test_block
-    _build_clause_prompt = getattr(ct, "_build_clause_prompt")
+    _build_clause_prompt = ct.build_clause_prompt
     lrm = tmp_path / "LRM.txt"
     t = _tb("X")
     prompt = _build_clause_prompt(t, lrm)
@@ -233,7 +235,7 @@ def test_build_clause_prompt_contains_lrm_path(ct, ct_helpers, tmp_path):
 def test_build_clause_prompt_contains_test_body(ct, ct_helpers, tmp_path):
     """Clause prompt includes the test's source code."""
     _tb = ct_helpers.make_test_block
-    _build_clause_prompt = getattr(ct, "_build_clause_prompt")
+    _build_clause_prompt = ct.build_clause_prompt
     t = _tb("MyTest")
     prompt = _build_clause_prompt(t, tmp_path / "lrm.txt")
     assert "TEST(S, MyTest)" in prompt
@@ -242,7 +244,7 @@ def test_build_clause_prompt_contains_test_body(ct, ct_helpers, tmp_path):
 def test_build_clause_prompt_no_prefix_instructions(ct, ct_helpers, tmp_path):
     """Clause prompt does not mention pipeline prefixes."""
     _tb = ct_helpers.make_test_block
-    _build_clause_prompt = getattr(ct, "_build_clause_prompt")
+    _build_clause_prompt = ct.build_clause_prompt
     t = _tb("X")
     prompt = _build_clause_prompt(t, tmp_path / "lrm.txt")
     assert "test_parser_" not in prompt
@@ -251,7 +253,7 @@ def test_build_clause_prompt_no_prefix_instructions(ct, ct_helpers, tmp_path):
 def test_build_clause_prompt_no_arch_path(ct, ct_helpers, tmp_path):
     """Clause prompt does not reference architecture file."""
     _tb = ct_helpers.make_test_block
-    _build_clause_prompt = getattr(ct, "_build_clause_prompt")
+    _build_clause_prompt = ct.build_clause_prompt
     t = _tb("X")
     prompt = _build_clause_prompt(t, tmp_path / "lrm.txt")
     assert "architecture" not in prompt.lower()
@@ -260,7 +262,7 @@ def test_build_clause_prompt_no_arch_path(ct, ct_helpers, tmp_path):
 def test_build_clause_prompt_no_file_context(ct, ct_helpers, tmp_path):
     """Clause prompt does not include FILE CONTEXT."""
     _tb = ct_helpers.make_test_block
-    _build_clause_prompt = getattr(ct, "_build_clause_prompt")
+    _build_clause_prompt = ct.build_clause_prompt
     t = _tb("X")
     prompt = _build_clause_prompt(t, tmp_path / "lrm.txt")
     assert "FILE CONTEXT" not in prompt
@@ -269,31 +271,24 @@ def test_build_clause_prompt_no_file_context(ct, ct_helpers, tmp_path):
 # ---- _build_topic_prompt ---------------------------------------------------
 
 
-def test_build_topic_prompt_no_topics(ct, ct_helpers, tmp_path):
+def test_build_topic_prompt_no_topics(ct, ct_helpers):
     """Topic prompt without existing topics omits hint."""
-    _tb = ct_helpers.make_test_block
-    _build_topic_prompt = getattr(ct, "_build_topic_prompt")
-    t = _tb("X")
-    prompt = _build_topic_prompt(t, tmp_path)
+    t = ct_helpers.make_test_block("X")
+    prompt = ct.build_topic_prompt(t, "")
     assert "Existing topic files" not in prompt
 
 
-def test_build_topic_prompt_with_topics(ct, ct_helpers, tmp_path):
+def test_build_topic_prompt_with_topics(ct, ct_helpers):
     """Topic prompt with existing topics includes hint."""
-    _tb = ct_helpers.make_test_block
-    _build_topic_prompt = getattr(ct, "_build_topic_prompt")
-    (tmp_path / "test_non_lrm_aig.cpp").write_text("")
-    t = _tb("X")
-    prompt = _build_topic_prompt(t, tmp_path)
+    t = ct_helpers.make_test_block("X")
+    prompt = ct.build_topic_prompt(t, "Existing topic files: aig\n")
     assert "Existing topic files" in prompt
 
 
-def test_build_topic_prompt_contains_test_body(ct, ct_helpers, tmp_path):
+def test_build_topic_prompt_contains_test_body(ct, ct_helpers):
     """Topic prompt includes the test's source code."""
-    _tb = ct_helpers.make_test_block
-    _build_topic_prompt = getattr(ct, "_build_topic_prompt")
-    t = _tb("MyTest")
-    prompt = _build_topic_prompt(t, tmp_path)
+    t = ct_helpers.make_test_block("MyTest")
+    prompt = ct.build_topic_prompt(t, "")
     assert "TEST(S, MyTest)" in prompt
 
 
@@ -621,6 +616,57 @@ def test_apply_classification_non_lrm_prefix_override(ct, ct_helpers):
 # ---- classify_test_block ----------------------------------------------------
 
 
+def test_classify_block_against_none_returns_none(
+    ct, ct_helpers, monkeypatch, tmp_path,
+):
+    """classify_test_block returns None when against clause is 'none'."""
+    monkeypatch.setattr(
+        ct, "_call_claude",
+        lambda p, schema=None, **_kw: {"clause": "none", "rationale": "r",
+                                        "suite_name": "S", "test_name": "T"},
+    )
+    t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
+    result = ct.classify_test_block(
+        t, tmp_path, tmp_path / "lrm.txt", against="23.2.1",
+    )
+    assert result is None
+
+
+def test_classify_block_against_match_returns_test(
+    ct, ct_helpers, monkeypatch, tmp_path,
+):
+    """classify_test_block returns test when against clause matches."""
+    monkeypatch.setattr(
+        ct, "_call_claude",
+        lambda p, schema=None, **_kw: {"clause": "23.2.1", "rationale": "r",
+                                        "suite_name": "S", "test_name": "T"},
+    )
+    t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
+    result = ct.classify_test_block(
+        t, tmp_path, tmp_path / "lrm.txt", against="23.2.1",
+    )
+    assert result is t
+
+
+def test_classify_block_against_uses_against_template(
+    ct, ct_helpers, monkeypatch, tmp_path,
+):
+    """classify_test_block uses the against prompt template."""
+    prompts = []
+    monkeypatch.setattr(
+        ct, "_call_claude",
+        lambda p, schema=None, **_kw: (
+            prompts.append(p) or
+            {"clause": "23.2.1", "rationale": "r",
+             "suite_name": "S", "test_name": "T"}
+        ),
+    )
+    t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
+    ct.classify_test_block(
+        t, tmp_path, tmp_path / "lrm.txt", against="23.2.1",
+    )
+    assert "23.2.1" in prompts[0]
+
 
 def test_classify_tests_matching(ct, ct_helpers, monkeypatch, tmp_path):
     """classify_test_block applies classification per test."""
@@ -870,9 +916,9 @@ def test_clause_schema_has_test_name(ct):
     assert "test_name" in schema["properties"]
 
 
-def test_clause_prompt_mentions_suite_name(ct):
+def test_clause_prompt_mentions_suite_name():
     """CLAUSE_PROMPT_TEMPLATE instructs Claude to return a suite name."""
-    assert "suite_name" in getattr(ct, "_CLAUSE_PROMPT_TEMPLATE")
+    assert "suite_name" in CLAUSE_PROMPT_TEMPLATE
 
 
 def test_topic_schema_has_suite_name(ct):

@@ -78,6 +78,7 @@ def _run_pipeline(ct, tmp_path, test, suite="S", dry_run=False):
         repo="test-repo",
         max_lines=1000,
         continue_session=False,
+        against="",
     ))
 
 
@@ -236,6 +237,7 @@ def test_self_named_source_not_treated_as_duplicate(ct, tmp_path, monkeypatch):
         lrm=str(tmp_path / "lrm.txt"), suite="S", test="Keeper",
         issue=1, organization="test-org", repo="test-repo",
         no_commit=False, max_lines=1000, continue_session=False,
+        against="",
     ))
     assert (tmp_path / "test_non_lrm_aig.cpp").exists()
 

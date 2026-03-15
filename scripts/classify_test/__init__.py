@@ -39,9 +39,9 @@ from ._github import (
 from ._generate import _filter_preamble, _preamble_name, generate_file
 from ._git import commit_classification
 from ._patterns import (
-    CLAUSE_PROMPT_TEMPLATE, CLAUSE_SCHEMA, PREFIX_PATTERNS,
-    PREFIX_PROMPT_TEMPLATE, PREFIX_SCHEMA,
-    TOPIC_PROMPT_TEMPLATE, TOPIC_SCHEMA,
+    CLAUSE_SCHEMA, PREFIX_PATTERNS,
+    PREFIX_PROMPT_TEMPLATE, PREFIX_SCHEMA, TOPIC_SCHEMA,
+    build_clause_prompt, build_topic_prompt,
 )
 from ._output import print_classification_table
 from ._split import (
@@ -399,40 +399,20 @@ def existing_non_lrm_topics(test_dir):
     return sorted(topics)
 
 
-_CLAUSE_PROMPT_TEMPLATE = CLAUSE_PROMPT_TEMPLATE
-_TOPIC_PROMPT_TEMPLATE = TOPIC_PROMPT_TEMPLATE
 _CLAUSE_SCHEMA = CLAUSE_SCHEMA
 _TOPIC_SCHEMA = TOPIC_SCHEMA
 
 
-def _build_clause_prompt(test, lrm_path):
-    """Build the clause-only classification prompt."""
-    body = "\n".join(test.preceding_comments + test.lines)
-    return _CLAUSE_PROMPT_TEMPLATE.format(
-        lrm_path=lrm_path,
-        suite=test.suite_name,
-        test_name=test.test_name,
-        test_body=body,
-    )
-
-
-def _build_topic_prompt(test, test_dir):
-    """Build the topic classification prompt for non-LRM tests."""
+def _build_topic_hint(test_dir):
+    """Build existing topics hint for non-LRM classification."""
     topics = existing_non_lrm_topics(test_dir)
-    topics_hint = ""
-    if topics:
-        topics_hint = (
-            "Existing topic files: "
-            + ", ".join(topics)
-            + "\nPREFER reusing one of these topics when the"
-            " test fits, to avoid near-duplicate filenames.\n"
-        )
-    body = "\n".join(test.preceding_comments + test.lines)
-    return _TOPIC_PROMPT_TEMPLATE.format(
-        topics=topics_hint,
-        suite=test.suite_name,
-        test_name=test.test_name,
-        test_body=body,
+    if not topics:
+        return ""
+    return (
+        "Existing topic files: "
+        + ", ".join(topics)
+        + "\nPREFER reusing one of these topics when the"
+        " test fits, to avoid near-duplicate filenames.\n"
     )
 
 
@@ -567,23 +547,27 @@ def _apply_classification(test, clause_resp, topic_resp=None,
 
 
 def classify_test_block(test, test_dir, lrm_path, *,
-                        continue_session=False):
+                        continue_session=False, against=""):
     """Use Claude to classify a single test's prefix and clause."""
     print(f"Calling Claude to classify clause for {test.test_name}...",
           end="", flush=True)
-    clause_prompt = _build_clause_prompt(test, lrm_path)
+    clause_prompt = build_clause_prompt(test, lrm_path, against=against)
     clause_resp = _call_claude(
         clause_prompt, _CLAUSE_SCHEMA,
         continue_session=continue_session,
     )
     print()
-    topic_resp = None
     clause = clause_resp.get("clause", "")
+    if against and clause == "none":
+        print(f"  Test {test.test_name} does not belong to"
+              f" {against} — skipping.")
+        return None
+    topic_resp = None
     if clause.replace("_", "-") == "non-lrm":
         print(f"Calling Claude to classify topic for"
               f" {test.test_name} because clause is non-lrm...",
               end="", flush=True)
-        topic_prompt = _build_topic_prompt(test, test_dir)
+        topic_prompt = build_topic_prompt(test, _build_topic_hint(test_dir))
         topic_resp = _call_claude(
             topic_prompt, _TOPIC_SCHEMA,
             continue_session=True,
@@ -711,6 +695,10 @@ def _parse_args():
     add_github_args(parser)
     add_run_mode_args(parser)
     add_continue_arg(parser)
+    parser.add_argument(
+        "--against", default="",
+        help="Comma-separated subclauses to classify against",
+    )
     return parser.parse_args()
 
 
@@ -925,11 +913,13 @@ def _run(args):
     filepath = Path(args.file).resolve()
     parsed, target = _validate_input(filepath, args.suite, args.test)
     out_dir = Path(args.output_dir).resolve()
-    classify_test_block(
+    if classify_test_block(
         target, out_dir,
         Path(args.lrm).resolve(),
         continue_session=args.continue_session,
-    )
+        against=args.against,
+    ) is None:
+        return
     targets = [target]
     print_classification_table(targets)
     groups = _group_tests(targets)

@@ -31,6 +31,7 @@ def _run_args(tmp_path, **overrides):
         "lrm": str(tmp_path / "lrm.txt"), "max_lines": 1000,
         "suite": "S", "test": "T", "issue": None, "organization": None,
         "repo": None, "no_commit": False, "continue_session": False,
+        "against": "",
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -148,8 +149,6 @@ def test_parse_args_issue_with_value(monkeypatch, ct):
     monkeypatch.setattr(sys, "argv", argv)
     assert _parse_args().issue == 42
 
-
-# ---- _preamble_name / _filter_preamble ------------------------------------
 
 
 def test_preamble_name_struct(ct):
@@ -302,8 +301,6 @@ def test_filter_preamble_keeps_unnamed(ct):
     assert unnamed in _filter_preamble([unnamed], [t])
 
 
-# ---- _group_tests ----------------------------------------------------------
-
 
 def test_group_tests_normal(ct, ct_helpers):
     """Groups tests by (prefix, clause)."""
@@ -323,8 +320,6 @@ def test_group_tests_defaults(ct, ct_helpers):
     groups = _group_tests([t])
     assert ("test_non_lrm", "non-lrm") in groups
 
-
-# ---- _resolve_destinations -------------------------------------------------
 
 
 def test_resolve_destinations_create(tmp_path, ct, ct_helpers):
@@ -413,8 +408,6 @@ def test_resolve_destinations_source_is_target(tmp_path, ct, ct_helpers):
     )
     assert len(to_create) == 0
 
-
-# ---- _write_files ----------------------------------------------------------
 
 
 def test_write_files_create(tmp_path, ct, ct_helpers):
@@ -967,7 +960,15 @@ def test_run_rename_in_place_no_commit(tmp_path, monkeypatch, ct):
     assert not committed
 
 
-# ---- main ------------------------------------------------------------------
+def test_run_against_none_skips(tmp_path, monkeypatch, ct, ct_helpers):
+    """_run returns early when classify_test_block returns None."""
+    _make_input_file(tmp_path)
+    ct_helpers.stub_classifier(monkeypatch, {
+        "clause": "none", "rationale": "r",
+        "suite_name": "S", "test_name": "T",
+    })
+    args = _run_args(tmp_path, against="23.2.1")
+    getattr(ct, "_run")(args)
 
 
 def _stub_main(monkeypatch, ct, run_fn):

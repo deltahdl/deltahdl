@@ -37,6 +37,26 @@ TEST({suite}, {test_name}):
 {test_body}
 """
 
+CLAUSE_AGAINST_PROMPT_TEMPLATE = \
+    """Does this test exercise any of these IEEE 1800-2023 subclauses: {against}?
+
+Read the LRM to verify — do not guess from titles.
+If the test exercises one of those subclauses, return that clause.
+If it does not exercise any of them, return "none".
+
+Also return a suite_name and test_name: PascalCase names that intuitively
+describe what the test exercises. Both must be valid C++ identifiers.
+The suite_name groups related tests (e.g., BinaryOperators,
+SpecifyBlocks, AlwaysCombLatch). The test_name describes what this
+specific test case verifies (e.g., AdditionOverflow, EmptyPattern,
+NestedReplication). Do NOT include clause or annex numbers.
+
+LRM: {lrm_path}
+
+TEST({suite}, {test_name}):
+{test_body}
+"""
+
 TOPIC_PROMPT_TEMPLATE = """What non-LRM topic does this test belong to?
 
 Return a short snake_case topic name (e.g., "aig", "arena", "dpi_helpers").
@@ -108,3 +128,30 @@ PREFIX_SCHEMA = json.dumps({
     "required": ["pipeline_stage", "rationale"],
     "additionalProperties": False,
 })
+
+
+def build_clause_prompt(test, lrm_path, against=""):
+    """Build the clause-only classification prompt."""
+    body = "\n".join(test.preceding_comments + test.lines)
+    template = (
+        CLAUSE_AGAINST_PROMPT_TEMPLATE if against
+        else CLAUSE_PROMPT_TEMPLATE
+    )
+    return template.format(
+        lrm_path=lrm_path,
+        suite=test.suite_name,
+        test_name=test.test_name,
+        test_body=body,
+        against=against,
+    )
+
+
+def build_topic_prompt(test, topics_hint):
+    """Build the topic classification prompt for non-LRM tests."""
+    body = "\n".join(test.preceding_comments + test.lines)
+    return TOPIC_PROMPT_TEMPLATE.format(
+        topics=topics_hint,
+        suite=test.suite_name,
+        test_name=test.test_name,
+        test_body=body,
+    )
