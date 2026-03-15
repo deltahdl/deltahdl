@@ -45,4 +45,4 @@ def commit_classification(ctx):
     t = ctx["target"][0]
     action = ctx.get("action", "")
     msg = build_commit_message(t.test_name, t.clause, t.rationale, action)
-    commit_and_push(changed, deleted, msg)
+    return commit_and_push(changed, deleted, msg)

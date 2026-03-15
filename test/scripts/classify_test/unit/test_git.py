@@ -120,6 +120,7 @@ def _stub_commit_push(monkeypatch, ct_git):
         captured["changed"] = list(changed)
         captured["deleted"] = list(deleted)
         captured["message"] = message
+        return "abc123"
 
     monkeypatch.setattr(ct_git, "commit_and_push", fake)
     return captured
@@ -235,3 +236,13 @@ def test_commit_classification_passes_action(monkeypatch, tmp_path, ct_git):
     )
     commit_classification(ctx)
     assert "Action: Moved to test_parser_clause_06_01.cpp" in captured["message"]
+
+
+# ---- commit_classification returns SHA -------------------------------------
+
+
+def test_commit_classification_returns_sha(monkeypatch, tmp_path, ct_git):
+    """commit_classification returns the SHA from commit_and_push."""
+    _stub_commit_push(monkeypatch, ct_git)
+    ctx = _make_ctx(tmp_path)
+    assert ct_git.commit_classification(ctx) == "abc123"

@@ -33,7 +33,8 @@ def update_test_status(body, test_name, status, *, remark=""):
     return body[:match.start()] + new_row + body[match.end():]
 
 
-def build_action_remark(test, *, source_is_target, target_filename=None):
+def build_action_remark(test, *, source_is_target, target_filename=None,
+                        commit_url=""):
     """Build a human-readable action remark for a classified test."""
     orig_test = getattr(test, "original_test_name", None)
     test_renamed = orig_test is not None and orig_test != test.test_name
@@ -59,14 +60,19 @@ def build_action_remark(test, *, source_is_target, target_filename=None):
         rename_str = ""
     if location and rename_str:
         joiner = " but " if source_is_target else " and "
-        return location + joiner + rename_str
-    if location:
-        return location
-    return rename_str
+        remark = location + joiner + rename_str
+    elif location:
+        remark = location
+    else:
+        remark = rename_str
+    if commit_url and remark:
+        return f"[{remark}]({commit_url})"
+    return remark
 
 
 def maybe_update_issue_status(
     args, tests, *, source_is_target, target_filenames=None,
+    commit_url="",
 ):
     """Update status for classified tests in a GitHub issue."""
     if args.issue is None:
@@ -84,6 +90,7 @@ def maybe_update_issue_status(
             t,
             source_is_target=source_is_target,
             target_filename=fname,
+            commit_url=commit_url,
         )
         body = update_test_status(
             body, lookup_name, status, remark=remark,
@@ -91,4 +98,25 @@ def maybe_update_issue_status(
     print(f"Updating status to '{status}' for issue #{args.issue}...")
     update_issue_body(
         args.organization, args.repo, args.issue, body,
+    )
+
+
+def build_commit_url(args, sha):
+    """Build a GitHub commit URL from org/repo and SHA."""
+    if not sha:
+        return ""
+    return (f"https://github.com/{args.organization}"
+            f"/{args.repo}/commit/{sha}")
+
+
+def update_issue_after_commit(args, target, source_is_target,
+                              target_filenames, commit_url=""):
+    """Update the GitHub issue with the action and commit link."""
+    if args.issue is None:
+        return
+    maybe_update_issue_status(
+        args, target,
+        source_is_target=source_is_target,
+        target_filenames=target_filenames,
+        commit_url=commit_url,
     )

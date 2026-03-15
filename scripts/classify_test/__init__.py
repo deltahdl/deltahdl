@@ -30,8 +30,10 @@ from lib.python.cli import add_continue_arg, run_claude_cli
 from ._github import (
     _validate_issue_args,
     build_action_remark,
+    build_commit_url,
     fetch_issue_body,
     maybe_update_issue_status,
+    update_issue_after_commit,
     update_issue_body,
 )
 from ._generate import _filter_preamble, _preamble_name, generate_file
@@ -851,11 +853,12 @@ def _update_source(filepath, parsed, ctx):
     return 0
 
 
-def _apply_rename_in_place(args, filepath, parsed, target, action=""):
+def _apply_rename_in_place(args, filepath, parsed, target,
+                           action=""):
     """Rewrite the source file when a test is renamed but stays in place.
 
-    Returns True if a rename was applied (caller should return),
-    False if there was nothing to rename (caller should return too).
+    Returns the commit SHA if a rename was applied, ``None`` if no
+    renames were needed, or ``False`` when ``no_commit`` is set.
     """
     has_renames = any(
         (getattr(t, "original_test_name", None) is not None
@@ -865,24 +868,24 @@ def _apply_rename_in_place(args, filepath, parsed, target, action=""):
         for t in target
     )
     if not has_renames:
-        return False
+        return None
     content = generate_file(
         target[0].clause, "", parsed, parsed.all_tests,
     )
     filepath.write_text(content, encoding="utf-8")
     if not getattr(args, "no_commit", False):
-        commit_classification({
+        return commit_classification({
             "filepath": filepath, "target": target,
             "to_merge": [], "new_names": [],
             "test_dir": Path(args.output_dir).resolve(),
             "cmake_path": CMAKE_PATH,
             "action": action,
         })
-    return True
+    return None
 
 
-def _report_action(args, target, source_is_target):
-    """Print action, update issue if needed, and return the action string."""
+def _build_action(target, source_is_target):
+    """Build the action string and target filenames map."""
     target_filenames = {
         t.test_name: clause_to_filename(t.prefix, t.clause) + ".cpp"
         for t in target
@@ -893,13 +896,20 @@ def _report_action(args, target, source_is_target):
         target_filename=target_filenames.get(target[0].test_name, ""),
     )
     print(f"  Action: {action}")
-    if args.issue is not None:
-        maybe_update_issue_status(
-            args, target,
-            source_is_target=source_is_target,
-            target_filenames=target_filenames,
-        )
-    return action
+    return action, target_filenames
+
+
+
+def _print_destinations(to_create, to_merge, max_lines):
+    """Print target and merge info for resolved destinations."""
+    for dest, _, _ in to_create:
+        print(f"  Target: {dest}.cpp")
+    for merge_into, merge_tests in to_merge:
+        for t in merge_tests:
+            print(f"  Merging test {t.test_name} into {merge_into.name}"
+                  " because that's where it belongs and because adding"
+                  " it to that file would not increase the file's"
+                  f" number of lines to more than {max_lines} lines")
 
 
 def _run(args):
@@ -907,8 +917,9 @@ def _run(args):
     _validate_issue_args(args)
     filepath = Path(args.file).resolve()
     parsed, target = _validate_input(filepath, args.suite, args.test)
+    out_dir = Path(args.output_dir).resolve()
     classify_tests(
-        target, Path(args.output_dir).resolve(),
+        target, out_dir,
         Path(args.lrm).resolve(),
         continue_session=args.continue_session,
     )
@@ -918,26 +929,23 @@ def _run(args):
         clause_to_filename(p, c) == filepath.stem
         for p, c in groups
     )
-    action = _report_action(args, target, source_is_target)
+    action, target_filenames = _build_action(target, source_is_target)
     to_create, to_merge, n_removed = _resolve_destinations(
-        groups, Path(args.output_dir).resolve(),
+        groups, out_dir,
         exclude_path=filepath, dry_run=args.dry_run,
     )
-    for dest, _, _ in to_create:
-        print(f"  Target: {dest}.cpp")
-    for merge_into, merge_tests in to_merge:
-        for t in merge_tests:
-            print(f"  Merging test {t.test_name} into {merge_into.name}"
-                  " because that's where it belongs and because adding"
-                  " it to that file would not increase the file's"
-                  f" number of lines to more than {args.max_lines} lines")
+    _print_destinations(to_create, to_merge, args.max_lines)
     if args.dry_run:
         return
     if not to_create and not to_merge and source_is_target and n_removed == 0:
-        _apply_rename_in_place(args, filepath, parsed, target, action)
+        sha = _apply_rename_in_place(args, filepath, parsed, target,
+                                     action)
+        update_issue_after_commit(args, target, source_is_target,
+                                 target_filenames,
+                                 build_commit_url(args, sha))
         return
     new_names = _write_files(to_create, to_merge, parsed, {
-        "test_dir": Path(args.output_dir).resolve(),
+        "test_dir": out_dir,
         "lrm_titles": {},
         "max_lines": getattr(args, "max_lines", None),
     })
@@ -958,13 +966,17 @@ def _run(args):
         ),
     )
     print("Updated `CMakeLists.txt`")
+    sha = None
     if not getattr(args, "no_commit", False):
-        commit_classification({
+        sha = commit_classification({
             "filepath": filepath, "target": target,
             "to_merge": to_merge, "new_names": new_names,
-            "test_dir": Path(args.output_dir).resolve(),
-            "cmake_path": CMAKE_PATH,
-            "action": action})
+            "test_dir": out_dir, "cmake_path": CMAKE_PATH,
+            "action": action,
+        })
+    update_issue_after_commit(args, target, source_is_target,
+                              target_filenames,
+                              build_commit_url(args, sha))
 
 
 def main():

@@ -234,7 +234,7 @@ def test_validate_issue_args_missing_repo(ct_github):
 
 def _setup_maybe_update(
     monkeypatch, ct_github, ct_helpers, *,
-    source_is_target, target_filenames=None,
+    source_is_target, **kw,
 ):
     """Run maybe_update_issue_status and return captured body updates."""
     _tb = ct_helpers.make_test_block
@@ -253,7 +253,7 @@ def _setup_maybe_update(
     ct_github.maybe_update_issue_status(
         args, [t],
         source_is_target=source_is_target,
-        target_filenames=target_filenames,
+        **kw,
     )
     return updated
 
@@ -553,3 +553,39 @@ def test_build_action_remark_suite_renamed_only(ct_github, ct_helpers):
         t, source_is_target=False,
     )
     assert result == "renamed suite to NewSuite"
+
+
+def test_maybe_update_with_commit_url(monkeypatch, ct_github, ct_helpers):
+    """Action remark is a markdown link when commit_url is provided."""
+    updated = _setup_maybe_update(
+        monkeypatch, ct_github, ct_helpers, source_is_target=False,
+        target_filenames={"T": "test_parser_clause_06_01.cpp"},
+        commit_url="https://github.com/org/repo/commit/abc",
+    )
+    assert (
+        "[Moved to test_parser_clause_06_01.cpp]"
+        "(https://github.com/org/repo/commit/abc)"
+    ) in updated[0]
+
+
+def test_build_action_remark_with_commit_url(ct_github, ct_helpers):
+    """Returns markdown link when commit_url is provided."""
+    t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
+    result = ct_github.build_action_remark(
+        t, source_is_target=False, target_filename="foo.cpp",
+        commit_url="https://github.com/org/repo/commit/abc123",
+    )
+    assert result == (
+        "[Moved to foo.cpp]"
+        "(https://github.com/org/repo/commit/abc123)"
+    )
+
+
+def test_build_action_remark_no_commit_url(ct_github, ct_helpers):
+    """Returns plain text when commit_url is empty."""
+    t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
+    result = ct_github.build_action_remark(
+        t, source_is_target=False, target_filename="foo.cpp",
+        commit_url="",
+    )
+    assert result == "Moved to foo.cpp"

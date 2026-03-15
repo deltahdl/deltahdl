@@ -484,7 +484,6 @@ def test_run_test_not_found(tmp_path, ct):
         _run(args)
 
 
-
 def test_run_dry_run_shows_target(tmp_path, monkeypatch, capsys, ct,
                                   ct_helpers):
     """Dry-run output shows the target filename."""
@@ -831,25 +830,27 @@ def test_update_source_calls_rewrite(tmp_path, ct, ct_helpers):
 
 
 def _setup_maybe_update_test(ct, ct_helpers, tmp_path, monkeypatch):
-    """Stub classifier and capture maybe_update_issue_status calls."""
-    _make_input_file(tmp_path)
-    ct_helpers.stub_classifier(monkeypatch, _parser_response())
+    """Set up a live run and capture maybe_update_issue_status calls."""
+    args = _setup_live_run(ct, ct_helpers, tmp_path, monkeypatch)
+    monkeypatch.setattr(ct, "commit_classification", lambda _ctx: "abc123")
     called = []
+    gh = __import__("classify_test._github", fromlist=["_github"])
     monkeypatch.setattr(
-        ct, "maybe_update_issue_status",
-        lambda args, tests, **kw: called.append(True),
+        gh, "maybe_update_issue_status",
+        lambda *_a, **_kw: called.append(True),
     )
-    return getattr(ct, "_run"), called
+    return getattr(ct, "_run"), called, args
 
 
 def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
                                          ct_helpers):
     """_run with --issue calls maybe_update_issue_status."""
-    _run, called = _setup_maybe_update_test(ct, ct_helpers, tmp_path, monkeypatch)
-    args = _run_args(
-        tmp_path, dry_run=True,
-        issue=42, organization="myorg", repo="myrepo",
+    _run, called, args = _setup_maybe_update_test(
+        ct, ct_helpers, tmp_path, monkeypatch,
     )
+    args.issue = 42
+    args.organization = "myorg"
+    args.repo = "myrepo"
     _run(args)
     assert len(called) == 1
 
@@ -857,8 +858,24 @@ def test_run_with_issue_calls_maybe_tick(tmp_path, monkeypatch, ct,
 def test_run_without_issue_skips_maybe_tick(tmp_path, monkeypatch, ct,
                                             ct_helpers):
     """_run without --issue skips maybe_update_issue_status."""
-    _run, called = _setup_maybe_update_test(ct, ct_helpers, tmp_path, monkeypatch)
-    _run(_run_args(tmp_path, dry_run=True))
+    _run, called, args = _setup_maybe_update_test(
+        ct, ct_helpers, tmp_path, monkeypatch,
+    )
+    _run(args)
+    assert len(called) == 0
+
+
+def test_run_dry_run_skips_issue_update(tmp_path, monkeypatch, ct,
+                                        ct_helpers):
+    """_run with --dry-run does not update the issue."""
+    _run, called, args = _setup_maybe_update_test(
+        ct, ct_helpers, tmp_path, monkeypatch,
+    )
+    args.dry_run = True
+    args.issue = 42
+    args.organization = "myorg"
+    args.repo = "myrepo"
+    _run(args)
     assert len(called) == 0
 
 
@@ -915,12 +932,8 @@ def test_run_rename_in_place_removes_old_name(tmp_path, monkeypatch, ct,
 
 
 def _run_rename_commit(ct, tmp_path, monkeypatch):
-    """Stub issue update, capture commits, run rename pipeline."""
+    """Capture commits from the rename pipeline."""
     monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
-    monkeypatch.setattr(
-        ct, "maybe_update_issue_status",
-        lambda _args, _tests, **_kw: None,
-    )
     committed = []
     monkeypatch.setattr(ct, "commit_classification", committed.append)
     _run_live_non_lrm(ct, tmp_path, monkeypatch, src_body=_RENAME_BODY)
@@ -941,10 +954,6 @@ def test_run_commit_includes_action(tmp_path, monkeypatch, ct):
 def test_run_rename_in_place_no_commit(tmp_path, monkeypatch, ct):
     """Rename-in-place with no_commit=True skips commit_classification."""
     monkeypatch.setattr(ct, "_call_claude", _rename_classifier)
-    monkeypatch.setattr(
-        ct, "maybe_update_issue_status",
-        lambda _args, _tests, **_kw: None,
-    )
     committed = []
     monkeypatch.setattr(ct, "commit_classification", committed.append)
     src = tmp_path / "test_non_lrm_aig.cpp"
@@ -961,18 +970,19 @@ def test_run_rename_in_place_no_commit(tmp_path, monkeypatch, ct):
 # ---- main ------------------------------------------------------------------
 
 
-def test_main(monkeypatch, ct):
-    """main calls _run with parsed args."""
-    ran = [False]
-
-    def mock_run(_args):
-        ran[0] = True
-
-    monkeypatch.setattr(ct, "_run", mock_run)
+def _stub_main(monkeypatch, ct, run_fn):
+    """Stub _parse_args and _run for main() tests."""
+    monkeypatch.setattr(ct, "_run", run_fn)
     monkeypatch.setattr(ct, "_parse_args", lambda: SimpleNamespace(
         file="x", output_dir="/tmp", dry_run=True, lrm="/lrm.txt",
         issue=None, organization=None, repo=None,
     ))
+
+
+def test_main(monkeypatch, ct):
+    """main calls _run with parsed args."""
+    ran = [False]
+    _stub_main(monkeypatch, ct, lambda _: ran.__setitem__(0, True))
     ct.main()
     assert ran[0] is True
 
@@ -980,15 +990,10 @@ def test_main(monkeypatch, ct):
 def test_main_enables_line_buffering(monkeypatch, ct):
     """main reconfigures stdout to line-buffered mode."""
     configured = []
-
-    def mock_reconfigure(**kwargs):
-        configured.append(kwargs)
-
-    monkeypatch.setattr(sys.stdout, "reconfigure", mock_reconfigure)
-    monkeypatch.setattr(ct, "_run", lambda _: None)
-    monkeypatch.setattr(ct, "_parse_args", lambda: SimpleNamespace(
-        file="x", output_dir="/tmp", dry_run=True, lrm="/lrm.txt",
-        issue=None, organization=None, repo=None,
-    ))
+    monkeypatch.setattr(
+        sys.stdout, "reconfigure",
+        lambda **kw: configured.append(kw),
+    )
+    _stub_main(monkeypatch, ct, lambda _: None)
     ct.main()
     assert any(k.get("line_buffering") for k in configured)

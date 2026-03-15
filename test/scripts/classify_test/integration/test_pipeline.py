@@ -57,7 +57,7 @@ def _stub_externals(ct, monkeypatch, tmp_path, classifier):
     )
     monkeypatch.setattr(ct, "CMAKE_PATH", cmake)
     monkeypatch.setattr(
-        ct, "maybe_update_issue_status", _noop)
+        ct, "update_issue_after_commit", _noop)
     monkeypatch.setattr(
         ct, "commit_classification", _noop)
 
