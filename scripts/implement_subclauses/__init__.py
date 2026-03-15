@@ -14,6 +14,7 @@ from lib.python.cli import (
 )
 from lib.python.github import (
     extract_subclause_from_title,
+    fetch_issue_state,
     fetch_issue_title,
 )
 
@@ -68,6 +69,12 @@ def main(argv: list[str] | None = None) -> None:
         if not subclause:
             print(f"WARNING: Could not extract subclause from issue"
                   f" #{issue_num} title: {title!r}")
+            continue
+        state = fetch_issue_state(
+            args.organization, args.repo, issue_num,
+        )
+        if state == "closed":
+            print(f"Skipping #{issue_num} (closed).")
             continue
         subclauses.append((subclause, issue_num))
 

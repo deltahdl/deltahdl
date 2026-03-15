@@ -29,6 +29,9 @@ def patch_main():
     """Return a helper that patches fetch_issue_title and invoke."""
     def _apply(monkeypatch, iscs):
         monkeypatch.setattr(iscs, "fetch_issue_title", _fake_title)
+        monkeypatch.setattr(
+            iscs, "fetch_issue_state", lambda _o, _r, _n: "open",
+        )
         mock_invoke = MagicMock()
         monkeypatch.setattr(iscs, "invoke_implement_subclause", mock_invoke)
         return mock_invoke

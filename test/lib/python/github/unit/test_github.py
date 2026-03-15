@@ -17,6 +17,7 @@ from lib.python.github import (
     delete_issue,
     extract_subclause_from_title,
     fetch_issue_body,
+    fetch_issue_state,
     fetch_issue_title,
     format_subclause_label,
     mark_master_complete,
@@ -81,6 +82,26 @@ def test_fetch_issue_title_failure() -> None:
     with patch("lib.python.github.subprocess.run", return_value=cp):
         with pytest.raises(SystemExit):
             fetch_issue_title("org", "repo", 1)
+
+
+# --- fetch_issue_state ---
+
+
+def test_fetch_issue_state_returns_state() -> None:
+    """Returns the issue state string."""
+    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="open\n")
+    with patch("lib.python.github.subprocess.run", return_value=cp):
+        assert fetch_issue_state("org", "repo", 42) == "open"
+
+
+def test_fetch_issue_state_failure() -> None:
+    """SystemExit raised on fetch failure."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=1, stdout="", stderr="err",
+    )
+    with patch("lib.python.github.subprocess.run", return_value=cp):
+        with pytest.raises(SystemExit):
+            fetch_issue_state("org", "repo", 1)
 
 
 # --- update_issue_body ---

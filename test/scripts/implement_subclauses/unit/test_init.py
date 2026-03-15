@@ -119,6 +119,37 @@ def test_main_skips_unextractable_issue(iscs, monkeypatch, base_argv):
     assert not mock_invoke.called
 
 
+def test_main_skips_closed_issues(iscs, monkeypatch, base_argv):
+    """main() skips closed issues."""
+    monkeypatch.setattr(iscs, "fetch_issue_title", lambda _o, _r, _n: (
+        f"Ensure IEEE 1800-2023 §6.{_n - 99}"
+        " functionalities and tests are implemented"
+    ))
+    monkeypatch.setattr(
+        iscs, "fetch_issue_state", lambda _o, _r, _n: "closed",
+    )
+    mock_invoke = MagicMock()
+    monkeypatch.setattr(iscs, "invoke_implement_subclause", mock_invoke)
+    iscs.main(base_argv)
+    assert not mock_invoke.called
+
+
+def test_main_processes_open_skips_closed(iscs, monkeypatch, base_argv):
+    """main() processes open issues and skips closed ones."""
+    monkeypatch.setattr(iscs, "fetch_issue_title", lambda _o, _r, _n: (
+        f"Ensure IEEE 1800-2023 §6.{_n - 99}"
+        " functionalities and tests are implemented"
+    ))
+    monkeypatch.setattr(
+        iscs, "fetch_issue_state",
+        lambda _o, _r, n: "open" if n == 100 else "closed",
+    )
+    mock_invoke = MagicMock()
+    monkeypatch.setattr(iscs, "invoke_implement_subclause", mock_invoke)
+    iscs.main(base_argv)
+    assert mock_invoke.call_count == 1
+
+
 # ---- __main__ guard ---------------------------------------------------------
 
 

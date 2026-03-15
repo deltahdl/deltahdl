@@ -138,6 +138,22 @@ def fetch_issue_title(organization: str, repo: str, issue: int) -> str:
     return result.stdout.strip()
 
 
+def fetch_issue_state(organization: str, repo: str, issue: int) -> str:
+    """Fetch the state of a GitHub issue using ``gh api``."""
+    result = subprocess.run(
+        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
+         "--jq", ".state"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(f"ERROR: Failed to fetch state for issue #{issue}:"
+              f"\n{result.stderr}", file=sys.stderr)
+        sys.exit(1)
+    return result.stdout.strip()
+
+
 def create_issue(
     organization: str, repo: str, title: str, body: str,
 ) -> int:
