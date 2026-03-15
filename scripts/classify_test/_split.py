@@ -1,12 +1,8 @@
 """File-splitting helpers for classify_test."""
 
 import glob
-import os
 import re
 from pathlib import Path
-
-from lib.python.classify import build_lrm_read_instruction
-from lib.python.cli import run_claude_cli
 
 
 def strip_lrm_quotes(line):
@@ -209,26 +205,3 @@ def _write_one_file(filename, content, test_dir, new_names):
     outpath = test_dir / f"{filename}.cpp"
     outpath.write_text(content, encoding="utf-8")
     new_names.append(filename)
-
-
-def send_lrm_preamble(clause_hint, lrm_path):
-    """Read LRM General & Overview for the given clause."""
-    prompt = (build_lrm_read_instruction(clause_hint, str(lrm_path))
-              + " Keep this context — you will classify tests next.")
-    print("Reading LRM context...")
-    env = os.environ.copy()
-    env.pop("CLAUDECODE", None)
-    cmd = ["claude", "-p", "--model", "opus", "--effort", "high",
-           "--dangerously-skip-permissions"]
-    run_claude_cli(cmd, prompt, env=env, timeout=600)
-
-
-def extract_clause_hint(stem):
-    """Extract top-level clause number from a filename stem."""
-    match = re.search(r"clause_(\d+)", stem)
-    if match:
-        return str(int(match.group(1)))
-    match = re.search(r"annex_([a-z])", stem)
-    if match:
-        return match.group(1).upper()
-    return ""

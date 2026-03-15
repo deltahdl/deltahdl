@@ -621,46 +621,6 @@ def test_apply_classification_non_lrm_prefix_override(ct, ct_helpers):
 # ---- classify_test_block ----------------------------------------------------
 
 
-def _run_preamble_test(ct, ct_helpers, monkeypatch, tmp_path, **kw):
-    """Classify with preamble stubs, return preamble call list."""
-    calls = []
-    monkeypatch.setattr(
-        ct, "send_lrm_preamble",
-        lambda hint, path: calls.append(hint),
-    )
-    monkeypatch.setattr(
-        ct, "_call_claude",
-        lambda p, _s=None, **_kw: {"clause": "6.1", "rationale": "r",
-                                    "suite_name": "S", "test_name": "T"},
-    )
-    t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
-    ct.classify_test_block(
-        t, tmp_path, tmp_path / "lrm.txt", clause_hint="6", **kw,
-    )
-    return calls
-
-
-def test_classify_block_sends_preamble_when_no_continue(
-    ct, ct_helpers, monkeypatch, tmp_path,
-):
-    """classify_test_block calls send_lrm_preamble when no --continue."""
-    assert _run_preamble_test(
-        ct, ct_helpers, monkeypatch, tmp_path,
-        continue_session=False,
-    ) == ["6"]
-
-
-def test_classify_block_skips_preamble_when_continue(
-    ct, ct_helpers, monkeypatch, tmp_path,
-):
-    """classify_test_block skips preamble when continue_session=True."""
-    assert not _run_preamble_test(
-        ct, ct_helpers, monkeypatch, tmp_path,
-        continue_session=True,
-    )
-
-
-
 
 def test_classify_tests_matching(ct, ct_helpers, monkeypatch, tmp_path):
     """classify_test_block applies classification per test."""
@@ -979,19 +939,3 @@ def test_rename_preserves_original_test_name(ct):
     _rename(t, "A", "Second")
     _rename(t, "B", "Third")
     assert t.original_test_name == "First"
-
-
-
-def test_extract_clause_hint_numeric(ct):
-    """Extracts clause number from numeric filename."""
-    assert ct.extract_clause_hint("test_parser_clause_06_03") == "6"
-
-
-def test_extract_clause_hint_annex(ct):
-    """Extracts annex letter from annex filename."""
-    assert ct.extract_clause_hint("test_parser_annex_a_08") == "A"
-
-
-def test_extract_clause_hint_no_match(ct):
-    """Returns empty string when no clause pattern matches."""
-    assert ct.extract_clause_hint("test_input") == ""

@@ -58,8 +58,6 @@ from ._split import (
     _write_one_file,
     _write_overflow_file,
     append_tests_to_file,
-    extract_clause_hint,
-    send_lrm_preamble,
     strip_lrm_quotes,
 )
 
@@ -564,16 +562,13 @@ def _apply_classification(test, clause_resp, topic_resp=None,
 
 
 def classify_test_block(test, test_dir, lrm_path, *,
-                        continue_session=False, clause_hint=""):
+                        continue_session=False):
     """Use Claude to classify a single test's prefix and clause."""
-    if not continue_session and clause_hint:
-        send_lrm_preamble(clause_hint, lrm_path)
     print(f"Calling Claude to classify clause for {test.test_name}...")
     clause_prompt = _build_clause_prompt(test, lrm_path)
-    use_continue = continue_session or bool(clause_hint)
     clause_resp = _call_claude(
         clause_prompt, _CLAUSE_SCHEMA,
-        continue_session=use_continue,
+        continue_session=continue_session,
     )
     topic_resp = None
     clause = clause_resp.get("clause", "")
@@ -925,7 +920,6 @@ def _run(args):
         target, out_dir,
         Path(args.lrm).resolve(),
         continue_session=args.continue_session,
-        clause_hint=extract_clause_hint(filepath.stem),
     )
     targets = [target]
     print_classification_table(targets)
