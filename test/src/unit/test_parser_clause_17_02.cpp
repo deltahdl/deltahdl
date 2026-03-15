@@ -459,4 +459,14 @@ TEST(CheckerDeclarations, CheckerKeywordIntroducesChecker) {
   EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
 }
 
+TEST(CheckerDeclarations, CheckerContainsDeclarations) {
+  auto r = Parse(
+      "checker chk;\n"
+      "  logic flag;\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->checkers[0]->items.empty());
+}
+
 }  // namespace
