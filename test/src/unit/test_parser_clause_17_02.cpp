@@ -512,4 +512,14 @@ TEST(CheckerDeclaration, WithPorts) {
   ASSERT_GE(r.cu->checkers[0]->ports.size(), 2u);
 }
 
+TEST(CheckerDeclaration, WithMixedContents) {
+  EXPECT_TRUE(
+      ParseOk("checker chk(input logic clk, input logic a, input logic b);\n"
+              "  logic internal;\n"
+              "  always_comb internal = a & b;\n"
+              "  assert property (@(posedge clk) a |-> b);\n"
+              "  cover property (@(posedge clk) a && b);\n"
+              "endchecker\n"));
+}
+
 }  // namespace
