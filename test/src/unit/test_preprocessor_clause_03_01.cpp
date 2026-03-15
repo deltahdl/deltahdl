@@ -4,20 +4,6 @@
 
 namespace {
 
-TEST(DesignElementPreprocessing, IfdefElseSelectsAlternate) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`ifdef MISSING\n"
-      "module a; endmodule\n"
-      "`else\n"
-      "module b; endmodule\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(result.find("module a"), std::string::npos);
-  EXPECT_NE(result.find("module b"), std::string::npos);
-}
-
 TEST(DesignElementPreprocessing, MacroExpandsInsideModule) {
   PreprocFixture f;
   auto result = Preprocess(

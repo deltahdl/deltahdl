@@ -604,3 +604,17 @@ TEST(IfndefConditionalCompilation, IfndefIncludesWhenUndefined) {
   EXPECT_NE(result.find("interface"), std::string::npos);
 }
 
+TEST(IfdefElse, UndefinedMacroSelectsElseBranch) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`ifdef MISSING\n"
+      "module a; endmodule\n"
+      "`else\n"
+      "module b; endmodule\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result.find("module a"), std::string::npos);
+  EXPECT_NE(result.find("module b"), std::string::npos);
+}
+
