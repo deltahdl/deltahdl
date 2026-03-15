@@ -88,3 +88,57 @@ def append_classify_cmd_flags(
         cmd.append("--dry-run")
     if args.no_commit:
         cmd.append("--no-commit")
+
+
+def build_hierarchy(clause: str) -> dict:
+    """Derive template variables from a clause string.
+
+    Returns a dict with keys:
+    - is_annex, subclause (always present)
+    - Numeric: clause_number, ancestors
+    - Annex: collection, letter, ancestors
+    """
+    parts = clause.split(".")
+    is_annex = parts[0][0].isalpha() and parts[0][0].isupper()
+    depth = len(parts)
+
+    result: dict = {"is_annex": is_annex, "subclause": clause}
+
+    if is_annex:
+        letter = parts[0]
+        result["collection"] = f"Annex {letter}"
+        result["letter"] = letter
+        ancestors = []
+        for k in range(2, depth):
+            ancestors.append(".".join(parts[:k]))
+        result["ancestors"] = ancestors
+    else:
+        result["clause_number"] = parts[0]
+        ancestors = []
+        for k in range(2, depth):
+            ancestors.append(".".join(parts[:k]))
+        result["ancestors"] = ancestors
+
+    return result
+
+
+def build_lrm_read_instruction(subclause: str, lrm: str) -> str:
+    """Build an instruction to read the relevant LRM sections."""
+    h = build_hierarchy(subclause)
+    if h["ancestors"]:
+        ancestors_str = ", ".join(f"§{a}" for a in h["ancestors"])
+        return (
+            f"Read §{subclause} and its ancestor subclauses"
+            f" ({ancestors_str}) in the LRM at {lrm}."
+            " Also read any General or Overview subclauses"
+            " at each level."
+        )
+    parts = subclause.split(".")
+    is_general = len(parts) == 2 and parts[1] == "1"
+    instruction = f"Read §{subclause} in the LRM at {lrm}."
+    if not is_general:
+        instruction += (
+            " Also read any General or Overview subclauses"
+            " for context."
+        )
+    return instruction

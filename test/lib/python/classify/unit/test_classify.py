@@ -8,6 +8,8 @@ from lib.python.classify import (
     add_output_args,
     add_run_mode_args,
     append_classify_cmd_flags,
+    build_hierarchy,
+    build_lrm_read_instruction,
     clause_to_filename,
 )
 
@@ -215,3 +217,69 @@ def test_clause_to_filename_bare_annex() -> None:
 def test_clause_to_filename_annex_subclause() -> None:
     """Annex subclause becomes padded annex filename."""
     assert clause_to_filename("test_parser_", "A.1.3") == "test_parser_annex_a_01_03"
+
+
+# --- build_hierarchy ---
+
+
+def test_build_hierarchy_numeric_depth_1() -> None:
+    """Clause '4' produces depth-1 numeric hierarchy."""
+    assert build_hierarchy("4")["clause_number"] == "4"
+
+
+def test_build_hierarchy_numeric_no_ancestors() -> None:
+    """Depth-2 clause '4.1' has no ancestors."""
+    assert build_hierarchy("4.1")["ancestors"] == []
+
+
+def test_build_hierarchy_numeric_ancestors() -> None:
+    """Depth-3 clause '6.24.1' has one ancestor."""
+    assert build_hierarchy("6.24.1")["ancestors"] == ["6.24"]
+
+
+def test_build_hierarchy_annex_letter() -> None:
+    """Annex 'B' sets letter to 'B'."""
+    assert build_hierarchy("B")["letter"] == "B"
+
+
+def test_build_hierarchy_annex_is_annex() -> None:
+    """Annex 'A.8' is flagged as annex."""
+    assert build_hierarchy("A.8")["is_annex"] is True
+
+
+def test_build_hierarchy_numeric_not_annex() -> None:
+    """Numeric '4' is not flagged as annex."""
+    assert build_hierarchy("4")["is_annex"] is False
+
+
+# --- build_lrm_read_instruction ---
+
+
+def test_lrm_read_general_subclause() -> None:
+    """General subclause (X.1) does not add 'Also read General'."""
+    result = build_lrm_read_instruction("6.1", "/lrm.pdf")
+    assert "Also read" not in result
+
+
+def test_lrm_read_non_general_adds_context() -> None:
+    """Non-general subclause adds 'Also read General or Overview'."""
+    result = build_lrm_read_instruction("6.3", "/lrm.pdf")
+    assert "General or Overview" in result
+
+
+def test_lrm_read_deep_includes_ancestors() -> None:
+    """Deep subclause includes ancestor list."""
+    result = build_lrm_read_instruction("6.3.2", "/lrm.pdf")
+    assert "§6.3" in result
+
+
+def test_lrm_read_includes_lrm_path() -> None:
+    """Instruction includes the LRM path."""
+    result = build_lrm_read_instruction("4.1", "/my/lrm.pdf")
+    assert "/my/lrm.pdf" in result
+
+
+def test_lrm_read_includes_subclause() -> None:
+    """Instruction includes the subclause number."""
+    result = build_lrm_read_instruction("9.2.1", "/lrm.pdf")
+    assert "§9.2.1" in result

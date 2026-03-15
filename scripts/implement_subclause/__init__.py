@@ -10,7 +10,9 @@ import re
 import sys
 from pathlib import Path
 
-from lib.python.classify import STAGE_TO_PREFIX, clause_to_filename
+from lib.python.classify import (
+    STAGE_TO_PREFIX, build_lrm_read_instruction, clause_to_filename,
+)
 from lib.python.cli import (
     add_continue_arg,
     add_lrm_arg,
@@ -33,40 +35,6 @@ from lib.python.git import (
 CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
 
 
-# ---------------------------------------------------------------------------
-# Hierarchy computation
-# ---------------------------------------------------------------------------
-
-def build_hierarchy(clause: str) -> dict:
-    """Derive template variables from a clause string.
-
-    Returns a dict with keys:
-    - is_annex, subclause (always present)
-    - Numeric: clause_number, ancestors
-    - Annex: collection, letter, ancestors
-    """
-    parts = clause.split(".")
-    is_annex = parts[0][0].isalpha() and parts[0][0].isupper()
-    depth = len(parts)
-
-    result = {"is_annex": is_annex, "subclause": clause}
-
-    if is_annex:
-        letter = parts[0]
-        result["collection"] = f"Annex {letter}"
-        result["letter"] = letter
-        ancestors = []
-        for k in range(2, depth):
-            ancestors.append(".".join(parts[:k]))
-        result["ancestors"] = ancestors
-    else:
-        result["clause_number"] = parts[0]
-        ancestors = []
-        for k in range(2, depth):
-            ancestors.append(".".join(parts[:k]))
-        result["ancestors"] = ancestors
-
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -80,23 +48,7 @@ def build_steps(
     exclude: str = "",
 ) -> list[tuple[str, str]]:
     """Build the list of (description, prompt) tuples for each atomic step."""
-    h = build_hierarchy(subclause)
-    if h["ancestors"]:
-        ancestors_str = ", ".join(f"§{a}" for a in h["ancestors"])
-        read_ctx = (
-            f"Read §{subclause} and its ancestor subclauses"
-            f" ({ancestors_str}) in the LRM at {lrm}."
-            " Also read any General or Overview subclauses at each level."
-        )
-    else:
-        parts = subclause.split(".")
-        is_general = len(parts) == 2 and parts[1] == "1"
-        read_ctx = f"Read §{subclause} in the LRM at {lrm}."
-        if not is_general:
-            read_ctx += (
-                " Also read any General or Overview subclauses"
-                " for context."
-            )
+    read_ctx = build_lrm_read_instruction(subclause, lrm)
 
     examples = [
         clause_to_filename(prefix, subclause) + ".cpp"

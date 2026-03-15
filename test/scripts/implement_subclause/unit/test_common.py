@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+from lib.python.classify import build_hierarchy
+
 
 # ---- build_hierarchy --------------------------------------------------------
 
@@ -11,7 +13,7 @@ class TestBuildHierarchyNumeric:
 
     def test_depth_1(self, isc):
         """Clause '4' produces depth-1 numeric hierarchy."""
-        assert isc.build_hierarchy("4") == {
+        assert build_hierarchy("4") == {
             "is_annex": False,
             "clause_number": "4",
             "ancestors": [],
@@ -20,7 +22,7 @@ class TestBuildHierarchyNumeric:
 
     def test_depth_2(self, isc):
         """Clause '4.1' produces depth-2 numeric hierarchy."""
-        assert isc.build_hierarchy("4.1") == {
+        assert build_hierarchy("4.1") == {
             "is_annex": False,
             "clause_number": "4",
             "ancestors": [],
@@ -29,7 +31,7 @@ class TestBuildHierarchyNumeric:
 
     def test_depth_3(self, isc):
         """Clause '6.24.1' produces depth-3 numeric hierarchy."""
-        assert isc.build_hierarchy("6.24.1") == {
+        assert build_hierarchy("6.24.1") == {
             "is_annex": False,
             "clause_number": "6",
             "ancestors": ["6.24"],
@@ -38,7 +40,7 @@ class TestBuildHierarchyNumeric:
 
     def test_depth_4(self, isc):
         """Clause '4.4.3.1' produces depth-4 numeric hierarchy."""
-        assert isc.build_hierarchy("4.4.3.1") == {
+        assert build_hierarchy("4.4.3.1") == {
             "is_annex": False,
             "clause_number": "4",
             "ancestors": ["4.4", "4.4.3"],
@@ -47,7 +49,7 @@ class TestBuildHierarchyNumeric:
 
     def test_depth_5(self, isc):
         """Clause '4.4.3.1.2' produces depth-5 numeric hierarchy."""
-        assert isc.build_hierarchy("4.4.3.1.2") == {
+        assert build_hierarchy("4.4.3.1.2") == {
             "is_annex": False,
             "clause_number": "4",
             "ancestors": ["4.4", "4.4.3", "4.4.3.1"],
@@ -60,7 +62,7 @@ class TestBuildHierarchyAnnex:
 
     def test_depth_1(self, isc):
         """Clause 'B' produces depth-1 annex hierarchy."""
-        assert isc.build_hierarchy("B") == {
+        assert build_hierarchy("B") == {
             "is_annex": True,
             "collection": "Annex B",
             "letter": "B",
@@ -70,7 +72,7 @@ class TestBuildHierarchyAnnex:
 
     def test_depth_2(self, isc):
         """Clause 'A.8' produces depth-2 annex hierarchy."""
-        assert isc.build_hierarchy("A.8") == {
+        assert build_hierarchy("A.8") == {
             "is_annex": True,
             "collection": "Annex A",
             "letter": "A",
@@ -80,7 +82,7 @@ class TestBuildHierarchyAnnex:
 
     def test_depth_3(self, isc):
         """Clause 'A.8.1' produces depth-3 annex hierarchy."""
-        assert isc.build_hierarchy("A.8.1") == {
+        assert build_hierarchy("A.8.1") == {
             "is_annex": True,
             "collection": "Annex A",
             "letter": "A",
@@ -90,7 +92,7 @@ class TestBuildHierarchyAnnex:
 
     def test_depth_4(self, isc):
         """Clause 'A.7.5.3' produces depth-4 annex hierarchy."""
-        assert isc.build_hierarchy("A.7.5.3") == {
+        assert build_hierarchy("A.7.5.3") == {
             "is_annex": True,
             "collection": "Annex A",
             "letter": "A",
@@ -100,7 +102,7 @@ class TestBuildHierarchyAnnex:
 
     def test_depth_5(self, isc):
         """Clause 'A.7.5.3.1' produces depth-5 annex hierarchy."""
-        assert isc.build_hierarchy("A.7.5.3.1") == {
+        assert build_hierarchy("A.7.5.3.1") == {
             "is_annex": True,
             "collection": "Annex A",
             "letter": "A",
