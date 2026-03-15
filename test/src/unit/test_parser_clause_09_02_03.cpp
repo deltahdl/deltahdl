@@ -186,4 +186,14 @@ TEST(ProcessParsing, FinalBlock) {
   EXPECT_TRUE(found);
 }
 
+TEST(FinalBlock, DisplayCall) {
+  auto r = Parse(
+      "module m;\n"
+      "  final $display(\"done\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
+}
+
 }  // namespace

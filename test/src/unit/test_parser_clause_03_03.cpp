@@ -6,16 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ModuleWithFinalBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  final $display(\"done\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
-}
-
 TEST(DesignBuildingBlockParsing, ModuleWithAlwaysBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
