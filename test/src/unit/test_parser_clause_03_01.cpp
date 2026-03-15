@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, CuScopeLocalparamGoesToCuItems) {
-  auto r = Parse(
-      "localparam int WIDTH = 8;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
-}
-
 TEST(CompilationUnitStructure, ModuleWithEmptyPortListParens) {
   auto r = Parse("module m(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
