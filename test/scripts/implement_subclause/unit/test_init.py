@@ -220,7 +220,7 @@ def test_main_prints_action_summary(
 @patch("implement_subclause.commit_implementation")
 @patch("implement_subclause.run_steps", return_value=None)
 def test_main_deletes_issue_when_not_implementable(
-    _mock_run, mock_commit, mock_delete, isc, tmp_path,
+    _mock_run, _mock_commit, mock_delete, isc, tmp_path,
 ):
     """main() deletes issue when run_steps returns None."""
     lrm = tmp_path / "lrm.pdf"
