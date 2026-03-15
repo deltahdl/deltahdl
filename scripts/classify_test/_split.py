@@ -205,3 +205,14 @@ def _write_one_file(filename, content, test_dir, new_names):
     outpath = test_dir / f"{filename}.cpp"
     outpath.write_text(content, encoding="utf-8")
     new_names.append(filename)
+
+
+def extract_clause_hint(stem):
+    """Extract top-level clause number from a filename stem."""
+    match = re.search(r"clause_(\d+)", stem)
+    if match:
+        return str(int(match.group(1)))
+    match = re.search(r"annex_([a-z])", stem)
+    if match:
+        return match.group(1).upper()
+    return ""

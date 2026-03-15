@@ -22,7 +22,7 @@ CLAUSE_PROMPT_TEMPLATE = """What IEEE 1800-2023 clause does this test exercise?
 
 Return exactly one clause — the single most relevant subclause.
 Use the most specific subclause possible (e.g., 9.2.2.2.2 not 9.2).
-Read the LRM to verify — do not guess from titles.
+Refer to the LRM you already read — do not guess from titles.
 If no LRM clause applies, respond with "non-lrm".
 
 Also return a suite_name and test_name: PascalCase names that intuitively

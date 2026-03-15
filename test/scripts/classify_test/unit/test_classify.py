@@ -621,8 +621,52 @@ def test_apply_classification_non_lrm_prefix_override(ct, ct_helpers):
 # ---- classify_test_block ----------------------------------------------------
 
 
+def test_classify_block_sends_preamble_when_no_continue(
+    ct, ct_helpers, monkeypatch, tmp_path,
+):
+    """classify_test_block sends LRM preamble when continue_session=False."""
+    _tb = ct_helpers.make_test_block
+    prompts = []
+
+    def capturing_claude(prompt, schema=None, **_kw):
+        prompts.append(prompt)
+        if schema:
+            return {"clause": "6.1", "rationale": "r",
+                    "suite_name": "S", "test_name": "T"}
+        return "ok"
+
+    monkeypatch.setattr(ct, "_call_claude", capturing_claude)
+    t = _tb("T", body=["  auto r = Parse(src);"])
+    ct.classify_test_block(
+        t, tmp_path, tmp_path / "lrm.txt",
+        continue_session=False, clause_hint="6",
+    )
+    assert "General or Overview" in prompts[0]
+
+
+def test_classify_block_skips_preamble_when_continue(
+    ct, ct_helpers, monkeypatch, tmp_path,
+):
+    """classify_test_block skips preamble when continue_session=True."""
+    _tb = ct_helpers.make_test_block
+    prompts = []
+
+    def capturing_claude(prompt, schema=None, **_kw):
+        prompts.append(prompt)
+        return {"clause": "6.1", "rationale": "r",
+                "suite_name": "S", "test_name": "T"}
+
+    monkeypatch.setattr(ct, "_call_claude", capturing_claude)
+    t = _tb("T", body=["  auto r = Parse(src);"])
+    ct.classify_test_block(
+        t, tmp_path, tmp_path / "lrm.txt",
+        continue_session=True, clause_hint="6",
+    )
+    assert "General or Overview" not in prompts[0]
+
+
 def test_classify_tests_matching(ct, ct_helpers, monkeypatch, tmp_path):
-    """classify_tests applies classification per test."""
+    """classify_test_block applies classification per test."""
     _tb = ct_helpers.make_test_block
     clause_resp = {"clause": "6.1", "rationale": "r",
                    "suite_name": "Parsing", "test_name": "T"}
