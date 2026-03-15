@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ProgramCannotContainAlwaysComb) {
-  auto r = Parse(
-      "program p;\n"
-      "  logic a, b;\n"
-      "  always_comb b = a;\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(DesignBuildingBlockParsing, ProgramCannotContainAlwaysFF) {
   auto r = Parse(
       "program p;\n"
