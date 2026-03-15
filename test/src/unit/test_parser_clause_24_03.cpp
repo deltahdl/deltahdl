@@ -791,4 +791,13 @@ TEST(ProgramDeclaration, CannotContainUdpInst) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(ProgramDeclaration, WithPorts) {
+  auto r = Parse(
+      "program p(input clk, input [16:1] addr, inout [7:0] data);\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->programs[0]->ports.size(), 3u);
+}
+
 }  // namespace
