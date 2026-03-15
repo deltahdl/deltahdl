@@ -616,19 +616,24 @@ def test_apply_classification_non_lrm_prefix_override(ct, ct_helpers):
 # ---- classify_test_block ----------------------------------------------------
 
 
+def _run_against(ct, ct_helpers, monkeypatch, tmp_path, clause):
+    """Classify with --against and return result."""
+    monkeypatch.setattr(
+        ct, "_call_claude",
+        lambda p, schema=None, **_kw: {"clause": clause, "rationale": "r",
+                                        "suite_name": "S", "test_name": "T"},
+    )
+    t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
+    return ct.classify_test_block(
+        t, tmp_path, tmp_path / "lrm.txt", against="23.2.1",
+    ), t
+
+
 def test_classify_block_against_none_returns_none(
     ct, ct_helpers, monkeypatch, tmp_path,
 ):
     """classify_test_block returns None when against clause is 'none'."""
-    monkeypatch.setattr(
-        ct, "_call_claude",
-        lambda p, schema=None, **_kw: {"clause": "none", "rationale": "r",
-                                        "suite_name": "S", "test_name": "T"},
-    )
-    t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
-    result = ct.classify_test_block(
-        t, tmp_path, tmp_path / "lrm.txt", against="23.2.1",
-    )
+    result, _ = _run_against(ct, ct_helpers, monkeypatch, tmp_path, "none")
     assert result is None
 
 
@@ -636,15 +641,7 @@ def test_classify_block_against_match_returns_test(
     ct, ct_helpers, monkeypatch, tmp_path,
 ):
     """classify_test_block returns test when against clause matches."""
-    monkeypatch.setattr(
-        ct, "_call_claude",
-        lambda p, schema=None, **_kw: {"clause": "23.2.1", "rationale": "r",
-                                        "suite_name": "S", "test_name": "T"},
-    )
-    t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
-    result = ct.classify_test_block(
-        t, tmp_path, tmp_path / "lrm.txt", against="23.2.1",
-    )
+    result, t = _run_against(ct, ct_helpers, monkeypatch, tmp_path, "23.2.1")
     assert result is t
 
 
