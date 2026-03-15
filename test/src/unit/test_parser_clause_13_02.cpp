@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §13.2
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, TaskAndFunctionCoexist) {
+TEST(Subroutines, TaskAndFunctionCoexist) {
   auto r = Parse(
       "module m;\n"
       "  function int add(int a, int b); return a + b; endfunction\n"
