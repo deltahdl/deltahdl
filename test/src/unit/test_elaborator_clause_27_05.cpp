@@ -85,4 +85,14 @@ TEST(GenerateInstantiationGrammar, ElaborationGenerateCaseDefault) {
   EXPECT_TRUE(found_def);
 }
 
+TEST(ConditionalGenerate, IfGenerateElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter int P = 1;\n"
+             "  if (P) begin : gen\n"
+             "    logic w;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace

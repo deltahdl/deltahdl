@@ -4,16 +4,6 @@
 
 namespace {
 
-TEST(DesignBuildingBlockElaboration, ModuleWithGenerateElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  parameter int P = 1;\n"
-             "  if (P) begin : gen\n"
-             "    logic w;\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
 TEST(ModuleDefinitions, EmptyModuleElaborates) {
   EXPECT_TRUE(ElabOk("module m; endmodule\n"));
 }
