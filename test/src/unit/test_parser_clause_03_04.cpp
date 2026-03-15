@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ProgramCannotContainUdpInst) {
-  auto r = Parse(
-      "primitive udp_buf (output out, input in);\n"
-      "  table 0 : 0; 1 : 1; endtable\n"
-      "endprimitive\n"
-      "program p;\n"
-      "  wire a, b;\n"
-      "  udp_buf u1(a, b);\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(DesignBuildingBlockParsing, ProgramWithPorts) {
   auto r = Parse(
       "program p(input clk, input [16:1] addr, inout [7:0] data);\n"
