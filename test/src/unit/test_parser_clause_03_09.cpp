@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, PackageWithFunction) {
-  EXPECT_TRUE(
-      ParseOk("package pkg;\n"
-              "  function int add(int a, int b); return a + b; endfunction\n"
-              "endpackage\n"));
-}
-
 TEST(DesignBuildingBlockParsing, ImportIntoModule) {
   auto r = Parse(
       "package pkg;\n"

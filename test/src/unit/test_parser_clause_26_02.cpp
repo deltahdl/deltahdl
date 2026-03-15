@@ -330,4 +330,11 @@ TEST(PackageDeclaration, WithTypedef) {
   EXPECT_FALSE(r.cu->packages[0]->items.empty());
 }
 
+TEST(PackageDeclaration, WithFunction) {
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  function int add(int a, int b); return a + b; endfunction\n"
+              "endpackage\n"));
+}
+
 }  // namespace
