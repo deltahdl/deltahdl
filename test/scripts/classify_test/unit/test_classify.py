@@ -618,7 +618,7 @@ def test_apply_classification_non_lrm_prefix_override(ct, ct_helpers):
     assert t.prefix == "test_non_lrm_"
 
 
-# ---- classify_tests --------------------------------------------------------
+# ---- classify_test_block ----------------------------------------------------
 
 
 def test_classify_tests_matching(ct, ct_helpers, monkeypatch, tmp_path):
@@ -631,34 +631,10 @@ def test_classify_tests_matching(ct, ct_helpers, monkeypatch, tmp_path):
         lambda p, schema=None, **_kw: clause_resp,
     )
     t = _tb("T", body=["  auto r = Parse(src);"])
-    ct.classify_tests(
-        [t], tmp_path, tmp_path / "lrm.txt",
+    ct.classify_test_block(
+        t, tmp_path, tmp_path / "lrm.txt",
     )
     assert t.prefix == "test_parser_"
-
-
-def test_classify_tests_per_test(ct, ct_helpers, monkeypatch, tmp_path):
-    """classify_tests calls Claude once per (non-lrm) test."""
-    _tb = ct_helpers.make_test_block
-    call_count = [0]
-
-    def counting_claude(_prompt, _schema=None, **_kw):
-        call_count[0] += 1
-        return {"clause": "6.1", "rationale": "r",
-                "suite_name": "S", "test_name": "T"}
-
-    monkeypatch.setattr(
-        ct, "_call_claude", counting_claude,
-    )
-    tests = [
-        _tb("A", body=["  auto r = Parse(src);"]),
-        _tb("B", body=["  auto r = Parse(src);"]),
-        _tb("C", body=["  auto r = Parse(src);"]),
-    ]
-    ct.classify_tests(
-        tests, tmp_path, tmp_path / "lrm.txt",
-    )
-    assert call_count[0] == 3
 
 
 def _do_non_lrm_two_calls(ct, ct_helpers, monkeypatch, tmp_path):
@@ -678,8 +654,8 @@ def _do_non_lrm_two_calls(ct, ct_helpers, monkeypatch, tmp_path):
         ct, "_call_claude", two_call_claude,
     )
     t = _tb("T", body=["  auto r = Parse(src);"])
-    ct.classify_tests(
-        [t], tmp_path, tmp_path / "lrm.txt",
+    ct.classify_test_block(
+        t, tmp_path, tmp_path / "lrm.txt",
     )
     return call_count[0], t
 
@@ -864,8 +840,8 @@ def test_classify_tests_propagates_validation_error(ct, ct_helpers, monkeypatch,
                                                       test_name="T"),
     )
     with pytest.raises(SystemExit):
-        ct.classify_tests(
-            [_tb("T", body=["  auto r = Parse(src);"])],
+        ct.classify_test_block(
+            _tb("T", body=["  auto r = Parse(src);"]),
             tmp_path, tmp_path / "lrm.txt",
         )
 

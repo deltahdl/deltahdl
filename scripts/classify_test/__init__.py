@@ -561,29 +561,28 @@ def _apply_classification(test, clause_resp, topic_resp=None,
     _rename_test_macro(test, suite, name)
 
 
-def classify_tests(tests, test_dir, lrm_path, *,
-                    continue_session=False):
-    """Use Claude to classify each test's prefix and clause."""
-    for test in tests:
-        print(f"Calling Claude to classify clause for {test.test_name}...")
-        clause_prompt = _build_clause_prompt(test, lrm_path)
-        clause_resp = _call_claude(
-            clause_prompt, _CLAUSE_SCHEMA,
-            continue_session=continue_session,
+def classify_test_block(test, test_dir, lrm_path, *,
+                        continue_session=False):
+    """Use Claude to classify a single test's prefix and clause."""
+    print(f"Calling Claude to classify clause for {test.test_name}...")
+    clause_prompt = _build_clause_prompt(test, lrm_path)
+    clause_resp = _call_claude(
+        clause_prompt, _CLAUSE_SCHEMA,
+        continue_session=continue_session,
+    )
+    topic_resp = None
+    clause = clause_resp.get("clause", "")
+    if clause.replace("_", "-") == "non-lrm":
+        print(f"Calling Claude to classify topic for"
+              f" {test.test_name} because clause is non-lrm...")
+        topic_prompt = _build_topic_prompt(test, test_dir)
+        topic_resp = _call_claude(
+            topic_prompt, _TOPIC_SCHEMA,
+            continue_session=True,
         )
-        topic_resp = None
-        clause = clause_resp.get("clause", "")
-        if clause.replace("_", "-") == "non-lrm":
-            print(f"Calling Claude to classify topic for"
-                  f" {test.test_name} because clause is non-lrm...")
-            topic_prompt = _build_topic_prompt(test, test_dir)
-            topic_resp = _call_claude(
-                topic_prompt, _TOPIC_SCHEMA,
-                continue_session=True,
-            )
-        _apply_classification(test, clause_resp, topic_resp,
-                              lrm_path=lrm_path)
-    return tests
+    _apply_classification(test, clause_resp, topic_resp,
+                          lrm_path=lrm_path)
+    return test
 
 
 # ---------------------------------------------------------------------------
@@ -824,7 +823,7 @@ def _validate_input(filepath, suite_name, test_name):
         print(f"ERROR: Test {suite_name}.{test_name!r} not found"
               f" in {filepath.name}")
         sys.exit(1)
-    return parsed, matches[:1]
+    return parsed, matches[0]
 
 
 def _update_source(filepath, parsed, ctx):
@@ -918,18 +917,19 @@ def _run(args):
     filepath = Path(args.file).resolve()
     parsed, target = _validate_input(filepath, args.suite, args.test)
     out_dir = Path(args.output_dir).resolve()
-    classify_tests(
+    classify_test_block(
         target, out_dir,
         Path(args.lrm).resolve(),
         continue_session=args.continue_session,
     )
-    print_classification_table(target)
-    groups = _group_tests(target)
+    targets = [target]
+    print_classification_table(targets)
+    groups = _group_tests(targets)
     source_is_target = any(
         clause_to_filename(p, c) == filepath.stem
         for p, c in groups
     )
-    action, target_filenames = _build_action(target, source_is_target)
+    action, target_filenames = _build_action(targets, source_is_target)
     to_create, to_merge, n_removed = _resolve_destinations(
         groups, out_dir,
         exclude_path=filepath, dry_run=args.dry_run,
@@ -938,9 +938,9 @@ def _run(args):
     if args.dry_run:
         return
     if not to_create and not to_merge and source_is_target and n_removed == 0:
-        sha = _apply_rename_in_place(args, filepath, parsed, target,
+        sha = _apply_rename_in_place(args, filepath, parsed, targets,
                                      action)
-        update_issue_after_commit(args, target, source_is_target,
+        update_issue_after_commit(args, targets, source_is_target,
                                  target_filenames,
                                  build_commit_url(args, sha))
         return
@@ -969,12 +969,12 @@ def _run(args):
     sha = None
     if not getattr(args, "no_commit", False):
         sha = commit_classification({
-            "filepath": filepath, "target": target,
+            "filepath": filepath, "target": targets,
             "to_merge": to_merge, "new_names": new_names,
             "test_dir": out_dir, "cmake_path": CMAKE_PATH,
             "action": action,
         })
-    update_issue_after_commit(args, target, source_is_target,
+    update_issue_after_commit(args, targets, source_is_target,
                               target_filenames,
                               build_commit_url(args, sha))
 
