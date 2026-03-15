@@ -1,26 +1,11 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(DesignBuildingBlockParsing, BuiltInNInputGates) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  and  g1(y, a, b);\n"
-      "  nand g2(y, a, b);\n"
-      "  or   g3(y, a, b);\n"
-      "  nor  g4(y, a, b);\n"
-      "  xor  g5(y, a, b);\n"
-      "  xnor g6(y, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  EXPECT_EQ(gates.size(), 6u);
-}
 
 TEST(DesignBuildingBlockParsing, BuiltInNOutputGates) {
   EXPECT_TRUE(
