@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, BuiltInPullGates) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire a, b;\n"
-              "  pullup   g1(a);\n"
-              "  pulldown g2(b);\n"
-              "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockParsing, UdpEnclosedByKeywords) {
   auto r = Parse(
       "primitive udp_buf (output out, input in);\n"

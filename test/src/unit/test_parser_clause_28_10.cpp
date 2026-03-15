@@ -63,4 +63,13 @@ TEST(PrimitiveInstantiationParsing, PullGateInst_PullupUnnamed) {
   EXPECT_TRUE(g->gate_inst_name.empty());
 }
 
+TEST(PullSources, PullupAndPulldown) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire a, b;\n"
+              "  pullup   g1(a);\n"
+              "  pulldown g2(b);\n"
+              "endmodule\n"));
+}
+
 }  // namespace
