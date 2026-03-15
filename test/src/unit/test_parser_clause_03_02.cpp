@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §3.2
 
 #include "fixture_parser.h"
 
@@ -33,7 +33,7 @@ TEST(DesignElements, TopLevelClassIsNotDesignElement) {
   EXPECT_TRUE(r.cu->configs.empty());
 }
 
-TEST(DesignBuildingBlockParsing, AllSevenDesignElementsCoexist) {
+TEST(DesignElements, AllSevenDesignElementsCoexist) {
   auto r = Parse(
       "module m; endmodule\n"
       "program p; endprogram\n"
