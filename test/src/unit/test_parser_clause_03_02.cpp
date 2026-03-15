@@ -1,4 +1,4 @@
-// §3.2
+// Non-LRM tests
 
 #include "fixture_parser.h"
 
@@ -31,17 +31,6 @@ TEST(DesignElements, TopLevelClassIsNotDesignElement) {
   EXPECT_TRUE(r.cu->packages.empty());
   EXPECT_TRUE(r.cu->udps.empty());
   EXPECT_TRUE(r.cu->configs.empty());
-}
-
-TEST(DesignBuildingBlockParsing, CuScopeTypedefIsNotDesignElement) {
-  auto r = Parse(
-      "typedef int myint;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->packages.empty());
 }
 
 TEST(DesignBuildingBlockParsing, CuScopeParamIsNotDesignElement) {

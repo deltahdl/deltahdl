@@ -542,4 +542,15 @@ TEST(CompilationUnitParsing, DollarUnitInSubexpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(CompilationUnits, CuScopeTypedefIsNotDesignElement) {
+  auto r = Parse(
+      "typedef int myint;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->packages.empty());
+}
+
 }  // namespace
