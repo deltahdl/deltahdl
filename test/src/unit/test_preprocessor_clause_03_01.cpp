@@ -4,17 +4,6 @@
 
 namespace {
 
-TEST(DesignElementPreprocessing, IfndefIncludesWhenUndefined) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`ifndef MISSING\n"
-      "interface ifc; endinterface\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("interface"), std::string::npos);
-}
-
 TEST(DesignElementPreprocessing, IfdefElseSelectsAlternate) {
   PreprocFixture f;
   auto result = Preprocess(

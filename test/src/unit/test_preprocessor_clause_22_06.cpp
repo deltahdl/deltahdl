@@ -593,3 +593,14 @@ TEST(DesignElementPreprocessing, IfdefAroundModuleExcludesUntaken) {
   EXPECT_EQ(result.find("module"), std::string::npos);
 }
 
+TEST(IfndefConditionalCompilation, IfndefIncludesWhenUndefined) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`ifndef MISSING\n"
+      "interface ifc; endinterface\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("interface"), std::string::npos);
+}
+
