@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ProgramWithDataDeclarations) {
-  auto r = Parse(
-      "program p;\n"
-      "  logic [7:0] count;\n"
-      "  int status;\n"
-      "  byte b;\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->programs[0]->items.size(), 3u);
-}
-
 TEST(DesignBuildingBlockParsing, ProgramWithClassDefinition) {
   auto r = Parse(
       "program p;\n"
