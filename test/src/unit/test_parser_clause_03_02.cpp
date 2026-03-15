@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §3.2
 
 #include "fixture_parser.h"
 
@@ -56,7 +56,7 @@ TEST(DesignElements, AllSevenDesignElementsCoexist) {
 }
 
 // §3.1 — All seven design element types coexist in a single compilation unit.
-TEST(CompilationUnitStructure, AllDesignElementTypesCoexist) {
+TEST(DesignElements, AllSevenDesignElementsCoexist) {
   auto r = Parse(
       "module m; endmodule\n"
       "program p; endprogram\n"
