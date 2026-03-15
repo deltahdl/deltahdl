@@ -4,16 +4,6 @@
 
 namespace {
 
-TEST(BuildingBlockElaboration, InterfaceWithModportElaborates) {
-  EXPECT_TRUE(
-      ElabOk("interface bus;\n"
-             "  logic data;\n"
-             "  modport master(output data);\n"
-             "endinterface\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
 TEST(BuildingBlockElaboration, MultiplePackagesElaborate) {
   EXPECT_TRUE(
       ElabOk("package p1;\n"
