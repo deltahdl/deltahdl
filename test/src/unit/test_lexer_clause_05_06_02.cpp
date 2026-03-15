@@ -76,4 +76,9 @@ TEST(Keywords, ConfigKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwConfig);
 }
 
+TEST(Keywords, EndconfigKeyword) {
+  auto r = LexOne("endconfig");
+  EXPECT_EQ(r.token.kind, TokenKind::kKwEndconfig);
+}
+
 }  // namespace

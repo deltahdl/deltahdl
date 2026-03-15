@@ -6,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockLexing, EndconfigKeyword) {
-  auto r = LexOne("endconfig");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwEndconfig);
-}
-
 TEST(DesignBuildingBlockLexing, DesignElementKeywordsAreNotIdentifiers) {
   const char* keywords[] = {"module",    "program",   "interface",
                             "checker",   "package",   "primitive",
