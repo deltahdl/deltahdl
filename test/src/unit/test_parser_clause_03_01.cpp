@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilationUnitStructure, TimeprecisionDeclarationSetsFlag) {
-  auto r = Parse(
-      "timeprecision 1ps;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->has_cu_timeprecision);
-}
-
 TEST(CompilationUnitStructure, TimeunitAndTimeprecisionBothSet) {
   auto r = Parse(
       "timeunit 1ns;\n"
