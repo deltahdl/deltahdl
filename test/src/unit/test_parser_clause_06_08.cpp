@@ -462,4 +462,15 @@ TEST(ImplicitDataType, ImplicitDataTypeSigned) {
   EXPECT_TRUE(port.data_type.is_signed);
 }
 
+TEST(VariableDeclarations, LogicWithPackedRange) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [3:0] data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kVarDecl);
+}
+
 }  // namespace
