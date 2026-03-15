@@ -1,6 +1,5 @@
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
-#include "preprocessor/preprocessor.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -101,4 +100,30 @@ TEST(LexicalTokenSim, LexicalTokenFreeFormatAlwaysComb) {
       "always_comb result\n=\na\n+\n8'd10\n;\nendmodule\n",
       "result");
   EXPECT_EQ(result, 15u);
+}
+
+TEST(LexicalTokenSim, LexicalTokenExcessiveWhitespace) {
+  auto result = RunAndGet(
+      "  module   t  ;   logic   [7:0]   result  ;   initial   result  =  "
+      "8'd33  ;   endmodule  ",
+      "result");
+  EXPECT_EQ(result, 33u);
+}
+
+TEST(LexicalTokenSim, LexicalTokenTabsAsSeparators) {
+  auto result = RunAndGet(
+      "module\tt;\tlogic\t[7:0]\tresult;\tinitial\tresult\t=\t8'd77;\t"
+      "endmodule",
+      "result");
+  EXPECT_EQ(result, 77u);
+}
+
+TEST(LexicalTokenSim, LexicalTokenCrlfLineEndings) {
+  auto result = RunAndGet(
+      "module t;\r\n"
+      "  logic [7:0] result;\r\n"
+      "  initial result = 8'd55;\r\n"
+      "endmodule\r\n",
+      "result");
+  EXPECT_EQ(result, 55u);
 }

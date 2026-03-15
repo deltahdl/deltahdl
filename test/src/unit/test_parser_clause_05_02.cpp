@@ -41,6 +41,14 @@ TEST(LexicalConventionParsing, WhitespaceVariationsProduceSameAST) {
   EXPECT_EQ(compact.cu->modules[0]->name, spread.cu->modules[0]->name);
 }
 
+TEST(LexicalConventionParsing, SourceWithAllTokenCategoriesParses) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic [7:0] data = 8'hAB;\n"
+              "  initial $display(\"hello\");\n"
+              "endmodule\n"));
+}
+
 TEST(LexicalConventionParsing, AllTokenCategoriesParsed) {
   EXPECT_TRUE(
       ParseOk("module t; // line comment\n"
@@ -73,6 +81,43 @@ TEST(LexicalConventionParsing, TabsAndFormfeedsAsWhitespace) {
 
 TEST(LexicalConventionParsing, EmptyModuleBody) {
   EXPECT_TRUE(ParseOk("module t; endmodule"));
+}
+
+TEST(LexicalConventionParsing, BlockCommentAsSeparatorParses) {
+  EXPECT_TRUE(ParseOk("module/**/t;logic/**/a;endmodule"));
+}
+
+TEST(LexicalConventionParsing, CrlfLineEndingsParseCorrectly) {
+  EXPECT_TRUE(
+      ParseOk("module t;\r\n  logic a;\r\n  assign a = 1'b0;\r\nendmodule\r\n"));
+}
+
+TEST(LexicalConventionParsing, CarriageReturnAloneAsWhitespace) {
+  EXPECT_TRUE(ParseOk("module\rt\r;\rlogic\ra\r;\rendmodule"));
+}
+
+TEST(LexicalConventionParsing, EscapedIdentifierAtEndOfDeclaration) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic \\sig! ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(LexicalConventionParsing, MultipleEscapedIdentifiers) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic \\a+b , \\c-d ;\n"
+              "endmodule\n"));
+}
+
+TEST(LexicalConventionParsing, LineCommentBetweenTokens) {
+  EXPECT_TRUE(
+      ParseOk("module // comment\n"
+              "t // comment\n"
+              "; // comment\n"
+              "endmodule // comment\n"));
 }
 
 }  // namespace

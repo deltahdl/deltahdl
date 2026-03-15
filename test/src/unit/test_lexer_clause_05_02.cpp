@@ -196,11 +196,95 @@ TEST(LexicalConventionLexing, TokensAdjacentToPunctuation) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kRParen);
 }
 
-TEST(LexicalConventionLexing, FormfeedIsWhitespace) {
-  auto tokens = Lex("a\fb");
+TEST(LexicalConventionLexing, BlockCommentActsAsTokenSeparator) {
+  auto tokens = Lex("a/**/b");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(LexicalConventionLexing, CrlfAsTokenSeparator) {
+  auto tokens = Lex("a\r\nb");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(LexicalConventionLexing, CarriageReturnAloneAsTokenSeparator) {
+  auto tokens = Lex("a\rb");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(LexicalConventionLexing, EmptyInputProducesOnlyEof) {
+  auto tokens = Lex("");
+  ASSERT_EQ(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
+}
+
+TEST(LexicalConventionLexing, TokenStreamAlwaysEndsWithEof) {
+  auto tokens = Lex("module m; endmodule");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens.back().kind, TokenKind::kEof);
+}
+
+TEST(LexicalConventionLexing, EscapedIdentifierAtEof) {
+  auto tokens = Lex("\\abc");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
+}
+
+TEST(LexicalConventionLexing, EscapedIdentifierTerminatedByFormfeed) {
+  auto tokens = Lex("\\abc\fdef");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "def");
+}
+
+TEST(LexicalConventionLexing, KeywordAdjacentToOperator) {
+  auto tokens = Lex("module+endmodule");
+  ASSERT_EQ(tokens.size(), 4u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kPlus);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kKwEndmodule);
+}
+
+TEST(LexicalConventionLexing, NumberAdjacentToOperator) {
+  auto tokens = Lex("42+7");
+  ASSERT_EQ(tokens.size(), 4u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kPlus);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIntLiteral);
+}
+
+TEST(LexicalConventionLexing, StringLiteralAdjacentToOtherTokens) {
+  auto tokens = Lex("a\"hello\"b");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kStringLiteral);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
+}
+
+TEST(LexicalConventionLexing, LineCommentActsAsTokenSeparator) {
+  auto tokens = Lex("a//comment\nb");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].text, "a");
+  EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(LexicalConventionLexing, FreeFormatIdentifierSplitByBlockComment) {
+  auto no_comment = Lex("abc");
+  auto with_comment = Lex("a/**/bc");
+  ASSERT_EQ(no_comment.size(), 2u);
+  EXPECT_EQ(no_comment[0].text, "abc");
+  ASSERT_EQ(with_comment.size(), 3u);
+  EXPECT_EQ(with_comment[0].text, "a");
+  EXPECT_EQ(with_comment[1].text, "bc");
 }
 
 }  // namespace

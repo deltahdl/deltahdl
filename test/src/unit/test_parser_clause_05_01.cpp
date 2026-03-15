@@ -4,14 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionParsing, SourceWithAllTokenCategoriesParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic [7:0] data = 8'hAB;\n"
-              "  initial $display(\"hello\");\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, CommentsDoNotAffectParseResult) {
   auto with = Parse(
       "module /* block */ t; // line\n"
