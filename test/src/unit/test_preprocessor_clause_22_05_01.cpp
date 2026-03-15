@@ -638,3 +638,15 @@ TEST(Preprocessor, IncludeWithMacroFilename) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("\"/tmp/test.sv\""), std::string::npos);
 }
+TEST(DesignElementPreprocessing, MacroExpandsInsideModule) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define WIDTH 8\n"
+      "module m;\n"
+      "  logic [`WIDTH-1:0] data;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("8"), std::string::npos);
+}
+
