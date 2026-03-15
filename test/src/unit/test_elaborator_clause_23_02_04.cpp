@@ -16,4 +16,13 @@ TEST(ModuleContents, MixedItemsElaborate) {
              "endmodule\n"));
 }
 
+TEST(ModuleContents, DeclarationsAndAssign) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a;\n"
+             "  wire b;\n"
+             "  assign b = a;\n"
+             "endmodule\n"));
+}
+
 }  // namespace
