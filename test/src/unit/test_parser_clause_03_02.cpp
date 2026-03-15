@@ -55,32 +55,4 @@ TEST(DesignElements, AllSevenDesignElementsCoexist) {
   EXPECT_EQ(r.cu->configs.size(), 1u);
 }
 
-// §3.1 — All seven design element types coexist in a single compilation unit.
-TEST(DesignElements, AllSevenDesignElementsCoexist) {
-  auto r = Parse(
-      "module m; endmodule\n"
-      "program p; endprogram\n"
-      "interface ifc; endinterface\n"
-      "checker chk; endchecker\n"
-      "package pkg; endpackage\n"
-      "primitive u(output y, input a);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "config cfg;\n"
-      "  design m;\n"
-      "endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->udps.size(), 1u);
-  EXPECT_EQ(r.cu->configs.size(), 1u);
-}
-
 }  // namespace
