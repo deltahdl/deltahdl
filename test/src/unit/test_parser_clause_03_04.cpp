@@ -7,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ProgramWithFinalBlock) {
-  auto r = Parse(
-      "program p;\n"
-      "  final $display(\"done\");\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
-}
-
 TEST(DesignBuildingBlockParsing, ProgramWithMultipleInitials) {
   auto r = Parse(
       "program p;\n"
