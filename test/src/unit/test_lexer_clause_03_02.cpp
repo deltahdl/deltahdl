@@ -1,13 +1,10 @@
+// Non-LRM tests
+
 #include "fixture_lexer.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(DesignBuildingBlockLexing, ModuleKeyword) {
-  auto r = LexOne("module");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwModule);
-}
 
 TEST(DesignBuildingBlockLexing, EndmoduleKeyword) {
   auto r = LexOne("endmodule");
