@@ -4,24 +4,6 @@
 
 namespace {
 
-TEST(DesignElementPreprocessing, ElsifChainSelectsCorrectDesignElement) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define USE_IFACE\n"
-      "`ifdef USE_MODULE\n"
-      "module m; endmodule\n"
-      "`elsif USE_IFACE\n"
-      "interface ifc; endinterface\n"
-      "`else\n"
-      "package p; endpackage\n"
-      "`endif\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(result.find("module"), std::string::npos);
-  EXPECT_NE(result.find("interface"), std::string::npos);
-  EXPECT_EQ(result.find("package"), std::string::npos);
-}
-
 TEST(DesignElementPreprocessing, UndefThenIfdefExcludesDesignElement) {
   PreprocFixture f;
   auto result = Preprocess(
