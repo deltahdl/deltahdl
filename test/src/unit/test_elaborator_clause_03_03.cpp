@@ -75,4 +75,8 @@ TEST(DesignBuildingBlockElaboration, ModuleWithGenerateElaborates) {
              "endmodule\n"));
 }
 
+TEST(ModuleDefinitions, EmptyModuleElaborates) {
+  EXPECT_TRUE(ElabOk("module m; endmodule\n"));
+}
+
 }  // namespace

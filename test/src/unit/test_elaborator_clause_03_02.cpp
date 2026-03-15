@@ -1,10 +1,8 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 
 namespace {
-
-TEST(DesignBuildingBlockElaboration, EmptyModuleElaborates) {
-  EXPECT_TRUE(ElabOk("module m; endmodule\n"));
-}
 
 TEST(DesignBuildingBlockElaboration, EmptyProgramElaborates) {
   ElabFixture f;
