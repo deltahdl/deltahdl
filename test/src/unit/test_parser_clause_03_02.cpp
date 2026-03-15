@@ -1,4 +1,4 @@
-// §3.2
+// Non-LRM tests
 
 #include "fixture_parser.h"
 
@@ -53,20 +53,6 @@ TEST(DesignElements, AllSevenDesignElementsCoexist) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
   EXPECT_EQ(r.cu->udps.size(), 1u);
   EXPECT_EQ(r.cu->configs.size(), 1u);
-}
-
-TEST(DesignBuildingBlockParsing, DesignElementsInterleaveWithNonDesignElements) {
-  auto r = Parse(
-      "typedef int myint;\n"
-      "module m; endmodule\n"
-      "class C; int x; endclass\n"
-      "package pkg; endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
 TEST(DesignBuildingBlockParsing, AllSevenDesignElementsThroughPreprocessor) {

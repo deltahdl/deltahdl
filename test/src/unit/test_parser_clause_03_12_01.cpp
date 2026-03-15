@@ -572,4 +572,18 @@ TEST(CompilationUnits, BareStatementAtTopLevelIsError) {
   EXPECT_FALSE(ParseOk("assign x = 1;"));
 }
 
+TEST(CompilationUnits, DesignElementsInterleaveWithNonDesignElements) {
+  auto r = Parse(
+      "typedef int myint;\n"
+      "module m; endmodule\n"
+      "class C; int x; endclass\n"
+      "package pkg; endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->packages.size(), 1u);
+}
+
 }  // namespace
