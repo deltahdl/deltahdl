@@ -712,4 +712,17 @@ TEST(ProgramDeclaration, WithFinalBlock) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kFinalBlock));
 }
 
+TEST(ProgramDeclaration, WithMultipleInitials) {
+  auto r = Parse(
+      "program p;\n"
+      "  initial $display(\"a\");\n"
+      "  initial $display(\"b\");\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(
+      CountItemsByKind(r.cu->programs[0]->items, ModuleItemKind::kInitialBlock),
+      2u);
+}
+
 }  // namespace
