@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ImportIntoModule) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  typedef int myint;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import pkg::*;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
-}
-
 TEST(DesignBuildingBlockParsing, ImportIntoInterface) {
   EXPECT_TRUE(
       ParseOk("package pkg; typedef int myint; endpackage\n"

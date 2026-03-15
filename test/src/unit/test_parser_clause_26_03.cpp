@@ -381,4 +381,18 @@ TEST(PackageImports, WildcardImport) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kImportDecl);
 }
 
+TEST(PackageImport, WildcardIntoModule) {
+  auto r = Parse(
+      "package pkg;\n"
+      "  typedef int myint;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pkg::*;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
+}
+
 }  // namespace
