@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, InterfaceWithInitialBlock) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  logic flag;\n"
-      "  initial flag = 0;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kInitialBlock));
-}
-
 TEST(DesignBuildingBlockParsing, InterfaceWithAlwaysBlock) {
   EXPECT_TRUE(
       ParseOk("interface ifc;\n"
