@@ -770,4 +770,13 @@ TEST(ProgramDeclaration, CannotContainModuleInst) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(ProgramDeclaration, CannotContainGateInst) {
+  auto r = Parse(
+      "program p;\n"
+      "  wire a, b, y;\n"
+      "  nand g1(y, a, b);\n"
+      "endprogram\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

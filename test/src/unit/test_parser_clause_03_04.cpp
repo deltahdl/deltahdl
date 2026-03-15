@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ProgramCannotContainGateInst) {
-  auto r = Parse(
-      "program p;\n"
-      "  wire a, b, y;\n"
-      "  nand g1(y, a, b);\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(DesignBuildingBlockParsing, ProgramCannotContainUdpInst) {
   auto r = Parse(
       "primitive udp_buf (output out, input in);\n"
