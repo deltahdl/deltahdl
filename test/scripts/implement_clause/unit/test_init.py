@@ -283,7 +283,7 @@ def test_ensure_skips_unrecognized_existing(ic, monkeypatch) -> None:
     )
     mock_create = MagicMock(return_value=11)
     monkeypatch.setattr(ic, "create_issue", mock_create)
-    result = ensure("o", "r", {"4.1": "General"}, [10])
+    ensure("o", "r", {"4.1": "General"}, [10])
     assert mock_create.call_count == 1
 
 
@@ -292,10 +292,7 @@ def test_ensure_creates_all_when_no_existing(ic, monkeypatch) -> None:
     ensure = getattr(ic, "_ensure_subclause_issues")
     mock_create = MagicMock(side_effect=[10, 11])
     monkeypatch.setattr(ic, "create_issue", mock_create)
-    result = ensure(
-        "o", "r",
-        {"4.1": "General", "4.2": "Exec"}, [],
-    )
+    ensure("o", "r", {"4.1": "General", "4.2": "Exec"}, [])
     assert mock_create.call_count == 2
 
 
@@ -308,10 +305,7 @@ def test_ensure_skips_existing(ic, monkeypatch) -> None:
     )
     mock_create = MagicMock(return_value=11)
     monkeypatch.setattr(ic, "create_issue", mock_create)
-    result = ensure(
-        "o", "r",
-        {"4.1": "General", "4.2": "Exec"}, [10],
-    )
+    ensure("o", "r", {"4.1": "General", "4.2": "Exec"}, [10])
     assert mock_create.call_count == 1
 
 
