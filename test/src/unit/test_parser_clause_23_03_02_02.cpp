@@ -205,4 +205,21 @@ TEST(AttributeParserParsing, Attribute_OnPortConnection) {
               "endmodule"));
 }
 
+TEST(PortConnections, NamedPortConnections) {
+  auto r = Parse(
+      "module sub(input logic a, output logic b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic x, y;\n"
+      "  sub u0(.a(x), .b(y));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* inst =
+      FindItemByKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_FALSE(inst->inst_ports.empty());
+}
+
 }  // namespace

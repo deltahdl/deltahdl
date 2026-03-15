@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, PortConnections) {
-  auto r = Parse(
-      "module sub(input logic a, output logic b);\n"
-      "  assign b = a;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic x, y;\n"
-      "  sub u0(.a(x), .b(y));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* inst =
-      FindItemByKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst);
-  ASSERT_NE(inst, nullptr);
-  EXPECT_FALSE(inst->inst_ports.empty());
-}
-
 TEST(DesignBuildingBlockParsing, TopMux2to1Example) {
   auto r = Parse(
       "module mux2to1 (input wire a, b, sel,\n"
