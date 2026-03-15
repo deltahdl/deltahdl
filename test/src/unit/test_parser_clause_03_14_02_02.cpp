@@ -378,4 +378,15 @@ TEST(CompilationUnitStructure, TimeprecisionDeclarationSetsFlag) {
   EXPECT_TRUE(r.cu->has_cu_timeprecision);
 }
 
+TEST(CompilationUnitTimeDeclarations, TimeunitAndTimeprecisionBothSet) {
+  auto r = Parse(
+      "timeunit 1ns;\n"
+      "timeprecision 1ps;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->has_cu_timeunit);
+  EXPECT_TRUE(r.cu->has_cu_timeprecision);
+}
+
 }  // namespace
