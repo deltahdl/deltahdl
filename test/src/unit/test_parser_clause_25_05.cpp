@@ -184,4 +184,19 @@ TEST(InterfaceModport, MasterSlaveDirections) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[1]->name, "slave");
 }
 
+TEST(InterfaceModport, DirectionalPorts) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  logic a, b, c;\n"
+      "  modport mp(input a, b, output c);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 3u);
+  EXPECT_EQ(mp->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[1].direction, Direction::kInput);
+  EXPECT_EQ(mp->ports[2].direction, Direction::kOutput);
+}
+
 }  // namespace
