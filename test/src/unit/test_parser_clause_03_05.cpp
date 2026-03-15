@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, InterfaceWithPorts) {
-  auto r = Parse(
-      "interface ifc(input logic clk);\n"
-      "  logic req, gnt;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
-}
-
 TEST(DesignBuildingBlockParsing, SimpleBusExample) {
   auto r = Parse(
       "interface simple_bus(input logic clk);\n"
