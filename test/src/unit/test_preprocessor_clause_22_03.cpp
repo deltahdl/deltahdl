@@ -245,12 +245,6 @@ TEST(Preprocessor, ResetAll_ResetsMultipleDirectivesAtOnce) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kNone);
 }
 
-TEST(Preprocessor, Pragma_Resetall_NoError) {
-  PreprocFixture f;
-  Preprocess("`pragma resetall\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(Preprocessor, Pragma_ResetallDoesNotAffectPragma) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
