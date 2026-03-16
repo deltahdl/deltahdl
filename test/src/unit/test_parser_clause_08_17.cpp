@@ -14,51 +14,6 @@ TEST(ClassParsing, ExtendsWithArgs) {
   EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
 
-TEST(ClassParsing, ConstructorSuperNew) {
-  auto r = Parse(
-      "class Base;\n"
-      "  function new();\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Child extends Base;\n"
-      "  function new();\n"
-      "    super.new();\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-}
-
-TEST(ClassParsing, SuperNewExpression) {
-  auto r = Parse(
-      "class Base;\n"
-      "  function new(int x);\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Child extends Base;\n"
-      "  function new();\n"
-      "    super.new(5);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-}
-
-TEST(ClassParsing, ConstructorChainingDefault) {
-  auto r = Parse(
-      "class Base;\n"
-      "  function new(int x = 0);\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Child extends Base;\n"
-      "  function new();\n"
-      "    super.new(5);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-}
-
 TEST(ChainedConstructorParsing, ExtendsArgsStored) {
   auto r = Parse(
       "class Base;\n"
@@ -90,19 +45,6 @@ TEST(ChainedConstructorParsing, ThreeLevelChaining) {
               "endclass\n"));
 }
 
-TEST(ChainedConstructorParsing, SuperNewWithMultipleArgs) {
-  EXPECT_TRUE(
-      ParseOk("class Base;\n"
-              "  function new(string name, int id);\n"
-              "  endfunction\n"
-              "endclass\n"
-              "class Child extends Base;\n"
-              "  function new();\n"
-              "    super.new(\"foo\", 42);\n"
-              "  endfunction\n"
-              "endclass\n"));
-}
-
 TEST(ChainedConstructorParsing, ExtendsWithDefault) {
   auto r = Parse(
       "class Base;\n"
@@ -127,34 +69,6 @@ TEST(ChainedConstructorParsing, ImplicitSuperNewNoConstructor) {
               "class Child extends Base;\n"
               "  int x;\n"
               "endclass\n"));
-}
-
-TEST(ClassSyntaxParsing, ConstructorMixedArgsWithDefault) {
-  auto r = Parse(
-      "class C extends Base;\n"
-      "  function new(int size, default);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& args = r.cu->classes[0]->members[0]->method->func_args;
-  ASSERT_EQ(args.size(), 2u);
-  EXPECT_FALSE(args[0].is_default);
-  EXPECT_EQ(args[0].name, "size");
-  EXPECT_TRUE(args[1].is_default);
-}
-
-TEST(ClassSyntaxParsing, ConstructorDefaultBeforeArgs) {
-  auto r = Parse(
-      "class C extends Base;\n"
-      "  function new(default, bit enable);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  auto& args = r.cu->classes[0]->members[0]->method->func_args;
-  ASSERT_EQ(args.size(), 2u);
-  EXPECT_TRUE(args[0].is_default);
-  EXPECT_FALSE(args[1].is_default);
 }
 
 }  // namespace

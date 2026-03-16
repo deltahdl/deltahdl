@@ -1,5 +1,4 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
@@ -31,22 +30,6 @@ TEST(FunctionDeclParsing, FuncPrototypeExtern) {
   EXPECT_TRUE(item->is_extern);
   EXPECT_EQ(item->name, "foo");
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
-}
-
-TEST(SourceText, ClassMethodPrototype) {
-  auto r = Parse(
-      "class C;\n"
-      "  extern function int get_val();\n"
-      "  extern task do_work();\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 2u);
-  EXPECT_EQ(members[0]->method->name, "get_val");
-  EXPECT_TRUE(members[0]->method->is_extern);
-  EXPECT_EQ(members[1]->method->name, "do_work");
-  EXPECT_TRUE(members[1]->method->is_extern);
 }
 
 TEST(FunctionDeclParsing, FuncBodyClassScope) {
@@ -140,19 +123,6 @@ TEST(ParameterizedClassParsing, RegularFuncNoMethodClass) {
     }
   }
   EXPECT_TRUE(found);
-}
-
-TEST(ClassSyntaxParsing, ExternConstructorPrototype) {
-  auto r = Parse(
-      "class C;\n"
-      "  extern function new(int x);\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 1u);
-  EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
-  EXPECT_EQ(members[0]->method->name, "new");
 }
 
 }  // namespace

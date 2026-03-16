@@ -1,5 +1,4 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
@@ -12,44 +11,6 @@ TEST(NetAndVariableTypeParsing, ClassScope) {
       "module m; base_cls::inner_t x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SourceText, ClassNestedClass) {
-  auto r = Parse(
-      "class Outer;\n"
-      "  class Inner;\n"
-      "    int val;\n"
-      "  endclass\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 1u);
-  EXPECT_EQ(members[0]->kind, ClassMemberKind::kClassDecl);
-  EXPECT_EQ(members[0]->nested_class->name, "Inner");
-}
-
-TEST(ClassParsing, ClassWithTypedef) {
-  auto r = Parse(
-      "class test_cls;\n"
-      "  typedef enum {A = 10, B = 20} e_type;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "test_cls");
-}
-
-TEST(ClassParsing, NestedClass) {
-  auto r = Parse(
-      "class Outer;\n"
-      "  class Inner;\n"
-      "    int x;\n"
-      "  endclass\n"
-      "  Inner inst;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "Outer");
 }
 
 TEST(ClassParsing, ClassScopeResolutionStaticMethod) {

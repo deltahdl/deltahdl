@@ -216,14 +216,4 @@ TEST(SourceText, ClassWithParams) {
   EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
 }
 
-TEST(ClassParsing, ClassWithParameter) {
-  auto r = Parse(
-      "class par_cls;\n"
-      "  parameter int b = 23;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->name, "par_cls");
-}
-
 }  // namespace

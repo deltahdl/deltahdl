@@ -453,6 +453,8 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
 }
 
 void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
+  // §A.1.9: class_item ::= { attribute_instance } class_property | ...
+  ParseAttributes();
   auto* member = arena_.Create<ClassMember>();
   member->loc = CurrentLoc();
   bool proto = ParseClassQualifiers(member);

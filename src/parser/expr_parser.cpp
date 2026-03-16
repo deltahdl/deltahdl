@@ -634,6 +634,16 @@ void Parser::ParseTrailingNamedArgs(Expr* call) {
 
 // Parse positional args, then optional named args: expr {, expr} {, .name(e)}
 void Parser::ParseCallArgs(Expr* call) {
+  // §A.1.9: super.new( [list_of_arguments | default] )
+  if (Check(TokenKind::kKwDefault)) {
+    auto tok = Consume();
+    auto* expr = arena_.Create<Expr>();
+    expr->kind = ExprKind::kIdentifier;
+    expr->text = tok.text;
+    expr->range.start = tok.loc;
+    call->args.push_back(expr);
+    return;
+  }
   call->args.push_back(ParseExpr());
   while (Match(TokenKind::kComma)) {
     if (Check(TokenKind::kDot)) {

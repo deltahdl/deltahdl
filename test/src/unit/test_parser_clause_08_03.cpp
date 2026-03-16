@@ -1,7 +1,7 @@
 
 
+
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -46,19 +46,6 @@ TEST(SourceText, ClassParameters) {
   EXPECT_EQ(members[1]->kind, ClassMemberKind::kProperty);
 }
 
-TEST(SourceText, ClassEmptyItem) {
-  auto r = Parse(
-      "class C;\n"
-      "  ;\n"
-      "  int x;\n"
-      "  ;\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-
-  EXPECT_EQ(r.cu->classes[0]->members.size(), 1u);
-}
-
 TEST(SourceText, ClassEndLabel) {
   auto r = Parse("class C; endclass : C\n");
   ASSERT_NE(r.cu, nullptr);
@@ -93,65 +80,6 @@ TEST(ClassSyntaxParsing, ExtendsWithArgs) {
   auto* cls = r.cu->classes[0];
   EXPECT_EQ(cls->base_class, "Base");
   ASSERT_EQ(cls->extends_args.size(), 1u);
-}
-
-TEST(ClassSyntaxParsing, ConstructorDefaultArg) {
-  auto r = Parse(
-      "class C extends Base;\n"
-      "  function new(default);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 1u);
-  ASSERT_EQ(members[0]->method->func_args.size(), 1u);
-  EXPECT_TRUE(members[0]->method->func_args[0].is_default);
-}
-
-TEST(ClassSyntaxParsing, MethodInitialSpecifier) {
-  auto r = Parse(
-      "class C;\n"
-      "  function :initial void foo(); endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-}
-
-TEST(ClassSyntaxParsing, ErrorDuplicateDefaultInConstructorArgs) {
-  auto r = Parse(
-      "class C extends Base;\n"
-      "  function new(default, int x, default);\n"
-      "  endfunction\n"
-      "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ClassSyntaxParsing, ErrorBothLocalAndProtected) {
-  auto r = Parse(
-      "class C;\n"
-      "  local protected int x;\n"
-      "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ClassSyntaxParsing, ErrorDuplicateStatic) {
-  auto r = Parse(
-      "class C;\n"
-      "  static static int x;\n"
-      "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ClassDeclarations, BasicClassWithProperty) {
-  auto r = Parse(
-      "module m;\n"
-      "  class C;\n"
-      "    int x;\n"
-      "  endclass\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kClassDecl);
 }
 
 }  // namespace

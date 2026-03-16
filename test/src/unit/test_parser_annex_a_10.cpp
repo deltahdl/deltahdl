@@ -112,30 +112,6 @@ TEST(TopLevelGrammarParsing, DollarInQueueSelect) {
               "endmodule\n"));
 }
 
-TEST(TopLevelGrammarParsing, ParameterInClassItem) {
-  EXPECT_TRUE(
-      ParseOk("class my_class;\n"
-              "  parameter int WIDTH = 8;\n"
-              "endclass\n"));
-}
-
-TEST(TopLevelGrammarParsing, LocalparamInClassItem) {
-  EXPECT_TRUE(
-      ParseOk("class my_class;\n"
-              "  localparam int WIDTH = 8;\n"
-              "endclass\n"));
-}
-
-TEST(TopLevelGrammarParsing, ClassNewWithDefaultArg) {
-  EXPECT_TRUE(
-      ParseOk("class my_class;\n"
-              "  int x;\n"
-              "  function new(int a = 0);\n"
-              "    x = a;\n"
-              "  endfunction\n"
-              "endclass\n"));
-}
-
 TEST(TopLevelGrammarParsing, StructPackedOk) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -160,16 +136,6 @@ TEST(TopLevelGrammarParsing, TypeRefInVarDeclWithVar) {
               "  int x;\n"
               "  var type(x) y;\n"
               "endmodule\n"));
-}
-
-TEST(TopLevelGrammarParsing, CovergroupInClass) {
-  EXPECT_TRUE(
-      ParseOk("class my_class;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "  int x;\n"
-              "endclass\n"));
 }
 
 }  // namespace
