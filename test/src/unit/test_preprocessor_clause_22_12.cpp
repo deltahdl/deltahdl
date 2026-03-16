@@ -229,3 +229,39 @@ TEST(Preprocessor, Line_TrailingWhitespaceAfterLevel_NoError) {
   Preprocess("`line 1 \"test.sv\" 0   \n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
+
+TEST(Preprocessor, Line_BetweenModules_NoInterference) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "module m1;\nendmodule\n"
+      "`line 50 \"mid.sv\" 0\n"
+      "module m2;\nendmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("module m1;"), std::string::npos);
+  EXPECT_NE(out.find("module m2;"), std::string::npos);
+}
+
+TEST(Preprocessor, Line_IncrementAcrossMultipleLines) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`line 10 \"f.sv\" 0\n"
+      "first\n"
+      "second\n"
+      "`__LINE__\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("12"), std::string::npos);
+}
+
+TEST(Preprocessor, Line_FileOverridePersistsAcrossLines) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`line 1 \"persistent.sv\" 0\n"
+      "wire a;\n"
+      "wire b;\n"
+      "`__FILE__\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("persistent.sv"), std::string::npos);
+}
