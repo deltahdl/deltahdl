@@ -85,6 +85,29 @@ TEST(Preprocessor, UndefFunctionLikeMacro) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(result.find("visible"), std::string::npos);
 }
+TEST(Preprocessor, UndefTwiceNoError) {
+  PreprocFixture f;
+  Preprocess(
+      "`define FOO 1\n"
+      "`undef FOO\n"
+      "`undef FOO\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, UndefMacroThenUseHasNoValue) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define FOO 42\n"
+      "`undef FOO\n"
+      "`ifndef FOO\n"
+      "fallback\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("fallback"), std::string::npos);
+}
+
 TEST(DesignElementPreprocessing, UndefThenIfdefExcludesDesignElement) {
   PreprocFixture f;
   auto result = Preprocess(
