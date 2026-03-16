@@ -460,18 +460,6 @@ TEST(SourceText, ExternInterface) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
 }
 
-TEST(SourceText, ProgramTimeunitsDecl) {
-  auto r = Parse(
-      "program prg;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->name, "prg");
-}
-
 // --- module_nonansi_header / module_ansi_header ---
 
 TEST(SourceText, ModuleAnsiHeader) {

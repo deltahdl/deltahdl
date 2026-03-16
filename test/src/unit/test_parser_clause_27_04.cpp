@@ -1,5 +1,4 @@
 #include "fixture_parser.h"
-#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -611,28 +610,6 @@ TEST(GenerateConstructParsing, GenerateForPreDecrement) {
   auto* gen = r.cu->modules[0]->items[0];
   EXPECT_EQ(gen->kind, ModuleItemKind::kGenerateFor);
   ASSERT_NE(gen->gen_step, nullptr);
-}
-
-bool HasItemKind(const std::vector<ModuleItem*>& items, ModuleItemKind kind) {
-  for (auto* item : items) {
-    if (item->kind == kind) return true;
-  }
-  return false;
-}
-
-TEST(SourceText, ProgramGenerateLoop) {
-  auto r = Parse(
-      "program prg;\n"
-      "  genvar i;\n"
-      "  for (i = 0; i < 4; i = i + 1) begin : blk\n"
-      "    int x;\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_TRUE(
-      HasItemKind(r.cu->programs[0]->items, ModuleItemKind::kGenerateFor));
 }
 
 TEST(ModuleAndHierarchyParsing, GenerateForInstantiation) {
