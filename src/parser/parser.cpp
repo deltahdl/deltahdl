@@ -62,7 +62,8 @@ void Parser::Synchronize() {
     }
     if (Check(TokenKind::kKwEndmodule) || Check(TokenKind::kKwEndpackage) ||
         Check(TokenKind::kKwEndinterface) || Check(TokenKind::kKwEndprogram) ||
-        Check(TokenKind::kKwEndclass) || Check(TokenKind::kKwEnd)) {
+        Check(TokenKind::kKwEndchecker) || Check(TokenKind::kKwEndclass) ||
+        Check(TokenKind::kKwEnd)) {
       return;
     }
     Consume();

@@ -18,6 +18,7 @@ ModuleDecl* Parser::ParseCheckerDecl() {
   auto* prev_module = current_module_;
   current_module_ = decl;
   while (!Check(TokenKind::kKwEndchecker) && !AtEnd()) {
+    if (Match(TokenKind::kSemicolon)) continue;  // null item (A.1.8)
     ParseModuleItem(decl->items);
   }
   current_module_ = prev_module;
