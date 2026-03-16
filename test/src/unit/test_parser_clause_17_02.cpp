@@ -263,14 +263,6 @@ TEST(SourceText, CheckerMultipleItemTypes) {
   EXPECT_TRUE(HasItemKind(chk->items, ModuleItemKind::kElabSystemTask));
 }
 
-TEST(SourceText, DescriptionChecker) {
-  auto r = Parse("checker chk; endchecker\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
-}
-
 TEST(FormalSyntaxParsing, CheckerDecl) {
   auto r = Parse("checker chk; endchecker\n");
   ASSERT_NE(r.cu, nullptr);

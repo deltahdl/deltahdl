@@ -5,17 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SourceText, InterfaceNonAnsiHeader) {
-  auto r = Parse(
-      "interface ifc(clk);\n"
-      "  input clk;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
-}
-
 TEST(InterfaceInstantiationGrammar, BasicInterfaceInst) {
   auto r = Parse("module m; my_if u0(.a(a), .b(b)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -150,23 +139,6 @@ TEST(SourceText, NonPortInterfaceItemTimeunits) {
       "endinterface\n");
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
-}
-
-TEST(SourceText, ExternInterface) {
-  auto r = Parse("extern interface ifc(input logic clk);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_TRUE(r.cu->interfaces[0]->is_extern);
-  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
-}
-
-TEST(SourceText, InterfaceAnsiHeader) {
-  auto r = Parse("interface ifc(input logic clk); endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
 }
 
 TEST(SourceText, InterfaceParamsAndPorts) {

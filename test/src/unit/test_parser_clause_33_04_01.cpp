@@ -121,18 +121,6 @@ TEST(SourceText, ConfigMultipleRules) {
   EXPECT_EQ(c->rules[2]->kind, ConfigRuleKind::kCell);
 }
 
-TEST(SourceText, DescriptionConfig) {
-  auto r = Parse(
-      "config cfg;\n"
-      "  design work.top;\n"
-      "  default liblist work;\n"
-      "endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->configs.size(), 1u);
-  EXPECT_EQ(r.cu->configs[0]->name, "cfg");
-}
-
 TEST(SourceText, ConfigDeclEndLabel) {
   auto r = Parse(
       "config cfg2;\n"

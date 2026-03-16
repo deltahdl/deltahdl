@@ -27,7 +27,7 @@ TEST(SourceText, MultipleDescriptions) {
   EXPECT_EQ(r.cu->packages.size(), 1u);
 }
 
-TEST(FormalSyntaxParsing, ModuleDecl) {
+TEST(SourceText, ModuleDecl) {
   auto r = ParseWithPreprocessor("module m; endmodule");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
