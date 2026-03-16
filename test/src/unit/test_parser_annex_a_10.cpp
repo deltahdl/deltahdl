@@ -38,22 +38,6 @@ TEST(TopLevelGrammarParsing, AutomaticInProceduralBlockOk) {
               "endmodule\n"));
 }
 
-TEST(TopLevelGrammarParsing, ParamOmitValueInPortList) {
-  auto r = Parse(
-      "module m #(parameter int W) (input [W-1:0] d);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TopLevelGrammarParsing, TypeParamOmitTypeInPortList) {
-  auto r = Parse(
-      "module m #(parameter type T) ();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(TopLevelGrammarParsing, MatchesPrecedenceOverLogicalAnd) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

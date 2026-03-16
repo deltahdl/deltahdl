@@ -400,6 +400,8 @@ struct PortDecl {
   std::string_view name;
   std::vector<Expr*> unpacked_dims;
   Expr* default_value = nullptr;
+  Expr* port_expr = nullptr;       // §A.1.3: port expression (.name(expr), {a,b}, a[3:0])
+  bool is_interface_port = false;  // §A.1.3: bare 'interface' keyword port header
   SourceLoc loc;
 };
 

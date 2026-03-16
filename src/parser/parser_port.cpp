@@ -227,10 +227,28 @@ void Parser::ParsePortList(ModuleDecl& mod) {
     Expect(TokenKind::kRParen);
     return;
   }
-  // Detect non-ANSI style: first token is an identifier (no direction).
-  if (CheckIdentifier()) {
+  // §A.1.3: Non-ANSI port list forms start with . or {.
+  if (Check(TokenKind::kDot) || Check(TokenKind::kLBrace)) {
     ParseNonAnsiPortList(mod);
     return;
+  }
+  // Detect non-ANSI style: first token is an identifier (no direction/type).
+  if (CheckIdentifier()) {
+    if (known_types_.count(CurrentToken().text) != 0) {
+      // Known type → ANSI (interface_port_header or typed port).
+    } else {
+      // Lookahead to distinguish non-ANSI port name from ANSI interface port.
+      auto saved = lexer_.SavePos();
+      Consume();
+      bool is_non_ansi = Check(TokenKind::kRParen) ||
+                          Check(TokenKind::kComma) ||
+                          Check(TokenKind::kLBracket);
+      lexer_.RestorePos(saved);
+      if (is_non_ansi) {
+        ParseNonAnsiPortList(mod);
+        return;
+      }
+    }
   }
   mod.ports.push_back(ParsePortDecl());
   while (Match(TokenKind::kComma)) {
@@ -240,11 +258,41 @@ void Parser::ParsePortList(ModuleDecl& mod) {
 }
 
 void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
-  // Non-ANSI: module m(a, b, c); -- just identifier names.
+  // §A.1.3 list_of_ports: port { , port }
   do {
     PortDecl port;
     port.loc = CurrentLoc();
-    port.name = ExpectIdentifier().text;
+    if (Match(TokenKind::kDot)) {
+      // §A.1.3 port: . port_identifier ( [ port_expression ] )
+      port.name = ExpectIdentifier().text;
+      Expect(TokenKind::kLParen);
+      if (!Check(TokenKind::kRParen)) {
+        port.port_expr = ParseExpr();
+      }
+      Expect(TokenKind::kRParen);
+    } else if (Check(TokenKind::kLBrace)) {
+      // §A.1.3 port_expression: { port_reference { , port_reference } }
+      port.port_expr = ParseExpr();
+    } else {
+      // §A.1.3 port_reference: port_identifier [ constant_select ]
+      port.name = ExpectIdentifier().text;
+      if (Check(TokenKind::kLBracket)) {
+        auto* ref = arena_.Create<Expr>();
+        ref->kind = ExprKind::kIdentifier;
+        ref->text = port.name;
+        Consume();
+        auto* idx = ParseExpr();
+        auto* sel = arena_.Create<Expr>();
+        sel->kind = ExprKind::kSelect;
+        sel->base = ref;
+        sel->index = idx;
+        if (Match(TokenKind::kColon)) {
+          sel->index_end = ParseExpr();
+        }
+        Expect(TokenKind::kRBracket);
+        port.port_expr = sel;
+      }
+    }
     mod.ports.push_back(port);
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kRParen);
@@ -258,6 +306,59 @@ PortDecl Parser::ParsePortDecl() {
   if (dir != Direction::kNone) {
     port.direction = dir;
     Consume();
+  }
+
+  // §A.1.3 ansi_port_declaration: [direction] . port_identifier ( [expression] )
+  if (Check(TokenKind::kDot)) {
+    Consume();
+    port.name = ExpectIdentifier().text;
+    Expect(TokenKind::kLParen);
+    if (!Check(TokenKind::kRParen)) {
+      port.port_expr = ParseExpr();
+    }
+    Expect(TokenKind::kRParen);
+    return port;
+  }
+
+  // §A.1.3 interface_port_header: interface [ . modport_identifier ] port_name
+  if (Check(TokenKind::kKwInterface)) {
+    Consume();
+    port.is_interface_port = true;
+    if (Match(TokenKind::kDot)) {
+      port.data_type.modport_name = ExpectIdentifier().text;
+    }
+    port.name = ExpectIdentifier().text;
+    ParseUnpackedDims(port.unpacked_dims);
+    if (Match(TokenKind::kEq)) {
+      port.default_value = ParseExpr();
+    }
+    return port;
+  }
+
+  // §A.1.3 interface_port_header: ident . modport_ident port_name
+  // Lookahead for unknown interface identifier followed by .modport pattern.
+  if (dir == Direction::kNone && CheckIdentifier() &&
+      known_types_.count(CurrentToken().text) == 0) {
+    auto saved = lexer_.SavePos();
+    auto id_tok = Consume();
+    if (Check(TokenKind::kDot)) {
+      Consume();
+      if (CheckIdentifier()) {
+        auto modport_tok = Consume();
+        if (CheckIdentifier()) {
+          port.data_type.kind = DataTypeKind::kNamed;
+          port.data_type.type_name = id_tok.text;
+          port.data_type.modport_name = modport_tok.text;
+          port.name = ExpectIdentifier().text;
+          ParseUnpackedDims(port.unpacked_dims);
+          if (Match(TokenKind::kEq)) {
+            port.default_value = ParseExpr();
+          }
+          return port;
+        }
+      }
+    }
+    lexer_.RestorePos(saved);
   }
 
   // A.2.1.2: variable_port_type ::= var_data_type
@@ -274,6 +375,12 @@ PortDecl Parser::ParsePortDecl() {
     }
   } else {
     port.data_type = ParseDataType();
+  }
+
+  // §A.1.3 interface_port_header: known_type . modport_identifier
+  if (port.data_type.kind == DataTypeKind::kNamed && Check(TokenKind::kDot)) {
+    Consume();
+    port.data_type.modport_name = ExpectIdentifier().text;
   }
 
   // Handle implicit type with packed dims: input [3:0] a (§6.10)
@@ -307,7 +414,12 @@ PortDecl Parser::ParsePortDecl() {
 
 static bool HasNonAnsiPorts(const ModuleDecl& mod) {
   if (mod.ports.empty()) return false;
-  return mod.ports[0].direction == Direction::kNone;
+  auto& first = mod.ports[0];
+  if (first.direction != Direction::kNone) return false;
+  // ANSI ports with interface_port_header or named type have kNone direction.
+  if (first.is_interface_port) return false;
+  if (first.data_type.kind != DataTypeKind::kImplicit) return false;
+  return true;
 }
 
 void Parser::ParseModuleBody(ModuleDecl& mod) {
