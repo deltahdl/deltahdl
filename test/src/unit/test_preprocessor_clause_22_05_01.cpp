@@ -654,3 +654,74 @@ TEST(DesignElementPreprocessing, MultipleMacrosExpandInSameDesignElement) {
   EXPECT_NE(result.find("8"), std::string::npos);
 }
 
+TEST(Preprocessor, EscapedIdentifierRequiresWhitespaceBeforeParen) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define \\escaped_mac (a) a+1\n"
+      "int x = `\\escaped_mac (5);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("5+1"), std::string::npos);
+}
+
+TEST(Preprocessor, RedefineWithDifferentArgCount) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(a) a\n"
+      "`define M(a,b) a+b\n"
+      "int x = `M(1,2);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("1+2"), std::string::npos);
+}
+
+TEST(Preprocessor, DirectivesInMacroTextIgnoredUntilUsed) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>",
+      "`define SET_NET `default_nettype none\n");
+  pp.Preprocess(fid);
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
+}
+
+TEST(Preprocessor, MacroDefaultWithNestedMacroAndArg) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define BASE 10\n"
+      "`define ADD(a, b=`BASE) (a+b)\n"
+      "int x = `ADD(5);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("(5+10)"), std::string::npos);
+}
+
+TEST(Preprocessor, TokenPasteCreatesIdentifier) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define JOIN(a, b) a``b\n"
+      "wire `JOIN(data, _bus);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("data_bus"), std::string::npos);
+}
+
+TEST(Preprocessor, EmptyDefaultExplicitlySpecified) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(a=, b=1) a b\n"
+      "int x = `M(,);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find(" 1"), std::string::npos);
+}
+
+TEST(Preprocessor, ObjectLikeMacroNoArgsExpands) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define ZERO 0\n"
+      "int x = `ZERO;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("int x = 0"), std::string::npos);
+}
+

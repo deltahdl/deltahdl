@@ -149,13 +149,31 @@ static bool EndsWithBackslash(std::string_view line) {
   return !line.empty() && line.back() == '\\';
 }
 
-// Count unmatched triple-quote sequences in text (ignoring inside comments).
+// Count unmatched triple-quote sequences in text, skipping backtick-prefixed
+// `""" sequences which are a distinct operator (§22.5.1).
 static bool HasOpenTripleQuote(std::string_view text) {
   int count = 0;
   for (size_t i = 0; i + 2 < text.size(); ++i) {
     if (text[i] == '"' && text[i + 1] == '"' && text[i + 2] == '"') {
+      if (i > 0 && text[i - 1] == '`') {
+        i += 2;
+        continue;
+      }
       ++count;
       i += 2;
+    }
+  }
+  return count % 2 != 0;
+}
+
+// §22.5.1: Count unmatched backtick-triple-quote (`""") sequences.
+static bool HasOpenBacktickTripleQuote(std::string_view text) {
+  int count = 0;
+  for (size_t i = 0; i + 3 < text.size(); ++i) {
+    if (text[i] == '`' && text[i + 1] == '"' && text[i + 2] == '"' &&
+        text[i + 3] == '"') {
+      ++count;
+      i += 3;
     }
   }
   return count % 2 != 0;
@@ -233,6 +251,11 @@ static std::string JoinDefineBody(std::string_view src, size_t pos, size_t& eol,
     ++line_num;
     eol = next_eol;
     first_line = next_line;  // For next backslash check.
+    // §22.5.1: Inside `""", backslash-newline preserves the newline
+    // (only the backslash is removed).
+    if (HasOpenBacktickTripleQuote(joined)) {
+      joined += '\n';
+    }
     if (EndsWithBackslash(next_line)) {
       joined.append(next_line.substr(0, next_line.size() - 1));
     } else {
