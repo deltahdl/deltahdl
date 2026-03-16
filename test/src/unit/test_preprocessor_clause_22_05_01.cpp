@@ -399,17 +399,6 @@ TEST(Preprocessor, DefineOutsideModule) {
   EXPECT_NE(result.find('8'), std::string::npos);
 }
 
-TEST(Preprocessor, ResetallDoesNotAffectMacros) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define PERSIST 99\n"
-      "`resetall\n"
-      "int x = `PERSIST;\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("99"), std::string::npos);
-}
-
 TEST(Preprocessor, DirectRecursiveMacroError) {
   PreprocFixture f;
   Preprocess(

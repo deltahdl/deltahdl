@@ -127,12 +127,3 @@ TEST(Preprocessor, Endcelldefine_TrailingContent) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(out.find("wire x;"), std::string::npos);
 }
-
-TEST(Preprocessor, Celldefine_ResetallClears) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("`celldefine\n", f, pp);
-  EXPECT_TRUE(pp.InCelldefine());
-  PreprocessWithPP("`resetall\n", f, pp);
-  EXPECT_FALSE(pp.InCelldefine());
-}

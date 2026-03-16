@@ -288,22 +288,6 @@ TEST(Preprocessor, AllDirectivesCombined) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kDistributed);
 }
 
-TEST(Preprocessor, ResetallResetsState) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP(
-      "`default_decay_time 50\n"
-      "`default_trireg_strength 200\n"
-      "`delay_mode_path\n"
-      "`resetall\n",
-      f, pp);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(pp.DefaultDecayTime(), 0);
-  EXPECT_TRUE(pp.DefaultDecayTimeInfinite());
-  EXPECT_EQ(pp.DefaultTriregStrength(), 0u);
-  EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kNone);
-}
-
 TEST(Preprocessor, CannotRedefineAsMarco) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});

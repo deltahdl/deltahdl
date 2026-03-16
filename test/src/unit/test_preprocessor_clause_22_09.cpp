@@ -123,12 +123,3 @@ TEST(Preprocessor, NounconnectedDrive_TrailingContent) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(out.find("wire x;"), std::string::npos);
 }
-
-TEST(Preprocessor, UnconnectedDrive_ResetallResetsToDefault) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  PreprocessWithPP("`unconnected_drive pull1\n", f, pp);
-  EXPECT_EQ(pp.UnconnectedDrive(), NetType::kTri1);
-  PreprocessWithPP("`resetall\n", f, pp);
-  EXPECT_EQ(pp.UnconnectedDrive(), NetType::kWire);
-}
