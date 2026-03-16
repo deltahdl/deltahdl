@@ -77,6 +77,9 @@ class Elaborator {
   /// Elaborate a module instantiation (resolve child, bind ports).
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
 
+  /// Create a pull0/pull1 constant expression for §22.9.
+  Expr* MakePullExpr(NetType drive);
+
   /// Bind instance ports to continuous assignments.
   void BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                  RtlirModule* parent_mod);

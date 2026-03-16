@@ -963,7 +963,8 @@ struct CompilationUnit {
   std::vector<IncludeStmt*> lib_includes;       // include statements (A.1.1)
   std::vector<BindDirective*> bind_directives;  // bind directives (§23.11)
   std::vector<ModuleItem*> cu_items;  // top-level functions/tasks (§3.12.1)
-  NetType default_nettype = NetType::kWire;  // §6.10/§22.8
+  NetType default_nettype = NetType::kWire;   // §6.10/§22.8
+  NetType unconnected_drive = NetType::kWire;  // §22.9 (kWire = no override)
 
   // §E.2: default decay time for trireg nets without explicit decay.
   uint64_t default_decay_time = 0;

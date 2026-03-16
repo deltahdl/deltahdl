@@ -328,6 +328,7 @@ std::string ReadFile(const std::string& path) {
 struct PreprocResult {
   std::string source;
   delta::NetType default_nettype = delta::NetType::kWire;
+  delta::NetType unconnected_drive = delta::NetType::kWire;
   // §E.2
   uint64_t default_decay_time = 0;
   double default_decay_time_real = 0.0;
@@ -358,6 +359,7 @@ PreprocResult PreprocessSources(const CliOptions& opts,
     result.source += preproc.Preprocess(file_id);
   }
   result.default_nettype = preproc.DefaultNetType();
+  result.unconnected_drive = preproc.UnconnectedDrive();
   result.default_decay_time = preproc.DefaultDecayTime();
   result.default_decay_time_real = preproc.DefaultDecayTimeReal();
   result.default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
@@ -520,6 +522,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   cu->default_nettype = pp.default_nettype;
+  cu->unconnected_drive = pp.unconnected_drive;
   cu->default_decay_time = pp.default_decay_time;
   cu->default_decay_time_real = pp.default_decay_time_real;
   cu->default_decay_time_infinite = pp.default_decay_time_infinite;

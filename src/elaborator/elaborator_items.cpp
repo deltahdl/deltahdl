@@ -370,12 +370,20 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   mod->children.push_back(inst);
 }
 
+Expr* Elaborator::MakePullExpr(NetType drive) {
+  auto* expr = arena_.Create<Expr>();
+  expr->kind = ExprKind::kIntegerLiteral;
+  expr->int_val = (drive == NetType::kTri1) ? 1 : 0;
+  return expr;
+}
+
 void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                            RtlirModule* parent_mod) {
   if (!inst.resolved) return;
   const auto& child_ports = inst.resolved->ports;
+  const bool has_pull = unit_->unconnected_drive != NetType::kWire;
 
-  for (const auto& [port_name, conn_expr] : item->inst_ports) {
+  for (auto& [port_name, conn_expr] : item->inst_ports) {
     // §6.10: Create implicit nets for undeclared identifiers in connections.
     if (conn_expr && conn_expr->kind == ExprKind::kIdentifier) {
       MaybeCreateImplicitNet(conn_expr->text, item->loc, parent_mod);
@@ -396,7 +404,35 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       binding.direction = it->direction;
       binding.width = it->width;
     }
+
+    // §22.9: Pull unconnected input ports.
+    if (has_pull && !binding.connection &&
+        binding.direction == Direction::kInput) {
+      binding.connection = MakePullExpr(unit_->unconnected_drive);
+    }
+
     inst.port_bindings.push_back(binding);
+  }
+
+  // §22.9: Add pull bindings for input ports not mentioned in the connection.
+  if (has_pull) {
+    for (const auto& port : child_ports) {
+      if (port.direction != Direction::kInput) continue;
+      bool connected = false;
+      for (const auto& [pname, _] : item->inst_ports) {
+        if (pname == port.name) {
+          connected = true;
+          break;
+        }
+      }
+      if (connected) continue;
+      RtlirPortBinding binding;
+      binding.port_name = port.name;
+      binding.direction = port.direction;
+      binding.width = port.width;
+      binding.connection = MakePullExpr(unit_->unconnected_drive);
+      inst.port_bindings.push_back(binding);
+    }
   }
 }
 

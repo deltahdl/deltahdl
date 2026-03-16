@@ -42,6 +42,7 @@ inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
   auto* cu = parser.Parse();
   // Propagate preprocessor state to CompilationUnit.
   cu->default_nettype = preproc.DefaultNetType();
+  cu->unconnected_drive = preproc.UnconnectedDrive();
   cu->default_decay_time = preproc.DefaultDecayTime();
   cu->default_decay_time_real = preproc.DefaultDecayTimeReal();
   cu->default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();

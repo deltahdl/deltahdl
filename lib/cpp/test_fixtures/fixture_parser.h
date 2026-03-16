@@ -78,6 +78,7 @@ inline ParseResult ParseWithPreprocessor(const std::string& src) {
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
   result.cu->default_nettype = preproc.DefaultNetType();
+  result.cu->unconnected_drive = preproc.UnconnectedDrive();
   result.cu->default_decay_time = preproc.DefaultDecayTime();
   result.cu->default_decay_time_real = preproc.DefaultDecayTimeReal();
   result.cu->default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
