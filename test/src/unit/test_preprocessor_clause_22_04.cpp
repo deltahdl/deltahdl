@@ -431,3 +431,65 @@ TEST(Preprocessor, Include_ResetallInIncludedFile) {
 
   EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
 }
+
+TEST(Preprocessor, Include_GuardPreventsDoubleInclusion) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("guarded.svh",
+                "`ifndef GUARDED_SVH\n"
+                "`define GUARDED_SVH\n"
+                "wire guarded;\n"
+                "`endif\n");
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "`include \"guarded.svh\"\n"
+                           "`include \"guarded.svh\"\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto first = result.find("wire guarded;");
+  EXPECT_NE(first, std::string::npos);
+  EXPECT_EQ(result.find("wire guarded;", first + 1), std::string::npos);
+}
+
+TEST(Preprocessor, Include_MultipleSequentialIncludes) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("a.svh", "wire a;\n");
+  tmp.WriteFile("b.svh", "wire b;\n");
+  tmp.WriteFile("c.svh", "wire c;\n");
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "`include \"a.svh\"\n"
+                           "`include \"b.svh\"\n"
+                           "`include \"c.svh\"\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("wire a;"), std::string::npos);
+  EXPECT_NE(result.find("wire b;"), std::string::npos);
+  EXPECT_NE(result.find("wire c;"), std::string::npos);
+}
+
+TEST(Preprocessor, Include_BothFormsInSameFile) {
+  IncludeTestDir tmp;
+  auto lib = tmp.dir / "lib";
+  fs::create_directories(lib);
+  tmp.WriteFile("local.svh", "wire local_w;\n");
+  tmp.WriteFile("lib/system.svh", "wire system_w;\n");
+
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back(lib.string());
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "`include \"local.svh\"\n"
+                           "`include <system.svh>\n");
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  auto result = pp.Preprocess(fid);
+
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("wire local_w;"), std::string::npos);
+  EXPECT_NE(result.find("wire system_w;"), std::string::npos);
+}
