@@ -233,6 +233,16 @@ def test_main_closes_clause_issue(ic, monkeypatch, clause_argv) -> None:
     assert mock_close.called
 
 
+def _stub_main_deps(monkeypatch, ic):
+    """Stub issue-creation, body-update, invoke, close, and time."""
+    monkeypatch.setattr(ic, "create_issue", MagicMock(return_value=50))
+    monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: "")
+    monkeypatch.setattr(ic, "update_issue_body", MagicMock())
+    monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
+    monkeypatch.setattr(ic, "close_issue", MagicMock())
+    monkeypatch.setattr(ic, "time", MagicMock())
+
+
 def test_main_annex(ic, monkeypatch, tmp_path) -> None:
     """Annex flag passes the letter to discover_subclauses."""
     lrm = tmp_path / "lrm.pdf"
@@ -243,12 +253,7 @@ def test_main_annex(ic, monkeypatch, tmp_path) -> None:
     ]
     mock_ds = MagicMock(return_value={"A.1": "General"})
     monkeypatch.setattr(ic, "discover_subclauses", mock_ds)
-    monkeypatch.setattr(ic, "create_issue", MagicMock(return_value=50))
-    monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: "")
-    monkeypatch.setattr(ic, "update_issue_body", MagicMock())
-    monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
-    monkeypatch.setattr(ic, "close_issue", MagicMock())
-    monkeypatch.setattr(ic, "time", MagicMock())
+    _stub_main_deps(monkeypatch, ic)
     ic.main(argv)
     assert mock_ds.call_args[0][1] == "A"
 
@@ -350,12 +355,7 @@ def test_main_discovers_when_issue_has_empty_body(
     """main() runs discovery when --issue body is empty."""
     mock_ds = MagicMock(return_value={"4.1": "General"})
     monkeypatch.setattr(ic, "discover_subclauses", mock_ds)
-    monkeypatch.setattr(ic, "fetch_issue_body", lambda *_a: "")
-    monkeypatch.setattr(ic, "create_issue", MagicMock(return_value=50))
-    monkeypatch.setattr(ic, "update_issue_body", MagicMock())
-    monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
-    monkeypatch.setattr(ic, "close_issue", MagicMock())
-    monkeypatch.setattr(ic, "time", MagicMock())
+    _stub_main_deps(monkeypatch, ic)
     ic.main(clause_argv)
     assert mock_ds.called
 
@@ -372,11 +372,8 @@ def test_main_discovers_when_issue_has_partial_refs(
         ic, "fetch_issue_title",
         lambda _o, _r, _i: "Ensure IEEE 1800-2023 §4.1 ...",
     )
+    _stub_main_deps(monkeypatch, ic)
     monkeypatch.setattr(ic, "create_issue", MagicMock(return_value=101))
-    monkeypatch.setattr(ic, "update_issue_body", MagicMock())
-    monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
-    monkeypatch.setattr(ic, "close_issue", MagicMock())
-    monkeypatch.setattr(ic, "time", MagicMock())
     ic.main(clause_argv)
     assert mock_ds.called
 
