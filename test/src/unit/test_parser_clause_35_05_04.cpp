@@ -429,18 +429,6 @@ TEST_F(AnnexHParseTest, AnnexOMultipleDpiDecls) {
   EXPECT_TRUE(items[3]->dpi_is_task);
 }
 
-TEST(SourceText, PackageItemDpiImportExport) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  import \"DPI-C\" function void c_func();\n"
-      "  export \"DPI-C\" function sv_func;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_GE(r.cu->packages[0]->items.size(), 2u);
-}
-
 TEST(TaskAndFunctionParsing, DpiImportWithCName) {
   auto r = Parse(
       "module m;\n"

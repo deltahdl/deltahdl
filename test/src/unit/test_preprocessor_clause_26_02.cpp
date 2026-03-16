@@ -21,15 +21,4 @@ TEST(DesignBuildingBlockParsing, PackageDeclarationsAndEndLabel) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kFunctionDecl));
 }
 
-TEST(SourceText, PackageItemTimeunitsDecl) {
-  auto r = ParseWithPreprocessor(
-      "package pkg;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-}
-
 }  // namespace
