@@ -9,6 +9,7 @@ import json
 import os
 import re
 import subprocess
+import time
 import sys
 from pathlib import Path
 
@@ -122,6 +123,7 @@ def _ensure_subclause_issues(
                 organization, repo, _issue_title(label), "",
             )
             all_issues.append(issue_num)
+            time.sleep(5)
     return all_issues
 
 

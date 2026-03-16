@@ -28,6 +28,7 @@ def _patch_main_with_subclauses(monkeypatch, ic, *, subclauses=None):
 
     mock_create = MagicMock(side_effect=lambda *_a, **_kw: next(_ISSUE_COUNTER))
     monkeypatch.setattr(ic, "create_issue", mock_create)
+    monkeypatch.setattr(ic, "time", MagicMock())
 
     mock_update = MagicMock()
     monkeypatch.setattr(ic, "update_issue_body", mock_update)
@@ -209,6 +210,7 @@ def _patch_main_with_issue(monkeypatch, ic):
         lambda _o, _r, i: f"Ensure IEEE 1800-2023 §4.{i - 99} ...",
     )
     monkeypatch.setattr(ic, "update_issue_body", MagicMock())
+    monkeypatch.setattr(ic, "time", MagicMock())
 
 
 def test_main_invokes_with_issue(ic, monkeypatch, clause_argv) -> None:
@@ -246,6 +248,7 @@ def test_main_annex(ic, monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(ic, "update_issue_body", MagicMock())
     monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
     monkeypatch.setattr(ic, "close_issue", MagicMock())
+    monkeypatch.setattr(ic, "time", MagicMock())
     ic.main(argv)
     assert mock_ds.call_args[0][1] == "A"
 
@@ -283,6 +286,7 @@ def test_ensure_skips_unrecognized_existing(ic, monkeypatch) -> None:
     )
     mock_create = MagicMock(return_value=11)
     monkeypatch.setattr(ic, "create_issue", mock_create)
+    monkeypatch.setattr(ic, "time", MagicMock())
     ensure("o", "r", {"4.1": "General"}, [10])
     assert mock_create.call_count == 1
 
@@ -292,8 +296,19 @@ def test_ensure_creates_all_when_no_existing(ic, monkeypatch) -> None:
     ensure = getattr(ic, "_ensure_subclause_issues")
     mock_create = MagicMock(side_effect=[10, 11])
     monkeypatch.setattr(ic, "create_issue", mock_create)
+    monkeypatch.setattr(ic, "time", MagicMock())
     ensure("o", "r", {"4.1": "General", "4.2": "Exec"}, [])
     assert mock_create.call_count == 2
+
+
+def test_ensure_sleeps_between_creations(ic, monkeypatch) -> None:
+    """Sleeps between issue creation calls to avoid rate limits."""
+    ensure = getattr(ic, "_ensure_subclause_issues")
+    monkeypatch.setattr(ic, "create_issue", MagicMock(side_effect=[10, 11]))
+    mock_time = MagicMock()
+    monkeypatch.setattr(ic, "time", mock_time)
+    ensure("o", "r", {"4.1": "General", "4.2": "Exec"}, [])
+    assert mock_time.sleep.call_count == 2
 
 
 def test_ensure_skips_existing(ic, monkeypatch) -> None:
@@ -305,6 +320,7 @@ def test_ensure_skips_existing(ic, monkeypatch) -> None:
     )
     mock_create = MagicMock(return_value=11)
     monkeypatch.setattr(ic, "create_issue", mock_create)
+    monkeypatch.setattr(ic, "time", MagicMock())
     ensure("o", "r", {"4.1": "General", "4.2": "Exec"}, [10])
     assert mock_create.call_count == 1
 
@@ -317,6 +333,7 @@ def test_ensure_returns_combined_list(ic, monkeypatch) -> None:
         lambda _o, _r, _i: "Ensure IEEE 1800-2023 §4.1 functionalities...",
     )
     monkeypatch.setattr(ic, "create_issue", MagicMock(return_value=11))
+    monkeypatch.setattr(ic, "time", MagicMock())
     result = ensure(
         "o", "r",
         {"4.1": "General", "4.2": "Exec"}, [10],
@@ -338,6 +355,7 @@ def test_main_discovers_when_issue_has_empty_body(
     monkeypatch.setattr(ic, "update_issue_body", MagicMock())
     monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
     monkeypatch.setattr(ic, "close_issue", MagicMock())
+    monkeypatch.setattr(ic, "time", MagicMock())
     ic.main(clause_argv)
     assert mock_ds.called
 
@@ -358,6 +376,7 @@ def test_main_discovers_when_issue_has_partial_refs(
     monkeypatch.setattr(ic, "update_issue_body", MagicMock())
     monkeypatch.setattr(ic, "invoke_implement_subclauses", MagicMock())
     monkeypatch.setattr(ic, "close_issue", MagicMock())
+    monkeypatch.setattr(ic, "time", MagicMock())
     ic.main(clause_argv)
     assert mock_ds.called
 
