@@ -1,5 +1,3 @@
-#include <algorithm>
-
 #include "parser/parser.h"
 
 namespace delta {
@@ -120,6 +118,8 @@ ConfigDecl* Parser::ParseConfigDecl() {
   // Design statement (required).
   if (Check(TokenKind::kKwDesign)) {
     ParseDesignStatement(decl);
+  } else if (!Check(TokenKind::kKwEndconfig) && !AtEnd()) {
+    diag_.Error(CurrentLoc(), "expected 'design' statement in config");
   }
 
   // Config rule statements.
