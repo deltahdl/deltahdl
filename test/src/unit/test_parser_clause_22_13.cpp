@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(CompilerDirectiveParsing, FileAndLineInErrorMessage) {
+TEST(FileAndLineMacroParsing, FileAndLineInErrorMessage) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module t;\n"
                               "  initial $display(\"Error at %s, line %d.\",\n"
@@ -13,7 +13,7 @@ TEST(CompilerDirectiveParsing, FileAndLineInErrorMessage) {
                               "endmodule\n"));
 }
 
-TEST(CompilerDirectiveParsing, LineDirectiveInAssignment) {
+TEST(FileAndLineMacroParsing, LineDirectiveInAssignment) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module t;\n"
                               "  integer line_num;\n"
@@ -21,21 +21,21 @@ TEST(CompilerDirectiveParsing, LineDirectiveInAssignment) {
                               "endmodule\n"));
 }
 
-TEST(CompilerDirectiveParsing, FileDirectiveInStringConcat) {
+TEST(FileAndLineMacroParsing, FileDirectiveInStringConcat) {
   EXPECT_TRUE(ParseWithPreprocessorOk(
       "module t;\n"
       "  initial $display(\"source: %s:%0d\", `__FILE__, `__LINE__);\n"
       "endmodule\n"));
 }
 
-TEST(CompilerDirectiveParsing, FileDirectiveInDisplay) {
+TEST(FileAndLineMacroParsing, FileDirectiveInDisplay) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module t;\n"
                               "  initial $display(\"File: %s\", `__FILE__);\n"
                               "endmodule\n"));
 }
 
-TEST(CompilerDirectiveParsing, LineDirectiveInDisplay) {
+TEST(FileAndLineMacroParsing, LineDirectiveInDisplay) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module t;\n"
                               "  initial $display(\"Line: %0d\", `__LINE__);\n"
