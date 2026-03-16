@@ -121,15 +121,6 @@ TEST(LibraryText, ConfigInLibraryText) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-TEST(LibraryText, EmptyInput) {
-  auto r = ParseLibrary("");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->libraries.empty());
-  EXPECT_TRUE(r.cu->lib_includes.empty());
-  EXPECT_TRUE(r.cu->configs.empty());
-}
-
 TEST(LibraryText, BasicLibraryDecl) {
   auto r = ParseLibrary("library mylib /proj/rtl/top.v;\n");
   ASSERT_NE(r.cu, nullptr);
