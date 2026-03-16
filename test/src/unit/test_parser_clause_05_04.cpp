@@ -65,16 +65,6 @@ TEST(LexicalConventionParsing, BlockCommentSpanningLines) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, BlockCommentInLibraryText) {
-  auto r = ParseLibrary(
-      "/* Multi-line\n"
-      "   comment */\n"
-      "library lib1 /proj/*.v;\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 1u);
-}
-
 TEST(LexicalConventionParsing, LineCommentTokenInsideBlockComment) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

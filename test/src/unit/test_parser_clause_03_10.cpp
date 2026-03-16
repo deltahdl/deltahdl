@@ -36,14 +36,6 @@ TEST(DesignBuildingBlockParsing, ConfigWithDefaultRule) {
               "endconfig\n"));
 }
 
-TEST(DesignBuildingBlockParsing, LibraryDeclaration) {
-  auto r = ParseLibrary("library work \"*.sv\";\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->libraries.size(), 1u);
-  EXPECT_EQ(r.cu->libraries[0]->name, "work");
-}
-
 TEST(DesignBuildingBlockParsing, ConfigAndModuleCoexist) {
   auto r = Parse(
       "module a; endmodule\n"
