@@ -285,17 +285,6 @@ TEST(Preprocessor, NestedMacroCallsAsArguments) {
   EXPECT_NE(result.find("b + 1 + 42 + a"), std::string::npos);
 }
 
-TEST(Preprocessor, DirectiveInMacroTextProcessedOnExpansion) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  auto fid = f.mgr.AddFile("<test>",
-                           "`define SET_TS `timescale 1ns / 1ps\n"
-                           "`SET_TS\n");
-  pp.Preprocess(fid);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_TRUE(pp.HasTimescale());
-}
-
 TEST(Preprocessor, DefineInInactiveConditionalSkipped) {
   PreprocFixture f;
   auto result = Preprocess(

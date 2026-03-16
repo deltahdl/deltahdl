@@ -38,26 +38,3 @@ TEST(CompilerDirectiveIdentSim, DefineMacroAffectsSimulation) {
   EXPECT_EQ(result, 42u);
 }
 
-TEST(CompilerDirectiveIdentSim, DirectivePersistsInCompilationUnit) {
-  auto result = PreprocessAndGet(
-      "`define CONST 8'd99\n"
-      "module other; endmodule\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = `CONST;\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(result, 99u);
-}
-
-TEST(CompilerDirectiveIdentSim, DirectiveCanBeOverridden) {
-  auto result = PreprocessAndGet(
-      "`define X 8'd10\n"
-      "`define X 8'd20\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = `X;\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(result, 20u);
-}

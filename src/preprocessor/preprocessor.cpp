@@ -383,6 +383,35 @@ void Preprocessor::ExpandAndAppendLine(std::string_view line, uint32_t file_id,
   output.append(expanded);
 }
 
+// §22.2: After stripping comments, find the start of a directive that was
+// hidden behind comments or whitespace.  Returns the position in `stripped`
+// where the backtick begins, or npos if the first meaningful character is
+// not a backtick.
+static size_t FindDirectiveInStripped(std::string_view stripped) {
+  size_t i = 0;
+  while (i < stripped.size()) {
+    auto c = stripped[i];
+    if (std::isspace(static_cast<unsigned char>(c))) {
+      ++i;
+      continue;
+    }
+    // Skip preserved comment shells left by StripComments.
+    if (i + 1 < stripped.size() && c == '/' && stripped[i + 1] == '*') {
+      auto close = stripped.find("*/", i + 2);
+      if (close != std::string_view::npos) {
+        i = close + 2;
+        continue;
+      }
+      break;
+    }
+    if (i + 1 < stripped.size() && c == '/' && stripped[i + 1] == '/') {
+      break;
+    }
+    return (c == '`') ? i : std::string_view::npos;
+  }
+  return std::string_view::npos;
+}
+
 // Handle a line that falls inside an open block comment. Passes through
 // comment text and processes any remainder after the closing */.
 // Returns true if the line was consumed (caller should advance to next line).
@@ -447,7 +476,27 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
 
     bool handled = ProcessDirective(line, file_id, line_num, depth, output);
     if (!handled && IsActive()) {
-      ExpandAndAppendLine(line, file_id, line_num, output);
+      // §22.2: A language element is allowed before a directive on the same
+      // line.  Strip comments and check whether the remaining text begins
+      // with a directive (e.g. after an inline block comment).
+      auto stripped = StripComments(std::string(line), in_block_comment_);
+      size_t dir_pos = FindDirectiveInStripped(stripped);
+      if (dir_pos != std::string_view::npos) {
+        if (dir_pos > 0) output.append(stripped, 0, dir_pos);
+        auto dir_text = std::string_view(stripped).substr(dir_pos);
+        if (!ProcessDirective(dir_text, file_id, line_num, depth, output)) {
+          auto conditioned = ExpandInlineConditionals(std::string(dir_text));
+          auto expanded =
+              ExpandInlineMacros(conditioned, file_id, line_num);
+          TrackDesignElement(Trim(expanded));
+          output.append(expanded);
+        }
+      } else {
+        auto conditioned = ExpandInlineConditionals(stripped);
+        auto expanded = ExpandInlineMacros(conditioned, file_id, line_num);
+        TrackDesignElement(Trim(expanded));
+        output.append(expanded);
+      }
     }
     output.push_back('\n');
     pos = eol + 1;

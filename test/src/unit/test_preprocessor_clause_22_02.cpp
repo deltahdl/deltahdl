@@ -437,3 +437,208 @@ TEST(Preprocessor, MacroInRemainderAfterDirectiveExpanded) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("42"), std::string::npos);
 }
+
+TEST(Preprocessor, GraveAccentRequiredForDirective) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define MY_MAC 42\n"
+      "int x = `MY_MAC;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("42"), std::string::npos);
+}
+
+TEST(Preprocessor, ApostropheIsNotGraveAccent) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define MY_MAC 42\n"
+      "int x = 'MY_MAC;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+
+  EXPECT_EQ(result.find("42"), std::string::npos);
+  EXPECT_NE(result.find("'MY_MAC"), std::string::npos);
+}
+
+TEST(Preprocessor, EscapedBacktickInStringNotDirective) {
+  PreprocFixture f;
+  Preprocess("string s = \"value is \\`FOO\";\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, DirectiveTakesEffectImmediately) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>",
+                           "`default_nettype none\n"
+                           "`default_nettype wire\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
+}
+
+TEST(Preprocessor, MultipleDirectivesAllInEffect) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>",
+                           "`default_nettype none\n"
+                           "`celldefine\n"
+                           "`timescale 1ns / 1ps\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+  EXPECT_TRUE(pp.InCelldefine());
+  EXPECT_TRUE(pp.HasTimescale());
+}
+
+TEST(Preprocessor, DirectivePersistsAcrossFiles) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+
+  auto fid1 = f.mgr.AddFile("<file1>", "`default_nettype none\n");
+  pp.Preprocess(fid1);
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+
+  auto fid2 = f.mgr.AddFile("<file2>", "module m; endmodule\n");
+  pp.Preprocess(fid2);
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+}
+
+TEST(Preprocessor, DirectiveInRemainderOfAnotherDirective) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>",
+                           "`celldefine `timescale 1ns / 1ps\n"
+                           "module m; endmodule\n"
+                           "`endcelldefine\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(pp.InCelldefine());
+  EXPECT_TRUE(pp.HasTimescale());
+}
+
+TEST(Preprocessor, DirectiveAtEndOfFileWithoutNewline) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>", "`default_nettype none");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+}
+
+TEST(Preprocessor, MacroUsageInDirectiveArgIsNotADirective) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"NET", "none"}};
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  auto fid = f.mgr.AddFile("<test>", "`default_nettype `NET\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+}
+
+TEST(Preprocessor, DirectiveInNestedConditionalBlocks) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"OUTER", "1"}, {"INNER", "1"}};
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  auto fid = f.mgr.AddFile("<test>",
+                           "`ifdef OUTER\n"
+                           "`ifdef INNER\n"
+                           "`timescale 1ns / 1ps\n"
+                           "`endif\n"
+                           "`endif\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(pp.HasTimescale());
+}
+
+TEST(Preprocessor, DirectiveInNestedConditionalInnerUndefined) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"OUTER", "1"}};
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  auto fid = f.mgr.AddFile("<test>",
+                           "`ifdef OUTER\n"
+                           "`ifdef INNER\n"
+                           "`timescale 1ns / 1ps\n"
+                           "`endif\n"
+                           "`endif\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_FALSE(pp.HasTimescale());
+}
+
+TEST(Preprocessor, DirectiveInElseBranchProcessed) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>",
+                           "`ifdef UNDEFINED\n"
+                           "`default_nettype wire\n"
+                           "`else\n"
+                           "`default_nettype none\n"
+                           "`endif\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+}
+
+TEST(Preprocessor, DirectiveSupersededAcrossFiles) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+
+  auto fid1 = f.mgr.AddFile("<file1>", "`default_nettype none\n");
+  pp.Preprocess(fid1);
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+
+  auto fid2 = f.mgr.AddFile("<file2>", "`default_nettype wire\n");
+  pp.Preprocess(fid2);
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
+}
+
+TEST(Preprocessor, MacroExpansionWithinUnconnectedDrive) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"PULL", "pull1"}};
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  auto fid = f.mgr.AddFile("<test>", "`unconnected_drive `PULL\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.UnconnectedDrive(), NetType::kTri1);
+}
+
+TEST(Preprocessor, WhitespaceOnlyBeforeDirective) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>", "   \t  `default_nettype none\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
+}
+
+TEST(Preprocessor, EmptyLinesBetweenDirectives) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto fid = f.mgr.AddFile("<test>",
+                           "`celldefine\n"
+                           "\n"
+                           "\n"
+                           "`timescale 1ns / 1ps\n");
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(pp.InCelldefine());
+  EXPECT_TRUE(pp.HasTimescale());
+}
+
+TEST(Preprocessor, DirectiveInMacroTextInConditionalBlock) {
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.defines = {{"FEATURE", "1"}};
+  auto result = Preprocess(
+      "`define SET_TS `timescale 1ns / 1ps\n"
+      "`ifdef FEATURE\n"
+      "`SET_TS\n"
+      "`endif\n",
+      f, std::move(cfg));
+  EXPECT_FALSE(f.diag.HasErrors());
+}
