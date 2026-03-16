@@ -208,13 +208,25 @@ BindDirective* Parser::ParseBindDirective() {
   decl->loc = CurrentLoc();
   Expect(TokenKind::kKwBind);
 
-  // Parse target: identifier (potentially hierarchical for form 2).
+  // Parse target: hierarchical_identifier with optional constant_bit_select.
   decl->target = ParseDottedPath();
+  if (Check(TokenKind::kLBracket)) {
+    Consume();
+    decl->target_bit_select = ParseExpr();
+    Expect(TokenKind::kRBracket);
+  }
 
   // Optional : bind_target_instance_list
   if (Match(TokenKind::kColon)) {
     do {
       decl->target_instances.push_back(ParseDottedPath());
+      Expr* bit_sel = nullptr;
+      if (Check(TokenKind::kLBracket)) {
+        Consume();
+        bit_sel = ParseExpr();
+        Expect(TokenKind::kRBracket);
+      }
+      decl->target_instance_bit_selects.push_back(bit_sel);
     } while (Match(TokenKind::kComma));
   }
 

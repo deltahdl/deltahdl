@@ -15,6 +15,21 @@
 
 namespace delta {
 
+void Elaborator::ValidateElabSystemTask(const ModuleItem* item) {
+  auto* expr = item->init_expr;
+  if (!expr || expr->kind != ExprKind::kSystemCall) return;
+  if (expr->callee != "$fatal") return;
+  if (expr->args.empty()) return;
+  auto* first_arg = expr->args[0];
+  if (first_arg->kind == ExprKind::kIntegerLiteral) {
+    auto val = first_arg->int_val;
+    if (val > 2) {
+      diag_.Error(first_arg->range.start,
+                  "finish_number must be 0, 1, or 2");
+    }
+  }
+}
+
 // §6.20.5: Elaborate a specparam as a simulation-accessible constant variable.
 void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   RtlirVariable var;
@@ -246,12 +261,14 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kClockingBlock:
       ValidateClockingBlock(item);
       break;
+    case ModuleItemKind::kElabSystemTask:
+      ValidateElabSystemTask(item);
+      break;
     case ModuleItemKind::kCovergroupDecl:
     case ModuleItemKind::kSpecifyBlock:
     case ModuleItemKind::kDpiImport:
     case ModuleItemKind::kDpiExport:
     case ModuleItemKind::kLetDecl:
-    case ModuleItemKind::kElabSystemTask:
     case ModuleItemKind::kDefaultDisableIff:
     case ModuleItemKind::kNestedModuleDecl:
     case ModuleItemKind::kClassDecl:

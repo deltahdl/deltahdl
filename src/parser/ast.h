@@ -921,7 +921,9 @@ struct IncludeStmt {
 
 struct BindDirective {
   std::string_view target;
+  Expr* target_bit_select = nullptr;  // §A.1.4: constant_bit_select on target
   std::vector<std::string_view> target_instances;
+  std::vector<Expr*> target_instance_bit_selects;  // §A.1.4: per-instance
   ModuleItem* instantiation = nullptr;
   SourceLoc loc;
 };

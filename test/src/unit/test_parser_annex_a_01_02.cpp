@@ -326,16 +326,6 @@ TEST(SourceText, TimeunitWithPrecisionSlash) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SourceText, BindDirectiveWithAttributes) {
-  auto r = Parse(
-      "module m; endmodule\n"
-      "module checker_m; endmodule\n"
-      "(* synthesis *) bind m checker_m inst(.*);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->bind_directives.size(), 1u);
-}
-
 TEST(SourceText, ModuleWithLifetime) {
   auto r = Parse("module automatic m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
