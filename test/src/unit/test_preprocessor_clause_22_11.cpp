@@ -20,6 +20,12 @@ TEST(Preprocessor, Pragma_MissingName_OnlyWhitespace_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+TEST(Preprocessor, Pragma_NumericName_Error) {
+  PreprocFixture f;
+  Preprocess("`pragma 123\n", f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(Preprocessor, Pragma_SimpleName_NoError) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma\n", f);
@@ -130,6 +136,66 @@ TEST(Preprocessor, Pragma_NoTrailingNewline_NoError) {
   PreprocFixture f;
   Preprocess("`pragma my_pragma", f);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Pragma_NestedParenthesizedValues_NoError) {
+  PreprocFixture f;
+  Preprocess("`pragma my_pragma (a, (b, c))\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Pragma_MultiplePragmasInSequence_NoError) {
+  PreprocFixture f;
+  Preprocess(
+      "`pragma first_pragma\n"
+      "`pragma second_pragma key = val\n"
+      "`pragma third_pragma 99\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Pragma_MultiplePragmasInSequence_NoOutput) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`pragma first_pragma\n"
+      "`pragma second_pragma key = val\n",
+      f);
+  auto trimmed = out;
+  trimmed.erase(0, trimmed.find_first_not_of(" \t\n\r"));
+  trimmed.erase(trimmed.find_last_not_of(" \t\n\r") + 1);
+  EXPECT_TRUE(trimmed.empty());
+}
+
+TEST(Preprocessor, Pragma_BetweenModules_NoInterference) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "module m1;\nendmodule\n"
+      "`pragma some_pragma\n"
+      "module m2;\nendmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("module m1;"), std::string::npos);
+  EXPECT_NE(out.find("module m2;"), std::string::npos);
+}
+
+TEST(Preprocessor, Pragma_AdjacentToOtherDirective_NoError) {
+  PreprocFixture f;
+  Preprocess(
+      "`timescale 1ns/1ps\n"
+      "`pragma my_pragma\n"
+      "module m;\nendmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Pragma_UnrecognizedNameNoEffect_CodePreserved) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`pragma totally_unknown_xyz key = val\n"
+      "wire w;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("wire w;"), std::string::npos);
 }
 
 }  // namespace

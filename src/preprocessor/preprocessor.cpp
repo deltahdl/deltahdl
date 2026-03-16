@@ -627,6 +627,11 @@ bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
     auto rest = Trim(AfterDirective(line, "pragma"));
     if (rest.empty()) {
       diag_.Error(loc, "`pragma requires a pragma_name");
+    } else {
+      char first = rest.front();
+      if (!std::isalpha(static_cast<unsigned char>(first)) && first != '_') {
+        diag_.Error(loc, "`pragma pragma_name must be a simple identifier");
+      }
     }
     return true;
   }
