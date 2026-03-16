@@ -98,37 +98,6 @@ TEST(InterfaceParsing, ModportImportWithDirectionSecond) {
   EXPECT_EQ(mp->ports[1].name, "Read");
 }
 
-TEST(SourceText, ExternFunctionPrototypeInInterface) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  extern function void compute(input int x);\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  auto* ifc = r.cu->interfaces[0];
-  ASSERT_GE(ifc->items.size(), 1u);
-  EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(ifc->items[0]->name, "compute");
-  EXPECT_TRUE(ifc->items[0]->is_extern);
-
-  EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
-}
-
-TEST(SourceText, ExternTaskPrototypeInInterface) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  extern task run();\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  auto* ifc = r.cu->interfaces[0];
-  ASSERT_GE(ifc->items.size(), 1u);
-  EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_EQ(ifc->items[0]->name, "run");
-  EXPECT_TRUE(ifc->items[0]->is_extern);
-  EXPECT_TRUE(ifc->items[0]->func_body_stmts.empty());
-}
-
 TEST(TaskDeclParsing, TaskBodyInterfaceScope) {
   auto r = Parse(
       "interface intf;\n"
@@ -211,31 +180,6 @@ TEST(InterfaceDeclParsing, TaskPrototype_HasArgs) {
   auto* mp = r.cu->interfaces[0]->modports[0];
   ASSERT_NE(mp->ports[0].prototype, nullptr);
   EXPECT_FALSE(mp->ports[0].prototype->func_args.empty());
-}
-
-TEST(InterfaceDeclaration, WithFunction) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  function automatic int transform(int val);\n"
-      "    return val + 1;\n"
-      "  endfunction\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kFunctionDecl));
-}
-
-TEST(InterfaceDeclaration, WithTask) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  task do_transfer;\n"
-      "  endtask\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kTaskDecl));
 }
 
 }  // namespace

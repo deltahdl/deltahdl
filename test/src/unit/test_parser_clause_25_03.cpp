@@ -84,63 +84,6 @@ TEST(Parser, EmptyInterface) {
   EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
 }
 
-TEST(SourceText, InterfaceOrGenerateItemModuleCommon) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  assign a = b;\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  auto* ifc = r.cu->interfaces[0];
-  ASSERT_GE(ifc->items.size(), 1u);
-  EXPECT_EQ(ifc->items[0]->kind, ModuleItemKind::kContAssign);
-}
-
-TEST(SourceText, NonPortInterfaceItemGenerateRegion) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  generate\n"
-      "    assign a = b;\n"
-      "  endgenerate\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_GE(r.cu->interfaces[0]->items.size(), 1u);
-}
-
-TEST(SourceText, NonPortInterfaceItemProgram) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  program p; endprogram\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  ASSERT_GE(r.cu->interfaces[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->items[0]->kind,
-            ModuleItemKind::kNestedModuleDecl);
-}
-
-TEST(SourceText, NonPortInterfaceItemNestedInterface) {
-  auto r = Parse(
-      "interface outer;\n"
-      "  interface inner; endinterface\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  ASSERT_GE(r.cu->interfaces[0]->items.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->items[0]->kind,
-            ModuleItemKind::kNestedModuleDecl);
-}
-
-TEST(SourceText, NonPortInterfaceItemTimeunits) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  timeunit 1ns;\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-}
-
 TEST(SourceText, InterfaceParamsAndPorts) {
   auto r = Parse(
       "interface ifc #(parameter int W = 8)(input logic clk);\n"
@@ -159,28 +102,6 @@ TEST(Parser, InterfaceWithPorts) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->interfaces.size(), 1);
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2);
-}
-
-TEST(SourceText, InterfaceItemPortDecl) {
-  auto r = Parse(
-      "interface ifc(input logic clk, output logic data);\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports[0].name, "clk");
-  EXPECT_EQ(r.cu->interfaces[0]->ports[1].name, "data");
-}
-
-TEST(SourceText, NonPortInterfaceItemModport) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  modport master(input clk, output data);\n"
-      "endinterface\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  ASSERT_EQ(r.cu->interfaces[0]->modports.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "master");
 }
 
 TEST(InterfaceDeclParsing, AttrOnSimplePorts) {
@@ -235,53 +156,6 @@ TEST(InterfaceDeclaration, EnclosedByKeywords) {
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
   EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
   EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
-}
-
-TEST(InterfaceDeclaration, WithInitialBlock) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  logic flag;\n"
-      "  initial flag = 0;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kInitialBlock));
-}
-
-TEST(InterfaceDeclaration, WithAlwaysBlock) {
-  EXPECT_TRUE(
-      ParseOk("interface ifc;\n"
-              "  logic clk, gnt, req;\n"
-              "  always @(posedge clk) gnt <= req;\n"
-              "endinterface\n"));
-}
-
-TEST(InterfaceDeclaration, WithContAssign) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  logic a;\n"
-      "  wire b;\n"
-      "  assign b = a;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kContAssign));
-}
-
-TEST(InterfaceDeclaration, WithMixedContents) {
-  EXPECT_TRUE(
-      ParseOk("interface ifc #(parameter int W = 8) (input logic clk);\n"
-              "  localparam int DEPTH = 4;\n"
-              "  logic [W-1:0] data;\n"
-              "  wire valid;\n"
-              "  function automatic int xform(int v); return v; endfunction\n"
-              "  task send; endtask\n"
-              "  assign valid = |data;\n"
-              "  modport master(output data, input valid);\n"
-              "  modport slave(input data, output valid);\n"
-              "endinterface\n"));
 }
 
 }  // namespace

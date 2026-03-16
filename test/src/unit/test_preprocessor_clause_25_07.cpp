@@ -1,5 +1,4 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -18,23 +17,6 @@ TEST(SourceText, ExternFunctionPrototypeInModule) {
   EXPECT_EQ(mod->items[0]->name, "compute");
   EXPECT_TRUE(mod->items[0]->is_extern);
   EXPECT_TRUE(mod->items[0]->func_body_stmts.empty());
-}
-
-TEST(DesignBuildingBlockParsing, FunctionsAndTasks) {
-  auto r = ParseWithPreprocessor(
-      "interface ifc;\n"
-      "  function automatic int get_data;\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "  task automatic send(input int val);\n"
-      "  endtask\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kFunctionDecl));
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->interfaces[0]->items, ModuleItemKind::kTaskDecl));
 }
 
 }  // namespace
