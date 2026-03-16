@@ -38,7 +38,8 @@ def discover_subclauses(
     """
     prompt = (
         f"Read clause {clause} in the LRM at {lrm_path}. "
-        "List ALL direct and indirect subclauses with their titles.\n\n"
+        "List ALL subclauses at EVERY depth level. For each subclause "
+        "that has its own numbered subsections, list those too.\n\n"
         "Return ONLY a JSON object where each key is a subclause "
         "number and each value is the subclause title.\n\n"
         'Example: {"4.1": "General", "4.2": "Overview", "4.3": "Event simulation"}'
