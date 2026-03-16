@@ -79,6 +79,14 @@ inline ParseResult ParseWithPreprocessor(const std::string& src) {
   result.cu = parser.Parse();
   result.cu->default_nettype = preproc.DefaultNetType();
   result.cu->unconnected_drive = preproc.UnconnectedDrive();
+  for (auto* mod : result.cu->modules) {
+    for (const auto& cell_name : preproc.CellModuleNames()) {
+      if (mod->name == cell_name) {
+        mod->is_cell = true;
+        break;
+      }
+    }
+  }
   result.cu->default_decay_time = preproc.DefaultDecayTime();
   result.cu->default_decay_time_real = preproc.DefaultDecayTimeReal();
   result.cu->default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();

@@ -688,6 +688,8 @@ struct ModuleDecl {
   std::vector<std::pair<std::string_view, Expr*>> params;
   std::vector<ModportDecl*> modports;
 
+  bool is_cell = false;  // §22.10: tagged by `celldefine
+
   // Timeunit/timeprecision (§3.14)
   TimeUnit time_unit = TimeUnit::kNs;
   TimeUnit time_prec = TimeUnit::kNs;

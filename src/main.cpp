@@ -329,6 +329,7 @@ struct PreprocResult {
   std::string source;
   delta::NetType default_nettype = delta::NetType::kWire;
   delta::NetType unconnected_drive = delta::NetType::kWire;
+  std::vector<std::string> cell_module_names;  // §22.10
   // §E.2
   uint64_t default_decay_time = 0;
   double default_decay_time_real = 0.0;
@@ -360,6 +361,7 @@ PreprocResult PreprocessSources(const CliOptions& opts,
   }
   result.default_nettype = preproc.DefaultNetType();
   result.unconnected_drive = preproc.UnconnectedDrive();
+  result.cell_module_names = preproc.CellModuleNames();
   result.default_decay_time = preproc.DefaultDecayTime();
   result.default_decay_time_real = preproc.DefaultDecayTimeReal();
   result.default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
@@ -523,6 +525,15 @@ int main(int argc, char* argv[]) {
   }
   cu->default_nettype = pp.default_nettype;
   cu->unconnected_drive = pp.unconnected_drive;
+  // §22.10: Tag cell modules.
+  for (auto* mod : cu->modules) {
+    for (const auto& cell_name : pp.cell_module_names) {
+      if (mod->name == cell_name) {
+        mod->is_cell = true;
+        break;
+      }
+    }
+  }
   cu->default_decay_time = pp.default_decay_time;
   cu->default_decay_time_real = pp.default_decay_time_real;
   cu->default_decay_time_infinite = pp.default_decay_time_infinite;

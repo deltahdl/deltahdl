@@ -463,11 +463,36 @@ bool Preprocessor::IsActive() const {
 // §3.2 + §22.3: Track design element nesting for resetall validation.
 // A design element is a module, program, interface, checker, package,
 // primitive, or configuration.
+// Extract the identifier following "module " or "macromodule " for §22.10.
+static std::string_view ExtractModuleName(std::string_view trimmed,
+                                          std::string_view keyword) {
+  auto rest = trimmed.substr(keyword.size());
+  // Skip optional "automatic" keyword.
+  if (rest.starts_with("automatic ")) rest = rest.substr(10);
+  while (!rest.empty() && (rest[0] == ' ' || rest[0] == '\t'))
+    rest.remove_prefix(1);
+  size_t end = 0;
+  while (end < rest.size() && rest[end] != ' ' && rest[end] != '\t' &&
+         rest[end] != '(' && rest[end] != ';' && rest[end] != '#')
+    ++end;
+  return rest.substr(0, end);
+}
+
 void Preprocessor::TrackDesignElement(std::string_view trimmed) {
   if (trimmed.starts_with("module ") || trimmed.starts_with("program ") ||
       trimmed.starts_with("interface ") || trimmed.starts_with("checker ") ||
       trimmed.starts_with("package ") || trimmed.starts_with("primitive ") ||
       trimmed.starts_with("config ") || trimmed.starts_with("macromodule ")) {
+    // §22.10: Record module names defined inside `celldefine.
+    if (in_celldefine_) {
+      if (trimmed.starts_with("module ")) {
+        auto name = ExtractModuleName(trimmed, "module ");
+        if (!name.empty()) cell_module_names_.emplace_back(name);
+      } else if (trimmed.starts_with("macromodule ")) {
+        auto name = ExtractModuleName(trimmed, "macromodule ");
+        if (!name.empty()) cell_module_names_.emplace_back(name);
+      }
+    }
     ++design_element_depth_;
   }
   // Also check for end keywords anywhere in the line (handles single-line

@@ -43,6 +43,14 @@ inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
   // Propagate preprocessor state to CompilationUnit.
   cu->default_nettype = preproc.DefaultNetType();
   cu->unconnected_drive = preproc.UnconnectedDrive();
+  for (auto* mod : cu->modules) {
+    for (const auto& cell_name : preproc.CellModuleNames()) {
+      if (mod->name == cell_name) {
+        mod->is_cell = true;
+        break;
+      }
+    }
+  }
   cu->default_decay_time = preproc.DefaultDecayTime();
   cu->default_decay_time_real = preproc.DefaultDecayTimeReal();
   cu->default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();

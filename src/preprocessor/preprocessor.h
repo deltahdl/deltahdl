@@ -148,6 +148,9 @@ class Preprocessor {
   bool HasTimescale() const { return has_timescale_; }
   NetType DefaultNetType() const { return default_net_type_; }
   bool InCelldefine() const { return in_celldefine_; }
+  const std::vector<std::string>& CellModuleNames() const {
+    return cell_module_names_;
+  }
   NetType UnconnectedDrive() const { return unconnected_drive_; }
   uint32_t LineOffset() const { return line_offset_; }
   bool HasLineOverride() const { return has_line_override_; }
@@ -176,6 +179,7 @@ class Preprocessor {
   std::vector<KeywordVersion> keyword_version_stack_;
   std::vector<std::string> expansion_stack_;  // §22.5.1: recursive macro guard.
   uint32_t design_element_depth_ = 0;         // §22.3: for resetall validation.
+  std::vector<std::string> cell_module_names_;  // §22.10: modules inside celldefine.
   bool in_block_comment_ = false;  // §22.2: track /* */ across lines.
   // Annex E state.
   uint64_t default_decay_time_ = 0;
