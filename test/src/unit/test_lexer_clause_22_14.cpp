@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Lexer, KeywordVersionMarker_RestoresToDefault) {
+TEST(KeywordVersionLexing, KeywordVersionMarker_RestoresToDefault) {
   std::string input;
   input += kKeywordMarker;
   input +=
@@ -25,7 +25,7 @@ TEST(Lexer, KeywordVersionMarker_RestoresToDefault) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kKwLogic);
 }
 
-TEST(Lexer, ParseKeywordVersion_ValidVersions) {
+TEST(KeywordVersionLexing, ParseKeywordVersion_ValidVersions) {
   struct Case {
     const char* input;
     KeywordVersion expected;
@@ -47,9 +47,65 @@ TEST(Lexer, ParseKeywordVersion_ValidVersions) {
   }
 }
 
-TEST(Lexer, ParseKeywordVersion_Invalid) {
+TEST(KeywordVersionLexing, ParseKeywordVersion_Invalid) {
   EXPECT_FALSE(ParseKeywordVersion("bogus").has_value());
   EXPECT_FALSE(ParseKeywordVersion("").has_value());
+}
+
+TEST(KeywordVersionLexing, LookupKeyword_ReturnsKindForCurrentVersion) {
+  auto result = LookupKeyword("logic", KeywordVersion::kVer18002023);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(*result, TokenKind::kKwLogic);
+}
+
+TEST(KeywordVersionLexing, LookupKeyword_ReturnsNulloptForOlderVersion) {
+  auto result = LookupKeyword("logic", KeywordVersion::kVer13642001);
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(KeywordVersionLexing, LookupKeyword_NonKeywordReturnsNullopt) {
+  auto result = LookupKeyword("my_ident", KeywordVersion::kVer18002023);
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST(KeywordVersionLexing, MarkerAtInputStart) {
+  std::string input;
+  input += kKeywordMarker;
+  input +=
+      static_cast<char>(static_cast<uint8_t>(KeywordVersion::kVer13641995));
+  input += '\n';
+  input += "module m; endmodule";
+  auto tokens = Lex(input);
+  bool found_module = false;
+  for (const auto& tok : tokens) {
+    if (tok.text == "module") {
+      EXPECT_EQ(tok.kind, TokenKind::kKwModule);
+      found_module = true;
+    }
+  }
+  EXPECT_TRUE(found_module);
+}
+
+TEST(KeywordVersionLexing, ConsecutiveMarkersSwitchVersion) {
+  std::string input;
+  input += kKeywordMarker;
+  input +=
+      static_cast<char>(static_cast<uint8_t>(KeywordVersion::kVer13641995));
+  input += '\n';
+  input += kKeywordMarker;
+  input +=
+      static_cast<char>(static_cast<uint8_t>(KeywordVersion::kVer18002023));
+  input += '\n';
+  input += "logic";
+  auto tokens = Lex(input);
+  bool found_logic = false;
+  for (const auto& tok : tokens) {
+    if (tok.text == "logic") {
+      EXPECT_EQ(tok.kind, TokenKind::kKwLogic);
+      found_logic = true;
+    }
+  }
+  EXPECT_TRUE(found_logic);
 }
 
 }  // namespace

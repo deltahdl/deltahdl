@@ -311,4 +311,86 @@ TEST(KeywordVersionPreprocessing, MarkerFormatCorrect) {
   EXPECT_EQ(out[pos + 2], '\n');
 }
 
+TEST(KeywordVersionPreprocessing, ConsecutiveBeginEndPairs) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`begin_keywords \"1364-1995\"\n"
+      "x\n"
+      "`end_keywords\n"
+      "`begin_keywords \"1800-2009\"\n"
+      "y\n"
+      "`end_keywords\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+
+  size_t pos = 0;
+  pos = out.find(kKeywordMarker, pos);
+  ASSERT_NE(pos, std::string::npos);
+  EXPECT_EQ(static_cast<KeywordVersion>(out[pos + 1]),
+            KeywordVersion::kVer13641995);
+
+  pos = out.find(kKeywordMarker, pos + 1);
+  ASSERT_NE(pos, std::string::npos);
+  EXPECT_EQ(static_cast<KeywordVersion>(out[pos + 1]),
+            KeywordVersion::kVer18002023);
+
+  pos = out.find(kKeywordMarker, pos + 1);
+  ASSERT_NE(pos, std::string::npos);
+  EXPECT_EQ(static_cast<KeywordVersion>(out[pos + 1]),
+            KeywordVersion::kVer18002009);
+
+  pos = out.find(kKeywordMarker, pos + 1);
+  ASSERT_NE(pos, std::string::npos);
+  EXPECT_EQ(static_cast<KeywordVersion>(out[pos + 1]),
+            KeywordVersion::kVer18002023);
+}
+
+TEST(KeywordVersionPreprocessing, BeginKeywordsWhitespaceBeforeQuote) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`begin_keywords   \"1800-2012\"\n"
+      "x\n"
+      "`end_keywords\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto pos = out.find(kKeywordMarker);
+  ASSERT_NE(pos, std::string::npos);
+  EXPECT_EQ(static_cast<KeywordVersion>(out[pos + 1]),
+            KeywordVersion::kVer18002012);
+}
+
+TEST(KeywordVersionPreprocessing, SameVersionNested) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`begin_keywords \"1800-2009\"\n"
+      "`begin_keywords \"1800-2009\"\n"
+      "x\n"
+      "`end_keywords\n"
+      "y\n"
+      "`end_keywords\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+
+  size_t pos = 0;
+  pos = out.find(kKeywordMarker, pos);
+  ASSERT_NE(pos, std::string::npos);
+  EXPECT_EQ(static_cast<KeywordVersion>(out[pos + 1]),
+            KeywordVersion::kVer18002009);
+
+  pos = out.find(kKeywordMarker, pos + 1);
+  ASSERT_NE(pos, std::string::npos);
+  EXPECT_EQ(static_cast<KeywordVersion>(out[pos + 1]),
+            KeywordVersion::kVer18002009);
+
+  pos = out.find(kKeywordMarker, pos + 1);
+  ASSERT_NE(pos, std::string::npos);
+  EXPECT_EQ(static_cast<KeywordVersion>(out[pos + 1]),
+            KeywordVersion::kVer18002009);
+
+  pos = out.find(kKeywordMarker, pos + 1);
+  ASSERT_NE(pos, std::string::npos);
+  EXPECT_EQ(static_cast<KeywordVersion>(out[pos + 1]),
+            KeywordVersion::kVer18002023);
+}
+
 }  // namespace

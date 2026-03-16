@@ -1,11 +1,10 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(CompilerDirectiveParsing, BeginKeywords1800_2023) {
+TEST(KeywordVersionParsing, BeginKeywords1800_2023) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`begin_keywords \"1800-2023\"\n"
                               "module t;\n"
@@ -13,7 +12,7 @@ TEST(CompilerDirectiveParsing, BeginKeywords1800_2023) {
                               "`end_keywords\n"));
 }
 
-TEST(CompilerDirectiveParsing, BeginKeywords1800_2005) {
+TEST(KeywordVersionParsing, BeginKeywords1800_2005) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`begin_keywords \"1800-2005\"\n"
                               "module t;\n"
@@ -21,12 +20,31 @@ TEST(CompilerDirectiveParsing, BeginKeywords1800_2005) {
                               "`end_keywords\n"));
 }
 
-TEST(CompilerDirectiveParsing, BeginKeywordsMultipleModules) {
+TEST(KeywordVersionParsing, BeginKeywordsMultipleModules) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`begin_keywords \"1800-2012\"\n"
                               "module m1;\n"
                               "endmodule\n"
                               "module m2;\n"
+                              "endmodule\n"
+                              "`end_keywords\n"));
+}
+
+TEST(KeywordVersionParsing, NestedBeginKeywordsParses) {
+  EXPECT_TRUE(
+      ParseWithPreprocessorOk("`begin_keywords \"1800-2012\"\n"
+                              "`begin_keywords \"1364-2001\"\n"
+                              "module t;\n"
+                              "endmodule\n"
+                              "`end_keywords\n"
+                              "`end_keywords\n"));
+}
+
+TEST(KeywordVersionParsing, OldVersionIdentifierInExpression) {
+  EXPECT_TRUE(
+      ParseWithPreprocessorOk("`begin_keywords \"1364-2001\"\n"
+                              "module t;\n"
+                              "  wire logic;\n"
                               "endmodule\n"
                               "`end_keywords\n"));
 }
