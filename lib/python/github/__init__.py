@@ -154,6 +154,26 @@ def fetch_issue_state(organization: str, repo: str, issue: int) -> str:
     return result.stdout.strip()
 
 
+def find_issue_by_title(
+    organization: str, repo: str, title: str,
+) -> int | None:
+    """Find an open issue by exact title. Returns number or None."""
+    result = subprocess.run(
+        ["gh", "issue", "list", "--repo", f"{organization}/{repo}",
+         "--search", f'"{title}" in:title', "--state", "open",
+         "--json", "number,title", "--limit", "10"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    for issue in json.loads(result.stdout):
+        if issue["title"] == title:
+            return issue["number"]
+    return None
+
+
 def create_issue(
     organization: str, repo: str, title: str, body: str,
 ) -> int:

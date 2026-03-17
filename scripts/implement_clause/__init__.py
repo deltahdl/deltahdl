@@ -24,6 +24,7 @@ from lib.python.github import (
     extract_subclause_from_title,
     fetch_issue_body,
     fetch_issue_title,
+    find_issue_by_title,
     format_subclause_label,
     update_issue_body,
 )
@@ -119,11 +120,16 @@ def _ensure_subclause_issues(
     for subclause in discovered:
         if subclause not in covered:
             label = format_subclause_label(subclause)
-            issue_num = create_issue(
-                organization, repo, _issue_title(label), "",
-            )
-            all_issues.append(issue_num)
-            time.sleep(5)
+            title = _issue_title(label)
+            existing = find_issue_by_title(organization, repo, title)
+            if existing:
+                all_issues.append(existing)
+            else:
+                issue_num = create_issue(
+                    organization, repo, title, "",
+                )
+                all_issues.append(issue_num)
+                time.sleep(5)
     return all_issues
 
 
