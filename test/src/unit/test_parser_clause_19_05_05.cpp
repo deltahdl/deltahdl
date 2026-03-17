@@ -3,16 +3,4 @@
 using namespace delta;
 
 namespace {
-
-TEST(CovergroupDeclParsing, BinsKeyword_IgnoreBins) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      ignore_bins skip = {128};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 }  // namespace

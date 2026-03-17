@@ -1,18 +1,8 @@
-#include "builders_ast.h"
-#include "fixture_simulator.h"
-#include "helpers_parser_verify.h"
+#include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(CovergroupDeclParsing, CovergroupDecl_InClass) {
-  EXPECT_TRUE(
-      ParseOk("class c;\n"
-              "  covergroup cg;\n"
-              "  endgroup\n"
-              "endclass\n"));
-}
 
 TEST(ClassParsing, CovergroupInClass) {
   auto r = Parse(

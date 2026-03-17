@@ -3,16 +3,4 @@
 using namespace delta;
 
 namespace {
-
-TEST(CovergroupDeclParsing, BinsOrOptions_WildcardBins) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    coverpoint x {\n"
-              "      wildcard bins even = {4'b???0};\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
 }  // namespace

@@ -335,6 +335,24 @@ static void SkipCoverpointBody(Lexer& lexer) {
   if (lexer.Peek().Is(TokenKind::kSemicolon)) lexer.Next();
 }
 
+void Parser::ParseBlockEventExpression() {
+  // block_event_expression ::=
+  //   begin hierarchical_btf_identifier
+  // | end   hierarchical_btf_identifier
+  // | block_event_expression or block_event_expression
+  do {
+    if (!Check(TokenKind::kKwBegin) && !Check(TokenKind::kKwEnd)) {
+      diag_.Error(CurrentLoc(), "expected 'begin' or 'end' in block event");
+      return;
+    }
+    Consume();
+    ExpectIdentifier();
+    while (Match(TokenKind::kDot)) {
+      ExpectIdentifier();
+    }
+  } while (Match(TokenKind::kKwOr));
+}
+
 void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kCovergroupDecl;
@@ -361,10 +379,16 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   } else if (Check(TokenKind::kAtAt)) {
     Consume();
     Expect(TokenKind::kLParen);
-    SkipParenContents(lexer_);
+    ParseBlockEventExpression();
+    Expect(TokenKind::kRParen);
   } else if (Match(TokenKind::kKwWith)) {
     Expect(TokenKind::kKwFunction);
-    ExpectIdentifier();
+    auto sample_id = ExpectIdentifier();
+    if (sample_id.text != "sample") {
+      diag_.Error(sample_id.loc,
+                  "expected 'sample', got '" +
+                      std::string(sample_id.text) + "'");
+    }
     Expect(TokenKind::kLParen);
     SkipParenContents(lexer_);
   }
@@ -375,7 +399,7 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
     SkipCovergroupItem();
   }
   Expect(TokenKind::kKwEndgroup);
-  if (Match(TokenKind::kColon)) ExpectIdentifier();
+  MatchEndLabel(item->name);
   items.push_back(item);
 }
 

@@ -1,62 +1,8 @@
-#include "fixture_parser.h"
 #include "fixture_program.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(CovergroupDeclParsing, CoverageSpecOrOption_Option) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    option.auto_bin_max = 128;\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
-TEST(CovergroupDeclParsing, CoverageOption_OptionMember) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    option.weight = 2;\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
-TEST(CovergroupDeclParsing, CoverageOption_Goal) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    option.goal = 90;\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
-TEST(CovergroupDeclParsing, BinsSelectionOrOption_CoverageOption) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    cp1: coverpoint a;\n"
-              "    cp2: coverpoint b;\n"
-              "    cross cp1, cp2 {\n"
-              "      option.weight = 5;\n"
-              "    }\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
-
-TEST(CovergroupDeclParsing, CoverGroup_MultipleOptions) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  covergroup cg;\n"
-              "    option.auto_bin_max = 64;\n"
-              "    option.weight = 2;\n"
-              "    option.goal = 95;\n"
-              "    coverpoint x;\n"
-              "  endgroup\n"
-              "endmodule\n"));
-}
 
 TEST_F(VerifyParseTest, CovergroupWithOption) {
   auto* unit = Parse(R"(
