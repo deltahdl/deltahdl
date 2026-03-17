@@ -179,6 +179,40 @@ ModuleItem* Parser::ParseTypedef() {
     }
     lexer_.RestorePos(saved);
   }
+  // A.2.1.3 form 2: typedef ifc_port {[const_expr]} . type_id new_name ;
+  if (CheckIdentifier()) {
+    auto saved = lexer_.SavePos();
+    Consume();  // potential interface port identifier
+    // Skip constant_bit_select: { [ constant_expression ] }
+    while (Check(TokenKind::kLBracket)) {
+      Consume();
+      int depth = 1;
+      while (depth > 0 && !Check(TokenKind::kEof)) {
+        if (CurrentToken().kind == TokenKind::kLBracket) depth++;
+        else if (CurrentToken().kind == TokenKind::kRBracket) depth--;
+        if (depth > 0) Consume();
+      }
+      if (Check(TokenKind::kRBracket)) Consume();
+    }
+    if (Check(TokenKind::kDot)) {
+      // Confirmed form 2 — restore and parse properly.
+      lexer_.RestorePos(saved);
+      item->typedef_ifc_port = Consume().text;
+      while (Check(TokenKind::kLBracket)) {
+        Consume();
+        item->unpacked_dims.push_back(ParseExpr());
+        Expect(TokenKind::kRBracket);
+      }
+      Expect(TokenKind::kDot);
+      item->typedef_type.kind = DataTypeKind::kNamed;
+      item->typedef_type.type_name = Expect(TokenKind::kIdentifier).text;
+      item->name = Expect(TokenKind::kIdentifier).text;
+      known_types_.insert(item->name);
+      Expect(TokenKind::kSemicolon);
+      return item;
+    }
+    lexer_.RestorePos(saved);
+  }
   if (Check(TokenKind::kKwEnum)) {
     item->typedef_type = ParseEnumType();
   } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {

@@ -591,6 +591,7 @@ struct ModuleItem {
 
   // Typedef / Nettype
   DataType typedef_type;
+  std::string_view typedef_ifc_port;      // §A.2.1.3: interface port for form 2.
   std::string_view nettype_resolve_func;  // §6.6.7: resolution function name
 
   // Generate
