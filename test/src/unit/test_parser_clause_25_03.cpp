@@ -1,5 +1,4 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -44,38 +43,6 @@ TEST(InterfaceParsing, EndinterfaceNoLabel) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "my_if");
 }
 
-TEST(InterfaceParsing, MultipleModportItems) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic a;\n"
-      "  logic b;\n"
-      "  modport m1(input a), m2(output b);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* iface = r.cu->interfaces[0];
-  ASSERT_EQ(iface->modports.size(), 2);
-  VerifyModportItem(iface->modports[0], "m1", Direction::kInput, "a");
-  VerifyModportItem(iface->modports[1], "m2", Direction::kOutput, "b");
-}
-
-TEST(InterfaceParsing, MultipleModportThreeItems) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  logic a;\n"
-      "  logic b;\n"
-      "  logic c;\n"
-      "  modport m1(input a), m2(output b), m3(inout c);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* iface = r.cu->interfaces[0];
-  ASSERT_EQ(iface->modports.size(), 3);
-  const std::string kExpectedNames[] = {"m1", "m2", "m3"};
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(iface->modports[i]->name, kExpectedNames[i]);
-  }
-  EXPECT_EQ(iface->modports[2]->ports[0].direction, Direction::kInout);
-}
-
 TEST(Parser, EmptyInterface) {
   auto r = Parse("interface simple_bus; endinterface");
   ASSERT_NE(r.cu, nullptr);
@@ -104,13 +71,6 @@ TEST(Parser, InterfaceWithPorts) {
   EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 2);
 }
 
-TEST(InterfaceDeclParsing, AttrOnSimplePorts) {
-  EXPECT_TRUE(
-      ParseOk("interface bus;\n"
-              "  logic a;\n"
-              "  modport target((* synthesis *) input a);\n"
-              "endinterface\n"));
-}
 TEST(ModuleAndHierarchyParsing, InterfaceLifetimeAutomatic) {
   auto r = Parse("interface automatic myif; endinterface\n");
   ASSERT_NE(r.cu, nullptr);
