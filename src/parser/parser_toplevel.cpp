@@ -209,6 +209,21 @@ void Parser::ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
       if (Match(TokenKind::kComma)) d3 = ParseMinTypMaxExpr();
     }
     Expect(TokenKind::kRParen);
+  } else if (Check(TokenKind::kIntLiteral) && CurrentToken().text == "1") {
+    auto saved = lexer_.SavePos();
+    auto one_tok = CurrentToken();
+    Consume();
+    if (Check(TokenKind::kIdentifier) && CurrentToken().text == "step") {
+      Consume();
+      d1 = arena_.Create<Expr>();
+      d1->kind = ExprKind::kIntegerLiteral;
+      d1->text = "1step";
+      d1->int_val = 0;
+      d1->range.start = one_tok.loc;
+    } else {
+      lexer_.RestorePos(saved);
+      d1 = ParsePrimaryExpr();
+    }
   } else {
     d1 = ParsePrimaryExpr();
   }
