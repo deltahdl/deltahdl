@@ -19,6 +19,7 @@ from lib.python.github import (
     fetch_issue_body,
     fetch_issue_state,
     fetch_issue_title,
+    find_issue_by_title,
     format_subclause_label,
     mark_master_complete,
     next_unchecked,
@@ -587,6 +588,44 @@ def test_sync_subclause_table_adds_new() -> None:
 
 
 # ---- create_issue -----------------------------------------------------------
+
+
+def test_find_issue_by_title_found() -> None:
+    """Returns issue number when title matches."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='[{"number": 42, "title": "My Issue"}]',
+    )
+    with patch("lib.python.github.subprocess.run", return_value=cp):
+        assert find_issue_by_title("org", "repo", "My Issue") == 42
+
+
+def test_find_issue_by_title_not_found() -> None:
+    """Returns None when no title matches."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout='[]',
+    )
+    with patch("lib.python.github.subprocess.run", return_value=cp):
+        assert find_issue_by_title("org", "repo", "Missing") is None
+
+
+def test_find_issue_by_title_failure() -> None:
+    """Returns None on API failure."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=1, stdout="", stderr="err",
+    )
+    with patch("lib.python.github.subprocess.run", return_value=cp):
+        assert find_issue_by_title("org", "repo", "X") is None
+
+
+def test_find_issue_by_title_partial_match() -> None:
+    """Returns None when title only partially matches."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout='[{"number": 42, "title": "My Issue Extended"}]',
+    )
+    with patch("lib.python.github.subprocess.run", return_value=cp):
+        assert find_issue_by_title("org", "repo", "My Issue") is None
 
 
 def test_create_issue_returns_number(monkeypatch) -> None:
