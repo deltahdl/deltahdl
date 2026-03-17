@@ -226,9 +226,26 @@ def run_steps(steps, *, model="opus",
     return summary
 
 
+_VALID_EXTENSIONS = (".cpp", ".h", ".py")
+_VALID_NAMES = ("CMakeLists.txt",)
+
+
+def _is_valid_path(path):
+    """Return True if the path has a valid source extension."""
+    return (any(path.endswith(ext) for ext in _VALID_EXTENSIONS)
+            or any(path.endswith(name) for name in _VALID_NAMES))
+
+
 def commit_implementation(subclause, issue, *, action=""):
     """Commit, push, and close the issue via the commit message."""
     added, modified, deleted = get_porcelain_changes()
+    added = [p for p in added if _is_valid_path(p)]
+    modified = [p for p in modified if _is_valid_path(p)]
+    deleted = [p for p in deleted if _is_valid_path(p)]
+
+    if not added and not modified and not deleted:
+        return
+
     label = _format_subclause_label(subclause)
 
     parts = [f"Implement {label}"]

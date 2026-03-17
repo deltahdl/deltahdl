@@ -385,6 +385,22 @@ def test_commit_implementation_message_closes_issue(isc):
     assert "Closes #8" in msg
 
 
+def test_commit_implementation_filters_garbage_files(isc):
+    """commit_implementation ignores files without valid extensions."""
+    mocks = _commit_impl_and_capture(
+        isc, changes=(["a.cpp", "2", "{a,"], ["b.h"], ["old"]),
+    )
+    assert mocks["cap"].call_args[0][0] == ["a.cpp", "b.h"]
+
+
+def test_commit_implementation_skips_commit_when_no_valid_changes(isc):
+    """commit_implementation skips commit when only garbage files exist."""
+    mocks = _commit_impl_and_capture(
+        isc, changes=(["2", "{a,"], [], ["ev"]),
+    )
+    assert not mocks["cap"].called
+
+
 # ---- __main__ guard --------------------------------------------------------
 
 
