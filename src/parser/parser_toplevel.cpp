@@ -59,6 +59,77 @@ static bool GateUsesDelay3(GateKind kind) {
   }
 }
 
+// §A.3.3: Check whether an expression is a valid net_lvalue.
+static bool IsNetLvalue(const Expr* e) {
+  switch (e->kind) {
+    case ExprKind::kIdentifier:
+    case ExprKind::kSelect:
+    case ExprKind::kMemberAccess:
+      return true;
+    case ExprKind::kConcatenation:
+      for (auto* child : e->elements)
+        if (!IsNetLvalue(child)) return false;
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §A.3.3: Validate that output_terminal and inout_terminal positions contain
+// net_lvalue expressions.
+static void ValidateGateTerminalLvalues(GateKind kind,
+                                        const std::vector<Expr*>& terms,
+                                        DiagEngine& diag, SourceLoc loc) {
+  if (terms.empty()) return;
+  switch (kind) {
+    case GateKind::kTran:
+    case GateKind::kRtran:
+      // ( inout_terminal , inout_terminal )
+      for (size_t i = 0; i < terms.size() && i < 2; ++i)
+        if (!IsNetLvalue(terms[i]))
+          diag.Error(loc, "inout terminal must be a net lvalue");
+      break;
+    case GateKind::kTranif0:
+    case GateKind::kTranif1:
+    case GateKind::kRtranif0:
+    case GateKind::kRtranif1:
+      // ( inout_terminal , inout_terminal , enable_terminal )
+      for (size_t i = 0; i < terms.size() && i < 2; ++i)
+        if (!IsNetLvalue(terms[i]))
+          diag.Error(loc, "inout terminal must be a net lvalue");
+      break;
+    case GateKind::kBuf:
+    case GateKind::kNot:
+      // ( output_terminal { , output_terminal } , input_terminal )
+      for (size_t i = 0; i + 1 < terms.size(); ++i)
+        if (!IsNetLvalue(terms[i]))
+          diag.Error(loc, "output terminal must be a net lvalue");
+      break;
+    case GateKind::kPullup:
+    case GateKind::kPulldown:
+    case GateKind::kAnd:
+    case GateKind::kNand:
+    case GateKind::kOr:
+    case GateKind::kNor:
+    case GateKind::kXor:
+    case GateKind::kXnor:
+    case GateKind::kBufif0:
+    case GateKind::kBufif1:
+    case GateKind::kNotif0:
+    case GateKind::kNotif1:
+    case GateKind::kNmos:
+    case GateKind::kPmos:
+    case GateKind::kRnmos:
+    case GateKind::kRpmos:
+    case GateKind::kCmos:
+    case GateKind::kRcmos:
+      // First terminal is output_terminal.
+      if (!IsNetLvalue(terms[0]))
+        diag.Error(loc, "output terminal must be a net lvalue");
+      break;
+  }
+}
+
 // §A.3.1: Validate terminal count for a gate instance.
 static bool ValidGateTerminalCount(GateKind kind, size_t count) {
   switch (kind) {
@@ -241,6 +312,7 @@ void Parser::ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
   Expect(TokenKind::kRParen);
   if (!ValidGateTerminalCount(kind, item->gate_terminals.size()))
     diag_.Error(loc, "incorrect number of terminals for gate instance");
+  ValidateGateTerminalLvalues(kind, item->gate_terminals, diag_, loc);
   items.push_back(item);
   while (Match(TokenKind::kComma)) {
     items.push_back(ParseOneGateInstance(kind, loc));
@@ -268,6 +340,7 @@ ModuleItem* Parser::ParseOneGateInstance(GateKind kind, SourceLoc loc) {
   Expect(TokenKind::kRParen);
   if (!ValidGateTerminalCount(kind, item->gate_terminals.size()))
     diag_.Error(loc, "incorrect number of terminals for gate instance");
+  ValidateGateTerminalLvalues(kind, item->gate_terminals, diag_, loc);
   return item;
 }
 

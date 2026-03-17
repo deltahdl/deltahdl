@@ -6,28 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PrimitiveTerminalParsing, InoutTerminal_SimpleIdent) {
-  auto r = Parse(
-      "module m;\n"
-      "  tran (a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTran);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
-TEST(PrimitiveTerminalParsing, InoutTerminal_RtranBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  rtran (p, q);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRtran);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
 TEST(PrimitiveGateTypeParsing, PassEnSwitchtype_Tranif0) {
   auto r = Parse(
       "module m;\n"

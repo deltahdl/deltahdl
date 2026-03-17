@@ -319,4 +319,114 @@ TEST(PrimitiveTerminalParsing, AllTerminalTypes) {
   EXPECT_EQ(gates.size(), 7u);
 }
 
+TEST(PrimitiveTerminalParsing, InoutTerminal_SimpleIdent) {
+  auto r = Parse(
+      "module m;\n"
+      "  tran (a, b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTran);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 2u);
+}
+
+TEST(PrimitiveTerminalParsing, InoutTerminal_RtranBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  rtran (p, q);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRtran);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 2u);
+}
+
+TEST(PrimitiveTerminalParsing, Error_OutputTerminalIntegerLiteral) {
+  auto r = Parse(
+      "module m;\n"
+      "  and (1, a, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PrimitiveTerminalParsing, Error_OutputTerminalBinaryExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  or (a + b, c, d);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PrimitiveTerminalParsing, Error_OutputTerminalTernaryExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  buf (sel ? a : b, in);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PrimitiveTerminalParsing, Error_OutputTerminalStringLiteral) {
+  auto r = Parse(
+      "module m;\n"
+      "  not (\"out\", in);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PrimitiveTerminalParsing, Error_EnableGateOutputTerminalExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  bufif0 (a & b, in, en);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PrimitiveTerminalParsing, Error_MosOutputTerminalExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  nmos (a + b, in, ctrl);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PrimitiveTerminalParsing, Error_CmosOutputTerminalExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  cmos (a | b, in, nctrl, pctrl);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PrimitiveTerminalParsing, Error_PullGateOutputTerminalLiteral) {
+  auto r = Parse(
+      "module m;\n"
+      "  pullup (1'b1);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PrimitiveTerminalParsing, Error_InoutTerminalIntegerLiteral) {
+  auto r = Parse(
+      "module m;\n"
+      "  tran (1, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PrimitiveTerminalParsing, Error_InoutTerminalBinaryExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  rtran (a + b, c);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PrimitiveTerminalParsing, Error_InoutTerminalTernaryExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  tranif0 (sel ? a : b, c, en);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
