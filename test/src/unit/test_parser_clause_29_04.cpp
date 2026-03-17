@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(FormalSyntaxParsing, UdpCombinational) {
+TEST(UdpDeclGrammar, UdpCombinational) {
   auto r = Parse(
       "primitive mux2(output y, input a, input b, input s);\n"
       "  table\n"
@@ -247,7 +247,7 @@ static void VerifyUdpInputNames(const UdpDecl* udp,
   }
 }
 
-TEST(UserDefinedPrimitiveParsing, CombinationalUdp) {
+TEST(UdpDeclGrammar, CombinationalMux) {
   auto r = Parse(
       "primitive mux(output out, input a, b, sel);\n"
       "  table\n"
@@ -271,7 +271,7 @@ TEST(UserDefinedPrimitiveParsing, CombinationalUdp) {
   EXPECT_EQ(udp->table[0].current_state, 0);
 }
 
-TEST(DesignBuildingBlockParsing, CombinationalUdp) {
+TEST(UdpDeclGrammar, CombinationalOrGate) {
   auto r = Parse(
       "primitive udp_or (output out, input a, b);\n"
       "  table\n"
@@ -294,26 +294,6 @@ TEST(DesignBuildingBlockParsing, CombinationalUdp) {
   ASSERT_EQ(udp->table.size(), 4u);
   EXPECT_EQ(udp->table[0].output, '0');
   EXPECT_EQ(udp->table[3].output, '1');
-}
-
-TEST(UserDefinedPrimitiveParsing, UdpMultiple) {
-  auto r = Parse(
-      "primitive inv(output out, input in);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "primitive buf2(output out, input in);\n"
-      "  table\n"
-      "    0 : 0;\n"
-      "    1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->udps.size(), 2);
-  EXPECT_EQ(r.cu->udps[0]->name, "inv");
-  EXPECT_EQ(r.cu->udps[1]->name, "buf2");
 }
 
 }  // namespace

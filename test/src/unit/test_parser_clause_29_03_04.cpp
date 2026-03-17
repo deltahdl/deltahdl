@@ -97,7 +97,7 @@ TEST(UdpBodyGrammar, EdgeInputList_LeadingLevel) {
   EXPECT_EQ(udp->table[0].inputs[1], 'r');
 }
 
-TEST(UserDefinedPrimitiveParsing, SequentialCurrentStateField) {
+TEST(UdpBodyGrammar, SequentialCurrentStateField) {
   auto r = Parse(
       "primitive srff(output reg q, input s, r);\n"
       "  table\n"
@@ -149,7 +149,7 @@ static void VerifySeqUdpTable(const UdpDecl* udp, const SeqUdpRow expected[],
   }
 }
 
-TEST(UserDefinedPrimitiveParsing, SequentialUdp) {
+TEST(UdpDeclGrammar, SequentialDff) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
       "  table\n"

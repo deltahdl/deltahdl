@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(FormalSyntaxParsing, UdpSequential) {
+TEST(UdpBodyGrammar, UdpSequential) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
       "  table\n"

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(UdpGrammarParsing, UdpInstBasic) {
+TEST(UdpInstantiationParsing, UdpInstBasic) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
@@ -23,7 +23,7 @@ TEST(UdpGrammarParsing, UdpInstBasic) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 2u);
 }
 
-TEST(UdpGrammarParsing, UdpInstUnnamed) {
+TEST(UdpInstantiationParsing, UdpInstUnnamed) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
@@ -40,7 +40,7 @@ TEST(UdpGrammarParsing, UdpInstUnnamed) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 2u);
 }
 
-TEST(UdpGrammarParsing, UdpInstMultipleInputs) {
+TEST(UdpInstantiationParsing, UdpInstMultipleInputs) {
   auto r = Parse(
       "primitive mux(output out, input a, b, sel);\n"
       "  table\n"
@@ -61,7 +61,7 @@ TEST(UdpGrammarParsing, UdpInstMultipleInputs) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 4u);
 }
 
-TEST(UdpGrammarParsing, UdpInstMultipleInstances) {
+TEST(UdpInstantiationParsing, UdpInstMultipleInstances) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
@@ -78,7 +78,7 @@ TEST(UdpGrammarParsing, UdpInstMultipleInstances) {
   EXPECT_EQ(insts[1]->gate_inst_name, "u2");
 }
 
-TEST(UdpGrammarParsing, UdpInstWithDriveStrength) {
+TEST(UdpInstantiationParsing, UdpInstWithDriveStrength) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
@@ -95,7 +95,7 @@ TEST(UdpGrammarParsing, UdpInstWithDriveStrength) {
   EXPECT_EQ(insts[0]->drive_strength1, 2u);
 }
 
-TEST(UdpGrammarParsing, UdpInstWithDelaySingle) {
+TEST(UdpInstantiationParsing, UdpInstWithDelaySingle) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
@@ -113,7 +113,7 @@ TEST(UdpGrammarParsing, UdpInstWithDelaySingle) {
   EXPECT_EQ(insts[0]->gate_delay_fall, nullptr);
 }
 
-TEST(UdpGrammarParsing, UdpInstWithDelayTwo) {
+TEST(UdpInstantiationParsing, UdpInstWithDelayTwo) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
@@ -132,7 +132,7 @@ TEST(UdpGrammarParsing, UdpInstWithDelayTwo) {
   EXPECT_EQ(insts[0]->gate_delay_fall->int_val, 7u);
 }
 
-TEST(UdpGrammarParsing, UdpInstStrengthAndDelay) {
+TEST(UdpInstantiationParsing, UdpInstStrengthAndDelay) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
@@ -151,7 +151,7 @@ TEST(UdpGrammarParsing, UdpInstStrengthAndDelay) {
   EXPECT_EQ(insts[0]->gate_delay->int_val, 10u);
 }
 
-TEST(UdpGrammarParsing, UdpInstWithInstanceArray) {
+TEST(UdpInstantiationParsing, UdpInstWithInstanceArray) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
@@ -169,7 +169,7 @@ TEST(UdpGrammarParsing, UdpInstWithInstanceArray) {
   EXPECT_NE(insts[0]->inst_range_right, nullptr);
 }
 
-TEST(UdpGrammarParsing, UdpInstNoStrengthNoDelay) {
+TEST(UdpInstantiationParsing, UdpInstNoStrengthNoDelay) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
@@ -188,7 +188,7 @@ TEST(UdpGrammarParsing, UdpInstNoStrengthNoDelay) {
   EXPECT_EQ(insts[0]->gate_delay_fall, nullptr);
 }
 
-TEST(UdpGrammarParsing, UdpInstStrengthSharedAcrossInstances) {
+TEST(UdpInstantiationParsing, UdpInstStrengthSharedAcrossInstances) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
@@ -207,7 +207,7 @@ TEST(UdpGrammarParsing, UdpInstStrengthSharedAcrossInstances) {
   EXPECT_EQ(insts[1]->drive_strength1, 5u);
 }
 
-TEST(UdpGrammarParsing, UdpInstSequential) {
+TEST(UdpInstantiationParsing, UdpInstSequential) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
       "  table\n"

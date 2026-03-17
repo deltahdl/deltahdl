@@ -60,7 +60,7 @@ TEST(UdpInstantiationParsing, UdpInst_ExternUdp) {
   EXPECT_EQ(insts[0]->inst_module, "my_udp");
 }
 
-TEST(PrimitiveWithEndLabel, CombinationalUdpEndLabel) {
+TEST(UdpDeclGrammar, CombinationalUdpEndLabel) {
   auto r = Parse(
       "primitive inv(output y, input a);\n"
       "  table\n"
@@ -74,7 +74,7 @@ TEST(PrimitiveWithEndLabel, CombinationalUdpEndLabel) {
   EXPECT_EQ(r.cu->udps[0]->name, "inv");
 }
 
-TEST(CombinationalUdp, MissingEndprimitiveIsError) {
+TEST(UdpDeclGrammar, MissingEndprimitiveIsError) {
   EXPECT_FALSE(ParseOk(
       "primitive inv(output y, input a);\n"
       "  table\n"
@@ -83,7 +83,7 @@ TEST(CombinationalUdp, MissingEndprimitiveIsError) {
       "  endtable\n"));
 }
 
-TEST(UserDefinedPrimitives, PrimitiveKeywordIntroducesUdp) {
+TEST(UdpDeclGrammar, PrimitiveKeywordIntroducesUdp) {
   auto r = Parse(
       "primitive udp_buf (output out, input in);\n"
       "  table 0 : 0; 1 : 1; endtable\n"

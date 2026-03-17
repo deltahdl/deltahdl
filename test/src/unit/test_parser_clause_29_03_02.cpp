@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DeclarationListParsing, ListOfUdpPortIdentifiersMultiple) {
+TEST(UdpPortGrammar, ListOfUdpPortIdentifiersMultiple) {
   auto r = Parse(
       "primitive mux(output out, input a, b, sel);\n"
       "  table\n"

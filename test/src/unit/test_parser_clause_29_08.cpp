@@ -257,7 +257,7 @@ TEST(UdpInstantiationParsing, UdpInst_WithAttributes) {
   EXPECT_FALSE(insts[0]->attrs.empty());
 }
 
-TEST(UserDefinedPrimitiveParsing, UdpInstance) {
+TEST(UdpInstantiationParsing, UdpInstance) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table\n"
@@ -278,7 +278,7 @@ TEST(UserDefinedPrimitiveParsing, UdpInstance) {
   EXPECT_EQ(insts[0]->gate_inst_name, "u1");
 }
 
-TEST(UdpInstantiation, UdpInstanceInModule) {
+TEST(UdpInstantiationParsing, UdpInstanceInModule) {
   auto r = Parse(
       "primitive udp_and (output out, input a, b);\n"
       "  table 0 0 : 0; 0 1 : 0; 1 0 : 0; 1 1 : 1; endtable\n"
@@ -292,7 +292,7 @@ TEST(UdpInstantiation, UdpInstanceInModule) {
   EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
 }
 
-TEST(UdpInstantiation, BuiltInAndUdpCoexist) {
+TEST(UdpInstantiationParsing, BuiltInAndUdpCoexist) {
   auto r = Parse(
       "primitive udp_inv (output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"

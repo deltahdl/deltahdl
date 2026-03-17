@@ -243,7 +243,7 @@ TEST(UdpBodyGrammar, InitVal_Bare1) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
 }
 
-TEST(DesignBuildingBlockParsing, SequentialUdp) {
+TEST(UdpDeclGrammar, SequentialLatch) {
   auto r = Parse(
       "primitive udp_latch (output reg q, input d, en);\n"
       "  initial q = 0;\n"
@@ -268,7 +268,7 @@ TEST(DesignBuildingBlockParsing, SequentialUdp) {
   EXPECT_EQ(udp->table[2].output, '-');
 }
 
-TEST(UserDefinedPrimitiveParsing, SequentialUdpInitial) {
+TEST(UdpDeclGrammar, SequentialUdpInitial) {
   auto r = Parse(
       "primitive srff(output reg q, input s, r);\n"
       "  initial q = 1'b1;\n"
