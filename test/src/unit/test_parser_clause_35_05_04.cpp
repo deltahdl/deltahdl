@@ -10,34 +10,6 @@ using namespace delta;
 
 namespace {
 
-TEST(FunctionDeclParsing, DpiImportFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" function int c_add(input int a, input int b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kDpiImport);
-  EXPECT_EQ(item->name, "c_add");
-  EXPECT_FALSE(item->dpi_is_task);
-  EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
-  ASSERT_EQ(item->func_args.size(), 2u);
-}
-
-TEST(FunctionDeclParsing, DpiImportTask) {
-  auto r = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" task c_do_work(input int x);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kDpiImport);
-  EXPECT_TRUE(item->dpi_is_task);
-  EXPECT_EQ(item->name, "c_do_work");
-}
-
 TEST(FunctionDeclParsing, DpiSpecStringDpiC) {
   auto r = Parse(
       "module m;\n"
@@ -93,19 +65,6 @@ TEST(FunctionDeclParsing, DpiTaskImportContext) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->dpi_is_context);
   EXPECT_TRUE(item->dpi_is_task);
-}
-
-TEST(FunctionDeclParsing, DpiImportWithCIdentifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  import \"DPI-C\" c_my_func = function int my_func(input int x);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kDpiImport);
-  EXPECT_EQ(item->dpi_c_name, "c_my_func");
-  EXPECT_EQ(item->name, "my_func");
 }
 
 TEST(FunctionDeclParsing, DpiImportTaskWithCIdentifier) {

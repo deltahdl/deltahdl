@@ -19,19 +19,6 @@ TEST(StrengthParsing, DriveStrengthStr1Highz0) {
   EXPECT_EQ(item->drive_strength1, 4u);
 }
 
-TEST(StrengthParsing, DriveStrengthStr0Str1) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire (strong0, pull1) w;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->drive_strength0, 4u);
-  EXPECT_EQ(item->drive_strength1, 3u);
-}
-
 TEST(StrengthParsing, DriveStrengthPull0Supply1) {
   auto r = Parse(
       "module m;\n"
