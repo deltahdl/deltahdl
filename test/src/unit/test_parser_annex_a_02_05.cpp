@@ -145,4 +145,148 @@ TEST(DeclarationRangeParsing, ParamWithUnpackedDims) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
+// --- unpacked_dimension edge cases ---
+
+TEST(DeclarationRangeParsing, UnpackedDimensionAscendingRange) {
+  auto r = Parse("module m; logic x [0:7]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_GE(item->unpacked_dims.size(), 1u);
+  EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kBinary);
+  EXPECT_EQ(item->unpacked_dims[0]->op, TokenKind::kColon);
+}
+
+TEST(DeclarationRangeParsing, UnpackedDimensionOnPort) {
+  auto r = Parse("module m(input logic x [3:0]); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->ports.size(), 1u);
+  EXPECT_GE(r.cu->modules[0]->ports[0].unpacked_dims.size(), 1u);
+}
+
+TEST(DeclarationRangeParsing, UnpackedDimensionOnNet) {
+  auto r = Parse("module m; wire w [3:0]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_GE(item->unpacked_dims.size(), 1u);
+}
+
+// --- associative_dimension with other built-in types ---
+
+TEST(DeclarationRangeParsing, AssociativeDimensionByteType) {
+  auto r = Parse("module m; int x [byte]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_GE(item->unpacked_dims.size(), 1u);
+  EXPECT_EQ(item->unpacked_dims[0]->text, "byte");
+}
+
+TEST(DeclarationRangeParsing, AssociativeDimensionShortintType) {
+  auto r = Parse("module m; int x [shortint]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_GE(item->unpacked_dims.size(), 1u);
+  EXPECT_EQ(item->unpacked_dims[0]->text, "shortint");
+}
+
+TEST(DeclarationRangeParsing, AssociativeDimensionLongintType) {
+  auto r = Parse("module m; int x [longint]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_GE(item->unpacked_dims.size(), 1u);
+  EXPECT_EQ(item->unpacked_dims[0]->text, "longint");
+}
+
+TEST(DeclarationRangeParsing, AssociativeDimensionIntegerType) {
+  auto r = Parse("module m; int x [integer]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_GE(item->unpacked_dims.size(), 1u);
+  EXPECT_EQ(item->unpacked_dims[0]->text, "integer");
+}
+
+// --- variable_dimension all alternatives ---
+
+TEST(DeclarationRangeParsing, VariableDimensionUnsized) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f(int x []);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_GE(item->func_args.size(), 1u);
+  ASSERT_GE(item->func_args[0].unpacked_dims.size(), 1u);
+  EXPECT_EQ(item->func_args[0].unpacked_dims[0], nullptr);
+}
+
+TEST(DeclarationRangeParsing, VariableDimensionAssociative) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f(int x [string]);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_GE(item->func_args.size(), 1u);
+  ASSERT_GE(item->func_args[0].unpacked_dims.size(), 1u);
+  EXPECT_EQ(item->func_args[0].unpacked_dims[0]->text, "string");
+}
+
+TEST(DeclarationRangeParsing, VariableDimensionQueue) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f(int x [$]);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_GE(item->func_args.size(), 1u);
+  ASSERT_GE(item->func_args[0].unpacked_dims.size(), 1u);
+  EXPECT_EQ(item->func_args[0].unpacked_dims[0]->text, "$");
+}
+
+// --- packed_dimension on struct member ---
+
+TEST(DeclarationRangeParsing, PackedDimensionOnStructMember) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] data; } my_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- multiple dimension kinds combined ---
+
+TEST(DeclarationRangeParsing, PackedAndQueueDimension) {
+  auto r = Parse("module m; logic [7:0] q [$]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
+  ASSERT_GE(item->unpacked_dims.size(), 1u);
+  EXPECT_EQ(item->unpacked_dims[0]->text, "$");
+}
+
+TEST(DeclarationRangeParsing, PackedAndAssociativeDimension) {
+  auto r = Parse("module m; logic [15:0] a [int]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
+  ASSERT_GE(item->unpacked_dims.size(), 1u);
+  EXPECT_EQ(item->unpacked_dims[0]->text, "int");
+}
+
 }  // namespace
