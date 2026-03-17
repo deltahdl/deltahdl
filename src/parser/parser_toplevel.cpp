@@ -359,6 +359,14 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
     Expect(TokenKind::kRParen);
     if (!GateAllowsStrength(gate_kind))
       diag_.Error(loc, "drive strength not allowed on this gate type");
+    // §A.3.2: single-strength pulldown must use strength0, pullup must use
+    // strength1.
+    if (gate_kind == GateKind::kPulldown && str0 == 0 && str1 != 0)
+      diag_.Error(loc,
+                  "pulldown single-strength must be a strength0 keyword");
+    if (gate_kind == GateKind::kPullup && str1 == 0 && str0 != 0)
+      diag_.Error(loc,
+                  "pullup single-strength must be a strength1 keyword");
   }
 
   Expr* delay = nullptr;
