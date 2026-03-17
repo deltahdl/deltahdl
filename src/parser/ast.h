@@ -581,6 +581,7 @@ struct ModuleItem {
   std::vector<EventExpr> sensitivity;
 
   // Module instantiation
+  std::string_view inst_scope;
   std::string_view inst_module;
   std::string_view inst_name;
   std::vector<std::pair<std::string_view, Expr*>> inst_params;

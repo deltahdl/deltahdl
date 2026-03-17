@@ -394,6 +394,15 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kColonColon)) {
     Consume();
     auto type_tok = ExpectIdentifier();
+    if (CheckIdentifier() || Check(TokenKind::kHash)) {
+      if (InProgramBlock())
+        diag_.Error(name_tok.loc, "instantiations not allowed in programs");
+      auto start = items.size();
+      ParseModuleInstList(type_tok, &items);
+      for (auto i = start; i < items.size(); ++i)
+        items[i]->inst_scope = name_tok.text;
+      return;
+    }
     DataType dtype;
     dtype.kind = DataTypeKind::kNamed;
     dtype.scope_name = name_tok.text;

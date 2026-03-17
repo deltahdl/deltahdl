@@ -376,8 +376,13 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
 
   auto* child_decl = FindModule(item->inst_module);
   if (!child_decl) {
-    diag_.Error(item->loc,
-                std::format("unknown module '{}'", item->inst_module));
+    if (item->inst_scope.empty())
+      diag_.Error(item->loc,
+                  std::format("unknown module '{}'", item->inst_module));
+    else
+      diag_.Error(item->loc,
+                  std::format("unknown module '{}::{}'", item->inst_scope,
+                              item->inst_module));
     mod->children.push_back(inst);
     return;
   }

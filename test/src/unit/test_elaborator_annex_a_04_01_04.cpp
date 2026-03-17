@@ -1,18 +1,17 @@
-#include "fixture_checker_elab.h"
 #include "fixture_elaborator.h"
 
 namespace {
 
-TEST(CheckerElab, CheckerInstantiatedFromModule) {
-  CheckerElabFixture f;
-  auto* design = ElaborateSource(
+TEST(CheckerInstantiationGrammar, ElaborationCheckerInstFromModule) {
+  ElabFixture f;
+  auto* design = Elaborate(
       "checker sub_chk(input logic a);\n"
       "endchecker\n"
       "module top;\n"
       "  logic sig;\n"
       "  sub_chk u0(.a(sig));\n"
       "endmodule\n",
-      f, "top");
+      f);
   ASSERT_NE(design, nullptr);
   auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1u);
@@ -78,6 +77,36 @@ TEST(CheckerInstantiationGrammar, ElaborationCheckerInsideChecker) {
   ASSERT_GE(outer->children.size(), 1u);
   EXPECT_EQ(outer->children[0].module_name, "inner_chk");
   EXPECT_NE(outer->children[0].resolved, nullptr);
+}
+
+TEST(CheckerInstantiationGrammar, ElaborationCheckerInstPositionalPorts) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "checker my_chk(input logic clk, input logic data);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk, data;\n"
+      "  my_chk u0(clk, data);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* top = design->top_modules[0];
+  ASSERT_GE(top->children.size(), 1u);
+  EXPECT_EQ(top->children[0].module_name, "my_chk");
+  EXPECT_NE(top->children[0].resolved, nullptr);
+}
+
+TEST(CheckerInstantiationGrammar, ElaborationUnresolvedChecker) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top;\n"
+      "  nonexistent_chk u0();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* top = design->top_modules[0];
+  ASSERT_GE(top->children.size(), 1u);
+  EXPECT_EQ(top->children[0].resolved, nullptr);
 }
 
 }  // namespace
