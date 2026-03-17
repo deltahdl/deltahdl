@@ -543,6 +543,9 @@ struct ModuleItem {
   bool is_extern = false;    // extern method_prototype / task_prototype
   bool is_forkjoin = false;  // extern forkjoin task_prototype
 
+  // §A.2.1.1: local_parameter_declaration vs parameter_declaration
+  bool is_localparam = false;
+
   // checker_or_generate_item_declaration (A.1.8)
   bool is_rand = false;  // [rand] data_declaration in checker body
 

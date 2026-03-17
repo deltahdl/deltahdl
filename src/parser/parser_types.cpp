@@ -453,7 +453,7 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
 
 // type_parameter_declaration: type [forward_type] list_of_type_assignments
 void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
-                                SourceLoc loc) {
+                                SourceLoc loc, bool localparam) {
   // Optional forward_type: enum | struct | union | class | interface class
   if (Check(TokenKind::kKwEnum) || Check(TokenKind::kKwStruct) ||
       Check(TokenKind::kKwUnion) || Check(TokenKind::kKwClass) ||
@@ -468,6 +468,7 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kParamDecl;
+    item->is_localparam = localparam;
     item->loc = loc;
     item->data_type.kind = DataTypeKind::kVoid;  // Marker for type params.
     item->name = Expect(TokenKind::kIdentifier).text;
@@ -487,10 +488,11 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
 
 void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
+  bool localparam = Check(TokenKind::kKwLocalparam);
   Consume();  // parameter or localparam
   // type_parameter_declaration: type [forward_type] list_of_type_assignments
   if (Match(TokenKind::kKwType)) {
-    ParseTypeParamDecl(items, loc);
+    ParseTypeParamDecl(items, loc, localparam);
     return;
   }
   DataType dtype = ParseDataType();
@@ -507,6 +509,7 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kParamDecl;
+    item->is_localparam = localparam;
     item->loc = loc;
     item->data_type = dtype;
     item->name = Expect(TokenKind::kIdentifier).text;

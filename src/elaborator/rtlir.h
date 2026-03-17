@@ -133,6 +133,7 @@ struct RtlirParamDecl {
   Expr* default_value = nullptr;
   int64_t resolved_value = 0;
   bool is_resolved = false;
+  bool is_localparam = false;  // §A.2.1.1: localparam vs parameter.
   bool from_override = false;  // True when set via instance #(...) override.
   bool is_unbounded = false;   // §6.20.7: parameter assigned $.
 };
