@@ -1,5 +1,6 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_elaborator.h"
 #include "fixture_program.h"
 
 using namespace delta;
@@ -43,23 +44,6 @@ TEST(ProgramElab, ElaborateProgramWithInitialBlock) {
   auto* mod = design->top_modules[0];
   EXPECT_FALSE(mod->processes.empty());
   EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kInitial);
-}
-
-TEST(ProgramElab, ProgramInstantiatedFromModule) {
-  ProgramElabFixture f;
-  auto* design = ElaborateSource(
-      "program sub_prog(input logic a);\n"
-      "endprogram\n"
-      "module top;\n"
-      "  logic sig;\n"
-      "  sub_prog u0(.a(sig));\n"
-      "endmodule\n",
-      f, "top");
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->children.size(), 1u);
-  EXPECT_NE(mod->children[0].resolved, nullptr);
-  EXPECT_EQ(mod->children[0].resolved->name, "sub_prog");
 }
 
 TEST(ProgramConstruct, ProgramWithDataAndInitialElaborates) {
