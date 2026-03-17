@@ -588,6 +588,9 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (auto* func : mod->function_decls) {
     ctx_.RegisterFunction(func->name, func);
   }
+  for (auto* let_decl : mod->let_decls) {
+    ctx_.RegisterLetDecl(let_decl->name, let_decl);
+  }
   for (auto* cls : mod->class_decls) {
     LowerClassDecl(cls);
   }

@@ -788,17 +788,31 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
 static thread_local std::unordered_set<std::string_view> expanding_lets;
 
 // §11.12/§F.4: Bind let formal arguments to actual values in a new scope.
+// §A.2.12 let_list_of_arguments: supports positional and named (.name(expr)).
 static void BindLetArgs(ModuleItem* decl, const Expr* call, SimContext& ctx,
                         Arena& arena) {
   auto& formals = decl->func_args;
+  size_t positional_count = call->args.size() - call->arg_names.size();
   for (size_t i = 0; i < formals.size(); ++i) {
     Logic4Vec val;
-    if (i < call->args.size()) {
+    if (i < positional_count) {
       val = EvalExpr(call->args[i], ctx, arena);
-    } else if (formals[i].default_value) {
-      val = EvalExpr(formals[i].default_value, ctx, arena);
     } else {
-      val = MakeLogic4Vec(arena, 32);
+      // Search named arguments for this formal.
+      int found = -1;
+      for (size_t j = 0; j < call->arg_names.size(); ++j) {
+        if (call->arg_names[j] == formals[i].name) {
+          found = static_cast<int>(positional_count + j);
+          break;
+        }
+      }
+      if (found >= 0 && call->args[static_cast<size_t>(found)]) {
+        val = EvalExpr(call->args[static_cast<size_t>(found)], ctx, arena);
+      } else if (formals[i].default_value) {
+        val = EvalExpr(formals[i].default_value, ctx, arena);
+      } else {
+        val = MakeLogic4Vec(arena, 32);
+      }
     }
     auto* var = ctx.CreateLocalVariable(formals[i].name, val.width);
     var->value = val;

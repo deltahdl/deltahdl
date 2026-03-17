@@ -270,6 +270,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kDpiImport:
     case ModuleItemKind::kDpiExport:
     case ModuleItemKind::kLetDecl:
+      mod->let_decls.push_back(item);
+      break;
     case ModuleItemKind::kDefaultDisableIff:
     case ModuleItemKind::kNestedModuleDecl:
     case ModuleItemKind::kClassDecl:
