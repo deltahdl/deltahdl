@@ -462,7 +462,7 @@ def test_discover_subclauses_prompt_contains_clause(
 ) -> None:
     """discover_subclauses prompt references the clause number."""
     prompt = _discover_subclauses_prompt(ic, monkeypatch)
-    assert "clause 4" in prompt.lower() or "§4" in prompt
+    assert "§4" in prompt
 
 
 def test_discover_subclauses_prompt_contains_lrm_path(

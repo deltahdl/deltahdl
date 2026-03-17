@@ -38,8 +38,9 @@ def discover_subclauses(
     Returns a dict of ``{subclause_number: title}`` for subclauses
     that Claude determines are implementable as software.
     """
+    label = format_subclause_label(clause)
     prompt = (
-        f"Read clause {clause} in the LRM at {lrm_path}. "
+        f"Read {label} in the LRM at {lrm_path}. "
         "List ALL subclauses at EVERY depth level. For each subclause "
         "that has its own numbered subsections, list those too.\n\n"
         "Return ONLY a JSON object where each key is a subclause "
@@ -51,7 +52,7 @@ def discover_subclauses(
     env.pop("CLAUDECODE", None)
 
     print(
-        f"Discovering subclauses for clause {clause}"
+        f"Discovering subclauses for {label}"
         f" via Claude ({model})...",
         end="", flush=True,
     )
