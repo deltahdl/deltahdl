@@ -212,4 +212,149 @@ TEST(BlockItemDeclParsing, MultipleBlockItemDecls) {
   EXPECT_EQ(stmts[2]->kind, StmtKind::kVarDecl);
 }
 
+// --- {attribute_instance} prefix ---
+
+TEST(BlockItemDeclParsing, DataDeclWithAttribute) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* synthesis *) int x;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_FALSE(stmt->attrs.empty());
+}
+
+TEST(BlockItemDeclParsing, LocalparamWithAttribute) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* mark *) localparam int W = 8;\n"
+      "  end\n"
+      "endmodule\n"));
+}
+
+TEST(BlockItemDeclParsing, ParameterWithAttribute) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* mark *) parameter int D = 4;\n"
+      "  end\n"
+      "endmodule\n"));
+}
+
+TEST(BlockItemDeclParsing, LetDeclWithAttribute) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  initial begin\n"
+      "    (* mark *) let double(x) = x * 2;\n"
+      "  end\n"
+      "endmodule\n"));
+}
+
+// --- additional contexts ---
+
+TEST(BlockItemDeclParsing, FunctionBodyBlockItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int f(int a);\n"
+      "    int temp;\n"
+      "    temp = a + 1;\n"
+      "    return temp;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FirstFunctionDecl(r);
+  ASSERT_NE(fn, nullptr);
+  EXPECT_GE(fn->func_body_stmts.size(), 1u);
+  EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+}
+
+TEST(BlockItemDeclParsing, AlwaysCombBlockItem) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  always_comb begin\n"
+      "    int temp;\n"
+      "    temp = 0;\n"
+      "  end\n"
+      "endmodule\n"));
+}
+
+// --- mixed alternatives ---
+
+TEST(BlockItemDeclParsing, MixedAlternativesInOneBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    localparam int W = 8;\n"
+      "    parameter int D = 4;\n"
+      "    int x;\n"
+      "    let inc(a) = a + 1;\n"
+      "    x = inc(W);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto stmts = AllInitialStmts(r);
+  ASSERT_GE(stmts.size(), 5u);
+  EXPECT_EQ(stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(stmts[1]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(stmts[2]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(stmts[3]->kind, StmtKind::kBlockItemDecl);
+}
+
+// --- data_declaration with var prefix ---
+
+TEST(BlockItemDeclParsing, DataDeclWithVarPrefix) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    var int x = 5;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(stmt->var_name, "x");
+}
+
+// --- data_declaration: import wildcard ---
+
+TEST(BlockItemDeclParsing, ImportWildcardInBlock) {
+  EXPECT_TRUE(ParseOk(
+      "package pkg;\n"
+      "  int x;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    import pkg::*;\n"
+      "  end\n"
+      "endmodule\n"));
+}
+
+// --- let_declaration without arguments ---
+
+TEST(BlockItemDeclParsing, LetDeclNoArgsInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    let ZERO = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockItemDecl);
+  ASSERT_NE(stmt->decl_item, nullptr);
+  EXPECT_EQ(stmt->decl_item->kind, ModuleItemKind::kLetDecl);
+}
+
 }  // namespace
