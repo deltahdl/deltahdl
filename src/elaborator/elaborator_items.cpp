@@ -573,7 +573,25 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
                               loop_scope[genvar_name]);
     ElaborateGenerateItems(item->gen_body, mod, loop_scope);
 
-    auto next = ConstEvalInt(item->gen_step->rhs, loop_scope);
+    // Evaluate genvar_iteration step: supports i = expr, i += expr,
+    // ++i, i++, --i, i-- (§A.4.2 genvar_iteration).
+    std::optional<int64_t> next;
+    if (item->gen_step->rhs) {
+      next = ConstEvalInt(item->gen_step->rhs, loop_scope);
+    } else if (item->gen_step->expr) {
+      auto* e = item->gen_step->expr;
+      if ((e->kind == ExprKind::kUnary ||
+           e->kind == ExprKind::kPostfixUnary) &&
+          e->lhs && e->lhs->kind == ExprKind::kIdentifier) {
+        auto it = loop_scope.find(e->lhs->text);
+        if (it != loop_scope.end()) {
+          if (e->op == TokenKind::kPlusPlus)
+            next = it->second + 1;
+          else if (e->op == TokenKind::kMinusMinus)
+            next = it->second - 1;
+        }
+      }
+    }
     if (!next) break;
     loop_scope[genvar_name] = *next;
   }

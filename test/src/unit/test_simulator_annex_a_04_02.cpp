@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaborator, GenerateIfTrueBranch) {
+TEST(GenerateSimulation, GenerateIfTrueBranch) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t #(parameter N = 1) ();\n"
@@ -32,7 +32,7 @@ TEST(Elaborator, GenerateIfTrueBranch) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(Elaborator, GenerateIfFalseBranch) {
+TEST(GenerateSimulation, GenerateIfFalseBranch) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t #(parameter N = 0) ();\n"
@@ -57,7 +57,7 @@ TEST(Elaborator, GenerateIfFalseBranch) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(Elaborator, GenerateCaseMatch) {
+TEST(GenerateSimulation, GenerateCaseMatch) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t #(parameter MODE = 2) ();\n"
@@ -82,7 +82,7 @@ TEST(Elaborator, GenerateCaseMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(Elaborator, GenerateCaseDefault) {
+TEST(GenerateSimulation, GenerateCaseDefault) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t #(parameter MODE = 99) ();\n"
@@ -105,6 +105,80 @@ TEST(Elaborator, GenerateCaseDefault) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
+}
+
+TEST(GenerateSimulation, GenerateForAssignValues) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter N = 3) ();\n"
+      "  logic [31:0] x;\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [31:0] w;\n"
+      "      assign w = 10;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "  assign x = 7;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+TEST(GenerateSimulation, GenerateIfNoElseFalse) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter EN = 0) ();\n"
+      "  logic [31:0] x;\n"
+      "  assign x = 5;\n"
+      "  generate\n"
+      "    if (EN) begin\n"
+      "      assign x = 99;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
+TEST(GenerateSimulation, GenerateCaseNoMatchNoDefault) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter MODE = 42) ();\n"
+      "  logic [31:0] x;\n"
+      "  assign x = 3;\n"
+      "  generate\n"
+      "    case (MODE)\n"
+      "      1: begin assign x = 10; end\n"
+      "      2: begin assign x = 20; end\n"
+      "    endcase\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
 }  // namespace

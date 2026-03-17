@@ -23,15 +23,20 @@ static std::optional<int64_t> EvalBinaryArith(TokenKind op, int64_t lhs,
                                               int64_t rhs) {
   switch (op) {
     case TokenKind::kPlus:
+    case TokenKind::kPlusEq:
       return lhs + rhs;
     case TokenKind::kMinus:
+    case TokenKind::kMinusEq:
       return lhs - rhs;
     case TokenKind::kStar:
+    case TokenKind::kStarEq:
       return lhs * rhs;
     case TokenKind::kSlash:
+    case TokenKind::kSlashEq:
       if (rhs == 0) return std::nullopt;
       return lhs / rhs;
     case TokenKind::kPercent:
+    case TokenKind::kPercentEq:
       if (rhs == 0) return std::nullopt;
       return lhs % rhs;
     case TokenKind::kPower:
@@ -46,20 +51,27 @@ static std::optional<int64_t> EvalBinaryBitwise(TokenKind op, int64_t lhs,
                                                 int64_t rhs) {
   switch (op) {
     case TokenKind::kAmp:
+    case TokenKind::kAmpEq:
       return lhs & rhs;
     case TokenKind::kPipe:
+    case TokenKind::kPipeEq:
       return lhs | rhs;
     case TokenKind::kCaret:
+    case TokenKind::kCaretEq:
       return lhs ^ rhs;
     case TokenKind::kTildeCaret:
     case TokenKind::kCaretTilde:
       return ~(lhs ^ rhs);
     case TokenKind::kLtLt:
     case TokenKind::kLtLtLt:
+    case TokenKind::kLtLtEq:
+    case TokenKind::kLtLtLtEq:
       return lhs << rhs;
     case TokenKind::kGtGt:
+    case TokenKind::kGtGtEq:
       return static_cast<int64_t>(static_cast<uint64_t>(lhs) >> rhs);
     case TokenKind::kGtGtGt:
+    case TokenKind::kGtGtGtEq:
       return lhs >> rhs;
     default:
       return std::nullopt;

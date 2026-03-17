@@ -3,6 +3,8 @@
 namespace delta {
 
 void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body) {
+  // generate_block_or_null: ';' produces an empty body (§A.4.2)
+  if (Match(TokenKind::kSemicolon)) return;
   if (Match(TokenKind::kKwBegin)) {
     if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
     while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
