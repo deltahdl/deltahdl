@@ -23,7 +23,7 @@ TEST(DeclarationListParsing, ListOfVariablePortIdentifiersWithDim) {
   EXPECT_NE(port.default_value, nullptr);
 }
 
-TEST(ConstraintDeclParsing, OutputDefaultValue) {
+TEST(DeclarationListParsing, OutputDefaultValue) {
   auto r = ParseWithPreprocessor("module m(output logic q = 1'b0); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
