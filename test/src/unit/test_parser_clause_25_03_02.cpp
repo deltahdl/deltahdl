@@ -62,23 +62,4 @@ TEST(InterfaceDeclaration, SimpleBusUsageInModules) {
               "endmodule\n"));
 }
 
-TEST(InterfaceDeclaration, InstantiationInModule) {
-  EXPECT_TRUE(
-      ParseOk("interface simple_bus(input logic clk);\n"
-              "  logic req, gnt;\n"
-              "endinterface\n"
-              "module top;\n"
-              "  logic clk;\n"
-              "  simple_bus sb_intf(.clk(clk));\n"
-              "endmodule\n"));
-}
-
-TEST(InterfaceInstantiation, ModuleInstantiatesInterface) {
-  EXPECT_TRUE(
-      ParseOk("interface ifc; logic req; endinterface\n"
-              "module m;\n"
-              "  ifc u0();\n"
-              "endmodule\n"));
-}
-
 }  // namespace

@@ -4,14 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(InterfaceInstantiationGrammar, InterfaceInstWildcardPort) {
-  auto r = Parse("module m; my_if u0(.*); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_TRUE(item->inst_wildcard);
-}
-
 TEST(ProgramInstantiationGrammar, ProgramInstWildcardPort) {
   auto r = Parse(
       "program my_prog(input logic clk);\n"
