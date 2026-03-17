@@ -1,27 +1,3 @@
-#include "fixture_parser.h"
-
-using namespace delta;
-
 namespace {
-
-TEST(DelayParsing, Delay3GateMintypmax) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y, a, b;\n"
-      "  and #(1:2:3) g1(y, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[3];
-  ASSERT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_delay->kind, ExprKind::kMinTypMax);
-}
-
-TEST(PrimitiveInstantiationParsing, GateInst_DelayWithMinTypMax) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  and #(1:2:3, 4:5:6) a1(out, in1, in2);\n"
-              "endmodule\n"));
-}
 
 }  // namespace

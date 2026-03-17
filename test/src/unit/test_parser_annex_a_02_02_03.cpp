@@ -218,7 +218,7 @@ TEST(DelayParsing, Delay3GateThreeValues) {
   auto r = Parse(
       "module m;\n"
       "  wire y, a, b;\n"
-      "  and #(5, 10, 15) g1(y, a, b);\n"
+      "  bufif0 #(5, 10, 15) g1(y, a, b);\n"
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

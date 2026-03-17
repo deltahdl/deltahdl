@@ -241,6 +241,28 @@ TEST(PrimitiveTerminalParsing, OutputTerminal_EnableGate) {
               "endmodule\n"));
 }
 
+TEST(PrimitiveTerminalParsing, OutputTerminal_MultipleOutputs) {
+  auto r = Parse(
+      "module m;\n"
+      "  buf (o1, o2, o3, in);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBuf);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 4u);
+}
+
+TEST(PrimitiveTerminalParsing, OutputTerminal_PullGate) {
+  auto r = Parse(
+      "module m;\n"
+      "  pullup (net_a);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 1u);
+}
+
 TEST(PrimitiveTerminalParsing, PcontrolTerminal_SimpleIdent) {
   auto r = Parse(
       "module m;\n"

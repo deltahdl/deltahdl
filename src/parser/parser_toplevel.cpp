@@ -4,6 +4,100 @@ namespace delta {
 
 // --- Gate primitive parsing ---
 
+// §A.3.1: Which gate categories allow drive_strength.
+static bool GateAllowsStrength(GateKind kind) {
+  switch (kind) {
+    case GateKind::kAnd:
+    case GateKind::kNand:
+    case GateKind::kOr:
+    case GateKind::kNor:
+    case GateKind::kXor:
+    case GateKind::kXnor:
+    case GateKind::kBuf:
+    case GateKind::kNot:
+    case GateKind::kBufif0:
+    case GateKind::kBufif1:
+    case GateKind::kNotif0:
+    case GateKind::kNotif1:
+    case GateKind::kPullup:
+    case GateKind::kPulldown:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §A.3.1: Which gate categories allow delay.
+static bool GateAllowsDelay(GateKind kind) {
+  switch (kind) {
+    case GateKind::kTran:
+    case GateKind::kRtran:
+    case GateKind::kPullup:
+    case GateKind::kPulldown:
+      return false;
+    default:
+      return true;
+  }
+}
+
+// §A.3.1: Whether the gate uses delay3 (true) or delay2 (false).
+static bool GateUsesDelay3(GateKind kind) {
+  switch (kind) {
+    case GateKind::kCmos:
+    case GateKind::kRcmos:
+    case GateKind::kNmos:
+    case GateKind::kPmos:
+    case GateKind::kRnmos:
+    case GateKind::kRpmos:
+    case GateKind::kBufif0:
+    case GateKind::kBufif1:
+    case GateKind::kNotif0:
+    case GateKind::kNotif1:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §A.3.1: Validate terminal count for a gate instance.
+static bool ValidGateTerminalCount(GateKind kind, size_t count) {
+  switch (kind) {
+    case GateKind::kCmos:
+    case GateKind::kRcmos:
+      return count == 4;
+    case GateKind::kNmos:
+    case GateKind::kPmos:
+    case GateKind::kRnmos:
+    case GateKind::kRpmos:
+    case GateKind::kBufif0:
+    case GateKind::kBufif1:
+    case GateKind::kNotif0:
+    case GateKind::kNotif1:
+    case GateKind::kTranif0:
+    case GateKind::kTranif1:
+    case GateKind::kRtranif0:
+    case GateKind::kRtranif1:
+      return count == 3;
+    case GateKind::kTran:
+    case GateKind::kRtran:
+      return count == 2;
+    case GateKind::kPullup:
+    case GateKind::kPulldown:
+      return count == 1;
+    case GateKind::kAnd:
+    case GateKind::kNand:
+    case GateKind::kOr:
+    case GateKind::kNor:
+    case GateKind::kXor:
+    case GateKind::kXnor:
+      return count >= 2;
+    case GateKind::kBuf:
+    case GateKind::kNot:
+      return count >= 2;
+  }
+  return true;
+}
+
 static GateKind TokenToGateKind(TokenKind tk) {
   switch (tk) {
     case TokenKind::kKwAnd:
@@ -145,6 +239,8 @@ void Parser::ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
     item->gate_terminals.push_back(ParseExpr());
   }
   Expect(TokenKind::kRParen);
+  if (!ValidGateTerminalCount(kind, item->gate_terminals.size()))
+    diag_.Error(loc, "incorrect number of terminals for gate instance");
   items.push_back(item);
   while (Match(TokenKind::kComma)) {
     items.push_back(ParseOneGateInstance(kind, loc));
@@ -170,6 +266,8 @@ ModuleItem* Parser::ParseOneGateInstance(GateKind kind, SourceLoc loc) {
     item->gate_terminals.push_back(ParseExpr());
   }
   Expect(TokenKind::kRParen);
+  if (!ValidGateTerminalCount(kind, item->gate_terminals.size()))
+    diag_.Error(loc, "incorrect number of terminals for gate instance");
   return item;
 }
 
@@ -259,12 +357,18 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
       if (Match(TokenKind::kComma)) str0 = ParseStrength0();
     }
     Expect(TokenKind::kRParen);
+    if (!GateAllowsStrength(gate_kind))
+      diag_.Error(loc, "drive strength not allowed on this gate type");
   }
 
   Expr* delay = nullptr;
   Expr* delay_fall = nullptr;
   Expr* delay_decay = nullptr;
   ParseGateDelay(delay, delay_fall, delay_decay);
+  if (delay && !GateAllowsDelay(gate_kind))
+    diag_.Error(loc, "delay not allowed on this gate type");
+  if (delay_decay && !GateUsesDelay3(gate_kind))
+    diag_.Error(loc, "this gate type allows at most 2 delay values");
 
   // Parse comma-separated instances.
   auto* first = ParseOneGateInstance(gate_kind, loc);
