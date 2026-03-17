@@ -346,10 +346,14 @@ bool Parser::TryParsePrimaryTopLevel(CompilationUnit* unit) {
 void Parser::ParseTopLevel(CompilationUnit* unit) {
   if (Match(TokenKind::kSemicolon)) return;  // null item
   auto top_attrs = ParseAttributes();        // consume optional (* ... *)
+  auto udp_count = unit->udps.size();
   if (TryParsePrimaryTopLevel(unit)) {
-    // §5.12: Attach attributes to the just-parsed module definition.
-    if (!top_attrs.empty() && !unit->modules.empty()) {
-      unit->modules.back()->attrs = std::move(top_attrs);
+    if (!top_attrs.empty()) {
+      if (unit->udps.size() > udp_count) {
+        unit->udps.back()->attrs = std::move(top_attrs);
+      } else if (!unit->modules.empty()) {
+        unit->modules.back()->attrs = std::move(top_attrs);
+      }
     }
     return;
   }
@@ -362,7 +366,12 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     unit->bind_directives.push_back(ParseBindDirective());
     return;
   }
-  if (TryParseSecondaryTopLevel(unit)) return;
+  if (TryParseSecondaryTopLevel(unit)) {
+    if (!top_attrs.empty() && unit->udps.size() > udp_count) {
+      unit->udps.back()->attrs = std::move(top_attrs);
+    }
+    return;
+  }
   if (TryParseCuScopeItem(unit)) return;
   diag_.Error(CurrentLoc(), "expected top-level declaration");
   Consume();

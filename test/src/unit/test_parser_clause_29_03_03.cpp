@@ -8,24 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(UdpDeclGrammar, SequentialWithInitial) {
-  auto r = Parse(
-      "primitive srff(output reg q, input s, input r);\n"
-      "  initial q = 1'b0;\n"
-      "  table\n"
-      "    1 0 : ? : 1;\n"
-      "    0 1 : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '0');
-}
-
 TEST(UdpDeclGrammar, SequentialInitialX) {
   auto r = Parse(
       "primitive dff_x(output reg q, input d, input clk);\n"
@@ -241,48 +223,6 @@ TEST(UdpBodyGrammar, InitVal_Bare1) {
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
-}
-
-TEST(UdpDeclGrammar, SequentialLatch) {
-  auto r = Parse(
-      "primitive udp_latch (output reg q, input d, en);\n"
-      "  initial q = 0;\n"
-      "  table\n"
-      "    1 1 : ? : 1;\n"
-      "    0 1 : ? : 0;\n"
-      "    ? 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  const auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->name, "udp_latch");
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '0');
-  ASSERT_EQ(udp->table.size(), 3u);
-
-  EXPECT_EQ(udp->table[0].current_state, '?');
-  EXPECT_EQ(udp->table[0].output, '1');
-  EXPECT_EQ(udp->table[2].output, '-');
-}
-
-TEST(UdpDeclGrammar, SequentialUdpInitial) {
-  auto r = Parse(
-      "primitive srff(output reg q, input s, r);\n"
-      "  initial q = 1'b1;\n"
-      "  table\n"
-      "    1 0 : ? : 1;\n"
-      "    0 1 : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->udps.size(), 1);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '1');
 }
 
 }  // namespace

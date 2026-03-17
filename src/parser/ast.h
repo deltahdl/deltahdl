@@ -901,6 +901,7 @@ struct UdpTableRow {
 struct UdpDecl {
   std::string_view name;
   SourceRange range;
+  std::vector<Attribute> attrs;
   std::string_view output_name;
   std::vector<std::string_view> input_names;
   bool is_sequential = false;
