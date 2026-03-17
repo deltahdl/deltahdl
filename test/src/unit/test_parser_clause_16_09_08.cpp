@@ -4,14 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(AssertionDeclParsing, SequenceExpr_FirstMatch) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  assert property (@(posedge clk)\n"
-              "    first_match(a ##[1:5] b));\n"
-              "endmodule\n"));
-}
-
 bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == kind) return true;

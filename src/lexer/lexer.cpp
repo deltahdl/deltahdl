@@ -743,6 +743,18 @@ Token Lexer::LexOpHash(SourceLoc loc, uint32_t start) {
     Advance();
     return MakeOp(TokenKind::kHashHash, loc, start);
   }
+  if (!AtEnd() && Current() == '-' && pos_ + 1 < source_.size() &&
+      source_[pos_ + 1] == '#') {
+    Advance();  // -
+    Advance();  // #
+    return MakeOp(TokenKind::kHashMinusHash, loc, start);
+  }
+  if (!AtEnd() && Current() == '=' && pos_ + 1 < source_.size() &&
+      source_[pos_ + 1] == '#') {
+    Advance();  // =
+    Advance();  // #
+    return MakeOp(TokenKind::kHashEqHash, loc, start);
+  }
   return MakeOp(TokenKind::kHash, loc, start);
 }
 

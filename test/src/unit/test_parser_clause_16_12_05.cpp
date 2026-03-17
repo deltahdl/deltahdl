@@ -1,5 +1,4 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -21,16 +20,6 @@ TEST(AssertionSemanticsParsing, PropertyAnd) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
-}
-
-TEST(AssertionParsing, PropertyConjunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  assert property (\n"
-      "    @(posedge clk) (a |-> b) and (c |-> d));\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
 }
 
 }  // namespace

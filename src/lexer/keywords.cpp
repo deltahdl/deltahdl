@@ -362,6 +362,12 @@ std::string_view TokenKindName(TokenKind kind) {
       return "':'";
     case TokenKind::kHash:
       return "'#'";
+    case TokenKind::kHashHash:
+      return "'##'";
+    case TokenKind::kHashMinusHash:
+      return "'#-#'";
+    case TokenKind::kHashEqHash:
+      return "'#=#'";
     case TokenKind::kEq:
       return "'='";
     case TokenKind::kLtEq:
