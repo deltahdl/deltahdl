@@ -307,7 +307,7 @@ def test_ensure_reuses_existing_issue_by_title(ic, monkeypatch) -> None:
     mock_create = MagicMock()
     monkeypatch.setattr(ic, "create_issue", mock_create)
     monkeypatch.setattr(ic, "time", MagicMock())
-    result = ensure("o", "r", {"4.1": "General"}, [])
+    ensure("o", "r", {"4.1": "General"}, [])
     assert not mock_create.called
 
 
