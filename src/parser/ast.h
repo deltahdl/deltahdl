@@ -586,8 +586,9 @@ struct ModuleItem {
   std::vector<std::pair<std::string_view, Expr*>> inst_params;
   std::vector<std::pair<std::string_view, Expr*>> inst_ports;
   bool inst_wildcard = false;        // .* port connection (§23.3.2.4)
-  Expr* inst_range_left = nullptr;   // Instance array left bound (§23.3.2)
-  Expr* inst_range_right = nullptr;  // Instance array right bound (§23.3.2)
+  Expr* inst_range_left = nullptr;   // First dimension left bound
+  Expr* inst_range_right = nullptr;  // First dimension right bound
+  std::vector<std::pair<Expr*, Expr*>> inst_dims;  // All unpacked dimensions
 
   // Typedef / Nettype
   DataType typedef_type;

@@ -21,14 +21,20 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
     item->inst_module = module_tok.text;
     item->inst_params = params;
     item->inst_name = Expect(TokenKind::kIdentifier).text;
-    // Instance array range: inst_name [left:right] or [size] (§23.3.2)
-    if (Check(TokenKind::kLBracket)) {
+    // §A.4.1.1: name_of_instance ::= instance_identifier { unpacked_dimension }
+    while (Check(TokenKind::kLBracket)) {
       Consume();
-      item->inst_range_left = ParseExpr();
+      Expr* left = ParseExpr();
+      Expr* right = nullptr;
       if (Match(TokenKind::kColon)) {
-        item->inst_range_right = ParseExpr();
+        right = ParseExpr();
       }
       Expect(TokenKind::kRBracket);
+      item->inst_dims.push_back({left, right});
+    }
+    if (!item->inst_dims.empty()) {
+      item->inst_range_left = item->inst_dims[0].first;
+      item->inst_range_right = item->inst_dims[0].second;
     }
     Expect(TokenKind::kLParen);
     if (!Check(TokenKind::kRParen)) {
