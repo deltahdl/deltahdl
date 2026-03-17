@@ -674,31 +674,35 @@ UdpDecl* Parser::ParseUdpDecl() {
     Expect(TokenKind::kRParen);
     Expect(TokenKind::kSemicolon);
     ParseUdpPortDecls(udp);
-  } else if (Check(TokenKind::kKwOutput)) {
-    Consume();
-    if (Match(TokenKind::kKwReg)) {
-      udp->is_sequential = true;
-    }
-    udp->output_name = Expect(TokenKind::kIdentifier).text;
-    if (Match(TokenKind::kEq)) {
-      udp->has_initial = true;
-      udp->initial_value =
-          ParseUdpInitialValue(TokenKind::kComma, TokenKind::kRParen);
-    }
-    while (Match(TokenKind::kComma)) {
-      Match(TokenKind::kKwInput);
-      udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
-    }
-    Expect(TokenKind::kRParen);
-    Expect(TokenKind::kSemicolon);
   } else {
-    Expect(TokenKind::kIdentifier);
-    while (Match(TokenKind::kComma)) {
+    ParseAttributes();
+    if (Check(TokenKind::kKwOutput)) {
+      Consume();
+      if (Match(TokenKind::kKwReg)) {
+        udp->is_sequential = true;
+      }
+      udp->output_name = Expect(TokenKind::kIdentifier).text;
+      if (Match(TokenKind::kEq)) {
+        udp->has_initial = true;
+        udp->initial_value =
+            ParseUdpInitialValue(TokenKind::kComma, TokenKind::kRParen);
+      }
+      while (Match(TokenKind::kComma)) {
+        ParseAttributes();
+        Match(TokenKind::kKwInput);
+        udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
+      }
+      Expect(TokenKind::kRParen);
+      Expect(TokenKind::kSemicolon);
+    } else {
       Expect(TokenKind::kIdentifier);
+      while (Match(TokenKind::kComma)) {
+        Expect(TokenKind::kIdentifier);
+      }
+      Expect(TokenKind::kRParen);
+      Expect(TokenKind::kSemicolon);
+      ParseUdpPortDecls(udp);
     }
-    Expect(TokenKind::kRParen);
-    Expect(TokenKind::kSemicolon);
-    ParseUdpPortDecls(udp);
   }
 
   if (Match(TokenKind::kKwInitial)) {
@@ -725,6 +729,7 @@ UdpDecl* Parser::ParseExternUdpDecl() {
 
   // Port list (forward declaration only — no body/table).
   Expect(TokenKind::kLParen);
+  ParseAttributes();
   if (Check(TokenKind::kKwOutput)) {
     // ANSI form: (output [reg] name, input in1, ...)
     Consume();
@@ -733,6 +738,7 @@ UdpDecl* Parser::ParseExternUdpDecl() {
     }
     udp->output_name = Expect(TokenKind::kIdentifier).text;
     while (Match(TokenKind::kComma)) {
+      ParseAttributes();
       Match(TokenKind::kKwInput);
       udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
     }
