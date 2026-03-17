@@ -16,6 +16,8 @@ static bool IsCastTypeToken(TokenKind kind) {
     case TokenKind::kKwInteger:
     case TokenKind::kKwReal:
     case TokenKind::kKwShortreal:
+    case TokenKind::kKwRealtime:
+    case TokenKind::kKwTime:
     case TokenKind::kKwReg:
     case TokenKind::kKwSigned:
     case TokenKind::kKwUnsigned:
