@@ -262,4 +262,141 @@ TEST(FunctionDeclParsing, FunctionBodyWithBlockItem) {
   EXPECT_GE(item->func_body_stmts.size(), 2u);
 }
 
+// --- function_declaration: no lifetime (default) ---
+
+TEST(FunctionDeclParsing, FunctionDeclNoLifetime) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int f(); return 0; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstFunctionDecl(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_FALSE(item->is_automatic);
+  EXPECT_FALSE(item->is_static);
+}
+
+// --- function_body_declaration: class_scope form ---
+
+TEST(FunctionDeclParsing, FunctionBodyWithClassScope) {
+  EXPECT_TRUE(ParseOk(
+      "class C;\n"
+      "  extern function int f(int x);\n"
+      "endclass\n"
+      "function int C::f(int x);\n"
+      "  return x + 1;\n"
+      "endfunction\n"));
+}
+
+// --- function_body_declaration: interface_identifier form ---
+
+TEST(FunctionDeclParsing, FunctionBodyWithInterfaceScope) {
+  EXPECT_TRUE(ParseOk(
+      "interface ifc;\n"
+      "  function int f(); return 0; endfunction\n"
+      "endinterface\n"));
+}
+
+// --- function_data_type_or_implicit: signed implicit ---
+
+TEST(FunctionDeclParsing, FunctionImplicitReturnTypeSigned) {
+  auto r = Parse(
+      "module m;\n"
+      "  function signed [7:0] f(); return -1; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstFunctionDecl(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->return_type.is_signed);
+  EXPECT_NE(item->return_type.packed_dim_left, nullptr);
+}
+
+// --- function_data_type_or_implicit: named type ---
+
+TEST(FunctionDeclParsing, FunctionNamedReturnType) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] data; } my_t;\n"
+      "  function my_t f(); return '0; endfunction\n"
+      "endmodule\n"));
+}
+
+// --- function_prototype with dynamic_override_specifiers ---
+
+TEST(FunctionDeclParsing, FunctionPrototypeWithOverride) {
+  EXPECT_TRUE(ParseOk(
+      "class C;\n"
+      "  pure virtual function :initial void f();\n"
+      "endclass\n"));
+}
+
+// --- function_prototype with args ---
+
+TEST(FunctionDeclParsing, FunctionPrototypeWithArgs) {
+  EXPECT_TRUE(ParseOk(
+      "module m;\n"
+      "  import \"DPI-C\" function int add(int a, int b);\n"
+      "endmodule\n"));
+}
+
+// --- dpi_task_import_property: context on task ---
+
+TEST(FunctionDeclParsing, DpiImportTaskContext) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" context task ctx_task();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->dpi_is_task);
+  EXPECT_TRUE(item->dpi_is_context);
+}
+
+// --- dpi_import_export: DPI import with C identifier on task ---
+
+TEST(FunctionDeclParsing, DpiImportTaskWithCIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" c_task_name = task sv_task();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiImport);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->dpi_is_task);
+  EXPECT_EQ(item->dpi_c_name, "c_task_name");
+}
+
+// --- dpi_import_export: DPI export task with C identifier ---
+
+TEST(FunctionDeclParsing, DpiExportTaskWithCIdentifier) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task(); endtask\n"
+      "  export \"DPI-C\" c_alias = task my_task;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kDpiExport);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->dpi_is_task);
+  EXPECT_EQ(item->dpi_c_name, "c_alias");
+}
+
+// --- dynamic_override_specifiers: combined extends:final ---
+
+TEST(FunctionDeclParsing, FunctionDynOverrideExtendsFinal) {
+  EXPECT_TRUE(ParseOk(
+      "class c;\n"
+      "  virtual function :extends :final void f(); endfunction\n"
+      "endclass\n"));
+}
+
 }  // namespace
