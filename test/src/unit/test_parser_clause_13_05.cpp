@@ -48,19 +48,6 @@ TEST(SubroutineCallSyntaxParsing, MethodCallWithArgs) {
   EXPECT_EQ(expr->args.size(), 2u);
 }
 
-TEST(StatementSyntaxParsing, StmtItemSubroutineCallStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $display(\"hello\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-}
 
 TEST(SubroutineCallExprParsing, FunctionSubroutineCallNested) {
   auto r = Parse(

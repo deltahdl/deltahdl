@@ -82,19 +82,6 @@ TEST(ProceduralAssignAndControlParsing, WaitStatementExpression) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-TEST(StatementSyntaxParsing, StmtItemWaitStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait (done) a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-}
 
 TEST(TimingControlSyntaxParsing, WaitConditionStatement) {
   auto r = Parse(

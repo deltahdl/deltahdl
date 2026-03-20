@@ -217,22 +217,6 @@ TEST(ProceduralStatementParsing, PlainCaseIsNotInside) {
   EXPECT_FALSE(stmt->case_inside);
 }
 
-TEST(StatementSyntaxParsing, StmtItemCaseStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case (x)\n"
-      "      1: a = 1;\n"
-      "      default: a = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-}
 
 TEST(CaseSyntaxParsing, NestedCaseStmt) {
   auto r = Parse(

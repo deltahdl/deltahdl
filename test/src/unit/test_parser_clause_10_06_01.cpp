@@ -295,19 +295,6 @@ TEST(AssignmentParsing, AssignInCase) {
   EXPECT_EQ(stmt->case_items[2].body->kind, StmtKind::kDeassign);
 }
 
-TEST(StatementSyntaxParsing, StmtItemProceduralContinuousAssignment) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assign x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-}
 
 TEST(AssignmentParsing, AssignInAlwaysWithEvent) {
   auto r = Parse(
@@ -497,18 +484,6 @@ TEST(AssignmentParsing, AssignInForkJoin) {
   EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kAssign);
 }
 
-TEST(StatementSyntaxParsing, StmtItemProceduralDeassign) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    deassign x;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
 }
 
 TEST(AssignmentParsing, DeassignConcatLhs) {

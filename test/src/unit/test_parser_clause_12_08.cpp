@@ -173,52 +173,6 @@ TEST(ProceduralStatementParsing, ReturnFromVoidFunctionEarly) {
   EXPECT_EQ(if_stmt->then_branch->expr, nullptr);
 }
 
-TEST(StatementSyntaxParsing, StmtItemJumpStatementBreak) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    forever begin\n"
-      "      break;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  VerifyForeverLoopJump(body, StmtKind::kBreak);
-}
-
-TEST(StatementSyntaxParsing, StmtItemJumpStatementContinue) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    forever begin\n"
-      "      continue;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  VerifyForeverLoopJump(body, StmtKind::kContinue);
-}
-
-TEST(StatementSyntaxParsing, StmtItemJumpStatementReturn) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void f();\n"
-      "    return;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* func = FirstFunctionDecl(r);
-  ASSERT_NE(func, nullptr);
-  ASSERT_GE(func->func_body_stmts.size(), 1u);
-  EXPECT_EQ(func->func_body_stmts[0]->kind, StmtKind::kReturn);
-}
 
 TEST(TimingControlSyntaxParsing, JumpReturnWithExpr) {
   auto r = Parse(

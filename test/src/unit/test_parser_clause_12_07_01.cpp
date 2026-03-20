@@ -194,19 +194,6 @@ TEST(ProceduralStatementParsing, ForWithDecrement) {
   EXPECT_NE(stmt->for_step, nullptr);
 }
 
-TEST(StatementSyntaxParsing, StmtItemLoopStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i++) a = i;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFor);
-}
 
 TEST(ProceduralStatementParsing, ForWithIntDeclParses) {
   auto r = Parse(

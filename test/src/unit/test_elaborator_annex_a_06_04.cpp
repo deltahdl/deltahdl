@@ -1,11 +1,34 @@
-
-
-#include "fixture_elaborator.h"
-#include "fixture_parser.h"
+#include "fixture_simulator.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 
 namespace {
+
+// --- Moved from test_elaborator_clause_12_03.cpp ---
+
+TEST(StatementElaboration, NullStatementNoEffect) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd5;\n"
+      "    ;\n"
+      "    ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
+// --- Moved from test_elaborator_clause_09_03_05.cpp ---
 
 TEST(StatementLabelElaboration, LabeledAssignmentElaborates) {
   ElabFixture f;
@@ -81,6 +104,48 @@ TEST(StatementLabelElaboration, LabelOnForLoopElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(StatementElaboration, StatementWithAttributeElaborates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    (* full_case *) x = 8'd10;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
+TEST(StatementElaboration, NullStatementInTaskElaborates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  task do_nothing();\n"
+      "    ;\n"
+      "  endtask\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd7;\n"
+      "    do_nothing();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
 }  // namespace

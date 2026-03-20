@@ -167,19 +167,7 @@ TEST(ProcessTimingAndControlParsing, DisableHierarchicalTaskName) {
               "endmodule\n"));
 }
 
-TEST(StatementSyntaxParsing, StmtItemDisableStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    disable my_block;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
-}
+
 TEST(Parser, DisableStatement) {
   auto r = Parse(
       "module t;\n"

@@ -141,19 +141,6 @@ TEST(SchedulingSemanticsParsing, InitialBlockWithDelays) {
   EXPECT_EQ(init_item->body->stmts[1]->kind, StmtKind::kDelay);
 }
 
-TEST(StatementSyntaxParsing, StmtItemProceduralTimingControlDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #10 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
-}
 
 TEST(TimingControlSyntaxParsing, ProceduralTimingControlDelay) {
   auto r = Parse(

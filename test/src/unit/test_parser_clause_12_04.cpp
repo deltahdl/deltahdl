@@ -322,19 +322,6 @@ TEST(AssignmentParsing, NestedIfElseWithExpressions) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(StatementSyntaxParsing, StmtItemConditionalStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if (x) a = 1; else a = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-}
 
 TEST(ProceduralStatementParsing, BasicIfElse) {
   auto r = Parse(

@@ -59,33 +59,6 @@ TEST(AssignmentParsing, ReleaseNet) {
   ASSERT_NE(stmt->lhs, nullptr);
 }
 
-TEST(StatementSyntaxParsing, StmtItemForceStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    force x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForce);
-}
-
-TEST(StatementSyntaxParsing, StmtItemReleaseStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    release x;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
-}
 
 TEST(DpiParsing, VpiSystemCallForce) {
   auto r = Parse(
