@@ -429,4 +429,11 @@ TEST(PrimitiveTerminalParsing, Error_InoutTerminalTernaryExpr) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(PrimitiveTerminalParsing, GateInst_ComplexTerminalExpressions) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  and a1(out[0], in1[3:0], in2[7:4]);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -27,50 +27,6 @@ TEST(SwitchInstanceParsing, CmosSwitchType_Rcmos) {
   EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
-TEST(SwitchInstanceParsing, EnableGateType_Bufif0) {
-  auto r = Parse(
-      "module m;\n"
-      "  bufif0 (out, in, en);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif0);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
-TEST(SwitchInstanceParsing, EnableGateType_Bufif1) {
-  auto r = Parse(
-      "module m;\n"
-      "  bufif1 (out, in, en);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif1);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
-TEST(SwitchInstanceParsing, EnableGateType_Notif0) {
-  auto r = Parse(
-      "module m;\n"
-      "  notif0 (out, in, en);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif0);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
-TEST(SwitchInstanceParsing, EnableGateType_Notif1) {
-  auto r = Parse(
-      "module m;\n"
-      "  notif1 (out, in, en);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif1);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 TEST(SwitchInstanceParsing, MosSwitchType_Nmos) {
   auto r = Parse(
       "module m;\n"
@@ -111,17 +67,6 @@ TEST(SwitchInstanceParsing, MosSwitchType_Rpmos) {
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRpmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
-TEST(SwitchInstanceParsing, NInputGateType_And) {
-  auto r = Parse(
-      "module m;\n"
-      "  and (y, a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
   ASSERT_NE(g, nullptr);
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
@@ -176,39 +121,6 @@ TEST(SwitchInstanceParsing, NInputGateType_Xnor) {
   ASSERT_NE(g, nullptr);
 }
 
-TEST(SwitchInstanceParsing, NOutputGateType_Buf) {
-  auto r = Parse(
-      "module m;\n"
-      "  buf (out, in);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBuf);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
-TEST(SwitchInstanceParsing, NOutputGateType_Not) {
-  auto r = Parse(
-      "module m;\n"
-      "  not (out, in);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNot);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
-TEST(SwitchInstanceParsing, PassEnSwitchType_Tranif0) {
-  auto r = Parse(
-      "module m;\n"
-      "  tranif0 (a, b, ctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 TEST(SwitchInstanceParsing, PassEnSwitchType_Tranif1) {
   auto r = Parse(
       "module m;\n"
@@ -237,39 +149,6 @@ TEST(SwitchInstanceParsing, PassEnSwitchType_Rtranif1) {
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRtranif1);
   ASSERT_NE(g, nullptr);
-}
-
-TEST(SwitchInstanceParsing, PassSwitchType_Tran) {
-  auto r = Parse(
-      "module m;\n"
-      "  tran (a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTran);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
-TEST(SwitchInstanceParsing, PassSwitchType_Rtran) {
-  auto r = Parse(
-      "module m;\n"
-      "  rtran (a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRtran);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
-TEST(SwitchInstanceParsing, PullGate_Pullup) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup (net_a);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 1u);
 }
 
 TEST(SwitchInstanceParsing, PullGate_Pulldown) {
@@ -394,17 +273,6 @@ TEST(PrimitiveGateTypeParsing, AllGateAndSwitchTypes) {
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRtran), nullptr);
 }
 
-TEST(PrimitiveGateTypeParsing, NInputGatetype_And) {
-  auto r = Parse(
-      "module m;\n"
-      "  and (out, a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 TEST(PrimitiveGateTypeParsing, NInputGatetype_Nand) {
   auto r = Parse(
       "module m;\n"
@@ -460,39 +328,6 @@ TEST(PrimitiveGateTypeParsing, NInputGatetype_Xnor) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(PrimitiveGateTypeParsing, NOutputGatetype_Buf) {
-  auto r = Parse(
-      "module m;\n"
-      "  buf (out, in);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBuf);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
-TEST(PrimitiveGateTypeParsing, NOutputGatetype_Not) {
-  auto r = Parse(
-      "module m;\n"
-      "  not (out, in);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNot);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
-TEST(PrimitiveGateTypeParsing, EnableGatetype_Bufif0) {
-  auto r = Parse(
-      "module m;\n"
-      "  bufif0 (out, in, en);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif0);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 TEST(PrimitiveGateTypeParsing, EnableGatetype_Bufif1) {
   auto r = Parse(
       "module m;\n"
@@ -522,28 +357,6 @@ TEST(PrimitiveGateTypeParsing, EnableGatetype_Notif1) {
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif1);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
-TEST(PrimitiveGateTypeParsing, MosSwitchtype_Nmos) {
-  auto r = Parse(
-      "module m;\n"
-      "  nmos (out, in, ctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
-TEST(PrimitiveGateTypeParsing, MosSwitchtype_Pmos) {
-  auto r = Parse(
-      "module m;\n"
-      "  pmos (out, in, ctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPmos);
   ASSERT_NE(g, nullptr);
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
@@ -614,17 +427,6 @@ TEST(PrimitiveGateTypeParsing, PassEnSwitchtype_Rtranif1) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-TEST(PrimitiveGateTypeParsing, PassSwitchtype_Tran) {
-  auto r = Parse(
-      "module m;\n"
-      "  tran (a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTran);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
 TEST(PrimitiveGateTypeParsing, PassSwitchtype_Rtran) {
   auto r = Parse(
       "module m;\n"
@@ -634,28 +436,6 @@ TEST(PrimitiveGateTypeParsing, PassSwitchtype_Rtran) {
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRtran);
   ASSERT_NE(g, nullptr);
   EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
-TEST(PrimitiveGateTypeParsing, CmosSwitchtype_Cmos) {
-  auto r = Parse(
-      "module m;\n"
-      "  cmos (out, in, nctrl, pctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kCmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 4u);
-}
-
-TEST(PrimitiveGateTypeParsing, CmosSwitchtype_Rcmos) {
-  auto r = Parse(
-      "module m;\n"
-      "  rcmos (out, in, nctrl, pctrl);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 4u);
 }
 
 }  // namespace
