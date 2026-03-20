@@ -192,4 +192,9 @@ TEST(GateKeywordLexing, KeywordSubstringIsIdentifier) {
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
 }
 
+TEST(GateKeywordLexing, KeywordPrefixIsIdentifier) {
+  auto r = LexOne("tranif");
+  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
+}
+
 }  // namespace
