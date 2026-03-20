@@ -54,4 +54,19 @@ TEST(GateLevelModelingParsing, StrengthSpecHighz) {
   EXPECT_EQ(item->drive_strength1, 3);
 }
 
+TEST(GateDriveStrength, StrengthAndDelay) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  wire a, b, y;\n"
+      "  and (strong0, strong1) #10 g1(y, a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->drive_strength0, 4u);
+  EXPECT_EQ(g->drive_strength1, 4u);
+  EXPECT_NE(g->gate_delay, nullptr);
+}
+
 }  // namespace
