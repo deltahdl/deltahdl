@@ -415,8 +415,20 @@ Expr* Parser::ParsePrimaryExpr() {
       return ParseConcatenation();
     case TokenKind::kApostropheLBrace:
       return ParseAssignmentPattern();
-    case TokenKind::kKwType:
-      return ParseTypeRefExpr();
+    case TokenKind::kKwType: {
+      auto* ref = ParseTypeRefExpr();
+      // §A.6.7.1: type_reference '{...} typed assignment pattern expression
+      if (Check(TokenKind::kApostropheLBrace)) {
+        auto* pat = ParseAssignmentPattern();
+        auto* typed = arena_.Create<Expr>();
+        typed->kind = ExprKind::kCast;
+        typed->range.start = ref->range.start;
+        typed->rhs = ref;
+        typed->lhs = pat;
+        return typed;
+      }
+      return ref;
+    }
     case TokenKind::kDollar:  // §6.20.7
     case TokenKind::kKwNull:  // §8.4
       return MakeLiteral(ExprKind::kIdentifier, tok);
