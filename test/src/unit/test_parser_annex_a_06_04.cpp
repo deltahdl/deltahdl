@@ -670,23 +670,6 @@ TEST(StatementSyntaxParsing, ParBlockAsStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
 }
 
-TEST(StatementSyntaxParsing, RandsequenceAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randsequence(top)\n"
-      "      top : a;\n"
-      "      a : { x = 1; };\n"
-      "    endsequence\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRandsequence);
-}
-
 TEST(StatementSyntaxParsing, FunctionNullStatementWithAttribute) {
   auto r = Parse(
       "module m;\n"

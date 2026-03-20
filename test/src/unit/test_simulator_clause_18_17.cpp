@@ -12,7 +12,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Constraint, RandsequenceBasicProduction) {
+TEST(RandsequenceSim, RandsequenceBasicProduction) {
   ConstraintSolver solver(42);
   RandVariable v;
   v.name = "production";
