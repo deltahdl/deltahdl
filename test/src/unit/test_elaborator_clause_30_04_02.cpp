@@ -4,19 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SpecifyBlockDeclElaboration, SpecifyBlockWithPathElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(SpecifyTerminalElaboration, TerminalBitSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -62,19 +49,6 @@ TEST(SpecifyTerminalElaboration, TerminalDottedElaborates) {
       "module m;\n"
       "  specify\n"
       "    (intf.sig => intf.out) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(SpecifyPathElaboration, SimpleParallelPathElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n",
       f);

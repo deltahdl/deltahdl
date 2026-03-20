@@ -5,13 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(FormalSyntaxParsing, SpecifyFullPath) {
-  auto r =
-      Parse("module m; specify (a, b *> c, d) = 10; endspecify endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SpecifyTerminalParsing, ListOfPathInputsMultiple) {
   auto r = Parse(
       "module m;\n"
