@@ -133,6 +133,8 @@ def build_steps(
          f" Place them in: {filenames}."
          " Cover all affected pipeline stages."
          " Include error conditions and edge cases."
+         f" If §{subclause} defines no testable requirements of its own"
+         " (only its descendants do), do NOT create any test files."
          + exclude_note + constraints),
         ("Implementing missing functionality",
          f"Implement any missing functionality for §{subclause}."
