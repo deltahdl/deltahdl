@@ -98,8 +98,9 @@ def build_steps(
          f" The correct files for §{subclause} tests are: {filenames}."
          + constraints),
         ("Deleting duplicate tests",
-         f"Delete any duplicate tests related to §{subclause}."
-         " Only delete exact duplicates."
+         f"Delete any duplicate tests that belong to §{subclause}."
+         " Do NOT delete tests that belong to other subclauses,"
+         " even if they look similar."
          + constraints),
         ("Moving misplaced tests",
          f"Search ALL files in test/src/unit/ for tests that belong to"
