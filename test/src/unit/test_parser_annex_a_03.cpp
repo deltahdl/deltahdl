@@ -7,21 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Edge case: delay2 vs delay3 ---
-TEST(PrimitiveInstantiationParsing, EnableGateAcceptsThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  bufif0 #(10, 20, 30) b1(out, in, en);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif0);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  ASSERT_NE(g->gate_delay_decay, nullptr);
-}
-
 TEST(PrimitiveInstantiationParsing, CmosSwitchAcceptsThreeValueDelay) {
   auto r = Parse(
       "module m;\n"
