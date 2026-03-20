@@ -48,4 +48,15 @@ TEST(PassSwitches, RtranDelayNotAllowed) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(PassEnableSwitches, MultipleInstances) {
+  auto r = Parse(
+      "module m;\n"
+      "  tranif0 t1(a1, b1, en), t2(a2, b2, en);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto gates = FindAllGates(r.cu->modules[0]->items);
+  EXPECT_EQ(gates.size(), 2u);
+}
+
 }  // namespace
