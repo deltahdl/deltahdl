@@ -211,4 +211,36 @@ TEST(StrengthParsing, AllDriveStrengthForms) {
   EXPECT_FALSE(r6.has_errors);
 }
 
+// --- drive_strength on gate instantiation ---
+
+TEST(StrengthParsing, DriveStrengthOnGateInst) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  and (strong0, weak1) g(y, a, b);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  EXPECT_EQ(item->drive_strength0, 4u);
+  EXPECT_EQ(item->drive_strength1, 2u);
+}
+
+// --- drive_strength combined with delay ---
+
+TEST(StrengthParsing, DriveStrengthWithDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  and (strong0, strong1) #5 g(y, a, b);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  EXPECT_EQ(item->drive_strength0, 4u);
+  EXPECT_EQ(item->drive_strength1, 4u);
+  ASSERT_NE(item->gate_delay, nullptr);
+  EXPECT_EQ(item->gate_delay->int_val, 5u);
+}
+
 }  // namespace

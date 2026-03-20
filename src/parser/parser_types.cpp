@@ -142,12 +142,16 @@ uint8_t Parser::ParseChargeStrength() {
   return result;
 }
 
-// Virtual interface type: virtual [interface] type_name [.modport] (§25.9)
+// Virtual interface type: virtual [interface] ifc [#(params)] [.modport] (§25.9)
 DataType Parser::ParseVirtualInterfaceType() {
   DataType dtype;
   dtype.kind = DataTypeKind::kVirtualInterface;
   Match(TokenKind::kKwInterface);
   dtype.type_name = Expect(TokenKind::kIdentifier).text;
+  if (Check(TokenKind::kHash)) {
+    Consume();
+    dtype.type_params = ParseTypeParamList();
+  }
   if (Match(TokenKind::kDot)) {
     dtype.modport_name = Expect(TokenKind::kIdentifier).text;
   }
@@ -274,16 +278,18 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
     dtype = inner;
     return true;
   }
-  // Struct/union type: wire struct packed { ... } memsig;
+  // Struct/union type: wire struct packed { ... } [dims] memsig;
   if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
     auto inner = ParseStructOrUnionType();
+    ParsePackedDims(inner);
     ApplyNetInfo(inner, dtype);
     dtype = inner;
     return true;
   }
-  // Enum type: wire enum { ... } e;
+  // Enum type: wire enum { ... } [dims] e;
   if (Check(TokenKind::kKwEnum)) {
     auto inner = ParseEnumType();
+    ParsePackedDims(inner);
     ApplyNetInfo(inner, dtype);
     dtype = inner;
     return true;
@@ -315,6 +321,7 @@ DataType Parser::ParseDataType() {
   if (is_named) {
     auto named = ParseNamedType();
     named.is_const = dtype.is_const;
+    ParsePackedDims(named);
     return named;
   }
 

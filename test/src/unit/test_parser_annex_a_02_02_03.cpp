@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -259,6 +260,125 @@ TEST(DelayParsing, DelayValueOneStep) {
   auto* item = r.cu->modules[0]->items[1];
   ASSERT_NE(item->assign_delay, nullptr);
   EXPECT_EQ(item->assign_delay->text, "1step");
+}
+
+TEST(DelayParsing, TriregSingleDelay) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg #5 t1;\n"
+      "endmodule\n");
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->int_val, 5u);
+}
+
+TEST(DelayParsing, TriregSingleDelayNoFallDecay) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg #5 t1;\n"
+      "endmodule\n");
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->net_delay_fall, nullptr);
+  EXPECT_EQ(item->net_delay_decay, nullptr);
+}
+
+TEST(DelayParsing, Delay3TriregWithChargeStrengthSmall) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (small) #(5, 10, 15) cap;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
+  EXPECT_EQ(item->data_type.charge_strength, 1);
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->int_val, 5u);
+  ASSERT_NE(item->net_delay_fall, nullptr);
+  EXPECT_EQ(item->net_delay_fall->int_val, 10u);
+  ASSERT_NE(item->net_delay_decay, nullptr);
+  EXPECT_EQ(item->net_delay_decay->int_val, 15u);
+}
+
+TEST(DelayParsing, Delay3TriregWithChargeStrengthLarge) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (large) #(10, 20, 50) cap1;\n"
+      "endmodule\n");
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.charge_strength, 4);
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->int_val, 10u);
+}
+
+TEST(DelayParsing, Delay3TriregFallAndDecay) {
+  auto r = Parse(
+      "module t;\n"
+      "  trireg (large) #(10, 20, 50) cap1;\n"
+      "endmodule\n");
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->net_delay_fall, nullptr);
+  EXPECT_EQ(item->net_delay_fall->int_val, 20u);
+  ASSERT_NE(item->net_delay_decay, nullptr);
+  EXPECT_EQ(item->net_delay_decay->int_val, 50u);
+}
+
+// --- delay2: mintypmax in both positions ---
+
+TEST(DelayParsing, Delay2MintypMaxTwoValues) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  xor #(1:2:3, 4:5:6) g(y, a, b);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  ASSERT_NE(item->gate_delay, nullptr);
+  EXPECT_EQ(item->gate_delay->kind, ExprKind::kMinTypMax);
+  ASSERT_NE(item->gate_delay_fall, nullptr);
+  EXPECT_EQ(item->gate_delay_fall->kind, ExprKind::kMinTypMax);
+}
+
+// --- delay3: mintypmax in all three positions ---
+
+TEST(DelayParsing, Delay3MintypMaxThreeValues) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire #(1:2:3, 4:5:6, 7:8:9) w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_NE(item->net_delay, nullptr);
+  EXPECT_EQ(item->net_delay->kind, ExprKind::kMinTypMax);
+  ASSERT_NE(item->net_delay_fall, nullptr);
+  EXPECT_EQ(item->net_delay_fall->kind, ExprKind::kMinTypMax);
+  ASSERT_NE(item->net_delay_decay, nullptr);
+  EXPECT_EQ(item->net_delay_decay->kind, ExprKind::kMinTypMax);
+}
+
+// --- delay3: single value on continuous assignment ---
+
+TEST(DelayParsing, Delay3AssignSingleValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire out_w, in_w;\n"
+      "  assign #5 out_w = in_w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[2];
+  ASSERT_NE(item->assign_delay, nullptr);
+  EXPECT_EQ(item->assign_delay->int_val, 5u);
+  EXPECT_EQ(item->assign_delay_fall, nullptr);
+  EXPECT_EQ(item->assign_delay_decay, nullptr);
 }
 
 }  // namespace

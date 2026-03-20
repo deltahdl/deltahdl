@@ -113,6 +113,10 @@ void Parser::ParseStructMembers(DataType& dtype) {
     DataType member_type;
     if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
       member_type = ParseStructOrUnionType();
+      ParsePackedDims(member_type);
+    } else if (Check(TokenKind::kKwEnum)) {
+      member_type = ParseEnumType();
+      ParsePackedDims(member_type);
     } else {
       member_type = ParseDataType();
     }

@@ -156,4 +156,209 @@ TEST(NetAndVariableTypeElaboration, SignedVariableElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// --- integer_atom_type widths ---
+
+TEST(NetAndVariableTypeElaboration, ByteAtomTypeWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  byte b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
+TEST(NetAndVariableTypeElaboration, ShortintAtomTypeWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  shortint s;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_EQ(mod->variables[0].width, 16u);
+}
+
+TEST(NetAndVariableTypeElaboration, LongintAtomTypeWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  longint l;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_EQ(mod->variables[0].width, 64u);
+}
+
+TEST(NetAndVariableTypeElaboration, IntegerAtomTypeWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  integer i;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_EQ(mod->variables[0].width, 32u);
+  EXPECT_TRUE(mod->variables[0].is_4state);
+}
+
+TEST(NetAndVariableTypeElaboration, TimeAtomTypeWidth) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  time t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_EQ(mod->variables[0].width, 64u);
+}
+
+// --- non_integer_type elaboration ---
+
+TEST(NetAndVariableTypeElaboration, ShortRealElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  shortreal sr;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_TRUE(mod->variables[0].is_real);
+}
+
+TEST(NetAndVariableTypeElaboration, RealtimeElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  realtime rt;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_TRUE(mod->variables[0].is_real);
+}
+
+// --- net_type elaboration for non-wire types ---
+
+TEST(NetAndVariableTypeElaboration, TriNetElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  tri t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->nets.empty());
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kTri);
+}
+
+TEST(NetAndVariableTypeElaboration, WandNetElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  wand w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->nets.empty());
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kWand);
+}
+
+TEST(NetAndVariableTypeElaboration, WorNetElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  wor w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->nets.empty());
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kWor);
+}
+
+TEST(NetAndVariableTypeElaboration, Supply0NetElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  supply0 s;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->nets.empty());
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kSupply0);
+}
+
+TEST(NetAndVariableTypeElaboration, Supply1NetElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  supply1 s;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->nets.empty());
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kSupply1);
+}
+
+TEST(NetAndVariableTypeElaboration, TriregNetElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  trireg t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->nets.empty());
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kTrireg);
+}
+
+// --- signing elaboration: unsigned override ---
+
+TEST(NetAndVariableTypeElaboration, UnsignedVariableElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  int unsigned x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_FALSE(mod->variables[0].is_signed);
+}
+
 }  // namespace

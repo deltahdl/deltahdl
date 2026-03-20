@@ -130,4 +130,22 @@ TEST(DelayElaboration, DelayValueRealElaborates) {
   EXPECT_EQ(mod->assigns[0].delay->kind, ExprKind::kRealLiteral);
 }
 
+// --- delay_value: time_literal elaboration ---
+
+TEST(DelayElaboration, ContAssignTimeLiteralDelay) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign #10ns w = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->assigns.empty());
+  ASSERT_NE(mod->assigns[0].delay, nullptr);
+  EXPECT_EQ(mod->assigns[0].delay->kind, ExprKind::kTimeLiteral);
+}
+
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -469,6 +470,236 @@ TEST(NetAndVariableTypeParsing, IntegerVectorMultiplePackedDims) {
 
 TEST(NetAndVariableTypeParsing, EnumPackedDimension) {
   EXPECT_TRUE(ParseOk("module m; enum logic [1:0] {A, B, C} x; endmodule"));
+}
+
+// --- net_port_type: interconnect ---
+
+TEST(NetAndVariableTypeParsing, InterconnectDeclFlag) {
+  auto r = Parse("module m; interconnect net1; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_TRUE(item->data_type.is_interconnect);
+}
+
+TEST(NetAndVariableTypeParsing, InterconnectWithDim) {
+  auto r = Parse("module m; interconnect [7:0] net1; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->items[0]->data_type.is_interconnect);
+}
+
+TEST(NetAndVariableTypeParsing, InterconnectMultipleNets) {
+  auto r = Parse(
+      "module t;\n"
+      "  interconnect w1;\n"
+      "  interconnect [3:0] w2;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
+}
+
+TEST(NetAndVariableTypeParsing, InterconnectWithPackedDim) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  interconnect [7:0] ibus;\n"
+              "endmodule\n"));
+}
+
+TEST(NetAndVariableTypeParsing, InterconnectBasic) {
+  EXPECT_TRUE(
+      ParseOk6("module t;\n"
+               "  interconnect bus;\n"
+               "endmodule\n"));
+}
+
+TEST(NetAndVariableTypeParsing, InterconnectDeclFlagWithPreprocessor) {
+  auto r = ParseWithPreprocessor(
+      "module t;\n"
+      "  interconnect ibus;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->data_type.is_interconnect);
+  EXPECT_EQ(item->name, "ibus");
+}
+
+// --- virtual interface with modport (§25.9) ---
+
+TEST(NetAndVariableTypeParsing, VirtualInterfaceWithModport) {
+  auto r = Parse(
+      "interface my_ifc;\n"
+      "  logic a;\n"
+      "  modport mp(input a);\n"
+      "endinterface\n"
+      "module m; virtual my_ifc.mp vif; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& dt = r.cu->modules[0]->items[0]->data_type;
+  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_EQ(dt.modport_name, "mp");
+}
+
+// --- struct_union_member: {attribute_instance} ---
+
+TEST(NetAndVariableTypeParsing, StructMemberWithAttribute) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct { (* mark *) int a; int b; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& members = r.cu->modules[0]->items[0]->data_type.struct_members;
+  ASSERT_GE(members.size(), 2u);
+  ASSERT_FALSE(members[0].attrs.empty());
+  EXPECT_EQ(members[0].attrs[0].name, "mark");
+}
+
+// --- struct_union_member: multiple names in list_of_variable_decl_assignments ---
+
+TEST(NetAndVariableTypeParsing, StructMemberMultipleNames) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct { int a, b, c; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& members = r.cu->modules[0]->items[0]->data_type.struct_members;
+  ASSERT_EQ(members.size(), 3u);
+  EXPECT_EQ(members[0].name, "a");
+  EXPECT_EQ(members[1].name, "b");
+  EXPECT_EQ(members[2].name, "c");
+}
+
+// --- class_type: chained :: scope resolution ---
+
+TEST(NetAndVariableTypeParsing, ClassTypeChainedScope) {
+  auto r = Parse(
+      "class A;\n"
+      "  class B;\n"
+      "    typedef int inner_t;\n"
+      "  endclass\n"
+      "endclass\n"
+      "module m; A::B::inner_t x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& dt = r.cu->modules[0]->items[0]->data_type;
+  EXPECT_EQ(dt.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(dt.scope_name, "B");
+  EXPECT_EQ(dt.type_name, "inner_t");
+}
+
+// --- enum_base_type: type_identifier ---
+
+TEST(NetAndVariableTypeParsing, EnumBaseTypeIdentifier) {
+  auto r = Parse(
+      "typedef logic [3:0] nibble_t;\n"
+      "module m; enum nibble_t {A, B} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kEnum);
+}
+
+// --- struct packed unsigned ---
+
+TEST(NetAndVariableTypeParsing, StructPackedUnsigned) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct packed unsigned { logic [7:0] a; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& dt = r.cu->modules[0]->items[0]->data_type;
+  EXPECT_EQ(dt.kind, DataTypeKind::kStruct);
+  EXPECT_TRUE(dt.is_packed);
+  EXPECT_FALSE(dt.is_signed);
+}
+
+// --- error: empty enum body ---
+
+TEST(NetAndVariableTypeParsing, EnumEmptyBodyIsError) {
+  auto r = Parse("module m; enum {} x; endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// --- virtual interface with parameter_value_assignment ---
+
+TEST(NetAndVariableTypeParsing, VirtualInterfaceWithParams) {
+  auto r = Parse(
+      "interface my_ifc #(parameter W = 8);\n"
+      "endinterface\n"
+      "module m; virtual my_ifc#(16) vif; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& dt = r.cu->modules[0]->items[0]->data_type;
+  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_FALSE(dt.type_params.empty());
+}
+
+TEST(NetAndVariableTypeParsing, VirtualInterfaceWithParamsAndModport) {
+  auto r = Parse(
+      "interface my_ifc #(parameter W = 8);\n"
+      "  logic [W-1:0] a;\n"
+      "  modport mp(input a);\n"
+      "endinterface\n"
+      "module m; virtual my_ifc#(16).mp vif; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& dt = r.cu->modules[0]->items[0]->data_type;
+  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
+  EXPECT_FALSE(dt.type_params.empty());
+  EXPECT_EQ(dt.modport_name, "mp");
+}
+
+// --- named type with packed dimensions ---
+
+TEST(NetAndVariableTypeParsing, NamedTypeWithPackedDim) {
+  auto r = Parse(
+      "typedef logic [7:0] byte_t;\n"
+      "module m; byte_t [3:0] x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& dt = r.cu->modules[0]->items[0]->data_type;
+  EXPECT_EQ(dt.kind, DataTypeKind::kNamed);
+  EXPECT_NE(dt.packed_dim_left, nullptr);
+}
+
+// --- struct/enum with trailing packed_dimension ---
+
+TEST(NetAndVariableTypeParsing, StructWithTrailingPackedDim) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct packed { logic [7:0] a; } [3:0] arr;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& dt = r.cu->modules[0]->items[0]->data_type;
+  EXPECT_EQ(dt.kind, DataTypeKind::kStruct);
+  EXPECT_NE(dt.packed_dim_left, nullptr);
+}
+
+TEST(NetAndVariableTypeParsing, EnumWithTrailingPackedDim) {
+  auto r = Parse(
+      "module m;\n"
+      "  enum logic [1:0] {A, B, C} [3:0] arr;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- enum member inside struct ---
+
+TEST(NetAndVariableTypeParsing, StructMemberWithEnumType) {
+  auto r = Parse(
+      "module m;\n"
+      "  struct { enum {A, B} x; int y; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& members = r.cu->modules[0]->items[0]->data_type.struct_members;
+  ASSERT_GE(members.size(), 2u);
+  EXPECT_EQ(members[0].type_kind, DataTypeKind::kEnum);
 }
 
 }  // namespace
