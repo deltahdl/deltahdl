@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_Simple) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin a = 42; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
 TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_ConcatLhs) {
   auto r = Parse(
       "module m;\n"

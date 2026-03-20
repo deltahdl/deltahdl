@@ -4,20 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_AlwaysLatch) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_latch\n"
-      "    if (en) q = d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysLatchBlock);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
-}
-
 TEST(ProcessParsing, ThreeAlwaysLatchBlocks) {
   auto r = Parse(
       "module m;\n"

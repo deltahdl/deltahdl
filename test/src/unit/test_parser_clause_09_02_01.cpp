@@ -4,17 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, InitialConstruct_SingleStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial $display(\"hello\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-}
 TEST(Parser, ModuleWithInitialBlock) {
   auto r = Parse(
       "module hello;\n"

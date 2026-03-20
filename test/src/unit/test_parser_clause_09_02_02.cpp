@@ -4,23 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, AlwaysKeyword_AllFourVariants) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk) a = 1;\n"
-      "  always_comb b = 2;\n"
-      "  always_latch if (en) c = 3;\n"
-      "  always_ff @(posedge clk) d <= 4;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysBlock));
-  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysCombBlock));
-  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysLatchBlock));
-  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysFFBlock));
-}
-
 TEST(AlwaysProcedureParsing, AlwaysKindPreserved) {
   auto r = Parse(
       "module m;\n"

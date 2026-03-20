@@ -39,38 +39,6 @@ TEST(BlockItemDeclParsing, DataDeclBasicInBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(body->stmts[0]->var_name, "x");
 }
-TEST(ProceduralBlockSyntaxParsing, InitialConstruct_BeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = 1;\n"
-      "    b = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_EQ(item->body->stmts.size(), 2u);
-}
-TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_WithBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk) begin\n"
-      "    q <= d;\n"
-      "    r <= e;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_EQ(item->body->stmts.size(), 2u);
-}
 
 TEST(ProceduralBlockSyntaxParsing, Integration_InitialWithTimingAndAssign) {
   auto r = Parse(

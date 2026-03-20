@@ -1,22 +1,8 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
-#include "simulator/udp_eval.h"
 
 using namespace delta;
 namespace {
-
-TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_AlwaysComb) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb y = a & b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysCombBlock);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysComb);
-}
 
 TEST(ProcessParsing, NestedIfElseAndCase) {
   auto r = Parse(

@@ -4,20 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, InitialConstruct_Multiple) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial a = 0;\n"
-      "  initial b = 0;\n"
-      "  initial c = 0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto inits =
-      FindItems(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  EXPECT_EQ(inits.size(), 3u);
-}
-
 TEST(ProceduralAssignAndControlParsing, StructuredProcInitialAndAlways) {
   auto r = Parse(
       "module m;\n"

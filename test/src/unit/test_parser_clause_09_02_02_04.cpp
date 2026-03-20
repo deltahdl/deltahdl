@@ -4,46 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_AlwaysFF) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(posedge clk or negedge rst_n)\n"
-      "    if (!rst_n) q <= 0;\n"
-      "    else q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysFFBlock);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
-
-  EXPECT_EQ(item->sensitivity.size(), 2u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
-}
-
-TEST(ProceduralBlockSyntaxParsing, Integration_AlwaysFFWithBlockingAndNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_ff @(posedge clk or negedge rst_n) begin\n"
-      "    if (!rst_n) begin\n"
-      "      q <= 0;\n"
-      "      r <= 0;\n"
-      "    end else begin\n"
-      "      q <= d;\n"
-      "      r <= e;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysFFBlock);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
-  EXPECT_EQ(item->sensitivity.size(), 2u);
-}
 TEST(ProcessParsing, BlockInAlwaysFFWithSensitivity) {
   auto r = Parse(
       "module m;\n"

@@ -4,19 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_PlainAlways) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
-  ASSERT_NE(item->body, nullptr);
-}
-
 TEST(ProcessParsing, AlwaysBlock) {
   auto r = Parse(
       "module m;\n"

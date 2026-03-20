@@ -1,33 +1,8 @@
 #include "fixture_parser.h"
-#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
-
-TEST(ProceduralBlockSyntaxParsing, Force_Net) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin force net_a = 0; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForce);
-}
-
-TEST(ProceduralBlockSyntaxParsing, Release_Net) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin release net_a; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
-}
 
 TEST(ProceduralBlockSyntaxParsing, Force_WithConcat) {
   auto r = Parse(

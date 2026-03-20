@@ -4,20 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_Simple) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin q <= d; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
 TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_WithIntraDelay) {
   auto r = Parse(
       "module m;\n"

@@ -1,69 +1,8 @@
 #include "fixture_parser.h"
-#include "fixture_program.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 namespace {
-
-TEST(ProceduralBlockSyntaxParsing, FinalConstruct_SingleStmt) {
-  auto r = Parse(
-      "module m;\n"
-      "  final $display(\"done\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-}
-
-TEST(ProceduralBlockSyntaxParsing, FinalConstruct_BeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  final begin\n"
-      "    $display(\"test1\");\n"
-      "    $display(\"test2\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_EQ(item->body->stmts.size(), 2u);
-}
-
-TEST(ProceduralBlockSyntaxParsing, FinalConstruct_Multiple) {
-  auto r = Parse(
-      "module m;\n"
-      "  final $display(\"a\");\n"
-      "  final $display(\"b\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto finals = FindItems(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
-  EXPECT_EQ(finals.size(), 2u);
-}
-
-TEST(ProceduralBlockSyntaxParsing, Integration_InitialFinalCoexistence) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $display(\"start\");\n"
-      "    a = 0;\n"
-      "  end\n"
-      "  final begin\n"
-      "    $display(\"end\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* init = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  auto* fin = FindItem(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
-  ASSERT_NE(init, nullptr);
-  ASSERT_NE(fin, nullptr);
-}
 
 TEST(ProcessTimingAndControlParsing, FinalBlockWithBeginEnd) {
   auto r = Parse(
@@ -132,17 +71,6 @@ TEST(ProcessParsing, BlockInFinalBlock) {
   EXPECT_TRUE(found);
 }
 
-TEST_F(ProgramTestParse, ProgramWithFinalBlock) {
-  auto* unit = Parse(
-      "program p;\n"
-      "  final begin\n"
-      "    $display(\"done\");\n"
-      "  end\n"
-      "endprogram\n");
-  ASSERT_EQ(unit->programs.size(), 1u);
-  ASSERT_EQ(unit->programs[0]->items.size(), 1u);
-  EXPECT_EQ(unit->programs[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
-}
 TEST(ProceduralAssignAndControlParsing, StructuredProcFinalBlock) {
   auto r = Parse(
       "module m;\n"
