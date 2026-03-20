@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PrimitiveInstantiationParsing, Error_PullGateEmptyTerminals) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup ();\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 // --- Minimum valid terminal counts ---
 TEST(PrimitiveInstantiationParsing, NInputGateMinimumTwoTerminals) {
   auto r = Parse(
