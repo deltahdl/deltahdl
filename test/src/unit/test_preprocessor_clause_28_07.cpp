@@ -27,4 +27,16 @@ TEST(Parser, GateNmos) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
+TEST(MosSwitches, NmosInstantiation) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  wire out, data, ctrl;\n"
+      "  nmos n1(out, data, ctrl);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNmos);
+  ASSERT_NE(g, nullptr);
+}
+
 }  // namespace
