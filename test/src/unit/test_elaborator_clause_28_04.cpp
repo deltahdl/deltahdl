@@ -86,4 +86,27 @@ TEST(GateLevelModelingParsing, ElaborateMultiInputAnd) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
+// --- N-input gate chain depth ---
+TEST(GateElaboration, FourInputAndProducesThreeNodeChain) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  wire a, b, c, d, y;\n"
+      "  and g1(y, a, b, c, d);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->assigns.size(), 1u);
+  auto& ca = mod->assigns.back();
+  ASSERT_NE(ca.rhs, nullptr);
+  EXPECT_EQ(ca.rhs->kind, ExprKind::kBinary);
+  // (a & b) & c) & d => root is binary, lhs is binary, lhs->lhs is binary
+  ASSERT_NE(ca.rhs->lhs, nullptr);
+  EXPECT_EQ(ca.rhs->lhs->kind, ExprKind::kBinary);
+  ASSERT_NE(ca.rhs->lhs->lhs, nullptr);
+  EXPECT_EQ(ca.rhs->lhs->lhs->kind, ExprKind::kBinary);
+}
+
 }  // namespace
