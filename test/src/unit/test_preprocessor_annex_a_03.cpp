@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(GateInstantiationPreprocessor, GateInsideConditionalCompilation) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "`ifdef INCLUDE_GATE\n"
-      "  and g1(y, a, b);\n"
-      "`endif\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd), nullptr);
-}
-
 TEST(GateInstantiationPreprocessor, GateWithStrengthAndDelayThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m;\n"

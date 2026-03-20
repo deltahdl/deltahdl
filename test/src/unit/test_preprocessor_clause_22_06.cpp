@@ -676,3 +676,16 @@ TEST(DesignElementPreprocessing, EmptyIfdefBodyPreservesSubsequent) {
   EXPECT_NE(result.find("module"), std::string::npos);
 }
 
+TEST(ConditionalCompilation, IfdefUndefinedExcludesBlock) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  wire a, b, y;\n"
+      "`ifdef INCLUDE_GATE\n"
+      "  and g1(y, a, b);\n"
+      "`endif\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd), nullptr);
+}
+
