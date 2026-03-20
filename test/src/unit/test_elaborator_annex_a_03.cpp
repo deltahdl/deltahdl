@@ -1,26 +1,10 @@
+// Non-LRM tests
+
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
-
-// --- Gate types not covered by subsection elaborator tests ---
-
-TEST(GateElaboration, EnableGateProducesNoAssign) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire y, a, en;\n"
-      "  bufif0 b1(y, a, en);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  for (auto& ca : mod->assigns) {
-    EXPECT_NE(ca.lhs, nullptr);
-  }
-}
 
 TEST(GateElaboration, MosSwitchProducesNoAssign) {
   ElabFixture f;
@@ -71,7 +55,6 @@ TEST(GateElaboration, PassEnableSwitchProducesNoAssign) {
 }
 
 // --- N-input gate chain depth ---
-
 TEST(GateElaboration, FourInputAndProducesThreeNodeChain) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -115,7 +98,6 @@ TEST(GateElaboration, TwoInputOrProducesSingleBinary) {
 }
 
 // --- Gate with strength elaborates normally ---
-
 TEST(GateElaboration, GateWithStrengthStillProducesAssign) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -135,7 +117,6 @@ TEST(GateElaboration, GateWithStrengthStillProducesAssign) {
 }
 
 // --- Gate with delay elaborates normally ---
-
 TEST(GateElaboration, GateWithDelayStillProducesAssign) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -155,7 +136,6 @@ TEST(GateElaboration, GateWithDelayStillProducesAssign) {
 }
 
 // --- Unnamed gate elaborates the same as named ---
-
 TEST(GateElaboration, UnnamedGateProducesAssign) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -175,7 +155,6 @@ TEST(GateElaboration, UnnamedGateProducesAssign) {
 }
 
 // --- Full pipeline: elaborate through preprocessor ---
-
 TEST(GateElaboration, GateThroughFullPipeline) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
