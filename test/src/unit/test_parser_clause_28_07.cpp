@@ -16,4 +16,12 @@ TEST(MosSwitches, TooFewTerminals) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(MosSwitches, TooManyTerminals) {
+  auto r = Parse(
+      "module m;\n"
+      "  pmos p1(out, data, ctrl, extra);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
