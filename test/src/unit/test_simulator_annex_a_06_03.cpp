@@ -8,7 +8,61 @@ using namespace delta;
 
 namespace {
 
-TEST(Lowerer, ForkJoinNone) {
+TEST(BlockStatementSimSyntax, SeqBlockExecutionOrder) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd10;\n"
+      "    x = 8'd20;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+TEST(BlockStatementSimSyntax, SeqBlockValuePropagation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'd5;\n"
+      "    b = a + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 6u);
+}
+
+TEST(SequentialBlockSimulation, SequentialWithinBeginEnd) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd1;\n"
+      "    x = 8'd2;\n"
+      "    x = 8'd3;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 3u);
+}
+
+TEST(ParallelBlockLowering, ForkJoinNone) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -25,7 +79,7 @@ TEST(Lowerer, ForkJoinNone) {
   LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
 }
 
-TEST(Lowerer, ForkJoin) {
+TEST(ParallelBlockLowering, ForkJoin) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -157,6 +211,73 @@ TEST(BlockStatementSimSyntax, EmptyForkJoin) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(BlockStatementSimSyntax, NestedSeqBlockExecution) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] r;\n"
+      "  initial begin\n"
+      "    r = 8'd1;\n"
+      "    begin\n"
+      "      r = r + 8'd1;\n"
+      "    end\n"
+      "    begin\n"
+      "      r = r + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+}
+
+TEST(BlockStatementSimSyntax, EmptySeqBlockNoOp) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "    end\n"
+      "    x = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(BlockStatementSimSyntax, NestedForkJoinExecution) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin\n"
+      "        fork\n"
+      "          a = 8'd1;\n"
+      "          b = 8'd2;\n"
+      "        join\n"
+      "      end\n"
+      "      c = 8'd3;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
 }
 
 }  // namespace
