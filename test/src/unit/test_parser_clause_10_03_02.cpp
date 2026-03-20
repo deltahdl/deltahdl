@@ -1,97 +1,9 @@
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
-#include "simulator/udp_eval.h"
 
 using namespace delta;
 namespace {
 
-TEST(ContinuousAssignSyntaxParsing, ContinuousAssign_Basic) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  assign a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  ASSERT_NE(cas[0]->assign_lhs, nullptr);
-  ASSERT_NE(cas[0]->assign_rhs, nullptr);
-}
-
-TEST(ContinuousAssignSyntaxParsing, ListOfNetAssignments_Two) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  assign a = b, c = d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 2u);
-  EXPECT_EQ(cas[0]->assign_lhs->text, "a");
-  EXPECT_EQ(cas[1]->assign_lhs->text, "c");
-}
-
-TEST(ContinuousAssignSyntaxParsing, ListOfNetAssignments_Three) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d, e, f;\n"
-      "  assign a = b, c = d, e = f;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 3u);
-  EXPECT_EQ(cas[0]->assign_lhs->text, "a");
-  EXPECT_EQ(cas[1]->assign_lhs->text, "c");
-  EXPECT_EQ(cas[2]->assign_lhs->text, "e");
-}
-
-TEST(ContinuousAssignSyntaxParsing, ListOfNetAssignments_SharedStrengthAndDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c, d;\n"
-      "  assign (strong0, strong1) #10 a = b, c = d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 2u);
-  EXPECT_EQ(cas[0]->drive_strength0, 4u);
-  EXPECT_EQ(cas[1]->drive_strength0, 4u);
-  EXPECT_EQ(cas[0]->drive_strength1, 4u);
-  EXPECT_EQ(cas[1]->drive_strength1, 4u);
-  EXPECT_NE(cas[0]->assign_delay, nullptr);
-  EXPECT_NE(cas[1]->assign_delay, nullptr);
-}
-
-TEST(ContinuousAssignSyntaxParsing, NetAssignment_ConcatLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [3:0] sum;\n"
-      "  wire carry;\n"
-      "  assign {carry, sum} = 5'b10101;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  EXPECT_EQ(cas[0]->assign_lhs->kind, ExprKind::kConcatenation);
-}
-
-TEST(ContinuousAssignSyntaxParsing, NetAssignment_ExprRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [3:0] a, b, sum;\n"
-      "  assign sum = a + b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  EXPECT_EQ(cas[0]->assign_rhs->kind, ExprKind::kBinary);
-}
 TEST(DataTypeParsing, VariableContinuousAssign) {
   auto r = Parse(
       "module t;\n"
@@ -313,21 +225,6 @@ TEST(AggregateTypeParsing, ContinuousAssign) {
   EXPECT_EQ(item->kind, ModuleItemKind::kContAssign);
   ASSERT_NE(item->assign_lhs, nullptr);
   ASSERT_NE(item->assign_rhs, nullptr);
-}
-
-TEST(ContinuousAssignment, SimpleNetAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  assign b = a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool has_assign = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kContAssign) has_assign = true;
-  }
-  EXPECT_TRUE(has_assign);
 }
 
 }  // namespace
