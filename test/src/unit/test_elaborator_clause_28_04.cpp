@@ -129,4 +129,13 @@ TEST(GateElaboration, TwoInputOrProducesSingleBinary) {
   EXPECT_EQ(ca.rhs->rhs->kind, ExprKind::kIdentifier);
 }
 
+// --- Full pipeline: elaborate through preprocessor ---
+TEST(GateElaboration, GateThroughFullPipeline) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  wire a, b, y;\n"
+      "  nand g1(y, a, b);\n"
+      "endmodule\n"));
+}
+
 }  // namespace

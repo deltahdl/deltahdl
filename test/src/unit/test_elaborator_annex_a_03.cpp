@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-// --- Full pipeline: elaborate through preprocessor ---
-TEST(GateElaboration, GateThroughFullPipeline) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  nand g1(y, a, b);\n"
-      "endmodule\n"));
-}
-
 TEST(GateElaboration, AllElaborableGatesThroughFullPipeline) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
