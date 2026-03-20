@@ -38,4 +38,17 @@ TEST(Parser, GateBufMultiOutput) {
   EXPECT_EQ(item->gate_terminals.size(), 3);
 }
 
+TEST(NOutputGates, BufGateInstantiation) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  wire a, o1, o2;\n"
+      "  buf (o1, o2, a);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBuf);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 3u);
+}
+
 }  // namespace
