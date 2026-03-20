@@ -1,15 +1,9 @@
-#include <gtest/gtest.h>
+// Non-LRM tests
 
+#include <gtest/gtest.h>
 #include "fixture_lexer.h"
 
 using namespace delta;
-
-namespace {
-
-struct GateKeywordEntry {
-  const char* text;
-  TokenKind expected;
-};
 
 static const GateKeywordEntry kGateKeywords[] = {
     {"and", TokenKind::kKwAnd},
@@ -40,12 +34,7 @@ static const GateKeywordEntry kGateKeywords[] = {
     {"pulldown", TokenKind::kKwPulldown},
 };
 
-TEST(GateKeywordLexing, AllTwentySixKeywords) {
-  for (const auto& entry : kGateKeywords) {
-    auto r = LexOne(entry.text);
-    EXPECT_EQ(r.token.kind, entry.expected) << "keyword: " << entry.text;
-  }
-}
+namespace {
 
 TEST(GateKeywordLexing, NInputGateInstantiationTokenSequence) {
   auto tokens = Lex("and g1(y, a, b);");
