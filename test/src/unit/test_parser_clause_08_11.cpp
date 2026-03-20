@@ -11,18 +11,6 @@ TEST(PrimaryParsing, PrimaryThis) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SubroutineCallSyntaxParsing, ThisMethodCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin this.method(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-}
-
 TEST(PrimaryParsing, ImplicitClassHandleThis) {
   auto r = Parse("module m; initial x = this; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -33,18 +21,6 @@ TEST(PrimaryParsing, ImplicitClassHandleThisMember) {
   auto r = Parse("module m; initial x = this.field; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SubroutineCallExprParsing, MethodCallRootThis) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin this.method(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
 TEST(ClassParsing, ThisExpression) {

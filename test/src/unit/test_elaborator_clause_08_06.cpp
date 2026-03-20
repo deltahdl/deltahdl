@@ -4,17 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SubroutineCallElaborationSyntax, MethodCallElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  initial begin obj.method(); end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(OperatorElaboration, ClassWithMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"

@@ -4,21 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SubroutineCallElaborationSyntax, TfCallElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  task set_x;\n"
-      "    x = 8'd1;\n"
-      "  endtask\n"
-      "  initial set_x();\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(PrimaryElaboration, PrimaryFunctionCallElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -333,6 +333,9 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
     inner.is_signed = false;
     return inner;
   }
+  if (type_name == "void") {
+    return MakeLogic4Vec(arena, 0);
+  }
   uint32_t target_width = CastWidth(type_name);
   // §6.12.1: real↔integer conversion.
   if (inner.is_real != IsRealCastTarget(type_name)) {

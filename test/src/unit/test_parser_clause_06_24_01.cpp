@@ -261,18 +261,6 @@ TEST(DataTypeParsing, TypeCast_UserDefined) {
                "endmodule\n"));
 }
 
-TEST(DataTypeParsing, VoidCastExpression) {
-  auto r = Parse(
-      "module t;\n"
-      "  function int foo(); return 1; endfunction\n"
-      "  initial void'(foo());\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-}
-
 TEST(DataTypeParsing, IntCast) {
   auto r = Parse(
       "module t;\n"

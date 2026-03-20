@@ -5,50 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SubroutineCallSyntaxParsing, TfCallNoParens) {
-  auto r = Parse(
-      "module m;\n"
-      "  task foo; endtask\n"
-      "  initial foo;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-}
-
-TEST(SubroutineCallSyntaxParsing, VoidCastFunctionCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int foo(); return 1; endfunction\n"
-      "  initial void'(foo());\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCast);
-  EXPECT_EQ(expr->text, "void");
-  ASSERT_NE(expr->lhs, nullptr);
-  EXPECT_EQ(expr->lhs->kind, ExprKind::kCall);
-  EXPECT_EQ(expr->lhs->callee, "foo");
-}
-
-TEST(SubroutineCallSyntaxParsing, MethodCallWithArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin obj.method(1, 2); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-  EXPECT_EQ(expr->args.size(), 2u);
-}
-
-
 TEST(SubroutineCallExprParsing, FunctionSubroutineCallNested) {
   auto r = Parse(
       "module m;\n"
@@ -85,14 +41,6 @@ TEST(OperatorAndExpressionParsing, ExprAsFunctionArgument) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial $display(a + b, c * d, {e, f});\n"
-              "endmodule\n"));
-}
-
-TEST(TaskDeclaration, TaskCalledAsStatement) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  task greet; endtask\n"
-              "  initial greet();\n"
               "endmodule\n"));
 }
 

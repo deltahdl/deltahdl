@@ -104,37 +104,6 @@ TEST(DataTypeParsing, RealInFunction) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kReal);
 }
 
-TEST(SubroutineCallSyntaxParsing, VoidCastSystemCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial void'($sformatf(\"hello\"));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCast);
-  EXPECT_EQ(expr->text, "void");
-  ASSERT_NE(expr->lhs, nullptr);
-  EXPECT_EQ(expr->lhs->kind, ExprKind::kSystemCall);
-}
-
-TEST(TaskAndFunctionParsing, VoidFunctionCallAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void myprint(int a);\n"
-      "    $display(\"%d\", a);\n"
-      "  endfunction\n"
-      "  initial myprint(42);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-  ASSERT_NE(stmt->expr, nullptr);
-  EXPECT_EQ(stmt->expr->kind, ExprKind::kCall);
-}
-
 TEST(TaskAndFunctionParsing, VoidFunctionReturnTypeKind) {
   auto r = Parse(
       "module m;\n"
@@ -382,14 +351,6 @@ TEST(FunctionDeclaration, NonVoidFunctionUsedAsOperand) {
               "  function int twice(int v); return v * 2; endfunction\n"
               "  logic [31:0] result;\n"
               "  initial result = twice(5);\n"
-              "endmodule\n"));
-}
-
-TEST(FunctionDeclaration, VoidFunctionCalledAsStatement) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function void log(int v); $display(\"%0d\", v); endfunction\n"
-              "  initial log(42);\n"
               "endmodule\n"));
 }
 

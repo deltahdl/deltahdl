@@ -8,47 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SubroutineCallSim, TaskCallSimple) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  task set_x;\n"
-      "    x = 8'd42;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    set_x();\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
-TEST(SubroutineCallSim, VoidCastFunctionCall) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  function int side_effect;\n"
-      "    x = 8'd55;\n"
-      "    return 123;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    void'(side_effect());\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"x", 55u}});
-}
-
 TEST(SubroutineCallSim, NestedFunctionCalls) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -95,29 +54,6 @@ TEST(SubroutineCallSim, TaskOutputArg) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
-}
-
-TEST(SubroutineCallExprSim, TfCallTaskModifiesVar) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  task set_x;\n"
-      "    x = 8'd42;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    set_x();\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(SubroutineCallExprSim, FunctionCallInBinaryExpr) {

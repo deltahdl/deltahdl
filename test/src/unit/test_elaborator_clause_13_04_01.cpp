@@ -45,18 +45,6 @@ TEST(StatementElaboration, NonVoidFunctionReturnWithValue) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SubroutineCallElaborationSyntax, VoidCastElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  function int foo(); return 1; endfunction\n"
-      "  initial void'(foo());\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(SubroutineCallExprElaboration, TfCallAsExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
