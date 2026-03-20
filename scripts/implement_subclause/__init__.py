@@ -106,6 +106,8 @@ def build_steps(
          f" §{subclause}. Move any that are in the wrong files"
          f" to the correct files: {filenames}."
          " Do NOT put tests in a parent clause file."
+         " If moving tests leaves a file empty, delete that file"
+         " and remove its entry from test/CMakeLists.txt."
          + exclude_note + constraints),
         ("Renaming test suites",
          f"Rename any test suites that test §{subclause} requirements"
