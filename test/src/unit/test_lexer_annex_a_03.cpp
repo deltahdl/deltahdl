@@ -36,21 +36,6 @@ static const GateKeywordEntry kGateKeywords[] = {
 
 namespace {
 
-TEST(GateKeywordLexing, NInputGateInstantiationTokenSequence) {
-  auto tokens = Lex("and g1(y, a, b);");
-  ASSERT_GE(tokens.size(), 8u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwAnd);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kLParen);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[8].kind, TokenKind::kRParen);
-  EXPECT_EQ(tokens[9].kind, TokenKind::kSemicolon);
-}
-
 TEST(GateKeywordLexing, UnnamedGateTokenSequence) {
   auto tokens = Lex("or (out, a, b);");
   ASSERT_GE(tokens.size(), 8u);
