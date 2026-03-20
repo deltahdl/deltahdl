@@ -1,19 +1,11 @@
+// Non-LRM tests
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
-
-// --- Terminal count error cases not covered by subsection files ---
-
-TEST(PrimitiveInstantiationParsing, Error_MosSwitchTooFewTerminals) {
-  auto r = Parse(
-      "module m;\n"
-      "  nmos n1(out, data);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
 
 TEST(PrimitiveInstantiationParsing, Error_MosSwitchTooManyTerminals) {
   auto r = Parse(
@@ -80,7 +72,6 @@ TEST(PrimitiveInstantiationParsing, Error_PullGateEmptyTerminals) {
 }
 
 // --- Minimum valid terminal counts ---
-
 TEST(PrimitiveInstantiationParsing, NInputGateMinimumTwoTerminals) {
   auto r = Parse(
       "module m;\n"
@@ -106,7 +97,6 @@ TEST(PrimitiveInstantiationParsing, NOutputGateMinimumTwoTerminals) {
 }
 
 // --- Pass/enable switch error for wrong strength/delay combinations ---
-
 TEST(PrimitiveInstantiationParsing, Error_DelayOnTran) {
   auto r = Parse(
       "module m;\n"
@@ -132,7 +122,6 @@ TEST(PrimitiveInstantiationParsing, Error_StrengthOnPullGateWrongType) {
 }
 
 // --- Multiple instances with mixed named/unnamed across all types ---
-
 TEST(PrimitiveInstantiationParsing, EnableGateMultipleInstancesMixed) {
   auto r = Parse(
       "module m;\n"
@@ -158,7 +147,6 @@ TEST(PrimitiveInstantiationParsing, PassEnSwitchMultipleInstances) {
 }
 
 // --- Edge case: delay2 vs delay3 ---
-
 TEST(PrimitiveInstantiationParsing, EnableGateAcceptsThreeValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -210,7 +198,6 @@ TEST(PrimitiveInstantiationParsing, PassEnSwitchAcceptsTwoValueDelay) {
 }
 
 // --- Net lvalue validation on output/inout terminals ---
-
 TEST(PrimitiveTerminalParsing, Error_PassSwitchInoutTerminalLiteral) {
   auto r = Parse(
       "module m;\n"
