@@ -101,7 +101,7 @@ def build_steps(
          f"Delete any duplicate tests that belong to §{subclause}."
          " Do NOT delete tests that belong to other subclauses,"
          " even if they look similar."
-         + constraints),
+         + exclude_note + constraints),
         ("Moving misplaced tests",
          f"Search ALL files in test/src/unit/ for tests that belong to"
          f" §{subclause}. Move any that are in the wrong files"
@@ -118,7 +118,7 @@ def build_steps(
          " Use PascalCase names that describe what is being tested."
          " Do NOT include clause or annex numbers."
          " Do NOT rename or modify tests that belong to other subclauses."
-         + constraints),
+         + exclude_note + constraints),
         ("Renaming test names",
          f"Rename any test names that test §{subclause} requirements"
          " and have unintuitive names"
@@ -127,7 +127,7 @@ def build_steps(
          " Use PascalCase names that describe what is being tested."
          " Do NOT include clause or annex numbers."
          " Do NOT rename or modify tests that belong to other subclauses."
-         + constraints),
+         + exclude_note + constraints),
         ("Implementing missing tests",
          f"Write missing unit tests for §{subclause} requirements."
          f" Place them in: {filenames}."
