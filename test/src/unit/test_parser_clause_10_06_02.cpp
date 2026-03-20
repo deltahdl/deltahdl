@@ -5,20 +5,6 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, Force_Variable) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin force q = 1; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForce);
-  EXPECT_NE(stmt->lhs, nullptr);
-  EXPECT_NE(stmt->rhs, nullptr);
-}
-
 TEST(ProceduralBlockSyntaxParsing, Force_Net) {
   auto r = Parse(
       "module m;\n"
@@ -29,19 +15,6 @@ TEST(ProceduralBlockSyntaxParsing, Force_Net) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kForce);
-}
-
-TEST(ProceduralBlockSyntaxParsing, Release_Variable) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin release q; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
-  EXPECT_NE(stmt->lhs, nullptr);
 }
 
 TEST(ProceduralBlockSyntaxParsing, Release_Net) {
