@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(GateInstantiationPreprocessor, PassSwitchThroughPreprocessor) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  tran (a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTran);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
 TEST(GateInstantiationPreprocessor, PassEnableSwitchThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m;\n"

@@ -27,4 +27,17 @@ TEST(Parser, GateTran) {
   EXPECT_EQ(item->gate_terminals.size(), 2);
 }
 
+TEST(BidirectionalPassSwitches, TranInstantiation) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  tran (a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTran);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 2u);
+}
+
 }  // namespace
