@@ -147,7 +147,10 @@ def build_steps(
          "- Added <file> because <reason>\n"
          "- Moved <TestName> from <file> because <reason>\n"
          "- Deleted <file> because <reason>\n"
-         "- Modified <file> because <reason>"),
+         "- Modified <file> because <reason>\n\n"
+         "Before finalizing, run git diff --stat and only include"
+         " actions that correspond to actual file changes."
+         " Remove any claims not backed by the diff."),
     ]
 
 
