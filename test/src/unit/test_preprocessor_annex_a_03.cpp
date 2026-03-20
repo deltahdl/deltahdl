@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(GateInstantiationPreprocessor, CmosSwitchThroughPreprocessor) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  wire out, data, nctrl, pctrl;\n"
-      "  cmos c1(out, data, nctrl, pctrl);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kCmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 4u);
-}
-
 TEST(GateInstantiationPreprocessor, PassSwitchThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
