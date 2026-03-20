@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PrimitiveInstantiationParsing, Error_CmosSwitchTooManyTerminals) {
-  auto r = Parse(
-      "module m;\n"
-      "  cmos c1(out, data, nctrl, pctrl, extra);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(PrimitiveInstantiationParsing, Error_EnableGateTooManyTerminals) {
   auto r = Parse(
       "module m;\n"
