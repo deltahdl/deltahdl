@@ -59,4 +59,16 @@ TEST(PassEnableSwitches, MultipleInstances) {
   EXPECT_EQ(gates.size(), 2u);
 }
 
+TEST(PassEnableSwitches, TwoValueDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  tranif0 #(10, 20) t1(a, b, en);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0);
+  ASSERT_NE(g, nullptr);
+  ASSERT_NE(g->gate_delay, nullptr);
+}
+
 }  // namespace
