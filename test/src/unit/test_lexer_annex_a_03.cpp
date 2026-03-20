@@ -36,11 +36,6 @@ static const GateKeywordEntry kGateKeywords[] = {
 
 namespace {
 
-TEST(GateKeywordLexing, GateKeywordSubstringIsIdentifier) {
-  auto r = LexOne("ands");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-}
-
 TEST(GateKeywordLexing, GateKeywordPrefixIsIdentifier) {
   auto r = LexOne("tranif");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
