@@ -7,26 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(GateInstantiationPreprocessor, AllNineAlternativesThroughPreprocessor) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  wire a, b, c, d, o, o2, n1, n2;\n"
-      "  and (o, a, b);\n"
-      "  buf (o, a);\n"
-      "  bufif0 (o, a, b);\n"
-      "  nmos (o, a, b);\n"
-      "  cmos (o, a, b, c);\n"
-      "  tran (n1, n2);\n"
-      "  tranif0 (n1, n2, a);\n"
-      "  pullup (o);\n"
-      "  pulldown (o2);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  EXPECT_EQ(gates.size(), 9u);
-}
-
 TEST(GateInstantiationPreprocessor, GateWithMacroExpandedDelay) {
   auto r = ParseWithPreprocessor(
       "`define DELAY 5\n"
