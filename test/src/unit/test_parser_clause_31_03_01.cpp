@@ -48,31 +48,6 @@ TEST(FormalSyntaxParsing, TimingCheckSetup) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SpecifyBlockDeclParsing, SpecifyItemSystemTimingCheck) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data, posedge clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kTimingCheck);
-}
-
-TEST_F(SpecifyParseTest, SpecifyBlockWithTimingCheck) {
-  auto* unit = Parse(
-      "module m; specify $setup(data, posedge clk, 10); endspecify "
-      "endmodule");
-  ASSERT_EQ(unit->modules.size(), 1u);
-  auto& items = unit->modules[0]->items;
-  ASSERT_EQ(items.size(), 1u);
-  EXPECT_EQ(items[0]->kind, ModuleItemKind::kSpecifyBlock);
-}
-
 TEST(GateLevelModelingParsing, TimingCheckSetup) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
