@@ -40,4 +40,12 @@ TEST(PassSwitches, DelayNotAllowed) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(PassSwitches, RtranDelayNotAllowed) {
+  auto r = Parse(
+      "module m;\n"
+      "  rtran #5 (a, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

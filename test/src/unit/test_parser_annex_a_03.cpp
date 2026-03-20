@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PrimitiveInstantiationParsing, Error_DelayOnRtran) {
-  auto r = Parse(
-      "module m;\n"
-      "  rtran #5 (a, b);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(PrimitiveInstantiationParsing, Error_StrengthOnPullGateWrongType) {
   auto r = Parse(
       "module m;\n"
