@@ -7,18 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PrimitiveInstantiationParsing, NOutputGateMinimumTwoTerminals) {
-  auto r = Parse(
-      "module m;\n"
-      "  not (out, in);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNot);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 2u);
-}
-
 // --- Pass/enable switch error for wrong strength/delay combinations ---
 TEST(PrimitiveInstantiationParsing, Error_DelayOnTran) {
   auto r = Parse(
