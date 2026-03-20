@@ -244,6 +244,11 @@ def commit_implementation(subclause, issue, *, action=""):
     deleted = [p for p in deleted if _is_valid_path(p)]
 
     if not added and not modified and not deleted:
+        subprocess.run(
+            ["gh", "issue", "close", str(issue),
+             "--comment", action or "No changes needed."],
+            check=True,
+        )
         return
 
     label = _format_subclause_label(subclause)

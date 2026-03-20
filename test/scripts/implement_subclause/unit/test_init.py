@@ -333,9 +333,11 @@ def _commit_impl_and_capture(isc, *, subclause="6.6.1", action="",
               return_value=changes) as m_files,
         patch("implement_subclause.commit_and_push",
               return_value="abc123") as m_cap,
+        patch("implement_subclause.subprocess.run",
+              return_value=MagicMock(returncode=0)) as m_gh,
     ):
         isc.commit_implementation(subclause, 8, action=action)
-    return {"files": m_files, "cap": m_cap}
+    return {"files": m_files, "cap": m_cap, "gh": m_gh}
 
 
 def test_commit_implementation_calls_commit_and_push(isc):
@@ -399,6 +401,24 @@ def test_commit_implementation_skips_commit_when_no_valid_changes(isc):
         isc, changes=(["2", "{a,"], [], ["ev"]),
     )
     assert not mocks["cap"].called
+
+
+def test_commit_implementation_closes_issue_when_no_changes(isc):
+    """commit_implementation closes issue via gh when no valid changes."""
+    mocks = _commit_impl_and_capture(
+        isc, changes=([], [], []), action="No changes needed.",
+    )
+    cmd = mocks["gh"].call_args[0][0]
+    assert "close" in cmd
+
+
+def test_commit_implementation_close_comment_has_action(isc):
+    """commit_implementation passes action summary as close comment."""
+    mocks = _commit_impl_and_capture(
+        isc, changes=([], [], []), action="Nothing to do.",
+    )
+    cmd = mocks["gh"].call_args[0][0]
+    assert "Nothing to do." in cmd
 
 
 # ---- __main__ guard --------------------------------------------------------
