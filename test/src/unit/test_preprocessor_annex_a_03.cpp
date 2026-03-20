@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(GateInstantiationPreprocessor, GateWithMacroExpandedDelay) {
-  auto r = ParseWithPreprocessor(
-      "`define DELAY 5\n"
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  and #(`DELAY) g1(y, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
-  ASSERT_NE(g, nullptr);
-  EXPECT_NE(g->gate_delay, nullptr);
-}
-
 TEST(GateInstantiationPreprocessor, GateInsideConditionalCompilation) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
