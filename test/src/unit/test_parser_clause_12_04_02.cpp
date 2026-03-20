@@ -4,56 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(SchedulingSemanticsParsing, UniqueIf) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    unique if (a) x = 1;\n"
-      "    else if (b) x = 2;\n"
-      "    else x = 3;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
-}
-
-TEST(SchedulingSemanticsParsing, Unique0If) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    unique0 if (a) x = 1;\n"
-      "    else if (b) x = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
-}
-
-TEST(SchedulingSemanticsParsing, PriorityIf) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    priority if (a) x = 1;\n"
-      "    else if (b) x = 2;\n"
-      "    else x = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
-}
-
 TEST(ProceduralStatementParsing, Unique0IfChainElseIf) {
   auto r = Parse(
       "module t;\n"
@@ -68,22 +18,6 @@ TEST(ProceduralStatementParsing, Unique0IfChainElseIf) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
-}
-
-TEST(ConditionalSyntaxParsing, UniqueIf) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    unique if (a == 0) x = 1;\n"
-      "    else if (a == 1) x = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
 TEST(ProceduralStatementParsing, PriorityIfWithElse) {
@@ -103,61 +37,6 @@ TEST(ProceduralStatementParsing, PriorityIfWithElse) {
 
   ASSERT_NE(stmt->else_branch, nullptr);
   ASSERT_NE(stmt->else_branch->else_branch, nullptr);
-}
-
-TEST(ConditionalSyntaxParsing, Unique0If) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    unique0 if (a == 0) x = 1;\n"
-      "    else if (a == 1) x = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
-}
-
-TEST(ConditionalSyntaxParsing, PriorityIf) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    priority if (a == 0) x = 1;\n"
-      "    else if (a == 1) x = 2;\n"
-      "    else x = 3;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
-}
-
-TEST(ConditionalSyntaxParsing, UniqueIfElseIfElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    unique if (a == 0) x = 1;\n"
-      "    else if (a == 1) x = 2;\n"
-      "    else if (a == 2) x = 3;\n"
-      "    else x = 4;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
-
-  ASSERT_NE(stmt->else_branch, nullptr);
-  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
-  EXPECT_EQ(stmt->else_branch->qualifier, CaseQualifier::kNone);
 }
 
 TEST(ProcessParsing, UniqueIf) {

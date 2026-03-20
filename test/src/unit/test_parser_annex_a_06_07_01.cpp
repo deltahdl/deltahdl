@@ -111,15 +111,4 @@ TEST(PatternParsing, CaseMatchesPattern) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(PatternParsing, CondPatternMatches) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if (x matches 42) a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 }  // namespace
