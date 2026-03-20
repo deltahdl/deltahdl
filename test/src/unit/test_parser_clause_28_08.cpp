@@ -31,4 +31,13 @@ TEST(PassEnableSwitches, TooManyTerminals) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// --- Pass/enable switch error for wrong strength/delay combinations ---
+TEST(PassSwitches, DelayNotAllowed) {
+  auto r = Parse(
+      "module m;\n"
+      "  tran #5 (a, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

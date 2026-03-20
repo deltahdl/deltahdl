@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-// --- Pass/enable switch error for wrong strength/delay combinations ---
-TEST(PrimitiveInstantiationParsing, Error_DelayOnTran) {
-  auto r = Parse(
-      "module m;\n"
-      "  tran #5 (a, b);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(PrimitiveInstantiationParsing, Error_DelayOnRtran) {
   auto r = Parse(
       "module m;\n"
