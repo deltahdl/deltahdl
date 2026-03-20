@@ -15,4 +15,12 @@ TEST(PassSwitches, SingleTerminal) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(PassEnableSwitches, TooFewTerminals) {
+  auto r = Parse(
+      "module m;\n"
+      "  tranif0 t1(a, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
