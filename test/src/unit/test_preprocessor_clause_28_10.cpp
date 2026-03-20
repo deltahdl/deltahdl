@@ -28,4 +28,19 @@ TEST(Parser, GatePullup) {
   EXPECT_EQ(item->gate_terminals.size(), 1);
 }
 
+TEST(PullupPulldownSources, PullupAndPulldownInstantiation) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  wire net1;\n"
+      "  pullup (net1);\n"
+      "  pulldown (net1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kPullup),
+            nullptr);
+  EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kPulldown),
+            nullptr);
+}
+
 }  // namespace
