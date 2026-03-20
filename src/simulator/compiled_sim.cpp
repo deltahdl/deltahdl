@@ -120,6 +120,7 @@ bool ProcessCompiler::HasTimingControl(const Stmt* stmt) {
     case StmtKind::kDoWhile:
     case StmtKind::kForever:
     case StmtKind::kRepeat:
+    case StmtKind::kForeach:
       return HasTimingControl(stmt->body);
     case StmtKind::kFork:
       return HasTimingControlInBlock(stmt->fork_stmts);

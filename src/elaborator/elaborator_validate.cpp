@@ -689,6 +689,7 @@ static void WalkStmtForCallArgs(
   WalkStmtForCallArgs(s->body, func_decls, diag);
   WalkStmtForCallArgs(s->for_init, func_decls, diag);
   WalkStmtForCallArgs(s->for_body, func_decls, diag);
+  WalkStmtForCallArgs(s->for_step, func_decls, diag);
   WalkExprForCallArgs(s->for_cond, func_decls, diag);
   for (auto& ci : s->case_items) WalkStmtForCallArgs(ci.body, func_decls, diag);
 }

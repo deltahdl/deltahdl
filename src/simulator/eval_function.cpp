@@ -567,6 +567,48 @@ static void ExecFuncVarDecl(const Stmt* stmt, std::string_view func_name,
                      arena);
 }
 
+static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
+                            std::string_view func_name, SimContext& ctx,
+                            Arena& arena) {
+  if (!stmt->expr) return false;
+  uint32_t size = 0;
+  if (stmt->expr->kind == ExprKind::kIdentifier) {
+    auto* info = ctx.FindArrayInfo(stmt->expr->text);
+    if (info) {
+      size = info->size;
+    } else {
+      auto* var = ctx.FindVariable(stmt->expr->text);
+      if (var) size = var->value.width;
+    }
+  }
+  if (size == 0) return false;
+
+  std::string_view iter_name;
+  if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
+    iter_name = stmt->foreach_vars[0];
+  }
+
+  ctx.PushScope();
+  Variable* iter_var = nullptr;
+  if (!iter_name.empty()) {
+    iter_var = ctx.CreateLocalVariable(iter_name, 32);
+  }
+
+  for (uint32_t i = 0; i < size; ++i) {
+    if (iter_var) {
+      iter_var->value = MakeLogic4VecVal(arena, 32, i);
+    }
+    if (stmt->body &&
+        ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
+      ctx.PopScope();
+      return true;
+    }
+  }
+
+  ctx.PopScope();
+  return false;
+}
+
 // Execute a single statement in a function body; returns true on 'return'.
 static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
                          std::string_view func_name, SimContext& ctx,
@@ -591,6 +633,8 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
       return ExecFuncBlock(stmt, ret_var, func_name, ctx, arena);
     case StmtKind::kFor:
       return ExecFuncFor(stmt, ret_var, func_name, ctx, arena);
+    case StmtKind::kForeach:
+      return ExecFuncForeach(stmt, ret_var, func_name, ctx, arena);
     default:
       return false;
   }

@@ -404,6 +404,7 @@ static bool StmtHasTimingControl(const Stmt* stmt) {
     case StmtKind::kDoWhile:
     case StmtKind::kForever:
     case StmtKind::kRepeat:
+    case StmtKind::kForeach:
       return StmtHasTimingControl(stmt->body);
     case StmtKind::kFork:
       for (const auto* s : stmt->fork_stmts)
