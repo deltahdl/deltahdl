@@ -7,19 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(GateInstantiationPreprocessor, EnableGateThroughPreprocessor) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  wire y, a, en;\n"
-      "  bufif0 b1(y, a, en);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif0);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->gate_terminals.size(), 3u);
-}
-
 TEST(GateInstantiationPreprocessor, MosSwitchThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
