@@ -51,4 +51,12 @@ TEST(NInputGateLexing, NamedAndGateTokenSequence) {
   EXPECT_EQ(tokens[9].kind, TokenKind::kSemicolon);
 }
 
+TEST(NInputGateLexing, UnnamedOrGateTokenSequence) {
+  auto tokens = Lex("or (out, a, b);");
+  ASSERT_GE(tokens.size(), 8u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwOr);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kLParen);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
+}
+
 }  // namespace

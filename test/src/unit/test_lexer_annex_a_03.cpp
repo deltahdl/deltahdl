@@ -36,14 +36,6 @@ static const GateKeywordEntry kGateKeywords[] = {
 
 namespace {
 
-TEST(GateKeywordLexing, UnnamedGateTokenSequence) {
-  auto tokens = Lex("or (out, a, b);");
-  ASSERT_GE(tokens.size(), 8u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwOr);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kLParen);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
-}
-
 TEST(GateKeywordLexing, GateWithDelayTokenSequence) {
   auto tokens = Lex("nand #5 g1(out, a, b);");
   ASSERT_GE(tokens.size(), 4u);
