@@ -122,9 +122,9 @@ static ModuleItem* WrapStmtAsItem(Arena& arena, Stmt* stmt, SourceLoc loc) {
 }
 
 // Parse a §16.4 deferred immediate assertion at module level.
-ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc) {
+ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
   auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kAssertImmediate;
+  stmt->kind = kind;
   stmt->range.start = loc;
   stmt->is_deferred = true;
   if (Match(TokenKind::kHash)) Expect(TokenKind::kIntLiteral);
@@ -151,7 +151,12 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
   Expect(keyword);
 
   // §16.4: deferred immediate assertions at module level
-  if (IsDeferredImmediate(lexer_)) return ParseDeferredImmediateItem(item->loc);
+  if (IsDeferredImmediate(lexer_)) {
+    StmtKind sk = (kind == ModuleItemKind::kAssertProperty)
+                      ? StmtKind::kAssertImmediate
+                      : StmtKind::kAssumeImmediate;
+    return ParseDeferredImmediateItem(item->loc, sk);
+  }
 
   Expect(TokenKind::kKwProperty);
   Expect(TokenKind::kLParen);

@@ -1,18 +1,1 @@
-#include "fixture_elaborator.h"
-
-using namespace delta;
-
-namespace {
-
-TEST(AssertionStatementElaboration, DeferredAssertElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  initial assert #0 (1);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-}  // namespace
+// Tests moved to test_elaborator_annex_a_06_10.cpp
