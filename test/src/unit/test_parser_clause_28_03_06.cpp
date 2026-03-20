@@ -16,4 +16,12 @@ TEST(PrimitiveTerminals, PassSwitchInoutLiteral) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(PrimitiveTerminals, PassEnSwitchInoutExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  tranif0 (a + b, c, en);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
