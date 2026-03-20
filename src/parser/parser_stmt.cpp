@@ -387,8 +387,13 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
   Expect(TokenKind::kLParen);
   stmt->condition = ParseExpr();
   Expect(TokenKind::kRParen);
-  // §12.5.4: case-inside variant.
-  if (Match(TokenKind::kKwInside)) {
+  // §12.5.4: case-inside variant (only valid with plain 'case').
+  if (Check(TokenKind::kKwInside)) {
+    auto inside_loc = CurrentLoc();
+    Consume();
+    if (case_kind != TokenKind::kKwCase) {
+      diag_.Error(inside_loc, "'inside' is only valid with 'case'");
+    }
     stmt->case_inside = true;
   }
   // §12.6: case-matches variant.

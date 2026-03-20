@@ -345,18 +345,38 @@ static bool CaseInsideValueMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   return true;
 }
 
-// §12.5.4: Range match [lo:hi] for case-inside.
+// §12.5.4: Range match for case-inside (plain range, $ bounds, tolerance).
 static bool CaseInsideRangeMatch(const Logic4Vec& sel, const Expr* pat,
                                  SimContext& ctx, Arena& arena) {
   if (!sel.IsKnown()) return false;
   uint64_t sv = sel.ToUint64();
-  uint64_t lo = EvalExpr(pat->index, ctx, arena).ToUint64();
-  uint64_t hi = EvalExpr(pat->index_end, ctx, arena).ToUint64();
-  if (lo > hi) {
-    uint64_t t = lo;
-    lo = hi;
-    hi = t;
+  // Tolerance ranges [A +/- B] and [A +%- B].
+  if (pat->op == TokenKind::kPlusSlashMinus ||
+      pat->op == TokenKind::kPlusPercentMinus) {
+    auto a_v = EvalExpr(pat->index, ctx, arena);
+    auto b_v = EvalExpr(pat->index_end, ctx, arena);
+    if (!a_v.IsKnown() || !b_v.IsKnown()) return false;
+    uint64_t a = a_v.ToUint64();
+    uint64_t b = b_v.ToUint64();
+    uint64_t tol = b;
+    if (pat->op == TokenKind::kPlusPercentMinus) tol = a * b / 100;
+    uint64_t lo = (a >= tol) ? a - tol : 0;
+    uint64_t hi = a + tol;
+    if (lo > hi) { uint64_t t = lo; lo = hi; hi = t; }
+    return sv >= lo && sv <= hi;
   }
+  // Normal range [lo:hi] with possible $ bounds.
+  auto is_dollar = [](const Expr* e) {
+    return e->kind == ExprKind::kIdentifier && e->text == "$";
+  };
+  uint64_t lo = is_dollar(pat->index)
+                    ? 0
+                    : EvalExpr(pat->index, ctx, arena).ToUint64();
+  uint64_t hi = is_dollar(pat->index_end)
+                    ? ((sel.width >= 64) ? ~uint64_t{0}
+                                         : (uint64_t{1} << sel.width) - 1)
+                    : EvalExpr(pat->index_end, ctx, arena).ToUint64();
+  if (lo > hi) { uint64_t t = lo; lo = hi; hi = t; }
   return sv >= lo && sv <= hi;
 }
 

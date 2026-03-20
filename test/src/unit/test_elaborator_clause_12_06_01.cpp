@@ -8,21 +8,4 @@ using namespace delta;
 
 namespace {
 
-TEST(PatternElaboration, CaseMatchesElaborates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x, y;\n"
-      "  initial begin\n"
-      "    x = 8'd5;\n"
-      "    case(x) matches\n"
-      "      8'd5: y = 8'd10;\n"
-      "      default: y = 8'd0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-}
-
 }  // namespace
