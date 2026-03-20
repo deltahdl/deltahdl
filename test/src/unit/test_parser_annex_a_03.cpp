@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PrimitiveInstantiationParsing, Error_StrengthOnPullGateWrongType) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup (strong0, strong1) (net1);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 // --- Multiple instances with mixed named/unnamed across all types ---
 TEST(PrimitiveInstantiationParsing, EnableGateMultipleInstancesMixed) {
   auto r = Parse(

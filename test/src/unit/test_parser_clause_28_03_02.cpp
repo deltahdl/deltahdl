@@ -26,4 +26,12 @@ TEST(GateDecl, StrengthSpecValidForNOutputGates) {
   EXPECT_TRUE(CanHaveStrengthSpec(GateType::kNot));
 }
 
+TEST(PullSources, StrengthWrongType) {
+  auto r = Parse(
+      "module m;\n"
+      "  pullup (strong0, strong1) (net1);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
