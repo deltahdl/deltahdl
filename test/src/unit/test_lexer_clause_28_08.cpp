@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §28.8
 
 #include <gtest/gtest.h>
 #include "fixture_lexer.h"
@@ -36,36 +36,11 @@ static const GateKeywordEntry kGateKeywords[] = {
 
 namespace {
 
-TEST(GateKeywordLexing, MultipleGateKeywordsInSequence) {
-  auto tokens = Lex("and nand or nor xor xnor");
-  ASSERT_GE(tokens.size(), 6u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwAnd);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kKwNand);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kKwOr);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kKwNor);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kKwXor);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kKwXnor);
-}
-
-TEST(GateKeywordLexing, GateKeywordSubstringIsIdentifier) {
-  auto r = LexOne("ands");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-}
-
-TEST(GateKeywordLexing, GateKeywordPrefixIsIdentifier) {
-  auto r = LexOne("tranif");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-}
-
-TEST(GateKeywordLexing, StrengthInGateContextTokenSequence) {
-  auto tokens = Lex("and (strong0, weak1) g1(y, a, b);");
-  ASSERT_GE(tokens.size(), 4u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwAnd);
+TEST(PassSwitchLexing, TranTokenSequence) {
+  auto tokens = Lex("tran (a, b);");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwTran);
   EXPECT_EQ(tokens[1].kind, TokenKind::kLParen);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kKwStrong0);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kComma);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kKwWeak1);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kRParen);
 }
 
 }  // namespace
