@@ -1,4 +1,4 @@
-// Non-LRM tests
+// §28.3.2
 
 #include <gtest/gtest.h>
 #include "fixture_lexer.h"
@@ -36,7 +36,7 @@ static const GateKeywordEntry kGateKeywords[] = {
 
 namespace {
 
-TEST(GateKeywordLexing, StrengthInGateContextTokenSequence) {
+TEST(GateStrengthLexing, DriveStrengthTokenSequence) {
   auto tokens = Lex("and (strong0, weak1) g1(y, a, b);");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwAnd);
