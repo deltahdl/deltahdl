@@ -18,4 +18,16 @@ TEST(GateElaboration, PassSwitchProducesNoAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(GateElaboration, PassEnableSwitchProducesNoAssign) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  wire a, b, en;\n"
+      "  tranif1 t1(a, b, en);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
