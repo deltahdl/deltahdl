@@ -481,11 +481,33 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   return item;
 }
 
+// §A.6.5: Check whether the token after '(' starts a parenthesized
+// event_expression.  Unambiguous when it is an edge keyword or another '('.
+static bool IsEventExprStart(TokenKind kind) {
+  return kind == TokenKind::kKwPosedge || kind == TokenKind::kKwNegedge ||
+         kind == TokenKind::kKwEdge || kind == TokenKind::kLParen;
+}
+
 std::vector<EventExpr> Parser::ParseEventList() {
   std::vector<EventExpr> events;
-  events.push_back(ParseSingleEvent());
-  while (Match(TokenKind::kKwOr) || Match(TokenKind::kComma)) {
+  auto parse_event_or_group = [&]() {
+    if (Check(TokenKind::kLParen)) {
+      auto saved = lexer_.SavePos();
+      Consume();  // consume '('
+      if (IsEventExprStart(CurrentToken().kind)) {
+        // ( event_expression )
+        auto sub = ParseEventList();
+        events.insert(events.end(), sub.begin(), sub.end());
+        Expect(TokenKind::kRParen);
+        return;
+      }
+      lexer_.RestorePos(saved);
+    }
     events.push_back(ParseSingleEvent());
+  };
+  parse_event_or_group();
+  while (Match(TokenKind::kKwOr) || Match(TokenKind::kComma)) {
+    parse_event_or_group();
   }
   return events;
 }

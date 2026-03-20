@@ -548,37 +548,6 @@ TEST(ProcessParsing, IffGuardAlwaysSensitivity) {
   EXPECT_EQ(item->sensitivity[1].edge, Edge::kPosedge);
 }
 
-TEST(TimingControlSyntaxParsing, EventExprIff) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(a iff enable) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprPosedgeIff) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge a iff enable == 1) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
-}
-
 TEST(ProcessParsing, IffGuardStmtLevel) {
   auto r = Parse(
       "module m;\n"

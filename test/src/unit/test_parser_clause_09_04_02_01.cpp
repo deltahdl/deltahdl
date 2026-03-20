@@ -56,67 +56,6 @@ TEST(SchedulingSemanticsParsing, MultipleEventControlInAlways) {
   EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
 }
 
-TEST(TimingControlSyntaxParsing, EventExprOr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk_a or posedge clk_b) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 2u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_EQ(stmt->events[1].edge, Edge::kPosedge);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprComma) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(a, b, c) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 3u);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprMixedOrComma) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(a or b, c) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 3u);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprPosedgeComma) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk, negedge rstn) x <= 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 2u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
-}
-
 TEST(InterprocessSyncParsing, WaitForEventOrExpr) {
   auto r = Parse(
       "module m;\n"
