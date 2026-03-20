@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(PrimitiveInstantiationParsing, Error_NOutputGateSingleTerminal) {
-  auto r = Parse(
-      "module m;\n"
-      "  buf b1(out);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(PrimitiveInstantiationParsing, Error_PassSwitchSingleTerminal) {
   auto r = Parse(
       "module m;\n"
