@@ -5,22 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(UdpDeclGrammar, SequentialInitialX) {
-  auto r = Parse(
-      "primitive dff_x(output reg q, input d, input clk);\n"
-      "  initial q = 1'bx;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, 'x');
-}
-
 TEST(UdpDeclGrammar, SimSequentialWithInitial) {
   auto r = Parse(
       "primitive latch(output reg q, input d, input en);\n"
