@@ -116,12 +116,16 @@ Direction Parser::ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
 
 // §14.3: Parse a single clocking item (default skew or signal declarations).
 void Parser::ParseClockingItem(ModuleItem* item) {
-  // Skip default skew declaration for now (not stored).
+  // default_skew: default {input clocking_skew} {output clocking_skew} ;
   if (Check(TokenKind::kKwDefault)) {
     Consume();
-    // Consume tokens until semicolon.
-    while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
-      Consume();
+    if (Match(TokenKind::kKwInput)) {
+      ParseClockingSkew(item->default_input_skew_edge,
+                        item->default_input_skew_delay);
+    }
+    if (Match(TokenKind::kKwOutput)) {
+      ParseClockingSkew(item->default_output_skew_edge,
+                        item->default_output_skew_delay);
     }
     Expect(TokenKind::kSemicolon);
     return;

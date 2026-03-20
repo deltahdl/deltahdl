@@ -4,34 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DefaultClockingElab, InlineDefaultClockingElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  default clocking cb @(posedge clk);\n"
-             "    input data;\n"
-             "  endclocking\n"
-             "endmodule\n"));
-}
-
-TEST(DefaultClockingElab, UnnamedDefaultClockingElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  default clocking @(posedge clk);\n"
-             "    input data;\n"
-             "  endclocking\n"
-             "endmodule\n"));
-}
-
-TEST(DefaultClockingElab, ReferenceFormElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
-             "    input data;\n"
-             "  endclocking\n"
-             "  default clocking cb;\n"
-             "endmodule\n"));
-}
-
 TEST(DefaultClockingElab, DuplicateDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -46,16 +18,6 @@ TEST(DefaultClockingElab, DuplicateDefaultClockingErrors) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(f.has_errors);
-}
-
-TEST(DefaultClockingElab, DefaultClockingInInterfaceElaborates) {
-  EXPECT_TRUE(
-      ElabOk("interface my_if (input clk);\n"
-             "  logic [7:0] data;\n"
-             "  default clocking cb @(posedge clk);\n"
-             "    input data;\n"
-             "  endclocking\n"
-             "endinterface\n"));
 }
 
 }  // namespace

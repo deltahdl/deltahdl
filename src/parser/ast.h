@@ -642,6 +642,10 @@ struct ModuleItem {
   std::vector<ClockingSignalDecl> clocking_signals;  // Signal declarations
   bool is_default_clocking = false;
   bool is_global_clocking = false;
+  Edge default_input_skew_edge = Edge::kNone;
+  Expr* default_input_skew_delay = nullptr;
+  Edge default_output_skew_edge = Edge::kNone;
+  Expr* default_output_skew_delay = nullptr;
 
   // DPI import/export (§35)
   std::string_view dpi_c_name;  // C-side function name

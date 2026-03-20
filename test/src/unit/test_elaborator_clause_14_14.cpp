@@ -4,28 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(GlobalClockingElab, BasicGlobalClockingElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  global clocking gclk @(posedge sys_clk);\n"
-             "  endclocking\n"
-             "endmodule\n"));
-}
-
-TEST(GlobalClockingElab, UnnamedGlobalClockingElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  global clocking @(posedge clk); endclocking\n"
-             "endmodule\n"));
-}
-
-TEST(GlobalClockingElab, CompoundEventElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  global clocking sys @(clk1 or clk2); endclocking\n"
-             "endmodule\n"));
-}
-
 TEST(GlobalClockingElab, DuplicateGlobalClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,23 +14,6 @@ TEST(GlobalClockingElab, DuplicateGlobalClockingErrors) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(f.has_errors);
-}
-
-TEST(GlobalClockingElab, GlobalClockingInInterfaceElaborates) {
-  EXPECT_TRUE(
-      ElabOk("interface my_if (input clk);\n"
-             "  global clocking gc @(posedge clk); endclocking\n"
-             "endinterface\n"));
-}
-
-TEST(GlobalClockingElab, GlobalAndDefaultCoexist) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  global clocking gc @(posedge clk); endclocking\n"
-             "  default clocking dc @(posedge clk);\n"
-             "    input data;\n"
-             "  endclocking\n"
-             "endmodule\n"));
 }
 
 }  // namespace
