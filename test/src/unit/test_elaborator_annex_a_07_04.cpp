@@ -69,4 +69,44 @@ TEST(SpecifyPathDelayElaboration, SixDelayMinTypMaxElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(SpecifyPathDelayElaboration, SpecparamDelayElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    specparam tRise = 3, tFall = 5;\n"
+      "    (a => b) = (tRise, tFall);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(SpecifyPathDelayElaboration, SingleDelayElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 10;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(SpecifyPathDelayElaboration, ThreeDelayElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = (2, 3, 4);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
