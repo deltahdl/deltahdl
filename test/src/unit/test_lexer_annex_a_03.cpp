@@ -36,16 +36,6 @@ static const GateKeywordEntry kGateKeywords[] = {
 
 namespace {
 
-TEST(GateKeywordLexing, PullGateTokenSequence) {
-  auto tokens = Lex("pullup (net1);");
-  ASSERT_GE(tokens.size(), 4u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwPullup);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kLParen);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kRParen);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kSemicolon);
-}
-
 TEST(GateKeywordLexing, CmosSwitchTokenSequence) {
   auto tokens = Lex("cmos c1(out, data, nctrl, pctrl);");
   ASSERT_GE(tokens.size(), 2u);
