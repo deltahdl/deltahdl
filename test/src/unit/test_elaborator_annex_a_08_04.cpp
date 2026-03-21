@@ -30,20 +30,6 @@ TEST(PrimaryElaboration, ConstantPrimaryParameterElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.4: cast elaborates
-TEST(PrimaryElaboration, CastElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  int b;\n"
-      "  initial b = int'(a);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // §A.8.4: hierarchical_identifier with select elaborates
 TEST(PrimaryElaboration, HierarchicalIdentifierSelectElaborates) {
   ElabFixture f;

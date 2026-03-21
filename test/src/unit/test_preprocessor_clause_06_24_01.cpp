@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeParsing, TypeExprInCast) {
+TEST(CastOperatorParsing, IntCastThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  initial begin\n"
@@ -18,7 +18,7 @@ TEST(DataTypeParsing, TypeExprInCast) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(DataTypeParsing, CastUnsigned) {
+TEST(CastOperatorParsing, CastUnsigned) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  initial x = unsigned'(y);\n"

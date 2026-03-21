@@ -393,27 +393,6 @@ TEST(NetAndVariableTypeParsing, ImplicitDataTypePackedDim) {
   EXPECT_NE(r.cu->modules[0]->items[0]->data_type.packed_dim_left, nullptr);
 }
 
-// --- casting_type ---
-
-TEST(NetAndVariableTypeParsing, CastingTypeIntegerType) {
-  EXPECT_TRUE(ParseOk("module m; int x; initial x = int'(3.14); endmodule"));
-}
-
-TEST(NetAndVariableTypeParsing, CastingTypeSigning) {
-  EXPECT_TRUE(
-      ParseOk("module m; int x; initial x = signed'(8'hFF); endmodule"));
-}
-
-TEST(NetAndVariableTypeParsing, CastingTypeString) {
-  EXPECT_TRUE(
-      ParseOk("module m; string s; initial s = string'(65); endmodule"));
-}
-
-TEST(NetAndVariableTypeParsing, CastingTypeConst) {
-  EXPECT_TRUE(
-      ParseOk("module m; int x; initial x = const'(42); endmodule"));
-}
-
 // --- incomplete_class_scoped_type ---
 
 TEST(NetAndVariableTypeParsing, IncompleteClassScopedType) {
@@ -439,14 +418,6 @@ TEST(NetAndVariableTypeParsing, DataTypeOrVoidReturn) {
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-// --- simple_type ---
-
-TEST(NetAndVariableTypeParsing, SimpleTypeNamedInCast) {
-  EXPECT_TRUE(ParseOk(
-      "typedef int my_t;\n"
-      "module m; my_t x; initial x = my_t'(42); endmodule"));
 }
 
 // --- Edge cases ---

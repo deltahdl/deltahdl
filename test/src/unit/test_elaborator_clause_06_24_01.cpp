@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(PrimaryElaboration, ConstantPrimaryCastElaborates) {
+TEST(CastOperatorElaboration, CastInParameterElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(PrimaryElaboration, ConstantPrimaryCastElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(PrimaryElaboration, PrimaryCastInInitialElaborates) {
+TEST(CastOperatorElaboration, CastInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -29,7 +29,45 @@ TEST(PrimaryElaboration, PrimaryCastInInitialElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(DataTypeSim, CastSigned) {
+TEST(CastOperatorElaboration, SignedCastElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [7:0] b;\n"
+      "  initial b = signed'(a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(CastOperatorElaboration, VoidCastElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function int f(); return 1; endfunction\n"
+      "  initial void'(f());\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(CastOperatorElaboration, CastInContinuousAssignElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [31:0] y;\n"
+      "  assign y = int'(a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(CastOperatorSim, CastSigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -53,7 +91,7 @@ TEST(DataTypeSim, CastSigned) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-TEST(DataTypeSim, CastUnsigned) {
+TEST(CastOperatorSim, CastUnsigned) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -77,7 +115,7 @@ TEST(DataTypeSim, CastUnsigned) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-TEST(DataTypeSim, CastShortint) {
+TEST(CastOperatorSim, CastShortint) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -128,7 +166,7 @@ TEST(TypeOperatorSim, TypeOpStructMemberWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-TEST(AlwaysStarSim, AlwaysStarTypeCast) {
+TEST(CastOperatorSim, SignedCastInAlwaysStar) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -153,31 +191,7 @@ TEST(AlwaysStarSim, AlwaysStarTypeCast) {
   EXPECT_EQ(y->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-TEST(BlockingAssignSim, BlockingAssignTypeCast) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    x = 8'hFF;\n"
-      "    result = signed'(x);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
-}
-
-TEST(DataTypeSim, CastRealMulToInt) {
+TEST(CastOperatorSim, CastRealMulToInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -196,7 +210,7 @@ TEST(DataTypeSim, CastRealMulToInt) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-TEST(DataTypeSim, CastConcatToShortint) {
+TEST(CastOperatorSim, CastConcatToShortint) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -215,7 +229,7 @@ TEST(DataTypeSim, CastConcatToShortint) {
   EXPECT_EQ(var->value.ToUint64(), 0xFACEu);
 }
 
-TEST(DataTypeSim, CastByteTruncate) {
+TEST(CastOperatorSim, CastByteTruncate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -137,15 +137,6 @@ TEST(PrimaryParsing, PrimaryUnbasedUnsizedLiteral1) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(PrimaryParsing, CastExpression) {
-  auto r = Parse("module m; initial x = int'(3.14); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCast);
-}
-
 TEST(PrimaryParsing, PrimaryThis) {
   auto r = Parse(
       "class C;\n"
@@ -200,16 +191,6 @@ TEST(PrimaryParsing, FunctionCallWithBitSelect) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-// §A.8.4: constant_cast — casting_type ' ( constant_expression )
-TEST(PrimaryParsing, ConstantCastInParameter) {
-  auto r = Parse("module m; parameter P = int'(3.14); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* param = r.cu->modules[0]->items[0];
-  ASSERT_NE(param->init_expr, nullptr);
-  EXPECT_EQ(param->init_expr->kind, ExprKind::kCast);
 }
 
 // §A.8.4: implicit_class_handle — super

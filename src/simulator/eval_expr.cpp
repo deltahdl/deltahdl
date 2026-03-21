@@ -260,7 +260,18 @@ static uint32_t CastWidth(std::string_view type_name) {
   if (type_name == "logic") return 1;
   if (type_name == "reg") return 1;
   if (type_name == "string") return 0;  // String cast handled separately.
-  return 32;                            // Default to 32-bit.
+  // §6.24.1: Numeric size cast (e.g., 17'(x)).
+  if (!type_name.empty() && type_name[0] >= '0' && type_name[0] <= '9') {
+    uint32_t w = 0;
+    for (char c : type_name) {
+      if (c >= '0' && c <= '9')
+        w = w * 10 + (c - '0');
+      else
+        break;
+    }
+    if (w > 0) return w;
+  }
+  return 32;  // Default to 32-bit.
 }
 
 static bool IsRealCastTarget(std::string_view name) {
@@ -329,8 +340,11 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
     inner.is_signed = true;
     return inner;
   }
-  if (type_name == "unsigned" || type_name == "const") {
+  if (type_name == "unsigned") {
     inner.is_signed = false;
+    return inner;
+  }
+  if (type_name == "const") {
     return inner;
   }
   if (type_name == "void") {

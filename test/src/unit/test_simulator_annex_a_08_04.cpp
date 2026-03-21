@@ -90,24 +90,6 @@ TEST(PrimarySim, PrimaryParenthesizedExpr) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §A.8.4: cast simulates correctly
-TEST(PrimarySim, CastSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x;\n"
-      "  initial x = int'(3.14);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 3u);
-}
-
 // §A.8.4: bit_select simulates correctly
 TEST(PrimarySim, BitSelectSimulates) {
   SimFixture f;
