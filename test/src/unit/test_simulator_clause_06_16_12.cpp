@@ -14,4 +14,20 @@ TEST(StringMethods, Hextoa) {
   EXPECT_EQ(VecToString(var->value), "ff");
 }
 
+TEST(StringMethods, HextoaZero) {
+  StringFixture f;
+  auto* var = f.CreateStringVar("s", "");
+  auto* call = f.MakeMethodCall("s", "hextoa", {f.MakeIntLiteral(0)});
+  EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(VecToString(var->value), "0");
+}
+
+TEST(StringMethods, HextoaOverwritesExisting) {
+  StringFixture f;
+  auto* var = f.CreateStringVar("s", "old");
+  auto* call = f.MakeMethodCall("s", "hextoa", {f.MakeIntLiteral(16)});
+  EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(VecToString(var->value), "10");
+}
+
 }  // namespace
