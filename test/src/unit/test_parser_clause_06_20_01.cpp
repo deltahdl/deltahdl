@@ -14,7 +14,7 @@ TEST(DeclarationListParsing, ListOfSpecparamAssignmentsMultiple) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SourceText, ParamPortDataTypeForm) {
+TEST(ParameterPortListParsing,ParamPortDataTypeForm) {
   auto r = Parse("module m #(int WIDTH = 8); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -22,7 +22,7 @@ TEST(SourceText, ParamPortDataTypeForm) {
   EXPECT_EQ(r.cu->modules[0]->params[0].first, "WIDTH");
 }
 
-TEST(SourceText, ParamPortMixedForms) {
+TEST(ParameterPortListParsing,ParamPortMixedForms) {
   auto r = Parse(
       "module m #(parameter int A = 1, localparam int B = 2,\n"
       "           type T = logic, int C = 3);\n"
@@ -78,14 +78,7 @@ TEST(DeclarationAssignmentParsing, TypeAssignmentWithDefault) {
   EXPECT_EQ(item->name, "T");
 }
 
-TEST(DeclarationListParsing, ListOfTypeAssignmentsSingle) {
-  auto r = Parse("module m; parameter type T = int; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
-}
-
-TEST(SourceText, ParamPortLocalparam) {
+TEST(ParameterPortListParsing,ParamPortLocalparam) {
   auto r = Parse("module m #(localparam int X = 5); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -110,6 +103,22 @@ TEST(DeclarationListParsing, ListOfSpecparamAssignmentsSingle) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParameterPortListParsing, EmptyParameterPortListParses) {
+  auto r = Parse("module m #(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->params.size(), 0u);
+}
+
+TEST(ParameterDeclarations, CompilationUnitParameterParses) {
+  auto r = Parse("parameter int X = 42;\nmodule m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "X");
 }
 
 TEST(ParameterDeclarations, ParameterAndLocalparam) {

@@ -253,6 +253,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   auto* mod = arena_.Create<RtlirModule>();
   mod->name = decl->name;
+  mod->has_param_port_list = decl->has_param_port_list;
   // §E.4-E.7: propagate delay mode directive.
   mod->delay_mode = unit_->delay_mode_directive;
   // §5.12: Resolve attributes on module definition.
@@ -271,8 +272,10 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
       pd.from_override = true;
     }
     if (!pd.is_resolved && pval) {
-      pd.resolved_value = ConstEvalInt(pval).value_or(0);
-      pd.is_resolved = ConstEvalInt(pval).has_value();
+      // §6.20.1: Parameters can depend on earlier parameters.
+      auto scope = BuildParamScope(mod);
+      pd.resolved_value = ConstEvalInt(pval, scope).value_or(0);
+      pd.is_resolved = ConstEvalInt(pval, scope).has_value();
     }
 
     mod->params.push_back(pd);

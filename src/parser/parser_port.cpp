@@ -200,6 +200,7 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
   if (Check(TokenKind::kHash)) {
     Consume();
     Expect(TokenKind::kLParen);
+    decl.has_param_port_list = true;
     if (!Check(TokenKind::kRParen)) {
       ParseParamPortDecl(decl.params);
       while (Match(TokenKind::kComma)) {

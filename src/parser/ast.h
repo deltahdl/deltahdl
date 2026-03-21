@@ -698,6 +698,7 @@ struct ModuleDecl {
   std::vector<PortDecl> ports;
   std::vector<ModuleItem*> items;
   std::vector<std::pair<std::string_view, Expr*>> params;
+  bool has_param_port_list = false;  // §6.20.1: #(...) was present.
   std::vector<ModportDecl*> modports;
 
   bool is_cell = false;  // §22.10: tagged by `celldefine

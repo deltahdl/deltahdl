@@ -173,6 +173,7 @@ struct RtlirEnumMember {
 
 struct RtlirModule {
   std::string_view name;
+  bool has_param_port_list = false;  // §6.20.1: #(...) was present.
   std::vector<ResolvedAttribute> attrs;
   DelayModeDirective delay_mode = DelayModeDirective::kNone;  // §E.4-E.7
 
