@@ -50,7 +50,7 @@ TEST(EnumMethods, PrevOnNonMemberValue) {
   auto* call = f.MakeEnumMethodCall("color", "prev");
   auto result = EvalExpr(call, f.ctx, f.arena);
 
-  EXPECT_EQ(result.ToUint64(), 2u);
+  EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(EnumMethods, PrevFullIteration) {

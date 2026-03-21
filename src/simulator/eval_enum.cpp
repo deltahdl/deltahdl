@@ -43,7 +43,7 @@ static Logic4Vec EnumPrev(const EnumTypeInfo& info, uint64_t current,
                           uint32_t count, Arena& arena) {
   if (info.members.empty()) return MakeLogic4VecVal(arena, 32, 0);
   int idx = FindMemberIndex(info, current);
-  if (idx < 0) return MakeLogic4VecVal(arena, 32, info.members.back().value);
+  if (idx < 0) return MakeLogic4VecVal(arena, 32, info.members.front().value);
   auto n = static_cast<int>(info.members.size());
   int offset = static_cast<int>(count % n);
   int new_idx = ((idx - offset) % n + n) % n;
