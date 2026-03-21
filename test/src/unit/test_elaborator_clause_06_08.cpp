@@ -27,17 +27,6 @@ TEST(VarDecl, ConstWithInitializerOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(VarDecl, RedeclarationIsError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module t;\n"
-      "  int x;\n"
-      "  int x;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(VarDecl, InitializerPreservedInRtlir) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -89,15 +89,4 @@ TEST(Elaboration, TriVectorWidth) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kTri);
 }
 
-TEST(Elaboration, WireRedeclarationError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module t;\n"
-      "  wire w;\n"
-      "  wire w;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 }  // namespace

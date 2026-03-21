@@ -195,4 +195,40 @@ TEST(NetsAndVariables, RedeclarationOfNetError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+TEST(NetsAndVariables, NetCannotBeProcedurallyAssigned) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  wire w;\n"
+      "  initial w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(NetsAndVariables, NetMultipleContinuousAssignmentsOk) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  wire w;\n"
+      "  assign w = 1'b0;\n"
+      "  assign w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(NetsAndVariables, VariableInitPlusContinuousAssignmentOk) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  logic v = 1'b1;\n"
+      "  assign v = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
