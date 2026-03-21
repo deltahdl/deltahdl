@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeParsing, MatchingNettypesSameWire) {
+TEST(MatchingNettypesParsing, SameWireNettype) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire logic [7:0] a;\n"
@@ -16,7 +16,7 @@ TEST(DataTypeParsing, MatchingNettypesSameWire) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(DataTypeParsing, MatchingNettypesWireAndTri) {
+TEST(MatchingNettypesParsing, WireAndTriAssignment) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire logic [3:0] a;\n"

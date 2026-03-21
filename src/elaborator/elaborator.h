@@ -71,6 +71,9 @@ class Elaborator {
   /// §6.6.7: Elaborate a nettype declaration.
   void ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod);
 
+  /// §6.22.6: Return true if two nettype names refer to matching nettypes.
+  bool NettypesMatch(std::string_view a, std::string_view b) const;
+
   /// Walk module items and populate nets, vars, assigns, processes.
   void ElaborateItems(const ModuleDecl* decl, RtlirModule* mod);
 
@@ -367,6 +370,8 @@ class Elaborator {
   std::unordered_set<std::string_view> nettype_names_;
   std::unordered_map<std::string_view, std::string_view>
       nettype_resolve_funcs_;  // §6.6.7: nettype name → resolution function
+  std::unordered_map<std::string_view, std::string_view>
+      nettype_canonical_;  // §6.22.6: nettype name → canonical base name
   std::unordered_set<std::string_view> interconnect_names_;
   std::unordered_set<std::string_view> task_names_;  // §13.2
   // §13.4.3: Function declarations by name for constant function validation.

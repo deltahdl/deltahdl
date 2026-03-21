@@ -377,13 +377,31 @@ void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* /*mod*/) {
   nettype_names_.insert(item->name);
   if (!item->nettype_resolve_func.empty()) {
     nettype_resolve_funcs_[item->name] = item->nettype_resolve_func;
+    nettype_canonical_[item->name] = item->name;
   } else if (item->typedef_type.kind == DataTypeKind::kNamed) {
     // §6.6.7: Alias form inherits resolution function from base nettype.
     auto it = nettype_resolve_funcs_.find(item->typedef_type.type_name);
     if (it != nettype_resolve_funcs_.end()) {
       nettype_resolve_funcs_[item->name] = it->second;
     }
+    // §6.22.6(b): Alias resolves to the base's canonical name.
+    auto cit = nettype_canonical_.find(item->typedef_type.type_name);
+    nettype_canonical_[item->name] =
+        (cit != nettype_canonical_.end()) ? cit->second
+                                          : item->typedef_type.type_name;
+  } else {
+    nettype_canonical_[item->name] = item->name;
   }
+}
+
+// §6.22.6: Two nettype names match if they resolve to the same canonical base.
+bool Elaborator::NettypesMatch(std::string_view a, std::string_view b) const {
+  if (a == b) return true;
+  auto ait = nettype_canonical_.find(a);
+  auto bit = nettype_canonical_.find(b);
+  std::string_view ca = (ait != nettype_canonical_.end()) ? ait->second : a;
+  std::string_view cb = (bit != nettype_canonical_.end()) ? bit->second : b;
+  return ca == cb;
 }
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
