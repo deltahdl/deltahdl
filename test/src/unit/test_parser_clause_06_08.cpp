@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(TypeDeclParsing, DataDeclBasicVar) {
+TEST(VariableDeclaration, DataDeclBasicVar) {
   auto r = Parse("module m; logic [7:0] data; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(TypeDeclParsing, DataDeclBasicVar) {
   EXPECT_EQ(item->name, "data");
 }
 
-TEST(TypeDeclParsing, DataDeclVarPrefix) {
+TEST(VariableDeclaration, DataDeclVarPrefix) {
   auto r = Parse("module m; var logic x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -23,7 +23,7 @@ TEST(TypeDeclParsing, DataDeclVarPrefix) {
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
 }
 
-TEST(TypeDeclParsing, DataDeclLifetimeAutomatic) {
+TEST(VariableDeclaration, DataDeclLifetimeAutomatic) {
   auto r = Parse("module m; automatic int counter; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -32,7 +32,7 @@ TEST(TypeDeclParsing, DataDeclLifetimeAutomatic) {
   EXPECT_TRUE(item->is_automatic);
 }
 
-TEST(TypeDeclParsing, DataDeclLifetimeStatic) {
+TEST(VariableDeclaration, DataDeclLifetimeStatic) {
   auto r = Parse("module m; static int counter; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -86,7 +86,7 @@ TEST(BlockItemDeclParsing, DataDeclMultiVarsInBlock) {
   EXPECT_EQ(body->stmts[2]->var_name, "c");
 }
 
-TEST(FormalSyntaxParsing, VarDeclWithInit) {
+TEST(VariableDeclaration, VarDeclWithInit) {
   auto r = Parse("module m; logic [7:0] data = 8'hFF; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -94,7 +94,7 @@ TEST(FormalSyntaxParsing, VarDeclWithInit) {
   EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
 }
 
-TEST(TypeDeclParsing, DataDeclMultipleAssign) {
+TEST(VariableDeclaration, DataDeclMultipleAssign) {
   auto r = Parse("module m; int a = 1, b = 2; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -105,7 +105,7 @@ TEST(TypeDeclParsing, DataDeclMultipleAssign) {
   EXPECT_GE(count, 2);
 }
 
-TEST(NetAndVariableTypeParsing, DataTypeScopedType) {
+TEST(VariableDeclaration, DataTypeScopedType) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef int my_int_t;\n"
@@ -471,6 +471,71 @@ TEST(VariableDeclarations, LogicWithPackedRange) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kVarDecl);
+}
+
+// §6.8: var with no explicit type is valid (implicit logic).
+TEST(VariableDeclarations, VarBareNoTypeIsValid) {
+  auto r = Parse(
+      "module m;\n"
+      "  var v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "v");
+}
+
+// §6.8: const var with explicit type and initializer.
+TEST(VariableDeclarations, ConstVarWithExplicitType) {
+  auto r = Parse(
+      "module m;\n"
+      "  const var logic [7:0] MASK = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_TRUE(item->data_type.is_const);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+// §6.8: Variable with unpacked array dimension.
+TEST(VariableDeclarations, VarWithUnpackedArrayDim) {
+  auto r = Parse(
+      "module m;\n"
+      "  int mem [256];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(item->name, "mem");
+  EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
+// §6.8: static lifetime in procedural block.
+TEST(VariableDeclarations, StaticLifetimeInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    static int count = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §6.8: automatic lifetime in procedural block.
+TEST(VariableDeclarations, AutomaticLifetimeInBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int tmp = 5;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

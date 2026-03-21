@@ -876,6 +876,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     }
     return;
   }
+  // §6.8 footnote 14: automatic is illegal in a non-procedural data_declaration.
+  if (item->is_automatic) {
+    diag_.Error(item->loc,
+                "automatic lifetime is not allowed on module-level variables");
+  }
   if (!declared_names_.insert(item->name).second) {
     diag_.Error(item->loc, std::format("redeclaration of '{}'", item->name));
   }

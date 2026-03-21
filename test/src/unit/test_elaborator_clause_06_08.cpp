@@ -143,4 +143,141 @@ TEST(VarDecl, MultipleVarsInOneStatement) {
   EXPECT_EQ(mod->variables[2].name, "t.c");
 }
 
+// §6.8: `var` with implicit type elaborates as logic (1-bit, 4-state).
+TEST(VarDecl, VarImplicitElaboratesAsLogic) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  var v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_EQ(mod->variables[0].width, 1u);
+  EXPECT_TRUE(mod->variables[0].is_4state);
+}
+
+// §6.8: `var` with range elaborates as logic vector.
+TEST(VarDecl, VarWithRangeElaboratesAsLogicVector) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  var [7:0] data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_EQ(mod->variables[0].width, 8u);
+  EXPECT_TRUE(mod->variables[0].is_4state);
+}
+
+// §6.8: chandle variable is tagged as chandle in RTLIR.
+TEST(VarDecl, ChandleIsChandle) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  chandle ch;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_TRUE(mod->variables[0].is_chandle);
+}
+
+// §6.8: byte is signed by default.
+TEST(VarDecl, ByteIsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_TRUE(mod->variables[0].is_signed);
+}
+
+// §6.8: shortint is signed by default.
+TEST(VarDecl, ShortintIsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  shortint si;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_TRUE(mod->variables[0].is_signed);
+}
+
+// §6.8: longint is signed by default.
+TEST(VarDecl, LongintIsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  longint li;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_TRUE(mod->variables[0].is_signed);
+}
+
+// §6.8: integer is signed by default.
+TEST(VarDecl, IntegerIsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  integer ig;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_TRUE(mod->variables[0].is_signed);
+}
+
+// §6.8: logic is unsigned by default.
+TEST(VarDecl, LogicIsUnsigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_FALSE(mod->variables[0].is_signed);
+}
+
+// §6.8: bit is unsigned by default.
+TEST(VarDecl, BitIsUnsigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  bit b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_FALSE(mod->variables[0].is_signed);
+}
+
 }  // namespace

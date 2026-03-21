@@ -395,6 +395,10 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   uint32_t width = var.class_type_name.empty() ? var.width : 64;
   if (var.is_real && width < 64) width = 64;
   auto* v = ctx_.CreateVariable(var.name, width);
+  // §6.8 Table 6-7: 2-state types default to 0, real/shortreal to 0.0.
+  if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle) {
+    v->value = MakeLogic4VecVal(arena_, width, 0);
+  }
   // §6.14: chandle defaults to null (0), not X.
   if (var.is_chandle) v->value = MakeLogic4VecVal(arena_, width, 0);
   if (var.is_event) v->is_event = true;
