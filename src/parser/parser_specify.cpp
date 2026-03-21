@@ -209,9 +209,37 @@ SpecifyTerminal Parser::ParseSpecifyTerminal() {
 }
 
 // Parse port list inside path: terminal {, terminal} or {terminal {, terminal}}
+// A.8.1: module_path_concatenation ::= { port {, port} }
+// A.8.1: module_path_multiple_concatenation ::= { const_expr { port {, port} } }
 void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
-  // A.8.1: module_path_concatenation ::= { port {, port} }
   if (Match(TokenKind::kLBrace)) {
+    // Disambiguate: if next token is not an identifier, it must be a
+    // replication count (e.g. {3{a, b}}).  If it IS an identifier, peek
+    // ahead: identifier followed by '{' is also replication ({N{a, b}}).
+    bool is_replication = false;
+    if (!Check(TokenKind::kIdentifier)) {
+      is_replication = true;
+    } else {
+      auto saved = lexer_.SavePos();
+      Consume();  // identifier
+      is_replication = Check(TokenKind::kLBrace);
+      lexer_.RestorePos(saved);
+    }
+
+    if (is_replication) {
+      // module_path_multiple_concatenation: skip count, parse inner concat.
+      ParseExpr();  // constant_expression (count)
+      Expect(TokenKind::kLBrace);
+      ports.push_back(ParseSpecifyTerminal());
+      while (Match(TokenKind::kComma)) {
+        ports.push_back(ParseSpecifyTerminal());
+      }
+      Expect(TokenKind::kRBrace);
+      Expect(TokenKind::kRBrace);
+      return;
+    }
+
+    // module_path_concatenation
     ports.push_back(ParseSpecifyTerminal());
     while (Match(TokenKind::kComma)) {
       ports.push_back(ParseSpecifyTerminal());
