@@ -483,6 +483,59 @@ void Elaborator::ValidateSpecparamInParams(const ModuleDecl* decl) {
   }
 }
 
+// §6.20.2: Check whether an expression contains a hierarchical reference.
+static bool ExprContainsHierRef(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kMemberAccess) return true;
+  if (ExprContainsHierRef(e->lhs)) return true;
+  if (ExprContainsHierRef(e->rhs)) return true;
+  if (ExprContainsHierRef(e->condition)) return true;
+  if (ExprContainsHierRef(e->true_expr)) return true;
+  if (ExprContainsHierRef(e->false_expr)) return true;
+  for (auto* elem : e->elements) {
+    if (ExprContainsHierRef(elem)) return true;
+  }
+  for (auto* arg : e->args) {
+    if (ExprContainsHierRef(arg)) return true;
+  }
+  return false;
+}
+
+void Elaborator::ValidateValueParams(const ModuleDecl* decl,
+                                     const RtlirModule* /*mod*/) {
+  // §6.20.2: Body value parameters must have a default value.
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kParamDecl) continue;
+    // Skip type parameters (§6.20.3).
+    if (item->data_type.kind == DataTypeKind::kVoid &&
+        item->typedef_type.kind != DataTypeKind::kImplicit)
+      continue;
+    if (!item->init_expr) {
+      diag_.Error(item->loc,
+                  std::format("value parameter '{}' has no default value",
+                              item->name));
+      continue;
+    }
+    // §6.20.2: Parameter value shall not contain hierarchical references.
+    if (ExprContainsHierRef(item->init_expr)) {
+      diag_.Error(item->loc,
+                  std::format("parameter '{}' value contains a hierarchical "
+                              "reference",
+                              item->name));
+    }
+  }
+  // §6.20.2: Port list parameter values must also be constant.
+  for (const auto& [pname, pval] : decl->params) {
+    if (!pval) continue;
+    if (ExprContainsHierRef(pval)) {
+      diag_.Error(pval->range.start,
+                  std::format("parameter '{}' value contains a hierarchical "
+                              "reference",
+                              pname));
+    }
+  }
+}
+
 // §13.2/§13.4.1/§13.4.4: Check function body for illegal constructs.
 static void CheckFuncBodyStmt(
     const Stmt* s, bool is_void,

@@ -416,6 +416,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   // §9.2.2.2: Check for multi-driver violations on always_comb LHS variables.
   CheckAlwaysCombMultiDriver(decl, mod);
   ValidateModuleConstraints(decl);
+  ValidateValueParams(decl, mod);
   ValidateClockvarAccess(decl);
   ValidateCycleDelayDefaultClocking(decl);
   ValidateDuplicateDefaultClocking(decl);

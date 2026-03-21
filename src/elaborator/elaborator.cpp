@@ -274,8 +274,9 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
     if (!pd.is_resolved && pval) {
       // §6.20.1: Parameters can depend on earlier parameters.
       auto scope = BuildParamScope(mod);
-      pd.resolved_value = ConstEvalInt(pval, scope).value_or(0);
-      pd.is_resolved = ConstEvalInt(pval, scope).has_value();
+      auto val = ConstEvalInt(pval, scope);
+      pd.resolved_value = val.value_or(0);
+      pd.is_resolved = val.has_value();
     }
 
     mod->params.push_back(pd);

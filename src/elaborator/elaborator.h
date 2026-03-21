@@ -215,6 +215,9 @@ class Elaborator {
   /// Check specparam not used in parameter expressions (§6.20.5).
   void ValidateSpecparamInParams(const ModuleDecl* decl);
 
+  /// §6.20.2: Validate value parameter declarations.
+  void ValidateValueParams(const ModuleDecl* decl, const RtlirModule* mod);
+
   /// §9.2.2.2: Check multi-driver violations on always_comb LHS variables.
   void CheckAlwaysCombMultiDriver(const ModuleDecl* decl, RtlirModule* mod);
 

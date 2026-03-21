@@ -1,4 +1,3 @@
-#include "fixture_elaborator.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
@@ -72,6 +71,24 @@ TEST(DataTypeParsing, ParamDecl_UnpackedDims) {
       ParseOk6("module t;\n"
                "  parameter logic [31:0] p [3:0] = '{1, 2, 3, 4};\n"
                "endmodule\n"));
+}
+
+TEST(DataTypeParsing, UntypedUnrangedParameterParses) {
+  auto r = Parse("module m; parameter P = 42; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "P");
+}
+
+TEST(DataTypeParsing, RangedUntypedParameterParses) {
+  auto r = Parse("module m; parameter [7:0] P = 200; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
+  EXPECT_EQ(item->name, "P");
 }
 
 }  // namespace
