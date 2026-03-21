@@ -6,7 +6,7 @@
 using namespace delta;
 namespace {
 
-TEST(DataTypeParsing, RealtimeWithInit) {
+TEST(RealDataType, RealtimeWithInit) {
   auto r = Parse(
       "module t;\n"
       "  realtime ts = 100.0;\n"
@@ -18,7 +18,7 @@ TEST(DataTypeParsing, RealtimeWithInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-TEST(DataTypeParsing, RealVarDeclKind) {
+TEST(RealDataType, RealVarDeclKind) {
   auto r = Parse(
       "module t;\n"
       "  real voltage;\n"
@@ -32,7 +32,7 @@ TEST(DataTypeParsing, RealVarDeclKind) {
   EXPECT_FALSE(item->data_type.is_net);
 }
 
-TEST(ClassParsing, DataTypeSyntaxNonInteger) {
+TEST(RealDataType, AllThreeRealTypesParsed) {
   auto r = Parse(
       "module m;\n"
       "  real r;\n"
@@ -47,40 +47,7 @@ TEST(ClassParsing, DataTypeSyntaxNonInteger) {
   EXPECT_EQ(items[2]->data_type.kind, DataTypeKind::kRealtime);
 }
 
-TEST(DataTypeParsing, RealVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  real r;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
-}
-
-TEST(DataTypeParsing, ShortrealVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  shortreal sr;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
-}
-
-TEST(DataTypeParsing, RealtimeVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  realtime rt;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kRealtime);
-}
-
-TEST(DataTypeParsing, RealTypesInProcedural) {
+TEST(RealDataType, RealTypesInProcedural) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -91,7 +58,7 @@ TEST(DataTypeParsing, RealTypesInProcedural) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, RealDecl) {
+TEST(RealDataType, RealDecl) {
   auto r = Parse(
       "module m;\n"
       "  real r;\n"
@@ -104,7 +71,7 @@ TEST(DataTypeParsing, RealDecl) {
   EXPECT_EQ(item->name, "r");
 }
 
-TEST(DataTypeParsing, ShortrealDecl) {
+TEST(RealDataType, ShortrealDecl) {
   auto r = Parse(
       "module m;\n"
       "  shortreal sr;\n"
@@ -117,7 +84,7 @@ TEST(DataTypeParsing, ShortrealDecl) {
   EXPECT_EQ(item->name, "sr");
 }
 
-TEST(DataTypeParsing, RealtimeDecl) {
+TEST(RealDataType, RealtimeDecl) {
   auto r = Parse(
       "module m;\n"
       "  realtime rt;\n"
@@ -130,7 +97,7 @@ TEST(DataTypeParsing, RealtimeDecl) {
   EXPECT_EQ(item->name, "rt");
 }
 
-TEST(DataTypeParsing, MultipleRealDecls) {
+TEST(RealDataType, MultipleRealDecls) {
   auto r = Parse(
       "module m;\n"
       "  real a, b, c;\n"
@@ -140,16 +107,7 @@ TEST(DataTypeParsing, MultipleRealDecls) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-TEST(DataTypeParsing, AllRealTypes) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  real r;\n"
-              "  shortreal sr;\n"
-              "  realtime rt;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, ShortrealInModule) {
+TEST(RealDataType, ShortrealInModule) {
   auto r = Parse(
       "module m;\n"
       "  shortreal x = 1.0;\n"
@@ -161,7 +119,7 @@ TEST(DataTypeParsing, ShortrealInModule) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kShortreal);
 }
 
-TEST(DataTypeParsing, ShortrealInFunctionArg) {
+TEST(RealDataType, ShortrealInFunctionArg) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function shortreal scale(shortreal val, shortreal factor);\n"
@@ -170,23 +128,7 @@ TEST(DataTypeParsing, ShortrealInFunctionArg) {
               "endmodule\n"));
 }
 
-TEST(NetAndVariableTypeParsing, NonIntegerTypes) {
-  auto r = Parse(
-      "module m;\n"
-      "  shortreal a;\n"
-      "  real b;\n"
-      "  realtime c;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind,
-            DataTypeKind::kShortreal);
-  EXPECT_EQ(r.cu->modules[0]->items[1]->data_type.kind, DataTypeKind::kReal);
-  EXPECT_EQ(r.cu->modules[0]->items[2]->data_type.kind,
-            DataTypeKind::kRealtime);
-}
-
-TEST(ConstEvalReal, DivByZeroReturnsNullopt) {
+TEST(RealDataType, DivByZeroReturnsNullopt) {
   EvalFixture f;
   auto* e = ParseExprFrom("1.0 / 0.0", f);
   auto val = ConstEvalReal(e);

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(RealTypes, RealVarStorage) {
+TEST(RealDataType, RealVarStorage) {
   RealFixture f;
   f.CreateRealVar("x", 1.5);
   auto* var = f.ctx.FindVariable("x");
@@ -13,7 +13,7 @@ TEST(RealTypes, RealVarStorage) {
   EXPECT_NEAR(VecToDouble(var->value), 1.5, 1e-10);
 }
 
-TEST(RealTypes, IsRealVariable) {
+TEST(RealDataType, IsRealVariable) {
   RealFixture f;
   f.CreateRealVar("r", 0.0);
   EXPECT_TRUE(f.ctx.IsRealVariable("r"));

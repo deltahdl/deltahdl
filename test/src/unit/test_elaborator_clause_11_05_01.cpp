@@ -44,19 +44,6 @@ TEST(PrimaryElaboration, PrimaryPartSelectRangeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elaboration, RealIndex_Error) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  real a = 0.5;\n"
-      "  wire [3:0] b;\n"
-      "  wire c;\n"
-      "  assign c = b[a];\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(PrimaryElaboration, PrimaryHierIdentSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
