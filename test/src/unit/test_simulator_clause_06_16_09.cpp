@@ -38,4 +38,52 @@ TEST(StringMethods, Atobin) {
   EXPECT_EQ(result.ToUint64(), 0b1010u);
 }
 
+TEST(StringMethods, AtoiNoDigitsReturnsZero) {
+  StringFixture f;
+  f.CreateStringVar("s", "abc");
+  auto* call = f.MakeMethodCall("s", "atoi");
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(StringMethods, AtoiEmptyStringReturnsZero) {
+  StringFixture f;
+  f.CreateStringVar("s", "");
+  auto* call = f.MakeMethodCall("s", "atoi");
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(StringMethods, AtoiStopsAtNonDigit) {
+  StringFixture f;
+  f.CreateStringVar("s", "123xyz");
+  auto* call = f.MakeMethodCall("s", "atoi");
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 123u);
+}
+
+TEST(StringMethods, AtohexNoDigitsReturnsZero) {
+  StringFixture f;
+  f.CreateStringVar("s", "xyz");
+  auto* call = f.MakeMethodCall("s", "atohex");
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(StringMethods, AtobinNoDigitsReturnsZero) {
+  StringFixture f;
+  f.CreateStringVar("s", "xyz");
+  auto* call = f.MakeMethodCall("s", "atobin");
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(StringMethods, AtoiReturns32Bit) {
+  StringFixture f;
+  f.CreateStringVar("s", "100");
+  auto* call = f.MakeMethodCall("s", "atoi");
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 32u);
+}
+
 }  // namespace
