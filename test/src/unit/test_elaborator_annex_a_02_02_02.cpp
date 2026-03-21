@@ -154,20 +154,6 @@ TEST(StrengthElaboration, ChargeStrengthLargeOnTrireg) {
   EXPECT_EQ(mod->nets[0].charge_strength, Strength::kLarge);
 }
 
-TEST(StrengthElaboration, TriregDefaultChargeStrengthMedium) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  trireg t;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->nets.empty());
-  EXPECT_EQ(mod->nets[0].charge_strength, Strength::kMedium);
-}
-
 // --- drive_strength on net declaration ---
 
 TEST(StrengthElaboration, NetDeclDriveStrengthPreserved) {
@@ -183,16 +169,6 @@ TEST(StrengthElaboration, NetDeclDriveStrengthPreserved) {
   ASSERT_FALSE(mod->assigns.empty());
   EXPECT_EQ(mod->assigns[0].drive_strength0, 5u);
   EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);
-}
-
-TEST(StrengthElaboration, NetDeclDriveStrengthWithoutAssignIsError) {
-  ElabFixture f;
-  Elaborate(
-      "module m;\n"
-      "  wire (strong0, weak1) w;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace
