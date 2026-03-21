@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, ImplicitNetOnAssignLhs) {
+TEST(ImplicitDeclaration, ImplicitNetOnAssignLhs) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -26,7 +26,7 @@ TEST(Elaboration, ImplicitNetOnAssignLhs) {
   EXPECT_TRUE(found) << "implicit net 'w' not created";
 }
 
-TEST(Elaboration, ImplicitNetOnInstancePort) {
+TEST(ImplicitDeclaration, ImplicitNetOnInstancePort) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic a, output logic b);\n"
@@ -49,7 +49,7 @@ TEST(Elaboration, ImplicitNetOnInstancePort) {
   EXPECT_TRUE(found_y) << "implicit net 'y' not created";
 }
 
-TEST(Elaboration, ImplicitNetOnInstancePortIsScalar) {
+TEST(ImplicitDeclaration, ImplicitNetOnInstancePortIsScalar) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic a, output logic b);\n"
@@ -72,7 +72,7 @@ TEST(Elaboration, ImplicitNetOnInstancePortIsScalar) {
   }
 }
 
-TEST(Elaboration, ImplicitNetUsesDefaultNettype) {
+TEST(ImplicitDeclaration, ImplicitNetUsesDefaultNettype) {
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>",
                            "module top;\n"
@@ -97,7 +97,7 @@ TEST(Elaboration, ImplicitNetUsesDefaultNettype) {
   EXPECT_TRUE(found) << "implicit net 'w' not created";
 }
 
-TEST(Elaboration, ExplicitNetNotDuplicatedByImplicit) {
+TEST(ImplicitDeclaration, ExplicitNetNotDuplicatedByImplicit) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -115,7 +115,54 @@ TEST(Elaboration, ExplicitNetNotDuplicatedByImplicit) {
   EXPECT_EQ(count, 1) << "net 'w' should not be duplicated";
 }
 
-TEST(Elaboration, ImplicitNetNone_Error) {
+TEST(ImplicitDeclaration, ImplicitNetDefaultTypeIsWire) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  assign w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  for (const auto& n : mod->nets) {
+    if (n.name == "w") {
+      EXPECT_EQ(n.net_type, NetType::kWire);
+    }
+  }
+}
+
+TEST(ImplicitDeclaration, ImplicitNetBelongsToInnermostScope) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input logic a, output logic b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0(.a(x), .b(y));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* top = design->top_modules[0];
+  bool x_in_top = false;
+  bool y_in_top = false;
+  for (const auto& n : top->nets) {
+    if (n.name == "x") x_in_top = true;
+    if (n.name == "y") y_in_top = true;
+  }
+  EXPECT_TRUE(x_in_top) << "implicit net 'x' should be in top";
+  EXPECT_TRUE(y_in_top) << "implicit net 'y' should be in top";
+  // Verify child module does not contain these implicit nets.
+  auto* child = top->children[0].resolved;
+  ASSERT_NE(child, nullptr);
+  for (const auto& n : child->nets) {
+    EXPECT_NE(n.name, "x") << "'x' should not be in child";
+    EXPECT_NE(n.name, "y") << "'y' should not be in child";
+  }
+}
+
+TEST(ImplicitDeclaration, ImplicitNetForbiddenUnderNone) {
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>",
                            "module top;\n"
@@ -128,6 +175,65 @@ TEST(Elaboration, ImplicitNetNone_Error) {
   Elaborator elab(f.arena, f.diag, cu);
   elab.Elaborate("top");
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ImplicitDeclaration, ImplicitNetOnInstancePortForbiddenUnderNone) {
+  ElabFixture f;
+  auto fid = f.mgr.AddFile("<test>",
+                           "module child(input logic a);\n"
+                           "endmodule\n"
+                           "module top;\n"
+                           "  child u0(.a(x));\n"
+                           "endmodule\n");
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  cu->default_nettype = NetType::kNone;
+  Elaborator elab(f.arena, f.diag, cu);
+  elab.Elaborate("top");
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ImplicitDeclaration, ExplicitVarNotDuplicatedByImplicit) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic w;\n"
+      "  assign w = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  int net_count = 0;
+  for (const auto& n : mod->nets) {
+    if (n.name == "w") ++net_count;
+  }
+  EXPECT_EQ(net_count, 0) << "declared variable 'w' should not create an implicit net";
+}
+
+TEST(ImplicitDeclaration, ImplicitNetOnInstancePortUsesDefaultNettype) {
+  ElabFixture f;
+  auto fid = f.mgr.AddFile("<test>",
+                           "module child(input logic a);\n"
+                           "endmodule\n"
+                           "module top;\n"
+                           "  child u0(.a(x));\n"
+                           "endmodule\n");
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  cu->default_nettype = NetType::kWand;
+  Elaborator elab(f.arena, f.diag, cu);
+  auto* design = elab.Elaborate("top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  for (const auto& n : mod->nets) {
+    if (n.name == "x") {
+      EXPECT_EQ(n.net_type, NetType::kWand);
+    }
+  }
 }
 
 }  // namespace
