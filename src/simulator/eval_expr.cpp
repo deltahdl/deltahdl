@@ -271,7 +271,7 @@ static uint32_t CastWidth(std::string_view type_name) {
     }
     if (w > 0) return w;
   }
-  return 32;  // Default to 32-bit.
+  return 0;  // Unknown type — caller must resolve via SimContext.
 }
 
 static bool IsRealCastTarget(std::string_view name) {
@@ -321,13 +321,22 @@ static Logic4Vec CastRealConversion(const Logic4Vec& inner,
   return result;
 }
 
+// §6.24.3: Resolve the target width for a cast, checking user-defined types.
+static uint32_t ResolveCastWidth(std::string_view type_name, SimContext& ctx) {
+  uint32_t w = CastWidth(type_name);
+  if (w > 0) return w;
+  // §6.24.3: Look up user-defined type width (typedef'd structs, enums, etc.).
+  uint32_t tw = ctx.FindTypeWidth(type_name);
+  return tw > 0 ? tw : 32;
+}
+
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §6.24.3: Detect bit-stream source (unpacked array).
   if (expr->lhs && expr->lhs->kind == ExprKind::kIdentifier) {
     auto* arr_info = ctx.FindArrayInfo(expr->lhs->text);
     if (arr_info && arr_info->size > 0) {
       auto inner = PackArrayBitStream(expr->lhs->text, *arr_info, ctx, arena);
-      uint32_t target_width = CastWidth(expr->text);
+      uint32_t target_width = ResolveCastWidth(expr->text, ctx);
       uint64_t val = inner.ToUint64();
       if (target_width < 64) val &= (uint64_t{1} << target_width) - 1;
       return MakeLogic4VecVal(arena, target_width, val);
@@ -350,7 +359,7 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (type_name == "void") {
     return MakeLogic4Vec(arena, 0);
   }
-  uint32_t target_width = CastWidth(type_name);
+  uint32_t target_width = ResolveCastWidth(type_name, ctx);
   // §6.12.1: real↔integer conversion.
   if (inner.is_real != IsRealCastTarget(type_name)) {
     return CastRealConversion(inner, type_name, target_width, arena);
@@ -460,7 +469,7 @@ static uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx,
   if (size_expr->kind == ExprKind::kIdentifier) {
     uint32_t num = ParseDigitStr(size_expr->text);
     if (num > 0) return num;
-    return CastWidth(size_expr->text);
+    return ResolveCastWidth(size_expr->text, ctx);
   }
   auto val = EvalExpr(size_expr, ctx, arena).ToUint64();
   return (val == 0) ? 1 : static_cast<uint32_t>(val);

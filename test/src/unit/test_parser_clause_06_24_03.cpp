@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeParsing, BitstreamCastStructToInt) {
+TEST(BitStreamCastParsing, BitstreamCastStructToInt) {
   EXPECT_TRUE(ParseOk(
       "module t;\n"
       "  typedef struct packed { logic [15:0] hi; logic [15:0] lo; } pair_t;\n"
@@ -18,7 +18,7 @@ TEST(DataTypeParsing, BitstreamCastStructToInt) {
       "endmodule\n"));
 }
 
-TEST(DataTypeParsing, BitstreamCastIntToStruct) {
+TEST(BitStreamCastParsing, BitstreamCastIntToStruct) {
   EXPECT_TRUE(ParseOk(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -29,7 +29,7 @@ TEST(DataTypeParsing, BitstreamCastIntToStruct) {
       "endmodule\n"));
 }
 
-TEST(DataTypeParsing, BitStreamCastToType) {
+TEST(BitStreamCastParsing, BitStreamCastToType) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { logic [3:0] a; logic [3:0] b; } pair_t;\n"
@@ -41,7 +41,7 @@ TEST(DataTypeParsing, BitStreamCastToType) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(DataTypeParsing, BitStreamCastFromStruct) {
+TEST(BitStreamCastParsing, BitStreamCastFromStruct) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { logic [3:0] a; logic [3:0] b; } pair_t;\n"
@@ -54,7 +54,7 @@ TEST(DataTypeParsing, BitStreamCastFromStruct) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(DataTypeParsing, BitstreamCastStructToStruct) {
+TEST(BitStreamCastParsing, BitstreamCastStructToStruct) {
   EXPECT_TRUE(ParseOk(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } ab_t;\n"
@@ -68,7 +68,7 @@ TEST(DataTypeParsing, BitstreamCastStructToStruct) {
       "endmodule\n"));
 }
 
-TEST(DataTypeParsing, BitstreamCastStringType) {
+TEST(BitStreamCastParsing, BitstreamCastStringType) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef bit [$bits(int)-1:0] tagbits;\n"
@@ -76,6 +76,17 @@ TEST(DataTypeParsing, BitstreamCastStringType) {
               "  tagbits t_val;\n"
               "  initial t_val = tagbits'(x);\n"
               "endmodule\n"));
+}
+
+TEST(BitStreamCastParsing, UnpackedArrayToIntCast) {
+  EXPECT_TRUE(ParseOk(
+      "module t;\n"
+      "  byte arr [4];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = int'(arr);\n"
+      "  end\n"
+      "endmodule\n"));
 }
 
 }  // namespace
