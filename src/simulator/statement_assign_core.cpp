@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -337,13 +339,57 @@ static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 }
 
+// §6.12.1: Get the base identifier name from an LHS expression.
+static std::string_view LhsIdentName(const Expr* lhs) {
+  while (lhs) {
+    if (lhs->kind == ExprKind::kIdentifier) return lhs->text;
+    if (lhs->kind == ExprKind::kSelect && lhs->base) {
+      lhs = lhs->base;
+      continue;
+    }
+    break;
+  }
+  return {};
+}
+
+// §6.12.1: Implicit real↔integer conversion on assignment.
+static Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
+                                     uint32_t target_width, SimContext& ctx,
+                                     Arena& arena) {
+  auto name = LhsIdentName(lhs);
+  if (name.empty()) return ResizeToWidth(rhs_val, target_width, arena);
+  bool lhs_is_real = ctx.IsRealVariable(name);
+  if (rhs_val.is_real && !lhs_is_real) {
+    double d = 0.0;
+    uint64_t bits = rhs_val.ToUint64();
+    std::memcpy(&d, &bits, sizeof(double));
+    auto ival = static_cast<uint64_t>(
+        static_cast<int64_t>(std::llround(d)));
+    return MakeLogic4VecVal(arena, target_width, ival);
+  }
+  if (!rhs_val.is_real && lhs_is_real) {
+    uint64_t raw =
+        rhs_val.nwords > 0
+            ? (rhs_val.words[0].aval & ~rhs_val.words[0].bval)
+            : 0;
+    auto d = static_cast<double>(raw);
+    uint64_t dbits = 0;
+    std::memcpy(&dbits, &d, sizeof(double));
+    auto result = MakeLogic4VecVal(arena, 64, dbits);
+    result.is_real = true;
+    return result;
+  }
+  return ResizeToWidth(rhs_val, target_width, arena);
+}
+
 static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,
                               SimContext& ctx, Arena& arena) {
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
   if (var) {
     // §10.6.2: While forced, procedural assigns do not change the value.
     if (var->is_forced) return;
-    rhs_val = ResizeToWidth(rhs_val, var->value.width, arena);
+    rhs_val = ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, ctx,
+                                  arena);
     var->value = rhs_val;
     var->NotifyWatchers();
     // §7.3.2: Set tag when RHS is a tagged expression.
@@ -442,8 +488,9 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
   if (var) {
     // §10.6.2: While forced, procedural assigns do not change the value.
     if (var->is_forced) return;
-    auto resized = ResizeToWidth(rhs_val, var->value.width, arena);
-    var->value = resized;
+    auto converted = ConvertRealOnAssign(rhs_val, lhs, var->value.width, ctx,
+                                         arena);
+    var->value = converted;
     var->NotifyWatchers();
   } else if (lhs->kind == ExprKind::kMemberAccess) {
     WriteStructField(lhs, rhs_val, ctx, arena);
@@ -485,8 +532,9 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
       var->NotifyWatchers();
     };
   } else {
-    auto resized = ResizeToWidth(rhs_val, var->value.width, arena);
-    SetupWholeVarNbaCallback(event, var, resized);
+    auto converted = ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width,
+                                         ctx, arena);
+    SetupWholeVarNbaCallback(event, var, converted);
   }
   auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
   auto schedule_time = ctx.CurrentTime() + SimTime{delay_ticks};

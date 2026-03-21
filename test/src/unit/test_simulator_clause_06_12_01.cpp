@@ -1,3 +1,4 @@
+#include "fixture_real.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -6,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeSim, CastRealToInt_RoundUp) {
+TEST(RealConversion, CastRealToInt_RoundUp) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -30,7 +31,7 @@ TEST(DataTypeSim, CastRealToInt_RoundUp) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(DataTypeSim, CastRealToInt_NegRound) {
+TEST(RealConversion, CastRealToInt_NegRound) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -55,7 +56,7 @@ TEST(DataTypeSim, CastRealToInt_NegRound) {
   EXPECT_EQ(var->value.ToUint64(), neg2_32bit);
 }
 
-TEST(DataTypeSim, CastRealToInt_Truncate) {
+TEST(RealConversion, CastRealToInt_Truncate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -79,7 +80,7 @@ TEST(DataTypeSim, CastRealToInt_Truncate) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(DataTypeSim, CastRealToInt_LrmExamples) {
+TEST(RealConversion, CastRealToInt_LrmExamples) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -101,7 +102,7 @@ TEST(DataTypeSim, CastRealToInt_LrmExamples) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 35u);
 }
 
-TEST(DataTypeSim, CastRealToInt_PosHalfRoundsAway) {
+TEST(RealConversion, CastRealToInt_PosHalfRoundsAway) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -118,6 +119,68 @@ TEST(DataTypeSim, CastRealToInt_PosHalfRoundsAway) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 2u);
+}
+
+TEST(RealConversion, ImplicitRealToInt_Rounds) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    r = 1.5;\n"
+      "    result = r;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+TEST(RealConversion, ImplicitIntToReal) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int i;\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    i = 42;\n"
+      "    r = i;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_NEAR(VecToDouble(var->value), 42.0, 1e-10);
+}
+
+TEST(RealConversion, XzBecomesZeroInRealConversion) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] val;\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    r = val;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_NEAR(VecToDouble(var->value), 0.0, 1e-10);
 }
 
 }  // namespace

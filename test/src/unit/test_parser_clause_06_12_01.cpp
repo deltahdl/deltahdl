@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeParsing, RealToIntAssignment) {
+TEST(RealConversion, RealToIntAssignment) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r;\n"
@@ -16,7 +16,7 @@ TEST(DataTypeParsing, RealToIntAssignment) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, IntToRealAssignment) {
+TEST(RealConversion, IntToRealAssignment) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  real r;\n"
