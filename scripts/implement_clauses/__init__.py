@@ -8,6 +8,7 @@ import argparse
 from lib.python.cli import (
     ClauseParams,
     add_clauses_arg,
+    add_continue_arg,
     add_github_args,
     add_lrm_arg,
     invoke_implement_clause,
@@ -24,6 +25,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     add_lrm_arg(parser)
     add_clauses_arg(parser)
     add_github_args(parser)
+    add_continue_arg(parser)
     return parse_and_validate(parser, argv)
 
 
@@ -33,5 +35,9 @@ def main(argv: list[str] | None = None) -> None:
     params = ClauseParams(
         str(args.lrm), args.master_issue, args.organization, args.repo,
     )
-    for clause, sub_issue in args.clauses.items():
-        invoke_implement_clause(params, clause, sub_issue)
+    for i, (clause, sub_issue) in enumerate(args.clauses.items()):
+        continue_session = i > 0 or args.continue_session
+        invoke_implement_clause(
+            params, clause, sub_issue,
+            continue_session=continue_session,
+        )

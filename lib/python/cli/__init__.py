@@ -211,6 +211,7 @@ def invoke_implement_subclauses(
     organization: str,
     repo: str,
     model: str = "opus",
+    continue_session: bool = False,
 ) -> None:
     """Shell out to ``python -m implement_subclauses``."""
     issues_str = ",".join(str(i) for i in issues)
@@ -223,13 +224,16 @@ def invoke_implement_subclauses(
         "--repo", repo,
         "--model", model,
     ]
+    if continue_session:
+        cmd.append("--continue")
     result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
         sys.exit(result.returncode)
 
 
 def invoke_implement_clause(
-    params: ClauseParams, clause: str, sub_issue: int,
+    params: ClauseParams, clause: str, sub_issue: int, *,
+    continue_session: bool = False,
 ) -> None:
     """Shell out to ``python -m implement_clause``."""
     print(f"Invoking implement_clause for clause {clause} (issue #{sub_issue})...")
@@ -242,6 +246,8 @@ def invoke_implement_clause(
         "--organization", params.organization,
         "--repo", params.repo,
     ]
+    if continue_session:
+        cmd.append("--continue")
     result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
         sys.exit(result.returncode)

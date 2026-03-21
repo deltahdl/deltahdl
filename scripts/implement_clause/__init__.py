@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from lib.python.cli import (
+    add_continue_arg,
     invoke_implement_subclauses,
     run_claude_cli,
     run_with_dots,
@@ -91,6 +92,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="Existing clause issue number (created if absent)")
     parser.add_argument("--organization", required=True)
     parser.add_argument("--repo", required=True)
+    add_continue_arg(parser)
 
     args = parser.parse_args(argv)
 
@@ -178,6 +180,7 @@ def main(argv: list[str] | None = None) -> None:
     invoke_implement_subclauses(
         str(lrm), subclause_issues,
         organization=args.organization, repo=args.repo,
+        continue_session=args.continue_session,
     )
 
     close_issue(

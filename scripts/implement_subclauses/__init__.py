@@ -7,6 +7,7 @@ subclause number, and invokes implement_subclause for each one.
 import argparse
 
 from lib.python.cli import (
+    add_continue_arg,
     add_lrm_arg,
     add_model_arg,
     invoke_implement_subclause,
@@ -50,6 +51,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="GitHub repository.",
     )
     add_model_arg(parser)
+    add_continue_arg(parser)
     return parse_and_validate(parser, argv)
 
 
@@ -79,7 +81,7 @@ def main(argv: list[str] | None = None) -> None:
         subclauses.append((subclause, issue_num))
 
     for i, (subclause, issue_num) in enumerate(subclauses):
-        continue_session = i > 0
+        continue_session = i > 0 or args.continue_session
         children = sorted(
             s for s, _ in subclauses if s.startswith(subclause + ".")
         )

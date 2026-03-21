@@ -58,6 +58,26 @@ def test_parse_args_model_default(iscs, base_argv):
     assert iscs.parse_args(base_argv).model == "opus"
 
 
+def test_parse_args_continue_default(iscs, base_argv):
+    """--continue defaults to False."""
+    assert iscs.parse_args(base_argv).continue_session is False
+
+
+def test_parse_args_continue_flag(iscs, base_argv):
+    """--continue sets continue_session to True."""
+    assert iscs.parse_args(
+        [*base_argv, "--continue"],
+    ).continue_session is True
+
+
+def test_main_continue_first_subclause(iscs, monkeypatch, base_argv,
+                                       patch_main):
+    """With --continue, first subclause also uses continue_session."""
+    mock_invoke = patch_main(monkeypatch, iscs)
+    iscs.main([*base_argv, "--continue"])
+    assert mock_invoke.call_args_list[0][1]["continue_session"] is True
+
+
 def test_parse_args_requires_issues(iscs, tmp_path):
     """--issues is required."""
     lrm = tmp_path / "lrm.pdf"
