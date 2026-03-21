@@ -65,6 +65,7 @@ static void StringPutc(Variable* var, const std::string& str,
   if (call_expr->args.size() < 2) return;
   auto idx = EvalExpr(call_expr->args[0], ctx, arena).ToUint64();
   auto ch = EvalExpr(call_expr->args[1], ctx, arena).ToUint64();
+  if ((ch & 0xFF) == 0) return;
   std::string copy = str;
   if (idx < copy.size()) {
     copy[idx] = static_cast<char>(ch & 0xFF);
