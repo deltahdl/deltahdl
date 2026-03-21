@@ -249,6 +249,14 @@ void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
       s->kind == StmtKind::kNonblockingAssign) {
     CheckEnumAssignStmt(s);
   }
+  if (s->kind == StmtKind::kExprStmt && s->expr &&
+      s->expr->kind == ExprKind::kPostfixUnary) {
+    auto name = ExprIdent(s->expr->lhs);
+    if (!name.empty() && enum_var_names_.count(name) != 0) {
+      diag_.Error(s->range.start,
+                  "increment/decrement of enum variable without cast");
+    }
+  }
   for (auto* sub : s->stmts) WalkStmtsForEnumAssign(sub);
   WalkStmtsForEnumAssign(s->then_branch);
   WalkStmtsForEnumAssign(s->else_branch);

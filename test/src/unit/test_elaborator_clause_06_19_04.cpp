@@ -63,4 +63,85 @@ TEST(Elaboration, EnumIntComparison_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(Elaboration, EnumExprAssignNoCast_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {Red, Green, Blue} Colors;\n"
+      "  initial begin\n"
+      "    Colors C;\n"
+      "    C = Red;\n"
+      "    C = C + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, EnumCastExprAssign_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {Red, Green, Blue} Colors;\n"
+      "  initial begin\n"
+      "    Colors C;\n"
+      "    C = Red;\n"
+      "    C = Colors'(C + 1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, EnumAddTwoEnumsToInt_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {Red, Green, Blue} Colors;\n"
+      "  typedef enum {Mo, Tu, We, Th, Fr, Sa, Su} Week;\n"
+      "  int I;\n"
+      "  initial begin\n"
+      "    Colors C;\n"
+      "    Week W;\n"
+      "    C = Red;\n"
+      "    W = Mo;\n"
+      "    I = C + W;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, EnumIncrementNoCast_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {Red, Green, Blue} Colors;\n"
+      "  initial begin\n"
+      "    Colors C;\n"
+      "    C = Red;\n"
+      "    C++;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, EnumDecrementNoCast_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {Red, Green, Blue} Colors;\n"
+      "  initial begin\n"
+      "    Colors C;\n"
+      "    C = Blue;\n"
+      "    C--;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace
