@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeParsing, CastCompatibleRealToIntType) {
+TEST(CastCompatibleParsing, RealToIntCompatible) {
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -14,7 +14,7 @@ TEST(DataTypeParsing, CastCompatibleRealToIntType) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-TEST(DataTypeParsing, CastCompatibleEnumToInt) {
+TEST(CastCompatibleParsing, EnumToIntCompatible) {
   DataType a;
   a.kind = DataTypeKind::kEnum;
   DataType b;
@@ -22,7 +22,7 @@ TEST(DataTypeParsing, CastCompatibleEnumToInt) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-TEST(DataTypeParsing, CastCompatibleIntToEnum) {
+TEST(CastCompatibleParsing, IntToEnumCompatible) {
   DataType a;
   a.kind = DataTypeKind::kInt;
   DataType b;
@@ -30,7 +30,7 @@ TEST(DataTypeParsing, CastCompatibleIntToEnum) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-TEST(DataTypeParsing, CastCompatibleRealToShortreal) {
+TEST(CastCompatibleParsing, RealToShortrealCompatible) {
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -38,12 +38,49 @@ TEST(DataTypeParsing, CastCompatibleRealToShortreal) {
   EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
-TEST(DataTypeParsing, NotCastCompatibleStringToInt) {
+TEST(CastCompatibleParsing, StringToIntNotCompatible) {
   DataType a;
   a.kind = DataTypeKind::kString;
   DataType b;
   b.kind = DataTypeKind::kInt;
   EXPECT_FALSE(IsCastCompatible(a, b));
+}
+
+TEST(CastCompatibleParsing, AssignmentCompatibleImpliesCastCompatible) {
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kLogic;
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+  EXPECT_TRUE(IsCastCompatible(a, b));
+}
+
+TEST(CastCompatibleParsing, EquivalentImpliesCastCompatible) {
+  DataType a;
+  a.kind = DataTypeKind::kLogic;
+  DataType b;
+  b.kind = DataTypeKind::kReg;
+  EXPECT_TRUE(TypesEquivalent(a, b));
+  EXPECT_TRUE(IsCastCompatible(a, b));
+}
+
+TEST(CastCompatibleParsing, IntEnumCastSymmetric) {
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kEnum;
+  EXPECT_TRUE(IsCastCompatible(a, b));
+  EXPECT_TRUE(IsCastCompatible(b, a));
+}
+
+TEST(CastCompatibleParsing, LogicToEnumCastCompatible) {
+  DataType a;
+  a.kind = DataTypeKind::kLogic;
+  DataType b;
+  b.kind = DataTypeKind::kEnum;
+  EXPECT_TRUE(IsCastCompatible(a, b));
 }
 
 }  // namespace
