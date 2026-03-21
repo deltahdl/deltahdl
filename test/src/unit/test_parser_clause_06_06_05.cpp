@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(DataTypeParsing, Tri0Decl) {
+TEST(Tri0Tri1Parsing, Tri0Decl) {
   auto r = Parse(
       "module t;\n"
       "  tri0 t0;\n"
@@ -19,7 +19,7 @@ TEST(DataTypeParsing, Tri0Decl) {
   EXPECT_TRUE(item->data_type.is_net);
 }
 
-TEST(DataTypeParsing, Tri1Decl) {
+TEST(Tri0Tri1Parsing, Tri1Decl) {
   auto r = Parse(
       "module t;\n"
       "  tri1 t1;\n"
