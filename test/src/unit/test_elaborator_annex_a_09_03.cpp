@@ -233,4 +233,46 @@ TEST(IdentifierElaboration, MixedIdentifierForms) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(IdentifierElaboration, UnresolvedIdentifierError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  assign x = nonexistent;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(IdentifierElaboration, TypeIdentifierResolution) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  byte_t data;\n"
+      "  assign data = 8'hFF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierElaboration, NestedHierarchicalIdentResolution) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module inner(input a, output b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module mid(input a, output b);\n"
+      "  inner u(.a(a), .b(b));\n"
+      "endmodule\n"
+      "module m;\n"
+      "  logic x, y;\n"
+      "  mid u(.a(x), .b(y));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

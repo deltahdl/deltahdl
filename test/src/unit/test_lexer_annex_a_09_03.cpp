@@ -214,3 +214,95 @@ TEST(IdentifierLexing, IdentifiersSeparatedByColonColon) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kColonColon);
   EXPECT_EQ(tokens[2].text, "item");
 }
+
+// --- system_tf_identifier ---
+
+TEST(IdentifierLexing, SystemIdentBasic) {
+  auto tokens = Lex("$display");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$display");
+}
+
+TEST(IdentifierLexing, SystemIdentWithDigits) {
+  auto tokens = Lex("$clog2");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$clog2");
+}
+
+TEST(IdentifierLexing, SystemIdentWithUnderscore) {
+  auto tokens = Lex("$read_mem_h");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$read_mem_h");
+}
+
+TEST(IdentifierLexing, SystemIdentWithDollar) {
+  auto tokens = Lex("$foo$bar");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text, "$foo$bar");
+}
+
+TEST(IdentifierLexing, SystemIdentMaxLength) {
+  std::string id = "$" + std::string(1023, 'a');
+  auto [tokens, errors] = LexWithDiag(id);
+  EXPECT_FALSE(errors);
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].text.size(), 1024u);
+}
+
+TEST(IdentifierLexing, SystemIdentExceedsMaxLength) {
+  std::string id = "$" + std::string(1025, 'a');
+  auto [tokens, errors] = LexWithDiag(id);
+  EXPECT_TRUE(errors);
+}
+
+TEST(IdentifierLexing, BareDollarIsNotSystemIdent) {
+  auto tokens = Lex("$");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
+}
+
+TEST(IdentifierLexing, SystemIdentSourceLocation) {
+  auto [tokens, errors] = LexWithDiag("  $finish");
+  EXPECT_FALSE(errors);
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(tokens[0].loc.line, 1u);
+  EXPECT_EQ(tokens[0].loc.column, 3u);
+}
+
+// --- escaped_identifier edge cases ---
+
+TEST(IdentifierLexing, EscapedIdentEmptyBodyAtSpace) {
+  auto [tokens, errors] = LexWithDiag("\\ foo");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_TRUE(tokens[0].text.empty());
+}
+
+TEST(IdentifierLexing, EscapedIdentAtEofNoWhitespace) {
+  auto tokens = Lex("\\myid");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "myid");
+}
+
+// --- simple_identifier edge cases ---
+
+TEST(IdentifierLexing, SimpleIdentDigitOnlyAfterStart) {
+  auto tokens = Lex("a1234567890");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "a1234567890");
+}
+
+TEST(IdentifierLexing, SimpleIdentConsecutiveDollars) {
+  auto tokens = Lex("x$$y");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "x$$y");
+}

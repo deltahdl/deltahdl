@@ -441,4 +441,130 @@ TEST(IdentifierSyntaxParsing, SystemCallClog2) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(IdentifierSyntaxParsing, UnitScopePackageAccess) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = $unit::top_param;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, SystemIdentNoArgsAsStatement) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  initial $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, SystemIdentMultipleInBlock) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    $display(\"a\");\n"
+      "    $write(\"b\");\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, EscapedIdentInPackageScope) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "package \\my-pkg ;\n"
+      "  parameter int W = 4;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  logic [\\my-pkg ::W-1:0] data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, TypeIdentifier) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  typedef logic [7:0] my_type_t;\n"
+      "  my_type_t data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, ProgramIdentifier) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "program my_prog;\n"
+      "  initial $finish;\n"
+      "endprogram\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, GenvarIdentifier) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m;\n"
+      "  genvar i;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, CovergroupIdentifier) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "class my_class;\n"
+      "  int val;\n"
+      "  covergroup cg;\n"
+      "    coverpoint val;\n"
+      "  endgroup\n"
+      "endclass\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, PropertyIdentifier) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m(input clk, input a);\n"
+      "  property my_prop;\n"
+      "    @(posedge clk) a;\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, SequenceIdentifier) {
+  ParseFixture f;
+  auto* cu = ParseSrc(
+      "module m(input clk, input a, input b);\n"
+      "  sequence my_seq;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
