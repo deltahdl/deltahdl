@@ -294,4 +294,3 @@ def remove_test_row(body: str, test_name: str) -> str:
             f"Row for {test_name!r} not found in issue body",
         )
     return body[:match.start()] + body[match.end():]
-
