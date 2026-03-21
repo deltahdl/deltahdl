@@ -65,4 +65,16 @@ TEST(DataTypeParsing, EventNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kEvent));
 }
 
+TEST(DataTypeParsing, EventAssignNull) {
+  auto r = Parse(
+      "module t;\n"
+      "  event empty = null;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
+}
+
 }  // namespace

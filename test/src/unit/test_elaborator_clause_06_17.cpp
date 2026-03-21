@@ -51,4 +51,33 @@ TEST(Elaboration, EventVarWidthZero) {
   }
 }
 
+TEST(Elaboration, EventAssignNullElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  event ev = null;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, MultipleEventDeclarationsElaborate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  event a;\n"
+      "  event b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  int event_count = 0;
+  for (const auto& v : mod->variables) {
+    if (v.is_event) ++event_count;
+  }
+  EXPECT_EQ(event_count, 2);
+}
+
 }  // namespace
