@@ -30,20 +30,6 @@ TEST(TypeCompatibilityElaboration, AssignRealToInt) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(TypeCompatibilityElaboration, MatchingTypesSameTypedef) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "  byte_t a;\n"
-      "  byte_t b;\n"
-      "  initial a = b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(TypeCompatibilityElaboration, IntAndBitSignedAreInterchangeable) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeParsing, CompatibleTypesNamedType) {
+TEST(MatchingTypesParsing, TypedefAssignThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  typedef logic [7:0] byte_t;\n"

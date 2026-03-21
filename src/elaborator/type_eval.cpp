@@ -215,11 +215,58 @@ bool IsIntegralType(DataTypeKind kind) {
   }
 }
 
+// §6.22.1(e): Types with a predefined width.
+static bool HasPredefinedWidth(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §6.22.1(e): Simple bit vector types without a predefined width.
+static bool IsSimpleBitVector(DataTypeKind kind) {
+  return kind == DataTypeKind::kBit || kind == DataTypeKind::kLogic ||
+         kind == DataTypeKind::kReg;
+}
+
 bool TypesMatch(const DataType& a, const DataType& b) {
-  if (a.kind != b.kind) return false;
   if (a.is_signed != b.is_signed) return false;
-  if (a.kind == DataTypeKind::kNamed) return a.type_name == b.type_name;
-  return true;
+
+  if (a.kind == b.kind) {
+    if (a.kind == DataTypeKind::kNamed) return a.type_name == b.type_name;
+    return true;
+  }
+
+  // §6.22.1(e): A simple bit vector with range [width-1:0] matches a
+  // predefined-width type if both have the same state and width.
+  const DataType* vec = nullptr;
+  const DataType* predef = nullptr;
+  if (IsSimpleBitVector(a.kind) && HasPredefinedWidth(b.kind)) {
+    vec = &a;
+    predef = &b;
+  } else if (HasPredefinedWidth(a.kind) && IsSimpleBitVector(b.kind)) {
+    vec = &b;
+    predef = &a;
+  }
+  if (vec && predef) {
+    if (Is4stateType(vec->kind) != Is4stateType(predef->kind)) return false;
+    if (!vec->packed_dim_left || !vec->packed_dim_right) return false;
+    if (!vec->extra_packed_dims.empty()) return false;
+    auto left = ConstEvalInt(vec->packed_dim_left);
+    auto right = ConstEvalInt(vec->packed_dim_right);
+    if (!left || !right || *right != 0 || *left < 0) return false;
+    uint32_t vec_width = static_cast<uint32_t>(*left + 1);
+    return vec_width == EvalTypeWidth(*predef);
+  }
+
+  return false;
 }
 
 bool TypesEquivalent(const DataType& a, const DataType& b) {
