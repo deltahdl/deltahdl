@@ -72,17 +72,4 @@ TEST(DataTypeParsing, UnresolvedNettypeDecl) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, NettypeAlias) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct { real r; bit [7:0] data; } T;\n"
-              "  function T Tsum(input T driver[]);\n"
-              "    Tsum.r = 0.0;\n"
-              "    Tsum.data = 0;\n"
-              "  endfunction\n"
-              "  nettype T wTsum with Tsum;\n"
-              "  nettype wTsum nettypeid2;\n"
-              "endmodule\n"));
-}
-
 }  // namespace

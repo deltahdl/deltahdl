@@ -326,6 +326,15 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
 void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* /*mod*/) {
   typedefs_[item->name] = item->typedef_type;
   nettype_names_.insert(item->name);
+  if (!item->nettype_resolve_func.empty()) {
+    nettype_resolve_funcs_[item->name] = item->nettype_resolve_func;
+  } else if (item->typedef_type.kind == DataTypeKind::kNamed) {
+    // §6.6.7: Alias form inherits resolution function from base nettype.
+    auto it = nettype_resolve_funcs_.find(item->typedef_type.type_name);
+    if (it != nettype_resolve_funcs_.end()) {
+      nettype_resolve_funcs_[item->name] = it->second;
+    }
+  }
 }
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {

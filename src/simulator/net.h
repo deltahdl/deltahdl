@@ -31,6 +31,10 @@ struct Net {
   uint64_t decay_ticks = 0;
   uint64_t decay_generation = 0;
 
+  // §6.6.7: User-defined nettype.
+  bool is_user_nettype = false;
+  std::string_view resolve_func;
+
   /// Resolve all driver values into the resolved variable.
   void Resolve(Arena& arena, Scheduler* sched = nullptr);
 

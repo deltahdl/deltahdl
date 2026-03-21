@@ -16,7 +16,7 @@ static ModuleItem* FindNettypeDecl(ParseResult& r, std::string_view name = "") {
 }
 namespace {
 
-TEST(DataTypeParsing, NettypeWithIntType) {
+TEST(NettypeParsing,NettypeWithIntType) {
   auto r = Parse(
       "module m;\n"
       "  nettype int mynet;\n"
@@ -27,7 +27,7 @@ TEST(DataTypeParsing, NettypeWithIntType) {
   ASSERT_NE(nt, nullptr);
   EXPECT_EQ(nt->name, "mynet");
 }
-TEST(DataTypeParsing, NettypeDeclWithResolveFunc) {
+TEST(NettypeParsing,NettypeDeclWithResolveFunc) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { real field1; bit field2; } T;\n"
@@ -47,7 +47,7 @@ TEST(DataTypeParsing, NettypeDeclWithResolveFunc) {
   EXPECT_EQ(nt->nettype_resolve_func, "Tsum");
 }
 
-TEST(DataTypeParsing, NettypeWithLogicType) {
+TEST(NettypeParsing,NettypeWithLogicType) {
   auto r = Parse(
       "module m;\n"
       "  nettype logic mylogic;\n"
@@ -59,7 +59,7 @@ TEST(DataTypeParsing, NettypeWithLogicType) {
   EXPECT_EQ(nt->name, "mylogic");
 }
 
-TEST(DataTypeParsing, NettypeDeclAlias) {
+TEST(NettypeParsing,NettypeDeclAlias) {
   auto r = Parse(
       "module t;\n"
       "  typedef real TR[5];\n"
@@ -75,14 +75,14 @@ TEST(DataTypeParsing, NettypeDeclAlias) {
   EXPECT_GE(nettype_count, 2);
 }
 
-TEST(DataTypeParsing, NettypeWithPackedVector) {
+TEST(NettypeParsing,NettypeWithPackedVector) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  nettype logic [7:0] byte_net;\n"
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, NettypeWithStruct) {
+TEST(NettypeParsing,NettypeWithStruct) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct { real field1; bit field2; } T;\n"
@@ -94,7 +94,7 @@ TEST(DataTypeParsing, NettypeWithStruct) {
   ASSERT_NE(nt, nullptr);
   EXPECT_EQ(nt->name, "wT");
 }
-TEST(Parser, NettypeDeclaration) {
+TEST(NettypeParsing,NettypeDeclaration) {
   auto r = Parse(
       "module t;\n"
       "  nettype logic [7:0] mynet;\n"
@@ -105,7 +105,7 @@ TEST(Parser, NettypeDeclaration) {
   EXPECT_EQ(item->name, "mynet");
 }
 
-TEST(DataTypeParsing, NettypeWithResolveFuncName) {
+TEST(NettypeParsing,NettypeWithResolveFuncName) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct { real field1; bit field2; } T;\n"
@@ -118,7 +118,7 @@ TEST(DataTypeParsing, NettypeWithResolveFuncName) {
   EXPECT_EQ(nt->nettype_resolve_func, "Tsum");
 }
 
-TEST(DataTypeParsing, NettypeAlias) {
+TEST(NettypeParsing,NettypeAlias) {
   auto r = Parse(
       "module m;\n"
       "  typedef real TR[5];\n"
@@ -132,7 +132,7 @@ TEST(DataTypeParsing, NettypeAlias) {
   EXPECT_EQ(nt->name, "alias_net");
 }
 
-TEST(Parser, NettypeWithResolutionFunction) {
+TEST(NettypeParsing,NettypeWithResolutionFunction) {
   auto r = Parse(
       "module t;\n"
       "  nettype logic [7:0] mynet with resolve_fn;\n"
@@ -144,7 +144,7 @@ TEST(Parser, NettypeWithResolutionFunction) {
   EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
 }
 
-TEST(DataTypeParsing, MultipleNettypesInModule) {
+TEST(NettypeParsing,MultipleNettypesInModule) {
   auto r = Parse(
       "module m;\n"
       "  typedef struct { real a; } A_t;\n"
@@ -161,7 +161,7 @@ TEST(DataTypeParsing, MultipleNettypesInModule) {
   EXPECT_EQ(count, 2);
 }
 
-TEST(TypeDeclParsing, DataDeclNettypeDeclaration) {
+TEST(NettypeParsing, NettypeParsesAsNettypeDecl) {
   auto r = Parse("module m; nettype logic my_net; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -169,14 +169,14 @@ TEST(TypeDeclParsing, DataDeclNettypeDeclaration) {
   EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
 }
 
-TEST(DataTypeParsing, NettypeWithRealType) {
+TEST(NettypeParsing,NettypeWithRealType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  nettype real real_net;\n"
               "endmodule\n"));
 }
 
-TEST(TypeDeclParsing, NettypeDeclBasic) {
+TEST(NettypeParsing,NettypeDeclBasic) {
   auto r = Parse("module m; nettype real my_real_net; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -185,14 +185,14 @@ TEST(TypeDeclParsing, NettypeDeclBasic) {
   EXPECT_EQ(item->name, "my_real_net");
 }
 
-TEST(DataTypeParsing, NettypeWithShortrealType) {
+TEST(NettypeParsing,NettypeWithShortrealType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  nettype shortreal sr_net;\n"
               "endmodule\n"));
 }
 
-TEST(TypeDeclParsing, NettypeDeclWithResolve) {
+TEST(NettypeParsing,NettypeDeclWithResolve) {
   auto r = Parse("module m; nettype logic my_net with my_resolve; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -201,7 +201,7 @@ TEST(TypeDeclParsing, NettypeDeclWithResolve) {
   EXPECT_EQ(item->nettype_resolve_func, "my_resolve");
 }
 
-TEST(TypeDeclParsing, NettypeDeclWithScopedResolve) {
+TEST(NettypeParsing,NettypeDeclWithScopedResolve) {
   auto r =
       Parse("module m; nettype logic my_net with pkg::resolve_fn; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -211,7 +211,7 @@ TEST(TypeDeclParsing, NettypeDeclWithScopedResolve) {
   EXPECT_EQ(item->nettype_resolve_func, "resolve_fn");
 }
 
-TEST(DataTypeParsing, NettypeInPackage) {
+TEST(NettypeParsing,NettypeInPackage) {
   auto r = Parse(
       "package pkg;\n"
       "  typedef real myreal;\n"
@@ -222,28 +222,28 @@ TEST(DataTypeParsing, NettypeInPackage) {
   ASSERT_GE(r.cu->packages.size(), 1u);
 }
 
-TEST(DataTypeParsing, NettypeWithByteType) {
+TEST(NettypeParsing,NettypeWithByteType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  nettype byte byte_net;\n"
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, NettypeWithBitType) {
+TEST(NettypeParsing,NettypeWithBitType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  nettype bit bit_net;\n"
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, NettypeWithLongintType) {
+TEST(NettypeParsing,NettypeWithLongintType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  nettype longint long_net;\n"
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, NettypeAsPortType) {
+TEST(NettypeParsing,NettypeAsPortType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct { logic [7:0] data; logic valid; } bus_t;\n"
@@ -254,7 +254,7 @@ TEST(DataTypeParsing, NettypeAsPortType) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, NettypeWithPackedStruct) {
+TEST(NettypeParsing,NettypeWithPackedStruct) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
       "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } nibble_t;\n"
@@ -262,7 +262,7 @@ TEST(DataTypeParsing, NettypeWithPackedStruct) {
       "endmodule\n"));
 }
 
-TEST(DataTypeParsing, NettypeWithArrayTypedef) {
+TEST(NettypeParsing,NettypeWithArrayTypedef) {
   auto r = Parse(
       "module m;\n"
       "  typedef real TR[5];\n"
@@ -274,7 +274,7 @@ TEST(DataTypeParsing, NettypeWithArrayTypedef) {
   ASSERT_NE(nt, nullptr);
 }
 
-TEST(DataTypeParsing, NettypeAliasForNetDecl) {
+TEST(NettypeParsing,NettypeAliasForNetDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef real TR[5];\n"
@@ -284,7 +284,7 @@ TEST(DataTypeParsing, NettypeAliasForNetDecl) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, NettypeResolveFuncMultipleDrivers) {
+TEST(NettypeParsing,NettypeResolveFuncMultipleDrivers) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct { real val; } S;\n"
@@ -295,7 +295,7 @@ TEST(DataTypeParsing, NettypeResolveFuncMultipleDrivers) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, DifferentResolveFuncs) {
+TEST(NettypeParsing,DifferentResolveFuncs) {
   auto r = Parse(
       "module m;\n"
       "  typedef int IT;\n"
@@ -312,7 +312,7 @@ TEST(DataTypeParsing, DifferentResolveFuncs) {
   EXPECT_EQ(nt_b->nettype_resolve_func, "resolve_b");
 }
 
-TEST(DataTypeParsing, NettypeNoResolveFunc) {
+TEST(NettypeParsing,NettypeNoResolveFunc) {
   auto r = Parse(
       "module m;\n"
       "  nettype int plain_net;\n"
@@ -324,14 +324,14 @@ TEST(DataTypeParsing, NettypeNoResolveFunc) {
   EXPECT_TRUE(nt->nettype_resolve_func.empty());
 }
 
-TEST(DataTypeParsing, NettypeWithShortintType) {
+TEST(NettypeParsing,NettypeWithShortintType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  nettype shortint si_net;\n"
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, NettypeWithWireDecls) {
+TEST(NettypeParsing,NettypeWithWireDecls) {
   auto r = Parse(
       "module m;\n"
       "  wire [7:0] w;\n"
@@ -343,7 +343,7 @@ TEST(DataTypeParsing, NettypeWithWireDecls) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
-TEST(DataTypeParsing, NettypeWithNamedType) {
+TEST(NettypeParsing,NettypeWithNamedType) {
   auto r = Parse(
       "module m;\n"
       "  typedef logic [31:0] word_t;\n"
@@ -355,7 +355,7 @@ TEST(DataTypeParsing, NettypeWithNamedType) {
   ASSERT_NE(nt, nullptr);
 }
 
-TEST(DataTypeParsing, NettypeWithResolveAndNetDecl) {
+TEST(NettypeParsing,NettypeWithResolveAndNetDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct { real field1; bit field2; } T;\n"

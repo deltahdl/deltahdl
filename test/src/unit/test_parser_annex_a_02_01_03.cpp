@@ -314,40 +314,6 @@ TEST(TypeDeclParsing, TypedefInterfacePortNoBitSelect) {
   EXPECT_TRUE(item->unpacked_dims.empty());
 }
 
-// --- nettype_declaration ---
-
-TEST(TypeDeclParsing, NettypeDeclBasic) {
-  auto r = Parse("module m; nettype logic my_net; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
-  EXPECT_EQ(item->name, "my_net");
-}
-
-TEST(TypeDeclParsing, NettypeDeclWithResolve) {
-  auto r = Parse(
-      "module m;\n"
-      "  nettype logic my_net with my_resolve;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
-  EXPECT_EQ(item->nettype_resolve_func, "my_resolve");
-}
-
-TEST(TypeDeclParsing, NettypeDeclWithScopedResolve) {
-  auto r = Parse(
-      "module m;\n"
-      "  nettype logic my_net with pkg::resolve_fn;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNettypeDecl);
-}
-
 // --- lifetime ---
 
 TEST(TypeDeclParsing, LifetimeStaticOnModuleItem) {

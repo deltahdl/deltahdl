@@ -355,6 +355,8 @@ class Elaborator {
   std::unordered_set<std::string_view> var_init_names_;     // §10.3.2
   std::unordered_set<std::string_view> nettype_net_names_;  // §10.3.2
   std::unordered_set<std::string_view> nettype_names_;
+  std::unordered_map<std::string_view, std::string_view>
+      nettype_resolve_funcs_;  // §6.6.7: nettype name → resolution function
   std::unordered_set<std::string_view> interconnect_names_;
   std::unordered_set<std::string_view> task_names_;  // §13.2
   // §13.4.3: Function declarations by name for constant function validation.

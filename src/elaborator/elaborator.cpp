@@ -845,6 +845,13 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     item->kind = ModuleItemKind::kNetDecl;
     nettype_net_names_.insert(item->name);
     ElaborateNetDecl(item, mod);
+    // §6.6.7: Tag the RtlirNet with user-nettype info.
+    auto& net = mod->nets.back();
+    net.is_user_nettype = true;
+    auto it = nettype_resolve_funcs_.find(item->data_type.type_name);
+    if (it != nettype_resolve_funcs_.end()) {
+      net.resolve_func = it->second;
+    }
     return;
   }
   if (!declared_names_.insert(item->name).second) {

@@ -5,6 +5,9 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "fixture_simulator.h"
+#include "helpers_switch_network.h"
+#include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
 
@@ -263,4 +266,197 @@ TEST(UserDefinedNettype, ReleaseRestoresResolvedValue) {
   var->value = MakeLogic4VecVal(arena, 1, 0);
   ResolveUserDefinedNet(net, nt, arena);
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
+}
+
+TEST(UserDefinedNettype, ResolutionActivatedAtTimeZero) {
+  Arena arena;
+  auto* var = MakeVar(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  bool activated = false;
+  UserNettype nt;
+  nt.resolution = [&](Arena& a, const std::vector<Logic4Vec>&) -> Logic4Vec {
+    activated = true;
+    return MakeLogic4Vec(a, 1);
+  };
+
+  ResolveUserDefinedNet(net, nt, arena);
+  EXPECT_TRUE(activated);
+}
+
+TEST(UserDefinedNettype, ResolutionAtTimeZeroEvenNoDrivers) {
+  Arena arena;
+  auto* var = MakeVar(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  bool activated = false;
+  UserNettype nt;
+  nt.resolution = [&](Arena& a,
+                      const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
+    activated = true;
+    EXPECT_TRUE(drivers.empty());
+    return MakeLogic4Vec(a, 1);
+  };
+
+  ResolveUserDefinedNet(net, nt, arena);
+  EXPECT_TRUE(activated);
+}
+
+TEST(UserDefinedNettype, DefaultIsDataTypeDefault) {
+  Arena arena;
+  auto* var = MakeVar(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  EXPECT_EQ(ValOf(*var), kValX);
+}
+
+TEST(UserDefinedNettype, ResolutionReceivesDrivers) {
+  Arena arena;
+  auto* var = MakeVar(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+
+  size_t driver_count = 0;
+  UserNettype nt;
+  nt.resolution = [&](Arena& a,
+                      const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
+    driver_count = drivers.size();
+    return MakeLogic4Vec(a, 1);
+  };
+
+  ResolveUserDefinedNet(net, nt, arena);
+  EXPECT_EQ(driver_count, 2u);
+}
+
+TEST(UserDefinedNettype, UnresolvedNettypeNoResolutionFunction) {
+  Arena arena;
+  auto* var = MakeVar(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  UserNettype nt;
+
+  ResolveUserDefinedNet(net, nt, arena);
+
+  EXPECT_EQ(ValOf(*var), kValX);
+}
+
+static void VerifyNetByName(const RtlirModule* mod, std::string_view name,
+                            uint32_t expected_width, bool& found) {
+  for (const auto& n : mod->nets) {
+    if (n.name == name) {
+      found = true;
+      EXPECT_EQ(n.width, expected_width);
+    }
+  }
+}
+
+TEST(NettypeSimulation,NettypeCreatesNet) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic [7:0] byte_net;\n"
+      "  byte_net x;\n"
+      "  assign x = 8'hAB;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  ASSERT_FALSE(design->top_modules.empty());
+  auto* mod = design->top_modules[0];
+  bool found_net = false;
+  VerifyNetByName(mod, "x", 8u, found_net);
+  EXPECT_TRUE(found_net) << "x should be elaborated as a net, not a variable";
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* net = f.ctx.FindNet("x");
+  ASSERT_NE(net, nullptr);
+}
+
+TEST(NettypeSimulation,NettypeWideNet) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic [15:0] wide_net;\n"
+      "  wide_net y;\n"
+      "  assign y = 16'hBEEF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  ASSERT_FALSE(design->top_modules.empty());
+  auto* mod = design->top_modules[0];
+  bool found_net = false;
+  VerifyNetByName(mod, "y", 16u, found_net);
+  EXPECT_TRUE(found_net) << "y should be elaborated as a net";
+}
+
+TEST(UserDefinedNettype, UnresolvedNettypeZeroDriversOk) {
+  Arena arena;
+  auto* var = MakeVar(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  UserNettype nt;
+  nt.resolution = nullptr;
+  EXPECT_FALSE(CheckUnresolvedMultipleDrivers(net, nt));
+}
+
+TEST(UserDefinedNettype, ResolutionWithThreeDrivers) {
+  Arena arena;
+  auto* var = MakeVar(arena, 1);
+
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+
+  size_t driver_count = 0;
+  UserNettype nt;
+  nt.resolution = [&](Arena& a,
+                      const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
+    driver_count = drivers.size();
+    uint64_t result = 0;
+    for (const auto& d : drivers) result |= (d.words[0].aval & 1);
+    return MakeLogic4VecVal(a, 1, result);
+  };
+
+  ResolveUserDefinedNet(net, nt, arena);
+  EXPECT_EQ(driver_count, 3u);
+  EXPECT_EQ(var->value.words[0].aval & 1, 1u);
+}
+
+TEST(UserDefinedNettype, ResolutionResultWrittenToNet) {
+  Arena arena;
+  auto* var = MakeVar(arena, 8);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 0xAB));
+
+  UserNettype nt;
+  nt.bit_width = 8;
+  nt.resolution = [](Arena& a,
+                     const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
+    return MakeLogic4VecVal(a, 8, drivers[0].words[0].aval);
+  };
+
+  ResolveUserDefinedNet(net, nt, arena);
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xABu);
 }

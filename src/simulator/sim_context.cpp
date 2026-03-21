@@ -49,7 +49,9 @@ Net* SimContext::FindNet(std::string_view name) {
 }
 
 Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
-                           Strength charge_strength, uint64_t decay_ticks) {
+                           Strength charge_strength, uint64_t decay_ticks,
+                           bool is_user_nettype,
+                           std::string_view resolve_func) {
   auto* var = CreateVariable(name, width);
   // Initialize net value to z (aval=all-ones, bval=all-ones) per IEEE §6.5.
   for (uint32_t i = 0; i < var->value.nwords; ++i) {
@@ -62,6 +64,8 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
   net->charge_strength = charge_strength;
   net->base_charge_strength = charge_strength;
   net->decay_ticks = decay_ticks;
+  net->is_user_nettype = is_user_nettype;
+  net->resolve_func = resolve_func;
   nets_[name] = net;
   return net;
 }

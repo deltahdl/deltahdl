@@ -576,7 +576,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   LowerParams(mod);
   for (const auto& net : mod->nets) {
     ctx_.CreateNet(net.name, net.net_type, net.width, net.charge_strength,
-                   net.decay_ticks);
+                   net.decay_ticks, net.is_user_nettype, net.resolve_func);
   }
   RegisterEnumTypes(mod);
   for (const auto& var : mod->variables) LowerVar(var);

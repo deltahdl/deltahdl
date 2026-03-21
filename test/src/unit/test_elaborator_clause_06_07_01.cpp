@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-
-#include "fixture_elaborator.h"
 #include "model_net_declaration.h"
 
 using namespace delta;
@@ -80,37 +77,6 @@ TEST(NetDecl, InvalidNetDataTypeDynamicArray) {
 
 TEST(NetDecl, InvalidNetDataTypeString) {
   EXPECT_FALSE(ValidateNetDataType(NetDataTypeKind::kString));
-}
-
-TEST(NetDecl, UserDefinedNettypeCreatesNet) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  nettype logic [7:0] mynet;\n"
-      "  mynet x;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-
-  bool found_net = false;
-  for (auto& net : mod->nets) {
-    if (net.name == "x") found_net = true;
-  }
-  EXPECT_TRUE(found_net);
-}
-
-TEST(NetDecl, UserDefinedNettypeArrayCreatesNet) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  nettype logic mynet;\n"
-      "  mynet x [0:3];\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(NetDecl, ChargeStrengthOnTriregIsValid) {

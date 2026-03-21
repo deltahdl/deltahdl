@@ -65,6 +65,9 @@ struct RtlirNet {
   Strength charge_strength = Strength::kMedium;
   uint32_t trireg_capacitance = 0;  // §E.3: 0-250 numeric capacitance.
   uint64_t decay_ticks = 0;
+  // §6.6.7: User-defined nettype.
+  bool is_user_nettype = false;
+  std::string_view resolve_func;
   std::vector<ResolvedAttribute> attrs;
 };
 

@@ -124,7 +124,8 @@ class SimContext {
   Net* FindNet(std::string_view name);
   Net* CreateNet(std::string_view name, NetType type, uint32_t width,
                  Strength charge_strength = Strength::kMedium,
-                 uint64_t decay_ticks = 0);
+                 uint64_t decay_ticks = 0, bool is_user_nettype = false,
+                 std::string_view resolve_func = {});
 
   Scheduler& GetScheduler() { return scheduler_; }
   Arena& GetArena() { return arena_; }
