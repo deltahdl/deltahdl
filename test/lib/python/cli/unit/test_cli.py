@@ -317,6 +317,15 @@ def test_invoke_implement_clause_failure(monkeypatch) -> None:
         invoke_implement_clause(_CL_PARAMS, "15", 17)
 
 
+def test_invoke_implement_clause_continue(monkeypatch) -> None:
+    """Passes --continue when continue_session is True."""
+    captured = stub_subprocess_success(monkeypatch)
+    invoke_implement_clause(
+        _CL_PARAMS, "15", 17, continue_session=True,
+    )
+    assert "--continue" in captured[0]
+
+
 # ---- invoke_implement_subclauses -------------------------------------------
 
 
@@ -369,6 +378,17 @@ def test_invoke_implement_subclauses_model(monkeypatch) -> None:
     """Passes --model with default opus."""
     cmd = _invoke_subclauses_and_capture(monkeypatch)
     assert cmd[cmd.index("--model") + 1] == "opus"
+
+
+def test_invoke_implement_subclauses_continue(monkeypatch) -> None:
+    """Passes --continue when continue_session is True."""
+    captured = stub_subprocess_success(monkeypatch)
+    invoke_implement_subclauses(
+        "/tmp/lrm.pdf", [100],
+        organization="o", repo="r",
+        continue_session=True,
+    )
+    assert "--continue" in captured[0]
 
 
 def test_invoke_implement_subclauses_failure(monkeypatch) -> None:
