@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(DataTypeParsing, Supply0AndSupply1) {
+TEST(SupplyNetParsing, Supply0AndSupply1) {
   auto r = Parse(
       "module t;\n"
       "  supply0 gnd;\n"
@@ -24,7 +24,7 @@ TEST(DataTypeParsing, Supply0AndSupply1) {
   EXPECT_EQ(items[1]->name, "vdd");
 }
 
-TEST(DataTypeParsing, Supply0Decl) {
+TEST(SupplyNetParsing, Supply0Decl) {
   auto r = Parse(
       "module t;\n"
       "  supply0 gnd;\n"
@@ -39,7 +39,7 @@ TEST(DataTypeParsing, Supply0Decl) {
   EXPECT_EQ(item->name, "gnd");
 }
 
-TEST(DataTypeParsing, Supply1Decl) {
+TEST(SupplyNetParsing, Supply1Decl) {
   auto r = Parse(
       "module t;\n"
       "  supply1 vdd;\n"
