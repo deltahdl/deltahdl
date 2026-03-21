@@ -59,15 +59,4 @@ TEST(DataTypeParsing, DynamicCastInCondition) {
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
 }
 
-TEST(DataTypeParsing, DynamicCastAssignResult) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    int ok;\n"
-      "    ok = $cast(d, b);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-
 }  // namespace

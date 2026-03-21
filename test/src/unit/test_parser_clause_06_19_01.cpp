@@ -5,26 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(FormalSyntaxParsing, TypedefEnumWithBase) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef enum logic [1:0] {IDLE, RUN, DONE} state_t;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kTypedef);
-}
-
-TEST(TypeDeclParsing, TypedefEnum) {
-  auto r = Parse("module m; typedef enum {A, B, C} abc_t; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
-  EXPECT_EQ(item->typedef_type.kind, DataTypeKind::kEnum);
-}
-
-TEST(ClassParsing, EnumTypedefUsage) {
+TEST(TypedefEnumParsing, EnumTypedefUsage) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum {NO, YES} boolean;\n"
@@ -38,7 +19,7 @@ TEST(ClassParsing, EnumTypedefUsage) {
   EXPECT_EQ(items[0]->typedef_type.enum_members.size(), 2u);
   EXPECT_EQ(items[1]->name, "flag");
 }
-TEST(Parser, EnumWithValues) {
+TEST(TypedefEnumParsing, EnumWithValues) {
   auto r = Parse(
       "module t;\n"
       "  typedef enum { IDLE=0, RUN=1, STOP=2 } cmd_t;\n"
@@ -53,7 +34,7 @@ TEST(Parser, EnumWithValues) {
   }
 }
 
-TEST(DesignBuildingBlockParsing, EnumInModuleScope) {
+TEST(TypedefEnumParsing, EnumInModuleScope) {
   auto r = Parse(
       "module m;\n"
       "  typedef enum logic [1:0] {IDLE, RUN, DONE} state_t;\n"
@@ -72,20 +53,23 @@ TEST(DesignBuildingBlockParsing, EnumInModuleScope) {
   EXPECT_TRUE(found_typedef);
 }
 
-TEST(ClassParsing, TypedefEnumWithMembers) {
+TEST(TypedefEnumParsing, TypeReusedForMultipleVars) {
   auto r = Parse(
       "module m;\n"
-      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
-      "  color_t c;\n"
+      "  typedef enum {NO, YES} boolean;\n"
+      "  boolean a;\n"
+      "  boolean b;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   auto& items = r.cu->modules[0]->items;
-  ASSERT_GE(items.size(), 2u);
+  ASSERT_GE(items.size(), 3u);
   EXPECT_EQ(items[0]->kind, ModuleItemKind::kTypedef);
-  EXPECT_EQ(items[0]->typedef_type.kind, DataTypeKind::kEnum);
+  EXPECT_EQ(items[1]->name, "a");
+  EXPECT_EQ(items[2]->name, "b");
 }
 
-TEST(DataTypeParsing, EnumBasic) {
+TEST(TypedefEnumParsing, EnumBasic) {
   auto r = Parse(
       "module t;\n"
       "  typedef enum { RED, GREEN, BLUE } color_t;\n"
