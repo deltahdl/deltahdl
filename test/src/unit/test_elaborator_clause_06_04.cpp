@@ -163,18 +163,91 @@ TEST(SingularAggregateTypes, WireIsSingular) {
   DataType dt;
   dt.kind = DataTypeKind::kWire;
   EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
 }
 
 TEST(SingularAggregateTypes, TriIsSingular) {
   DataType dt;
   dt.kind = DataTypeKind::kTri;
   EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
 }
 
 TEST(SingularAggregateTypes, TriregIsSingular) {
   DataType dt;
   dt.kind = DataTypeKind::kTrireg;
   EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
+}
+
+TEST(SingularAggregateTypes, WandIsSingular) {
+  DataType dt;
+  dt.kind = DataTypeKind::kWand;
+  EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
+}
+
+TEST(SingularAggregateTypes, WorIsSingular) {
+  DataType dt;
+  dt.kind = DataTypeKind::kWor;
+  EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
+}
+
+TEST(SingularAggregateTypes, TriandIsSingular) {
+  DataType dt;
+  dt.kind = DataTypeKind::kTriand;
+  EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
+}
+
+TEST(SingularAggregateTypes, TriorIsSingular) {
+  DataType dt;
+  dt.kind = DataTypeKind::kTrior;
+  EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
+}
+
+TEST(SingularAggregateTypes, Tri0IsSingular) {
+  DataType dt;
+  dt.kind = DataTypeKind::kTri0;
+  EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
+}
+
+TEST(SingularAggregateTypes, Tri1IsSingular) {
+  DataType dt;
+  dt.kind = DataTypeKind::kTri1;
+  EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
+}
+
+TEST(SingularAggregateTypes, Supply0IsSingular) {
+  DataType dt;
+  dt.kind = DataTypeKind::kSupply0;
+  EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
+}
+
+TEST(SingularAggregateTypes, Supply1IsSingular) {
+  DataType dt;
+  dt.kind = DataTypeKind::kSupply1;
+  EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
+}
+
+TEST(SingularAggregateTypes, UwireIsSingular) {
+  DataType dt;
+  dt.kind = DataTypeKind::kUwire;
+  EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
+}
+
+TEST(SingularAggregateTypes, NamedIsSingular) {
+  DataType dt;
+  dt.kind = DataTypeKind::kNamed;
+  EXPECT_TRUE(IsSingularType(dt));
+  EXPECT_FALSE(IsAggregateType(dt));
 }
 
 TEST(SingularAggregateTypes, LogicVectorIsSingular) {
