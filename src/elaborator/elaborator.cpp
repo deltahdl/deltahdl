@@ -700,6 +700,16 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
     net.net_type = DataTypeToNetType(item->data_type.kind);
   }
   net.width = EvalTypeWidth(item->data_type, typedefs_);
+  // §6.7.1: Validate explicit net data type is 4-state.
+  if (!item->data_type.is_interconnect) {
+    DataTypeKind k = item->data_type.kind;
+    if (k != DataTypeKind::kStruct && k != DataTypeKind::kUnion &&
+        k != DataTypeKind::kEnum && k != DataTypeKind::kNamed &&
+        DataTypeToNetType(k) == NetType::kWire &&
+        k != DataTypeKind::kWire && !Is4stateType(k)) {
+      diag_.Error(item->loc, "net data type must be 4-state");
+    }
+  }
   // §6.7 footnote 16: charge strength shall only be used with trireg.
   if (item->data_type.charge_strength != 0 &&
       net.net_type != NetType::kTrireg) {

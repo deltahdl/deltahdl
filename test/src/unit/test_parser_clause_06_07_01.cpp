@@ -294,6 +294,30 @@ TEST(DataTypeParsing, WireImplicitLogic) {
   EXPECT_TRUE(item->data_type.is_net);
 }
 
+TEST(DataTypeParsing, TriImplicitLogic) {
+  auto r = Parse(
+      "module t;\n"
+      "  tri t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+}
+
+TEST(DataTypeParsing, WandImplicitLogic) {
+  auto r = Parse(
+      "module t;\n"
+      "  wand w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+}
+
 TEST(DataTypeParsing, WireWithRange) {
   auto r = Parse(
       "module t;\n"
@@ -326,6 +350,30 @@ TEST(DataTypeParsing, WireExplicitLogicType) {
       "  wire logic [7:0] w;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+}
+
+TEST(DataTypeParsing, WireIntegerType) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire integer w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+}
+
+TEST(DataTypeParsing, WireTimeType) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire time w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
@@ -740,6 +788,69 @@ TEST(DataTypeParsing, IdentifierStartingWithRegOk) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->name, "reg_name");
+}
+
+TEST(DataTypeParsing, WorRegDirectlyIsError) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  wor reg w;\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, TriandRegDirectlyIsError) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  triand reg w;\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, TriorRegDirectlyIsError) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  trior reg w;\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, Tri0RegDirectlyIsError) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  tri0 reg r;\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, Tri1RegDirectlyIsError) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  tri1 reg r;\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, Supply0RegDirectlyIsError) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  supply0 reg r;\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, Supply1RegDirectlyIsError) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  supply1 reg r;\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, UwireRegDirectlyIsError) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  uwire reg r;\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, TriregRegDirectlyIsError) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  trireg reg r;\n"
+              "endmodule\n"));
 }
 
 TEST(DataTypeParsing, Delay3RiseFallDecay) {
