@@ -159,6 +159,49 @@ static void CollectProcTargets(
   for (auto& ci : s->case_items) CollectProcTargets(ci.body, out);
 }
 
+// §6.6.8: interconnect nets cannot be targets of procedural continuous
+// assignments (force/release/assign/deassign).
+static void CheckInterconnectProcContAssign(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& interconnect_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kForce || s->kind == StmtKind::kRelease ||
+      s->kind == StmtKind::kAssign || s->kind == StmtKind::kDeassign) {
+    auto name = ExprIdent(s->lhs);
+    if (!name.empty() && interconnect_names.count(name)) {
+      diag.Error(s->range.start,
+                 "interconnect net cannot be used in procedural "
+                 "continuous assignment");
+    }
+  }
+  for (auto* sub : s->stmts)
+    CheckInterconnectProcContAssign(sub, interconnect_names, diag);
+  CheckInterconnectProcContAssign(s->then_branch, interconnect_names, diag);
+  CheckInterconnectProcContAssign(s->else_branch, interconnect_names, diag);
+  CheckInterconnectProcContAssign(s->body, interconnect_names, diag);
+  CheckInterconnectProcContAssign(s->for_body, interconnect_names, diag);
+  for (auto& ci : s->case_items)
+    CheckInterconnectProcContAssign(ci.body, interconnect_names, diag);
+}
+
+// §6.6.8: check if an expression tree contains an interconnect identifier.
+static bool ExprUsesInterconnect(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& names) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kIdentifier) return names.count(e->text) > 0;
+  if (ExprUsesInterconnect(e->lhs, names)) return true;
+  if (ExprUsesInterconnect(e->rhs, names)) return true;
+  if (ExprUsesInterconnect(e->condition, names)) return true;
+  if (ExprUsesInterconnect(e->true_expr, names)) return true;
+  if (ExprUsesInterconnect(e->false_expr, names)) return true;
+  if (ExprUsesInterconnect(e->base, names)) return true;
+  for (auto* el : e->elements)
+    if (ExprUsesInterconnect(el, names)) return true;
+  return false;
+}
+
 bool IsRealType(DataTypeKind k) {
   return k == DataTypeKind::kReal || k == DataTypeKind::kShortreal ||
          k == DataTypeKind::kRealtime;
@@ -244,12 +287,16 @@ void Elaborator::ValidateChandleSensitivity(const ModuleItem* item) {
 // §6.6.8: interconnect nets cannot appear in continuous assignments.
 void Elaborator::ValidateInterconnectContAssign(const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kContAssign) return;
-  if (!item->assign_lhs || item->assign_lhs->kind != ExprKind::kIdentifier) {
-    return;
-  }
-  if (interconnect_names_.count(item->assign_lhs->text)) {
+  // §6.6.8: interconnect net cannot be LHS of continuous assignment.
+  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier &&
+      interconnect_names_.count(item->assign_lhs->text)) {
     diag_.Error(item->loc,
                 "interconnect net cannot be used in continuous assignment");
+  }
+  // §6.6.8: interconnect net cannot appear in RHS expression.
+  if (ExprUsesInterconnect(item->assign_rhs, interconnect_names_)) {
+    diag_.Error(item->loc,
+                "interconnect net cannot be used in expression");
   }
 }
 
@@ -258,6 +305,8 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
                  item->kind == ModuleItemKind::kInitialBlock;
   if (is_proc && item->body) {
     CollectProcTargets(item->body, proc_assign_targets_);
+    // §6.6.8: interconnect cannot be target of force/release/assign/deassign.
+    CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);
   }
   ValidateEdgeOnReal(item);
   ValidateChandleContAssign(item);

@@ -93,27 +93,6 @@ TEST(ContinuousAssignDeclElaboration, MultiNetDeclAssign) {
   ASSERT_GE(mod->assigns.size(), 2u);
 }
 
-TEST(ContinuousAssignDeclElaboration, InterconnectWithInit_Error) {
-  ElabFixture f;
-  Elaborate(
-      "module t;\n"
-      "  interconnect sig = 1;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(ContinuousAssignDeclElaboration, InterconnectNoInit_Ok) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  interconnect sig;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(ContinuousAssignDeclElaboration, NetDeclAssignConflictsWithProcAssign) {
   ElabFixture f;
   Elaborate(

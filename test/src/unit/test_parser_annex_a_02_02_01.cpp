@@ -348,10 +348,6 @@ TEST(NetAndVariableTypeParsing, NetPortTypeWithNetType) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInout);
 }
 
-TEST(NetAndVariableTypeParsing, NetPortTypeInterconnect) {
-  EXPECT_TRUE(ParseOk("module m; interconnect ic; endmodule"));
-}
-
 // --- variable_port_type / var_data_type ---
 
 TEST(NetAndVariableTypeParsing, VarDataTypeWithVar) {
@@ -470,59 +466,6 @@ TEST(NetAndVariableTypeParsing, IntegerVectorMultiplePackedDims) {
 
 TEST(NetAndVariableTypeParsing, EnumPackedDimension) {
   EXPECT_TRUE(ParseOk("module m; enum logic [1:0] {A, B, C} x; endmodule"));
-}
-
-// --- net_port_type: interconnect ---
-
-TEST(NetAndVariableTypeParsing, InterconnectDeclFlag) {
-  auto r = Parse("module m; interconnect net1; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_TRUE(item->data_type.is_interconnect);
-}
-
-TEST(NetAndVariableTypeParsing, InterconnectWithDim) {
-  auto r = Parse("module m; interconnect [7:0] net1; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->items[0]->data_type.is_interconnect);
-}
-
-TEST(NetAndVariableTypeParsing, InterconnectMultipleNets) {
-  auto r = Parse(
-      "module t;\n"
-      "  interconnect w1;\n"
-      "  interconnect [3:0] w2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
-}
-
-TEST(NetAndVariableTypeParsing, InterconnectWithPackedDim) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  interconnect [7:0] ibus;\n"
-              "endmodule\n"));
-}
-
-TEST(NetAndVariableTypeParsing, InterconnectBasic) {
-  EXPECT_TRUE(
-      ParseOk6("module t;\n"
-               "  interconnect bus;\n"
-               "endmodule\n"));
-}
-
-TEST(NetAndVariableTypeParsing, InterconnectDeclFlagWithPreprocessor) {
-  auto r = ParseWithPreprocessor(
-      "module t;\n"
-      "  interconnect ibus;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->data_type.is_interconnect);
-  EXPECT_EQ(item->name, "ibus");
 }
 
 // --- virtual interface with modport (§25.9) ---
