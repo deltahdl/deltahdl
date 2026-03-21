@@ -153,17 +153,6 @@ TEST(DeclarationListParsing, ListOfParamAssignmentsSingle) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(DeclarationListParsing, ListOfSpecparamAssignmentsMultiple) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam tRise = 10, tFall = 12;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsMultiple) {
   auto r = Parse("module m; logic a, b, c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

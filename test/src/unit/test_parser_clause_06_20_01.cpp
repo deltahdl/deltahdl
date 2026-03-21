@@ -5,15 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DeclarationListParsing, ListOfSpecparamAssignmentsMultiple) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 100, tFALL = 50, tHOLD = 10; endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParameterPortListParsing,ParamPortDataTypeForm) {
   auto r = Parse("module m #(int WIDTH = 8); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -94,15 +85,6 @@ TEST(ModuleParamsParsing, TypedParamPort) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->params.size(), 2u);
-}
-
-TEST(DeclarationListParsing, ListOfSpecparamAssignmentsSingle) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 100; endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ParameterPortListParsing, EmptyParameterPortListParses) {

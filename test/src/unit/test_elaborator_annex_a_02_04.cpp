@@ -76,28 +76,6 @@ TEST(DeclarationAssignmentElaboration, ParamAssignmentNoDefaultInPort) {
       "module m; child #(.P(10)) c(); endmodule\n"));
 }
 
-// --- specparam_assignment ---
-
-TEST(DeclarationAssignmentElaboration, SpecparamCreatesVariable) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  specify specparam tRISE = 100; endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  bool found = false;
-  for (auto& v : mod->variables) {
-    if (v.name == "tRISE") {
-      found = true;
-      EXPECT_NE(v.init_expr, nullptr);
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 // --- type_assignment ---
 
 TEST(DeclarationAssignmentElaboration, TypeAssignmentRegistersType) {

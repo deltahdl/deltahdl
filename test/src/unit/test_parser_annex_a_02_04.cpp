@@ -107,26 +107,6 @@ TEST(DeclarationAssignmentParsing, DefparamAssignmentMintypmax) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- specparam_assignment ---
-
-TEST(DeclarationAssignmentParsing, SpecparamAssignmentBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 100; endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(DeclarationAssignmentParsing, SpecparamAssignmentMintypmax) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tDEL = 1:2:3; endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // --- pulse_control_specparam ---
 
 TEST(DeclarationAssignmentParsing, PulseControlSpecparamRejectOnly) {

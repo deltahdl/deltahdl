@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DeclarationAssignmentParsing, SpecparamAssignmentMintypmax) {
+TEST(SpecparamParsing, SpecparamAssignmentMintypmax) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -18,7 +18,7 @@ TEST(DeclarationAssignmentParsing, SpecparamAssignmentMintypmax) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SourceText, SpecparamAsModuleItem) {
+TEST(SpecparamParsing, SpecparamAsModuleItem) {
   auto r = Parse(
       "module m;\n"
       "  specparam delay = 10;\n"
@@ -29,7 +29,7 @@ TEST(SourceText, SpecparamAsModuleItem) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
 }
 
-TEST(DeclarationAssignmentParsing, SpecparamAssignmentBasic) {
+TEST(SpecparamParsing, SpecparamAssignmentBasic) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -92,7 +92,7 @@ static bool HasSpecifyItemKind(ModuleItem* spec_block, SpecifyItemKind kind) {
   return false;
 }
 
-TEST(GateLevelModelingParsing, SpecifyBlockWithSpecparam) {
+TEST(SpecparamParsing, SpecifyBlockWithSpecparam) {
   auto r = Parse(
       "module m(input clk, output q);\n"
       "  specify\n"
@@ -107,7 +107,7 @@ TEST(GateLevelModelingParsing, SpecifyBlockWithSpecparam) {
   EXPECT_TRUE(HasSpecifyItemKind(spec, SpecifyItemKind::kPathDecl));
 }
 
-TEST(SpecifyBlockDeclParsing, SpecparamMultipleDecls) {
+TEST(SpecparamParsing, SpecparamMultipleDecls) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -118,7 +118,7 @@ TEST(SpecifyBlockDeclParsing, SpecparamMultipleDecls) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SpecifyBlockDeclParsing, SpecifyItemSpecparamDecl) {
+TEST(SpecparamParsing, SpecifyItemSpecparamDecl) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -131,6 +131,117 @@ TEST(SpecifyBlockDeclParsing, SpecifyItemSpecparamDecl) {
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 1u);
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kSpecparam);
+}
+
+TEST(SpecparamParsing, SpecparamBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify specparam tRISE = 100; endspecify\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SpecparamParsing, SpecparamPackedDim) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify specparam [31:0] tDELAY = 50; endspecify\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SpecparamParsing, SpecparamMultipleAssignments) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify specparam tRISE = 100, tFALL = 50; endspecify\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SpecparamParsing, SpecparamOutsideSpecify) {
+  auto r = Parse("module m; specparam tPD = 10; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
+}
+
+TEST(SpecparamParsing, SpecparamMintypmax) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify specparam tRISE = 1:2:3; endspecify\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SpecparamParsing, ErrorSpecparamMissingSemicolon) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify specparam tRISE = 100 endspecify\n"
+      "endmodule");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(SpecparamParsing, CommaSeparatedSpecparamList) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify specparam tRISE = 100, tFALL = 50, tHOLD = 10; endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SpecparamParsing, SingleSpecparamInSpecifyBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify specparam tRISE = 100; endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SpecparamParsing, SpecparamWithConstantExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  specparam tDelay = 2 * 5 + 3;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
+  EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
+}
+
+TEST(SpecparamParsing, SpecparamReferencingPriorSpecparam) {
+  auto r = Parse(
+      "module m;\n"
+      "  specparam tBase = 10;\n"
+      "  specparam tDerived = tBase + 5;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->items[0]->name, "tBase");
+  EXPECT_EQ(r.cu->modules[0]->items[1]->name, "tDerived");
+}
+
+TEST(SpecparamParsing, SpecparamInBothSpecifyAndModuleBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  specparam tSetup = 5;\n"
+      "  specify\n"
+      "    specparam tHold = 3;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  ASSERT_GE(items.size(), 2u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kSpecparam);
+  EXPECT_EQ(items[0]->name, "tSetup");
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kSpecifyBlock);
 }
 
 }  // namespace

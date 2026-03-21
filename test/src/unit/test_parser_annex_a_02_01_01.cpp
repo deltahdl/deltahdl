@@ -55,40 +55,6 @@ TEST(ParameterDeclParsing, ListOfParamAssignments) {
   EXPECT_GE(param_count, 3);
 }
 
-TEST(ParameterDeclParsing, SpecparamBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 100; endspecify\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ParameterDeclParsing, SpecparamPackedDim) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam [31:0] tDELAY = 50; endspecify\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ParameterDeclParsing, SpecparamMultipleAssignments) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 100, tFALL = 50; endspecify\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ParameterDeclParsing, SpecparamOutsideSpecify) {
-  auto r = Parse("module m; specparam tPD = 10; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kSpecparam);
-}
-
 TEST(ParameterDeclParsing, ParamAssignmentNoDefault) {
   auto r = Parse("module m #(parameter int P)(); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -130,15 +96,6 @@ TEST(ParameterDeclParsing, ParameterIntegerType) {
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
 }
 
-TEST(ParameterDeclParsing, SpecparamMintypmax) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 1:2:3; endspecify\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParameterDeclParsing, SpecparamPathpulse) {
   auto r = Parse(
       "module m;\n"
@@ -166,14 +123,6 @@ TEST(ParameterDeclParsing, ErrorParameterMissingSemicolon) {
 
 TEST(ParameterDeclParsing, ErrorLocalparamMissingSemicolon) {
   auto r = Parse("module m; localparam int Y = 10 endmodule");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ParameterDeclParsing, ErrorSpecparamMissingSemicolon) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam tRISE = 100 endspecify\n"
-      "endmodule");
   EXPECT_TRUE(r.has_errors);
 }
 
