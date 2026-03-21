@@ -4,33 +4,33 @@ using namespace delta;
 
 namespace {
 
-TEST(TopLevelGrammarElaboration, RefPortOnModule) {
+TEST(BnfClarificationElaboration, RefPortOnModule) {
   EXPECT_TRUE(
       ElabOk("module m(ref int x);\n"
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, InoutPortOnModule) {
+TEST(BnfClarificationElaboration, InoutPortOnModule) {
   EXPECT_TRUE(
       ElabOk("module m(inout wire a);\n"
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, TimeunitDeclOk) {
+TEST(BnfClarificationElaboration, TimeunitDeclOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  timeunit 1ns;\n"
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, TimeprecisionDeclOk) {
+TEST(BnfClarificationElaboration, TimeprecisionDeclOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  timeprecision 1ps;\n"
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, TimeunitAndPrecisionOk) {
+TEST(BnfClarificationElaboration, TimeunitAndPrecisionOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  timeunit 1ns;\n"
@@ -38,7 +38,7 @@ TEST(TopLevelGrammarElaboration, TimeunitAndPrecisionOk) {
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, ParameterInClassIsLocalparam) {
+TEST(BnfClarificationElaboration, ParameterInClassIsLocalparam) {
   EXPECT_TRUE(
       ElabOk("class c;\n"
              "  parameter int WIDTH = 8;\n"
@@ -46,7 +46,7 @@ TEST(TopLevelGrammarElaboration, ParameterInClassIsLocalparam) {
              "module m; endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, AutomaticInInitialBlockOk) {
+TEST(BnfClarificationElaboration, AutomaticInInitialBlockOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  initial begin\n"
@@ -55,7 +55,7 @@ TEST(TopLevelGrammarElaboration, AutomaticInInitialBlockOk) {
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, AutomaticInModuleScopeError) {
+TEST(BnfClarificationElaboration, AutomaticInModuleScopeError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -65,7 +65,7 @@ TEST(TopLevelGrammarElaboration, AutomaticInModuleScopeError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(TopLevelGrammarElaboration, ImportInClassScopeError) {
+TEST(BnfClarificationElaboration, ImportInClassScopeError) {
   ElabFixture f;
   ElaborateSrc(
       "package pkg;\n"
@@ -79,21 +79,21 @@ TEST(TopLevelGrammarElaboration, ImportInClassScopeError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(TopLevelGrammarElaboration, VectoredRequiresPackedDim) {
+TEST(BnfClarificationElaboration, VectoredRequiresPackedDim) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  wire vectored [7:0] bus;\n"
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, ScalaredRequiresPackedDim) {
+TEST(BnfClarificationElaboration, ScalaredRequiresPackedDim) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  wire scalared [3:0] w;\n"
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, StructPackedWithDimOk) {
+TEST(BnfClarificationElaboration, StructPackedWithDimOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  typedef struct packed {\n"
@@ -104,7 +104,7 @@ TEST(TopLevelGrammarElaboration, StructPackedWithDimOk) {
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, TypeRefWithWireOk) {
+TEST(BnfClarificationElaboration, TypeRefWithWireOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  wire x;\n"
@@ -112,7 +112,7 @@ TEST(TopLevelGrammarElaboration, TypeRefWithWireOk) {
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, TypeRefWithVarOk) {
+TEST(BnfClarificationElaboration, TypeRefWithVarOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int x;\n"
@@ -120,7 +120,7 @@ TEST(TopLevelGrammarElaboration, TypeRefWithVarOk) {
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, DotStarOk) {
+TEST(BnfClarificationElaboration, DotStarOk) {
   EXPECT_TRUE(
       ElabOk("module sub(input a, output b);\n"
              "  assign b = a;\n"
@@ -131,7 +131,7 @@ TEST(TopLevelGrammarElaboration, DotStarOk) {
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, ReplicationWithConstantOk) {
+TEST(BnfClarificationElaboration, ReplicationWithConstantOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  logic [7:0] x;\n"
@@ -139,7 +139,7 @@ TEST(TopLevelGrammarElaboration, ReplicationWithConstantOk) {
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, EmptyUnpackedArrayConcatOk) {
+TEST(BnfClarificationElaboration, EmptyUnpackedArrayConcatOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int q[$];\n"
@@ -147,7 +147,7 @@ TEST(TopLevelGrammarElaboration, EmptyUnpackedArrayConcatOk) {
              "endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, ThisInClassMethodOk) {
+TEST(BnfClarificationElaboration, ThisInClassMethodOk) {
   EXPECT_TRUE(
       ElabOk("class c;\n"
              "  int x;\n"
@@ -158,11 +158,57 @@ TEST(TopLevelGrammarElaboration, ThisInClassMethodOk) {
              "module m; endmodule\n"));
 }
 
-TEST(TopLevelGrammarElaboration, DollarInQueueSelectOk) {
+TEST(BnfClarificationElaboration, DollarInQueueSelectOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int q[$];\n"
              "  initial q[$] = 5;\n"
+             "endmodule\n"));
+}
+
+// Item 8: final_specifier illegal on pure virtual method
+
+TEST(BnfClarificationElaboration, FinalOnPureVirtualError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "virtual class c;\n"
+      "  pure virtual function void do_it() final;\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// Item 46: this outside class is an error
+
+TEST(BnfClarificationElaboration, ThisOutsideClassError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int x;\n"
+      "  initial this.x = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// Item 7: parameter in class treated as localparam (cannot override)
+
+TEST(BnfClarificationElaboration, ParameterInClassNoOverride) {
+  EXPECT_TRUE(
+      ElabOk("class c;\n"
+             "  parameter int A = 1;\n"
+             "  parameter int B = A + 1;\n"
+             "endclass\n"
+             "module m; endmodule\n"));
+}
+
+// Item 16: charge strength only with trireg
+
+TEST(BnfClarificationElaboration, ChargeStrengthWithTriregOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  trireg (small) x;\n"
              "endmodule\n"));
 }
 

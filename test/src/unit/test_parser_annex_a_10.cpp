@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(TopLevelGrammarParsing, ImportInHeaderFollowedByPorts) {
+TEST(BnfClarificationParsing, ImportInHeaderFollowedByPorts) {
   auto r = Parse(
       "module m import pkg::*; (input a, output b);\n"
       "endmodule\n");
@@ -13,7 +13,7 @@ TEST(TopLevelGrammarParsing, ImportInHeaderFollowedByPorts) {
   EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
 }
 
-TEST(TopLevelGrammarParsing, ImportInHeaderFollowedByParams) {
+TEST(BnfClarificationParsing, ImportInHeaderFollowedByParams) {
   auto r = Parse(
       "module m import pkg::*; #(parameter int W = 8) (input a);\n"
       "endmodule\n");
@@ -21,7 +21,7 @@ TEST(TopLevelGrammarParsing, ImportInHeaderFollowedByParams) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(TopLevelGrammarParsing, ImportInHeaderFollowedByBoth) {
+TEST(BnfClarificationParsing, ImportInHeaderFollowedByBoth) {
   auto r = Parse(
       "module m import pkg::*; #(parameter int W = 8) (input a, output b);\n"
       "endmodule\n");
@@ -29,7 +29,7 @@ TEST(TopLevelGrammarParsing, ImportInHeaderFollowedByBoth) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(TopLevelGrammarParsing, AutomaticInProceduralBlockOk) {
+TEST(BnfClarificationParsing, AutomaticInProceduralBlockOk) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -38,7 +38,7 @@ TEST(TopLevelGrammarParsing, AutomaticInProceduralBlockOk) {
               "endmodule\n"));
 }
 
-TEST(TopLevelGrammarParsing, MatchesPrecedenceOverLogicalAnd) {
+TEST(BnfClarificationParsing, MatchesPrecedenceOverLogicalAnd) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -48,7 +48,7 @@ TEST(TopLevelGrammarParsing, MatchesPrecedenceOverLogicalAnd) {
               "endmodule\n"));
 }
 
-TEST(TopLevelGrammarParsing, DotStarOnceInPortConnections) {
+TEST(BnfClarificationParsing, DotStarOnceInPortConnections) {
   auto r = Parse(
       "module sub(input a, input b, output c);\n"
       "endmodule\n"
@@ -60,7 +60,7 @@ TEST(TopLevelGrammarParsing, DotStarOnceInPortConnections) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(TopLevelGrammarParsing, DotStarWithNamedPorts) {
+TEST(BnfClarificationParsing, DotStarWithNamedPorts) {
   auto r = Parse(
       "module sub(input a, input b, output c);\n"
       "endmodule\n"
@@ -72,7 +72,7 @@ TEST(TopLevelGrammarParsing, DotStarWithNamedPorts) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(TopLevelGrammarParsing, EventExprInParensOk) {
+TEST(BnfClarificationParsing, EventExprInParensOk) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  event e1, e2;\n"
@@ -80,7 +80,7 @@ TEST(TopLevelGrammarParsing, EventExprInParensOk) {
               "endmodule\n"));
 }
 
-TEST(TopLevelGrammarParsing, EmptyUnpackedArrayConcat) {
+TEST(BnfClarificationParsing, EmptyUnpackedArrayConcat) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q[$];\n"
@@ -88,7 +88,7 @@ TEST(TopLevelGrammarParsing, EmptyUnpackedArrayConcat) {
               "endmodule\n"));
 }
 
-TEST(TopLevelGrammarParsing, TaskCallWithoutParens) {
+TEST(BnfClarificationParsing, TaskCallWithoutParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  task my_task; endtask\n"
@@ -96,7 +96,7 @@ TEST(TopLevelGrammarParsing, TaskCallWithoutParens) {
               "endmodule\n"));
 }
 
-TEST(TopLevelGrammarParsing, VoidFunctionCallWithParens) {
+TEST(BnfClarificationParsing, VoidFunctionCallWithParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function void my_func(); endfunction\n"
@@ -104,7 +104,7 @@ TEST(TopLevelGrammarParsing, VoidFunctionCallWithParens) {
               "endmodule\n"));
 }
 
-TEST(TopLevelGrammarParsing, DollarInQueueSelect) {
+TEST(BnfClarificationParsing, DollarInQueueSelect) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int q[$];\n"
@@ -112,7 +112,7 @@ TEST(TopLevelGrammarParsing, DollarInQueueSelect) {
               "endmodule\n"));
 }
 
-TEST(TopLevelGrammarParsing, StructPackedOk) {
+TEST(BnfClarificationParsing, StructPackedOk) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct packed {\n"
@@ -122,7 +122,7 @@ TEST(TopLevelGrammarParsing, StructPackedOk) {
               "endmodule\n"));
 }
 
-TEST(TopLevelGrammarParsing, TypeRefInNetDecl) {
+TEST(BnfClarificationParsing, TypeRefInNetDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  wire x;\n"
@@ -130,12 +130,131 @@ TEST(TopLevelGrammarParsing, TypeRefInNetDecl) {
               "endmodule\n"));
 }
 
-TEST(TopLevelGrammarParsing, TypeRefInVarDeclWithVar) {
+TEST(BnfClarificationParsing, TypeRefInVarDeclWithVar) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  int x;\n"
               "  var type(x) y;\n"
               "endmodule\n"));
+}
+
+// Item 10: protected/local mutual exclusion
+
+TEST(BnfClarificationParsing, ErrorLocalAndProtected) {
+  auto r = Parse(
+      "class c;\n"
+      "  local protected int x;\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(BnfClarificationParsing, ErrorDuplicateLocal) {
+  auto r = Parse(
+      "class c;\n"
+      "  local local int x;\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// Item 10: rand/randc mutual exclusion
+
+TEST(BnfClarificationParsing, ErrorRandAndRandc) {
+  auto r = Parse(
+      "class c;\n"
+      "  rand randc int x;\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(BnfClarificationParsing, ErrorDuplicateRand) {
+  auto r = Parse(
+      "class c;\n"
+      "  rand rand int x;\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// Item 10: static/virtual duplicate
+
+TEST(BnfClarificationParsing, ErrorDuplicateStatic) {
+  auto r = Parse(
+      "class c;\n"
+      "  static static int x;\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// Item 17: union with packed keyword
+
+TEST(BnfClarificationParsing, UnionPackedOk) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef union packed {\n"
+              "    logic [7:0] a;\n"
+              "    logic [7:0] b;\n"
+              "  } my_t;\n"
+              "endmodule\n"));
+}
+
+// Item 42: nonvoid function call requires parens
+
+TEST(BnfClarificationParsing, NonvoidFunctionCallWithParens) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function int my_func(); return 0; endfunction\n"
+              "  int y;\n"
+              "  initial y = my_func();\n"
+              "endmodule\n"));
+}
+
+// Item 52: streaming concatenation basic forms
+
+TEST(BnfClarificationParsing, StreamingConcatRight) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [31:0] x;\n"
+              "  logic [31:0] y;\n"
+              "  assign y = {>>{ x }};\n"
+              "endmodule\n"));
+}
+
+TEST(BnfClarificationParsing, StreamingConcatLeft) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [31:0] x;\n"
+              "  logic [31:0] y;\n"
+              "  assign y = {<<{ x }};\n"
+              "endmodule\n"));
+}
+
+TEST(BnfClarificationParsing, StreamingConcatWithSliceSize) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [31:0] x;\n"
+              "  logic [31:0] y;\n"
+              "  assign y = {<<8{ x }};\n"
+              "endmodule\n"));
+}
+
+// Item 29: covergroup extends only within class
+
+TEST(BnfClarificationParsing, CovergroupExtendsInClassOk) {
+  EXPECT_TRUE(
+      ParseOk("class c;\n"
+              "  int val;\n"
+              "  covergroup base_cg;\n"
+              "    coverpoint val;\n"
+              "  endgroup\n"
+              "endclass\n"));
+}
+
+// Item 8: pure virtual method parses ok (constraint enforced at elaboration)
+
+TEST(BnfClarificationParsing, PureVirtualMethodOk) {
+  EXPECT_TRUE(
+      ParseOk("virtual class c;\n"
+              "  pure virtual function void do_it();\n"
+              "endclass\n"));
 }
 
 }  // namespace
