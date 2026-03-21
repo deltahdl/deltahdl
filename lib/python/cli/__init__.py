@@ -210,8 +210,7 @@ def invoke_implement_subclauses(
     *,
     organization: str,
     repo: str,
-    model: str = "opus",
-    continue_session: bool = False,
+    **kwargs,
 ) -> None:
     """Shell out to ``python -m implement_subclauses``."""
     issues_str = ",".join(str(i) for i in issues)
@@ -222,9 +221,9 @@ def invoke_implement_subclauses(
         "--issues", issues_str,
         "--organization", organization,
         "--repo", repo,
-        "--model", model,
+        "--model", kwargs.get("model", "opus"),
     ]
-    if continue_session:
+    if kwargs.get("continue_session"):
         cmd.append("--continue")
     result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
