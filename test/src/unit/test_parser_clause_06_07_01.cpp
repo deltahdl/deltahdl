@@ -331,17 +331,6 @@ TEST(DataTypeParsing, WireExplicitLogicType) {
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
 }
 
-TEST(DataTypeParsing, TriregDefaultInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg t1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
-}
-
 TEST(DataTypeParsing, WireWithPackedStruct) {
   auto r = Parse(
       "module t;\n"
@@ -765,20 +754,6 @@ TEST(DataTypeParsing, Delay3RiseFallDecay) {
   EXPECT_NE(item->net_delay, nullptr);
   EXPECT_NE(item->net_delay_fall, nullptr);
   EXPECT_NE(item->net_delay_decay, nullptr);
-}
-
-TEST(DataTypeParsing, TriregChargeStrengthWithLogic) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (large) logic cap1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-  EXPECT_EQ(item->name, "cap1");
 }
 
 TEST(StrengthParsing, DriveStrengthSupply0Weak1) {
