@@ -33,4 +33,55 @@ TEST(StringMethods, CompareLessThan) {
   EXPECT_LT(signed_val, 0);
 }
 
+TEST(StringMethods, CompareGreaterThan) {
+  StringFixture f;
+  f.CreateStringVar("s", "abd");
+  f.CreateStringVar("t", "abc");
+  auto* arg = f.arena.Create<Expr>();
+  arg->kind = ExprKind::kIdentifier;
+  arg->text = "t";
+  auto* call = f.MakeMethodCall("s", "compare", {arg});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  auto signed_val = static_cast<int32_t>(result.ToUint64() & 0xFFFFFFFF);
+  EXPECT_GT(signed_val, 0);
+}
+
+TEST(StringMethods, CompareBothEmpty) {
+  StringFixture f;
+  f.CreateStringVar("s", "");
+  f.CreateStringVar("t", "");
+  auto* arg = f.arena.Create<Expr>();
+  arg->kind = ExprKind::kIdentifier;
+  arg->text = "t";
+  auto* call = f.MakeMethodCall("s", "compare", {arg});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(static_cast<int64_t>(result.ToUint64()), 0);
+}
+
+TEST(StringMethods, CompareEmptyVsNonEmpty) {
+  StringFixture f;
+  f.CreateStringVar("s", "");
+  f.CreateStringVar("t", "abc");
+  auto* arg = f.arena.Create<Expr>();
+  arg->kind = ExprKind::kIdentifier;
+  arg->text = "t";
+  auto* call = f.MakeMethodCall("s", "compare", {arg});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  auto signed_val = static_cast<int32_t>(result.ToUint64() & 0xFFFFFFFF);
+  EXPECT_LT(signed_val, 0);
+}
+
+TEST(StringMethods, CompareCaseSensitive) {
+  StringFixture f;
+  f.CreateStringVar("s", "ABC");
+  f.CreateStringVar("t", "abc");
+  auto* arg = f.arena.Create<Expr>();
+  arg->kind = ExprKind::kIdentifier;
+  arg->text = "t";
+  auto* call = f.MakeMethodCall("s", "compare", {arg});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  auto signed_val = static_cast<int32_t>(result.ToUint64() & 0xFFFFFFFF);
+  EXPECT_NE(signed_val, 0);
+}
+
 }  // namespace
