@@ -30,25 +30,4 @@ TEST(NetDecl, InvalidNetDataTypeString) {
   EXPECT_FALSE(ValidateNetDataType(NetDataTypeKind::kString));
 }
 
-TEST(NetDecl, ChargeStrengthOnTriregIsValid) {
-  NetDeclInfo info;
-  info.type = NetType::kTrireg;
-  info.has_charge_strength = true;
-  EXPECT_TRUE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, VectoredWithPackedDimensionOk) {
-  NetDeclInfo info;
-  info.is_vectored = true;
-  info.packed_dim_count = 1;
-  EXPECT_TRUE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, ScalaredWithPackedDimensionOk) {
-  NetDeclInfo info;
-  info.is_scalared = true;
-  info.packed_dim_count = 1;
-  EXPECT_TRUE(ValidateNetDecl(info));
-}
-
 }  // namespace

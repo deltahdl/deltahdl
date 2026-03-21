@@ -700,6 +700,18 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
     net.net_type = DataTypeToNetType(item->data_type.kind);
   }
   net.width = EvalTypeWidth(item->data_type, typedefs_);
+  // §6.7 footnote 16: charge strength shall only be used with trireg.
+  if (item->data_type.charge_strength != 0 &&
+      net.net_type != NetType::kTrireg) {
+    diag_.Error(item->loc,
+                "charge strength can only be used with trireg nets");
+  }
+  // §6.7 footnote 16: vectored/scalared requires at least one packed dim.
+  if ((item->data_type.is_vectored || item->data_type.is_scalared) &&
+      net.width <= 1 && item->data_type.packed_dim_left == nullptr) {
+    diag_.Error(item->loc,
+                "vectored or scalared requires at least one packed dimension");
+  }
   // §6.6.4: Extract charge strength and decay time for trireg nets.
   if (item->data_type.charge_strength != 0) {
     net.charge_strength =
