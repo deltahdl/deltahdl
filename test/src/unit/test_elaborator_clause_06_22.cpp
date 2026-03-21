@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, AssignIntToLogicVector) {
+TEST(TypeCompatibilityElaboration, AssignIntToLogicVector) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -17,7 +17,7 @@ TEST(Elaboration, AssignIntToLogicVector) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, AssignRealToInt) {
+TEST(TypeCompatibilityElaboration, AssignRealToInt) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -30,7 +30,7 @@ TEST(Elaboration, AssignRealToInt) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, MatchingTypesSameTypedef) {
+TEST(TypeCompatibilityElaboration, MatchingTypesSameTypedef) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -44,7 +44,23 @@ TEST(Elaboration, MatchingTypesSameTypedef) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, TypeIncompatibleStringToInt) {
+TEST(TypeCompatibilityElaboration, IntAndBitSignedAreInterchangeable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  int x;\n"
+      "  bit signed [31:0] y;\n"
+      "  initial begin\n"
+      "    x = y;\n"
+      "    y = x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(TypeCompatibilityElaboration, TypeIncompatibleStringToInt) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
