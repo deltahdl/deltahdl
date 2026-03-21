@@ -18,11 +18,22 @@ def _write_input(tmp_path, body):
 
 
 def _make_classifier(*triples):
-    """Build per-test classifier from (test_name, clause) triples."""
-    lookup = dict(triples)
+    """Build per-test classifier from (name, clause[, stage]) triples."""
+    clause_lookup = {}
+    stage_lookup = {}
+    for triple in triples:
+        name, clause = triple[0], triple[1]
+        stage = triple[2] if len(triple) > 2 else "parser"
+        clause_lookup[name] = clause
+        stage_lookup[name] = stage
 
     def classifier(prompt, _schema=None, **_kw):
-        for name, clause in lookup.items():
+        if _schema and "pipeline_stage" in _schema:
+            for name, stage in stage_lookup.items():
+                if name in prompt:
+                    return {"pipeline_stage": stage, "rationale": "r"}
+            return {"pipeline_stage": "parser", "rationale": "r"}
+        for name, clause in clause_lookup.items():
             if name in prompt:
                 return {"clause": clause, "rationale": "r",
                         "suite_name": "S", "test_name": name}
@@ -35,6 +46,8 @@ def _make_classifier(*triples):
 def _make_classifier_with_topic(_name, clause, topic):
     """Build per-test classifier that returns clause then topic."""
     def classifier(_prompt, schema=None, **_kw):
+        if schema and "pipeline_stage" in schema:
+            return {"pipeline_stage": "parser", "rationale": "r"}
         if schema and "non_lrm_topic" in schema:
             return {"non_lrm_topic": topic, "rationale": "r",
                     "suite_name": "S", "test_name": _name}
@@ -90,8 +103,8 @@ def _do_multi_clause(ct, tmp_path, monkeypatch):
         "TEST(S, Beta) {\n  auto t = Lex(src);\n}\n\n",
     )
     _stub_externals(ct, monkeypatch, tmp_path, _make_classifier(
-        ("Alpha", "6.1"),
-        ("Beta", "5.3"),
+        ("Alpha", "6.1", "parser"),
+        ("Beta", "5.3", "lexer"),
     ))
     _run_pipeline(ct, tmp_path, test="Alpha")
     _run_pipeline(ct, tmp_path, test="Beta")
@@ -374,7 +387,7 @@ def test_named_ns_output_contains_test(ct, tmp_path, monkeypatch):
 def _make_classifier_with_prefix(name, clause, stage):
     """Build classifier that returns clause, then pipeline stage on fallback."""
     def classifier(prompt, _schema=None, **_kw):
-        if "pipeline stage" in prompt.lower():
+        if _schema and "pipeline_stage" in _schema:
             return {"pipeline_stage": stage, "rationale": "r"}
         if name in prompt:
             return {"clause": clause, "rationale": "r",

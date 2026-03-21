@@ -1,22 +1,6 @@
-"""Patterns, prompts, and schemas for test classification.
-
-Only obviously-named helpers are listed in ``PREFIX_PATTERNS``.  When
-no pattern matches, ``_detect_prefix`` falls back to a Claude call
-using ``PREFIX_PROMPT_TEMPLATE`` and ``PREFIX_SCHEMA``.
-"""
+"""Prompts and schemas for test classification."""
 
 import json
-
-PREFIX_PATTERNS: list[tuple[str, str]] = [
-    ("Preprocess", "test_preprocessor_"),
-    ("SynthLower", "test_synthesizer_"),
-    ("Aig", "test_synthesizer_"),
-    ("Elaborate", "test_elaborator_"),
-    ("Parse", "test_parser_"),
-    ("Lex", "test_lexer_"),
-    ("Scheduler", "test_simulator_"),
-    ("SimContext", "test_simulator_"),
-]
 
 CLAUSE_PROMPT_TEMPLATE = """What IEEE 1800-2023 clause does this test exercise?
 

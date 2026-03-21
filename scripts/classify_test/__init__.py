@@ -39,7 +39,7 @@ from ._github import (
 from ._generate import _filter_preamble, _preamble_name, generate_file
 from ._git import commit_classification
 from ._patterns import (
-    CLAUSE_SCHEMA, PREFIX_PATTERNS,
+    CLAUSE_SCHEMA,
     PREFIX_PROMPT_TEMPLATE, PREFIX_SCHEMA, TOPIC_SCHEMA,
     build_clause_prompt, build_topic_prompt,
 )
@@ -348,7 +348,6 @@ def parse_file(filepath):
 # Stage 2: Classify via Claude
 # ---------------------------------------------------------------------------
 
-_PREFIX_PATTERNS = PREFIX_PATTERNS
 _STAGE_TO_PREFIX = STAGE_TO_PREFIX
 _PREFIX_PROMPT_TEMPLATE = PREFIX_PROMPT_TEMPLATE
 _PREFIX_SCHEMA = PREFIX_SCHEMA
@@ -360,12 +359,8 @@ def _detect_prefix(test, clause, lrm_path):
         test.prefix_rationale = "clause is non-LRM"
         return "test_non_lrm_"
     body = "\n".join(test.lines)
-    for pattern, prefix in _PREFIX_PATTERNS:
-        if pattern in body:
-            test.prefix_rationale = f"body contains '{pattern}'"
-            return prefix
-    print(f"Calling Claude to detect pipeline stage for {test.test_name}"
-          " because body does not match any known pattern...",
+    print(f"Calling Claude to detect pipeline stage for"
+          f" {test.test_name}...",
           end="", flush=True)
     prompt = _PREFIX_PROMPT_TEMPLATE.format(
         lrm_path=lrm_path,

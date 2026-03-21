@@ -10,6 +10,15 @@ import pytest
 from classify_test._patterns import CLAUSE_PROMPT_TEMPLATE
 
 
+def _multi_claude(clause_resp, prefix_stage="parser"):
+    """Return a mock _call_claude that handles clause and prefix calls."""
+    def _mock(_prompt, schema=None, **_kw):
+        if schema and "pipeline_stage" in schema:
+            return {"pipeline_stage": prefix_stage, "rationale": "r"}
+        return clause_resp
+    return _mock
+
+
 # ---- existing_non_lrm_topics ----------------------------------------------
 
 
@@ -45,153 +54,50 @@ def test_existing_non_lrm_topics_empty_topic(ct, tmp_path):
 # ---- _detect_prefix --------------------------------------------------------
 
 
-def test_detect_prefix_parser(ct, ct_helpers):
-    """Detects parser prefix from Parse( call."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  auto r = Parse(src);"])
-    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_parser_"
+def _stub_prefix_claude(monkeypatch, ct, stage):
+    """Stub _call_claude to return the given pipeline stage."""
+    monkeypatch.setattr(
+        ct, "_call_claude",
+        lambda _p, _s=None, **_kw: {
+            "pipeline_stage": stage, "rationale": "r",
+        },
+    )
 
 
-def test_detect_prefix_parser_src(ct, ct_helpers):
-    """Detects parser prefix from ParseSrc( variant."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  auto r = ParseSrc(src);"])
-    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_parser_"
-
-
-def test_detect_prefix_elaborator(ct, ct_helpers):
-    """Detects elaborator prefix from Elaborate( call."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  auto* d = Elaborate(src);"])
-    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_elaborator_"
-
-
-def test_detect_prefix_elaborator_src(ct, ct_helpers):
-    """Detects elaborator prefix from ElaborateSrc( variant."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  auto* d = ElaborateSrc(src, f);"])
-    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_elaborator_"
-
-
-def test_detect_prefix_lexer_lex(ct, ct_helpers):
-    """Detects lexer prefix from Lex( call."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  auto tok = Lex(src);"])
-    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_lexer_"
-
-
-def test_detect_prefix_lexer_one(ct, ct_helpers):
-    """Detects lexer prefix from LexOne( variant."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  auto tok = LexOne(src);"])
-    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_lexer_"
-
-
-def test_detect_prefix_simulator(ct, ct_helpers):
-    """Detects simulator prefix from Scheduler( call."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  Scheduler sched;"])
-    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_simulator_"
-
-
-def test_detect_prefix_simulator_sim_context(ct, ct_helpers):
-    """Detects simulator prefix from SimContext call."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  SimContext ctx;"])
-    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_simulator_"
-
-
-def test_detect_prefix_synthesizer(ct, ct_helpers):
-    """Detects synthesizer prefix from SynthLower( call."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  auto g = SynthLower(src);"])
-    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_synthesizer_"
-
-
-def test_detect_prefix_synthesizer_aig(ct, ct_helpers):
-    """Detects synthesizer prefix from AigGraph."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  AigGraph g;"])
-    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_synthesizer_"
-
-
-def test_detect_prefix_preprocessor(ct, ct_helpers):
-    """Detects preprocessor prefix from Preprocessor( call."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  Preprocessor pp(src);"])
-    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_preprocessor_"
+def test_detect_prefix_returns_claude_stage(ct, ct_helpers, monkeypatch):
+    """Returns prefix based on Claude's pipeline_stage response."""
+    _stub_prefix_claude(monkeypatch, ct, "parser")
+    t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
+    assert getattr(ct, "_detect_prefix")(t, "6.1", "/lrm") == "test_parser_"
 
 
 def test_detect_prefix_non_lrm_override(ct, ct_helpers):
-    """Non-LRM clause overrides detected prefix to test_non_lrm_."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  auto r = Parse(src);"])
-    assert _detect_prefix(t, "non-lrm", "/tmp/lrm.txt") == "test_non_lrm_"
+    """Non-LRM clause overrides to test_non_lrm_ without calling Claude."""
+    t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
+    assert getattr(ct, "_detect_prefix")(t, "non-lrm", "/lrm") == "test_non_lrm_"
 
 
-def test_detect_prefix_non_lrm_underscore_override(ct, ct_helpers):
+def test_detect_prefix_non_lrm_underscore(ct, ct_helpers):
     """Non_lrm (underscore variant) also overrides prefix."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  auto r = Parse(src);"])
-    assert _detect_prefix(t, "non_lrm", "/tmp/lrm.txt") == "test_non_lrm_"
+    t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
+    assert getattr(ct, "_detect_prefix")(t, "non_lrm", "/lrm") == "test_non_lrm_"
 
 
-def test_detect_prefix_no_match_fallback(ct, ct_helpers, monkeypatch):
-    """Falls back to Claude when no obvious pattern matches."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
+def test_detect_prefix_stores_rationale(ct, ct_helpers, monkeypatch):
+    """Stores Claude's rationale on the test block."""
     monkeypatch.setattr(
         ct, "_call_claude",
         lambda _p, _s=None, **_kw: {
-            "pipeline_stage": "simulator", "rationale": "r",
+            "pipeline_stage": "simulator", "rationale": "timing checks",
         },
     )
-    t = _tb("T", body=["  EvalExpr(ctx, e);"])
-    assert _detect_prefix(t, "6.1", "/tmp/lrm.txt") == "test_simulator_"
-
-
-def test_detect_prefix_fallback_stores_rationale(ct, ct_helpers, monkeypatch):
-    """Fallback stores prefix_rationale on the test block."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    monkeypatch.setattr(
-        ct, "_call_claude",
-        lambda _p, _s=None, **_kw: {
-            "pipeline_stage": "simulator",
-            "rationale": "timing checks",
-        },
-    )
-    t = _tb("T", body=["  EvalExpr(ctx, e);"])
-    _detect_prefix(t, "6.1", "/tmp/lrm.txt")
+    t = ct_helpers.make_test_block("T", body=["  x();"])
+    getattr(ct, "_detect_prefix")(t, "6.1", "/lrm")
     assert t.prefix_rationale == "timing checks"
 
 
-def test_detect_prefix_pattern_match_rationale(ct, ct_helpers):
-    """Pattern match stores rationale mentioning matched pattern."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    t = _tb("T", body=["  auto r = Parse(src);"])
-    _detect_prefix(t, "6.1", "/tmp/lrm.txt")
-    assert "Parse" in t.prefix_rationale
-
-
-def test_detect_prefix_fallback_calls_claude(ct, ct_helpers, monkeypatch):
-    """Fallback invokes _call_claude with prefix prompt."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
+def test_detect_prefix_calls_claude(ct, ct_helpers, monkeypatch):
+    """Invokes _call_claude with prefix prompt."""
     calls = []
 
     def spy(prompt, _schema=None, **_kw):
@@ -199,24 +105,17 @@ def test_detect_prefix_fallback_calls_claude(ct, ct_helpers, monkeypatch):
         return {"pipeline_stage": "simulator", "rationale": "r"}
 
     monkeypatch.setattr(ct, "_call_claude", spy)
-    t = _tb("T", body=["  EvalExpr(ctx, e);"])
-    _detect_prefix(t, "6.1", "/tmp/lrm.txt")
+    t = ct_helpers.make_test_block("T", body=["  x();"])
+    getattr(ct, "_detect_prefix")(t, "6.1", "/lrm")
     assert "pipeline stage" in calls[0].lower()
 
 
-def test_detect_prefix_fallback_invalid_stage_exits(ct, ct_helpers, monkeypatch):
+def test_detect_prefix_invalid_stage_exits(ct, ct_helpers, monkeypatch):
     """Exits when Claude returns an unrecognized pipeline stage."""
-    _tb = ct_helpers.make_test_block
-    _detect_prefix = getattr(ct, "_detect_prefix")
-    monkeypatch.setattr(
-        ct, "_call_claude",
-        lambda _p, _s=None, **_kw: {
-            "pipeline_stage": "bogus", "rationale": "r",
-        },
-    )
-    t = _tb("T", body=["  EvalExpr(ctx, e);"])
+    _stub_prefix_claude(monkeypatch, ct, "bogus")
+    t = ct_helpers.make_test_block("T", body=["  x();"])
     with pytest.raises(SystemExit):
-        _detect_prefix(t, "6.1", "/tmp/lrm.txt")
+        getattr(ct, "_detect_prefix")(t, "6.1", "/lrm")
 
 
 # ---- _build_clause_prompt --------------------------------------------------
@@ -527,8 +426,9 @@ def test_call_claude_failure_exhausted(ct, monkeypatch):
 # ---- _apply_classification -------------------------------------------------
 
 
-def test_apply_classification_found(ct, ct_helpers):
+def test_apply_classification_found(ct, ct_helpers, monkeypatch):
     """Applies prefix, clause, and rationale from clause response."""
+    _stub_prefix_claude(monkeypatch, ct, "parser")
     _tb = ct_helpers.make_test_block
     _apply_classification = getattr(ct, "_apply_classification")
     t = _tb("MyTest", body=["  auto r = Parse(src);"])
@@ -571,8 +471,9 @@ def test_apply_classification_non_lrm_with_topic(ct, ct_helpers):
     assert t.clause == "non-lrm:aig"
 
 
-def test_apply_classification_no_rationale(ct, ct_helpers):
+def test_apply_classification_no_rationale(ct, ct_helpers, monkeypatch):
     """Missing rationale defaults to empty string."""
+    _stub_prefix_claude(monkeypatch, ct, "parser")
     _tb = ct_helpers.make_test_block
     _apply_classification = getattr(ct, "_apply_classification")
     t = _tb("T", body=["  auto r = Parse(src);"])
@@ -596,8 +497,9 @@ def test_apply_classification_non_lrm_empty_topic(ct, ct_helpers):
         )
 
 
-def test_apply_classification_detects_prefix(ct, ct_helpers):
-    """Prefix is derived mechanically from test body."""
+def test_apply_classification_detects_prefix(ct, ct_helpers, monkeypatch):
+    """Prefix is derived from Claude's pipeline stage detection."""
+    _stub_prefix_claude(monkeypatch, ct, "elaborator")
     _tb = ct_helpers.make_test_block
     _apply_classification = getattr(ct, "_apply_classification")
     t = _tb("T", body=["  auto* d = Elaborate(src);"])
@@ -620,8 +522,8 @@ def _run_against(ct, ct_helpers, monkeypatch, tmp_path, clause):
     """Classify with --against and return result."""
     monkeypatch.setattr(
         ct, "_call_claude",
-        lambda p, schema=None, **_kw: {"clause": clause, "rationale": "r",
-                                        "suite_name": "S", "test_name": "T"},
+        _multi_claude({"clause": clause, "rationale": "r",
+                       "suite_name": "S", "test_name": "T"}),
     )
     t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
     return ct.classify_test_block(
@@ -650,14 +552,15 @@ def test_classify_block_against_uses_against_template(
 ):
     """classify_test_block uses the against prompt template."""
     prompts = []
-    monkeypatch.setattr(
-        ct, "_call_claude",
-        lambda p, schema=None, **_kw: (
-            prompts.append(p) or
-            {"clause": "23.2.1", "rationale": "r",
-             "suite_name": "S", "test_name": "T"}
-        ),
-    )
+
+    def capturing(prompt, schema=None, **_kw):
+        prompts.append(prompt)
+        if schema and "pipeline_stage" in schema:
+            return {"pipeline_stage": "parser", "rationale": "r"}
+        return {"clause": "23.2.1", "rationale": "r",
+                "suite_name": "S", "test_name": "T"}
+
+    monkeypatch.setattr(ct, "_call_claude", capturing)
     t = ct_helpers.make_test_block("T", body=["  auto r = Parse(src);"])
     ct.classify_test_block(
         t, tmp_path, tmp_path / "lrm.txt", against="23.2.1",
@@ -670,10 +573,7 @@ def test_classify_tests_matching(ct, ct_helpers, monkeypatch, tmp_path):
     _tb = ct_helpers.make_test_block
     clause_resp = {"clause": "6.1", "rationale": "r",
                    "suite_name": "Parsing", "test_name": "T"}
-    monkeypatch.setattr(
-        ct, "_call_claude",
-        lambda p, schema=None, **_kw: clause_resp,
-    )
+    monkeypatch.setattr(ct, "_call_claude", _multi_claude(clause_resp))
     t = _tb("T", body=["  auto r = Parse(src);"])
     ct.classify_test_block(
         t, tmp_path, tmp_path / "lrm.txt",
@@ -933,8 +833,9 @@ def test_topic_schema_has_test_name(ct):
 # ---- _apply_classification: renaming ---------------------------------------
 
 
-def _apply_with_names(ct, *, macro="TEST"):
+def _apply_with_names(ct, monkeypatch, *, macro="TEST"):
     """Apply a clause response with suite_name+test_name, return test block."""
+    _stub_prefix_claude(monkeypatch, ct, "parser")
     _apply = getattr(ct, "_apply_classification")
     body = ["  auto r = Parse(src);"]
     lines = [f"{macro}(S, MyTest) {{"] + body + ["}"]
@@ -952,31 +853,31 @@ def _apply_with_names(ct, *, macro="TEST"):
     return t
 
 
-def test_apply_classification_renames_suite(ct):
+def test_apply_classification_renames_suite(ct, monkeypatch):
     """Updates test.suite_name to the new suite name."""
-    assert _apply_with_names(ct).suite_name == "BinaryOps"
+    assert _apply_with_names(ct, monkeypatch).suite_name == "BinaryOps"
 
 
-def test_apply_classification_renames_test_name(ct):
+def test_apply_classification_renames_test_name(ct, monkeypatch):
     """Updates test.test_name to the new test name."""
-    assert _apply_with_names(ct).test_name == "ParseAddition"
+    assert _apply_with_names(ct, monkeypatch).test_name == "ParseAddition"
 
 
-def test_apply_classification_renames_test_line(ct):
+def test_apply_classification_renames_test_line(ct, monkeypatch):
     """Renames both args in TEST() line."""
-    t = _apply_with_names(ct)
+    t = _apply_with_names(ct, monkeypatch)
     assert t.lines[0] == "TEST(BinaryOps, ParseAddition) {"
 
 
-def test_apply_classification_renames_test_f(ct):
+def test_apply_classification_renames_test_f(ct, monkeypatch):
     """Renames both args in TEST_F() line."""
-    t = _apply_with_names(ct, macro="TEST_F")
+    t = _apply_with_names(ct, monkeypatch, macro="TEST_F")
     assert t.lines[0] == "TEST_F(BinaryOps, ParseAddition) {"
 
 
-def test_apply_classification_renames_test_p(ct):
+def test_apply_classification_renames_test_p(ct, monkeypatch):
     """Renames both args in TEST_P() line."""
-    t = _apply_with_names(ct, macro="TEST_P")
+    t = _apply_with_names(ct, monkeypatch, macro="TEST_P")
     assert t.lines[0] == "TEST_P(BinaryOps, ParseAddition) {"
 
 
