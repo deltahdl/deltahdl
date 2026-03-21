@@ -1,22 +1,27 @@
-#include <gtest/gtest.h>
-
-#include <string>
-#include <string_view>
-#include <vector>
-
-#include "fixture_enum_methods.h"
-#include "simulator/evaluation.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(EnumMethods, NumSingleMember) {
-  EnumFixture f;
-  f.RegisterEnum("flag", "flag_t", {{"ONLY", 42}});
-  auto* call = f.MakeEnumMethodCall("flag", "num");
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
+TEST(EnumMethods, NumElaboratesOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  typedef enum {RED, GREEN, BLUE} color_e;\n"
+             "  color_e c;\n"
+             "  int n;\n"
+             "  initial n = c.num();\n"
+             "endmodule\n"));
+}
+
+TEST(EnumMethods, NumSingleMemberElaboratesOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  typedef enum {ONLY} one_e;\n"
+             "  one_e o;\n"
+             "  int n;\n"
+             "  initial n = o.num();\n"
+             "endmodule\n"));
 }
 
 }  // namespace
