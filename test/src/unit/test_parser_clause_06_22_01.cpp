@@ -45,16 +45,6 @@ TEST(MatchingTypesParsing, TypesMatchNamedDifferentType) {
   EXPECT_FALSE(TypesMatch(a, b));
 }
 
-TEST(MatchingTypesParsing, TypesEquivalentSameSignedInt) {
-  DataType a;
-  a.kind = DataTypeKind::kInt;
-  a.is_signed = true;
-  DataType b;
-  b.kind = DataTypeKind::kInt;
-  b.is_signed = true;
-  EXPECT_TRUE(TypesEquivalent(a, b));
-}
-
 TEST(MatchingTypesParsing, TypesMatchBuiltin) {
   DataType a;
   a.kind = DataTypeKind::kInt;

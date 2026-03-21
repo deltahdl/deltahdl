@@ -269,14 +269,37 @@ bool TypesMatch(const DataType& a, const DataType& b) {
   return false;
 }
 
+// §6.22.2(c): Only packed/integral types participate in equivalence.
+static bool IsPackedOrIntegral(const DataType& dtype) {
+  if (IsIntegralType(dtype.kind)) return true;
+  if ((dtype.kind == DataTypeKind::kStruct ||
+       dtype.kind == DataTypeKind::kUnion) &&
+      dtype.is_packed)
+    return true;
+  return false;
+}
+
+// §6.22.2(c): 4-state with contagion for packed structs/unions.
+static bool Is4stateForEquivalence(const DataType& dtype) {
+  if (Is4stateType(dtype.kind)) return true;
+  if ((dtype.kind == DataTypeKind::kStruct ||
+       dtype.kind == DataTypeKind::kUnion) &&
+      dtype.is_packed) {
+    for (const auto& m : dtype.struct_members) {
+      if (Is4stateType(m.type_kind)) return true;
+    }
+  }
+  return false;
+}
+
 bool TypesEquivalent(const DataType& a, const DataType& b) {
   if (TypesMatch(a, b)) return true;
-  // §6.22.2c: Packed/integral types equivalent if same width, signing,
-  // and state-ness (both 2-state or both 4-state).
+  // §6.22.2(c): Only applies to packed/integral types.
+  if (!IsPackedOrIntegral(a) || !IsPackedOrIntegral(b)) return false;
   uint32_t wa = EvalTypeWidth(a);
   uint32_t wb = EvalTypeWidth(b);
   if (wa != wb || wa == 0 || a.is_signed != b.is_signed) return false;
-  return Is4stateType(a.kind) == Is4stateType(b.kind);
+  return Is4stateForEquivalence(a) == Is4stateForEquivalence(b);
 }
 
 bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
