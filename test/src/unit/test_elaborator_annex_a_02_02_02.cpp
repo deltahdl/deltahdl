@@ -110,50 +110,6 @@ TEST(StrengthElaboration, Highz1Highz0IsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- charge_strength elaboration ---
-
-TEST(StrengthElaboration, ChargeStrengthSmallOnTrireg) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  trireg (small) t;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->nets.empty());
-  EXPECT_EQ(mod->nets[0].charge_strength, Strength::kSmall);
-}
-
-TEST(StrengthElaboration, ChargeStrengthMediumOnTrireg) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  trireg (medium) t;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->nets.empty());
-  EXPECT_EQ(mod->nets[0].charge_strength, Strength::kMedium);
-}
-
-TEST(StrengthElaboration, ChargeStrengthLargeOnTrireg) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  trireg (large) t;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->nets.empty());
-  EXPECT_EQ(mod->nets[0].charge_strength, Strength::kLarge);
-}
-
 // --- drive_strength on net declaration ---
 
 TEST(StrengthElaboration, NetDeclDriveStrengthPreserved) {

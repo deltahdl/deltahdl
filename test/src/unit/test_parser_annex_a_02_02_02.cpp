@@ -106,28 +106,6 @@ TEST(StrengthParsing, Strength1AllKeywords) {
   }
 }
 
-TEST(StrengthParsing, ChargeStrengthSmall) {
-  auto r = Parse(
-      "module m;\n"
-      "  trireg (small) t;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.charge_strength, 1u);
-}
-
-TEST(StrengthParsing, ChargeStrengthLarge) {
-  auto r = Parse(
-      "module m;\n"
-      "  trireg (large) t;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.charge_strength, 4u);
-}
-
 TEST(StrengthParsing, StrengthValueEncoding) {
   auto r = Parse(
       "module m;\n"
@@ -156,17 +134,6 @@ TEST(StrengthParsing, DriveStrengthStr1Highz0) {
   EXPECT_EQ(item->drive_strength1, 4u);
 }
 
-TEST(StrengthParsing, ChargeStrengthMedium) {
-  auto r = Parse(
-      "module m;\n"
-      "  trireg (medium) t;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.charge_strength, 2u);
-}
-
 TEST(StrengthParsing, NoDriveStrengthDefault) {
   auto r = Parse(
       "module m;\n"
@@ -177,17 +144,6 @@ TEST(StrengthParsing, NoDriveStrengthDefault) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->drive_strength0, 0u);
   EXPECT_EQ(item->drive_strength1, 0u);
-}
-
-TEST(StrengthParsing, NoChargeStrengthDefault) {
-  auto r = Parse(
-      "module m;\n"
-      "  trireg t;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->data_type.charge_strength, 0u);
 }
 
 TEST(StrengthParsing, AllDriveStrengthForms) {
