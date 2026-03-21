@@ -227,11 +227,22 @@ void Elaborator::CheckEnumAssignStmt(const Stmt* s) {
 void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kVarDecl) {
-    if (s->var_decl_type.kind == DataTypeKind::kNamed) {
+    bool is_enum = false;
+    if (s->var_decl_type.kind == DataTypeKind::kEnum) {
+      enum_var_names_.insert(s->var_name);
+      is_enum = true;
+    } else if (s->var_decl_type.kind == DataTypeKind::kNamed) {
       auto it = typedefs_.find(s->var_decl_type.type_name);
       if (it != typedefs_.end() && it->second.kind == DataTypeKind::kEnum) {
         enum_var_names_.insert(s->var_name);
+        is_enum = true;
       }
+    }
+    if (is_enum && s->var_init &&
+        s->var_init->kind != ExprKind::kIdentifier &&
+        s->var_init->kind != ExprKind::kCast) {
+      diag_.Error(s->range.start,
+                  "integer assigned to enum variable without cast");
     }
   }
   if (s->kind == StmtKind::kBlockingAssign ||
@@ -248,6 +259,14 @@ void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
 
 void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
+    // §6.19.3: Check module-level enum variable initializers.
+    if (item->kind == ModuleItemKind::kVarDecl &&
+        enum_var_names_.count(item->name) != 0 && item->init_expr &&
+        item->init_expr->kind != ExprKind::kIdentifier &&
+        item->init_expr->kind != ExprKind::kCast) {
+      diag_.Error(item->loc,
+                  "integer assigned to enum variable without cast");
+    }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;
     if (is_proc && item->body) {
