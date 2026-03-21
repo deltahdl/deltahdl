@@ -95,6 +95,45 @@ TEST(StringLiteralSyntaxParsing, TripleQuotedStringWithEscapeSeq) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(StringLiteralSyntaxParsing, QuotedStringProducesStringLiteralNode) {
+  auto r = Parse(
+      "module m;\n"
+      "  string s;\n"
+      "  initial s = \"hello\";\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
+}
+
+TEST(StringLiteralSyntaxParsing, TripleQuotedStringProducesStringLiteralNode) {
+  auto r = Parse(
+      "module m;\n"
+      "  string s;\n"
+      "  initial s = \"\"\"hello\"\"\";\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
+}
+
+TEST(StringLiteralSyntaxParsing, EmptyQuotedStringProducesStringLiteralNode) {
+  auto r = Parse(
+      "module m;\n"
+      "  string s;\n"
+      "  initial s = \"\";\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kStringLiteral);
+}
+
 TEST(StringLiteralSyntaxParsing, StringLiteralInSystemTaskArg) {
   auto r = Parse(
       "module m;\n"

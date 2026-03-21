@@ -120,4 +120,20 @@ TEST(StringLiteralLexing, TwoConsecutiveStringLiterals) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kStringLiteral);
 }
 
+TEST(StringLiteralLexing, QuotedStringItemTabCharacter) {
+  auto tokens = Lex("\"hello\tworld\"");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+}
+
+TEST(StringLiteralLexing, TripleQuotedStringEmpty) {
+  auto tokens = Lex("\"\"\"\"\"\"");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
+}
+
+TEST(StringLiteralLexing, QuotedStringNewlineTerminatesError) {
+  EXPECT_TRUE(LexHasErrors("\"before\nafter\""));
+}
+
 }  // namespace
