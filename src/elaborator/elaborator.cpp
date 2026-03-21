@@ -274,11 +274,15 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
       pd.from_override = true;
     }
     if (!pd.is_resolved && pval) {
-      // §6.20.1: Parameters can depend on earlier parameters.
-      auto scope = BuildParamScope(mod);
-      auto val = ConstEvalInt(pval, scope);
-      pd.resolved_value = val.value_or(0);
-      pd.is_resolved = val.has_value();
+      if (pval->kind == ExprKind::kIdentifier && pval->text == "$") {
+        pd.is_unbounded = true;
+      } else {
+        // §6.20.1: Parameters can depend on earlier parameters.
+        auto scope = BuildParamScope(mod);
+        auto val = ConstEvalInt(pval, scope);
+        pd.resolved_value = val.value_or(0);
+        pd.is_resolved = val.has_value();
+      }
     }
 
     mod->params.push_back(pd);
