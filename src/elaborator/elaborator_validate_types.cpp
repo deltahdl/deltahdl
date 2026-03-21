@@ -101,7 +101,23 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
   bool is_2state = !Is4stateType(dtype, typedefs_);
   bool prev_had_xz = false;
 
+  // §6.19: Compute max representable value for overflow detection.
+  uint64_t max_val = dtype.is_signed
+                         ? (base_width > 0 ? (1ULL << (base_width - 1)) - 1 : 0)
+                         : (base_width < 64 ? (1ULL << base_width) - 1
+                                            : UINT64_MAX);
+
+  std::unordered_set<std::string_view> seen_names;
+  std::unordered_set<int64_t> seen_values;
+  int64_t next_val = 0;
+
   for (const auto& member : dtype.enum_members) {
+    // §6.19: Enum member names shall be unique.
+    if (!seen_names.insert(member.name).second) {
+      diag_.Error(loc,
+                  std::format("duplicate enum member name '{}'", member.name));
+    }
+
     if (!member.value) {
       if (prev_had_xz) {
         diag_.Error(loc,
@@ -110,9 +126,30 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
                                 member.name));
       }
       prev_had_xz = false;
-      continue;
+    } else {
+      prev_had_xz = ValidateEnumLiteral(member, base_width, is_2state);
+      if (!prev_had_xz) {
+        auto v = ConstEvalInt(member.value);
+        if (v) next_val = *v;
+      }
     }
-    prev_had_xz = ValidateEnumLiteral(member, base_width, is_2state);
+
+    // §6.19: Enum member values shall be unique.
+    if (!prev_had_xz) {
+      if (!seen_values.insert(next_val).second) {
+        diag_.Error(loc,
+                    std::format("duplicate enum member value {}", next_val));
+      }
+    }
+
+    // §6.19: Auto-increment past max representable value is an error.
+    ++next_val;
+    if (!prev_had_xz && next_val > 0 &&
+        static_cast<uint64_t>(next_val) > max_val &&
+        &member != &dtype.enum_members.back()) {
+      diag_.Error(loc, "enum auto-increment exceeds maximum representable "
+                       "value of base type");
+    }
   }
 }
 
