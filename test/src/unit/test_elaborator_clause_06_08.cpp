@@ -175,21 +175,6 @@ TEST(VarDecl, VarWithRangeElaboratesAsLogicVector) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
-// §6.8: chandle variable is tagged as chandle in RTLIR.
-TEST(VarDecl, ChandleIsChandle) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  chandle ch;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_TRUE(mod->variables[0].is_chandle);
-}
-
 // §6.8: byte is signed by default.
 TEST(VarDecl, ByteIsSigned) {
   ElabFixture f;

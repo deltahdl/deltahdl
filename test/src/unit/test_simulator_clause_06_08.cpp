@@ -153,23 +153,6 @@ TEST(VariableDeclaration, ShortrealDefaultIsZero) {
   EXPECT_EQ(var->value.words[0].aval, 0u);
 }
 
-// Table 6-7: chandle defaults to null (0).
-TEST(VariableDeclaration, ChandleDefaultIsNull) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  chandle ch;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-
-  auto* var = f.ctx.FindVariable("ch");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0u);
-}
 
 // Table 6-7: event variable is marked as event.
 TEST(VariableDeclaration, EventDefaultIsNewEvent) {

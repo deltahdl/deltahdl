@@ -190,6 +190,10 @@ class Elaborator {
   /// §6.14: chandle cannot appear in event expression.
   void ValidateChandleSensitivity(const ModuleItem* item);
 
+  /// §6.14: chandle operator and assignment restrictions.
+  void ValidateChandleOps(const ModuleDecl* decl);
+  void WalkStmtsForChandleOps(const Stmt* s);
+
   /// §6.6.8: interconnect net cannot appear in continuous assignment.
   void ValidateInterconnectContAssign(const ModuleItem* item);
 

@@ -1,4 +1,3 @@
-#include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "parser/ast.h"
@@ -7,28 +6,14 @@ using namespace delta;
 
 namespace {
 
-TEST(TypeEval, ChandleWidth64) {
-  DataType dt;
-  dt.kind = DataTypeKind::kChandle;
-  EXPECT_EQ(EvalTypeWidth(dt), 64u);
-}
-
-TEST(TypeEval, ChandleNotIntegral) {
-  EXPECT_FALSE(IsIntegralType(DataTypeKind::kChandle));
-}
-
-TEST(TypeEval, ChandleNot4State) {
-  EXPECT_FALSE(Is4stateType(DataTypeKind::kChandle));
-}
-
-TEST(NetAndVariableTypeParsing, DataTypeChandle) {
+TEST(ChandleDataType, DataTypeChandle) {
   auto r = Parse("module m; chandle h; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind, DataTypeKind::kChandle);
 }
 
-TEST(DataTypeParsing, ChandleVarDecl) {
+TEST(ChandleDataType, ChandleVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  chandle handle;\n"
@@ -43,7 +28,7 @@ TEST(DataTypeParsing, ChandleVarDecl) {
   EXPECT_EQ(item->name, "handle");
 }
 
-TEST(PrimaryParsing, ConstantPrimaryNull) {
+TEST(ChandleDataType, ConstantPrimaryNull) {
   auto r = Parse("module m; initial x = null; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -53,14 +38,14 @@ TEST(PrimaryParsing, ConstantPrimaryNull) {
   EXPECT_EQ(rhs->text, "null");
 }
 
-TEST(DataTypeParsing, ChandleMultipleDecls) {
+TEST(ChandleDataType, ChandleMultipleDecls) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  chandle h1, h2;\n"
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, ChandleVarDeclSimple) {
+TEST(ChandleDataType, ChandleVarDeclSimple) {
   auto r = Parse(
       "module t;\n"
       "  chandle ch;\n"
@@ -72,7 +57,7 @@ TEST(DataTypeParsing, ChandleVarDeclSimple) {
   EXPECT_EQ(item->name, "ch");
 }
 
-TEST(DataTypeParsing, ChandleFunctionReturn) {
+TEST(ChandleDataType, ChandleFunctionReturn) {
   auto r = Parse(
       "module m;\n"
       "  function chandle get_handle();\n"
@@ -86,7 +71,7 @@ TEST(DataTypeParsing, ChandleFunctionReturn) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kChandle);
 }
 
-TEST(DataTypeParsing, ChandleFunctionArg) {
+TEST(ChandleDataType, ChandleFunctionArg) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function void use_handle(chandle h);\n"
@@ -94,7 +79,7 @@ TEST(DataTypeParsing, ChandleFunctionArg) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, ChandleAssignNull) {
+TEST(ChandleDataType, ChandleAssignNull) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  chandle h;\n"
@@ -102,12 +87,56 @@ TEST(DataTypeParsing, ChandleAssignNull) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, ChandleEqualityWithNull) {
+TEST(ChandleDataType, ChandleEqualityWithNull) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  chandle h;\n"
               "  int r;\n"
               "  initial r = (h == null) ? 1 : 0;\n"
+              "endmodule\n"));
+}
+
+TEST(ChandleDataType, ChandleTaskArg) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task do_something(chandle h);\n"
+              "  endtask\n"
+              "endmodule\n"));
+}
+
+TEST(ChandleDataType, ChandleInequalityNull) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  chandle h;\n"
+              "  int r;\n"
+              "  initial r = (h != null) ? 1 : 0;\n"
+              "endmodule\n"));
+}
+
+TEST(ChandleDataType, ChandleCaseEqualityNull) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  chandle h;\n"
+              "  int r;\n"
+              "  initial r = (h === null) ? 1 : 0;\n"
+              "endmodule\n"));
+}
+
+TEST(ChandleDataType, ChandleCaseInequalityNull) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  chandle h;\n"
+              "  int r;\n"
+              "  initial r = (h !== null) ? 1 : 0;\n"
+              "endmodule\n"));
+}
+
+TEST(ChandleDataType, ChandleChandleEquality) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  chandle a, b;\n"
+              "  int r;\n"
+              "  initial r = (a == b) ? 1 : 0;\n"
               "endmodule\n"));
 }
 

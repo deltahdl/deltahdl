@@ -284,6 +284,92 @@ void Elaborator::ValidateChandleSensitivity(const ModuleItem* item) {
   }
 }
 
+static bool IsNullLiteral(const Expr* e) {
+  return e && e->kind == ExprKind::kIdentifier && e->text == "null";
+}
+
+static bool IsAllowedChandleBinaryOp(TokenKind op) {
+  return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
+         op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq;
+}
+
+static void CheckChandleExpr(const Expr* e, const TypeMap& types,
+                              DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kBinary) {
+    bool lhs_ch = e->lhs && IsChandleVar(e->lhs, types);
+    bool rhs_ch = e->rhs && IsChandleVar(e->rhs, types);
+    if ((lhs_ch || rhs_ch) && !IsAllowedChandleBinaryOp(e->op)) {
+      diag.Error(e->range.start, "operator is not allowed on chandle");
+    }
+  }
+  if (e->kind == ExprKind::kUnary && IsChandleVar(e->lhs, types)) {
+    diag.Error(e->range.start, "operator is not allowed on chandle");
+  }
+  if (e->kind == ExprKind::kPostfixUnary && IsChandleVar(e->lhs, types)) {
+    diag.Error(e->range.start, "operator is not allowed on chandle");
+  }
+  if (e->kind == ExprKind::kSelect && e->base &&
+      IsChandleVar(e->base, types)) {
+    diag.Error(e->range.start, "bit-select on chandle is illegal");
+  }
+  CheckChandleExpr(e->lhs, types, diag);
+  CheckChandleExpr(e->rhs, types, diag);
+  CheckChandleExpr(e->base, types, diag);
+  CheckChandleExpr(e->index, types, diag);
+  CheckChandleExpr(e->condition, types, diag);
+  CheckChandleExpr(e->true_expr, types, diag);
+  CheckChandleExpr(e->false_expr, types, diag);
+  for (const auto* elem : e->elements) {
+    CheckChandleExpr(elem, types, diag);
+  }
+}
+
+void Elaborator::WalkStmtsForChandleOps(const Stmt* s) {
+  if (!s) return;
+  if ((s->kind == StmtKind::kBlockingAssign ||
+       s->kind == StmtKind::kNonblockingAssign) &&
+      s->lhs && s->rhs) {
+    bool lhs_ch = IsChandleVar(s->lhs, var_types_);
+    bool rhs_ch = IsChandleVar(s->rhs, var_types_);
+    if (lhs_ch && !rhs_ch && !IsNullLiteral(s->rhs)) {
+      diag_.Error(s->range.start,
+                  "chandle can only be assigned from another chandle or null");
+    }
+    if (!lhs_ch && rhs_ch) {
+      diag_.Error(s->range.start,
+                  "chandle cannot be assigned to a non-chandle variable");
+    }
+  }
+  CheckChandleExpr(s->rhs, var_types_, diag_);
+  CheckChandleExpr(s->expr, var_types_, diag_);
+  CheckChandleExpr(s->condition, var_types_, diag_);
+  for (auto* sub : s->stmts) WalkStmtsForChandleOps(sub);
+  WalkStmtsForChandleOps(s->then_branch);
+  WalkStmtsForChandleOps(s->else_branch);
+  WalkStmtsForChandleOps(s->body);
+  WalkStmtsForChandleOps(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForChandleOps(ci.body);
+}
+
+void Elaborator::ValidateChandleOps(const ModuleDecl* decl) {
+  bool has_chandle = false;
+  for (const auto& [name, kind] : var_types_) {
+    if (kind == DataTypeKind::kChandle) {
+      has_chandle = true;
+      break;
+    }
+  }
+  if (!has_chandle) return;
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForChandleOps(item->body);
+    }
+  }
+}
+
 // §6.6.8: interconnect nets cannot appear in continuous assignments.
 void Elaborator::ValidateInterconnectContAssign(const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kContAssign) return;
