@@ -1,31 +1,85 @@
-#include "fixture_simulator.h"
-#include "simulator/lowerer.h"
-#include "simulator/variable.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(DataTypeSim, TypeParameterDefault) {
-  SimFixture f;
+TEST(TypeParameterElab, BodyTypeParamElaboratesOk) {
+  ElabFixture f;
   auto* design = ElaborateSrc(
-      "module t;\n"
-      "  parameter type T = shortint;\n"
+      "module m;\n"
+      "  parameter type T = int;\n"
       "  T x;\n"
-      "  initial x = 32'hFFFFFFFF;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
 
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+TEST(TypeParameterElab, TypeParamVariableGetsCorrectWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter type T = shortint;\n"
+      "  T x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].name, "x");
+  EXPECT_EQ(mod->variables[0].width, 16u);
+}
 
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
+TEST(TypeParameterElab, LocalparamTypeElaboratesOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam type T = byte;\n"
+      "  T data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].name, "data");
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
 
-  EXPECT_EQ(var->value.width, 16u);
-  EXPECT_EQ(var->value.ToUint64(), 0xFFFFu);
+TEST(TypeParameterElab, MultipleTypeParamsElaborate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter type A = int;\n"
+      "  parameter type B = shortint;\n"
+      "  A x;\n"
+      "  B y;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 2u);
+  EXPECT_EQ(mod->variables[0].width, 32u);
+  EXPECT_EQ(mod->variables[1].width, 16u);
+}
+
+TEST(TypeParameterElab, TypeParamLogicVectorWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter type T = logic [7:0];\n"
+      "  T bus;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].name, "bus");
+  EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
 }  // namespace

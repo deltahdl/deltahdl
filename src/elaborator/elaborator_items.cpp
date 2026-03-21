@@ -167,12 +167,14 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
 
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.20.3: Type parameters register as typedefs.
-  if (item->data_type.kind == DataTypeKind::kVoid &&
-      item->typedef_type.kind != DataTypeKind::kImplicit) {
+  bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
+                 item->typedef_type.kind != DataTypeKind::kImplicit;
+  if (is_type) {
     typedefs_[item->name] = item->typedef_type;
   }
   RtlirParamDecl pd;
   pd.name = item->name;
+  pd.is_type_param = is_type;
   // §6.20.1: Body parameter becomes localparam when parameter_port_list exists.
   pd.is_localparam = item->is_localparam || mod->has_param_port_list;
   pd.default_value = item->init_expr;

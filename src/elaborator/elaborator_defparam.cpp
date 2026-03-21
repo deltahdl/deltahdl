@@ -59,6 +59,10 @@ void Elaborator::ApplyDefparams(RtlirModule* top, const ModuleDecl* decl) {
         continue;
       }
       if (param->from_override) continue;  // Instance #(...) takes priority.
+      if (param->is_type_param) {
+        diag_.Error(item->loc, "defparam cannot override a type parameter");
+        continue;
+      }
       auto val = ConstEvalInt(val_expr, scope);
       if (!val) {
         diag_.Warning(item->loc, "defparam value is not constant");

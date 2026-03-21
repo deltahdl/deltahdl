@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -546,6 +547,9 @@ struct ModuleItem {
   // §A.2.1.1: local_parameter_declaration vs parameter_declaration
   bool is_localparam = false;
 
+  // §6.20.3: forward_type restriction for type parameters.
+  DataTypeKind forward_type_kind = DataTypeKind::kImplicit;
+
   // checker_or_generate_item_declaration (A.1.8)
   bool is_rand = false;  // [rand] data_declaration in checker body
 
@@ -698,6 +702,7 @@ struct ModuleDecl {
   std::vector<PortDecl> ports;
   std::vector<ModuleItem*> items;
   std::vector<std::pair<std::string_view, Expr*>> params;
+  std::unordered_set<std::string_view> type_param_names;  // §6.20.3
   bool has_param_port_list = false;  // §6.20.1: #(...) was present.
   std::vector<ModportDecl*> modports;
 
@@ -767,6 +772,7 @@ struct ClassDecl {
   std::vector<std::string_view> implements_types;  // §8.3/§8.26: implements
   std::vector<ClassMember*> members;
   std::vector<std::pair<std::string_view, Expr*>> params;
+  std::unordered_set<std::string_view> type_param_names;  // §6.20.3
 };
 
 // --- Specify block items (§30, §31) ---

@@ -142,6 +142,7 @@ struct RtlirParamDecl {
   bool is_localparam = false;  // §A.2.1.1: localparam vs parameter.
   bool from_override = false;  // True when set via instance #(...) override.
   bool is_unbounded = false;   // §6.20.7: parameter assigned $.
+  bool is_type_param = false;  // §6.20.3: type parameter.
 };
 
 // --- Port binding (for module instances) ---

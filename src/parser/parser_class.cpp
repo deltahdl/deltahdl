@@ -245,7 +245,7 @@ ClassDecl* Parser::ParseClassDecl() {
     Consume();
     Expect(TokenKind::kLParen);
     while (!Check(TokenKind::kRParen) && !AtEnd()) {
-      ParseParamPortDecl(decl->params);
+      ParseParamPortDecl(decl->params, decl->type_param_names);
       Match(TokenKind::kComma);
     }
     Expect(TokenKind::kRParen);

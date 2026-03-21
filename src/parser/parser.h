@@ -59,7 +59,8 @@ class Parser {
                          CompilationUnit* cu = nullptr);
   bool TryParseClockingOrVerification(std::vector<ModuleItem*>& items);
   void ParseParamPortDecl(
-      std::vector<std::pair<std::string_view, Expr*>>& params);
+      std::vector<std::pair<std::string_view, Expr*>>& params,
+      std::unordered_set<std::string_view>& type_param_names);
   void ParseParamsPortsAndSemicolon(ModuleDecl& decl);
 
   // Generate blocks (parser_generate.cpp)

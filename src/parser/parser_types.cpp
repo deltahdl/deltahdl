@@ -462,12 +462,18 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
 void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
                                 SourceLoc loc, bool localparam) {
   // Optional forward_type: enum | struct | union | class | interface class
+  DataTypeKind fwd = DataTypeKind::kImplicit;
   if (Check(TokenKind::kKwEnum) || Check(TokenKind::kKwStruct) ||
       Check(TokenKind::kKwUnion) || Check(TokenKind::kKwClass) ||
       Check(TokenKind::kKwInterface)) {
     if (Match(TokenKind::kKwInterface)) {
       Expect(TokenKind::kKwClass);
+      fwd = DataTypeKind::kVoid;  // Reuse kVoid for interface class.
     } else {
+      if (Check(TokenKind::kKwEnum)) fwd = DataTypeKind::kEnum;
+      else if (Check(TokenKind::kKwStruct)) fwd = DataTypeKind::kStruct;
+      else if (Check(TokenKind::kKwUnion)) fwd = DataTypeKind::kUnion;
+      else if (Check(TokenKind::kKwClass)) fwd = DataTypeKind::kNamed;
       Consume();
     }
   }
@@ -478,6 +484,7 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
     item->is_localparam = localparam;
     item->loc = loc;
     item->data_type.kind = DataTypeKind::kVoid;  // Marker for type params.
+    item->forward_type_kind = fwd;
     item->name = Expect(TokenKind::kIdentifier).text;
     if (Match(TokenKind::kEq)) {
       auto dtype = ParseDataType();

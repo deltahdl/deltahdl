@@ -167,7 +167,8 @@ ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
 }
 
 void Parser::ParseParamPortDecl(
-    std::vector<std::pair<std::string_view, Expr*>>& params) {
+    std::vector<std::pair<std::string_view, Expr*>>& params,
+    std::unordered_set<std::string_view>& type_param_names) {
   Match(TokenKind::kKwParameter) || Match(TokenKind::kKwLocalparam);
   // Handle type parameter: #(type T = real)  (§6.20.3)
   if (Match(TokenKind::kKwType)) {
@@ -180,6 +181,7 @@ void Parser::ParseParamPortDecl(
       }
     }
     params.push_back({name.text, nullptr});
+    type_param_names.insert(name.text);
     known_types_.insert(name.text);
     return;
   }
@@ -202,9 +204,9 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
     Expect(TokenKind::kLParen);
     decl.has_param_port_list = true;
     if (!Check(TokenKind::kRParen)) {
-      ParseParamPortDecl(decl.params);
+      ParseParamPortDecl(decl.params, decl.type_param_names);
       while (Match(TokenKind::kComma)) {
-        ParseParamPortDecl(decl.params);
+        ParseParamPortDecl(decl.params, decl.type_param_names);
       }
     }
     Expect(TokenKind::kRParen);
