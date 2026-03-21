@@ -152,4 +152,12 @@ TEST(AttributeSyntaxParsing, AttrValueStringLiteral) {
   EXPECT_TRUE(ParseOk("(* tool = \"synplify\" *) module m; endmodule\n"));
 }
 
+TEST(AttributeSyntaxParsing, ErrorUnterminatedAttribute) {
+  EXPECT_FALSE(ParseOk("(* missing_end module m; endmodule\n"));
+}
+
+TEST(AttributeSyntaxParsing, ErrorEmptyAttribute) {
+  EXPECT_FALSE(ParseOk("(* *) module m; endmodule\n"));
+}
+
 }  // namespace
