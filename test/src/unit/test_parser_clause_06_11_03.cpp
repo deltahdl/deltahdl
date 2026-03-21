@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(NetAndVariableTypeParsing, DataTypeIntegerAtom) {
+TEST(SignedAndUnsigned, DataTypeIntegerAtom) {
   auto r = Parse("module m; int unsigned x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,14 +15,14 @@ TEST(NetAndVariableTypeParsing, DataTypeIntegerAtom) {
   EXPECT_FALSE(item->data_type.is_signed);
 }
 
-TEST(NetAndVariableTypeParsing, SigningUnsigned) {
+TEST(SignedAndUnsigned, SigningUnsigned) {
   auto r = Parse("module m; integer unsigned x; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_FALSE(r.cu->modules[0]->items[0]->data_type.is_signed);
 }
 
-TEST(NetAndVariableTypeParsing, DataTypeIntegerVector) {
+TEST(SignedAndUnsigned, DataTypeIntegerVector) {
   auto r = Parse("module m; logic signed [7:0] a; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -32,7 +32,7 @@ TEST(NetAndVariableTypeParsing, DataTypeIntegerVector) {
   EXPECT_NE(item->data_type.packed_dim_left, nullptr);
 }
 
-TEST(DataTypeParsing, LogicSignedWithPackedDims) {
+TEST(SignedAndUnsigned, LogicSignedWithPackedDims) {
   auto r = Parse(
       "module t;\n"
       "  logic signed [15:0] sv;\n"
@@ -49,7 +49,7 @@ TEST(DataTypeParsing, LogicSignedWithPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(DataTypeParsing, BitUnsignedWithPackedDims) {
+TEST(SignedAndUnsigned, BitUnsignedWithPackedDims) {
   auto r = Parse(
       "module t;\n"
       "  bit unsigned [7:0] uv;\n"
@@ -64,7 +64,7 @@ TEST(DataTypeParsing, BitUnsignedWithPackedDims) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
 }
 
-TEST(DataTypeParsing, ByteSignedExplicit) {
+TEST(SignedAndUnsigned, ByteSignedExplicit) {
   auto r = Parse(
       "module t;\n"
       "  byte signed bs;\n"
@@ -78,7 +78,7 @@ TEST(DataTypeParsing, ByteSignedExplicit) {
   EXPECT_EQ(item->name, "bs");
 }
 
-TEST(DataTypeParsing, ByteUnsignedOverride) {
+TEST(SignedAndUnsigned, ByteUnsignedOverride) {
   auto r = Parse(
       "module t;\n"
       "  byte unsigned bu;\n"
@@ -92,7 +92,7 @@ TEST(DataTypeParsing, ByteUnsignedOverride) {
   EXPECT_EQ(item->name, "bu");
 }
 
-TEST(DataTypeParsing, ShortintUnsignedOverride) {
+TEST(SignedAndUnsigned, ShortintUnsignedOverride) {
   auto r = Parse(
       "module t;\n"
       "  shortint unsigned su;\n"
@@ -106,7 +106,7 @@ TEST(DataTypeParsing, ShortintUnsignedOverride) {
   EXPECT_EQ(item->name, "su");
 }
 
-TEST(DataTypeParsing, LongintUnsignedOverride) {
+TEST(SignedAndUnsigned, LongintUnsignedOverride) {
   auto r = Parse(
       "module t;\n"
       "  longint unsigned lu;\n"
@@ -120,7 +120,7 @@ TEST(DataTypeParsing, LongintUnsignedOverride) {
   EXPECT_EQ(item->name, "lu");
 }
 
-TEST(DataTypeParsing, IntegerUnsignedOverride) {
+TEST(SignedAndUnsigned, IntegerUnsignedOverride) {
   auto r = Parse(
       "module t;\n"
       "  integer unsigned iu;\n"
@@ -134,7 +134,7 @@ TEST(DataTypeParsing, IntegerUnsignedOverride) {
   EXPECT_EQ(item->name, "iu");
 }
 
-TEST(DataTypeParsing, TimeSignedOverride) {
+TEST(SignedAndUnsigned, TimeSignedOverride) {
   auto r = Parse(
       "module t;\n"
       "  time signed ts;\n"
@@ -148,7 +148,7 @@ TEST(DataTypeParsing, TimeSignedOverride) {
   EXPECT_EQ(item->name, "ts");
 }
 
-TEST(DataTypeParsing, BitSignedOverride) {
+TEST(SignedAndUnsigned, BitSignedOverride) {
   auto r = Parse(
       "module t;\n"
       "  bit signed bs;\n"
@@ -162,7 +162,7 @@ TEST(DataTypeParsing, BitSignedOverride) {
   EXPECT_EQ(item->name, "bs");
 }
 
-TEST(DataTypeParsing, IntUnsignedDecl) {
+TEST(SignedAndUnsigned, IntUnsignedDecl) {
   auto r = Parse(
       "module m;\n"
       "  int unsigned ui;\n"
@@ -176,7 +176,7 @@ TEST(DataTypeParsing, IntUnsignedDecl) {
   EXPECT_EQ(item->name, "ui");
 }
 
-TEST(DataTypeParsing, IntSignedDecl) {
+TEST(SignedAndUnsigned, IntSignedDecl) {
   auto r = Parse(
       "module m;\n"
       "  int signed si;\n"
@@ -189,7 +189,7 @@ TEST(DataTypeParsing, IntSignedDecl) {
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
-TEST(DataTypeParsing, LogicSignedDecl) {
+TEST(SignedAndUnsigned, LogicSignedDecl) {
   auto r = Parse(
       "module m;\n"
       "  logic signed [7:0] sv;\n"
@@ -202,7 +202,7 @@ TEST(DataTypeParsing, LogicSignedDecl) {
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
-TEST(DataTypeParsing, RegUnsignedDecl) {
+TEST(SignedAndUnsigned, RegUnsignedDecl) {
   auto r = Parse(
       "module m;\n"
       "  reg unsigned [3:0] ru;\n"
@@ -215,7 +215,7 @@ TEST(DataTypeParsing, RegUnsignedDecl) {
   EXPECT_FALSE(item->data_type.is_signed);
 }
 
-TEST(ConstrainedRandomParsing, IntUnsignedFunctionReturnType) {
+TEST(SignedAndUnsigned, IntUnsignedFunctionReturnType) {
   auto r = Parse(
       "class C;\n"
       "  function int unsigned get_val();\n"
@@ -230,7 +230,7 @@ TEST(ConstrainedRandomParsing, IntUnsignedFunctionReturnType) {
   EXPECT_GE(r.cu->classes[0]->members.size(), 1u);
 }
 
-TEST(DataTypeParsing, RegSignedQualifier) {
+TEST(SignedAndUnsigned, RegSignedQualifier) {
   auto r = Parse(
       "module t;\n"
       "  reg signed [7:0] sr;\n"
@@ -245,7 +245,7 @@ TEST(DataTypeParsing, RegSignedQualifier) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
 }
 
-TEST(DataTypeParsing, AllTypesExplicitSignedness) {
+TEST(SignedAndUnsigned, AllTypesExplicitSignedness) {
   auto r = Parse(
       "module t;\n"
       "  byte signed bs;\n"
@@ -300,7 +300,7 @@ TEST(DataTypeParsing, AllTypesExplicitSignedness) {
   EXPECT_FALSE(items[17]->data_type.is_signed);
 }
 
-TEST(DataTypeParsing, RegUnsignedExplicit) {
+TEST(SignedAndUnsigned, RegUnsignedExplicit) {
   auto r = Parse(
       "module t;\n"
       "  reg unsigned [7:0] ru;\n"
@@ -314,7 +314,7 @@ TEST(DataTypeParsing, RegUnsignedExplicit) {
   ASSERT_NE(item->data_type.packed_dim_left, nullptr);
 }
 
-TEST(DataTypeParsing, IntDefaultSigned) {
+TEST(SignedAndUnsigned, IntDefaultSigned) {
   auto r = Parse(
       "module t;\n"
       "  int x;\n"
@@ -326,7 +326,7 @@ TEST(DataTypeParsing, IntDefaultSigned) {
   EXPECT_TRUE(item->data_type.is_signed) << "int is signed by default";
 }
 
-TEST(DataTypeParsing, IntExplicitUnsigned) {
+TEST(SignedAndUnsigned, IntExplicitUnsigned) {
   auto r = Parse(
       "module t;\n"
       "  int unsigned x;\n"
@@ -338,7 +338,7 @@ TEST(DataTypeParsing, IntExplicitUnsigned) {
   EXPECT_FALSE(item->data_type.is_signed) << "int unsigned is unsigned";
 }
 
-TEST(DataTypeParsing, ByteDefaultSigned) {
+TEST(SignedAndUnsigned, ByteDefaultSigned) {
   auto r = Parse(
       "module t;\n"
       "  byte b;\n"
@@ -350,7 +350,7 @@ TEST(DataTypeParsing, ByteDefaultSigned) {
   EXPECT_TRUE(item->data_type.is_signed) << "byte is signed by default";
 }
 
-TEST(DataTypeParsing, ShortintDefaultSigned) {
+TEST(SignedAndUnsigned, ShortintDefaultSigned) {
   auto r = Parse(
       "module t;\n"
       "  shortint s;\n"
@@ -362,7 +362,7 @@ TEST(DataTypeParsing, ShortintDefaultSigned) {
   EXPECT_TRUE(item->data_type.is_signed) << "shortint is signed by default";
 }
 
-TEST(DataTypeParsing, LongintDefaultSigned) {
+TEST(SignedAndUnsigned, LongintDefaultSigned) {
   auto r = Parse(
       "module t;\n"
       "  longint l;\n"
@@ -374,7 +374,7 @@ TEST(DataTypeParsing, LongintDefaultSigned) {
   EXPECT_TRUE(item->data_type.is_signed) << "longint is signed by default";
 }
 
-TEST(DataTypeParsing, IntegerDefaultSigned) {
+TEST(SignedAndUnsigned, IntegerDefaultSigned) {
   auto r = Parse(
       "module t;\n"
       "  integer i;\n"
@@ -386,7 +386,7 @@ TEST(DataTypeParsing, IntegerDefaultSigned) {
   EXPECT_TRUE(item->data_type.is_signed) << "integer is signed by default";
 }
 
-TEST(DataTypeParsing, TimeDefaultUnsigned) {
+TEST(SignedAndUnsigned, TimeDefaultUnsigned) {
   auto r = Parse(
       "module t;\n"
       "  time t;\n"
@@ -398,7 +398,7 @@ TEST(DataTypeParsing, TimeDefaultUnsigned) {
   EXPECT_FALSE(item->data_type.is_signed) << "time is unsigned by default";
 }
 
-TEST(DataTypeParsing, LogicDefaultUnsigned) {
+TEST(SignedAndUnsigned, LogicDefaultUnsigned) {
   auto r = Parse(
       "module t;\n"
       "  logic l;\n"
@@ -410,7 +410,7 @@ TEST(DataTypeParsing, LogicDefaultUnsigned) {
   EXPECT_FALSE(item->data_type.is_signed) << "logic is unsigned by default";
 }
 
-TEST(DataTypeParsing, BitDefaultUnsigned) {
+TEST(SignedAndUnsigned, BitDefaultUnsigned) {
   auto r = Parse(
       "module t;\n"
       "  bit b;\n"
@@ -422,7 +422,7 @@ TEST(DataTypeParsing, BitDefaultUnsigned) {
   EXPECT_FALSE(item->data_type.is_signed) << "bit is unsigned by default";
 }
 
-TEST(DataTypeParsing, RegDefaultUnsigned) {
+TEST(SignedAndUnsigned, RegDefaultUnsigned) {
   auto r = Parse(
       "module t;\n"
       "  reg r;\n"
@@ -434,7 +434,7 @@ TEST(DataTypeParsing, RegDefaultUnsigned) {
   EXPECT_FALSE(item->data_type.is_signed) << "reg is unsigned by default";
 }
 
-TEST(DataTypeParsing, SignedVector) {
+TEST(SignedAndUnsigned, SignedVector) {
   auto r = Parse(
       "module t;\n"
       "  logic signed [7:0] sv;\n"
@@ -446,7 +446,7 @@ TEST(DataTypeParsing, SignedVector) {
   EXPECT_TRUE(item->data_type.is_signed);
 }
 
-TEST(DataTypeParsing, UnsignedVector) {
+TEST(SignedAndUnsigned, UnsignedVector) {
   auto r = Parse(
       "module t;\n"
       "  logic unsigned [15:0] uv;\n"
