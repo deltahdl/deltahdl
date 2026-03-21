@@ -820,6 +820,8 @@ Expr* Parser::ParseConcatenation() {
     }
     Expect(TokenKind::kRBrace);
     Expect(TokenKind::kRBrace);
+    // §A.8.4: multiple_concatenation [ [ range_expression ] ]
+    if (Check(TokenKind::kLBracket)) return ParseSelectExpr(rep);
     return rep;
   }
 
