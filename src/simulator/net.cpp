@@ -242,7 +242,9 @@ bool Net::InCapacitiveState() const {
 }
 
 void Net::Resolve(Arena& arena, Scheduler* sched) {
-  if (!resolved || drivers.empty()) return;
+  if (!resolved) return;
+  // §6.7.3: User-defined nettypes must resolve even with no drivers.
+  if (drivers.empty() && !is_user_nettype) return;
 
   // Cancel pending decay when trireg exits capacitive state.
   if (type == NetType::kTrireg && !AllDriversZ(drivers)) {

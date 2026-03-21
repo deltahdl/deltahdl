@@ -53,10 +53,15 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
                            bool is_user_nettype,
                            std::string_view resolve_func) {
   auto* var = CreateVariable(name, width);
-  // Initialize net value to z (aval=all-ones, bval=all-ones) per IEEE §6.5.
-  for (uint32_t i = 0; i < var->value.nwords; ++i) {
-    var->value.words[i].aval = ~uint64_t{0};
-    var->value.words[i].bval = ~uint64_t{0};
+  if (is_user_nettype) {
+    // §6.7.3: User-defined nettype defaults to data type default (x for logic).
+    // CreateVariable already initializes to x, so nothing more needed.
+  } else {
+    // Initialize net value to z (aval=all-ones, bval=all-ones) per IEEE §6.5.
+    for (uint32_t i = 0; i < var->value.nwords; ++i) {
+      var->value.words[i].aval = ~uint64_t{0};
+      var->value.words[i].bval = ~uint64_t{0};
+    }
   }
   auto* net = arena_.Create<Net>();
   net->type = type;

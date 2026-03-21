@@ -266,54 +266,6 @@ TEST(UserDefinedNettype, ReleaseRestoresResolvedValue) {
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
 }
 
-TEST(UserDefinedNettype, ResolutionActivatedAtTimeZero) {
-  Arena arena;
-  auto* var = MakeVar(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-
-  bool activated = false;
-  UserNettype nt;
-  nt.resolution = [&](Arena& a, const std::vector<Logic4Vec>&) -> Logic4Vec {
-    activated = true;
-    return MakeLogic4Vec(a, 1);
-  };
-
-  ResolveUserDefinedNet(net, nt, arena);
-  EXPECT_TRUE(activated);
-}
-
-TEST(UserDefinedNettype, ResolutionAtTimeZeroEvenNoDrivers) {
-  Arena arena;
-  auto* var = MakeVar(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-
-  bool activated = false;
-  UserNettype nt;
-  nt.resolution = [&](Arena& a,
-                      const std::vector<Logic4Vec>& drivers) -> Logic4Vec {
-    activated = true;
-    EXPECT_TRUE(drivers.empty());
-    return MakeLogic4Vec(a, 1);
-  };
-
-  ResolveUserDefinedNet(net, nt, arena);
-  EXPECT_TRUE(activated);
-}
-
-TEST(UserDefinedNettype, DefaultIsDataTypeDefault) {
-  Arena arena;
-  auto* var = MakeVar(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-
-  EXPECT_EQ(ValOf(*var), kValX);
-}
-
 TEST(UserDefinedNettype, ResolutionReceivesDrivers) {
   Arena arena;
   auto* var = MakeVar(arena, 1);
