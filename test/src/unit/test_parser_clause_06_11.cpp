@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(DataTypeParsing, IntegerTypeTimeDecl) {
+TEST(IntegerDataType, IntegerTypeTimeDecl) {
   auto r = Parse(
       "module m;\n"
       "  time t;\n"
@@ -17,7 +17,7 @@ TEST(DataTypeParsing, IntegerTypeTimeDecl) {
   EXPECT_EQ(item->name, "t");
 }
 
-TEST(DataTypeParsing, ByteFunctionReturnType) {
+TEST(IntegerDataType, ByteFunctionReturnType) {
   auto r = Parse(
       "module t;\n"
       "  function byte get_byte();\n"
@@ -32,7 +32,7 @@ TEST(DataTypeParsing, ByteFunctionReturnType) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kByte);
 }
 
-TEST(DataTypeParsing, IntegerTypesInTaskPorts) {
+TEST(IntegerDataType, IntegerTypesInTaskPorts) {
   auto r = Parse(
       "module t;\n"
       "  task t1(input int x, output longint y);\n"
@@ -50,7 +50,7 @@ TEST(DataTypeParsing, IntegerTypesInTaskPorts) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
-TEST(DataTypeParsing, LongintWithInit) {
+TEST(IntegerDataType, LongintWithInit) {
   auto r = Parse(
       "module t;\n"
       "  longint big = 64'hDEAD_BEEF_CAFE_BABE;\n"
@@ -62,7 +62,7 @@ TEST(DataTypeParsing, LongintWithInit) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kLongint);
   ASSERT_NE(item->init_expr, nullptr);
 }
-TEST(DataTypeParsing, IntVarDecl) {
+TEST(IntegerDataType, IntVarDecl) {
   auto r = Parse(
       "module t;\n"
       "  int count;\n"
@@ -74,7 +74,7 @@ TEST(DataTypeParsing, IntVarDecl) {
   EXPECT_EQ(item->name, "count");
 }
 
-TEST(NetAndVariableTypeParsing, IntegerAtomTypes) {
+TEST(IntegerDataType, IntegerAtomTypes) {
   auto r = Parse(
       "module m;\n"
       "  byte a;\n"
