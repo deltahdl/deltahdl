@@ -24,4 +24,58 @@ TEST(StringMethods, SubstrOutOfBounds) {
   EXPECT_EQ(VecToString(result), "");
 }
 
+TEST(StringMethods, SubstrNegativeI) {
+  StringFixture f;
+  f.CreateStringVar("s", "hello");
+  auto* call = f.MakeMethodCall("s", "substr",
+                                {f.MakeIntLiteral(-1), f.MakeIntLiteral(2)});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(VecToString(result), "");
+}
+
+TEST(StringMethods, SubstrJLessThanI) {
+  StringFixture f;
+  f.CreateStringVar("s", "hello");
+  auto* call = f.MakeMethodCall("s", "substr",
+                                {f.MakeIntLiteral(3), f.MakeIntLiteral(1)});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(VecToString(result), "");
+}
+
+TEST(StringMethods, SubstrJBeyondLength) {
+  StringFixture f;
+  f.CreateStringVar("s", "hello");
+  auto* call = f.MakeMethodCall("s", "substr",
+                                {f.MakeIntLiteral(0), f.MakeIntLiteral(10)});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(VecToString(result), "");
+}
+
+TEST(StringMethods, SubstrEntireString) {
+  StringFixture f;
+  f.CreateStringVar("s", "hello");
+  auto* call = f.MakeMethodCall("s", "substr",
+                                {f.MakeIntLiteral(0), f.MakeIntLiteral(4)});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(VecToString(result), "hello");
+}
+
+TEST(StringMethods, SubstrSingleCharacter) {
+  StringFixture f;
+  f.CreateStringVar("s", "hello");
+  auto* call = f.MakeMethodCall("s", "substr",
+                                {f.MakeIntLiteral(2), f.MakeIntLiteral(2)});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(VecToString(result), "l");
+}
+
+TEST(StringMethods, SubstrEmptyString) {
+  StringFixture f;
+  f.CreateStringVar("s", "");
+  auto* call = f.MakeMethodCall("s", "substr",
+                                {f.MakeIntLiteral(0), f.MakeIntLiteral(0)});
+  auto result = EvalExpr(call, f.ctx, f.arena);
+  EXPECT_EQ(VecToString(result), "");
+}
+
 }  // namespace
