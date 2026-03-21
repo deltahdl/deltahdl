@@ -35,7 +35,6 @@ def _all_flags(tmp_path, clauses="15=17,16=18"):
     return [
         "--lrm", _create_lrm(tmp_path),
         "--clauses", clauses,
-        "--master-issue", "1",
         "--organization", "o",
         "--repo", "r",
     ]
@@ -59,7 +58,6 @@ def test_missing_lrm_exits_nonzero(tmp_path):
     result = _invoke(
         "--lrm", str(tmp_path / "no.pdf"),
         "--clauses", "15=17",
-        "--master-issue", "1",
         "--organization", "o",
         "--repo", "r",
     )

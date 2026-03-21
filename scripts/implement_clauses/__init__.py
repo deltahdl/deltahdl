@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> None:
     """Parse args and invoke implement_clause for each clause."""
     args = parse_args(argv)
     params = ClauseParams(
-        str(args.lrm), args.master_issue, args.organization, args.repo,
+        str(args.lrm), args.organization, args.repo,
     )
     for i, (clause, sub_issue) in enumerate(args.clauses.items()):
         continue_session = i > 0 or args.continue_session

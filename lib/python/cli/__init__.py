@@ -75,19 +75,12 @@ class ClauseParams:
     """Batch-constant parameters for ``invoke_implement_clause``."""
 
     lrm: str
-    master_issue: int
     organization: str
     repo: str
 
 
 def add_github_args(parser: argparse.ArgumentParser) -> None:
-    """Add ``--master-issue``, ``--organization``, and ``--repo`` to *parser*."""
-    parser.add_argument(
-        "--master-issue",
-        type=int,
-        required=True,
-        help="GitHub master tracking issue number.",
-    )
+    """Add ``--organization`` and ``--repo`` to *parser*."""
     parser.add_argument(
         "--organization",
         required=True,
@@ -240,8 +233,7 @@ def invoke_implement_clause(
         sys.executable, "-m", "implement_clause",
         "--lrm", params.lrm,
         "--clause", clause,
-        "--sub-issue", str(sub_issue),
-        "--master-issue", str(params.master_issue),
+        "--issue", str(sub_issue),
         "--organization", params.organization,
         "--repo", params.repo,
     ]

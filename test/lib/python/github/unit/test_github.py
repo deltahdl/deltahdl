@@ -21,7 +21,6 @@ from lib.python.github import (
     fetch_issue_title,
     find_issue_by_title,
     format_subclause_label,
-    mark_master_complete,
     next_unchecked,
     remove_test_row,
     sync_checklist,
@@ -362,59 +361,6 @@ def test_next_unchecked_indented() -> None:
     )
     assert next_unchecked(body) == "6.3.1"
 
-
-# --- mark_master_complete ---
-
-
-_MASTER_BODY = """\
-## Phase 1
-
-| Section | Title | Issue | Status |
-|---------|-------|-------|--------|
-| §3 | Building blocks | #5 | :white_check_mark: |
-| §4 | Scheduling semantics | #6 | |
-"""
-
-
-def _mark_master_and_capture(monkeypatch, sub_issue=6) -> str:
-    """Call mark_master_complete and return the updated body."""
-    monkeypatch.setattr(
-        "lib.python.github.fetch_issue_body", lambda *_a: _MASTER_BODY,
-    )
-    updated: list[str] = []
-    monkeypatch.setattr(
-        "lib.python.github.update_issue_body",
-        lambda _o, _r, _i, body: updated.append(body),
-    )
-    mark_master_complete("o", "r", 1, sub_issue)
-    assert updated, "update_issue_body was not called"
-    return updated[0]
-
-
-def test_mark_master_complete_ticks_status(monkeypatch) -> None:
-    """Row matching the sub-issue gets :white_check_mark: in Status."""
-    body = _mark_master_and_capture(monkeypatch)
-    assert "| #6 | :white_check_mark: |" in body
-
-
-def test_mark_master_complete_preserves_other_rows(monkeypatch) -> None:
-    """Other rows are unchanged after marking."""
-    body = _mark_master_and_capture(monkeypatch)
-    assert "| #5 | :white_check_mark: |" in body
-
-
-def test_mark_master_complete_warns_when_not_found(
-    monkeypatch, capsys,
-) -> None:
-    """Prints warning when no matching row found."""
-    monkeypatch.setattr(
-        "lib.python.github.fetch_issue_body", lambda *_a: _MASTER_BODY,
-    )
-    monkeypatch.setattr(
-        "lib.python.github.update_issue_body", lambda *_a: None,
-    )
-    mark_master_complete("o", "r", 1, 999)
-    assert "WARNING" in capsys.readouterr().err
 
 
 # --- remove_test_row ---

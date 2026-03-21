@@ -104,19 +104,11 @@ def test_validate_lrm_file_missing() -> None:
 # ---- add_github_args --------------------------------------------------------
 
 
-def test_add_github_args_master_issue() -> None:
-    """Adds --master-issue as required int."""
-    parser = argparse.ArgumentParser()
-    add_github_args(parser)
-    args = parser.parse_args(["--master-issue", "1", "--organization", "o", "--repo", "r"])
-    assert args.master_issue == 1
-
-
 def test_add_github_args_organization() -> None:
     """Adds --organization as required string."""
     parser = argparse.ArgumentParser()
     add_github_args(parser)
-    args = parser.parse_args(["--master-issue", "1", "--organization", "myorg", "--repo", "r"])
+    args = parser.parse_args(["--organization", "myorg", "--repo", "r"])
     assert args.organization == "myorg"
 
 
@@ -124,7 +116,7 @@ def test_add_github_args_repo() -> None:
     """Adds --repo as required string."""
     parser = argparse.ArgumentParser()
     add_github_args(parser)
-    args = parser.parse_args(["--master-issue", "1", "--organization", "o", "--repo", "myrepo"])
+    args = parser.parse_args(["--organization", "o", "--repo", "myrepo"])
     assert args.repo == "myrepo"
 
 
@@ -263,7 +255,7 @@ def test_add_clauses_arg() -> None:
 
 
 _CL_PARAMS = ClauseParams(
-    lrm="/tmp/lrm.pdf", master_issue=1,
+    lrm="/tmp/lrm.pdf",
     organization="deltahdl", repo="deltahdl",
 )
 
@@ -286,16 +278,10 @@ def test_invoke_implement_clause_clause(monkeypatch) -> None:
     assert cmd[cmd.index("--clause") + 1] == "15"
 
 
-def test_invoke_implement_clause_sub_issue(monkeypatch) -> None:
-    """Passes --sub-issue as string."""
+def test_invoke_implement_clause_issue(monkeypatch) -> None:
+    """Passes --issue as string."""
     cmd = _invoke_clause_and_capture(monkeypatch)
-    assert cmd[cmd.index("--sub-issue") + 1] == "17"
-
-
-def test_invoke_implement_clause_master_issue(monkeypatch) -> None:
-    """Passes --master-issue as string."""
-    cmd = _invoke_clause_and_capture(monkeypatch)
-    assert cmd[cmd.index("--master-issue") + 1] == "1"
+    assert cmd[cmd.index("--issue") + 1] == "17"
 
 
 def test_invoke_implement_clause_organization(monkeypatch) -> None:

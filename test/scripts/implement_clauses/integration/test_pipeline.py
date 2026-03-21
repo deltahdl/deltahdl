@@ -19,7 +19,7 @@ def _patch_externals(monkeypatch, icls):
     calls = []
 
     def fake_invoke(ctx, clause, sub_issue, **_kw):
-        calls.append((clause, sub_issue, ctx.master_issue, ctx.organization, ctx.repo))
+        calls.append((clause, sub_issue, ctx.organization, ctx.repo))
 
     monkeypatch.setattr(icls, "invoke_implement_clause", fake_invoke)
     return calls
