@@ -295,4 +295,3 @@ def remove_test_row(body: str, test_name: str) -> str:
         )
     return body[:match.start()] + body[match.end():]
 
-
