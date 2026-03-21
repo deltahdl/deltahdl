@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeParsing, DynamicCastTask) {
+TEST(DynamicCastParsing, DynamicCastTask) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef enum { A, B, C } abc_t;\n"
@@ -17,7 +17,7 @@ TEST(DataTypeParsing, DynamicCastTask) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, DynamicCastFunction) {
+TEST(DynamicCastParsing, DynamicCastFunction) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef enum { X, Y, Z } xyz_t;\n"
@@ -29,7 +29,7 @@ TEST(DataTypeParsing, DynamicCastFunction) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, DynamicCastCall) {
+TEST(DynamicCastParsing, DynamicCastCall) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -45,7 +45,7 @@ TEST(DataTypeParsing, DynamicCastCall) {
   EXPECT_EQ(stmt->expr->callee, "$cast");
 }
 
-TEST(DataTypeParsing, DynamicCastInCondition) {
+TEST(DynamicCastParsing, DynamicCastInCondition) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -57,6 +57,17 @@ TEST(DataTypeParsing, DynamicCastInCondition) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
+}
+
+TEST(DynamicCastParsing, DynamicCastWithExpression) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  typedef enum {RED, GREEN, BLUE, YELLOW, WHITE, BLACK} Colors;\n"
+              "  Colors col;\n"
+              "  initial begin\n"
+              "    $cast(col, 2 + 3);\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 }  // namespace

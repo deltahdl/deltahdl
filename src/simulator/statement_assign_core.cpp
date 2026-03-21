@@ -542,7 +542,12 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
 }
 
 StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  EvalExpr(stmt->expr, ctx, arena);
+  auto result = EvalExpr(stmt->expr, ctx, arena);
+  // §6.24.2: Task-form $cast issues a runtime error on invalid assignment.
+  if (stmt->expr && stmt->expr->kind == ExprKind::kSystemCall &&
+      stmt->expr->callee == "$cast" && result.ToUint64() == 0) {
+    ctx.GetDiag().Error({}, "runtime error: $cast failed — invalid assignment");
+  }
   return StmtResult::kDone;
 }
 
