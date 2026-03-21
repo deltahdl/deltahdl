@@ -265,4 +265,40 @@ TEST(WireTriResolution, ThreeDriverWireResolution) {
   EXPECT_TRUE((w.bval & 8u) == 0);
 }
 
+TEST(WireTriResolution, WireZDriverPassesThrough) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 42));
+  auto z_drv = MakeLogic4Vec(arena, 8);
+  z_drv.words[0].aval = 0xFF;
+  z_drv.words[0].bval = 0xFF;
+  net.drivers.push_back(z_drv);
+
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(WireTriResolution, TriZDriverPassesThrough) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  Net net;
+  net.type = NetType::kTri;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 8, 42));
+  auto z_drv = MakeLogic4Vec(arena, 8);
+  z_drv.words[0].aval = 0xFF;
+  z_drv.words[0].bval = 0xFF;
+  net.drivers.push_back(z_drv);
+
+  net.Resolve(arena);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
 }  // namespace

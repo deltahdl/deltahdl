@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, WireNetType) {
+TEST(WireTriElaboration, WireNetType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -22,7 +22,7 @@ TEST(Elaboration, WireNetType) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kWire);
 }
 
-TEST(Elaboration, TriNetType) {
+TEST(WireTriElaboration, TriNetType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -39,7 +39,7 @@ TEST(Elaboration, TriNetType) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kTri);
 }
 
-TEST(Elaboration, WireAndTriAreNets) {
+TEST(WireTriElaboration, WireAndTriAreNets) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -57,7 +57,7 @@ TEST(Elaboration, WireAndTriAreNets) {
   EXPECT_TRUE(mod->variables.empty());
 }
 
-TEST(Elaboration, WireVectorWidth) {
+TEST(WireTriElaboration, WireVectorWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -73,7 +73,7 @@ TEST(Elaboration, WireVectorWidth) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kWire);
 }
 
-TEST(Elaboration, TriVectorWidth) {
+TEST(WireTriElaboration, TriVectorWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -87,6 +87,40 @@ TEST(Elaboration, TriVectorWidth) {
   ASSERT_EQ(mod->nets.size(), 1u);
   EXPECT_EQ(mod->nets[0].width, 16u);
   EXPECT_EQ(mod->nets[0].net_type, NetType::kTri);
+}
+
+TEST(WireTriElaboration, WireMultipleDeclarators) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire a, b, c;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->nets.size(), 3u);
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kWire);
+  EXPECT_EQ(mod->nets[1].net_type, NetType::kWire);
+  EXPECT_EQ(mod->nets[2].net_type, NetType::kWire);
+}
+
+TEST(WireTriElaboration, TriMultipleDeclarators) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  tri a, b, c;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->nets.size(), 3u);
+  EXPECT_EQ(mod->nets[0].net_type, NetType::kTri);
+  EXPECT_EQ(mod->nets[1].net_type, NetType::kTri);
+  EXPECT_EQ(mod->nets[2].net_type, NetType::kTri);
 }
 
 }  // namespace
