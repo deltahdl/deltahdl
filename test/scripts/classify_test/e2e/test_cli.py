@@ -62,12 +62,21 @@ def _install_fake(tmp_path, name, body):
     return bin_dir
 
 
-def _env_with_fakes(tmp_path, claude_response, test_names=None):
+def _env_with_fakes(tmp_path, claude_response, test_names=None,
+                    prefix_stage="parser"):
     """Build env with fake claude, git, and gh binaries on PATH."""
-    payload = json.dumps(claude_response)
+    clause_payload = json.dumps(claude_response)
+    prefix_payload = json.dumps(
+        {"pipeline_stage": prefix_stage, "rationale": "r"},
+    )
     bin_dir = _install_fake(
         tmp_path, "claude",
-        f"#!/bin/sh\necho '{payload}'\n",
+        '#!/bin/sh\n'
+        'if echo "$@" | grep -q "pipeline_stage"; then\n'
+        f"  echo '{prefix_payload}'\n"
+        'else\n'
+        f"  echo '{clause_payload}'\n"
+        'fi\n',
     )
     _install_fake(tmp_path, "git", "#!/bin/sh\nexit 0\n")
     names = test_names or ["Alpha", "DryT"]

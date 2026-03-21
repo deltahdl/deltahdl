@@ -592,9 +592,10 @@ def test_run_live_merge_prints_rationale(tmp_path, monkeypatch, capsys, ct,
     _run(args)
     assert "because" in capsys.readouterr().out
 
-
 def _mixed_classifier(prompt, schema=None, **_kw):
     """Return different classifications based on which test is in prompt."""
+    if schema and "pipeline_stage" in schema:
+        return {"pipeline_stage": "parser", "rationale": "r"}
     if "Stay" in prompt:
         if schema and "non_lrm_topic" in schema:
             return {"non_lrm_topic": "aig", "rationale": "r",
