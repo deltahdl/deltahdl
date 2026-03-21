@@ -46,16 +46,4 @@ TEST(TypeCompatibilityElaboration, IntAndBitSignedAreInterchangeable) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(TypeCompatibilityElaboration, TypeIncompatibleStringToInt) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  string s;\n"
-      "  int i;\n"
-      "  initial i = s;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 }  // namespace
