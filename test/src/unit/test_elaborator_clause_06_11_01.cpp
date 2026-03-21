@@ -1,16 +1,13 @@
 
 
 #include "elaborator/type_eval.h"
-#include "fixture_simulator.h"
 #include "parser/ast.h"
-#include "simulator/lowerer.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(TypeEval, IntegerTypesAreIntegral) {
+TEST(IntegralType, IntegerTypesAreIntegral) {
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kBit));
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kLogic));
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kReg));
@@ -22,11 +19,11 @@ TEST(TypeEval, IntegerTypesAreIntegral) {
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kTime));
 }
 
-TEST(TypeEval, EnumIsIntegral) {
+TEST(IntegralType, EnumIsIntegral) {
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kEnum));
 }
 
-TEST(TypeEval, NonIntegralTypes) {
+TEST(IntegralType, NonIntegralTypes) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kReal));
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kShortreal));
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kRealtime));
@@ -36,7 +33,11 @@ TEST(TypeEval, NonIntegralTypes) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kEvent));
 }
 
-TEST(TypeEval, IntegerTypeWidths) {
+TEST(IntegralType, ImplicitTypeIsIntegral) {
+  EXPECT_TRUE(IsIntegralType(DataTypeKind::kImplicit));
+}
+
+TEST(IntegralType, IntegerTypeWidths) {
   DataType dt;
   dt.kind = DataTypeKind::kByte;
   EXPECT_EQ(EvalTypeWidth(dt), 8u);
@@ -50,6 +51,16 @@ TEST(TypeEval, IntegerTypeWidths) {
   EXPECT_EQ(EvalTypeWidth(dt), 32u);
   dt.kind = DataTypeKind::kTime;
   EXPECT_EQ(EvalTypeWidth(dt), 64u);
+}
+
+TEST(IntegralType, SimpleBitVectorDefaultWidthIsOne) {
+  DataType dt;
+  dt.kind = DataTypeKind::kBit;
+  EXPECT_EQ(EvalTypeWidth(dt), 1u);
+  dt.kind = DataTypeKind::kLogic;
+  EXPECT_EQ(EvalTypeWidth(dt), 1u);
+  dt.kind = DataTypeKind::kReg;
+  EXPECT_EQ(EvalTypeWidth(dt), 1u);
 }
 
 }  // namespace
