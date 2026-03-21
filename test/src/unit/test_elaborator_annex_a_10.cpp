@@ -55,16 +55,6 @@ TEST(BnfClarificationElaboration, AutomaticInInitialBlockOk) {
              "endmodule\n"));
 }
 
-TEST(BnfClarificationElaboration, AutomaticInModuleScopeError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  automatic int x;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(BnfClarificationElaboration, ImportInClassScopeError) {
   ElabFixture f;
   ElaborateSrc(

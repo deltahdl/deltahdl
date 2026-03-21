@@ -601,6 +601,15 @@ static void CheckTaskBodyStmt(
     diag.Error(s->range.start,
                "automatic task variable in nonblocking assignment");
   }
+  // §6.21: Automatic variables shall not be written by procedural continuous
+  // assignments (force/release/assign/deassign).
+  if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
+    auto name = ExprIdent(s->lhs);
+    if (!name.empty() && auto_vars.count(name) != 0) {
+      diag.Error(s->range.start,
+                 "automatic variable in procedural continuous assignment");
+    }
+  }
   // Collect locally declared variables as we descend.
   for (auto* sub : s->stmts) CheckTaskBodyStmt(sub, is_auto, auto_vars, diag);
   CheckTaskBodyStmt(s->then_branch, is_auto, auto_vars, diag);
@@ -619,6 +628,8 @@ static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
     // In an automatic task, all locals are automatic unless explicitly static.
     // In a static task, only explicitly automatic locals are automatic.
     if (task_is_auto && !s->var_is_static) {
+      out.insert(s->var_name);
+    } else if (!task_is_auto && s->var_is_automatic) {
       out.insert(s->var_name);
     }
   }

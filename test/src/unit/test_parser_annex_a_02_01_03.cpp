@@ -44,28 +44,6 @@ TEST(TypeDeclParsing, DataDeclVarPrefix) {
   EXPECT_EQ(item->name, "x");
 }
 
-TEST(TypeDeclParsing, DataDeclLifetimeAutomatic) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int counter = 0;\n"
-      "  end\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TypeDeclParsing, DataDeclLifetimeStatic) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    static int counter = 0;\n"
-      "  end\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(TypeDeclParsing, DataDeclMultipleAssignments) {
   auto r = Parse("module m; logic a, b, c; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -312,20 +290,6 @@ TEST(TypeDeclParsing, TypedefInterfacePortNoBitSelect) {
   EXPECT_EQ(item->typedef_type.type_name, "my_type");
   EXPECT_EQ(item->name, "local_t");
   EXPECT_TRUE(item->unpacked_dims.empty());
-}
-
-// --- lifetime ---
-
-TEST(TypeDeclParsing, LifetimeStaticOnModuleItem) {
-  auto r = Parse("module m; static int x = 0; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TypeDeclParsing, LifetimeAutomaticOnModuleItem) {
-  auto r = Parse("module m; automatic int y = 0; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 // --- Error conditions ---

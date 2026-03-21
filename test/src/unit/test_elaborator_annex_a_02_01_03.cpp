@@ -209,30 +209,6 @@ TEST(TypeDeclElaboration, PackageExportElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- lifetime: static/automatic on variables ---
-
-TEST(TypeDeclElaboration, LifetimeStaticElaborates) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  static int x = 0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TypeDeclElaboration, LifetimeAutomaticElaborates) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  automatic int y = 0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // --- Error conditions ---
 
 TEST(TypeDeclElaboration, ErrorRedeclarationDetected) {

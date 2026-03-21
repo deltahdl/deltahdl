@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, ModuleLevelVarStaticLifetime) {
+TEST(ScopeAndLifetimeElaboration, ModuleLevelVarStaticLifetime) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -16,7 +16,7 @@ TEST(Elaboration, ModuleLevelVarStaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, StaticVarInInitialBlock) {
+TEST(ScopeAndLifetimeElaboration, StaticVarInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -30,7 +30,7 @@ TEST(Elaboration, StaticVarInInitialBlock) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, AutomaticVarInInitialBlock) {
+TEST(ScopeAndLifetimeElaboration, AutomaticVarInInitialBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -43,7 +43,7 @@ TEST(Elaboration, AutomaticVarInInitialBlock) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, StaticVarInAutoFunc) {
+TEST(ScopeAndLifetimeElaboration, StaticVarInAutoFunc) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -58,7 +58,7 @@ TEST(Elaboration, StaticVarInAutoFunc) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, AutoVarInStaticFunc) {
+TEST(ScopeAndLifetimeElaboration, AutoVarInStaticFunc) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -72,7 +72,7 @@ TEST(Elaboration, AutoVarInStaticFunc) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, ModuleAutomaticLifetime) {
+TEST(ScopeAndLifetimeElaboration, ModuleAutomaticLifetime) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module automatic top;\n"
@@ -85,10 +85,96 @@ TEST(Elaboration, ModuleAutomaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(ModuleScope, LocalScopesDoNotConflict) {
+TEST(ScopeAndLifetimeElaboration, LocalScopesDoNotConflict) {
   EXPECT_TRUE(
       ElabOk("module a; logic x; endmodule\n"
              "module b; logic x; endmodule\n"));
+}
+
+TEST(ScopeAndLifetimeElaboration, LifetimeStaticElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  static int x = 0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ScopeAndLifetimeElaboration, LifetimeAutomaticElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  automatic int y = 0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ScopeAndLifetimeElaboration, AutomaticInModuleScopeError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  automatic int x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ScopeAndLifetimeElaboration, AutomaticVarForceInTaskIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t();\n"
+      "    int x;\n"
+      "    force x = 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ScopeAndLifetimeElaboration, AutomaticVarProceduralAssignInTaskIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task automatic t();\n"
+      "    int x;\n"
+      "    assign x = 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ScopeAndLifetimeElaboration, StaticVarForceInTaskSucceeds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task automatic t();\n"
+      "    static int x;\n"
+      "    force x = 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ScopeAndLifetimeElaboration, ForLoopInInitialBlockElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) begin\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

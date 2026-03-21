@@ -484,28 +484,4 @@ TEST(VariableDeclarations, VarWithUnpackedArrayDim) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-// §6.8: static lifetime in procedural block.
-TEST(VariableDeclarations, StaticLifetimeInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    static int count = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// §6.8: automatic lifetime in procedural block.
-TEST(VariableDeclarations, AutomaticLifetimeInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int tmp = 5;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 }  // namespace
