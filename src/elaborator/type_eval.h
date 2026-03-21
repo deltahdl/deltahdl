@@ -35,6 +35,9 @@ bool IsImplicitlySigned(DataTypeKind kind);
 /// Overload that resolves kNamed types via the typedef map.
 bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs);
 
+/// Overload that resolves kNamed types via the typedef map.
+bool IsSignedType(const DataType& dtype, const TypedefMap& typedefs);
+
 // Forward declarations
 struct Expr;
 

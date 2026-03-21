@@ -119,4 +119,48 @@ TEST(Elaborator, ForwardTypedefThenDefinition) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(Elaborator, BareForwardTypedefThenDefinition) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef my_type;\n"
+      "  typedef int my_type;\n"
+      "  my_type x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Elaborator, TypedefChain2State) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef bit [7:0] ubyte_t;\n"
+      "  typedef ubyte_t alias_t;\n"
+      "  alias_t val;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  for (const auto& v : mod->variables) {
+    if (v.name == "val") {
+      EXPECT_EQ(v.width, 8u);
+      EXPECT_FALSE(v.is_4state);
+    }
+  }
+}
+
+TEST(Elaborator, MultipleForwardTypedefsElaborate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef class myclass;\n"
+      "  typedef class myclass;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

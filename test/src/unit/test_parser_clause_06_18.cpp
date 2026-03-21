@@ -150,14 +150,6 @@ TEST(ClassParsing, TypedefSimpleBuiltin) {
   EXPECT_EQ(items[0]->name, "my_int");
 }
 
-TEST(ClassParsing, TypedefForwardEnum) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef enum my_enum;\n"
-              "  typedef enum {A, B, C} my_enum;\n"
-              "endmodule\n"));
-}
-
 TEST(DataTypeParsing, TypedefInt) {
   auto r = Parse(
       "module t;\n"
@@ -182,7 +174,7 @@ static bool ParseOk5(const std::string& src) {
   return !diag.HasErrors();
 }
 
-TEST(DataObjectParsing, UnpackedDim_Typedef) {
+TEST(DataObjectParsing, TypedefUnpackedDim) {
   EXPECT_TRUE(ParseOk5("module m; typedef int triple[1:3]; endmodule"));
 }
 

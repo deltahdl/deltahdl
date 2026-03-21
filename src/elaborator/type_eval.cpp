@@ -177,6 +177,12 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
                   : Is4stateType(dtype.kind);
 }
 
+bool IsSignedType(const DataType& dtype, const TypedefMap& typedefs) {
+  const auto* resolved = ResolveNamed(dtype, typedefs);
+  return resolved ? IsSignedType(*resolved, typedefs)
+                  : (dtype.is_signed || IsImplicitlySigned(dtype.kind));
+}
+
 // --- §6.4: Singular and aggregate types ---
 
 bool IsAggregateType(const DataType& dtype) {
