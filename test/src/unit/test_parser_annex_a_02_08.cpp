@@ -121,21 +121,6 @@ TEST(BlockItemDeclParsing, BlockItemImportDecl) {
   EXPECT_EQ(stmt->decl_item->kind, ModuleItemKind::kImportDecl);
 }
 
-TEST(BlockItemDeclParsing, BlockItemConstDataDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    const int C = 99;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->var_is_const);
-}
-
 TEST(BlockItemDeclParsing, BlockItemAutomaticLifetime) {
   auto r = Parse(
       "module m;\n"

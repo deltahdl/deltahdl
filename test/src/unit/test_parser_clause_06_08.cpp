@@ -403,22 +403,6 @@ TEST(DataTypeParsing, MixedScalarAndArrayDecl) {
   EXPECT_FALSE(items[1]->unpacked_dims.empty());
 }
 
-TEST(DataTypeParsing, ConstVarDecl) {
-  auto r = Parse(
-      "module t;\n"
-      "  const int MAX = 100;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_TRUE(item->data_type.is_const);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_EQ(item->name, "MAX");
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
 TEST(DataTypeParsing, IntInitZero) {
   auto r = Parse(
       "module t;\n"
@@ -484,20 +468,6 @@ TEST(VariableDeclarations, VarBareNoTypeIsValid) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "v");
-}
-
-// §6.8: const var with explicit type and initializer.
-TEST(VariableDeclarations, ConstVarWithExplicitType) {
-  auto r = Parse(
-      "module m;\n"
-      "  const var logic [7:0] MASK = 8'hFF;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_TRUE(item->data_type.is_const);
-  EXPECT_NE(item->init_expr, nullptr);
 }
 
 // §6.8: Variable with unpacked array dimension.

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(TypeDeclParsing, DataDeclConstVar) {
+TEST(ConstConstantParsing, ConstIntAtModuleLevel) {
   auto r = Parse("module m; const int MAX = 100; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(TypeDeclParsing, DataDeclConstVar) {
   EXPECT_TRUE(item->data_type.is_const);
 }
 
-TEST(BlockItemDeclParsing, DataDeclConstInBlock) {
+TEST(ConstConstantParsing, ConstIntInProceduralBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -30,7 +30,7 @@ TEST(BlockItemDeclParsing, DataDeclConstInBlock) {
   EXPECT_EQ(body->stmts[0]->var_name, "x");
 }
 
-TEST(BlockItemDeclParsing, DataDeclConstVarInBlock) {
+TEST(ConstConstantParsing, ConstVarKeywordInProceduralBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -45,7 +45,7 @@ TEST(BlockItemDeclParsing, DataDeclConstVarInBlock) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(BlockItemDeclParsing, ConstWithLifetimeInBlock) {
+TEST(ConstConstantParsing, ConstWithLifetimeInBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -54,7 +54,7 @@ TEST(BlockItemDeclParsing, ConstWithLifetimeInBlock) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, ConstRealDecl) {
+TEST(ConstConstantParsing, ConstRealDecl) {
   auto r = Parse(
       "module t;\n"
       "  const real PI = 3.14159;\n"
@@ -66,7 +66,7 @@ TEST(DataTypeParsing, ConstRealDecl) {
   EXPECT_TRUE(item->data_type.is_const);
 }
 
-TEST(DataTypeParsing, ConstStringDecl) {
+TEST(ConstConstantParsing, ConstStringDecl) {
   auto r = Parse(
       "module t;\n"
       "  const string GREETING = \"Hi\";\n"
@@ -78,7 +78,7 @@ TEST(DataTypeParsing, ConstStringDecl) {
   EXPECT_TRUE(item->data_type.is_const);
 }
 
-TEST(DataTypeParsing, ConstVarDecl) {
+TEST(ConstConstantParsing, ConstLogicWithPackedRange) {
   auto r = Parse(
       "module t;\n"
       "  const logic [7:0] MAX = 8'hFF;\n"
@@ -90,7 +90,7 @@ TEST(DataTypeParsing, ConstVarDecl) {
   EXPECT_TRUE(item->data_type.is_const);
 }
 
-TEST(DataTypeParsing, ConstVarDecl_NameAndInit) {
+TEST(ConstConstantParsing, ConstLogicCapturesNameAndInit) {
   auto r = Parse(
       "module t;\n"
       "  const logic [7:0] MAX = 8'hFF;\n"
@@ -102,7 +102,7 @@ TEST(DataTypeParsing, ConstVarDecl_NameAndInit) {
   ASSERT_NE(item->init_expr, nullptr);
 }
 
-TEST(DataTypeParsing, ConstIntDecl) {
+TEST(ConstConstantParsing, ConstIntDecl) {
   auto r = Parse(
       "module t;\n"
       "  const int LIMIT = 100;\n"
@@ -112,6 +112,56 @@ TEST(DataTypeParsing, ConstIntDecl) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
   EXPECT_TRUE(item->data_type.is_const);
+}
+
+TEST(ConstConstantParsing, ConstVarWithExplicitType) {
+  auto r = Parse(
+      "module m;\n"
+      "  const var logic [7:0] MASK = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_TRUE(item->data_type.is_const);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(ConstConstantParsing, ConstInBlockSetsConstFlag) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    const int C = 99;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = r.cu->modules[0]->items[0]->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 1u);
+  EXPECT_TRUE(body->stmts[0]->var_is_const);
+}
+
+TEST(ConstConstantParsing, ConstInitializedFromParameterReference) {
+  auto r = Parse(
+      "module m #(parameter P = 5);\n"
+      "  const int x = P + 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_TRUE(item->data_type.is_const);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(ConstConstantParsing, ConstWithStaticLifetimeInBlock) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    const var static int x = 5;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 }  // namespace

@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, ConstVarNoInit_Error) {
+TEST(ConstConstantElaboration, ConstWithoutInitializerIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -18,7 +18,7 @@ TEST(Elaboration, ConstVarNoInit_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, ConstVarWithInit_OK) {
+TEST(ConstConstantElaboration, ConstIntWithInitializerSucceeds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -29,7 +29,7 @@ TEST(Elaboration, ConstVarWithInit_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, ConstVarReassign_Error) {
+TEST(ConstConstantElaboration, ConstReassignmentIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -40,7 +40,7 @@ TEST(Elaboration, ConstVarReassign_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, ConstRealWithInit_OK) {
+TEST(ConstConstantElaboration, ConstRealWithInitializerSucceeds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -51,7 +51,7 @@ TEST(Elaboration, ConstRealWithInit_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, ConstStringWithInit_OK) {
+TEST(ConstConstantElaboration, ConstStringWithInitializerSucceeds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -60,6 +60,72 @@ TEST(Elaboration, ConstStringWithInit_OK) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConstConstantElaboration, ConstNonblockingReassignmentIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  const int x = 5;\n"
+      "  initial x <= 10;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ConstConstantElaboration, ConstInitializedFromParameterSucceeds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top #(parameter P = 5);\n"
+      "  const int x = P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConstConstantElaboration, ConstInitializedFromLocalparamSucceeds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  localparam LP = 10;\n"
+      "  const int x = LP;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConstConstantElaboration, ConstInitializedFromAnotherConstSucceeds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  const int a = 5;\n"
+      "  const int b = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConstConstantElaboration, ConstCreatesVariable) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  const int LIMIT = 42;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (auto& v : mod->variables) {
+    if (v.name == "LIMIT") {
+      found = true;
+      EXPECT_NE(v.init_expr, nullptr);
+    }
+  }
+  EXPECT_TRUE(found);
 }
 
 }  // namespace
