@@ -306,9 +306,8 @@ bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
   if (TypesEquivalent(a, b)) return true;
   // §6.22.3: All integral types are assignment compatible with each other.
   if (IsIntegralType(a.kind) && IsIntegralType(b.kind)) return true;
-  // §6.22.3: enum → integral is assignment compatible.
+  // §6.22.3: enum → integral is assignment compatible (not the reverse).
   if (a.kind == DataTypeKind::kEnum && IsIntegralType(b.kind)) return true;
-  if (b.kind == DataTypeKind::kEnum && IsIntegralType(a.kind)) return true;
   // Real types are assignment compatible with integral types.
   bool a_real =
       (a.kind == DataTypeKind::kReal || a.kind == DataTypeKind::kShortreal ||

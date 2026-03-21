@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeParsing, AssignmentCompatibleRealToReal) {
+TEST(AssignmentCompatibleParsing, RealToShortrealCompatible) {
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -13,7 +13,7 @@ TEST(DataTypeParsing, AssignmentCompatibleRealToReal) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(DataTypeParsing, AssignCompatibleByteToShortint) {
+TEST(AssignmentCompatibleParsing, ByteToShortintCompatible) {
   DataType a;
   a.kind = DataTypeKind::kByte;
   DataType b;
@@ -21,7 +21,7 @@ TEST(DataTypeParsing, AssignCompatibleByteToShortint) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(DataTypeParsing, AssignCompatibleRealToReal) {
+TEST(AssignmentCompatibleParsing, RealToRealCompatible) {
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -29,7 +29,7 @@ TEST(DataTypeParsing, AssignCompatibleRealToReal) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(DataTypeParsing, AssignCompatibleEnumToLogic) {
+TEST(AssignmentCompatibleParsing, EnumToLogicCompatible) {
   DataType a;
   a.kind = DataTypeKind::kEnum;
   DataType b;
@@ -37,7 +37,7 @@ TEST(DataTypeParsing, AssignCompatibleEnumToLogic) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(DataTypeParsing, AssignmentCompatibleIntegral) {
+TEST(AssignmentCompatibleParsing, IntToLogicCompatible) {
   DataType a;
   a.kind = DataTypeKind::kInt;
   DataType b;
@@ -45,7 +45,7 @@ TEST(DataTypeParsing, AssignmentCompatibleIntegral) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(DataTypeParsing, AssignmentCompatibleEnumToInt) {
+TEST(AssignmentCompatibleParsing, EnumToIntCompatible) {
   DataType a;
   a.kind = DataTypeKind::kEnum;
   DataType b;
@@ -53,7 +53,7 @@ TEST(DataTypeParsing, AssignmentCompatibleEnumToInt) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(DataTypeParsing, NotAssignmentCompatibleStringInt) {
+TEST(AssignmentCompatibleParsing, StringToIntNotCompatible) {
   DataType a;
   a.kind = DataTypeKind::kString;
   DataType b;
@@ -61,7 +61,7 @@ TEST(DataTypeParsing, NotAssignmentCompatibleStringInt) {
   EXPECT_FALSE(IsAssignmentCompatible(a, b));
 }
 
-TEST(DataTypeParsing, AssignCompatibleRealToLogic) {
+TEST(AssignmentCompatibleParsing, RealToLogicCompatible) {
   DataType a;
   a.kind = DataTypeKind::kReal;
   DataType b;
@@ -69,7 +69,7 @@ TEST(DataTypeParsing, AssignCompatibleRealToLogic) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(DataTypeParsing, AssignCompatibleRealtimeToShortreal) {
+TEST(AssignmentCompatibleParsing, RealtimeToShortrealCompatible) {
   DataType a;
   a.kind = DataTypeKind::kRealtime;
   DataType b;
@@ -77,12 +77,58 @@ TEST(DataTypeParsing, AssignCompatibleRealtimeToShortreal) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-TEST(DataTypeParsing, NotAssignCompatibleChandleToInt) {
+TEST(AssignmentCompatibleParsing, ChandleToIntNotCompatible) {
   DataType a;
   a.kind = DataTypeKind::kChandle;
   DataType b;
   b.kind = DataTypeKind::kInt;
   EXPECT_FALSE(IsAssignmentCompatible(a, b));
+}
+
+TEST(AssignmentCompatibleParsing, IntToEnumNotCompatible) {
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kEnum;
+  EXPECT_FALSE(IsAssignmentCompatible(a, b));
+}
+
+TEST(AssignmentCompatibleParsing, EquivalentTypesAreCompatible) {
+  DataType a;
+  a.kind = DataTypeKind::kLogic;
+  DataType b;
+  b.kind = DataTypeKind::kReg;
+  EXPECT_TRUE(TypesEquivalent(a, b));
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+}
+
+TEST(AssignmentCompatibleParsing, IntegralCompatibleIsSymmetric) {
+  DataType a;
+  a.kind = DataTypeKind::kInt;
+  a.is_signed = true;
+  DataType b;
+  b.kind = DataTypeKind::kLogic;
+  EXPECT_TRUE(IsAssignmentCompatible(a, b));
+  EXPECT_TRUE(IsAssignmentCompatible(b, a));
+}
+
+TEST(AssignmentCompatibleParsing, EventToIntNotCompatible) {
+  DataType a;
+  a.kind = DataTypeKind::kEvent;
+  DataType b;
+  b.kind = DataTypeKind::kInt;
+  EXPECT_FALSE(IsAssignmentCompatible(a, b));
+}
+
+TEST(AssignmentCompatibleParsing, EnumDirectionalityNotSymmetric) {
+  DataType e;
+  e.kind = DataTypeKind::kEnum;
+  DataType i;
+  i.kind = DataTypeKind::kInt;
+  i.is_signed = true;
+  EXPECT_TRUE(IsAssignmentCompatible(e, i));
+  EXPECT_FALSE(IsAssignmentCompatible(i, e));
 }
 
 }  // namespace
