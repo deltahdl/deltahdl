@@ -8,19 +8,19 @@ using namespace delta;
 
 namespace {
 
-TEST(TypeDeclParsing, NetDeclVectored) {
+TEST(VectorNetAccessibility, WireVectoredParses) {
   auto r = Parse("module m; wire vectored [7:0] bus; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(TypeDeclParsing, NetDeclScalared) {
+TEST(VectorNetAccessibility, WireScalaredParses) {
   auto r = Parse("module m; wire scalared [7:0] bus; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(DataTypeParsing, ScalaredWithExplicitType) {
+TEST(VectorNetAccessibility, ScalaredWithExplicitType) {
   auto r = Parse(
       "module t;\n"
       "  wire scalared logic [7:0] s;\n"
@@ -35,7 +35,7 @@ TEST(DataTypeParsing, ScalaredWithExplicitType) {
   EXPECT_EQ(item->name, "s");
 }
 
-TEST(DataTypeParsing, WireVectoredQualifier) {
+TEST(VectorNetAccessibility, WireVectoredQualifier) {
   auto r = Parse(
       "module t;\n"
       "  wire vectored [7:0] v;\n"
@@ -49,7 +49,7 @@ TEST(DataTypeParsing, WireVectoredQualifier) {
   EXPECT_EQ(item->name, "v");
 }
 
-TEST(DataTypeParsing, WireScalaredQualifier) {
+TEST(VectorNetAccessibility, WireScalaredQualifier) {
   auto r = Parse(
       "module t;\n"
       "  wire scalared [7:0] sc;\n"
@@ -63,7 +63,7 @@ TEST(DataTypeParsing, WireScalaredQualifier) {
   EXPECT_EQ(item->name, "sc");
 }
 
-TEST(DataTypeParsing, Tri1ScalaredBus) {
+TEST(VectorNetAccessibility, Tri1ScalaredBus) {
   auto r = Parse(
       "module t;\n"
       "  tri1 scalared [63:0] bus64;\n"
@@ -79,7 +79,7 @@ TEST(DataTypeParsing, Tri1ScalaredBus) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 63u);
 }
 
-TEST(DataTypeParsing, TriVectoredData) {
+TEST(VectorNetAccessibility, TriVectoredData) {
   auto r = Parse(
       "module t;\n"
       "  tri vectored [31:0] data;\n"
@@ -95,18 +95,90 @@ TEST(DataTypeParsing, TriVectoredData) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 31u);
 }
 
-TEST(DataTypeParsing, VectoredWithoutPackedDim) {
+TEST(VectorNetAccessibility, VectoredWithoutPackedDim) {
   NetDeclInfo info;
   info.is_vectored = true;
   info.packed_dim_count = 0;
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
-TEST(DataTypeParsing, ScalaredWithoutPackedDim) {
+TEST(VectorNetAccessibility, ScalaredWithoutPackedDim) {
   NetDeclInfo info;
   info.is_scalared = true;
   info.packed_dim_count = 0;
   EXPECT_FALSE(ValidateNetDecl(info));
+}
+
+TEST(VectorNetAccessibility, WireVectoredRegOk) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  wire vectored reg [7:0] r;\n"
+              "endmodule\n"));
+}
+
+TEST(VectorNetAccessibility, VectoredWithExplicitType) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire vectored logic [7:0] v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_TRUE(item->data_type.is_net);
+  EXPECT_TRUE(item->data_type.is_vectored);
+  EXPECT_EQ(item->name, "v");
+}
+
+TEST(VectorNetAccessibility, VectoredAndScalaredMutuallyExclusive) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire vectored [7:0] v;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->data_type.is_vectored);
+  EXPECT_FALSE(item->data_type.is_scalared);
+}
+
+TEST(VectorNetAccessibility, ScalaredNotVectored) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire scalared [7:0] s;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->data_type.is_scalared);
+  EXPECT_FALSE(item->data_type.is_vectored);
+}
+
+TEST(VectorNetAccessibility, WandVectoredOk) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  wand vectored [7:0] w;\n"
+              "endmodule\n"));
+}
+
+TEST(VectorNetAccessibility, WorScalaredOk) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  wor scalared [7:0] w;\n"
+              "endmodule\n"));
+}
+
+TEST(VectorNetAccessibility, PlainWireNeitherFlag) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire [7:0] w;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_FALSE(item->data_type.is_vectored);
+  EXPECT_FALSE(item->data_type.is_scalared);
 }
 
 }  // namespace

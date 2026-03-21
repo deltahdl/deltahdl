@@ -717,6 +717,8 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
     diag_.Error(item->loc,
                 "charge strength can only be used with trireg nets");
   }
+  net.is_vectored = item->data_type.is_vectored;
+  net.is_scalared = item->data_type.is_scalared;
   // §6.7 footnote 16: vectored/scalared requires at least one packed dim.
   if ((item->data_type.is_vectored || item->data_type.is_scalared) &&
       net.width <= 1 && item->data_type.packed_dim_left == nullptr) {

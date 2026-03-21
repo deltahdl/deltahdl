@@ -763,13 +763,6 @@ TEST(DataTypeParsing, WandRegDirectlyIsError) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, WireVectoredRegOk) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  wire vectored reg [7:0] r;\n"
-              "endmodule\n"));
-}
-
 TEST(DataTypeParsing, WireDriveStrengthRegOk) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -943,21 +936,6 @@ TEST(StrengthParsing, NetDeclNoDriveStrengthDefault) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->drive_strength0, 0u);
   EXPECT_EQ(item->drive_strength1, 0u);
-}
-
-TEST(DataTypeParsing, VectoredWithExplicitType) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire vectored logic [7:0] v;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-  EXPECT_TRUE(item->data_type.is_vectored);
-  EXPECT_EQ(item->name, "v");
 }
 
 TEST(NetDeclarations, WireWithPackedRange) {

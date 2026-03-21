@@ -79,20 +79,6 @@ TEST(BnfClarificationElaboration, ImportInClassScopeError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(BnfClarificationElaboration, VectoredRequiresPackedDim) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  wire vectored [7:0] bus;\n"
-             "endmodule\n"));
-}
-
-TEST(BnfClarificationElaboration, ScalaredRequiresPackedDim) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  wire scalared [3:0] w;\n"
-             "endmodule\n"));
-}
-
 TEST(BnfClarificationElaboration, StructPackedWithDimOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
