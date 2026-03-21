@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
@@ -317,12 +318,95 @@ void Elaborator::ValidateConstAssignments(const ModuleDecl* decl) {
 
 // --- Type resolution (§6.23, §6.25) ---
 
+// §6.23: Compute self-determined width of an expression inside type(),
+// resolving identifiers from already-elaborated module variables.
+static uint32_t InferTypeRefExprWidth(const Expr* expr,
+                                      const RtlirModule* mod) {
+  if (!expr) return 0;
+  switch (expr->kind) {
+    case ExprKind::kIdentifier:
+      for (const auto& v : mod->variables) {
+        if (v.name == expr->text) return v.width;
+      }
+      return 0;
+    case ExprKind::kIntegerLiteral: {
+      auto tick = expr->text.find('\'');
+      if (tick != std::string_view::npos && tick > 0) {
+        uint32_t w = 0;
+        for (size_t i = 0; i < tick; ++i) {
+          char c = expr->text[i];
+          if (c >= '0' && c <= '9') w = w * 10 + (c - '0');
+        }
+        if (w > 0) return w;
+      }
+      return 32;
+    }
+    case ExprKind::kBinary: {
+      uint32_t lw = InferTypeRefExprWidth(expr->lhs, mod);
+      uint32_t rw = InferTypeRefExprWidth(expr->rhs, mod);
+      return std::max(lw, rw);
+    }
+    case ExprKind::kTernary: {
+      uint32_t tw = InferTypeRefExprWidth(expr->true_expr, mod);
+      uint32_t fw = InferTypeRefExprWidth(expr->false_expr, mod);
+      return std::max(tw, fw);
+    }
+    case ExprKind::kConcatenation: {
+      uint32_t total = 0;
+      for (const auto* el : expr->elements) {
+        total += InferTypeRefExprWidth(el, mod);
+      }
+      return total;
+    }
+    case ExprKind::kUnary:
+      return InferTypeRefExprWidth(expr->lhs, mod);
+    default:
+      return 0;
+  }
+}
+
+// §6.23: Compute signedness of a self-determined expression inside type().
+static bool InferTypeRefExprSigned(const Expr* expr, const RtlirModule* mod) {
+  if (!expr) return false;
+  switch (expr->kind) {
+    case ExprKind::kIdentifier:
+      for (const auto& v : mod->variables) {
+        if (v.name == expr->text) return v.is_signed;
+      }
+      return false;
+    case ExprKind::kBinary:
+      return InferTypeRefExprSigned(expr->lhs, mod) &&
+             InferTypeRefExprSigned(expr->rhs, mod);
+    case ExprKind::kTernary:
+      return InferTypeRefExprSigned(expr->true_expr, mod) &&
+             InferTypeRefExprSigned(expr->false_expr, mod);
+    case ExprKind::kConcatenation:
+      return false;
+    case ExprKind::kUnary:
+      return InferTypeRefExprSigned(expr->lhs, mod);
+    default:
+      return false;
+  }
+}
+
 void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
   if (!item->data_type.type_ref_expr) return;
   auto* ref = item->data_type.type_ref_expr;
   if (ref->kind != ExprKind::kIdentifier) {
-    // For complex expressions, infer width from expression.
+    // §6.23: Self-determined result type of the expression.
+    uint32_t w = InferTypeRefExprWidth(ref, mod);
     item->data_type.kind = DataTypeKind::kLogic;
+    if (w > 1) {
+      auto* left = arena_.Create<Expr>();
+      left->kind = ExprKind::kIntegerLiteral;
+      left->int_val = static_cast<int64_t>(w - 1);
+      auto* right = arena_.Create<Expr>();
+      right->kind = ExprKind::kIntegerLiteral;
+      right->int_val = 0;
+      item->data_type.packed_dim_left = left;
+      item->data_type.packed_dim_right = right;
+    }
+    item->data_type.is_signed = InferTypeRefExprSigned(ref, mod);
     item->data_type.type_ref_expr = nullptr;
     return;
   }
@@ -331,6 +415,19 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
     if (v.name != ref->text) continue;
     item->data_type.kind = var_types_[ref->text];
     item->data_type.is_signed = v.is_signed;
+    // §6.23: Reconstruct packed dimensions for vector types.
+    if (v.width > 1 && (item->data_type.kind == DataTypeKind::kLogic ||
+                        item->data_type.kind == DataTypeKind::kBit ||
+                        item->data_type.kind == DataTypeKind::kReg)) {
+      auto* left = arena_.Create<Expr>();
+      left->kind = ExprKind::kIntegerLiteral;
+      left->int_val = static_cast<int64_t>(v.width - 1);
+      auto* right = arena_.Create<Expr>();
+      right->kind = ExprKind::kIntegerLiteral;
+      right->int_val = 0;
+      item->data_type.packed_dim_left = left;
+      item->data_type.packed_dim_right = right;
+    }
     item->data_type.type_ref_expr = nullptr;
     return;
   }

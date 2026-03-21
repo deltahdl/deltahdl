@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeSim, TypeRefVarDecl) {
+TEST(TypeOperatorSim, TypeRefVarDecl) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -747,6 +747,79 @@ TEST(TypeOperatorSim, TypeOpLogicVector) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 16u);
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
+}
+
+TEST(TypeOperatorSim, TypeOpWireNetDecl) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [7:0] x;\n"
+      "  wire type(x) y;\n"
+      "  assign x = 8'hAB;\n"
+      "  assign y = 8'hCD;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 8u);
+  EXPECT_EQ(var->value.ToUint64(), 0xCDu);
+}
+
+TEST(TypeOperatorSim, TypeOpSelfDeterminedBinaryWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte a;\n"
+      "  int b;\n"
+      "  var type(a + b) c;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = 2;\n"
+      "    c = 32'hDEAD_BEEF;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("c");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 32u);
+  EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
+}
+
+TEST(TypeOperatorSim, TypeOpBitTypeUnsigned) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  bit [7:0] a;\n"
+      "  var type(a) b;\n"
+      "  initial begin\n"
+      "    a = 8'hFF;\n"
+      "    b = 8'hAB;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 8u);
+  EXPECT_FALSE(var->is_signed);
+  EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
 }  // namespace
