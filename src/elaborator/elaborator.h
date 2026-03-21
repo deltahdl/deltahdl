@@ -155,6 +155,9 @@ class Elaborator {
   /// Validate packed union constraints (§7.3.1).
   void ValidatePackedUnion(const DataType& dtype, SourceLoc loc);
 
+  /// §6.9.1: Range bounds shall not contain x or z.
+  void ValidatePackedDimRange(const DataType& dtype, SourceLoc loc);
+
   /// §7.4.1: Predefined-width types shall not have packed dims.
   void ValidatePackedDimOnPredefinedType(const DataType& dtype, SourceLoc loc);
 

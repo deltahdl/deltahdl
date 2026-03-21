@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(DataTypeParsing, VectorBigEndian) {
+TEST(VectorSpecification, VectorBigEndian) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic [31:0] wide;\n"
@@ -19,7 +19,7 @@ TEST(DataTypeParsing, VectorBigEndian) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(DataTypeParsing, VectorLittleEndian) {
+TEST(VectorSpecification, VectorLittleEndian) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic [0:7] le;\n"
@@ -33,7 +33,7 @@ TEST(DataTypeParsing, VectorLittleEndian) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 7u);
 }
 
-TEST(DataTypeParsing, VectorUnsignedExplicit) {
+TEST(VectorSpecification, VectorUnsignedExplicit) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
       "  logic unsigned [7:0] uv;\n"

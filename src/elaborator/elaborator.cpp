@@ -700,6 +700,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
     net.net_type = DataTypeToNetType(item->data_type.kind);
   }
   net.width = EvalTypeWidth(item->data_type, typedefs_);
+  ValidatePackedDimRange(item->data_type, item->loc);
   // §6.7.1: Validate explicit net data type is 4-state.
   if (!item->data_type.is_interconnect) {
     DataTypeKind k = item->data_type.kind;
@@ -899,6 +900,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   RtlirVariable var;
   var.name = ScopedName(item->name);
   var.width = EvalTypeWidth(item->data_type, typedefs_);
+  ValidatePackedDimRange(item->data_type, item->loc);
   var.is_4state = Is4stateType(item->data_type, typedefs_);
   var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
   var.is_chandle = (item->data_type.kind == DataTypeKind::kChandle);

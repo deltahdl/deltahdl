@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DataTypeParsing, LogicPackedDimsEightBit) {
+TEST(VectorSpecification, LogicPackedDimsEightBit) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] data;\n"
@@ -24,7 +24,7 @@ TEST(DataTypeParsing, LogicPackedDimsEightBit) {
   EXPECT_EQ(item->name, "data");
 }
 
-TEST(DataTypeParsing, LogicPackedDimsSixteenBit) {
+TEST(VectorSpecification, LogicPackedDimsSixteenBit) {
   auto r = Parse(
       "module t;\n"
       "  logic [15:0] addr;\n"
@@ -41,7 +41,7 @@ TEST(DataTypeParsing, LogicPackedDimsSixteenBit) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(DataTypeParsing, LittleEndianRange) {
+TEST(VectorSpecification, LittleEndianRange) {
   auto r = Parse(
       "module t;\n"
       "  logic [0:7] data;\n"
@@ -56,14 +56,14 @@ TEST(DataTypeParsing, LittleEndianRange) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 7u);
 }
 
-TEST(DataTypeParsing, NegativeRange) {
+TEST(VectorSpecification, NegativeRange) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  logic [-1:4] b;\n"
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, MultipleVectors) {
+TEST(VectorSpecification, MultipleVectors) {
   auto r = Parse(
       "module t;\n"
       "  logic [4:0] x, y, z;\n"
@@ -80,7 +80,7 @@ TEST(DataTypeParsing, MultipleVectors) {
   }
 }
 
-TEST(DataTypeParsing, RegVectorUnsignedDefault) {
+TEST(VectorSpecification, RegVectorUnsignedDefault) {
   auto r = Parse(
       "module t;\n"
       "  reg [7:0] r;\n"
@@ -93,7 +93,7 @@ TEST(DataTypeParsing, RegVectorUnsignedDefault) {
   EXPECT_FALSE(item->data_type.is_signed);
 }
 
-TEST(DataTypeParsing, LogicSignedVector) {
+TEST(VectorSpecification, LogicSignedVector) {
   auto r = Parse(
       "module t;\n"
       "  logic signed [3:0] signed_reg;\n"
@@ -107,7 +107,66 @@ TEST(DataTypeParsing, LogicSignedVector) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 3u);
 }
 
-TEST(DataTypeParsing, LrmExamplesScalarAndVector) {
+TEST(VectorSpecification, BitVectorRange) {
+  auto r = Parse(
+      "module t;\n"
+      "  bit [7:0] b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
+  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
+}
+
+TEST(VectorSpecification, EqualMsbLsb) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [3:3] a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 3u);
+  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 3u);
+}
+
+TEST(VectorSpecification, ZeroRangeBounds) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [0:0] a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
+  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 0u);
+  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
+}
+
+TEST(VectorSpecification, BitVectorUnsignedDefault) {
+  auto r = Parse(
+      "module t;\n"
+      "  bit [7:0] b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
+  EXPECT_FALSE(item->data_type.is_signed);
+}
+
+TEST(VectorSpecification, MixedScalarAndVectorDeclarations) {
   auto r = Parse(
       "module t;\n"
       "  logic a;\n"

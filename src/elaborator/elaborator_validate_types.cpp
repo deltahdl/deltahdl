@@ -452,6 +452,20 @@ static bool HasPredefinedWidth(DataTypeKind kind) {
   }
 }
 
+void Elaborator::ValidatePackedDimRange(const DataType& dtype, SourceLoc loc) {
+  if (dtype.packed_dim_left && ExprContainsXZ(dtype.packed_dim_left)) {
+    diag_.Error(loc, "packed dimension range shall not contain x or z");
+  }
+  if (dtype.packed_dim_right && ExprContainsXZ(dtype.packed_dim_right)) {
+    diag_.Error(loc, "packed dimension range shall not contain x or z");
+  }
+  for (const auto& [left, right] : dtype.extra_packed_dims) {
+    if (ExprContainsXZ(left) || ExprContainsXZ(right)) {
+      diag_.Error(loc, "packed dimension range shall not contain x or z");
+    }
+  }
+}
+
 void Elaborator::ValidatePackedDimOnPredefinedType(const DataType& dtype,
                                                    SourceLoc loc) {
   if (!HasPredefinedWidth(dtype.kind)) return;
