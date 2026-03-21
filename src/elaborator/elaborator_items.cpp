@@ -82,6 +82,12 @@ void Elaborator::ValidateContAssignIdentLhs(ModuleItem* item,
     if (net_names_.count(name) == 0) {
       diag_.Error(item->loc,
                   std::format("multiple continuous assignments to '{}'", name));
+    } else {
+      auto it = var_types_.find(name);
+      if (it != var_types_.end() && it->second == DataTypeKind::kUwire) {
+        diag_.Error(item->loc,
+                    std::format("uwire '{}' cannot have multiple drivers", name));
+      }
     }
   }
   if (var_init_names_.count(name) != 0) {
