@@ -148,6 +148,66 @@ TEST(Types, Logic4Vec_XZToString) {
   EXPECT_FALSE(vec.IsKnown());
 }
 
+TEST(Types, Logic4Or_ZTreatedAsX) {
+  Logic4Word zero = {0, 0};
+  Logic4Word one = {1, 0};
+  Logic4Word x = {0, 1};
+  Logic4Word z = {1, 1};
+
+  auto one_or_z = Logic4Or(one, z);
+  auto one_or_x = Logic4Or(one, x);
+  EXPECT_EQ(one_or_z.aval, one_or_x.aval);
+  EXPECT_EQ(one_or_z.bval, one_or_x.bval);
+  EXPECT_TRUE(one_or_z.IsOne());
+
+  auto zero_or_z = Logic4Or(zero, z);
+  auto zero_or_x = Logic4Or(zero, x);
+  EXPECT_EQ(zero_or_z.aval, zero_or_x.aval);
+  EXPECT_EQ(zero_or_z.bval, zero_or_x.bval);
+  EXPECT_FALSE(zero_or_z.IsKnown());
+}
+
+TEST(Types, Logic4Xor_ZTreatedAsX) {
+  Logic4Word zero = {0, 0};
+  Logic4Word one = {1, 0};
+  Logic4Word x = {0, 1};
+  Logic4Word z = {1, 1};
+
+  auto zero_xor_z = Logic4Xor(zero, z);
+  auto zero_xor_x = Logic4Xor(zero, x);
+  EXPECT_EQ(zero_xor_z.aval, zero_xor_x.aval);
+  EXPECT_EQ(zero_xor_z.bval, zero_xor_x.bval);
+  EXPECT_FALSE(zero_xor_z.IsKnown());
+
+  auto one_xor_z = Logic4Xor(one, z);
+  auto one_xor_x = Logic4Xor(one, x);
+  EXPECT_EQ(one_xor_z.aval, one_xor_x.aval);
+  EXPECT_EQ(one_xor_z.bval, one_xor_x.bval);
+  EXPECT_FALSE(one_xor_z.IsKnown());
+}
+
+TEST(Types, Logic4Xor_KnownValues) {
+  Logic4Word zero = {0, 0};
+  Logic4Word one = {1, 0};
+
+  EXPECT_TRUE(Logic4Xor(zero, zero).IsZero());
+  EXPECT_TRUE(Logic4Xor(zero, one).IsOne());
+  EXPECT_TRUE(Logic4Xor(one, zero).IsOne());
+  EXPECT_TRUE(Logic4Xor(one, one).IsZero());
+}
+
+TEST(Types, Logic4Vec_IndependentBitValues) {
+  Arena arena;
+  auto vec = MakeLogic4Vec(arena, 4);
+  vec.words[0].aval = 0b1100;
+  vec.words[0].bval = 0b1010;
+  // bit 0: aval=0,bval=0 -> 0
+  // bit 1: aval=0,bval=1 -> x
+  // bit 2: aval=1,bval=0 -> 1
+  // bit 3: aval=1,bval=1 -> z
+  EXPECT_EQ(vec.ToString(), "zx10");
+}
+
 TEST(Types, Logic2Vec_BasicOperations) {
   Logic2Vec vec;
   vec.width = 8;
