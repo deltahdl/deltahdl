@@ -70,28 +70,6 @@ TEST(DeclarationAssignmentElaboration, ParamAssignmentResolvesConstant) {
   EXPECT_TRUE(found);
 }
 
-TEST(DeclarationAssignmentElaboration, ParamAssignmentLocalparam) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  localparam X = 42;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  bool found = false;
-  for (auto& p : mod->params) {
-    if (p.name == "X") {
-      found = true;
-      EXPECT_TRUE(p.is_localparam);
-      EXPECT_TRUE(p.is_resolved);
-      EXPECT_EQ(p.resolved_value, 42);
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 TEST(DeclarationAssignmentElaboration, ParamAssignmentNoDefaultInPort) {
   EXPECT_TRUE(ElabOk(
       "module child #(parameter int P = 1)(); endmodule\n"

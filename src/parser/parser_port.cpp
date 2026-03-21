@@ -168,8 +168,14 @@ ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
 
 void Parser::ParseParamPortDecl(
     std::vector<std::pair<std::string_view, Expr*>>& params,
-    std::unordered_set<std::string_view>& type_param_names) {
-  Match(TokenKind::kKwParameter) || Match(TokenKind::kKwLocalparam);
+    std::unordered_set<std::string_view>& type_param_names,
+    std::unordered_set<std::string_view>& localparam_port_names,
+    bool& is_localparam_group) {
+  if (Match(TokenKind::kKwLocalparam)) {
+    is_localparam_group = true;
+  } else if (Match(TokenKind::kKwParameter)) {
+    is_localparam_group = false;
+  }
   // Handle type parameter: #(type T = real)  (§6.20.3)
   if (Match(TokenKind::kKwType)) {
     auto name = Expect(TokenKind::kIdentifier);
@@ -182,6 +188,7 @@ void Parser::ParseParamPortDecl(
     }
     params.push_back({name.text, nullptr});
     type_param_names.insert(name.text);
+    if (is_localparam_group) localparam_port_names.insert(name.text);
     known_types_.insert(name.text);
     return;
   }
@@ -192,6 +199,7 @@ void Parser::ParseParamPortDecl(
     default_val = ParseExpr();
   }
   params.push_back({name.text, default_val});
+  if (is_localparam_group) localparam_port_names.insert(name.text);
 }
 
 void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
@@ -204,9 +212,12 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
     Expect(TokenKind::kLParen);
     decl.has_param_port_list = true;
     if (!Check(TokenKind::kRParen)) {
-      ParseParamPortDecl(decl.params, decl.type_param_names);
+      bool is_lp_group = false;
+      ParseParamPortDecl(decl.params, decl.type_param_names,
+                         decl.localparam_port_names, is_lp_group);
       while (Match(TokenKind::kComma)) {
-        ParseParamPortDecl(decl.params, decl.type_param_names);
+        ParseParamPortDecl(decl.params, decl.type_param_names,
+                           decl.localparam_port_names, is_lp_group);
       }
     }
     Expect(TokenKind::kRParen);

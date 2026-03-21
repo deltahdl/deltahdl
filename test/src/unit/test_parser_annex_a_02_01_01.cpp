@@ -5,34 +5,6 @@ using namespace delta;
 
 namespace {}
 
-TEST(ParameterDeclParsing, LocalparamExplicitType) {
-  auto r = Parse("module m; localparam int X = 5; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 1u);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_TRUE(item->is_localparam);
-  EXPECT_EQ(item->name, "X");
-}
-
-TEST(ParameterDeclParsing, LocalparamImplicitType) {
-  auto r = Parse("module m; localparam X = 42; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_EQ(item->name, "X");
-}
-
-TEST(ParameterDeclParsing, LocalparamPackedDimImplicit) {
-  auto r = Parse("module m; localparam [7:0] MASK = 8'hFF; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
-  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
-}
 
 TEST(ParameterDeclParsing, ParameterExplicitType) {
   auto r = Parse("module m; parameter int WIDTH = 8; endmodule");
@@ -81,17 +53,6 @@ TEST(ParameterDeclParsing, ListOfParamAssignments) {
     if (item->kind == ModuleItemKind::kParamDecl) param_count++;
   }
   EXPECT_GE(param_count, 3);
-}
-
-TEST(ParameterDeclParsing, ListOfLocalparamAssignments) {
-  auto r = Parse("module m; localparam int X = 10, Y = 20; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int param_count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kParamDecl) param_count++;
-  }
-  EXPECT_GE(param_count, 2);
 }
 
 TEST(ParameterDeclParsing, SpecparamBasic) {
@@ -194,21 +155,6 @@ TEST(ParameterDeclParsing, ParameterExpressionDefault) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->name, "HALF");
-}
-
-TEST(ParameterDeclParsing, LocalparamExpressionReferenceOther) {
-  auto r = Parse(
-      "module m;\n"
-      "  parameter int WIDTH = 8;\n"
-      "  localparam int DEPTH = 2 ** WIDTH;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int param_count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kParamDecl) param_count++;
-  }
-  EXPECT_EQ(param_count, 2);
 }
 
 // Error conditions

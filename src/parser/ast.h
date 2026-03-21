@@ -703,6 +703,7 @@ struct ModuleDecl {
   std::vector<ModuleItem*> items;
   std::vector<std::pair<std::string_view, Expr*>> params;
   std::unordered_set<std::string_view> type_param_names;  // §6.20.3
+  std::unordered_set<std::string_view> localparam_port_names;  // §6.20.4
   bool has_param_port_list = false;  // §6.20.1: #(...) was present.
   std::vector<ModportDecl*> modports;
 
@@ -773,6 +774,7 @@ struct ClassDecl {
   std::vector<ClassMember*> members;
   std::vector<std::pair<std::string_view, Expr*>> params;
   std::unordered_set<std::string_view> type_param_names;  // §6.20.3
+  std::unordered_set<std::string_view> localparam_port_names;  // §6.20.4
 };
 
 // --- Specify block items (§30, §31) ---

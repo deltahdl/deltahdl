@@ -265,6 +265,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
     pd.default_value = pval;
     pd.is_resolved = false;
     pd.is_type_param = decl->type_param_names.count(pname) > 0;
+    pd.is_localparam = decl->localparam_port_names.count(pname) > 0;
 
     auto override_val = FindParamOverride(params, pname);
     if (override_val) {
