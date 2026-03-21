@@ -454,12 +454,71 @@ static Logic4Vec EvalRelational(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   return MakeLogic4VecVal(arena, 1,
                           EvalRelationalOp(op, lhs.ToUint64(), rhs.ToUint64()));
 }
+// §6.16 Table 6-9: Convert packed string Logic4Vec to std::string for
+// lexicographic comparison.
+static std::string PackedToStr(const Logic4Vec& vec) {
+  std::string result;
+  uint32_t nbytes = vec.width / 8;
+  result.reserve(nbytes);
+  for (uint32_t i = nbytes; i > 0; --i) {
+    uint32_t byte_idx = i - 1;
+    uint32_t word = (byte_idx * 8) / 64;
+    uint32_t bit = (byte_idx * 8) % 64;
+    auto ch = (word < vec.nwords)
+                  ? static_cast<char>((vec.words[word].aval >> bit) & 0xFF)
+                  : '\0';
+    if (ch != 0) result += ch;
+  }
+  return result;
+}
+
+// §6.16 Table 6-9: String equality and relational comparison.
+static Logic4Vec EvalStringCompare(TokenKind op, const Logic4Vec& lhs,
+                                    const Logic4Vec& rhs, Arena& arena) {
+  auto ls = PackedToStr(lhs);
+  auto rs = PackedToStr(rhs);
+  bool r = false;
+  switch (op) {
+    case TokenKind::kEqEq:
+      r = (ls == rs);
+      break;
+    case TokenKind::kBangEq:
+      r = (ls != rs);
+      break;
+    case TokenKind::kEqEqEq:
+      r = (ls == rs);
+      break;
+    case TokenKind::kBangEqEq:
+      r = (ls != rs);
+      break;
+    case TokenKind::kLt:
+      r = (ls < rs);
+      break;
+    case TokenKind::kGt:
+      r = (ls > rs);
+      break;
+    case TokenKind::kLtEq:
+      r = (ls <= rs);
+      break;
+    case TokenKind::kGtEq:
+      r = (ls >= rs);
+      break;
+    default:
+      break;
+  }
+  return MakeLogic4VecVal(arena, 1, r ? 1 : 0);
+}
+
 static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                    Arena& arena) {
   if (op == TokenKind::kLtLt || op == TokenKind::kLtLtLt ||
       op == TokenKind::kGtGt || op == TokenKind::kGtGtGt) {
     if (HasUnknownBits(rhs)) return MakeAllX(arena, lhs.width);
     return EvalShift(op, lhs, rhs.ToUint64(), arena);
+  }
+  // §6.16 Table 6-9: String comparison uses lexicographic ordering.
+  if (lhs.is_string || rhs.is_string) {
+    return EvalStringCompare(op, lhs, rhs, arena);
   }
   if (IsEqualityOp(op)) {
     uint64_t val = EvalEqualityOp(op, lhs, rhs);

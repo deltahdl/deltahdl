@@ -237,4 +237,46 @@ TEST(DataTypeParsing, MultipleStringDecls) {
   ASSERT_GE(r.cu->modules[0]->items.size(), 3u);
 }
 
+TEST(DataTypeParsing, StringRelationalLessEqual) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string a, b;\n"
+              "  initial begin\n"
+              "    if (a <= b) $display(\"le\");\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, StringRelationalGreater) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string a, b;\n"
+              "  initial begin\n"
+              "    if (a > b) $display(\"gt\");\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, StringRelationalGreaterEqual) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string a, b;\n"
+              "  initial begin\n"
+              "    if (a >= b) $display(\"ge\");\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, StringIndexing) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  string s;\n"
+              "  byte b;\n"
+              "  initial begin\n"
+              "    s = \"hello\";\n"
+              "    b = s[0];\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

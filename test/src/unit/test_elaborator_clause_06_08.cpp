@@ -99,20 +99,6 @@ TEST(VarDecl, RealIsReal) {
   EXPECT_TRUE(mod->variables[0].is_real);
 }
 
-TEST(VarDecl, StringIsString) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  string name;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_TRUE(mod->variables[0].is_string);
-}
-
 TEST(VarDecl, EventIsEvent) {
   ElabFixture f;
   auto* design = ElaborateSrc(

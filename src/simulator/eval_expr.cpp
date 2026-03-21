@@ -890,6 +890,18 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
   if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
   auto base_val = EvalExpr(expr->base, ctx, arena);
+  // §6.16 Table 6-9: String indexing returns byte at given index.
+  if (base_val.is_string && !expr->index_end) {
+    uint32_t nbytes = base_val.width / 8;
+    if (idx >= nbytes) return MakeLogic4VecVal(arena, 8, 0);
+    uint32_t byte_idx = nbytes - 1 - static_cast<uint32_t>(idx);
+    uint32_t word = (byte_idx * 8) / 64;
+    uint32_t bit = (byte_idx * 8) % 64;
+    uint64_t ch = (word < base_val.nwords)
+                      ? (base_val.words[word].aval >> bit) & 0xFF
+                      : 0;
+    return MakeLogic4VecVal(arena, 8, ch);
+  }
   if (expr->index_end)
     return EvalPackedPartSelect(expr, base_val, idx, ctx, arena);
   return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> idx) & 1);
