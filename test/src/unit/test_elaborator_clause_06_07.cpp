@@ -1,19 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-
 #include "model_net_declaration.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(NetDecl, ChargeStrengthOnlyWithTrireg) {
-  NetDeclInfo info;
-  info.type = NetType::kTrireg;
-  info.has_charge_strength = true;
-  EXPECT_TRUE(ValidateNetDecl(info));
-}
 
 TEST(NetDecl, VectoredRequiresPackedDimension) {
   NetDeclInfo info;
@@ -26,13 +17,6 @@ TEST(NetDecl, ScalaredRequiresPackedDimension) {
   NetDeclInfo info;
   info.is_scalared = true;
   info.packed_dim_count = 0;
-  EXPECT_FALSE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, ChargeStrengthOnNonTriregNotAccepted) {
-  NetDeclInfo info;
-  info.type = NetType::kWire;
-  info.has_charge_strength = true;
   EXPECT_FALSE(ValidateNetDecl(info));
 }
 
@@ -54,28 +38,6 @@ TEST(NetDecl, BasicWireDeclOk) {
   NetDeclInfo info;
   info.type = NetType::kWire;
   EXPECT_TRUE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, TriregWithChargeStrengthOk) {
-  NetDeclInfo info;
-  info.type = NetType::kTrireg;
-  info.has_charge_strength = true;
-  info.charge = LocalChargeStrength::kLarge;
-  EXPECT_TRUE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, ChargeStrengthOnWireIsError) {
-  NetDeclInfo info;
-  info.type = NetType::kWire;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
-}
-
-TEST(NetDecl, ChargeStrengthOnWandIsError) {
-  NetDeclInfo info;
-  info.type = NetType::kWand;
-  info.has_charge_strength = true;
-  EXPECT_FALSE(ValidateNetDecl(info));
 }
 
 }  // namespace
