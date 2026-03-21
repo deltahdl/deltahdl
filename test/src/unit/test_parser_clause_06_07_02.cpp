@@ -72,4 +72,22 @@ TEST(DataTypeParsing, UnresolvedNettypeDecl) {
               "endmodule\n"));
 }
 
+TEST(DataTypeParsing, NettypeNetWithDelay) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  nettype logic [7:0] mynet;\n"
+              "  mynet #5 x;\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, NettypeNetWithUnpackedDims) {
+  auto r = Parse(
+      "module m;\n"
+      "  nettype logic [7:0] mynet;\n"
+      "  mynet x [0:3][0:1];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
