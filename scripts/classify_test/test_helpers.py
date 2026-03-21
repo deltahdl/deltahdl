@@ -64,10 +64,13 @@ def stub_side_effects(monkeypatch):
     )
 
 
-def stub_classifier(monkeypatch, response):
+def stub_classifier(monkeypatch, response, stage="parser"):
     """Stub _call_claude and side-effect functions for _run tests."""
-    monkeypatch.setattr(
-        classify_test, "_call_claude",
-        lambda p, schema=None, **_kw: response,
-    )
+
+    def _fake_claude(_prompt, schema=None, **_kw):
+        if schema and "pipeline_stage" in schema:
+            return {"pipeline_stage": stage, "rationale": "r"}
+        return response
+
+    monkeypatch.setattr(classify_test, "_call_claude", _fake_claude)
     stub_side_effects(monkeypatch)
