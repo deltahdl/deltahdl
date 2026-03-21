@@ -1,25 +1,10 @@
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
-#include "simulator/specify.h"
 #include "simulator/variable.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(TimingCheckCommandSim, NochangeOffsetsStored) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kNochange;
-  tc.ref_signal = "clk";
-  tc.ref_edge = SpecifyEdge::kPosedge;
-  tc.data_signal = "data";
-  tc.limit = 0;
-  tc.limit2 = 0;
-  mgr.AddTimingCheck(tc);
-  auto& stored = mgr.GetTimingChecks()[0];
-  EXPECT_EQ(stored.kind, TimingCheckKind::kNochange);
-}
 
 TEST(TimingCheckArgumentSim, NochangeMinTypMaxOffsetsSimulates) {
   SimFixture f;

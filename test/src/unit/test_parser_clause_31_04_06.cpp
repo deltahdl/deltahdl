@@ -5,46 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SystemTimingCheckParsing, SystemTimingCheckNochange) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(posedge clk, data, 0, 0);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kNochange);
-}
-
-TEST(TimingCheckCommandParsing, NochangeTimingCheck) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(posedge clk, data, 0, 0);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kNochange);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
-TEST(TimingCheckCommandParsing, NochangeWithNotifier) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(posedge clk, data, 0, 0, ntfr);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->notifier, "ntfr");
-}
-
 TEST(TimingCheckArgumentParsing, StartEndEdgeOffsetMinTypMax) {
   auto r = Parse(
       "module m;\n"
@@ -58,19 +18,6 @@ TEST(TimingCheckArgumentParsing, StartEndEdgeOffsetMinTypMax) {
   ASSERT_GE(tc->limits.size(), 2u);
   EXPECT_EQ(tc->limits[0]->kind, ExprKind::kMinTypMax);
   EXPECT_EQ(tc->limits[1]->kind, ExprKind::kMinTypMax);
-}
-
-TEST(NochangeBasic, NochangeBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(posedge clk, data, 0, 0);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kNochange);
 }
 
 }  // namespace
