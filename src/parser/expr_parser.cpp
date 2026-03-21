@@ -494,6 +494,8 @@ Expr* Parser::ParseCastOrTypedPattern() {
   id->kind = ExprKind::kIdentifier;
   id->text = type_tok.text;
   id->range.start = type_tok.loc;
+  // §A.8.2: data_type argument may include packed dimensions (e.g. logic [7:0])
+  if (Check(TokenKind::kLBracket)) return ParseSelectExpr(id);
   return id;
 }
 
@@ -761,7 +763,17 @@ Expr* Parser::ParseSystemCall() {
       call->args.push_back(ParseExpr());
     }
     while (Match(TokenKind::kComma)) {
-      if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
+      if (Check(TokenKind::kAt)) {
+        // §A.8.2: optional trailing clocking_event (@id or @(event))
+        Consume();
+        if (Match(TokenKind::kLParen)) {
+          ParseEventList();
+          Expect(TokenKind::kRParen);
+        } else {
+          Consume();
+        }
+        break;
+      } else if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
         call->args.push_back(nullptr);
       } else {
         call->args.push_back(ParseExpr());

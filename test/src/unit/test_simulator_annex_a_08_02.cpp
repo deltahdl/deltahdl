@@ -155,4 +155,64 @@ TEST(SubroutineCallSim, SequentialCallStatements) {
   LowerRunAndCheck(f, design, {{"x", 10u}, {"y", 20u}});
 }
 
+TEST(SubroutineCallSim, FunctionCallReturnValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function logic [7:0] get_val();\n"
+      "    return 8'd33;\n"
+      "  endfunction\n"
+      "  initial x = get_val();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 33u);
+}
+
+TEST(SubroutineCallSim, FunctionCallWithArgs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function logic [7:0] add(logic [7:0] a, logic [7:0] b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "  initial x = add(8'd10, 8'd20);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 30u);
+}
+
+TEST(SubroutineCallSim, NestedFunctionCalls) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function logic [7:0] inc(logic [7:0] v);\n"
+      "    return v + 8'd1;\n"
+      "  endfunction\n"
+      "  initial x = inc(inc(8'd5));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
 }  // namespace
