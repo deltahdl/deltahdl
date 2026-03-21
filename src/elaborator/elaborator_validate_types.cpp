@@ -113,9 +113,11 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
 
   for (const auto& member : dtype.enum_members) {
     // §6.19: Enum member names shall be unique.
-    if (!seen_names.insert(member.name).second) {
-      diag_.Error(loc,
-                  std::format("duplicate enum member name '{}'", member.name));
+    if (!member.range_start) {
+      if (!seen_names.insert(member.name).second) {
+        diag_.Error(loc,
+                    std::format("duplicate enum member name '{}'", member.name));
+      }
     }
 
     if (!member.value) {
@@ -134,16 +136,32 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
       }
     }
 
+    // §6.19.2: Compute how many concrete members this entry expands to.
+    int64_t count = 1;
+    if (member.range_start) {
+      auto n = ConstEvalInt(member.range_start).value_or(0);
+      if (member.range_end) {
+        auto m = ConstEvalInt(member.range_end).value_or(0);
+        count = (m >= n) ? (m - n + 1) : (n - m + 1);
+      } else {
+        count = n;
+      }
+      if (count < 1) count = 1;
+    }
+
     // §6.19: Enum member values shall be unique.
     if (!prev_had_xz) {
-      if (!seen_values.insert(next_val).second) {
-        diag_.Error(loc,
-                    std::format("duplicate enum member value {}", next_val));
+      for (int64_t i = 0; i < count; ++i) {
+        if (!seen_values.insert(next_val + i).second) {
+          diag_.Error(
+              loc,
+              std::format("duplicate enum member value {}", next_val + i));
+        }
       }
     }
 
     // §6.19: Auto-increment past max representable value is an error.
-    ++next_val;
+    next_val += count;
     if (!prev_had_xz && next_val > 0 &&
         static_cast<uint64_t>(next_val) > max_val &&
         &member != &dtype.enum_members.back()) {

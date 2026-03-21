@@ -305,19 +305,60 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   if (item->typedef_type.kind != DataTypeKind::kEnum) return;
   ValidateEnumDecl(item->typedef_type, item->loc);
   int64_t next_val = 0;
+  auto width = EvalTypeWidth(item->typedef_type, typedefs_);
   std::vector<RtlirEnumMember> members;
   for (const auto& member : item->typedef_type.enum_members) {
-    enum_member_names_.insert(member.name);
     if (member.value) {
       next_val = ConstEvalInt(member.value).value_or(next_val);
     }
-    members.push_back({member.name, next_val});
-    RtlirVariable var;
-    var.name = member.name;
-    var.width = EvalTypeWidth(item->typedef_type, typedefs_);
-    var.is_4state = false;
-    mod->variables.push_back(var);
-    ++next_val;
+    // §6.19.2: Expand range members into concrete named constants.
+    if (member.range_start) {
+      auto n = ConstEvalInt(member.range_start).value_or(0);
+      if (member.range_end) {
+        // name[N:M] form: generate nameN, nameN+1, ..., nameM (or decrement).
+        auto m = ConstEvalInt(member.range_end).value_or(0);
+        int step = (m >= n) ? 1 : -1;
+        for (auto i = n;; i += step) {
+          auto s = std::format("{}{}", member.name, i);
+          auto* p = arena_.AllocString(s.c_str(), s.size());
+          std::string_view sv{p, s.size()};
+          enum_member_names_.insert(sv);
+          members.push_back({sv, next_val});
+          RtlirVariable var;
+          var.name = sv;
+          var.width = width;
+          var.is_4state = false;
+          mod->variables.push_back(var);
+          ++next_val;
+          if (i == m) break;
+        }
+      } else {
+        // name[N] form: generate name0, name1, ..., nameN-1.
+        for (int64_t i = 0; i < n; ++i) {
+          auto s = std::format("{}{}", member.name, i);
+          auto* p = arena_.AllocString(s.c_str(), s.size());
+          std::string_view sv{p, s.size()};
+          enum_member_names_.insert(sv);
+          members.push_back({sv, next_val});
+          RtlirVariable var;
+          var.name = sv;
+          var.width = width;
+          var.is_4state = false;
+          mod->variables.push_back(var);
+          ++next_val;
+        }
+      }
+    } else {
+      // Plain member (no range).
+      enum_member_names_.insert(member.name);
+      members.push_back({member.name, next_val});
+      RtlirVariable var;
+      var.name = member.name;
+      var.width = width;
+      var.is_4state = false;
+      mod->variables.push_back(var);
+      ++next_val;
+    }
   }
   mod->enum_types[item->name] = std::move(members);
 }
