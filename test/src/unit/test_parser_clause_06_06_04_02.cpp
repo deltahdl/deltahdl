@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(DataTypeParsing, TriregThreeDelayDecay) {
+TEST(ChargeDecayParsing, TriregThreeDelayDecay) {
   auto r = Parse(
       "module t;\n"
       "  trireg (large) #(0, 0, 50) cap1;\n"
@@ -23,7 +23,7 @@ TEST(DataTypeParsing, TriregThreeDelayDecay) {
   EXPECT_EQ(item->net_delay_decay->int_val, 50u);
 }
 
-TEST(DataTypeParsing, TriregSingleDelayNoDecay) {
+TEST(ChargeDecayParsing, TriregSingleDelayNoDecay) {
   auto r = Parse(
       "module t;\n"
       "  trireg #5 cap;\n"
@@ -38,7 +38,7 @@ TEST(DataTypeParsing, TriregSingleDelayNoDecay) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-TEST(DataTypeParsing, TriregTwoDelayNoDecay) {
+TEST(ChargeDecayParsing, TriregTwoDelayNoDecay) {
   auto r = Parse(
       "module t;\n"
       "  trireg #(3, 5) cap;\n"
@@ -55,7 +55,7 @@ TEST(DataTypeParsing, TriregTwoDelayNoDecay) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-TEST(DataTypeParsing, TriregNoDelayIdeal) {
+TEST(ChargeDecayParsing, TriregNoDelayIdeal) {
   auto r = Parse(
       "module t;\n"
       "  trireg cap;\n"
