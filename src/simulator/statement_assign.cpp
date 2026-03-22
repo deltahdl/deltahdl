@@ -482,13 +482,17 @@ static void CollectQueueElements(const Expr* expr, SimContext& ctx,
 }
 
 // §7.5.1: Copy source array into new[size](src) target.
-static void CopyNewInit(const Expr* rhs, QueueObject* q, SimContext& ctx,
-                        Arena& /*arena*/) {
-  if (!rhs->lhs || rhs->lhs->kind != ExprKind::kIdentifier) return;
-  auto* src = ctx.FindQueue(rhs->lhs->text);
+static void CopyNewInit(const Expr* rhs, QueueObject* q,
+                        const std::vector<Logic4Vec>& saved, SimContext& ctx) {
+  if (rhs->args.size() < 2) return;
+  auto* init_expr = rhs->args[1];
+  if (!init_expr || init_expr->kind != ExprKind::kIdentifier) return;
+  auto* src = ctx.FindQueue(init_expr->text);
   if (!src) return;
-  size_t copy_len = std::min(q->elements.size(), src->elements.size());
-  for (size_t i = 0; i < copy_len; ++i) q->elements[i] = src->elements[i];
+  // §7.5.1: Self-reference (d = new[N](d)) — use saved snapshot.
+  const auto& src_elems = (src == q) ? saved : src->elements;
+  size_t copy_len = std::min(q->elements.size(), src_elems.size());
+  for (size_t i = 0; i < copy_len; ++i) q->elements[i] = src_elems[i];
 }
 
 // §7.10.4: Queue assignment from concatenation, slice, or literal.
@@ -505,10 +509,18 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
   if (stmt->rhs->kind == ExprKind::kCall && stmt->rhs->text == "new" &&
       !stmt->rhs->args.empty()) {
-    auto sz = EvalExpr(stmt->rhs->args[0], ctx, arena).ToUint64();
+    auto sz_val = EvalExpr(stmt->rhs->args[0], ctx, arena);
+    int64_t sz = SignExtend(sz_val.ToUint64(), sz_val.width);
+    // §7.5.1: Negative size is a runtime error.
+    if (sz < 0) {
+      ctx.GetDiag().Error({}, "dynamic array new[] size is negative");
+      return true;
+    }
+    // §7.5.1: Snapshot for self-reference (d = new[N](d)).
+    auto saved = q->elements;
     q->elements.resize(static_cast<size_t>(sz),
                        MakeLogic4VecVal(arena, q->elem_width, 0));
-    CopyNewInit(stmt->rhs, q, ctx, arena);
+    CopyNewInit(stmt->rhs, q, saved, ctx);
     q->AssignFreshIds();
     ++q->generation;
     return true;
