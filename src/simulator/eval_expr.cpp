@@ -746,7 +746,8 @@ static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
       std::string(expr->base->text) + "[" + std::to_string(idx) + "]";
   auto* elem = ctx.FindVariable(elem_name);
   if (!elem) {
-    out = MakeAllX(arena, info->elem_width);
+    out = info->is_4state ? MakeAllX(arena, info->elem_width)
+                          : MakeLogic4VecVal(arena, info->elem_width, 0);
     return true;
   }
   out = elem->value;

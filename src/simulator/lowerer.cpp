@@ -285,6 +285,7 @@ static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
   info.size = var.unpacked_size;
   info.elem_width = var.width;
   info.is_descending = var.is_descending;
+  info.is_4state = var.is_4state;
   ctx.RegisterArray(var.name, info);
   // §5.11: Detect replication and named array pattern forms.
   bool named = var.init_expr && !var.init_expr->pattern_keys.empty();

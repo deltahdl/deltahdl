@@ -102,6 +102,7 @@ struct ArrayInfo {
   bool is_descending = false;  // §7.4: true for [hi:lo] range.
   bool is_dynamic = false;     // §7.5: dynamic array (new/delete).
   bool is_queue = false;       // §7.10: queue ($).
+  bool is_4state = true;       // §7.4.5 Table 7-1: 4-state vs 2-state default.
 };
 
 // §11.11: Delay mode for min:typ:max expression evaluation.
