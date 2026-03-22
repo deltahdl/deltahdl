@@ -846,6 +846,7 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
     ValidateUnpackedStructWithUnionDefaults(item->data_type, item->loc);
     ValidateVoidMembers(item->data_type, item->loc);
     ValidateRandQualifiers(item->data_type, item->loc);
+    ValidatePackedDimRequiresPackedKeyword(item->data_type, item->loc);
     ValidatePackedStructMemberTypes(item->data_type, item->loc);
     ValidateChandleInUnion(item->data_type, item->loc);
     ValidatePackedUnion(item->data_type, item->loc);

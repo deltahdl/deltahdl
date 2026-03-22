@@ -149,6 +149,10 @@ class Elaborator {
   /// §7.2, footnote 20: random qualifier only in unpacked structures.
   void ValidateRandQualifiers(const DataType& dtype, SourceLoc loc);
 
+  /// §7.2, footnote 17: packed dimension requires packed/soft keyword.
+  void ValidatePackedDimRequiresPackedKeyword(const DataType& dtype,
+                                              SourceLoc loc);
+
   /// §7.2.1/§7.3.1: Only packed/integer types in packed structures/unions.
   void ValidatePackedStructMemberTypes(const DataType& dtype, SourceLoc loc);
 

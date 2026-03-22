@@ -542,6 +542,20 @@ void Elaborator::ValidateRandQualifiers(const DataType& dtype, SourceLoc loc) {
   }
 }
 
+// §7.2, footnote 17: packed dimension on struct requires packed keyword;
+// on union requires soft and/or packed keyword.
+void Elaborator::ValidatePackedDimRequiresPackedKeyword(const DataType& dtype,
+                                                        SourceLoc loc) {
+  if (dtype.kind != DataTypeKind::kStruct && dtype.kind != DataTypeKind::kUnion)
+    return;
+  if (!dtype.packed_dim_left) return;
+  if (dtype.is_packed || dtype.is_soft) return;
+  const char* kw = (dtype.kind == DataTypeKind::kStruct) ? "struct" : "union";
+  diag_.Error(loc,
+              std::format("packed dimension on {} requires the packed keyword",
+                          kw));
+}
+
 // §7.2.1: Only packed data types and integer data types shall be legal in
 // packed structures.
 static bool IsLegalPackedMemberType(DataTypeKind kind) {

@@ -305,6 +305,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     ValidateUnpackedStructWithUnionDefaults(item->typedef_type, item->loc);
     ValidateVoidMembers(item->typedef_type, item->loc);
     ValidateRandQualifiers(item->typedef_type, item->loc);
+    ValidatePackedDimRequiresPackedKeyword(item->typedef_type, item->loc);
     ValidatePackedStructMemberTypes(item->typedef_type, item->loc);
     ValidateChandleInUnion(item->typedef_type, item->loc);
     ValidatePackedUnion(item->typedef_type, item->loc);

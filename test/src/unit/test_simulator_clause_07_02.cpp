@@ -98,7 +98,7 @@ TEST(StructType, FieldTypeKindPreserved) {
   EXPECT_EQ(found->fields[1].type_kind, DataTypeKind::kByte);
 }
 
-TEST(EvalOp, MemberAccessBasic) {
+TEST(StructMemberAccess, MemberAccessBasic) {
   SimFixture f;
 
   auto* var = f.ctx.CreateVariable("s.x", 32);

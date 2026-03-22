@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, VoidMemberInUnpackedStruct_Rejected) {
+TEST(StructDeclarationValidation, VoidMemberInUnpackedStruct_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -14,7 +14,7 @@ TEST(Elaboration, VoidMemberInUnpackedStruct_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, VoidMemberInPackedStruct_Rejected) {
+TEST(StructDeclarationValidation, VoidMemberInPackedStruct_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -24,7 +24,7 @@ TEST(Elaboration, VoidMemberInPackedStruct_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, VoidMemberInTaggedUnion_Allowed) {
+TEST(StructDeclarationValidation, VoidMemberInTaggedUnion_Allowed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -34,7 +34,7 @@ TEST(Elaboration, VoidMemberInTaggedUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, VoidMemberInUnpackedUnion_Rejected) {
+TEST(StructDeclarationValidation, VoidMemberInUnpackedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -44,7 +44,7 @@ TEST(Elaboration, VoidMemberInUnpackedUnion_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, VoidMemberInPackedUnion_Rejected) {
+TEST(StructDeclarationValidation, VoidMemberInPackedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -54,7 +54,7 @@ TEST(Elaboration, VoidMemberInPackedUnion_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, RandInPackedStruct_Rejected) {
+TEST(StructDeclarationValidation, RandInPackedStruct_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -64,7 +64,7 @@ TEST(Elaboration, RandInPackedStruct_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, RandcInPackedStruct_Rejected) {
+TEST(StructDeclarationValidation, RandcInPackedStruct_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -74,7 +74,7 @@ TEST(Elaboration, RandcInPackedStruct_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, RandInUnpackedStruct_Allowed) {
+TEST(StructDeclarationValidation, RandInUnpackedStruct_Allowed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -84,7 +84,7 @@ TEST(Elaboration, RandInUnpackedStruct_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, RandcInUnpackedStruct_Allowed) {
+TEST(StructDeclarationValidation, RandcInUnpackedStruct_Allowed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -94,11 +94,41 @@ TEST(Elaboration, RandcInUnpackedStruct_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, RandInUnion_Rejected) {
+TEST(StructDeclarationValidation, RandInUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
       "  union { rand int a; int b; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(StructDeclarationValidation, RandcInUnion_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union { randc int a; int b; } u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(StructDeclarationValidation, PackedDimOnUnpackedStruct_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct { logic [7:0] a; logic [7:0] b; } [3:0] arr;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(StructDeclarationValidation, PackedDimOnUnpackedUnion_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  union { int a; int b; } [3:0] arr;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
