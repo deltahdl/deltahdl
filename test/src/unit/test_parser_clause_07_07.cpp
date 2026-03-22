@@ -68,4 +68,37 @@ TEST(AggregateTypeParsing, FuncWithStringArrayArg) {
   EXPECT_FALSE(item->func_args[0].unpacked_dims.empty());
 }
 
+TEST(AggregateTypeParsing, FixedSizeArrayArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo(int data[3]);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].unpacked_dims.size(), 1u);
+}
+
+TEST(AggregateTypeParsing, FuncWithAssocArrayArg) {
+  auto r = Parse(
+      "module t;\n"
+      "  function void foo(int aa[string]);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(AggregateTypeParsing, TaskWithAssocArrayInOut) {
+  auto r = Parse(
+      "module t;\n"
+      "  task bar(input int a[int], output int b[int]);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

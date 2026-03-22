@@ -320,19 +320,6 @@ TEST(BlockItemDeclParsing, BlockItemInFunction) {
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(TaskAndFunctionParsing, ArrayParamOnFuncArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void foo(int data[3]);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "foo");
-  ASSERT_NE(fn, nullptr);
-  ASSERT_EQ(fn->func_args.size(), 1u);
-  EXPECT_EQ(fn->func_args[0].unpacked_dims.size(), 1u);
-}
-
 TEST(TaskAndFunctionParsing, NoDimsOnFuncArg) {
   auto r = Parse(
       "module m;\n"

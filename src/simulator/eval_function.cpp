@@ -362,17 +362,33 @@ static bool TryBindAssocArg(const Expr* call_arg, std::string_view param_name,
 }
 
 // §13.4: Copy array elements when passing an unpacked array to a subroutine.
-static bool TryBindArrayArg(const Expr* call_arg, std::string_view param_name,
+// §7.7: Runtime size check when fixed-size formal receives dynamic/queue actual.
+static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
                             SimContext& ctx, Arena& arena) {
   if (!call_arg || call_arg->kind != ExprKind::kIdentifier) return false;
-  if (TryBindAssocArg(call_arg, param_name, ctx)) return true;
+  if (TryBindAssocArg(call_arg, formal.name, ctx)) return true;
   auto* info = ctx.FindArrayInfo(call_arg->text);
   if (!info) return false;
-  ctx.RegisterArray(param_name, *info);
+
+  // §7.7: Fixed-size formal receiving dynamic/queue actual requires runtime
+  // size check.
+  if (!formal.unpacked_dims.empty() && formal.unpacked_dims[0] != nullptr &&
+      (info->is_dynamic || info->is_queue)) {
+    auto formal_size = EvalExpr(formal.unpacked_dims[0], ctx, arena).ToUint64();
+    if (info->size != formal_size) {
+      ctx.GetDiag().Error(
+          {}, "array size mismatch: formal expects " +
+                  std::to_string(formal_size) + " elements, actual has " +
+                  std::to_string(info->size));
+      return true;
+    }
+  }
+
+  ctx.RegisterArray(formal.name, *info);
   for (uint32_t j = 0; j < info->size; ++j) {
     uint32_t idx = info->lo + j;
     auto src = std::string(call_arg->text) + "[" + std::to_string(idx) + "]";
-    auto dst = std::string(param_name) + "[" + std::to_string(idx) + "]";
+    auto dst = std::string(formal.name) + "[" + std::to_string(idx) + "]";
     auto* src_var = ctx.FindVariable(src);
     auto val =
         src_var ? src_var->value : MakeLogic4VecVal(arena, info->elem_width, 0);
@@ -395,7 +411,7 @@ static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
         continue;
     }
     if (ai >= 0 && TryBindArrayArg(expr->args[static_cast<size_t>(ai)],
-                                   func->func_args[i].name, ctx, arena)) {
+                                   func->func_args[i], ctx, arena)) {
       continue;
     }
     auto val = ResolveArgValue(func->func_args[i], expr, ai, ctx, arena);
