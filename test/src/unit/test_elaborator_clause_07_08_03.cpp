@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, AssocArrayClassIndex_IsAssoc) {
+TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_IsAssoc) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -27,7 +27,7 @@ TEST(Elaboration, AssocArrayClassIndex_IsAssoc) {
   EXPECT_TRUE(found);
 }
 
-TEST(Elaboration, AssocArrayClassIndex_IsClassIndex) {
+TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_IsClassIndex) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -51,7 +51,7 @@ TEST(Elaboration, AssocArrayClassIndex_IsClassIndex) {
   EXPECT_TRUE(found);
 }
 
-TEST(Elaboration, AssocArrayClassIndex_IndexWidth64) {
+TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_IndexWidth64) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -74,7 +74,7 @@ TEST(Elaboration, AssocArrayClassIndex_IndexWidth64) {
   EXPECT_TRUE(found);
 }
 
-TEST(Elaboration, AssocArrayClassIndex_NotStringIndex) {
+TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_NotStringIndex) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -97,7 +97,7 @@ TEST(Elaboration, AssocArrayClassIndex_NotStringIndex) {
   EXPECT_TRUE(found);
 }
 
-TEST(Elaboration, AssocArrayClassIndex_SameTypeAssignOk) {
+TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_SameTypeAssignOk) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
              "  class K;\n"
@@ -109,7 +109,7 @@ TEST(Elaboration, AssocArrayClassIndex_SameTypeAssignOk) {
              "endmodule\n"));
 }
 
-TEST(Elaboration, AssocArrayClassIndex_DifferentTypeAssignError) {
+TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_DifferentTypeAssignError) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -127,7 +127,7 @@ TEST(Elaboration, AssocArrayClassIndex_DifferentTypeAssignError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, AssocArrayClassIndex_MixedTypeAssignError) {
+TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_MixedTypeAssignError) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"

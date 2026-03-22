@@ -9,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AssocArray, ClassIndex_NullKeyValid) {
+TEST(ClassIndexAssocArraySimulation, ClassIndex_NullKeyValid) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 64);
   auto null_key = static_cast<int64_t>(kNullClassHandle);
@@ -18,7 +18,7 @@ TEST(AssocArray, ClassIndex_NullKeyValid) {
   EXPECT_EQ(aa->int_data[null_key].ToUint64(), 99u);
 }
 
-TEST(AssocArray, ClassIndex_DistinctHandles) {
+TEST(ClassIndexAssocArraySimulation, ClassIndex_DistinctHandles) {
   SimFixture f;
   auto* type = MakeClassType(f, "Foo", {"id"});
   auto [h1, _1] = MakeObj(f, type);
@@ -35,7 +35,7 @@ TEST(AssocArray, ClassIndex_DistinctHandles) {
   EXPECT_EQ(aa->int_data[k2].ToUint64(), 20u);
 }
 
-TEST(AssocArray, ClassIndex_NullAndObjectCoexist) {
+TEST(ClassIndexAssocArraySimulation, ClassIndex_NullAndObjectCoexist) {
   SimFixture f;
   auto* type = MakeClassType(f, "Bar", {"x"});
   auto [h1, _1] = MakeObj(f, type);
@@ -51,7 +51,7 @@ TEST(AssocArray, ClassIndex_NullAndObjectCoexist) {
   EXPECT_EQ(aa->int_data[obj_key].ToUint64(), 200u);
 }
 
-TEST(AssocArray, ClassIndex_OverwriteEntry) {
+TEST(ClassIndexAssocArraySimulation, ClassIndex_OverwriteEntry) {
   SimFixture f;
   auto* type = MakeClassType(f, "Key", {"v"});
   auto [h1, _1] = MakeObj(f, type);
@@ -66,7 +66,7 @@ TEST(AssocArray, ClassIndex_OverwriteEntry) {
   EXPECT_EQ(aa->int_data[k1].ToUint64(), 42u);
 }
 
-TEST(AssocArray, ClassIndex_DeterministicOrdering) {
+TEST(ClassIndexAssocArraySimulation, ClassIndex_DeterministicOrdering) {
   SimFixture f;
   auto* type = MakeClassType(f, "Item", {"id"});
   auto [h1, _1] = MakeObj(f, type);
@@ -92,7 +92,7 @@ TEST(AssocArray, ClassIndex_DeterministicOrdering) {
   EXPECT_TRUE(std::is_sorted(keys.begin(), keys.end()));
 }
 
-TEST(AssocArray, ClassIndex_EmptySize) {
+TEST(ClassIndexAssocArraySimulation, ClassIndex_EmptySize) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 64);
   EXPECT_EQ(aa->Size(), 0u);
