@@ -684,6 +684,12 @@ static void ComputeUnpackedDims(
       var.is_class_index = true;
       var.assoc_index_class_name = dim->text;
       var.assoc_index_width = 64;  // Class handles are 64-bit.
+    } else {
+      // §7.8.5: Resolve typedef to compute index width.
+      auto it = typedefs.find(dim->text);
+      if (it != typedefs.end()) {
+        var.assoc_index_width = EvalTypeWidth(it->second, typedefs);
+      }
     }
     return;
   }

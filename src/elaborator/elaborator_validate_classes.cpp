@@ -153,12 +153,33 @@ void Elaborator::ValidateAssocArraySlices(const ModuleDecl* decl) {
 }
 
 // §7.8.5: real/shortreal shall be an illegal associative array index type.
+static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds) {
+  if (dtype.kind == DataTypeKind::kNamed) {
+    auto it = tds.find(dtype.type_name);
+    if (it != tds.end()) return ContainsRealType(it->second, tds);
+    return false;
+  }
+  if (IsRealType(dtype.kind)) return true;
+  for (const auto& m : dtype.struct_members) {
+    if (IsRealType(m.type_kind)) return true;
+  }
+  return false;
+}
+
 void Elaborator::ValidateAssocIndexType(const ModuleItem* item) {
   if (item->unpacked_dims.empty()) return;
   auto* dim = item->unpacked_dims[0];
   if (!dim || dim->kind != ExprKind::kIdentifier) return;
   auto t = dim->text;
   if (t == "real" || t == "shortreal" || t == "realtime") {
+    diag_.Error(item->loc,
+                "real or shortreal type shall not be used as an "
+                "associative array index type");
+    return;
+  }
+  // §7.8.5: A type containing real or shortreal is also illegal.
+  auto it = typedefs_.find(t);
+  if (it != typedefs_.end() && ContainsRealType(it->second, typedefs_)) {
     diag_.Error(item->loc,
                 "real or shortreal type shall not be used as an "
                 "associative array index type");
