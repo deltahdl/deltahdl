@@ -167,6 +167,18 @@ TEST(BlockingAssignSim, BlockingAssignSplitPacked) {
   EXPECT_EQ(lo->value.ToUint64(), 0xADu);
 }
 
+TEST(ExpressionElaboration, GenvarExprElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter int N = 4;\n"
+      "  logic [N-1:0] w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
 TEST(VarLvaluePartSelect, VarLvaluePartSelect) {
   SimFixture f;

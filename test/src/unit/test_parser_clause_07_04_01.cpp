@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DeclarationRangeParsing, PackedDimConstantRange) {
+TEST(PackedArrayParsing, PackedDimConstantRange) {
   auto r = Parse("module m; logic [7:0] x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -17,7 +17,7 @@ TEST(DeclarationRangeParsing, PackedDimConstantRange) {
   ASSERT_NE(item->data_type.packed_dim_right, nullptr);
 }
 
-TEST(DeclarationRangeParsing, PackedDimMultiple) {
+TEST(PackedArrayParsing, PackedDimMultiple) {
   auto r = Parse("module m; logic [3:0][7:0] x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -26,7 +26,7 @@ TEST(DeclarationRangeParsing, PackedDimMultiple) {
   EXPECT_EQ(item->data_type.extra_packed_dims.size(), 1u);
 }
 
-TEST(DataTypeParsing, MultiplePackedDims) {
+TEST(PackedArrayParsing, MultiplePackedDims) {
   auto r = Parse(
       "module t;\n"
       "  logic [3:0][7:0] data;\n"
@@ -41,7 +41,7 @@ TEST(DataTypeParsing, MultiplePackedDims) {
   EXPECT_FALSE(item->data_type.extra_packed_dims.empty());
 }
 
-TEST(AggregateTypeParsing, PackedArrayMultiDim) {
+TEST(PackedArrayParsing, PackedArrayMultiDim) {
   auto r = Parse(
       "module t;\n"
       "  bit [3:0][7:0] packed_2d;\n"
@@ -53,7 +53,7 @@ TEST(AggregateTypeParsing, PackedArrayMultiDim) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
 }
 
-TEST(ExpressionParsing, ConstantRangeInPackedDim) {
+TEST(PackedArrayParsing, ConstantRangeInPackedDim) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] x;\n"
@@ -67,10 +67,28 @@ TEST(ExpressionParsing, ConstantRangeInPackedDim) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-TEST(PrimaryParsing, ConstantBitSelectPackedDim) {
+TEST(PackedArrayParsing, ConstantBitSelectPackedDim) {
   auto r = Parse("module m; logic [7:0] data; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(PackedArrayParsing, SingleNumberDimIsError) {
+  auto r = Parse("module m; logic [8] x; endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(PackedArrayParsing, SignedPackedArray) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic signed [7:0] x;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_TRUE(item->data_type.is_signed);
+  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
+  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
 }
 
 }  // namespace

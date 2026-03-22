@@ -50,4 +50,26 @@ TEST(CompiledSim, ExecuteBlockingAssign) {
   EXPECT_EQ(x_var->value.ToUint64(), 42u);
 }
 
+TEST(BlockingAssignSim, VerifyWidthAndToUint64_8bit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] val;\n"
+      "  initial begin\n"
+      "    val = 8'hAB;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("val");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 8u);
+  EXPECT_EQ(var->value.ToUint64(), 0xABu);
+}
+
 }  // namespace
