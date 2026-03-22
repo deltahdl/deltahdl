@@ -25,6 +25,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateEnumAssignments(decl);
   ValidateConstAssignments(decl);
   ValidateArrayAssignments(decl);
+  ValidateAssocArraySlices(decl);
   ValidateUnpackedArrayConcatNesting(decl);
   ValidateClassHandleOps(decl);
   ValidateChandleOps(decl);

@@ -179,6 +179,9 @@ class Elaborator {
   void ValidateArrayAssignments(const ModuleDecl* decl);
   void ValidateOneArrayAssignment(const ModuleItem* item);
 
+  /// §7.4.6: Associative arrays shall not be sliced.
+  void ValidateAssocArraySlices(const ModuleDecl* decl);
+
   /// §7.8.5: real/shortreal as associative array index type is illegal.
   void ValidateAssocIndexType(const ModuleItem* item);
 

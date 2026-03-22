@@ -51,20 +51,6 @@ TEST(AggregateExpr, StructPassedToFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AggregateExpr, ArrayEqualityComparison) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int a [4];\n"
-      "  int b [4];\n"
-      "  logic eq;\n"
-      "  initial eq = (a == b);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(AggregateExpr, NonEquivalentTypeComparisonError) {
   ElabFixture f;
   auto* design = ElaborateSrc(

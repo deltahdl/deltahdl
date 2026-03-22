@@ -85,6 +85,73 @@ void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
   }
 }
 
+// §7.4.6: Detect slice expressions on associative arrays.
+static bool IsSliceSelect(const Expr* e) {
+  if (!e || e->kind != ExprKind::kSelect) return false;
+  return e->is_part_select_plus || e->is_part_select_minus || e->index_end;
+}
+
+static void CheckAssocSliceExpr(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& assoc_names,
+    DiagEngine& diag) {
+  if (!e) return;
+  if (IsSliceSelect(e) && e->base &&
+      e->base->kind == ExprKind::kIdentifier) {
+    if (assoc_names.count(e->base->text)) {
+      diag.Error(e->range.start,
+                 "slice is not allowed on an associative array");
+    }
+  }
+  CheckAssocSliceExpr(e->lhs, assoc_names, diag);
+  CheckAssocSliceExpr(e->rhs, assoc_names, diag);
+  CheckAssocSliceExpr(e->base, assoc_names, diag);
+  CheckAssocSliceExpr(e->index, assoc_names, diag);
+  CheckAssocSliceExpr(e->index_end, assoc_names, diag);
+  CheckAssocSliceExpr(e->condition, assoc_names, diag);
+  CheckAssocSliceExpr(e->true_expr, assoc_names, diag);
+  CheckAssocSliceExpr(e->false_expr, assoc_names, diag);
+  for (const auto* elem : e->elements) {
+    CheckAssocSliceExpr(elem, assoc_names, diag);
+  }
+}
+
+static void WalkStmtsForAssocSlice(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& assoc_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  CheckAssocSliceExpr(s->lhs, assoc_names, diag);
+  CheckAssocSliceExpr(s->rhs, assoc_names, diag);
+  CheckAssocSliceExpr(s->expr, assoc_names, diag);
+  CheckAssocSliceExpr(s->condition, assoc_names, diag);
+  for (auto* sub : s->stmts) WalkStmtsForAssocSlice(sub, assoc_names, diag);
+  WalkStmtsForAssocSlice(s->then_branch, assoc_names, diag);
+  WalkStmtsForAssocSlice(s->else_branch, assoc_names, diag);
+  WalkStmtsForAssocSlice(s->body, assoc_names, diag);
+  WalkStmtsForAssocSlice(s->for_body, assoc_names, diag);
+  for (auto& ci : s->case_items) WalkStmtsForAssocSlice(ci.body, assoc_names, diag);
+}
+
+void Elaborator::ValidateAssocArraySlices(const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> assoc_names;
+  for (const auto& [name, info] : var_array_info_) {
+    if (info.is_assoc) assoc_names.insert(name);
+  }
+  if (assoc_names.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckAssocSliceExpr(item->assign_lhs, assoc_names, diag_);
+      CheckAssocSliceExpr(item->assign_rhs, assoc_names, diag_);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForAssocSlice(item->body, assoc_names, diag_);
+    }
+  }
+}
+
 // §7.8.5: real/shortreal shall be an illegal associative array index type.
 void Elaborator::ValidateAssocIndexType(const ModuleItem* item) {
   if (item->unpacked_dims.empty()) return;
