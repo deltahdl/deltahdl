@@ -173,8 +173,17 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
 
 bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
-  return resolved ? Is4stateType(*resolved, typedefs)
-                  : Is4stateType(dtype.kind);
+  if (resolved) return Is4stateType(*resolved, typedefs);
+  if (Is4stateType(dtype.kind)) return true;
+  // §7.2.1: If any member of a packed struct/union is 4-state, the whole is.
+  if ((dtype.kind == DataTypeKind::kStruct ||
+       dtype.kind == DataTypeKind::kUnion) &&
+      dtype.is_packed) {
+    for (const auto& m : dtype.struct_members) {
+      if (Is4stateType(m.type_kind)) return true;
+    }
+  }
+  return false;
 }
 
 bool IsSignedType(const DataType& dtype, const TypedefMap& typedefs) {

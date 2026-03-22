@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, UnpackedStructSigned_Rejected) {
+TEST(PackedStructValidation, UnpackedStructSigned_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -14,7 +14,7 @@ TEST(Elaboration, UnpackedStructSigned_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, UnpackedStructUnsigned_Rejected) {
+TEST(PackedStructValidation, UnpackedStructUnsigned_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -24,7 +24,7 @@ TEST(Elaboration, UnpackedStructUnsigned_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, PackedStructSigned_Allowed) {
+TEST(PackedStructValidation, PackedStructSigned_Allowed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -34,7 +34,7 @@ TEST(Elaboration, PackedStructSigned_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, PackedStructUnsigned_Allowed) {
+TEST(PackedStructValidation, PackedStructUnsigned_Allowed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -44,7 +44,7 @@ TEST(Elaboration, PackedStructUnsigned_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, PackedStructRealMember_Rejected) {
+TEST(PackedStructValidation, PackedStructRealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -54,7 +54,7 @@ TEST(Elaboration, PackedStructRealMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, PackedStructStringMember_Rejected) {
+TEST(PackedStructValidation, PackedStructStringMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -64,7 +64,7 @@ TEST(Elaboration, PackedStructStringMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, PackedStructChandleMember_Rejected) {
+TEST(PackedStructValidation, PackedStructChandleMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -74,7 +74,7 @@ TEST(Elaboration, PackedStructChandleMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, PackedStructLogicMember_Allowed) {
+TEST(PackedStructValidation, PackedStructLogicMember_Allowed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -84,7 +84,7 @@ TEST(Elaboration, PackedStructLogicMember_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, PackedStructBitMember_Allowed) {
+TEST(PackedStructValidation, PackedStructBitMember_Allowed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -94,7 +94,7 @@ TEST(Elaboration, PackedStructBitMember_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, PackedStructIntegerTypes_Allowed) {
+TEST(PackedStructValidation, PackedStructIntegerTypes_Allowed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -104,7 +104,7 @@ TEST(Elaboration, PackedStructIntegerTypes_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, PackedStructTimeInteger_Allowed) {
+TEST(PackedStructValidation, PackedStructTimeInteger_Allowed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -114,7 +114,7 @@ TEST(Elaboration, PackedStructTimeInteger_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, PackedStructShortrealMember_Rejected) {
+TEST(PackedStructValidation, PackedStructShortrealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -122,6 +122,62 @@ TEST(Elaboration, PackedStructShortrealMember_Rejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(PackedStructValidation, PackedStructRealtimeMember_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct packed { realtime rt; logic [7:0] a; } ps;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(PackedStructValidation, PackedStructEventMember_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct packed { event e; logic [7:0] a; } ps;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(PackedStructValidation, PackedStructRegMember_Allowed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct packed { reg [7:0] a; reg [7:0] b; } s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PackedStructValidation, PackedStructEnumMember_Allowed) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  typedef enum logic [1:0] { A, B, C } abc_e;\n"
+             "  struct packed { abc_e x; logic [5:0] data; } s;\n"
+             "endmodule\n"));
+}
+
+TEST(PackedStructValidation, NestedPackedStruct_Allowed) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  typedef struct packed {\n"
+             "    struct packed { logic [7:0] x; logic [7:0] y; } coord;\n"
+             "    logic [7:0] color;\n"
+             "  } pixel_t;\n"
+             "  pixel_t p;\n"
+             "endmodule\n"));
+}
+
+TEST(PackedStructValidation, PackedStructDefaultUnsigned_Accepted) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  struct packed { logic [7:0] a; logic [7:0] b; } s;\n"
+             "endmodule\n"));
 }
 
 }  // namespace
