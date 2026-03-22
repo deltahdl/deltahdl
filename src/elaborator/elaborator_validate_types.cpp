@@ -685,6 +685,21 @@ void Elaborator::ValidatePackedDimRange(const DataType& dtype, SourceLoc loc) {
   }
 }
 
+void Elaborator::ValidateUnpackedDimRange(const std::vector<Expr*>& dims,
+                                          SourceLoc loc) {
+  for (const auto* dim : dims) {
+    if (!dim) continue;
+    if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+      if (ExprContainsXZ(dim->lhs) || ExprContainsXZ(dim->rhs)) {
+        diag_.Error(loc,
+                    "unpacked dimension range shall not contain x or z");
+      }
+    } else if (ExprContainsXZ(dim)) {
+      diag_.Error(loc, "unpacked dimension range shall not contain x or z");
+    }
+  }
+}
+
 void Elaborator::ValidatePackedDimOnPredefinedType(const DataType& dtype,
                                                    SourceLoc loc) {
   if (!HasPredefinedWidth(dtype.kind)) return;

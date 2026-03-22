@@ -169,6 +169,9 @@ class Elaborator {
   /// §6.9.1: Range bounds shall not contain x or z.
   void ValidatePackedDimRange(const DataType& dtype, SourceLoc loc);
 
+  /// §7.4.2: Unpacked dimension ranges shall not contain x or z.
+  void ValidateUnpackedDimRange(const std::vector<Expr*>& dims, SourceLoc loc);
+
   /// §7.4.1: Predefined-width types shall not have packed dims.
   void ValidatePackedDimOnPredefinedType(const DataType& dtype, SourceLoc loc);
 

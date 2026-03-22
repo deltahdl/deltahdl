@@ -939,6 +939,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   SetEnumTypeInfo(item, var, typedefs_, arena_);
   // §7.4/§7.5: Compute unpacked array element count.
   ComputeUnpackedDims(item->unpacked_dims, var, typedefs_, class_names_);
+  ValidateUnpackedDimRange(item->unpacked_dims, item->loc);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
   // §7.6/§7.9.9: Track array info for assignment compatibility.
   TrackVarArrayInfo(item, var);

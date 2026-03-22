@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DeclarationAssignmentParsing, VarDeclAssignmentWithDims) {
+TEST(UnpackedArrayParsing, VarDeclAssignmentWithDims) {
   auto r = Parse("module m; int arr [3:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -15,7 +15,7 @@ TEST(DeclarationAssignmentParsing, VarDeclAssignmentWithDims) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
-TEST(DeclarationRangeParsing, UnpackedDimConstantRange) {
+TEST(UnpackedArrayParsing, UnpackedDimConstantRange) {
   auto r = Parse("module m; logic x [7:0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -28,7 +28,7 @@ TEST(DeclarationRangeParsing, UnpackedDimConstantRange) {
   EXPECT_EQ(item->unpacked_dims[0]->op, TokenKind::kColon);
 }
 
-TEST(DeclarationRangeParsing, UnpackedDimConstantExpression) {
+TEST(UnpackedArrayParsing, UnpackedDimConstantExpression) {
   auto r = Parse("module m; logic x [8]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -40,7 +40,7 @@ TEST(DeclarationRangeParsing, UnpackedDimConstantExpression) {
   EXPECT_EQ(item->unpacked_dims[0]->kind, ExprKind::kIntegerLiteral);
 }
 
-TEST(BlockItemDeclParsing, DataDeclUnpackedDimsInBlock) {
+TEST(UnpackedArrayParsing, DataDeclUnpackedDimsInBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -56,7 +56,7 @@ TEST(BlockItemDeclParsing, DataDeclUnpackedDimsInBlock) {
   EXPECT_EQ(body->stmts[0]->var_unpacked_dims.size(), 1u);
 }
 
-TEST(DataTypeParsing, IntUnpackedDim) {
+TEST(UnpackedArrayParsing, IntUnpackedDim) {
   auto r = Parse(
       "module t;\n"
       "  int arr[5];\n"
@@ -70,7 +70,7 @@ TEST(DataTypeParsing, IntUnpackedDim) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(DataTypeParsing, LogicUnpackedDim) {
+TEST(UnpackedArrayParsing, LogicUnpackedDim) {
   auto r = Parse(
       "module t;\n"
       "  logic arr [4];\n"
@@ -85,19 +85,7 @@ TEST(DataTypeParsing, LogicUnpackedDim) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(AggregateTypeParsing, UnpackedArraySize) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[8];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "arr");
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
-TEST(AggregateTypeParsing, UnpackedArrayRange) {
+TEST(UnpackedArrayParsing, UnpackedArrayRange) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] mem[0:255];\n"
@@ -109,19 +97,7 @@ TEST(AggregateTypeParsing, UnpackedArrayRange) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-TEST(AggregateTypeParsing, UnpackedArrayFixedSize) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr [3];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "arr");
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
-TEST(DataTypeParsing, Int2DUnpackedArray) {
+TEST(UnpackedArrayParsing, Int2DUnpackedArray) {
   auto r = Parse(
       "module t;\n"
       "  int matrix[3][4];\n"
@@ -135,7 +111,7 @@ TEST(DataTypeParsing, Int2DUnpackedArray) {
   ASSERT_GE(item->unpacked_dims.size(), 2u);
 }
 
-TEST(DataTypeParsing, IntUnpackedRangeNotation) {
+TEST(UnpackedArrayParsing, IntUnpackedRangeNotation) {
   auto r = Parse(
       "module t;\n"
       "  int data [0:7];\n"
@@ -159,12 +135,34 @@ static bool ParseOk5(const std::string& src) {
   return !diag.HasErrors();
 }
 
-TEST(DataObjectParsing, UnpackedDim_Range) {
-  EXPECT_TRUE(ParseOk5("module m; int a[1:0]; endmodule"));
+TEST(UnpackedArrayParsing, UnpackedDimMultiRange) {
+  EXPECT_TRUE(ParseOk5("module m; int a[1:2][1:3]; endmodule"));
 }
 
-TEST(DataObjectParsing, UnpackedDim_MultiRange) {
-  EXPECT_TRUE(ParseOk5("module m; int a[1:2][1:3]; endmodule"));
+TEST(UnpackedArrayParsing, RealUnpackedDim) {
+  auto r = Parse(
+      "module t;\n"
+      "  real vals [4];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kReal);
+  EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
+TEST(UnpackedArrayParsing, StringUnpackedDim) {
+  auto r = Parse(
+      "module t;\n"
+      "  string names [3];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->data_type.kind, DataTypeKind::kString);
+  EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
 }  // namespace
