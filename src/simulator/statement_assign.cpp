@@ -345,6 +345,14 @@ bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     auto* dst = ctx.FindArrayInfo(stmt->lhs->text);
     auto* src = ctx.FindArrayInfo(stmt->rhs->text);
     if (dst && src) {
+      // §7.6: Copying a dynamic array or queue into a fixed-size array with a
+      // different number of elements is a run-time error.
+      if (!dst->is_dynamic && !dst->is_queue &&
+          (src->is_dynamic || src->is_queue) && dst->size != src->size) {
+        ctx.GetDiag().Error(
+            {}, "array size mismatch in assignment to fixed-size array");
+        return true;
+      }
       CopyArrayElements(stmt->lhs->text, *dst, stmt->rhs->text, *src, ctx);
       return true;
     }
