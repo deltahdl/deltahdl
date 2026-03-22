@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, PackedStructMemberDefault_Rejected) {
+TEST(StructAssignmentValidation, PackedStructMemberDefault_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -14,7 +14,7 @@ TEST(Elaboration, PackedStructMemberDefault_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, UnpackedStructMemberDefault_Allowed) {
+TEST(StructAssignmentValidation, UnpackedStructMemberDefault_Allowed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -24,7 +24,7 @@ TEST(Elaboration, UnpackedStructMemberDefault_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, UnpackedStructWithUnionMemberDefault_Rejected) {
+TEST(StructAssignmentValidation, UnpackedStructWithUnionMemberDefault_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -37,7 +37,7 @@ TEST(Elaboration, UnpackedStructWithUnionMemberDefault_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, UnpackedStructWithUnionNoDefault_Allowed) {
+TEST(StructAssignmentValidation, UnpackedStructWithUnionNoDefault_Allowed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -50,7 +50,7 @@ TEST(Elaboration, UnpackedStructWithUnionNoDefault_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, ExplicitInitOverridesDefault) {
+TEST(StructAssignmentValidation, ExplicitInitOverridesDefault) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -64,7 +64,7 @@ TEST(Elaboration, ExplicitInitOverridesDefault) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(AggregateExpr, UnpackedStructAssignment) {
+TEST(StructAssignmentValidation, UnpackedStructAssignment) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -75,6 +75,47 @@ TEST(AggregateExpr, UnpackedStructAssignment) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §7.2.2: Even when ALL members of a packed struct have defaults, still rejected.
+TEST(StructAssignmentValidation, PackedStructAllMembersDefaulted_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct packed { bit [3:0] a = 1; bit [3:0] b = 2; } s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §7.2.2: Packed struct member default rejected even via typedef.
+TEST(StructAssignmentValidation, PackedStructTypedefMemberDefault_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct packed {\n"
+      "    logic [7:0] cmd = 8'hFF;\n"
+      "    logic [7:0] data;\n"
+      "  } msg_t;\n"
+      "  msg_t m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §7.2.2: Unpacked struct with nested union, default on the union member itself.
+TEST(StructAssignmentValidation,
+     UnpackedStructWithUnionMemberDefault_OnUnionMember_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct {\n"
+      "    union { int a; logic [31:0] b; } u = 0;\n"
+      "    int tag;\n"
+      "  } bad_t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 }  // namespace

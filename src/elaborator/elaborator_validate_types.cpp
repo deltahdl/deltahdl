@@ -519,6 +519,26 @@ void Elaborator::ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
   }
 }
 
+// §7.2.2: Struct member default values must be constant expressions.
+void Elaborator::ValidateStructMemberDefaultsConstant(const DataType& dtype,
+                                                      SourceLoc loc) {
+  if (dtype.kind != DataTypeKind::kStruct) return;
+  // Packed struct defaults are rejected entirely by ValidatePackedStructDefaults.
+  if (dtype.is_packed) return;
+  // Unpacked structs containing a union are rejected entirely by
+  // ValidateUnpackedStructWithUnionDefaults.
+  for (const auto& m : dtype.struct_members) {
+    if (m.type_kind == DataTypeKind::kUnion) return;
+  }
+  for (const auto& m : dtype.struct_members) {
+    if (m.init_expr && !IsConstantExpr(m.init_expr, cu_param_scope_)) {
+      diag_.Error(loc,
+                  "struct member default value must be a constant expression");
+      return;
+    }
+  }
+}
+
 // §7.2, footnote 20: void struct_union_member only within tagged unions.
 void Elaborator::ValidateVoidMembers(const DataType& dtype, SourceLoc loc) {
   bool allow_void = (dtype.kind == DataTypeKind::kUnion && dtype.is_tagged);

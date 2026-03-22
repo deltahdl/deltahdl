@@ -303,6 +303,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
       item->typedef_type.kind == DataTypeKind::kUnion) {
     ValidatePackedStructDefaults(item->typedef_type, item->loc);
     ValidateUnpackedStructWithUnionDefaults(item->typedef_type, item->loc);
+    ValidateStructMemberDefaultsConstant(item->typedef_type, item->loc);
     ValidateVoidMembers(item->typedef_type, item->loc);
     ValidateRandQualifiers(item->typedef_type, item->loc);
     ValidatePackedDimRequiresPackedKeyword(item->typedef_type, item->loc);

@@ -143,6 +143,10 @@ class Elaborator {
   void ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
                                                SourceLoc loc);
 
+  /// §7.2.2: Struct member defaults must be constant expressions.
+  void ValidateStructMemberDefaultsConstant(const DataType& dtype,
+                                            SourceLoc loc);
+
   /// §7.2, footnote 20: void member only in tagged unions.
   void ValidateVoidMembers(const DataType& dtype, SourceLoc loc);
 

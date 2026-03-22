@@ -844,6 +844,7 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
       item->data_type.kind == DataTypeKind::kUnion) {
     ValidatePackedStructDefaults(item->data_type, item->loc);
     ValidateUnpackedStructWithUnionDefaults(item->data_type, item->loc);
+    ValidateStructMemberDefaultsConstant(item->data_type, item->loc);
     ValidateVoidMembers(item->data_type, item->loc);
     ValidateRandQualifiers(item->data_type, item->loc);
     ValidatePackedDimRequiresPackedKeyword(item->data_type, item->loc);

@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(AggregateTypeParsing, StructMemberInit) {
+TEST(StructAssignmentParsing, StructMemberInit) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct {\n"
@@ -20,7 +20,7 @@ TEST(AggregateTypeParsing, StructMemberInit) {
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
 
-TEST(AggregateTypeParsing, VarDeclWithInit) {
+TEST(StructAssignmentParsing, VarDeclWithInit) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int a; int b; } pair_t;\n"
@@ -38,7 +38,7 @@ TEST(AggregateTypeParsing, VarDeclWithInit) {
   EXPECT_EQ(stmt->var_init->kind, ExprKind::kAssignmentPattern);
 }
 
-TEST(AggregateTypeParsing, PackedArrayMemberAssign) {
+TEST(StructAssignmentParsing, PackedArrayMemberAssign) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct {\n"
@@ -63,7 +63,7 @@ TEST(AggregateTypeParsing, PackedArrayMemberAssign) {
   EXPECT_EQ(s1->lhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(AggregateTypeParsing, PackedMemberDefaultInit) {
+TEST(StructAssignmentParsing, PackedMemberDefaultInit) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed {\n"
@@ -81,7 +81,7 @@ TEST(AggregateTypeParsing, PackedMemberDefaultInit) {
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
 
-TEST(AggregateTypeParsing, AssignFromStructVar) {
+TEST(StructAssignmentParsing, AssignFromStructVar) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int x; int y; } point_t;\n"
@@ -101,7 +101,7 @@ TEST(AggregateTypeParsing, AssignFromStructVar) {
   EXPECT_EQ(stmt->rhs->text, "a");
 }
 
-TEST(AggregateTypeParsing, DefaultMemberValues) {
+TEST(StructAssignmentParsing, DefaultMemberValues) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct {\n"
@@ -121,7 +121,7 @@ TEST(AggregateTypeParsing, DefaultMemberValues) {
   EXPECT_NE(item->typedef_type.struct_members[2].init_expr, nullptr);
 }
 
-TEST(AggregateTypeParsing, FunctionArgStruct) {
+TEST(StructAssignmentParsing, FunctionArgStruct) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct { int a; int b; } pair_t;\n"
@@ -132,19 +132,7 @@ TEST(AggregateTypeParsing, FunctionArgStruct) {
               "endmodule\n"));
 }
 
-TEST(AggregateTypeParsing, StructWholeAssignment) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct { int a; int b; } pair_t;\n"
-      "  pair_t p1, p2;\n"
-      "  initial p2 = p1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-TEST(AggregateTypeParsing, StructMemberDefaultInit) {
+TEST(StructAssignmentParsing, StructMemberDefaultInit) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct {\n"
@@ -160,6 +148,26 @@ TEST(AggregateTypeParsing, StructMemberDefaultInit) {
   EXPECT_NE(item->typedef_type.struct_members[0].init_expr, nullptr);
   EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
   EXPECT_NE(item->typedef_type.struct_members[2].init_expr, nullptr);
+}
+
+// §7.2.2: Default member value can be a constant expression, not just a literal.
+TEST(StructAssignmentParsing, StructMemberExpressionDefault) {
+  auto r = Parse(
+      "module t;\n"
+      "  typedef struct {\n"
+      "    int addr = 1 + 2;\n"
+      "    int crc;\n"
+      "  } pkt_t;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->typedef_type.struct_members.size(), 2u);
+  ASSERT_NE(item->typedef_type.struct_members[0].init_expr, nullptr);
+  EXPECT_EQ(item->typedef_type.struct_members[0].init_expr->kind,
+            ExprKind::kBinary);
+  EXPECT_EQ(item->typedef_type.struct_members[1].init_expr, nullptr);
 }
 
 }  // namespace
