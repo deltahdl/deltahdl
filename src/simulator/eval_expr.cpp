@@ -866,7 +866,7 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
                                   "': index contains x/z");
     return AssocDefault(aa, arena);
   }
-  auto key = static_cast<int64_t>(val.ToUint64());
+  auto key = SignExtend(val.ToUint64(), aa->index_width);
   auto it = aa->int_data.find(key);
   if (it != aa->int_data.end()) return it->second;
   WarnAssocMiss(aa, name, ctx);

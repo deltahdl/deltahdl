@@ -1,5 +1,3 @@
-#include "elaborator/elaborator.h"
-#include "elaborator/rtlir.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -7,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DeclarationRangeParsing, AssocDimIntType) {
+TEST(IntegralIndexAssocArrayParsing, AssocDimIntType) {
   auto r = Parse("module m; logic [7:0] aa [int]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -17,7 +15,7 @@ TEST(DeclarationRangeParsing, AssocDimIntType) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "int");
 }
 
-TEST(DeclarationRangeParsing, AssocDimByteType) {
+TEST(IntegralIndexAssocArrayParsing, AssocDimByteType) {
   auto r = Parse("module m; int aa [byte]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -25,7 +23,7 @@ TEST(DeclarationRangeParsing, AssocDimByteType) {
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
   EXPECT_EQ(item->unpacked_dims[0]->text, "byte");
 }
-TEST(AggregateTypeParsing, AssocArrayIntIndex) {
+TEST(IntegralIndexAssocArrayParsing, AssocArrayIntIndex) {
   auto r = Parse(
       "module t;\n"
       "  byte lookup[int];\n"
@@ -38,7 +36,7 @@ TEST(AggregateTypeParsing, AssocArrayIntIndex) {
   ASSERT_NE(item->unpacked_dims[0], nullptr);
 }
 
-TEST(AggregateTypeParsing, AssocArrayIntegerIndex) {
+TEST(IntegralIndexAssocArrayParsing, AssocArrayIntegerIndex) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] cache[integer];\n"
@@ -50,7 +48,7 @@ TEST(AggregateTypeParsing, AssocArrayIntegerIndex) {
   ASSERT_EQ(item->unpacked_dims.size(), 1u);
 }
 
-TEST(AggregateTypeParsing, AssocArrayIntegerIndex_DimExpr) {
+TEST(IntegralIndexAssocArrayParsing, AssocArrayIntegerIndex_DimExpr) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] cache[integer];\n"
@@ -63,7 +61,7 @@ TEST(AggregateTypeParsing, AssocArrayIntegerIndex_DimExpr) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "integer");
 }
 
-TEST(AggregateTypeParsing, AssociativeArrayIntIndex) {
+TEST(IntegralIndexAssocArrayParsing, AssociativeArrayIntIndex) {
   auto r = Parse(
       "module t;\n"
       "  string names[int];\n"
@@ -74,7 +72,7 @@ TEST(AggregateTypeParsing, AssociativeArrayIntIndex) {
   EXPECT_EQ(item->name, "names");
 }
 
-TEST(AggregateTypeParsing, AssocArrayIntIndex_DimExpr) {
+TEST(IntegralIndexAssocArrayParsing, AssocArrayIntIndex_DimExpr) {
   auto r = Parse(
       "module t;\n"
       "  byte lookup[int];\n"
