@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DeclarationAssignmentParsing, VarDeclAssignmentAssocArray) {
+TEST(StringIndexAssocArrayParsing, VarDeclAssignmentAssocArray) {
   auto r = Parse("module m; int aa [string]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(DeclarationAssignmentParsing, VarDeclAssignmentAssocArray) {
   EXPECT_EQ(item->name, "aa");
 }
 
-TEST(DeclarationRangeParsing, AssocDimBuiltinType) {
+TEST(StringIndexAssocArrayParsing, AssocDimBuiltinType) {
   auto r = Parse("module m; int aa [string]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -23,7 +23,7 @@ TEST(DeclarationRangeParsing, AssocDimBuiltinType) {
   ASSERT_NE(item->unpacked_dims[0], nullptr);
   EXPECT_EQ(item->unpacked_dims[0]->text, "string");
 }
-TEST(AggregateTypeParsing, AssocArrayStringIndex) {
+TEST(StringIndexAssocArrayParsing, AssocArrayStringIndex) {
   auto r = Parse(
       "module t;\n"
       "  int scores[string];\n"
@@ -36,7 +36,7 @@ TEST(AggregateTypeParsing, AssocArrayStringIndex) {
   ASSERT_NE(item->unpacked_dims[0], nullptr);
 }
 
-TEST(AggregateTypeParsing, AssocArrayStringIndex_DimExpr) {
+TEST(StringIndexAssocArrayParsing, AssocArrayStringIndex_DimExpr) {
   auto r = Parse(
       "module t;\n"
       "  int scores[string];\n"
@@ -49,7 +49,7 @@ TEST(AggregateTypeParsing, AssocArrayStringIndex_DimExpr) {
   EXPECT_EQ(item->unpacked_dims[0]->text, "string");
 }
 
-TEST(AggregateTypeParsing, AssociativeArrayTypedIndex) {
+TEST(StringIndexAssocArrayParsing, AssociativeArrayTypedIndex) {
   auto r = Parse(
       "module t;\n"
       "  int aa[string];\n"
