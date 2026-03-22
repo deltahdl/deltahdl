@@ -653,6 +653,7 @@ static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var) {
       t == "shortint" || t == "longint" || t == "*") {
     var.is_assoc = true;
     var.is_string_index = (t == "string");
+    var.is_wildcard_index = (t == "*");
     var.assoc_index_width = AssocIndexWidth(t);
     return true;
   }

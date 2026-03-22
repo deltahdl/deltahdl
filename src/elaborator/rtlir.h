@@ -95,6 +95,7 @@ struct RtlirVariable {
   int32_t queue_max_size = -1;      // §7.10: max queue size (-1=unbounded).
   bool is_assoc = false;            // §7.8: associative array.
   bool is_string_index = false;     // §7.8: true if index type is string.
+  bool is_wildcard_index = false;   // §7.8.1: true if index type is [*].
   bool is_class_index = false;      // §7.8.3: true if index type is a class.
   uint32_t assoc_index_width = 32;  // §7.9.8: width of assoc index type.
   std::string_view assoc_index_class_name;  // §7.8.3: class index type name.

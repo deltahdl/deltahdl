@@ -622,6 +622,16 @@ static uint32_t GetArraySize(const Stmt* stmt, SimContext& ctx) {
 }
 
 static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  // §7.8.1: foreach is not allowed on wildcard-indexed associative arrays.
+  if (stmt->expr && stmt->expr->kind == ExprKind::kIdentifier) {
+    auto* aa = ctx.FindAssocArray(stmt->expr->text);
+    if (aa && aa->is_wildcard) {
+      ctx.GetDiag().Error(
+          {}, "foreach not allowed on wildcard associative array '" +
+                  std::string(stmt->expr->text) + "'");
+      co_return StmtResult::kDone;
+    }
+  }
   uint32_t size = GetArraySize(stmt, ctx);
   if (size == 0) co_return StmtResult::kDone;
 

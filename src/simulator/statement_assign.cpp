@@ -379,8 +379,12 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     }
     aa->str_data[s] = rhs_val;
   } else {
-    auto key =
-        static_cast<int64_t>(EvalExpr(lhs->index, ctx, arena).ToUint64());
+    auto key_val = EvalExpr(lhs->index, ctx, arena);
+    if (HasUnknownBits(key_val)) {
+      ctx.GetDiag().Warning({}, "associative array index contains x/z");
+      return true;
+    }
+    auto key = static_cast<int64_t>(key_val.ToUint64());
     aa->int_data[key] = rhs_val;
   }
   return true;

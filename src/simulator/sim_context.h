@@ -89,6 +89,7 @@ struct AssocArrayObject {
   uint32_t elem_width = 32;
   uint32_t index_width = 32;  // §7.9.8: width of index type for validation.
   bool is_string_key = false;
+  bool is_wildcard = false;  // §7.8.1: true if declared with [*].
   bool has_default = false;
   Logic4Vec default_value;
   uint32_t Size() const;
@@ -236,7 +237,8 @@ class SimContext {
   // §7.8: Associative array management.
   AssocArrayObject* CreateAssocArray(std::string_view name, uint32_t elem_width,
                                      bool is_string_key,
-                                     uint32_t index_width = 32);
+                                     uint32_t index_width = 32,
+                                     bool is_wildcard = false);
   AssocArrayObject* FindAssocArray(std::string_view name);
 
   // §7.3.2: Tagged union tag management.

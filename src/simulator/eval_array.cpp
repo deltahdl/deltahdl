@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -571,7 +572,11 @@ static std::string EvalStrKey(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 static int64_t EvalIntKey(const Expr* expr, SimContext& ctx, Arena& arena) {
-  return static_cast<int64_t>(EvalExpr(expr, ctx, arena).ToUint64());
+  auto val = EvalExpr(expr, ctx, arena);
+  if (HasUnknownBits(val)) {
+    ctx.GetDiag().Warning({}, "associative array index contains x/z");
+  }
+  return static_cast<int64_t>(val.ToUint64());
 }
 
 // §7.8.1: exists(key).

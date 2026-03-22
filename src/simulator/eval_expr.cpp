@@ -860,7 +860,13 @@ static Logic4Vec AssocReadStr(AssocArrayObject* aa, const Expr* idx_expr,
 static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
                               std::string_view name, SimContext& ctx,
                               Arena& arena) {
-  auto key = static_cast<int64_t>(EvalExpr(idx_expr, ctx, arena).ToUint64());
+  auto val = EvalExpr(idx_expr, ctx, arena);
+  if (HasUnknownBits(val)) {
+    ctx.GetDiag().Warning({}, "associative array '" + std::string(name) +
+                                  "': index contains x/z");
+    return AssocDefault(aa, arena);
+  }
+  auto key = static_cast<int64_t>(val.ToUint64());
   auto it = aa->int_data.find(key);
   if (it != aa->int_data.end()) return it->second;
   WarnAssocMiss(aa, name, ctx);
