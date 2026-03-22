@@ -176,16 +176,17 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
   if (resolved) return Is4stateType(*resolved, typedefs);
   if (Is4stateType(dtype.kind)) return true;
   // §7.2.1: If any member of a packed struct/union is 4-state, the whole is.
+  // §7.3.1: soft implies packed.
   if ((dtype.kind == DataTypeKind::kStruct ||
        dtype.kind == DataTypeKind::kUnion) &&
-      dtype.is_packed) {
+      (dtype.is_packed || dtype.is_soft)) {
     for (const auto& m : dtype.struct_members) {
       if (Is4stateType(m.type_kind)) return true;
     }
   }
   // §7.3: Unpacked union defaults to first member's type.
   if (dtype.kind == DataTypeKind::kUnion && !dtype.is_packed &&
-      !dtype.struct_members.empty()) {
+      !dtype.is_soft && !dtype.struct_members.empty()) {
     return Is4stateType(dtype.struct_members[0].type_kind);
   }
   return false;
@@ -201,7 +202,7 @@ bool IsSignedType(const DataType& dtype, const TypedefMap& typedefs) {
 
 bool IsAggregateType(const DataType& dtype) {
   if (dtype.kind == DataTypeKind::kStruct || dtype.kind == DataTypeKind::kUnion)
-    return !dtype.is_packed;
+    return !(dtype.is_packed || dtype.is_soft);
   return false;
 }
 
@@ -288,7 +289,7 @@ static bool IsPackedOrIntegral(const DataType& dtype) {
   if (IsIntegralType(dtype.kind)) return true;
   if ((dtype.kind == DataTypeKind::kStruct ||
        dtype.kind == DataTypeKind::kUnion) &&
-      dtype.is_packed)
+      (dtype.is_packed || dtype.is_soft))
     return true;
   return false;
 }
@@ -298,7 +299,7 @@ static bool Is4stateForEquivalence(const DataType& dtype) {
   if (Is4stateType(dtype.kind)) return true;
   if ((dtype.kind == DataTypeKind::kStruct ||
        dtype.kind == DataTypeKind::kUnion) &&
-      dtype.is_packed) {
+      (dtype.is_packed || dtype.is_soft)) {
     for (const auto& m : dtype.struct_members) {
       if (Is4stateType(m.type_kind)) return true;
     }
