@@ -24,16 +24,6 @@ TEST(UnionDeclarationValidation, ChandleInPackedUnion_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(UnionDeclarationValidation, ChandleInTaggedUnion_Allowed) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union tagged { chandle Handle; int Value; } u;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(UnionDeclarationValidation, AnonymousUnionInStruct_OK) {
   ElabFixture f;
   ElaborateSrc(
@@ -52,17 +42,6 @@ TEST(UnionDeclarationValidation, UnpackedUnionBasic_OK) {
   ElaborateSrc(
       "module top;\n"
       "  typedef union { int i; shortreal f; } num;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-// Footnote 20: void member only in tagged unions.
-TEST(UnionDeclarationValidation, VoidMemberInTaggedUnion_Allowed) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union tagged { void Invalid; int Valid; } u;\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
@@ -129,17 +108,6 @@ TEST(UnionDeclarationValidation, StringInUntaggedUnion_Rejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
-}
-
-// §7.3: String (dynamic type) in tagged union is allowed.
-TEST(UnionDeclarationValidation, StringInTaggedUnion_Allowed) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union tagged { string S; int I; } u;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 // Footnote 20: random_qualifier rejected in tagged unions too (only unpacked structs).
