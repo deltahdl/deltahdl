@@ -625,6 +625,10 @@ void Elaborator::ValidateChandleInUnion(const DataType& dtype, SourceLoc loc) {
       diag_.Error(loc, "chandle type can only be used in tagged unions");
       return;
     }
+    if (m.type_kind == DataTypeKind::kString) {
+      diag_.Error(loc, "string type can only be used in tagged unions");
+      return;
+    }
   }
 }
 

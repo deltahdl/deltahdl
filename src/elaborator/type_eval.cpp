@@ -183,6 +183,11 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
       if (Is4stateType(m.type_kind)) return true;
     }
   }
+  // §7.3: Unpacked union defaults to first member's type.
+  if (dtype.kind == DataTypeKind::kUnion && !dtype.is_packed &&
+      !dtype.struct_members.empty()) {
+    return Is4stateType(dtype.struct_members[0].type_kind);
+  }
   return false;
 }
 

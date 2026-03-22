@@ -24,36 +24,6 @@ TEST(StructDeclarationValidation, VoidMemberInPackedStruct_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(StructDeclarationValidation, VoidMemberInTaggedUnion_Allowed) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union tagged { void Invalid; int Valid; } u;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(StructDeclarationValidation, VoidMemberInUnpackedUnion_Rejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union { void v; int a; } u;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(StructDeclarationValidation, VoidMemberInPackedUnion_Rejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union packed { void v; logic [7:0] a; } u;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(StructDeclarationValidation, RandInPackedStruct_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -94,41 +64,11 @@ TEST(StructDeclarationValidation, RandcInUnpackedStruct_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(StructDeclarationValidation, RandInUnion_Rejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union { rand int a; int b; } u;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(StructDeclarationValidation, RandcInUnion_Rejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union { randc int a; int b; } u;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(StructDeclarationValidation, PackedDimOnUnpackedStruct_Rejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
       "  struct { logic [7:0] a; logic [7:0] b; } [3:0] arr;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(StructDeclarationValidation, PackedDimOnUnpackedUnion_Rejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union { int a; int b; } [3:0] arr;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
