@@ -229,6 +229,7 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   }
   if (TryClassPropertyAccess(base_var, field_name, ctx, arena, out)) return out;
   if (TryCollectionAccess(base_name, field_name, ctx, arena, out)) return out;
+  if (TryEvalEnumProperty(base_name, field_name, ctx, arena, out)) return out;
   if (TryStaticMemberAccess(base_name, field_name, ctx, out)) return out;
   return MakeLogic4Vec(arena, 1);
 }

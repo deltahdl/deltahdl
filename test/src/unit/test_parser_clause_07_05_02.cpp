@@ -5,34 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DynamicArraySizeParsing, BuiltInMethodCall_Parse) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = arr.size();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCall);
-}
-
-TEST(DynamicArraySizeParsing, BuiltInMethodCall_Callee) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = arr.size();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  ASSERT_NE(rhs->lhs, nullptr);
-  EXPECT_EQ(rhs->lhs->kind, ExprKind::kMemberAccess);
-}
-
 TEST(DynamicArraySizeParsing, DynamicArraySize) {
   auto r = Parse(
       "module m;\n"

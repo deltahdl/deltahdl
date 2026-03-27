@@ -161,4 +161,51 @@ TEST(BuiltinMethodParsing, MethodCallWithMultipleArgs) {
               "endmodule\n"));
 }
 
+TEST(BuiltinMethodParsing, MethodCallCalleeIsMemberAccess) {
+  auto r = Parse(
+      "module m;\n"
+      "  int arr [0:3];\n"
+      "  int s;\n"
+      "  initial s = arr.size();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  ASSERT_EQ(rhs->kind, ExprKind::kCall);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kMemberAccess);
+}
+
+TEST(BuiltinMethodParsing, MethodWithDefaultArgNoParens) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  typedef enum {A, B, C} abc_e;\n"
+              "  abc_e e;\n"
+              "  abc_e n;\n"
+              "  initial n = e.next;\n"
+              "endmodule\n"));
+}
+
+TEST(BuiltinMethodParsing, MethodNoParensIsMemberAccess) {
+  auto r = Parse(
+      "module m;\n"
+      "  int arr [0:2];\n"
+      "  int s;\n"
+      "  initial s = arr.size;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
+}
+
+TEST(BuiltinMethodParsing, MethodNoParensInBinaryExpr) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int arr [0:3];\n"
+              "  int r;\n"
+              "  initial r = arr.size + 1;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

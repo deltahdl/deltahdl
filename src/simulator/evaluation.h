@@ -57,6 +57,8 @@ bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 // §6.19 Enum method dispatch (eval_enum.cpp).
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out);
+bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,
+                          SimContext& ctx, Arena& arena, Logic4Vec& out);
 
 // §7.12 Array method dispatch (eval_array.cpp).
 bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,

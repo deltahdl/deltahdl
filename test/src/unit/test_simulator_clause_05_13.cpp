@@ -264,6 +264,56 @@ TEST(BuiltinMethodSim, EnumNum) {
   EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 3u);
 }
 
+TEST(BuiltinMethodSim, MethodNoParensInBinaryExpr) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] arr [0:4];\n"
+      "  logic [31:0] r;\n"
+      "  initial r = arr.size + 32'd1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 6u);
+}
+
+TEST(BuiltinMethodSim, EnumNextNoParens) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum logic [1:0] {RED, GREEN, BLUE} color_e;\n"
+      "  color_e c = RED;\n"
+      "  logic [1:0] n;\n"
+      "  initial n = c.next;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 1u);
+}
+
+TEST(BuiltinMethodSim, EnumPrevNoParens) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum logic [1:0] {RED, GREEN, BLUE} color_e;\n"
+      "  color_e c = BLUE;\n"
+      "  logic [1:0] n;\n"
+      "  initial n = c.prev;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 1u);
+}
+
 TEST(BuiltinMethodSim, MethodResultInConditional) {
   SimFixture f;
   auto* design = ElaborateSrc(

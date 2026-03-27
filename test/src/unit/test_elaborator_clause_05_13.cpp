@@ -104,4 +104,23 @@ TEST(BuiltinMethodElaboration, EnumNumOk) {
              "endmodule\n"));
 }
 
+TEST(BuiltinMethodElaboration, MethodWithDefaultArgNoParensOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  typedef enum {RED, GREEN, BLUE} color_e;\n"
+             "  color_e c;\n"
+             "  color_e n;\n"
+             "  initial n = c.next;\n"
+             "endmodule\n"));
+}
+
+TEST(BuiltinMethodElaboration, MethodNoParensInExpressionOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int arr [0:3];\n"
+             "  int r;\n"
+             "  initial r = arr.size + 1;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

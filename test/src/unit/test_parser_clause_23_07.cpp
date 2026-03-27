@@ -5,13 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(BuiltInMethodParsing, BuiltInMethod_ChainedAccess) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial x = obj.sub.method();\n"
-              "endmodule"));
-}
-
 TEST(OperatorAndExpressionParsing, MemberAccessExpression) {
   auto r = Parse(
       "module t;\n"

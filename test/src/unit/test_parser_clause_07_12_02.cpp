@@ -29,14 +29,6 @@ TEST(AggregateTypeParsing, ArrayShuffleMethod) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-TEST(BuiltInMethodParsing, BuiltInMethod_WithArgs) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int q[$];\n"
-              "  initial q.sort();\n"
-              "endmodule"));
-}
-
 TEST(AggregateTypeParsing, ArrayMethodSort) {
   auto r = Parse(
       "module t;\n"

@@ -142,4 +142,37 @@ bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return DispatchEnumMethod(parts.method_name, args, out);
 }
 
+// §5.13: Property-style access for enum methods (no parentheses).
+// Handles methods with no required arguments or where all args have defaults.
+bool TryEvalEnumProperty(std::string_view var_name, std::string_view method,
+                          SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  const auto* info = ctx.GetVariableEnumType(var_name);
+  if (!info) return false;
+
+  auto* var = ctx.FindVariable(var_name);
+  uint64_t current = var ? var->value.ToUint64() : 0;
+
+  if (method == "first") {
+    out = EnumFirst(*info, arena);
+    return true;
+  }
+  if (method == "last") {
+    out = EnumLast(*info, arena);
+    return true;
+  }
+  if (method == "next") {
+    out = EnumNext(*info, current, /*count=*/1, arena);
+    return true;
+  }
+  if (method == "prev") {
+    out = EnumPrev(*info, current, /*count=*/1, arena);
+    return true;
+  }
+  if (method == "num") {
+    out = EnumNum(*info, arena);
+    return true;
+  }
+  return false;
+}
+
 }  // namespace delta

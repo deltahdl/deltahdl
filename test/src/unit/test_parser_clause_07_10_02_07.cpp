@@ -5,14 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(BuiltInMethodParsing, BuiltInMethod_PushBack) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int q[$];\n"
-              "  initial q.push_back(42);\n"
-              "endmodule"));
-}
-
 TEST(AggregateTypeParsing, QueueMethodPushBack) {
   auto r = Parse(
       "module t;\n"
