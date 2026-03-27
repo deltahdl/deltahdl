@@ -91,10 +91,9 @@ def build_steps(
          " items (e.g., which methods exist, which formats are valid)"
          " IS implementable even if it references other sections"
          " for additional details."
-         " A parent subclause that classifies entities, defines"
-         " properties (e.g., 'X is an elaboration-time constant'),"
-         " or states constraints IS implementable — those are"
-         " testable claims even if child subclauses add detail."
+         " A subclause that makes concrete statements — not merely"
+         " introducing a topic for its child subclauses — IS"
+         " implementable."
          " Respond with exactly IMPLEMENTABLE: yes or IMPLEMENTABLE: no"),
         ("Auditing src",
          f"Search src/ for existing code that implements §{subclause}."

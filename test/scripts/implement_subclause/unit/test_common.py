@@ -143,10 +143,10 @@ def test_build_steps_second_checks_implementability(isc):
     assert "IMPLEMENTABLE" in steps[1][1]
 
 
-def test_build_steps_implementability_mentions_parent_claims(isc):
-    """Implementability step recognizes parent subclauses with concrete claims."""
+def test_build_steps_implementability_mentions_concrete_statements(isc):
+    """Implementability step recognizes subclauses with concrete statements."""
     steps = isc.build_steps("6.20", "~/LRM.txt", exclude="6.20.1")
-    assert "parent subclause" in steps[1][1]
+    assert "concrete statements" in steps[1][1]
 
 
 def test_build_steps_each_has_description(isc):
