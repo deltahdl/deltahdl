@@ -34,11 +34,11 @@ def test_pipeline_first_no_continue(
     assert mock_invoke.call_args_list[0][1]["continue_session"] is False
 
 
-def test_pipeline_second_uses_continue(
+def test_pipeline_second_no_continue(
     module_loader, monkeypatch, base_argv, patch_main,
 ):
-    """Second subclause has continue_session=True."""
+    """Second subclause starts a fresh session (no continue)."""
     iscs = _load(module_loader)
     mock_invoke = patch_main(monkeypatch, iscs)
     iscs.main(base_argv)
-    assert mock_invoke.call_args_list[1][1]["continue_session"] is True
+    assert mock_invoke.call_args_list[1][1]["continue_session"] is False
