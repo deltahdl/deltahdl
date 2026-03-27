@@ -1,8 +1,34 @@
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <string>
+
 #include "fixture_preprocessor.h"
 
 using namespace delta;
+namespace fs = std::filesystem;
+
+struct IncludeTestDir {
+  fs::path dir;
+
+  IncludeTestDir() {
+    dir =
+        fs::temp_directory_path() / ("delta_test_" + std::to_string(getpid()));
+    fs::create_directories(dir);
+  }
+
+  ~IncludeTestDir() { fs::remove_all(dir); }
+
+  fs::path WriteFile(const std::string& rel_path, const std::string& content) {
+    auto full = dir / rel_path;
+    fs::create_directories(full.parent_path());
+    std::ofstream ofs(full);
+    ofs << content;
+    return full;
+  }
+};
 
 TEST(Preprocessor, DefineRecognized) {
   PreprocFixture f;
@@ -249,6 +275,24 @@ TEST(Preprocessor, CannotRedefine_end_keywords) {
   PreprocFixture f;
   Preprocess("`define end_keywords 1\n", f);
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, IncludeRecognized) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("empty.svh", "\n");
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile(tmp.dir / "top.sv", "`include \"empty.svh\"\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, UnknownBacktickNameNotTreatedAsDirective) {
+  PreprocFixture f;
+  auto result = Preprocess("int x = `foobar;\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("`foobar"), std::string::npos);
 }
 
 TEST(Preprocessor, UserMacroNotConfusedWithDirective) {
