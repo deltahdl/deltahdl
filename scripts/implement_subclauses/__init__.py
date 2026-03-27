@@ -80,8 +80,8 @@ def main(argv: list[str] | None = None) -> None:
             continue
         subclauses.append((subclause, issue_num))
 
-    for i, (subclause, issue_num) in enumerate(subclauses):
-        continue_session = i > 0 or args.continue_session
+    for subclause, issue_num in subclauses:
+        continue_session = args.continue_session
         children = sorted(
             s for s, _ in subclauses if s.startswith(subclause + ".")
         )

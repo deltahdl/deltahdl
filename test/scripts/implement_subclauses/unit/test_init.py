@@ -113,11 +113,11 @@ def test_main_passes_issue_number(iscs, monkeypatch, base_argv, patch_main):
     assert mock_invoke.call_args_list[0][0][2] == 100
 
 
-def test_main_second_uses_continue(iscs, monkeypatch, base_argv, patch_main):
-    """Second subclause uses continue_session=True."""
+def test_main_second_no_continue(iscs, monkeypatch, base_argv, patch_main):
+    """Second subclause starts a fresh session (no continue)."""
     mock_invoke = patch_main(monkeypatch, iscs)
     iscs.main(base_argv)
-    assert mock_invoke.call_args_list[1][1]["continue_session"] is True
+    assert mock_invoke.call_args_list[1][1]["continue_session"] is False
 
 
 def test_main_first_no_continue(iscs, monkeypatch, base_argv, patch_main):
