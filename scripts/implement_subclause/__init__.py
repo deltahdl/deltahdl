@@ -60,13 +60,20 @@ def build_steps(
     if exclude:
         excluded = [f"§{s.strip()}" for s in exclude.split(",")]
         exclude_note = (
-            f" {', '.join(excluded)} will be implemented separately."
-            " Do NOT touch their tests or functionality."
+            f"\n\nOFF-LIMITS SUBCLAUSES: {', '.join(excluded)}."
+            " These are descendant subclauses that will be implemented"
+            f" separately. Requirements defined by these subclauses"
+            f" belong to THEM, not to §{subclause}."
+            " Do NOT implement, move, delete, rename, or otherwise"
+            " act on their content — even if you find it misplaced"
+            " in other files. Leave it exactly as-is."
         )
 
     constraints = (
-        f" Only act on requirements directly defined by §{subclause},"
-        " not requirements it merely references."
+        f" Only act on requirements directly defined in the text of"
+        f" §{subclause} in the LRM — not requirements defined by"
+        f" any descendant subclause (§{subclause}.1, §{subclause}.2, etc.)."
+        " A requirement belongs to the subclause whose LRM text defines it."
         " Do not make git commits or push."
         " Do not copy LRM prose into source comments."
         " Do not build or run tests."
@@ -139,6 +146,14 @@ def build_steps(
         ("Implementing missing functionality",
          f"Implement any missing functionality for §{subclause}."
          f" Only implement §{subclause}, no other subclauses."
+         + exclude_note + constraints),
+        ("Auditing scope",
+         f"Run git diff and review every change you made."
+         f" For each change, verify it acts on content defined by"
+         f" §{subclause} in the LRM — not content defined by any"
+         f" descendant subclause."
+         f" If you find any change that acts on descendant content,"
+         f" revert it with git checkout."
          + exclude_note + constraints),
         ("Summarizing actions",
          "Summarize everything you did as a bullet list."

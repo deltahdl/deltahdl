@@ -120,9 +120,9 @@ def test_build_steps_returns_list(isc):
     assert isinstance(steps, list)
 
 
-def test_build_steps_has_11_steps(isc):
-    """build_steps returns exactly 11 steps."""
-    assert len(isc.build_steps("4.1", "~/LRM.txt")) == 11
+def test_build_steps_has_12_steps(isc):
+    """build_steps returns exactly 12 steps."""
+    assert len(isc.build_steps("4.1", "~/LRM.txt")) == 12
 
 
 def test_build_steps_first_mentions_lrm(isc):
@@ -206,8 +206,8 @@ def _run_steps_and_capture(isc):
 
 
 def test_run_steps_call_count(isc):
-    """run_steps calls run_with_dots 11 times (once per step)."""
-    assert _run_steps_and_capture(isc).call_count == 11
+    """run_steps calls run_with_dots 12 times (once per step)."""
+    assert _run_steps_and_capture(isc).call_count == 12
 
 
 def test_run_steps_returns_summary(isc):
@@ -228,7 +228,7 @@ def test_run_steps_prints_step_numbers(isc, capsys):
                side_effect=lambda f, *a, **kw: f(*a, **kw)):
         isc.run_steps(steps, model="opus")
     out = capsys.readouterr().out
-    assert "Step 1/11:" in out
+    assert "Step 1/12:" in out
 
 
 def _run_not_implementable(isc):
