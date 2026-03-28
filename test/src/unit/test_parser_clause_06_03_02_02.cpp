@@ -58,4 +58,44 @@ TEST(StrengthParsing, DriveStrengthOnTri) {
   EXPECT_EQ(item->drive_strength1, 3u);
 }
 
+TEST(StrengthParsing, DriveStrengthWithAssignment) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (strong0, pull1) w = 1'b1;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->drive_strength0, 4u);
+  EXPECT_EQ(item->drive_strength1, 3u);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(StrengthParsing, DriveStrengthReversedOrder) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire (weak1, supply0) w = 1'b0;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->drive_strength0, 5u);
+  EXPECT_EQ(item->drive_strength1, 2u);
+}
+
+TEST(StrengthParsing, NoStrengthNoFields) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->drive_strength0, 0u);
+  EXPECT_EQ(item->drive_strength1, 0u);
+}
+
 }  // namespace
