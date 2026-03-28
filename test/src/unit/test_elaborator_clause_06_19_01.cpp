@@ -38,7 +38,7 @@ TEST(Elaboration, EnumAutoIncrementValues) {
   EXPECT_EQ(it->second[2].value, 6);
 }
 
-TEST(Elaboration, TypedefEnumTypeReusedForMultipleVars) {
+TEST(TypedefEnumElaboration, TypedefEnumTypeReusedForMultipleVars) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
