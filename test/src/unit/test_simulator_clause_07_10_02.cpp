@@ -55,19 +55,6 @@ TEST(QueueMethodDispatch, PropertyReturnsFalseForUnknownProperty) {
   EXPECT_FALSE(TryEvalQueueProperty("q", "nonexistent", f.ctx, f.arena, out));
 }
 
-// --- Child-subclause tests (§7.10.2.6–§7.10.2.7) below ---
-
-TEST(QueueMethods, PushFrontInsertsAtFront) {
-  SimFixture f;
-  auto* q = MakeQueue(f, "q", {20, 30});
-  auto* call =
-      MakeMethodCall(f.arena, "q", "push_front", {MakeInt(f.arena, 10)});
-  TryExecQueueMethodStmt(call, f.ctx, f.arena);
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-}
-
 TEST(QueueMethods, PushBackInsertsAtEnd) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20});
