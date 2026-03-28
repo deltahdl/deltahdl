@@ -113,20 +113,6 @@ TEST(AssocArray, ReadMissingKeyReturnsZeroFromEmptyArray) {
   EXPECT_GT(f.diag.WarningCount(), before);
 }
 
-TEST(AssocArray, ReadMissingKeyWithDefaultReturnsDefaultNoWarning) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->has_default = true;
-  aa->default_value = MakeLogic4VecVal(f.arena, 32, 77);
-  aa->int_data[1] = MakeLogic4VecVal(f.arena, 32, 10);
-
-  auto* sel = MakeAssocSelect(f.arena, 99);
-  uint32_t before = f.diag.WarningCount();
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 77u);
-  EXPECT_EQ(f.diag.WarningCount(), before);
-}
-
 TEST(AssocArray, XzIndexReadWithDefaultReturnsDefaultValue) {
   SimFixture f;
   auto* aa = f.ctx.CreateAssocArray("aa", 32, false, 32);

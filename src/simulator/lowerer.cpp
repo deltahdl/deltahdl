@@ -385,7 +385,8 @@ void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
   } else if (var.is_assoc) {
     auto* aa = ctx_.CreateAssocArray(var.name, var.width, var.is_string_index,
                                      var.assoc_index_width,
-                                     var.is_wildcard_index);
+                                     var.is_wildcard_index,
+                                     var.is_4state);
     InitAssocDefault(var.init_expr, aa);
   } else {
     CreateArrayElements(var, ctx_, arena_);

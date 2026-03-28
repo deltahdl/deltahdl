@@ -359,6 +359,7 @@ static bool TryBindAssocArg(const Expr* call_arg, std::string_view param_name,
   dst->default_value = src->default_value;
   dst->index_width = src->index_width;
   dst->is_wildcard = src->is_wildcard;
+  dst->is_4state = src->is_4state;
   return true;
 }
 

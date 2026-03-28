@@ -829,8 +829,9 @@ static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, uint64_t idx,
 }
 
 static Logic4Vec AssocDefault(const AssocArrayObject* aa, Arena& arena) {
-  return aa->has_default ? aa->default_value
-                         : MakeLogic4VecVal(arena, aa->elem_width, 0);
+  if (aa->has_default) return aa->default_value;
+  return aa->is_4state ? MakeAllX(arena, aa->elem_width)
+                       : MakeLogic4VecVal(arena, aa->elem_width, 0);
 }
 
 static std::string ExtractStringKey(const Logic4Vec& key) {

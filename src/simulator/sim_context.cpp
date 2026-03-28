@@ -330,12 +330,14 @@ AssocArrayObject* SimContext::CreateAssocArray(std::string_view name,
                                                uint32_t elem_width,
                                                bool is_string_key,
                                                uint32_t index_width,
-                                               bool is_wildcard) {
+                                               bool is_wildcard,
+                                               bool is_4state) {
   auto* aa = arena_.Create<AssocArrayObject>();
   aa->elem_width = elem_width;
   aa->is_string_key = is_string_key;
   aa->is_wildcard = is_wildcard;
   aa->index_width = index_width;
+  aa->is_4state = is_4state;
   assoc_arrays_[name] = aa;
   return aa;
 }
