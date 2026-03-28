@@ -73,6 +73,26 @@ static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
+// §8.8: Try to handle typed constructor call `D::new` (no parens) in a
+// blocking assignment.  The with-parens form `D::new(args)` is a kCall and
+// is handled by the expression evaluator via TryEvalClassScopeCall.
+static bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  if (!stmt->rhs || stmt->rhs->kind != ExprKind::kMemberAccess) return false;
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
+  if (!stmt->rhs->lhs || stmt->rhs->lhs->kind != ExprKind::kIdentifier)
+    return false;
+  if (!stmt->rhs->rhs || stmt->rhs->rhs->kind != ExprKind::kIdentifier)
+    return false;
+  if (stmt->rhs->rhs->text != "new") return false;
+  if (!ctx.FindClassType(stmt->rhs->lhs->text)) return false;
+  auto handle =
+      EvalClassNew(stmt->rhs->lhs->text, nullptr, ctx, arena);
+  auto* var = ctx.FindVariable(stmt->lhs->text);
+  if (var) var->value = handle;
+  return true;
+}
+
 // §A.6.7.1: Unwrap typed assignment pattern expression (kCast wrapping
 // pattern).
 static const Expr* UnwrapTypedPattern(const Expr* expr) {
@@ -406,6 +426,7 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (!stmt->lhs) return StmtResult::kDone;
 
   if (TryClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
+  if (TryTypedClassNewAssign(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryAssocCopyAssign(stmt, ctx)) return StmtResult::kDone;
   if (TryQueueBlockingAssign(stmt, ctx, arena)) return StmtResult::kDone;
   // §15.5.5.2: Assigning null breaks the event synchronization association.

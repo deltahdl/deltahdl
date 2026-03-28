@@ -887,6 +887,11 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
   ClassScopeInfo info;
   if (!ResolveClassScope(expr, ctx, info)) return false;
   if (!info.access->lhs->elements.empty()) return false;
+  // §8.8: Typed constructor call — Class::new(args).
+  if (info.access->rhs->text == "new") {
+    out = EvalClassNew(info.access->lhs->text, expr, ctx, arena);
+    return true;
+  }
   ctx.PushScope();
   ExecClassMethod(info.method, expr, ctx, arena, out);
   ctx.PopScope();
@@ -901,6 +906,12 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
   if (info.access->lhs->elements.empty()) return false;
   ctx.PushScope();
   BindClassParams(info.cls, info.access->lhs, ctx, arena);
+  // §8.8: Parameterized typed constructor call — C#(N)::new(args).
+  if (info.access->rhs->text == "new") {
+    out = EvalClassNew(info.access->lhs->text, expr, ctx, arena);
+    ctx.PopScope();
+    return true;
+  }
   ExecClassMethod(info.method, expr, ctx, arena, out);
   ctx.PopScope();
   return true;

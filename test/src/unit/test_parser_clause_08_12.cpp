@@ -102,4 +102,20 @@ TEST(ClassAssignRenameParsing, ClassContainingClassProperty) {
               "endclass\n"));
 }
 
+TEST(ClassAssignRenameParsing, ShallowCopyWithData) {
+  auto r = Parse(
+      "class C;\n"
+      "  int data;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C a, b;\n"
+      "  initial begin\n"
+      "    a = new;\n"
+      "    b = new a;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

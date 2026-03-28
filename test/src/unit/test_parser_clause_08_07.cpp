@@ -198,4 +198,15 @@ TEST(ClassConstructorParsing, DerivedClassWithPropertyDefaults) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ClassConstructorParsing, DeclarationClassNewNoArgs) {
+  auto r = Parse(
+      "class C;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c = new;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
