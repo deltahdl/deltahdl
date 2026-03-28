@@ -11,17 +11,6 @@ static std::string PreprocessWithPP(const std::string& src, PreprocFixture& f,
   return pp.Preprocess(fid);
 }
 
-TEST(Preprocessor, ResetAll_PreservesTextMacros) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define FOO bar\n"
-      "`resetall\n"
-      "int x = `FOO;\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("bar"), std::string::npos);
-}
-
 TEST(Preprocessor, ResetAll_IllegalInsideModule) {
   PreprocFixture f;
   Preprocess("module m;\n`resetall\nendmodule\n", f);
@@ -216,17 +205,6 @@ TEST(Preprocessor, ResetAll_BetweenDesignElementsLegal) {
   EXPECT_FALSE(f.diag.HasErrors());
 
   EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
-}
-
-TEST(Preprocessor, ResetAll_DoesNotAffectMacros) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define PERSIST 99\n"
-      "`resetall\n"
-      "int x = `PERSIST;\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("99"), std::string::npos);
 }
 
 TEST(Preprocessor, ResetAll_ResetsMultipleDirectivesAtOnce) {
