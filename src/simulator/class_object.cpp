@@ -27,11 +27,23 @@ Logic4Vec ClassObject::GetProperty(std::string_view name, Arena& arena) const {
   std::string key(name);
   auto it = properties.find(key);
   if (it != properties.end()) return it->second;
+  if (type) {
+    auto sit = type->static_properties.find(key);
+    if (sit != type->static_properties.end()) return sit->second;
+  }
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
 void ClassObject::SetProperty(std::string_view name, const Logic4Vec& val) {
-  properties[std::string(name)] = val;
+  std::string key(name);
+  if (type) {
+    auto it = type->static_properties.find(key);
+    if (it != type->static_properties.end()) {
+      it->second = val;
+      return;
+    }
+  }
+  properties[key] = val;
 }
 
 ModuleItem* ClassObject::ResolveVirtualMethod(std::string_view name) const {

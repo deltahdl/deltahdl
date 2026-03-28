@@ -499,11 +499,17 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
 }
 
 // §8.9: Initialize static properties on the class type.
-static void InitStaticProperties(ClassTypeInfo* info, Arena& arena) {
+static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
+                                 Arena& arena) {
   for (const auto& p : info->properties) {
     if (p.is_static) {
-      info->static_properties[std::string(p.name)] =
-          MakeLogic4VecVal(arena, p.width, 0);
+      if (p.init_expr) {
+        info->static_properties[std::string(p.name)] =
+            EvalExpr(p.init_expr, ctx, arena);
+      } else {
+        info->static_properties[std::string(p.name)] =
+            MakeLogic4VecVal(arena, p.width, 0);
+      }
     }
   }
 }
@@ -531,7 +537,7 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
     }
   }
   BuildVTable(info, cls);
-  InitStaticProperties(info, arena_);
+  InitStaticProperties(info, ctx_, arena_);
   // §8.5: Register class parameters as properties.
   for (const auto& [pname, pexpr] : cls->params) {
     info->properties.push_back({pname, 32, false});
