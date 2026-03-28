@@ -12,6 +12,7 @@ namespace delta {
 
 struct ClassDecl;
 struct ClassMember;
+struct Expr;
 struct ModuleItem;
 class Arena;
 
@@ -41,6 +42,7 @@ struct ClassTypeInfo {
     bool is_local = false;
     bool is_protected = false;
     bool is_const = false;
+    Expr* init_expr = nullptr;
   };
   std::vector<PropertyInfo> properties;
 

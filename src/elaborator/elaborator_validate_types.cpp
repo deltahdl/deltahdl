@@ -37,6 +37,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateArrayArgTypes(decl);
   ValidateLocalProtectedAccess(decl);
   ValidateStaticMethodBodies(decl);
+  ValidateClassMethodBodies(decl);
   ValidateThisUsage(decl);
   // §3.14: Precision shall be at least as precise as the time unit.
   if (decl->has_timeunit && decl->has_timeprecision) {

@@ -291,6 +291,9 @@ class Elaborator {
   /// §8.13: A class declared :final shall not be extended.
   void ValidateFinalClassExtension();
 
+  /// §8.7: Validate class method function bodies (nonblocking, etc.).
+  void ValidateClassMethodBodies(const ModuleDecl* decl);
+
   /// §8.17: Validate chaining constructor rules.
   void ValidateChainingConstructors();
   void ValidateOneClassChainingCtor(const ClassDecl* cls);

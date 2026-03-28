@@ -768,6 +768,24 @@ void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
   }
 }
 
+// §8.7: Validate class method function bodies (constructors are functions and
+// shall be nonblocking; general function body rules from §13.2 apply).
+void Elaborator::ValidateClassMethodBodies(const ModuleDecl* decl) {
+  for (const auto* cls : unit_->classes) {
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+      ValidateFunctionBody(m->method);
+    }
+  }
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kClassDecl || !item->class_decl) continue;
+    for (const auto* m : item->class_decl->members) {
+      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+      ValidateFunctionBody(m->method);
+    }
+  }
+}
+
 // §8.17: Validate chaining constructor rules.
 void Elaborator::ValidateChainingConstructors() {
   for (const auto* cls : unit_->classes) {

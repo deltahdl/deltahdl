@@ -665,16 +665,19 @@ static void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   }
 }
 
-// §8.7: Allocate a new class object, execute constructor, return handle.
-Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
-                       SimContext& ctx, Arena& arena) {
-  auto* info = ctx.FindClassType(class_type);
-  if (!info) return MakeLogic4VecVal(arena, 64, kNullClassHandle);
-  auto* obj = arena.Create<ClassObject>();
-  obj->type = info;
+// §8.7: Initialize properties for a single class level to their explicit
+// defaults or zero if no default is provided.
+static void InitClassPropertyDefaults(const ClassTypeInfo* info,
+                                      ClassObject* obj, SimContext& ctx,
+                                      Arena& arena) {
   for (const auto& prop : info->properties) {
-    obj->properties[std::string(prop.name)] =
-        MakeLogic4VecVal(arena, prop.width, 0);
+    if (prop.init_expr) {
+      obj->properties[std::string(prop.name)] =
+          EvalExpr(prop.init_expr, ctx, arena);
+    } else {
+      obj->properties[std::string(prop.name)] =
+          MakeLogic4VecVal(arena, prop.width, 0);
+    }
   }
   // §8.5: Populate parameter properties with default values.
   if (info->decl) {
@@ -685,17 +688,58 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
       }
     }
   }
-  auto handle = ctx.AllocateClassObject(obj);
+}
+
+// §8.7: Run the constructor for a single class level. If the class has no
+// explicit constructor, this is a no-op (implicit constructor).
+static void RunConstructorForLevel(const ClassTypeInfo* info, ClassObject* obj,
+                                   const Expr* args_expr, SimContext& ctx,
+                                   Arena& arena) {
   auto it = info->methods.find("new");
-  if (it != info->methods.end() && it->second) {
-    ctx.PushScope();
-    ctx.PushThis(obj);
-    if (new_expr) BindFunctionArgs(it->second, new_expr, ctx, arena);
-    Variable dummy;
-    ExecFunctionBody(it->second, &dummy, ctx, arena);
-    ctx.PopThis();
-    ctx.PopScope();
+  if (it == info->methods.end() || !it->second) return;
+  ctx.PushScope();
+  if (args_expr) BindFunctionArgs(it->second, args_expr, ctx, arena);
+  Variable dummy;
+  ExecFunctionBody(it->second, &dummy, ctx, arena);
+  ctx.PopScope();
+}
+
+// §8.7: Allocate a new class object, execute constructor, return handle.
+//
+// Construction order per §8.7:
+//  1. Call base class constructor (super.new).
+//  2. Initialize each property to its explicit default value or its
+//     uninitialized value if no default is provided.
+//  3. Execute the remaining code in the user-defined constructor.
+//
+// For implicit constructors (no user-defined new), steps 2-3 still apply;
+// the base class constructor is called automatically for derived classes.
+Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
+                       SimContext& ctx, Arena& arena) {
+  auto* info = ctx.FindClassType(class_type);
+  if (!info) return MakeLogic4VecVal(arena, 64, kNullClassHandle);
+  auto* obj = arena.Create<ClassObject>();
+  obj->type = info;
+
+  // Collect the inheritance chain from base to most-derived.
+  std::vector<const ClassTypeInfo*> chain;
+  for (auto* cur = info; cur; cur = cur->parent) chain.push_back(cur);
+  std::reverse(chain.begin(), chain.end());
+
+  auto handle = ctx.AllocateClassObject(obj);
+  ctx.PushThis(obj);
+
+  // Walk base-to-derived: for each level, initialize property defaults then
+  // run its constructor. The most-derived constructor receives new_expr args;
+  // base constructors run with no args (explicit super.new args are handled
+  // when the constructor body executes a super.new() call).
+  for (size_t i = 0; i < chain.size(); ++i) {
+    InitClassPropertyDefaults(chain[i], obj, ctx, arena);
+    const Expr* args = (i == chain.size() - 1) ? new_expr : nullptr;
+    RunConstructorForLevel(chain[i], obj, args, ctx, arena);
   }
+
+  ctx.PopThis();
   return MakeLogic4VecVal(arena, 64, handle);
 }
 
