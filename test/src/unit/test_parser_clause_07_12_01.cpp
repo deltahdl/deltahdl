@@ -5,31 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(AggregateTypeParsing, ArrayFindWithClause) {
-  auto r = Parse(
-      "module t;\n"
-      "  int d[] = '{1,2,3,4,5};\n"
-      "  initial qi = d.find with (item > 3);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-}
-
-TEST(AggregateTypeParsing, ArrayFindIndexMethod) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[8];\n"
-      "  initial qi = arr.find_index with (item == 0);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-}
-
 TEST(AggregateTypeParsing, ArrayLocatorUnique) {
   auto r = Parse(
       "module t;\n"
@@ -107,26 +82,6 @@ TEST(SubroutineCallSyntaxParsing, ArrayMethodWithClause) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SubroutineCallExprParsing, ArrayManipCallWithClause) {
-  auto r = Parse(
-      "module m;\n"
-      "  int arr[4];\n"
-      "  int result[$];\n"
-      "  initial begin result = arr.find with (item > 5); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SubroutineCallExprParsing, ArrayMethodNameUnique) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = arr.unique(); end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(AggregateTypeParsing, ArrayMethodMax) {
   auto r = Parse(
       "module t;\n"
@@ -153,6 +108,122 @@ TEST(AggregateTypeParsing, ArrayMethodUniqueIndex) {
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
+}
+
+TEST(AggregateTypeParsing, ArrayLocatorFindFirst) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3};\n"
+      "  int found[$];\n"
+      "  initial found = arr.find_first with (item > 1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+TEST(AggregateTypeParsing, ArrayLocatorFindLast) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3};\n"
+      "  int found[$];\n"
+      "  initial found = arr.find_last with (item > 1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+TEST(AggregateTypeParsing, ArrayLocatorFindFirstIndex) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{10, 20, 30};\n"
+      "  int idx[$];\n"
+      "  initial idx = arr.find_first_index with (item == 20);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+TEST(AggregateTypeParsing, ArrayLocatorFindLastIndex) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{10, 20, 30};\n"
+      "  int idx[$];\n"
+      "  initial idx = arr.find_last_index with (item > 10);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+}
+
+TEST(AggregateTypeParsing, ArrayLocatorMinWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{5, 1, 3};\n"
+      "  int res[$];\n"
+      "  initial res = arr.min with (item);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_NE(stmt->rhs->with_expr, nullptr);
+}
+
+TEST(AggregateTypeParsing, ArrayLocatorMaxWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{5, 1, 3};\n"
+      "  int res[$];\n"
+      "  initial res = arr.max with (item);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_NE(stmt->rhs->with_expr, nullptr);
+}
+
+TEST(AggregateTypeParsing, ArrayLocatorUniqueWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3};\n"
+      "  int res[$];\n"
+      "  initial res = arr.unique with (item % 2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_NE(stmt->rhs->with_expr, nullptr);
+}
+
+TEST(AggregateTypeParsing, ArrayLocatorUniqueIndexWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[] = '{1, 2, 3, 4};\n"
+      "  int idx[$];\n"
+      "  initial idx = arr.unique_index with (item % 2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_NE(stmt->rhs->with_expr, nullptr);
 }
 
 }  // namespace

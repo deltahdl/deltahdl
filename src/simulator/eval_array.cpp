@@ -817,7 +817,8 @@ static bool IsStringArray(std::string_view var_name, const ArrayInfo& info,
 // §7.12.1/§7.12.5: Check if a method name is a locator or map method.
 static bool IsLocatorMethod(std::string_view name) {
   return name == "find" || name == "find_first" || name == "find_last" ||
-         name == "find_index" || name == "find_last_index" ||
+         name == "find_index" || name == "find_first_index" ||
+         name == "find_last_index" || name == "min" || name == "max" ||
          name == "unique" || name == "unique_index" || name == "map";
 }
 
@@ -867,6 +868,22 @@ static bool EvalLocatorPredicate(const LocatorCtx& lc,
   return result != 0;
 }
 
+// Evaluate a with-clause expression and return its value (not just bool).
+static Logic4Vec EvalLocatorWithExpr(const LocatorCtx& lc,
+                                     const Logic4Vec& item_val,
+                                     size_t item_index) {
+  lc.ctx.PushScope();
+  auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, item_val.width);
+  item_var->value = item_val;
+  if (lc.is_string) lc.ctx.RegisterStringVariable(lc.iter_name);
+  auto* idx_var = lc.ctx.CreateLocalVariable(lc.idx_var_name, 32);
+  idx_var->value =
+      MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(item_index));
+  auto result = EvalExpr(lc.with_expr, lc.ctx, lc.arena);
+  lc.ctx.PopScope();
+  return result;
+}
+
 // §7.12.1: find/find_first/find_last with predicate.
 static void LocatorFind(std::string_view method, const LocatorCtx& lc,
                         std::vector<Logic4Vec>& out) {
@@ -891,7 +908,7 @@ static void LocatorFindDispatch(std::string_view method, const LocatorCtx& lc,
   LocatorFind(method, lc, out);
 }
 
-// §7.12.1: find_index/find_last_index with predicate.
+// §7.12.1: find_index/find_first_index/find_last_index with predicate.
 static void LocatorFindIndex(std::string_view method, const LocatorCtx& lc,
                              std::vector<Logic4Vec>& out) {
   if (method == "find_last_index") {
@@ -906,6 +923,7 @@ static void LocatorFindIndex(std::string_view method, const LocatorCtx& lc,
   for (size_t i = 0; i < lc.elems.size(); ++i) {
     if (!EvalLocatorPredicate(lc, lc.elems[i], i)) continue;
     out.push_back(MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i)));
+    if (method == "find_first_index") break;
   }
 }
 
@@ -963,6 +981,68 @@ static void LocatorUniqueIndex(const std::vector<Logic4Vec>& elems,
   }
 }
 
+// §7.12.1: min/max — return element whose with-expression is minimal/maximal.
+static void LocatorMinMax(std::string_view method, const LocatorCtx& lc,
+                          std::vector<Logic4Vec>& out) {
+  if (lc.elems.empty()) return;
+  size_t best_idx = 0;
+  uint64_t best_val = lc.with_expr
+                          ? EvalLocatorWithExpr(lc, lc.elems[0], 0).ToUint64()
+                          : lc.elems[0].ToUint64();
+  for (size_t i = 1; i < lc.elems.size(); ++i) {
+    uint64_t val = lc.with_expr
+                       ? EvalLocatorWithExpr(lc, lc.elems[i], i).ToUint64()
+                       : lc.elems[i].ToUint64();
+    if ((method == "min" && val < best_val) ||
+        (method == "max" && val > best_val)) {
+      best_val = val;
+      best_idx = i;
+    }
+  }
+  out.push_back(lc.elems[best_idx]);
+}
+
+// §7.12.1: unique with with-clause — uniqueness by expression value.
+static void LocatorUniqueWith(const LocatorCtx& lc,
+                              std::vector<Logic4Vec>& out) {
+  std::vector<uint64_t> seen;
+  for (size_t i = 0; i < lc.elems.size(); ++i) {
+    uint64_t v = EvalLocatorWithExpr(lc, lc.elems[i], i).ToUint64();
+    bool dup = false;
+    for (uint64_t s : seen) {
+      if (s == v) {
+        dup = true;
+        break;
+      }
+    }
+    if (!dup) {
+      seen.push_back(v);
+      out.push_back(lc.elems[i]);
+    }
+  }
+}
+
+// §7.12.1: unique_index with with-clause — uniqueness by expression value.
+static void LocatorUniqueIndexWith(const LocatorCtx& lc,
+                                   std::vector<Logic4Vec>& out) {
+  std::vector<uint64_t> seen;
+  for (size_t i = 0; i < lc.elems.size(); ++i) {
+    uint64_t v = EvalLocatorWithExpr(lc, lc.elems[i], i).ToUint64();
+    bool dup = false;
+    for (uint64_t s : seen) {
+      if (s == v) {
+        dup = true;
+        break;
+      }
+    }
+    if (!dup) {
+      seen.push_back(v);
+      out.push_back(
+          MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i)));
+    }
+  }
+}
+
 // Extract var and method names from member access (e.g., s.find, s.unique).
 static bool ExtractLocatorParts(const Expr* expr, MethodCallParts& out) {
   // Member access pattern: s.find (no parens).
@@ -995,12 +1075,28 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   auto elems = CollectVecElements(parts.var_name, *info, ctx, arena);
   bool is_str = IsStringArray(parts.var_name, *info, ctx);
 
+  // §7.12.1: unique/unique_index/min/max may omit the with clause.
   if (parts.method_name == "unique") {
-    LocatorUnique(elems, arena, out);
+    if (expr->with_expr) {
+      LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+      LocatorUniqueWith(lc, out);
+    } else {
+      LocatorUnique(elems, arena, out);
+    }
     return true;
   }
   if (parts.method_name == "unique_index") {
-    LocatorUniqueIndex(elems, arena, out);
+    if (expr->with_expr) {
+      LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+      LocatorUniqueIndexWith(lc, out);
+    } else {
+      LocatorUniqueIndex(elems, arena, out);
+    }
+    return true;
+  }
+  if (parts.method_name == "min" || parts.method_name == "max") {
+    LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
+    LocatorMinMax(parts.method_name, lc, out);
     return true;
   }
 
@@ -1011,6 +1107,7 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   if (parts.method_name == "map") {
     LocatorMap(lc, out);
   } else if (parts.method_name == "find_index" ||
+             parts.method_name == "find_first_index" ||
              parts.method_name == "find_last_index") {
     LocatorFindIndex(parts.method_name, lc, out);
   } else {

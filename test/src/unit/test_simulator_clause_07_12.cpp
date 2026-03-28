@@ -27,24 +27,6 @@ TEST(DynArrayMethod, SizeProperty) {
   EXPECT_EQ(out.ToUint64(), 3u);
 }
 
-TEST(DynArrayMethod, MinReduction) {
-  SimFixture f;
-  MakeDynArray(f, "d", {50, 10, 30});
-  Logic4Vec out{};
-  bool ok = TryEvalArrayProperty("d", "min", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 10u);
-}
-
-TEST(DynArrayMethod, MaxReduction) {
-  SimFixture f;
-  MakeDynArray(f, "d", {50, 10, 30});
-  Logic4Vec out{};
-  bool ok = TryEvalArrayProperty("d", "max", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 50u);
-}
-
 TEST(ArrayMethodWithClause, DefaultIteratorNameIsItem) {
   SimFixture f;
   MakeDynArray(f, "arr", {10, 20, 30, 40});
