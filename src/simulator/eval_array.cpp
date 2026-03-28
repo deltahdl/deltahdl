@@ -580,7 +580,7 @@ static int64_t EvalIntKey(const Expr* expr, SimContext& ctx, Arena& arena,
   return SignExtend(val.ToUint64(), index_width);
 }
 
-// §7.8.1: exists(key).
+// §7.9.3: exists(key).
 static bool AssocExists(AssocArrayObject* aa, const Expr* expr, SimContext& ctx,
                         Arena& arena, Logic4Vec& out) {
   if (expr->args.empty()) return false;
@@ -590,7 +590,7 @@ static bool AssocExists(AssocArrayObject* aa, const Expr* expr, SimContext& ctx,
   } else {
     found = aa->int_data.count(EvalIntKey(expr->args[0], ctx, arena, aa->index_width)) ? 1 : 0;
   }
-  out = MakeLogic4VecVal(arena, 1, found);
+  out = MakeLogic4VecVal(arena, 32, found);
   return true;
 }
 
