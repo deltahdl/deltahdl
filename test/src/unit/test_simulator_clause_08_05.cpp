@@ -1,5 +1,6 @@
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
@@ -8,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ClassSim, PropertySetAndGet) {
+TEST(ObjectPropertySim, PropertySetAndGet) {
   SimFixture f;
   auto* type = MakeClassType(f, "Packet", {"data"});
   auto [handle, obj] = MakeObj(f, type);
@@ -17,7 +18,7 @@ TEST(ClassSim, PropertySetAndGet) {
   EXPECT_EQ(obj->GetProperty("data", f.arena).ToUint64(), 42u);
 }
 
-TEST(ClassSim, MultipleProperties) {
+TEST(ObjectPropertySim, MultipleProperties) {
   SimFixture f;
   auto* type = MakeClassType(f, "Packet", {"header", "payload", "crc"});
   auto [handle, obj] = MakeObj(f, type);
@@ -31,7 +32,7 @@ TEST(ClassSim, MultipleProperties) {
   EXPECT_EQ(obj->GetProperty("crc", f.arena).ToUint64(), 3u);
 }
 
-TEST(ClassSim, UndefinedPropertyReturnsZero) {
+TEST(ObjectPropertySim, UndefinedPropertyReturnsZero) {
   SimFixture f;
   auto* type = MakeClassType(f, "Empty", {});
   auto [handle, obj] = MakeObj(f, type);
@@ -39,7 +40,7 @@ TEST(ClassSim, UndefinedPropertyReturnsZero) {
   EXPECT_EQ(obj->GetProperty("nonexistent", f.arena).ToUint64(), 0u);
 }
 
-TEST(ClassSim, ParameterAccessAsProperty) {
+TEST(ObjectPropertySim, ParameterAccessAsProperty) {
   SimFixture f;
   auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = "vector";
@@ -58,7 +59,7 @@ TEST(ClassSim, ParameterAccessAsProperty) {
   EXPECT_EQ(obj->GetProperty("width", f.arena).ToUint64(), 7u);
 }
 
-TEST(ClassSim, PropertyOverwrite) {
+TEST(ObjectPropertySim, PropertyOverwrite) {
   SimFixture f;
   auto* type = MakeClassType(f, "C", {"x"});
   auto [handle, obj] = MakeObj(f, type);
@@ -68,6 +69,107 @@ TEST(ClassSim, PropertyOverwrite) {
 
   obj->SetProperty("x", MakeLogic4VecVal(f.arena, 32, 20));
   EXPECT_EQ(obj->GetProperty("x", f.arena).ToUint64(), 20u);
+}
+
+TEST(ObjectPropertySim, PropertyReadViaInstance) {
+  EXPECT_EQ(RunAndGet(
+      "class Packet;\n"
+      "  int command;\n"
+      "  int address;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    Packet p;\n"
+      "    p = new;\n"
+      "    p.command = 42;\n"
+      "    result = p.command;\n"
+      "  end\n"
+      "endmodule\n", "result"), 42u);
+}
+
+TEST(ObjectPropertySim, MultiplePropertyReadWrite) {
+  EXPECT_EQ(RunAndGet(
+      "class Packet;\n"
+      "  int header;\n"
+      "  int payload;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    Packet p;\n"
+      "    p = new;\n"
+      "    p.header = 10;\n"
+      "    p.payload = 20;\n"
+      "    result = p.header + p.payload;\n"
+      "  end\n"
+      "endmodule\n", "result"), 30u);
+}
+
+TEST(ObjectPropertySim, EnumAccessViaInstance) {
+  EXPECT_EQ(RunAndGet(
+      "class Packet;\n"
+      "  typedef enum integer {ERR_OVERFLOW = 10, ERR_UNDERFLOW = 1123} "
+      "PCKT_TYPE;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    Packet p;\n"
+      "    p = new;\n"
+      "    result = p.ERR_OVERFLOW;\n"
+      "  end\n"
+      "endmodule\n", "result"), 10u);
+}
+
+TEST(ObjectPropertySim, ParameterValueAccessViaInstance) {
+  EXPECT_EQ(RunAndGet(
+      "class vector #(parameter width = 7);\n"
+      "  bit [width:0] data;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    vector #(3) v;\n"
+      "    v = new;\n"
+      "    result = v.width;\n"
+      "  end\n"
+      "endmodule\n", "result"), 3u);
+}
+
+TEST(ObjectPropertySim, ParameterDefaultValueAccessViaInstance) {
+  EXPECT_EQ(RunAndGet(
+      "class vector #(parameter width = 7);\n"
+      "  bit [width:0] data;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    vector v;\n"
+      "    v = new;\n"
+      "    result = v.width;\n"
+      "  end\n"
+      "endmodule\n", "result"), 7u);
+}
+
+TEST(ObjectPropertySim, NoRestrictionOnPropertyDataType) {
+  EXPECT_EQ(RunAndGet(
+      "class C;\n"
+      "  bit [7:0] b;\n"
+      "  logic [15:0] l;\n"
+      "  integer ig;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    c.b = 8'hAB;\n"
+      "    c.l = 16'hCDEF;\n"
+      "    c.ig = 5;\n"
+      "    result = c.ig;\n"
+      "  end\n"
+      "endmodule\n", "result"), 5u);
 }
 
 }  // namespace

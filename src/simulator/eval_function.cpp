@@ -676,6 +676,15 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
     obj->properties[std::string(prop.name)] =
         MakeLogic4VecVal(arena, prop.width, 0);
   }
+  // §8.5: Populate parameter properties with default values.
+  if (info->decl) {
+    for (const auto& [pname, pexpr] : info->decl->params) {
+      if (pexpr) {
+        auto val = EvalExpr(pexpr, ctx, arena);
+        obj->SetProperty(pname, val);
+      }
+    }
+  }
   auto handle = ctx.AllocateClassObject(obj);
   auto it = info->methods.find("new");
   if (it != info->methods.end() && it->second) {
@@ -688,6 +697,23 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
     ctx.PopScope();
   }
   return MakeLogic4VecVal(arena, 64, handle);
+}
+
+// §8.5: Override parameter properties on a class object with specialization
+// values stored for the given variable.
+void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
+                              SimContext& ctx, Arena& arena) {
+  auto* obj = ctx.GetClassObject(handle);
+  if (!obj || !obj->type || !obj->type->decl) return;
+  const auto& param_exprs = ctx.GetVariableClassParamExprs(var_name);
+  if (param_exprs.empty()) return;
+  const auto& params = obj->type->decl->params;
+  for (size_t i = 0; i < params.size() && i < param_exprs.size(); ++i) {
+    if (param_exprs[i]) {
+      auto val = EvalExpr(param_exprs[i], ctx, arena);
+      obj->SetProperty(params[i].first, val);
+    }
+  }
 }
 
 static Logic4Vec EvalDpiCall(const Expr* expr, SimContext& ctx, Arena& arena) {

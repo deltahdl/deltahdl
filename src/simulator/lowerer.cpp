@@ -536,6 +536,18 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
   for (const auto& [pname, pexpr] : cls->params) {
     info->properties.push_back({pname, 32, false});
   }
+  // §8.5: Collect enum members declared inside the class.
+  for (const auto* member : cls->members) {
+    if (member->kind != ClassMemberKind::kTypedef || !member->typedef_item)
+      continue;
+    const auto& enum_members = member->typedef_item->typedef_type.enum_members;
+    int64_t next_val = 0;
+    for (const auto& em : enum_members) {
+      if (em.value) next_val = static_cast<int64_t>(em.value->int_val);
+      info->enum_members[std::string(em.name)] = static_cast<uint64_t>(next_val);
+      ++next_val;
+    }
+  }
   ctx_.RegisterClassType(cls->name, info);
 }
 

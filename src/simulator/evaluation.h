@@ -106,6 +106,11 @@ void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
                        SimContext& ctx, Arena& arena);
 
+// §8.5: Override parameter properties on a class object with specialization
+// values stored for the given variable.
+void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
+                              SimContext& ctx, Arena& arena);
+
 // §6.21: Validate that ref arguments are not used in static subroutines.
 class DiagEngine;
 struct ModuleItem;

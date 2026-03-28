@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LvalueParsing, PropertyAccessDotNotation) {
+TEST(ObjectPropertyParsing, PropertyAccessDotNotation) {
   auto r = Parse(
       "class Packet;\n"
       "  int command;\n"
@@ -32,7 +32,7 @@ TEST(LvalueParsing, PropertyAccessDotNotation) {
   EXPECT_EQ(cls->members[1]->name, "address");
 }
 
-TEST(LvalueParsing, ParameterizedClassWithValueParam) {
+TEST(ObjectPropertyParsing, ParameterizedClassWithValueParam) {
   auto r = Parse(
       "class vector #(parameter width = 7);\n"
       "  bit [width:0] data;\n"
@@ -45,7 +45,7 @@ TEST(LvalueParsing, ParameterizedClassWithValueParam) {
   EXPECT_EQ(cls->params[0].first, "width");
 }
 
-TEST(LvalueParsing, ParameterAccessViaScope) {
+TEST(ObjectPropertyParsing, ParameterAccessViaInstance) {
   ParseOk(
       "class vector #(parameter width = 7, type T = int);\n"
       "  T data;\n"
@@ -56,6 +56,43 @@ TEST(LvalueParsing, ParameterAccessViaScope) {
       "    vector #(3) v;\n"
       "    v = new;\n"
       "    w = v.width;\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+TEST(ObjectPropertyParsing, EnumAccessViaInstance) {
+  ParseOk(
+      "class Packet;\n"
+      "  typedef enum {ERR_OVERFLOW = 10, ERR_UNDERFLOW = 1123} PCKT_TYPE;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    Packet p;\n"
+      "    automatic int x;\n"
+      "    p = new;\n"
+      "    x = p.ERR_OVERFLOW;\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+TEST(ObjectPropertyParsing, PropertyReadAndWrite) {
+  ParseOk(
+      "class Packet;\n"
+      "  bit [3:0] command;\n"
+      "  bit [40:0] address;\n"
+      "  integer time_requested;\n"
+      "  const integer buffer_size = 100;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    Packet p;\n"
+      "    automatic int var1;\n"
+      "    automatic integer packet_time;\n"
+      "    p = new;\n"
+      "    p.command = 4'd0;\n"
+      "    p.address = 41'b0;\n"
+      "    packet_time = p.time_requested;\n"
+      "    var1 = p.buffer_size;\n"
       "  end\n"
       "endmodule\n");
 }

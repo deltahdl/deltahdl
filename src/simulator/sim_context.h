@@ -277,6 +277,10 @@ class SimContext {
   ClassTypeInfo* FindClassType(std::string_view name);
   void SetVariableClassType(std::string_view var, std::string_view type);
   std::string_view GetVariableClassType(std::string_view var) const;
+  void SetVariableClassParamExprs(std::string_view var,
+                                  std::vector<Expr*> exprs);
+  const std::vector<Expr*>& GetVariableClassParamExprs(
+      std::string_view var) const;
 
   // Allocate a new class object, returning its handle ID (>0).
   uint64_t AllocateClassObject(ClassObject* obj);
@@ -354,6 +358,8 @@ class SimContext {
   // §8: Class type registry and variable→class type mapping.
   std::unordered_map<std::string_view, ClassTypeInfo*> class_types_;
   std::unordered_map<std::string_view, std::string_view> var_class_types_;
+  std::unordered_map<std::string_view, std::vector<Expr*>>
+      var_class_param_exprs_;
   // §8: Object heap — maps handle ID to ClassObject.
   std::unordered_map<uint64_t, ClassObject*> class_objects_;
   uint64_t next_handle_id_ = 1;

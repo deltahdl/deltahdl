@@ -443,6 +443,19 @@ std::string_view SimContext::GetVariableClassType(std::string_view var) const {
   return (it != var_class_types_.end()) ? it->second : std::string_view{};
 }
 
+void SimContext::SetVariableClassParamExprs(std::string_view var,
+                                            std::vector<Expr*> exprs) {
+  var_class_param_exprs_[var] = std::move(exprs);
+}
+
+static const std::vector<Expr*> kEmptyExprVec;
+
+const std::vector<Expr*>& SimContext::GetVariableClassParamExprs(
+    std::string_view var) const {
+  auto it = var_class_param_exprs_.find(var);
+  return (it != var_class_param_exprs_.end()) ? it->second : kEmptyExprVec;
+}
+
 uint64_t SimContext::AllocateClassObject(ClassObject* obj) {
   uint64_t id = next_handle_id_++;
   class_objects_[id] = obj;

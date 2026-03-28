@@ -800,6 +800,12 @@ static void CheckMemberAccessVisibility(
   if (e->rhs->kind != ExprKind::kIdentifier) return;
   const auto* cls = FindClassDecl(it->second, unit);
   if (!cls) return;
+  // §8.5: Accessing a type parameter via a class handle is illegal.
+  if (cls->type_param_names.count(e->rhs->text) > 0) {
+    diag.Error(e->rhs->range.start,
+               "cannot access type parameter via class handle");
+    return;
+  }
   const auto* m = FindMemberInClass(cls, e->rhs->text, unit);
   if (m && m->is_local) {
     diag.Error(e->rhs->range.start,

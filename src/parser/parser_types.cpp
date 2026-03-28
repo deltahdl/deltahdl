@@ -189,13 +189,13 @@ std::vector<DataType> Parser::ParseTypeParamList() {
   if (!Check(TokenKind::kRParen)) {
     auto dt = ParseDataType();
     if (dt.kind == DataTypeKind::kImplicit) {
-      ParseExpr();
+      dt.type_ref_expr = ParseExpr();
     }
     result.push_back(dt);
     while (Match(TokenKind::kComma)) {
       dt = ParseDataType();
       if (dt.kind == DataTypeKind::kImplicit) {
-        ParseExpr();
+        dt.type_ref_expr = ParseExpr();
       }
       result.push_back(dt);
     }

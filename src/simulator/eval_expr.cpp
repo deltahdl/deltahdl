@@ -200,6 +200,19 @@ static bool TryClassPropertyAccess(Variable* base_var,
   return true;
 }
 
+// §8.5: Try class enum member access via instance (e.g., p.ERR_OVERFLOW).
+static bool TryClassEnumAccess(Variable* base_var, std::string_view field_name,
+                               SimContext& ctx, Arena& arena, Logic4Vec& out) {
+  if (!base_var) return false;
+  auto handle = base_var->value.ToUint64();
+  auto* obj = ctx.GetClassObject(handle);
+  if (!obj || !obj->type) return false;
+  auto it = obj->type->enum_members.find(std::string(field_name));
+  if (it == obj->type->enum_members.end()) return false;
+  out = MakeLogic4VecVal(arena, 32, it->second);
+  return true;
+}
+
 // §8.23: Try class scope resolution for static members.
 static bool TryStaticMemberAccess(std::string_view base_name,
                                   std::string_view field_name, SimContext& ctx,
@@ -233,6 +246,7 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
                             ctx.IsEventTriggered(base_name) ? 1u : 0u);
   }
   if (TryClassPropertyAccess(base_var, field_name, ctx, arena, out)) return out;
+  if (TryClassEnumAccess(base_var, field_name, ctx, arena, out)) return out;
   if (TryCollectionAccess(base_name, field_name, ctx, arena, out)) return out;
   if (TryEvalEnumProperty(base_name, field_name, ctx, arena, out)) return out;
   if (TryStaticMemberAccess(base_name, field_name, ctx, out)) return out;

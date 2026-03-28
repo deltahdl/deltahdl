@@ -53,6 +53,9 @@ struct ClassTypeInfo {
   // §8.10: Static property storage (class-level, shared by all instances).
   std::unordered_map<std::string, Logic4Vec> static_properties;
 
+  // §8.5: Enum members declared inside the class (name → value).
+  std::unordered_map<std::string, uint64_t> enum_members;
+
   // Look up vtable index by method name; returns -1 if not found.
   int FindVTableIndex(std::string_view mname) const;
 

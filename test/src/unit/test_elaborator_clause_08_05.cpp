@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LvalueElaboration, ClassWithPropertiesElaborates) {
+TEST(ObjectPropertyElaboration, ClassWithPropertiesElaborates) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  int command;\n"
@@ -15,7 +15,7 @@ TEST(LvalueElaboration, ClassWithPropertiesElaborates) {
              "endmodule\n"));
 }
 
-TEST(LvalueElaboration, PropertyAccessElaborates) {
+TEST(ObjectPropertyElaboration, PropertyAccessElaborates) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  int command;\n"
@@ -28,7 +28,7 @@ TEST(LvalueElaboration, PropertyAccessElaborates) {
              "endmodule\n"));
 }
 
-TEST(LvalueElaboration, VariousPropertyTypes) {
+TEST(ObjectPropertyElaboration, VariousPropertyTypes) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
              "  int i;\n"
@@ -42,7 +42,7 @@ TEST(LvalueElaboration, VariousPropertyTypes) {
              "endmodule\n"));
 }
 
-TEST(LvalueElaboration, MultiplePropertyAccess) {
+TEST(ObjectPropertyElaboration, MultiplePropertyAccess) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
              "  int header;\n"
@@ -61,13 +61,76 @@ TEST(LvalueElaboration, MultiplePropertyAccess) {
              "endmodule\n"));
 }
 
-TEST(LvalueElaboration, ParameterizedClassElaborates) {
+TEST(ObjectPropertyElaboration, ParameterizedClassElaborates) {
   EXPECT_TRUE(
       ElabOk("class vector #(parameter width = 7);\n"
              "  bit [width:0] data;\n"
              "endclass\n"
              "module m;\n"
              "  vector v;\n"
+             "endmodule\n"));
+}
+
+TEST(ObjectPropertyElaboration, PropertyReadElaborates) {
+  EXPECT_TRUE(
+      ElabOk("class Packet;\n"
+             "  int command;\n"
+             "  int address;\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    automatic int var1;\n"
+             "    Packet p;\n"
+             "    p = new;\n"
+             "    p.command = 1;\n"
+             "    p.address = 2;\n"
+             "    var1 = p.command;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(ObjectPropertyElaboration, EnumAccessViaInstanceElaborates) {
+  EXPECT_TRUE(
+      ElabOk("class Packet;\n"
+             "  typedef enum {ERR_OVERFLOW = 10, ERR_UNDERFLOW = 1123} "
+             "PCKT_TYPE;\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    Packet p;\n"
+             "    automatic int x;\n"
+             "    p = new;\n"
+             "    x = p.ERR_OVERFLOW;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(ObjectPropertyElaboration, ParameterValueAccessViaInstanceElaborates) {
+  EXPECT_TRUE(
+      ElabOk("class vector #(parameter width = 7, type T = int);\n"
+             "  T data;\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    automatic int w;\n"
+             "    vector #(3) v;\n"
+             "    v = new;\n"
+             "    w = v.width;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(ObjectPropertyElaboration, TypeParamAccessViaHandleIsIllegal) {
+  EXPECT_FALSE(
+      ElabOk("class vector #(parameter width = 7, type T = int);\n"
+             "  T data;\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    vector #(3) v;\n"
+             "    v = new;\n"
+             "    $display((v.T)'(3));\n"
+             "  end\n"
              "endmodule\n"));
 }
 

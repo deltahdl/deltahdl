@@ -69,6 +69,7 @@ static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto handle = EvalClassNew(type_name, stmt->rhs, ctx, arena);
   auto* var = ctx.FindVariable(stmt->lhs->text);
   if (var) var->value = handle;
+  ApplyClassParamOverrides(stmt->lhs->text, handle.ToUint64(), ctx, arena);
   return true;
 }
 
@@ -586,12 +587,22 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   if (class_type.empty() || !ctx.FindClassType(class_type)) return false;
   ctx.CreateVariable(stmt->var_name, 64);
   ctx.SetVariableClassType(stmt->var_name, class_type);
+  // §8.5: Store specialization value expressions for parameter access.
+  const auto& type_params = stmt->var_decl_type.type_params;
+  if (!type_params.empty()) {
+    std::vector<Expr*> exprs;
+    for (const auto& tp : type_params) {
+      exprs.push_back(tp.type_ref_expr);
+    }
+    ctx.SetVariableClassParamExprs(stmt->var_name, std::move(exprs));
+  }
   if (!stmt->var_init) return true;
   if (stmt->var_init->kind != ExprKind::kCall) return true;
   if (stmt->var_init->text != "new") return true;
   auto handle = EvalClassNew(class_type, stmt->var_init, ctx, arena);
   auto* var = ctx.FindVariable(stmt->var_name);
   if (var) var->value = handle;
+  ApplyClassParamOverrides(stmt->var_name, handle.ToUint64(), ctx, arena);
   return true;
 }
 
