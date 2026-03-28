@@ -390,23 +390,46 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   return true;
 }
 
-// §7.10: Queue indexed write (q[i] = val).
+// §7.10.1: Queue indexed write (q[i] = val).
 bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                           SimContext& ctx, Arena& /*arena*/) {
   if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
   auto* q = ctx.FindQueue(lhs->base->text);
   if (!q || !lhs->index) return false;
-  auto idx = EvalExpr(lhs->index, ctx, ctx.GetArena()).ToUint64();
-  if (idx < q->elements.size()) {
-    q->elements[idx] = rhs_val;
+  auto& arena = ctx.GetArena();
+  bool idx_xz = false;
+  auto idx = EvalQueueIndex(lhs->index, q, ctx, arena, &idx_xz);
+  // §7.10.1: x/z index — ignore write with warning.
+  if (idx_xz) {
+    ctx.GetDiag().Warning({}, "queue write index contains x/z");
     return true;
   }
-  return false;
+  auto sz = static_cast<int64_t>(q->elements.size());
+  // §7.10.1: Writing to Q[$+1] is legal — append.
+  if (idx == sz) {
+    bool has_room =
+        (q->max_size < 0) || (static_cast<int32_t>(q->elements.size()) <
+                              q->max_size);
+    if (has_room) {
+      q->elements.push_back(rhs_val);
+      q->element_ids.push_back(q->AllocateId());
+      ++q->generation;
+    }
+    return true;
+  }
+  if (idx >= 0 && idx < sz) {
+    q->elements[static_cast<size_t>(idx)] = rhs_val;
+    return true;
+  }
+  // §7.10.1: Invalid index (negative or beyond $+1) — ignore with warning.
+  ctx.GetDiag().Warning({}, "queue write index out of bounds");
+  return true;
 }
 
 // §7.10: Evaluate a queue index expression with $ = last index.
+// Sets *has_xz to true if the index contains x/z bits.
 static int64_t EvalQueueIndex(const Expr* expr, QueueObject* q, SimContext& ctx,
-                              Arena& arena) {
+                              Arena& arena, bool* has_xz = nullptr) {
   ctx.PushScope();
   auto* dv = ctx.CreateLocalVariable("$", 32);
   int64_t last =
@@ -414,6 +437,7 @@ static int64_t EvalQueueIndex(const Expr* expr, QueueObject* q, SimContext& ctx,
   dv->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(last));
   auto val = EvalExpr(expr, ctx, arena);
   ctx.PopScope();
+  if (has_xz) *has_xz = HasUnknownBits(val);
   uint64_t raw = val.ToUint64();
   if (val.width > 0 && val.width < 64) {
     uint64_t sign = uint64_t{1} << (val.width - 1);
@@ -430,11 +454,17 @@ static bool CollectFromQueueSlice(const Expr* expr, SimContext& ctx,
   if (expr->base->kind != ExprKind::kIdentifier) return false;
   auto* q = ctx.FindQueue(expr->base->text);
   if (!q) return false;
-  auto lo = EvalQueueIndex(expr->index, q, ctx, arena);
-  auto hi = EvalQueueIndex(expr->index_end, q, ctx, arena);
+  bool lo_xz = false, hi_xz = false;
+  auto lo = EvalQueueIndex(expr->index, q, ctx, arena, &lo_xz);
+  auto hi = EvalQueueIndex(expr->index_end, q, ctx, arena, &hi_xz);
+  // §7.10.1: If either bound contains x/z, yield empty queue.
+  if (lo_xz || hi_xz) return true;
+  // §7.10.1: a < 0 → same as Q[0:b].
   if (lo < 0) lo = 0;
   auto qsz = static_cast<int64_t>(q->elements.size());
+  // §7.10.1: b > $ → same as Q[a:$].
   if (hi >= qsz) hi = qsz - 1;
+  // §7.10.1: a > b → empty queue (loop simply doesn't execute).
   for (int64_t i = lo; i <= hi; ++i)
     out.push_back(q->elements[static_cast<size_t>(i)]);
   return true;

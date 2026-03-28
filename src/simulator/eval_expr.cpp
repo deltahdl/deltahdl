@@ -718,14 +718,17 @@ Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena) {
 // --- Select (bit/part) ---
 
 // §7.10: Resolve a queue index with $ = last element index.
+// Sets *has_xz to true if the index contains x/z bits.
 static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
-                                SimContext& ctx, Arena& arena) {
+                                SimContext& ctx, Arena& arena,
+                                bool* has_xz = nullptr) {
   ctx.PushScope();
   auto* dv = ctx.CreateLocalVariable("$", 32);
   uint64_t last = q->elements.empty() ? 0 : q->elements.size() - 1;
   dv->value = MakeLogic4VecVal(arena, 32, last);
   auto val = EvalExpr(idx_expr, ctx, arena);
   ctx.PopScope();
+  if (has_xz) *has_xz = HasUnknownBits(val);
   return val.ToUint64();
 }
 
@@ -735,7 +738,13 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->index_end) return false;
   auto* q = ctx.FindQueue(expr->base->text);
   if (!q) return false;
-  auto idx = ResolveQueueIdx(expr->index, q, ctx, arena);
+  // §7.10.1: x/z index returns default value (all-X).
+  bool idx_xz = false;
+  auto idx = ResolveQueueIdx(expr->index, q, ctx, arena, &idx_xz);
+  if (idx_xz) {
+    out = MakeAllX(arena, q->elem_width);
+    return true;
+  }
   out = (idx < q->elements.size()) ? q->elements[idx]
                                    : MakeAllX(arena, q->elem_width);
   return true;
