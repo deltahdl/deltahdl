@@ -345,7 +345,7 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
   }
   if (method == "pop_front") {
     if (q->elements.empty()) {
-      out = MakeLogic4VecVal(arena, q->elem_width, 0);
+      out = MakeAllX(arena, q->elem_width);
     } else {
       out = q->elements.front();
       q->elements.erase(q->elements.begin());
