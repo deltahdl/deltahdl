@@ -281,6 +281,11 @@ bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (!ExtractMethodCallParts(expr, parts)) return false;
   auto* info = ctx.FindArrayInfo(parts.var_name);
   if (!info) return false;
+  // §7.12: Specifying an iterator_argument without a with clause is illegal.
+  if (!expr->args.empty() && !expr->with_expr) {
+    ctx.GetDiag().Error({}, "iterator argument without 'with' clause");
+    return false;
+  }
   if (parts.method_name == "sort") {
     ArraySort(parts.var_name, *info, ctx, arena);
     return true;
@@ -823,16 +828,38 @@ struct LocatorCtx {
   const Expr* with_expr;
   SimContext& ctx;
   Arena& arena;
+  std::string_view iter_name = "item";
+  std::string idx_var_name = "item.index";
 };
 
-// Evaluate a with-clause predicate with 'item' bound to a value.
+// §7.12: Extract iterator_argument and index_argument names from call args.
+static LocatorCtx MakeLocatorCtx(const std::vector<Logic4Vec>& elems,
+                                 bool is_str, const Expr* expr,
+                                 SimContext& ctx, Arena& arena) {
+  std::string_view iter_name = "item";
+  std::string_view index_name = "index";
+  if (!expr->args.empty() && expr->args[0] &&
+      expr->args[0]->kind == ExprKind::kIdentifier) {
+    iter_name = expr->args[0]->text;
+  }
+  if (expr->args.size() >= 2 && expr->args[1] &&
+      expr->args[1]->kind == ExprKind::kIdentifier) {
+    index_name = expr->args[1]->text;
+  }
+  std::string idx_var = std::string(iter_name) + "." + std::string(index_name);
+  return LocatorCtx{elems,    is_str,       expr->with_expr,
+                    ctx,      arena,        iter_name,
+                    std::move(idx_var)};
+}
+
+// Evaluate a with-clause predicate with iterator bound to a value.
 static bool EvalLocatorPredicate(const LocatorCtx& lc,
                                  const Logic4Vec& item_val, size_t item_index) {
   lc.ctx.PushScope();
-  auto* item_var = lc.ctx.CreateLocalVariable("item", item_val.width);
+  auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, item_val.width);
   item_var->value = item_val;
-  if (lc.is_string) lc.ctx.RegisterStringVariable("item");
-  auto* idx_var = lc.ctx.CreateLocalVariable("item.index", 32);
+  if (lc.is_string) lc.ctx.RegisterStringVariable(lc.iter_name);
+  auto* idx_var = lc.ctx.CreateLocalVariable(lc.idx_var_name, 32);
   idx_var->value =
       MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(item_index));
   auto result = EvalExpr(lc.with_expr, lc.ctx, lc.arena).ToUint64();
@@ -886,10 +913,10 @@ static void LocatorFindIndex(std::string_view method, const LocatorCtx& lc,
 static void LocatorMap(const LocatorCtx& lc, std::vector<Logic4Vec>& out) {
   for (size_t i = 0; i < lc.elems.size(); ++i) {
     lc.ctx.PushScope();
-    auto* item_var = lc.ctx.CreateLocalVariable("item", lc.elems[i].width);
+    auto* item_var = lc.ctx.CreateLocalVariable(lc.iter_name, lc.elems[i].width);
     item_var->value = lc.elems[i];
-    if (lc.is_string) lc.ctx.RegisterStringVariable("item");
-    auto* idx_var = lc.ctx.CreateLocalVariable("item.index", 32);
+    if (lc.is_string) lc.ctx.RegisterStringVariable(lc.iter_name);
+    auto* idx_var = lc.ctx.CreateLocalVariable(lc.idx_var_name, 32);
     idx_var->value = MakeLogic4VecVal(lc.arena, 32, static_cast<uint64_t>(i));
     out.push_back(EvalExpr(lc.with_expr, lc.ctx, lc.arena));
     lc.ctx.PopScope();
@@ -956,6 +983,12 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!ExtractLocatorParts(expr, parts)) return false;
   if (!IsLocatorMethod(parts.method_name)) return false;
 
+  // §7.12: Specifying an iterator_argument without a with clause is illegal.
+  if (!expr->args.empty() && !expr->with_expr) {
+    ctx.GetDiag().Error({}, "iterator argument without 'with' clause");
+    return false;
+  }
+
   auto* info = ctx.FindArrayInfo(parts.var_name);
   if (!info) return false;
 
@@ -974,7 +1007,7 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   // All other locator methods require a with clause.
   if (!expr->with_expr) return false;
 
-  LocatorCtx lc{elems, is_str, expr->with_expr, ctx, arena};
+  LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
   if (parts.method_name == "map") {
     LocatorMap(lc, out);
   } else if (parts.method_name == "find_index" ||

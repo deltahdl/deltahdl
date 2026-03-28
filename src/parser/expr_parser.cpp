@@ -637,7 +637,21 @@ Expr* Parser::ParseIdentifierExpr() {
     return post;
   }
 
-  return ParseWithClause(result);
+  result = ParseWithClause(result);
+
+  // §7.12: Range selects and properties shall follow the with clause.
+  if (result->with_expr) {
+    while (Check(TokenKind::kDot) || Check(TokenKind::kLBracket)) {
+      if (Check(TokenKind::kDot)) {
+        result = MakeMemberAccess(result);
+        if (Check(TokenKind::kLParen)) result = ParseCallExpr(result);
+      } else {
+        result = ParseSelectExpr(result);
+      }
+    }
+  }
+
+  return result;
 }
 
 // Parse one or more named args: .name(expr) {, .name(expr)}
