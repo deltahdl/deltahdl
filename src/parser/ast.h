@@ -747,6 +747,11 @@ struct ClassMember {
   bool is_const = false;
   bool is_pure_virtual = false;  // §8.21: pure virtual method (no body)
 
+  // Constraint dynamic_override_specifiers
+  bool is_constraint_initial = false;
+  bool is_constraint_extends = false;
+  bool is_constraint_final = false;
+
   // Property fields
   DataType data_type;
   std::string_view name;

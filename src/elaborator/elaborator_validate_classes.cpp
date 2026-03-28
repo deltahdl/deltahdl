@@ -911,10 +911,18 @@ void Elaborator::ValidateAbstractClassUnimplemented(const ClassDecl* cls) {
 void Elaborator::ValidateAbstractClassRules() {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
-      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-      if (m->is_pure_virtual && m->method->is_method_final) {
-        diag_.Error(m->method->loc,
-                    "':final' shall not be specified on a pure virtual method");
+      if (m->kind == ClassMemberKind::kMethod && m->method) {
+        if (m->is_pure_virtual && m->method->is_method_final) {
+          diag_.Error(
+              m->method->loc,
+              "':final' shall not be specified on a pure virtual method");
+        }
+      } else if (m->kind == ClassMemberKind::kConstraint) {
+        if (m->is_pure_virtual && m->is_constraint_final) {
+          diag_.Error(
+              m->loc,
+              "':final' shall not be specified on a pure constraint");
+        }
       }
     }
     ValidateAbstractClassUnimplemented(cls);
@@ -967,6 +975,13 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
 // §8.26.1: Validate members of an interface class.
 void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
   for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod && m->method &&
+        (m->method->is_method_initial || m->method->is_method_extends ||
+         m->method->is_method_final)) {
+      diag_.Error(m->method->loc,
+                  "dynamic_override_specifiers shall not be used in "
+                  "an interface class");
+    }
     if (m->kind == ClassMemberKind::kMethod && !m->is_pure_virtual) {
       diag_.Error(m->method ? m->method->loc : cls->range.start,
                   std::format("interface class '{}' shall only contain "

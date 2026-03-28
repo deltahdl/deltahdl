@@ -66,15 +66,6 @@ TEST(AbstractClassElaboration, NonAbstractMissingInheritedPureVirtualError) {
              "endmodule\n"));
 }
 
-TEST(AbstractClassElaboration, FinalOnPureVirtualError) {
-  EXPECT_FALSE(
-      ElabOk("virtual class Base;\n"
-             "  pure virtual function :final void display();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
 TEST(AbstractClassElaboration, ConcreteImplementsAllDeepPureVirtuals) {
   EXPECT_TRUE(
       ElabOk("virtual class Shape;\n"

@@ -499,10 +499,17 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
   Consume();  // constraint keyword
   // Optional dynamic_override_specifiers: [:initial|:extends] [:final]
   if (Match(TokenKind::kColon)) {
-    Match(TokenKind::kKwInitial) || Match(TokenKind::kKwExtends) ||
-        Match(TokenKind::kKwFinal);
+    if (Match(TokenKind::kKwInitial)) {
+      member->is_constraint_initial = true;
+    } else if (Match(TokenKind::kKwExtends)) {
+      member->is_constraint_extends = true;
+    } else if (Match(TokenKind::kKwFinal)) {
+      member->is_constraint_final = true;
+    }
   }
-  if (Match(TokenKind::kColon)) Match(TokenKind::kKwFinal);
+  if (Match(TokenKind::kColon)) {
+    if (Match(TokenKind::kKwFinal)) member->is_constraint_final = true;
+  }
   member->name = Expect(TokenKind::kIdentifier).text;
   // §18.5.1: extern/implicit constraint declaration — no body
   if (Match(TokenKind::kSemicolon)) return member;

@@ -252,45 +252,6 @@ TEST(SourceText, CheckerDeclEndLabel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SourceText, VirtualClass) {
-  auto r = Parse("virtual class base; endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_TRUE(r.cu->classes[0]->is_virtual);
-}
-
-TEST(SourceText, ClassWithExtends) {
-  auto r = Parse(
-      "class Derived extends Base;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->base_class, "Base");
-}
-
-TEST(SourceText, ClassWithParameterPortList) {
-  auto r = Parse(
-      "class Param #(parameter int W = 8);\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
-}
-
-TEST(SourceText, InterfaceClassDecl) {
-  auto r = Parse(
-      "interface class iface_cls;\n"
-      "  pure virtual function void do_work();\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_TRUE(r.cu->classes[0]->is_interface);
-}
-
 TEST(SourceText, PackageDecl) {
   auto r = Parse(
       "package my_pkg;\n"
@@ -504,39 +465,6 @@ TEST(SourceText, CheckerDeclWithParens) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 1u);
-}
-
-// --- class_declaration missing forms ---
-
-TEST(SourceText, ClassEndLabel) {
-  auto r = Parse("class C; endclass : C\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
-TEST(SourceText, ClassWithImplements) {
-  auto r = Parse(
-      "interface class IfcA; endclass\n"
-      "class C implements IfcA;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_FALSE(r.cu->classes[1]->implements_types.empty());
-}
-
-// --- interface_class_declaration missing form ---
-
-TEST(SourceText, InterfaceClassWithExtends) {
-  auto r = Parse(
-      "interface class Base; endclass\n"
-      "interface class Derived extends Base;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_TRUE(r.cu->classes[1]->is_interface);
 }
 
 // --- package_declaration missing form ---

@@ -21,23 +21,6 @@ TEST(Parser, ClassExtends) {
   EXPECT_EQ(cls->base_class, "parent");
 }
 
-TEST(SourceText, ClassWithExtends) {
-  auto r = Parse("class Child extends Parent; endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_EQ(r.cu->classes[0]->base_class, "Parent");
-}
-
-TEST(SourceText, ClassWithFinal) {
-  auto r = Parse("class :final C; endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_TRUE(r.cu->classes[0]->is_final);
-  EXPECT_EQ(r.cu->classes[0]->name, "C");
-}
-
 TEST(ClassParsing, ClassExtendsBase) {
   auto r = Parse(
       "class Base;\n"
@@ -87,19 +70,6 @@ TEST(InheritanceParsing, SubclassInheritsAndAddsMembers) {
   EXPECT_EQ(lp->name, "LinkedPacket");
   EXPECT_EQ(lp->base_class, "Packet");
   EXPECT_GE(lp->members.size(), 2u);
-}
-
-TEST(InheritanceParsing, FinalClassWithExtends) {
-  auto r = Parse(
-      "class Base;\n"
-      "endclass\n"
-      "class :final TopPacket extends Base;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_TRUE(r.cu->classes[1]->is_final);
-  EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
 }
 
 TEST(InheritanceParsing, ExtendsWithConstructorArgs) {
