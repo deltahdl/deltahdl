@@ -151,3 +151,91 @@ TEST(LvalueElaboration, NonrangeVarLvalueElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 }
+
+TEST(LvalueElaboration, NetLvaluePartSelectContAssign) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire [7:0] a;\n"
+      "  wire [3:0] b;\n"
+      "  assign a[7:4] = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LvalueElaboration, VarLvalueIndexedPartSelectProcedural) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [15:0] x;\n"
+      "  initial x[4+:4] = 4'hF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LvalueElaboration, VarLvalueNestedConcatProcedural) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, c, d;\n"
+      "  initial {{a, b}, {c, d}} = 4'hF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LvalueElaboration, VarLvalueHierarchicalMemberProcedural) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] x; } inner_t;\n"
+      "  typedef struct packed { inner_t sub; } outer_t;\n"
+      "  outer_t o;\n"
+      "  initial o.sub.x = 8'hFF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LvalueElaboration, VarLvalueArrayElementProcedural) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] arr [4];\n"
+      "  initial arr[2] = 8'hAB;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LvalueElaboration, VarLvalueMemberAccessWithBitSelect) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial p.hi[3] = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LvalueElaboration, VarLvalueSingleElementConcatProcedural) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  initial {a} = 8'hAB;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}

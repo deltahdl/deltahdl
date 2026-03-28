@@ -59,7 +59,7 @@ static bool GateUsesDelay3(GateKind kind) {
   }
 }
 
-// §A.3.3: Check whether an expression is a valid net_lvalue.
+// §A.8.5: Check whether an expression is a valid net_lvalue.
 static bool IsNetLvalue(const Expr* e) {
   switch (e->kind) {
     case ExprKind::kIdentifier:
@@ -70,6 +70,13 @@ static bool IsNetLvalue(const Expr* e) {
       for (auto* child : e->elements)
         if (!IsNetLvalue(child)) return false;
       return true;
+    case ExprKind::kAssignmentPattern:
+      for (auto* child : e->elements)
+        if (!IsNetLvalue(child)) return false;
+      return true;
+    case ExprKind::kCast:
+      return e->lhs && e->lhs->kind == ExprKind::kAssignmentPattern &&
+             IsNetLvalue(e->lhs);
     default:
       return false;
   }

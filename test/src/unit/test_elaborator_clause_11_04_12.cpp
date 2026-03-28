@@ -149,13 +149,3 @@ TEST(BlockingAssignSim, BlockingAssignConcatRHS) {
 }
 
 }  // namespace
-TEST(VarLvalueConcatenation, VarLvalueConcatenation) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] a, b;\n"
-      "  initial {a, b} = 8'hA5;\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"a", 0xAu}, {"b", 0x5u}});
-}

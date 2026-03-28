@@ -233,4 +233,211 @@ TEST(LvalueParsing, NonrangeVarLvalueMemberAccess) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
+TEST(LvalueParsing, VarLvalueStreamingConcatRightShift) {
+  auto r = Parse(
+      "module m; logic [31:0] a, b;\n"
+      "  initial {>> {a, b}} = 64'hDEADBEEF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
+  EXPECT_EQ(stmt->lhs->op, TokenKind::kGtGt);
+  EXPECT_EQ(stmt->lhs->elements.size(), 2u);
+}
+
+TEST(LvalueParsing, VarLvalueStreamingConcatLeftShift) {
+  auto r = Parse(
+      "module m; logic [7:0] a, b;\n"
+      "  initial {<< byte {a, b}} = 16'hABCD;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
+  EXPECT_EQ(stmt->lhs->op, TokenKind::kLtLt);
+  ASSERT_NE(stmt->lhs->lhs, nullptr);
+}
+
+TEST(LvalueParsing, VarLvalueStreamingConcatWithSliceSize) {
+  auto r = Parse(
+      "module m; logic [31:0] a, b;\n"
+      "  initial {>> 8 {a}} = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
+}
+
+TEST(LvalueParsing, VarLvalueStreamingConcatNonblocking) {
+  auto r = Parse(
+      "module m; logic [7:0] x;\n"
+      "  initial {>> {x}} <= 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
+}
+
+TEST(LvalueParsing, VarLvalueStreamingConcatSingleElement) {
+  auto r = Parse(
+      "module m; logic [15:0] v;\n"
+      "  initial {<< 4 {v}} = 16'hABCD;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
+  EXPECT_EQ(stmt->lhs->elements.size(), 1u);
+}
+
+TEST(LvalueParsing, VarLvalueStreamingConcatFromStreamingRhs) {
+  auto r = Parse(
+      "module m; logic [7:0] a, b, c, d;\n"
+      "  initial {>> {a, b}} = {>> {c, d}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
+}
+
+TEST(LvalueParsing, NetLvalueAssignmentPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign '{a, b} = c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(LvalueParsing, VarLvalueAssignmentPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    '{a, b} = '{1, 2};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(LvalueParsing, VarLvalueAssignmentPatternWithIndex) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    '{a[0], b[1]} = '{1, 2};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(LvalueParsing, VarLvalueHierarchicalMember) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] x; } inner_t;\n"
+      "  typedef struct packed { inner_t sub; } outer_t;\n"
+      "  outer_t o;\n"
+      "  initial o.sub.x = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
+}
+
+TEST(LvalueParsing, VarLvalueArrayElement) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] arr [4];\n"
+      "  integer i;\n"
+      "  initial arr[i] = 8'hAB;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+}
+
+TEST(LvalueParsing, NetLvalueMemberAccess) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } s_t;\n"
+      "  wire s_t s;\n"
+      "  assign s.a = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* ca = FirstContAssign(r);
+  ASSERT_NE(ca, nullptr);
+  ASSERT_NE(ca->assign_lhs, nullptr);
+  EXPECT_EQ(ca->assign_lhs->kind, ExprKind::kMemberAccess);
+}
+
+TEST(LvalueParsing, VarLvalueSingleElementConcat) {
+  auto r = Parse(
+      "module m; logic [7:0] a;\n"
+      "  initial {a} = 8'hAB;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(stmt->lhs->elements.size(), 1u);
+}
+
+TEST(LvalueParsing, VarLvalueMemberAccessWithBitSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
+      "  pair_t p;\n"
+      "  initial p.hi[3] = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
+}
+
+TEST(LvalueParsing, VarLvalueConcatWithMemberAccess) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } s_t;\n"
+      "  s_t s;\n"
+      "  logic [3:0] x;\n"
+      "  initial {s.a, x} = 8'hFF;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(stmt->lhs->elements[0]->kind, ExprKind::kMemberAccess);
+}
+
 }  // namespace

@@ -76,27 +76,6 @@ TEST(PatternParsing, AssignmentPatternIntegerAtomType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(PatternParsing, AssignmentPatternNetLvalue) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  assign '{a, b} = c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(PatternParsing, AssignmentPatternVariableLvalue) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    '{a, b} = '{1, 2};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(PatternParsing, CaseMatchesPattern) {
   auto r = Parse(
       "module m;\n"
@@ -165,17 +144,6 @@ TEST(PatternParsing, PatternKeyDefault) {
       "module m;\n"
       "  initial begin\n"
       "    x = '{default: 0};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(PatternParsing, AssignmentPatternVariableLvalueThreeElements) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    '{a, b, c} = '{1, 2, 3};\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -977,33 +945,12 @@ TEST(PatternParsing, ConstantAssignmentPatternExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(PatternParsing, AssignmentPatternVariableLvalueWithIndex) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    '{a[0], b[1]} = '{1, 2};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(PatternParsing, PatternDotBindingInIfMatches) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
       "    if (s matches '{.a, .b}) x = a + b;\n"
       "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(AssignmentPatternParsing, AssignmentPatternNetLvalueThreeElements) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, c;\n"
-      "  assign '{a, b, c} = d;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

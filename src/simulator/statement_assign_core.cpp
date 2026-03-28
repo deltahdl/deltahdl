@@ -434,7 +434,8 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 
   auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
 
-  if (stmt->lhs->kind == ExprKind::kConcatenation) {
+  if (stmt->lhs->kind == ExprKind::kConcatenation ||
+      stmt->lhs->kind == ExprKind::kAssignmentPattern) {
     UnpackConcatLhs(stmt->lhs, rhs_val, ctx, arena);
     return StmtResult::kDone;
   }
@@ -470,7 +471,8 @@ StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
                            SimContext& ctx, Arena& arena) {
   if (!lhs) return;
-  if (lhs->kind == ExprKind::kConcatenation) {
+  if (lhs->kind == ExprKind::kConcatenation ||
+      lhs->kind == ExprKind::kAssignmentPattern) {
     UnpackConcatLhs(lhs, rhs_val, ctx, arena);
     return;
   }

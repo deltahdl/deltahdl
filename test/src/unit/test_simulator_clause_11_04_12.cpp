@@ -1,7 +1,6 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
-#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 
@@ -71,28 +70,6 @@ TEST(EvalOp, ReplicateXZPropagation) {
 
   EXPECT_EQ(result.words[0].aval, 0x99u);
   EXPECT_EQ(result.words[0].bval, 0x55u);
-}
-
-TEST(ConcatenationSim, ConcatAsLHS) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] a, b;\n"
-      "  initial {a, b} = 8'hC3;\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"a", 0xCu}, {"b", 0x3u}});
-}
-
-TEST(LvalueSim, NetLvalueConcatProcedural) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] a, b;\n"
-      "  initial {a, b} = 8'hA5;\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"a", 0xAu}, {"b", 0x5u}});
 }
 
 }  // namespace
