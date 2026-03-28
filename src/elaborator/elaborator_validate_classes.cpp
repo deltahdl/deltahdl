@@ -152,6 +152,79 @@ void Elaborator::ValidateAssocArraySlices(const ModuleDecl* decl) {
   }
 }
 
+// §7.9.4–§7.9.7: Traversal methods (first/last/next/prev) shall not be
+// called on wildcard-indexed associative arrays.
+
+static bool IsTraversalMethod(std::string_view name) {
+  return name == "first" || name == "last" || name == "next" || name == "prev";
+}
+
+static void CheckWildcardTraversalExpr(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& wildcard_names,
+    DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kCall && e->base &&
+      e->base->kind == ExprKind::kIdentifier &&
+      IsTraversalMethod(e->callee) &&
+      wildcard_names.count(e->base->text)) {
+    diag.Error(e->range.start,
+               std::format("'{}' is not allowed on wildcard associative "
+                           "array '{}'",
+                           e->callee, e->base->text));
+  }
+  CheckWildcardTraversalExpr(e->lhs, wildcard_names, diag);
+  CheckWildcardTraversalExpr(e->rhs, wildcard_names, diag);
+  CheckWildcardTraversalExpr(e->base, wildcard_names, diag);
+  CheckWildcardTraversalExpr(e->index, wildcard_names, diag);
+  CheckWildcardTraversalExpr(e->index_end, wildcard_names, diag);
+  CheckWildcardTraversalExpr(e->condition, wildcard_names, diag);
+  CheckWildcardTraversalExpr(e->true_expr, wildcard_names, diag);
+  CheckWildcardTraversalExpr(e->false_expr, wildcard_names, diag);
+  for (const auto* elem : e->elements) {
+    CheckWildcardTraversalExpr(elem, wildcard_names, diag);
+  }
+}
+
+static void WalkStmtsForWildcardTraversal(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& wildcard_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  CheckWildcardTraversalExpr(s->lhs, wildcard_names, diag);
+  CheckWildcardTraversalExpr(s->rhs, wildcard_names, diag);
+  CheckWildcardTraversalExpr(s->expr, wildcard_names, diag);
+  CheckWildcardTraversalExpr(s->condition, wildcard_names, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtsForWildcardTraversal(sub, wildcard_names, diag);
+  WalkStmtsForWildcardTraversal(s->then_branch, wildcard_names, diag);
+  WalkStmtsForWildcardTraversal(s->else_branch, wildcard_names, diag);
+  WalkStmtsForWildcardTraversal(s->body, wildcard_names, diag);
+  WalkStmtsForWildcardTraversal(s->for_body, wildcard_names, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForWildcardTraversal(ci.body, wildcard_names, diag);
+}
+
+void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> wildcard_names;
+  for (const auto& [name, info] : var_array_info_) {
+    if (info.is_assoc && info.assoc_index_type == "*")
+      wildcard_names.insert(name);
+  }
+  if (wildcard_names.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckWildcardTraversalExpr(item->assign_lhs, wildcard_names, diag_);
+      CheckWildcardTraversalExpr(item->assign_rhs, wildcard_names, diag_);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForWildcardTraversal(item->body, wildcard_names, diag_);
+    }
+  }
+}
+
 // §7.8.5: real/shortreal shall be an illegal associative array index type.
 static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds) {
   if (dtype.kind == DataTypeKind::kNamed) {

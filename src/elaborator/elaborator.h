@@ -182,6 +182,9 @@ class Elaborator {
   /// §7.4.6: Associative arrays shall not be sliced.
   void ValidateAssocArraySlices(const ModuleDecl* decl);
 
+  /// §7.9.4–§7.9.7: Traversal methods not allowed on wildcard assoc arrays.
+  void ValidateAssocWildcardTraversal(const ModuleDecl* decl);
+
   /// §7.8.5: real/shortreal as associative array index type is illegal.
   void ValidateAssocIndexType(const ModuleItem* item);
 
