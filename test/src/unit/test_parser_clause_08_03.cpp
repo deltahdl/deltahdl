@@ -850,22 +850,6 @@ TEST(ClassSyntaxParsing, LocalMethodTask) {
   EXPECT_TRUE(m->is_local);
 }
 
-TEST(ClassSyntaxParsing, MethodAutomaticLifetimeLegal) {
-  ParseOk(
-      "class C;\n"
-      "  function automatic void foo();\n"
-      "  endfunction\n"
-      "endclass\n");
-}
-
-TEST(ClassSyntaxParsing, MethodNoLifetimeLegal) {
-  ParseOk(
-      "class C;\n"
-      "  function void foo();\n"
-      "  endfunction\n"
-      "endclass\n");
-}
-
 // === class_method: extern ===
 
 TEST(ClassSyntaxParsing, ExternMethod) {

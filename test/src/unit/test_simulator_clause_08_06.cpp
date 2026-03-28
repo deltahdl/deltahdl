@@ -2,6 +2,7 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
@@ -64,6 +65,89 @@ TEST(ClassSim, MethodNotFound) {
 
   auto* resolved = obj->ResolveMethod("nonexistent");
   EXPECT_EQ(resolved, nullptr);
+}
+
+TEST(ClassSim, MethodCallReturnValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Counter;\n"
+      "  int count;\n"
+      "  function new();\n"
+      "    count = 42;\n"
+      "  endfunction\n"
+      "  function int get_count();\n"
+      "    return count;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    Counter c;\n"
+      "    c = new;\n"
+      "    result = c.get_count();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"result", 42u}});
+}
+
+TEST(ClassSim, MethodCallModifiesProperty) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Acc;\n"
+      "  int total;\n"
+      "  function new();\n"
+      "    total = 0;\n"
+      "  endfunction\n"
+      "  function void add(int v);\n"
+      "    total = total + v;\n"
+      "  endfunction\n"
+      "  function int get();\n"
+      "    return total;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    Acc a;\n"
+      "    a = new;\n"
+      "    a.add(10);\n"
+      "    a.add(7);\n"
+      "    result = a.get();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"result", 17u}});
+}
+
+TEST(ClassSim, MultipleMethodsSameObject) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Pair;\n"
+      "  int x;\n"
+      "  int y;\n"
+      "  function new();\n"
+      "    x = 3;\n"
+      "    y = 4;\n"
+      "  endfunction\n"
+      "  function int get_x();\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  function int get_y();\n"
+      "    return y;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx, ry;\n"
+      "  initial begin\n"
+      "    Pair p;\n"
+      "    p = new;\n"
+      "    rx = p.get_x();\n"
+      "    ry = p.get_y();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"rx", 3u}, {"ry", 4u}});
 }
 
 }  // namespace
