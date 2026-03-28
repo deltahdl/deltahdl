@@ -281,6 +281,7 @@ class SimContext {
   // Allocate a new class object, returning its handle ID (>0).
   uint64_t AllocateClassObject(ClassObject* obj);
   ClassObject* GetClassObject(uint64_t handle) const;
+  void DeallocateClassObject(uint64_t handle);
 
   // §8.11: `this` pointer management for method calls.
   void PushThis(ClassObject* obj);

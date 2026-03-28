@@ -455,6 +455,10 @@ ClassObject* SimContext::GetClassObject(uint64_t handle) const {
   return (it != class_objects_.end()) ? it->second : nullptr;
 }
 
+void SimContext::DeallocateClassObject(uint64_t handle) {
+  class_objects_.erase(handle);
+}
+
 void SimContext::PushThis(ClassObject* obj) { this_stack_.push_back(obj); }
 
 void SimContext::PopThis() {
