@@ -1,4 +1,3 @@
-#include "fixture_elaborator.h"
 #include "fixture_parser.h"
 
 using namespace delta;
@@ -25,57 +24,6 @@ TEST(DataTypeParsing, ClassVariableDecl) {
   ASSERT_NE(var_item, nullptr);
   EXPECT_EQ(var_item->data_type.kind, DataTypeKind::kNamed);
   EXPECT_EQ(var_item->data_type.type_name, "Packet");
-}
-
-TEST(DataTypeParsing, ClassVariableNullCheck) {
-  EXPECT_TRUE(
-      ParseOk("class C;\n"
-              "  int x;\n"
-              "endclass\n"
-              "module m;\n"
-              "  C obj;\n"
-              "  int r;\n"
-              "  initial r = (obj == null) ? 1 : 0;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, ClassVariableNew) {
-  EXPECT_TRUE(
-      ParseOk("class C;\n"
-              "  int x;\n"
-              "endclass\n"
-              "module m;\n"
-              "  C obj;\n"
-              "  initial obj = new;\n"
-              "endmodule\n"));
-}
-
-TEST(DataTypeParsing, ClassHandleAssignment) {
-  EXPECT_TRUE(
-      ParseOk("class C;\n"
-              "  int x;\n"
-              "endclass\n"
-              "module m;\n"
-              "  C a, b;\n"
-              "  initial begin\n"
-              "    a = new;\n"
-              "    b = a;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(Elaboration, ClassVariableElaboratesOk) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "class Pkt;\n"
-      "  int data;\n"
-      "endclass\n"
-      "module top;\n"
-      "  Pkt p;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

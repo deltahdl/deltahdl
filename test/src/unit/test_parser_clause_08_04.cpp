@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(DataTypeParsing, ClassVarDecl_VarType) {
+TEST(ClassObjectParsing, ClassVariableHasNamedType) {
   auto r = Parse(
       "class MyClass;\n"
       "  int x;\n"
@@ -28,7 +28,7 @@ TEST(DataTypeParsing, ClassVarDecl_VarType) {
   EXPECT_EQ(var_item->data_type.type_name, "MyClass");
 }
 
-TEST(ClassParsing, NullExpression) {
+TEST(ClassParsing, NullComparisonWithNew) {
   auto r = Parse(
       "module m;\n"
       "  class test_cls;\n"
@@ -43,7 +43,7 @@ TEST(ClassParsing, NullExpression) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(DataTypeParsing, ClassVarDecl_ClassParsed) {
+TEST(ClassObjectParsing, ClassDeclarationParsed) {
   auto r = Parse(
       "class MyClass;\n"
       "  int x;\n"
@@ -55,6 +55,43 @@ TEST(DataTypeParsing, ClassVarDecl_ClassParsed) {
   ASSERT_FALSE(r.cu->classes.empty());
   EXPECT_EQ(r.cu->classes[0]->name, "MyClass");
   ASSERT_FALSE(r.cu->modules.empty());
+}
+
+TEST(ClassParsing, ClassVariableNullCheck) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  int x;\n"
+              "endclass\n"
+              "module m;\n"
+              "  C obj;\n"
+              "  int r;\n"
+              "  initial r = (obj == null) ? 1 : 0;\n"
+              "endmodule\n"));
+}
+
+TEST(ClassParsing, ClassVariableNew) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  int x;\n"
+              "endclass\n"
+              "module m;\n"
+              "  C obj;\n"
+              "  initial obj = new;\n"
+              "endmodule\n"));
+}
+
+TEST(ClassParsing, ClassHandleAssignment) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  int x;\n"
+              "endclass\n"
+              "module m;\n"
+              "  C a, b;\n"
+              "  initial begin\n"
+              "    a = new;\n"
+              "    b = a;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 }  // namespace

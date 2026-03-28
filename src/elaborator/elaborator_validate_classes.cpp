@@ -471,9 +471,32 @@ static bool IsAllowedClassBinaryOp(TokenKind op) {
          op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq;
 }
 
+// §8.4: Check whether class type `a` is the same as or derived from `b`.
+static bool IsClassDerivedFrom(std::string_view a, std::string_view b,
+                               const CompilationUnit* unit) {
+  if (a == b) return true;
+  for (const auto* cls = FindClassDecl(a, unit);
+       cls && !cls->base_class.empty();
+       cls = FindClassDecl(cls->base_class, unit)) {
+    if (cls->base_class == b) return true;
+  }
+  return false;
+}
+
+// §8.4: One of the objects being compared shall be assignment compatible with
+// the other; for assignment, the source must be compatible with the target.
+static bool AreClassTypesComparable(
+    std::string_view type_a, std::string_view type_b,
+    const CompilationUnit* unit) {
+  return IsClassDerivedFrom(type_a, type_b, unit) ||
+         IsClassDerivedFrom(type_b, type_a, unit);
+}
+
 static void CheckClassHandleExpr(
     const Expr* e, const std::unordered_set<std::string_view>& class_vars,
-    DiagEngine& diag) {
+    const std::unordered_map<std::string_view, std::string_view>&
+        class_var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
   if (!e) return;
   // Binary: only equality operators are allowed.
   if (e->kind == ExprKind::kBinary) {
@@ -482,6 +505,20 @@ static void CheckClassHandleExpr(
     if ((lhs_class || rhs_class) && !IsAllowedClassBinaryOp(e->op)) {
       diag.Error(e->range.start,
                  "operator is not allowed on class object handles");
+    }
+    // §8.4: When both operands are class handles, check assignment
+    // compatibility.
+    if (lhs_class && rhs_class && IsAllowedClassBinaryOp(e->op)) {
+      auto lhs_name = ExprIdent(e->lhs);
+      auto rhs_name = ExprIdent(e->rhs);
+      auto lt = class_var_types.find(lhs_name);
+      auto rt = class_var_types.find(rhs_name);
+      if (lt != class_var_types.end() && rt != class_var_types.end() &&
+          !AreClassTypesComparable(lt->second, rt->second, unit)) {
+        diag.Error(e->range.start,
+                   "class handle comparison requires assignment compatible "
+                   "types");
+      }
     }
   }
   // Unary: no unary operators are allowed on class handles.
@@ -500,15 +537,15 @@ static void CheckClassHandleExpr(
     diag.Error(e->range.start, "bit-select on class object handle is illegal");
   }
   // Recurse into sub-expressions.
-  CheckClassHandleExpr(e->lhs, class_vars, diag);
-  CheckClassHandleExpr(e->rhs, class_vars, diag);
-  CheckClassHandleExpr(e->base, class_vars, diag);
-  CheckClassHandleExpr(e->index, class_vars, diag);
-  CheckClassHandleExpr(e->condition, class_vars, diag);
-  CheckClassHandleExpr(e->true_expr, class_vars, diag);
-  CheckClassHandleExpr(e->false_expr, class_vars, diag);
+  CheckClassHandleExpr(e->lhs, class_vars, class_var_types, unit, diag);
+  CheckClassHandleExpr(e->rhs, class_vars, class_var_types, unit, diag);
+  CheckClassHandleExpr(e->base, class_vars, class_var_types, unit, diag);
+  CheckClassHandleExpr(e->index, class_vars, class_var_types, unit, diag);
+  CheckClassHandleExpr(e->condition, class_vars, class_var_types, unit, diag);
+  CheckClassHandleExpr(e->true_expr, class_vars, class_var_types, unit, diag);
+  CheckClassHandleExpr(e->false_expr, class_vars, class_var_types, unit, diag);
   for (const auto* elem : e->elements) {
-    CheckClassHandleExpr(elem, class_vars, diag);
+    CheckClassHandleExpr(elem, class_vars, class_var_types, unit, diag);
   }
 }
 
@@ -523,11 +560,28 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
       diag_.Error(s->range.start,
                   "operator is not allowed on class object handles");
     }
+    // §8.4: Assignment of a class object whose class data type is assignment
+    // compatible with the target class object.
+    if (s->rhs && IsClassVar(s->rhs, class_var_names_)) {
+      auto lhs_name = ExprIdent(s->lhs);
+      auto rhs_name = ExprIdent(s->rhs);
+      auto lt = class_var_types_.find(lhs_name);
+      auto rt = class_var_types_.find(rhs_name);
+      if (lt != class_var_types_.end() && rt != class_var_types_.end() &&
+          !IsClassDerivedFrom(rt->second, lt->second, unit_)) {
+        diag_.Error(s->range.start,
+                    "class handle assignment requires assignment compatible "
+                    "types");
+      }
+    }
   }
   // Check expressions in assignments, conditions, and expression statements.
-  CheckClassHandleExpr(s->rhs, class_var_names_, diag_);
-  CheckClassHandleExpr(s->expr, class_var_names_, diag_);
-  CheckClassHandleExpr(s->condition, class_var_names_, diag_);
+  CheckClassHandleExpr(s->rhs, class_var_names_, class_var_types_, unit_,
+                       diag_);
+  CheckClassHandleExpr(s->expr, class_var_names_, class_var_types_, unit_,
+                       diag_);
+  CheckClassHandleExpr(s->condition, class_var_names_, class_var_types_, unit_,
+                       diag_);
   for (auto* sub : s->stmts) WalkStmtsForClassHandleOps(sub);
   WalkStmtsForClassHandleOps(s->then_branch);
   WalkStmtsForClassHandleOps(s->else_branch);

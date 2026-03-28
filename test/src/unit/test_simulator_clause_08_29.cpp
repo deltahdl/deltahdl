@@ -6,29 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ClassSim, MemMgmtDynamicAllocation) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "MyClass", {"x"});
-  auto [handle, obj] = MakeObj(f, type);
-  EXPECT_GT(handle, 0u);
-  EXPECT_NE(obj, nullptr);
-  EXPECT_EQ(f.ctx.GetClassObject(handle), obj);
-}
-
-TEST(ClassSim, MemMgmtUniqueHandles) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Obj", {"val"});
-  auto [h1, o1] = MakeObj(f, type);
-  auto [h2, o2] = MakeObj(f, type);
-  EXPECT_NE(h1, h2);
-  EXPECT_NE(o1, o2);
-}
-
-TEST(ClassSim, MemMgmtNullHandle) {
-  SimFixture f;
-  EXPECT_EQ(f.ctx.GetClassObject(0), nullptr);
-}
-
 TEST(ClassSim, MemMgmtPropertiesPersist) {
   SimFixture f;
   auto* type = MakeClassType(f, "Persistent", {"data"});

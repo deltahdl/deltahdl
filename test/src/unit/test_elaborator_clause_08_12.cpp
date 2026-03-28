@@ -4,30 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ClassAssignRenameElaboration, ClassVariableDeclarationOk) {
-  EXPECT_TRUE(
-      ElabOk("class Packet;\n"
-             "  int data;\n"
-             "endclass\n"
-             "module m;\n"
-             "  Packet p1;\n"
-             "endmodule\n"));
-}
-
-TEST(ClassAssignRenameElaboration, HandleAssignmentOk) {
-  EXPECT_TRUE(
-      ElabOk("class Packet;\n"
-             "  int data;\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    Packet p1, p2;\n"
-             "    p1 = new;\n"
-             "    p2 = p1;\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
 TEST(ClassAssignRenameElaboration, ShallowCopyOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"

@@ -21,18 +21,6 @@ TEST(ClassSim, HandleAssignmentSharesObject) {
   EXPECT_EQ(retrieved->GetProperty("val", f.arena).ToUint64(), 20u);
 }
 
-TEST(ClassSim, HandleNullAssignment) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Foo", {"x"});
-  auto [handle, obj] = MakeObj(f, type);
-
-  EXPECT_NE(f.ctx.GetClassObject(handle), nullptr);
-  EXPECT_EQ(f.ctx.GetClassObject(handle), obj);
-
-  uint64_t null_handle = kNullClassHandle;
-  EXPECT_EQ(f.ctx.GetClassObject(null_handle), nullptr);
-}
-
 TEST(ClassSim, ShallowCopyCreatesNewObject) {
   SimFixture f;
   auto* type = MakeClassType(f, "Packet", {"data"});
