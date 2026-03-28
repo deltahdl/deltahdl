@@ -87,7 +87,7 @@ static Logic4Vec ArraySum(std::string_view var_name, const ArrayInfo& info,
   auto vals = CollectElements(var_name, info, ctx);
   uint64_t result = 0;
   for (auto v : vals) result += v;
-  return MakeLogic4VecVal(arena, 32, result);
+  return MakeLogic4VecVal(arena, info.elem_width, result);
 }
 
 static Logic4Vec ArrayProduct(std::string_view var_name, const ArrayInfo& info,
@@ -95,7 +95,7 @@ static Logic4Vec ArrayProduct(std::string_view var_name, const ArrayInfo& info,
   auto vals = CollectElements(var_name, info, ctx);
   uint64_t result = 1;
   for (auto v : vals) result *= v;
-  return MakeLogic4VecVal(arena, 32, result);
+  return MakeLogic4VecVal(arena, info.elem_width, result);
 }
 
 static Logic4Vec ArrayAnd(std::string_view var_name, const ArrayInfo& info,
@@ -120,6 +120,51 @@ static Logic4Vec ArrayXor(std::string_view var_name, const ArrayInfo& info,
   uint64_t result = 0;
   for (auto v : vals) result ^= v;
   return MakeLogic4VecVal(arena, info.elem_width, result);
+}
+
+// Evaluate the with-clause expression for each element, then reduce.
+static Logic4Vec ReduceWithExpr(std::string_view var_name,
+                                const ArrayInfo& info, const Expr* expr,
+                                SimContext& ctx, Arena& arena) {
+  auto elems = CollectVecElements(var_name, info, ctx, arena);
+  std::string_view iter_name = "item";
+  if (!expr->args.empty() && expr->args[0] &&
+      expr->args[0]->kind == ExprKind::kIdentifier) {
+    iter_name = expr->args[0]->text;
+  }
+  // Evaluate with-clause for each element to get transformed values.
+  std::vector<uint64_t> vals;
+  vals.reserve(elems.size());
+  uint32_t result_width = 0;
+  for (size_t i = 0; i < elems.size(); ++i) {
+    ctx.PushScope();
+    auto* item_var = ctx.CreateLocalVariable(iter_name, elems[i].width);
+    item_var->value = elems[i];
+    Logic4Vec ev = EvalExpr(expr->with_expr, ctx, arena);
+    ctx.PopScope();
+    vals.push_back(ev.ToUint64());
+    if (i == 0) result_width = ev.width;
+  }
+  if (result_width == 0) result_width = info.elem_width;
+
+  // Extract method name from the call expression.
+  std::string_view method = expr->lhs->rhs->text;
+
+  uint64_t result = 0;
+  if (method == "sum") {
+    for (auto v : vals) result += v;
+  } else if (method == "product") {
+    result = 1;
+    for (auto v : vals) result *= v;
+  } else if (method == "and") {
+    result = vals.empty() ? 0 : vals[0];
+    for (size_t i = 1; i < vals.size(); ++i) result &= vals[i];
+  } else if (method == "or") {
+    for (auto v : vals) result |= v;
+  } else if (method == "xor") {
+    for (auto v : vals) result ^= v;
+  }
+  return MakeLogic4VecVal(arena, result_width, result);
 }
 
 // --- Size method ---
@@ -161,7 +206,12 @@ struct ArrayCtx {
   Arena& arena;
 };
 
-// §7.12.3: Reduction method dispatch.
+static bool IsReductionMethod(std::string_view method) {
+  return method == "sum" || method == "product" || method == "and" ||
+         method == "or" || method == "xor";
+}
+
+// §7.12.3: Reduction method dispatch (property access, no with clause).
 static bool DispatchReduction(std::string_view method, const ArrayCtx& ac,
                               Logic4Vec& out) {
   if (method == "sum") {
@@ -185,6 +235,26 @@ static bool DispatchReduction(std::string_view method, const ArrayCtx& ac,
     return true;
   }
   return false;
+}
+
+// §7.12.3: Reduction dispatch with full Expr (supports with clause).
+static bool DispatchReductionExpr(std::string_view method, const ArrayCtx& ac,
+                                  const Expr* expr, Logic4Vec& out) {
+  if (!IsReductionMethod(method)) return false;
+  if (expr->with_expr) {
+    out = ReduceWithExpr(ac.var_name, ac.info, expr, ac.ctx, ac.arena);
+  } else if (method == "sum") {
+    out = ArraySum(ac.var_name, ac.info, ac.ctx, ac.arena);
+  } else if (method == "product") {
+    out = ArrayProduct(ac.var_name, ac.info, ac.ctx, ac.arena);
+  } else if (method == "and") {
+    out = ArrayAnd(ac.var_name, ac.info, ac.ctx, ac.arena);
+  } else if (method == "or") {
+    out = ArrayOr(ac.var_name, ac.info, ac.ctx, ac.arena);
+  } else if (method == "xor") {
+    out = ArrayXor(ac.var_name, ac.info, ac.ctx, ac.arena);
+  }
+  return true;
 }
 
 // §7.12.1: Locator and query method dispatch.
@@ -212,7 +282,7 @@ bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   auto* info = ctx.FindArrayInfo(parts.var_name);
   if (!info) return false;
   ArrayCtx ac{parts.var_name, *info, ctx, arena};
-  if (DispatchReduction(parts.method_name, ac, out)) return true;
+  if (DispatchReductionExpr(parts.method_name, ac, expr, out)) return true;
   if (DispatchQuery(parts.method_name, ac, out)) return true;
   // Mutating methods return void; set out to 0 on success.
   if (TryExecArrayMethodStmt(expr, ctx, arena)) {

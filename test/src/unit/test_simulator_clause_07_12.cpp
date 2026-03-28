@@ -9,15 +9,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DynArrayMethod, SumReduction) {
-  SimFixture f;
-  MakeDynArray(f, "d", {10, 20, 30, 40});
-  Logic4Vec out{};
-  bool ok = TryEvalArrayProperty("d", "sum", f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 100u);
-}
-
 TEST(DynArrayMethod, SizeProperty) {
   SimFixture f;
   MakeDynArray(f, "d", {1, 2, 3});

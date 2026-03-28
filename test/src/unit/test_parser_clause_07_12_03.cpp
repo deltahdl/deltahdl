@@ -130,7 +130,7 @@ TEST(SubroutineCallSyntaxParsing, ArrayMethodXor) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-TEST(SubroutineCallExprParsing, ArrayManipCallSum) {
+TEST(SubroutineCallExprParsing, SumCallExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = arr.sum(); end\n"
@@ -143,7 +143,7 @@ TEST(SubroutineCallExprParsing, ArrayManipCallSum) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-TEST(SubroutineCallExprParsing, ArrayMethodNameAnd) {
+TEST(SubroutineCallExprParsing, AndCallExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = arr.and(); end\n"
@@ -152,7 +152,7 @@ TEST(SubroutineCallExprParsing, ArrayMethodNameAnd) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SubroutineCallExprParsing, ArrayMethodNameOr) {
+TEST(SubroutineCallExprParsing, OrCallExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = arr.or(); end\n"
@@ -161,10 +161,95 @@ TEST(SubroutineCallExprParsing, ArrayMethodNameOr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SubroutineCallExprParsing, ArrayMethodNameXor) {
+TEST(SubroutineCallExprParsing, XorCallExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = arr.xor(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- product() call syntax ---
+
+TEST(SubroutineCallExprParsing, ProductCallExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin x = arr.product(); end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
+}
+
+// --- with clause for each reduction method ---
+
+TEST(AggregateTypeParsing, ProductWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial x = arr.product with (item + 1);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(AggregateTypeParsing, AndWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte b[4];\n"
+      "  initial y = b.and with (item);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(AggregateTypeParsing, OrWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte b[4];\n"
+      "  initial y = b.or with (item);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(AggregateTypeParsing, XorWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  byte b[4];\n"
+      "  initial y = b.xor with (item + 4);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// --- with clause populates with_expr on AST ---
+
+TEST(AggregateTypeParsing, SumWithClausePopulatesWithExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial x = arr.sum with (item * 2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_NE(rhs->with_expr, nullptr);
+}
+
+// --- custom iterator argument ---
+
+TEST(AggregateTypeParsing, ReductionWithCustomIterator) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial x = arr.sum(x) with (x * 2);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

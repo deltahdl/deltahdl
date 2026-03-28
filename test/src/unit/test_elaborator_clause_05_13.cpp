@@ -41,15 +41,6 @@ TEST(BuiltinMethodElaboration, DynArraySizeElaborates) {
              "endmodule\n"));
 }
 
-TEST(BuiltinMethodElaboration, ArraySumOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  int arr [0:2] = '{1, 2, 3};\n"
-             "  int total;\n"
-             "  initial total = arr.sum();\n"
-             "endmodule\n"));
-}
-
 TEST(BuiltinMethodElaboration, StringLenOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

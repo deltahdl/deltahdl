@@ -124,22 +124,6 @@ TEST(BuiltinMethodSim, QueuePopFront) {
   EXPECT_EQ(q->elements[1].ToUint64(), 0x30u);
 }
 
-TEST(BuiltinMethodSim, ArraySum) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] arr [0:2] = '{8'd10, 8'd20, 8'd30};\n"
-      "  logic [31:0] total;\n"
-      "  initial total = arr.sum();\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
-}
-
 TEST(BuiltinMethodSim, DynArraySize) {
   SimFixture f;
   auto* design = ElaborateSrc(

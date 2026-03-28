@@ -73,15 +73,6 @@ TEST(BuiltinMethodParsing, QueuePopFront) {
               "endmodule\n"));
 }
 
-TEST(BuiltinMethodParsing, ReductionSum) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int arr [0:2];\n"
-              "  int total;\n"
-              "  initial total = arr.sum();\n"
-              "endmodule\n"));
-}
-
 TEST(BuiltinMethodParsing, DynArraySize) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

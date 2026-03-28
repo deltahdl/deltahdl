@@ -394,47 +394,11 @@ TEST(SubroutineCallExprParsing, ListOfArgsMixedPositionalAndNamed) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-TEST(SubroutineCallExprParsing, ArrayManipulationCallWithClause) {
-  auto r = Parse(
-      "module m;\n"
-      "  int arr[4];\n"
-      "  int s;\n"
-      "  initial s = arr.sum with (item > 0);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SubroutineCallExprParsing, ArrayMethodNameUnique) {
   auto r = Parse(
       "module m;\n"
       "  int q[$];\n"
       "  initial q = q.unique;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SubroutineCallExprParsing, ArrayMethodNameAnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] arr[4];\n"
-      "  logic [7:0] r;\n"
-      "  initial r = arr.and;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SubroutineCallExprParsing, ArrayMethodNameOrXor) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] arr[4];\n"
-      "  logic [7:0] r1, r2;\n"
-      "  initial begin\n"
-      "    r1 = arr.or;\n"
-      "    r2 = arr.xor;\n"
-      "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
