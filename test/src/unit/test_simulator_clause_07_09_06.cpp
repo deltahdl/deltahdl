@@ -31,6 +31,67 @@ TEST(AssocTraversal, NextReturnsZeroAtEnd) {
   bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
   ASSERT_TRUE(ok);
   EXPECT_EQ(out.ToUint64(), 0u);
+  EXPECT_EQ(ref->value.ToUint64(), 20u);
+}
+
+TEST(AssocTraversal, NextReturnsZeroOnEmptyArray) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  aa->index_width = 32;
+  auto* ref = f.ctx.CreateVariable("k", 32);
+  ref->value = MakeLogic4VecVal(f.arena, 32, 5);
+  Logic4Vec out{};
+  auto* call = MkAssocCall(f.arena, "aa", "next", "k");
+  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 0u);
+  EXPECT_EQ(ref->value.ToUint64(), 5u);
+}
+
+TEST(AssocTraversal, NextFindsSmallestGreaterIndex) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  aa->index_width = 32;
+  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 1);
+  aa->int_data[30] = MakeLogic4VecVal(f.arena, 32, 2);
+  aa->int_data[50] = MakeLogic4VecVal(f.arena, 32, 3);
+  auto* ref = f.ctx.CreateVariable("k", 32);
+  ref->value = MakeLogic4VecVal(f.arena, 32, 10);
+  Logic4Vec out{};
+  auto* call = MkAssocCall(f.arena, "aa", "next", "k");
+  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 1u);
+  EXPECT_EQ(ref->value.ToUint64(), 30u);
+}
+
+TEST(AssocTraversal, NextStringKeyUnchangedAtEnd) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
+  aa->str_data["apple"] = MakeLogic4VecVal(f.arena, 32, 1);
+  auto* ref = f.ctx.CreateVariable("s", 48);
+  auto v = MakeLogic4Vec(f.arena, 40);
+  v.words[0].aval = (uint64_t('a') << 32) | (uint64_t('p') << 24) |
+                    (uint64_t('p') << 16) | (uint64_t('l') << 8) |
+                    uint64_t('e');
+  ref->value = v;
+  auto saved = ref->value.ToUint64();
+  Logic4Vec out{};
+  auto* call = MkAssocCall(f.arena, "aa", "next", "s");
+  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 0u);
+  EXPECT_EQ(ref->value.ToUint64(), saved);
+}
+
+TEST(AssocTraversal, NextNoRefArgReturnsZero) {
+  SimFixture f;
+  f.ctx.CreateAssocArray("aa", 32, false);
+  Logic4Vec out{};
+  auto* call = MkAssocCallNoArg(f.arena, "aa", "next");
+  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 0u);
 }
 
 TEST(AssocTraversal, NextStringKey) {
