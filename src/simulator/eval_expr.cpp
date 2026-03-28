@@ -12,6 +12,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 
 namespace delta {
 
@@ -105,6 +106,8 @@ Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->lhs->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->lhs->text);
     if (var) var->value = new_val;
+  } else if (expr->lhs->kind == ExprKind::kSelect) {
+    TryAssocIndexedWrite(expr->lhs, new_val, ctx, arena);
   }
   return new_val;  // Return new value (prefix semantics).
 }
@@ -113,23 +116,25 @@ Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto old_val = EvalExpr(expr->lhs, ctx, arena);
+  Logic4Vec new_val;
+  if (old_val.is_real) {
+    double d = 0.0;
+    uint64_t bits = old_val.ToUint64();
+    std::memcpy(&d, &bits, sizeof(double));
+    d += (expr->op == TokenKind::kPlusPlus) ? 1.0 : -1.0;
+    std::memcpy(&bits, &d, sizeof(double));
+    new_val = MakeLogic4VecVal(arena, 64, bits);
+    new_val.is_real = true;
+  } else {
+    uint64_t v = old_val.ToUint64();
+    uint64_t nv = (expr->op == TokenKind::kPlusPlus) ? v + 1 : v - 1;
+    new_val = MakeLogic4VecVal(arena, old_val.width, nv);
+  }
   if (expr->lhs->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->lhs->text);
-    if (var) {
-      if (old_val.is_real) {
-        double d = 0.0;
-        uint64_t bits = old_val.ToUint64();
-        std::memcpy(&d, &bits, sizeof(double));
-        d += (expr->op == TokenKind::kPlusPlus) ? 1.0 : -1.0;
-        std::memcpy(&bits, &d, sizeof(double));
-        var->value = MakeLogic4VecVal(arena, 64, bits);
-        var->value.is_real = true;
-      } else {
-        uint64_t v = old_val.ToUint64();
-        uint64_t nv = (expr->op == TokenKind::kPlusPlus) ? v + 1 : v - 1;
-        var->value = MakeLogic4VecVal(arena, old_val.width, nv);
-      }
-    }
+    if (var) var->value = new_val;
+  } else if (expr->lhs->kind == ExprKind::kSelect) {
+    TryAssocIndexedWrite(expr->lhs, new_val, ctx, arena);
   }
   return old_val;  // Return original value (postfix semantics).
 }
@@ -983,6 +988,8 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->lhs->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->lhs->text);
     if (var) var->value = result;
+  } else if (expr->lhs->kind == ExprKind::kSelect) {
+    TryAssocIndexedWrite(expr->lhs, result, ctx, arena);
   }
   return result;
 }
