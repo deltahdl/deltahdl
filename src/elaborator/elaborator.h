@@ -250,6 +250,9 @@ class Elaborator {
   /// §13.5: Validate subroutine call arguments.
   void ValidateSubroutineCallArgs(const ModuleDecl* decl);
 
+  /// §7.9.10: Validate array argument type compatibility at call sites.
+  void ValidateArrayArgTypes(const ModuleDecl* decl);
+
   /// Track enum type info for a variable declaration.
   void TrackEnumVariable(const ModuleItem* item);
 

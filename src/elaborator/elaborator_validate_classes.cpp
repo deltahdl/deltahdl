@@ -110,6 +110,178 @@ void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
   }
 }
 
+// §7.9.10: Build VarArrayInfo for a formal parameter from its dimensions.
+static Elaborator::VarArrayInfo FormalArrayInfo(
+    const FunctionArg& arg,
+    const std::unordered_set<std::string_view>& class_names) {
+  Elaborator::VarArrayInfo info;
+  info.elem_type = arg.data_type.kind;
+  if (arg.unpacked_dims.empty()) return info;
+  auto* dim = arg.unpacked_dims[0];
+  if (!dim) {
+    info.is_dynamic = true;
+    return info;
+  }
+  if (dim->kind == ExprKind::kIdentifier) {
+    auto t = dim->text;
+    if (t == "$") return info;  // queue — not assoc or fixed
+    if (t == "string" || t == "int" || t == "integer" || t == "byte" ||
+        t == "shortint" || t == "longint" || t == "*") {
+      info.is_assoc = true;
+      info.assoc_index_type = t;
+      return info;
+    }
+    if (class_names.count(t) > 0) {
+      info.is_assoc = true;
+      info.assoc_index_type = t;
+      return info;
+    }
+  }
+  // Fixed-size array — set a nonzero size to distinguish from scalar.
+  info.unpacked_size = 1;
+  return info;
+}
+
+// §7.9.10: Check a single call's array argument compatibility.
+static void CheckArrayArgTypes(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const std::unordered_set<std::string_view>& class_names,
+    DiagEngine& diag) {
+  if (!expr || expr->kind != ExprKind::kCall || expr->callee.empty()) return;
+  auto it = func_decls.find(expr->callee);
+  if (it == func_decls.end()) return;
+  const auto* func = it->second;
+  size_t positional_count = expr->args.size() - expr->arg_names.size();
+  for (size_t i = 0; i < func->func_args.size(); ++i) {
+    const auto& formal = func->func_args[i];
+    auto formal_info = FormalArrayInfo(formal, class_names);
+    // Only check when formal is an array parameter.
+    if (formal.unpacked_dims.empty()) continue;
+    // Resolve actual argument.
+    int ai = -1;
+    if (expr->arg_names.empty()) {
+      ai = (i < expr->args.size()) ? static_cast<int>(i) : -1;
+    } else if (i < positional_count) {
+      ai = static_cast<int>(i);
+    } else {
+      for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+        if (expr->arg_names[j] == formal.name) {
+          ai = static_cast<int>(positional_count + j);
+          break;
+        }
+      }
+    }
+    if (ai < 0) continue;
+    auto* actual = expr->args[static_cast<size_t>(ai)];
+    if (!actual || actual->kind != ExprKind::kIdentifier) continue;
+    auto ait = var_array_info.find(actual->text);
+    if (ait == var_array_info.end()) continue;
+    const auto& actual_info = ait->second;
+    if (actual_info.is_assoc != formal_info.is_assoc) {
+      diag.Error(actual->range.start,
+                 "associative array cannot be passed to or from a "
+                 "non-associative array parameter");
+      continue;
+    }
+    if (actual_info.is_assoc && formal_info.is_assoc &&
+        actual_info.assoc_index_type != formal_info.assoc_index_type) {
+      diag.Error(actual->range.start,
+                 "associative array index type mismatch in argument");
+    }
+  }
+}
+
+// §7.9.10: Walk expressions for array argument checks.
+static void WalkExprForArrayArgTypes(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const std::unordered_set<std::string_view>& class_names,
+    DiagEngine& diag) {
+  if (!expr) return;
+  CheckArrayArgTypes(expr, func_decls, var_array_info, class_names, diag);
+  WalkExprForArrayArgTypes(expr->lhs, func_decls, var_array_info, class_names,
+                           diag);
+  WalkExprForArrayArgTypes(expr->rhs, func_decls, var_array_info, class_names,
+                           diag);
+  WalkExprForArrayArgTypes(expr->condition, func_decls, var_array_info,
+                           class_names, diag);
+  WalkExprForArrayArgTypes(expr->true_expr, func_decls, var_array_info,
+                           class_names, diag);
+  WalkExprForArrayArgTypes(expr->false_expr, func_decls, var_array_info,
+                           class_names, diag);
+  for (auto* a : expr->args)
+    WalkExprForArrayArgTypes(a, func_decls, var_array_info, class_names, diag);
+  for (auto* e : expr->elements)
+    WalkExprForArrayArgTypes(e, func_decls, var_array_info, class_names, diag);
+}
+
+// §7.9.10: Walk statements for array argument checks.
+static void WalkStmtForArrayArgTypes(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    const std::unordered_set<std::string_view>& class_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  WalkExprForArrayArgTypes(s->expr, func_decls, var_array_info, class_names,
+                           diag);
+  WalkExprForArrayArgTypes(s->lhs, func_decls, var_array_info, class_names,
+                           diag);
+  WalkExprForArrayArgTypes(s->rhs, func_decls, var_array_info, class_names,
+                           diag);
+  WalkExprForArrayArgTypes(s->condition, func_decls, var_array_info,
+                           class_names, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtForArrayArgTypes(sub, func_decls, var_array_info, class_names,
+                             diag);
+  WalkStmtForArrayArgTypes(s->then_branch, func_decls, var_array_info,
+                           class_names, diag);
+  WalkStmtForArrayArgTypes(s->else_branch, func_decls, var_array_info,
+                           class_names, diag);
+  WalkStmtForArrayArgTypes(s->body, func_decls, var_array_info, class_names,
+                           diag);
+  WalkStmtForArrayArgTypes(s->for_init, func_decls, var_array_info,
+                           class_names, diag);
+  WalkStmtForArrayArgTypes(s->for_body, func_decls, var_array_info,
+                           class_names, diag);
+  WalkStmtForArrayArgTypes(s->for_step, func_decls, var_array_info,
+                           class_names, diag);
+  WalkExprForArrayArgTypes(s->for_cond, func_decls, var_array_info,
+                           class_names, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtForArrayArgTypes(ci.body, func_decls, var_array_info, class_names,
+                             diag);
+}
+
+void Elaborator::ValidateArrayArgTypes(const ModuleDecl* decl) {
+  std::unordered_map<std::string_view, const ModuleItem*> all_decls =
+      func_decls_;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
+  }
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kFinalBlock) {
+      WalkStmtForArrayArgTypes(item->body, all_decls, var_array_info_,
+                               class_names_, diag_);
+    }
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      for (auto* s : item->func_body_stmts) {
+        WalkStmtForArrayArgTypes(s, all_decls, var_array_info_, class_names_,
+                                 diag_);
+      }
+    }
+  }
+}
+
 // §7.4.6: Detect slice expressions on associative arrays.
 static bool IsSliceSelect(const Expr* e) {
   if (!e || e->kind != ExprKind::kSelect) return false;

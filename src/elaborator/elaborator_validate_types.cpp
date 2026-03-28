@@ -34,6 +34,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateRealOperatorRestrictions(decl);
   ValidateAssignInExprRestrictions(decl);
   ValidateSubroutineCallArgs(decl);
+  ValidateArrayArgTypes(decl);
   ValidateLocalProtectedAccess(decl);
   ValidateStaticMethodBodies(decl);
   ValidateThisUsage(decl);
