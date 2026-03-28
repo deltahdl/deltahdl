@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AggregateTypeParsing, QueueSizeMethod) {
+TEST(QueueSizeParsing, QueueSizeMethod) {
   auto r = Parse(
       "module t;\n"
       "  int q[$];\n"
@@ -18,7 +18,7 @@ TEST(AggregateTypeParsing, QueueSizeMethod) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-TEST(AggregateTypeParsing, QueueMethodSize) {
+TEST(QueueSizeParsing, QueueMethodSize) {
   auto r = Parse(
       "module t;\n"
       "  int q[$];\n"

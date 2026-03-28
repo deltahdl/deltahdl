@@ -55,27 +55,7 @@ TEST(QueueMethodDispatch, PropertyReturnsFalseForUnknownProperty) {
   EXPECT_FALSE(TryEvalQueueProperty("q", "nonexistent", f.ctx, f.arena, out));
 }
 
-// --- Child-subclause tests (§7.10.2.1–§7.10.2.7) below ---
-
-TEST(QueueMethods, SizeReturnsCount) {
-  SimFixture f;
-  MakeQueue(f, "q", {10, 20, 30});
-  Logic4Vec out{};
-  auto* call = MakeMethodCall(f.arena, "q", "size", {});
-  bool ok = TryEvalQueueMethodCall(call, f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 3u);
-}
-
-TEST(QueueMethods, SizeReturnsZeroForEmpty) {
-  SimFixture f;
-  f.ctx.CreateQueue("q", 32);
-  Logic4Vec out{};
-  auto* call = MakeMethodCall(f.arena, "q", "size", {});
-  bool ok = TryEvalQueueMethodCall(call, f.ctx, f.arena, out);
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(out.ToUint64(), 0u);
-}
+// --- Child-subclause tests (§7.10.2.2–§7.10.2.7) below ---
 
 TEST(QueueMethods, InsertAtIndex) {
   SimFixture f;

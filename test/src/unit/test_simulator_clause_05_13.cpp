@@ -206,27 +206,6 @@ TEST(BuiltinMethodSim, StringLen) {
   EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 5u);
 }
 
-TEST(BuiltinMethodSim, QueueSizeNoParens) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] q [$];\n"
-      "  logic [31:0] s;\n"
-      "  initial begin\n"
-      "    q.push_back(8'h01);\n"
-      "    q.push_back(8'h02);\n"
-      "    q.push_back(8'h03);\n"
-      "    s = q.size;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 3u);
-}
-
 TEST(BuiltinMethodSim, EnumNum) {
   SimFixture f;
   auto* design = ElaborateSrc(

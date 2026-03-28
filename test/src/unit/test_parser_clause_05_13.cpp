@@ -107,24 +107,6 @@ TEST(BuiltinMethodParsing, DynArraySize) {
               "endmodule\n"));
 }
 
-TEST(BuiltinMethodParsing, QueueSizeWithParens) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  int q[$];\n"
-              "  int sz;\n"
-              "  initial sz = q.size();\n"
-              "endmodule\n"));
-}
-
-TEST(BuiltinMethodParsing, QueueSizeWithoutParens) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  int q[$];\n"
-              "  int sz;\n"
-              "  initial sz = q.size;\n"
-              "endmodule\n"));
-}
-
 TEST(BuiltinMethodParsing, StringMethodParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

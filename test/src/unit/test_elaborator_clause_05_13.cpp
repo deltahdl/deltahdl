@@ -32,15 +32,6 @@ TEST(BuiltinMethodElaboration, QueuePushBackOk) {
              "endmodule\n"));
 }
 
-TEST(BuiltinMethodElaboration, QueueSizeElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  int q [$];\n"
-             "  int sz;\n"
-             "  initial sz = q.size();\n"
-             "endmodule\n"));
-}
-
 TEST(BuiltinMethodElaboration, DynArraySizeElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -73,15 +64,6 @@ TEST(BuiltinMethodElaboration, StringLenOk) {
              "  string s;\n"
              "  int n;\n"
              "  initial n = s.len();\n"
-             "endmodule\n"));
-}
-
-TEST(BuiltinMethodElaboration, QueueSizeNoParensOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  int q [$];\n"
-             "  int sz;\n"
-             "  initial sz = q.size;\n"
              "endmodule\n"));
 }
 
