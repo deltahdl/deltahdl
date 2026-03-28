@@ -419,8 +419,11 @@ static bool DispatchQueueDelete(std::string_view method, QueueObject* q,
                                 Arena& arena) {
   if (method != "delete") return false;
   if (!expr->args.empty()) {
-    auto idx =
-        static_cast<size_t>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
+    auto idx_val = EvalExpr(expr->args[0], ctx, arena);
+    if (!idx_val.IsKnown()) return true;
+    auto raw = static_cast<int64_t>(idx_val.ToUint64());
+    if (idx_val.is_signed && raw < 0) return true;
+    auto idx = static_cast<size_t>(raw);
     if (idx < q->elements.size()) {
       q->elements.erase(q->elements.begin() + static_cast<ptrdiff_t>(idx));
       if (idx < q->element_ids.size())
