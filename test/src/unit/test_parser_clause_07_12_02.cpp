@@ -75,6 +75,59 @@ TEST(AggregateTypeParsing, ArraySortWithClause) {
 
   auto* expr = stmt->expr;
   ASSERT_NE(expr, nullptr);
+  EXPECT_NE(expr->with_expr, nullptr);
+}
+
+TEST(AggregateTypeParsing, ArrayRsortWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial arr.rsort with (item.y);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+
+  auto* expr = stmt->expr;
+  ASSERT_NE(expr, nullptr);
+  EXPECT_NE(expr->with_expr, nullptr);
+}
+
+TEST(AggregateTypeParsing, ArraySortMethodCallWithParens) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial arr.sort();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+TEST(AggregateTypeParsing, ArrayRsortMethodCallWithParens) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[4];\n"
+      "  initial arr.rsort();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+TEST(AggregateTypeParsing, ArraySortWithIteratorAndWithClause) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial arr.sort(x) with ({x.blue, x.green});\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+
+  auto* expr = stmt->expr;
+  ASSERT_NE(expr, nullptr);
+  EXPECT_NE(expr->with_expr, nullptr);
 }
 
 TEST(AggregateTypeParsing, ArrayMethodReverse) {

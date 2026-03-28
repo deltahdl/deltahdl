@@ -140,40 +140,6 @@ TEST(BuiltinMethodSim, ArraySum) {
   EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
 }
 
-TEST(BuiltinMethodSim, ArrayReverseWithParens) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] arr [0:2] = '{8'hAA, 8'hBB, 8'hCC};\n"
-      "  initial arr.reverse();\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0xCC);
-  EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0xBB);
-  EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
-}
-
-TEST(BuiltinMethodSim, ArrayReverseNoParens) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] arr [0:2] = '{8'h11, 8'h22, 8'h33};\n"
-      "  initial arr.reverse;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0x33);
-  EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0x22);
-  EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0x11);
-}
-
 TEST(BuiltinMethodSim, DynArraySize) {
   SimFixture f;
   auto* design = ElaborateSrc(

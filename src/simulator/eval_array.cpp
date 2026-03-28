@@ -224,6 +224,46 @@ bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
 // --- Mutating methods (§7.12.2) ---
 
+static uint64_t EvalSortKey(const Expr* with_expr, std::string_view iter_name,
+                            const Logic4Vec& elem, size_t index,
+                            SimContext& ctx, Arena& arena) {
+  ctx.PushScope();
+  auto* item_var = ctx.CreateLocalVariable(iter_name, elem.width);
+  item_var->value = elem;
+  auto* idx_var =
+      ctx.CreateLocalVariable(std::string(iter_name) + ".index", 32);
+  idx_var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(index));
+  uint64_t key = EvalExpr(with_expr, ctx, arena).ToUint64();
+  ctx.PopScope();
+  return key;
+}
+
+static void ArraySortWithExpr(std::string_view var_name, const ArrayInfo& info,
+                              const Expr* expr, bool ascending,
+                              SimContext& ctx, Arena& arena) {
+  auto vals = CollectVecElements(var_name, info, ctx, arena);
+  std::string_view iter_name = "item";
+  if (!expr->args.empty() && expr->args[0] &&
+      expr->args[0]->kind == ExprKind::kIdentifier) {
+    iter_name = expr->args[0]->text;
+  }
+  // Compute sort keys for each element.
+  std::vector<std::pair<uint64_t, size_t>> keys(vals.size());
+  for (size_t i = 0; i < vals.size(); ++i) {
+    keys[i] = {EvalSortKey(expr->with_expr, iter_name, vals[i], i, ctx, arena),
+               i};
+  }
+  if (ascending) {
+    std::sort(keys.begin(), keys.end());
+  } else {
+    std::sort(keys.begin(), keys.end(),
+              [](const auto& a, const auto& b) { return a.first > b.first; });
+  }
+  std::vector<Logic4Vec> sorted(vals.size());
+  for (size_t i = 0; i < keys.size(); ++i) sorted[i] = vals[keys[i].second];
+  WriteVecElements(var_name, info, sorted, ctx);
+}
+
 static void ArraySort(std::string_view var_name, const ArrayInfo& info,
                       SimContext& ctx, Arena& arena) {
   auto vals = CollectElements(var_name, info, ctx);
@@ -276,22 +316,42 @@ static void ArrayShuffle(std::string_view var_name, const ArrayInfo& info,
   WriteElements(var_name, info, vals, ctx, arena);
 }
 
+static bool IsOrderingMethod(std::string_view name) {
+  return name == "sort" || name == "rsort" || name == "reverse" ||
+         name == "shuffle";
+}
+
 bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
   MethodCallParts parts;
   if (!ExtractMethodCallParts(expr, parts)) return false;
   auto* info = ctx.FindArrayInfo(parts.var_name);
   if (!info) return false;
+  if (!IsOrderingMethod(parts.method_name)) return false;
   // §7.12: Specifying an iterator_argument without a with clause is illegal.
   if (!expr->args.empty() && !expr->with_expr) {
     ctx.GetDiag().Error({}, "iterator argument without 'with' clause");
     return false;
   }
+  // §7.12.2: reverse/shuffle with a with clause shall be a compiler error.
+  if ((parts.method_name == "reverse" || parts.method_name == "shuffle") &&
+      expr->with_expr) {
+    ctx.GetDiag().Error(
+        {}, "'" + std::string(parts.method_name) +
+                "' does not accept a 'with' clause");
+    return true;
+  }
   if (parts.method_name == "sort") {
-    ArraySort(parts.var_name, *info, ctx, arena);
+    if (expr->with_expr)
+      ArraySortWithExpr(parts.var_name, *info, expr, true, ctx, arena);
+    else
+      ArraySort(parts.var_name, *info, ctx, arena);
     return true;
   }
   if (parts.method_name == "rsort") {
-    ArrayRsort(parts.var_name, *info, ctx, arena);
+    if (expr->with_expr)
+      ArraySortWithExpr(parts.var_name, *info, expr, false, ctx, arena);
+    else
+      ArrayRsort(parts.var_name, *info, ctx, arena);
     return true;
   }
   if (parts.method_name == "reverse") {

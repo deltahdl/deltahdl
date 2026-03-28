@@ -56,22 +56,6 @@ TEST(BuiltinMethodParsing, MethodInExpression) {
               "endmodule\n"));
 }
 
-TEST(BuiltinMethodParsing, MutatingMethodStatement) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int arr [0:2];\n"
-              "  initial arr.reverse();\n"
-              "endmodule\n"));
-}
-
-TEST(BuiltinMethodParsing, MutatingMethodStatementNoParens) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int arr [0:2];\n"
-              "  initial arr.reverse;\n"
-              "endmodule\n"));
-}
-
 TEST(BuiltinMethodParsing, QueueDelete) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

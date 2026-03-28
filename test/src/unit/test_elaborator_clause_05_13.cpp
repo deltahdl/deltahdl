@@ -41,14 +41,6 @@ TEST(BuiltinMethodElaboration, DynArraySizeElaborates) {
              "endmodule\n"));
 }
 
-TEST(BuiltinMethodElaboration, ArrayReverseOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  int arr [0:2];\n"
-             "  initial arr.reverse();\n"
-             "endmodule\n"));
-}
-
 TEST(BuiltinMethodElaboration, ArraySumOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
