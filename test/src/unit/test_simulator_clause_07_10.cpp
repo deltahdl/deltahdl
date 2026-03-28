@@ -22,4 +22,18 @@ TEST(QueueAccess, OutOfBoundsReturnsX) {
   EXPECT_FALSE(oob_result.IsKnown());
 }
 
+TEST(QueueAccess, DefaultInitializationIsEmpty) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->elements.size(), 0u);
+}
+
 }  // namespace

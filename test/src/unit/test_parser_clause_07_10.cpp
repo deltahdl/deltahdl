@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DeclarationAssignmentParsing, VarDeclAssignmentQueueDim) {
+TEST(QueueDeclarationParsing, UnboundedQueueParsesAsVarDecl) {
   auto r = Parse("module m; int q [$]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -14,7 +14,7 @@ TEST(DeclarationAssignmentParsing, VarDeclAssignmentQueueDim) {
   EXPECT_EQ(item->name, "q");
 }
 
-TEST(DeclarationRangeParsing, VarDimAllFourAlternatives) {
+TEST(QueueDeclarationParsing, VarDimAllFourAlternatives) {
   auto r = Parse(
       "module m;\n"
       "  int d [];       \n"
@@ -41,7 +41,7 @@ TEST(DeclarationRangeParsing, VarDimAllFourAlternatives) {
   EXPECT_EQ(items[3]->unpacked_dims[0]->text, "$");
 }
 
-TEST(DeclarationRangeParsing, QueueDimUnbounded) {
+TEST(QueueDeclarationParsing, QueueDimUnbounded) {
   auto r = Parse("module m; int q [$]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -52,18 +52,7 @@ TEST(DeclarationRangeParsing, QueueDimUnbounded) {
   EXPECT_EQ(item->unpacked_dims[0]->rhs, nullptr);
 }
 
-TEST(AggregateTypeParsing, QueueDeclaration) {
-  auto r = Parse(
-      "module t;\n"
-      "  int q[$];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "q");
-}
-
-TEST(AggregateTypeParsing, QueueWithInitializer) {
+TEST(QueueDeclarationParsing, QueueWithInitializer) {
   auto r = Parse(
       "module t;\n"
       "  integer Q[$] = '{3, 2, 7};\n"
@@ -75,19 +64,7 @@ TEST(AggregateTypeParsing, QueueWithInitializer) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(AggregateTypeParsing, QueueUnbounded) {
-  auto r = Parse(
-      "module t;\n"
-      "  byte q[$];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "q");
-  EXPECT_FALSE(item->unpacked_dims.empty());
-}
-
-TEST(AggregateTypeParsing, QueueOfStrings) {
+TEST(QueueDeclarationParsing, QueueOfStrings) {
   auto r = Parse(
       "module t;\n"
       "  string names[$] = '{\"Bob\"};\n"
@@ -99,10 +76,43 @@ TEST(AggregateTypeParsing, QueueOfStrings) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(DynamicArrayAndQueueParsing, QueueDecl) {
+TEST(QueueDeclarationParsing, QueueDimBounded) {
+  auto r = Parse("module m; int q [$:100]; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->unpacked_dims.size(), 1u);
+  ASSERT_NE(item->unpacked_dims[0], nullptr);
+  EXPECT_EQ(item->unpacked_dims[0]->text, "$");
+  ASSERT_NE(item->unpacked_dims[0]->rhs, nullptr);
+}
+
+TEST(QueueDeclarationParsing, QueueWithBound) {
+  auto r = Parse(
+      "module t;\n"
+      "  bit q2[$:255];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "q2");
+}
+TEST(QueueDeclarationParsing, QueueBounded) {
+  auto r = Parse(
+      "module t;\n"
+      "  bit q2[$:255];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->name, "q2");
+  EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
+TEST(QueueDeclarationParsing, QueueWithMaxSize) {
   auto r = Parse(
       "module m;\n"
-      "  int q[$];\n"
+      "  int q[$:255];\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

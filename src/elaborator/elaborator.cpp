@@ -612,12 +612,19 @@ static void InferDynArraySize(const std::vector<Expr*>& dims, const Expr* init,
 
 // §7.4: Extract unpacked array size from dimension expressions.
 // §7.10: Detect queue [$] or [$:N].
-static bool TryParseQueueDim(const Expr* dim, RtlirVariable& var) {
+static bool TryParseQueueDim(const Expr* dim, RtlirVariable& var,
+                             DiagEngine& diag, SourceLoc loc) {
   if (dim->kind != ExprKind::kIdentifier || dim->text != "$") return false;
   var.is_queue = true;
   if (dim->rhs) {
     auto max_val = ConstEvalInt(dim->rhs);
-    if (max_val) var.queue_max_size = static_cast<int32_t>(*max_val + 1);
+    if (max_val) {
+      if (*max_val <= 0) {
+        diag.Error(loc, "queue bound must be a positive integer");
+      } else {
+        var.queue_max_size = static_cast<int32_t>(*max_val + 1);
+      }
+    }
   }
   return true;
 }
@@ -670,10 +677,11 @@ static bool IsUserDefinedType(
 static void ComputeUnpackedDims(
     const std::vector<Expr*>& dims, RtlirVariable& var,
     const TypedefMap& typedefs,
-    const std::unordered_set<std::string_view>& class_names) {
+    const std::unordered_set<std::string_view>& class_names,
+    DiagEngine& diag, SourceLoc loc) {
   if (dims.empty() || !dims[0]) return;
   auto* dim = dims[0];
-  if (TryParseQueueDim(dim, var)) return;
+  if (TryParseQueueDim(dim, var, diag, loc)) return;
   if (TryParseAssocDim(dim, var)) return;
   // §7.8.3/§7.8.5: User-defined type (class, struct, enum) as assoc index.
   if (dim->kind == ExprKind::kIdentifier &&
@@ -945,7 +953,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.19/§6.24.2: Track enum type for $cast validation.
   SetEnumTypeInfo(item, var, typedefs_, arena_);
   // §7.4/§7.5: Compute unpacked array element count.
-  ComputeUnpackedDims(item->unpacked_dims, var, typedefs_, class_names_);
+  ComputeUnpackedDims(item->unpacked_dims, var, typedefs_, class_names_,
+                      diag_, item->loc);
   ValidateUnpackedDimRange(item->unpacked_dims, item->loc);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
   // §7.6/§7.9.9: Track array info for assignment compatibility.
