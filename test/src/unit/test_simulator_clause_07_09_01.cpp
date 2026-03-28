@@ -41,4 +41,35 @@ TEST(AssocMethods, NumReturnsZeroForEmpty) {
   EXPECT_EQ(out.ToUint64(), 0u);
 }
 
+TEST(AssocMethods, SizeReturnsZeroForEmpty) {
+  SimFixture f;
+  f.ctx.CreateAssocArray("aa", 32, true);
+  Logic4Vec out{};
+  auto* call = MkAssocCallNoArg(f.arena, "aa", "size");
+  bool ok = TryEvalAssocMethodCall(call, f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 0u);
+}
+
+TEST(AssocMethods, NumPropertySyntaxReturnsCount) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
+  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 1);
+  aa->int_data[20] = MakeLogic4VecVal(f.arena, 32, 2);
+  Logic4Vec out{};
+  bool ok = TryEvalAssocProperty("aa", "num", f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 2u);
+}
+
+TEST(AssocMethods, SizePropertySyntaxReturnsCount) {
+  SimFixture f;
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, true);
+  aa->str_data["a"] = MakeLogic4VecVal(f.arena, 32, 1);
+  Logic4Vec out{};
+  bool ok = TryEvalAssocProperty("aa", "size", f.ctx, f.arena, out);
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(out.ToUint64(), 1u);
+}
+
 }  // namespace

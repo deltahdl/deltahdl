@@ -76,15 +76,6 @@ TEST(BuiltinMethodElaboration, StringLenOk) {
              "endmodule\n"));
 }
 
-TEST(BuiltinMethodElaboration, AssocArrayNumOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  int assoc [string];\n"
-             "  int n;\n"
-             "  initial n = assoc.num();\n"
-             "endmodule\n"));
-}
-
 TEST(BuiltinMethodElaboration, QueueSizeNoParensOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

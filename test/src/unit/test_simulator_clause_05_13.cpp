@@ -206,26 +206,6 @@ TEST(BuiltinMethodSim, StringLen) {
   EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 5u);
 }
 
-TEST(BuiltinMethodSim, AssocArrayNum) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int assoc [string];\n"
-      "  logic [31:0] n;\n"
-      "  initial begin\n"
-      "    assoc[\"a\"] = 1;\n"
-      "    assoc[\"b\"] = 2;\n"
-      "    n = assoc.num();\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("n")->value.ToUint64(), 2u);
-}
-
 TEST(BuiltinMethodSim, QueueSizeNoParens) {
   SimFixture f;
   auto* design = ElaborateSrc(
