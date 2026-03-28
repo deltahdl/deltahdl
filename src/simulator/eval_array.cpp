@@ -384,13 +384,14 @@ static bool DispatchQueuePush(std::string_view method, QueueObject* q,
   }
   if (method == "push_front" && !expr->args.empty()) {
     auto val = EvalExpr(expr->args[0], ctx, arena);
-    bool has_room = (q->max_size < 0) ||
-                    (static_cast<int32_t>(q->elements.size()) < q->max_size);
-    if (has_room) {
-      q->elements.insert(q->elements.begin(), val);
-      q->element_ids.insert(q->element_ids.begin(), q->AllocateId());
-      ++q->generation;
+    q->elements.insert(q->elements.begin(), val);
+    q->element_ids.insert(q->element_ids.begin(), q->AllocateId());
+    if (q->max_size > 0 &&
+        static_cast<int32_t>(q->elements.size()) > q->max_size) {
+      q->elements.pop_back();
+      q->element_ids.pop_back();
     }
+    ++q->generation;
     return true;
   }
   if (method == "insert" && expr->args.size() >= 2) {
@@ -406,6 +407,11 @@ static bool DispatchQueuePush(std::string_view method, QueueObject* q,
       q->element_ids.insert(
           q->element_ids.begin() + static_cast<ptrdiff_t>(idx),
           q->AllocateId());
+      if (q->max_size > 0 &&
+          static_cast<int32_t>(q->elements.size()) > q->max_size) {
+        q->elements.pop_back();
+        q->element_ids.pop_back();
+      }
       ++q->generation;
     }
     return true;
