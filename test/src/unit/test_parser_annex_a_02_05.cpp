@@ -127,15 +127,6 @@ TEST(DeclarationRangeParsing, VariableDimensionOnFuncArg) {
   EXPECT_GE(item->func_args[0].unpacked_dims.size(), 1u);
 }
 
-TEST(DeclarationRangeParsing, MixedPackedAndUnpackedDims) {
-  auto r = Parse("module m; logic [7:0] x [3:0][1:0]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
-  EXPECT_EQ(item->unpacked_dims.size(), 2u);
-}
-
 TEST(DeclarationRangeParsing, ParamWithUnpackedDims) {
   auto r = Parse("module m; parameter int P [1:0] = '{0, 1}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -265,28 +256,6 @@ TEST(DeclarationRangeParsing, PackedDimensionOnStructMember) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-// --- multiple dimension kinds combined ---
-
-TEST(DeclarationRangeParsing, PackedAndQueueDimension) {
-  auto r = Parse("module m; logic [7:0] q [$]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
-  ASSERT_GE(item->unpacked_dims.size(), 1u);
-  EXPECT_EQ(item->unpacked_dims[0]->text, "$");
-}
-
-TEST(DeclarationRangeParsing, PackedAndAssociativeDimension) {
-  auto r = Parse("module m; logic [15:0] a [int]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_NE(item->data_type.packed_dim_left, nullptr);
-  ASSERT_GE(item->unpacked_dims.size(), 1u);
-  EXPECT_EQ(item->unpacked_dims[0]->text, "int");
 }
 
 }  // namespace

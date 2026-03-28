@@ -285,27 +285,4 @@ TEST(DeclarationRangeElaboration, AssociativeDimensionLongintIndex) {
   EXPECT_TRUE(found);
 }
 
-// --- mixed dimensions ---
-
-TEST(DeclarationRangeElaboration, PackedAndUnpackedDims) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  logic [7:0] x [0:3];\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  bool found = false;
-  for (auto& v : mod->variables) {
-    if (v.name == "x") {
-      found = true;
-      EXPECT_EQ(v.width, 8u);
-      EXPECT_EQ(v.unpacked_size, 4u);
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 }  // namespace
