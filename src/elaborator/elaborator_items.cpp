@@ -196,6 +196,8 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     }
   }
   mod->params.push_back(pd);
+  // §6.20: Constants are named data objects that never change.
+  const_names_.insert(item->name);
 }
 
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
@@ -254,6 +256,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kSpecparam:
       specparam_names_.insert(item->name);
+      const_names_.insert(item->name);
       ElaborateSpecparam(item, mod);
       break;
     case ModuleItemKind::kAlias: {
@@ -426,6 +429,10 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   clocking_signals_.clear();
   task_names_.clear();
   func_decls_.clear();
+  // §6.20: Parameter port list names are constants that never change.
+  for (const auto& [pname, pval] : decl->params) {
+    const_names_.insert(pname);
+  }
   // §13.2: Collect task names so function body validation can detect task
   // enables. §13.4.3: Collect function declarations for constant function
   // validation.

@@ -285,7 +285,7 @@ void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
   }
 }
 
-// --- §6.20.6: Const assignment validation ---
+// --- §6.20: Constant assignment validation ---
 
 void Elaborator::WalkStmtsForConstAssign(const Stmt* s) {
   if (!s) return;
@@ -295,7 +295,7 @@ void Elaborator::WalkStmtsForConstAssign(const Stmt* s) {
       if (const_names_.count(s->lhs->text)) {
         diag_.Error(
             s->range.start,
-            std::format("assignment to const variable '{}'", s->lhs->text));
+            std::format("assignment to constant '{}'", s->lhs->text));
       }
     }
   }
