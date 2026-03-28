@@ -128,10 +128,17 @@ static Logic4Vec ReduceWithExpr(std::string_view var_name,
                                 SimContext& ctx, Arena& arena) {
   auto elems = CollectVecElements(var_name, info, ctx, arena);
   std::string_view iter_name = "item";
+  std::string_view index_name = "index";
   if (!expr->args.empty() && expr->args[0] &&
       expr->args[0]->kind == ExprKind::kIdentifier) {
     iter_name = expr->args[0]->text;
   }
+  if (expr->args.size() >= 2 && expr->args[1] &&
+      expr->args[1]->kind == ExprKind::kIdentifier) {
+    index_name = expr->args[1]->text;
+  }
+  std::string idx_var_name =
+      std::string(iter_name) + "." + std::string(index_name);
   // Evaluate with-clause for each element to get transformed values.
   std::vector<uint64_t> vals;
   vals.reserve(elems.size());
@@ -140,6 +147,9 @@ static Logic4Vec ReduceWithExpr(std::string_view var_name,
     ctx.PushScope();
     auto* item_var = ctx.CreateLocalVariable(iter_name, elems[i].width);
     item_var->value = elems[i];
+    auto* idx_var = ctx.CreateLocalVariable(idx_var_name, 32);
+    idx_var->value =
+        MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(i));
     Logic4Vec ev = EvalExpr(expr->with_expr, ctx, arena);
     ctx.PopScope();
     vals.push_back(ev.ToUint64());
@@ -295,13 +305,13 @@ bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 // --- Mutating methods (§7.12.2) ---
 
 static uint64_t EvalSortKey(const Expr* with_expr, std::string_view iter_name,
+                            const std::string& idx_var_name,
                             const Logic4Vec& elem, size_t index,
                             SimContext& ctx, Arena& arena) {
   ctx.PushScope();
   auto* item_var = ctx.CreateLocalVariable(iter_name, elem.width);
   item_var->value = elem;
-  auto* idx_var =
-      ctx.CreateLocalVariable(std::string(iter_name) + ".index", 32);
+  auto* idx_var = ctx.CreateLocalVariable(idx_var_name, 32);
   idx_var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(index));
   uint64_t key = EvalExpr(with_expr, ctx, arena).ToUint64();
   ctx.PopScope();
@@ -313,14 +323,22 @@ static void ArraySortWithExpr(std::string_view var_name, const ArrayInfo& info,
                               SimContext& ctx, Arena& arena) {
   auto vals = CollectVecElements(var_name, info, ctx, arena);
   std::string_view iter_name = "item";
+  std::string_view index_name = "index";
   if (!expr->args.empty() && expr->args[0] &&
       expr->args[0]->kind == ExprKind::kIdentifier) {
     iter_name = expr->args[0]->text;
   }
+  if (expr->args.size() >= 2 && expr->args[1] &&
+      expr->args[1]->kind == ExprKind::kIdentifier) {
+    index_name = expr->args[1]->text;
+  }
+  std::string idx_var_name =
+      std::string(iter_name) + "." + std::string(index_name);
   // Compute sort keys for each element.
   std::vector<std::pair<uint64_t, size_t>> keys(vals.size());
   for (size_t i = 0; i < vals.size(); ++i) {
-    keys[i] = {EvalSortKey(expr->with_expr, iter_name, vals[i], i, ctx, arena),
+    keys[i] = {EvalSortKey(expr->with_expr, iter_name, idx_var_name, vals[i], i,
+                           ctx, arena),
                i};
   }
   if (ascending) {
