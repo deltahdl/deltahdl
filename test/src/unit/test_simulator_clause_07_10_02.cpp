@@ -55,28 +55,7 @@ TEST(QueueMethodDispatch, PropertyReturnsFalseForUnknownProperty) {
   EXPECT_FALSE(TryEvalQueueProperty("q", "nonexistent", f.ctx, f.arena, out));
 }
 
-// --- Child-subclause tests (§7.10.2.2–§7.10.2.7) below ---
-
-TEST(QueueMethods, InsertAtIndex) {
-  SimFixture f;
-  auto* q = MakeQueue(f, "q", {10, 30});
-  auto* call = MakeMethodCall(f.arena, "q", "insert",
-                              {MakeInt(f.arena, 1), MakeInt(f.arena, 20)});
-  TryExecQueueMethodStmt(call, f.ctx, f.arena);
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
-}
-
-TEST(QueueMethods, InsertOutOfRangeIsNoop) {
-  SimFixture f;
-  auto* q = MakeQueue(f, "q", {10, 20});
-  auto* call = MakeMethodCall(f.arena, "q", "insert",
-                              {MakeInt(f.arena, 100), MakeInt(f.arena, 99)});
-  TryExecQueueMethodStmt(call, f.ctx, f.arena);
-  EXPECT_EQ(q->elements.size(), 2u);
-}
+// --- Child-subclause tests (§7.10.2.3–§7.10.2.7) below ---
 
 TEST(QueueMethods, DeleteAtIndex) {
   SimFixture f;
