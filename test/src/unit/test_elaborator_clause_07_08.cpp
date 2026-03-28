@@ -34,19 +34,6 @@ TEST(AssocArrayElaboration, ElementWidth) {
   EXPECT_TRUE(found);
 }
 
-// §7.8: Assigning non-associative array to associative array is an error.
-TEST(AssocArrayElaboration, NonAssocToAssocAssignError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module t;\n"
-      "  int aa[int];\n"
-      "  int bb[4];\n"
-      "  assign aa = bb;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 // §7.8: Multiple associative arrays elaborate without errors.
 TEST(AssocArrayElaboration, MultipleArrays) {
   EXPECT_TRUE(

@@ -47,7 +47,7 @@ static bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
   return true;
 }
 
-// §7.8: Associative array whole-array copy assignment (w = words).
+// §7.9.9: Associative array whole-array copy assignment.
 static bool TryAssocCopyAssign(const Stmt* stmt, SimContext& ctx) {
   if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
   if (stmt->rhs->kind != ExprKind::kIdentifier) return false;

@@ -36,52 +36,77 @@ static bool IsCompoundAssignOp(TokenKind op) {
   }
 }
 
-// §7.6: Check a single continuous assignment for array compatibility.
-void Elaborator::ValidateOneArrayAssignment(const ModuleItem* item) {
-  if (!item->assign_lhs || !item->assign_rhs) return;
-  if (item->assign_lhs->kind != ExprKind::kIdentifier) return;
-  if (item->assign_rhs->kind != ExprKind::kIdentifier) return;
-  auto lhs_it = var_array_info_.find(item->assign_lhs->text);
-  auto rhs_it = var_array_info_.find(item->assign_rhs->text);
+// §7.6, §7.9.9: Check array assignment compatibility for a pair of exprs.
+void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
+                                       SourceLoc loc) {
+  if (!lhs || !rhs) return;
+  if (lhs->kind != ExprKind::kIdentifier) return;
+  if (rhs->kind != ExprKind::kIdentifier) return;
+  auto lhs_it = var_array_info_.find(lhs->text);
+  auto rhs_it = var_array_info_.find(rhs->text);
   if (lhs_it == var_array_info_.end() || rhs_it == var_array_info_.end())
     return;
-  const auto& lhs = lhs_it->second;
-  const auto& rhs = rhs_it->second;
+  const auto& l = lhs_it->second;
+  const auto& r = rhs_it->second;
   // §7.9.9
-  if (lhs.is_assoc != rhs.is_assoc) {
-    diag_.Error(item->loc,
+  if (l.is_assoc != r.is_assoc) {
+    diag_.Error(loc,
                 "associative array cannot be assigned to or from a "
                 "non-associative array");
     return;
   }
-  if (lhs.is_assoc && rhs.is_assoc &&
-      lhs.assoc_index_type != rhs.assoc_index_type) {
-    diag_.Error(item->loc,
-                "associative array index type mismatch in assignment");
+  if (l.is_assoc && r.is_assoc &&
+      l.assoc_index_type != r.assoc_index_type) {
+    diag_.Error(loc, "associative array index type mismatch in assignment");
     return;
   }
-  if (lhs.elem_type != rhs.elem_type) {
-    diag_.Error(item->loc,
+  if (l.elem_type != r.elem_type) {
+    diag_.Error(loc,
                 std::format("array element type mismatch in assignment "
                             "('{}' vs '{}')",
-                            item->assign_lhs->text, item->assign_rhs->text));
+                            lhs->text, rhs->text));
     return;
   }
-  if (lhs.unpacked_size > 0 && !lhs.is_dynamic && rhs.unpacked_size > 0 &&
-      !rhs.is_dynamic && lhs.unpacked_size != rhs.unpacked_size) {
-    diag_.Error(item->loc,
+  if (l.unpacked_size > 0 && !l.is_dynamic && r.unpacked_size > 0 &&
+      !r.is_dynamic && l.unpacked_size != r.unpacked_size) {
+    diag_.Error(loc,
                 std::format("array size mismatch: '{}' has {} elements but "
                             "'{}' has {}",
-                            item->assign_lhs->text, lhs.unpacked_size,
-                            item->assign_rhs->text, rhs.unpacked_size));
+                            lhs->text, l.unpacked_size,
+                            rhs->text, r.unpacked_size));
   }
 }
 
-// §7.6: Validate array assignment compatibility in continuous assignments.
+void Elaborator::ValidateOneArrayAssignment(const ModuleItem* item) {
+  if (!item->assign_lhs || !item->assign_rhs) return;
+  CheckArrayAssignExprs(item->assign_lhs, item->assign_rhs, item->loc);
+}
+
+void Elaborator::WalkStmtsForArrayAssign(const Stmt* s) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    CheckArrayAssignExprs(s->lhs, s->rhs, s->range.start);
+  }
+  for (auto* sub : s->stmts) WalkStmtsForArrayAssign(sub);
+  WalkStmtsForArrayAssign(s->then_branch);
+  WalkStmtsForArrayAssign(s->else_branch);
+  WalkStmtsForArrayAssign(s->body);
+  WalkStmtsForArrayAssign(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForArrayAssign(ci.body);
+}
+
+// §7.6, §7.9.9: Validate array assignment compatibility.
 void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kContAssign) continue;
-    ValidateOneArrayAssignment(item);
+    if (item->kind == ModuleItemKind::kContAssign) {
+      ValidateOneArrayAssignment(item);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForArrayAssign(item->body);
+    }
   }
 }
 

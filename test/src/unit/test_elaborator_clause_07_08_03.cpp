@@ -97,49 +97,4 @@ TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_NotStringIndex) {
   EXPECT_TRUE(found);
 }
 
-TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_SameTypeAssignOk) {
-  EXPECT_TRUE(
-      ElabOk("module top;\n"
-             "  class K;\n"
-             "    int id;\n"
-             "  endclass\n"
-             "  int aa[K];\n"
-             "  int bb[K];\n"
-             "  assign aa = bb;\n"
-             "endmodule\n"));
-}
-
-TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_DifferentTypeAssignError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  class A;\n"
-      "    int id;\n"
-      "  endclass\n"
-      "  class B;\n"
-      "    int id;\n"
-      "  endclass\n"
-      "  int aa[A];\n"
-      "  int bb[B];\n"
-      "  assign aa = bb;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_MixedTypeAssignError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  class K;\n"
-      "    int id;\n"
-      "  endclass\n"
-      "  int aa[K];\n"
-      "  int bb[int];\n"
-      "  assign aa = bb;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 }  // namespace

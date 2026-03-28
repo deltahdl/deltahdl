@@ -175,9 +175,11 @@ class Elaborator {
   /// §7.4.1: Predefined-width types shall not have packed dims.
   void ValidatePackedDimOnPredefinedType(const DataType& dtype, SourceLoc loc);
 
-  /// §7.6: Array assignment compatibility checks.
+  /// §7.6, §7.9.9: Array assignment compatibility checks.
   void ValidateArrayAssignments(const ModuleDecl* decl);
   void ValidateOneArrayAssignment(const ModuleItem* item);
+  void CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs, SourceLoc loc);
+  void WalkStmtsForArrayAssign(const Stmt* s);
 
   /// §7.4.6: Associative arrays shall not be sliced.
   void ValidateAssocArraySlices(const ModuleDecl* decl);
