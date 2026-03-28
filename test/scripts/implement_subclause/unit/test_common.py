@@ -155,6 +155,12 @@ def test_build_steps_implementability_mentions_concrete_statements(isc):
     assert "concrete statements" in steps[1][1]
 
 
+def test_build_steps_implementability_mentions_definitional_claims(isc):
+    """Implementability step recognizes definitional claims as implementable."""
+    steps = isc.build_steps("6.2", "~/LRM.txt")
+    assert "definitional claims" in steps[1][1]
+
+
 def test_build_steps_each_has_description(isc):
     """Each step has a non-empty description."""
     steps = isc.build_steps("4.1", "~/LRM.txt")

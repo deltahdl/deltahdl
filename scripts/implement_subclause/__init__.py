@@ -94,6 +94,10 @@ def build_steps(
          " A subclause that makes concrete statements — not merely"
          " introducing a topic for its child subclauses — IS"
          " implementable."
+         " A subclause that defines classifications, properties, or"
+         " distinctions (e.g., 'X is a Y', 'X has property Z') IS"
+         " implementable — those are testable definitional claims"
+         " even if the text is short."
          " Respond with exactly IMPLEMENTABLE: yes or IMPLEMENTABLE: no"),
         ("Auditing src",
          f"Search src/ for existing code that implements §{subclause}."
