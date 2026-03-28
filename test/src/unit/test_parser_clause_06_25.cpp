@@ -72,4 +72,14 @@ TEST(DataTypeParsing, ParameterizedDataType_ValueParamOnly) {
               "endmodule\n"));
 }
 
+TEST(DataTypeParsing, ClassTypeParameterized) {
+  auto r = Parse(
+      "class param_cls #(type T = int);\n"
+      "  typedef T value_t;\n"
+      "endclass\n"
+      "module m; param_cls#(int)::value_t x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

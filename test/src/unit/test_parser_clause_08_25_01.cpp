@@ -1,19 +1,8 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(NetAndVariableTypeParsing, ClassTypeParameterized) {
-  auto r = Parse(
-      "class param_cls #(type T = int);\n"
-      "  typedef T value_t;\n"
-      "endclass\n"
-      "module m; param_cls#(int)::value_t x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
 
 TEST(TaskAndFunctionParsing, ScopeCallParsesAsExpr) {
   auto r = Parse(
