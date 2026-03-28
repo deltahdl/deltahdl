@@ -159,7 +159,9 @@ def build_steps(
          f" revert it with git checkout."
          + exclude_note + constraints),
         ("Summarizing actions",
-         "Summarize everything you did as a bullet list."
+         "Summarize everything you did as a self-contained bullet list."
+         " Do NOT say 'see above' or refer to prior responses —"
+         " produce the full list here."
          " Every line MUST include 'because' with a categorical"
          " rationale. Example format:\n"
          "- Added <file> because <reason>\n"

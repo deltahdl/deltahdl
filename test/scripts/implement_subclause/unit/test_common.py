@@ -137,6 +137,12 @@ def test_build_steps_last_mentions_summarize(isc):
     assert "Summarize" in steps[-1][1]
 
 
+def test_build_steps_summary_requires_self_contained(isc):
+    """Summary step requires a self-contained list, not a back-reference."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    assert "self-contained" in steps[-1][1]
+
+
 def test_build_steps_second_checks_implementability(isc):
     """Second step asks Claude if the subclause is implementable."""
     steps = isc.build_steps("4.1", "~/LRM.txt")
