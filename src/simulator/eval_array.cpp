@@ -379,6 +379,8 @@ static bool DispatchQueuePush(std::string_view method, QueueObject* q,
       q->elements.push_back(val);
       q->element_ids.push_back(q->AllocateId());
       ++q->generation;
+    } else {
+      ctx.GetDiag().Warning({}, "bounded queue overflow in push_back");
     }
     return true;
   }
@@ -390,6 +392,7 @@ static bool DispatchQueuePush(std::string_view method, QueueObject* q,
         static_cast<int32_t>(q->elements.size()) > q->max_size) {
       q->elements.pop_back();
       q->element_ids.pop_back();
+      ctx.GetDiag().Warning({}, "bounded queue overflow in push_front");
     }
     ++q->generation;
     return true;
@@ -411,6 +414,7 @@ static bool DispatchQueuePush(std::string_view method, QueueObject* q,
           static_cast<int32_t>(q->elements.size()) > q->max_size) {
         q->elements.pop_back();
         q->element_ids.pop_back();
+        ctx.GetDiag().Warning({}, "bounded queue overflow in insert");
       }
       ++q->generation;
     }

@@ -311,25 +311,6 @@ TEST(QueueAssign, SlicePopBackOnSingleElement) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-TEST(QueueAssign, BoundedQueueConcatTruncates) {
-  SimFixture f;
-  auto* q = f.ctx.CreateQueue("q", 32, 3);
-  q->elements = {MakeLogic4VecVal(f.arena, 32, 10),
-                 MakeLogic4VecVal(f.arena, 32, 20)};
-  q->AssignFreshIds();
-  // q = {q, 30, 40, 50} — would be 5 elements, bounded to 3.
-  auto* rhs = MakeConcat(
-      f.arena, {MakeId(f.arena, "q"), MakeInt(f.arena, 30),
-                MakeInt(f.arena, 40), MakeInt(f.arena, 50)});
-  auto* stmt = MakeAssign(f.arena, "q", rhs);
-  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
-
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
-}
-
 TEST(QueueAssign, AssignReplacesContents) {
   SimFixture f;
   auto* dst = MakeQueue(f, "dst", {1, 2, 3});

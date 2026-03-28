@@ -414,6 +414,8 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
       q->elements.push_back(rhs_val);
       q->element_ids.push_back(q->AllocateId());
       ++q->generation;
+    } else {
+      ctx.GetDiag().Warning({}, "bounded queue overflow in indexed write");
     }
     return true;
   }
@@ -571,6 +573,7 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   CollectQueueElements(stmt->rhs, ctx, arena, elems);
   if (q->max_size > 0 && static_cast<int32_t>(elems.size()) > q->max_size) {
     elems.resize(static_cast<size_t>(q->max_size));
+    ctx.GetDiag().Warning({}, "bounded queue overflow in assignment");
   }
   q->elements = std::move(elems);
   q->AssignFreshIds();
