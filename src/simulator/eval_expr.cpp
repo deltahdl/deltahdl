@@ -224,16 +224,24 @@ static bool TryClassEnumAccess(Variable* base_var, std::string_view field_name,
   return true;
 }
 
-// §8.23: Try class scope resolution for static members.
+// §8.23: Try class scope resolution for static members, enumerations, and
+// parameters.
 static bool TryStaticMemberAccess(std::string_view base_name,
                                   std::string_view field_name, SimContext& ctx,
-                                  Logic4Vec& out) {
+                                  Arena& arena, Logic4Vec& out) {
   auto* cls_type = ctx.FindClassType(base_name);
   if (!cls_type) return false;
   auto it = cls_type->static_properties.find(std::string(field_name));
-  if (it == cls_type->static_properties.end()) return false;
-  out = it->second;
-  return true;
+  if (it != cls_type->static_properties.end()) {
+    out = it->second;
+    return true;
+  }
+  auto eit = cls_type->enum_members.find(std::string(field_name));
+  if (eit != cls_type->enum_members.end()) {
+    out = MakeLogic4VecVal(arena, 32, eit->second);
+    return true;
+  }
+  return false;
 }
 
 static Logic4Vec ResolveMemberByType(std::string_view base_name,
@@ -275,7 +283,7 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   if (TryClassEnumAccess(base_var, field_name, ctx, arena, out)) return out;
   if (TryCollectionAccess(base_name, field_name, ctx, arena, out)) return out;
   if (TryEvalEnumProperty(base_name, field_name, ctx, arena, out)) return out;
-  if (TryStaticMemberAccess(base_name, field_name, ctx, out)) return out;
+  if (TryStaticMemberAccess(base_name, field_name, ctx, arena, out)) return out;
   return MakeLogic4Vec(arena, 1);
 }
 

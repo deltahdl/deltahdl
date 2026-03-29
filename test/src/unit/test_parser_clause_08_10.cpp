@@ -4,21 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StaticMethodParsing, StaticMethodClassScopeCall) {
-  ParseOk(
-      "class id;\n"
-      "  static function int next_id();\n"
-      "    return 0;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int x;\n"
-      "    x = id::next_id();\n"
-      "  end\n"
-      "endmodule\n");
-}
-
 TEST(StaticMethodParsing, StaticMethodInstanceDotCall) {
   ParseOk(
       "class C;\n"

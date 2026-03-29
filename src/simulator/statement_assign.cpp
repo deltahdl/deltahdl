@@ -117,6 +117,16 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
     }
     return false;
   }
+  // §8.23: Write to a static property via class scope resolution (Class::prop).
+  auto* cls_type = ctx.FindClassType(base_name);
+  if (cls_type) {
+    auto sit = cls_type->static_properties.find(std::string(field_name));
+    if (sit != cls_type->static_properties.end()) {
+      sit->second = rhs_val;
+      return true;
+    }
+    return false;
+  }
   auto* base_var = ctx.FindVariable(base_name);
   if (!base_var) return false;
   auto* info = ctx.GetVariableStructType(base_name);

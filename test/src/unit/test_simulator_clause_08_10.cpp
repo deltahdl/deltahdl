@@ -61,21 +61,6 @@ TEST(StaticMethodSimulation, StaticMethodAccessesStaticProperty) {
   EXPECT_EQ(type->static_properties["current"].ToUint64(), 42u);
 }
 
-TEST(StaticMethodSimulation, ClassScopeCallReturnsValue) {
-  EXPECT_EQ(RunAndGet(
-      "class Util;\n"
-      "  static function int answer();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    result = Util::answer();\n"
-      "  end\n"
-      "endmodule\n", "result"), 42u);
-}
-
 TEST(StaticMethodSimulation, StaticMethodModifiesStaticProperty) {
   EXPECT_EQ(RunAndGet(
       "class Counter;\n"

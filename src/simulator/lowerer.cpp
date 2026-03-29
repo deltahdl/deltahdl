@@ -543,9 +543,17 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
   }
   BuildVTable(info, cls);
   InitStaticProperties(info, ctx_, arena_);
-  // §8.5: Register class parameters as properties.
+  // §8.23: Register class parameters as static properties so they are
+  // accessible via the scope resolution operator (ClassName::PARAM).
   for (const auto& [pname, pexpr] : cls->params) {
     info->properties.push_back({pname, 32, false});
+    if (pexpr) {
+      info->static_properties[std::string(pname)] =
+          EvalExpr(pexpr, ctx_, arena_);
+    } else {
+      info->static_properties[std::string(pname)] =
+          MakeLogic4VecVal(arena_, 32, 0);
+    }
   }
   // §8.5: Collect enum members declared inside the class.
   for (const auto* member : cls->members) {
@@ -560,6 +568,35 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
     }
   }
   ctx_.RegisterClassType(cls->name, info);
+  // §8.23: Register nested class declarations with scope-qualified names
+  // (e.g., Outer::Inner) so they can be accessed via the :: operator.
+  for (const auto* member : cls->members) {
+    if (member->kind == ClassMemberKind::kClassDecl && member->nested_class) {
+      auto qualified =
+          std::string(cls->name) + "::" + std::string(member->nested_class->name);
+      auto* nested_info = arena_.Create<ClassTypeInfo>();
+      nested_info->name =
+          *arena_.Create<std::string>(std::move(qualified));
+      nested_info->decl = member->nested_class;
+      nested_info->is_abstract = member->nested_class->is_virtual;
+      nested_info->is_interface = member->nested_class->is_interface;
+      if (!member->nested_class->base_class.empty())
+        nested_info->parent = ctx_.FindClassType(member->nested_class->base_class);
+      for (auto* m : member->nested_class->members) {
+        if (m->kind == ClassMemberKind::kProperty) {
+          uint32_t w = EvalTypeWidth(m->data_type, {});
+          if (w == 0) w = 32;
+          nested_info->properties.push_back({m->name, w, m->is_static,
+                                             m->is_local, m->is_protected,
+                                             m->is_const, m->init_expr});
+        } else if (m->kind == ClassMemberKind::kMethod && m->method) {
+          nested_info->methods[std::string(m->method->name)] = m->method;
+        }
+      }
+      InitStaticProperties(nested_info, ctx_, arena_);
+      ctx_.RegisterClassType(nested_info->name, nested_info);
+    }
+  }
 }
 
 void Lowerer::LowerProcesses(const std::vector<RtlirProcess>& procs) {
