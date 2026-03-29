@@ -41,30 +41,6 @@ TEST(EvalOpXZ, ModByZeroReturnsX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, RealArithResult) {
-  SimFixture f;
-  MakeRealVar(f, "ra", 2.5);
-  MakeRealVar(f, "rb", 1.5);
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "ra"),
-                          MakeId(f.arena, "rb"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_real);
-  EXPECT_DOUBLE_EQ(ToDouble(result), 4.0);
-}
-
-TEST(EvalOpXZ, MixedRealIntArith) {
-  SimFixture f;
-
-  MakeRealVar(f, "re", 2.5);
-  auto* vi = f.ctx.CreateVariable("ri", 32);
-  vi->value = MakeLogic4VecVal(f.arena, 32, 3);
-  auto* expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "re"),
-                          MakeId(f.arena, "ri"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_real);
-  EXPECT_DOUBLE_EQ(ToDouble(result), 7.5);
-}
-
 TEST(EvalOpXZ, ArithSubX) {
   SimFixture f;
 

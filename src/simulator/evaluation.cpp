@@ -521,6 +521,14 @@ static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
     return EvalStringCompare(op, lhs, rhs, arena);
   }
   if (IsEqualityOp(op)) {
+    if ((lhs.is_real || rhs.is_real) &&
+        (op == TokenKind::kEqEq || op == TokenKind::kBangEq)) {
+      double ld = ToDouble(lhs);
+      double rd = ToDouble(rhs);
+      bool eq = (ld == rd);
+      return MakeLogic4VecVal(arena, 1,
+                              (op == TokenKind::kEqEq) == eq ? 1 : 0);
+    }
     uint64_t val = EvalEqualityOp(op, lhs, rhs);
     if (val == kResultX) return MakeAllX(arena, 1);
     return MakeLogic4VecVal(arena, 1, val);
@@ -598,6 +606,7 @@ static Logic4Vec CombineBranches(Logic4Vec tv, Logic4Vec fv, Arena& arena) {
     result.words[i].aval = tw.aval & fw.aval;
     result.words[i].bval = tw.bval | fw.bval | (tw.aval ^ fw.aval);
   }
+  if (tv.is_real || fv.is_real) result.is_real = true;
   return result;
 }
 static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena) {
