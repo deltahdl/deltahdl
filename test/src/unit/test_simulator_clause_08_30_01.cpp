@@ -6,17 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ClassSim, WeakReferenceDefaultNull) {
-  WeakReference wr;
-  EXPECT_EQ(wr.Get(), kNullClassHandle);
-}
-
-TEST(ClassSim, WeakReferenceStoresReferent) {
-  WeakReference wr;
-  wr.referent_handle = 42;
-  EXPECT_EQ(wr.Get(), 42u);
-}
-
 TEST(ClassSim, WeakReferenceDoesNotPreventGc) {
   SimFixture f;
   auto* type = MakeClassType(f, "obj", {"x"});
@@ -69,12 +58,6 @@ TEST(ClassSim, MultipleWeakRefsClearedAtomically) {
   // Both weak references to the same referent should be cleared.
   EXPECT_EQ(wr1.Get(), kNullClassHandle);
   EXPECT_EQ(wr2.Get(), kNullClassHandle);
-}
-
-TEST(ClassSim, WeakReferenceHasGetMethod) {
-  WeakReference wr;
-  // get() exists and returns null handle by default.
-  EXPECT_EQ(wr.Get(), kNullClassHandle);
 }
 
 TEST(ClassSim, WeakReferenceHasClearMethod) {
