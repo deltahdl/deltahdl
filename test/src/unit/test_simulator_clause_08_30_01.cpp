@@ -60,11 +60,6 @@ TEST(ClassSim, MultipleWeakRefsClearedAtomically) {
   EXPECT_EQ(wr2.Get(), kNullClassHandle);
 }
 
-TEST(ClassSim, WeakReferenceHasGetIdMethod) {
-  EXPECT_EQ(WeakReference::GetId(kNullClassHandle), 0);
-  EXPECT_NE(WeakReference::GetId(1), 0);
-}
-
 TEST(ClassSim, WeakReferenceInstanceIsGcEligible) {
   SimFixture f;
   auto* type = MakeClassType(f, "obj", {"x"});

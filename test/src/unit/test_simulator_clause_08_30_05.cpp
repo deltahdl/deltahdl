@@ -34,12 +34,36 @@ TEST(ClassSim, WeakRefGetIdUnique) {
   EXPECT_NE(WeakReference::GetId(h1), WeakReference::GetId(h2));
 }
 
-TEST(ClassSim, WeakRefGetIdSameObjectSameId) {
+TEST(ClassSim, WeakRefGetIdUniqueAcrossTypes) {
+  SimFixture f;
+  auto* type_a = MakeClassType(f, "alpha", {"a"});
+  auto* type_b = MakeClassType(f, "beta", {"b"});
+  auto [h1, o1] = MakeObj(f, type_a);
+  auto [h2, o2] = MakeObj(f, type_b);
+  EXPECT_NE(WeakReference::GetId(h1), WeakReference::GetId(h2));
+}
+
+TEST(ClassSim, WeakRefGetIdSameAcrossInheritanceTree) {
+  SimFixture f;
+  auto* parent = MakeClassType(f, "parent", {"x"});
+  auto* child = f.arena.Create<ClassTypeInfo>();
+  child->name = "child";
+  child->parent = parent;
+  child->properties.push_back({"y", 32, false});
+  f.ctx.RegisterClassType("child", child);
+
+  auto [handle, obj] = MakeObj(f, child);
+  auto id_via_child = WeakReference::GetId(handle);
+  auto id_via_parent = WeakReference::GetId(handle);
+  EXPECT_EQ(id_via_child, id_via_parent);
+}
+
+TEST(ClassSim, WeakRefGetIdReturnsLongint) {
   SimFixture f;
   auto* type = MakeClassType(f, "obj", {"x"});
   auto [handle, obj] = MakeObj(f, type);
-
-  EXPECT_EQ(WeakReference::GetId(handle), WeakReference::GetId(handle));
+  int64_t id = WeakReference::GetId(handle);
+  EXPECT_GT(id, 0);
 }
 
 }  // namespace

@@ -1041,6 +1041,22 @@ static bool TryEvalWeakRefMethodCall(const Expr* expr, SimContext& ctx,
   return false;
 }
 
+// §8.30.5: Dispatch weak_reference#(T)::get_id(obj) static call.
+static bool TryEvalWeakRefStaticCall(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, Logic4Vec& out) {
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
+  auto* access = expr->lhs;
+  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier) return false;
+  if (access->lhs->text != "weak_reference") return false;
+  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
+  if (access->rhs->text != "get_id") return false;
+  if (expr->args.empty()) return false;
+  uint64_t obj_handle = EvalExpr(expr->args[0], ctx, arena).ToUint64();
+  int64_t id = WeakReference::GetId(obj_handle);
+  out = MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(id));
+  return true;
+}
+
 // Try dispatching to built-in type methods (enum, string, array, queue).
 static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
@@ -1108,6 +1124,7 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   if (TryBuiltinMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalSuperMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassMethodCall(expr, ctx, arena, out)) return true;
+  if (TryEvalWeakRefStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassScopeCall(expr, ctx, arena, out)) return true;
   if (TryEvalParameterizedScopeCall(expr, ctx, arena, out)) return true;
   auto* let_decl = ctx.FindLetDecl(expr->callee);
