@@ -901,6 +901,60 @@ void Elaborator::ValidateClassMethodBodies(const ModuleDecl* decl) {
   }
 }
 
+// §8.15: Check if an expression references 'super'.
+static bool ExprRefsSuper(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kIdentifier && e->text == "super") return true;
+  if (ExprRefsSuper(e->lhs)) return true;
+  if (ExprRefsSuper(e->rhs)) return true;
+  if (ExprRefsSuper(e->base)) return true;
+  if (ExprRefsSuper(e->index)) return true;
+  if (ExprRefsSuper(e->condition)) return true;
+  if (ExprRefsSuper(e->true_expr)) return true;
+  if (ExprRefsSuper(e->false_expr)) return true;
+  for (const auto* elem : e->elements)
+    if (ExprRefsSuper(elem)) return true;
+  for (const auto* arg : e->args)
+    if (ExprRefsSuper(arg)) return true;
+  if (ExprRefsSuper(e->with_expr)) return true;
+  return false;
+}
+
+// §8.15: Walk statements looking for 'super' references.
+static bool StmtRefsSuper(const Stmt* s) {
+  if (!s) return false;
+  if (ExprRefsSuper(s->lhs)) return true;
+  if (ExprRefsSuper(s->rhs)) return true;
+  if (ExprRefsSuper(s->expr)) return true;
+  if (ExprRefsSuper(s->condition)) return true;
+  for (auto* sub : s->stmts)
+    if (StmtRefsSuper(sub)) return true;
+  if (StmtRefsSuper(s->then_branch)) return true;
+  if (StmtRefsSuper(s->else_branch)) return true;
+  if (StmtRefsSuper(s->body)) return true;
+  if (StmtRefsSuper(s->for_body)) return true;
+  for (auto& ci : s->case_items)
+    if (StmtRefsSuper(ci.body)) return true;
+  return false;
+}
+
+// §8.15: 'super' shall only be used in a class that extends a base class.
+void Elaborator::ValidateSuperInNonDerivedClass() {
+  for (const auto* cls : unit_->classes) {
+    if (!cls->base_class.empty()) continue;
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+      for (const auto* s : m->method->func_body_stmts) {
+        if (StmtRefsSuper(s)) {
+          diag_.Error(m->method->loc,
+                      "'super' shall only be used in a derived class");
+          break;
+        }
+      }
+    }
+  }
+}
+
 // §8.17: Validate chaining constructor rules.
 void Elaborator::ValidateChainingConstructors() {
   for (const auto* cls : unit_->classes) {

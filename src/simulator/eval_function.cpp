@@ -486,6 +486,18 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
       stmt->lhs->rhs->kind == ExprKind::kIdentifier) {
     auto* self = ctx.CurrentThis();
     if (self) self->SetProperty(std::string(stmt->lhs->rhs->text), val);
+    return;
+  }
+  // §8.15: super.property = val
+  if (stmt->lhs->kind == ExprKind::kMemberAccess && stmt->lhs->lhs &&
+      stmt->lhs->lhs->kind == ExprKind::kIdentifier &&
+      stmt->lhs->lhs->text == "super" && stmt->lhs->rhs &&
+      stmt->lhs->rhs->kind == ExprKind::kIdentifier) {
+    auto* self = ctx.CurrentThis();
+    if (self && self->type && self->type->parent) {
+      self->SetPropertyForType(std::string(stmt->lhs->rhs->text),
+                               self->type->parent, val);
+    }
   }
 }
 
@@ -686,12 +698,15 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
     std::string scoped = std::string(info->name) + "::" + std::string(prop.name);
     obj->properties[scoped] = val;
   }
-  // §8.5: Populate parameter properties with default values.
+  // §8.5/§8.15: Populate parameter properties with default values.
+  // Store with scoped names so super.PARAM resolves to the base class value.
   if (info->decl) {
     for (const auto& [pname, pexpr] : info->decl->params) {
       if (pexpr) {
         auto val = EvalExpr(pexpr, ctx, arena);
-        obj->SetProperty(pname, val);
+        obj->properties[std::string(pname)] = val;
+        std::string scoped = std::string(info->name) + "::" + std::string(pname);
+        obj->properties[scoped] = val;
       }
     }
   }
@@ -762,7 +777,10 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
   for (size_t i = 0; i < params.size() && i < param_exprs.size(); ++i) {
     if (param_exprs[i]) {
       auto val = EvalExpr(param_exprs[i], ctx, arena);
-      obj->SetProperty(params[i].first, val);
+      obj->properties[std::string(params[i].first)] = val;
+      std::string scoped =
+          std::string(obj->type->name) + "::" + std::string(params[i].first);
+      obj->properties[scoped] = val;
     }
   }
 }
@@ -830,6 +848,21 @@ static Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
   ctx.PopThis();
   ctx.PopScope();
   return out;
+}
+
+// §8.15: Dispatch a super.method() call from within a derived class.
+static bool TryEvalSuperMethodCall(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (parts.var_name != "super") return false;
+  auto* self = ctx.CurrentThis();
+  if (!self || !self->type || !self->type->parent) return false;
+  auto* method =
+      self->ResolveMethodForType(parts.method_name, self->type->parent);
+  if (!method) return false;
+  out = ExecInstanceMethodCall(method, self, expr, ctx, arena);
+  return true;
 }
 
 // §8: Dispatch a method call on a class object instance.
@@ -998,6 +1031,7 @@ static Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call,
 static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   if (TryBuiltinMethodCall(expr, ctx, arena, out)) return true;
+  if (TryEvalSuperMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassScopeCall(expr, ctx, arena, out)) return true;
   if (TryEvalParameterizedScopeCall(expr, ctx, arena, out)) return true;

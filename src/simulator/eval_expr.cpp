@@ -245,6 +245,14 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
     if (self) return self->GetProperty(field_name, arena);
     return MakeLogic4Vec(arena, 1);
   }
+  // §8.15: 'super' refers to the base class of the current instance.
+  if (base_name == "super") {
+    auto* self = ctx.CurrentThis();
+    if (self && self->type && self->type->parent) {
+      return self->GetPropertyForType(field_name, self->type->parent, arena);
+    }
+    return MakeLogic4Vec(arena, 1);
+  }
   auto* base_var = ctx.FindVariable(base_name);
   auto* sinfo = ctx.GetVariableStructType(base_name);
   Logic4Vec out;
