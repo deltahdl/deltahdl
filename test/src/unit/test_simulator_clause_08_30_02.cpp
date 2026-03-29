@@ -22,6 +22,14 @@ TEST(ClassSim, WeakRefNewWithNull) {
   EXPECT_EQ(wr.Get(), kNullClassHandle);
 }
 
+TEST(ClassSim, WeakRefNewNullNoWarning) {
+  SimFixture f;
+  WeakReference wr;
+  wr.referent_handle = kNullClassHandle;
+  f.ctx.RegisterWeakReference(&wr);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 TEST(ClassSim, WeakRefInstancesAreUnique) {
   SimFixture f;
   auto* type = MakeClassType(f, "obj", {"x"});

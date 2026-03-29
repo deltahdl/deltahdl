@@ -575,6 +575,21 @@ void SimContext::UnregisterWeakReference(WeakReference* wr) {
   weak_references_.erase(wr);
 }
 
+uint64_t SimContext::AllocateWeakReference(uint64_t referent_handle,
+                                           Arena& arena) {
+  auto* wr = arena.Create<WeakReference>();
+  wr->referent_handle = referent_handle;
+  uint64_t handle = next_handle_id_++;
+  weak_ref_by_handle_[handle] = wr;
+  RegisterWeakReference(wr);
+  return handle;
+}
+
+WeakReference* SimContext::FindWeakReferenceByHandle(uint64_t handle) const {
+  auto it = weak_ref_by_handle_.find(handle);
+  return (it != weak_ref_by_handle_.end()) ? it->second : nullptr;
+}
+
 void SimContext::PushThis(ClassObject* obj) { this_stack_.push_back(obj); }
 
 void SimContext::PopThis() {

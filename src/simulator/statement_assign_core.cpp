@@ -80,6 +80,19 @@ static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
   }
 
+  // §8.30.2: weak_reference new(T referent).
+  if (type_name == "weak_reference") {
+    uint64_t referent = kNullClassHandle;
+    if (!stmt->rhs->args.empty()) {
+      auto val = EvalExpr(stmt->rhs->args[0], ctx, arena);
+      referent = val.ToUint64();
+    }
+    auto wr_handle = ctx.AllocateWeakReference(referent, arena);
+    auto* var = ctx.FindVariable(stmt->lhs->text);
+    if (var) var->value = MakeLogic4VecVal(arena, 64, wr_handle);
+    return true;
+  }
+
   auto handle = EvalClassNew(type_name, stmt->rhs, ctx, arena);
   auto* var = ctx.FindVariable(stmt->lhs->text);
   if (var) var->value = handle;
@@ -615,6 +628,34 @@ static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
   }
 }
 
+// §8.30.2: Handle weak_reference variable declaration with optional new().
+static bool TryExecWeakRefVarDecl(const Stmt* stmt, SimContext& ctx,
+                                  Arena& arena) {
+  if (stmt->var_decl_type.type_name != "weak_reference") return false;
+  ctx.CreateVariable(stmt->var_name, 64);
+  ctx.SetVariableClassType(stmt->var_name, "weak_reference");
+  const auto& type_params = stmt->var_decl_type.type_params;
+  if (!type_params.empty()) {
+    std::vector<Expr*> exprs;
+    for (const auto& tp : type_params) {
+      exprs.push_back(tp.type_ref_expr);
+    }
+    ctx.SetVariableClassParamExprs(stmt->var_name, std::move(exprs));
+  }
+  if (!stmt->var_init || stmt->var_init->kind != ExprKind::kCall ||
+      stmt->var_init->text != "new")
+    return true;
+  uint64_t referent = kNullClassHandle;
+  if (!stmt->var_init->args.empty()) {
+    auto val = EvalExpr(stmt->var_init->args[0], ctx, arena);
+    referent = val.ToUint64();
+  }
+  auto wr_handle = ctx.AllocateWeakReference(referent, arena);
+  auto* var = ctx.FindVariable(stmt->var_name);
+  if (var) var->value = MakeLogic4VecVal(arena, 64, wr_handle);
+  return true;
+}
+
 // §8: Handle block-level class-typed variable declaration.
 static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
@@ -678,6 +719,7 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
 }
 
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   // §13.3.1: Inside a task/function scope, local variables persist in static
   // scopes — skip re-creation if the variable already exists locally.

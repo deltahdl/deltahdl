@@ -301,6 +301,10 @@ class SimContext {
   void RegisterWeakReference(WeakReference* wr);
   void UnregisterWeakReference(WeakReference* wr);
 
+  // §8.30.2: Allocate a weak reference object, returning its handle.
+  uint64_t AllocateWeakReference(uint64_t referent_handle, Arena& arena);
+  WeakReference* FindWeakReferenceByHandle(uint64_t handle) const;
+
   // §8.11: `this` pointer management for method calls.
   void PushThis(ClassObject* obj);
   void PopThis();
@@ -379,6 +383,8 @@ class SimContext {
   uint64_t next_handle_id_ = 1;
   // §8.30.1: Registered weak references for GC clearing.
   std::unordered_set<WeakReference*> weak_references_;
+  // §8.30.2: Maps handle ID to WeakReference object.
+  std::unordered_map<uint64_t, WeakReference*> weak_ref_by_handle_;
   // §8.11: Stack of `this` pointers for nested method calls.
   std::vector<ClassObject*> this_stack_;
   // §7.10.3: Stack of queue ref binding frames for nested function calls.
