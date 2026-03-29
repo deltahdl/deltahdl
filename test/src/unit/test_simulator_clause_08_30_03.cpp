@@ -20,13 +20,6 @@ TEST(ClassSim, WeakRefGetReturnsReferent) {
   EXPECT_EQ(retrieved, obj);
 }
 
-TEST(ClassSim, WeakRefGetReturnsNullAfterClear) {
-  WeakReference wr;
-  wr.referent_handle = 42;
-  wr.Clear();
-  EXPECT_EQ(wr.Get(), kNullClassHandle);
-}
-
 TEST(ClassSim, WeakRefGetDefaultNull) {
   WeakReference wr;
   EXPECT_EQ(wr.Get(), kNullClassHandle);

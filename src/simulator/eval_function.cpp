@@ -1018,20 +1018,27 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §8.30.3: Dispatch weak_reference get() method call.
+// §8.30.3/§8.30.4: Dispatch weak_reference get()/clear() method calls.
 static bool TryEvalWeakRefMethodCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;
   if (!ExtractMethodCallParts(expr, parts)) return false;
   if (ctx.GetVariableClassType(parts.var_name) != "weak_reference") return false;
-  if (parts.method_name != "get") return false;
   auto* var = ctx.FindVariable(parts.var_name);
   if (!var) return false;
   auto wr_handle = var->value.ToUint64();
   auto* wr = ctx.FindWeakReferenceByHandle(wr_handle);
-  uint64_t referent = (wr != nullptr) ? wr->Get() : kNullClassHandle;
-  out = MakeLogic4VecVal(arena, 64, referent);
-  return true;
+  if (parts.method_name == "get") {
+    uint64_t referent = (wr != nullptr) ? wr->Get() : kNullClassHandle;
+    out = MakeLogic4VecVal(arena, 64, referent);
+    return true;
+  }
+  if (parts.method_name == "clear") {
+    if (wr != nullptr) wr->Clear();
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  return false;
 }
 
 // Try dispatching to built-in type methods (enum, string, array, queue).
