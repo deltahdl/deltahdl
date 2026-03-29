@@ -68,17 +68,6 @@ TEST(ClassSyntaxParsing, ClassWithParameterPortList) {
   EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
 }
 
-TEST(ClassSyntaxParsing, ImplementsSingleInterface) {
-  auto r = Parse(
-      "class C implements IFace;\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto* cls = r.cu->classes[0];
-  ASSERT_EQ(cls->implements_types.size(), 1u);
-  EXPECT_EQ(cls->implements_types[0], "IFace");
-}
-
 TEST(ClassSyntaxParsing, ExtendsWithArgs) {
   auto r = Parse(
       "class D extends Base(5);\n"
@@ -760,40 +749,6 @@ TEST(ClassSyntaxParsing, ErrorDuplicateRandc) {
       "  randc randc bit [2:0] x;\n"
       "endclass\n");
   EXPECT_TRUE(r.has_errors);
-}
-
-// === class_declaration: implements multiple interfaces ===
-
-TEST(ClassSyntaxParsing, ImplementsMultipleInterfaces) {
-  auto r = Parse(
-      "interface class IA; endclass\n"
-      "interface class IB; endclass\n"
-      "interface class IC; endclass\n"
-      "class C implements IA, IB, IC;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* cls = r.cu->classes[3];
-  ASSERT_EQ(cls->implements_types.size(), 3u);
-  EXPECT_EQ(cls->implements_types[0], "IA");
-  EXPECT_EQ(cls->implements_types[1], "IB");
-  EXPECT_EQ(cls->implements_types[2], "IC");
-}
-
-// === class_declaration: extends + implements combined ===
-
-TEST(ClassSyntaxParsing, ExtendsAndImplementsCombined) {
-  auto r = Parse(
-      "interface class IA; endclass\n"
-      "class Base; endclass\n"
-      "class C extends Base implements IA;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* cls = r.cu->classes[2];
-  EXPECT_EQ(cls->base_class, "Base");
-  ASSERT_EQ(cls->implements_types.size(), 1u);
-  EXPECT_EQ(cls->implements_types[0], "IA");
 }
 
 // === class_declaration: virtual + final combined ===

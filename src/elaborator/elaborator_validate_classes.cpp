@@ -1476,15 +1476,26 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   }
 }
 
-// §8.26.2: Validate that a regular class does not extend an interface class.
+// §8.26.2: Validate that a regular class does not extend an interface class
+// and does not implement a non-interface class.
 void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
-  if (cls->base_class.empty()) return;
-  const auto* base = FindClassDecl(cls->base_class, unit_);
-  if (base && base->is_interface) {
-    diag_.Error(cls->range.start,
-                std::format("class '{}' cannot extend interface class "
-                            "'{}'; use 'implements' instead",
-                            cls->name, cls->base_class));
+  if (!cls->base_class.empty()) {
+    const auto* base = FindClassDecl(cls->base_class, unit_);
+    if (base && base->is_interface) {
+      diag_.Error(cls->range.start,
+                  std::format("class '{}' cannot extend interface class "
+                              "'{}'; use 'implements' instead",
+                              cls->name, cls->base_class));
+    }
+  }
+  for (auto impl_name : cls->implements_types) {
+    const auto* impl = FindClassDecl(impl_name, unit_);
+    if (impl && !impl->is_interface) {
+      diag_.Error(cls->range.start,
+                  std::format("class '{}' cannot implement non-interface "
+                              "class '{}'",
+                              cls->name, impl_name));
+    }
   }
 }
 
