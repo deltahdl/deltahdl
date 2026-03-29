@@ -127,6 +127,15 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   auto handle = base_var->value.ToUint64();
   auto* obj = ctx.GetClassObject(handle);
   if (obj) {
+    // §8.14: Write through the declared type so overridden members are scoped.
+    auto declared = ctx.GetVariableClassType(base_name);
+    if (!declared.empty()) {
+      auto* declared_type = ctx.FindClassType(declared);
+      if (declared_type) {
+        obj->SetPropertyForType(field_name, declared_type, rhs_val);
+        return true;
+      }
+    }
     obj->SetProperty(std::string(field_name), rhs_val);
     return true;
   }

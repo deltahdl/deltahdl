@@ -61,6 +61,43 @@ ModuleItem* ClassObject::ResolveMethod(std::string_view name) const {
   return nullptr;
 }
 
+ModuleItem* ClassObject::ResolveMethodForType(
+    std::string_view name, const ClassTypeInfo* from_type) const {
+  for (const auto* t = from_type; t != nullptr; t = t->parent) {
+    auto it = t->methods.find(std::string(name));
+    if (it != t->methods.end()) return it->second;
+  }
+  return nullptr;
+}
+
+Logic4Vec ClassObject::GetPropertyForType(std::string_view name,
+                                          const ClassTypeInfo* declared_type,
+                                          Arena& arena) const {
+  for (const auto* t = declared_type; t != nullptr; t = t->parent) {
+    std::string scoped = std::string(t->name) + "::" + std::string(name);
+    auto it = properties.find(scoped);
+    if (it != properties.end()) return it->second;
+  }
+  return GetProperty(name, arena);
+}
+
+void ClassObject::SetPropertyForType(std::string_view name,
+                                     const ClassTypeInfo* declared_type,
+                                     const Logic4Vec& val) {
+  for (const auto* t = declared_type; t != nullptr; t = t->parent) {
+    std::string scoped = std::string(t->name) + "::" + std::string(name);
+    auto it = properties.find(scoped);
+    if (it != properties.end()) {
+      it->second = val;
+      // Keep the bare key in sync when writing through the most-derived type.
+      if (declared_type == type)
+        properties[std::string(name)] = val;
+      return;
+    }
+  }
+  SetProperty(name, val);
+}
+
 ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   auto* copy = arena.Create<ClassObject>();
   copy->type = type;

@@ -65,4 +65,46 @@ TEST(OverriddenMemberElaboration, BaseClassMemberAccessOk) {
              "endmodule\n"));
 }
 
+TEST(OverriddenMemberElaboration, MultiLevelOverrideThroughBaseOk) {
+  EXPECT_TRUE(
+      ElabOk("class A;\n"
+             "  integer x = 1;\n"
+             "endclass\n"
+             "class B extends A;\n"
+             "  integer x = 2;\n"
+             "endclass\n"
+             "class C extends B;\n"
+             "  integer x = 3;\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    C c;\n"
+             "    A a;\n"
+             "    c = new;\n"
+             "    a = c;\n"
+             "    automatic integer j;\n"
+             "    j = a.x;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(OverriddenMemberElaboration, NonOverriddenMemberThroughBaseOk) {
+  EXPECT_TRUE(
+      ElabOk("class Packet;\n"
+             "  integer x = 5;\n"
+             "endclass\n"
+             "class LinkedPacket extends Packet;\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    LinkedPacket lp;\n"
+             "    Packet p;\n"
+             "    lp = new;\n"
+             "    p = lp;\n"
+             "    automatic integer j;\n"
+             "    j = p.x;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace

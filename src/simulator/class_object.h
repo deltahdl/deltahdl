@@ -82,6 +82,20 @@ struct ClassObject {
   // Resolve a non-virtual method (walk type chain).
   ModuleItem* ResolveMethod(std::string_view name) const;
 
+  // §8.14: Resolve a non-virtual method starting from a declared type.
+  ModuleItem* ResolveMethodForType(std::string_view name,
+                                   const ClassTypeInfo* from_type) const;
+
+  // §8.14: Get a property scoped to a declared type (member hiding).
+  Logic4Vec GetPropertyForType(std::string_view name,
+                               const ClassTypeInfo* declared_type,
+                               Arena& arena) const;
+
+  // §8.14: Set a property scoped to a declared type (member hiding).
+  void SetPropertyForType(std::string_view name,
+                          const ClassTypeInfo* declared_type,
+                          const Logic4Vec& val);
+
   // §8.12: Create a shallow copy — new object, same type, properties copied.
   ClassObject* ShallowCopy(Arena& arena) const;
 };

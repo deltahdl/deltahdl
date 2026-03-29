@@ -189,13 +189,24 @@ static bool TryCollectionAccess(std::string_view base, std::string_view field,
 }
 
 // §8: Try class object property access.
+// §8.14: When the declared type differs from the runtime type, access
+// resolves to the declared type's version (overridden members are hidden).
 static bool TryClassPropertyAccess(Variable* base_var,
-                                   std::string_view field_name, SimContext& ctx,
+                                   std::string_view field_name,
+                                   std::string_view var_name, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   if (!base_var) return false;
   auto handle = base_var->value.ToUint64();
   auto* obj = ctx.GetClassObject(handle);
   if (!obj) return false;
+  auto declared = ctx.GetVariableClassType(var_name);
+  if (!declared.empty()) {
+    auto* declared_type = ctx.FindClassType(declared);
+    if (declared_type) {
+      out = obj->GetPropertyForType(field_name, declared_type, arena);
+      return true;
+    }
+  }
   out = obj->GetProperty(field_name, arena);
   return true;
 }
@@ -251,7 +262,8 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
     return MakeLogic4VecVal(arena, 1,
                             ctx.IsEventTriggered(base_name) ? 1u : 0u);
   }
-  if (TryClassPropertyAccess(base_var, field_name, ctx, arena, out)) return out;
+  if (TryClassPropertyAccess(base_var, field_name, base_name, ctx, arena, out))
+    return out;
   if (TryClassEnumAccess(base_var, field_name, ctx, arena, out)) return out;
   if (TryCollectionAccess(base_name, field_name, ctx, arena, out)) return out;
   if (TryEvalEnumProperty(base_name, field_name, ctx, arena, out)) return out;

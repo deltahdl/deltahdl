@@ -680,13 +680,11 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
                                       ClassObject* obj, SimContext& ctx,
                                       Arena& arena) {
   for (const auto& prop : info->properties) {
-    if (prop.init_expr) {
-      obj->properties[std::string(prop.name)] =
-          EvalExpr(prop.init_expr, ctx, arena);
-    } else {
-      obj->properties[std::string(prop.name)] =
-          MakeLogic4VecVal(arena, prop.width, 0);
-    }
+    Logic4Vec val = prop.init_expr ? EvalExpr(prop.init_expr, ctx, arena)
+                                  : MakeLogic4VecVal(arena, prop.width, 0);
+    obj->properties[std::string(prop.name)] = val;
+    std::string scoped = std::string(info->name) + "::" + std::string(prop.name);
+    obj->properties[scoped] = val;
   }
   // §8.5: Populate parameter properties with default values.
   if (info->decl) {
@@ -804,7 +802,17 @@ static bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   info.obj = ctx.GetClassObject(handle);
   if (!info.obj) return false;
   info.method = info.obj->ResolveVirtualMethod(parts.method_name);
-  if (!info.method) info.method = info.obj->ResolveMethod(parts.method_name);
+  if (!info.method) {
+    // §8.14: Non-virtual methods resolve from the declared type, not the
+    // runtime type, so overridden members are hidden through base handles.
+    auto* declared_type = ctx.FindClassType(class_type);
+    if (declared_type) {
+      info.method =
+          info.obj->ResolveMethodForType(parts.method_name, declared_type);
+    } else {
+      info.method = info.obj->ResolveMethod(parts.method_name);
+    }
+  }
   return info.method != nullptr;
 }
 
