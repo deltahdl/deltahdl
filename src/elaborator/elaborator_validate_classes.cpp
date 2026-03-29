@@ -1132,12 +1132,83 @@ static const ClassMember* FindBaseVirtualMethod(const ClassDecl* cls,
                                  : FindClassDecl(c->base_class, unit)) {
     for (const auto* m : c->members) {
       if (m->kind == ClassMemberKind::kMethod && m->method &&
-          m->method->name == method_name && m->is_virtual) {
+          m->method->name == method_name &&
+          (m->is_virtual || m->is_pure_virtual)) {
         return m;
       }
     }
   }
   return nullptr;
+}
+
+// §8.20: Find any method with ':final' in a base class by name.
+static const ClassMember* FindBaseFinalMethod(const ClassDecl* cls,
+                                              std::string_view method_name,
+                                              const CompilationUnit* unit) {
+  if (cls->base_class.empty()) return nullptr;
+  for (const auto* c = FindClassDecl(cls->base_class, unit); c;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      if (m->kind == ClassMemberKind::kMethod && m->method &&
+          m->method->name == method_name && m->method->is_method_final) {
+        return m;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// §8.20: Validate that a virtual method override has a compatible signature.
+static void ValidateOverrideSignature(const ModuleItem* base_method,
+                                      const ModuleItem* override_method,
+                                      const CompilationUnit* unit,
+                                      DiagEngine& diag) {
+  const auto& base_args = base_method->func_args;
+  const auto& over_args = override_method->func_args;
+  if (base_args.size() != over_args.size()) {
+    diag.Error(override_method->loc,
+               "virtual method override has different number of arguments");
+    return;
+  }
+  for (size_t i = 0; i < base_args.size(); ++i) {
+    if (!TypesMatch(base_args[i].data_type, over_args[i].data_type)) {
+      diag.Error(override_method->loc,
+                 std::format("virtual method override argument '{}' has "
+                             "mismatched type",
+                             over_args[i].name));
+    }
+    if (base_args[i].name != over_args[i].name) {
+      diag.Error(override_method->loc,
+                 std::format("virtual method override argument name '{}' "
+                             "does not match base '{}' ",
+                             over_args[i].name, base_args[i].name));
+    }
+    if (base_args[i].direction != over_args[i].direction) {
+      diag.Error(override_method->loc,
+                 std::format("virtual method override argument '{}' has "
+                             "mismatched direction",
+                             over_args[i].name));
+    }
+    bool base_has_default = base_args[i].default_value != nullptr;
+    bool over_has_default = over_args[i].default_value != nullptr;
+    if (base_has_default != over_has_default) {
+      diag.Error(override_method->loc,
+                 std::format("virtual method override argument '{}': "
+                             "presence of default must match",
+                             over_args[i].name));
+    }
+  }
+  if (!TypesMatch(base_method->return_type, override_method->return_type)) {
+    if (base_method->return_type.kind == DataTypeKind::kNamed &&
+        override_method->return_type.kind == DataTypeKind::kNamed &&
+        IsClassDerivedFrom(override_method->return_type.type_name,
+                           base_method->return_type.type_name, unit)) {
+      return;
+    }
+    diag.Error(override_method->loc,
+               "virtual method override has mismatched return type");
+  }
 }
 
 // §8.20: Validate a single method's override rules within a class.
@@ -1160,9 +1231,15 @@ void Elaborator::ValidateOneMethodOverride(const ClassDecl* cls,
                 "method with ':extends' does not override a virtual "
                 "base class method");
   }
-  if (base_virtual && base_virtual->method &&
-      base_virtual->method->is_method_final) {
+  // §8.20: ':final' prevents override regardless of whether the method is
+  // declared virtual in either the subclass or the base.
+  const auto* base_final = FindBaseFinalMethod(cls, method->name, unit_);
+  if (base_final) {
     diag_.Error(method->loc, "cannot override a method declared ':final'");
+  }
+  // §8.20: Validate override signature compatibility.
+  if (base_virtual && base_virtual->method) {
+    ValidateOverrideSignature(base_virtual->method, method, unit_, diag_);
   }
 }
 

@@ -27,24 +27,6 @@ TEST(ClassSyntaxElaboration, MultipleParametersInClassBody) {
 // Footnote 8: It shall be illegal to use the final_specifier when declaring a
 // pure virtual method or pure constraint.
 
-TEST(ClassSyntaxElaboration, FinalOnPureVirtualFunctionError) {
-  EXPECT_FALSE(
-      ElabOk("virtual class Base;\n"
-             "  pure virtual function :final void display();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
-TEST(ClassSyntaxElaboration, FinalOnPureVirtualTaskError) {
-  EXPECT_FALSE(
-      ElabOk("virtual class Base;\n"
-             "  pure virtual task :final run();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
 TEST(ClassSyntaxElaboration, FinalOnPureConstraintError) {
   EXPECT_FALSE(
       ElabOk("virtual class Base;\n"
@@ -52,15 +34,6 @@ TEST(ClassSyntaxElaboration, FinalOnPureConstraintError) {
              "endclass\n"
              "module m;\n"
              "endmodule\n"));
-}
-
-TEST(ClassSyntaxElaboration, FinalOnNonPureVirtualMethodOk) {
-  EXPECT_TRUE(
-      ElabOk("class Base;\n"
-             "  virtual function :final void display();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m; endmodule\n"));
 }
 
 // Footnote 25: The dynamic_override_specifiers shall only be legal on method

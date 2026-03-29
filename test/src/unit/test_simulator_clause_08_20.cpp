@@ -145,4 +145,59 @@ TEST(ClassSim, MethodFinalFlag) {
   EXPECT_TRUE(method->is_method_final);
 }
 
+TEST(ClassSim, VirtualOverridesNonVirtualInVTable) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Base", {});
+  auto* derived = MakeClassType(f, "Derived", {});
+  derived->parent = base;
+
+  auto* base_method = f.arena.Create<ModuleItem>();
+  base_method->kind = ModuleItemKind::kFunctionDecl;
+  base_method->name = "action";
+  base->methods["action"] = base_method;
+
+  auto* derived_method = f.arena.Create<ModuleItem>();
+  derived_method->kind = ModuleItemKind::kFunctionDecl;
+  derived_method->name = "action";
+  derived->vtable.push_back({"action", derived_method, derived});
+
+  auto [handle, obj] = MakeObj(f, derived);
+  EXPECT_EQ(obj->ResolveVirtualMethod("action"), derived_method);
+}
+
+TEST(ClassSim, MethodInitialFlag) {
+  SimFixture f;
+  auto* method = f.arena.Create<ModuleItem>();
+  method->kind = ModuleItemKind::kFunctionDecl;
+  method->name = "fresh";
+  method->is_method_initial = true;
+  EXPECT_TRUE(method->is_method_initial);
+  EXPECT_FALSE(method->is_method_extends);
+}
+
+TEST(ClassSim, MethodExtendsFlag) {
+  SimFixture f;
+  auto* method = f.arena.Create<ModuleItem>();
+  method->kind = ModuleItemKind::kFunctionDecl;
+  method->name = "override";
+  method->is_method_extends = true;
+  EXPECT_TRUE(method->is_method_extends);
+  EXPECT_FALSE(method->is_method_initial);
+}
+
+TEST(ClassSim, FinalMethodInVTable) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "Sealed", {});
+
+  auto* method = f.arena.Create<ModuleItem>();
+  method->kind = ModuleItemKind::kFunctionDecl;
+  method->name = "locked";
+  method->is_method_final = true;
+  type->vtable.push_back({"locked", method, type});
+
+  EXPECT_EQ(type->FindVTableIndex("locked"), 0);
+  auto [handle, obj] = MakeObj(f, type);
+  EXPECT_EQ(obj->ResolveVirtualMethod("locked"), method);
+}
+
 }  // namespace

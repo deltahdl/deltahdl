@@ -493,7 +493,12 @@ static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
   if (info->parent) info->vtable = info->parent->vtable;
   for (auto* member : cls->members) {
     if (member->kind != ClassMemberKind::kMethod || !member->method) continue;
-    if (!member->is_virtual) continue;
+    // §8.20: A virtual method may override a non-virtual method, making it
+    // virtual from that point in the hierarchy. Also include pure_virtual
+    // and methods with ':extends' (which implies virtuality per §8.20).
+    if (!member->is_virtual && !member->is_pure_virtual &&
+        !(member->method && member->method->is_method_extends))
+      continue;
     AddOrUpdateVTableEntry(info, member);
   }
 }
