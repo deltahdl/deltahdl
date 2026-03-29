@@ -876,7 +876,7 @@ void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
     }
     break;
   }
-  if (has_super_new && !cls->extends_args.empty()) {
+  if (has_super_new && (!cls->extends_args.empty() || cls->extends_has_default)) {
     diag_.Error(ctor->method->loc,
                 "constructor shall not contain super.new() when extends "
                 "specifier has arguments");

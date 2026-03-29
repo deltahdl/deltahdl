@@ -758,6 +758,45 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   for (size_t i = 0; i < chain.size(); ++i) {
     InitClassPropertyDefaults(chain[i], obj, ctx, arena);
     const Expr* args = (i == chain.size() - 1) ? new_expr : nullptr;
+    // §8.17: Forward extends specifier args to base constructor.
+    if (!args && i + 1 < chain.size() && chain[i + 1]->decl) {
+      const auto* child_decl = chain[i + 1]->decl;
+      if (!child_decl->extends_args.empty()) {
+        auto* synth = arena.Create<Expr>();
+        synth->kind = ExprKind::kCall;
+        synth->args = child_decl->extends_args;
+        args = synth;
+      } else if (child_decl->extends_has_default && new_expr) {
+        // Find the position of 'default' in the child constructor's arg list.
+        size_t default_pos = 0;
+        for (const auto* m : child_decl->members) {
+          if (m->kind == ClassMemberKind::kMethod && m->method &&
+              m->method->name == "new") {
+            for (size_t j = 0; j < m->method->func_args.size(); ++j) {
+              if (m->method->func_args[j].is_default) {
+                default_pos = j;
+                break;
+              }
+            }
+            break;
+          }
+        }
+        // Determine base constructor arg count.
+        size_t base_argc = 0;
+        auto base_it = chain[i]->methods.find("new");
+        if (base_it != chain[i]->methods.end() && base_it->second) {
+          base_argc = base_it->second->func_args.size();
+        }
+        auto* synth = arena.Create<Expr>();
+        synth->kind = ExprKind::kCall;
+        for (size_t j = 0; j < base_argc &&
+                           default_pos + j < new_expr->args.size();
+             ++j) {
+          synth->args.push_back(new_expr->args[default_pos + j]);
+        }
+        args = synth;
+      }
+    }
     RunConstructorForLevel(chain[i], obj, args, ctx, arena);
   }
 

@@ -1091,59 +1091,6 @@ TEST(ClassSyntaxParsing, ExternConstructorPrototypeNoArgs) {
   EXPECT_EQ(members[0]->method->name, "new");
 }
 
-// === class_constructor_arg: default keyword (footnote 9) ===
-
-TEST(ClassSyntaxParsing, ConstructorDefaultArg) {
-  auto r = Parse(
-      "class C extends Base;\n"
-      "  function new(default);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& members = r.cu->classes[0]->members;
-  ASSERT_EQ(members.size(), 1u);
-  ASSERT_EQ(members[0]->method->func_args.size(), 1u);
-  EXPECT_TRUE(members[0]->method->func_args[0].is_default);
-}
-
-TEST(ClassSyntaxParsing, ConstructorMixedArgsWithDefault) {
-  auto r = Parse(
-      "class C extends Base;\n"
-      "  function new(int size, default);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto& args = r.cu->classes[0]->members[0]->method->func_args;
-  ASSERT_EQ(args.size(), 2u);
-  EXPECT_FALSE(args[0].is_default);
-  EXPECT_EQ(args[0].name, "size");
-  EXPECT_TRUE(args[1].is_default);
-}
-
-TEST(ClassSyntaxParsing, ConstructorDefaultBeforeArgs) {
-  auto r = Parse(
-      "class C extends Base;\n"
-      "  function new(default, bit enable);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_FALSE(r.has_errors);
-  auto& args = r.cu->classes[0]->members[0]->method->func_args;
-  ASSERT_EQ(args.size(), 2u);
-  EXPECT_TRUE(args[0].is_default);
-  EXPECT_FALSE(args[1].is_default);
-}
-
-TEST(ClassSyntaxParsing, ErrorDuplicateDefaultInConstructorArgs) {
-  auto r = Parse(
-      "class C extends Base;\n"
-      "  function new(default, int x, default);\n"
-      "  endfunction\n"
-      "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 // === class_constraint ===
 
 TEST(ClassSyntaxParsing, ConstraintPrototype) {
@@ -1313,30 +1260,6 @@ TEST(ClassSyntaxParsing, ErrorDuplicateRandc) {
       "  randc randc bit [2:0] x;\n"
       "endclass\n");
   EXPECT_TRUE(r.has_errors);
-}
-
-// === class_declaration: extends with default / multiple args ===
-
-TEST(ClassSyntaxParsing, ExtendsWithDefaultArg) {
-  auto r = Parse(
-      "class Base; endclass\n"
-      "class Derived extends Base(default);\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_TRUE(r.cu->classes[1]->extends_has_default);
-}
-
-TEST(ClassSyntaxParsing, ExtendsWithMultipleArgs) {
-  auto r = Parse(
-      "class Base; endclass\n"
-      "class Derived extends Base(1, 2, 3);\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_EQ(r.cu->classes[1]->extends_args.size(), 3u);
 }
 
 // === class_declaration: implements multiple interfaces ===

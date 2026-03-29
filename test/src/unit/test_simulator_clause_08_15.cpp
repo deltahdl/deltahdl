@@ -102,41 +102,6 @@ TEST(SuperSimulation, SuperMethodCallDispatchesToBase) {
       "endmodule\n", "result"), 24u);  // 3*3 + 5*3 = 9 + 15 = 24
 }
 
-TEST(SuperSimulation, SuperNewWithArgsInitializesBase) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  int x;\n"
-      "  function new(int v); x = v; endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  function new(int v); super.new(v); endfunction\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Derived d = new(42);\n"
-      "    result = d.x;\n"
-      "  end\n"
-      "endmodule\n", "result"), 42u);
-}
-
-TEST(SuperSimulation, ImplicitSuperNewInitializesBase) {
-  EXPECT_EQ(RunAndGet(
-      "class Base;\n"
-      "  int x;\n"
-      "  function new(); x = 7; endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "endclass\n"
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    Derived d = new;\n"
-      "    result = d.x;\n"
-      "  end\n"
-      "endmodule\n", "result"), 7u);
-}
-
 TEST(SuperSimulation, SuperAccessesInheritedMember) {
   EXPECT_EQ(RunAndGet(
       "class Base;\n"

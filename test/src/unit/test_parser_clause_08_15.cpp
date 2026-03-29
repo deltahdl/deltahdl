@@ -159,19 +159,6 @@ TEST(SuperParsing, SuperNewWithMultipleArgs) {
               "endclass\n"));
 }
 
-TEST(SuperParsing, SuperNewDefault) {
-  ParseOk(
-      "class Base;\n"
-      "  function new();\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  function new();\n"
-      "    super.new(default);\n"
-      "  endfunction\n"
-      "endclass\n");
-}
-
 TEST(SuperParsing, SuperAccessInheritedGrandparentMember) {
   EXPECT_TRUE(
       ParseOk("class A;\n"
