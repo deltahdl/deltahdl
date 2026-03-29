@@ -1056,14 +1056,68 @@ void Elaborator::ValidateLocalProtectedAccess(const ModuleDecl* decl) {
   }
 }
 
+// §8.19: Walk statements checking for assignments to const class properties.
+static void WalkStmtsForConstClassProp(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& global_consts,
+    const std::unordered_set<std::string_view>& instance_consts,
+    bool in_constructor, DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    if (s->lhs && s->lhs->kind == ExprKind::kIdentifier) {
+      if (global_consts.count(s->lhs->text)) {
+        diag.Error(s->range.start,
+                   std::format("assignment to global constant '{}'",
+                               s->lhs->text));
+      } else if (instance_consts.count(s->lhs->text) && !in_constructor) {
+        diag.Error(
+            s->range.start,
+            std::format(
+                "assignment to instance constant '{}' outside constructor",
+                s->lhs->text));
+      }
+    }
+  }
+  for (auto* sub : s->stmts)
+    WalkStmtsForConstClassProp(sub, global_consts, instance_consts,
+                               in_constructor, diag);
+  WalkStmtsForConstClassProp(s->then_branch, global_consts, instance_consts,
+                             in_constructor, diag);
+  WalkStmtsForConstClassProp(s->else_branch, global_consts, instance_consts,
+                             in_constructor, diag);
+  WalkStmtsForConstClassProp(s->body, global_consts, instance_consts,
+                             in_constructor, diag);
+  WalkStmtsForConstClassProp(s->for_body, global_consts, instance_consts,
+                             in_constructor, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForConstClassProp(ci.body, global_consts, instance_consts,
+                               in_constructor, diag);
+}
+
 // §8.19: Validate constant class property rules.
 void Elaborator::ValidateConstClassProperties() {
   for (const auto* cls : unit_->classes) {
+    std::unordered_set<std::string_view> global_consts;
+    std::unordered_set<std::string_view> instance_consts;
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kProperty || !m->is_const) continue;
       if (!m->init_expr && m->is_static) {
         diag_.Error(m->loc, "instance constant cannot be declared static");
       }
+      if (m->init_expr) {
+        global_consts.insert(m->name);
+      } else {
+        instance_consts.insert(m->name);
+      }
+    }
+    if (global_consts.empty() && instance_consts.empty()) continue;
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+      if (!m->method->body) continue;
+      bool is_ctor = m->method->name == "new";
+      WalkStmtsForConstClassProp(m->method->body, global_consts,
+                                 instance_consts, is_ctor, diag_);
     }
   }
 }
