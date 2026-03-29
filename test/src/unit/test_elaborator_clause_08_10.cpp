@@ -70,4 +70,130 @@ TEST(StaticMethodElaboration, StaticMethodNoThisSuperOk) {
              "endmodule\n"));
 }
 
+TEST(StaticMethodElaboration, StaticMethodCallsStaticMethodOk) {
+  EXPECT_TRUE(
+      ElabOk("class Util;\n"
+             "  static int count;\n"
+             "  static function void inc();\n"
+             "    count = count + 1;\n"
+             "  endfunction\n"
+             "  static function void inc_twice();\n"
+             "    inc();\n"
+             "    inc();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  Util u;\n"
+             "endmodule\n"));
+}
+
+TEST(StaticMethodElaboration, StaticMethodThisInConditionError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  int x;\n"
+             "  static function int check();\n"
+             "    if (this.x > 0) return 1;\n"
+             "    return 0;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+TEST(StaticMethodElaboration, StaticMethodThisInAssignmentError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  int x;\n"
+             "  static function void reset();\n"
+             "    this.x = 0;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+TEST(StaticMethodElaboration, StaticTaskThisError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  int x;\n"
+             "  static task set_x();\n"
+             "    this.x = 5;\n"
+             "  endtask\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+TEST(StaticMethodElaboration, UnqualifiedNonStaticPropertyError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  int x;\n"
+             "  static function void f();\n"
+             "    x = 5;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+TEST(StaticMethodElaboration, UnqualifiedNonStaticMethodCallError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  function void helper(); endfunction\n"
+             "  static function void f();\n"
+             "    helper();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+TEST(StaticMethodElaboration, LocalShadowsNonStaticOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  int x;\n"
+             "  static function void f();\n"
+             "    int x;\n"
+             "    x = 5;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+TEST(StaticMethodElaboration, ParamShadowsNonStaticOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  int x;\n"
+             "  static function void f(int x);\n"
+             "    x = 5;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+TEST(StaticMethodElaboration, StaticMethodThisInCallArgError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  int x;\n"
+             "  static function int id(int v);\n"
+             "    return v;\n"
+             "  endfunction\n"
+             "  static function int bad();\n"
+             "    return id(this.x);\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

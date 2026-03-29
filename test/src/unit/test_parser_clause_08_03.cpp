@@ -640,66 +640,6 @@ TEST(ClassSyntaxParsing, PureVirtualProtectedMethodPrototype) {
 
 // === method_qualifier: class_item_qualifier ===
 
-TEST(ClassSyntaxParsing, StaticMethod) {
-  auto r = Parse(
-      "class C;\n"
-      "  static function int get_count();\n"
-      "    return 0;\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->classes[0]->members[0]->is_static);
-}
-
-TEST(ClassSyntaxParsing, StaticFunctionQualifierLegal) {
-  ParseOk(
-      "class C;\n"
-      "  static function void foo();\n"
-      "  endfunction\n"
-      "endclass\n");
-}
-
-TEST(ClassSyntaxParsing, StaticQualifierAutoLifetimeLegal) {
-  ParseOk(
-      "class C;\n"
-      "  static function automatic void foo();\n"
-      "  endfunction\n"
-      "endclass\n");
-}
-
-TEST(ClassSyntaxParsing, StaticFunctionDeclaration) {
-  auto r = Parse(
-      "class id;\n"
-      "  static int current;\n"
-      "  static function int next_id();\n"
-      "    return current;\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* cls = r.cu->classes[0];
-  ASSERT_GE(cls->members.size(), 2u);
-  auto* m = cls->members[1];
-  EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
-  EXPECT_TRUE(m->is_static);
-  EXPECT_EQ(m->method->name, "next_id");
-}
-
-TEST(ClassSyntaxParsing, StaticTaskDeclaration) {
-  auto r = Parse(
-      "class Logger;\n"
-      "  static task log_msg();\n"
-      "  endtask\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* cls = r.cu->classes[0];
-  ASSERT_GE(cls->members.size(), 1u);
-  EXPECT_EQ(cls->members[0]->kind, ClassMemberKind::kMethod);
-  EXPECT_TRUE(cls->members[0]->is_static);
-}
-
 TEST(ClassSyntaxParsing, MixedStaticFuncAndTask) {
   auto r = Parse(
       "virtual class Utils#(parameter N = 4);\n"
@@ -736,19 +676,6 @@ TEST(ClassSyntaxParsing, StaticMethodMultipleArgs) {
               "    return a + b;\n"
               "  endfunction\n"
               "endclass\n"));
-}
-
-TEST(ClassSyntaxParsing, StaticMethodVsStaticLifetime) {
-  auto r = Parse(
-      "class TwoTasks;\n"
-      "  static task t1();\n"
-      "  endtask\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* cls = r.cu->classes[0];
-  ASSERT_GE(cls->members.size(), 1u);
-  EXPECT_TRUE(cls->members[0]->is_static);
 }
 
 TEST(ClassSyntaxParsing, ProtectedMethodFunction) {

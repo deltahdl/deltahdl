@@ -629,6 +629,10 @@ static bool ExprRefsThisOrSuper(const Expr* e) {
   for (const auto* elem : e->elements) {
     if (ExprRefsThisOrSuper(elem)) return true;
   }
+  for (const auto* arg : e->args) {
+    if (ExprRefsThisOrSuper(arg)) return true;
+  }
+  if (ExprRefsThisOrSuper(e->with_expr)) return true;
   return false;
 }
 
@@ -652,8 +656,81 @@ static bool StmtRefsThisOrSuper(const Stmt* s) {
   return false;
 }
 
-// §8.10: Check a single class for static methods referencing this/super.
+// §8.10: Collect all local variable names declared in a method body.
+static void CollectLocalNames(const Stmt* s,
+                              std::unordered_set<std::string_view>& out) {
+  if (!s) return;
+  if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
+    out.insert(s->var_name);
+  }
+  if (s->for_init) CollectLocalNames(s->for_init, out);
+  for (auto v : s->foreach_vars) {
+    if (!v.empty()) out.insert(v);
+  }
+  for (auto* sub : s->stmts) CollectLocalNames(sub, out);
+  CollectLocalNames(s->then_branch, out);
+  CollectLocalNames(s->else_branch, out);
+  CollectLocalNames(s->body, out);
+  CollectLocalNames(s->for_body, out);
+  for (auto& ci : s->case_items) CollectLocalNames(ci.body, out);
+}
+
+// §8.10: Check if an expression contains an unqualified non-static member ref.
+static bool ExprRefsNonStaticMember(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& non_static,
+    const std::unordered_set<std::string_view>& locals) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kIdentifier &&
+      non_static.count(e->text) && !locals.count(e->text))
+    return true;
+  if (e->kind == ExprKind::kCall && !e->callee.empty() &&
+      non_static.count(e->callee) && !locals.count(e->callee))
+    return true;
+  if (ExprRefsNonStaticMember(e->lhs, non_static, locals)) return true;
+  if (ExprRefsNonStaticMember(e->rhs, non_static, locals)) return true;
+  if (ExprRefsNonStaticMember(e->base, non_static, locals)) return true;
+  if (ExprRefsNonStaticMember(e->index, non_static, locals)) return true;
+  if (ExprRefsNonStaticMember(e->condition, non_static, locals)) return true;
+  if (ExprRefsNonStaticMember(e->true_expr, non_static, locals)) return true;
+  if (ExprRefsNonStaticMember(e->false_expr, non_static, locals)) return true;
+  for (const auto* elem : e->elements) {
+    if (ExprRefsNonStaticMember(elem, non_static, locals)) return true;
+  }
+  for (const auto* arg : e->args) {
+    if (ExprRefsNonStaticMember(arg, non_static, locals)) return true;
+  }
+  if (ExprRefsNonStaticMember(e->with_expr, non_static, locals)) return true;
+  return false;
+}
+
+// §8.10: Walk statements looking for unqualified non-static member references.
+static bool StmtRefsNonStaticMember(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& non_static,
+    const std::unordered_set<std::string_view>& locals) {
+  if (!s) return false;
+  if (ExprRefsNonStaticMember(s->lhs, non_static, locals)) return true;
+  if (ExprRefsNonStaticMember(s->rhs, non_static, locals)) return true;
+  if (ExprRefsNonStaticMember(s->expr, non_static, locals)) return true;
+  if (ExprRefsNonStaticMember(s->condition, non_static, locals)) return true;
+  for (auto* sub : s->stmts) {
+    if (StmtRefsNonStaticMember(sub, non_static, locals)) return true;
+  }
+  if (StmtRefsNonStaticMember(s->then_branch, non_static, locals)) return true;
+  if (StmtRefsNonStaticMember(s->else_branch, non_static, locals)) return true;
+  if (StmtRefsNonStaticMember(s->body, non_static, locals)) return true;
+  if (StmtRefsNonStaticMember(s->for_body, non_static, locals)) return true;
+  for (auto& ci : s->case_items) {
+    if (StmtRefsNonStaticMember(ci.body, non_static, locals)) return true;
+  }
+  return false;
+}
+
+// §8.10: Check a single class for static methods referencing this/super
+// or unqualified non-static members.
 void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
+  // First pass: check for this/super.
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kMethod || !m->is_static) continue;
     if (!m->method) continue;
@@ -662,6 +739,44 @@ void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
         diag_.Error(m->method->loc,
                     "'this' and 'super' shall not be used in "
                     "a static method");
+        break;
+      }
+    }
+  }
+
+  // Collect non-static member names for unqualified access check.
+  std::unordered_set<std::string_view> non_static;
+  for (const auto* member : cls->members) {
+    if (member->is_static) continue;
+    if (member->kind == ClassMemberKind::kProperty && !member->name.empty()) {
+      non_static.insert(member->name);
+    } else if (member->kind == ClassMemberKind::kMethod && member->method &&
+               member->method->name != "new") {
+      non_static.insert(member->method->name);
+    }
+  }
+  if (non_static.empty()) return;
+
+  // Second pass: check for unqualified non-static member access.
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kMethod || !m->is_static) continue;
+    if (!m->method) continue;
+
+    std::unordered_set<std::string_view> locals;
+    for (const auto& arg : m->method->func_args) {
+      if (!arg.name.empty()) locals.insert(arg.name);
+    }
+    if (m->method->kind == ModuleItemKind::kFunctionDecl) {
+      locals.insert(m->method->name);
+    }
+    for (const auto* s : m->method->func_body_stmts) {
+      CollectLocalNames(s, locals);
+    }
+
+    for (const auto* s : m->method->func_body_stmts) {
+      if (StmtRefsNonStaticMember(s, non_static, locals)) {
+        diag_.Error(m->method->loc,
+                    "static method shall not access non-static members");
         break;
       }
     }
