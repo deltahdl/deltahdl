@@ -1633,6 +1633,164 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
   }
 }
 
+// §8.26.6.1: Check whether two method signatures are compatible (same return
+// type, same argument count, same argument types).
+static bool MethodSignaturesCompatible(const ModuleItem* a,
+                                       const ModuleItem* b) {
+  if (!TypesMatch(a->return_type, b->return_type)) return false;
+  if (a->func_args.size() != b->func_args.size()) return false;
+  for (size_t i = 0; i < a->func_args.size(); ++i) {
+    if (!TypesMatch(a->func_args[i].data_type, b->func_args[i].data_type))
+      return false;
+    if (a->func_args[i].direction != b->func_args[i].direction) return false;
+  }
+  return true;
+}
+
+// §8.26.6.1: Collect all pure virtual methods from an interface class and all
+// its extended parents into a map keyed by method name.
+using IfaceMethodMap =
+    std::unordered_map<std::string_view,
+                       std::vector<std::pair<std::string_view,
+                                             const ModuleItem*>>>;
+
+static void CollectInterfacePureVirtualMethods(
+    const ClassDecl* iface, std::string_view iface_name,
+    const CompilationUnit* unit, IfaceMethodMap& out,
+    std::unordered_set<std::string_view>& visited) {
+  if (!visited.insert(iface_name).second) return;
+  for (const auto* m : iface->members) {
+    if (m->kind != ClassMemberKind::kMethod || !m->is_pure_virtual) continue;
+    if (!m->method) continue;
+    out[m->method->name].push_back({iface_name, m->method});
+  }
+  if (!iface->base_class.empty()) {
+    const auto* base = FindClassDecl(iface->base_class, unit);
+    if (base && base->is_interface)
+      CollectInterfacePureVirtualMethods(base, iface->base_class, unit, out,
+                                         visited);
+  }
+  for (auto ext_name : iface->extends_interfaces) {
+    const auto* ext = FindClassDecl(ext_name, unit);
+    if (ext && ext->is_interface)
+      CollectInterfacePureVirtualMethods(ext, ext_name, unit, out, visited);
+  }
+}
+
+// §8.26: Collect all implemented interfaces from the class hierarchy.
+static void CollectImplementedInterfaces(
+    const ClassDecl* cls, const CompilationUnit* unit,
+    std::vector<std::string_view>& out) {
+  for (auto iface : cls->implements_types) {
+    out.push_back(iface);
+  }
+  if (!cls->base_class.empty()) {
+    const auto* base = FindClassDecl(cls->base_class, unit);
+    if (base && !base->is_interface) {
+      CollectImplementedInterfaces(base, unit, out);
+    }
+  }
+}
+
+// §8.26.6.1: Validate method name conflicts for a class implementing
+// interfaces, or an interface extending multiple interfaces.
+static void ValidateMethodNameConflicts(
+    const ClassDecl* cls, const CompilationUnit* unit, DiagEngine& diag) {
+  IfaceMethodMap iface_methods;
+  std::unordered_set<std::string_view> visited;
+
+  if (cls->is_interface) {
+    // Interface class extending multiple interfaces.
+    if (!cls->base_class.empty()) {
+      const auto* base = FindClassDecl(cls->base_class, unit);
+      if (base && base->is_interface)
+        CollectInterfacePureVirtualMethods(base, cls->base_class, unit,
+                                           iface_methods, visited);
+    }
+    for (auto ext_name : cls->extends_interfaces) {
+      const auto* ext = FindClassDecl(ext_name, unit);
+      if (ext && ext->is_interface)
+        CollectInterfacePureVirtualMethods(ext, ext_name, unit, iface_methods,
+                                           visited);
+    }
+  } else {
+    // Regular/virtual class implementing interfaces.
+    std::vector<std::string_view> all_ifaces;
+    CollectImplementedInterfaces(cls, unit, all_ifaces);
+    std::unordered_set<std::string_view> seen_iface;
+    for (auto iface_name : all_ifaces) {
+      if (!seen_iface.insert(iface_name).second) continue;
+      const auto* iface = FindClassDecl(iface_name, unit);
+      if (!iface || !iface->is_interface) continue;
+      CollectInterfacePureVirtualMethods(iface, iface_name, unit,
+                                         iface_methods, visited);
+    }
+  }
+
+  // Check that all same-named methods from different interfaces have compatible
+  // signatures.
+  for (const auto& [method_name, entries] : iface_methods) {
+    if (entries.size() < 2) continue;
+    const auto* first_method = entries[0].second;
+    for (size_t i = 1; i < entries.size(); ++i) {
+      if (!MethodSignaturesCompatible(first_method, entries[i].second)) {
+        diag.Error(
+            cls->range.start,
+            std::format("method name conflict for '{}' in '{}': incompatible "
+                        "signatures in interface '{}' and interface '{}'",
+                        method_name, cls->name, entries[0].first,
+                        entries[i].first));
+        break;
+      }
+    }
+  }
+
+  // For non-interface classes: validate that the implementing method's signature
+  // matches each interface method's signature.
+  if (!cls->is_interface) {
+    for (const auto& [method_name, entries] : iface_methods) {
+      // Find the concrete virtual method in the class hierarchy.
+      const ModuleItem* impl = nullptr;
+      for (const auto* cm : cls->members) {
+        if (cm->kind == ClassMemberKind::kMethod && cm->method &&
+            cm->method->name == method_name &&
+            (cm->is_virtual || cm->is_pure_virtual)) {
+          impl = cm->method;
+          break;
+        }
+      }
+      if (!impl) {
+        for (const auto* walk = cls->base_class.empty()
+                                    ? nullptr
+                                    : FindClassDecl(cls->base_class, unit);
+             walk; walk = walk->base_class.empty()
+                              ? nullptr
+                              : FindClassDecl(walk->base_class, unit)) {
+          for (const auto* bm : walk->members) {
+            if (bm->kind == ClassMemberKind::kMethod && bm->method &&
+                bm->method->name == method_name && bm->is_virtual) {
+              impl = bm->method;
+              break;
+            }
+          }
+          if (impl) break;
+        }
+      }
+      if (!impl) continue;
+      for (const auto& [iface_name, iface_method] : entries) {
+        if (!MethodSignaturesCompatible(impl, iface_method)) {
+          diag.Error(
+              impl->loc,
+              std::format("method '{}' does not match signature of pure "
+                          "virtual method '{}' in interface '{}'",
+                          method_name, method_name, iface_name));
+          break;
+        }
+      }
+    }
+  }
+}
+
 // §8.26: Check whether a class hierarchy has a concrete virtual method.
 static bool HasConcreteVirtualMethodInHierarchy(const ClassDecl* cls,
                                                 std::string_view method_name,
@@ -1675,21 +1833,6 @@ static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
   }
 }
 
-// §8.26: Collect all implemented interfaces from the class hierarchy.
-static void CollectImplementedInterfaces(
-    const ClassDecl* cls, const CompilationUnit* unit,
-    std::vector<std::string_view>& out) {
-  for (auto iface : cls->implements_types) {
-    out.push_back(iface);
-  }
-  if (!cls->base_class.empty()) {
-    const auto* base = FindClassDecl(cls->base_class, unit);
-    if (base && !base->is_interface) {
-      CollectImplementedInterfaces(base, unit, out);
-    }
-  }
-}
-
 // §8.26: Validate that a non-abstract class implements all interface methods.
 void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
   if (cls->is_virtual) return;
@@ -1715,6 +1858,8 @@ void Elaborator::ValidateInterfaceClassRules() {
       ValidateRegularClassInheritance(cls);
       ValidateImplementsInterfaceMethods(cls);
     }
+    // §8.26.6.1: Check for method name conflicts across interfaces.
+    ValidateMethodNameConflicts(cls, unit_, diag_);
   }
 }
 
