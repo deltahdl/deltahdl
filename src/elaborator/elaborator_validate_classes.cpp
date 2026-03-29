@@ -1848,6 +1848,86 @@ void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
   }
 }
 
+// §8.26.6.2: Collect the effective set of param/typedef names visible from an
+// interface class, mapping each name to its originating interface class(es).
+using NameOriginMap =
+    std::unordered_map<std::string_view,
+                       std::unordered_set<std::string_view>>;
+
+static void CollectOwnParamTypeNames(
+    const ClassDecl* iface,
+    std::unordered_set<std::string_view>& own_names) {
+  for (const auto& [pname, _] : iface->params)
+    own_names.insert(pname);
+  for (const auto* m : iface->members) {
+    if (m->kind == ClassMemberKind::kTypedef)
+      own_names.insert(m->name);
+    else if (m->kind == ClassMemberKind::kProperty)
+      own_names.insert(m->name);
+  }
+}
+
+static void CollectEffectiveParamTypeNames(
+    const ClassDecl* iface, const CompilationUnit* unit,
+    NameOriginMap& out) {
+  std::unordered_set<std::string_view> own_names;
+  CollectOwnParamTypeNames(iface, own_names);
+  for (auto n : own_names)
+    out[n].insert(iface->name);
+  auto inherit = [&](const ClassDecl* parent) {
+    NameOriginMap parent_map;
+    CollectEffectiveParamTypeNames(parent, unit, parent_map);
+    for (const auto& [name, origins] : parent_map) {
+      if (own_names.count(name)) continue;
+      for (auto o : origins) out[name].insert(o);
+    }
+  };
+  if (!iface->base_class.empty()) {
+    const auto* base = FindClassDecl(iface->base_class, unit);
+    if (base && base->is_interface) inherit(base);
+  }
+  for (auto ext_name : iface->extends_interfaces) {
+    const auto* ext = FindClassDecl(ext_name, unit);
+    if (ext && ext->is_interface) inherit(ext);
+  }
+}
+
+// §8.26.6.2: Validate that parameter/type declaration name collisions from
+// multiple parent interface classes are overridden by the subclass.
+static void ValidateParamTypeConflicts(
+    const ClassDecl* cls, const CompilationUnit* unit, DiagEngine& diag) {
+  if (!cls->is_interface) return;
+  std::unordered_set<std::string_view> own_names;
+  CollectOwnParamTypeNames(cls, own_names);
+  NameOriginMap inherited;
+  auto process = [&](const ClassDecl* parent) {
+    NameOriginMap parent_map;
+    CollectEffectiveParamTypeNames(parent, unit, parent_map);
+    for (const auto& [name, origins] : parent_map) {
+      if (own_names.count(name)) continue;
+      for (auto o : origins) inherited[name].insert(o);
+    }
+  };
+  if (!cls->base_class.empty()) {
+    const auto* base = FindClassDecl(cls->base_class, unit);
+    if (base && base->is_interface) process(base);
+  }
+  for (auto ext_name : cls->extends_interfaces) {
+    const auto* ext = FindClassDecl(ext_name, unit);
+    if (ext && ext->is_interface) process(ext);
+  }
+  for (const auto& [name, origins] : inherited) {
+    if (origins.size() > 1) {
+      diag.Error(
+          cls->range.start,
+          std::format("parameter or type '{}' in interface class '{}' is "
+                      "inherited from multiple interface classes and must be "
+                      "overridden",
+                      name, cls->name));
+    }
+  }
+}
+
 // §8.26: Validate interface class rules.
 void Elaborator::ValidateInterfaceClassRules() {
   for (const auto* cls : unit_->classes) {
@@ -1860,6 +1940,8 @@ void Elaborator::ValidateInterfaceClassRules() {
     }
     // §8.26.6.1: Check for method name conflicts across interfaces.
     ValidateMethodNameConflicts(cls, unit_, diag_);
+    // §8.26.6.2: Check for parameter/type declaration name collisions.
+    ValidateParamTypeConflicts(cls, unit_, diag_);
   }
 }
 
