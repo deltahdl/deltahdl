@@ -17,6 +17,9 @@ int ClassTypeInfo::FindVTableIndex(std::string_view mname) const {
 bool ClassTypeInfo::IsA(const ClassTypeInfo* other) const {
   for (const auto* cur = this; cur != nullptr; cur = cur->parent) {
     if (cur == other) return true;
+    for (const auto* iface : cur->extended_interfaces) {
+      if (iface && iface->IsA(other)) return true;
+    }
   }
   return false;
 }

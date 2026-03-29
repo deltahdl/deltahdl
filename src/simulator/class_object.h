@@ -33,6 +33,7 @@ struct ClassTypeInfo {
   const ClassDecl* decl = nullptr;
   bool is_abstract = false;
   bool is_interface = false;  // §8.26: interface class
+  std::vector<const ClassTypeInfo*> extended_interfaces;  // §8.26.1: additional extends
 
   // Property metadata (name -> default init value).
   struct PropertyInfo {

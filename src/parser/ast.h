@@ -777,6 +777,7 @@ struct ClassDecl {
   std::vector<DataType> base_class_type_params;  // §8.25: extends C #(...)
   std::vector<Expr*> extends_args;   // §8.3: extends constructor args
   bool extends_has_default = false;  // §8.3: extends Base(default)
+  std::vector<std::string_view> extends_interfaces;  // §8.26.1: additional extends bases
   std::vector<std::string_view> implements_types;  // §8.3/§8.26: implements
   std::vector<ClassMember*> members;
   std::vector<std::pair<std::string_view, Expr*>> params;

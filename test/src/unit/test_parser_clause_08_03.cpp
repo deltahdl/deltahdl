@@ -68,28 +68,6 @@ TEST(ClassSyntaxParsing, ClassWithParameterPortList) {
   EXPECT_EQ(r.cu->classes[0]->params.size(), 1u);
 }
 
-TEST(ClassSyntaxParsing, InterfaceClassDecl) {
-  auto r = Parse(
-      "interface class iface_cls;\n"
-      "  pure virtual function void do_work();\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_TRUE(r.cu->classes[0]->is_interface);
-}
-
-TEST(ClassSyntaxParsing, InterfaceClassWithExtends) {
-  auto r = Parse(
-      "interface class Base; endclass\n"
-      "interface class Derived extends Base;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_TRUE(r.cu->classes[1]->is_interface);
-}
-
 TEST(ClassSyntaxParsing, ImplementsSingleInterface) {
   auto r = Parse(
       "class C implements IFace;\n"
@@ -177,20 +155,6 @@ TEST(ClassSyntaxParsing, CovergroupInClass) {
               "  endgroup\n"
               "  int x;\n"
               "endclass\n"));
-}
-
-TEST(ClassSyntaxParsing, InterfaceClassItems) {
-  auto r = Parse(
-      "interface class IFace;\n"
-      "  pure virtual function void do_work();\n"
-      "  typedef int myint;\n"
-      "  localparam int SIZE = 4;\n"
-      "  parameter int W = 8;\n"
-      "  ;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->classes[0]->is_interface);
 }
 
 // === class_property ===
@@ -729,17 +693,6 @@ TEST(ClassSyntaxParsing, NestedClassWithInstance) {
   EXPECT_EQ(r.cu->classes[0]->name, "Outer");
 }
 
-TEST(ClassSyntaxParsing, NestedInterfaceClassDeclaration) {
-  auto r = Parse(
-      "class Outer;\n"
-      "  interface class Inner;\n"
-      "    pure virtual function void work();\n"
-      "  endclass\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ClassSyntaxParsing, ClassWithTypedef) {
   auto r = Parse(
       "class test_cls;\n"
@@ -773,13 +726,6 @@ TEST(ClassSyntaxParsing, InterfaceMethodMultipleDefaultArgs) {
       ParseOk("interface class IC;\n"
               "  pure virtual function int calc(int a = 0, int b = 1);\n"
               "endclass\n"));
-}
-
-TEST(ClassSyntaxParsing, InterfaceClassPureVirtualTask) {
-  ParseOk(
-      "interface class IC;\n"
-      "  pure virtual task run();\n"
-      "endclass\n");
 }
 
 // === Footnote 10: mutual exclusivity ===

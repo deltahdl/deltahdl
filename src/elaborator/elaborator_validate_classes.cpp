@@ -1465,6 +1465,15 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
                             "non-interface class '{}'",
                             cls->name, cls->base_class));
   }
+  for (auto iface_name : cls->extends_interfaces) {
+    const auto* ibase = FindClassDecl(iface_name, unit_);
+    if (ibase && !ibase->is_interface) {
+      diag_.Error(cls->range.start,
+                  std::format("interface class '{}' cannot extend "
+                              "non-interface class '{}'",
+                              cls->name, iface_name));
+    }
+  }
 }
 
 // §8.26.2: Validate that a regular class does not extend an interface class.

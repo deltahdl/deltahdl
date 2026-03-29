@@ -205,8 +205,12 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
     }
     if (is_implements) {
       decl->implements_types.push_back(name);
-    } else if (decl->base_class.empty()) {
-      decl->base_class = name;
+    } else {
+      if (decl->base_class.empty()) {
+        decl->base_class = name;
+      } else {
+        decl->extends_interfaces.push_back(name);
+      }
     }
     if (Check(TokenKind::kHash)) {
       Consume();

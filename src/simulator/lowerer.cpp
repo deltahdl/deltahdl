@@ -491,6 +491,16 @@ static void AddOrUpdateVTableEntry(ClassTypeInfo* info,
 // §8.22: Build vtable for polymorphic dispatch from class members.
 static void BuildVTable(ClassTypeInfo* info, const ClassDecl* cls) {
   if (info->parent) info->vtable = info->parent->vtable;
+  for (const auto* iface : info->extended_interfaces) {
+    if (!iface) continue;
+    for (const auto& entry : iface->vtable) {
+      bool found = false;
+      for (const auto& existing : info->vtable) {
+        if (existing.method_name == entry.method_name) { found = true; break; }
+      }
+      if (!found) info->vtable.push_back(entry);
+    }
+  }
   for (auto* member : cls->members) {
     if (member->kind != ClassMemberKind::kMethod || !member->method) continue;
     // §8.20: A virtual method may override a non-virtual method, making it
@@ -529,6 +539,10 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
   // §8.13: Wire parent linkage from base_class.
   if (!cls->base_class.empty())
     info->parent = ctx_.FindClassType(cls->base_class);
+  for (auto iface_name : cls->extends_interfaces) {
+    auto* iface = ctx_.FindClassType(iface_name);
+    if (iface) info->extended_interfaces.push_back(iface);
+  }
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
       uint32_t w = EvalTypeWidth(member->data_type, {});
