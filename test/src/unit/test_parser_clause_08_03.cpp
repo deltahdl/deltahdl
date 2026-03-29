@@ -90,28 +90,6 @@ TEST(ClassSyntaxParsing, InterfaceClassWithExtends) {
   EXPECT_TRUE(r.cu->classes[1]->is_interface);
 }
 
-TEST(ClassSyntaxParsing, ClassWithFinal) {
-  auto r = Parse("class :final C; endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  EXPECT_TRUE(r.cu->classes[0]->is_final);
-  EXPECT_EQ(r.cu->classes[0]->name, "C");
-}
-
-TEST(ClassSyntaxParsing, FinalClassWithExtends) {
-  auto r = Parse(
-      "class Base;\n"
-      "endclass\n"
-      "class :final TopPacket extends Base;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_TRUE(r.cu->classes[1]->is_final);
-  EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
-}
-
 TEST(ClassSyntaxParsing, ImplementsSingleInterface) {
   auto r = Parse(
       "class C implements IFace;\n"

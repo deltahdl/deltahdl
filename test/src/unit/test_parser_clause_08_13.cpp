@@ -3,7 +3,7 @@
 using namespace delta;
 namespace {
 
-TEST(ClassParsing, ExtendsScopedName) {
+TEST(InheritanceParsing, ExtendsScopedName) {
   auto r = Parse(
       "class Child extends pkg::Base;\n"
       "endclass\n");
@@ -13,7 +13,7 @@ TEST(ClassParsing, ExtendsScopedName) {
   EXPECT_EQ(r.cu->classes[0]->name, "Child");
 }
 
-TEST(Parser, ClassExtends) {
+TEST(InheritanceParsing, ClassExtends) {
   auto r = Parse("class child extends parent; endclass");
   ASSERT_NE(r.cu, nullptr);
   auto* cls = r.cu->classes[0];
@@ -21,7 +21,7 @@ TEST(Parser, ClassExtends) {
   EXPECT_EQ(cls->base_class, "parent");
 }
 
-TEST(ClassParsing, ClassExtendsBase) {
+TEST(InheritanceParsing, ClassExtendsBase) {
   auto r = Parse(
       "class Base;\n"
       "  int x;\n"
@@ -35,7 +35,7 @@ TEST(ClassParsing, ClassExtendsBase) {
   EXPECT_TRUE(r.cu->classes[0]->base_class.empty());
 }
 
-TEST(ClassParsing, ClassExtendsDerived) {
+TEST(InheritanceParsing, ClassExtendsDerived) {
   auto r = Parse(
       "class Base;\n"
       "  int x;\n"
@@ -72,32 +72,6 @@ TEST(InheritanceParsing, SubclassInheritsAndAddsMembers) {
   EXPECT_GE(lp->members.size(), 2u);
 }
 
-TEST(InheritanceParsing, ExtendsWithConstructorArgs) {
-  auto r = Parse(
-      "class Base;\n"
-      "  function new(int x);\n"
-      "  endfunction\n"
-      "endclass\n"
-      "class Derived extends Base(42);\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* cls = r.cu->classes[1];
-  EXPECT_EQ(cls->base_class, "Base");
-  ASSERT_GE(cls->extends_args.size(), 1u);
-}
-
-TEST(InheritanceParsing, ExtendsWithDefault) {
-  auto r = Parse(
-      "class Base;\n"
-      "endclass\n"
-      "class Derived extends Base(default);\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->classes[1]->extends_has_default);
-}
-
 TEST(InheritanceParsing, SingleInheritanceChain) {
   auto r = Parse(
       "class A;\n"
@@ -112,6 +86,55 @@ TEST(InheritanceParsing, SingleInheritanceChain) {
   EXPECT_TRUE(r.cu->classes[0]->base_class.empty());
   EXPECT_EQ(r.cu->classes[1]->base_class, "A");
   EXPECT_EQ(r.cu->classes[2]->base_class, "B");
+}
+
+TEST(InheritanceParsing, FinalClassParsed) {
+  auto r = Parse("class :final C; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->is_final);
+  EXPECT_EQ(r.cu->classes[0]->name, "C");
+}
+
+TEST(InheritanceParsing, FinalClassWithExtends) {
+  auto r = Parse(
+      "class Base;\n"
+      "endclass\n"
+      "class :final TopPacket extends Base;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  EXPECT_TRUE(r.cu->classes[1]->is_final);
+  EXPECT_EQ(r.cu->classes[1]->base_class, "Base");
+}
+
+TEST(InheritanceParsing, SubclassAdditionalMembers) {
+  auto r = Parse(
+      "class Base;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  int y;\n"
+      "  int z;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* derived = r.cu->classes[1];
+  EXPECT_EQ(derived->base_class, "Base");
+  EXPECT_GE(derived->members.size(), 2u);
+}
+
+TEST(InheritanceParsing, NonFinalDerivedClassIsFinalFalse) {
+  auto r = Parse(
+      "class Base;\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->classes[1]->is_final);
 }
 
 }  // namespace

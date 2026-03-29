@@ -69,20 +69,4 @@ TEST(OverriddenMemberParsing, AccessThroughBaseClassVariable) {
               "endmodule\n"));
 }
 
-TEST(OverriddenMemberParsing, SubclassAdditionalMembers) {
-  auto r = Parse(
-      "class Base;\n"
-      "  int x;\n"
-      "endclass\n"
-      "class Derived extends Base;\n"
-      "  int y;\n"
-      "  int z;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* derived = r.cu->classes[1];
-  EXPECT_EQ(derived->base_class, "Base");
-  EXPECT_GE(derived->members.size(), 2u);
-}
-
 }  // namespace

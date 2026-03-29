@@ -64,4 +64,33 @@ TEST(InheritanceElaboration, ExtendFinalInChainError) {
              "endmodule\n"));
 }
 
+TEST(InheritanceElaboration, SubclassWithAdditionalMembersOk) {
+  EXPECT_TRUE(
+      ElabOk("class Packet;\n"
+             "  int data;\n"
+             "endclass\n"
+             "class LinkedPacket extends Packet;\n"
+             "  LinkedPacket next;\n"
+             "  function LinkedPacket get_next();\n"
+             "    get_next = next;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  LinkedPacket lp;\n"
+             "endmodule\n"));
+}
+
+TEST(InheritanceElaboration, FinalDerivedClassOk) {
+  EXPECT_TRUE(
+      ElabOk("class Base;\n"
+             "  int x;\n"
+             "endclass\n"
+             "class :final Leaf extends Base;\n"
+             "  int y;\n"
+             "endclass\n"
+             "module m;\n"
+             "  Leaf l;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

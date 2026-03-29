@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ClassSim, InheritanceParentLink) {
+TEST(InheritanceSimulation, InheritanceParentLink) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {"x"});
   auto* derived = MakeClassType(f, "Derived", {"y"});
@@ -20,7 +20,7 @@ TEST(ClassSim, InheritanceParentLink) {
   EXPECT_EQ(derived->parent->name, "Base");
 }
 
-TEST(ClassSim, InheritedMethodResolution) {
+TEST(InheritanceSimulation, InheritedMethodResolution) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {"x"});
 
@@ -40,7 +40,7 @@ TEST(ClassSim, InheritedMethodResolution) {
   EXPECT_EQ(resolved->name, "get_x");
 }
 
-TEST(ClassSim, InheritanceChainPropertyAccess) {
+TEST(InheritanceSimulation, InheritanceChainPropertyAccess) {
   SimFixture f;
   auto* grand = MakeClassType(f, "Grand", {"a"});
   auto* parent = MakeClassType(f, "Parent", {"b"});
@@ -58,7 +58,7 @@ TEST(ClassSim, InheritanceChainPropertyAccess) {
   EXPECT_EQ(obj->GetProperty("c", f.arena).ToUint64(), 3u);
 }
 
-TEST(ClassSim, MethodResolutionWalksChain) {
+TEST(InheritanceSimulation, MethodResolutionWalksChain) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {});
   auto* mid = MakeClassType(f, "Mid", {});
@@ -76,13 +76,13 @@ TEST(ClassSim, MethodResolutionWalksChain) {
   EXPECT_EQ(resolved, m);
 }
 
-TEST(ClassSim, IsAReflexive) {
+TEST(InheritanceSimulation, IsAReflexive) {
   SimFixture f;
   auto* type = MakeClassType(f, "A", {});
   EXPECT_TRUE(type->IsA(type));
 }
 
-TEST(ClassSim, IsADerived) {
+TEST(InheritanceSimulation, IsADerived) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {});
   auto* derived = MakeClassType(f, "Derived", {});
@@ -92,7 +92,7 @@ TEST(ClassSim, IsADerived) {
   EXPECT_FALSE(base->IsA(derived));
 }
 
-TEST(ClassSim, IsAMultiLevel) {
+TEST(InheritanceSimulation, IsAMultiLevel) {
   SimFixture f;
   auto* a = MakeClassType(f, "A", {});
   auto* b = MakeClassType(f, "B", {});
@@ -105,7 +105,7 @@ TEST(ClassSim, IsAMultiLevel) {
   EXPECT_FALSE(a->IsA(c));
 }
 
-TEST(ClassSim, DerivedMethodOverridesBase) {
+TEST(InheritanceSimulation, DerivedMethodOverridesBase) {
   SimFixture f;
   auto* base = MakeClassType(f, "Base", {});
   auto* base_method = f.arena.Create<ModuleItem>();
@@ -123,6 +123,25 @@ TEST(ClassSim, DerivedMethodOverridesBase) {
   auto [handle, obj] = MakeObj(f, derived);
   auto* resolved = obj->ResolveMethod("get");
   EXPECT_EQ(resolved, derived_method);
+}
+
+TEST(InheritanceSimulation, IsAUnrelatedTypes) {
+  SimFixture f;
+  auto* a = MakeClassType(f, "A", {});
+  auto* b = MakeClassType(f, "B", {});
+
+  EXPECT_FALSE(a->IsA(b));
+  EXPECT_FALSE(b->IsA(a));
+}
+
+TEST(InheritanceSimulation, MethodNotFoundReturnsNull) {
+  SimFixture f;
+  auto* base = MakeClassType(f, "Base", {});
+  auto* derived = MakeClassType(f, "Derived", {});
+  derived->parent = base;
+
+  auto [handle, obj] = MakeObj(f, derived);
+  EXPECT_EQ(obj->ResolveMethod("nonexistent"), nullptr);
 }
 
 }  // namespace
