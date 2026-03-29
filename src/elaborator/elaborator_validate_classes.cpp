@@ -1435,6 +1435,16 @@ void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
                   std::format("interface class '{}' shall not contain "
                               "constraint blocks",
                               cls->name));
+    } else if (m->kind == ClassMemberKind::kCovergroup) {
+      diag_.Error(cls->range.start,
+                  std::format("interface class '{}' shall not contain "
+                              "covergroups",
+                              cls->name));
+    } else if (m->kind == ClassMemberKind::kClassDecl) {
+      diag_.Error(cls->range.start,
+                  std::format("interface class '{}' shall not contain "
+                              "nested classes",
+                              cls->name));
     }
   }
 }
@@ -1511,10 +1521,30 @@ static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
   }
 }
 
+// §8.26: Collect all implemented interfaces from the class hierarchy.
+static void CollectImplementedInterfaces(
+    const ClassDecl* cls, const CompilationUnit* unit,
+    std::vector<std::string_view>& out) {
+  for (auto iface : cls->implements_types) {
+    out.push_back(iface);
+  }
+  if (!cls->base_class.empty()) {
+    const auto* base = FindClassDecl(cls->base_class, unit);
+    if (base && !base->is_interface) {
+      CollectImplementedInterfaces(base, unit, out);
+    }
+  }
+}
+
 // §8.26: Validate that a non-abstract class implements all interface methods.
 void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
-  if (cls->is_virtual || cls->implements_types.empty()) return;
-  for (auto iface_name : cls->implements_types) {
+  if (cls->is_virtual) return;
+  std::vector<std::string_view> all_ifaces;
+  CollectImplementedInterfaces(cls, unit_, all_ifaces);
+  if (all_ifaces.empty()) return;
+  std::unordered_set<std::string_view> seen;
+  for (auto iface_name : all_ifaces) {
+    if (!seen.insert(iface_name).second) continue;
     const auto* iface = FindClassDecl(iface_name, unit_);
     if (!iface) continue;
     CheckInterfaceMethods(cls, iface, iface_name, unit_, diag_);
