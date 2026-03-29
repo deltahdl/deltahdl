@@ -297,6 +297,10 @@ class SimContext {
   // §8.29: Garbage collection — reclaim unreachable objects.
   void CollectGarbage();
 
+  // §8.30.1: Register/unregister a weak reference for GC clearing.
+  void RegisterWeakReference(WeakReference* wr);
+  void UnregisterWeakReference(WeakReference* wr);
+
   // §8.11: `this` pointer management for method calls.
   void PushThis(ClassObject* obj);
   void PopThis();
@@ -373,6 +377,8 @@ class SimContext {
   // §8: Object heap — maps handle ID to ClassObject.
   std::unordered_map<uint64_t, ClassObject*> class_objects_;
   uint64_t next_handle_id_ = 1;
+  // §8.30.1: Registered weak references for GC clearing.
+  std::unordered_set<WeakReference*> weak_references_;
   // §8.11: Stack of `this` pointers for nested method calls.
   std::vector<ClassObject*> this_stack_;
   // §7.10.3: Stack of queue ref binding frames for nested function calls.

@@ -192,6 +192,8 @@ void Elaborator::RegisterCuScopeItems() {
   class_names_.insert("semaphore");
   // §15.4: mailbox is a built-in class type in the std package.
   class_names_.insert("mailbox");
+  // §8.30.1: weak_reference is a built-in parameterized class in the std package.
+  class_names_.insert("weak_reference");
   for (auto* item : unit_->cu_items) {
     if (!item->name.empty()) cu_scope_names_.insert(item->name);
     if (item->kind == ModuleItemKind::kTypedef) {
@@ -872,6 +874,15 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
             break;
           }
         }
+      }
+    }
+    // §8.30.1: weak_reference parameter type T shall be a class type.
+    if (item->data_type.type_name == "weak_reference" &&
+        !item->data_type.type_params.empty()) {
+      const auto& tp = item->data_type.type_params[0];
+      if (tp.kind != DataTypeKind::kNamed || !class_names_.count(tp.type_name)) {
+        diag_.Error(item->loc,
+                    "weak_reference type parameter shall be a class type");
       }
     }
   }

@@ -494,6 +494,10 @@ Reachability SimContext::GetReachability(uint64_t handle) const {
   auto it = class_objects_.find(handle);
   if (it == class_objects_.end()) return Reachability::kUnreachable;
   if (it->second->ref_count > 0) return Reachability::kStronglyReachable;
+  // §8.30.1: Object is weakly reachable if any weak reference points to it.
+  for (const auto* wr : weak_references_) {
+    if (wr->referent_handle == handle) return Reachability::kWeaklyReachable;
+  }
   return Reachability::kUnreachable;
 }
 
@@ -544,7 +548,15 @@ void SimContext::CollectGarbage() {
     }
   }
 
-  // Phase 3: Sweep — deallocate unreachable objects.
+  // Phase 3: Clear weak references to unreachable objects atomically.
+  for (auto* wr : weak_references_) {
+    if (wr->referent_handle != kNullClassHandle &&
+        !live.count(wr->referent_handle)) {
+      wr->Clear();
+    }
+  }
+
+  // Phase 4: Sweep — deallocate unreachable objects.
   for (auto it = class_objects_.begin(); it != class_objects_.end();) {
     if (!live.count(it->first) && !this_live.count(it->second)) {
       it->second->ref_count = 0;
@@ -553,6 +565,14 @@ void SimContext::CollectGarbage() {
       ++it;
     }
   }
+}
+
+void SimContext::RegisterWeakReference(WeakReference* wr) {
+  if (wr) weak_references_.insert(wr);
+}
+
+void SimContext::UnregisterWeakReference(WeakReference* wr) {
+  weak_references_.erase(wr);
 }
 
 void SimContext::PushThis(ClassObject* obj) { this_stack_.push_back(obj); }

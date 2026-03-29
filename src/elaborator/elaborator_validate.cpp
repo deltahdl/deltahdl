@@ -643,6 +643,19 @@ static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
 }
 
 void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
+  // §8.30.1: Validate weak_reference type parameter on function/task arguments.
+  for (const auto& arg : item->func_args) {
+    if (arg.data_type.kind == DataTypeKind::kNamed &&
+        arg.data_type.type_name == "weak_reference" &&
+        !arg.data_type.type_params.empty()) {
+      const auto& tp = arg.data_type.type_params[0];
+      if (tp.kind != DataTypeKind::kNamed || !class_names_.count(tp.type_name)) {
+        diag_.Error(item->loc,
+                    "weak_reference type parameter shall be a class type");
+      }
+    }
+  }
+
   if (item->kind == ModuleItemKind::kTaskDecl) {
     bool is_auto = item->is_automatic;
     // §13.3.2: Collect automatic variable names in the task.
