@@ -539,12 +539,12 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
   // §8.13: Wire parent linkage from base_class.
   if (!cls->base_class.empty())
     info->parent = ctx_.FindClassType(cls->base_class);
-  for (auto iface_name : cls->extends_interfaces) {
-    auto* iface = ctx_.FindClassType(iface_name);
+  for (const auto& ref : cls->extends_interfaces) {
+    auto* iface = ctx_.FindClassType(ref.name);
     if (iface) info->extended_interfaces.push_back(iface);
   }
-  for (auto iface_name : cls->implements_types) {
-    auto* iface = ctx_.FindClassType(iface_name);
+  for (const auto& ref : cls->implements_types) {
+    auto* iface = ctx_.FindClassType(ref.name);
     if (iface) info->extended_interfaces.push_back(iface);
   }
   for (auto* member : cls->members) {

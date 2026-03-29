@@ -203,21 +203,22 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
     while (Match(TokenKind::kColonColon)) {
       name = Expect(TokenKind::kIdentifier).text;
     }
-    if (is_implements) {
-      decl->implements_types.push_back(name);
-    } else {
-      if (decl->base_class.empty()) {
-        decl->base_class = name;
-      } else {
-        decl->extends_interfaces.push_back(name);
-      }
+    bool is_first_base = !is_implements && decl->base_class.empty();
+    if (is_first_base) {
+      decl->base_class = name;
     }
+    std::vector<DataType> tparams;
     if (Check(TokenKind::kHash)) {
       Consume();
-      auto tparams = ParseTypeParamList();
-      if (!is_implements && decl->base_class_type_params.empty()) {
-        decl->base_class_type_params = std::move(tparams);
+      tparams = ParseTypeParamList();
+      if (is_first_base) {
+        decl->base_class_type_params = tparams;
       }
+    }
+    if (is_implements) {
+      decl->implements_types.push_back({name, std::move(tparams)});
+    } else if (!is_first_base) {
+      decl->extends_interfaces.push_back({name, std::move(tparams)});
     }
     // §8.3: extends class_type [ ( [ list_of_arguments | default ] ) ]
     if (Check(TokenKind::kLParen)) {

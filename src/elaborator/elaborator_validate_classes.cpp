@@ -480,11 +480,11 @@ static bool IsClassDerivedFrom(std::string_view a, std::string_view b,
        cls = cls->base_class.empty() ? nullptr
                                      : FindClassDecl(cls->base_class, unit)) {
     if (cls->base_class == b) return true;
-    for (auto iface : cls->implements_types) {
-      if (IsClassDerivedFrom(iface, b, unit)) return true;
+    for (const auto& iface : cls->implements_types) {
+      if (IsClassDerivedFrom(iface.name, b, unit)) return true;
     }
-    for (auto iface : cls->extends_interfaces) {
-      if (IsClassDerivedFrom(iface, b, unit)) return true;
+    for (const auto& iface : cls->extends_interfaces) {
+      if (IsClassDerivedFrom(iface.name, b, unit)) return true;
     }
   }
   return false;
@@ -1543,7 +1543,8 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
                             "non-interface class '{}'",
                             cls->name, cls->base_class));
   }
-  for (auto iface_name : cls->extends_interfaces) {
+  for (const auto& ref : cls->extends_interfaces) {
+    auto iface_name = ref.name;
     // §8.26.4: An interface class shall not extend a type parameter.
     if (cls->type_param_names.count(iface_name) > 0) {
       diag_.Error(cls->range.start,
@@ -1594,7 +1595,8 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
                               cls->name, cls->base_class));
     }
   }
-  for (auto impl_name : cls->implements_types) {
+  for (const auto& ref : cls->implements_types) {
+    auto impl_name = ref.name;
     // §8.26.4: A class shall not implement a type parameter.
     if (cls->type_param_names.count(impl_name) > 0) {
       diag_.Error(cls->range.start,
@@ -1647,41 +1649,65 @@ static bool MethodSignaturesCompatible(const ModuleItem* a,
   return true;
 }
 
+// §8.26.6.3: Build a key that uniquely identifies an interface class
+// specialization.  Different parameterizations produce different keys so they
+// are not treated as a diamond relationship.
+static std::string MakeSpecKey(std::string_view name,
+                               const std::vector<DataType>& type_params) {
+  if (type_params.empty()) return std::string(name);
+  std::string key(name);
+  key += "#(";
+  for (size_t i = 0; i < type_params.size(); ++i) {
+    if (i > 0) key += ',';
+    const auto& dt = type_params[i];
+    if (!dt.type_name.empty())
+      key += dt.type_name;
+    else
+      key += std::to_string(static_cast<int>(dt.kind));
+  }
+  key += ')';
+  return key;
+}
+
 // §8.26.6.1: Collect all pure virtual methods from an interface class and all
 // its extended parents into a map keyed by method name.
 using IfaceMethodMap =
     std::unordered_map<std::string_view,
-                       std::vector<std::pair<std::string_view,
+                       std::vector<std::pair<std::string,
                                              const ModuleItem*>>>;
 
 static void CollectInterfacePureVirtualMethods(
-    const ClassDecl* iface, std::string_view iface_name,
+    const ClassDecl* iface, const std::string& spec_key,
     const CompilationUnit* unit, IfaceMethodMap& out,
-    std::unordered_set<std::string_view>& visited) {
-  if (!visited.insert(iface_name).second) return;
+    std::unordered_set<std::string>& visited) {
+  if (!visited.insert(spec_key).second) return;
   for (const auto* m : iface->members) {
     if (m->kind != ClassMemberKind::kMethod || !m->is_pure_virtual) continue;
     if (!m->method) continue;
-    out[m->method->name].push_back({iface_name, m->method});
+    out[m->method->name].push_back({spec_key, m->method});
   }
   if (!iface->base_class.empty()) {
     const auto* base = FindClassDecl(iface->base_class, unit);
-    if (base && base->is_interface)
-      CollectInterfacePureVirtualMethods(base, iface->base_class, unit, out,
-                                         visited);
+    if (base && base->is_interface) {
+      auto base_key = MakeSpecKey(iface->base_class,
+                                  iface->base_class_type_params);
+      CollectInterfacePureVirtualMethods(base, base_key, unit, out, visited);
+    }
   }
-  for (auto ext_name : iface->extends_interfaces) {
-    const auto* ext = FindClassDecl(ext_name, unit);
-    if (ext && ext->is_interface)
-      CollectInterfacePureVirtualMethods(ext, ext_name, unit, out, visited);
+  for (const auto& ref : iface->extends_interfaces) {
+    const auto* ext = FindClassDecl(ref.name, unit);
+    if (ext && ext->is_interface) {
+      auto ext_key = MakeSpecKey(ref.name, ref.type_params);
+      CollectInterfacePureVirtualMethods(ext, ext_key, unit, out, visited);
+    }
   }
 }
 
 // §8.26: Collect all implemented interfaces from the class hierarchy.
 static void CollectImplementedInterfaces(
     const ClassDecl* cls, const CompilationUnit* unit,
-    std::vector<std::string_view>& out) {
-  for (auto iface : cls->implements_types) {
+    std::vector<InterfaceRef>& out) {
+  for (const auto& iface : cls->implements_types) {
     out.push_back(iface);
   }
   if (!cls->base_class.empty()) {
@@ -1697,32 +1723,38 @@ static void CollectImplementedInterfaces(
 static void ValidateMethodNameConflicts(
     const ClassDecl* cls, const CompilationUnit* unit, DiagEngine& diag) {
   IfaceMethodMap iface_methods;
-  std::unordered_set<std::string_view> visited;
+  std::unordered_set<std::string> visited;
 
   if (cls->is_interface) {
     // Interface class extending multiple interfaces.
     if (!cls->base_class.empty()) {
       const auto* base = FindClassDecl(cls->base_class, unit);
-      if (base && base->is_interface)
-        CollectInterfacePureVirtualMethods(base, cls->base_class, unit,
+      if (base && base->is_interface) {
+        auto base_key = MakeSpecKey(cls->base_class,
+                                    cls->base_class_type_params);
+        CollectInterfacePureVirtualMethods(base, base_key, unit,
                                            iface_methods, visited);
+      }
     }
-    for (auto ext_name : cls->extends_interfaces) {
-      const auto* ext = FindClassDecl(ext_name, unit);
-      if (ext && ext->is_interface)
-        CollectInterfacePureVirtualMethods(ext, ext_name, unit, iface_methods,
+    for (const auto& ref : cls->extends_interfaces) {
+      const auto* ext = FindClassDecl(ref.name, unit);
+      if (ext && ext->is_interface) {
+        auto ext_key = MakeSpecKey(ref.name, ref.type_params);
+        CollectInterfacePureVirtualMethods(ext, ext_key, unit, iface_methods,
                                            visited);
+      }
     }
   } else {
     // Regular/virtual class implementing interfaces.
-    std::vector<std::string_view> all_ifaces;
+    std::vector<InterfaceRef> all_ifaces;
     CollectImplementedInterfaces(cls, unit, all_ifaces);
-    std::unordered_set<std::string_view> seen_iface;
-    for (auto iface_name : all_ifaces) {
-      if (!seen_iface.insert(iface_name).second) continue;
-      const auto* iface = FindClassDecl(iface_name, unit);
+    std::unordered_set<std::string> seen_iface;
+    for (const auto& iref : all_ifaces) {
+      auto iface_key = MakeSpecKey(iref.name, iref.type_params);
+      if (!seen_iface.insert(iface_key).second) continue;
+      const auto* iface = FindClassDecl(iref.name, unit);
       if (!iface || !iface->is_interface) continue;
-      CollectInterfacePureVirtualMethods(iface, iface_name, unit,
+      CollectInterfacePureVirtualMethods(iface, iface_key, unit,
                                          iface_methods, visited);
     }
   }
@@ -1836,15 +1868,16 @@ static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
 // §8.26: Validate that a non-abstract class implements all interface methods.
 void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
   if (cls->is_virtual) return;
-  std::vector<std::string_view> all_ifaces;
+  std::vector<InterfaceRef> all_ifaces;
   CollectImplementedInterfaces(cls, unit_, all_ifaces);
   if (all_ifaces.empty()) return;
-  std::unordered_set<std::string_view> seen;
-  for (auto iface_name : all_ifaces) {
-    if (!seen.insert(iface_name).second) continue;
-    const auto* iface = FindClassDecl(iface_name, unit_);
+  std::unordered_set<std::string> seen;
+  for (const auto& iref : all_ifaces) {
+    auto iface_key = MakeSpecKey(iref.name, iref.type_params);
+    if (!seen.insert(iface_key).second) continue;
+    const auto* iface = FindClassDecl(iref.name, unit_);
     if (!iface) continue;
-    CheckInterfaceMethods(cls, iface, iface_name, unit_, diag_);
+    CheckInterfaceMethods(cls, iface, iref.name, unit_, diag_);
   }
 }
 
@@ -1852,7 +1885,7 @@ void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
 // interface class, mapping each name to its originating interface class(es).
 using NameOriginMap =
     std::unordered_map<std::string_view,
-                       std::unordered_set<std::string_view>>;
+                       std::unordered_set<std::string>>;
 
 static void CollectOwnParamTypeNames(
     const ClassDecl* iface,
@@ -1868,27 +1901,34 @@ static void CollectOwnParamTypeNames(
 }
 
 static void CollectEffectiveParamTypeNames(
-    const ClassDecl* iface, const CompilationUnit* unit,
-    NameOriginMap& out) {
+    const ClassDecl* iface, const std::string& spec_key,
+    const CompilationUnit* unit, NameOriginMap& out) {
   std::unordered_set<std::string_view> own_names;
   CollectOwnParamTypeNames(iface, own_names);
   for (auto n : own_names)
-    out[n].insert(iface->name);
-  auto inherit = [&](const ClassDecl* parent) {
+    out[n].insert(spec_key);
+  auto inherit = [&](const ClassDecl* parent, const std::string& parent_key) {
     NameOriginMap parent_map;
-    CollectEffectiveParamTypeNames(parent, unit, parent_map);
+    CollectEffectiveParamTypeNames(parent, parent_key, unit, parent_map);
     for (const auto& [name, origins] : parent_map) {
       if (own_names.count(name)) continue;
-      for (auto o : origins) out[name].insert(o);
+      for (const auto& o : origins) out[name].insert(o);
     }
   };
   if (!iface->base_class.empty()) {
     const auto* base = FindClassDecl(iface->base_class, unit);
-    if (base && base->is_interface) inherit(base);
+    if (base && base->is_interface) {
+      auto base_key = MakeSpecKey(iface->base_class,
+                                  iface->base_class_type_params);
+      inherit(base, base_key);
+    }
   }
-  for (auto ext_name : iface->extends_interfaces) {
-    const auto* ext = FindClassDecl(ext_name, unit);
-    if (ext && ext->is_interface) inherit(ext);
+  for (const auto& ref : iface->extends_interfaces) {
+    const auto* ext = FindClassDecl(ref.name, unit);
+    if (ext && ext->is_interface) {
+      auto ext_key = MakeSpecKey(ref.name, ref.type_params);
+      inherit(ext, ext_key);
+    }
   }
 }
 
@@ -1900,21 +1940,28 @@ static void ValidateParamTypeConflicts(
   std::unordered_set<std::string_view> own_names;
   CollectOwnParamTypeNames(cls, own_names);
   NameOriginMap inherited;
-  auto process = [&](const ClassDecl* parent) {
+  auto process = [&](const ClassDecl* parent, const std::string& parent_key) {
     NameOriginMap parent_map;
-    CollectEffectiveParamTypeNames(parent, unit, parent_map);
+    CollectEffectiveParamTypeNames(parent, parent_key, unit, parent_map);
     for (const auto& [name, origins] : parent_map) {
       if (own_names.count(name)) continue;
-      for (auto o : origins) inherited[name].insert(o);
+      for (const auto& o : origins) inherited[name].insert(o);
     }
   };
   if (!cls->base_class.empty()) {
     const auto* base = FindClassDecl(cls->base_class, unit);
-    if (base && base->is_interface) process(base);
+    if (base && base->is_interface) {
+      auto base_key = MakeSpecKey(cls->base_class,
+                                  cls->base_class_type_params);
+      process(base, base_key);
+    }
   }
-  for (auto ext_name : cls->extends_interfaces) {
-    const auto* ext = FindClassDecl(ext_name, unit);
-    if (ext && ext->is_interface) process(ext);
+  for (const auto& ref : cls->extends_interfaces) {
+    const auto* ext = FindClassDecl(ref.name, unit);
+    if (ext && ext->is_interface) {
+      auto ext_key = MakeSpecKey(ref.name, ref.type_params);
+      process(ext, ext_key);
+    }
   }
   for (const auto& [name, origins] : inherited) {
     if (origins.size() > 1) {
