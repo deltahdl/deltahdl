@@ -16,6 +16,13 @@ struct Expr;
 struct ModuleItem;
 class Arena;
 
+// §8.29: Reachability levels for object lifecycle.
+enum class Reachability {
+  kStronglyReachable,
+  kWeaklyReachable,
+  kUnreachable,
+};
+
 // Forward declare for vtable entries.
 struct ClassTypeInfo;
 
@@ -70,6 +77,7 @@ struct ClassTypeInfo {
 struct ClassObject {
   const ClassTypeInfo* type = nullptr;
   std::unordered_map<std::string, Logic4Vec> properties;
+  uint32_t ref_count = 0;
 
   // Get a property value, walking up inheritance chain defaults.
   Logic4Vec GetProperty(std::string_view name, Arena& arena) const;

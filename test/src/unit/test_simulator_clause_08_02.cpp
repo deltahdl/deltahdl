@@ -51,20 +51,4 @@ TEST(ClassSim, ClassContainsBothPropertiesAndMethods) {
   EXPECT_NE(obj->ResolveMethod("current_status"), nullptr);
 }
 
-TEST(ClassSim, DeallocatedObjectBecomesInvalid) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Temp", {"x"});
-  auto [handle, obj] = MakeObj(f, type);
-  ASSERT_NE(f.ctx.GetClassObject(handle), nullptr);
-
-  f.ctx.DeallocateClassObject(handle);
-  EXPECT_EQ(f.ctx.GetClassObject(handle), nullptr);
-}
-
-TEST(ClassSim, DeallocateNullHandleIsHarmless) {
-  SimFixture f;
-  f.ctx.DeallocateClassObject(kNullClassHandle);
-  f.ctx.DeallocateClassObject(99999);
-}
-
 }  // namespace

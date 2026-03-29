@@ -459,6 +459,7 @@ const std::vector<Expr*>& SimContext::GetVariableClassParamExprs(
 uint64_t SimContext::AllocateClassObject(ClassObject* obj) {
   uint64_t id = next_handle_id_++;
   class_objects_[id] = obj;
+  obj->ref_count = 1;
   return id;
 }
 
@@ -470,6 +471,88 @@ ClassObject* SimContext::GetClassObject(uint64_t handle) const {
 
 void SimContext::DeallocateClassObject(uint64_t handle) {
   class_objects_.erase(handle);
+}
+
+void SimContext::RetainObject(uint64_t handle) {
+  if (handle == kNullClassHandle) return;
+  auto it = class_objects_.find(handle);
+  if (it != class_objects_.end()) {
+    ++it->second->ref_count;
+  }
+}
+
+void SimContext::ReleaseObject(uint64_t handle) {
+  if (handle == kNullClassHandle) return;
+  auto it = class_objects_.find(handle);
+  if (it != class_objects_.end() && it->second->ref_count > 0) {
+    --it->second->ref_count;
+  }
+}
+
+Reachability SimContext::GetReachability(uint64_t handle) const {
+  if (handle == kNullClassHandle) return Reachability::kUnreachable;
+  auto it = class_objects_.find(handle);
+  if (it == class_objects_.end()) return Reachability::kUnreachable;
+  if (it->second->ref_count > 0) return Reachability::kStronglyReachable;
+  return Reachability::kUnreachable;
+}
+
+void SimContext::CollectGarbage() {
+  if (class_objects_.empty()) return;
+
+  // Phase 1: Mark handles directly referenced by live variables.
+  std::unordered_set<uint64_t> live;
+
+  auto scan_var = [&](std::string_view name, Variable* var) {
+    if (!var || !var_class_types_.count(name)) return;
+    uint64_t h = var->value.ToUint64();
+    if (h != kNullClassHandle) live.insert(h);
+    if (var->has_pending_nba) {
+      uint64_t ph = var->pending_nba.ToUint64();
+      if (ph != kNullClassHandle) live.insert(ph);
+    }
+  };
+
+  for (const auto& [name, var] : variables_) scan_var(name, var);
+  for (const auto& scope : scope_stack_) {
+    for (const auto& [name, var] : scope) scan_var(name, var);
+  }
+  for (const auto& [func, frame] : static_frames_) {
+    for (const auto& [name, var] : frame) scan_var(name, var);
+  }
+
+  // Objects on the this_stack_ are strongly reachable.
+  std::unordered_set<ClassObject*> this_live;
+  for (auto* obj : this_stack_) {
+    if (obj) this_live.insert(obj);
+  }
+
+  // Phase 2: Transitively mark handles in properties of live objects.
+  std::vector<uint64_t> worklist(live.begin(), live.end());
+  while (!worklist.empty()) {
+    uint64_t h = worklist.back();
+    worklist.pop_back();
+    auto it = class_objects_.find(h);
+    if (it == class_objects_.end()) continue;
+    for (const auto& [pname, pval] : it->second->properties) {
+      uint64_t ph = pval.ToUint64();
+      if (ph != kNullClassHandle && class_objects_.count(ph) &&
+          !live.count(ph)) {
+        live.insert(ph);
+        worklist.push_back(ph);
+      }
+    }
+  }
+
+  // Phase 3: Sweep — deallocate unreachable objects.
+  for (auto it = class_objects_.begin(); it != class_objects_.end();) {
+    if (!live.count(it->first) && !this_live.count(it->second)) {
+      it->second->ref_count = 0;
+      it = class_objects_.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 void SimContext::PushThis(ClassObject* obj) { this_stack_.push_back(obj); }

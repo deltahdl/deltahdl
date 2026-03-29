@@ -287,6 +287,16 @@ class SimContext {
   ClassObject* GetClassObject(uint64_t handle) const;
   void DeallocateClassObject(uint64_t handle);
 
+  // §8.29: Memory management — reference counting.
+  void RetainObject(uint64_t handle);
+  void ReleaseObject(uint64_t handle);
+
+  // §8.29: Query reachability of an object.
+  Reachability GetReachability(uint64_t handle) const;
+
+  // §8.29: Garbage collection — reclaim unreachable objects.
+  void CollectGarbage();
+
   // §8.11: `this` pointer management for method calls.
   void PushThis(ClassObject* obj);
   void PopThis();

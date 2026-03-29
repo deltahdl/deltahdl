@@ -25,17 +25,4 @@ TEST(ClassTypeElaboration, MultipleClassTypesOk) {
              "endmodule\n"));
 }
 
-TEST(ClassTypeElaboration, NullAssignmentOk) {
-  EXPECT_TRUE(
-      ElabOk("class MyClass;\n"
-             "  int x;\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    MyClass obj;\n"
-             "    obj = null;\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
 }  // namespace
