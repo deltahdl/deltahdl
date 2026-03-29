@@ -556,6 +556,42 @@ static void CheckClassHandleExpr(
   }
 }
 
+// §8.26.9: Extract a method call on a class handle from an expression.
+// Matches patterns: var.method(...), void'(var.method(...)).
+// Returns the var name and method name if the var is an interface class handle.
+static void CheckInterfaceHandleRandConstraintMode(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  if (!s) return;
+  // Match expression statement or assignment RHS containing a method call.
+  const Expr* call = nullptr;
+  if (s->kind == StmtKind::kExprStmt && s->expr) {
+    call = s->expr;
+  } else if ((s->kind == StmtKind::kBlockingAssign ||
+              s->kind == StmtKind::kNonblockingAssign) &&
+             s->rhs) {
+    call = s->rhs;
+  }
+  // Unwrap void'(...) cast.
+  if (call && call->kind == ExprKind::kCast && call->lhs) call = call->lhs;
+  if (!call || call->kind != ExprKind::kCall) return;
+  const Expr* callee = call->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return;
+  if (!callee->lhs || callee->lhs->kind != ExprKind::kIdentifier) return;
+  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return;
+  auto method_name = callee->rhs->text;
+  if (method_name != "rand_mode" && method_name != "constraint_mode") return;
+  auto var_name = callee->lhs->text;
+  auto it = var_types.find(var_name);
+  if (it == var_types.end()) return;
+  const auto* cls = FindClassDecl(it->second, unit);
+  if (!cls || !cls->is_interface) return;
+  diag.Error(callee->range.start,
+             std::format("'{}' is not legal on interface class handle '{}'",
+                         method_name, var_name));
+}
+
 void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
   if (!s) return;
   // Check compound assignment to class handle.
@@ -596,6 +632,10 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
       }
     }
   }
+  // §8.26.9: rand_mode and constraint_mode shall not be legal on interface
+  // class handles.
+  CheckInterfaceHandleRandConstraintMode(s, class_var_types_, unit_, diag_);
+
   // Check expressions in assignments, conditions, and expression statements.
   CheckClassHandleExpr(s->rhs, class_var_names_, class_var_types_, unit_,
                        diag_);
@@ -1773,9 +1813,12 @@ static void ValidateMethodNameConflicts(
   }
 
   // Check that all same-named methods from different interfaces have compatible
-  // signatures.
+  // signatures.  pre_randomize and post_randomize are built-in virtual methods
+  // on interface classes and shall not cause method name conflicts.
   for (const auto& [method_name, entries] : iface_methods) {
     if (entries.size() < 2) continue;
+    if (method_name == "pre_randomize" || method_name == "post_randomize")
+      continue;
     const auto* first_method = entries[0].second;
     for (size_t i = 1; i < entries.size(); ++i) {
       if (!MethodSignaturesCompatible(first_method, entries[i].second)) {

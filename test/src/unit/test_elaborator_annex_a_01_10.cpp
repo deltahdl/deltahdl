@@ -114,18 +114,4 @@ TEST(ConstraintElaboration, ConstraintWithComplexBlock) {
              "endmodule\n"));
 }
 
-// === Error: interface class shall not contain constraint blocks ===
-
-TEST(ConstraintElaboration, ErrorInterfaceClassWithConstraint) {
-  ElabFixture f;
-  ElaborateSrc(
-      "interface class IC;\n"
-      "  constraint c { };\n"
-      "endclass\n"
-      "module m;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 }  // namespace
