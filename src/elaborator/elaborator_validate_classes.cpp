@@ -1467,6 +1467,19 @@ void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
                               "nested classes",
                               cls->name));
     }
+    // §8.26.8: Default argument values in interface class methods shall be
+    // constant expressions.
+    if (m->kind == ClassMemberKind::kMethod && m->method) {
+      for (const auto& arg : m->method->func_args) {
+        if (arg.default_value &&
+            !IsConstantExpr(arg.default_value, cu_param_scope_)) {
+          diag_.Error(m->method->loc,
+                      std::format("interface class method '{}' argument '{}': "
+                                  "default value must be a constant expression",
+                                  m->method->name, arg.name));
+        }
+      }
+    }
   }
 }
 
@@ -1849,6 +1862,34 @@ static bool HasConcreteVirtualMethodInHierarchy(const ClassDecl* cls,
   return false;
 }
 
+// §8.26.8: Find the concrete virtual method implementation in a class
+// hierarchy, returning its ModuleItem (or nullptr if not found).
+static const ModuleItem* FindConcreteMethodInHierarchy(
+    const ClassDecl* cls, std::string_view method_name,
+    const CompilationUnit* unit) {
+  for (const auto* cm : cls->members) {
+    if (cm->kind == ClassMemberKind::kMethod && cm->method &&
+        cm->method->name == method_name && cm->is_virtual) {
+      return cm->method;
+    }
+  }
+  const auto* walk = cls->base_class.empty()
+                         ? nullptr
+                         : FindClassDecl(cls->base_class, unit);
+  while (walk) {
+    for (const auto* bm : walk->members) {
+      if (bm->kind == ClassMemberKind::kMethod && bm->method &&
+          bm->method->name == method_name && bm->is_virtual &&
+          !bm->is_pure_virtual) {
+        return bm->method;
+      }
+    }
+    walk = walk->base_class.empty() ? nullptr
+                                    : FindClassDecl(walk->base_class, unit);
+  }
+  return nullptr;
+}
+
 static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
                                   std::string_view iface_name,
                                   const CompilationUnit* unit,
@@ -1856,11 +1897,32 @@ static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
   for (const auto* im : iface->members) {
     if (im->kind != ClassMemberKind::kMethod || !im->is_pure_virtual) continue;
     if (!im->method) continue;
-    if (!HasConcreteVirtualMethodInHierarchy(cls, im->method->name, unit)) {
+    const auto* impl = FindConcreteMethodInHierarchy(cls, im->method->name,
+                                                     unit);
+    if (!impl) {
       diag.Error(cls->range.start,
                  std::format("class '{}' does not implement pure virtual "
                              "method '{}' from interface '{}'",
                              cls->name, im->method->name, iface_name));
+      continue;
+    }
+    // §8.26.8: The value of the default argument constant expression shall be
+    // the same for all the classes that implement the method.
+    const auto& iface_args = im->method->func_args;
+    const auto& impl_args = impl->func_args;
+    size_t n = std::min(iface_args.size(), impl_args.size());
+    for (size_t i = 0; i < n; ++i) {
+      if (!iface_args[i].default_value || !impl_args[i].default_value) continue;
+      auto iface_val = ConstEvalInt(iface_args[i].default_value);
+      auto impl_val = ConstEvalInt(impl_args[i].default_value);
+      if (iface_val && impl_val && *iface_val != *impl_val) {
+        diag.Error(impl->loc,
+                   std::format("method '{}' argument '{}': default value "
+                               "does not match interface '{}' (expected {}, "
+                               "got {})",
+                               impl->name, impl_args[i].name, iface_name,
+                               *iface_val, *impl_val));
+      }
     }
   }
 }
