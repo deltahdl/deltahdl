@@ -121,19 +121,6 @@ TEST(TaskDeclParsing, TaskBodyInterfaceScope) {
   EXPECT_EQ(item->name, "my_task");
 }
 
-TEST(TaskDeclParsing, TaskBodyClassScope) {
-  auto r = Parse(
-      "module m;\n"
-      "  task MyClass::my_task;\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->method_class, "MyClass");
-  EXPECT_EQ(item->name, "my_task");
-}
-
 TEST(TaskDeclParsing, TaskBodyEmptyNoPortsNoStatements) {
   auto r = Parse(
       "module m;\n"

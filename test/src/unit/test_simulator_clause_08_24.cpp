@@ -79,4 +79,52 @@ TEST(ClassSim, OutOfBlockConstructor) {
   EXPECT_EQ(it->second->method_class, "C");
 }
 
+TEST(ClassSim, OutOfBlockTaskResolvedViaResolveMethod) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "C", {});
+
+  auto* task = f.arena.Create<ModuleItem>();
+  task->kind = ModuleItemKind::kTaskDecl;
+  task->name = "run";
+  task->method_class = "C";
+  type->methods["run"] = task;
+
+  auto [handle, obj] = MakeObj(f, type);
+  auto* resolved = obj->ResolveMethod("run");
+  EXPECT_NE(resolved, nullptr);
+  EXPECT_EQ(resolved->name, "run");
+  EXPECT_EQ(resolved->kind, ModuleItemKind::kTaskDecl);
+}
+
+TEST(ClassSim, MultipleOutOfBlockMethodsLinked) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "C", {"x"});
+
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "get";
+  func->method_class = "C";
+  func->func_body_stmts.push_back(MakeReturn(f.arena, MkInt(f.arena, 1)));
+  type->methods["get"] = func;
+
+  auto* task = f.arena.Create<ModuleItem>();
+  task->kind = ModuleItemKind::kTaskDecl;
+  task->name = "set";
+  task->method_class = "C";
+  type->methods["set"] = task;
+
+  auto [handle, obj] = MakeObj(f, type);
+  EXPECT_NE(obj->ResolveMethod("get"), nullptr);
+  EXPECT_NE(obj->ResolveMethod("set"), nullptr);
+  EXPECT_EQ(obj->ResolveMethod("get")->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(obj->ResolveMethod("set")->kind, ModuleItemKind::kTaskDecl);
+}
+
+TEST(ClassSim, UnresolvedMethodReturnsNull) {
+  SimFixture f;
+  auto* type = MakeClassType(f, "C", {});
+  auto [handle, obj] = MakeObj(f, type);
+  EXPECT_EQ(obj->ResolveMethod("nonexistent"), nullptr);
+}
+
 }  // namespace

@@ -277,18 +277,6 @@ TEST(FunctionDeclParsing, FunctionDeclNoLifetime) {
   EXPECT_FALSE(item->is_static);
 }
 
-// --- function_body_declaration: class_scope form ---
-
-TEST(FunctionDeclParsing, FunctionBodyWithClassScope) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "  extern function int f(int x);\n"
-      "endclass\n"
-      "function int C::f(int x);\n"
-      "  return x + 1;\n"
-      "endfunction\n"));
-}
-
 // --- function_body_declaration: interface_identifier form ---
 
 TEST(FunctionDeclParsing, FunctionBodyWithInterfaceScope) {

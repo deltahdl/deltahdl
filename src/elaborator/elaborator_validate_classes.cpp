@@ -1307,12 +1307,71 @@ void Elaborator::ValidateAbstractClassRules() {
   }
 }
 
-static bool HasExternPrototype(const ClassDecl* cls, std::string_view name) {
-  return std::any_of(
-      cls->members.begin(), cls->members.end(), [name](const auto* m) {
-        return m->kind == ClassMemberKind::kMethod && m->method &&
-               m->method->name == name && m->method->is_extern;
-      });
+static const ModuleItem* FindExternPrototype(const ClassDecl* cls,
+                                              std::string_view name) {
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod && m->method &&
+        m->method->name == name && m->method->is_extern) {
+      return m->method;
+    }
+  }
+  return nullptr;
+}
+
+static void ValidateOutOfBlockSignature(const ModuleItem* proto,
+                                        const ModuleItem* impl,
+                                        std::string_view class_name,
+                                        DiagEngine& diag) {
+  if (proto->kind != impl->kind) {
+    diag.Error(impl->loc,
+               std::format("out-of-block declaration for '{}::{}' is a {} but "
+                           "the prototype is a {}",
+                           class_name, impl->name,
+                           impl->kind == ModuleItemKind::kFunctionDecl
+                               ? "function"
+                               : "task",
+                           proto->kind == ModuleItemKind::kFunctionDecl
+                               ? "function"
+                               : "task"));
+    return;
+  }
+  const auto& proto_args = proto->func_args;
+  const auto& impl_args = impl->func_args;
+  if (proto_args.size() != impl_args.size()) {
+    diag.Error(impl->loc,
+               std::format("out-of-block declaration for '{}::{}' has {} "
+                           "argument(s) but the prototype has {}",
+                           class_name, impl->name, impl_args.size(),
+                           proto_args.size()));
+    return;
+  }
+  for (size_t i = 0; i < proto_args.size(); ++i) {
+    if (!TypesMatch(proto_args[i].data_type, impl_args[i].data_type)) {
+      diag.Error(impl->loc,
+                 std::format("out-of-block declaration for '{}::{}' argument "
+                             "'{}' has mismatched type",
+                             class_name, impl->name, impl_args[i].name));
+    }
+    if (proto_args[i].direction != impl_args[i].direction) {
+      diag.Error(impl->loc,
+                 std::format("out-of-block declaration for '{}::{}' argument "
+                             "'{}' has mismatched direction",
+                             class_name, impl->name, impl_args[i].name));
+    }
+  }
+  if (proto->kind == ModuleItemKind::kFunctionDecl) {
+    auto impl_ret = impl->return_type;
+    if (impl_ret.kind == DataTypeKind::kNamed && !impl_ret.scope_name.empty() &&
+        impl_ret.scope_name == class_name) {
+      impl_ret.scope_name = {};
+    }
+    if (!TypesMatch(proto->return_type, impl_ret)) {
+      diag.Error(impl->loc,
+                 std::format("out-of-block declaration for '{}::{}' has "
+                             "mismatched return type",
+                             class_name, impl->name));
+    }
+  }
 }
 
 // §8.24: Validate out-of-block method declarations.
@@ -1330,8 +1389,8 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
                               item->method_class));
       continue;
     }
-    bool found_proto = HasExternPrototype(cls, item->name);
-    if (!found_proto) {
+    const auto* proto = FindExternPrototype(cls, item->name);
+    if (!proto) {
       diag_.Error(
           item->loc,
           std::format("no matching extern prototype for '{}::{}' in "
@@ -1347,6 +1406,7 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
       continue;
     }
     linked.insert(key);
+    ValidateOutOfBlockSignature(proto, item, item->method_class, diag_);
   }
 }
 
