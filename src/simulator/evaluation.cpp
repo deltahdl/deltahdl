@@ -121,7 +121,9 @@ static Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
         return r;
       }
       uint64_t val = operand.ToUint64();
-      return MakeLogic4VecVal(arena, operand.width, -val);
+      auto r = MakeLogic4VecVal(arena, operand.width, -val);
+      r.is_signed = operand.is_signed;
+      return r;
     }
     default:
       return operand;

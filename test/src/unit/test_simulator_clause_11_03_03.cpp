@@ -1,4 +1,7 @@
+#include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
+#include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -6,7 +9,9 @@ using namespace delta;
 
 namespace {
 
-TEST(PrimarySim, ConstantPrimaryIntegerLiteral) {
+// --- Literal used as expression operand ---
+
+TEST(IntegerLiteralSim, LiteralAssignedThroughParameter) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -22,6 +27,114 @@ TEST(PrimarySim, ConstantPrimaryIntegerLiteral) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+// --- Signedness based on base specifier ---
+
+TEST(IntegerLiteralSignedness, DecimalLiteralIsSigned) {
+  SimFixture f;
+  auto* lit = MakeInt(f.arena, 42);
+  lit->text = "42";
+  auto result = EvalExpr(lit, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 42u);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(IntegerLiteralSignedness, BasedLiteralIsUnsigned) {
+  SimFixture f;
+  auto* lit = MakeInt(f.arena, 0xA);
+  lit->text = "8'hA";
+  auto result = EvalExpr(lit, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0xAu);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(IntegerLiteralSignedness, SignedBasedLiteralIsSigned) {
+  SimFixture f;
+  auto* lit = MakeInt(f.arena, 0xA);
+  lit->text = "4'shA";
+  auto result = EvalExpr(lit, f.ctx, f.arena);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(IntegerLiteralSignedness, UnsizedBasedUnsignedIsNotSigned) {
+  SimFixture f;
+  auto* lit = MakeInt(f.arena, 12);
+  lit->text = "'d12";
+  auto result = EvalExpr(lit, f.ctx, f.arena);
+  EXPECT_FALSE(result.is_signed);
+}
+
+TEST(IntegerLiteralSignedness, UnsizedBasedSignedIsSigned) {
+  SimFixture f;
+  auto* lit = MakeInt(f.arena, 12);
+  lit->text = "'sd12";
+  auto result = EvalExpr(lit, f.ctx, f.arena);
+  EXPECT_TRUE(result.is_signed);
+}
+
+// --- Negation of unsigned literal ---
+
+TEST(IntegerLiteralSim, NegatedUnsignedSizedLiteral) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = -8'd6;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 250u);
+}
+
+TEST(IntegerLiteralSim, NegatedUnbasedLiteralIsTwosComplement) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = -1;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result, 255u);
+}
+
+// --- Negation/division examples from §11.3.3 ---
+
+TEST(IntegerLiteralSim, NegatedUnbasedDivThree) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  integer x;\n"
+      "  initial x = -12 / 3;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result & 0xFFFFFFFFu, 0xFFFFFFFCu);
+}
+
+TEST(IntegerLiteralSim, NegatedUnsignedBasedDivThree) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  integer x;\n"
+      "  initial x = -'d12 / 3;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result & 0xFFFFFFFFu, 1431655761u);
+}
+
+TEST(IntegerLiteralSim, NegatedSignedBasedDivThree) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  integer x;\n"
+      "  initial x = -'sd12 / 3;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result & 0xFFFFFFFFu, 0xFFFFFFFCu);
+}
+
+TEST(IntegerLiteralSim, NegatedSizedSignedBasedDivThree) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  integer x;\n"
+      "  initial x = -4'sd12 / 3;\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(result & 0xFFFFFFFFu, 1u);
 }
 
 }  // namespace

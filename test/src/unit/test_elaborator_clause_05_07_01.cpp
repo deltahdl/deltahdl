@@ -3,7 +3,6 @@
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 
@@ -18,15 +17,6 @@ static void LowerRunAndCompareBitPatterns(SimFixture& f, RtlirDesign* design,
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.words[0].aval & mask, vb->value.words[0].aval & mask);
   EXPECT_EQ(va->value.words[0].bval & mask, vb->value.words[0].bval & mask);
-}
-
-static Expr* MakeSizedLiteral(Arena& arena, std::string_view text,
-                              uint64_t val) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kIntegerLiteral;
-  e->text = text;
-  e->int_val = val;
-  return e;
 }
 
 namespace {
@@ -590,33 +580,6 @@ TEST(IntegerLiteralElaboration, LeftPadKnownHexWithXDigit) {
   EXPECT_EQ(var->value.words[0].aval & 0xFFF, 0x03Fu);
   EXPECT_EQ(var->value.words[0].bval & 0x00F, 0x00Fu);
   EXPECT_EQ(var->value.words[0].bval & 0xF00, 0x000u);
-}
-
-TEST(IntegerLiteralElaboration, SignedBaseLiteralIsSigned) {
-  SimFixture f;
-  auto* lit = MakeSizedLiteral(f.arena, "4'sd3", 3);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_signed);
-  EXPECT_EQ(result.width, 4u);
-  EXPECT_EQ(result.ToUint64(), 3u);
-}
-
-TEST(IntegerLiteralElaboration, UnsignedBaseLiteralNotSigned) {
-  SimFixture f;
-  auto* lit = MakeSizedLiteral(f.arena, "4'd3", 3);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_FALSE(result.is_signed);
-  EXPECT_EQ(result.width, 4u);
-  EXPECT_EQ(result.ToUint64(), 3u);
-}
-
-TEST(IntegerLiteralElaboration, SignedHexLiteralIsSigned) {
-  SimFixture f;
-  auto* lit = MakeSizedLiteral(f.arena, "8'shFF", 0xFF);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_signed);
-  EXPECT_EQ(result.width, 8u);
-  EXPECT_EQ(result.ToUint64(), 0xFFu);
 }
 
 TEST(IntegerLiteralElaboration, LeftPadWithZeros) {

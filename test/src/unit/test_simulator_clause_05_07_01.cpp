@@ -569,26 +569,6 @@ TEST(IntegerLiteralSim, UnsizedOctalLiteral) {
   EXPECT_EQ(result, 07460u);
 }
 
-TEST(IntegerLiteralSim, UnaryMinusBeforeSize) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = -8'd6;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 250u);
-}
-
-TEST(IntegerLiteralSim, NegativeTwosComplement) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = -1;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 255u);
-}
-
 TEST(IntegerLiteralSim, TruncationFromLeft) {
   auto result = RunAndGet(
       "module t;\n"

@@ -225,58 +225,149 @@ static std::optional<int64_t> EvalConstSysCall(const Expr* expr,
   return std::nullopt;
 }
 
-std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope) {
+// §11.3.3: Internal representation for constant evaluation with signedness.
+struct ConstVal {
+  int64_t value;
+  uint32_t width;
+  bool is_signed;
+};
+
+// §11.3.3: Determine signedness of a literal from its text.
+static bool IsSignedLiteral(std::string_view text) {
+  auto tick = text.find('\'');
+  if (tick == std::string_view::npos) return true;
+  if (tick + 1 >= text.size()) return false;
+  char c = text[tick + 1];
+  return c == 's' || c == 'S';
+}
+
+// Truncate a value to the given bit width.
+static int64_t TruncateToWidth(int64_t val, uint32_t width) {
+  if (width == 0 || width >= 64) return val;
+  return static_cast<int64_t>(static_cast<uint64_t>(val) &
+                               ((uint64_t{1} << width) - 1));
+}
+
+// Sign-extend a truncated value from the given bit width to 64 bits.
+static int64_t SignExtendFromWidth(int64_t val, uint32_t width) {
+  if (width == 0 || width >= 64) return val;
+  uint64_t mask = (uint64_t{1} << width) - 1;
+  uint64_t uval = static_cast<uint64_t>(val) & mask;
+  if (uval & (uint64_t{1} << (width - 1))) {
+    uval |= ~mask;
+  }
+  return static_cast<int64_t>(uval);
+}
+
+// Constant-evaluate an expression, tracking signedness and width per §11.3.3.
+static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
+                                             const ScopeMap& scope) {
   if (!expr) return std::nullopt;
 
   switch (expr->kind) {
-    case ExprKind::kIntegerLiteral:
-      return static_cast<int64_t>(expr->int_val);
+    case ExprKind::kIntegerLiteral: {
+      uint32_t w = ConstLiteralWidth(expr);
+      bool s = IsSignedLiteral(expr->text);
+      int64_t v = TruncateToWidth(static_cast<int64_t>(expr->int_val), w);
+      if (s) v = SignExtendFromWidth(v, w);
+      return ConstVal{v, w, s};
+    }
     case ExprKind::kIdentifier: {
       auto it = scope.find(expr->text);
-      if (it != scope.end()) return it->second;
+      if (it != scope.end()) return ConstVal{it->second, 32, true};
       return std::nullopt;
     }
     case ExprKind::kUnary: {
-      auto operand = ConstEvalInt(expr->lhs, scope);
+      auto operand = ConstEvalFull(expr->lhs, scope);
       if (!operand) return std::nullopt;
-      return EvalUnary(expr->op, *operand);
+      if (expr->op == TokenKind::kMinus) {
+        int64_t v = TruncateToWidth(-operand->value, operand->width);
+        if (operand->is_signed) v = SignExtendFromWidth(v, operand->width);
+        return ConstVal{v, operand->width, operand->is_signed};
+      }
+      auto result = EvalUnary(expr->op, operand->value);
+      if (!result) return std::nullopt;
+      return ConstVal{*result, operand->width, operand->is_signed};
     }
     case ExprKind::kBinary: {
-      auto lhs = ConstEvalInt(expr->lhs, scope);
-      auto rhs = ConstEvalInt(expr->rhs, scope);
+      auto lhs = ConstEvalFull(expr->lhs, scope);
+      auto rhs = ConstEvalFull(expr->rhs, scope);
       if (!lhs || !rhs) return std::nullopt;
-      return EvalBinary(expr->op, *lhs, *rhs);
+      uint32_t w = std::max(lhs->width, rhs->width);
+      bool s = lhs->is_signed && rhs->is_signed;
+      int64_t lv, rv;
+      if (s) {
+        lv = SignExtendFromWidth(lhs->value, lhs->width);
+        rv = SignExtendFromWidth(rhs->value, rhs->width);
+      } else {
+        lv = TruncateToWidth(lhs->value, lhs->width);
+        rv = TruncateToWidth(rhs->value, rhs->width);
+      }
+      if (!s && (expr->op == TokenKind::kSlash ||
+                 expr->op == TokenKind::kSlashEq)) {
+        auto ul = static_cast<uint64_t>(lv);
+        auto ur = static_cast<uint64_t>(rv);
+        if (ur == 0) return std::nullopt;
+        return ConstVal{static_cast<int64_t>(ul / ur), w, false};
+      }
+      if (!s && (expr->op == TokenKind::kPercent ||
+                 expr->op == TokenKind::kPercentEq)) {
+        auto ul = static_cast<uint64_t>(lv);
+        auto ur = static_cast<uint64_t>(rv);
+        if (ur == 0) return std::nullopt;
+        return ConstVal{static_cast<int64_t>(ul % ur), w, false};
+      }
+      auto result = EvalBinary(expr->op, lv, rv);
+      if (!result) return std::nullopt;
+      return ConstVal{*result, w, s};
     }
     case ExprKind::kTernary: {
-      auto cond = ConstEvalInt(expr->condition, scope);
+      auto cond = ConstEvalFull(expr->condition, scope);
       if (!cond) return std::nullopt;
-      return ConstEvalInt(*cond ? expr->true_expr : expr->false_expr, scope);
+      return ConstEvalFull(cond->value ? expr->true_expr : expr->false_expr,
+                           scope);
     }
-    case ExprKind::kConcatenation:
-      return EvalConcat(expr, scope);
-    case ExprKind::kReplicate:
-      return EvalReplicate(expr, scope);
+    case ExprKind::kConcatenation: {
+      auto val = EvalConcat(expr, scope);
+      if (!val) return std::nullopt;
+      return ConstVal{*val, 32, false};
+    }
+    case ExprKind::kReplicate: {
+      auto val = EvalReplicate(expr, scope);
+      if (!val) return std::nullopt;
+      return ConstVal{*val, 32, false};
+    }
     case ExprKind::kSelect: {
-      auto base_val = ConstEvalInt(expr->base, scope);
+      auto base_val = ConstEvalFull(expr->base, scope);
       if (!base_val) return std::nullopt;
-      auto idx = ConstEvalInt(expr->index, scope);
+      auto idx = ConstEvalFull(expr->index, scope);
       if (!idx) return std::nullopt;
       if (expr->index_end) {
-        auto end = ConstEvalInt(expr->index_end, scope);
+        auto end = ConstEvalFull(expr->index_end, scope);
         if (!end) return std::nullopt;
-        int64_t hi = std::max(*idx, *end);
-        int64_t lo = std::min(*idx, *end);
+        int64_t hi = std::max(idx->value, end->value);
+        int64_t lo = std::min(idx->value, end->value);
         int64_t width = hi - lo + 1;
         if (width <= 0 || width > 63) return std::nullopt;
-        return (*base_val >> lo) & ((int64_t{1} << width) - 1);
+        int64_t v = (base_val->value >> lo) & ((int64_t{1} << width) - 1);
+        return ConstVal{v, static_cast<uint32_t>(width), false};
       }
-      return (*base_val >> *idx) & 1;
+      return ConstVal{(base_val->value >> idx->value) & 1, 1, false};
     }
-    case ExprKind::kSystemCall:
-      return EvalConstSysCall(expr, scope);
+    case ExprKind::kSystemCall: {
+      auto val = EvalConstSysCall(expr, scope);
+      if (!val) return std::nullopt;
+      return ConstVal{*val, 32, true};
+    }
     default:
       return std::nullopt;
   }
+}
+
+std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope) {
+  auto result = ConstEvalFull(expr, scope);
+  if (!result) return std::nullopt;
+  return result->value;
 }
 
 std::optional<int64_t> ConstEvalInt(const Expr* expr) {

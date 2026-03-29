@@ -6,32 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ExprType, DecimalLiteralIsSigned) {
-  SimFixture f;
-  auto* lit = MakeInt(f.arena, 42);
-  lit->text = "42";
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-  EXPECT_TRUE(result.is_signed);
-}
-
-TEST(ExprType, BasedLiteralIsUnsigned) {
-  SimFixture f;
-  auto* lit = MakeInt(f.arena, 0xA);
-  lit->text = "8'hA";
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0xAu);
-  EXPECT_FALSE(result.is_signed);
-}
-
-TEST(ExprType, SignedBasedLiteralIsSigned) {
-  SimFixture f;
-  auto* lit = MakeInt(f.arena, 0xA);
-  lit->text = "4'shA";
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_signed);
-}
-
 TEST(ExprType, MixedSignednessYieldsUnsigned) {
   SimFixture f;
   MakeSignedVarAdv(f, "s", 8, 5);

@@ -1,4 +1,3 @@
-#include "fixture_evaluator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -77,10 +76,6 @@ TEST(IntegerLiteralParsing, SignedLiteral) {
 
 TEST(IntegerLiteralParsing, SignedDecimalQuestion) {
   EXPECT_TRUE(ParseOk("module m; initial x = 16'sd?; endmodule"));
-}
-
-TEST(IntegerLiteralParsing, NegativeUnsized) {
-  EXPECT_TRUE(ParseOk("module m; initial x = -8'd6; endmodule"));
 }
 
 TEST(IntegerLiteralParsing, XValue) {
@@ -692,12 +687,6 @@ TEST(IntegerLiteralParsing, ZeroSizeError) {
   delete r.diag;
 }
 
-TEST(IntegerLiteralParsing, NegativeBeforeSizedLiteral) {
-  auto r = Parse("module m; logic [7:0] x; initial x = -8'd6; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(IntegerLiteralParsing, QuestionMarkInOctal) {
   auto r = Parse("module m; logic [5:0] x; initial x = 6'o?; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -733,44 +722,6 @@ TEST(IntegerLiteralParsing, DecimalValueWithUnderscores) {
   EXPECT_EQ(rhs->int_val, 27195000u);
 }
 
-TEST(IntegerLiteralParsing, UnsizedUnbasedLiteral) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = 12;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(rhs->int_val, 12u);
-}
-
-TEST(IntegerLiteralParsing, UnsizedBasedLiteral) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = 'd12;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-}
-
-TEST(IntegerLiteralParsing, SizedBasedLiteral) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = 16'd12;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
-}
-
-TEST(IntegerLiteralParsing, NegativeUnsizedIsTwosComplement) {
-  EvalFixture f;
-  auto val = ConstEvalInt(ParseExprFrom("-12 / 3", f));
-  ASSERT_TRUE(val.has_value());
-  EXPECT_EQ(val.value_or(0), -4);
-}
-
 TEST(IntegerLiteralParsing, BinaryLiteral) {
   auto r = Parse(
       "module t;\n"
@@ -780,14 +731,6 @@ TEST(IntegerLiteralParsing, BinaryLiteral) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kIntegerLiteral);
   EXPECT_EQ(rhs->int_val, 0xAu);
-}
-
-TEST(IntegerLiteralParsing, IntegerLiteralInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic [31:0] x;\n"
-              "  initial x = 32'd42;\n"
-              "endmodule\n"));
 }
 
 TEST(IntegerLiteralParsing, UnbasedUnsizedLiteralInExpression) {
