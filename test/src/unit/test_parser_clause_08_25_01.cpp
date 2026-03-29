@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(TaskAndFunctionParsing, ScopeCallParsesAsExpr) {
+TEST(ParameterizedScopeResolutionParsing, ScopeCallParsesAsExpr) {
   auto r = Parse(
       "module top;\n"
       "  logic [7:0] d;\n"
@@ -15,7 +15,7 @@ TEST(TaskAndFunctionParsing, ScopeCallParsesAsExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(TaskAndFunctionParsing, TwoSpecializations) {
+TEST(ParameterizedScopeResolutionParsing, TwoSpecializations) {
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] a4;\n"
@@ -29,7 +29,7 @@ TEST(TaskAndFunctionParsing, TwoSpecializations) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(TaskAndFunctionParsing, MultiParamSpecialization) {
+TEST(ParameterizedScopeResolutionParsing, MultiParamSpecialization) {
   auto r = Parse(
       "module m;\n"
       "  logic [15:0] data;\n"
@@ -40,7 +40,7 @@ TEST(TaskAndFunctionParsing, MultiParamSpecialization) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(TaskAndFunctionParsing, TypeParamOverrideCall) {
+TEST(ParameterizedScopeResolutionParsing, TypeParamOverrideCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic [7:0] x, y;\n"
@@ -48,7 +48,7 @@ TEST(TaskAndFunctionParsing, TypeParamOverrideCall) {
               "endmodule\n"));
 }
 
-TEST(TaskAndFunctionParsing, ChainedParameterizedCalls) {
+TEST(ParameterizedScopeResolutionParsing, ChainedParameterizedCalls) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic [7:0] a, b, c;\n"
@@ -56,22 +56,14 @@ TEST(TaskAndFunctionParsing, ChainedParameterizedCalls) {
               "endmodule\n"));
 }
 
-TEST(TaskAndFunctionParsing, ExplicitParamSpecialization) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic [31:0] d, r;\n"
-              "  assign r = Shifter#(4)::left(d);\n"
-              "endmodule\n"));
-}
-
-TEST(TaskAndFunctionParsing, CallParamTaskFromInitial) {
+TEST(ParameterizedScopeResolutionParsing, CallParamTaskFromInitial) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial Utils#(16)::report();\n"
               "endmodule\n"));
 }
 
-TEST(TaskAndFunctionParsing, ParamCallInTernary) {
+TEST(ParameterizedScopeResolutionParsing, ParamCallInTernary) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic [7:0] x, y;\n"
@@ -80,7 +72,7 @@ TEST(TaskAndFunctionParsing, ParamCallInTernary) {
               "endmodule\n"));
 }
 
-TEST(ClassParsing, ParameterizedClassScopeResolution) {
+TEST(ParameterizedScopeResolutionParsing, ExplicitDefaultAccessesLocalParam) {
   auto r = Parse(
       "module m;\n"
       "  class par_cls #(parameter int a = 25);\n"
@@ -92,6 +84,52 @@ TEST(ClassParsing, ParameterizedClassScopeResolution) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
+TEST(ParameterizedScopeResolutionParsing, ExplicitDefaultAccessesClassParam) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  class C #(parameter int p = 1);\n"
+              "  endclass\n"
+              "  int result;\n"
+              "  initial result = C#()::p;\n"
+              "endmodule\n"));
+}
+
+TEST(ParameterizedScopeResolutionParsing, ExplicitSpecAccessesClassParam) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  class C #(parameter int p = 1);\n"
+              "  endclass\n"
+              "  int result;\n"
+              "  initial result = C#(5)::p;\n"
+              "endmodule\n"));
+}
+
+TEST(ParameterizedScopeResolutionParsing, OutOfBlockMethodForParameterizedClass) {
+  EXPECT_TRUE(
+      ParseOk("class C #(int p = 1);\n"
+              "  extern static function int f();\n"
+              "endclass\n"
+              "function int C::f();\n"
+              "  return p;\n"
+              "endfunction\n"
+              "module m;\n"
+              "endmodule\n"));
+}
+
+TEST(ParameterizedScopeResolutionParsing, EmptyParamListWithMemberAccess) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  class C #(parameter int p = 10);\n"
+              "    parameter int q = 20;\n"
+              "  endclass\n"
+              "  int a, b;\n"
+              "  initial begin\n"
+              "    a = C#()::p;\n"
+              "    b = C#()::q;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 }  // namespace

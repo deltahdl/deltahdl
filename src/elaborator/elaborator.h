@@ -315,6 +315,9 @@ class Elaborator {
   /// §8.24: Validate out-of-block method declarations.
   void ValidateOutOfBlockDeclarations();
 
+  /// §8.25.1: Validate parameterized class scope resolution.
+  void ValidateParameterizedScopeResolution(const ModuleDecl* decl);
+
   /// §8.26: Validate interface class rules.
   void ValidateInterfaceClassRules();
   void ValidateInterfaceClassMembers(const ClassDecl* cls);
@@ -387,6 +390,7 @@ class Elaborator {
   std::unordered_set<std::string_view> enum_member_names_;
   std::unordered_set<std::string_view> const_names_;
   std::unordered_set<std::string_view> class_names_;
+  std::unordered_set<std::string_view> parameterized_class_names_;  // §8.25.1
   std::unordered_set<std::string_view> class_var_names_;  // §8.4
   std::unordered_map<std::string_view, std::string_view>
       class_var_types_;  // §8.18: var name → class type name

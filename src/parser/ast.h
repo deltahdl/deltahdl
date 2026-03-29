@@ -79,6 +79,7 @@ struct Expr {
   Expr* index_end = nullptr;
   bool is_part_select_plus = false;   // [base +: width] (§7.4.5)
   bool is_part_select_minus = false;  // [base -: width] (§7.4.5)
+  bool has_param_spec = false;        // §8.25.1: C#(...):: explicit specialization
 
   // Array method with-clause (§7.12)
   Expr* with_expr = nullptr;

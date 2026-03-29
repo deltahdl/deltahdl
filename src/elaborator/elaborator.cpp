@@ -196,6 +196,8 @@ void Elaborator::RegisterCuScopeItems() {
       typedefs_[item->name] = item->typedef_type;
     } else if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
       class_names_.insert(item->class_decl->name);
+      if (!item->class_decl->params.empty())
+        parameterized_class_names_.insert(item->class_decl->name);
     } else if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
       auto val = ConstEvalInt(item->init_expr, cu_param_scope_);
       if (val) {
@@ -206,6 +208,7 @@ void Elaborator::RegisterCuScopeItems() {
   for (auto* cls : unit_->classes) {
     class_names_.insert(cls->name);
     cu_scope_names_.insert(cls->name);
+    if (!cls->params.empty()) parameterized_class_names_.insert(cls->name);
   }
 }
 

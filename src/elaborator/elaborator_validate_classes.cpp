@@ -1534,4 +1534,67 @@ void Elaborator::ValidateInterfaceClassRules() {
   }
 }
 
+// §8.25.1: Check expressions for unadorned parameterized class scope resolution.
+static void CheckParamScopeExpr(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& param_classes,
+    DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kMemberAccess && e->lhs && e->rhs &&
+      e->lhs->kind == ExprKind::kIdentifier &&
+      !e->lhs->has_param_spec &&
+      param_classes.count(e->lhs->text)) {
+    diag.Error(e->lhs->range.start,
+               std::format("unadorned name '{}' used as scope resolution "
+                           "prefix for parameterized class; use explicit "
+                           "specialization '{}#(...)::' or '{}#()::'",
+                           e->lhs->text, e->lhs->text, e->lhs->text));
+  }
+  CheckParamScopeExpr(e->lhs, param_classes, diag);
+  CheckParamScopeExpr(e->rhs, param_classes, diag);
+  CheckParamScopeExpr(e->base, param_classes, diag);
+  CheckParamScopeExpr(e->index, param_classes, diag);
+  CheckParamScopeExpr(e->condition, param_classes, diag);
+  CheckParamScopeExpr(e->true_expr, param_classes, diag);
+  CheckParamScopeExpr(e->false_expr, param_classes, diag);
+  for (const auto* arg : e->args)
+    CheckParamScopeExpr(arg, param_classes, diag);
+}
+
+static void WalkStmtsForParamScope(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& param_classes,
+    DiagEngine& diag) {
+  if (!s) return;
+  CheckParamScopeExpr(s->lhs, param_classes, diag);
+  CheckParamScopeExpr(s->rhs, param_classes, diag);
+  CheckParamScopeExpr(s->expr, param_classes, diag);
+  CheckParamScopeExpr(s->condition, param_classes, diag);
+  for (auto* sub : s->stmts) WalkStmtsForParamScope(sub, param_classes, diag);
+  WalkStmtsForParamScope(s->then_branch, param_classes, diag);
+  WalkStmtsForParamScope(s->else_branch, param_classes, diag);
+  WalkStmtsForParamScope(s->body, param_classes, diag);
+  WalkStmtsForParamScope(s->for_body, param_classes, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForParamScope(ci.body, param_classes, diag);
+}
+
+void Elaborator::ValidateParameterizedScopeResolution(const ModuleDecl* decl) {
+  if (parameterized_class_names_.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckParamScopeExpr(item->rhs, parameterized_class_names_, diag_);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForParamScope(item->body, parameterized_class_names_, diag_);
+    }
+  }
+}
+
 }  // namespace delta

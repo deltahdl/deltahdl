@@ -549,6 +549,7 @@ Expr* Parser::ParseMemberAccessChain(Token tok) {
 Expr* Parser::ParseParameterizedScope(Expr* base) {
   Consume();  // #
   if (!Check(TokenKind::kLParen)) return base;
+  base->has_param_spec = true;
   Consume();  // (
   if (!Check(TokenKind::kRParen)) {
     base->elements.push_back(ParseExpr());

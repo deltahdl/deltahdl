@@ -294,6 +294,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kClassDecl:
       if (item->class_decl) {
         class_names_.insert(item->class_decl->name);
+        if (!item->class_decl->params.empty())
+          parameterized_class_names_.insert(item->class_decl->name);
         mod->class_decls.push_back(item->class_decl);
       }
       break;
