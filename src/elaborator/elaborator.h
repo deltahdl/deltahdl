@@ -320,6 +320,9 @@ class Elaborator {
 
   /// §8.26: Validate interface class rules.
   void ValidateInterfaceClassRules();
+
+  /// §8.27: Validate forward class typedefs are resolved.
+  void ValidateForwardClassTypedefs();
   void ValidateInterfaceClassMembers(const ClassDecl* cls);
   void ValidateInterfaceClassInheritance(const ClassDecl* cls);
   void ValidateRegularClassInheritance(const ClassDecl* cls);

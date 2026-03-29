@@ -2160,4 +2160,35 @@ void Elaborator::ValidateParameterizedScopeResolution(const ModuleDecl* decl) {
   }
 }
 
+void Elaborator::ValidateForwardClassTypedefs() {
+  for (const auto* item : unit_->cu_items) {
+    if (item->kind != ModuleItemKind::kTypedef) continue;
+    if (item->typedef_type.kind != DataTypeKind::kImplicit) continue;
+    bool resolved = false;
+    for (const auto* cls : unit_->classes) {
+      if (cls->name == item->name) {
+        resolved = true;
+        break;
+      }
+    }
+    if (!resolved) {
+      for (const auto* other : unit_->cu_items) {
+        if (other == item) continue;
+        if (other->kind == ModuleItemKind::kTypedef &&
+            other->name == item->name &&
+            other->typedef_type.kind != DataTypeKind::kImplicit) {
+          resolved = true;
+          break;
+        }
+      }
+    }
+    if (!resolved) {
+      diag_.Error(item->loc,
+                  std::format("forward typedef '{}' is never resolved by a "
+                              "definition in the same scope",
+                              item->name));
+    }
+  }
+}
+
 }  // namespace delta

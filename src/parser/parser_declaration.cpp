@@ -183,6 +183,18 @@ ModuleItem* Parser::ParseTypedef() {
     }
     lexer_.RestorePos(saved);
   }
+  // Bare forward typedef: typedef IDENT ;
+  if (CheckIdentifier()) {
+    auto saved = lexer_.SavePos();
+    auto id_tok = Consume();
+    if (Check(TokenKind::kSemicolon)) {
+      item->name = id_tok.text;
+      known_types_.insert(item->name);
+      Expect(TokenKind::kSemicolon);
+      return item;
+    }
+    lexer_.RestorePos(saved);
+  }
   // A.2.1.3 form 2: typedef ifc_port {[const_expr]} . type_id new_name ;
   if (CheckIdentifier()) {
     auto saved = lexer_.SavePos();

@@ -152,6 +152,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateOutOfBlockDeclarations();
   // §8.26: Validate interface class rules.
   ValidateInterfaceClassRules();
+  // §8.27: Validate forward class typedefs are resolved.
+  ValidateForwardClassTypedefs();
 
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {

@@ -54,4 +54,33 @@ TEST(ClassParsing, TypedefInterfaceClass) {
   EXPECT_TRUE(r.cu->classes[0]->is_interface);
 }
 
+TEST(ClassParsing, BareForwardTypedefWithoutClassKeyword) {
+  auto r = Parse(
+      "typedef C2;\n"
+      "class C1;\n"
+      "  C2 c;\n"
+      "endclass\n"
+      "class C2;\n"
+      "  C1 c;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+}
+
+TEST(ClassParsing, ForwardTypedefParameterizedClass) {
+  auto r = Parse(
+      "typedef class C;\n"
+      "module top;\n"
+      "  C#(1, real) v2;\n"
+      "  C#(.p(2), .T(real)) v3;\n"
+      "endmodule\n"
+      "class C #(parameter p = 2, type T = int);\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "C");
+}
+
 }  // namespace
