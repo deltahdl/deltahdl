@@ -543,6 +543,20 @@ static void CheckClassHandleExpr(
       IsClassVar(e->base, class_vars)) {
     diag.Error(e->range.start, "bit-select on class object handle is illegal");
   }
+  // §8.28(b): Casting a class handle to a non-class data type is disallowed.
+  if (e->kind == ExprKind::kCast && e->lhs && IsClassVar(e->lhs, class_vars) &&
+      !e->text.empty() && !FindClassDecl(e->text, unit)) {
+    diag.Error(e->range.start,
+               "cannot cast class object handle to a non-class type");
+  }
+  // §8.28(b): Casting a non-class value to a class type is disallowed.
+  if (e->kind == ExprKind::kCast && !e->text.empty() &&
+      FindClassDecl(e->text, unit) != nullptr && e->lhs &&
+      !IsClassVar(e->lhs, class_vars) &&
+      !(e->lhs->kind == ExprKind::kIdentifier && e->lhs->text == "null")) {
+    diag.Error(e->range.start,
+               "cannot cast non-class value to a class type");
+  }
   // Recurse into sub-expressions.
   CheckClassHandleExpr(e->lhs, class_vars, class_var_types, unit, diag);
   CheckClassHandleExpr(e->rhs, class_vars, class_var_types, unit, diag);
@@ -594,6 +608,13 @@ static void CheckInterfaceHandleRandConstraintMode(
 
 void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
   if (!s) return;
+  // §8.28: Track local class variable declarations inside procedural blocks.
+  if (s->kind == StmtKind::kVarDecl &&
+      s->var_decl_type.kind == DataTypeKind::kNamed &&
+      class_names_.count(s->var_decl_type.type_name)) {
+    class_var_names_.insert(s->var_name);
+    class_var_types_[s->var_name] = s->var_decl_type.type_name;
+  }
   // Check compound assignment to class handle.
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
@@ -631,6 +652,20 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
                     "types");
       }
     }
+    // §8.28(b): Assigning a non-class literal to a class handle is disallowed.
+    if (s->rhs && s->rhs->kind == ExprKind::kLiteral) {
+      diag_.Error(s->range.start,
+                  "cannot assign non-class value to class object handle");
+    }
+  }
+  // §8.28(b): Assigning a class handle to a non-class variable is disallowed.
+  if ((s->kind == StmtKind::kBlockingAssign ||
+       s->kind == StmtKind::kNonblockingAssign) &&
+      s->lhs && s->lhs->kind == ExprKind::kIdentifier &&
+      !IsClassVar(s->lhs, class_var_names_) &&
+      s->rhs && IsClassVar(s->rhs, class_var_names_)) {
+    diag_.Error(s->range.start,
+                "cannot assign class object handle to a non-class variable");
   }
   // §8.26.9: rand_mode and constraint_mode shall not be legal on interface
   // class handles.
