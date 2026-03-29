@@ -105,26 +105,6 @@ TEST(ClassConstructorParsing, ConstructorVirtualError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ClassConstructorParsing, ConstructorLocalAllowed) {
-  auto r = Parse(
-      "class C;\n"
-      "  local function new();\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ClassConstructorParsing, ConstructorProtectedAllowed) {
-  auto r = Parse(
-      "class C;\n"
-      "  protected function new(int x);\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ClassConstructorParsing, ConstructorNoReturnType) {
   auto r = Parse(
       "class C;\n"

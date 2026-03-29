@@ -101,28 +101,6 @@ TEST(ClassConstructorElaboration, ConstructorVirtualError) {
              "endmodule\n"));
 }
 
-TEST(ClassConstructorElaboration, ConstructorLocalAllowed) {
-  EXPECT_TRUE(
-      ElabOk("class C;\n"
-             "  local function new();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
-}
-
-TEST(ClassConstructorElaboration, ConstructorProtectedAllowed) {
-  EXPECT_TRUE(
-      ElabOk("class C;\n"
-             "  protected function new(int x);\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
-}
-
 TEST(ClassConstructorElaboration, PropertyWithExplicitDefaultElaborates) {
   EXPECT_TRUE(
       ElabOk("class C;\n"

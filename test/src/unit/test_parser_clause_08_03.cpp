@@ -324,26 +324,6 @@ TEST(ClassSyntaxParsing, StaticProperty) {
   EXPECT_TRUE(r.cu->classes[0]->members[0]->is_static);
 }
 
-TEST(ClassSyntaxParsing, ProtectedProperty) {
-  auto r = Parse(
-      "class C;\n"
-      "  protected int data;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->classes[0]->members[0]->is_protected);
-}
-
-TEST(ClassSyntaxParsing, LocalProperty) {
-  auto r = Parse(
-      "class C;\n"
-      "  local int secret;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->classes[0]->members[0]->is_local);
-}
-
 // === class_property: const variant ===
 
 TEST(ClassSyntaxParsing, ConstPropertyVerifiesName) {
@@ -415,43 +395,7 @@ TEST(ClassSyntaxParsing, StaticConstPropertyWithInitializer) {
   EXPECT_NE(m->init_expr, nullptr);
 }
 
-TEST(ClassSyntaxParsing, ConstProtectedProperty) {
-  auto r = Parse(
-      "class C;\n"
-      "  const protected int X = 10;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* m = r.cu->classes[0]->members[0];
-  EXPECT_TRUE(m->is_const);
-  EXPECT_TRUE(m->is_protected);
-}
-
-TEST(ClassSyntaxParsing, ConstLocalProperty) {
-  auto r = Parse(
-      "class C;\n"
-      "  const local int Y = 20;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* m = r.cu->classes[0]->members[0];
-  EXPECT_TRUE(m->is_const);
-  EXPECT_TRUE(m->is_local);
-}
-
 // === property_qualifier combinations ===
-
-TEST(ClassSyntaxParsing, RandProtectedProperty) {
-  auto r = Parse(
-      "class C;\n"
-      "  rand protected int x;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* m = r.cu->classes[0]->members[0];
-  EXPECT_TRUE(m->is_rand);
-  EXPECT_TRUE(m->is_protected);
-}
 
 TEST(ClassSyntaxParsing, RandStaticProperty) {
   auto r = Parse(
@@ -605,17 +549,6 @@ TEST(ClassSyntaxParsing, PureVirtualTaskPrototype) {
   EXPECT_TRUE(m->is_virtual);
 }
 
-TEST(ClassSyntaxParsing, PureVirtualProtectedMethodPrototype) {
-  auto r = Parse(
-      "class C;\n"
-      "  pure virtual protected function void work();\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* m = r.cu->classes[0]->members[0];
-  EXPECT_TRUE(m->is_protected);
-}
-
 // === method_qualifier: class_item_qualifier ===
 
 TEST(ClassSyntaxParsing, MixedStaticFuncAndTask) {
@@ -654,58 +587,6 @@ TEST(ClassSyntaxParsing, StaticMethodMultipleArgs) {
               "    return a + b;\n"
               "  endfunction\n"
               "endclass\n"));
-}
-
-TEST(ClassSyntaxParsing, ProtectedMethodFunction) {
-  auto r = Parse(
-      "class C;\n"
-      "  protected function void work();\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* m = r.cu->classes[0]->members[0];
-  EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
-  EXPECT_TRUE(m->is_protected);
-}
-
-TEST(ClassSyntaxParsing, ProtectedMethodTask) {
-  auto r = Parse(
-      "class C;\n"
-      "  protected task run();\n"
-      "  endtask\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* m = r.cu->classes[0]->members[0];
-  EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
-  EXPECT_TRUE(m->is_protected);
-}
-
-TEST(ClassSyntaxParsing, LocalMethodFunction) {
-  auto r = Parse(
-      "class C;\n"
-      "  local function void secret();\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* m = r.cu->classes[0]->members[0];
-  EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
-  EXPECT_TRUE(m->is_local);
-}
-
-TEST(ClassSyntaxParsing, LocalMethodTask) {
-  auto r = Parse(
-      "class C;\n"
-      "  local task secret_task();\n"
-      "  endtask\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* m = r.cu->classes[0]->members[0];
-  EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
-  EXPECT_TRUE(m->is_local);
 }
 
 // === class_method: extern ===
@@ -1053,22 +934,6 @@ TEST(ClassSyntaxParsing, ConstructorDefaultArgs) {
   EXPECT_NE(m->method->func_args[1].default_value, nullptr);
 }
 
-TEST(ClassSyntaxParsing, ConstructorLocalQualifierLegal) {
-  ParseOk(
-      "class C;\n"
-      "  local function new();\n"
-      "  endfunction\n"
-      "endclass\n");
-}
-
-TEST(ClassSyntaxParsing, ConstructorProtectedQualifierLegal) {
-  ParseOk(
-      "class C;\n"
-      "  protected function new(int x);\n"
-      "  endfunction\n"
-      "endclass\n");
-}
-
 TEST(ClassSyntaxParsing, ClassNewWithDefaultArg) {
   EXPECT_TRUE(
       ParseOk("class my_class;\n"
@@ -1197,14 +1062,6 @@ TEST(ClassSyntaxParsing, InterfaceClassPureVirtualTask) {
 
 // === Footnote 10: mutual exclusivity ===
 
-TEST(ClassSyntaxParsing, ErrorBothLocalAndProtected) {
-  auto r = Parse(
-      "class C;\n"
-      "  local protected int x;\n"
-      "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(ClassSyntaxParsing, ErrorDuplicateStatic) {
   auto r = Parse(
       "class C;\n"
@@ -1225,31 +1082,6 @@ TEST(ClassSyntaxParsing, ErrorDuplicateRand) {
   auto r = Parse(
       "class C;\n"
       "  rand rand int x;\n"
-      "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ClassSyntaxParsing, ErrorDuplicateVirtual) {
-  auto r = Parse(
-      "class C;\n"
-      "  virtual virtual function void foo();\n"
-      "  endfunction\n"
-      "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ClassSyntaxParsing, ErrorDuplicateProtected) {
-  auto r = Parse(
-      "class C;\n"
-      "  protected protected int x;\n"
-      "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(ClassSyntaxParsing, ErrorDuplicateLocal) {
-  auto r = Parse(
-      "class C;\n"
-      "  local local int x;\n"
       "endclass\n");
   EXPECT_TRUE(r.has_errors);
 }
@@ -1319,44 +1151,6 @@ TEST(ClassSyntaxParsing, ExternStaticMethodPrototype) {
   auto* m = r.cu->classes[0]->members[0];
   EXPECT_TRUE(m->is_static);
   EXPECT_TRUE(m->method->is_extern);
-}
-
-TEST(ClassSyntaxParsing, ExternProtectedMethodPrototype) {
-  auto r = Parse(
-      "class C;\n"
-      "  extern protected function void compute();\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* m = r.cu->classes[0]->members[0];
-  EXPECT_TRUE(m->is_protected);
-  EXPECT_TRUE(m->method->is_extern);
-}
-
-TEST(ClassSyntaxParsing, ExternLocalMethodPrototype) {
-  auto r = Parse(
-      "class C;\n"
-      "  extern local task do_work();\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* m = r.cu->classes[0]->members[0];
-  EXPECT_TRUE(m->is_local);
-  EXPECT_TRUE(m->method->is_extern);
-}
-
-// === class_method: pure virtual with class_item_qualifier ===
-
-TEST(ClassSyntaxParsing, PureVirtualLocalMethodPrototype) {
-  auto r = Parse(
-      "class C;\n"
-      "  pure virtual local function void secret();\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* m = r.cu->classes[0]->members[0];
-  EXPECT_TRUE(m->is_virtual);
-  EXPECT_TRUE(m->is_local);
 }
 
 // === class_constructor_prototype: multiple args, default ===

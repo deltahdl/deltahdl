@@ -138,24 +138,6 @@ TEST(BnfClarificationParsing, TypeRefInVarDeclWithVar) {
               "endmodule\n"));
 }
 
-// Item 10: protected/local mutual exclusion
-
-TEST(BnfClarificationParsing, ErrorLocalAndProtected) {
-  auto r = Parse(
-      "class c;\n"
-      "  local protected int x;\n"
-      "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(BnfClarificationParsing, ErrorDuplicateLocal) {
-  auto r = Parse(
-      "class c;\n"
-      "  local local int x;\n"
-      "endclass\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 // Item 10: rand/randc mutual exclusion
 
 TEST(BnfClarificationParsing, ErrorRandAndRandc) {

@@ -346,10 +346,10 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
       continue;
     }
     if (TryConsumeRandQualifier(m)) continue;
-    if (Match(TokenKind::kKwConst)) {
-      m->is_const = true;
+    if (TryConsumeClassQualifier(m, TokenKind::kKwConst,
+                                 &ClassMember::is_const,
+                                 "duplicate 'const' qualifier"))
       continue;
-    }
     if (Match(TokenKind::kKwExtern)) {
       proto = true;
       continue;

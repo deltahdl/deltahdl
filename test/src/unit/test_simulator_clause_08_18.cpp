@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ClassSim, PropertyInfoLocal) {
+TEST(DataHidingSimulation, PropertyInfoLocal) {
   SimFixture f;
   auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = "Packet";
@@ -17,7 +17,7 @@ TEST(ClassSim, PropertyInfoLocal) {
   EXPECT_FALSE(info->properties[0].is_protected);
 }
 
-TEST(ClassSim, PropertyInfoProtected) {
+TEST(DataHidingSimulation, PropertyInfoProtected) {
   SimFixture f;
   auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = "Packet";
@@ -28,14 +28,14 @@ TEST(ClassSim, PropertyInfoProtected) {
   EXPECT_TRUE(info->properties[0].is_protected);
 }
 
-TEST(ClassSim, PropertyInfoPublicDefault) {
+TEST(DataHidingSimulation, PropertyInfoPublicDefault) {
   SimFixture f;
   auto* type = MakeClassType(f, "Packet", {"x"});
   EXPECT_FALSE(type->properties[0].is_local);
   EXPECT_FALSE(type->properties[0].is_protected);
 }
 
-TEST(ClassSim, LocalPropertyAccessibleAtRuntime) {
+TEST(DataHidingSimulation, LocalPropertyAccessibleAtRuntime) {
   SimFixture f;
   auto* info = f.arena.Create<ClassTypeInfo>();
   info->name = "Packet";
@@ -48,7 +48,7 @@ TEST(ClassSim, LocalPropertyAccessibleAtRuntime) {
   EXPECT_EQ(obj->GetProperty("secret", f.arena).ToUint64(), 42u);
 }
 
-TEST(ClassSim, ProtectedMemberInherited) {
+TEST(DataHidingSimulation, ProtectedMemberInherited) {
   SimFixture f;
   auto* base = f.arena.Create<ClassTypeInfo>();
   base->name = "Base";
