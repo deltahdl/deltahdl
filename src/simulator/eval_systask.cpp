@@ -406,9 +406,15 @@ static bool TryCastEnum(std::string_view dest_name, uint64_t src_val,
   return true;
 }
 
+// §8.16: Check if two class types are cast compatible.
+static bool AreCastCompatible(const ClassTypeInfo* a, const ClassTypeInfo* b) {
+  return a->IsA(b) || b->IsA(a) || a->is_interface || b->is_interface;
+}
+
 // §8.16: Try class handle cast.
 static bool TryCastClassHandle(std::string_view dest_name, uint64_t src_val,
-                               SimContext& ctx, Arena& arena, Logic4Vec& out) {
+                               const Expr* src_expr, SimContext& ctx,
+                               Arena& arena, Logic4Vec& out) {
   auto dest_class = ctx.GetVariableClassType(dest_name);
   if (dest_class.empty()) return false;
   auto* dest_type = ctx.FindClassType(dest_class);
@@ -416,6 +422,21 @@ static bool TryCastClassHandle(std::string_view dest_name, uint64_t src_val,
     out = MakeLogic4VecVal(arena, 32, 0);
     return true;
   }
+  // §8.16: If the source is a class variable, check cast compatibility at the
+  // type level. $cast shall fail when types are not cast compatible, even if
+  // the source evaluates to null.
+  if (src_expr && src_expr->kind == ExprKind::kIdentifier &&
+      src_expr->text != "null") {
+    auto src_class = ctx.GetVariableClassType(src_expr->text);
+    if (!src_class.empty()) {
+      auto* src_type = ctx.FindClassType(src_class);
+      if (src_type && !AreCastCompatible(src_type, dest_type)) {
+        out = MakeLogic4VecVal(arena, 32, 0);
+        return true;
+      }
+    }
+  }
+  // §8.16 success case 3: source is the literal null.
   if (src_val == kNullClassHandle) {
     out = CastAssignSuccess(dest_name, 0, ctx, arena);
     return true;
@@ -444,7 +465,8 @@ static Logic4Vec EvalCastSysFunc(const Expr* expr, SimContext& ctx,
   auto dest_name = dest_expr->text;
   Logic4Vec out;
   if (TryCastEnum(dest_name, src_val, ctx, arena, out)) return out;
-  if (TryCastClassHandle(dest_name, src_val, ctx, arena, out)) return out;
+  if (TryCastClassHandle(dest_name, src_val, expr->args[1], ctx, arena, out))
+    return out;
   return CastAssignSuccess(dest_name, src_val, ctx, arena);
 }
 
