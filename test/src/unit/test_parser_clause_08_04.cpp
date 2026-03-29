@@ -80,18 +80,4 @@ TEST(ClassParsing, ClassVariableNew) {
               "endmodule\n"));
 }
 
-TEST(ClassParsing, ClassHandleAssignment) {
-  EXPECT_TRUE(
-      ParseOk("class C;\n"
-              "  int x;\n"
-              "endclass\n"
-              "module m;\n"
-              "  C a, b;\n"
-              "  initial begin\n"
-              "    a = new;\n"
-              "    b = a;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 }  // namespace

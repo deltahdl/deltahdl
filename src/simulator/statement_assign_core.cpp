@@ -66,6 +66,20 @@ static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
   auto type_name = ctx.GetVariableClassType(stmt->lhs->text);
   if (type_name.empty()) return false;
+
+  // §8.12: shallow copy — `p2 = new p1;`
+  if (stmt->rhs->lhs && stmt->rhs->lhs->kind == ExprKind::kIdentifier) {
+    auto src_val = EvalExpr(stmt->rhs->lhs, ctx, arena);
+    auto* src_obj = ctx.GetClassObject(src_val.ToUint64());
+    if (src_obj) {
+      auto* copy = src_obj->ShallowCopy(arena);
+      auto copy_handle = ctx.AllocateClassObject(copy);
+      auto* var = ctx.FindVariable(stmt->lhs->text);
+      if (var) var->value = MakeLogic4VecVal(arena, 64, copy_handle);
+      return true;
+    }
+  }
+
   auto handle = EvalClassNew(type_name, stmt->rhs, ctx, arena);
   auto* var = ctx.FindVariable(stmt->lhs->text);
   if (var) var->value = handle;
@@ -620,6 +634,21 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   if (!stmt->var_init) return true;
   if (stmt->var_init->kind != ExprKind::kCall) return true;
   if (stmt->var_init->text != "new") return true;
+
+  // §8.12: shallow copy — `C c2 = new c1;`
+  if (stmt->var_init->lhs &&
+      stmt->var_init->lhs->kind == ExprKind::kIdentifier) {
+    auto src_val = EvalExpr(stmt->var_init->lhs, ctx, arena);
+    auto* src_obj = ctx.GetClassObject(src_val.ToUint64());
+    if (src_obj) {
+      auto* copy = src_obj->ShallowCopy(arena);
+      auto copy_handle = ctx.AllocateClassObject(copy);
+      auto* var = ctx.FindVariable(stmt->var_name);
+      if (var) var->value = MakeLogic4VecVal(arena, 64, copy_handle);
+      return true;
+    }
+  }
+
   auto handle = EvalClassNew(class_type, stmt->var_init, ctx, arena);
   auto* var = ctx.FindVariable(stmt->var_name);
   if (var) var->value = handle;

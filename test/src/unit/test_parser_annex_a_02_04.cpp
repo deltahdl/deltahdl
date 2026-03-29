@@ -228,16 +228,6 @@ TEST(DeclarationAssignmentParsing, VarDeclAssignmentClassNewWithArgs) {
       "endmodule\n"));
 }
 
-TEST(DeclarationAssignmentParsing, VarDeclAssignmentShallowCopy) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c1, c2;\n"
-      "  initial c2 = new c1;\n"
-      "endmodule\n"));
-}
-
 // --- class_new ---
 
 TEST(DeclarationAssignmentParsing, ClassNewNoArgs) {
@@ -256,16 +246,6 @@ TEST(DeclarationAssignmentParsing, ClassNewWithParenArgs) {
       "endclass\n"
       "module m;\n"
       "  C c = new(42);\n"
-      "endmodule\n"));
-}
-
-TEST(DeclarationAssignmentParsing, ClassNewShallowCopy) {
-  EXPECT_TRUE(ParseOk(
-      "class C;\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c1;\n"
-      "  initial begin C c2 = new c1; end\n"
       "endmodule\n"));
 }
 

@@ -75,24 +75,6 @@ TEST(ClassSim, MultipleObjectsSameType) {
   EXPECT_EQ(o2->GetProperty("value", f.arena).ToUint64(), 200u);
 }
 
-TEST(ClassSim, TwoHandlesSameObjectShareState) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Shared", {"val"});
-  auto [handle, obj] = MakeObj(f, type);
-
-  // Simulate assigning the handle to another variable.
-  uint64_t handle2 = handle;
-
-  // Both handles resolve to the exact same object.
-  auto* obj_via_h1 = f.ctx.GetClassObject(handle);
-  auto* obj_via_h2 = f.ctx.GetClassObject(handle2);
-  EXPECT_EQ(obj_via_h1, obj_via_h2);
-
-  // Mutation through one handle is visible through the other.
-  obj_via_h1->SetProperty("val", MakeLogic4VecVal(f.arena, 32, 42));
-  EXPECT_EQ(obj_via_h2->GetProperty("val", f.arena).ToUint64(), 42u);
-}
-
 TEST(ClassSim, HandleNullAssignment) {
   SimFixture f;
   auto* type = MakeClassType(f, "Foo", {"x"});

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DeclarationAssignmentParsing, ClassNewCopy) {
+TEST(ClassAssignRenameParsing, ClassNewCopy) {
   auto r = Parse(
       "class C;\n"
       "endclass\n"
@@ -16,7 +16,7 @@ TEST(DeclarationAssignmentParsing, ClassNewCopy) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ClassParsing, ShallowCopy) {
+TEST(ClassAssignRenameParsing, ShallowCopy) {
   auto r = Parse(
       "module m;\n"
       "  class Packet;\n"
@@ -116,6 +116,69 @@ TEST(ClassAssignRenameParsing, ShallowCopyWithData) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ClassAssignRenameParsing, ShallowCopyInDeclaration) {
+  EXPECT_TRUE(ParseOk(
+      "class C;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c1;\n"
+      "  initial begin C c2 = new c1; end\n"
+      "endmodule\n"));
+}
+
+TEST(ClassAssignRenameParsing, DeepChainedMemberAccess) {
+  EXPECT_TRUE(
+      ParseOk("class Node;\n"
+              "  int val;\n"
+              "  Node next;\n"
+              "endclass\n"
+              "module m;\n"
+              "  initial begin\n"
+              "    Node p;\n"
+              "    p = new;\n"
+              "    p.next = new;\n"
+              "    p.next.next = new;\n"
+              "    p.next.next.val = 99;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ClassAssignRenameParsing, ShallowCopyExtendedClass) {
+  EXPECT_TRUE(
+      ParseOk("class Base;\n"
+              "  int j;\n"
+              "endclass\n"
+              "class Ext extends Base;\n"
+              "  int x;\n"
+              "endclass\n"
+              "module m;\n"
+              "  initial begin\n"
+              "    Ext e;\n"
+              "    Base b;\n"
+              "    e = new;\n"
+              "    b = e;\n"
+              "    Base b2;\n"
+              "    b2 = new b;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ClassAssignRenameParsing, HandleAssignmentAfterPropertyMutation) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  int x;\n"
+              "endclass\n"
+              "module m;\n"
+              "  initial begin\n"
+              "    C p1, p2;\n"
+              "    p1 = new;\n"
+              "    p1.x = 5;\n"
+              "    p2 = p1;\n"
+              "    p2.x = 10;\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 }  // namespace
