@@ -83,20 +83,6 @@ TEST(ExpressionParsing, ExprUnaryNot) {
   EXPECT_EQ(rhs->op, TokenKind::kBang);
 }
 
-TEST(OperatorAndExpressionParsing, ImplicationRightAssocStructure) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic a, b, c, d;\n"
-      "  initial d = a -> b -> c;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-
-  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(rhs->rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->rhs->op, TokenKind::kArrow);
-}
-
 TEST(ExpressionParsing, ExprBinaryLogicalAnd) {
   auto r = Parse("module m; initial x = a && b; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

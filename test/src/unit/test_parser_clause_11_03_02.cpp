@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(OperatorAndExpressionParsing, NestedParenthesizedExpression) {
+TEST(Precedence, NestedParenthesizedExpression) {
   auto r = Parse(
       "module t;\n"
       "  initial x = ((a + b) * (c - d));\n"
@@ -17,7 +17,7 @@ TEST(OperatorAndExpressionParsing, NestedParenthesizedExpression) {
   EXPECT_EQ(rhs->op, TokenKind::kStar);
 }
 
-TEST(OperatorAndExpressionParsing, ChainedAdditiveLeftAssoc) {
+TEST(Precedence, ChainedAdditiveLeftAssoc) {
   auto r = Parse(
       "module t;\n"
       "  initial x = a + b - c + d;\n"
@@ -29,15 +29,7 @@ TEST(OperatorAndExpressionParsing, ChainedAdditiveLeftAssoc) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kPlus);
 }
-TEST(Parser, ExpressionPrecedence) {
-  auto r = Parse(
-      "module expr;\n"
-      "  logic a;\n"
-      "  assign a = 1 + 2 * 3;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-TEST(OperatorAndExpressionParsing, ImplicationRightAssocParses) {
+TEST(Precedence, ImplicationRightAssocParses) {
   auto r = Parse(
       "module t;\n"
       "  logic a, b, c, d;\n"
@@ -51,7 +43,7 @@ TEST(OperatorAndExpressionParsing, ImplicationRightAssocParses) {
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
 }
 
-TEST(ExpressionParsing, ExprPrecedenceChain) {
+TEST(Precedence, MultiplyHigherThanAdd) {
   auto r = Parse("module m; initial x = a + b * c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -65,7 +57,7 @@ TEST(ExpressionParsing, ExprPrecedenceChain) {
   EXPECT_EQ(rhs->rhs->op, TokenKind::kStar);
 }
 
-TEST(ExpressionParsing, ChainedBinaryOps) {
+TEST(Precedence, ChainedBinaryOps) {
   auto r = Parse("module m; initial x = a | b & c ^ d; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -74,7 +66,7 @@ TEST(ExpressionParsing, ChainedBinaryOps) {
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
 }
 
-TEST(ExpressionParsing, ParenthesizedExpr) {
+TEST(Precedence, ParenthesizedExpr) {
   auto r = Parse("module m; initial x = (a + b) * c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -87,21 +79,7 @@ TEST(ExpressionParsing, ParenthesizedExpr) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kPlus);
 }
 
-TEST(OperatorAndExpressionParsing, ParenthesizedExprPreservesSemantics) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = (a + b) * c;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kStar);
-  ASSERT_NE(rhs->lhs, nullptr);
-  EXPECT_EQ(rhs->lhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->lhs->op, TokenKind::kPlus);
-}
-
-TEST(OperatorAndExpressionParsing, ExprInInitialBlock) {
+TEST(Precedence, ParenthesesOverrideBitwise) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a | b) & c;\n"
@@ -114,32 +92,54 @@ TEST(OperatorAndExpressionParsing, ExprInInitialBlock) {
   EXPECT_EQ(rhs->op, TokenKind::kAmp);
 }
 
-TEST(OperatorAndExpressionParsing, OperatorPrecedenceMixedArithParses) {
+TEST(Precedence, ImplicationRightAssocStructure) {
   auto r = Parse(
       "module t;\n"
-      "  initial x = a + b * c;\n"
+      "  logic a, b, c, d;\n"
+      "  initial d = a -> b -> c;\n"
+      "endmodule\n");
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(rhs->rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->rhs->op, TokenKind::kArrow);
+}
+
+TEST(Precedence, NestedTernaryRightAssoc) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = a ? b : c ? d : e;\n"
+      "endmodule\n");
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
+}
+
+TEST(Precedence, ChainedTernaryRightAssoc) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel1 ? a : sel2 ? b : c;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kIdentifier);
 
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kPlus);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->false_expr->true_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->true_expr->kind, ExprKind::kIdentifier);
+  ASSERT_NE(rhs->false_expr->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->false_expr->kind, ExprKind::kIdentifier);
 }
 
-TEST(OperatorAndExpressionParsing, OperatorPrecedenceMixedArithRhs) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a + b * c;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  ASSERT_NE(rhs->rhs, nullptr);
-  EXPECT_EQ(rhs->rhs->op, TokenKind::kStar);
-}
-
-TEST(OperatorAndExpressionParsing, OperatorPrecedenceCompareAndLogical) {
+TEST(Precedence, CompareAndLogicalWithParentheses) {
   auto r = Parse(
       "module t;\n"
       "  initial x = (a > 0) && (b < 10);\n"

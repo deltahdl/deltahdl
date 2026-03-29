@@ -157,7 +157,7 @@ static std::pair<int, int> InfixBp(TokenKind kind) {
     case TokenKind::kPercent:
       return {21, 22};
     case TokenKind::kPower:
-      return {24, 23};  // right-assoc
+      return {23, 24};  // left-assoc
     default:
       return {-1, -1};
   }
@@ -213,7 +213,7 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     return bin;
   }
   // inside expression: expr inside { range_list }
-  if (tok.kind == TokenKind::kKwInside && min_bp <= 1) {
+  if (tok.kind == TokenKind::kKwInside && min_bp <= 15) {
     return ParseInsideExpr(lhs);
   }
   // §12.6: matches expression
