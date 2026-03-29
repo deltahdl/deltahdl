@@ -256,6 +256,22 @@ std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope) {
       return EvalConcat(expr, scope);
     case ExprKind::kReplicate:
       return EvalReplicate(expr, scope);
+    case ExprKind::kSelect: {
+      auto base_val = ConstEvalInt(expr->base, scope);
+      if (!base_val) return std::nullopt;
+      auto idx = ConstEvalInt(expr->index, scope);
+      if (!idx) return std::nullopt;
+      if (expr->index_end) {
+        auto end = ConstEvalInt(expr->index_end, scope);
+        if (!end) return std::nullopt;
+        int64_t hi = std::max(*idx, *end);
+        int64_t lo = std::min(*idx, *end);
+        int64_t width = hi - lo + 1;
+        if (width <= 0 || width > 63) return std::nullopt;
+        return (*base_val >> lo) & ((int64_t{1} << width) - 1);
+      }
+      return (*base_val >> *idx) & 1;
+    }
     case ExprKind::kSystemCall:
       return EvalConstSysCall(expr, scope);
     default:
@@ -384,6 +400,15 @@ static bool IsConstantSysFunc(std::string_view name) {
       "$asinh",
       "$acosh",
       "$atanh",
+      // §20.7: Array query functions
+      "$dimensions",
+      "$unpacked_dimensions",
+      "$left",
+      "$right",
+      "$low",
+      "$high",
+      "$increment",
+      "$size",
       // §20.9: Bit vector system functions
       "$countbits",
       // §21.3.3
@@ -401,11 +426,21 @@ static bool AllElementsConstant(const std::vector<Expr*>& elems,
   return true;
 }
 
+// §11.2.1: Data query (§20.6) and array query (§20.7) system functions may be
+// constant even when their arguments are not constant.
+static bool IsConstEvenWithNonConstArgs(std::string_view name) {
+  static const std::unordered_set<std::string_view> kFuncs = {
+      "$bits",   "$dimensions", "$unpacked_dimensions", "$left",
+      "$right",  "$low",        "$high",                "$increment",
+      "$size",
+  };
+  return kFuncs.count(name) > 0;
+}
+
 // Check that a system call with constant arguments is a constant expression.
 static bool IsConstantSysCallExpr(const Expr* expr, const ScopeMap& scope) {
   if (!IsConstantSysFunc(expr->callee)) return false;
-  // §20.6: $bits is constant even with non-constant type arguments.
-  if (expr->callee == "$bits") return true;
+  if (IsConstEvenWithNonConstArgs(expr->callee)) return true;
   return AllElementsConstant(expr->args, scope);
 }
 
@@ -435,6 +470,12 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kReplicate:
       return IsConstantExpr(expr->repeat_count, scope) &&
              AllElementsConstant(expr->elements, scope);
+    case ExprKind::kSelect:
+      if (!IsConstantExpr(expr->base, scope)) return false;
+      if (!IsConstantExpr(expr->index, scope)) return false;
+      if (expr->index_end && !IsConstantExpr(expr->index_end, scope))
+        return false;
+      return true;
     case ExprKind::kSystemCall:
       return IsConstantSysCallExpr(expr, scope);
     case ExprKind::kCast:

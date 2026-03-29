@@ -1,4 +1,3 @@
-#include "fixture_evaluator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -29,12 +28,6 @@ TEST(PrimaryParsing, ConstantPrimaryTypeReference) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ConstExpr, BitsIsConstantSysFunc) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("$bits(32'd0)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
 }
 
 }  // namespace

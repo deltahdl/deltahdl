@@ -1,4 +1,3 @@
-#include "fixture_evaluator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -64,24 +63,6 @@ TEST(OptionalSystemTaskExtendedParsing, Onehot) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(ConstExpr, CountonesConstantArg) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("$countones(8'hFF)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
-}
-
-TEST(ConstExpr, OnehotConstantArg) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("$onehot(8'h04)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
-}
-
-TEST(ConstExpr, Onehot0ConstantArg) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("$onehot0(8'h00)", f);
-  EXPECT_TRUE(IsConstantExpr(e));
 }
 
 }  // namespace
