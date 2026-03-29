@@ -1449,6 +1449,38 @@ void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
   }
 }
 
+// §8.26.4: Check whether a name refers to a forward typedef that has not yet
+// been fully declared before the given class in the compilation unit.
+static bool IsForwardTypedefOnly(std::string_view name,
+                                 const ClassDecl* before_cls,
+                                 const CompilationUnit* unit) {
+  bool has_forward = false;
+  for (const auto* item : unit->cu_items) {
+    if (item->kind == ModuleItemKind::kTypedef && item->name == name &&
+        item->typedef_type.kind == DataTypeKind::kImplicit) {
+      has_forward = true;
+    }
+  }
+  if (!has_forward) return false;
+  for (const auto* c : unit->classes) {
+    if (c == before_cls) return true;
+    if (c->name == name) return false;
+  }
+  return true;
+}
+
+// §8.26.4: Check whether a class declaration appears before another in the
+// compilation unit's class list.
+static bool IsDeclaredBefore(std::string_view name,
+                             const ClassDecl* before_cls,
+                             const CompilationUnit* unit) {
+  for (const auto* c : unit->classes) {
+    if (c == before_cls) return false;
+    if (c->name == name) return true;
+  }
+  return false;
+}
+
 // §8.26.2: Validate inheritance rules for an interface class.
 void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   if (!cls->implements_types.empty()) {
@@ -1458,6 +1490,31 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
                             cls->name));
   }
   if (cls->base_class.empty()) return;
+
+  // §8.26.4: An interface class shall not extend a type parameter.
+  if (cls->type_param_names.count(cls->base_class) > 0) {
+    diag_.Error(cls->range.start,
+                std::format("interface class '{}' shall not extend type "
+                            "parameter '{}'",
+                            cls->name, cls->base_class));
+  } else if (IsForwardTypedefOnly(cls->base_class, cls, unit_)) {
+    // §8.26.4: An interface class shall not extend from a forward typedef.
+    diag_.Error(cls->range.start,
+                std::format("interface class '{}' shall not extend forward "
+                            "typedef '{}'; the interface class must be "
+                            "declared before it is extended",
+                            cls->name, cls->base_class));
+  } else if (!IsDeclaredBefore(cls->base_class, cls, unit_)) {
+    // §8.26.4: An interface class shall be declared before it is extended.
+    const auto* base = FindClassDecl(cls->base_class, unit_);
+    if (base && base->is_interface) {
+      diag_.Error(cls->range.start,
+                  std::format("interface class '{}' must be declared before "
+                              "it is extended by '{}'",
+                              cls->base_class, cls->name));
+    }
+  }
+
   const auto* base = FindClassDecl(cls->base_class, unit_);
   if (base && !base->is_interface) {
     diag_.Error(cls->range.start,
@@ -1466,6 +1523,34 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
                             cls->name, cls->base_class));
   }
   for (auto iface_name : cls->extends_interfaces) {
+    // §8.26.4: An interface class shall not extend a type parameter.
+    if (cls->type_param_names.count(iface_name) > 0) {
+      diag_.Error(cls->range.start,
+                  std::format("interface class '{}' shall not extend type "
+                              "parameter '{}'",
+                              cls->name, iface_name));
+      continue;
+    }
+    // §8.26.4: An interface class shall not extend from a forward typedef.
+    if (IsForwardTypedefOnly(iface_name, cls, unit_)) {
+      diag_.Error(cls->range.start,
+                  std::format("interface class '{}' shall not extend forward "
+                              "typedef '{}'; the interface class must be "
+                              "declared before it is extended",
+                              cls->name, iface_name));
+      continue;
+    }
+    // §8.26.4: An interface class shall be declared before it is extended.
+    if (!IsDeclaredBefore(iface_name, cls, unit_)) {
+      const auto* ibase = FindClassDecl(iface_name, unit_);
+      if (ibase && ibase->is_interface) {
+        diag_.Error(cls->range.start,
+                    std::format("interface class '{}' must be declared before "
+                                "it is extended by '{}'",
+                                iface_name, cls->name));
+        continue;
+      }
+    }
     const auto* ibase = FindClassDecl(iface_name, unit_);
     if (ibase && !ibase->is_interface) {
       diag_.Error(cls->range.start,
@@ -1489,6 +1574,34 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
     }
   }
   for (auto impl_name : cls->implements_types) {
+    // §8.26.4: A class shall not implement a type parameter.
+    if (cls->type_param_names.count(impl_name) > 0) {
+      diag_.Error(cls->range.start,
+                  std::format("class '{}' shall not implement type "
+                              "parameter '{}'",
+                              cls->name, impl_name));
+      continue;
+    }
+    // §8.26.4: A class shall not implement a forward typedef.
+    if (IsForwardTypedefOnly(impl_name, cls, unit_)) {
+      diag_.Error(cls->range.start,
+                  std::format("class '{}' shall not implement forward "
+                              "typedef '{}'; the interface class must be "
+                              "declared before it is implemented",
+                              cls->name, impl_name));
+      continue;
+    }
+    // §8.26.4: An interface class shall be declared before it is implemented.
+    if (!IsDeclaredBefore(impl_name, cls, unit_)) {
+      const auto* impl = FindClassDecl(impl_name, unit_);
+      if (impl && impl->is_interface) {
+        diag_.Error(cls->range.start,
+                    std::format("interface class '{}' must be declared before "
+                                "it is implemented by '{}'",
+                                impl_name, cls->name));
+        continue;
+      }
+    }
     const auto* impl = FindClassDecl(impl_name, unit_);
     if (impl && !impl->is_interface) {
       diag_.Error(cls->range.start,
