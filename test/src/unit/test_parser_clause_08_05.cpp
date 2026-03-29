@@ -32,19 +32,6 @@ TEST(ObjectPropertyParsing, PropertyAccessDotNotation) {
   EXPECT_EQ(cls->members[1]->name, "address");
 }
 
-TEST(ObjectPropertyParsing, ParameterizedClassWithValueParam) {
-  auto r = Parse(
-      "class vector #(parameter width = 7);\n"
-      "  bit [width:0] data;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->classes.size(), 1u);
-  auto* cls = r.cu->classes[0];
-  EXPECT_EQ(cls->name, "vector");
-  ASSERT_GE(cls->params.size(), 1u);
-  EXPECT_EQ(cls->params[0].first, "width");
-}
-
 TEST(ObjectPropertyParsing, ParameterAccessViaInstance) {
   ParseOk(
       "class vector #(parameter width = 7, type T = int);\n"

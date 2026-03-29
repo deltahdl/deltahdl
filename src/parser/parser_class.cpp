@@ -210,7 +210,10 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
     }
     if (Check(TokenKind::kHash)) {
       Consume();
-      ParseTypeParamList();
+      auto tparams = ParseTypeParamList();
+      if (!is_implements && decl->base_class_type_params.empty()) {
+        decl->base_class_type_params = std::move(tparams);
+      }
     }
     // §8.3: extends class_type [ ( [ list_of_arguments | default ] ) ]
     if (Check(TokenKind::kLParen)) {

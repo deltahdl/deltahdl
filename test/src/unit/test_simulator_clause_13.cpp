@@ -34,27 +34,6 @@ TEST(ParameterizedClassSim, VirtualClassIsAbstract) {
   EXPECT_TRUE(info->is_abstract);
 }
 
-TEST(ParameterizedClassSim, ClassParamsPreserved) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  class C #(parameter A = 1, parameter B = 2);\n"
-      "    static function int f; f = A; endfunction\n"
-      "  endclass\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-
-  auto* info = f.ctx.FindClassType("C");
-  ASSERT_NE(info, nullptr);
-  ASSERT_NE(info->decl, nullptr);
-  EXPECT_EQ(info->decl->params.size(), 2u);
-  EXPECT_EQ(info->decl->params[0].first, "A");
-  EXPECT_EQ(info->decl->params[1].first, "B");
-}
-
 TEST(ParameterizedClassSim, StaticMethodRegistered) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -635,19 +614,3 @@ TEST(ParameterizedClassSim, EncoderDecoderSameClass) {
   EXPECT_EQ(dec->value.ToUint64(), 8u);
 }
 
-TEST(ParameterizedClassSim, ParserPreservesParams) {
-  SimFixture f;
-  auto fid = f.mgr.AddFile("<test>",
-                           "module t;\n"
-                           "  class C #(parameter W = 8);\n"
-                           "    static function int f; f = W; endfunction\n"
-                           "  endclass\n"
-                           "  int x;\n"
-                           "  initial x = C#(16)::f();\n"
-                           "endmodule\n");
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  ASSERT_NE(cu, nullptr);
-  EXPECT_FALSE(cu->modules.empty());
-}

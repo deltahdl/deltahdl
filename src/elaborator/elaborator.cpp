@@ -851,6 +851,24 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
       class_names_.count(item->data_type.type_name)) {
     class_var_names_.insert(item->name);
     class_var_types_[item->name] = item->data_type.type_name;
+    // §8.25: Using the unadorned name of a parameterized class denotes the
+    // default specialization. If any parameter lacks a default, the class has
+    // no default specialization and the unadorned name is illegal.
+    if (item->data_type.type_params.empty()) {
+      const auto* cls = FindClassDecl(item->data_type.type_name, unit_);
+      if (cls && !cls->params.empty()) {
+        for (const auto& [pname, pexpr] : cls->params) {
+          if (!pexpr && !cls->type_param_names.count(pname)) {
+            diag_.Error(item->loc,
+                        std::format("parameterized class '{}' has no default "
+                                    "specialization; parameter '{}' has no "
+                                    "default value",
+                                    cls->name, pname));
+            break;
+          }
+        }
+      }
+    }
   }
   if (item->data_type.kind == DataTypeKind::kEnum) {
     ValidateEnumDecl(item->data_type, item->loc);

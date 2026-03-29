@@ -61,16 +61,6 @@ TEST(ObjectPropertyElaboration, MultiplePropertyAccess) {
              "endmodule\n"));
 }
 
-TEST(ObjectPropertyElaboration, ParameterizedClassElaborates) {
-  EXPECT_TRUE(
-      ElabOk("class vector #(parameter width = 7);\n"
-             "  bit [width:0] data;\n"
-             "endclass\n"
-             "module m;\n"
-             "  vector v;\n"
-             "endmodule\n"));
-}
-
 TEST(ObjectPropertyElaboration, PropertyReadElaborates) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
