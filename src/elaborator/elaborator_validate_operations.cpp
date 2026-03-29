@@ -21,6 +21,16 @@ void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
   auto rit = var_named_types_.find(expr->rhs->text);
   if (lit == var_named_types_.end() || rit == var_named_types_.end()) return;
   if (lit->second == rit->second) return;
+
+  auto is_aggregate_var = [&](std::string_view name,
+                              std::string_view type_name) {
+    if (var_array_info_.count(name)) return true;
+    auto it = typedefs_.find(type_name);
+    return it != typedefs_.end() && IsAggregateType(it->second);
+  };
+  if (!is_aggregate_var(expr->lhs->text, lit->second)) return;
+  if (!is_aggregate_var(expr->rhs->text, rit->second)) return;
+
   diag_.Error(expr->range.start,
               std::format("comparison of non-equivalent aggregate "
                           "types '{}' and '{}'",

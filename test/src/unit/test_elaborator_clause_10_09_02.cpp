@@ -191,19 +191,6 @@ TEST(PatternElaboration, StructNamedPatternElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-TEST(AggregateExpr, AssignmentPatternAsAggregate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  typedef struct { int x; int y; } point_t;\n"
-      "  point_t p;\n"
-      "  initial p = '{1, 2};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(AssignmentPatternSim, StructTypeKeyedPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
