@@ -228,6 +228,12 @@ static bool TryStaticMemberAccess(std::string_view base_name,
 static Logic4Vec ResolveMemberByType(std::string_view base_name,
                                      std::string_view field_name,
                                      SimContext& ctx, Arena& arena) {
+  // §8.11: 'this' refers to the current instance.
+  if (base_name == "this") {
+    auto* self = ctx.CurrentThis();
+    if (self) return self->GetProperty(field_name, arena);
+    return MakeLogic4Vec(arena, 1);
+  }
   auto* base_var = ctx.FindVariable(base_name);
   auto* sinfo = ctx.GetVariableStructType(base_name);
   Logic4Vec out;

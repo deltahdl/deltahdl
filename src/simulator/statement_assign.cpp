@@ -98,6 +98,15 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   if (dot == std::string::npos) return false;
   auto base_name = std::string_view(name).substr(0, dot);
   auto field_name = std::string_view(name).substr(dot + 1);
+  // §8.11: 'this' refers to the current instance.
+  if (base_name == "this") {
+    auto* self = ctx.CurrentThis();
+    if (self) {
+      self->SetProperty(std::string(field_name), rhs_val);
+      return true;
+    }
+    return false;
+  }
   auto* base_var = ctx.FindVariable(base_name);
   if (!base_var) return false;
   auto* info = ctx.GetVariableStructType(base_name);

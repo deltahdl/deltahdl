@@ -70,4 +70,64 @@ TEST(ThisElaboration, NoThisReferencesOk) {
              "endmodule\n"));
 }
 
+TEST(ThisElaboration, ThisInModuleTaskError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  task do_work();\n"
+             "    automatic int x;\n"
+             "    x = this.data;\n"
+             "  endtask\n"
+             "endmodule\n"));
+}
+
+TEST(ThisElaboration, ThisInClassTaskOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  int data;\n"
+             "  task set_data(int d);\n"
+             "    this.data = d;\n"
+             "  endtask\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+TEST(ThisElaboration, ThisInConstructorOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  int a;\n"
+             "  int b;\n"
+             "  function new(int a, int b);\n"
+             "    this.a = a;\n"
+             "    this.b = b;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
+TEST(ThisElaboration, BareThisInModuleInitialError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  initial begin\n"
+             "    automatic int x;\n"
+             "    x = this;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(ThisElaboration, BareThisInClassMethodOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  function C get_self();\n"
+             "    return this;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

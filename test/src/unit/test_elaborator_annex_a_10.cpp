@@ -123,17 +123,6 @@ TEST(BnfClarificationElaboration, EmptyUnpackedArrayConcatOk) {
              "endmodule\n"));
 }
 
-TEST(BnfClarificationElaboration, ThisInClassMethodOk) {
-  EXPECT_TRUE(
-      ElabOk("class c;\n"
-             "  int x;\n"
-             "  function void set(int v);\n"
-             "    this.x = v;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m; endmodule\n"));
-}
-
 TEST(BnfClarificationElaboration, DollarInQueueSelectOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -151,19 +140,6 @@ TEST(BnfClarificationElaboration, FinalOnPureVirtualError) {
       "  pure virtual function void do_it() final;\n"
       "endclass\n"
       "module m; endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-// Item 46: this outside class is an error
-
-TEST(BnfClarificationElaboration, ThisOutsideClassError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  int x;\n"
-      "  initial this.x = 1;\n"
-      "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
 }

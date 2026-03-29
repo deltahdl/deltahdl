@@ -137,17 +137,6 @@ TEST(PrimaryParsing, PrimaryUnbasedUnsizedLiteral1) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnbasedUnsizedLiteral);
 }
 
-TEST(PrimaryParsing, PrimaryThis) {
-  auto r = Parse(
-      "class C;\n"
-      "  function void f();\n"
-      "    this.x = 1;\n"
-      "  endfunction\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(PrimaryParsing, PrimaryDollarSign) {
   auto r = Parse(
       "module m;\n"

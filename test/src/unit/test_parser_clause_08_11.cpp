@@ -11,12 +11,6 @@ TEST(PrimaryParsing, PrimaryThis) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(PrimaryParsing, ImplicitClassHandleThis) {
-  auto r = Parse("module m; initial x = this; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(PrimaryParsing, ImplicitClassHandleThisMember) {
   auto r = Parse("module m; initial x = this.field; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -33,16 +27,6 @@ TEST(ClassParsing, ThisExpression) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->classes.size(), 1u);
-}
-
-TEST(ClassParsing, ThisKeywordPropertyAccess) {
-  EXPECT_TRUE(
-      ParseOk("class MyClass;\n"
-              "  int value;\n"
-              "  function void set_value(int value);\n"
-              "    this.value = value;\n"
-              "  endfunction\n"
-              "endclass\n"));
 }
 
 TEST(ThisParsing, ThisDisambiguationInConstructor) {
@@ -77,6 +61,75 @@ TEST(ThisParsing, ThisMethodCallChain) {
       ParseOk("class C;\n"
               "  function C get_self();\n"
               "    return this;\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
+TEST(ThisParsing, ThisInClassTask) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  int x;\n"
+              "  task set_x(int x);\n"
+              "    this.x = x;\n"
+              "  endtask\n"
+              "endclass\n"));
+}
+
+TEST(ThisParsing, ThisMemberAccessProducesAst) {
+  auto r = Parse(
+      "class C;\n"
+      "  int x;\n"
+      "  function int get_x();\n"
+      "    return this.x;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* cls = r.cu->classes[0];
+  auto* method = cls->members[1]->method;
+  ASSERT_GE(method->func_body_stmts.size(), 1u);
+  auto* ret_stmt = method->func_body_stmts[0];
+  ASSERT_NE(ret_stmt->expr, nullptr);
+  EXPECT_EQ(ret_stmt->expr->kind, ExprKind::kMemberAccess);
+}
+
+TEST(ThisParsing, BareThisProducesIdentifier) {
+  auto r = Parse(
+      "class C;\n"
+      "  function C get_self();\n"
+      "    return this;\n"
+      "  endfunction\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* cls = r.cu->classes[0];
+  auto* method = cls->members[0]->method;
+  ASSERT_GE(method->func_body_stmts.size(), 1u);
+  auto* ret_stmt = method->func_body_stmts[0];
+  ASSERT_NE(ret_stmt->expr, nullptr);
+  EXPECT_EQ(ret_stmt->expr->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(ret_stmt->expr->text, "this");
+}
+
+TEST(ThisParsing, ThisWithMethodCall) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  function void foo();\n"
+              "  endfunction\n"
+              "  function void bar();\n"
+              "    this.foo();\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
+TEST(ThisParsing, ThisMultipleMemberAccesses) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  int a;\n"
+              "  int b;\n"
+              "  function void swap(int a, int b);\n"
+              "    this.a = b;\n"
+              "    this.b = a;\n"
               "  endfunction\n"
               "endclass\n"));
 }

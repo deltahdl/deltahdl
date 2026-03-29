@@ -477,6 +477,15 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
   }
   if (stmt->lhs->kind == ExprKind::kSelect) {
     ExecFuncSelectAssign(stmt->lhs, val, ctx, arena);
+    return;
+  }
+  // §8.11: this.property = val
+  if (stmt->lhs->kind == ExprKind::kMemberAccess && stmt->lhs->lhs &&
+      stmt->lhs->lhs->kind == ExprKind::kIdentifier &&
+      stmt->lhs->lhs->text == "this" && stmt->lhs->rhs &&
+      stmt->lhs->rhs->kind == ExprKind::kIdentifier) {
+    auto* self = ctx.CurrentThis();
+    if (self) self->SetProperty(std::string(stmt->lhs->rhs->text), val);
   }
 }
 
