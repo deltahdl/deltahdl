@@ -4,13 +4,13 @@
 using namespace delta;
 namespace {
 
-TEST(Parser, VirtualClass) {
+TEST(AbstractClassParsing, VirtualClass) {
   auto r = Parse("virtual class base; endclass");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(r.cu->classes[0]->is_virtual);
 }
 
-TEST(ClassParsing, PureVirtualFunction) {
+TEST(PureVirtualMethodParsing, PureVirtualFunction) {
   auto r = Parse(
       "virtual class Base;\n"
       "  pure virtual function void display();\n"
@@ -24,7 +24,7 @@ TEST(ClassParsing, PureVirtualFunction) {
   EXPECT_EQ(m->kind, ClassMemberKind::kMethod);
 }
 
-TEST(FunctionDeclParsing, FuncPrototypePureVirtual) {
+TEST(PureVirtualMethodParsing, PureVirtualFunctionPrototype) {
   auto r = Parse(
       "class C;\n"
       "  pure virtual function int compute(input int x);\n"
@@ -35,7 +35,7 @@ TEST(FunctionDeclParsing, FuncPrototypePureVirtual) {
   EXPECT_TRUE(m->is_pure_virtual);
 }
 
-TEST(TaskDeclParsing, TaskPrototypePureVirtual) {
+TEST(PureVirtualMethodParsing, PureVirtualTaskPrototype) {
   auto r = Parse(
       "class C;\n"
       "  pure virtual task do_work(input int x);\n"
@@ -87,7 +87,7 @@ TEST(AbstractClassParsing, ConcreteOverridesPureVirtual) {
   EXPECT_FALSE(derived_m->is_pure_virtual);
 }
 
-TEST(SourceText, ClassPureVirtualAndExtern) {
+TEST(PureVirtualMethodParsing, PureVirtualAndExtern) {
   auto r = Parse(
       "class C;\n"
       "  pure virtual function void pv_fn();\n"
@@ -107,6 +107,35 @@ TEST(SourceText, ClassPureVirtualAndExtern) {
   EXPECT_TRUE(members[1]->is_virtual);
   EXPECT_EQ(members[2]->method->name, "ext_fn");
   EXPECT_TRUE(members[3]->is_static);
+}
+
+TEST(PureVirtualMethodParsing, PureVirtualMethodHasNoBody) {
+  auto r = Parse(
+      "virtual class Base;\n"
+      "  pure virtual function void display();\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* m = r.cu->classes[0]->members[0];
+  EXPECT_TRUE(m->is_pure_virtual);
+  EXPECT_TRUE(m->method->func_body_stmts.empty());
+}
+
+TEST(AbstractClassParsing, NonAbstractClassNotFlaggedVirtual) {
+  auto r = Parse("class C; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.cu->classes[0]->is_virtual);
+}
+
+TEST(AbstractClassParsing, MultiplePureVirtualMethods) {
+  auto r = Parse(
+      "virtual class Base;\n"
+      "  pure virtual function int compute();\n"
+      "  pure virtual task run(input int x);\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->classes[0]->members.size(), 2u);
+  EXPECT_TRUE(r.cu->classes[0]->members[0]->is_pure_virtual);
+  EXPECT_TRUE(r.cu->classes[0]->members[1]->is_pure_virtual);
 }
 
 }  // namespace

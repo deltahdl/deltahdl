@@ -740,6 +740,12 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
                        SimContext& ctx, Arena& arena) {
   auto* info = ctx.FindClassType(class_type);
   if (!info) return MakeLogic4VecVal(arena, 64, kNullClassHandle);
+  if (info->is_abstract) {
+    ctx.GetDiag().Error(
+        {}, "cannot construct object of abstract class '" +
+                std::string(class_type) + "'");
+    return MakeLogic4VecVal(arena, 64, kNullClassHandle);
+  }
   auto* obj = arena.Create<ClassObject>();
   obj->type = info;
 

@@ -105,4 +105,69 @@ TEST(AbstractClassElaboration, EmptyBodyMethodNotPureVirtual) {
              "endmodule\n"));
 }
 
+TEST(AbstractClassElaboration, AbstractClassNoPureVirtualsOk) {
+  EXPECT_TRUE(
+      ElabOk("virtual class Base;\n"
+             "  function void foo(); endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+TEST(AbstractClassElaboration, PureVirtualTaskMustBeOverridden) {
+  EXPECT_FALSE(
+      ElabOk("virtual class Base;\n"
+             "  pure virtual task run();\n"
+             "endclass\n"
+             "class Derived extends Base;\n"
+             "endclass\n"
+             "module m;\n"
+             "  Derived d;\n"
+             "endmodule\n"));
+}
+
+TEST(AbstractClassElaboration, PureVirtualTaskOverriddenOk) {
+  EXPECT_TRUE(
+      ElabOk("virtual class Base;\n"
+             "  pure virtual task run();\n"
+             "endclass\n"
+             "class Derived extends Base;\n"
+             "  virtual task run(); endtask\n"
+             "endclass\n"
+             "module m;\n"
+             "  Derived d;\n"
+             "endmodule\n"));
+}
+
+TEST(AbstractClassElaboration, AbstractClassAddsNewPureVirtuals) {
+  EXPECT_TRUE(
+      ElabOk("class Concrete;\n"
+             "  function void foo(); endfunction\n"
+             "endclass\n"
+             "virtual class AbstractDerived extends Concrete;\n"
+             "  pure virtual function void bar();\n"
+             "endclass\n"
+             "class ConcreteFinal extends AbstractDerived;\n"
+             "  virtual function void bar(); endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  ConcreteFinal c;\n"
+             "endmodule\n"));
+}
+
+TEST(AbstractClassElaboration, AbstractClassAddsNewPureVirtualsNotOverriddenError) {
+  EXPECT_FALSE(
+      ElabOk("class Concrete;\n"
+             "  function void foo(); endfunction\n"
+             "endclass\n"
+             "virtual class AbstractDerived extends Concrete;\n"
+             "  pure virtual function void bar();\n"
+             "endclass\n"
+             "class ConcreteFinal extends AbstractDerived;\n"
+             "endclass\n"
+             "module m;\n"
+             "  ConcreteFinal c;\n"
+             "endmodule\n"));
+}
+
 }  // namespace
