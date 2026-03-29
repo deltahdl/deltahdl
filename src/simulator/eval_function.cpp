@@ -746,6 +746,12 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
                 std::string(class_type) + "'");
     return MakeLogic4VecVal(arena, 64, kNullClassHandle);
   }
+  if (info->is_interface) {
+    ctx.GetDiag().Error(
+        {}, "cannot construct object of interface class '" +
+                std::string(class_type) + "'");
+    return MakeLogic4VecVal(arena, 64, kNullClassHandle);
+  }
   auto* obj = arena.Create<ClassObject>();
   obj->type = info;
 

@@ -543,6 +543,10 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
     auto* iface = ctx_.FindClassType(iface_name);
     if (iface) info->extended_interfaces.push_back(iface);
   }
+  for (auto iface_name : cls->implements_types) {
+    auto* iface = ctx_.FindClassType(iface_name);
+    if (iface) info->extended_interfaces.push_back(iface);
+  }
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
       uint32_t w = EvalTypeWidth(member->data_type, {});

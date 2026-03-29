@@ -471,14 +471,21 @@ static bool IsAllowedClassBinaryOp(TokenKind op) {
          op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq;
 }
 
-// §8.4: Check whether class type `a` is the same as or derived from `b`.
+// §8.4/§8.26.5: Check whether class type `a` is the same as or derived from
+// `b`, including implements and extends relationships for interface classes.
 static bool IsClassDerivedFrom(std::string_view a, std::string_view b,
                                const CompilationUnit* unit) {
   if (a == b) return true;
-  for (const auto* cls = FindClassDecl(a, unit);
-       cls && !cls->base_class.empty();
-       cls = FindClassDecl(cls->base_class, unit)) {
+  for (const auto* cls = FindClassDecl(a, unit); cls;
+       cls = cls->base_class.empty() ? nullptr
+                                     : FindClassDecl(cls->base_class, unit)) {
     if (cls->base_class == b) return true;
+    for (auto iface : cls->implements_types) {
+      if (IsClassDerivedFrom(iface, b, unit)) return true;
+    }
+    for (auto iface : cls->extends_interfaces) {
+      if (IsClassDerivedFrom(iface, b, unit)) return true;
+    }
   }
   return false;
 }
@@ -559,6 +566,20 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
         IsCompoundAssignOp(s->rhs->op)) {
       diag_.Error(s->range.start,
                   "operator is not allowed on class object handles");
+    }
+    // §8.26.5: Interface class objects shall not be constructed.
+    if (s->rhs && s->rhs->kind == ExprKind::kCall && s->rhs->text == "new") {
+      auto lhs_name = ExprIdent(s->lhs);
+      auto lt = class_var_types_.find(lhs_name);
+      if (lt != class_var_types_.end()) {
+        const auto* cls = FindClassDecl(lt->second, unit_);
+        if (cls && cls->is_interface) {
+          diag_.Error(s->range.start,
+                      std::format("cannot construct object of interface class "
+                                  "'{}'",
+                                  cls->name));
+        }
+      }
     }
     // §8.4: Assignment of a class object whose class data type is assignment
     // compatible with the target class object.
