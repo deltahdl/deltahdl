@@ -581,6 +581,23 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
       ++next_val;
     }
   }
+  // §8.26.3: Interface class params and typedefs are inherited through extends.
+  if (cls->is_interface) {
+    auto inherit_from = [&](const ClassTypeInfo* src) {
+      for (const auto& [k, v] : src->static_properties) {
+        if (info->static_properties.find(k) == info->static_properties.end())
+          info->static_properties[k] = v;
+      }
+      for (const auto& [k, v] : src->enum_members) {
+        if (info->enum_members.find(k) == info->enum_members.end())
+          info->enum_members[k] = v;
+      }
+    };
+    if (info->parent && info->parent->is_interface)
+      inherit_from(info->parent);
+    for (const auto* iface : info->extended_interfaces)
+      inherit_from(iface);
+  }
   ctx_.RegisterClassType(cls->name, info);
   // §8.23: Register nested class declarations with scope-qualified names
   // (e.g., Outer::Inner) so they can be accessed via the :: operator.

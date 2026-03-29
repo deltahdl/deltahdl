@@ -224,8 +224,9 @@ static bool TryClassEnumAccess(Variable* base_var, std::string_view field_name,
   return true;
 }
 
-// §8.23: Try class scope resolution for static members, enumerations, and
-// parameters.
+// §8.23/§8.26.3: Try class scope resolution for static members, enumerations,
+// and parameters.  For interface classes, walks extended_interfaces to find
+// inherited members.
 static bool TryStaticMemberAccess(std::string_view base_name,
                                   std::string_view field_name, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
@@ -240,6 +241,32 @@ static bool TryStaticMemberAccess(std::string_view base_name,
   if (eit != cls_type->enum_members.end()) {
     out = MakeLogic4VecVal(arena, 32, eit->second);
     return true;
+  }
+  // §8.26.3: Walk extended interface hierarchy for inherited members.
+  if (cls_type->is_interface) {
+    std::vector<const ClassTypeInfo*> stack;
+    if (cls_type->parent && cls_type->parent->is_interface)
+      stack.push_back(cls_type->parent);
+    for (const auto* ei : cls_type->extended_interfaces)
+      stack.push_back(ei);
+    while (!stack.empty()) {
+      const auto* cur = stack.back();
+      stack.pop_back();
+      auto sit = cur->static_properties.find(std::string(field_name));
+      if (sit != cur->static_properties.end()) {
+        out = sit->second;
+        return true;
+      }
+      auto seit = cur->enum_members.find(std::string(field_name));
+      if (seit != cur->enum_members.end()) {
+        out = MakeLogic4VecVal(arena, 32, seit->second);
+        return true;
+      }
+      if (cur->parent && cur->parent->is_interface)
+        stack.push_back(cur->parent);
+      for (const auto* ei : cur->extended_interfaces)
+        stack.push_back(ei);
+    }
   }
   return false;
 }
