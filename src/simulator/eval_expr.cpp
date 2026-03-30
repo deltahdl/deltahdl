@@ -1030,7 +1030,7 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 // --- Compound assignment operators (§11.4.1) ---
 
-static TokenKind CompoundAssignBaseOp(TokenKind op) {
+TokenKind CompoundAssignBaseOp(TokenKind op) {
   switch (op) {
     case TokenKind::kPlusEq:
       return TokenKind::kPlus;

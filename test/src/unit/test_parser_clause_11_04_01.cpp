@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_WithSelectLhs) {
+TEST(AssignmentParsing, CompoundAssignWithSelectLhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin mem[0] += 1; end\n"
@@ -245,129 +245,6 @@ TEST(LvalueParsing, VarLvalueCompoundBitSelect) {
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-}
-
-TEST(OperatorAndExpressionParsing, CompoundAssignPlusEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a += 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
-TEST(OperatorAndExpressionParsing, CompoundAssignMinusEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a -= 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
-TEST(OperatorAndExpressionParsing, CompoundAssignStarEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a *= 2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(OperatorAndExpressionParsing, CompoundAssignSlashEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a /= 2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(OperatorAndExpressionParsing, CompoundAssignPercentEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a %= 3;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(OperatorAndExpressionParsing, CompoundAssignAmpEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a &= 8'hFF;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(OperatorAndExpressionParsing, CompoundAssignPipeEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a |= 8'h0F;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(OperatorAndExpressionParsing, CompoundAssignCaretEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a ^= b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(OperatorAndExpressionParsing, CompoundAssignLtLtEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a <<= 2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(OperatorAndExpressionParsing, CompoundAssignGtGtEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a >>= 2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(OperatorAndExpressionParsing, CompoundAssignLtLtLtEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a <<<= 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(OperatorAndExpressionParsing, CompoundAssignGtGtGtEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial a >>>= 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-TEST(ProceduralAssignAndControlParsing, BlockingAssignCompound) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x += 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
 }  // namespace

@@ -74,6 +74,7 @@ Logic4Vec EvalBinaryOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs, Arena& arena,
                        uint32_t context_width = 0);
 
 // §11.4.1: Compound assignment operators (eval_expr.cpp).
+TokenKind CompoundAssignBaseOp(TokenKind op);
 bool IsCompoundAssignOp(TokenKind op);
 Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena);

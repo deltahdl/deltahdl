@@ -85,4 +85,48 @@ TEST(EvalOp, PercentEq) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
+TEST(EvalOp, LtLtLtEq) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("a", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 1);
+
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtLtLtEq, MakeId(f.arena, "a"),
+                          MakeInt(f.arena, 4));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 16u);
+  EXPECT_EQ(var->value.ToUint64(), 16u);
+}
+
+TEST(EvalOp, GtGtGtEq) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("a", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 256);
+
+  auto* expr = MakeBinary(f.arena, TokenKind::kGtGtGtEq, MakeId(f.arena, "a"),
+                          MakeInt(f.arena, 4));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 16u);
+  EXPECT_EQ(var->value.ToUint64(), 16u);
+}
+
+TEST(LvalueSim, CompoundAssignWithIndexedLhs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int arr [0:3];\n"
+      "  initial begin\n"
+      "    arr[0] = 0; arr[1] = 0; arr[2] = 10; arr[3] = 0;\n"
+      "    arr[2] += 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("arr");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->unpacked_array[2].ToUint64(), 15u);
+}
+
 }  // namespace

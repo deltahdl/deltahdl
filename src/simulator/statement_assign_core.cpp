@@ -492,6 +492,38 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   // §7.4.5: Multi-dimensional sub-array copy (B[1][1] = A[0][2]).
   if (TrySubarrayAssign(stmt, ctx, arena)) return StmtResult::kDone;
 
+  // §11.4.1: Compound assignment — evaluate the LHS index only once.
+  if (stmt->rhs && stmt->rhs->kind == ExprKind::kBinary &&
+      IsCompoundAssignOp(stmt->rhs->op)) {
+    auto base_op = CompoundAssignBaseOp(stmt->rhs->op);
+    auto actual_rhs = EvalExpr(stmt->rhs->rhs, ctx, arena);
+
+    if (stmt->lhs->kind == ExprKind::kIdentifier) {
+      auto* var = ResolveLhsVariable(stmt->lhs, ctx);
+      if (var) {
+        auto result = EvalBinaryOp(base_op, var->value, actual_rhs, arena);
+        WriteVar(var, result, arena);
+      }
+    } else if (stmt->lhs->kind == ExprKind::kSelect) {
+      if (auto* elem = TryResolveArrayElement(stmt->lhs, ctx)) {
+        auto result = EvalBinaryOp(base_op, elem->value, actual_rhs, arena);
+        WriteVar(elem, result, arena);
+      } else {
+        auto lhs_val = EvalExpr(stmt->lhs, ctx, arena);
+        auto result = EvalBinaryOp(base_op, lhs_val, actual_rhs, arena);
+        TrySelectBlockingAssign(stmt->lhs, result, ctx, arena);
+      }
+    } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
+      auto lhs_val = EvalExpr(stmt->lhs, ctx, arena);
+      auto result = EvalBinaryOp(base_op, lhs_val, actual_rhs, arena);
+      WriteStructField(stmt->lhs, result, ctx, arena);
+    } else {
+      auto result = EvalExpr(stmt->rhs, ctx, arena);
+      AssignToScalarLhs(stmt, result, ctx, arena);
+    }
+    return StmtResult::kDone;
+  }
+
   auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
 
   if (stmt->lhs->kind == ExprKind::kConcatenation ||
