@@ -190,10 +190,31 @@ void Elaborator::ValidateRealOperatorRestrictions(const ModuleDecl* decl) {
 
 // --- §11.3.6: Assignment-in-expression restrictions ---
 
+static bool IsAssignOp(TokenKind op) {
+  switch (op) {
+    case TokenKind::kEq:
+    case TokenKind::kPlusEq:
+    case TokenKind::kMinusEq:
+    case TokenKind::kStarEq:
+    case TokenKind::kSlashEq:
+    case TokenKind::kPercentEq:
+    case TokenKind::kAmpEq:
+    case TokenKind::kPipeEq:
+    case TokenKind::kCaretEq:
+    case TokenKind::kLtLtEq:
+    case TokenKind::kGtGtEq:
+    case TokenKind::kLtLtLtEq:
+    case TokenKind::kGtGtGtEq:
+      return true;
+    default:
+      return false;
+  }
+}
+
 void Elaborator::WalkExprForAssignInExpr(const Expr* expr,
                                          bool in_event_or_cont) {
   if (!expr) return;
-  if (expr->kind == ExprKind::kBinary && expr->op == TokenKind::kEq) {
+  if (expr->kind == ExprKind::kBinary && IsAssignOp(expr->op)) {
     if (in_event_or_cont) {
       diag_.Error(expr->range.start,
                   "assignment operator within expression is illegal in "
@@ -212,6 +233,11 @@ void Elaborator::WalkExprForAssignInExpr(const Expr* expr,
 
 void Elaborator::WalkStmtsForAssignInExpr(const Stmt* s) {
   if (!s) return;
+  // §11.3.6: assignment operator is illegal in a procedural continuous
+  // assignment expression.
+  if (s->kind == StmtKind::kAssign && s->rhs) {
+    WalkExprForAssignInExpr(s->rhs, true);
+  }
   for (auto* sub : s->stmts) WalkStmtsForAssignInExpr(sub);
   WalkStmtsForAssignInExpr(s->then_branch);
   WalkStmtsForAssignInExpr(s->else_branch);
@@ -226,6 +252,10 @@ void Elaborator::ValidateAssignInExprRestrictions(const ModuleDecl* decl) {
       for (const auto& ev : item->sensitivity) {
         WalkExprForAssignInExpr(ev.signal, true);
       }
+      if (item->body) WalkStmtsForAssignInExpr(item->body);
+    }
+    if (item->kind == ModuleItemKind::kInitialBlock && item->body) {
+      WalkStmtsForAssignInExpr(item->body);
     }
     if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
       WalkExprForAssignInExpr(item->assign_rhs, true);

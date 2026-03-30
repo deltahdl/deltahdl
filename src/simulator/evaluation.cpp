@@ -10,6 +10,7 @@
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 
 namespace delta {
 static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
@@ -624,17 +625,26 @@ static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   return EvalExpr(expr->false_expr, ctx, arena);
 }
+// §11.3.6: Compute the bit-width that the LHS of an assignment expression
+// contributes to the return type.
+static uint32_t AssignExprLhsWidth(const Expr* lhs, SimContext& ctx) {
+  if (lhs->kind == ExprKind::kConcatenation) {
+    uint32_t total = 0;
+    for (auto* elem : lhs->elements) total += AssignExprLhsWidth(elem, ctx);
+    return total;
+  }
+  auto* var = ResolveLhsVariable(lhs, ctx);
+  return var ? var->value.width : 0;
+}
+
 // §11.3.6: Assignment within expression — evaluate RHS, store in LHS, return
 // the value cast to LHS type (width).
 static Logic4Vec EvalAssignInExpr(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
-  if (expr->lhs->kind != ExprKind::kIdentifier) return rhs_val;
-  auto* var = ctx.FindVariable(expr->lhs->text);
-  if (!var) return rhs_val;
-  uint32_t lhs_w = var->value.width;
-  var->value = rhs_val;
-  // §11.3.6: Result is cast to LHS data type.
+  uint32_t lhs_w = AssignExprLhsWidth(expr->lhs, ctx);
+  if (lhs_w == 0) return rhs_val;
+  PerformBlockingAssign(expr->lhs, rhs_val, ctx, arena);
   if (lhs_w == rhs_val.width) return rhs_val;
   uint64_t v = rhs_val.ToUint64();
   if (lhs_w < 64) v &= (uint64_t{1} << lhs_w) - 1;
