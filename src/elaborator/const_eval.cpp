@@ -10,7 +10,12 @@ namespace delta {
 
 // Evaluate a constant power expression.
 static std::optional<int64_t> EvalPower(int64_t base, int64_t exp) {
-  if (exp < 0) return std::nullopt;
+  if (exp < 0) {
+    if (base == 0) return std::nullopt;
+    if (base == 1) return 1;
+    if (base == -1) return (exp % 2 == 0) ? 1 : -1;
+    return 0;
+  }
   int64_t result = 1;
   for (int64_t i = 0; i < exp; ++i) {
     result *= base;

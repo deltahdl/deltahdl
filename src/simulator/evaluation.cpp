@@ -121,11 +121,16 @@ static Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
         r.is_real = true;
         return r;
       }
+      if (HasUnknownBits(operand)) return MakeAllX(arena, operand.width);
       uint64_t val = operand.ToUint64();
       auto r = MakeLogic4VecVal(arena, operand.width, -val);
       r.is_signed = operand.is_signed;
       return r;
     }
+    case TokenKind::kPlus:
+      if (!operand.is_real && HasUnknownBits(operand))
+        return MakeAllX(arena, operand.width);
+      return operand;
     default:
       return operand;
   }
@@ -233,7 +238,9 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                  Arena& arena, uint32_t context_width = 0) {
   // §11.3.1: If either operand is real, do real arithmetic.
   if (lhs.is_real || rhs.is_real) return EvalRealArith(op, lhs, rhs, arena);
-  uint32_t self_w = (lhs.width > rhs.width) ? lhs.width : rhs.width;
+  uint32_t self_w = (op == TokenKind::kPower)
+                        ? lhs.width
+                        : ((lhs.width > rhs.width) ? lhs.width : rhs.width);
   uint32_t width = (context_width > self_w) ? context_width : self_w;
   if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) {
     return MakeAllX(arena, width);

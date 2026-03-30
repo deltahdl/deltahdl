@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(EvalOpXZ, ArithAddX) {
+TEST(EvalOpXZ, AddWithXPropagatesX) {
   SimFixture f;
 
   MakeVar4(f, "ax", 4, 0b1000, 0b0100);
@@ -41,7 +41,7 @@ TEST(EvalOpXZ, ModByZeroReturnsX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, ArithSubX) {
+TEST(EvalOpXZ, SubtractWithXPropagatesX) {
   SimFixture f;
 
   MakeVar4(f, "sx", 4, 0b1000, 0b0100);
@@ -53,7 +53,7 @@ TEST(EvalOpXZ, ArithSubX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, ArithMulZ) {
+TEST(EvalOpXZ, MultiplyWithZPropagatesX) {
   SimFixture f;
 
   MakeVar4(f, "mz", 4, 0b1000, 0b0010);
@@ -65,7 +65,7 @@ TEST(EvalOpXZ, ArithMulZ) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, ArithPowX) {
+TEST(EvalOpXZ, PowerWithXPropagatesX) {
   SimFixture f;
 
   MakeVar4(f, "px", 4, 0b1000, 0b0100);
@@ -75,72 +75,46 @@ TEST(EvalOpXZ, ArithPowX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(ExpressionSim, BinaryAddition) {
+TEST(EvalOpXZ, DivideWithXPropagatesX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd3 + 8'd7;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);
+
+  MakeVar4(f, "dx", 4, 0b1000, 0b0100);
+  auto* b = f.ctx.CreateVariable("d2", 4);
+  b->value = MakeLogic4VecVal(f.arena, 4, 2);
+  auto* expr = MakeBinary(f.arena, TokenKind::kSlash, MakeId(f.arena, "dx"),
+                          MakeId(f.arena, "d2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(ExpressionSim, BinarySubtraction) {
+TEST(EvalOpXZ, ModulusWithXPropagatesX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd10 - 8'd3;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 7u);
+
+  MakeVar4(f, "mx2", 4, 0b1000, 0b0100);
+  auto* b = f.ctx.CreateVariable("m3", 4);
+  b->value = MakeLogic4VecVal(f.arena, 4, 3);
+  auto* expr = MakeBinary(f.arena, TokenKind::kPercent, MakeId(f.arena, "mx2"),
+                          MakeId(f.arena, "m3"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(ExpressionSim, BinaryMultiplication) {
+TEST(EvalOpXZ, UnaryMinusWithXPropagatesX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd5 * 8'd6;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 30u);
+
+  MakeVar4(f, "umx", 4, 0b1000, 0b0100);
+  auto* expr = MakeUnary(f.arena, TokenKind::kMinus, MakeId(f.arena, "umx"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(ExpressionSim, UnaryNegate) {
+TEST(EvalOpXZ, UnaryPlusWithXPropagatesX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = -8'd1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
+
+  MakeVar4(f, "upx", 4, 0b1000, 0b0100);
+  auto* expr = MakeUnary(f.arena, TokenKind::kPlus, MakeId(f.arena, "upx"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);
 }
 
 TEST(OperatorSim, UnaryPlus) {
@@ -316,19 +290,7 @@ TEST(CompiledSim, ExecuteExpressionEval) {
   EXPECT_EQ(c_var->value.ToUint64(), 30u);
 }
 
-TEST(EvalAdv, PowZeroExp) {
-  SimFixture f;
-
-  auto* expr = f.arena.Create<Expr>();
-  expr->kind = ExprKind::kBinary;
-  expr->op = TokenKind::kPower;
-  expr->lhs = MakeInt(f.arena, 7);
-  expr->rhs = MakeInt(f.arena, 0);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(EvalAdv, PowNegExpInt) {
+TEST(EvalAdv, PowerNegativeExponentReturnsZero) {
   SimFixture f;
 
   MakeSignedVarAdv(f, "pb", 8, 3);
@@ -343,7 +305,7 @@ TEST(EvalAdv, PowNegExpInt) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(EvalAdv, PowZeroBaseNegExp) {
+TEST(EvalAdv, PowerZeroBaseNegativeExponentReturnsX) {
   SimFixture f;
 
   MakeSignedVarAdv(f, "zb", 8, 0);
@@ -357,7 +319,7 @@ TEST(EvalAdv, PowZeroBaseNegExp) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalAdv, PowNeg1OddExp) {
+TEST(EvalAdv, PowerNegativeOneOddExponentReturnsNegativeOne) {
   SimFixture f;
 
   MakeSignedVarAdv(f, "n1", 8, 0xFF);
@@ -372,7 +334,7 @@ TEST(EvalAdv, PowNeg1OddExp) {
   EXPECT_TRUE(result.is_signed);
 }
 
-TEST(EvalAdv, PowNeg1EvenExp) {
+TEST(EvalAdv, PowerNegativeOneEvenExponentReturnsOne) {
   SimFixture f;
 
   MakeSignedVarAdv(f, "n1", 8, 0xFF);
@@ -387,7 +349,7 @@ TEST(EvalAdv, PowNeg1EvenExp) {
   EXPECT_TRUE(result.is_signed);
 }
 
-TEST(EvalAdv, SignedDivTruncToZero) {
+TEST(EvalAdv, SignedDivisionTruncatesTowardZero) {
   SimFixture f;
   MakeSignedVarAdv(f, "sd", 8, 0xF9);
   MakeSignedVarAdv(f, "se", 8, 2);
@@ -398,7 +360,7 @@ TEST(EvalAdv, SignedDivTruncToZero) {
   EXPECT_TRUE(result.is_signed);
 }
 
-TEST(EvalAdv, SignedModSignOfFirst) {
+TEST(EvalAdv, SignedModulusSignFollowsFirstOperand) {
   SimFixture f;
   MakeSignedVarAdv(f, "sm", 8, 0xF9);
   MakeSignedVarAdv(f, "sn", 8, 2);
@@ -409,7 +371,7 @@ TEST(EvalAdv, SignedModSignOfFirst) {
   EXPECT_TRUE(result.is_signed);
 }
 
-TEST(EvalAdv, SignedMulNeg) {
+TEST(EvalAdv, SignedMultiplyNegativeOperand) {
   SimFixture f;
   MakeSignedVarAdv(f, "ma", 8, 0xFD);
   MakeSignedVarAdv(f, "mb", 8, 4);
@@ -445,6 +407,151 @@ TEST(EvalOp, PowerOneExponent) {
                           MakeInt(f.arena, 1));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 7u);
+}
+
+TEST(EvalAdv, UnsignedDivisionTruncates) {
+  SimFixture f;
+  auto* a = MakeVar(f, "ud", 8, 0xF9);
+  (void)a;
+  auto* b = MakeVar(f, "ue", 8, 2);
+  (void)b;
+  auto* expr = MakeBinary(f.arena, TokenKind::kSlash, MakeId(f.arena, "ud"),
+                          MakeId(f.arena, "ue"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 124u);
+}
+
+TEST(EvalOp, ZeroPowerZero) {
+  SimFixture f;
+
+  auto* expr = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 0),
+                          MakeInt(f.arena, 0));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalOp, PowerBaseOneAnyExponent) {
+  SimFixture f;
+
+  auto* e1 = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 1),
+                         MakeInt(f.arena, 100));
+  EXPECT_EQ(EvalExpr(e1, f.ctx, f.arena).ToUint64(), 1u);
+
+  auto* e2 = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 1),
+                         MakeInt(f.arena, 0));
+  EXPECT_EQ(EvalExpr(e2, f.ctx, f.arena).ToUint64(), 1u);
+}
+
+TEST(EvalOp, ModulusBasic) {
+  SimFixture f;
+
+  auto* e1 = MakeBinary(f.arena, TokenKind::kPercent, MakeInt(f.arena, 10),
+                         MakeInt(f.arena, 3));
+  EXPECT_EQ(EvalExpr(e1, f.ctx, f.arena).ToUint64(), 1u);
+
+  auto* e2 = MakeBinary(f.arena, TokenKind::kPercent, MakeInt(f.arena, 11),
+                         MakeInt(f.arena, 3));
+  EXPECT_EQ(EvalExpr(e2, f.ctx, f.arena).ToUint64(), 2u);
+
+  auto* e3 = MakeBinary(f.arena, TokenKind::kPercent, MakeInt(f.arena, 12),
+                         MakeInt(f.arena, 3));
+  EXPECT_EQ(EvalExpr(e3, f.ctx, f.arena).ToUint64(), 0u);
+}
+
+TEST(EvalAdv, PowerNegativeBasePositiveExponent) {
+  SimFixture f;
+
+  MakeSignedVarAdv(f, "nb", 8, 0xFD);  // -3
+  MakeSignedVarAdv(f, "ne", 8, 3);
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kPower;
+  expr->lhs = MakeId(f.arena, "nb");
+  expr->rhs = MakeId(f.arena, "ne");
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  // (-3) ** 3 = -27, in 8-bit two's complement: 0xE5
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0xE5u);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalAdv, PowerNegativeBaseNegativeExponentReturnsZero) {
+  SimFixture f;
+
+  MakeSignedVarAdv(f, "nb2", 8, 0xFD);  // -3
+  MakeSignedVarAdv(f, "ne2", 8, 0xFF);  // -1
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kPower;
+  expr->lhs = MakeId(f.arena, "nb2");
+  expr->rhs = MakeId(f.arena, "ne2");
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EvalAdv, PowerOneBaseNegativeExponentReturnsOne) {
+  SimFixture f;
+
+  MakeSignedVarAdv(f, "ob", 8, 1);
+  MakeSignedVarAdv(f, "oe", 8, 0xFE);  // -2
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kPower;
+  expr->lhs = MakeId(f.arena, "ob");
+  expr->rhs = MakeId(f.arena, "oe");
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalAdv, PowerNegativeOneNegativeOddExponentReturnsNegativeOne) {
+  SimFixture f;
+
+  MakeSignedVarAdv(f, "n1a", 8, 0xFF);  // -1
+  MakeSignedVarAdv(f, "n3a", 8, 0xFD);  // -3
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kPower;
+  expr->lhs = MakeId(f.arena, "n1a");
+  expr->rhs = MakeId(f.arena, "n3a");
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64() & 0xFF, 0xFFu);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalAdv, PowerNegativeOneNegativeEvenExponentReturnsOne) {
+  SimFixture f;
+
+  MakeSignedVarAdv(f, "n1b", 8, 0xFF);  // -1
+  MakeSignedVarAdv(f, "n4b", 8, 0xFC);  // -4
+  auto* expr = f.arena.Create<Expr>();
+  expr->kind = ExprKind::kBinary;
+  expr->op = TokenKind::kPower;
+  expr->lhs = MakeId(f.arena, "n1b");
+  expr->rhs = MakeId(f.arena, "n4b");
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalAdv, SignedModulusNegativeDivisor) {
+  SimFixture f;
+
+  MakeSignedVarAdv(f, "sm2", 8, 11);
+  MakeSignedVarAdv(f, "sn2", 8, 0xFD);  // -3
+  auto* expr = MakeBinary(f.arena, TokenKind::kPercent, MakeId(f.arena, "sm2"),
+                          MakeId(f.arena, "sn2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  // 11 % -3 = 2 (sign follows first operand, which is positive)
+  EXPECT_EQ(result.ToUint64() & 0xFF, 2u);
+  EXPECT_TRUE(result.is_signed);
+}
+
+TEST(EvalOp, ZeroBasePositiveExponent) {
+  SimFixture f;
+
+  auto* expr = MakeBinary(f.arena, TokenKind::kPower, MakeInt(f.arena, 0),
+                          MakeInt(f.arena, 5));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 }  // namespace

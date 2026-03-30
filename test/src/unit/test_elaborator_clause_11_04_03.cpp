@@ -27,6 +27,11 @@ TEST(ConstEval, Power) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("3 ** 0", f)), 1);
 }
 
+TEST(ConstEval, ZeroPowerZero) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 ** 0", f)), 1);
+}
+
 TEST(ExpressionElaboration, BinaryExprInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -57,6 +62,30 @@ TEST(OperatorElaboration, UnaryMinusElaborates) {
       "module m;\n"
       "  logic [7:0] x, a;\n"
       "  initial x = -a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(OperatorElaboration, BinarySubElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'd30 - 8'd12;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(OperatorElaboration, BinaryMulElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'd7 * 8'd6;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -258,6 +287,54 @@ TEST(BlockingAssignSim, BlockingAssignUnaryPlus) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(ConstEvalReal, SubtractReals) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("5.0 - 2.0", f);
+  auto val = ConstEvalReal(e);
+  ASSERT_TRUE(val.has_value());
+  EXPECT_DOUBLE_EQ(val.value_or(0.0), 3.0);
+}
+
+TEST(ConstEvalReal, DivideReals) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("7.0 / 2.0", f);
+  auto val = ConstEvalReal(e);
+  ASSERT_TRUE(val.has_value());
+  EXPECT_DOUBLE_EQ(val.value_or(0.0), 3.5);
+}
+
+TEST(ConstEvalReal, PowerReals) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("9.0 ** 0.5", f);
+  auto val = ConstEvalReal(e);
+  ASSERT_TRUE(val.has_value());
+  EXPECT_NEAR(val.value_or(0.0), 3.0, 1e-9);
+}
+
+TEST(ConstEvalReal, UnaryMinusOnReal) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("-3.14", f);
+  auto val = ConstEvalReal(e);
+  ASSERT_TRUE(val.has_value());
+  EXPECT_NEAR(val.value_or(0.0), -3.14, 1e-6);
+}
+
+TEST(ConstEvalReal, BinaryAddReals) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("1.5 + 2.5", f);
+  auto val = ConstEvalReal(e);
+  ASSERT_TRUE(val.has_value());
+  EXPECT_DOUBLE_EQ(val.value_or(0.0), 4.0);
+}
+
+TEST(ConstEvalReal, BinaryMulReals) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("2.0 * 3.0", f);
+  auto val = ConstEvalReal(e);
+  ASSERT_TRUE(val.has_value());
+  EXPECT_DOUBLE_EQ(val.value_or(0.0), 6.0);
 }
 
 }  // namespace

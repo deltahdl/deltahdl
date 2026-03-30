@@ -1,46 +1,10 @@
 
-
-#include "fixture_evaluator.h"
 #include "fixture_parser.h"
-#include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(OperatorAndExpressionParsing, RealMultiplication) {
-  auto r = Parse(
-      "module t;\n"
-      "  real r;\n"
-      "  initial r = 3.14 * 2.0;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kStar);
-}
-
-TEST(OperatorParsing, BinaryMul) {
-  auto r = Parse("module m; initial x = a * b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kStar);
-}
-
-TEST(OperatorAndExpressionParsing, ArithmeticDiv) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a / b;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kSlash);
-}
 
 TEST(DataTypeParsing, RealInExpression) {
   EXPECT_TRUE(
@@ -52,51 +16,6 @@ TEST(DataTypeParsing, RealInExpression) {
               "    c = a + b;\n"
               "  end\n"
               "endmodule\n"));
-}
-
-TEST(OperatorTokenParserParsing, Operator_BinaryAdd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = a + b;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kPlus);
-}
-
-TEST(Eval, Addition) {
-  ExprFixture f;
-  auto* expr = ParseExprFrom("10 + 32", f);
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-}
-
-TEST(ConstEvalReal, UnaryMinusOnReal) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("-3.14", f);
-  auto val = ConstEvalReal(e);
-  ASSERT_TRUE(val.has_value());
-  EXPECT_NEAR(val.value_or(0.0), -3.14, 1e-6);
-}
-
-TEST(ConstEvalReal, BinaryAddReals) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("1.5 + 2.5", f);
-  auto val = ConstEvalReal(e);
-  ASSERT_TRUE(val.has_value());
-  EXPECT_DOUBLE_EQ(val.value_or(0.0), 4.0);
-}
-
-TEST(ConstEvalReal, BinaryMulReals) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("2.0 * 3.0", f);
-  auto val = ConstEvalReal(e);
-  ASSERT_TRUE(val.has_value());
-  EXPECT_DOUBLE_EQ(val.value_or(0.0), 6.0);
 }
 
 }  // namespace

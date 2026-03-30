@@ -394,6 +394,7 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kBinary: {
       if (IsComparisonOp(expr->op)) return 1;
       if (IsShiftOp(expr->op)) return InferExprWidth(expr->lhs, typedefs);
+      if (expr->op == TokenKind::kPower) return InferExprWidth(expr->lhs, typedefs);
       uint32_t lw = InferExprWidth(expr->lhs, typedefs);
       uint32_t rw = InferExprWidth(expr->rhs, typedefs);
       return std::max(lw, rw);
