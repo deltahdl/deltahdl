@@ -47,44 +47,37 @@ TEST(OperatorParsing, BinaryGreaterOrEqual) {
   EXPECT_EQ(rhs->op, TokenKind::kGtEq);
 }
 
-TEST(OperatorAndExpressionParsing, RelationalLt) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = (a < b);\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kLt);
-}
-
-TEST(OperatorAndExpressionParsing, RelationalGt) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = (a > b);\n"
-      "endmodule\n");
+TEST(Precedence, RelationalLeftAssoc) {
+  auto r = Parse("module m; initial x = a < b > c; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGt);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->op, TokenKind::kLt);
 }
 
-TEST(OperatorAndExpressionParsing, RelationalLtEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = (a <= b);\n"
-      "endmodule\n");
+TEST(Precedence, RelationalLowerThanArithmetic) {
+  auto r = Parse("module m; initial x = a < b - 1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kLtEq);
+  EXPECT_EQ(rhs->op, TokenKind::kLt);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->op, TokenKind::kMinus);
 }
 
-TEST(OperatorAndExpressionParsing, RelationalGtEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = (a >= b);\n"
-      "endmodule\n");
+TEST(Precedence, AllRelationalOperatorsSamePrecedence) {
+  auto r = Parse("module m; initial x = a <= b >= c; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->op, TokenKind::kGtEq);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->op, TokenKind::kLtEq);
 }
 
 TEST(Eval, Comparison) {

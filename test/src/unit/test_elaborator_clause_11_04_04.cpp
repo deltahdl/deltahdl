@@ -27,6 +27,23 @@ TEST(ConstEval, Comparison) {
   }
 }
 
+TEST(ConstEval, RelationalFalseResults) {
+  EvalFixture f;
+  struct Case {
+    const char* expr;
+    int64_t expected;
+  };
+  const Case kCases[] = {
+      {"3 > 5", 0},
+      {"3 >= 5", 0},
+      {"5 <= 3", 0},
+      {"5 < 3", 0},
+  };
+  for (const auto& c : kCases) {
+    EXPECT_EQ(ConstEvalInt(ParseExprFrom(c.expr, f)), c.expected) << c.expr;
+  }
+}
+
 TEST(AlwaysCombBasicSim, AlwaysCombComparison) {
   SimFixture f;
   auto* design = ElaborateSrc(
