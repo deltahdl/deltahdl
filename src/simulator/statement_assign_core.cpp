@@ -20,9 +20,18 @@
 
 namespace delta {
 
+// Clear x/z bits when writing to a 2-state variable.
+static void CoerceTo2State(Logic4Vec& v) {
+  for (uint32_t i = 0; i < v.nwords; ++i) {
+    v.words[i].aval &= ~v.words[i].bval;
+    v.words[i].bval = 0;
+  }
+}
+
 // Write to a variable and notify watchers.
 static void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena) {
   var->value = ResizeToWidth(val, var->value.width, arena);
+  if (!var->is_4state) CoerceTo2State(var->value);
   var->NotifyWatchers();
 }
 
@@ -209,6 +218,7 @@ static bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx,
     auto* var = ctx.FindVariable(n);
     if (!var) continue;
     var->value = ResizeToWidth(src[i], var->value.width, arena);
+    if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();
   }
   return true;
@@ -439,6 +449,7 @@ static void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val,
     rhs_val = ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width, ctx,
                                   arena);
     var->value = rhs_val;
+    if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();
     // §7.3.2: Set tag when RHS is a tagged expression.
     if (stmt->rhs && stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs)
@@ -542,6 +553,7 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
     auto converted = ConvertRealOnAssign(rhs_val, lhs, var->value.width, ctx,
                                          arena);
     var->value = converted;
+    if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();
   } else if (lhs->kind == ExprKind::kMemberAccess) {
     WriteStructField(lhs, rhs_val, ctx, arena);
@@ -557,6 +569,7 @@ static void SetupWholeVarNbaCallback(Event* event, Variable* var,
     if (var->has_pending_nba) {
       if (!var->is_forced) {
         var->value = var->pending_nba;
+        if (!var->is_4state) CoerceTo2State(var->value);
         var->NotifyWatchers();
       }
       var->has_pending_nba = false;
@@ -731,9 +744,14 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
                   stmt->var_decl_type.kind == DataTypeKind::kShortreal ||
                   stmt->var_decl_type.kind == DataTypeKind::kRealtime);
   CreateDeclVariable(stmt, width, is_real, ctx, arena);
-  if (stmt->var_init) {
-    auto* var = ctx.FindVariable(stmt->var_name);
-    if (var) var->value = EvalExpr(stmt->var_init, ctx, arena);
+  auto* var = ctx.FindVariable(stmt->var_name);
+  if (var) {
+    var->is_4state = Is4stateType(stmt->var_decl_type.kind);
+    if (!var->is_4state) CoerceTo2State(var->value);
+    if (stmt->var_init) {
+      var->value = EvalExpr(stmt->var_init, ctx, arena);
+      if (!var->is_4state) CoerceTo2State(var->value);
+    }
   }
   return StmtResult::kDone;
 }
@@ -750,6 +768,7 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   var->is_forced = true;
   var->forced_value = rhs_val;
   var->value = rhs_val;
+  if (!var->is_4state) CoerceTo2State(var->value);
   return StmtResult::kDone;
 }
 

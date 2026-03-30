@@ -404,6 +404,7 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   }
   // §6.14: chandle defaults to null (0), not X.
   if (var.is_chandle) v->value = MakeLogic4VecVal(arena_, width, 0);
+  v->is_4state = var.is_4state;
   if (var.is_event) v->is_event = true;
   if (var.is_signed) v->is_signed = true;
   if (var.is_string) ctx_.RegisterStringVariable(var.name);

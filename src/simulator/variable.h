@@ -20,6 +20,7 @@ struct Variable {
   bool is_event = false;
   bool is_null_event = false;
   bool is_signed = false;
+  bool is_4state = true;
   uint64_t triggered_ticks = UINT64_MAX;
 
   // Watchers return true if consumed (should be removed), false to keep.
