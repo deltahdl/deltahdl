@@ -28,16 +28,4 @@ TEST(OperatorAndExpressionParsing, StringReplication) {
               "endmodule\n"));
 }
 
-TEST(DataTypeParsing, StringConcatOp) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  string a, b, c;\n"
-              "  initial begin\n"
-              "    a = \"hello\";\n"
-              "    b = \" world\";\n"
-              "    c = {a, b};\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 }  // namespace

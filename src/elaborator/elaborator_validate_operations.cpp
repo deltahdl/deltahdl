@@ -669,4 +669,64 @@ void Elaborator::ValidateReplicateMultiplier(const ModuleDecl* decl) {
   }
 }
 
+// --- §11.4.12.2: String concatenation shall not appear on the LHS ---
+
+bool Elaborator::ConcatContainsStringElement(const Expr* expr) {
+  if (!expr) return false;
+  if (expr->kind == ExprKind::kIdentifier) {
+    auto it = var_types_.find(expr->text);
+    return it != var_types_.end() && it->second == DataTypeKind::kString;
+  }
+  if (expr->kind == ExprKind::kStringLiteral) return true;
+  if (expr->kind == ExprKind::kConcatenation) {
+    for (const auto* elem : expr->elements) {
+      if (ConcatContainsStringElement(elem)) return true;
+    }
+  }
+  return false;
+}
+
+void Elaborator::CheckStringConcatLvalue(const Expr* lhs) {
+  if (!lhs) return;
+  if (lhs->kind != ExprKind::kConcatenation) return;
+  if (ConcatContainsStringElement(lhs)) {
+    diag_.Error(lhs->range.start,
+                "string concatenation is not allowed on the left-hand side "
+                "of an assignment");
+  }
+}
+
+void Elaborator::WalkStmtsForStringConcatLvalue(const Stmt* s) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign ||
+      s->kind == StmtKind::kAssign ||
+      s->kind == StmtKind::kForce) {
+    CheckStringConcatLvalue(s->lhs);
+  }
+  for (auto* sub : s->stmts) WalkStmtsForStringConcatLvalue(sub);
+  WalkStmtsForStringConcatLvalue(s->then_branch);
+  WalkStmtsForStringConcatLvalue(s->else_branch);
+  WalkStmtsForStringConcatLvalue(s->body);
+  WalkStmtsForStringConcatLvalue(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForStringConcatLvalue(ci.body);
+}
+
+void Elaborator::ValidateStringConcatLvalue(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForStringConcatLvalue(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckStringConcatLvalue(item->assign_lhs);
+    }
+  }
+}
+
 }  // namespace delta

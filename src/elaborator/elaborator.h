@@ -381,6 +381,12 @@ class Elaborator {
   void WalkExprForReplicateMultiplier(const Expr* expr);
   void WalkStmtsForReplicateMultiplier(const Stmt* s);
 
+  /// §11.4.12.2: String concatenation shall not be an lvalue.
+  void ValidateStringConcatLvalue(const ModuleDecl* decl);
+  void CheckStringConcatLvalue(const Expr* lhs);
+  void WalkStmtsForStringConcatLvalue(const Stmt* s);
+  bool ConcatContainsStringElement(const Expr* expr);
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 

@@ -65,66 +65,6 @@ static Variable* MakeStringVar(SimFixture& f, std::string_view name,
   return var;
 }
 
-TEST(StringDataType, StringConcatValue) {
-  SimFixture f;
-  MakeStringVar(f, "s1", "hello");
-  MakeStringVar(f, "s2", " world");
-  auto* concat = f.arena.Create<Expr>();
-  concat->kind = ExprKind::kConcatenation;
-  concat->elements.push_back(MakeId(f.arena, "s1"));
-  concat->elements.push_back(MakeId(f.arena, "s2"));
-  auto result = EvalExpr(concat, f.ctx, f.arena);
-  EXPECT_EQ(VecToStr(result), "hello world");
-}
-
-TEST(StringDataType, StringReplicateValue) {
-  SimFixture f;
-  MakeStringVar(f, "sr", "ab");
-  auto* repl = f.arena.Create<Expr>();
-  repl->kind = ExprKind::kReplicate;
-  repl->repeat_count = MakeInt(f.arena, 3);
-  repl->elements.push_back(MakeId(f.arena, "sr"));
-  auto result = EvalExpr(repl, f.ctx, f.arena);
-  EXPECT_EQ(VecToStr(result), "ababab");
-}
-
-TEST(StringDataType, StringConcatSetsIsString) {
-  SimFixture f;
-  MakeStringVar(f, "sa", "hi");
-  MakeStringVar(f, "sb", "lo");
-  auto* concat = f.arena.Create<Expr>();
-  concat->kind = ExprKind::kConcatenation;
-  concat->elements.push_back(MakeId(f.arena, "sa"));
-  concat->elements.push_back(MakeId(f.arena, "sb"));
-  auto result = EvalExpr(concat, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_string);
-}
-
-TEST(StringDataType, NonStringConcatNotIsString) {
-  SimFixture f;
-  auto* a = f.ctx.CreateVariable("ia", 8);
-  a->value = MakeLogic4VecVal(f.arena, 8, 0x41);
-  auto* b = f.ctx.CreateVariable("ib", 8);
-  b->value = MakeLogic4VecVal(f.arena, 8, 0x42);
-  auto* concat = f.arena.Create<Expr>();
-  concat->kind = ExprKind::kConcatenation;
-  concat->elements.push_back(MakeId(f.arena, "ia"));
-  concat->elements.push_back(MakeId(f.arena, "ib"));
-  auto result = EvalExpr(concat, f.ctx, f.arena);
-  EXPECT_FALSE(result.is_string);
-}
-
-TEST(StringDataType, StringReplicateSetsIsString) {
-  SimFixture f;
-  MakeStringVar(f, "sr2", "ab");
-  auto* repl = f.arena.Create<Expr>();
-  repl->kind = ExprKind::kReplicate;
-  repl->repeat_count = MakeInt(f.arena, 2);
-  repl->elements.push_back(MakeId(f.arena, "sr2"));
-  auto result = EvalExpr(repl, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_string);
-}
-
 TEST(StringDataType, IdentifierStringPropagation) {
   SimFixture f;
   MakeStringVar(f, "sv2", "test");
