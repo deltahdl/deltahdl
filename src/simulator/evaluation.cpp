@@ -386,14 +386,19 @@ static Logic4Vec MakeSignedResult(Arena& arena, uint32_t width, uint64_t val,
 }
 static Logic4Vec EvalArithShiftRight(Logic4Vec lhs, uint64_t rv, Arena& arena) {
   uint64_t lv = lhs.ToUint64();
+  uint64_t bv = lhs.nwords > 0 ? lhs.words[0].bval : 0;
   uint32_t w = lhs.width;
-  if (w > 0 && w < 64 && ((lv >> (w - 1)) & 1)) {
-    auto sv = static_cast<int64_t>(lv | (~uint64_t{0} << w));
-    auto shifted = static_cast<uint64_t>(sv >> rv);
-    uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
-    return MakeSignedResult(arena, w, shifted & mask, lhs.is_signed);
-  }
-  return MakeSignedResult(arena, lhs.width, lv >> rv, lhs.is_signed);
+  auto shift_right = [&](uint64_t val) -> uint64_t {
+    if (lhs.is_signed && w > 0 && w < 64 && ((val >> (w - 1)) & 1)) {
+      auto sv = static_cast<int64_t>(val | (~uint64_t{0} << w));
+      auto shifted = static_cast<uint64_t>(sv >> rv);
+      return shifted & ((uint64_t{1} << w) - 1);
+    }
+    return val >> rv;
+  };
+  auto result = MakeSignedResult(arena, w, shift_right(lv), lhs.is_signed);
+  if (result.nwords > 0) result.words[0].bval = shift_right(bv);
+  return result;
 }
 static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t rv,
                            Arena& arena) {
