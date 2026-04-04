@@ -14,16 +14,16 @@ TEST(ConstEval, Bitwise) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("5 ^ 3", f)), 6);
 }
 
-TEST(ExpressionElaboration, UnaryExprInInitialElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial b = ~a;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
+TEST(ConstEval, BitwiseXnor) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("8'hFF ^~ 8'h0F", f)), 0x0F);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("4'b1100 ~^ 4'b1010", f)), 0b1001);
+}
+
+TEST(ConstEval, BitwiseNot) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("~8'hF0", f)), 0x0F);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("~8'h00", f)), 0xFF);
 }
 
 TEST(OperatorElaboration, UnaryBitwiseNotElaborates) {
@@ -50,7 +50,7 @@ TEST(OperatorElaboration, BinaryBitwiseXnorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AlwaysCombBasicSim, AlwaysCombPartSelect) {
+TEST(AlwaysCombBasicSim, AlwaysCombBitwiseAnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -98,7 +98,7 @@ TEST(AlwaysCombExtendedSim, AlwaysCombNand) {
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0xF0u);
 }
 
-TEST(AlwaysCombExtendedSim, AlwaysCombChainedLogic) {
+TEST(AlwaysCombExtendedSim, AlwaysCombChainedBitwise) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

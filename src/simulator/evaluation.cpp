@@ -102,11 +102,21 @@ static Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
   if (IsReductionOp(op)) return EvalReductionOp(op, operand, arena);
   auto result = MakeLogic4Vec(arena, operand.width);
   switch (op) {
-    case TokenKind::kTilde:
+    case TokenKind::kTilde: {
       for (uint32_t i = 0; i < result.nwords; ++i) {
         result.words[i] = Logic4Not(operand.words[i]);
       }
+      // Mask the top word: Logic4Not inverts all 64 bits, including those
+      // above the declared width.
+      uint32_t bit_pos = operand.width % 64;
+      if (bit_pos != 0) {
+        uint64_t mask = (uint64_t{1} << bit_pos) - 1;
+        result.words[result.nwords - 1].aval &= mask;
+        result.words[result.nwords - 1].bval &= mask;
+      }
+      result.is_signed = operand.is_signed;
       return result;
+    }
     case TokenKind::kBang:
       // §11.4.7: X/Z operand → 1'bx.
       if (HasUnknownBits(operand)) return MakeAllX(arena, 1);
@@ -279,14 +289,22 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   }
   return MakeLogic4VecVal(arena, width, result);
 }
+static Logic4Vec ExtendVec(const Logic4Vec& v, uint32_t target_width,
+                           bool sign_ext, Arena& arena);
 static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                    Arena& arena) {
   uint32_t width = (lhs.width > rhs.width) ? lhs.width : rhs.width;
+  // Sign-extend the smaller operand when both are signed; zero-extend otherwise.
+  if (lhs.width != rhs.width) {
+    bool sign_ext = lhs.is_signed && rhs.is_signed;
+    if (lhs.width < width) lhs = ExtendVec(lhs, width, sign_ext, arena);
+    if (rhs.width < width) rhs = ExtendVec(rhs, width, sign_ext, arena);
+  }
   auto result = MakeLogic4Vec(arena, width);
   uint32_t words = result.nwords;
   for (uint32_t i = 0; i < words; ++i) {
-    auto lw = (i < lhs.nwords) ? lhs.words[i] : Logic4Word{};
-    auto rw = (i < rhs.nwords) ? rhs.words[i] : Logic4Word{};
+    auto lw = lhs.words[i];
+    auto rw = rhs.words[i];
     switch (op) {
       case TokenKind::kAmp:
         result.words[i] = Logic4And(lw, rw);
