@@ -524,6 +524,24 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       binding.width = it->width;
     }
 
+    // §11.4.12.1: Replication shall not appear on output/inout port connections.
+    if (conn_expr && binding.direction != Direction::kInput) {
+      std::function<bool(const Expr*)> has_rep = [&](const Expr* e) -> bool {
+        if (!e) return false;
+        if (e->kind == ExprKind::kReplicate) return true;
+        if (e->kind == ExprKind::kConcatenation) {
+          for (const auto* el : e->elements)
+            if (has_rep(el)) return true;
+        }
+        return false;
+      };
+      if (has_rep(conn_expr)) {
+        diag_.Error(conn_expr->range.start,
+                    "replication shall not appear in an output or inout "
+                    "port connection");
+      }
+    }
+
     // §22.9: Pull unconnected input ports.
     if (has_pull && !binding.connection &&
         binding.direction == Direction::kInput) {

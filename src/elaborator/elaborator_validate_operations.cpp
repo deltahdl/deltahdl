@@ -2,6 +2,7 @@
 #include <unordered_set>
 
 #include "common/diagnostic.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
@@ -450,6 +451,221 @@ void Elaborator::ValidateSelectOnConcatLvalue(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckSelectOnConcatLvalue(item->assign_lhs);
     }
+  }
+}
+
+// --- §11.4.12.1: Replication shall not appear on the LHS of an assignment ---
+
+static bool ExprContainsReplicate(const Expr* expr) {
+  if (!expr) return false;
+  if (expr->kind == ExprKind::kReplicate) return true;
+  if (expr->kind == ExprKind::kConcatenation) {
+    for (const auto* elem : expr->elements) {
+      if (ExprContainsReplicate(elem)) return true;
+    }
+  }
+  return false;
+}
+
+void Elaborator::CheckReplicateLvalue(const Expr* lhs) {
+  if (!lhs) return;
+  if (ExprContainsReplicate(lhs)) {
+    diag_.Error(lhs->range.start,
+                "replication shall not appear on the left-hand side "
+                "of an assignment");
+  }
+}
+
+void Elaborator::WalkStmtsForReplicateLvalue(const Stmt* s) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign ||
+      s->kind == StmtKind::kAssign ||
+      s->kind == StmtKind::kForce) {
+    CheckReplicateLvalue(s->lhs);
+  }
+  for (auto* sub : s->stmts) WalkStmtsForReplicateLvalue(sub);
+  WalkStmtsForReplicateLvalue(s->then_branch);
+  WalkStmtsForReplicateLvalue(s->else_branch);
+  WalkStmtsForReplicateLvalue(s->body);
+  WalkStmtsForReplicateLvalue(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForReplicateLvalue(ci.body);
+}
+
+void Elaborator::ValidateReplicateLvalue(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForReplicateLvalue(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckReplicateLvalue(item->assign_lhs);
+    }
+  }
+}
+
+// --- §11.4.12.1: Replication multiplier constraints ---
+
+static bool RepeatCountHasXZ(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kIntegerLiteral) {
+    auto apos = e->text.find('\'');
+    if (apos != std::string_view::npos) {
+      return e->text.substr(apos + 1).find_first_of("xXzZ") !=
+             std::string_view::npos;
+    }
+  }
+  return false;
+}
+
+void Elaborator::WalkExprForReplicateMultiplier(const Expr* expr) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kReplicate) {
+    const Expr* rc = expr->repeat_count;
+    if (RepeatCountHasXZ(rc)) {
+      diag_.Error(rc->range.start,
+                  "replication multiplier shall not contain x or z");
+    } else {
+      auto val = ConstEvalInt(rc);
+      if (val) {
+        if (*val < 0) {
+          diag_.Error(rc->range.start,
+                      "replication multiplier shall not be negative");
+        } else if (*val == 0) {
+          // Zero is only valid inside a concatenation with other operands.
+          // A standalone zero replication is checked here: the parent must
+          // be a concatenation (which is ensured by the caller context).
+          // We flag standalone uses — the enclosing expression check below
+          // handles the case where {0{x}} appears as a top-level expression
+          // rather than inside a concatenation.
+        }
+      }
+    }
+  }
+  WalkExprForReplicateMultiplier(expr->lhs);
+  WalkExprForReplicateMultiplier(expr->rhs);
+  WalkExprForReplicateMultiplier(expr->condition);
+  WalkExprForReplicateMultiplier(expr->true_expr);
+  WalkExprForReplicateMultiplier(expr->false_expr);
+  for (auto* elem : expr->elements) WalkExprForReplicateMultiplier(elem);
+  for (auto* arg : expr->args) WalkExprForReplicateMultiplier(arg);
+}
+
+static bool IsZeroReplicate(const Expr* expr) {
+  if (!expr || expr->kind != ExprKind::kReplicate) return false;
+  auto val = ConstEvalInt(expr->repeat_count);
+  return val && *val == 0;
+}
+
+static void CheckZeroReplicateStandalone(const Expr* expr,
+                                         DiagEngine& diag) {
+  if (!expr) return;
+  if (IsZeroReplicate(expr)) {
+    diag.Error(expr->range.start,
+               "zero replication shall appear only within a concatenation "
+               "in which at least one operand has a positive size");
+  }
+  if (expr->kind == ExprKind::kConcatenation) {
+    // Inside a concatenation, zero replication is OK as long as at least one
+    // other operand has positive size. Since a concatenation requires at
+    // least one element, and the only way ALL operands could have zero size
+    // is if every element is a zero replication, we check that.
+    bool all_zero = true;
+    for (const auto* elem : expr->elements) {
+      if (!IsZeroReplicate(elem)) {
+        all_zero = false;
+        break;
+      }
+    }
+    if (all_zero && !expr->elements.empty()) {
+      diag.Error(expr->range.start,
+                 "zero replication shall appear only within a concatenation "
+                 "in which at least one operand has a positive size");
+    }
+    // Recurse into non-zero elements (but not into the zero replication
+    // elements, which are valid here).
+    for (const auto* elem : expr->elements) {
+      if (!IsZeroReplicate(elem)) {
+        CheckZeroReplicateStandalone(elem, diag);
+      }
+    }
+    return;
+  }
+  CheckZeroReplicateStandalone(expr->lhs, diag);
+  CheckZeroReplicateStandalone(expr->rhs, diag);
+  CheckZeroReplicateStandalone(expr->condition, diag);
+  CheckZeroReplicateStandalone(expr->true_expr, diag);
+  CheckZeroReplicateStandalone(expr->false_expr, diag);
+  for (const auto* elem : expr->elements)
+    CheckZeroReplicateStandalone(elem, diag);
+  for (const auto* arg : expr->args)
+    CheckZeroReplicateStandalone(arg, diag);
+}
+
+static void WalkStmtsForZeroReplicateStandalone(const Stmt* s,
+                                                DiagEngine& diag) {
+  if (!s) return;
+  CheckZeroReplicateStandalone(s->rhs, diag);
+  CheckZeroReplicateStandalone(s->lhs, diag);
+  CheckZeroReplicateStandalone(s->expr, diag);
+  CheckZeroReplicateStandalone(s->condition, diag);
+  CheckZeroReplicateStandalone(s->assert_expr, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtsForZeroReplicateStandalone(sub, diag);
+  WalkStmtsForZeroReplicateStandalone(s->then_branch, diag);
+  WalkStmtsForZeroReplicateStandalone(s->else_branch, diag);
+  WalkStmtsForZeroReplicateStandalone(s->body, diag);
+  WalkStmtsForZeroReplicateStandalone(s->for_body, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForZeroReplicateStandalone(ci.body, diag);
+}
+
+void Elaborator::WalkStmtsForReplicateMultiplier(const Stmt* s) {
+  if (!s) return;
+  WalkExprForReplicateMultiplier(s->rhs);
+  WalkExprForReplicateMultiplier(s->lhs);
+  WalkExprForReplicateMultiplier(s->expr);
+  WalkExprForReplicateMultiplier(s->condition);
+  WalkExprForReplicateMultiplier(s->assert_expr);
+  for (auto* sub : s->stmts) WalkStmtsForReplicateMultiplier(sub);
+  WalkStmtsForReplicateMultiplier(s->then_branch);
+  WalkStmtsForReplicateMultiplier(s->else_branch);
+  WalkStmtsForReplicateMultiplier(s->body);
+  WalkStmtsForReplicateMultiplier(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForReplicateMultiplier(ci.body);
+}
+
+void Elaborator::ValidateReplicateMultiplier(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForReplicateMultiplier(item->body);
+      WalkStmtsForZeroReplicateStandalone(item->body, diag_);
+    }
+    if (item->kind == ModuleItemKind::kContAssign) {
+      WalkExprForReplicateMultiplier(item->assign_lhs);
+      WalkExprForReplicateMultiplier(item->assign_rhs);
+      CheckZeroReplicateStandalone(item->assign_lhs, diag_);
+      CheckZeroReplicateStandalone(item->assign_rhs, diag_);
+    }
+    if (item->init_value) {
+      WalkExprForReplicateMultiplier(item->init_value);
+      CheckZeroReplicateStandalone(item->init_value, diag_);
+    }
+  }
+  for (const auto& p : decl->params) {
+    WalkExprForReplicateMultiplier(p.init_value);
+    CheckZeroReplicateStandalone(p.init_value, diag_);
   }
 }
 

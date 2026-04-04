@@ -35,6 +35,8 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateAssignInExprRestrictions(decl);
   ValidateUnsizedInConcat(decl);
   ValidateSelectOnConcatLvalue(decl);
+  ValidateReplicateLvalue(decl);
+  ValidateReplicateMultiplier(decl);
   ValidateSubroutineCallArgs(decl);
   ValidateArrayArgTypes(decl);
   ValidateLocalProtectedAccess(decl);

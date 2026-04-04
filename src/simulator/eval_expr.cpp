@@ -60,7 +60,12 @@ static ReplicateInner EvalReplicateInner(const Expr* expr, SimContext& ctx,
 Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t count = static_cast<uint32_t>(
       EvalExpr(expr->repeat_count, ctx, arena).ToUint64());
-  if (count == 0 || expr->elements.empty()) return MakeLogic4Vec(arena, 1);
+  if (count == 0) {
+    // §11.4.12.1: Each operand shall be evaluated exactly once.
+    EvalReplicateInner(expr, ctx, arena);
+    return MakeLogic4Vec(arena, 0);
+  }
+  if (expr->elements.empty()) return MakeLogic4Vec(arena, 0);
 
   auto inner = EvalReplicateInner(expr, ctx, arena);
   uint32_t total_width = inner.width * count;

@@ -371,6 +371,16 @@ class Elaborator {
   void CheckSelectOnConcatLvalue(const Expr* lhs);
   void WalkStmtsForSelectOnConcatLvalue(const Stmt* s);
 
+  /// §11.4.12.1: Replication shall not be an lvalue.
+  void ValidateReplicateLvalue(const ModuleDecl* decl);
+  void CheckReplicateLvalue(const Expr* lhs);
+  void WalkStmtsForReplicateLvalue(const Stmt* s);
+
+  /// §11.4.12.1: Replication multiplier constraints.
+  void ValidateReplicateMultiplier(const ModuleDecl* decl);
+  void WalkExprForReplicateMultiplier(const Expr* expr);
+  void WalkStmtsForReplicateMultiplier(const Stmt* s);
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 
