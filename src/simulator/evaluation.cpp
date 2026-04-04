@@ -1,5 +1,6 @@
 #include "simulator/evaluation.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <string>
@@ -315,6 +316,42 @@ static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   }
   return result;
 }
+static Logic4Vec ExtendVec(const Logic4Vec& v, uint32_t target_width,
+                           bool sign_ext, Arena& arena) {
+  auto result = MakeLogic4Vec(arena, target_width);
+  for (uint32_t i = 0; i < v.nwords; ++i) {
+    result.words[i] = v.words[i];
+  }
+  if (sign_ext && v.width > 0) {
+    uint32_t msb_idx = (v.width - 1) / 64;
+    uint64_t msb_mask = uint64_t{1} << ((v.width - 1) % 64);
+    uint64_t a_fill = (v.words[msb_idx].aval & msb_mask) ? ~uint64_t{0} : 0;
+    uint64_t b_fill = (v.words[msb_idx].bval & msb_mask) ? ~uint64_t{0} : 0;
+    if (a_fill || b_fill) {
+      uint32_t fill_bit = v.width % 64;
+      if (fill_bit != 0) {
+        uint64_t mask = ~((uint64_t{1} << fill_bit) - 1);
+        result.words[v.width / 64].aval |= a_fill & mask;
+        result.words[v.width / 64].bval |= b_fill & mask;
+      }
+      uint32_t first_full = v.width / 64 + (fill_bit != 0 ? 1 : 0);
+      for (uint32_t i = first_full; i < result.nwords; ++i) {
+        result.words[i].aval = a_fill;
+        result.words[i].bval = b_fill;
+      }
+      uint32_t top_bit = target_width % 64;
+      if (top_bit != 0 && result.nwords > 0) {
+        uint64_t top_mask = (uint64_t{1} << top_bit) - 1;
+        result.words[result.nwords - 1].aval &= top_mask;
+        result.words[result.nwords - 1].bval &= top_mask;
+      }
+    }
+  }
+  result.is_signed = v.is_signed;
+  result.is_real = v.is_real;
+  result.is_string = v.is_string;
+  return result;
+}
 static bool EvalCaseEquality(Logic4Vec lhs, Logic4Vec rhs) {
   if (lhs.width != rhs.width) return false;
   for (uint32_t i = 0; i < lhs.nwords; ++i) {
@@ -538,6 +575,12 @@ static Logic4Vec EvalBinaryCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
       bool eq = (ld == rd);
       return MakeLogic4VecVal(arena, 1,
                               (op == TokenKind::kEqEq) == eq ? 1 : 0);
+    }
+    if (lhs.width != rhs.width) {
+      bool sign_ext = lhs.is_signed && rhs.is_signed;
+      uint32_t w = std::max(lhs.width, rhs.width);
+      if (lhs.width < w) lhs = ExtendVec(lhs, w, sign_ext, arena);
+      if (rhs.width < w) rhs = ExtendVec(rhs, w, sign_ext, arena);
     }
     uint64_t val = EvalEqualityOp(op, lhs, rhs);
     if (val == kResultX) return MakeAllX(arena, 1);

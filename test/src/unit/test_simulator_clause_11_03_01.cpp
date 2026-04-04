@@ -291,34 +291,4 @@ TEST(RealOperandResult, E2eUnaryMinusOnReal) {
   EXPECT_DOUBLE_EQ(v, -3.5);
 }
 
-TEST(RealOperandResult, E2eEqualityOnReal) {
-  auto v = RunAndGet(
-      "module t;\n"
-      "  real a, b;\n"
-      "  logic r;\n"
-      "  initial begin\n"
-      "    a = 2.5;\n"
-      "    b = 2.5;\n"
-      "    r = (a == b);\n"
-      "  end\n"
-      "endmodule\n",
-      "r");
-  EXPECT_EQ(v, 1u);
-}
-
-TEST(RealOperandResult, E2eInequalityOnReal) {
-  auto v = RunAndGet(
-      "module t;\n"
-      "  real a, b;\n"
-      "  logic r;\n"
-      "  initial begin\n"
-      "    a = 2.5;\n"
-      "    b = 3.0;\n"
-      "    r = (a != b);\n"
-      "  end\n"
-      "endmodule\n",
-      "r");
-  EXPECT_EQ(v, 1u);
-}
-
 }  // namespace

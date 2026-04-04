@@ -89,21 +89,6 @@ TEST(Precedence, PowerLeftAssoc) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kPower);
 }
 
-TEST(Precedence, EqualityLowerThanRelational) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a < b == c < d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kEqEq);
-  ASSERT_NE(rhs->lhs, nullptr);
-  EXPECT_EQ(rhs->lhs->op, TokenKind::kLt);
-  ASSERT_NE(rhs->rhs, nullptr);
-  EXPECT_EQ(rhs->rhs->op, TokenKind::kLt);
-}
-
 TEST(Precedence, ShiftHigherThanComparison) {
   auto r = Parse("module m; initial x = a < b << c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -192,28 +177,6 @@ TEST(Precedence, TernaryHigherThanImplication) {
   EXPECT_EQ(rhs->op, TokenKind::kArrow);
   ASSERT_NE(rhs->rhs, nullptr);
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kTernary);
-}
-
-TEST(Precedence, CaseEqualitySamePrecedenceAsLogicalEquality) {
-  auto r = Parse("module m; initial x = a === b != c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kBangEq);
-  ASSERT_NE(rhs->lhs, nullptr);
-  EXPECT_EQ(rhs->lhs->op, TokenKind::kEqEqEq);
-}
-
-TEST(Precedence, CaseInequalitySamePrecedenceAsLogicalEquality) {
-  auto r = Parse("module m; initial x = a !== b == c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kEqEq);
-  ASSERT_NE(rhs->lhs, nullptr);
-  EXPECT_EQ(rhs->lhs->op, TokenKind::kBangEqEq);
 }
 
 TEST(Precedence, WildcardEqualitySamePrecedenceAsLogicalEquality) {

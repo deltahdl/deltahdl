@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -9,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(EvalOpXZ, LogicalEqX) {
+TEST(EqualityWithUnknownBits, LogicalEqualityReturnsXWithUnknownOperand) {
   SimFixture f;
 
   MakeVar4(f, "el", 4, 0b1000, 0b0100);
@@ -21,7 +22,7 @@ TEST(EvalOpXZ, LogicalEqX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, LogicalNeqX) {
+TEST(EqualityWithUnknownBits, LogicalInequalityReturnsXWithUnknownOperand) {
   SimFixture f;
 
   MakeVar4(f, "nl", 4, 0b1000, 0b0100);
@@ -33,7 +34,7 @@ TEST(EvalOpXZ, LogicalNeqX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, CaseEqStillExact) {
+TEST(EqualityWithUnknownBits, CaseEqualityAlwaysReturnsKnownValue) {
   SimFixture f;
 
   auto* expr = MakeBinary(f.arena, TokenKind::kEqEqEq, MakeInt(f.arena, 5),
@@ -41,6 +42,88 @@ TEST(EvalOpXZ, CaseEqStillExact) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
   EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(EqualityWithUnknownBits, CaseEqualityMatchesXZPatterns) {
+  SimFixture f;
+
+  MakeVar4(f, "a", 4, 0b1010, 0b0100);
+  MakeVar4(f, "b", 4, 0b1010, 0b0100);
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEqEq, MakeId(f.arena, "a"),
+                          MakeId(f.arena, "b"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(EqualityWithUnknownBits, CaseEqualityMismatchesXZPatterns) {
+  SimFixture f;
+
+  MakeVar4(f, "a", 4, 0b1010, 0b0100);
+  MakeVar4(f, "b", 4, 0b1010, 0b1000);
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEqEq, MakeId(f.arena, "a"),
+                          MakeId(f.arena, "b"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(EqualityWithUnknownBits, CaseInequalityMatchesXZPatterns) {
+  SimFixture f;
+
+  MakeVar4(f, "a", 4, 0b1010, 0b0100);
+  MakeVar4(f, "b", 4, 0b1010, 0b0100);
+  auto* expr = MakeBinary(f.arena, TokenKind::kBangEqEq, MakeId(f.arena, "a"),
+                          MakeId(f.arena, "b"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(EqualityWithUnknownBits, CaseInequalityMismatchesXZPatterns) {
+  SimFixture f;
+
+  MakeVar4(f, "a", 4, 0b1010, 0b0100);
+  MakeVar4(f, "b", 4, 0b1010, 0b1000);
+  auto* expr = MakeBinary(f.arena, TokenKind::kBangEqEq, MakeId(f.arena, "a"),
+                          MakeId(f.arena, "b"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(ExpressionSim, EqualityFalse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = (8'd5 == 8'd3);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(ExpressionSim, InequalityFalse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = (8'd5 != 8'd5);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(ExpressionSim, EqualityTrue) {
@@ -66,40 +149,6 @@ TEST(ExpressionSim, InequalityTrue) {
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd5 != 8'd3);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
-TEST(OperatorSim, BinaryEqTrue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = (8'd10 == 8'd10);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
-TEST(OperatorSim, BinaryNeqTrue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = (8'd10 != 8'd5);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -145,7 +194,41 @@ TEST(OperatorSim, BinaryCaseNeq) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(EvalAdv, PackedStructEqualitySameValue) {
+TEST(OperatorSim, BinaryCaseEqFalse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = (8'd7 === 8'd3);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(OperatorSim, BinaryCaseNeqFalse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic x;\n"
+      "  initial x = (8'd7 !== 8'd7);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(EqualityOperatorEval, PackedStructEqualitySameValue) {
   SimFixture f;
 
   StructTypeInfo sinfo;
@@ -165,7 +248,7 @@ TEST(EvalAdv, PackedStructEqualitySameValue) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(EvalAdv, PackedStructEqualityDiffValue) {
+TEST(EqualityOperatorEval, PackedStructEqualityDiffValue) {
   SimFixture f;
 
   StructTypeInfo sinfo;
@@ -185,7 +268,7 @@ TEST(EvalAdv, PackedStructEqualityDiffValue) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(EvalAdv, PackedStructInequality) {
+TEST(EqualityOperatorEval, PackedStructInequality) {
   SimFixture f;
   StructTypeInfo sinfo;
   sinfo.type_name = "my_struct";
@@ -204,7 +287,7 @@ TEST(EvalAdv, PackedStructInequality) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(EvalAdv, SignedEqNeg) {
+TEST(EqualityOperatorEval, SignedEqualityNegativeValues) {
   SimFixture f;
   MakeSignedVarAdv(f, "sa", 8, 0xFF);
   MakeSignedVarAdv(f, "sb", 8, 0xFF);
@@ -212,6 +295,133 @@ TEST(EvalAdv, SignedEqNeg) {
                           MakeId(f.arena, "sb"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(RealOperandResult, RealEqualityComparison) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  real a, b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 2.5;\n"
+      "    b = 2.5;\n"
+      "    r = (a == b);\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 1u);
+}
+
+TEST(RealOperandResult, RealInequalityComparison) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  real a, b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 2.5;\n"
+      "    b = 3.0;\n"
+      "    r = (a != b);\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 1u);
+}
+
+TEST(RealOperandResult, MixedRealIntEqualityComparison) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  real a;\n"
+      "  int b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 3.0;\n"
+      "    b = 3;\n"
+      "    r = (a == b);\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 1u);
+}
+
+TEST(RealOperandResult, MixedRealIntInequalityComparison) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  real a;\n"
+      "  int b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 3.5;\n"
+      "    b = 3;\n"
+      "    r = (a != b);\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(v, 1u);
+}
+
+TEST(EqualityOperatorEval, LogicalEqualityFalse) {
+  SimFixture f;
+
+  MakeVar(f, "a", 8, 5);
+  MakeVar(f, "b", 8, 3);
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "a"),
+                          MakeId(f.arena, "b"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EqualityOperatorEval, LogicalInequalityFalse) {
+  SimFixture f;
+
+  MakeVar(f, "a", 8, 5);
+  MakeVar(f, "b", 8, 5);
+  auto* expr = MakeBinary(f.arena, TokenKind::kBangEq, MakeId(f.arena, "a"),
+                          MakeId(f.arena, "b"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EqualityOperatorEval, CaseEqualityFalseOnDifferentValues) {
+  SimFixture f;
+
+  auto* expr = MakeBinary(f.arena, TokenKind::kEqEqEq, MakeInt(f.arena, 5),
+                          MakeInt(f.arena, 3));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(EqualityOperatorEval, CaseInequalityFalseOnSameValues) {
+  SimFixture f;
+
+  auto* expr = MakeBinary(f.arena, TokenKind::kBangEqEq, MakeInt(f.arena, 5),
+                          MakeInt(f.arena, 5));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(EqualityOperatorEval, AllEqualityOperatorsReturnOneBit) {
+  SimFixture f;
+
+  MakeVar(f, "a", 32, 42);
+  MakeVar(f, "b", 32, 42);
+
+  auto* eq = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "a"),
+                        MakeId(f.arena, "b"));
+  EXPECT_EQ(EvalExpr(eq, f.ctx, f.arena).width, 1u);
+
+  auto* neq = MakeBinary(f.arena, TokenKind::kBangEq, MakeId(f.arena, "a"),
+                         MakeId(f.arena, "b"));
+  EXPECT_EQ(EvalExpr(neq, f.ctx, f.arena).width, 1u);
+
+  auto* ceq = MakeBinary(f.arena, TokenKind::kEqEqEq, MakeId(f.arena, "a"),
+                         MakeId(f.arena, "b"));
+  EXPECT_EQ(EvalExpr(ceq, f.ctx, f.arena).width, 1u);
+
+  auto* cneq = MakeBinary(f.arena, TokenKind::kBangEqEq, MakeId(f.arena, "a"),
+                          MakeId(f.arena, "b"));
+  EXPECT_EQ(EvalExpr(cneq, f.ctx, f.arena).width, 1u);
 }
 
 }  // namespace
