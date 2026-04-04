@@ -79,14 +79,6 @@ TEST(ConstantExpressionElaboration, NestedSysFuncInParamElaborates) {
       "endmodule\n"));
 }
 
-TEST(ConstEval, ScopedTernaryEvaluation) {
-  EvalFixture f;
-  ScopeMap scope = {{"SEL", 1}};
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("SEL ? 100 : 200", f), scope), 100);
-  scope["SEL"] = 0;
-  EXPECT_EQ(ConstEvalInt(ParseExprFrom("SEL ? 100 : 200", f), scope), 200);
-}
-
 TEST(ConstEval, ScopedConcatenationEvaluation) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("{4'd3, 4'd5}", f)), 0x35);
@@ -115,13 +107,6 @@ TEST(ConstEvalReal, RealBinaryEvaluation) {
   auto val = ConstEvalReal(ParseExprFrom("1.5 + 2.5", f));
   ASSERT_TRUE(val.has_value());
   EXPECT_DOUBLE_EQ(*val, 4.0);
-}
-
-TEST(ConstEvalReal, RealTernaryEvaluation) {
-  EvalFixture f;
-  auto val = ConstEvalReal(ParseExprFrom("1 ? 3.14 : 2.72", f));
-  ASSERT_TRUE(val.has_value());
-  EXPECT_DOUBLE_EQ(*val, 3.14);
 }
 
 TEST(ConstEvalReal, IntPromotesToReal) {

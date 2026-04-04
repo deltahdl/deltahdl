@@ -106,39 +106,6 @@ TEST(Precedence, ImplicationRightAssocStructure) {
   EXPECT_EQ(rhs->rhs->op, TokenKind::kArrow);
 }
 
-TEST(Precedence, NestedTernaryRightAssoc) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a ? b : c ? d : e;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
-}
-
-TEST(Precedence, ChainedTernaryRightAssoc) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = sel1 ? a : sel2 ? b : c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->true_expr, nullptr);
-  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kIdentifier);
-
-  ASSERT_NE(rhs->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->false_expr->true_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->true_expr->kind, ExprKind::kIdentifier);
-  ASSERT_NE(rhs->false_expr->false_expr, nullptr);
-  EXPECT_EQ(rhs->false_expr->false_expr->kind, ExprKind::kIdentifier);
-}
-
 TEST(Precedence, CompareAndLogicalWithParentheses) {
   auto r = Parse(
       "module t;\n"

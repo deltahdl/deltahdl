@@ -5,31 +5,6 @@
 using namespace delta;
 namespace {
 
-TEST(ContinuousAssignSyntaxParsing, NetAssignment_TernaryRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b, sel, y;\n"
-      "  assign y = sel ? a : b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto cas = FindContAssigns(r.cu->modules[0]->items);
-  ASSERT_EQ(cas.size(), 1u);
-  EXPECT_NE(cas[0]->assign_rhs, nullptr);
-}
-TEST(ProceduralBlockSyntaxParsing, VariableAssignment_TernaryRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = sel ? a : b; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
-}
-
 TEST(OperatorAndExpressionParsing, TernaryInCaseExpr) {
   auto r = Parse(
       "module t;\n"
@@ -128,22 +103,6 @@ TEST(OperatorAndExpressionParsing, TernaryWithCast) {
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kCast);
 }
 
-TEST(ProcessParsing, TernaryExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic sel, a, b, y;\n"
-      "  always_comb y = sel ? a : b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(item->body->rhs, nullptr);
-  EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
-}
-
 TEST(ExpressionParsing, ConditionalExprNested) {
   auto r = Parse("module m; initial x = a ? b ? c : d : e; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -152,15 +111,6 @@ TEST(ExpressionParsing, ConditionalExprNested) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
   EXPECT_EQ(rhs->true_expr->kind, ExprKind::kTernary);
-}
-
-TEST(ExpressionParsing, ConditionalExprWithBinaryCondition) {
-  auto r = Parse("module m; initial x = (a > b) ? a : b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
 TEST(OperatorAndExpressionParsing, TernaryWithInsideCondition) {
@@ -179,18 +129,6 @@ TEST(OperatorAndExpressionParsing, TernaryWithInsideCondition) {
   EXPECT_EQ(stmt->condition->kind, ExprKind::kTernary);
   ASSERT_NE(stmt->condition->condition, nullptr);
   EXPECT_EQ(stmt->condition->condition->kind, ExprKind::kInside);
-}
-
-TEST(OperatorAndExpressionParsing, VerifyExprKindTernary) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = en ? val_a : val_b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
 }
 
 TEST(OperatorAndExpressionParsing, VerifyTernaryFields) {
@@ -280,23 +218,6 @@ TEST(OperatorAndExpressionParsing, MultipleTernariesInExpr) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(AssignmentParsing, TernaryRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b, c, sel;\n"
-      "  initial begin\n"
-      "    a = sel ? b : c;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
-}
-
 TEST(OperatorAndExpressionParsing, TernaryWithStringLiterals) {
   auto r = Parse(
       "module t;\n"
@@ -383,19 +304,6 @@ TEST(AggregateTypeParsing, StructTernary) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(OperatorAndExpressionParsing, TernaryFieldAccess) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = sel ? a : b;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->condition, nullptr);
-  ASSERT_NE(rhs->true_expr, nullptr);
-  ASSERT_NE(rhs->false_expr, nullptr);
-}
-
 TEST(OperatorAndExpressionParsing, TernaryTristateDriver) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -403,15 +311,6 @@ TEST(OperatorAndExpressionParsing, TernaryTristateDriver) {
               "  wire [15:0] data;\n"
               "  wire [15:0] busa = drive_busa ? data : 16'bz;\n"
               "endmodule\n"));
-}
-
-TEST(FormalSyntaxParsing, TernaryExpr) {
-  auto r = Parse("module m; initial x = (a > b) ? a : b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
 TEST(ProcessParsing, TernaryExpressionRHS) {
@@ -455,17 +354,6 @@ TEST(OperatorAndExpressionParsing, BitSelectInTernaryCondition) {
   ASSERT_NE(rhs->condition, nullptr);
   EXPECT_EQ(rhs->condition->kind, ExprKind::kSelect);
   EXPECT_EQ(rhs->condition->index_end, nullptr);
-}
-
-TEST(OperatorAndExpressionParsing, SimpleTernary) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = sel ? a : b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  VerifyTernaryFieldsAllIdentifier(rhs);
 }
 
 static ModuleItem* FirstContAssign(ParseResult& r) {
@@ -658,13 +546,72 @@ TEST(OperatorAndExpressionParsing, TernaryInIfCondition) {
   EXPECT_EQ(stmt->condition->kind, ExprKind::kTernary);
 }
 
-TEST(OperatorAndExpressionParsing, TernaryConditionalFields) {
+// --- Moved from test_parser_clause_11_03_02.cpp ---
+
+TEST(Precedence, NestedTernaryRightAssoc) {
   auto r = Parse(
       "module t;\n"
-      "  initial x = en ? val_a : val_b;\n"
+      "  initial x = a ? b : c ? d : e;\n"
       "endmodule\n");
   auto* rhs = FirstInitialRHS(r);
-  VerifyTernaryFieldsAllIdentifier(rhs);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
+}
+
+TEST(Precedence, ChainedTernaryRightAssoc) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = sel1 ? a : sel2 ? b : c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->true_expr, nullptr);
+  EXPECT_EQ(rhs->true_expr->kind, ExprKind::kIdentifier);
+
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->false_expr->true_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->true_expr->kind, ExprKind::kIdentifier);
+  ASSERT_NE(rhs->false_expr->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->false_expr->kind, ExprKind::kIdentifier);
+}
+
+TEST(OperatorAndExpressionParsing, CondPredicateTripleAndInTernary) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a &&& b) ? y : z;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->condition, nullptr);
+  EXPECT_EQ(rhs->condition->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->condition->op, TokenKind::kAmpAmpAmp);
+}
+
+TEST(OperatorAndExpressionParsing, ChainedCondPredicateTripleAndInTernary) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = (a &&& b &&& c) ? y : z;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->condition, nullptr);
+  EXPECT_EQ(rhs->condition->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->condition->op, TokenKind::kAmpAmpAmp);
+  ASSERT_NE(rhs->condition->lhs, nullptr);
+  EXPECT_EQ(rhs->condition->lhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->condition->lhs->op, TokenKind::kAmpAmpAmp);
 }
 
 }  // namespace

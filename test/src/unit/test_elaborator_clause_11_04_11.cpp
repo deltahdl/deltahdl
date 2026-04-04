@@ -1,12 +1,13 @@
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "fixture_simulator.h"
+#include "simulator/evaluation.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(ConstEval, Ternary) {
+TEST(ConstEval, TernarySelectsCorrectBranch) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("1 ? 42 : 99", f)), 42);
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 ? 42 : 99", f)), 99);
@@ -194,6 +195,123 @@ TEST(BlockingAssignSim, BlockingAssignTernaryFalse) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+// --- Moved from test_parser_clause_11_04_11_b.cpp ---
+
+TEST(ConstEvalReal, TernaryOnReals) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("1 ? 2.5 : 3.5", f);
+  auto val = ConstEvalReal(e);
+  ASSERT_TRUE(val.has_value());
+  EXPECT_DOUBLE_EQ(val.value_or(0.0), 2.5);
+}
+
+TEST(ConstExpr, NestedTernaryIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("1 ? (0 ? 3 : 4) : 5", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+  EXPECT_EQ(ConstEvalInt(e), 4);
+}
+
+TEST(ExpressionElaboration, TernaryWidthIsMaxOfBranches) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] narrow;\n"
+      "  logic [7:0] wide;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    narrow = 4'hF;\n"
+      "    wide = 8'hAA;\n"
+      "    result = 1 ? narrow : wide;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 8u);
+  EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
+}
+
+TEST(ExpressionElaboration, TernaryWidthEqualBranches) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, result;\n"
+      "  initial begin\n"
+      "    a = 8'hAB;\n"
+      "    b = 8'hCD;\n"
+      "    result = 1 ? a : b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.width, 8u);
+}
+
+TEST(ExpressionElaboration, TernarySignedBothBranchesSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b;\n"
+      "  int result;\n"
+      "  assign result = 1 ? a : b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ExpressionElaboration, TernaryUnsignedMixedSignedness) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int signed_val;\n"
+      "  logic [31:0] unsigned_val;\n"
+      "  logic [31:0] result;\n"
+      "  assign result = 1 ? signed_val : unsigned_val;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ConstEvalReal, TernaryFalseConditionSelectsSecondReal) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("0 ? 2.5 : 3.5", f);
+  auto val = ConstEvalReal(e);
+  ASSERT_TRUE(val.has_value());
+  EXPECT_DOUBLE_EQ(val.value_or(0.0), 3.5);
+}
+
+TEST(ConstEval, NestedTernaryConstEval) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("1 ? (0 ? 10 : 20) : 30", f)), 20);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 ? 10 : (1 ? 20 : 30)", f)), 20);
+}
+
+TEST(ConstEval, ChainedTernaryConstEval) {
+  EvalFixture f;
+  ScopeMap scope = {{"SEL", 2}};
+  EXPECT_EQ(ConstEvalInt(
+                ParseExprFrom("SEL == 0 ? 10 : SEL == 1 ? 20 : 30", f), scope),
+            30);
+  scope["SEL"] = 1;
+  EXPECT_EQ(ConstEvalInt(
+                ParseExprFrom("SEL == 0 ? 10 : SEL == 1 ? 20 : 30", f), scope),
+            20);
 }
 
 }  // namespace

@@ -693,6 +693,7 @@ static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (HasUnknownBits(cond)) {
     auto tv = EvalExpr(expr->true_expr, ctx, arena);
     auto fv = EvalExpr(expr->false_expr, ctx, arena);
+    if (EvalCaseEquality(tv, fv)) return tv;
     return CombineBranches(tv, fv, arena);
   }
   if (cond.ToUint64() != 0) {

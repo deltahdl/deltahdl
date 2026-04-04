@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-inline Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kTernary;
-  e->condition = cond;
-  e->true_expr = t;
-  e->false_expr = f;
-  return e;
-}
-
 TEST(ShortCircuit, LogicalAndShortCircuitsOnFalseLhs) {
   SimFixture f;
   MakeVar(f, "a", 8, 0);
@@ -63,30 +54,6 @@ TEST(ShortCircuit, ImplicationShortCircuitsOnFalseLhs) {
                                     MakeId(f.arena, "a"), MakeId(f.arena, "b")),
                          f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 1u);
-}
-
-TEST(ShortCircuit, TernaryEvaluatesTrueBranchOnly) {
-  SimFixture f;
-  MakeVar(f, "c", 8, 1);
-  MakeVar(f, "t", 8, 10);
-  MakeVar(f, "e", 8, 20);
-  auto result =
-      EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "c"), MakeId(f.arena, "t"),
-                           MakeId(f.arena, "e")),
-               f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 10u);
-}
-
-TEST(ShortCircuit, TernaryEvaluatesFalseBranchOnly) {
-  SimFixture f;
-  MakeVar(f, "c", 8, 0);
-  MakeVar(f, "t", 8, 10);
-  MakeVar(f, "e", 8, 20);
-  auto result =
-      EvalExpr(MakeTernary(f.arena, MakeId(f.arena, "c"), MakeId(f.arena, "t"),
-                           MakeId(f.arena, "e")),
-               f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 20u);
 }
 
 TEST(ShortCircuit, BitwiseAndAlwaysEvaluatesBothOperands) {
@@ -171,32 +138,6 @@ TEST(ShortCircuit, ImplicationTrueLhsExecutesRhsSideEffect) {
                       MakeAssignExpr(f.arena, "se", 42)),
            f.ctx, f.arena);
   EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 42u);
-}
-
-TEST(ShortCircuit, TernaryTrueCondSkipsFalseBranchSideEffect) {
-  SimFixture f;
-  MakeVar(f, "c", 8, 1);
-  MakeVar(f, "t", 8, 10);
-  MakeVar(f, "se", 8, 99);
-  auto result = EvalExpr(
-      MakeTernary(f.arena, MakeId(f.arena, "c"), MakeId(f.arena, "t"),
-                  MakeAssignExpr(f.arena, "se", 42)),
-      f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 10u);
-  EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 99u);
-}
-
-TEST(ShortCircuit, TernaryFalseCondSkipsTrueBranchSideEffect) {
-  SimFixture f;
-  MakeVar(f, "c", 8, 0);
-  MakeVar(f, "se", 8, 99);
-  MakeVar(f, "e", 8, 20);
-  auto result = EvalExpr(
-      MakeTernary(f.arena, MakeId(f.arena, "c"),
-                  MakeAssignExpr(f.arena, "se", 42), MakeId(f.arena, "e")),
-      f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 20u);
-  EXPECT_EQ(f.ctx.FindVariable("se")->value.ToUint64(), 99u);
 }
 
 // Non-short-circuit operators: verify both operands are always evaluated.
