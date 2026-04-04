@@ -337,4 +337,120 @@ void Elaborator::ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl) {
   }
 }
 
+// --- §11.4.12: Unsized constants not allowed in concatenations ---
+
+void Elaborator::WalkExprForUnsizedInConcat(const Expr* expr) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kConcatenation) {
+    for (auto* elem : expr->elements) {
+      if (elem->kind == ExprKind::kIntegerLiteral) {
+        auto tick = elem->text.find('\'');
+        if (tick == std::string_view::npos || tick == 0) {
+          diag_.Error(elem->range.start,
+                      "unsized constant is not allowed in a concatenation");
+        }
+      }
+    }
+  }
+  WalkExprForUnsizedInConcat(expr->lhs);
+  WalkExprForUnsizedInConcat(expr->rhs);
+  WalkExprForUnsizedInConcat(expr->condition);
+  WalkExprForUnsizedInConcat(expr->true_expr);
+  WalkExprForUnsizedInConcat(expr->false_expr);
+  for (auto* elem : expr->elements) WalkExprForUnsizedInConcat(elem);
+  for (auto* arg : expr->args) WalkExprForUnsizedInConcat(arg);
+}
+
+void Elaborator::WalkStmtsForUnsizedInConcat(const Stmt* s) {
+  if (!s) return;
+  WalkExprForUnsizedInConcat(s->rhs);
+  WalkExprForUnsizedInConcat(s->lhs);
+  WalkExprForUnsizedInConcat(s->expr);
+  WalkExprForUnsizedInConcat(s->condition);
+  WalkExprForUnsizedInConcat(s->assert_expr);
+  for (auto* sub : s->stmts) WalkStmtsForUnsizedInConcat(sub);
+  WalkStmtsForUnsizedInConcat(s->then_branch);
+  WalkStmtsForUnsizedInConcat(s->else_branch);
+  WalkStmtsForUnsizedInConcat(s->body);
+  WalkStmtsForUnsizedInConcat(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForUnsizedInConcat(ci.body);
+}
+
+void Elaborator::ValidateUnsizedInConcat(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForUnsizedInConcat(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign) {
+      WalkExprForUnsizedInConcat(item->assign_lhs);
+      WalkExprForUnsizedInConcat(item->assign_rhs);
+    }
+    if (item->init_value) {
+      WalkExprForUnsizedInConcat(item->init_value);
+    }
+  }
+  for (const auto& p : decl->params) {
+    WalkExprForUnsizedInConcat(p.init_value);
+  }
+}
+
+// --- §11.4.12: Select of concatenation shall not be an lvalue ---
+
+static bool IsSelectOnConcat(const Expr* expr) {
+  if (!expr || expr->kind != ExprKind::kSelect) return false;
+  const Expr* base = expr->lhs;
+  while (base && base->kind == ExprKind::kSelect) base = base->lhs;
+  return base && base->kind == ExprKind::kConcatenation;
+}
+
+void Elaborator::CheckSelectOnConcatLvalue(const Expr* lhs) {
+  if (!lhs) return;
+  if (IsSelectOnConcat(lhs)) {
+    diag_.Error(lhs->range.start,
+                "select of a concatenation shall not be used as an lvalue");
+  }
+  if (lhs->kind == ExprKind::kConcatenation) {
+    for (auto* elem : lhs->elements) CheckSelectOnConcatLvalue(elem);
+  }
+}
+
+void Elaborator::WalkStmtsForSelectOnConcatLvalue(const Stmt* s) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign ||
+      s->kind == StmtKind::kAssign ||
+      s->kind == StmtKind::kForce) {
+    CheckSelectOnConcatLvalue(s->lhs);
+  }
+  for (auto* sub : s->stmts) WalkStmtsForSelectOnConcatLvalue(sub);
+  WalkStmtsForSelectOnConcatLvalue(s->then_branch);
+  WalkStmtsForSelectOnConcatLvalue(s->else_branch);
+  WalkStmtsForSelectOnConcatLvalue(s->body);
+  WalkStmtsForSelectOnConcatLvalue(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForSelectOnConcatLvalue(ci.body);
+}
+
+void Elaborator::ValidateSelectOnConcatLvalue(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForSelectOnConcatLvalue(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckSelectOnConcatLvalue(item->assign_lhs);
+    }
+  }
+}
+
 }  // namespace delta

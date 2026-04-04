@@ -361,6 +361,16 @@ class Elaborator {
   void WalkExprForAssignInExpr(const Expr* expr, bool in_event_or_cont);
   void WalkStmtsForAssignInExpr(const Stmt* s);
 
+  /// §11.4.12: Unsized constants not allowed in concatenations.
+  void ValidateUnsizedInConcat(const ModuleDecl* decl);
+  void WalkExprForUnsizedInConcat(const Expr* expr);
+  void WalkStmtsForUnsizedInConcat(const Stmt* s);
+
+  /// §11.4.12: Select of concatenation shall not be an lvalue.
+  void ValidateSelectOnConcatLvalue(const ModuleDecl* decl);
+  void CheckSelectOnConcatLvalue(const Expr* lhs);
+  void WalkStmtsForSelectOnConcatLvalue(const Stmt* s);
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 
