@@ -26,7 +26,7 @@ Logic4Word Logic4Or(Logic4Word a, Logic4Word b) {
   uint64_t result_aval = a.aval | b.aval;
   uint64_t any_known_1 = a_known_1 | b_known_1;
   uint64_t result_bval = (a.bval | b.bval) & ~any_known_1;
-  return {result_aval | result_bval, result_bval};
+  return {result_aval & ~result_bval, result_bval};
 }
 
 Logic4Word Logic4Xor(Logic4Word a, Logic4Word b) {

@@ -129,4 +129,28 @@ TEST(LvalueSim, CompoundAssignWithIndexedLhs) {
   EXPECT_EQ(var->unpacked_array[2].ToUint64(), 15u);
 }
 
+TEST(EvalOp, LtLtEq) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("a", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 1);
+
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtLtEq, MakeId(f.arena, "a"),
+                          MakeInt(f.arena, 4));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 16u);
+  EXPECT_EQ(var->value.ToUint64(), 16u);
+}
+
+TEST(EvalOp, GtGtEq) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("a", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 256);
+
+  auto* expr = MakeBinary(f.arena, TokenKind::kGtGtEq, MakeId(f.arena, "a"),
+                          MakeInt(f.arena, 4));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 16u);
+  EXPECT_EQ(var->value.ToUint64(), 16u);
+}
+
 }  // namespace
