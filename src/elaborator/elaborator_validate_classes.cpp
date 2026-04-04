@@ -468,7 +468,8 @@ static bool IsClassVar(const Expr* e,
 // §8.4 Table 8-1: Only ==, !=, ===, !== are legal binary ops on class handles.
 static bool IsAllowedClassBinaryOp(TokenKind op) {
   return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
-         op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq;
+         op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq ||
+         op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
 // §8.4/§8.26.5: Check whether class type `a` is the same as or derived from

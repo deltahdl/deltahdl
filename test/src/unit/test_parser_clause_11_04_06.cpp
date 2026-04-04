@@ -25,24 +25,15 @@ TEST(OperatorParsing, BinaryWildcardNeq) {
   EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
 }
 
-TEST(OperatorAndExpressionParsing, WildcardEq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = (a ==? b);\n"
-      "endmodule\n");
+TEST(Precedence, WildcardEqualitySamePrecedenceAsLogicalEquality) {
+  auto r = Parse("module m; initial x = a ==? b != c; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kEqEqQuestion);
-}
-
-TEST(OperatorAndExpressionParsing, WildcardNeq) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = (a !=? b);\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
+  EXPECT_EQ(rhs->op, TokenKind::kBangEq);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->op, TokenKind::kEqEqQuestion);
 }
 
 TEST(OperatorAndExpressionParsing, WildcardEqInIfCondition) {
@@ -55,34 +46,6 @@ TEST(OperatorAndExpressionParsing, WildcardEqInIfCondition) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(LexicalOverviewParsing, ThreeCharOperatorWildcardInequality) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = (a !=? b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
-}
-
-TEST(OperatorTokenParserParsing, Operator_WildcardEquality) {
-  EXPECT_TRUE(ParseOk("module m; initial x = (a ==? b); endmodule"));
-}
-
-TEST(OperatorParsing, BinaryWildcardNotEq) {
-  auto r = Parse("module m; initial x = a !=? b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kBangEqQuestion);
 }
 
 }  // namespace

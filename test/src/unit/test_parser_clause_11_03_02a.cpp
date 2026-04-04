@@ -179,17 +179,6 @@ TEST(Precedence, TernaryHigherThanImplication) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(Precedence, WildcardEqualitySamePrecedenceAsLogicalEquality) {
-  auto r = Parse("module m; initial x = a ==? b != c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kBangEq);
-  ASSERT_NE(rhs->lhs, nullptr);
-  EXPECT_EQ(rhs->lhs->op, TokenKind::kEqEqQuestion);
-}
-
 TEST(Precedence, ArithShiftSamePrecedenceAsLogicShift) {
   auto r = Parse("module m; initial x = a <<< b >> c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

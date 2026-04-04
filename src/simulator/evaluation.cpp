@@ -416,8 +416,10 @@ static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
       return EvalCaseEquality(lhs, rhs) ? 0 : 1;
     case TokenKind::kEqEqQuestion:
       return EvalWildcardEq(lhs, rhs);
-    case TokenKind::kBangEqQuestion:
-      return EvalWildcardEq(lhs, rhs) ^ 1;
+    case TokenKind::kBangEqQuestion: {
+      uint64_t r = EvalWildcardEq(lhs, rhs);
+      return r == kResultX ? kResultX : r ^ 1;
+    }
     default:
       return 0;
   }

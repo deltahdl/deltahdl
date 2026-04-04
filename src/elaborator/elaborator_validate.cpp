@@ -290,7 +290,8 @@ static bool IsNullLiteral(const Expr* e) {
 
 static bool IsAllowedChandleBinaryOp(TokenKind op) {
   return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
-         op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq;
+         op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq ||
+         op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
 static void CheckChandleExpr(const Expr* e, const TypeMap& types,
