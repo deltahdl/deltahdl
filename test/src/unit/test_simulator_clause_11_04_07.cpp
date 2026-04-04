@@ -45,6 +45,24 @@ TEST(EvalOp, CaretEq) {
   EXPECT_EQ(var->value.ToUint64(), 0xF0u);
 }
 
+TEST(EvalOpXZ, LogicalNotZero) {
+  SimFixture f;
+  auto* expr = MakeUnary(f.arena, TokenKind::kBang, MakeInt(f.arena, 0));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(EvalOpXZ, LogicalNotNonzero) {
+  SimFixture f;
+  auto* expr = MakeUnary(f.arena, TokenKind::kBang, MakeInt(f.arena, 237));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
 TEST(EvalOpXZ, LogicalNotX) {
   SimFixture f;
 
@@ -118,7 +136,7 @@ TEST(EvalOpXZ, LogicalOrXX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, ImplTT) {
+TEST(EvalOpXZ, ImplicationTrueTrue) {
   SimFixture f;
 
   MakeVar4(f, "it1", 1, 1, 0);
@@ -130,7 +148,7 @@ TEST(EvalOpXZ, ImplTT) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(EvalOpXZ, ImplTF) {
+TEST(EvalOpXZ, ImplicationTrueFalse) {
   SimFixture f;
 
   MakeVar4(f, "it1", 1, 1, 0);
@@ -141,7 +159,7 @@ TEST(EvalOpXZ, ImplTF) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(EvalOpXZ, ImplFT) {
+TEST(EvalOpXZ, ImplicationFalseTrue) {
   SimFixture f;
 
   MakeVar4(f, "it1", 1, 0, 0);
@@ -152,7 +170,7 @@ TEST(EvalOpXZ, ImplFT) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(EvalOpXZ, ImplFF) {
+TEST(EvalOpXZ, ImplicationFalseFalse) {
   SimFixture f;
 
   MakeVar4(f, "it1", 1, 0, 0);
@@ -163,7 +181,7 @@ TEST(EvalOpXZ, ImplFF) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(EvalOpXZ, ImplXT) {
+TEST(EvalOpXZ, ImplicationUnknownTrue) {
   SimFixture f;
 
   MakeVar4(f, "ix1", 1, 0, 1);
@@ -175,7 +193,7 @@ TEST(EvalOpXZ, ImplXT) {
   EXPECT_EQ(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, ImplXF) {
+TEST(EvalOpXZ, ImplicationUnknownFalse) {
   SimFixture f;
 
   MakeVar4(f, "ix1", 1, 0, 1);
@@ -186,7 +204,7 @@ TEST(EvalOpXZ, ImplXF) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, EquivSame) {
+TEST(EvalOpXZ, EquivalenceSameValue) {
   SimFixture f;
 
   MakeVar4(f, "eq1", 1, 1, 0);
@@ -197,7 +215,7 @@ TEST(EvalOpXZ, EquivSame) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(EvalOpXZ, EquivDiff) {
+TEST(EvalOpXZ, EquivalenceDifferentValues) {
   SimFixture f;
 
   MakeVar4(f, "eq1", 1, 1, 0);
@@ -208,7 +226,7 @@ TEST(EvalOpXZ, EquivDiff) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(EvalOpXZ, EquivX) {
+TEST(EvalOpXZ, EquivalenceUnknownOperand) {
   SimFixture f;
 
   MakeVar4(f, "ex1", 1, 0, 1);
@@ -219,29 +237,133 @@ TEST(EvalOpXZ, EquivX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(ExpressionSim, LogicalAnd) {
+TEST(EvalOpXZ, LogicalAndTrueTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic x;\n"
-      "  initial x = (8'd1 && 8'd1);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
+  auto* expr = MakeBinary(f.arena, TokenKind::kAmpAmp, MakeInt(f.arena, 1),
+                          MakeInt(f.arena, 1));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-TEST(ExpressionSim, LogicalOr) {
+TEST(EvalOpXZ, LogicalAndTrueFalse) {
+  SimFixture f;
+  auto* expr = MakeBinary(f.arena, TokenKind::kAmpAmp, MakeInt(f.arena, 1),
+                          MakeInt(f.arena, 0));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EvalOpXZ, LogicalAndFalseTrue) {
+  SimFixture f;
+  auto* expr = MakeBinary(f.arena, TokenKind::kAmpAmp, MakeInt(f.arena, 0),
+                          MakeInt(f.arena, 1));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EvalOpXZ, LogicalAndFalseFalse) {
+  SimFixture f;
+  auto* expr = MakeBinary(f.arena, TokenKind::kAmpAmp, MakeInt(f.arena, 0),
+                          MakeInt(f.arena, 0));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EvalOpXZ, LogicalOrTrueTrue) {
+  SimFixture f;
+  auto* expr = MakeBinary(f.arena, TokenKind::kPipePipe, MakeInt(f.arena, 1),
+                          MakeInt(f.arena, 1));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalOpXZ, LogicalOrTrueFalse) {
+  SimFixture f;
+  auto* expr = MakeBinary(f.arena, TokenKind::kPipePipe, MakeInt(f.arena, 1),
+                          MakeInt(f.arena, 0));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalOpXZ, LogicalOrFalseTrue) {
+  SimFixture f;
+  auto* expr = MakeBinary(f.arena, TokenKind::kPipePipe, MakeInt(f.arena, 0),
+                          MakeInt(f.arena, 1));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(EvalOpXZ, LogicalOrFalseFalse) {
+  SimFixture f;
+  auto* expr = MakeBinary(f.arena, TokenKind::kPipePipe, MakeInt(f.arena, 0),
+                          MakeInt(f.arena, 0));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EvalOpXZ, ImplicationTrueUnknown) {
+  SimFixture f;
+  MakeVar4(f, "ix2", 1, 0, 1);
+  auto* expr = MakeBinary(f.arena, TokenKind::kArrow, MakeInt(f.arena, 1),
+                          MakeId(f.arena, "ix2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);
+}
+
+TEST(EvalOpXZ, EquivalenceFalseFalse) {
+  SimFixture f;
+  MakeVar4(f, "e1", 1, 0, 0);
+  MakeVar4(f, "e2", 1, 0, 0);
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "e1"),
+                          MakeId(f.arena, "e2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(EvalOpXZ, EquivalenceFalseTrue) {
+  SimFixture f;
+  MakeVar4(f, "e1", 1, 0, 0);
+  MakeVar4(f, "e2", 1, 1, 0);
+  auto* expr = MakeBinary(f.arena, TokenKind::kLtDashGt, MakeId(f.arena, "e1"),
+                          MakeId(f.arena, "e2"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+  EXPECT_EQ(result.words[0].bval, 0u);
+}
+
+TEST(OperatorSim, ShortCircuitAndSkipsRhs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  logic x;\n"
-      "  initial x = (8'd0 || 8'd1);\n"
+      "  int x;\n"
+      "  initial x = (0 && (1/0));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+  EXPECT_EQ(var->value.words[0].bval, 0u);
+}
+
+TEST(OperatorSim, ShortCircuitOrSkipsRhs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x;\n"
+      "  initial x = (1 || (1/0));\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -251,6 +373,25 @@ TEST(ExpressionSim, LogicalOr) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
+  EXPECT_EQ(var->value.words[0].bval, 0u);
+}
+
+TEST(OperatorSim, ShortCircuitImplicationSkipsRhs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x;\n"
+      "  initial x = (0 -> (1/0));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+  EXPECT_EQ(var->value.words[0].bval, 0u);
 }
 
 TEST(OperatorSim, UnaryLogicalNot) {
@@ -336,6 +477,142 @@ TEST(OperatorSim, BinaryEquivalence) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(AlwaysCombBasicSim, AlwaysCombLogicalOps) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b;\n"
+      "  logic result;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = 0;\n"
+      "  end\n"
+      "  always_comb begin\n"
+      "    result = a && !b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(AlwaysStarSim, AlwaysStarLogicalNot) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic y;\n"
+      "  always @* y = !a;\n"
+      "  initial begin\n"
+      "    a = 8'h00;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+
+  EXPECT_EQ(y->value.ToUint64(), 1u);
+}
+
+TEST(BlockingAssignSim, BlockingAssignUnaryOps) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a;\n"
+      "  int r_not, r_bang;\n"
+      "  initial begin\n"
+      "    a = 0;\n"
+      "    r_not = !a;\n"
+      "    r_bang = !5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* r_not = f.ctx.FindVariable("r_not");
+  auto* r_bang = f.ctx.FindVariable("r_bang");
+  ASSERT_NE(r_not, nullptr);
+  ASSERT_NE(r_bang, nullptr);
+
+  EXPECT_EQ(r_not->value.ToUint64(), 1u);
+
+  EXPECT_EQ(r_bang->value.ToUint64(), 0u);
+}
+
+TEST(BlockingAssignSim, BlockingAssignUnaryLogicalNotAndMinus) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a, neg_result, not_result;\n"
+      "  initial begin\n"
+      "    a = 5;\n"
+      "    neg_result = -a;\n"
+      "    not_result = !a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* neg = f.ctx.FindVariable("neg_result");
+  ASSERT_NE(neg, nullptr);
+
+  auto neg5_32bit = static_cast<uint32_t>(-5);
+  EXPECT_EQ(neg->value.ToUint64(), neg5_32bit);
+
+  auto* notv = f.ctx.FindVariable("not_result");
+  ASSERT_NE(notv, nullptr);
+
+  EXPECT_EQ(notv->value.ToUint64(), 0u);
+}
+
+TEST(BlockingAssignSim, BlockingAssignLogicalOps) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a, b;\n"
+      "  int r_and, r_or;\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = 0;\n"
+      "    r_and = a && b;\n"
+      "    r_or  = a || b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* r_and = f.ctx.FindVariable("r_and");
+  auto* r_or = f.ctx.FindVariable("r_or");
+  ASSERT_NE(r_and, nullptr);
+  ASSERT_NE(r_or, nullptr);
+  EXPECT_EQ(r_and->value.ToUint64(), 0u);
+  EXPECT_EQ(r_or->value.ToUint64(), 1u);
 }
 
 }  // namespace

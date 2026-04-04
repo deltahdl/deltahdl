@@ -103,6 +103,10 @@ static std::optional<int64_t> EvalBinaryCompare(TokenKind op, int64_t lhs,
       return static_cast<int64_t>(lhs != 0 && rhs != 0);
     case TokenKind::kPipePipe:
       return static_cast<int64_t>(lhs != 0 || rhs != 0);
+    case TokenKind::kArrow:
+      return static_cast<int64_t>(lhs == 0 || rhs != 0);
+    case TokenKind::kLtDashGt:
+      return static_cast<int64_t>((lhs != 0) == (rhs != 0));
     default:
       return std::nullopt;
   }

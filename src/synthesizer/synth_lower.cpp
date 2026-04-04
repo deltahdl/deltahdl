@@ -192,6 +192,18 @@ uint32_t SynthLower::LowerBinaryBit(const Expr* expr, AigGraph& aig,
     case TokenKind::kTildeCaret:
     case TokenKind::kCaretTilde:
       return aig.AddNot(aig.AddXor(l, r));
+    case TokenKind::kAmpAmp:
+      if (bit > 0) return AigGraph::kConstFalse;
+      return aig.AddAnd(l, r);
+    case TokenKind::kPipePipe:
+      if (bit > 0) return AigGraph::kConstFalse;
+      return aig.AddOr(l, r);
+    case TokenKind::kArrow:
+      if (bit > 0) return AigGraph::kConstFalse;
+      return aig.AddOr(aig.AddNot(l), r);
+    case TokenKind::kLtDashGt:
+      if (bit > 0) return AigGraph::kConstFalse;
+      return aig.AddNot(aig.AddXor(l, r));
     default:
       return AigGraph::kConstFalse;
   }
