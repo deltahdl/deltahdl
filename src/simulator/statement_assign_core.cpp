@@ -647,7 +647,9 @@ static Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
     std::memcpy(&d, &bits, sizeof(double));
     auto ival = static_cast<uint64_t>(
         static_cast<int64_t>(std::llround(d)));
-    return MakeLogic4VecVal(arena, target_width, ival);
+    auto result = MakeLogic4VecVal(arena, target_width, ival);
+    result.is_signed = true;
+    return result;
   }
   if (!rhs_val.is_real && lhs_is_real) {
     uint64_t raw =

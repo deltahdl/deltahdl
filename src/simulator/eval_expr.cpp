@@ -397,7 +397,9 @@ static Logic4Vec CastRealConversion(const Logic4Vec& inner,
     auto val = static_cast<uint64_t>(
         static_cast<int64_t>(std::llround(ExtractDouble(inner))));
     if (target_width < 64) val &= (uint64_t{1} << target_width) - 1;
-    return MakeLogic4VecVal(arena, target_width, val);
+    auto result = MakeLogic4VecVal(arena, target_width, val);
+    result.is_signed = true;
+    return result;
   }
   auto d = static_cast<double>(inner.ToUint64());
   uint64_t bits = 0;

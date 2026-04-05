@@ -693,13 +693,21 @@ static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (HasUnknownBits(cond)) {
     auto tv = EvalExpr(expr->true_expr, ctx, arena);
     auto fv = EvalExpr(expr->false_expr, ctx, arena);
-    if (EvalCaseEquality(tv, fv)) return tv;
-    return CombineBranches(tv, fv, arena);
+    bool result_signed = tv.is_signed && fv.is_signed;
+    if (EvalCaseEquality(tv, fv)) {
+      tv.is_signed = result_signed;
+      return tv;
+    }
+    auto result = CombineBranches(tv, fv, arena);
+    result.is_signed = result_signed;
+    return result;
   }
-  if (cond.ToUint64() != 0) {
-    return EvalExpr(expr->true_expr, ctx, arena);
-  }
-  return EvalExpr(expr->false_expr, ctx, arena);
+  auto tv = EvalExpr(expr->true_expr, ctx, arena);
+  auto fv = EvalExpr(expr->false_expr, ctx, arena);
+  bool result_signed = tv.is_signed && fv.is_signed;
+  auto& result = (cond.ToUint64() != 0) ? tv : fv;
+  result.is_signed = result_signed;
+  return result;
 }
 // §11.3.6: Compute the bit-width that the LHS of an assignment expression
 // contributes to the return type.

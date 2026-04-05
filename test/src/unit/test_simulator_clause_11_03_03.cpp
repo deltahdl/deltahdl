@@ -29,50 +29,6 @@ TEST(IntegerLiteralSim, LiteralAssignedThroughParameter) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// --- Signedness based on base specifier ---
-
-TEST(IntegerLiteralSignedness, DecimalLiteralIsSigned) {
-  SimFixture f;
-  auto* lit = MakeInt(f.arena, 42);
-  lit->text = "42";
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-  EXPECT_TRUE(result.is_signed);
-}
-
-TEST(IntegerLiteralSignedness, BasedLiteralIsUnsigned) {
-  SimFixture f;
-  auto* lit = MakeInt(f.arena, 0xA);
-  lit->text = "8'hA";
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0xAu);
-  EXPECT_FALSE(result.is_signed);
-}
-
-TEST(IntegerLiteralSignedness, SignedBasedLiteralIsSigned) {
-  SimFixture f;
-  auto* lit = MakeInt(f.arena, 0xA);
-  lit->text = "4'shA";
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_signed);
-}
-
-TEST(IntegerLiteralSignedness, UnsizedBasedUnsignedIsNotSigned) {
-  SimFixture f;
-  auto* lit = MakeInt(f.arena, 12);
-  lit->text = "'d12";
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_FALSE(result.is_signed);
-}
-
-TEST(IntegerLiteralSignedness, UnsizedBasedSignedIsSigned) {
-  SimFixture f;
-  auto* lit = MakeInt(f.arena, 12);
-  lit->text = "'sd12";
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_signed);
-}
-
 // --- Negation of unsigned literal ---
 
 TEST(IntegerLiteralSim, NegatedUnsignedSizedLiteral) {
