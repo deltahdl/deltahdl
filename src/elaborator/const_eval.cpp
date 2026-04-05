@@ -586,25 +586,46 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
 }
 
 // §11.5.3: Build the textual representation of a static prefix.
-static std::string BuildStaticPrefix(const Expr* expr, const ScopeMap& scope) {
-  if (!expr) return "";
-  if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
-  if (expr->kind != ExprKind::kSelect || !expr->base) return "";
-  std::string base = BuildStaticPrefix(expr->base, scope);
-  if (base.empty()) return "";
-  // Check if index is a constant expression.
-  auto idx = ConstEvalInt(expr->index, scope);
-  if (!idx) return base;  // Non-constant index → stop here.
-  return base + "[" + std::to_string(*idx) + "]";
+// Returns the longest static prefix text and whether the expression itself is
+// fully static (i.e. the entire expression is a static prefix, not truncated).
+struct StaticPrefixResult {
+  std::string text;
+  bool is_static;
+};
+
+static StaticPrefixResult BuildStaticPrefix(const Expr* expr,
+                                            const ScopeMap& scope) {
+  if (!expr) return {"", false};
+
+  if (expr->kind == ExprKind::kIdentifier) {
+    std::string result;
+    if (!expr->scope_prefix.empty()) result += expr->scope_prefix;
+    result += expr->text;
+    return {result, true};
+  }
+
+  if (expr->kind == ExprKind::kMemberAccess) {
+    if (!expr->lhs || !expr->rhs) return {"", false};
+    auto base = BuildStaticPrefix(expr->lhs, scope);
+    if (!base.is_static) return {base.text, false};
+    return {base.text + "." + std::string(expr->rhs->text), true};
+  }
+
+  if (expr->kind == ExprKind::kSelect && expr->base) {
+    auto base = BuildStaticPrefix(expr->base, scope);
+    if (base.text.empty()) return {"", false};
+    if (!base.is_static) return {base.text, false};
+    auto idx = ConstEvalInt(expr->index, scope);
+    if (!idx) return {base.text, false};
+    return {base.text + "[" + std::to_string(*idx) + "]", true};
+  }
+
+  return {"", false};
 }
 
 std::string LongestStaticPrefix(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return "";
-  // For a select chain, walk recursively.
-  if (expr->kind == ExprKind::kSelect) return BuildStaticPrefix(expr, scope);
-  // For a plain identifier, the prefix is the identifier itself.
-  if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
-  return "";
+  return BuildStaticPrefix(expr, scope).text;
 }
 
 }  // namespace delta

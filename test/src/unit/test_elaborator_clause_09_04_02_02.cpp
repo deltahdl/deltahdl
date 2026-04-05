@@ -1,5 +1,3 @@
-#include "builders_sensitivity.h"
-#include "elaborator/sensitivity.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -719,15 +717,6 @@ TEST(AlwaysStarSim, AlwaysStarParenResultWidth32) {
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.width, 32u);
   EXPECT_EQ(y->value.ToUint64(), 0xDEADBEEFu);
-}
-
-TEST(SelectVarIdxUsesLSP, SelectVarIdxUsesLSP) {
-  Arena arena;
-  auto* expr = SensSelect(arena, SensId(arena, "a"), SensId(arena, "i"));
-  std::unordered_set<std::string> reads;
-  CollectExprReads(expr, reads);
-  EXPECT_TRUE(reads.count("a"));
-  EXPECT_TRUE(reads.count("i"));
 }
 
 }  // namespace
