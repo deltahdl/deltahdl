@@ -30,7 +30,7 @@ static Stmt* MakeStreamUnpackAssign(Arena& arena, Expr* lhs_stream, Expr* rhs) {
   return s;
 }
 
-TEST(EvalAdv, StreamingUnpackRightShiftBasic) {
+TEST(StreamingUnpack, StreamingUnpackRightShiftBasic) {
   SimFixture f;
 
   MakeVar(f, "a", 32, 0);
@@ -41,6 +41,7 @@ TEST(EvalAdv, StreamingUnpackRightShiftBasic) {
       f.arena, TokenKind::kGtGt,
       {MakeId(f.arena, "a"), MakeId(f.arena, "b"), MakeId(f.arena, "c")});
   auto* rhs = MakeInt(f.arena, 1);
+  rhs->text = "96'h0";
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
@@ -49,7 +50,7 @@ TEST(EvalAdv, StreamingUnpackRightShiftBasic) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 1u);
 }
 
-TEST(EvalAdv, StreamingUnpackRightShiftMultiByte) {
+TEST(StreamingUnpack, StreamingUnpackRightShiftMultiByte) {
   SimFixture f;
 
   MakeVar(f, "a", 8, 0);
@@ -58,6 +59,7 @@ TEST(EvalAdv, StreamingUnpackRightShiftMultiByte) {
   auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
                                {MakeId(f.arena, "a"), MakeId(f.arena, "b")});
   auto* rhs = MakeInt(f.arena, 0xABCD);
+  rhs->text = "16'h0";
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
@@ -65,7 +67,7 @@ TEST(EvalAdv, StreamingUnpackRightShiftMultiByte) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xCDu);
 }
 
-TEST(EvalAdv, StreamingUnpackLeftShiftByte) {
+TEST(StreamingUnpack, StreamingUnpackLeftShiftByte) {
   SimFixture f;
 
   MakeVar(f, "a", 8, 0);
@@ -77,6 +79,7 @@ TEST(EvalAdv, StreamingUnpackLeftShiftByte) {
       MakeStreamConcat(f.arena, TokenKind::kLtLt,
                        {MakeId(f.arena, "a"), MakeId(f.arena, "b")}, ss);
   auto* rhs = MakeInt(f.arena, 0xABCD);
+  rhs->text = "16'h0";
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
@@ -84,7 +87,7 @@ TEST(EvalAdv, StreamingUnpackLeftShiftByte) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xABu);
 }
 
-TEST(EvalAdv, StreamingUnpackSourceWiderTruncatesLSBs) {
+TEST(StreamingUnpack, StreamingUnpackSourceWiderTruncatesLSBs) {
   SimFixture f;
 
   MakeVar(f, "a2", 8, 0);
@@ -101,7 +104,7 @@ TEST(EvalAdv, StreamingUnpackSourceWiderTruncatesLSBs) {
   EXPECT_EQ(f.ctx.FindVariable("b2")->value.ToUint64(), 0xCDu);
 }
 
-TEST(EvalAdv, StreamingUnpackRightShiftSingleElement) {
+TEST(StreamingUnpack, StreamingUnpackRightShiftSingleElement) {
   SimFixture f;
 
   MakeVar(f, "x", 16, 0);
@@ -109,13 +112,14 @@ TEST(EvalAdv, StreamingUnpackRightShiftSingleElement) {
   auto* lhs =
       MakeStreamConcat(f.arena, TokenKind::kGtGt, {MakeId(f.arena, "x")});
   auto* rhs = MakeInt(f.arena, 0xBEEF);
+  rhs->text = "16'h0";
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0xBEEFu);
 }
 
-TEST(EvalAdv, StreamingUnpackLeftShiftBitReverse) {
+TEST(StreamingUnpack, StreamingUnpackLeftShiftBitReverse) {
   SimFixture f;
 
   MakeVar(f, "v", 8, 0);
@@ -123,13 +127,14 @@ TEST(EvalAdv, StreamingUnpackLeftShiftBitReverse) {
   auto* lhs =
       MakeStreamConcat(f.arena, TokenKind::kLtLt, {MakeId(f.arena, "v")});
   auto* rhs = MakeInt(f.arena, 0xCA);
+  rhs->text = "8'h0";
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
   EXPECT_EQ(f.ctx.FindVariable("v")->value.ToUint64(), 0x53u);
 }
 
-TEST(EvalAdv, StreamingUnpackLeftShiftNibbleReverse) {
+TEST(StreamingUnpack, StreamingUnpackLeftShiftNibbleReverse) {
   SimFixture f;
 
   MakeVar(f, "v2", 8, 0);
@@ -139,13 +144,14 @@ TEST(EvalAdv, StreamingUnpackLeftShiftNibbleReverse) {
   auto* lhs =
       MakeStreamConcat(f.arena, TokenKind::kLtLt, {MakeId(f.arena, "v2")}, ss);
   auto* rhs = MakeInt(f.arena, 0xAB);
+  rhs->text = "8'h0";
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
   EXPECT_EQ(f.ctx.FindVariable("v2")->value.ToUint64(), 0xBAu);
 }
 
-TEST(EvalAdv, StreamingUnpackLeftShift16BitSlice) {
+TEST(StreamingUnpack, StreamingUnpackLeftShift16BitSlice) {
   SimFixture f;
 
   MakeVar(f, "a3", 16, 0);
@@ -157,6 +163,7 @@ TEST(EvalAdv, StreamingUnpackLeftShift16BitSlice) {
       MakeStreamConcat(f.arena, TokenKind::kLtLt,
                        {MakeId(f.arena, "a3"), MakeId(f.arena, "b3")}, ss);
   auto* rhs = MakeInt(f.arena, 0xDEADBEEFu);
+  rhs->text = "32'h0";
   auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
@@ -164,7 +171,7 @@ TEST(EvalAdv, StreamingUnpackLeftShift16BitSlice) {
   EXPECT_EQ(f.ctx.FindVariable("b3")->value.ToUint64(), 0xDEADu);
 }
 
-TEST(EvalAdv, StreamingUnpackRoundTripRightShift) {
+TEST(StreamingUnpack, StreamingUnpackRoundTripRightShift) {
   SimFixture f;
 
   MakeVar(f, "p", 8, 0xAA);
@@ -181,6 +188,7 @@ TEST(EvalAdv, StreamingUnpackRoundTripRightShift) {
   auto* unpack = MakeStreamConcat(f.arena, TokenKind::kGtGt,
                                   {MakeId(f.arena, "r"), MakeId(f.arena, "s")});
   auto* rhs_expr = MakeInt(f.arena, pack_val.ToUint64());
+  rhs_expr->text = "16'h0";
   auto* stmt = MakeStreamUnpackAssign(f.arena, unpack, rhs_expr);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
@@ -188,7 +196,7 @@ TEST(EvalAdv, StreamingUnpackRoundTripRightShift) {
   EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 0xBBu);
 }
 
-TEST(EvalAdv, StreamingUnpackRoundTripLeftShift) {
+TEST(StreamingUnpack, StreamingUnpackRoundTripLeftShift) {
   SimFixture f;
 
   MakeVar(f, "p2", 8, 0xAA);
@@ -211,11 +219,67 @@ TEST(EvalAdv, StreamingUnpackRoundTripLeftShift) {
       MakeStreamConcat(f.arena, TokenKind::kLtLt,
                        {MakeId(f.arena, "r2"), MakeId(f.arena, "s2")}, ss2);
   auto* rhs_expr = MakeInt(f.arena, pack_val.ToUint64());
+  rhs_expr->text = "16'h0";
   auto* stmt = MakeStreamUnpackAssign(f.arena, unpack, rhs_expr);
   ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
 
   EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 0xAAu);
   EXPECT_EQ(f.ctx.FindVariable("s2")->value.ToUint64(), 0xBBu);
+}
+
+TEST(StreamingUnpack, SourceExactlyMatchesTargetWidth) {
+  SimFixture f;
+
+  MakeVar(f, "a", 8, 0);
+  MakeVar(f, "b", 8, 0);
+  MakeVar(f, "c", 8, 0);
+  MakeVar(f, "d", 8, 0);
+
+  auto* lhs = MakeStreamConcat(
+      f.arena, TokenKind::kGtGt,
+      {MakeId(f.arena, "a"), MakeId(f.arena, "b"), MakeId(f.arena, "c"),
+       MakeId(f.arena, "d")});
+  auto* rhs = MakeInt(f.arena, 0xDEADBEEFu);
+  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
+  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
+
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xDEu);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xADu);
+  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 0xBEu);
+  EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 0xEFu);
+}
+
+TEST(StreamingUnpack, SourceNarrowerThanTargetErrors) {
+  SimFixture f;
+
+  MakeVar(f, "a", 32, 0);
+  MakeVar(f, "b", 32, 0);
+  MakeVar(f, "c", 32, 0);
+
+  auto* lhs = MakeStreamConcat(
+      f.arena, TokenKind::kGtGt,
+      {MakeId(f.arena, "a"), MakeId(f.arena, "b"), MakeId(f.arena, "c")});
+  auto* rhs = MakeInt(f.arena, 0xABCD);
+  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
+  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
+
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(StreamingUnpack, SourceWiderConsumesMsbWithMixedWidths) {
+  SimFixture f;
+
+  MakeVar(f, "a", 16, 0);
+  MakeVar(f, "b", 8, 0);
+
+  auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
+                               {MakeId(f.arena, "a"), MakeId(f.arena, "b")});
+  auto* rhs = MakeInt(f.arena, 0xABCDEF12u);
+  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
+  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
+
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xABCDu);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xEFu);
 }
 
 }  // namespace

@@ -65,19 +65,6 @@ TEST(OperatorAndExpressionParsing, StreamingAsAssignmentSource) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(OperatorAndExpressionParsing, StreamingAsAssignmentTarget) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial {>> {a, b}} = 16'hABCD;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
-}
-
 TEST(OperatorAndExpressionParsing, StreamingNestedInStreaming) {
   auto r = Parse(
       "module t;\n"
@@ -91,20 +78,6 @@ TEST(OperatorAndExpressionParsing, StreamingNestedInStreaming) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
   EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kStreamingConcat);
-}
-
-TEST(OperatorAndExpressionParsing, StreamingSourceToStreamingTarget) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [7:0] a, b, c, d;\n"
-      "  initial {>> {a, b}} = {>> {c, d}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kStreamingConcat);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
 }
 
 TEST(OperatorAndExpressionParsing, StreamingWithNoSliceSize) {

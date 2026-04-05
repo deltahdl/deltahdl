@@ -17,18 +17,6 @@ TEST(StreamingOperatorElaboration, StreamingAsAssignmentSource) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(StreamingOperatorElaboration, StreamingAsAssignmentTarget) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial {>> {a, b}} = 16'hABCD;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(StreamingOperatorElaboration, StreamingWithBitStreamCast) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -49,18 +37,6 @@ TEST(StreamingOperatorElaboration, StreamingNestedInStreaming) {
       "  logic [7:0] a;\n"
       "  logic [15:0] b;\n"
       "  initial b = {>> {{<< {a}}}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(StreamingOperatorElaboration, StreamingSourceToStreamingTarget) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a, b, c, d;\n"
-      "  initial {>> {a, b}} = {>> {c, d}};\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

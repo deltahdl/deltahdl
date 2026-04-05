@@ -357,25 +357,35 @@ static Logic4Vec ReverseStreamSlices(const Logic4Vec& stream,
       if (dbit >= total_width) break;
       uint32_t sw = sbit / 64, sb = sbit % 64;
       uint32_t dw = dbit / 64, db = dbit % 64;
-      if (sw < stream.nwords && (stream.words[sw].aval >> sb) & 1)
-        reordered.words[dw].aval |= uint64_t{1} << db;
+      if (sw < stream.nwords) {
+        if ((stream.words[sw].aval >> sb) & 1)
+          reordered.words[dw].aval |= uint64_t{1} << db;
+        if ((stream.words[sw].bval >> sb) & 1)
+          reordered.words[dw].bval |= uint64_t{1} << db;
+      }
     }
   }
   return reordered;
 }
 
 // §11.4.14.3: Extract a bit-field from a stream vector.
-static uint64_t ExtractStreamBits(const Logic4Vec& stream, uint32_t bit_offset,
-                                  uint32_t width, uint32_t total_width) {
-  uint64_t val = 0;
-  for (uint32_t b = 0; b < width && b < 64; ++b) {
+static Logic4Vec ExtractStreamBits(const Logic4Vec& stream,
+                                   uint32_t bit_offset, uint32_t width,
+                                   uint32_t total_width, Arena& arena) {
+  auto result = MakeLogic4Vec(arena, width);
+  for (uint32_t b = 0; b < width; ++b) {
     uint32_t sbit = bit_offset + b;
     if (sbit >= total_width) break;
-    uint32_t w = sbit / 64, bi = sbit % 64;
-    if (w < stream.nwords && (stream.words[w].aval >> bi) & 1)
-      val |= uint64_t{1} << b;
+    uint32_t sw = sbit / 64, sb = sbit % 64;
+    uint32_t dw = b / 64, db = b % 64;
+    if (sw < stream.nwords) {
+      if ((stream.words[sw].aval >> sb) & 1)
+        result.words[dw].aval |= uint64_t{1} << db;
+      if ((stream.words[sw].bval >> sb) & 1)
+        result.words[dw].bval |= uint64_t{1} << db;
+    }
   }
-  return val;
+  return result;
 }
 
 // §11.4.14.3: Streaming concatenation as LHS — unpack RHS into elements.
@@ -385,7 +395,29 @@ static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   uint32_t total_width = CollectStreamElements(lhs, ctx, elems);
   if (total_width == 0 || elems.empty()) return;
 
-  auto stream = ResizeToWidth(rhs_val, total_width, arena);
+  if (rhs_val.width < total_width) {
+    ctx.GetDiag().Error({}, "too few bits in stream for streaming unpack");
+    return;
+  }
+
+  Logic4Vec stream;
+  if (rhs_val.width > total_width) {
+    uint32_t shift = rhs_val.width - total_width;
+    stream = MakeLogic4Vec(arena, total_width);
+    for (uint32_t b = 0; b < total_width; ++b) {
+      uint32_t sbit = shift + b;
+      uint32_t sw = sbit / 64, sb = sbit % 64;
+      uint32_t dw = b / 64, db = b % 64;
+      if (sw < rhs_val.nwords) {
+        if ((rhs_val.words[sw].aval >> sb) & 1)
+          stream.words[dw].aval |= uint64_t{1} << db;
+        if ((rhs_val.words[sw].bval >> sb) & 1)
+          stream.words[dw].bval |= uint64_t{1} << db;
+      }
+    }
+  } else {
+    stream = rhs_val;
+  }
 
   if (lhs->op == TokenKind::kLtLt) {
     uint32_t ss = StreamSliceSizeForUnpack(lhs->lhs, ctx, arena);
@@ -397,8 +429,9 @@ static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
     bit_offset -= ei.width;
     auto* var = ResolveLhsVariable(ei.expr, ctx);
     if (!var) continue;
-    uint64_t val = ExtractStreamBits(stream, bit_offset, ei.width, total_width);
-    var->value = MakeLogic4VecVal(arena, ei.width, val);
+    var->value =
+        ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena);
+    if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();
   }
 }

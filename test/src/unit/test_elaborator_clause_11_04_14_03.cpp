@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ConcatenationElaboration, StreamingConcatAsLhsRightShiftElab) {
+TEST(StreamingUnpackElaboration, StreamingConcatAsLhsRightShiftElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -18,7 +18,7 @@ TEST(ConcatenationElaboration, StreamingConcatAsLhsRightShiftElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ConcatenationElaboration, StreamingConcatAsLhsLeftShiftElab) {
+TEST(StreamingUnpackElaboration, StreamingConcatAsLhsLeftShiftElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(ConcatenationElaboration, StreamingConcatAsLhsLeftShiftElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ConcatenationElaboration, StreamingConcatAsLhsWithSliceSizeElab) {
+TEST(StreamingUnpackElaboration, StreamingConcatAsLhsWithSliceSizeElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -42,7 +42,7 @@ TEST(ConcatenationElaboration, StreamingConcatAsLhsWithSliceSizeElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ConcatenationElaboration, StreamingConcatAsLhsFromStreamingRhsElab) {
+TEST(StreamingUnpackElaboration, StreamingConcatAsLhsFromStreamingRhsElab) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -54,7 +54,19 @@ TEST(ConcatenationElaboration, StreamingConcatAsLhsFromStreamingRhsElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ConcatenationSim, StreamingUnpackRightShift) {
+TEST(StreamingUnpackElaboration, NonblockingAssignWithStreamingTarget) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  initial {>> {a}} <= 8'hFF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(StreamingUnpackSimulation, StreamingUnpackRightShift) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -74,7 +86,7 @@ TEST(ConcatenationSim, StreamingUnpackRightShift) {
   EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
 }
 
-TEST(ConcatenationSim, StreamingUnpackLeftShiftByte) {
+TEST(StreamingUnpackSimulation, StreamingUnpackLeftShiftByte) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -94,7 +106,7 @@ TEST(ConcatenationSim, StreamingUnpackLeftShiftByte) {
   EXPECT_EQ(vb->value.ToUint64(), 0xABu);
 }
 
-TEST(ConcatenationSim, StreamingUnpackSingleElement) {
+TEST(StreamingUnpackSimulation, StreamingUnpackSingleElement) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -109,6 +121,55 @@ TEST(ConcatenationSim, StreamingUnpackSingleElement) {
   auto* var = f.ctx.FindVariable("v");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xBEEFu);
+}
+
+TEST(StreamingUnpackSimulation, SourceExactlyMatchesTargetWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c, d;\n"
+      "  initial {>> {a, b, c, d}} = 32'hDEADBEEF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xDEu);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xADu);
+  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 0xBEu);
+  EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 0xEFu);
+}
+
+TEST(StreamingUnpackSimulation, SourceNarrowerThanTargetIsError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial {>> {a, b, c}} = 16'hABCD;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(StreamingUnpackSimulation, SourceWiderConsumesMsbMultipleElements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial {>> {a, b}} = 32'hABCD1234;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xABu);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xCDu);
 }
 
 }  // namespace
