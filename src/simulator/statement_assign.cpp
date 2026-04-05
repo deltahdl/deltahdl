@@ -131,6 +131,22 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   if (!base_var) return false;
   auto* info = ctx.GetVariableStructType(base_name);
   if (info) {
+    if (info->is_union) {
+      auto tag = ctx.GetVariableTag(base_name);
+      if (!tag.empty()) {
+        auto top = field_name;
+        auto subdot = top.find('.');
+        if (subdot != std::string_view::npos) top = top.substr(0, subdot);
+        if (tag != top) {
+          ctx.GetDiag().Error(
+              {}, "run-time error: assigning member '" +
+                      std::string(field_name) + "' of tagged union '" +
+                      std::string(base_name) + "' which currently has tag '" +
+                      std::string(tag) + "'");
+          return true;
+        }
+      }
+    }
     for (const auto& f : info->fields) {
       if (f.name != field_name) continue;
       uint64_t old_val = base_var->value.ToUint64();

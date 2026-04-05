@@ -2,6 +2,7 @@
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -10,7 +11,7 @@ using namespace delta;
 
 namespace {
 
-TEST(EvalAdv, TaggedUnionMismatchReturnsX) {
+TEST(TaggedUnionEval, TaggedUnionMismatchReturnsX) {
   SimFixture f;
 
   StructTypeInfo uinfo;
@@ -43,7 +44,7 @@ TEST(EvalAdv, TaggedUnionMismatchReturnsX) {
   EXPECT_NE(result_b.words[0].bval, 0u);
 }
 
-TEST(EvalAdv, TaggedUnionNoTagSetAccessesNormally) {
+TEST(TaggedUnionEval, TaggedUnionNoTagSetAccessesNormally) {
   SimFixture f;
 
   StructTypeInfo uinfo;
@@ -65,7 +66,7 @@ TEST(EvalAdv, TaggedUnionNoTagSetAccessesNormally) {
   EXPECT_EQ(result_x.ToUint64(), 0xFFu);
 }
 
-TEST(EvalAdv, TaggedExprWithValue) {
+TEST(TaggedUnionEval, TaggedExprWithValue) {
   SimFixture f;
 
   auto* tagged = f.arena.Create<Expr>();
@@ -79,7 +80,7 @@ TEST(EvalAdv, TaggedExprWithValue) {
   EXPECT_EQ(result.ToUint64(), 42u);
 }
 
-TEST(EvalAdv, TaggedExprVoidMember) {
+TEST(TaggedUnionEval, TaggedExprVoidMember) {
   SimFixture f;
 
   auto* tagged = f.arena.Create<Expr>();
@@ -100,6 +101,134 @@ TEST(TaggedUnion, SetAndGetTag) {
 
   f.ctx.SetVariableTag("u", "field_a");
   EXPECT_EQ(f.ctx.GetVariableTag("u"), "field_a");
+}
+
+TEST(TaggedUnion, OverwriteTagUpdatesActiveTag) {
+  SimFixture f;
+  f.ctx.CreateVariable("u", 32);
+  f.ctx.SetVariableTag("u", "a");
+  EXPECT_EQ(f.ctx.GetVariableTag("u"), "a");
+  f.ctx.SetVariableTag("u", "b");
+  EXPECT_EQ(f.ctx.GetVariableTag("u"), "b");
+}
+
+TEST(TaggedUnionEval, MatchingMemberReadReturnsValue) {
+  SimFixture f;
+
+  StructTypeInfo uinfo;
+  uinfo.type_name = "u3";
+  uinfo.is_union = true;
+  uinfo.is_packed = true;
+  uinfo.total_width = 16;
+  uinfo.fields.push_back({"x", 0, 16, DataTypeKind::kLogic});
+  uinfo.fields.push_back({"y", 0, 16, DataTypeKind::kLogic});
+  uinfo.fields.push_back({"z", 0, 16, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("u3", uinfo);
+
+  MakeVar(f, "u", 16, 0xBEEF);
+  f.ctx.SetVariableStructType("u", "u3");
+  f.ctx.SetVariableTag("u", "y");
+
+  auto* access = f.arena.Create<Expr>();
+  access->kind = ExprKind::kMemberAccess;
+  access->lhs = MakeId(f.arena, "u");
+  access->rhs = MakeId(f.arena, "y");
+  auto result = EvalExpr(access, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0xBEEFu);
+}
+
+TEST(TaggedUnionEval, MismatchedMemberReadThreeMemberUnion) {
+  SimFixture f;
+
+  StructTypeInfo uinfo;
+  uinfo.type_name = "u3";
+  uinfo.is_union = true;
+  uinfo.is_packed = true;
+  uinfo.total_width = 8;
+  uinfo.fields.push_back({"a", 0, 8, DataTypeKind::kLogic});
+  uinfo.fields.push_back({"b", 0, 8, DataTypeKind::kLogic});
+  uinfo.fields.push_back({"c", 0, 8, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("u3", uinfo);
+
+  MakeVar(f, "u", 8, 0x55);
+  f.ctx.SetVariableStructType("u", "u3");
+  f.ctx.SetVariableTag("u", "a");
+
+  // Access "b" while tag is "a" — should return X.
+  auto* access_b = f.arena.Create<Expr>();
+  access_b->kind = ExprKind::kMemberAccess;
+  access_b->lhs = MakeId(f.arena, "u");
+  access_b->rhs = MakeId(f.arena, "b");
+  auto rb = EvalExpr(access_b, f.ctx, f.arena);
+  EXPECT_NE(rb.words[0].bval, 0u);
+
+  // Access "c" while tag is "a" — should also return X.
+  auto* access_c = f.arena.Create<Expr>();
+  access_c->kind = ExprKind::kMemberAccess;
+  access_c->lhs = MakeId(f.arena, "u");
+  access_c->rhs = MakeId(f.arena, "c");
+  auto rc = EvalExpr(access_c, f.ctx, f.arena);
+  EXPECT_NE(rc.words[0].bval, 0u);
+}
+
+TEST(TaggedUnionEval, TaggedExprWithSubExpr) {
+  SimFixture f;
+
+  auto* inner = MakeBinary(f.arena, TokenKind::kPlus, MakeInt(f.arena, 23),
+                           MakeInt(f.arena, 34));
+  auto* tagged = f.arena.Create<Expr>();
+  tagged->kind = ExprKind::kTagged;
+  tagged->rhs = MakeId(f.arena, "Valid");
+  tagged->lhs = inner;
+  auto result = EvalExpr(tagged, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 57u);
+}
+
+TEST(TaggedUnionEval, TaggedAssignSetsTag) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef union tagged { int A; int B; } U;\n"
+      "  U u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    u = tagged A 7;\n"
+      "    result = u.A;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 7u);
+}
+
+TEST(TaggedUnionEval, TaggedAssignOverwriteAndRead) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef union tagged { int X; int Y; } U;\n"
+      "  U u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    u = tagged X 100;\n"
+      "    u = tagged Y 200;\n"
+      "    result = u.Y;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 200u);
+}
+
+TEST(TaggedUnionEval, VoidMemberThenValueMember) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  typedef union tagged { void None; int Some; } Opt;\n"
+      "  Opt o;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    o = tagged None;\n"
+      "    o = tagged Some 77;\n"
+      "    result = o.Some;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 77u);
 }
 
 }  // namespace

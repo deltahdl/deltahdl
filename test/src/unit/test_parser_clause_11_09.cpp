@@ -13,25 +13,6 @@ TEST(FormalSyntaxParsing, MemberAccess) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(PatternParsing, TaggedExprAstKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    x = tagged Valid 42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTagged);
-
-  ASSERT_NE(rhs->rhs, nullptr);
-  EXPECT_EQ(rhs->rhs->text, "Valid");
-}
-
 TEST(ExpressionParsing, TaggedUnionWithValue) {
   auto r = Parse("module m; initial x = tagged Valid 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -67,6 +48,63 @@ TEST(OperatorAndExpressionParsing, TaggedUnionExpr) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ExpressionParsing, TaggedUnionWithAssignmentPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = tagged Add '{ 1, 2, 3 };\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTagged);
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->text, "Add");
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kAssignmentPattern);
+}
+
+TEST(ExpressionParsing, NestedTaggedUnionExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = tagged Jmp (tagged JmpU 239);\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTagged);
+  EXPECT_EQ(rhs->rhs->text, "Jmp");
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kTagged);
+  EXPECT_EQ(rhs->lhs->rhs->text, "JmpU");
+}
+
+TEST(ExpressionParsing, TaggedUnionParenthesizedExpr) {
+  auto r = Parse("module m; initial x = tagged Valid (23+34); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTagged);
+  EXPECT_EQ(rhs->rhs->text, "Valid");
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kBinary);
+}
+
+TEST(FormalSyntaxParsing, ChainedMemberAccess) {
+  auto r = Parse("module m; initial x = u.Add.reg1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
 
 }  // namespace

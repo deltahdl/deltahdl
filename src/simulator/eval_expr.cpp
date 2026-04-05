@@ -300,8 +300,19 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   if (base_var && sinfo) {
     if (sinfo->is_union) {
       auto tag = ctx.GetVariableTag(base_name);
-      if (!tag.empty() && tag != field_name)
-        return MakeAllX(arena, sinfo->total_width);
+      if (!tag.empty()) {
+        auto top = field_name;
+        auto subdot = top.find('.');
+        if (subdot != std::string_view::npos) top = top.substr(0, subdot);
+        if (tag != top) {
+          ctx.GetDiag().Error(
+              {},
+              "run-time error: accessing member '" + std::string(field_name) +
+                  "' of tagged union '" + std::string(base_name) +
+                  "' which currently has tag '" + std::string(tag) + "'");
+          return MakeAllX(arena, sinfo->total_width);
+        }
+      }
     }
     return ExtractStructField(base_var, sinfo, field_name, arena);
   }
