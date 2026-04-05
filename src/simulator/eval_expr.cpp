@@ -1271,6 +1271,7 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   if (expr->index_end)
     return EvalPackedPartSelect(expr, base_val, idx, ctx, arena);
+  if (idx >= base_val.width) return MakeAllX(arena, 1);
   return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> idx) & 1);
 }
 

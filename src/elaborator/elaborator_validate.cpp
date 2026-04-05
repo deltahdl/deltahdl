@@ -240,6 +240,84 @@ static void CheckRealSelect(const Expr* e, const TypeMap& types,
   CheckRealSelect(e->index, types, diag);
 }
 
+using NameSet = std::unordered_set<std::string_view>;
+
+static void CheckScalarSelectNode(const Expr* e, const NameSet& scalars,
+                                  DiagEngine& diag) {
+  auto name = ExprIdent(e->base);
+  if (name.empty()) return;
+  if (scalars.count(name) != 0)
+    diag.Error(e->range.start, "bit-select or part-select of a scalar is illegal");
+}
+
+static void CheckScalarSelect(const Expr* e, const NameSet& scalars,
+                               DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kSelect && e->base)
+    CheckScalarSelectNode(e, scalars, diag);
+  CheckScalarSelect(e->lhs, scalars, diag);
+  CheckScalarSelect(e->rhs, scalars, diag);
+  CheckScalarSelect(e->base, scalars, diag);
+  CheckScalarSelect(e->index, scalars, diag);
+}
+
+static void CheckIndexedPartSelectWidthNode(const Expr* e, DiagEngine& diag) {
+  if (!e->index_end) return;
+  if (!e->is_part_select_plus && !e->is_part_select_minus) return;
+  if (!ConstEvalInt(e->index_end).has_value())
+    diag.Error(e->range.start,
+               "indexed part-select width must be a constant expression");
+}
+
+static void CheckIndexedPartSelectWidth(const Expr* e, DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kSelect && e->base)
+    CheckIndexedPartSelectWidthNode(e, diag);
+  CheckIndexedPartSelectWidth(e->lhs, diag);
+  CheckIndexedPartSelectWidth(e->rhs, diag);
+  CheckIndexedPartSelectWidth(e->base, diag);
+  CheckIndexedPartSelectWidth(e->index, diag);
+}
+
+static void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
+                                  DiagEngine& diag) {
+  if (!s) return;
+  CheckScalarSelect(s->lhs, scalars, diag);
+  CheckScalarSelect(s->rhs, scalars, diag);
+  CheckScalarSelect(s->expr, scalars, diag);
+  CheckScalarSelect(s->condition, scalars, diag);
+  for (auto* child : s->stmts) CheckScalarSelectStmt(child, scalars, diag);
+  CheckScalarSelectStmt(s->then_branch, scalars, diag);
+  CheckScalarSelectStmt(s->else_branch, scalars, diag);
+  CheckScalarSelectStmt(s->body, scalars, diag);
+  CheckScalarSelectStmt(s->for_init, scalars, diag);
+  CheckScalarSelectStmt(s->for_body, scalars, diag);
+  CheckScalarSelectStmt(s->for_step, scalars, diag);
+  CheckScalarSelect(s->for_cond, scalars, diag);
+  for (const auto& ci : s->case_items)
+    CheckScalarSelectStmt(ci.body, scalars, diag);
+  for (auto* fs : s->fork_stmts) CheckScalarSelectStmt(fs, scalars, diag);
+}
+
+static void CheckIndexedPartSelectWidthStmt(const Stmt* s, DiagEngine& diag) {
+  if (!s) return;
+  CheckIndexedPartSelectWidth(s->lhs, diag);
+  CheckIndexedPartSelectWidth(s->rhs, diag);
+  CheckIndexedPartSelectWidth(s->expr, diag);
+  CheckIndexedPartSelectWidth(s->condition, diag);
+  for (auto* child : s->stmts) CheckIndexedPartSelectWidthStmt(child, diag);
+  CheckIndexedPartSelectWidthStmt(s->then_branch, diag);
+  CheckIndexedPartSelectWidthStmt(s->else_branch, diag);
+  CheckIndexedPartSelectWidthStmt(s->body, diag);
+  CheckIndexedPartSelectWidthStmt(s->for_init, diag);
+  CheckIndexedPartSelectWidthStmt(s->for_body, diag);
+  CheckIndexedPartSelectWidthStmt(s->for_step, diag);
+  CheckIndexedPartSelectWidth(s->for_cond, diag);
+  for (const auto& ci : s->case_items)
+    CheckIndexedPartSelectWidthStmt(ci.body, diag);
+  for (auto* fs : s->fork_stmts) CheckIndexedPartSelectWidthStmt(fs, diag);
+}
+
 static bool ExprContainsIdent(const Expr* e, std::string_view name) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier && e->text == name) return true;
@@ -409,10 +487,18 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
   }
   if (item->kind == ModuleItemKind::kContAssign) {
     CheckRealSelect(item->assign_rhs, var_types_, diag_);
+    CheckScalarSelect(item->assign_rhs, scalar_var_names_, diag_);
+    CheckScalarSelect(item->assign_lhs, scalar_var_names_, diag_);
+    CheckIndexedPartSelectWidth(item->assign_rhs, diag_);
+    CheckIndexedPartSelectWidth(item->assign_lhs, diag_);
     // §10.3.4: (highz0, highz1) and (highz1, highz0) are illegal.
     if (item->drive_strength0 == 1 && item->drive_strength1 == 1) {
       diag_.Error(item->loc, "drive strength (highz0, highz1) is illegal");
     }
+  }
+  if (is_proc && item->body) {
+    CheckScalarSelectStmt(item->body, scalar_var_names_, diag_);
+    CheckIndexedPartSelectWidthStmt(item->body, diag_);
   }
 }
 

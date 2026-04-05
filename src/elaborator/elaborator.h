@@ -436,6 +436,7 @@ class Elaborator {
   std::unordered_map<std::string_view, std::string_view>
       nettype_canonical_;  // §6.22.6: nettype name → canonical base name
   std::unordered_set<std::string_view> interconnect_names_;
+  std::unordered_set<std::string_view> scalar_var_names_;  // §11.5.1
   std::unordered_set<std::string_view> task_names_;  // §13.2
   // §13.4.3: Function declarations by name for constant function validation.
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;

@@ -175,8 +175,11 @@ static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,
 // Write rhs_val to var at the bit position(s) indicated by a Select LHS.
 void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
                     SimContext& ctx, Arena& arena) {
-  auto idx = static_cast<uint32_t>(EvalExpr(lhs->index, ctx, arena).ToUint64());
+  auto idx_val = EvalExpr(lhs->index, ctx, arena);
+  if (HasUnknownBits(idx_val)) return;
+  auto idx = static_cast<uint32_t>(idx_val.ToUint64());
   if (!lhs->index_end) {
+    if (idx >= var->value.width) return;
     uint64_t old_val = var->value.ToUint64();
     uint64_t bit = rhs_val.ToUint64() & 1;
     uint64_t cleared = old_val & ~(uint64_t{1} << idx);
@@ -201,6 +204,8 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
     ctx.GetDiag().Error({}, "zero-width part-select is not allowed");
     return;
   }
+  if (lo >= var->value.width) return;
+  if (lo + w > var->value.width) w = var->value.width - lo;
   WritePartSelect(var, lo, w, rhs_val, arena);
 }
 

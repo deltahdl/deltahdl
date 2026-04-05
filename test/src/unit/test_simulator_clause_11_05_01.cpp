@@ -6,12 +6,13 @@
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(EvalAdv, PartSelectPartialOOB) {
+TEST(SelectBoundaryBehavior, PartSelectPartialOOB) {
   SimFixture f;
 
   MakeVar(f, "ov", 8, 0xFF);
@@ -29,7 +30,7 @@ TEST(EvalAdv, PartSelectPartialOOB) {
   EXPECT_NE(result.words[0].bval & 0xCu, 0u);
 }
 
-TEST(EvalAdv, ArrayXZAddrReturnsX) {
+TEST(SelectBoundaryBehavior, ArrayXZAddrReturnsX) {
   SimFixture f;
 
   MakeVar(f, "arr4[0]", 8, 0x11);
@@ -59,7 +60,33 @@ TEST(EvalAdv, ArrayXZAddrReturnsX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, BitSelectXAddr) {
+TEST(SelectBoundaryBehavior, BitSelectOOBReturnsX) {
+  SimFixture f;
+  MakeVar(f, "bov", 8, 0xFF);
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "bov");
+  sel->index = MakeInt(f.arena, 10);
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 1u);
+  EXPECT_NE(result.words[0].bval, 0u);
+}
+
+TEST(SelectBoundaryBehavior, PartSelectCompletelyOOBReturnsX) {
+  SimFixture f;
+  MakeVar(f, "cov", 8, 0xFF);
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "cov");
+  sel->index = MakeInt(f.arena, 12);
+  sel->index_end = MakeInt(f.arena, 4);
+  sel->is_part_select_plus = true;
+  auto result = EvalExpr(sel, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 4u);
+  EXPECT_EQ(result.words[0].bval & 0xFu, 0xFu);
+}
+
+TEST(SelectXZHandling, BitSelectXAddr) {
   SimFixture f;
 
   auto* v = f.ctx.CreateVariable("bsv", 8);
@@ -74,7 +101,7 @@ TEST(EvalOpXZ, BitSelectXAddr) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-TEST(EvalOpXZ, PartSelectXAddr) {
+TEST(SelectXZHandling, PartSelectXAddr) {
   SimFixture f;
 
   auto* v = f.ctx.CreateVariable("psv", 8);
@@ -315,4 +342,91 @@ TEST(BlockingAssignPartSelect, BlockingAssignPartSelect) {
 
   RunStmt(stmt, f.ctx, f.arena);
   EXPECT_EQ(var->value.ToUint64(), 0xAFu);
+}
+
+TEST(SelectBoundaryBehavior, BitSelectOOBWriteNoEffect) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("bow", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
+
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "bow");
+  sel->index = MakeInt(f.arena, 10);
+
+  WriteBitSelect(var, sel, MakeLogic4VecVal(f.arena, 1, 1), f.ctx, f.arena);
+  EXPECT_EQ(var->value.ToUint64(), 0xABu);
+}
+
+TEST(SelectBoundaryBehavior, PartSelectCompletelyOOBWriteNoEffect) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("pow", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
+
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "pow");
+  sel->index = MakeInt(f.arena, 12);
+  sel->index_end = MakeInt(f.arena, 4);
+  sel->is_part_select_plus = true;
+
+  WriteBitSelect(var, sel, MakeLogic4VecVal(f.arena, 4, 0xF), f.ctx, f.arena);
+  EXPECT_EQ(var->value.ToUint64(), 0xABu);
+}
+
+TEST(SelectBoundaryBehavior, PartSelectPartialOOBWriteInRangeOnly) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("ppw", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0x00);
+
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "ppw");
+  sel->index = MakeInt(f.arena, 6);
+  sel->index_end = MakeInt(f.arena, 4);
+  sel->is_part_select_plus = true;
+
+  WriteBitSelect(var, sel, MakeLogic4VecVal(f.arena, 4, 0xF), f.ctx, f.arena);
+  EXPECT_EQ(var->value.ToUint64() & 0xC0u, 0xC0u);
+  EXPECT_EQ(var->value.ToUint64() & 0x3Fu, 0x00u);
+}
+
+TEST(SelectXZHandling, BitSelectXZIndexWriteNoEffect) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("bxw", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
+
+  auto* idx_var = f.ctx.CreateVariable("bxi", 4);
+  idx_var->value = MakeLogic4Vec(f.arena, 4);
+  idx_var->value.words[0].aval = 0;
+  idx_var->value.words[0].bval = 1;
+
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "bxw");
+  sel->index = MakeId(f.arena, "bxi");
+
+  WriteBitSelect(var, sel, MakeLogic4VecVal(f.arena, 1, 1), f.ctx, f.arena);
+  EXPECT_EQ(var->value.ToUint64(), 0xABu);
+}
+
+TEST(SelectXZHandling, PartSelectXZIndexWriteNoEffect) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("pxw", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
+
+  auto* idx_var = f.ctx.CreateVariable("pxi", 4);
+  idx_var->value = MakeLogic4Vec(f.arena, 4);
+  idx_var->value.words[0].aval = 0;
+  idx_var->value.words[0].bval = 1;
+
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "pxw");
+  sel->index = MakeId(f.arena, "pxi");
+  sel->index_end = MakeInt(f.arena, 4);
+  sel->is_part_select_plus = true;
+
+  WriteBitSelect(var, sel, MakeLogic4VecVal(f.arena, 4, 0xF), f.ctx, f.arena);
+  EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }

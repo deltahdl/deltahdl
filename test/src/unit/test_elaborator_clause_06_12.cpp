@@ -56,18 +56,6 @@ TEST(RealDataType, RealTypesNotIntegral) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kRealtime));
 }
 
-TEST(RealDataType, RealBitSelect_Error) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  real a = 0.5;\n"
-      "  wire b;\n"
-      "  assign b = a[2];\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(RealDataType, RealEdge_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -93,18 +81,6 @@ TEST(RealDataType, RealIndex_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(RealDataType, RealPartSelectError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  real a = 0.5;\n"
-      "  wire [3:0] b;\n"
-      "  assign b = a[3:0];\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(RealDataType, AllRealTypesElaborateWithIsReal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -124,18 +100,6 @@ TEST(RealDataType, AllRealTypesElaborateWithIsReal) {
   EXPECT_EQ(mod->variables[1].width, 32u) << "shortreal width";
   EXPECT_TRUE(mod->variables[2].is_real) << "realtime";
   EXPECT_EQ(mod->variables[2].width, 64u) << "realtime width";
-}
-
-TEST(RealDataType, ShortrealBitSelectError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  shortreal a = 1.0;\n"
-      "  wire b;\n"
-      "  assign b = a[0];\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(RealDataType, RealtimePosedgeError) {

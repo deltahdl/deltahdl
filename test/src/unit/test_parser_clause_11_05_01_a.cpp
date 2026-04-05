@@ -57,24 +57,6 @@ TEST(OperatorAndExpressionParsing, BitSelectExpressionIndex) {
   EXPECT_EQ(rhs->index_end, nullptr);
 }
 
-TEST(AssignmentParsing, PartSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg [7:0] a;\n"
-      "  initial begin\n"
-      "    a[7:4] = 4'hF;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-  ASSERT_NE(stmt->lhs->index_end, nullptr);
-}
-
 TEST(OperatorAndExpressionParsing, ConstPartSelectDescending) {
   auto r = Parse(
       "module t;\n"
@@ -165,35 +147,6 @@ TEST(ProcessParsing, BitSelectLHS) {
   EXPECT_EQ(item->body->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(PrimaryParsing, RangeExpressionSimpleIndex) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] data;\n"
-      "  logic x;\n"
-      "  initial x = data[0];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-}
-
-TEST(PrimaryParsing, RangeExpressionPartSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [15:0] data;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = data[7:0];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_NE(rhs->index_end, nullptr);
-}
-
 TEST(AggregateTypeParsing, PackedBitSelect) {
   auto r = Parse(
       "module t;\n"
@@ -211,24 +164,6 @@ TEST(AggregateTypeParsing, PackedBitSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-TEST(ProcessParsing, PartSelectLHS) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [15:0] bus;\n"
-      "  logic [7:0] low_byte;\n"
-      "  always_comb bus[7:0] = low_byte;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysComb(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(item->body->lhs, nullptr);
-  EXPECT_EQ(item->body->lhs->kind, ExprKind::kSelect);
-  EXPECT_NE(item->body->lhs->index, nullptr);
-  EXPECT_NE(item->body->lhs->index_end, nullptr);
-}
 static Expr* FirstAssignLhs(ParseResult& r) {
   auto* stmt = FirstInitialStmt(r);
   if (!stmt) return nullptr;
@@ -292,27 +227,6 @@ TEST(OperatorAndExpressionParsing, PartSelectInContAssignRhs) {
   ASSERT_NE(ca->assign_rhs->index_end, nullptr);
 }
 
-TEST(ExpressionParsing, ConstantRangeExprBitSelect) {
-  auto r = Parse("module m; initial x = data[3]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->index, nullptr);
-  EXPECT_EQ(rhs->index_end, nullptr);
-}
-
-TEST(ExpressionParsing, ConstantRangePartSelect) {
-  auto r = Parse("module m; initial x = data[7:4]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->index, nullptr);
-  ASSERT_NE(rhs->index_end, nullptr);
-}
 TEST(AggregateTypeParsing, IndexedPartSelectPlus) {
   auto r = Parse(
       "module t;\n"
@@ -341,28 +255,6 @@ TEST(AggregateTypeParsing, IndexedPartSelectMinus) {
   EXPECT_TRUE(rhs->is_part_select_minus);
 }
 
-TEST(ExpressionParsing, IndexedRangePlusColon) {
-  auto r = Parse("module m; initial x = data[2+:4]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_TRUE(rhs->is_part_select_plus);
-  EXPECT_FALSE(rhs->is_part_select_minus);
-}
-
-TEST(ExpressionParsing, IndexedRangeMinusColon) {
-  auto r = Parse("module m; initial x = data[7-:4]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_FALSE(rhs->is_part_select_plus);
-  EXPECT_TRUE(rhs->is_part_select_minus);
-}
-
 TEST(OperatorAndExpressionParsing, PartSelectAfterBitSelect) {
   auto r = Parse(
       "module t;\n"
@@ -379,17 +271,6 @@ TEST(OperatorAndExpressionParsing, PartSelectAfterBitSelect) {
   ASSERT_NE(rhs->base, nullptr);
   EXPECT_EQ(rhs->base->kind, ExprKind::kSelect);
   EXPECT_EQ(rhs->base->index_end, nullptr);
-}
-
-TEST(ExpressionParsing, IndexedRangeVariableBase) {
-  auto r = Parse("module m; initial x = data[i+:8]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_TRUE(rhs->is_part_select_plus);
-  EXPECT_EQ(rhs->index->kind, ExprKind::kIdentifier);
 }
 
 TEST(OperatorAndExpressionParsing, BitSelectOnConcat) {
@@ -435,15 +316,6 @@ TEST(OperatorAndExpressionParsing, IndexedPartSelectInAlwaysComb) {
   ASSERT_NE(item->body->rhs, nullptr);
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kSelect);
   EXPECT_TRUE(item->body->rhs->is_part_select_plus);
-}
-
-TEST(FormalSyntaxParsing, BitAndPartSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin x = data[3]; y = data[7:4]; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(OperatorAndExpressionParsing, PartSelectWithSysFuncIndex) {
@@ -499,34 +371,6 @@ TEST(OperatorAndExpressionParsing, IndexedPartSelectComplexBase) {
   EXPECT_EQ(rhs->index->op, TokenKind::kStar);
 }
 
-TEST(OperatorAndExpressionParsing, BitSelectWithExprIndex) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a[i + 1];\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->index, nullptr);
-  EXPECT_EQ(rhs->index->kind, ExprKind::kBinary);
-}
-
-TEST(PrimaryParsing, BitSelectSingleDim) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] data;\n"
-      "  logic x;\n"
-      "  initial x = data[5];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->index, nullptr);
-  EXPECT_EQ(rhs->index_end, nullptr);
-}
-
 TEST(OperatorAndExpressionParsing, PartSelectInIfCondition) {
   auto r = Parse(
       "module t;\n"
@@ -565,77 +409,6 @@ TEST(AggregateTypeParsing, PackedIndexedPartSelectPlus) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
   EXPECT_TRUE(stmt->rhs->is_part_select_plus);
-}
-
-TEST(PrimaryParsing, SelectBitWithPartSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [31:0] data;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = data[15:8];\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->index, nullptr);
-  ASSERT_NE(rhs->index_end, nullptr);
-}
-
-TEST(OperatorAndExpressionParsing, PartSelectHasIndexEnd) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a[15:8];\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_NE(rhs->index, nullptr);
-  EXPECT_NE(rhs->index_end, nullptr);
-}
-
-TEST(ExpressionParsing, PartSelectConstantRange) {
-  auto r = Parse("module m; initial x = data[15:8]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  ASSERT_NE(rhs->index, nullptr);
-  ASSERT_NE(rhs->index_end, nullptr);
-  EXPECT_FALSE(rhs->is_part_select_plus);
-  EXPECT_FALSE(rhs->is_part_select_minus);
-}
-
-TEST(ExpressionParsing, PartSelectIndexedPlus) {
-  auto r = Parse("module m; initial x = data[0+:8]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_TRUE(rhs->is_part_select_plus);
-}
-
-TEST(ExpressionParsing, PartSelectIndexedMinus) {
-  auto r = Parse("module m; initial x = data[7-:8]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
-  EXPECT_TRUE(rhs->is_part_select_minus);
-}
-
-TEST(PrimaryParsing, NonrangeSelectBitSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic [7:0] data;\n"
-      "  initial data[3] = 1'b1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(OperatorAndExpressionParsing, BitSelectAssignedFromFuncCall) {

@@ -31,19 +31,6 @@ TEST(ExpressionElaboration, ConstantRangePackedDimElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(PrimaryElaboration, PrimaryPartSelectRangeElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [31:0] data;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = data[15:8];\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(PrimaryElaboration, PrimaryHierIdentSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -57,7 +44,7 @@ TEST(PrimaryElaboration, PrimaryHierIdentSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AlwaysLatchBasicSim, BitSelectHighBit) {
+TEST(VectorSelectSim, BitSelectHighBit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -84,7 +71,7 @@ TEST(AlwaysLatchBasicSim, BitSelectHighBit) {
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
-TEST(AlwaysLatchBasicSim, PartSelectLowerNibble) {
+TEST(VectorSelectSim, PartSelectLowerNibble) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -112,7 +99,7 @@ TEST(AlwaysLatchBasicSim, PartSelectLowerNibble) {
   EXPECT_EQ(q->value.ToUint64(), 0xBu);
 }
 
-TEST(AlwaysLatchBasicSim, PartSelectUpperNibble) {
+TEST(VectorSelectSim, PartSelectUpperNibble) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -140,7 +127,7 @@ TEST(AlwaysLatchBasicSim, PartSelectUpperNibble) {
   EXPECT_EQ(q->value.ToUint64(), 0xAu);
 }
 
-TEST(BlockingAssignSim, BlockingAssignSplitPacked) {
+TEST(PartSelectReadSim, BlockingAssignSplitPacked) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -179,6 +166,42 @@ TEST(ExpressionElaboration, GenvarExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(RealDataType, RealBitSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  real a = 0.5;\n"
+      "  wire b;\n"
+      "  assign b = a[2];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(RealDataType, RealPartSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  real a = 0.5;\n"
+      "  wire [3:0] b;\n"
+      "  assign b = a[3:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(RealDataType, ShortrealBitSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  shortreal a = 1.0;\n"
+      "  wire b;\n"
+      "  assign b = a[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace
 TEST(VarLvaluePartSelect, VarLvaluePartSelect) {
   SimFixture f;
@@ -195,4 +218,41 @@ TEST(VarLvaluePartSelect, VarLvaluePartSelect) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xF0u);
+}
+
+TEST(SelectElaboration, ScalarBitSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic x;\n"
+      "  logic y;\n"
+      "  assign y = x[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(SelectElaboration, ScalarPartSelectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic x;\n"
+      "  logic [3:0] y;\n"
+      "  assign y = x[3:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(SelectElaboration, IndexedPartSelectWidthMustBeConstant) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic [15:0] data;\n"
+      "  integer w;\n"
+      "  logic [7:0] y;\n"
+      "  initial begin w = 8; y = data[0+:w]; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
 }

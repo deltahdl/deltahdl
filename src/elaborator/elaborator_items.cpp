@@ -427,6 +427,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   var_init_names_.clear();
   nettype_net_names_.clear();
   interconnect_names_.clear();
+  scalar_var_names_.clear();
   var_named_types_.clear();
   clocking_signals_.clear();
   task_names_.clear();
