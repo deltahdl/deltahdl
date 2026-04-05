@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DelayParsing, Delay2MintypMaxSingleValue) {
+TEST(DelayParsing, AssignDelayMinTypMaxNode) {
   auto r = Parse(
       "module m;\n"
       "  wire out, in;\n"
@@ -71,6 +71,50 @@ TEST(OperatorAndExpressionParsing, MinTypMaxInSpecparam) {
               "  specify\n"
               "    specparam tRise = 1:2:3;\n"
               "  endspecify\n"
+              "endmodule\n"));
+}
+
+TEST(MinTypMaxParsing, FieldsAreMinTypMax) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a;\n"
+      "  assign #(10:20:30) y = a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* delay = r.cu->modules[0]->items[2]->assign_delay;
+  ASSERT_NE(delay, nullptr);
+  ASSERT_EQ(delay->kind, ExprKind::kMinTypMax);
+  ASSERT_NE(delay->lhs, nullptr);
+  ASSERT_NE(delay->condition, nullptr);
+  ASSERT_NE(delay->rhs, nullptr);
+  EXPECT_EQ(delay->lhs->int_val, 10u);
+  EXPECT_EQ(delay->condition->int_val, 20u);
+  EXPECT_EQ(delay->rhs->int_val, 30u);
+}
+
+TEST(MinTypMaxParsing, SubExpressions) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire y, a;\n"
+              "  assign #(1+2 : 3+4 : 5+6) y = a;\n"
+              "endmodule\n"));
+}
+
+TEST(MinTypMaxParsing, MultipleGateDelays) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire a, b, c;\n"
+              "  and #(1:2:3, 4:5:6) g1(c, a, b);\n"
+              "endmodule\n"));
+}
+
+TEST(MinTypMaxParsing, ProceduralDelayStatement) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    #(1:2:3);\n"
+              "  end\n"
               "endmodule\n"));
 }
 

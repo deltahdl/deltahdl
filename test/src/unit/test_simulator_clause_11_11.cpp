@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(EvalOpXZ, MinTypMaxDefaultTyp) {
+TEST(MinTypMaxEval, DefaultTyp) {
   SimFixture f;
 
   auto* mtm = f.arena.Create<Expr>();
@@ -22,7 +22,7 @@ TEST(EvalOpXZ, MinTypMaxDefaultTyp) {
   EXPECT_EQ(result.ToUint64(), 20u);
 }
 
-TEST(EvalOpXZ, MinTypMaxMin) {
+TEST(MinTypMaxEval, SelectsMin) {
   SimFixture f;
   f.ctx.SetDelayMode(DelayMode::kMin);
   auto* mtm = f.arena.Create<Expr>();
@@ -34,7 +34,7 @@ TEST(EvalOpXZ, MinTypMaxMin) {
   EXPECT_EQ(result.ToUint64(), 10u);
 }
 
-TEST(EvalOpXZ, MinTypMaxMax) {
+TEST(MinTypMaxEval, SelectsMax) {
   SimFixture f;
   f.ctx.SetDelayMode(DelayMode::kMax);
   auto* mtm = f.arena.Create<Expr>();
@@ -45,9 +45,78 @@ TEST(EvalOpXZ, MinTypMaxMax) {
   auto result = EvalExpr(mtm, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 30u);
 }
+TEST(MinTypMaxEval, SubExpressionsAddedPerMode) {
+  SimFixture f;
+  // LRM Example 1: (a:b:c) + (d:e:f) => min=a+d, typ=b+e, max=c+f
+  auto* lhs_mtm = f.arena.Create<Expr>();
+  lhs_mtm->kind = ExprKind::kMinTypMax;
+  lhs_mtm->lhs = MakeInt(f.arena, 1);
+  lhs_mtm->condition = MakeInt(f.arena, 2);
+  lhs_mtm->rhs = MakeInt(f.arena, 3);
+
+  auto* rhs_mtm = f.arena.Create<Expr>();
+  rhs_mtm->kind = ExprKind::kMinTypMax;
+  rhs_mtm->lhs = MakeInt(f.arena, 10);
+  rhs_mtm->condition = MakeInt(f.arena, 20);
+  rhs_mtm->rhs = MakeInt(f.arena, 30);
+
+  auto* add = MakeBinary(f.arena, TokenKind::kPlus, lhs_mtm, rhs_mtm);
+
+  f.ctx.SetDelayMode(DelayMode::kMin);
+  EXPECT_EQ(EvalExpr(add, f.ctx, f.arena).ToUint64(), 11u);
+
+  f.ctx.SetDelayMode(DelayMode::kTyp);
+  EXPECT_EQ(EvalExpr(add, f.ctx, f.arena).ToUint64(), 22u);
+
+  f.ctx.SetDelayMode(DelayMode::kMax);
+  EXPECT_EQ(EvalExpr(add, f.ctx, f.arena).ToUint64(), 33u);
+}
+
+TEST(MinTypMaxEval, SingleExpressionFallthrough) {
+  SimFixture f;
+  auto* expr = MakeInt(f.arena, 42);
+  f.ctx.SetDelayMode(DelayMode::kMin);
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 42u);
+  f.ctx.SetDelayMode(DelayMode::kMax);
+  EXPECT_EQ(EvalExpr(expr, f.ctx, f.arena).ToUint64(), 42u);
+}
+
+TEST(MinTypMaxEval, AllThreeValuesSame) {
+  SimFixture f;
+  auto* mtm = f.arena.Create<Expr>();
+  mtm->kind = ExprKind::kMinTypMax;
+  mtm->lhs = MakeInt(f.arena, 7);
+  mtm->condition = MakeInt(f.arena, 7);
+  mtm->rhs = MakeInt(f.arena, 7);
+
+  f.ctx.SetDelayMode(DelayMode::kMin);
+  EXPECT_EQ(EvalExpr(mtm, f.ctx, f.arena).ToUint64(), 7u);
+  f.ctx.SetDelayMode(DelayMode::kTyp);
+  EXPECT_EQ(EvalExpr(mtm, f.ctx, f.arena).ToUint64(), 7u);
+  f.ctx.SetDelayMode(DelayMode::kMax);
+  EXPECT_EQ(EvalExpr(mtm, f.ctx, f.arena).ToUint64(), 7u);
+}
+
+TEST(MinTypMaxDelays, SelectMin) {
+  MinTypMax mtm{5, 10, 15};
+  EXPECT_EQ(SelectMinTypMax(mtm, 0), 5u);
+}
+
 TEST(MinTypMaxDelays, SelectTyp) {
   MinTypMax mtm{5, 10, 15};
   EXPECT_EQ(SelectMinTypMax(mtm, 1), 10u);
+}
+
+TEST(MinTypMaxDelays, SelectMax) {
+  MinTypMax mtm{5, 10, 15};
+  EXPECT_EQ(SelectMinTypMax(mtm, 2), 15u);
+}
+
+TEST(MinTypMaxDelays, NoRequiredOrdering) {
+  MinTypMax mtm{20, 5, 10};
+  EXPECT_EQ(SelectMinTypMax(mtm, 0), 20u);
+  EXPECT_EQ(SelectMinTypMax(mtm, 1), 5u);
+  EXPECT_EQ(SelectMinTypMax(mtm, 2), 10u);
 }
 
 }  // namespace
