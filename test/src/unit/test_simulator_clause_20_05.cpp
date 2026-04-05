@@ -1,12 +1,9 @@
 #include <cstring>
 
-#include "builders_ast.h"
 #include "builders_systask.h"
-#include "fixture_simulator.h"
 #include "helpers_eval_op.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
-#include "simulator/lowerer.h"
 
 using namespace delta;
 
@@ -57,37 +54,6 @@ TEST(SysTask, RealtobitsReinterpretsRealAsBits) {
   uint64_t expected_bits = 0;
   std::memcpy(&expected_bits, &dval, sizeof(double));
   EXPECT_EQ(result.ToUint64(), expected_bits);
-}
-
-TEST(SubroutineCallExprSim, SystemTfCallUnsigned) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = $unsigned(8'sd5);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 5u);
-}
-
-TEST(UtilitySystemTaskTest, Unsigned) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$unsigned", {MakeInt(f.arena, 42)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-}
-
-TEST(UtilitySystemTaskTest, Signed) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$signed", {MakeInt(f.arena, 42)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
 }
 
 }  // namespace

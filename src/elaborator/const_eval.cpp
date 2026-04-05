@@ -364,6 +364,12 @@ static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
       return ConstVal{(base_val->value >> idx->value) & 1, 1, false};
     }
     case ExprKind::kSystemCall: {
+      if (expr->callee == "$signed" || expr->callee == "$unsigned") {
+        if (expr->args.empty()) return std::nullopt;
+        auto arg = ConstEvalFull(expr->args[0], scope);
+        if (!arg) return std::nullopt;
+        return ConstVal{arg->value, arg->width, expr->callee == "$signed"};
+      }
       auto val = EvalConstSysCall(expr, scope);
       if (!val) return std::nullopt;
       return ConstVal{*val, 32, true};
