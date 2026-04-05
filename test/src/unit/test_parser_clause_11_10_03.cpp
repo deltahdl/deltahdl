@@ -25,4 +25,20 @@ TEST(EmptyStringLiteralParsing, EmptyStringComparedWithZeroParses) {
               "endmodule\n"));
 }
 
+TEST(EmptyStringLiteralParsing, EmptyStringComparedWithNulEscapeParses) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic result;\n"
+              "  initial result = (\"\" == \"\\0\");\n"
+              "endmodule\n"));
+}
+
+TEST(EmptyStringLiteralParsing, EmptyStringInConditionalParses) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  logic r;\n"
+              "  initial if (\"\") r = 1;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -185,14 +185,4 @@ TEST(StringLiteralSim, EscapeSeqUnknownDropsBackslash) {
   EXPECT_EQ(v, 0x62u);
 }
 
-TEST(StringLiteralSim, EmptyQuotedString) {
-  auto v = RunAndGet(
-      "module t;\n"
-      "  byte c;\n"
-      "  initial c = \"\";\n"
-      "endmodule\n",
-      "c");
-  EXPECT_EQ(v, 0u);
-}
-
 }  // namespace

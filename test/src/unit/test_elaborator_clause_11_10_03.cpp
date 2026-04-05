@@ -28,4 +28,28 @@ TEST(Elaboration, EmptyStringVsZeroCompareElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(Elaboration, EmptyStringVsNulEscapeCompareElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic result;\n"
+      "  initial result = (\"\" == \"\\0\");\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(Elaboration, EmptyStringInConditionalElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic r;\n"
+      "  initial if (\"\") r = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

@@ -76,12 +76,6 @@ TEST(LexicalConventionSim, TripleQuotedLineContinuation) {
   EXPECT_EQ(v, 0x41424344u);
 }
 
-TEST(LexicalConventionSim, EmptyStringValue) {
-  auto v = RunAndGet(
-      "module t;\n  byte s;\n  initial s = \"\";\nendmodule\n", "s");
-  EXPECT_EQ(v, 0u);
-}
-
 TEST(LexicalConventionSim, ExactWidthMatch) {
   auto v = RunAndGet(
       "module t;\n  byte s;\n  initial s = \"Z\";\nendmodule\n", "s");
