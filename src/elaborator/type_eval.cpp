@@ -356,6 +356,30 @@ static bool IsComparisonOp(TokenKind op) {
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
+static uint32_t CastTargetWidth(std::string_view type_name) {
+  if (type_name == "byte") return 8;
+  if (type_name == "shortint") return 16;
+  if (type_name == "int") return 32;
+  if (type_name == "longint") return 64;
+  if (type_name == "integer") return 32;
+  if (type_name == "real" || type_name == "realtime") return 64;
+  if (type_name == "shortreal") return 32;
+  if (type_name == "bit") return 1;
+  if (type_name == "logic") return 1;
+  if (type_name == "reg") return 1;
+  if (!type_name.empty() && type_name[0] >= '0' && type_name[0] <= '9') {
+    uint32_t w = 0;
+    for (char c : type_name) {
+      if (c >= '0' && c <= '9')
+        w = w * 10 + (c - '0');
+      else
+        break;
+    }
+    return w;
+  }
+  return 0;
+}
+
 static bool IsShiftOp(TokenKind op) {
   return op == TokenKind::kLtLt || op == TokenKind::kGtGt ||
          op == TokenKind::kLtLtLt || op == TokenKind::kGtGtGt;
@@ -421,11 +445,21 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     }
     case ExprKind::kTypeRef:
       return InferExprWidth(expr->lhs, typedefs);
+    case ExprKind::kCast: {
+      if (expr->text == "signed" || expr->text == "unsigned" ||
+          expr->text == "const")
+        return InferExprWidth(expr->lhs, typedefs);
+      if (expr->text == "void") return 0;
+      uint32_t w = CastTargetWidth(expr->text);
+      if (w > 0) return w;
+      auto it = typedefs.find(expr->text);
+      if (it != typedefs.end()) return EvalTypeWidth(it->second);
+      return InferExprWidth(expr->lhs, typedefs);
+    }
     case ExprKind::kSelect:
     case ExprKind::kMemberAccess:
     case ExprKind::kCall:
     case ExprKind::kAssignmentPattern:
-    case ExprKind::kCast:
     case ExprKind::kPostfixUnary:
     case ExprKind::kInside:
     case ExprKind::kStreamingConcat:

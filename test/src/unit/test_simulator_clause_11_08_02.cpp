@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(EvalSteps, ContextWidthPropagates) {
-  SimFixture f;
-  MakeVar(f, "a", 4, 0xF);
-  MakeVar(f, "b", 4, 1);
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "a"),
-                          MakeId(f.arena, "b"));
-
-  auto r1 = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(r1.ToUint64(), 0u);
-
-  auto r2 = EvalExpr(expr, f.ctx, f.arena, 8);
-  EXPECT_EQ(r2.ToUint64(), 0x10u);
-}
-
 TEST(EvalSteps, ShiftAmountSelfDetermined) {
   SimFixture f;
   MakeVar(f, "v", 8, 0x01);

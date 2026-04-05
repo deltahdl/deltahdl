@@ -11,7 +11,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AssertionControlSim, AssignmentContextWidthPreservesCarry) {
+TEST(ExpressionBitLength, AssignmentContextWidthPreservesCarry) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -34,7 +34,7 @@ TEST(AssertionControlSim, AssignmentContextWidthPreservesCarry) {
   EXPECT_EQ(var->value.ToUint64(), 0x10000u);
 }
 
-TEST(AssertionControlSim, AssignmentContextWidthSameSize) {
+TEST(ExpressionBitLength, AssignmentContextWidthSameSize) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -57,7 +57,7 @@ TEST(AssertionControlSim, AssignmentContextWidthSameSize) {
   EXPECT_EQ(var->value.ToUint64(), 0x0000u);
 }
 
-TEST(AssertionControlSim, ContextWidthPropagatesForMultiplication) {
+TEST(ExpressionBitLength, ContextWidthPropagatesForMultiplication) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -79,7 +79,7 @@ TEST(AssertionControlSim, ContextWidthPropagatesForMultiplication) {
   EXPECT_EQ(var->value.ToUint64(), 0xE1u);
 }
 
-TEST(AssertionControlSim, ContextWidthParamInEvalExpr) {
+TEST(ExpressionBitLength, ContextWidthParamInEvalExpr) {
   SimFixture f;
 
   MakeVar(f, "ca", 4, 0xF);
@@ -95,7 +95,7 @@ TEST(AssertionControlSim, ContextWidthParamInEvalExpr) {
   EXPECT_EQ(r2.width, 5u);
 }
 
-TEST(AssertionControlSim, CastingSetsContextWidth) {
+TEST(ExpressionBitLength, CastingSetsContextWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -118,7 +118,40 @@ TEST(AssertionControlSim, CastingSetsContextWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0x8000u);
 }
 
-TEST(AssertionControlSim, SubtractionContextWidthPreservesBorrow) {
+TEST(ExpressionBitLength, CastWidensIntermediateValue) {
+  SimFixture f;
+  MakeVar(f, "x", 4, 0xF);
+
+  auto* cast = f.arena.Create<Expr>();
+  cast->kind = ExprKind::kCast;
+  cast->text = "int";
+  cast->lhs = MakeId(f.arena, "x");
+
+  auto result = EvalExpr(cast, f.ctx, f.arena);
+  EXPECT_EQ(result.width, 32u);
+  EXPECT_EQ(result.ToUint64(), 0xFu);
+}
+
+TEST(ExpressionBitLength, CastWidensOperandPreservesCarry) {
+  SimFixture f;
+  MakeVar(f, "a", 4, 0xF);
+  MakeVar(f, "b", 4, 1);
+
+  auto* cast = f.arena.Create<Expr>();
+  cast->kind = ExprKind::kCast;
+  cast->text = "int";
+  cast->lhs = MakeId(f.arena, "a");
+
+  auto* add = MakeBinary(f.arena, TokenKind::kPlus, cast, MakeId(f.arena, "b"));
+
+  auto result = EvalExpr(add, f.ctx, f.arena);
+  // int'(a) is 32-bit, so addition uses max(32, 4) = 32 bits.
+  // 0xF + 0x1 = 0x10, carry preserved.
+  EXPECT_EQ(result.ToUint64(), 0x10u);
+  EXPECT_EQ(result.width, 32u);
+}
+
+TEST(ExpressionBitLength, SubtractionContextWidthPreservesBorrow) {
   SimFixture f;
 
   MakeVar(f, "sa", 8, 0);
