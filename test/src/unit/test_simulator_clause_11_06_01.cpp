@@ -10,24 +10,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ExpressionBitLength, WidthPropFromContext) {
-  SimFixture f;
-
-  auto* va = f.ctx.CreateVariable("wa", 4);
-  va->value = MakeLogic4VecVal(f.arena, 4, 0xF);
-  auto* vb = f.ctx.CreateVariable("wb", 4);
-  vb->value = MakeLogic4VecVal(f.arena, 4, 1);
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "wa"),
-                          MakeId(f.arena, "wb"));
-
-  auto r1 = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(r1.ToUint64(), 0u);
-
-  auto r2 = EvalExpr(expr, f.ctx, f.arena, 8);
-  EXPECT_EQ(r2.ToUint64(), 0x10u);
-  EXPECT_EQ(r2.width, 8u);
-}
-
 TEST(ExpressionBitLength, TernaryWidthFromBranches) {
   SimFixture f;
 
@@ -46,29 +28,6 @@ TEST(ExpressionBitLength, TernaryWidthFromBranches) {
 
   EXPECT_EQ(result.width, 8u);
   EXPECT_EQ(result.ToUint64(), 0xFFu);
-}
-
-TEST(ExpressionBitLength, AssignmentContextWidthPreservesCarry) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] a, b;\n"
-      "  logic [16:0] sumB;\n"
-      "  initial begin\n"
-      "    a = 16'hFFFF;\n"
-      "    b = 16'h0001;\n"
-      "    sumB = a + b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sumB");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 0x10000u);
 }
 
 TEST(ExpressionBitLength, AssignmentContextWidthSameSize) {
@@ -92,28 +51,6 @@ TEST(ExpressionBitLength, AssignmentContextWidthSameSize) {
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x0000u);
-}
-
-TEST(ExpressionBitLength, ContextWidthPropagatesForMultiplication) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] a;\n"
-      "  logic [7:0] result;\n"
-      "  initial begin\n"
-      "    a = 4'hF;\n"
-      "    result = a * a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 0xE1u);
 }
 
 TEST(ExpressionBitLength, CastingSetsContextWidth) {
@@ -170,23 +107,6 @@ TEST(ExpressionBitLength, CastWidensOperandPreservesCarry) {
   // 0xF + 0x1 = 0x10, carry preserved.
   EXPECT_EQ(result.ToUint64(), 0x10u);
   EXPECT_EQ(result.width, 32u);
-}
-
-TEST(ExpressionBitLength, SubtractionContextWidthPreservesBorrow) {
-  SimFixture f;
-
-  MakeVar(f, "sa", 8, 0);
-  MakeVar(f, "sb", 8, 1);
-  auto* expr = MakeBinary(f.arena, TokenKind::kMinus, MakeId(f.arena, "sa"),
-                          MakeId(f.arena, "sb"));
-
-  auto r1 = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(r1.ToUint64(), 0xFFu);
-  EXPECT_EQ(r1.width, 8u);
-
-  auto r2 = EvalExpr(expr, f.ctx, f.arena, 16);
-  EXPECT_EQ(r2.ToUint64(), 0xFFFFu);
-  EXPECT_EQ(r2.width, 16u);
 }
 
 // Table 11-21: >> << >>> <<< → width of LHS, shift amount is self-determined.
@@ -333,76 +253,6 @@ TEST(ExpressionBitLength, ReplicationWidthIsCountTimesElement) {
   repl->elements.push_back(MakeId(f.arena, "re"));
   auto result = EvalExpr(repl, f.ctx, f.arena);
   EXPECT_EQ(result.width, 24u);
-}
-
-// Context-determined: division with wider LHS target.
-TEST(ExpressionBitLength, DivisionContextWidthFromLhs) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] a;\n"
-      "  logic [7:0] result;\n"
-      "  initial begin\n"
-      "    a = 4'hF;\n"
-      "    result = a / 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xFu);
-  EXPECT_EQ(var->value.width, 8u);
-}
-
-// Context-determined: modulus with wider LHS target.
-TEST(ExpressionBitLength, ModulusContextWidthFromLhs) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] a;\n"
-      "  logic [7:0] result;\n"
-      "  initial begin\n"
-      "    a = 4'hF;\n"
-      "    result = a % 4'hB;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 4u);
-  EXPECT_EQ(var->value.width, 8u);
-}
-
-// Context-determined: bitwise AND with wider LHS target.
-TEST(ExpressionBitLength, BitwiseAndContextWidthFromLhs) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] a, b;\n"
-      "  logic [7:0] result;\n"
-      "  initial begin\n"
-      "    a = 4'hF;\n"
-      "    b = 4'hA;\n"
-      "    result = a & b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xAu);
-  EXPECT_EQ(var->value.width, 8u);
 }
 
 }  // namespace

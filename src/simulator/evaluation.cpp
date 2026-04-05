@@ -292,8 +292,9 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
 static Logic4Vec ExtendVec(const Logic4Vec& v, uint32_t target_width,
                            bool sign_ext, Arena& arena);
 static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
-                                   Arena& arena) {
-  uint32_t width = (lhs.width > rhs.width) ? lhs.width : rhs.width;
+                                   Arena& arena, uint32_t context_width = 0) {
+  uint32_t self_w = (lhs.width > rhs.width) ? lhs.width : rhs.width;
+  uint32_t width = (context_width > self_w) ? context_width : self_w;
   // Sign-extend the smaller operand when both are signed; zero-extend otherwise.
   if (lhs.width != rhs.width) {
     bool sign_ext = lhs.is_signed && rhs.is_signed;
@@ -628,7 +629,7 @@ Logic4Vec EvalBinaryOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs, Arena& arena,
     case TokenKind::kCaret:
     case TokenKind::kTildeCaret:
     case TokenKind::kCaretTilde:
-      return EvalBinaryBitwise(op, lhs, rhs, arena);
+      return EvalBinaryBitwise(op, lhs, rhs, arena, context_width);
     default:
       return EvalBinaryCompare(op, lhs, rhs, arena);
   }
@@ -687,13 +688,20 @@ static Logic4Vec CombineBranches(Logic4Vec tv, Logic4Vec fv, Arena& arena) {
   if (tv.is_real || fv.is_real) result.is_real = true;
   return result;
 }
-static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena) {
+static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
+                             uint32_t context_width = 0) {
   auto cond = EvalExpr(expr->condition, ctx, arena);
   // §11.4.11: X/Z condition → eval both, combine bit-by-bit.
   if (HasUnknownBits(cond)) {
-    auto tv = EvalExpr(expr->true_expr, ctx, arena);
-    auto fv = EvalExpr(expr->false_expr, ctx, arena);
+    auto tv = EvalExpr(expr->true_expr, ctx, arena, context_width);
+    auto fv = EvalExpr(expr->false_expr, ctx, arena, context_width);
     bool result_signed = tv.is_signed && fv.is_signed;
+    uint32_t width = (tv.width > fv.width) ? tv.width : fv.width;
+    if (context_width > width) width = context_width;
+    if (tv.width < width)
+      tv = ExtendVec(tv, width, result_signed, arena);
+    if (fv.width < width)
+      fv = ExtendVec(fv, width, result_signed, arena);
     if (EvalCaseEquality(tv, fv)) {
       tv.is_signed = result_signed;
       return tv;
@@ -702,12 +710,19 @@ static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena) {
     result.is_signed = result_signed;
     return result;
   }
-  auto tv = EvalExpr(expr->true_expr, ctx, arena);
-  auto fv = EvalExpr(expr->false_expr, ctx, arena);
+  auto tv = EvalExpr(expr->true_expr, ctx, arena, context_width);
+  auto fv = EvalExpr(expr->false_expr, ctx, arena, context_width);
   bool result_signed = tv.is_signed && fv.is_signed;
-  auto& result = (cond.ToUint64() != 0) ? tv : fv;
-  result.is_signed = result_signed;
-  return result;
+  uint32_t width = (tv.width > fv.width) ? tv.width : fv.width;
+  if (context_width > width) width = context_width;
+  auto& chosen = (cond.ToUint64() != 0) ? tv : fv;
+  if (chosen.width < width) {
+    auto extended = ExtendVec(chosen, width, result_signed, arena);
+    extended.is_signed = result_signed;
+    return extended;
+  }
+  chosen.is_signed = result_signed;
+  return chosen;
 }
 // §11.3.6: Compute the bit-width that the LHS of an assignment expression
 // contributes to the return type.
@@ -934,7 +949,7 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
       }
       return EvalBinaryExpr(expr, ctx, arena, context_width);
     case ExprKind::kTernary:
-      return EvalTernary(expr, ctx, arena);
+      return EvalTernary(expr, ctx, arena, context_width);
     case ExprKind::kConcatenation:
       return EvalConcat(expr, ctx, arena);
     case ExprKind::kReplicate:
