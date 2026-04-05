@@ -613,6 +613,54 @@ static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, uint64_t val,
   }
 }
 
+// §11.4.14.4: Resolve a with-clause range into (start, count) indices.
+// Returns false if the range is invalid.
+static bool ResolveWithRange(const Expr* with_expr, SimContext& ctx,
+                             Arena& arena, uint32_t array_size,
+                             uint32_t array_lo, uint32_t& out_start,
+                             uint32_t& out_count) {
+  if (!with_expr || with_expr->kind != ExprKind::kSelect) {
+    out_start = 0;
+    out_count = array_size;
+    return true;
+  }
+  int64_t idx = static_cast<int64_t>(EvalExpr(with_expr->index, ctx, arena).ToUint64());
+  if (!with_expr->index_end) {
+    // Simple index: with [N] — select single element.
+    int64_t rel = idx - static_cast<int64_t>(array_lo);
+    if (rel < 0 || static_cast<uint32_t>(rel) >= array_size) {
+      out_start = 0;
+      out_count = 0;
+      return false;
+    }
+    out_start = static_cast<uint32_t>(rel);
+    out_count = 1;
+    return true;
+  }
+  int64_t idx2 = static_cast<int64_t>(EvalExpr(with_expr->index_end, ctx, arena).ToUint64());
+  if (with_expr->is_part_select_plus) {
+    // with [base +: width]
+    int64_t rel = idx - static_cast<int64_t>(array_lo);
+    out_start = (rel < 0) ? 0 : static_cast<uint32_t>(rel);
+    out_count = (idx2 < 0) ? 0 : static_cast<uint32_t>(idx2);
+  } else if (with_expr->is_part_select_minus) {
+    // with [base -: width]
+    uint32_t width = (idx2 < 0) ? 0 : static_cast<uint32_t>(idx2);
+    int64_t lo_idx = idx - static_cast<int64_t>(width) + 1;
+    int64_t rel = lo_idx - static_cast<int64_t>(array_lo);
+    out_start = (rel < 0) ? 0 : static_cast<uint32_t>(rel);
+    out_count = width;
+  } else {
+    // with [lo : hi] — fixed range.
+    int64_t lo = idx, hi = idx2;
+    if (lo > hi) std::swap(lo, hi);
+    int64_t rel_lo = lo - static_cast<int64_t>(array_lo);
+    out_start = (rel_lo < 0) ? 0 : static_cast<uint32_t>(rel_lo);
+    out_count = static_cast<uint32_t>(hi - lo + 1);
+  }
+  return true;
+}
+
 // §11.4.14.1: Expand an unpacked array identifier into its element values.
 static void ExpandArrayElements(std::string_view name, SimContext& ctx,
                                 std::vector<Logic4Vec>& parts,
@@ -632,6 +680,32 @@ static void ExpandArrayElements(std::string_view name, SimContext& ctx,
   }
 }
 
+// §11.4.14.4: Expand a subset of unpacked array elements selected by with-clause.
+static void ExpandArrayElementsSliced(std::string_view name, SimContext& ctx,
+                                      std::vector<Logic4Vec>& parts,
+                                      uint32_t& total_width,
+                                      uint32_t start, uint32_t count) {
+  auto* info = ctx.FindArrayInfo(name);
+  if (!info) return;
+  for (uint32_t i = 0; i < count; ++i) {
+    uint32_t abs_idx = info->lo + start + i;
+    if (start + i < info->size) {
+      std::string elem_name =
+          std::string(name) + "[" + std::to_string(abs_idx) + "]";
+      auto* var = ctx.FindVariable(elem_name);
+      if (var) {
+        parts.push_back(var->value);
+      } else {
+        parts.push_back(MakeLogic4Vec(ctx.GetArena(), info->elem_width));
+      }
+    } else {
+      // §11.4.14.4: Range larger than array — use default value.
+      parts.push_back(MakeLogic4Vec(ctx.GetArena(), info->elem_width));
+    }
+    total_width += info->elem_width;
+  }
+}
+
 // §11.4.14.1: Expand a queue into its element values (left-to-right order).
 static void ExpandQueueElements(QueueObject* queue,
                                 std::vector<Logic4Vec>& parts,
@@ -639,6 +713,22 @@ static void ExpandQueueElements(QueueObject* queue,
   for (const auto& elem : queue->elements) {
     parts.push_back(elem);
     total_width += elem.width;
+  }
+}
+
+// §11.4.14.4: Expand a subset of queue elements selected by with-clause.
+static void ExpandQueueElementsSliced(QueueObject* queue,
+                                      std::vector<Logic4Vec>& parts,
+                                      uint32_t& total_width, Arena& arena,
+                                      uint32_t start, uint32_t count) {
+  for (uint32_t i = 0; i < count; ++i) {
+    if (start + i < queue->elements.size()) {
+      parts.push_back(queue->elements[start + i]);
+    } else {
+      // §11.4.14.4: Range larger than array — use default value.
+      parts.push_back(MakeLogic4Vec(arena, queue->elem_width));
+    }
+    total_width += queue->elem_width;
   }
 }
 
@@ -715,13 +805,32 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   for (auto* elem : expr->elements) {
     if (elem->kind == ExprKind::kIdentifier) {
       // §11.4.14.1 branch 2: unpacked array → expand each element.
-      if (ctx.FindArrayInfo(elem->text)) {
-        ExpandArrayElements(elem->text, ctx, parts, total_width);
+      if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
+        if (elem->with_expr) {
+          // §11.4.14.4: with-clause limits elements to a slice.
+          uint32_t start = 0, count = 0;
+          ResolveWithRange(elem->with_expr, ctx, arena, ainfo->size,
+                           ainfo->lo, start, count);
+          ExpandArrayElementsSliced(elem->text, ctx, parts, total_width,
+                                    start, count);
+        } else {
+          ExpandArrayElements(elem->text, ctx, parts, total_width);
+        }
         continue;
       }
       // §11.4.14.1 branch 2: queue → expand each element in order.
       if (auto* queue = ctx.FindQueue(elem->text)) {
-        ExpandQueueElements(queue, parts, total_width, arena);
+        if (elem->with_expr) {
+          // §11.4.14.4: with-clause limits elements to a slice.
+          uint32_t start = 0, count = 0;
+          ResolveWithRange(elem->with_expr, ctx, arena,
+                           static_cast<uint32_t>(queue->elements.size()), 0,
+                           start, count);
+          ExpandQueueElementsSliced(queue, parts, total_width, arena,
+                                    start, count);
+        } else {
+          ExpandQueueElements(queue, parts, total_width, arena);
+        }
         continue;
       }
       // §11.4.14.1 branch 2: associative array → expand in index-sorted order.

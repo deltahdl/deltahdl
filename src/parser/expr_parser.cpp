@@ -714,11 +714,19 @@ Expr* Parser::ParseWithClause(Expr* expr) {
   // §11.4.14.4: streaming with [ array_range_expression ]
   if (Check(TokenKind::kLBracket)) {
     Consume();
-    expr->with_expr = ParseExpr();
-    if (Match(TokenKind::kPlusColon) || Match(TokenKind::kMinusColon) ||
-        Match(TokenKind::kColon)) {
-      ParseExpr();
+    auto* range = arena_.Create<Expr>();
+    range->kind = ExprKind::kSelect;
+    range->index = ParseExpr();
+    if (Match(TokenKind::kPlusColon)) {
+      range->is_part_select_plus = true;
+      range->index_end = ParseExpr();
+    } else if (Match(TokenKind::kMinusColon)) {
+      range->is_part_select_minus = true;
+      range->index_end = ParseExpr();
+    } else if (Match(TokenKind::kColon)) {
+      range->index_end = ParseExpr();
     }
+    expr->with_expr = range;
     Expect(TokenKind::kRBracket);
     return expr;
   }

@@ -323,16 +323,174 @@ static uint32_t StreamSliceSizeForUnpack(const Expr* size_expr, SimContext& ctx,
 struct StreamElemInfo {
   const Expr* expr;
   uint32_t width;
+  std::string target_name;  // §11.4.14.4: set for expanded array elements.
 };
 
-// §11.4.14.3: Collect LHS elements and compute total width.
+// §11.4.14.4: Resolve a with-clause range into (start, count) indices.
+static bool ResolveWithRangeForUnpack(const Expr* with_expr, SimContext& ctx,
+                                      Arena& arena, uint32_t array_size,
+                                      uint32_t array_lo, uint32_t& out_start,
+                                      uint32_t& out_count) {
+  if (!with_expr || with_expr->kind != ExprKind::kSelect) {
+    out_start = 0;
+    out_count = array_size;
+    return true;
+  }
+  int64_t idx =
+      static_cast<int64_t>(EvalExpr(with_expr->index, ctx, arena).ToUint64());
+  if (!with_expr->index_end) {
+    int64_t rel = idx - static_cast<int64_t>(array_lo);
+    if (rel < 0 || static_cast<uint32_t>(rel) >= array_size) {
+      out_start = 0;
+      out_count = 0;
+      return false;
+    }
+    out_start = static_cast<uint32_t>(rel);
+    out_count = 1;
+    return true;
+  }
+  int64_t idx2 =
+      static_cast<int64_t>(EvalExpr(with_expr->index_end, ctx, arena).ToUint64());
+  if (with_expr->is_part_select_plus) {
+    int64_t rel = idx - static_cast<int64_t>(array_lo);
+    out_start = (rel < 0) ? 0 : static_cast<uint32_t>(rel);
+    out_count = (idx2 < 0) ? 0 : static_cast<uint32_t>(idx2);
+  } else if (with_expr->is_part_select_minus) {
+    uint32_t width = (idx2 < 0) ? 0 : static_cast<uint32_t>(idx2);
+    int64_t lo_idx = idx - static_cast<int64_t>(width) + 1;
+    int64_t rel = lo_idx - static_cast<int64_t>(array_lo);
+    out_start = (rel < 0) ? 0 : static_cast<uint32_t>(rel);
+    out_count = width;
+  } else {
+    int64_t lo = idx, hi = idx2;
+    if (lo > hi) std::swap(lo, hi);
+    int64_t rel_lo = lo - static_cast<int64_t>(array_lo);
+    out_start = (rel_lo < 0) ? 0 : static_cast<uint32_t>(rel_lo);
+    out_count = static_cast<uint32_t>(hi - lo + 1);
+  }
+  return true;
+}
+
+// §11.4.14.3/§11.4.14.4: Collect LHS elements and compute total width.
+// rhs_width is needed for §11.4.14.4 greedy unpacking of dynamically sized types.
 static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
-                                      std::vector<StreamElemInfo>& elems) {
-  uint32_t total_width = 0;
+                                      Arena& arena,
+                                      std::vector<StreamElemInfo>& elems,
+                                      uint32_t rhs_width) {
+  // §11.4.14.4: Detect dynamically sized items (queues without with_expr).
+  bool has_dynamic = false;
   for (auto* elem : lhs->elements) {
+    if (elem->with_expr) continue;
+    if (elem->kind == ExprKind::kIdentifier && ctx.FindQueue(elem->text)) {
+      has_dynamic = true;
+      break;
+    }
+  }
+
+  // §11.4.14.4: Pre-scan to compute total fixed-size width for greedy sizing.
+  uint32_t fixed_sum = 0;
+  if (has_dynamic) {
+    for (auto* elem : lhs->elements) {
+      if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
+        if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
+          uint32_t start = 0, count = 0;
+          ResolveWithRangeForUnpack(elem->with_expr, ctx, arena,
+                                    ainfo->size, ainfo->lo, start, count);
+          if (start + count > ainfo->size)
+            count = (start < ainfo->size) ? ainfo->size - start : 0;
+          fixed_sum += count * ainfo->elem_width;
+        } else if (auto* queue = ctx.FindQueue(elem->text)) {
+          uint32_t start = 0, count = 0;
+          ResolveWithRangeForUnpack(
+              elem->with_expr, ctx, arena,
+              static_cast<uint32_t>(queue->elements.size()), 0, start, count);
+          fixed_sum += count * queue->elem_width;
+        }
+        continue;
+      }
+      if (elem->kind == ExprKind::kIdentifier && ctx.FindQueue(elem->text))
+        continue;
+      auto* var = ResolveLhsVariable(elem, ctx);
+      if (var) fixed_sum += var->value.width;
+    }
+  }
+
+  uint32_t total_width = 0;
+  bool first_dynamic_consumed = false;
+  for (auto* elem : lhs->elements) {
+    // §11.4.14.4: If the element has a with-clause and is an array, expand
+    // only the selected positions as individual targets.
+    if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
+      if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
+        uint32_t start = 0, count = 0;
+        bool in_range = ResolveWithRangeForUnpack(
+            elem->with_expr, ctx, arena, ainfo->size, ainfo->lo, start, count);
+        if (!in_range || start + count > ainfo->size) {
+          uint32_t clamped = (start < ainfo->size) ? ainfo->size - start : 0;
+          ctx.GetDiag().Error(
+              {}, "streaming unpack with-range exceeds fixed array bounds");
+          count = clamped;
+        }
+        for (uint32_t i = 0; i < count; ++i) {
+          uint32_t abs_idx = ainfo->lo + start + i;
+          std::string name =
+              std::string(elem->text) + "[" + std::to_string(abs_idx) + "]";
+          elems.push_back({elem, ainfo->elem_width, std::move(name)});
+          total_width += ainfo->elem_width;
+        }
+        continue;
+      }
+      if (auto* queue = ctx.FindQueue(elem->text)) {
+        uint32_t start = 0, count = 0;
+        ResolveWithRangeForUnpack(
+            elem->with_expr, ctx, arena,
+            static_cast<uint32_t>(queue->elements.size()), 0, start, count);
+        uint32_t needed = start + count;
+        while (queue->elements.size() < needed) {
+          queue->elements.push_back(
+              MakeLogic4Vec(arena, queue->elem_width));
+        }
+        for (uint32_t i = 0; i < count; ++i) {
+          std::string name = std::string(elem->text) + "__q__" +
+                             std::to_string(start + i);
+          elems.push_back({elem, queue->elem_width, std::move(name)});
+          total_width += queue->elem_width;
+        }
+        continue;
+      }
+    }
+    // §11.4.14.4: Queue without with_expr — greedy unpacking.
+    if (has_dynamic && !elem->with_expr &&
+        elem->kind == ExprKind::kIdentifier) {
+      auto* queue = ctx.FindQueue(elem->text);
+      if (queue) {
+        if (!first_dynamic_consumed) {
+          first_dynamic_consumed = true;
+          uint32_t remaining =
+              (rhs_width > fixed_sum) ? rhs_width - fixed_sum : 0;
+          uint32_t count =
+              queue->elem_width > 0 ? remaining / queue->elem_width : 0;
+          queue->elements.clear();
+          for (uint32_t i = 0; i < count; ++i) {
+            queue->elements.push_back(
+                MakeLogic4Vec(arena, queue->elem_width));
+          }
+          for (uint32_t i = 0; i < count; ++i) {
+            std::string name = std::string(elem->text) + "__q__" +
+                               std::to_string(i);
+            elems.push_back({elem, queue->elem_width, std::move(name)});
+            total_width += queue->elem_width;
+          }
+        } else {
+          // §11.4.14.4: Subsequent dynamic items are left empty.
+          queue->elements.clear();
+        }
+        continue;
+      }
+    }
     auto* var = ResolveLhsVariable(elem, ctx);
     if (!var) continue;
-    elems.push_back({elem, var->value.width});
+    elems.push_back({elem, var->value.width, {}});
     total_width += var->value.width;
   }
   return total_width;
@@ -392,7 +550,8 @@ static Logic4Vec ExtractStreamBits(const Logic4Vec& stream,
 static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                                      SimContext& ctx, Arena& arena) {
   std::vector<StreamElemInfo> elems;
-  uint32_t total_width = CollectStreamElements(lhs, ctx, elems);
+  uint32_t total_width = CollectStreamElements(lhs, ctx, arena, elems,
+                                                 rhs_val.width);
   if (total_width == 0 || elems.empty()) return;
 
   if (rhs_val.width < total_width) {
@@ -427,12 +586,38 @@ static void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   uint32_t bit_offset = total_width;
   for (auto& ei : elems) {
     bit_offset -= ei.width;
-    auto* var = ResolveLhsVariable(ei.expr, ctx);
-    if (!var) continue;
-    var->value =
-        ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena);
-    if (!var->is_4state) CoerceTo2State(var->value);
-    var->NotifyWatchers();
+    if (!ei.target_name.empty()) {
+      // §11.4.14.4: Expanded array element — write to specific position.
+      // Check for queue pseudo-name (name__q__index).
+      auto qpos = ei.target_name.find("__q__");
+      if (qpos != std::string::npos) {
+        auto qname = std::string_view(ei.target_name).substr(0, qpos);
+        auto idx_str = ei.target_name.substr(qpos + 5);
+        uint32_t idx = static_cast<uint32_t>(std::stoul(idx_str));
+        auto* queue = ctx.FindQueue(qname);
+        if (queue && idx < queue->elements.size()) {
+          queue->elements[idx] =
+              ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena);
+        }
+      } else {
+        auto* var = ctx.FindVariable(ei.target_name);
+        if (!var) {
+          var = ctx.CreateVariable(
+              *arena.Create<std::string>(ei.target_name), ei.width);
+        }
+        var->value =
+            ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena);
+        if (!var->is_4state) CoerceTo2State(var->value);
+        var->NotifyWatchers();
+      }
+    } else {
+      auto* var = ResolveLhsVariable(ei.expr, ctx);
+      if (!var) continue;
+      var->value =
+          ExtractStreamBits(stream, bit_offset, ei.width, total_width, arena);
+      if (!var->is_4state) CoerceTo2State(var->value);
+      var->NotifyWatchers();
+    }
   }
 }
 

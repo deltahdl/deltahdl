@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(OperatorAndExpressionParsing, StreamingWithPartSelect) {
+TEST(StreamingDynamicDataParsing, StreamingWithPartSelect) {
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] pkt[10];\n"
@@ -19,7 +19,7 @@ TEST(OperatorAndExpressionParsing, StreamingWithPartSelect) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorAndExpressionParsing, StreamingWithSimpleIndex) {
+TEST(StreamingDynamicDataParsing, StreamingWithSimpleIndex) {
   auto r = Parse(
       "module t;\n"
       "  int arr[4], out[4];\n"
@@ -29,7 +29,7 @@ TEST(OperatorAndExpressionParsing, StreamingWithSimpleIndex) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConcatenationParsing, StreamExpressionWithArrayRange) {
+TEST(StreamingDynamicDataParsing, StreamExpressionWithArrayRange) {
   auto r = Parse("module m; initial x = {<< {a with [3]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -38,20 +38,65 @@ TEST(ConcatenationParsing, StreamExpressionWithArrayRange) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(ConcatenationParsing, StreamExprWithFixedRange) {
+TEST(StreamingDynamicDataParsing, StreamExprWithFixedRange) {
   auto r = Parse("module m; initial x = {<< {a with [3:0]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConcatenationParsing, StreamExprWithPlusRange) {
+TEST(StreamingDynamicDataParsing, StreamExprWithPlusRange) {
   auto r = Parse("module m; initial x = {<< {a with [0+:4]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConcatenationParsing, StreamExprWithMinusRange) {
+TEST(StreamingDynamicDataParsing, StreamExprWithMinusRange) {
   auto r = Parse("module m; initial x = {<< {a with [7-:4]}}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(StreamingDynamicDataParsing, WithClauseInRightShiftStreaming) {
+  auto r = Parse("module m; initial x = {>> {a with [3]}}; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
+  EXPECT_EQ(stmt->rhs->op, TokenKind::kGtGt);
+}
+
+TEST(StreamingDynamicDataParsing, WithClauseAmongMultipleElements) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7:0] hdr, crc;\n"
+      "  logic [7:0] payload[8];\n"
+      "  int len;\n"
+      "  initial x = {<< byte {hdr, payload with [0 +: len], crc}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(StreamingDynamicDataParsing, WithClauseProducesStreamingConcatNode) {
+  auto r = Parse(
+      "module m;\n"
+      "  int arr[4];\n"
+      "  initial x = {>> int {arr with [1:2]}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
+}
+
+TEST(StreamingDynamicDataParsing, WithClauseAsUnpackTarget) {
+  auto r = Parse(
+      "module m;\n"
+      "  byte q[$];\n"
+      "  initial {<< byte {q with [0 +: 4]}} = src;\n"
+      "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }

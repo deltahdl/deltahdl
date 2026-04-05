@@ -106,15 +106,6 @@ TEST(ConcatenationParsing, ConcatenationNested) {
   EXPECT_EQ(rhs->elements.size(), 2u);
 }
 
-TEST(ConcatenationParsing, StreamExpressionWithRange) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = {>> {a with [0:3]}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ConcatenationParsing, ConstantConcatenation) {
   auto r = Parse(
       "module m;\n"
@@ -170,33 +161,6 @@ TEST(ConcatenationParsing, StreamConcatenationMultipleElements) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
   EXPECT_EQ(rhs->elements.size(), 3u);
-}
-
-TEST(ConcatenationParsing, StreamExpressionWithPlusIndexedRange) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = {>> {a with [0+:4]}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ConcatenationParsing, StreamExpressionWithMinusIndexedRange) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = {>> {a with [7-:4]}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ConcatenationParsing, StreamExpressionWithSimpleIndex) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial x = {>> {a with [3]}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ConcatenationParsing, ErrorConcatenationMissingCloseBrace) {
