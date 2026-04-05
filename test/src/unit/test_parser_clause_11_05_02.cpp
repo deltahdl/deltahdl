@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AggregateTypeParsing, ArrayElementSelect) {
+TEST(ArrayAddressingParsing, ArrayElementSelect) {
   auto r = Parse(
       "module t;\n"
       "  int arr[8];\n"
@@ -18,7 +18,7 @@ TEST(AggregateTypeParsing, ArrayElementSelect) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSelect);
 }
 
-TEST(AggregateTypeParsing, MultiDimSelect) {
+TEST(ArrayAddressingParsing, MultiDimSelect) {
   auto r = Parse(
       "module t;\n"
       "  int arr[4][8];\n"
@@ -47,7 +47,7 @@ TEST(OperatorAndExpressionParsing, NestedBitSelects) {
   EXPECT_EQ(rhs->base->kind, ExprKind::kSelect);
   EXPECT_EQ(rhs->base->index_end, nullptr);
 }
-TEST(OperatorAndExpressionParsing, BitSelectChained) {
+TEST(OperatorAndExpressionParsing, ChainedArrayIndexing) {
   auto r = Parse(
       "module t;\n"
       "  initial x = mem[i][j];\n"
@@ -80,6 +80,36 @@ TEST(OperatorAndExpressionParsing, ArrayThenPartSelect) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ArrayAddressingParsing, MemoryIndirection) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [7:0] mem [0:7];\n"
+      "  initial x = mem[mem[3]];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->index, nullptr);
+  EXPECT_EQ(rhs->index->kind, ExprKind::kSelect);
+}
+
+TEST(ArrayAddressingParsing, ComputedIndexExpression) {
+  auto r = Parse(
+      "module t;\n"
+      "  int arr[8];\n"
+      "  initial x = arr[a + b];\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSelect);
+  ASSERT_NE(rhs->index, nullptr);
+  EXPECT_EQ(rhs->index->kind, ExprKind::kBinary);
 }
 
 }  // namespace

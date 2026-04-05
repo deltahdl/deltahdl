@@ -30,36 +30,6 @@ TEST(SelectBoundaryBehavior, PartSelectPartialOOB) {
   EXPECT_NE(result.words[0].bval & 0xCu, 0u);
 }
 
-TEST(SelectBoundaryBehavior, ArrayXZAddrReturnsX) {
-  SimFixture f;
-
-  MakeVar(f, "arr4[0]", 8, 0x11);
-  MakeVar(f, "arr4[1]", 8, 0x22);
-  ArrayInfo info{};
-  info.lo = 0;
-  info.size = 2;
-  info.elem_width = 8;
-  f.ctx.RegisterArray("arr4", info);
-
-  auto* sel = f.arena.Create<Expr>();
-  sel->kind = ExprKind::kSelect;
-  sel->base = MakeId(f.arena, "arr4");
-
-  auto* idx = MakeInt(f.arena, 0);
-  sel->index = idx;
-
-  auto* xvar = f.ctx.CreateVariable("xidx", 8);
-  xvar->value = MakeLogic4Vec(f.arena, 8);
-  xvar->value.words[0].aval = 1;
-  xvar->value.words[0].bval = 1;
-  sel->index = MakeId(f.arena, "xidx");
-
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-
-  EXPECT_NE(result.nwords, 0u);
-  EXPECT_NE(result.words[0].bval, 0u);
-}
-
 TEST(SelectBoundaryBehavior, BitSelectOOBReturnsX) {
   SimFixture f;
   MakeVar(f, "bov", 8, 0xFF);

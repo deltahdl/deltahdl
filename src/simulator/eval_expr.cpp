@@ -1071,6 +1071,15 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// §11.5.2: Walk a chain of kSelect nodes to the root identifier's ArrayInfo.
+static const ArrayInfo* FindRootArrayInfo(const Expr* expr, SimContext& ctx) {
+  const Expr* root = expr->base;
+  while (root && root->kind == ExprKind::kSelect) root = root->base;
+  return (root && root->kind == ExprKind::kIdentifier)
+             ? ctx.FindArrayInfo(root->text)
+             : nullptr;
+}
+
 static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
                                   SimContext& ctx, Arena& arena,
                                   Logic4Vec& out) {
@@ -1091,15 +1100,20 @@ static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
 }
 
 static bool BuildCompoundName(const Expr* expr, SimContext& ctx, Arena& arena,
-                              std::string& name) {
+                              std::string& name, bool* has_xz = nullptr) {
   if (expr->kind == ExprKind::kIdentifier) {
     name = expr->text;
     return true;
   }
   if (expr->kind != ExprKind::kSelect || expr->index_end) return false;
-  if (!BuildCompoundName(expr->base, ctx, arena, name)) return false;
-  auto idx = EvalExpr(expr->index, ctx, arena).ToUint64();
-  name += "[" + std::to_string(idx) + "]";
+  if (!BuildCompoundName(expr->base, ctx, arena, name, has_xz)) return false;
+  auto idx_val = EvalExpr(expr->index, ctx, arena);
+  // §11.5.2: x/z in any dimension invalidates the compound reference.
+  if (HasUnknownBits(idx_val)) {
+    if (has_xz) *has_xz = true;
+    return false;
+  }
+  name += "[" + std::to_string(idx_val.ToUint64()) + "]";
   return true;
 }
 
@@ -1108,9 +1122,27 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
   if (!expr->base || expr->base->kind != ExprKind::kSelect) return false;
   if (expr->index_end) return false;
   std::string compound;
-  if (!BuildCompoundName(expr, ctx, arena, compound)) return false;
+  bool xz = false;
+  if (!BuildCompoundName(expr, ctx, arena, compound, &xz)) {
+    if (!xz) return false;
+    // §11.5.2: x/z in any dimension → element-width X per §7.4.5.
+    if (auto* info = FindRootArrayInfo(expr, ctx)) {
+      out = info->is_4state ? MakeAllX(arena, info->elem_width)
+                            : MakeLogic4VecVal(arena, info->elem_width, 0);
+      return true;
+    }
+    return false;
+  }
   auto* elem = ctx.FindVariable(compound);
-  if (!elem) return false;
+  if (!elem) {
+    // §11.5.2: OOB multi-dim access → element-width X per §7.4.5.
+    if (auto* info = FindRootArrayInfo(expr, ctx)) {
+      out = info->is_4state ? MakeAllX(arena, info->elem_width)
+                            : MakeLogic4VecVal(arena, info->elem_width, 0);
+      return true;
+    }
+    return false;
+  }
   out = elem->value;
   return true;
 }
@@ -1243,8 +1275,15 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryQueueSelect(expr, ctx, arena, result)) return result;
   if (TryAssocSelect(expr, ctx, arena, result)) return result;
   auto idx_val = EvalExpr(expr->index, ctx, arena);
-  // §11.5.1: X/Z index → return X for packed bit/part-select.
   if (HasUnknownBits(idx_val)) {
+    // §11.5.2: x/z index on array → element-width X per §7.4.5.
+    if (!expr->index_end) {
+      if (auto* info = FindRootArrayInfo(expr, ctx)) {
+        return info->is_4state ? MakeAllX(arena, info->elem_width)
+                               : MakeLogic4VecVal(arena, info->elem_width, 0);
+      }
+    }
+    // §11.5.1: X/Z index → return X for packed bit/part-select.
     if (expr->index_end) {
       auto w = static_cast<uint32_t>(
           EvalExpr(expr->index_end, ctx, arena).ToUint64());
