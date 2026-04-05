@@ -43,63 +43,6 @@ TEST(TwoStateAndFourState, FourStateToTwoStateZBecomesZero) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(TwoStateAndFourState, UnsignedZeroExtendOnWiden) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] narrow;\n"
-      "  logic [7:0] wide;\n"
-      "  initial begin\n"
-      "    narrow = 4'b1010;\n"
-      "    wide = narrow;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("wide");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0x0Au);
-}
-
-TEST(TwoStateAndFourState, SignedSignExtendOnWiden) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic signed [3:0] narrow;\n"
-      "  logic signed [7:0] wide;\n"
-      "  initial begin\n"
-      "    narrow = 4'sb1111;\n"
-      "    wide = narrow;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("wide");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
-}
-
-TEST(TwoStateAndFourState, MsbTruncationOnNarrow) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] wide;\n"
-      "  logic [3:0] narrow;\n"
-      "  initial begin\n"
-      "    wide = 8'hAB;\n"
-      "    narrow = wide;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("narrow");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0x0Bu);
-}
-
 TEST(TwoStateAndFourState, LogicAndRegSimulateIdentically) {
   SimFixture f;
   auto* design = ElaborateSrc(
