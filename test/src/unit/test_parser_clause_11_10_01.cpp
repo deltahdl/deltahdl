@@ -43,4 +43,33 @@ TEST(StringLiteralVectorParsing, StringLiteralCompare) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(StringLiteralVectorParsing, StringLiteralCaseEqualityParses) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  bit [8*5:1] s1, s2;\n"
+              "  logic result;\n"
+              "  initial begin\n"
+              "    s1 = \"Hello\";\n"
+              "    s2 = \"Hello\";\n"
+              "    result = (s1 === s2);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(StringLiteralVectorParsing, StringLiteralConcatOfPureLiterals) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  bit [8*4:1] s;\n"
+              "  initial s = {\"AB\", \"CD\"};\n"
+              "endmodule\n"));
+}
+
+TEST(StringLiteralVectorParsing, StringLiteralToSmallerVector) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  bit [15:0] s;\n"
+              "  initial s = \"ABC\";\n"
+              "endmodule\n"));
+}
+
 }  // namespace
