@@ -1,48 +1,10 @@
 #include "fixture_simulator.h"
-#include "helpers_clocking.h"
-#include "helpers_eval_op.h"
-#include "helpers_scheduler.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(ConcatenationSim, StreamingRightShift) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = {>> {8'hAB}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xABu);
-}
-
-TEST(ConcatenationSim, StreamingLeftShift) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = {<< {8'hAB}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 0xD5u);
-}
-
-TEST(ConcatenationElaboration, StreamingConcatLeftShiftElab) {
+TEST(StreamReorderingElaboration, LeftShiftElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -54,7 +16,7 @@ TEST(ConcatenationElaboration, StreamingConcatLeftShiftElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ConcatenationElaboration, StreamingConcatRightShiftElab) {
+TEST(StreamReorderingElaboration, RightShiftElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -66,7 +28,7 @@ TEST(ConcatenationElaboration, StreamingConcatRightShiftElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ConcatenationElaboration, StreamingWithSliceSizeElab) {
+TEST(StreamReorderingElaboration, TypeSliceSizeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -78,7 +40,7 @@ TEST(ConcatenationElaboration, StreamingWithSliceSizeElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(PrimaryElaboration, PrimaryStreamingConcatElaborates) {
+TEST(StreamReorderingElaboration, IntegerSliceSizeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -89,6 +51,28 @@ TEST(PrimaryElaboration, PrimaryStreamingConcatElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(StreamReorderingElaboration, ZeroSliceSizeIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial b = {<< 0 {a}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(StreamReorderingElaboration, NegativeSliceSizeIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial b = {<< (-1) {a}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace

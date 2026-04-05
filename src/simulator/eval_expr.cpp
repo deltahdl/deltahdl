@@ -563,7 +563,12 @@ static uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx,
     return ResolveCastWidth(size_expr->text, ctx);
   }
   auto val = EvalExpr(size_expr, ctx, arena).ToUint64();
-  return (val == 0) ? 1 : static_cast<uint32_t>(val);
+  auto sval = static_cast<int64_t>(val);
+  if (val == 0 || sval < 0) {
+    ctx.GetDiag().Error({}, "slice_size for streaming operator must be positive");
+    return 1;
+  }
+  return static_cast<uint32_t>(val);
 }
 
 // Extract a slice of `slice_size` bits starting at `start_bit` from `src`.
@@ -779,7 +784,8 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto result = MakeLogic4Vec(arena, total_width);
   for (uint32_t i = 0; i < nslices; ++i) {
     uint32_t src_start = i * ss;
-    uint32_t dst_start = (nslices - 1 - i) * ss;
+    uint32_t dst_start =
+        total_width > (i + 1) * ss ? total_width - (i + 1) * ss : 0;
     uint64_t slice = ExtractSlice(concat, src_start, ss);
     PlaceSlice(result, dst_start, slice, ss);
   }

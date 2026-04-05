@@ -311,7 +311,12 @@ static uint32_t StreamSliceSizeForUnpack(const Expr* size_expr, SimContext& ctx,
     return TypeNameToSliceWidth(size_expr->text);
   }
   auto val = EvalExpr(size_expr, ctx, arena).ToUint64();
-  return (val == 0) ? 1 : static_cast<uint32_t>(val);
+  auto sval = static_cast<int64_t>(val);
+  if (val == 0 || sval < 0) {
+    ctx.GetDiag().Error({}, "slice_size for streaming operator must be positive");
+    return 1;
+  }
+  return static_cast<uint32_t>(val);
 }
 
 // §11.4.14.3: Element info for streaming unpack.
@@ -341,7 +346,8 @@ static Logic4Vec ReverseStreamSlices(const Logic4Vec& stream,
   auto reordered = MakeLogic4Vec(arena, total_width);
   for (uint32_t i = 0; i < nslices; ++i) {
     uint32_t src_start = i * ss;
-    uint32_t dst_start = (nslices - 1 - i) * ss;
+    uint32_t dst_start =
+        total_width > (i + 1) * ss ? total_width - (i + 1) * ss : 0;
     uint32_t bits_to_copy = ss;
     if (src_start + bits_to_copy > total_width)
       bits_to_copy = total_width - src_start;

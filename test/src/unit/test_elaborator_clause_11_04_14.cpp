@@ -80,28 +80,4 @@ TEST(StreamingOperatorElaboration, StreamingTargetWiderThanStream) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(StreamingOperatorElaboration, StreamingWithSliceSizeExpression) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [15:0] a, b;\n"
-      "  initial b = {<< 4 {a}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(StreamingOperatorElaboration, StreamingWithTypeSliceSize) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [31:0] a, b;\n"
-      "  initial b = {<< byte {a}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }  // namespace

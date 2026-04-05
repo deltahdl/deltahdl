@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(OperatorAndExpressionParsing, StreamingLeft) {
+TEST(StreamReorderingParsing, LeftShiftOperator) {
   auto r = Parse(
       "module t;\n"
       "  initial x = {<< {a, b, c}};\n"
@@ -17,7 +17,7 @@ TEST(OperatorAndExpressionParsing, StreamingLeft) {
   EXPECT_EQ(rhs->op, TokenKind::kLtLt);
 }
 
-TEST(ConcatenationParsing, StreamingWithTypeSliceSize) {
+TEST(StreamReorderingParsing, StreamingWithTypeSliceSize) {
   auto r = Parse("module m; initial x = {<< byte {a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -27,7 +27,7 @@ TEST(ConcatenationParsing, StreamingWithTypeSliceSize) {
   ASSERT_NE(stmt->rhs->lhs, nullptr);
 }
 
-TEST(ConcatenationParsing, StreamingWithIntSliceSize) {
+TEST(StreamReorderingParsing, StreamingWithIntSliceSize) {
   auto r = Parse("module m; initial x = {<< int {a, b}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -37,7 +37,7 @@ TEST(ConcatenationParsing, StreamingWithIntSliceSize) {
   ASSERT_NE(stmt->rhs->lhs, nullptr);
 }
 
-TEST(ConcatenationParsing, StreamingWithExprSliceSize) {
+TEST(StreamReorderingParsing, StreamingWithExprSliceSize) {
   auto r = Parse("module m; initial x = {<< 4 {a}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -47,7 +47,7 @@ TEST(ConcatenationParsing, StreamingWithExprSliceSize) {
   ASSERT_NE(stmt->rhs->lhs, nullptr);
 }
 
-TEST(OperatorAndExpressionParsing, StreamingWithTypedSlice) {
+TEST(StreamReorderingParsing, TypeSliceSizeInFullModule) {
   auto r = Parse(
       "module t;\n"
       "  byte a;\n"
@@ -56,6 +56,19 @@ TEST(OperatorAndExpressionParsing, StreamingWithTypedSlice) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(StreamReorderingParsing, RightShiftOperator) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial x = {>> {a, b}};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
+  EXPECT_EQ(rhs->op, TokenKind::kGtGt);
 }
 
 }  // namespace
