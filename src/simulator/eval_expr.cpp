@@ -627,18 +627,139 @@ static void ExpandArrayElements(std::string_view name, SimContext& ctx,
   }
 }
 
+// §11.4.14.1: Expand a queue into its element values (left-to-right order).
+static void ExpandQueueElements(QueueObject* queue,
+                                std::vector<Logic4Vec>& parts,
+                                uint32_t& total_width, Arena& arena) {
+  for (const auto& elem : queue->elements) {
+    parts.push_back(elem);
+    total_width += elem.width;
+  }
+}
+
+// §11.4.14.1: Expand an associative array in index-sorted order.
+static void ExpandAssocArrayElements(AssocArrayObject* aa,
+                                     std::vector<Logic4Vec>& parts,
+                                     uint32_t& total_width) {
+  if (aa->is_string_key) {
+    for (const auto& [key, val] : aa->str_data) {
+      parts.push_back(val);
+      total_width += val.width;
+    }
+  } else {
+    for (const auto& [key, val] : aa->int_data) {
+      parts.push_back(val);
+      total_width += val.width;
+    }
+  }
+}
+
+// §11.4.14.1: Expand a packed struct's fields in declaration order.
+static void ExpandStructFields(Variable* var, const StructTypeInfo* sinfo,
+                               std::vector<Logic4Vec>& parts,
+                               uint32_t& total_width, Arena& arena) {
+  for (const auto& f : sinfo->fields) {
+    uint64_t val = var->value.ToUint64() >> f.bit_offset;
+    uint64_t mask =
+        (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
+    parts.push_back(MakeLogic4VecVal(arena, f.width, val & mask));
+    total_width += f.width;
+  }
+}
+
+// §11.4.14.1: For an untagged union, apply to first declared member only.
+static void ExpandUnionFirstMember(Variable* var, const StructTypeInfo* sinfo,
+                                   std::vector<Logic4Vec>& parts,
+                                   uint32_t& total_width, Arena& arena) {
+  if (sinfo->fields.empty()) return;
+  const auto& f = sinfo->fields[0];
+  uint64_t val = var->value.ToUint64() >> f.bit_offset;
+  uint64_t mask =
+      (f.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << f.width) - 1;
+  parts.push_back(MakeLogic4VecVal(arena, f.width, val & mask));
+  total_width += f.width;
+}
+
+// §11.4.14.1: Expand class object properties base-to-derived, declaration order.
+static void ExpandClassProperties(ClassObject* obj,
+                                  std::vector<Logic4Vec>& parts,
+                                  uint32_t& total_width, Arena& arena) {
+  // Collect type chain from base to derived.
+  std::vector<const ClassTypeInfo*> chain;
+  for (auto* t = obj->type; t; t = t->parent) chain.push_back(t);
+  std::reverse(chain.begin(), chain.end());
+  for (auto* t : chain) {
+    for (const auto& prop : t->properties) {
+      if (prop.is_static) continue;
+      auto it = obj->properties.find(std::string(prop.name));
+      if (it != obj->properties.end()) {
+        parts.push_back(it->second);
+        total_width += it->second.width;
+      } else {
+        parts.push_back(MakeLogic4Vec(arena, prop.width));
+        total_width += prop.width;
+      }
+    }
+  }
+}
+
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   // Concatenate all elements MSB-first (left-to-right = most significant).
   uint32_t total_width = 0;
   std::vector<Logic4Vec> parts;
   for (auto* elem : expr->elements) {
-    // §11.4.14.1: If element is an unpacked array, expand its elements.
-    if (elem->kind == ExprKind::kIdentifier && ctx.FindArrayInfo(elem->text)) {
-      ExpandArrayElements(elem->text, ctx, parts, total_width);
-    } else {
-      parts.push_back(EvalExpr(elem, ctx, arena));
-      total_width += parts.back().width;
+    if (elem->kind == ExprKind::kIdentifier) {
+      // §11.4.14.1 branch 2: unpacked array → expand each element.
+      if (ctx.FindArrayInfo(elem->text)) {
+        ExpandArrayElements(elem->text, ctx, parts, total_width);
+        continue;
+      }
+      // §11.4.14.1 branch 2: queue → expand each element in order.
+      if (auto* queue = ctx.FindQueue(elem->text)) {
+        ExpandQueueElements(queue, parts, total_width, arena);
+        continue;
+      }
+      // §11.4.14.1 branch 2: associative array → expand in index-sorted order.
+      if (auto* aa = ctx.FindAssocArray(elem->text)) {
+        ExpandAssocArrayElements(aa, parts, total_width);
+        continue;
+      }
+      // §11.4.14.1 branches 3/4: struct or untagged union.
+      if (auto* sinfo = ctx.GetVariableStructType(elem->text)) {
+        auto* var = ctx.FindVariable(elem->text);
+        if (var) {
+          if (sinfo->is_union) {
+            // §11.4.14.1 branch 4: untagged union → first declared member.
+            ExpandUnionFirstMember(var, sinfo, parts, total_width, arena);
+          } else {
+            // §11.4.14.1 branch 3: struct → each member in declaration order.
+            ExpandStructFields(var, sinfo, parts, total_width, arena);
+          }
+          continue;
+        }
+      }
+      // §11.4.14.1 branches 5/6: class handle.
+      if (auto class_type = ctx.GetVariableClassType(elem->text);
+          !class_type.empty()) {
+        auto* var = ctx.FindVariable(elem->text);
+        if (var) {
+          uint64_t handle = var->value.ToUint64();
+          if (handle == kNullClassHandle) {
+            // §11.4.14.1 branch 5: null class handle → skip.
+            continue;
+          }
+          // §11.4.14.1 branch 6: non-null class handle → expand properties.
+          auto* obj = ctx.GetClassObject(handle);
+          if (obj) {
+            ExpandClassProperties(obj, parts, total_width, arena);
+            continue;
+          }
+        }
+      }
     }
+    // §11.4.14.1 branch 1: bit-stream type or nested streaming_concatenation.
+    parts.push_back(EvalExpr(elem, ctx, arena));
+    total_width += parts.back().width;
   }
   if (total_width == 0) return MakeLogic4Vec(arena, 1);
 

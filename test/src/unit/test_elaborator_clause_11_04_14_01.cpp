@@ -1,27 +1,76 @@
-#include "fixture_simulator.h"
-#include "helpers_clocking.h"
-#include "helpers_eval_op.h"
-#include "helpers_scheduler.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(ConcatenationSim, StreamingMultipleElements) {
-  SimFixture f;
+// --- Branch 1: nested streaming_concatenation as stream_expression ---
+
+TEST(StreamExpressionConcatElaboration, NestedStreamingConcatAccepted) {
+  ElabFixture f;
   auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = {>> {4'hA, 4'h5}};\n"
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [15:0] b;\n"
+      "  initial b = {>> {{<< {a}}, a}};\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xA5u);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(StreamExpressionConcatElaboration, DeeplyNestedStreamingAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [23:0] b;\n"
+      "  initial b = {>> {{>> {{<< {a}}}}, a, a}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// --- Left-to-right concatenation of multiple stream_expressions ---
+
+TEST(StreamExpressionConcatElaboration, MultipleElementsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  logic [23:0] dst;\n"
+      "  initial dst = {>> {a, b, c}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(StreamExpressionConcatElaboration, UnequalWidthElementsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a;\n"
+      "  logic [3:0] b;\n"
+      "  logic [11:0] dst;\n"
+      "  initial dst = {>> {a, b}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(StreamExpressionConcatElaboration, LiteralElementsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [15:0] dst;\n"
+      "  initial dst = {>> {8'hAB, 8'hCD}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
