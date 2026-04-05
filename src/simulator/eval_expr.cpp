@@ -506,14 +506,19 @@ static int InsideMatchRange(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
   uint64_t hi = IsDollarExpr(elem->index_end)
                     ? ResolveDollarBound(lhs.width, false)
                     : EvalExpr(elem->index_end, ctx, arena).ToUint64();
-  if (lo > hi) std::swap(lo, hi);
+  if (lo > hi) return 0;
   return (lv >= lo && lv <= hi) ? 1 : 0;
 }
 
 static int InsideMatchValue(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
                             Arena& arena) {
   auto ev = EvalExpr(elem, ctx, arena);
-  if (!lhs.IsKnown() || !ev.IsKnown()) return 2;
+  uint64_t rhs_dc = ev.nwords > 0 ? ev.words[0].bval : 0;
+  uint64_t lhs_x = lhs.nwords > 0 ? lhs.words[0].bval : 0;
+  if (lhs_x & ~rhs_dc) return 2;
+  if (rhs_dc || lhs_x) {
+    return (((lhs.ToUint64() ^ ev.ToUint64()) & ~rhs_dc) == 0) ? 1 : 0;
+  }
   return (lhs.ToUint64() == ev.ToUint64()) ? 1 : 0;
 }
 

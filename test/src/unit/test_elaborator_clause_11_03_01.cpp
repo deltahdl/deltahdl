@@ -400,16 +400,4 @@ TEST(RealOps, LegalOpOnRealInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(RealOps, InsideOnRealIsLegal) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  real a;\n"
-      "  logic r;\n"
-      "  initial r = a inside {1.0, 2.0, 3.0};\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }  // namespace

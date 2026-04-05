@@ -6,52 +6,6 @@
 using namespace delta;
 namespace {
 
-TEST(OperatorAndExpressionParsing, InsideBasicListCondition) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (a inside {1, 2, 3}) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* cond = stmt->condition;
-  ASSERT_NE(cond, nullptr);
-  EXPECT_EQ(cond->kind, ExprKind::kInside);
-  EXPECT_EQ(cond->elements.size(), 3u);
-}
-
-TEST(OperatorAndExpressionParsing, InsideBasicListLhs) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (a inside {1, 2, 3}) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* cond = stmt->condition;
-  ASSERT_NE(cond, nullptr);
-  ASSERT_NE(cond->lhs, nullptr);
-  EXPECT_EQ(cond->lhs->kind, ExprKind::kIdentifier);
-}
-
-TEST(OperatorAndExpressionParsing, InsideWithRange) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (a inside {[16:23], [32:47]}) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* cond = stmt->condition;
-  ASSERT_NE(cond, nullptr);
-  EXPECT_EQ(cond->kind, ExprKind::kInside);
-}
-
 TEST(OperatorAndExpressionParsing, InsideWithRangeElements) {
   auto r = Parse(
       "module t;\n"
@@ -95,6 +49,54 @@ TEST(OperatorAndExpressionParsing, InsideWithDollarRange) {
               "  end\n"
               "endmodule\n"));
 }
+
+TEST(OperatorAndExpressionParsing, InsideWithDollarUpperBound) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  int a;\n"
+              "  initial begin\n"
+              "    if (a inside {[10:$]}) a = 0;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(OperatorAndExpressionParsing, InsideAbsToleranceRange) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a inside {[5 +/- 2]}) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* cond = stmt->condition;
+  ASSERT_NE(cond, nullptr);
+  EXPECT_EQ(cond->kind, ExprKind::kInside);
+  EXPECT_EQ(cond->elements.size(), 1u);
+  EXPECT_EQ(cond->elements[0]->kind, ExprKind::kSelect);
+  EXPECT_EQ(cond->elements[0]->op, TokenKind::kPlusSlashMinus);
+}
+
+TEST(OperatorAndExpressionParsing, InsideRelToleranceRange) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    if (a inside {[50 +%- 10]}) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* cond = stmt->condition;
+  ASSERT_NE(cond, nullptr);
+  EXPECT_EQ(cond->kind, ExprKind::kInside);
+  EXPECT_EQ(cond->elements.size(), 1u);
+  EXPECT_EQ(cond->elements[0]->op, TokenKind::kPlusPercentMinus);
+}
+
 TEST(OperatorAndExpressionParsing, InsideMixedValuesAndRanges) {
   auto r = Parse(
       "module t;\n"
@@ -170,20 +172,6 @@ TEST(OperatorAndExpressionParsing, InsideExpressionWithLhsAndElements) {
   ASSERT_NE(cond->lhs, nullptr);
   EXPECT_EQ(cond->lhs->kind, ExprKind::kIdentifier);
   EXPECT_EQ(cond->elements.size(), 3u);
-}
-
-TEST(OperatorAndExpressionParsing, InsideBasicListParses) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    if (a inside {1, 2, 3}) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
 }
 
 TEST(AggregateExpr, PackedStructInsideSet) {
