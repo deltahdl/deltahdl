@@ -233,6 +233,25 @@ Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
     result.words[i].aval = val.words[i].aval;
     result.words[i].bval = val.words[i].bval;
   }
+  if (val.is_signed && target_width > val.width && val.width > 0) {
+    uint32_t msb_idx = (val.width - 1) / 64;
+    uint64_t msb_mask = uint64_t{1} << ((val.width - 1) % 64);
+    uint64_t a_fill = (val.words[msb_idx].aval & msb_mask) ? ~uint64_t{0} : 0;
+    uint64_t b_fill = (val.words[msb_idx].bval & msb_mask) ? ~uint64_t{0} : 0;
+    if (a_fill || b_fill) {
+      uint32_t fill_bit = val.width % 64;
+      if (fill_bit != 0) {
+        uint64_t fill_mask = ~((uint64_t{1} << fill_bit) - 1);
+        result.words[val.width / 64].aval |= a_fill & fill_mask;
+        result.words[val.width / 64].bval |= b_fill & fill_mask;
+      }
+      uint32_t first_full = val.width / 64 + (fill_bit != 0 ? 1 : 0);
+      for (uint32_t i = first_full; i < result.nwords; ++i) {
+        result.words[i].aval = a_fill;
+        result.words[i].bval = b_fill;
+      }
+    }
+  }
   // Mask off bits beyond target_width in the last word.
   uint32_t last_bit = target_width % 64;
   if (last_bit != 0) {

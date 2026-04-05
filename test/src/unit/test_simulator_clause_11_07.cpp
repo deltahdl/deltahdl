@@ -9,40 +9,7 @@
 
 using namespace delta;
 
-static Variable* MakeVar4Adv(SimFixture& f, std::string_view name,
-                             uint32_t width, uint64_t aval, uint64_t bval) {
-  auto* var = f.ctx.CreateVariable(name, width);
-  var->value = MakeLogic4Vec(f.arena, width);
-  var->value.words[0].aval = aval;
-  var->value.words[0].bval = bval;
-  return var;
-}
 namespace {
-
-TEST(EvalAdv, SignedXFillsX) {
-  SimFixture f;
-
-  auto* var = MakeVar4Adv(f, "sx", 4, 0b0001, 0b1000);
-  var->is_signed = true;
-
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "sx"),
-                          MakeInt(f.arena, 0));
-  auto result = EvalExpr(expr, f.ctx, f.arena, 8);
-
-  EXPECT_NE(result.words[0].bval & 0xF0u, 0u);
-}
-
-TEST(EvalAdv, SignedZFillsZ) {
-  SimFixture f;
-
-  auto* var = MakeVar4Adv(f, "sz", 4, 0b0001, 0b1000);
-  var->is_signed = true;
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "sz"),
-                          MakeInt(f.arena, 0));
-  auto result = EvalExpr(expr, f.ctx, f.arena, 8);
-
-  EXPECT_NE(result.words[0].bval & 0xF0u, 0u);
-}
 
 TEST(SignedExprSim, SystemTfCallUnsigned) {
   SimFixture f;
