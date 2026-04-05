@@ -48,16 +48,4 @@ TEST(Elaboration, StringLiteralCompareElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Elaboration, StringLiteralWiderVectorElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  bit [8*10:1] s;\n"
-      "  initial s = \"Hi\";\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }  // namespace

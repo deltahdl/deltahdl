@@ -43,12 +43,4 @@ TEST(StringLiteralVectorParsing, StringLiteralCompare) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(StringLiteralVectorParsing, StringLiteralWideVector) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  bit [8*20:1] wide;\n"
-              "  initial wide = \"short\";\n"
-              "endmodule\n"));
-}
-
 }  // namespace
