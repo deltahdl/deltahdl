@@ -387,6 +387,11 @@ class Elaborator {
   void WalkStmtsForStringConcatLvalue(const Stmt* s);
   bool ConcatContainsStringElement(const Expr* expr);
 
+  /// §11.4.14: Streaming concatenation context restrictions.
+  void ValidateStreamingConcatContext(const ModuleDecl* decl);
+  void WalkExprForStreamingContext(const Expr* expr, bool is_valid_context);
+  void WalkStmtsForStreamingContext(const Stmt* s);
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 

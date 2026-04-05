@@ -729,4 +729,82 @@ void Elaborator::ValidateStringConcatLvalue(const ModuleDecl* decl) {
   }
 }
 
+// --- §11.4.14: Streaming concatenation context restrictions ---
+
+void Elaborator::WalkExprForStreamingContext(const Expr* expr,
+                                             bool is_valid_context) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kStreamingConcat) {
+    if (!is_valid_context) {
+      diag_.Error(expr->range.start,
+                  "streaming concatenation shall not be used as an operand "
+                  "of an expression other than an assignment or bit-stream "
+                  "cast");
+    }
+    // Elements inside streaming concat are valid contexts for nested streaming.
+    for (auto* elem : expr->elements) {
+      WalkExprForStreamingContext(elem, true);
+    }
+    // Slice size expression cannot contain streaming concat.
+    WalkExprForStreamingContext(expr->lhs, false);
+    return;
+  }
+  if (expr->kind == ExprKind::kCast) {
+    // The operand of a cast is a valid context for streaming concat.
+    WalkExprForStreamingContext(expr->lhs, true);
+    return;
+  }
+  // For all other expression kinds, children are not valid contexts.
+  WalkExprForStreamingContext(expr->lhs, false);
+  WalkExprForStreamingContext(expr->rhs, false);
+  WalkExprForStreamingContext(expr->condition, false);
+  WalkExprForStreamingContext(expr->true_expr, false);
+  WalkExprForStreamingContext(expr->false_expr, false);
+  for (auto* elem : expr->elements) WalkExprForStreamingContext(elem, false);
+  for (auto* arg : expr->args) WalkExprForStreamingContext(arg, false);
+}
+
+void Elaborator::WalkStmtsForStreamingContext(const Stmt* s) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign ||
+      s->kind == StmtKind::kAssign ||
+      s->kind == StmtKind::kForce) {
+    // LHS and RHS of assignments are valid top-level contexts.
+    WalkExprForStreamingContext(s->lhs, true);
+    WalkExprForStreamingContext(s->rhs, true);
+  } else {
+    // All other expression positions are invalid contexts.
+    WalkExprForStreamingContext(s->lhs, false);
+    WalkExprForStreamingContext(s->rhs, false);
+  }
+  WalkExprForStreamingContext(s->expr, false);
+  WalkExprForStreamingContext(s->condition, false);
+  WalkExprForStreamingContext(s->assert_expr, false);
+  for (auto* sub : s->stmts) WalkStmtsForStreamingContext(sub);
+  WalkStmtsForStreamingContext(s->then_branch);
+  WalkStmtsForStreamingContext(s->else_branch);
+  WalkStmtsForStreamingContext(s->body);
+  WalkStmtsForStreamingContext(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForStreamingContext(ci.body);
+}
+
+void Elaborator::ValidateStreamingConcatContext(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForStreamingContext(item->body);
+    }
+    if (item->kind == ModuleItemKind::kContAssign) {
+      WalkExprForStreamingContext(item->assign_lhs, true);
+      WalkExprForStreamingContext(item->assign_rhs, true);
+    }
+  }
+}
+
 }  // namespace delta

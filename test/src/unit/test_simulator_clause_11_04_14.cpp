@@ -4,6 +4,7 @@
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
 
 using namespace delta;
@@ -108,6 +109,90 @@ TEST(EvalAdv, StreamingUnpackedArrayMissingElemGivesX) {
   EXPECT_EQ(result.width, 24u);
 
   EXPECT_EQ(result.ToUint64(), 0x110033u);
+}
+
+TEST(StreamingOperatorSim, PackAsAssignmentSource) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] dst;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'hAB;\n"
+      "    b = 8'hCD;\n"
+      "    dst = {>> {a, b}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
+}
+
+TEST(StreamingOperatorSim, TargetWiderThanStreamZeroPads) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] dst;\n"
+      "  logic [7:0] a;\n"
+      "  initial begin\n"
+      "    a = 8'hFF;\n"
+      "    dst = {>> {a}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFu);
+}
+
+TEST(StreamingOperatorSim, BitStreamCastOfStreaming) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  initial begin\n"
+      "    a = 8'hAB;\n"
+      "    b = int'({>> {a}});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xABu);
+}
+
+TEST(StreamingOperatorSim, PackSingleElementPreservesValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'h5A;\n"
+      "    b = {>> {a}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("b");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x5Au);
 }
 
 }  // namespace

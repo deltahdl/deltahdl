@@ -38,6 +38,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateReplicateLvalue(decl);
   ValidateStringConcatLvalue(decl);
   ValidateReplicateMultiplier(decl);
+  ValidateStreamingConcatContext(decl);
   ValidateSubroutineCallArgs(decl);
   ValidateArrayArgTypes(decl);
   ValidateLocalProtectedAccess(decl);
