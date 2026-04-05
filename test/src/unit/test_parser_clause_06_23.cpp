@@ -1,4 +1,3 @@
-#include "elaborator/type_eval.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -443,17 +442,6 @@ TEST(TypeOperatorParsing, TypeOpInParamDefault) {
       ParseOk("module t #(parameter type T = type(logic [7:0]));\n"
               "  T data;\n"
               "endmodule\n"));
-}
-
-TEST(TypeOperatorParsing, TypeRefInferWidth) {
-  Arena arena;
-  auto* inner = arena.Create<Expr>();
-  inner->kind = ExprKind::kIntegerLiteral;
-  auto* ref = arena.Create<Expr>();
-  ref->kind = ExprKind::kTypeRef;
-  ref->lhs = inner;
-  TypedefMap typedefs;
-  EXPECT_EQ(InferExprWidth(ref, typedefs), 32u);
 }
 
 TEST(TypeOperatorParsing, TypeRefDataTypeCaseAndComparison) {

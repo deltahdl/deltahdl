@@ -347,13 +347,21 @@ bool IsCastCompatible(const DataType& a, const DataType& b) {
 
 // --- Width inference (IEEE §11.6) ---
 
-static bool IsComparisonOp(TokenKind op) {
+static bool IsOneBitResultOp(TokenKind op) {
   return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
          op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq ||
          op == TokenKind::kLt || op == TokenKind::kGt ||
          op == TokenKind::kLtEq || op == TokenKind::kGtEq ||
+         op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion ||
          op == TokenKind::kAmpAmp || op == TokenKind::kPipePipe ||
-         op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
+         op == TokenKind::kArrow || op == TokenKind::kLtDashGt;
+}
+
+static bool IsReductionOp(TokenKind op) {
+  return op == TokenKind::kAmp || op == TokenKind::kTildeAmp ||
+         op == TokenKind::kPipe || op == TokenKind::kTildePipe ||
+         op == TokenKind::kCaret || op == TokenKind::kTildeCaret ||
+         op == TokenKind::kCaretTilde;
 }
 
 static uint32_t CastTargetWidth(std::string_view type_name) {
@@ -413,10 +421,10 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kSystemCall:
       return 32;
     case ExprKind::kUnary:
-      if (expr->op == TokenKind::kBang) return 1;
+      if (expr->op == TokenKind::kBang || IsReductionOp(expr->op)) return 1;
       return InferExprWidth(expr->lhs, typedefs);
     case ExprKind::kBinary: {
-      if (IsComparisonOp(expr->op)) return 1;
+      if (IsOneBitResultOp(expr->op)) return 1;
       if (IsShiftOp(expr->op)) return InferExprWidth(expr->lhs, typedefs);
       if (expr->op == TokenKind::kPower) return InferExprWidth(expr->lhs, typedefs);
       uint32_t lw = InferExprWidth(expr->lhs, typedefs);
