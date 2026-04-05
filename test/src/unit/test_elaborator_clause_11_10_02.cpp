@@ -33,4 +33,20 @@ TEST(Elaboration, PaddedConcatCompareElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(Elaboration, PaddingComparedToExplicitNulElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  bit [8*3:1] s;\n"
+      "  logic result;\n"
+      "  initial begin\n"
+      "    s = \"A\";\n"
+      "    result = (s == {8'd0, 8'd0, 8'd65});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

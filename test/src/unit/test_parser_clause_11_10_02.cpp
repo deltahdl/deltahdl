@@ -24,4 +24,16 @@ TEST(StringLiteralPaddedParsing, PaddedConcatCompareParses) {
               "endmodule\n"));
 }
 
+TEST(StringLiteralPaddedParsing, PaddingComparedToExplicitNulParses) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  bit [8*3:1] s;\n"
+              "  logic result;\n"
+              "  initial begin\n"
+              "    s = \"A\";\n"
+              "    result = (s == {8'd0, 8'd0, 8'd65});\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace
