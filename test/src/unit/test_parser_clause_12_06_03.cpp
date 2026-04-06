@@ -1,10 +1,11 @@
 #include "fixture_parser.h"
+#include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(PatternConditionalParsing, MatchesInTernary) {
+TEST(TernaryMatchesParsing, MatchesInTernary) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -13,9 +14,16 @@ TEST(PatternConditionalParsing, MatchesInTernary) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(stmt->rhs->condition, nullptr);
+  EXPECT_EQ(stmt->rhs->condition->kind, ExprKind::kBinary);
+  EXPECT_EQ(stmt->rhs->condition->op, TokenKind::kKwMatches);
 }
 
-TEST(PatternConditionalParsing, MatchesWithGuardInTernary) {
+TEST(TernaryMatchesParsing, MatchesWithGuardInTernary) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -24,9 +32,16 @@ TEST(PatternConditionalParsing, MatchesWithGuardInTernary) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(stmt->rhs->condition, nullptr);
+  EXPECT_EQ(stmt->rhs->condition->kind, ExprKind::kBinary);
+  EXPECT_EQ(stmt->rhs->condition->op, TokenKind::kAmpAmpAmp);
 }
 
-TEST(PatternConditionalParsing, MatchesWildcardInTernary) {
+TEST(TernaryMatchesParsing, MatchesWildcardInTernary) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
