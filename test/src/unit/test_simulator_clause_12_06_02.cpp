@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(PatternMatchingSim, MatchesConstantTrue) {
+TEST(IfMatchesSim, MatchesConstantTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -29,7 +29,7 @@ TEST(PatternMatchingSim, MatchesConstantTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(PatternMatchingSim, MatchesConstantFalse) {
+TEST(IfMatchesSim, MatchesConstantFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -50,7 +50,7 @@ TEST(PatternMatchingSim, MatchesConstantFalse) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(PatternMatchingSim, MatchesWildcardPattern) {
+TEST(IfMatchesSim, MatchesWildcardPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -72,7 +72,7 @@ TEST(PatternMatchingSim, MatchesWildcardPattern) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(PatternMatchingSim, MatchesWildcardMismatch) {
+TEST(IfMatchesSim, MatchesWildcardMismatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -94,7 +94,7 @@ TEST(PatternMatchingSim, MatchesWildcardMismatch) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(PatternMatchingSim, MatchesWithGuardTrue) {
+TEST(IfMatchesSim, MatchesWithGuardTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -117,7 +117,7 @@ TEST(PatternMatchingSim, MatchesWithGuardTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(PatternMatchingSim, MatchesWithGuardFalse) {
+TEST(IfMatchesSim, MatchesWithGuardFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -140,7 +140,7 @@ TEST(PatternMatchingSim, MatchesWithGuardFalse) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(PatternMatchingSim, TripleAndShortCircuit) {
+TEST(IfMatchesSim, TripleAndShortCircuit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -164,7 +164,7 @@ TEST(PatternMatchingSim, TripleAndShortCircuit) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(PatternMatchingSim, ElseIfChainMatches) {
+TEST(IfMatchesSim, ElseIfChainMatches) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -186,7 +186,7 @@ TEST(PatternMatchingSim, ElseIfChainMatches) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-TEST(PatternMatchingSim, MatchesResultIsBool) {
+TEST(IfMatchesSim, MatchesResultIsBool) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -206,7 +206,7 @@ TEST(PatternMatchingSim, MatchesResultIsBool) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(PatternMatchingSim, MatchesNoElse) {
+TEST(IfMatchesSim, MatchesNoElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
