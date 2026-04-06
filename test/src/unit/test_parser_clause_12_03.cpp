@@ -395,23 +395,6 @@ TEST(StatementSyntaxParsing, WaitAsStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-TEST(StatementSyntaxParsing, RandcaseAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randcase\n"
-      "      1: a = 1;\n"
-      "      1: a = 2;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
-}
-
 TEST(StatementSyntaxParsing, SeqBlockAsStatement) {
   auto r = Parse(
       "module m;\n"

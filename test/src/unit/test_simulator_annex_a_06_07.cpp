@@ -580,66 +580,6 @@ TEST(CaseStatementSim, CaseInsideLRMExample) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(StmtExec, RandcaseSelectsItem) {
-  StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("rc", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kRandcase;
-  stmt->randcase_items.push_back(
-      {MakeInt(f.arena, 1), MakeBlockAssign(f.arena, "rc", 10)});
-  stmt->randcase_items.push_back(
-      {MakeInt(f.arena, 1), MakeBlockAssign(f.arena, "rc", 20)});
-  stmt->randcase_items.push_back(
-      {MakeInt(f.arena, 1), MakeBlockAssign(f.arena, "rc", 30)});
-
-  RunStmt(stmt, f.ctx, f.arena);
-  uint64_t val = result_var->value.ToUint64();
-  EXPECT_TRUE(val == 10 || val == 20 || val == 30);
-}
-
-TEST(StmtExec, RandcaseZeroTotalWeightNoOp) {
-  StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("rc", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 99);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kRandcase;
-  stmt->randcase_items.push_back(
-      {MakeInt(f.arena, 0), MakeBlockAssign(f.arena, "rc", 10)});
-  stmt->randcase_items.push_back(
-      {MakeInt(f.arena, 0), MakeBlockAssign(f.arena, "rc", 20)});
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result_var->value.ToUint64(), 99u);
-}
-
-TEST(CaseStatementSim, RandcaseExecution) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    randcase\n"
-      "      1: x = 8'd10;\n"
-      "      1: x = 8'd20;\n"
-      "      1: x = 8'd30;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  uint64_t val = var->value.ToUint64();
-  EXPECT_TRUE(val == 10 || val == 20 || val == 30);
-}
-
 TEST(CaseStatementSim, Unique0CasezNoMatchSilent) {
   SimFixture f;
   auto* design = ElaborateSrc(

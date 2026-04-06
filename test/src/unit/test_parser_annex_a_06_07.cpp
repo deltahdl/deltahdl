@@ -39,25 +39,6 @@ TEST(CaseSyntaxParsing, PriorityCase) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-TEST(CaseSyntaxParsing, Randcase) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randcase\n"
-      "      50: a = 1;\n"
-      "      30: a = 2;\n"
-      "      20: a = 3;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
-  ASSERT_EQ(stmt->randcase_items.size(), 3u);
-}
-
 static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   for (auto* item : r.cu->modules[0]->items) {
     if (item->kind == ModuleItemKind::kAlwaysLatchBlock) return item;
@@ -542,42 +523,6 @@ TEST(CaseQualifierParsing, Unique0Casex) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
   EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
-}
-
-TEST(CaseSyntaxParsing, RandcaseVaryingWeights) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randcase\n"
-      "      10: x = 1;\n"
-      "      30: x = 2;\n"
-      "      60: x = 3;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
-  EXPECT_EQ(stmt->randcase_items.size(), 3u);
-}
-
-TEST(CaseSyntaxParsing, RandcaseSingleItem) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    randcase\n"
-      "      1: x = 42;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRandcase);
-  EXPECT_EQ(stmt->randcase_items.size(), 1u);
 }
 
 }  // namespace

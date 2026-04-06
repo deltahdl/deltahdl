@@ -28,7 +28,11 @@ static ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   for (const auto& item : stmt->randcase_items) {
     total_weight += EvalExpr(item.first, ctx, arena).ToUint64();
   }
-  if (total_weight == 0) co_return StmtResult::kDone;
+  if (total_weight == 0) {
+    ctx.GetDiag().Warning(stmt->range.start,
+                          "randcase: all weights are zero; no branch selected");
+    co_return StmtResult::kDone;
+  }
 
   uint64_t pick = ctx.Urandom32() % total_weight;
   uint64_t cumulative = 0;
