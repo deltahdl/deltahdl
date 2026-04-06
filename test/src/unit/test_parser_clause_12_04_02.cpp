@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralStatementParsing, Unique0IfChainElseIf) {
+TEST(QualifiedIfParsing, Unique0IfChainElseIf) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -20,7 +20,7 @@ TEST(ProceduralStatementParsing, Unique0IfChainElseIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
 }
 
-TEST(ProceduralStatementParsing, PriorityIfWithElse) {
+TEST(QualifiedIfParsing, PriorityIfWithElse) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -39,7 +39,7 @@ TEST(ProceduralStatementParsing, PriorityIfWithElse) {
   ASSERT_NE(stmt->else_branch->else_branch, nullptr);
 }
 
-TEST(ProcessParsing, UniqueIf) {
+TEST(QualifiedIfParsing, UniqueIfInAlwaysComb) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -63,6 +63,169 @@ TEST(ProcessParsing, UniqueIf) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
   EXPECT_NE(stmt->then_branch, nullptr);
   EXPECT_NE(stmt->else_branch, nullptr);
+}
+
+TEST(QualifiedIfParsing, UniqueIfWithElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a) x = 1;\n"
+      "    else x = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
+TEST(QualifiedIfParsing, Unique0IfNoElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 if (a) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+}
+
+TEST(QualifiedIfParsing, UniqueIfElseIfElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a == 0) x = 1;\n"
+      "    else if (a == 1) x = 2;\n"
+      "    else if (a == 2) x = 3;\n"
+      "    else x = 4;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->else_branch->qualifier, CaseQualifier::kNone);
+}
+
+TEST(QualifiedIfParsing, UniqueIfElseIfChain) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else x = 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
+}
+
+TEST(QualifiedIfParsing, Unique0IfElseIfNoFinalElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+}
+
+TEST(QualifiedIfParsing, PriorityIfElseIfWithElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else x = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+}
+
+TEST(QualifiedIfParsing, PriorityIfNoFinalElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
+  EXPECT_EQ(stmt->else_branch->else_branch, nullptr);
+}
+
+TEST(QualifiedIfParsing, Unique0IfWithElse) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    unique0 if (a) x = 1;\n"
+      "    else if (b) x = 2;\n"
+      "    else x = 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique0);
+  ASSERT_NE(stmt->else_branch, nullptr);
+  EXPECT_EQ(stmt->else_branch->kind, StmtKind::kIf);
+  EXPECT_NE(stmt->else_branch->else_branch, nullptr);
+}
+
+TEST(QualifiedIfParsing, NestedQualifiedIfs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    priority if (a) begin\n"
+      "      unique if (b) x = 1;\n"
+      "      else x = 2;\n"
+      "    end else begin\n"
+      "      x = 3;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* outer = FirstInitialStmt(r);
+  ASSERT_NE(outer, nullptr);
+  EXPECT_EQ(outer->qualifier, CaseQualifier::kPriority);
+  ASSERT_NE(outer->then_branch, nullptr);
+  EXPECT_EQ(outer->then_branch->kind, StmtKind::kBlock);
+  auto* inner = outer->then_branch->stmts[0];
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(inner->qualifier, CaseQualifier::kUnique);
 }
 
 }  // namespace

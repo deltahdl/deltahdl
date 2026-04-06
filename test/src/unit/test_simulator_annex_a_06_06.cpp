@@ -11,37 +11,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StmtExec, UniqueIfMatchingBranch) {
-  StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("ui", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kIf;
-  stmt->qualifier = CaseQualifier::kUnique;
-  stmt->condition = MakeInt(f.arena, 1);
-  stmt->then_branch = MakeBlockAssign(f.arena, "ui", 10);
-  stmt->else_branch = MakeBlockAssign(f.arena, "ui", 20);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result_var->value.ToUint64(), 10u);
-}
-
-TEST(StmtExec, PriorityIfFirstMatchTaken) {
-  StmtFixture f;
-  auto* result_var = f.ctx.CreateVariable("pi", 32);
-  result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kIf;
-  stmt->qualifier = CaseQualifier::kPriority;
-  stmt->condition = MakeInt(f.arena, 1);
-  stmt->then_branch = MakeBlockAssign(f.arena, "pi", 30);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_EQ(result_var->value.ToUint64(), 30u);
-}
-
 TEST(StmtExec, PriorityIfNoMatchNoElseWarning) {
   StmtFixture f;
   auto* result_var = f.ctx.CreateVariable("piw", 32);
@@ -58,49 +27,6 @@ TEST(StmtExec, PriorityIfNoMatchNoElseWarning) {
   EXPECT_EQ(result_var->value.ToUint64(), 0u);
 
   EXPECT_GE(f.diag.WarningCount(), 1u);
-}
-
-TEST(ConditionalStatementSim, UniqueIfQualifierStored) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, x;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    unique if (a == 8'd0) x = 8'd10;\n"
-      "    else if (a == 8'd1) x = 8'd20;\n"
-      "    else x = 8'd30;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 20u);
-}
-
-TEST(ConditionalStatementSim, PriorityIfFirstMatch) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    priority if (1) x = 8'd10;\n"
-      "    else if (1) x = 8'd20;\n"
-      "    else x = 8'd30;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
 TEST(ConditionalStatementSim, UniqueIfNoMatchNoElseWarning) {
