@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SynthLower, AlwaysCombCaseInsideStmt) {
+TEST(CaseInsideStatementSynth, AlwaysCombCaseInsideStmt) {
   SynthFixture f;
   auto* mod =
       ElaborateSrc(f,
