@@ -17,15 +17,4 @@ TEST(ConditionalElaboration, UniqueIfInAlwaysComb) {
       "endmodule\n"));
 }
 
-TEST(ConditionalElaboration, IfElseIfElseInAlwaysLatch) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  logic a, b, x;\n"
-      "  always_latch begin\n"
-      "    if (a) x = 1;\n"
-      "    else if (b) x = 0;\n"
-      "  end\n"
-      "endmodule\n"));
-}
-
 }  // namespace

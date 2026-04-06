@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AlwaysCombBasicSim, AlwaysCombPriorityEncoder) {
+TEST(IfElseIfElaboration, AlwaysCombPriorityEncoder) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -33,6 +33,44 @@ TEST(AlwaysCombBasicSim, AlwaysCombPriorityEncoder) {
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+TEST(ConditionalElaboration, IfElseIfElseInAlwaysLatch) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  logic a, b, x;\n"
+      "  always_latch begin\n"
+      "    if (a) x = 1;\n"
+      "    else if (b) x = 0;\n"
+      "  end\n"
+      "endmodule\n"));
+}
+
+TEST(IfElseIfElaboration, IfElseIfNoFinalElseElaborates) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  logic a, b, x;\n"
+      "  initial begin\n"
+      "    if (a) x = 1;\n"
+      "    else if (b) x = 0;\n"
+      "  end\n"
+      "endmodule\n"));
+}
+
+TEST(IfElseIfElaboration, IfElseIfInInitialElaborates) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, x;\n"
+      "  initial begin\n"
+      "    a = 8'd0;\n"
+      "    if (a == 8'd0) x = 8'd10;\n"
+      "    else if (a == 8'd1) x = 8'd20;\n"
+      "    else x = 8'd30;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
 }
 
 }  // namespace
