@@ -262,9 +262,10 @@ def _handle_step2(stdout: str) -> "NotImplementable | None":
     except ValueError as exc:
         print(f"\nERROR: {exc}", file=sys.stderr)
         sys.exit(1)
-    if verdict == "no":
-        print(f"Not implementable — {rationale}")
-        return NotImplementable(rationale=rationale)
+    else:
+        if verdict == "no":
+            print(f"Not implementable — {rationale}")
+            return NotImplementable(rationale=rationale)
     return None
 
 

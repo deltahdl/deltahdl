@@ -246,19 +246,25 @@ def test_main_closes_issue_when_not_implementable(isc, tmp_path):
 def test_main_close_comment_deemed_not_implementable(isc, tmp_path):
     """main() comment contains the 'Deemed not implementable.' header."""
     mocks = _run_main_not_implementable(isc, tmp_path)
-    assert "Deemed not implementable." in mocks["gh"].call_args[0][0]
+    cmd = mocks["gh"].call_args[0][0]
+    comment = cmd[cmd.index("--comment") + 1]
+    assert "Deemed not implementable." in comment
 
 
 def test_main_close_comment_includes_rationale(isc, tmp_path):
     """main() embeds the captured rationale in the close comment."""
     mocks = _run_main_not_implementable(isc, tmp_path)
-    assert _NOT_IMPL_FIXTURE_RATIONALE in mocks["gh"].call_args[0][0]
+    cmd = mocks["gh"].call_args[0][0]
+    comment = cmd[cmd.index("--comment") + 1]
+    assert _NOT_IMPL_FIXTURE_RATIONALE in comment
 
 
 def test_main_close_comment_labels_rationale(isc, tmp_path):
     """main() prefixes the rationale block with a 'Rationale:' label."""
     mocks = _run_main_not_implementable(isc, tmp_path)
-    assert "Rationale:" in mocks["gh"].call_args[0][0]
+    cmd = mocks["gh"].call_args[0][0]
+    comment = cmd[cmd.index("--comment") + 1]
+    assert "Rationale:" in comment
 
 
 def test_main_skips_commit_when_not_implementable(isc, tmp_path):
