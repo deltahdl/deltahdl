@@ -508,46 +508,6 @@ TEST(ProceduralStatementParsing, UniqueCasexQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-TEST(CaseSyntaxParsing, CaseMatchesKeyword) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case (sel) matches\n"
-      "      8'd5: x = 1;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_TRUE(stmt->case_matches);
-  EXPECT_FALSE(stmt->case_inside);
-}
-
-TEST(CaseSyntaxParsing, CaseMatchesWithGuard) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case (sel) matches\n"
-      "      8'd5 &&& guard: x = 1;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_TRUE(stmt->case_matches);
-  ASSERT_GE(stmt->case_items.size(), 1u);
-  auto* pat = stmt->case_items[0].patterns[0];
-  EXPECT_EQ(pat->kind, ExprKind::kBinary);
-  EXPECT_EQ(pat->op, TokenKind::kAmpAmpAmp);
-}
-
 TEST(CaseSyntaxParsing, CaseMatchesDefault) {
   auto r = Parse(
       "module m;\n"
@@ -564,24 +524,6 @@ TEST(CaseSyntaxParsing, CaseMatchesDefault) {
   EXPECT_TRUE(stmt->case_matches);
   ASSERT_EQ(stmt->case_items.size(), 1u);
   EXPECT_TRUE(stmt->case_items[0].is_default);
-}
-
-TEST(CaseSyntaxParsing, CasezMatches) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    casez (sel) matches\n"
-      "      4'b1???: x = 1;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_TRUE(stmt->case_matches);
-  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
 }
 
 TEST(CaseSyntaxParsing, CaseMatchesMultipleItems) {

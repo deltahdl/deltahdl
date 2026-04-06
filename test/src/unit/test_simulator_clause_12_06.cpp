@@ -126,4 +126,28 @@ TEST(Matches, CaseMatchesWildcardNoMatch) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
+TEST(Matches, TripleAmpTrue) {
+  SimFixture f;
+  auto* expr = ParseExprFrom("1 &&& 1", f);
+  ASSERT_NE(expr, nullptr);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 1u);
+}
+
+TEST(Matches, TripleAmpFalseShortCircuit) {
+  SimFixture f;
+  auto* expr = ParseExprFrom("0 &&& 1", f);
+  ASSERT_NE(expr, nullptr);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(Matches, TripleAmpSecondFalse) {
+  SimFixture f;
+  auto* expr = ParseExprFrom("1 &&& 0", f);
+  ASSERT_NE(expr, nullptr);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64(), 0u);
+}
+
 }  // namespace

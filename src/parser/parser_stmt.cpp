@@ -396,8 +396,14 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
     }
     stmt->case_inside = true;
   }
-  // §12.6: case-matches variant.
-  if (Match(TokenKind::kKwMatches)) {
+  // §12.6: case-matches variant (mutually exclusive with inside).
+  if (Check(TokenKind::kKwMatches)) {
+    auto matches_loc = CurrentLoc();
+    Consume();
+    if (stmt->case_inside) {
+      diag_.Error(matches_loc,
+                  "'matches' and 'inside' cannot be used together");
+    }
     stmt->case_matches = true;
   }
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
