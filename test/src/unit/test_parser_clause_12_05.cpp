@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProcessParsing, BlockWithCaseStatement) {
+TEST(CaseSyntaxParsing, CaseInInitialBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -23,7 +23,7 @@ TEST(ProcessParsing, BlockWithCaseStatement) {
   EXPECT_GE(stmt->case_items.size(), 3u);
 }
 
-TEST(AssignmentParsing, CaseDecoderPattern) {
+TEST(CaseSyntaxParsing, CaseWithNonblockingAssigns) {
   auto r = Parse(
       "module m;\n"
       "  reg [1:0] sel;\n"
@@ -49,7 +49,7 @@ TEST(AssignmentParsing, CaseDecoderPattern) {
   EXPECT_EQ(stmt->case_items[3].body->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ProceduralStatementParsing, CaseInsideForLoop) {
+TEST(CaseSyntaxParsing, CaseInsideForLoop) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial begin\n"
@@ -64,7 +64,7 @@ TEST(ProceduralStatementParsing, CaseInsideForLoop) {
               "endmodule\n"));
 }
 
-TEST(ProcessParsing, CaseStatement) {
+TEST(CaseSyntaxParsing, CaseInAlwaysComb) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -88,7 +88,7 @@ TEST(ProcessParsing, CaseStatement) {
   EXPECT_TRUE(stmt->case_items[3].is_default);
 }
 
-TEST(AssignmentParsing, InCaseItems) {
+TEST(CaseSyntaxParsing, CaseItemsWithBlockingAssigns) {
   auto r = Parse(
       "module m;\n"
       "  reg [1:0] sel;\n"
@@ -112,6 +112,344 @@ TEST(AssignmentParsing, InCaseItems) {
   EXPECT_EQ(stmt->case_items[1].body->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(stmt->case_items[2].body->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(stmt->case_items[3].body->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(CaseSyntaxParsing, CaseBasic) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case (sel)\n"
+      "      2'b00: a = 1;\n"
+      "      2'b01: a = 2;\n"
+      "      default: a = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCase);
+  ASSERT_GE(stmt->case_items.size(), 3u);
+  EXPECT_TRUE(stmt->case_items[2].is_default);
+}
+
+TEST(CaseSyntaxParsing, CaseMultipleExprs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case (sel)\n"
+      "      1, 2, 3: a = 1;\n"
+      "      default: a = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_GE(stmt->case_items.size(), 2u);
+  EXPECT_EQ(stmt->case_items[0].patterns.size(), 3u);
+}
+
+TEST(CaseSyntaxParsing, CaseDefaultNoColon) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case (sel)\n"
+      "      1: a = 1;\n"
+      "      default a = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_TRUE(HasDefaultCaseItem(stmt));
+}
+
+TEST(CaseSyntaxParsing, CaseWithBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case (sel)\n"
+      "      1: begin a = 1; b = 2; end\n"
+      "      default: begin a = 0; end\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kBlock);
+}
+
+TEST(CaseSyntaxParsing, CaseMultipleExprsPerItem) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (sel)\n"
+      "      0, 1: x = 1;\n"
+      "      2, 3: x = 2;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  ASSERT_GE(stmt->case_items.size(), 3u);
+
+  EXPECT_EQ(stmt->case_items[0].patterns.size(), 2u);
+}
+
+TEST(CaseSyntaxParsing, CaseWithOnlyDefault) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (sel)\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  ASSERT_EQ(stmt->case_items.size(), 1u);
+  EXPECT_TRUE(stmt->case_items[0].is_default);
+}
+
+TEST(CaseSyntaxParsing, CaseItemDefaultFlags) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; default: y = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 2u);
+  EXPECT_FALSE(stmt->case_items[0].is_default);
+  EXPECT_TRUE(stmt->case_items[1].is_default);
+}
+
+TEST(CaseSyntaxParsing, CaseMultipleItemExprs) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(sel)\n"
+      "      0, 1: x = 8'd10;\n"
+      "      2, 3, 4: x = 8'd20;\n"
+      "      default: x = 8'd30;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 3u);
+  EXPECT_EQ(stmt->case_items[0].patterns.size(), 2u);
+  EXPECT_EQ(stmt->case_items[1].patterns.size(), 3u);
+  EXPECT_TRUE(stmt->case_items[2].is_default);
+}
+
+TEST(CaseSyntaxParsing, CaseNoDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; 1: y = 2; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 2u);
+  EXPECT_FALSE(stmt->case_items[0].is_default);
+  EXPECT_FALSE(stmt->case_items[1].is_default);
+}
+
+TEST(CaseSyntaxParsing, CaseItemWithBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x)\n"
+      "      0: begin y = 1; z = 2; end\n"
+      "      default: begin y = 0; z = 0; end\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kBlock);
+}
+
+TEST(CaseSyntaxParsing, PlainCaseHasNoQualifier) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (sel)\n"
+      "      0: x = 1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->qualifier, CaseQualifier::kNone);
+}
+
+TEST(CaseSyntaxParsing, PlainCaseIsNotInside) {
+  auto r = Parse(
+      "module t;\n"
+      "  initial begin\n"
+      "    case (val)\n"
+      "      0: x = 1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_FALSE(stmt->case_inside);
+}
+
+TEST(CaseSyntaxParsing, NestedCaseStmt) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(a)\n"
+      "      0: case(b)\n"
+      "           0: x = 1;\n"
+      "           1: x = 2;\n"
+      "         endcase\n"
+      "      1: x = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_items[0].body->kind, StmtKind::kCase);
+}
+
+TEST(CaseSyntaxParsing, CaseKindAndKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) 0: y = 1; default: y = 0; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCase);
+}
+
+TEST(CaseSyntaxParsing, CaseItemNullBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x)\n"
+      "      0: ;\n"
+      "      1: y = 1;\n"
+      "      default: ;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 3u);
+}
+
+TEST(CaseSyntaxParsing, CaseComplexExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(a + b)\n"
+      "      0: y = 1;\n"
+      "      1: y = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->condition, nullptr);
+  EXPECT_EQ(stmt->condition->kind, ExprKind::kBinary);
+}
+
+TEST(CaseSyntaxParsing, ConstExprCaseExpr) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(1)\n"
+      "      a: y = 1;\n"
+      "      b: y = 2;\n"
+      "      default: y = 3;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_NE(stmt->condition, nullptr);
+}
+
+TEST(CaseSyntaxParsing, CaseEmptyNoItems) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(stmt->case_items.size(), 0u);
+}
+
+TEST(CaseSyntaxParsing, CaseDefaultInMiddle) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(sel)\n"
+      "      0: x = 1;\n"
+      "      default: x = 99;\n"
+      "      1: x = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->case_items.size(), 3u);
+  EXPECT_FALSE(stmt->case_items[0].is_default);
+  EXPECT_TRUE(stmt->case_items[1].is_default);
+  EXPECT_FALSE(stmt->case_items[2].is_default);
 }
 
 }  // namespace
