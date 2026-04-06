@@ -255,6 +255,19 @@ def _parse_implementability(stdout: str) -> tuple[str, str]:
     return verdict, rationale
 
 
+def _handle_step2(stdout: str) -> "NotImplementable | None":
+    """Parse the step 2 response; return a sentinel if not implementable."""
+    try:
+        verdict, rationale = _parse_implementability(stdout)
+    except ValueError as exc:
+        print(f"\nERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+    if verdict == "no":
+        print(f"Not implementable — {rationale}")
+        return NotImplementable(rationale=rationale)
+    return None
+
+
 def run_steps(steps, *, model="opus",
               continue_session=False) -> "str | NotImplementable":
     """Run each step as a separate Claude call, return summary text."""
@@ -263,16 +276,13 @@ def run_steps(steps, *, model="opus",
 
     total = len(steps)
     summary = ""
-    skip_to_summary = False
-    not_implementable_rationale: str | None = None
+    not_implementable: NotImplementable | None = None
 
     for i, (description, prompt) in enumerate(steps):
         step_num = i + 1
 
-        if skip_to_summary and step_num < total:
+        if not_implementable is not None and step_num < total:
             continue
-
-        use_continue = continue_session if i == 0 else True
 
         cmd = [
             "claude", "-p",
@@ -282,7 +292,7 @@ def run_steps(steps, *, model="opus",
             "--output-format", "json",
             "--dangerously-skip-permissions",
         ]
-        if use_continue:
+        if i > 0 or continue_session:
             cmd.append("--continue")
 
         print(f"Step {step_num}/{total}: {description}...",
@@ -299,21 +309,13 @@ def run_steps(steps, *, model="opus",
             sys.exit(1)
 
         if step_num == 2:
-            try:
-                verdict, rationale = _parse_implementability(result.stdout)
-            except ValueError as exc:
-                print(f"\nERROR: {exc}", file=sys.stderr)
-                sys.exit(1)
-            if verdict == "no":
-                print(f"Not implementable — {rationale}")
-                not_implementable_rationale = rationale
-                skip_to_summary = True
+            not_implementable = _handle_step2(result.stdout)
 
         if step_num == total:
             summary = _extract_result_text(result.stdout)
 
-    if not_implementable_rationale is not None:
-        return NotImplementable(rationale=not_implementable_rationale)
+    if not_implementable is not None:
+        return not_implementable
     return summary
 
 

@@ -167,12 +167,15 @@ def test_build_steps_implementability_requires_rationale(isc):
     assert "RATIONALE:" in steps[1][1]
 
 
-def test_build_steps_implementability_specifies_format(isc):
-    """Implementability step pins the exact response format."""
+def test_build_steps_implementability_mentions_implementable_token(isc):
+    """Implementability step still includes the IMPLEMENTABLE: token."""
     steps = isc.build_steps("4.1", "~/LRM.txt")
-    prompt = steps[1][1]
-    # The prompt must require both fields, in order, in a fixed format.
-    assert "IMPLEMENTABLE:" in prompt
+    assert "IMPLEMENTABLE:" in steps[1][1]
+
+
+def test_build_steps_implementability_rationale_before_verdict(isc):
+    """Implementability step orders RATIONALE: before IMPLEMENTABLE:."""
+    prompt = isc.build_steps("4.1", "~/LRM.txt")[1][1]
     assert prompt.index("RATIONALE:") < prompt.index("IMPLEMENTABLE:")
 
 
@@ -347,17 +350,20 @@ def test_run_steps_captures_rationale_on_not_implementable(isc):
     assert result.rationale == _NOT_IMPL_RATIONALE
 
 
-def test_run_steps_implementable_yes_does_not_skip(isc):
-    """A 'yes' response with rationale runs all 12 steps and returns summary."""
-    yes_stdout = (
-        '{"result": "RATIONALE: Defines concrete syntax X and semantics Y.'
-        '\\nIMPLEMENTABLE: yes"}'
-    )
+_YES_STEP2_STDOUT = (
+    '{"result": "RATIONALE: Defines concrete syntax X and semantics Y.'
+    '\\nIMPLEMENTABLE: yes"}'
+)
 
+
+def _run_implementable_yes(isc):
+    """Run all steps with a yes verdict on step 2; return (result, count)."""
     def fake_run(_func, *_args, **_kwargs):
         fake_run.count += 1
         if fake_run.count == 2:
-            return MagicMock(returncode=0, stdout=yes_stdout, stderr="")
+            return MagicMock(
+                returncode=0, stdout=_YES_STEP2_STDOUT, stderr="",
+            )
         return MagicMock(returncode=0, stdout=_OK_STDOUT, stderr="")
 
     fake_run.count = 0
@@ -365,19 +371,27 @@ def test_run_steps_implementable_yes_does_not_skip(isc):
     steps = isc.build_steps("4.1", "~/LRM.txt")
     with patch("implement_subclause.run_with_dots", side_effect=fake_run):
         result = isc.run_steps(steps, model="opus")
-    assert fake_run.count == 12
+    return result, fake_run.count
+
+
+def test_run_steps_implementable_yes_runs_all_steps(isc):
+    """A 'yes' response with rationale runs all 12 steps."""
+    _, count = _run_implementable_yes(isc)
+    assert count == 12
+
+
+def test_run_steps_implementable_yes_returns_summary(isc):
+    """A 'yes' response returns the final step's summary text."""
+    result, _ = _run_implementable_yes(isc)
     assert result == "- Done because needed"
 
 
-@patch("implement_subclause.sys.exit")
-def test_run_steps_exits_on_malformed_step2(mock_exit, isc):
-    """A step 2 response missing RATIONALE: causes a hard failure."""
-    malformed = '{"result": "IMPLEMENTABLE: no"}'
-
+def _run_steps_with_step2_stdout(isc, step2_stdout):
+    """Run steps where step 2 returns ``step2_stdout``."""
     def fake_run(_func, *_args, **_kwargs):
         fake_run.count += 1
         if fake_run.count == 2:
-            return MagicMock(returncode=0, stdout=malformed, stderr="")
+            return MagicMock(returncode=0, stdout=step2_stdout, stderr="")
         return MagicMock(returncode=0, stdout=_OK_STDOUT, stderr="")
 
     fake_run.count = 0
@@ -385,25 +399,21 @@ def test_run_steps_exits_on_malformed_step2(mock_exit, isc):
     steps = isc.build_steps("4.1", "~/LRM.txt")
     with patch("implement_subclause.run_with_dots", side_effect=fake_run):
         isc.run_steps(steps, model="opus")
+
+
+@patch("implement_subclause.sys.exit")
+def test_run_steps_exits_on_malformed_step2(mock_exit, isc):
+    """A step 2 response missing RATIONALE: causes a hard failure."""
+    _run_steps_with_step2_stdout(isc, '{"result": "IMPLEMENTABLE: no"}')
     assert mock_exit.called
 
 
 @patch("implement_subclause.sys.exit")
 def test_run_steps_exits_on_empty_rationale(mock_exit, isc):
     """A step 2 response with an empty RATIONALE causes a hard failure."""
-    empty = '{"result": "RATIONALE:\\nIMPLEMENTABLE: no"}'
-
-    def fake_run(_func, *_args, **_kwargs):
-        fake_run.count += 1
-        if fake_run.count == 2:
-            return MagicMock(returncode=0, stdout=empty, stderr="")
-        return MagicMock(returncode=0, stdout=_OK_STDOUT, stderr="")
-
-    fake_run.count = 0
-
-    steps = isc.build_steps("4.1", "~/LRM.txt")
-    with patch("implement_subclause.run_with_dots", side_effect=fake_run):
-        isc.run_steps(steps, model="opus")
+    _run_steps_with_step2_stdout(
+        isc, '{"result": "RATIONALE:\\nIMPLEMENTABLE: no"}',
+    )
     assert mock_exit.called
 
 
