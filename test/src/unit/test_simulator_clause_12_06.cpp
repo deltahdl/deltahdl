@@ -75,57 +75,6 @@ TEST(Matches, ResultAlwaysDetermined) {
   EXPECT_EQ(result.width, 1u);
 }
 
-TEST(Matches, CaseMatchesWildcardPattern) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] sel;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    sel = 4'b1010;\n"
-      "    case(sel) matches\n"
-      "      4'b0???: x = 8'd1;\n"
-      "      4'b1???: x = 8'd2;\n"
-      "      default: x = 8'd0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 2u);
-}
-
-TEST(Matches, CaseMatchesWildcardNoMatch) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] sel;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    sel = 4'b1010;\n"
-      "    case(sel) matches\n"
-      "      4'b0??0: x = 8'd1;\n"
-      "      default: x = 8'd99;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 99u);
-}
-
 TEST(Matches, TripleAmpTrue) {
   SimFixture f;
   auto* expr = ParseExprFrom("1 &&& 1", f);

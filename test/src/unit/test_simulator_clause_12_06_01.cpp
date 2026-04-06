@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(PatternSim, CaseMatchesConstantMatch) {
+TEST(CaseMatchesItemSim, CaseMatchesConstantMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -33,7 +33,7 @@ TEST(PatternSim, CaseMatchesConstantMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(PatternSim, CaseMatchesDefaultFallthrough) {
+TEST(CaseMatchesItemSim, CaseMatchesDefaultFallthrough) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -57,7 +57,7 @@ TEST(PatternSim, CaseMatchesDefaultFallthrough) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(PatternSim, CaseMatchesFirstMatchWins) {
+TEST(CaseMatchesItemSim, CaseMatchesFirstMatchWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -81,7 +81,7 @@ TEST(PatternSim, CaseMatchesFirstMatchWins) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(PatternSim, CaseMatchesGuardTrue) {
+TEST(CaseMatchesItemSim, CaseMatchesGuardTrue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -106,7 +106,7 @@ TEST(PatternSim, CaseMatchesGuardTrue) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(PatternSim, CaseMatchesGuardFalse) {
+TEST(CaseMatchesItemSim, CaseMatchesGuardFalse) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -132,7 +132,7 @@ TEST(PatternSim, CaseMatchesGuardFalse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(PatternSim, CaseMatchesGuardFalseSecondMatches) {
+TEST(CaseMatchesItemSim, CaseMatchesGuardFalseSecondMatches) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -157,7 +157,7 @@ TEST(PatternSim, CaseMatchesGuardFalseSecondMatches) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(PatternSim, CasezMatchesWildcard) {
+TEST(CaseMatchesItemSim, CasezMatchesWildcard) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -182,7 +182,7 @@ TEST(PatternSim, CasezMatchesWildcard) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(PatternSim, PriorityCaseMatchesNoMatchViolation) {
+TEST(CaseMatchesItemSim, PriorityCaseMatchesNoMatchViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -204,7 +204,7 @@ TEST(PatternSim, PriorityCaseMatchesNoMatchViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(PatternSim, UniqueCaseMatchesOverlapViolation) {
+TEST(CaseMatchesItemSim, UniqueCaseMatchesOverlapViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -228,7 +228,7 @@ TEST(PatternSim, UniqueCaseMatchesOverlapViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(PatternSim, CaseMatchesNoMatchNoDefault) {
+TEST(CaseMatchesItemSim, CaseMatchesNoMatchNoDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -251,6 +251,151 @@ TEST(PatternSim, CaseMatchesNoMatchNoDefault) {
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(CaseMatchesItemSim, CaseMatchesWildcardPattern) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = 4'b1010;\n"
+      "    case(sel) matches\n"
+      "      4'b0???: x = 8'd1;\n"
+      "      4'b1???: x = 8'd2;\n"
+      "      default: x = 8'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+TEST(CaseMatchesItemSim, CaseMatchesWildcardNoMatch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = 4'b1010;\n"
+      "    case(sel) matches\n"
+      "      4'b0??0: x = 8'd1;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+TEST(CaseMatchesItemSim, CasexMatchesXInSelectorDontCare) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = 4'bx010;\n"
+      "    casex(sel) matches\n"
+      "      4'b1010: x = 8'd1;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(CaseMatchesItemSim, CaseMatchesXInSelectorNoMatch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] sel;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    sel = 4'bx010;\n"
+      "    case(sel) matches\n"
+      "      4'b1010: x = 8'd1;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+TEST(CaseMatchesItemSim, CaseMatchesCommaSeparatedPatterns) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd3;\n"
+      "    case(sel) matches\n"
+      "      8'd1, 8'd2, 8'd3: x = 8'd10;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
+TEST(CaseMatchesItemSim, CaseMatchesCommaSeparatedNoneMatch) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd5;\n"
+      "    case(sel) matches\n"
+      "      8'd1, 8'd2, 8'd3: x = 8'd10;\n"
+      "      default: x = 8'd99;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 }  // namespace

@@ -508,44 +508,6 @@ TEST(ProceduralStatementParsing, UniqueCasexQualifier) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kUnique);
 }
 
-TEST(CaseSyntaxParsing, CaseMatchesDefault) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case (sel) matches\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_TRUE(stmt->case_matches);
-  ASSERT_EQ(stmt->case_items.size(), 1u);
-  EXPECT_TRUE(stmt->case_items[0].is_default);
-}
-
-TEST(CaseSyntaxParsing, CaseMatchesMultipleItems) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case (sel) matches\n"
-      "      8'd1: x = 1;\n"
-      "      8'd2: x = 2;\n"
-      "      8'd3: x = 3;\n"
-      "      default: x = 0;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_TRUE(stmt->case_matches);
-  EXPECT_EQ(stmt->case_items.size(), 4u);
-}
-
 TEST(CaseQualifierParsing, Unique0Casez) {
   auto r = Parse(
       "module m;\n"

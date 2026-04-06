@@ -76,21 +76,6 @@ TEST(PatternParsing, AssignmentPatternIntegerAtomType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(PatternParsing, CaseMatchesPattern) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case (x) matches\n"
-      "      .a: $display(\"a\");\n"
-      "      .b: $display(\"b\");\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-
 TEST(AssignmentPatternParsing, TypePrefixedPattern) {
   auto r = Parse(
       "module t;\n"

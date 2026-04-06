@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(PatternParsing, CasePatternItemWithGuard) {
+TEST(CaseMatchesItemParsing, CasePatternItemWithGuard) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -19,7 +19,7 @@ TEST(PatternParsing, CasePatternItemWithGuard) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(PatternParsing, CasePatternTaggedWithGuard) {
+TEST(CaseMatchesItemParsing, CasePatternTaggedWithGuard) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -33,7 +33,7 @@ TEST(PatternParsing, CasePatternTaggedWithGuard) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CaseSyntaxParsing, CaseMatchesParse) {
+TEST(CaseMatchesItemParsing, CaseMatchesParse) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -50,7 +50,7 @@ TEST(CaseSyntaxParsing, CaseMatchesParse) {
   EXPECT_EQ(stmt->kind, StmtKind::kCase);
 }
 
-TEST(PatternParsing, CaseMatchesDefault) {
+TEST(CaseMatchesItemParsing, CaseMatchesDefault) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -69,7 +69,7 @@ TEST(PatternParsing, CaseMatchesDefault) {
   EXPECT_TRUE(stmt->case_items[1].is_default);
 }
 
-TEST(PatternParsing, CaseMatchesMultipleItems) {
+TEST(CaseMatchesItemParsing, CaseMatchesMultipleItems) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -88,5 +88,37 @@ TEST(PatternParsing, CaseMatchesMultipleItems) {
   ASSERT_EQ(stmt->case_items.size(), 4u);
 }
 
+
+TEST(CaseMatchesItemParsing, CaseMatchesPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case (x) matches\n"
+      "      .a: $display(\"a\");\n"
+      "      .b: $display(\"b\");\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(CaseMatchesItemParsing, CaseMatchesCommaSeparatedPatterns) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case(x) matches\n"
+      "      1, 2, 3: y = 10;\n"
+      "      default: y = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_GE(stmt->case_items.size(), 1u);
+  EXPECT_EQ(stmt->case_items[0].patterns.size(), 3u);
+}
 
 }  // namespace
