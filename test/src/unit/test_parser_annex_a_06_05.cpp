@@ -590,79 +590,6 @@ TEST(TimingControlSyntaxParsing, RepeatEventControl) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
 }
 
-TEST(TimingControlSyntaxParsing, JumpReturnExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int f();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TimingControlSyntaxParsing, JumpReturnWithExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int f(); return 42; endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* func = FirstFunctionDecl(r);
-  ASSERT_NE(func, nullptr);
-  ASSERT_GE(func->func_body_stmts.size(), 1u);
-  auto* stmt = func->func_body_stmts[0];
-  EXPECT_EQ(stmt->kind, StmtKind::kReturn);
-  EXPECT_NE(stmt->expr, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, JumpReturnVoid) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void f(); return; endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* func = FirstFunctionDecl(r);
-  ASSERT_NE(func, nullptr);
-  ASSERT_GE(func->func_body_stmts.size(), 1u);
-  auto* stmt = func->func_body_stmts[0];
-  EXPECT_EQ(stmt->kind, StmtKind::kReturn);
-  EXPECT_EQ(stmt->expr, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, JumpBreak) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    forever begin\n"
-      "      break;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  VerifyForeverLoopJump(body, StmtKind::kBreak);
-}
-
-TEST(TimingControlSyntaxParsing, JumpContinue) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    forever begin\n"
-      "      continue;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  VerifyForeverLoopJump(body, StmtKind::kContinue);
-}
-
 TEST(TimingControlSyntaxParsing, WaitStatement) {
   auto r = Parse(
       "module m;\n"
@@ -778,28 +705,6 @@ TEST(TimingControlSyntaxParsing, WaitForkMissingSemicolon) {
       "endmodule\n").has_errors);
 }
 
-TEST(TimingControlSyntaxParsing, ReturnMissingSemicolon) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  function int f();\n"
-      "    return 42\n"
-      "  endfunction\n"
-      "endmodule\n").has_errors);
-}
-
-TEST(TimingControlSyntaxParsing, BreakMissingSemicolon) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial forever begin break end\n"
-      "endmodule\n").has_errors);
-}
-
-TEST(TimingControlSyntaxParsing, ContinueMissingSemicolon) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial forever begin continue end\n"
-      "endmodule\n").has_errors);
-}
 
 TEST(TimingControlSyntaxParsing, WaitOrderMissingLParen) {
   EXPECT_TRUE(Parse(
