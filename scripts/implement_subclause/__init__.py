@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from lib.python.classify import (
@@ -33,6 +34,20 @@ from lib.python.git import (
 # ---------------------------------------------------------------------------
 
 CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
+
+_RATIONALE_RE = re.compile(
+    r"RATIONALE:\s*(.*?)\s*IMPLEMENTABLE:\s*(yes|no)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+@dataclass
+class NotImplementable:
+    """Sentinel returned by run_steps when Step 2 verdicts a subclause as
+    not implementable. Carries the rationale Claude was forced to articulate
+    so the close-issue comment can preserve it for human review."""
+
+    rationale: str
 
 
 
@@ -98,7 +113,20 @@ def build_steps(
          " distinctions (e.g., 'X is a Y', 'X has property Z') IS"
          " implementable — those are testable definitional claims"
          " even if the text is short."
-         " Respond with exactly IMPLEMENTABLE: yes or IMPLEMENTABLE: no"),
+         " If existing tests under test/src/unit/ already cover"
+         f" §{subclause}, that is by itself sufficient evidence"
+         " the subclause is implementable.\n\n"
+         "Respond in EXACTLY this format and nothing else:\n\n"
+         "RATIONALE: <2-6 sentences citing specific language from"
+         f" §{subclause} that does or does not impose testable"
+         " requirements. If you claim the section is overview-only,"
+         " you must quote the wording that convinces you of that.>\n"
+         "IMPLEMENTABLE: yes\n\n"
+         "(or `IMPLEMENTABLE: no` after the rationale).\n\n"
+         "Writing the rationale is mandatory — a response missing"
+         " the RATIONALE: line will be rejected. Use the rationale"
+         " to check your own answer: if you cannot articulate why,"
+         " you do not yet know the answer."),
         ("Auditing src",
          f"Search src/ for existing code that implements §{subclause}."
          " Report what aligns with the LRM and what is missing."
@@ -204,8 +232,31 @@ def _format_subclause_label(subclause):
     return f"§{subclause}"
 
 
+def _parse_implementability(stdout: str) -> tuple[str, str]:
+    """Parse a Step 2 response into (verdict, rationale).
+
+    The verdict is the lowercase 'yes' or 'no' value of the IMPLEMENTABLE
+    field. The rationale is the RATIONALE field text. Raises ValueError
+    when either field is missing — Step 2 has a strict contract and a
+    malformed response must not silently degrade into a 'no' verdict.
+    """
+    text = _extract_result_text(stdout)
+    match = _RATIONALE_RE.search(text)
+    if not match:
+        raise ValueError(
+            "Step 2 response is missing the required"
+            " 'RATIONALE: <text>\\nIMPLEMENTABLE: yes|no' format."
+            f" Got: {text!r}"
+        )
+    rationale = match.group(1).strip()
+    verdict = match.group(2).strip().lower()
+    if not rationale:
+        raise ValueError("Step 2 response had an empty RATIONALE.")
+    return verdict, rationale
+
+
 def run_steps(steps, *, model="opus",
-              continue_session=False) -> str | None:
+              continue_session=False) -> "str | NotImplementable":
     """Run each step as a separate Claude call, return summary text."""
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
@@ -213,6 +264,7 @@ def run_steps(steps, *, model="opus",
     total = len(steps)
     summary = ""
     skip_to_summary = False
+    not_implementable_rationale: str | None = None
 
     for i, (description, prompt) in enumerate(steps):
         step_num = i + 1
@@ -246,15 +298,22 @@ def run_steps(steps, *, model="opus",
             )
             sys.exit(1)
 
-        if step_num == 2 and "IMPLEMENTABLE: no" in result.stdout:
-            print("Not implementable — skipping to summary.")
-            skip_to_summary = True
+        if step_num == 2:
+            try:
+                verdict, rationale = _parse_implementability(result.stdout)
+            except ValueError as exc:
+                print(f"\nERROR: {exc}", file=sys.stderr)
+                sys.exit(1)
+            if verdict == "no":
+                print(f"Not implementable — {rationale}")
+                not_implementable_rationale = rationale
+                skip_to_summary = True
 
         if step_num == total:
             summary = _extract_result_text(result.stdout)
 
-    if skip_to_summary:
-        return None
+    if not_implementable_rationale is not None:
+        return NotImplementable(rationale=not_implementable_rationale)
     return summary
 
 
@@ -358,11 +417,14 @@ def main(argv=None):
         steps, model=args.model,
         continue_session=args.continue_session,
     )
-    if action is None:
+    if isinstance(action, NotImplementable):
         print("Not implementable — closing issue.")
+        comment = (
+            "Deemed not implementable.\n\n"
+            f"Rationale:\n{action.rationale}"
+        )
         subprocess.run(
-            ["gh", "issue", "close", str(args.issue),
-             "--comment", "Deemed not implementable."],
+            ["gh", "issue", "close", str(args.issue), "--comment", comment],
             check=True,
         )
         return

@@ -216,18 +216,28 @@ def test_main_prints_action_summary(
 
 
 
+_NOT_IMPL_FIXTURE_RATIONALE = (
+    "Section §6.6.1 only points at §6.6.2 for actual semantics."
+)
+
+
+def _not_impl(isc):
+    """Build a NotImplementable sentinel for tests."""
+    return isc.NotImplementable(rationale=_NOT_IMPL_FIXTURE_RATIONALE)
+
+
 @patch("implement_subclause.subprocess.run",
        return_value=MagicMock(returncode=0))
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_steps", return_value=None)
 def test_main_closes_issue_when_not_implementable(
-    _mock_run, _mock_commit, mock_gh, isc, tmp_path,
+    _mock_commit, mock_gh, isc, tmp_path,
 ):
     """main() closes issue with comment when not implementable."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
-    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1",
-              "--issue", "8", "--model", "opus"])
+    with patch("implement_subclause.run_steps", return_value=_not_impl(isc)):
+        isc.main(["--lrm", str(lrm), "--subclause", "6.6.1",
+                  "--issue", "8", "--model", "opus"])
     cmd = mock_gh.call_args[0][0]
     assert "close" in cmd
 
@@ -235,15 +245,15 @@ def test_main_closes_issue_when_not_implementable(
 @patch("implement_subclause.subprocess.run",
        return_value=MagicMock(returncode=0))
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_steps", return_value=None)
 def test_main_close_comment_deemed_not_implementable(
-    _mock_run, _mock_commit, mock_gh, isc, tmp_path,
+    _mock_commit, mock_gh, isc, tmp_path,
 ):
-    """main() passes 'Deemed not implementable.' comment."""
+    """main() comment starts with the 'Deemed not implementable.' header."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
-    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1",
-              "--issue", "8", "--model", "opus"])
+    with patch("implement_subclause.run_steps", return_value=_not_impl(isc)):
+        isc.main(["--lrm", str(lrm), "--subclause", "6.6.1",
+                  "--issue", "8", "--model", "opus"])
     cmd = mock_gh.call_args[0][0]
     assert "Deemed not implementable." in cmd
 
@@ -251,15 +261,47 @@ def test_main_close_comment_deemed_not_implementable(
 @patch("implement_subclause.subprocess.run",
        return_value=MagicMock(returncode=0))
 @patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_steps", return_value=None)
+def test_main_close_comment_includes_rationale(
+    _mock_commit, mock_gh, isc, tmp_path,
+):
+    """main() embeds the captured rationale in the close comment."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    with patch("implement_subclause.run_steps", return_value=_not_impl(isc)):
+        isc.main(["--lrm", str(lrm), "--subclause", "6.6.1",
+                  "--issue", "8", "--model", "opus"])
+    cmd = mock_gh.call_args[0][0]
+    assert _NOT_IMPL_FIXTURE_RATIONALE in cmd
+
+
+@patch("implement_subclause.subprocess.run",
+       return_value=MagicMock(returncode=0))
+@patch("implement_subclause.commit_implementation")
+def test_main_close_comment_labels_rationale(
+    _mock_commit, mock_gh, isc, tmp_path,
+):
+    """main() prefixes the rationale block with a 'Rationale:' label."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    with patch("implement_subclause.run_steps", return_value=_not_impl(isc)):
+        isc.main(["--lrm", str(lrm), "--subclause", "6.6.1",
+                  "--issue", "8", "--model", "opus"])
+    cmd = mock_gh.call_args[0][0]
+    assert "Rationale:" in cmd
+
+
+@patch("implement_subclause.subprocess.run",
+       return_value=MagicMock(returncode=0))
+@patch("implement_subclause.commit_implementation")
 def test_main_skips_commit_when_not_implementable(
-    _mock_run, mock_commit, _mock_gh, isc, tmp_path,
+    mock_commit, _mock_gh, isc, tmp_path,
 ):
     """main() does not call commit_implementation when not implementable."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
-    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1",
-              "--issue", "8", "--model", "opus"])
+    with patch("implement_subclause.run_steps", return_value=_not_impl(isc)):
+        isc.main(["--lrm", str(lrm), "--subclause", "6.6.1",
+                  "--issue", "8", "--model", "opus"])
     assert not mock_commit.called
 
 
