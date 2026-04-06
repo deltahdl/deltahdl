@@ -276,13 +276,103 @@ void SynthLower::LowerIfStmt(const Stmt* stmt, AigGraph& aig) {
   }
 }
 
+struct PatternBits {
+  uint64_t aval = 0;
+  uint64_t dc_mask = 0;
+};
+
+static PatternBits ParsePatternLiteral(std::string_view text,
+                                       TokenKind case_kind) {
+  PatternBits result{};
+  std::string buf;
+  buf.reserve(text.size());
+  for (char c : text) {
+    if (c != '_' && c != ' ' && c != '\t') buf.push_back(c);
+  }
+  auto tick = buf.find('\'');
+  if (tick == std::string::npos) return result;
+
+  size_t i = tick + 1;
+  if (i < buf.size() && (buf[i] == 's' || buf[i] == 'S')) ++i;
+  if (i >= buf.size()) return result;
+
+  int bits_per_digit = 0;
+  switch (buf[i]) {
+    case 'b':
+    case 'B':
+      bits_per_digit = 1;
+      break;
+    case 'o':
+    case 'O':
+      bits_per_digit = 3;
+      break;
+    case 'h':
+    case 'H':
+      bits_per_digit = 4;
+      break;
+    case 'd':
+    case 'D':
+      for (size_t j = i + 1; j < buf.size(); ++j) {
+        char c = buf[j];
+        bool is_z = (c == 'z' || c == 'Z' || c == '?');
+        bool is_x = (c == 'x' || c == 'X');
+        if (is_z || (is_x && case_kind == TokenKind::kKwCasex)) {
+          result.dc_mask = ~uint64_t{0};
+          return result;
+        }
+      }
+      return result;
+    default:
+      return result;
+  }
+  ++i;
+
+  uint32_t bit_pos = 0;
+  for (size_t j = buf.size(); j > i; --j) {
+    char c = buf[j - 1];
+    bool is_z = (c == 'z' || c == 'Z' || c == '?');
+    bool is_x = (c == 'x' || c == 'X');
+    bool is_dc =
+        (case_kind == TokenKind::kKwCasez) ? is_z : (is_z || is_x);
+    if (is_dc) {
+      for (int b = 0; b < bits_per_digit && bit_pos + b < 64; ++b)
+        result.dc_mask |= uint64_t{1} << (bit_pos + b);
+    } else {
+      uint64_t dv = 0;
+      if (c >= '0' && c <= '9')
+        dv = c - '0';
+      else if (c >= 'a' && c <= 'f')
+        dv = c - 'a' + 10;
+      else if (c >= 'A' && c <= 'F')
+        dv = c - 'A' + 10;
+      for (int b = 0; b < bits_per_digit && bit_pos + b < 64; ++b) {
+        if ((dv >> b) & 1u) result.aval |= uint64_t{1} << (bit_pos + b);
+      }
+    }
+    bit_pos += bits_per_digit;
+  }
+  return result;
+}
+
 static uint32_t BuildPatternMatch(const Expr* sel_expr, const Expr* pat,
                                   AigGraph& aig, SynthLower& synth,
-                                  uint32_t sel_width) {
+                                  uint32_t sel_width, TokenKind case_kind) {
+  bool has_dc = (case_kind != TokenKind::kKwCase) &&
+                (pat->kind == ExprKind::kIntegerLiteral);
+  PatternBits pbits{};
+  if (has_dc) pbits = ParsePatternLiteral(pat->text, case_kind);
+
   uint32_t eq = AigGraph::kConstTrue;
   for (uint32_t b = 0; b < sel_width; ++b) {
+    if (has_dc && ((pbits.dc_mask >> b) & 1u)) continue;
     uint32_t sb = synth.LowerExprBit(sel_expr, aig, b);
-    uint32_t pb = synth.LowerExprBit(pat, aig, b);
+    uint32_t pb;
+    if (has_dc) {
+      pb = ((pbits.aval >> b) & 1u) ? AigGraph::kConstTrue
+                                    : AigGraph::kConstFalse;
+    } else {
+      pb = synth.LowerExprBit(pat, aig, b);
+    }
     eq = aig.AddAnd(eq, aig.AddNot(aig.AddXor(sb, pb)));
   }
   return eq;
@@ -313,7 +403,8 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
     uint32_t match = AigGraph::kConstFalse;
     for (const auto* pat : ci.patterns) {
       match = aig.AddOr(match, BuildPatternMatch(stmt->condition, pat, aig,
-                                                 *this, sel_width));
+                                                 *this, sel_width,
+                                                 stmt->case_kind));
     }
     MuxCaseBits(result_bits, case_bits, match, aig);
   }
