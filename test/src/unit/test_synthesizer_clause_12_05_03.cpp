@@ -8,15 +8,15 @@ using namespace delta;
 
 namespace {
 
-TEST(SynthLower, AlwaysCombCaseInsideStmt) {
+TEST(CasezStatementSynth, AlwaysCombCasezStmt) {
   SynthFixture f;
   auto* mod =
       ElaborateSrc(f,
                    "module m(input logic [1:0] sel, output logic [1:0] y);\n"
                    "  always_comb begin\n"
-                   "    case (sel) inside\n"
-                   "      2'b00: y = 2'b01;\n"
-                   "      [2'b01:2'b10]: y = 2'b10;\n"
+                   "    casez (sel)\n"
+                   "      2'b1?: y = 2'b01;\n"
+                   "      2'b01: y = 2'b10;\n"
                    "      default: y = 2'b00;\n"
                    "    endcase\n"
                    "  end\n"
