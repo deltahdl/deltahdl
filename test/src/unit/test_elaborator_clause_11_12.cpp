@@ -129,4 +129,75 @@ TEST(LetDeclElaboration, LetDeclWithAttributeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(LetDeclElaboration, LetDeclInProgramElaborates) {
+  EXPECT_TRUE(
+      ElabOk("program p;\n"
+             "  let inc(x) = x + 1;\n"
+             "endprogram\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+TEST(LetDeclElaboration, LetDeclInCheckerElaborates) {
+  EXPECT_TRUE(
+      ElabOk("checker chk;\n"
+             "  let valid(a, b) = a | b;\n"
+             "endchecker\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+TEST(LetDeclElaboration, LetDeclInGenerateBlockElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  generate\n"
+      "    if (1) begin\n"
+      "      let g(x) = x + 1;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LetDeclElaboration, LetDeclInFunctionElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  function int foo();\n"
+      "    let inc(x) = x + 1;\n"
+      "    return inc(5);\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LetDeclElaboration, LetDeclInTaskElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  task my_task();\n"
+      "    let inc(x) = x + 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LetDeclElaboration, LetDeclWithTernaryBodyElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  let clamp(v, lo, hi) = (v < lo) ? lo : ((v > hi) ? hi : v);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

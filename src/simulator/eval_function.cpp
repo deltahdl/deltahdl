@@ -14,6 +14,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 #include "simulator/vcd_writer.h"
 
 namespace delta {
@@ -1071,18 +1072,19 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
 // §11.12: Guard against recursive let expansion.
 static thread_local std::unordered_set<std::string_view> expanding_lets;
 
-// §11.12/§F.4: Bind let formal arguments to actual values in a new scope.
-// §A.2.12 let_list_of_arguments: supports positional and named (.name(expr)).
-static void BindLetArgs(ModuleItem* decl, const Expr* call, SimContext& ctx,
-                        Arena& arena) {
+// §11.12: Evaluate let actual arguments in the caller's scope.
+// Returns a vector of evaluated values, one per formal.
+static std::vector<Logic4Vec> EvalLetActuals(ModuleItem* decl, const Expr* call,
+                                             SimContext& ctx, Arena& arena) {
   auto& formals = decl->func_args;
   size_t positional_count = call->args.size() - call->arg_names.size();
+  std::vector<Logic4Vec> vals;
+  vals.reserve(formals.size());
   for (size_t i = 0; i < formals.size(); ++i) {
     Logic4Vec val;
     if (i < positional_count) {
       val = EvalExpr(call->args[i], ctx, arena);
     } else {
-      // Search named arguments for this formal.
       int found = -1;
       for (size_t j = 0; j < call->arg_names.size(); ++j) {
         if (call->arg_names[j] == formals[i].name) {
@@ -1098,21 +1100,48 @@ static void BindLetArgs(ModuleItem* decl, const Expr* call, SimContext& ctx,
         val = MakeLogic4Vec(arena, 32);
       }
     }
-    auto* var = ctx.CreateLocalVariable(formals[i].name, val.width);
-    var->value = val;
+    // §11.12: Typed formal — cast actual to formal's declared width.
+    const auto& dt = formals[i].data_type;
+    if (dt.kind != DataTypeKind::kImplicit && dt.packed_dim_left &&
+        dt.packed_dim_right) {
+      uint32_t formal_width = EvalTypeWidth(dt);
+      if (formal_width > 0 && formal_width != val.width) {
+        val = ResizeToWidth(val, formal_width, arena);
+      }
+    }
+    vals.push_back(val);
+  }
+  return vals;
+}
+
+// §11.12: Bind pre-evaluated actual values to let formals in the current scope.
+static void BindLetArgs(ModuleItem* decl, const std::vector<Logic4Vec>& vals,
+                        SimContext& ctx) {
+  auto& formals = decl->func_args;
+  for (size_t i = 0; i < formals.size(); ++i) {
+    auto* var = ctx.CreateLocalVariable(formals[i].name, vals[i].width);
+    var->value = vals[i];
   }
 }
 
 // §11.12/§F.4: Expand a let declaration by binding args and evaluating body.
+// §11.12: Free variables in the let body resolve from the declaration scope
+// (module-level), not the instantiation scope.
 static Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call,
                                   SimContext& ctx, Arena& arena) {
   // §11.12: Recursive let instantiation is not permitted.
   if (expanding_lets.count(decl->name)) return MakeAllX(arena, 32);
   expanding_lets.insert(decl->name);
+  // §11.12: Evaluate actuals in the caller's scope before isolating.
+  auto vals = EvalLetActuals(decl, call, ctx, arena);
+  // §11.12: Clear the scope stack so free variables in the let body
+  // resolve from the declaration (module-level) scope, not the caller's.
+  auto saved_scopes = ctx.SwapScopeStack({});
   ctx.PushScope();
-  BindLetArgs(decl, call, ctx, arena);
+  BindLetArgs(decl, vals, ctx);
   auto result = EvalExpr(decl->init_expr, ctx, arena);
   ctx.PopScope();
+  ctx.SwapScopeStack(std::move(saved_scopes));
   expanding_lets.erase(decl->name);
   return result;
 }

@@ -782,6 +782,10 @@ void Lowerer::Lower(const RtlirDesign* design) {
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }
+  // §11.12: Register CU-scope let declarations.
+  for (auto* let_decl : design->cu_let_decls) {
+    ctx_.RegisterLetDecl(let_decl->name, let_decl);
+  }
   // §8.24: Link out-of-block method bodies to their class types.
   for (auto* item : design->cu_function_decls) {
     if (item->method_class.empty()) continue;

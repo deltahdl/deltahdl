@@ -203,6 +203,8 @@ struct RtlirDesign {
   std::unordered_map<std::string_view, uint32_t> type_widths;
   // §3.12.1: CU-scope function/task declarations visible to all modules.
   std::vector<ModuleItem*> cu_function_decls;
+  // §11.12: CU-scope let declarations visible to all modules.
+  std::vector<ModuleItem*> cu_let_decls;
 };
 
 }  // namespace delta

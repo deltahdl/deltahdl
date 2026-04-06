@@ -99,6 +99,14 @@ void SimContext::PopScope() {
   if (!scope_stack_.empty()) scope_stack_.pop_back();
 }
 
+std::vector<std::unordered_map<std::string_view, Variable*>>
+SimContext::SwapScopeStack(
+    std::vector<std::unordered_map<std::string_view, Variable*>> new_stack) {
+  auto old = std::move(scope_stack_);
+  scope_stack_ = std::move(new_stack);
+  return old;
+}
+
 void SimContext::PushStaticScope(std::string_view func_name) {
   scope_stack_.push_back(static_frames_[func_name]);
 }

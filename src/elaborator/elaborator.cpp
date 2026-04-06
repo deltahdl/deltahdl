@@ -176,6 +176,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
       design->cu_function_decls.push_back(item);
+    } else if (item->kind == ModuleItemKind::kLetDecl) {
+      design->cu_let_decls.push_back(item);
     }
   }
   // §20.6.2: Populate type widths for $bits(type) support.

@@ -157,6 +157,9 @@ class SimContext {
 
   void PushScope();
   void PopScope();
+  // §11.12: Save and replace the scope stack for declarative context binding.
+  std::vector<std::unordered_map<std::string_view, Variable*>> SwapScopeStack(
+      std::vector<std::unordered_map<std::string_view, Variable*>> new_stack);
   void PushStaticScope(std::string_view func_name);
   void PopStaticScope(std::string_view func_name);
   bool HasLocalScope() const { return !scope_stack_.empty(); }

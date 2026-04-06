@@ -54,4 +54,28 @@ TEST(LetKeywordLexing, LetDeclTokenSequence) {
   EXPECT_EQ(tokens[6].kind, TokenKind::kIdentifier);
 }
 
+TEST(LetKeywordLexing, LetNoArgsTokenSequence) {
+  auto tokens = Lex("let addr = base;");
+  ASSERT_GE(tokens.size(), 5u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwLet);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "addr");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kEq);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[3].text, "base");
+  EXPECT_EQ(tokens[4].kind, TokenKind::kSemicolon);
+}
+
+TEST(LetKeywordLexing, UntypedInLetPortTokenSequence) {
+  auto tokens = Lex("let f(untyped a) = a;");
+  ASSERT_GE(tokens.size(), 9u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwLet);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kLParen);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kKwUntyped);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[4].text, "a");
+  EXPECT_EQ(tokens[5].kind, TokenKind::kRParen);
+}
+
 }  // namespace
