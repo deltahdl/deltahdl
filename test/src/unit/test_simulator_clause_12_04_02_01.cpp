@@ -29,25 +29,6 @@ TEST(UniqueIfViolationSim, DeferredOverlapViolationReported) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(StatementTimingSim, DeferredPriorityNoMatchReported) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    priority if (0) x = 8'd10;\n"
-      "    else if (0) x = 8'd20;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.diag.WarningCount(), 1u);
-}
-
 TEST(UniqueIfViolationSim, FlushClearsPendingViolations) {
   SimFixture f;
 

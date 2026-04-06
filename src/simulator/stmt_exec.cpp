@@ -265,11 +265,37 @@ static ExecTask ExecUniqueIf(const Stmt* stmt, CaseQualifier qual,
   co_return StmtResult::kDone;
 }
 
+static ExecTask ExecPriorityIf(const Stmt* stmt, SimContext& ctx,
+                               Arena& arena) {
+  bool has_final_else = false;
+  for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
+       cur = cur->else_branch) {
+    auto cond = EvalExpr(cur->condition, ctx, arena);
+    if (cond.IsTruthy()) {
+      co_return co_await ExecStmt(cur->then_branch, ctx, arena);
+    }
+    if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
+      has_final_else = true;
+    }
+  }
+  if (has_final_else) {
+    const Stmt* final_else = FindFinalElse(stmt);
+    if (final_else) co_return co_await ExecStmt(final_else, ctx, arena);
+  }
+  if (!has_final_else) {
+    ctx.AddPendingViolation("priority if: no condition matched");
+  }
+  co_return StmtResult::kDone;
+}
+
 static ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto qual = stmt->qualifier;
 
   if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
     co_return co_await ExecUniqueIf(stmt, qual, ctx, arena);
+  }
+  if (qual == CaseQualifier::kPriority) {
+    co_return co_await ExecPriorityIf(stmt, ctx, arena);
   }
 
   auto cond = EvalExpr(stmt->condition, ctx, arena);
@@ -278,9 +304,6 @@ static ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
   if (stmt->else_branch) {
     co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
-  }
-  if (qual == CaseQualifier::kPriority) {
-    ctx.AddPendingViolation("priority if: no condition matched");
   }
   co_return StmtResult::kDone;
 }
