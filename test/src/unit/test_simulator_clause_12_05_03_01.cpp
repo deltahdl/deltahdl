@@ -8,4 +8,210 @@ using namespace delta;
 
 namespace {
 
+TEST(CaseViolationDeferralSim, DeferredUniqueCaseOverlapReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd1;\n"
+      "    unique case(sel)\n"
+      "      8'd1: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+TEST(CaseViolationDeferralSim, DeferredPriorityCaseNoMatchReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd5;\n"
+      "    x = 8'd0;\n"
+      "    priority case(sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+TEST(CaseViolationDeferralSim, DeferredUniqueCaseNoMatchReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd99;\n"
+      "    x = 8'd0;\n"
+      "    unique case(sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+TEST(CaseViolationDeferralSim, FlushClearsPendingCaseViolations) {
+  SimFixture f;
+
+  Process proc;
+  proc.kind = ProcessKind::kInitial;
+  f.ctx.SetCurrentProcess(&proc);
+
+  f.ctx.AddPendingViolation("unique case: multiple items matched");
+  ASSERT_EQ(proc.pending_violations.size(), 1u);
+
+  f.ctx.FlushPendingViolations();
+  EXPECT_TRUE(proc.pending_violations.empty());
+
+  f.scheduler.Run();
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+
+  f.ctx.SetCurrentProcess(nullptr);
+}
+
+TEST(CaseViolationDeferralSim, MultipleCaseViolationsMature) {
+  SimFixture f;
+
+  Process proc;
+  proc.kind = ProcessKind::kInitial;
+  f.ctx.SetCurrentProcess(&proc);
+
+  f.ctx.AddPendingViolation("unique case: multiple items matched");
+  f.ctx.AddPendingViolation("unique case: no matching item found");
+  ASSERT_EQ(proc.pending_violations.size(), 2u);
+
+  f.scheduler.Run();
+  EXPECT_EQ(f.diag.WarningCount(), 2u);
+
+  f.ctx.SetCurrentProcess(nullptr);
+}
+
+TEST(CaseViolationDeferralSim, Unique0CaseNoMatchNoDeferredViolation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd5;\n"
+      "    x = 8'd0;\n"
+      "    unique0 case(sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(CaseViolationDeferralSim, FlushAfterPartialAccumulation) {
+  SimFixture f;
+
+  Process proc;
+  proc.kind = ProcessKind::kInitial;
+  f.ctx.SetCurrentProcess(&proc);
+
+  f.ctx.AddPendingViolation("unique case: multiple items matched");
+  f.ctx.FlushPendingViolations();
+
+  f.ctx.AddPendingViolation("unique case: no matching item found");
+
+  f.scheduler.Run();
+
+  EXPECT_EQ(f.diag.WarningCount(), 1u);
+
+  f.ctx.SetCurrentProcess(nullptr);
+}
+
+TEST(CaseViolationDeferralSim, Unique0CaseOverlapDeferredViolation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    unique0 case(8'd1)\n"
+      "      8'd1: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+TEST(CaseViolationDeferralSim, DeferredUniqueCasezOverlapReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'b00000001;\n"
+      "    unique casez(sel)\n"
+      "      8'b0000???1: x = 8'd10;\n"
+      "      8'b000000?1: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+TEST(CaseViolationDeferralSim, DeferredPriorityCasexNoMatchReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] sel, x;\n"
+      "  initial begin\n"
+      "    sel = 8'd99;\n"
+      "    x = 8'd0;\n"
+      "    priority casex(sel)\n"
+      "      8'd0: x = 8'd10;\n"
+      "      8'd1: x = 8'd20;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
 }  // namespace
