@@ -120,4 +120,26 @@ TEST(LoopStatementSim, DoWhileBlock) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
+TEST(LoopStatementSim, DoWhileXConditionOneIteration) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic cond;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    cond = 1'bx;\n"
+      "    do x = x + 8'd1; while (cond);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace

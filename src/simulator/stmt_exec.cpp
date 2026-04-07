@@ -648,7 +648,7 @@ static ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       co_return result;
     }
     auto cond = EvalExpr(stmt->condition, ctx, arena);
-    if (cond.ToUint64() == 0) break;
+    if (!cond.IsTruthy()) break;
   } while (!ctx.StopRequested());
   co_return StmtResult::kDone;
 }
