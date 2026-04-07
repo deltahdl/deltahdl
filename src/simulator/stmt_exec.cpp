@@ -606,7 +606,7 @@ static ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 static ExecTask ExecWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   while (!ctx.StopRequested()) {
     auto cond = EvalExpr(stmt->condition, ctx, arena);
-    if (cond.ToUint64() == 0) break;
+    if (!cond.IsTruthy()) break;
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {

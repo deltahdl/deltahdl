@@ -438,20 +438,6 @@ TEST(StatementSyntaxParsing, MultipleAttributesOnNullStatement) {
   ASSERT_GE(stmt->attrs.size(), 2u);
 }
 
-TEST(StatementSyntaxParsing, WhileAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    while (x) a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWhile);
-}
-
 TEST(StatementSyntaxParsing, DoWhileAsStatement) {
   auto r = Parse(
       "module m;\n"

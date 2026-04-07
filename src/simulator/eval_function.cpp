@@ -628,6 +628,19 @@ static std::string GetForeachArrayName(const Expr* expr) {
   return {};
 }
 
+static bool ExecFuncWhile(const Stmt* stmt, Variable* ret_var,
+                          std::string_view func_name, SimContext& ctx,
+                          Arena& arena) {
+  while (stmt->condition &&
+         EvalExpr(stmt->condition, ctx, arena).IsTruthy()) {
+    if (stmt->body &&
+        ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
                             std::string_view func_name, SimContext& ctx,
                             Arena& arena) {
@@ -695,6 +708,8 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
       return ExecFuncFor(stmt, ret_var, func_name, ctx, arena);
     case StmtKind::kForeach:
       return ExecFuncForeach(stmt, ret_var, func_name, ctx, arena);
+    case StmtKind::kWhile:
+      return ExecFuncWhile(stmt, ret_var, func_name, ctx, arena);
     default:
       return false;
   }
