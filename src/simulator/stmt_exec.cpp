@@ -629,7 +629,7 @@ static ExecTask ExecForever(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 static ExecTask ExecRepeat(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto count_val = EvalExpr(stmt->condition, ctx, arena);
-  auto count = count_val.ToUint64();
+  uint64_t count = count_val.IsKnown() ? count_val.ToUint64() : 0;
   for (uint64_t i = 0; i < count && !ctx.StopRequested(); ++i) {
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;

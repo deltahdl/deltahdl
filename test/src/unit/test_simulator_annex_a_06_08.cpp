@@ -63,25 +63,4 @@ TEST(LoopSyntaxSimulation, ForPreIncrementStep) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(LoopSyntaxSimulation, RepeatExpressionCount) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] total;\n"
-      "  logic [7:0] n;\n"
-      "  initial begin\n"
-      "    n = 8'd3;\n"
-      "    total = 8'd0;\n"
-      "    repeat (n + 8'd2)\n"
-      "      total = total + 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("total");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 5u);
-}
-
 }  // namespace

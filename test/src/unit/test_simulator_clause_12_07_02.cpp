@@ -114,4 +114,71 @@ TEST(LoopStatementSim, RepeatVariableCount) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
+TEST(LoopStatementSim, RepeatExpressionCount) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] total;\n"
+      "  logic [7:0] n;\n"
+      "  initial begin\n"
+      "    n = 8'd3;\n"
+      "    total = 8'd0;\n"
+      "    repeat (n + 8'd2)\n"
+      "      total = total + 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("total");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
+TEST(LoopStatementSim, RepeatXCountZeroIterations) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic [7:0] n;\n"
+      "  initial begin\n"
+      "    x = 8'd42;\n"
+      "    n = 8'bx;\n"
+      "    repeat (n) x = 8'd0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(LoopStatementSim, RepeatZCountZeroIterations) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  logic [7:0] n;\n"
+      "  initial begin\n"
+      "    x = 8'd42;\n"
+      "    n = 8'bz;\n"
+      "    repeat (n) x = 8'd0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
 }  // namespace
