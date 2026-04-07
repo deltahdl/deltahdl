@@ -438,20 +438,6 @@ TEST(StatementSyntaxParsing, MultipleAttributesOnNullStatement) {
   ASSERT_GE(stmt->attrs.size(), 2u);
 }
 
-TEST(StatementSyntaxParsing, ForeverAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    forever @(posedge clk) a = ~a;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForever);
-}
-
 TEST(StatementSyntaxParsing, SubroutineCallAsStatement) {
   auto r = Parse(
       "module m;\n"

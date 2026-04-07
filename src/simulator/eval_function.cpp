@@ -654,6 +654,18 @@ static bool ExecFuncDoWhile(const Stmt* stmt, Variable* ret_var,
   return false;
 }
 
+static bool ExecFuncForever(const Stmt* stmt, Variable* ret_var,
+                            std::string_view func_name, SimContext& ctx,
+                            Arena& arena) {
+  for (;;) {
+    if (stmt->body &&
+        ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
                             std::string_view func_name, SimContext& ctx,
                             Arena& arena) {
@@ -725,6 +737,8 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
       return ExecFuncWhile(stmt, ret_var, func_name, ctx, arena);
     case StmtKind::kDoWhile:
       return ExecFuncDoWhile(stmt, ret_var, func_name, ctx, arena);
+    case StmtKind::kForever:
+      return ExecFuncForever(stmt, ret_var, func_name, ctx, arena);
     default:
       return false;
   }
