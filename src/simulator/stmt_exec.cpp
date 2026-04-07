@@ -655,24 +655,35 @@ static ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 // --- Foreach (IEEE §12.7.3) ---
 
+static std::string GetForeachArrayName(const Expr* expr) {
+  if (!expr) return {};
+  if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
+  if (expr->kind == ExprKind::kMemberAccess) {
+    std::string name;
+    BuildLhsName(expr, name);
+    return name;
+  }
+  return {};
+}
+
 static uint32_t GetArraySize(const Stmt* stmt, SimContext& ctx) {
-  if (!stmt->expr) return 0;
-  if (stmt->expr->kind != ExprKind::kIdentifier) return 0;
-  auto* info = ctx.FindArrayInfo(stmt->expr->text);
+  std::string name = GetForeachArrayName(stmt->expr);
+  if (name.empty()) return 0;
+  auto* info = ctx.FindArrayInfo(name);
   if (info) return info->size;
-  auto* var = ctx.FindVariable(stmt->expr->text);
+  auto* var = ctx.FindVariable(name);
   if (!var) return 0;
   return var->value.width;
 }
 
 static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  // §7.8.1: foreach is not allowed on wildcard-indexed associative arrays.
-  if (stmt->expr && stmt->expr->kind == ExprKind::kIdentifier) {
-    auto* aa = ctx.FindAssocArray(stmt->expr->text);
+  std::string arr_name = GetForeachArrayName(stmt->expr);
+  if (!arr_name.empty()) {
+    auto* aa = ctx.FindAssocArray(arr_name);
     if (aa && aa->is_wildcard) {
       ctx.GetDiag().Error(
           {}, "foreach not allowed on wildcard associative array '" +
-                  std::string(stmt->expr->text) + "'");
+                  arr_name + "'");
       co_return StmtResult::kDone;
     }
   }

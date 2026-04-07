@@ -617,19 +617,29 @@ static void ExecFuncVarDecl(const Stmt* stmt, std::string_view func_name,
                      arena);
 }
 
+static std::string GetForeachArrayName(const Expr* expr) {
+  if (!expr) return {};
+  if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
+  if (expr->kind == ExprKind::kMemberAccess) {
+    std::string name;
+    BuildLhsName(expr, name);
+    return name;
+  }
+  return {};
+}
+
 static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
                             std::string_view func_name, SimContext& ctx,
                             Arena& arena) {
-  if (!stmt->expr) return false;
+  std::string name = GetForeachArrayName(stmt->expr);
+  if (name.empty()) return false;
   uint32_t size = 0;
-  if (stmt->expr->kind == ExprKind::kIdentifier) {
-    auto* info = ctx.FindArrayInfo(stmt->expr->text);
-    if (info) {
-      size = info->size;
-    } else {
-      auto* var = ctx.FindVariable(stmt->expr->text);
-      if (var) size = var->value.width;
-    }
+  auto* info = ctx.FindArrayInfo(name);
+  if (info) {
+    size = info->size;
+  } else {
+    auto* var = ctx.FindVariable(name);
+    if (var) size = var->value.width;
   }
   if (size == 0) return false;
 
