@@ -155,18 +155,6 @@ TEST(LoopSyntaxParsing, ForeachSkippedIndex) {
   EXPECT_EQ(stmt->kind, StmtKind::kForeach);
 }
 
-TEST(LoopSyntaxParsing, ForWithMultipleVarDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0, int j = 10; i < j; i++, j--)\n"
-      "      a = i + j;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(LoopSyntaxParsing, RepeatWithBlock) {
   auto r = Parse(
       "module m;\n"

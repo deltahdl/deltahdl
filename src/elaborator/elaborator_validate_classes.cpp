@@ -246,12 +246,12 @@ static void WalkStmtForArrayArgTypes(
                            class_names, diag);
   WalkStmtForArrayArgTypes(s->body, func_decls, var_array_info, class_names,
                            diag);
-  WalkStmtForArrayArgTypes(s->for_init, func_decls, var_array_info,
-                           class_names, diag);
+  for (auto* fi : s->for_inits)
+    WalkStmtForArrayArgTypes(fi, func_decls, var_array_info, class_names, diag);
   WalkStmtForArrayArgTypes(s->for_body, func_decls, var_array_info,
                            class_names, diag);
-  WalkStmtForArrayArgTypes(s->for_step, func_decls, var_array_info,
-                           class_names, diag);
+  for (auto* fs : s->for_steps)
+    WalkStmtForArrayArgTypes(fs, func_decls, var_array_info, class_names, diag);
   WalkExprForArrayArgTypes(s->for_cond, func_decls, var_array_info,
                            class_names, diag);
   for (auto& ci : s->case_items)
@@ -760,7 +760,7 @@ static void CollectLocalNames(const Stmt* s,
   if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
     out.insert(s->var_name);
   }
-  if (s->for_init) CollectLocalNames(s->for_init, out);
+  for (auto* fi : s->for_inits) CollectLocalNames(fi, out);
   for (auto v : s->foreach_vars) {
     if (!v.empty()) out.insert(v);
   }

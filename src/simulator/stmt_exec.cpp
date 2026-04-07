@@ -559,30 +559,47 @@ static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 // --- Loops ---
 
-// Create for-init variable when the init declares a type (§12.7.1).
-static void CreateForInitVar(const Stmt* stmt, SimContext& ctx) {
-  if (stmt->for_init_type.kind == DataTypeKind::kImplicit) return;
-  if (!stmt->for_init || !stmt->for_init->lhs) return;
-  uint32_t w = EvalTypeWidth(stmt->for_init_type);
-  if (w == 0) w = 32;
-  ctx.CreateVariable(stmt->for_init->lhs->text, w);
+// Create for-init variables when the init declares a type (§12.7.1).
+static void CreateForInitVars(const Stmt* stmt, SimContext& ctx) {
+  for (size_t i = 0; i < stmt->for_inits.size(); ++i) {
+    if (i >= stmt->for_init_types.size()) break;
+    if (stmt->for_init_types[i].kind == DataTypeKind::kImplicit) continue;
+    auto* init = stmt->for_inits[i];
+    if (!init || !init->lhs) continue;
+    uint32_t w = EvalTypeWidth(stmt->for_init_types[i]);
+    if (w == 0) w = 32;
+    ctx.CreateLocalVariable(init->lhs->text, w);
+  }
+}
+
+static bool HasTypedForInit(const Stmt* stmt) {
+  for (const auto& t : stmt->for_init_types) {
+    if (t.kind != DataTypeKind::kImplicit) return true;
+  }
+  return false;
 }
 
 static ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  CreateForInitVar(stmt, ctx);
-  if (stmt->for_init) co_await ExecStmt(stmt->for_init, ctx, arena);
+  bool scoped = HasTypedForInit(stmt);
+  if (scoped) ctx.PushScope();
+  CreateForInitVars(stmt, ctx);
+  for (auto* init : stmt->for_inits)
+    co_await ExecStmt(init, ctx, arena);
   while (!ctx.StopRequested()) {
     if (stmt->for_cond) {
       auto cond = EvalExpr(stmt->for_cond, ctx, arena);
-      if (cond.ToUint64() == 0) break;
+      if (!cond.IsTruthy()) break;
     }
     auto result = co_await ExecStmt(stmt->for_body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
+      if (scoped) ctx.PopScope();
       co_return result;
     }
-    if (stmt->for_step) co_await ExecStmt(stmt->for_step, ctx, arena);
+    for (auto* step : stmt->for_steps)
+      co_await ExecStmt(step, ctx, arena);
   }
+  if (scoped) ctx.PopScope();
   co_return StmtResult::kDone;
 }
 

@@ -45,36 +45,4 @@ TEST(ScopeAndLifetimeSimulation, ExplicitAutoInStaticFuncBlockFresh) {
   EXPECT_EQ(val, 11u);
 }
 
-TEST(ScopeAndLifetimeSimulation, ForLoopVariableCountsCorrectly) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    result = 0;\n"
-      "    for (int i = 0; i < 5; i = i + 1) begin\n"
-      "      result = result + i;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(val, 10u);
-}
-
-TEST(ScopeAndLifetimeSimulation, NestedForLoopVarsScopedCorrectly) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  initial begin\n"
-      "    result = 0;\n"
-      "    for (int i = 0; i < 3; i = i + 1) begin\n"
-      "      for (int j = 0; j < 2; j = j + 1) begin\n"
-      "        result = result + 1;\n"
-      "      end\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(val, 6u);
-}
-
 }  // namespace

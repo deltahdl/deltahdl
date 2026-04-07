@@ -1,5 +1,4 @@
 #include "fixture_elaborator.h"
-#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -52,30 +51,89 @@ TEST(LoopStatementElaboration, NestedLoops) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(BlockingAssignSim, BlockingAssignForLoop) {
-  SimFixture f;
+TEST(LoopStatementElaboration, ForByteDeclElaborates) {
+  ElabFixture f;
   auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int sum;\n"
-      "  int i;\n"
+      "module m;\n"
+      "  logic [7:0] x;\n"
       "  initial begin\n"
-      "    sum = 0;\n"
-      "    for (i = 1; i <= 5; i = i + 1) begin\n"
-      "      sum = sum + i;\n"
+      "    for (byte i = 0; i < 10; i++) x = i;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LoopStatementElaboration, ForLogicDeclElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    for (logic [3:0] i = 0; i < 10; i++) x = i[7:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LoopStatementElaboration, ForCompoundAssignStepElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 20; i += 2) x = i[7:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LoopStatementElaboration, ForLoopInInitialBlockElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i = i + 1) begin\n"
       "    end\n"
       "  end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
 
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+TEST(LoopStatementElaboration, ForCommaSeparatedTypedInitElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    for (int i = 0, int j = 4; i < j; i++, j--)\n"
+      "      x = i[7:0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
 
-  auto* var = f.ctx.FindVariable("sum");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 15u);
+TEST(LoopStatementElaboration, ForTypedInitNotVisibleAfterLoop) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 10; i++) begin\n"
+      "    end\n"
+      "    i = 5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace

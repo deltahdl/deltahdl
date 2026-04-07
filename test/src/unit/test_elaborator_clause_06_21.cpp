@@ -163,18 +163,4 @@ TEST(ScopeAndLifetimeElaboration, StaticVarForceInTaskSucceeds) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ScopeAndLifetimeElaboration, ForLoopInInitialBlockElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 10; i = i + 1) begin\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 }  // namespace

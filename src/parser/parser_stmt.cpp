@@ -437,27 +437,37 @@ Stmt* Parser::ParseForStmt() {
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwFor);
   Expect(TokenKind::kLParen);
-  // §A.6.8: for_initialization is optional.
+  // §A.6.8 / §12.7.1: for_initialization is optional; may be comma-separated.
   if (Check(TokenKind::kSemicolon)) {
     // Empty init — just consume the ';'.
     Consume();
   } else if (Check(TokenKind::kKwVar) ||
              IsDataTypeKeyword(CurrentToken().kind)) {
-    // §A.6.8: for_variable_declaration: [var] data_type id = expr
-    Match(TokenKind::kKwVar);
-    stmt->for_init_type = ParseDataType();
-    stmt->for_init = ParseAssignmentOrExprStmt();
+    // §A.6.8: for_variable_declaration { , for_variable_declaration }
+    do {
+      Match(TokenKind::kKwVar);
+      stmt->for_init_types.push_back(ParseDataType());
+      stmt->for_inits.push_back(ParseAssignmentOrExprNoSemi());
+    } while (Match(TokenKind::kComma));
+    Expect(TokenKind::kSemicolon);
   } else {
-    stmt->for_init = ParseAssignmentOrExprStmt();
+    // §A.6.8: list_of_variable_assignments (comma-separated)
+    do {
+      stmt->for_init_types.emplace_back();
+      stmt->for_inits.push_back(ParseAssignmentOrExprNoSemi());
+    } while (Match(TokenKind::kComma));
+    Expect(TokenKind::kSemicolon);
   }
   // §A.6.8: condition expression is optional.
   if (!Check(TokenKind::kSemicolon)) {
     stmt->for_cond = ParseExpr();
   }
   Expect(TokenKind::kSemicolon);
-  // §A.6.8: for_step is optional.
+  // §A.6.8 / §12.7.1: for_step is optional; may be comma-separated.
   if (!Check(TokenKind::kRParen)) {
-    stmt->for_step = ParseAssignmentOrExprNoSemi();
+    do {
+      stmt->for_steps.push_back(ParseAssignmentOrExprNoSemi());
+    } while (Match(TokenKind::kComma));
   }
   Expect(TokenKind::kRParen);
   stmt->for_body = ParseStmt();

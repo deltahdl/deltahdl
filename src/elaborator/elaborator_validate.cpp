@@ -290,9 +290,9 @@ static void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
   CheckScalarSelectStmt(s->then_branch, scalars, diag);
   CheckScalarSelectStmt(s->else_branch, scalars, diag);
   CheckScalarSelectStmt(s->body, scalars, diag);
-  CheckScalarSelectStmt(s->for_init, scalars, diag);
+  for (auto* fi : s->for_inits) CheckScalarSelectStmt(fi, scalars, diag);
   CheckScalarSelectStmt(s->for_body, scalars, diag);
-  CheckScalarSelectStmt(s->for_step, scalars, diag);
+  for (auto* fs : s->for_steps) CheckScalarSelectStmt(fs, scalars, diag);
   CheckScalarSelect(s->for_cond, scalars, diag);
   for (const auto& ci : s->case_items)
     CheckScalarSelectStmt(ci.body, scalars, diag);
@@ -309,9 +309,9 @@ static void CheckIndexedPartSelectWidthStmt(const Stmt* s, DiagEngine& diag) {
   CheckIndexedPartSelectWidthStmt(s->then_branch, diag);
   CheckIndexedPartSelectWidthStmt(s->else_branch, diag);
   CheckIndexedPartSelectWidthStmt(s->body, diag);
-  CheckIndexedPartSelectWidthStmt(s->for_init, diag);
+  for (auto* fi : s->for_inits) CheckIndexedPartSelectWidthStmt(fi, diag);
   CheckIndexedPartSelectWidthStmt(s->for_body, diag);
-  CheckIndexedPartSelectWidthStmt(s->for_step, diag);
+  for (auto* fs : s->for_steps) CheckIndexedPartSelectWidthStmt(fs, diag);
   CheckIndexedPartSelectWidth(s->for_cond, diag);
   for (const auto& ci : s->case_items)
     CheckIndexedPartSelectWidthStmt(ci.body, diag);
@@ -986,9 +986,9 @@ static void WalkStmtForCallArgs(
   WalkStmtForCallArgs(s->then_branch, func_decls, diag);
   WalkStmtForCallArgs(s->else_branch, func_decls, diag);
   WalkStmtForCallArgs(s->body, func_decls, diag);
-  WalkStmtForCallArgs(s->for_init, func_decls, diag);
+  for (auto* fi : s->for_inits) WalkStmtForCallArgs(fi, func_decls, diag);
   WalkStmtForCallArgs(s->for_body, func_decls, diag);
-  WalkStmtForCallArgs(s->for_step, func_decls, diag);
+  for (auto* fs : s->for_steps) WalkStmtForCallArgs(fs, func_decls, diag);
   WalkExprForCallArgs(s->for_cond, func_decls, diag);
   for (auto& ci : s->case_items) WalkStmtForCallArgs(ci.body, func_decls, diag);
 }

@@ -53,8 +53,8 @@ void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
   CollectStmtReads(stmt->then_branch, out);
   CollectStmtReads(stmt->else_branch, out);
   CollectStmtReads(stmt->for_body, out);
-  CollectStmtReads(stmt->for_init, out);
-  CollectStmtReads(stmt->for_step, out);
+  for (auto* fi : stmt->for_inits) CollectStmtReads(fi, out);
+  for (auto* fs : stmt->for_steps) CollectStmtReads(fs, out);
   CollectStmtReads(stmt->body, out);
   for (auto* s : stmt->fork_stmts) CollectStmtReads(s, out);
   // §9.2.2.2.2: Case item patterns and bodies contribute to sensitivity.
@@ -97,8 +97,8 @@ void CollectWrittenNames(const Stmt* stmt,
   CollectWrittenNames(stmt->else_branch, out);
   CollectWrittenNames(stmt->body, out);
   CollectWrittenNames(stmt->for_body, out);
-  CollectWrittenNames(stmt->for_init, out);
-  CollectWrittenNames(stmt->for_step, out);
+  for (auto* fi : stmt->for_inits) CollectWrittenNames(fi, out);
+  for (auto* fs : stmt->for_steps) CollectWrittenNames(fs, out);
   for (const auto& ci : stmt->case_items) CollectWrittenNames(ci.body, out);
   for (const auto* s : stmt->fork_stmts) CollectWrittenNames(s, out);
 }

@@ -538,25 +538,35 @@ static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var,
 static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
                         std::string_view func_name, SimContext& ctx,
                         Arena& arena) {
-  if (stmt->for_init_type.kind != DataTypeKind::kImplicit && stmt->for_init &&
-      stmt->for_init->lhs &&
-      stmt->for_init->lhs->kind == ExprKind::kIdentifier) {
-    uint32_t w = EvalTypeWidth(stmt->for_init_type);
-    if (w == 0) w = 32;
-    auto* v = ctx.CreateLocalVariable(stmt->for_init->lhs->text, w);
-    if (stmt->for_init->rhs)
-      v->value = EvalExpr(stmt->for_init->rhs, ctx, arena);
-  } else if (stmt->for_init) {
-    ExecFuncStmt(stmt->for_init, ret_var, func_name, ctx, arena);
+  bool scoped = false;
+  for (const auto& t : stmt->for_init_types) {
+    if (t.kind != DataTypeKind::kImplicit) { scoped = true; break; }
+  }
+  if (scoped) ctx.PushScope();
+  for (size_t i = 0; i < stmt->for_inits.size(); ++i) {
+    auto* init = stmt->for_inits[i];
+    if (i < stmt->for_init_types.size() &&
+        stmt->for_init_types[i].kind != DataTypeKind::kImplicit && init &&
+        init->lhs && init->lhs->kind == ExprKind::kIdentifier) {
+      uint32_t w = EvalTypeWidth(stmt->for_init_types[i]);
+      if (w == 0) w = 32;
+      auto* v = ctx.CreateLocalVariable(init->lhs->text, w);
+      if (init->rhs) v->value = EvalExpr(init->rhs, ctx, arena);
+    } else if (init) {
+      ExecFuncStmt(init, ret_var, func_name, ctx, arena);
+    }
   }
   while (stmt->for_cond &&
-         EvalExpr(stmt->for_cond, ctx, arena).ToUint64() != 0) {
+         EvalExpr(stmt->for_cond, ctx, arena).IsTruthy()) {
     if (stmt->for_body &&
-        ExecFuncStmt(stmt->for_body, ret_var, func_name, ctx, arena))
+        ExecFuncStmt(stmt->for_body, ret_var, func_name, ctx, arena)) {
+      if (scoped) ctx.PopScope();
       return true;
-    if (stmt->for_step)
-      ExecFuncStmt(stmt->for_step, ret_var, func_name, ctx, arena);
+    }
+    for (auto* step : stmt->for_steps)
+      ExecFuncStmt(step, ret_var, func_name, ctx, arena);
   }
+  if (scoped) ctx.PopScope();
   return false;
 }
 

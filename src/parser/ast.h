@@ -335,11 +335,11 @@ struct Stmt {
   Expr* cycle_delay = nullptr;  // Cycle delay ##N in clocking drive (§14.16)
 
   // For
-  Stmt* for_init = nullptr;
+  std::vector<Stmt*> for_inits;
   Expr* for_cond = nullptr;
-  Stmt* for_step = nullptr;
+  std::vector<Stmt*> for_steps;
   Stmt* for_body = nullptr;
-  DataType for_init_type;  // Non-implicit when for-init declares a variable
+  std::vector<DataType> for_init_types;  // Parallel to for_inits; non-implicit when typed
 
   // Case
   std::vector<CaseItem> case_items;
