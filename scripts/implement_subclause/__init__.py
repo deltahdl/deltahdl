@@ -316,6 +316,10 @@ def _handle_step2(stdout: str) -> "NotImplementable | None":
         verdict, rationale, evidence = _parse_implementability(stdout)
     except ValueError as exc:
         print(f"\nERROR: {exc}", file=sys.stderr)
+        print(
+            f"Raw Step 2 stdout (verbatim, for debugging):\n{stdout}",
+            file=sys.stderr,
+        )
         sys.exit(1)
     else:
         if verdict == "no":

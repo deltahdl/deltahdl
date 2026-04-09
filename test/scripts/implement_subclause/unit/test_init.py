@@ -559,6 +559,30 @@ def test_handle_step2_exits_on_schema_violation(isc):
         handle(response)
 
 
+_PARSE_FAIL_RAW = '{"result": "garbage that is not valid JSON at all"}'
+
+
+def _handle_step2_capture_stderr(isc, capsys, raw):
+    """Invoke _handle_step2 expecting SystemExit; return captured stderr."""
+    try:
+        getattr(isc, "_handle_step2")(raw)
+    except SystemExit:
+        pass
+    return capsys.readouterr().err
+
+
+def test_handle_step2_dumps_raw_stdout_on_parse_failure(isc, capsys):
+    """Parse failure dumps the raw stdout to stderr for debugging."""
+    err = _handle_step2_capture_stderr(isc, capsys, _PARSE_FAIL_RAW)
+    assert _PARSE_FAIL_RAW in err
+
+
+def test_handle_step2_dumps_error_message_on_parse_failure(isc, capsys):
+    """Parse failure prints the parser ValueError text to stderr."""
+    err = _handle_step2_capture_stderr(isc, capsys, _PARSE_FAIL_RAW)
+    assert "ERROR:" in err
+
+
 # ---- NotImplementable dataclass --------------------------------------------
 
 
