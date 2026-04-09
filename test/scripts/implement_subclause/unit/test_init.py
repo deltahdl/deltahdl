@@ -6,6 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from .conftest import step2_envelope as _step2_envelope_helper
+
 
 # ---- clause_depth -----------------------------------------------------------
 
@@ -151,67 +153,98 @@ def test_parse_args_exclude_value(isc, tmp_path):
     assert args.exclude == "15.3.1,15.3.2"
 
 
-_MOCK_PROMPT_RESULT = "- Added foo.cpp"
+# ---- build_action_summary --------------------------------------------------
+
+
+def test_build_action_summary_added_bullets(isc):
+    """Added paths produce 'Added' bullets in sorted order."""
+    summary = isc.build_action_summary(["b.cpp", "a.cpp"], [], [])
+    assert summary == "- Added a.cpp\n- Added b.cpp"
+
+
+def test_build_action_summary_modified_bullets(isc):
+    """Modified paths produce 'Modified' bullets."""
+    summary = isc.build_action_summary([], ["x.h"], [])
+    assert summary == "- Modified x.h"
+
+
+def test_build_action_summary_deleted_bullets(isc):
+    """Deleted paths produce 'Deleted' bullets."""
+    summary = isc.build_action_summary([], [], ["old.cpp"])
+    assert summary == "- Deleted old.cpp"
+
+
+def test_build_action_summary_combined(isc):
+    """Combined output orders added, then modified, then deleted."""
+    summary = isc.build_action_summary(["a.cpp"], ["b.h"], ["c.cpp"])
+    assert summary == "- Added a.cpp\n- Modified b.h\n- Deleted c.cpp"
+
+
+def test_build_action_summary_empty(isc):
+    """Empty inputs produce an empty string."""
+    assert isc.build_action_summary([], [], []) == ""
 
 
 # ---- main ------------------------------------------------------------------
 
 
-@patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_steps", return_value="summary")
-def test_main_dispatches_depth_1(mock_run, _mock_commit, isc, tmp_path):
+def _run_main_success(isc, tmp_path, *, changes=(["foo.cpp"], [], [])):
+    """Run main() with run_steps success and stubbed git changes."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    with (
+        patch("implement_subclause.run_steps",
+              return_value=None) as mock_run,
+        patch("implement_subclause.commit_implementation") as mock_commit,
+        patch("implement_subclause.get_porcelain_changes",
+              return_value=changes),
+    ):
+        isc.main([
+            "--lrm", str(lrm), "--subclause", "6.6.1",
+            "--issue", "8", "--model", "opus",
+        ])
+    return {"run": mock_run, "commit": mock_commit}
+
+
+def test_main_dispatches_depth_1(isc, tmp_path):
     """main() passes model to run_steps."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
-    isc.main(["--lrm", str(lrm), "--subclause", "4", "--issue", "6", "--model", "opus"])
+    with (
+        patch("implement_subclause.run_steps",
+              return_value=None) as mock_run,
+        patch("implement_subclause.commit_implementation"),
+        patch("implement_subclause.get_porcelain_changes",
+              return_value=([], [], [])),
+    ):
+        isc.main([
+            "--lrm", str(lrm), "--subclause", "4",
+            "--issue", "6", "--model", "opus",
+        ])
     assert mock_run.call_args[1]["model"] == "opus"
 
 
-@patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_steps", return_value="summary")
-def test_main_calls_commit_implementation_subclause(
-    _mock_run, mock_commit, isc, tmp_path,
-):
+def test_main_calls_commit_implementation_subclause(isc, tmp_path):
     """main() calls commit_implementation with the subclause."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
-    assert mock_commit.call_args[0][0] == "6.6.1"
+    mocks = _run_main_success(isc, tmp_path)
+    assert mocks["commit"].call_args[0][0] == "6.6.1"
 
 
-@patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_steps", return_value="summary")
-def test_main_calls_commit_implementation_issue(
-    _mock_run, mock_commit, isc, tmp_path,
-):
+def test_main_calls_commit_implementation_issue(isc, tmp_path):
     """main() calls commit_implementation with the issue number."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
-    assert mock_commit.call_args[0][1] == 8
+    mocks = _run_main_success(isc, tmp_path)
+    assert mocks["commit"].call_args[0][1] == 8
 
 
-@patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_steps", return_value=_MOCK_PROMPT_RESULT)
-def test_main_passes_action_to_commit(
-    _mock_run, mock_commit, isc, tmp_path,
-):
-    """main() passes action summary from run_prompt to commit_implementation."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
-    assert mock_commit.call_args[1]["action"] == "- Added foo.cpp"
+def test_main_passes_action_to_commit(isc, tmp_path):
+    """main() builds the action summary from git status and passes it down."""
+    mocks = _run_main_success(isc, tmp_path)
+    assert mocks["commit"].call_args[1]["action"] == "- Added foo.cpp"
 
 
-@patch("implement_subclause.commit_implementation")
-@patch("implement_subclause.run_steps", return_value=_MOCK_PROMPT_RESULT)
-def test_main_prints_action_summary(
-    _mock_run, _mock_commit, isc, tmp_path, capsys,
-):
+def test_main_prints_action_summary(isc, tmp_path, capsys):
     """main() prints the action summary to stdout."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.write_text("")
-    isc.main(["--lrm", str(lrm), "--subclause", "6.6.1", "--issue", "8", "--model", "opus"])
+    _run_main_success(isc, tmp_path)
     assert "- Added foo.cpp" in capsys.readouterr().out
 
 
@@ -271,6 +304,312 @@ def test_main_skips_commit_when_not_implementable(isc, tmp_path):
     """main() does not call commit_implementation when not implementable."""
     mocks = _run_main_not_implementable(isc, tmp_path)
     assert not mocks["commit"].called
+
+
+# ---- _parse_implementability (evidence-based JSON envelope) ----------------
+
+
+def _make_step2_response(evidence=None, verdict="yes",
+                         rationale="reasonable rationale here"):
+    """Build a Claude CLI envelope wrapping a Step 2 JSON response."""
+    return _step2_envelope_helper(
+        verdict, evidence=evidence, rationale=rationale,
+    )
+
+
+_EVIDENCE_FIXTURE = [
+    {"quote": "X shall Y", "why_testable": "parser must enforce X→Y"},
+]
+
+
+def test_parse_implementability_yes_verdict_passes_through(isc):
+    """Yes verdict with evidence stays yes."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _make_step2_response(evidence=_EVIDENCE_FIXTURE, verdict="yes")
+    verdict, _rationale, _evidence = parse(response)
+    assert verdict == "yes"
+
+
+def test_parse_implementability_no_verdict_no_evidence_stays_no(isc):
+    """No verdict with empty evidence stays no."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _make_step2_response(evidence=[], verdict="no")
+    verdict, _rationale, _evidence = parse(response)
+    assert verdict == "no"
+
+
+def test_parse_implementability_override_no_to_yes(isc):
+    """No verdict with non-empty evidence is overridden to yes."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _make_step2_response(evidence=_EVIDENCE_FIXTURE, verdict="no")
+    verdict, _rationale, _evidence = parse(response)
+    assert verdict == "yes"
+
+
+def test_parse_implementability_override_annotates_rationale(isc):
+    """Overridden rationale carries an OVERRIDE marker."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _make_step2_response(
+        evidence=_EVIDENCE_FIXTURE, verdict="no",
+        rationale="text says it's just an overview",
+    )
+    _verdict, rationale, _evidence = parse(response)
+    assert "OVERRIDE" in rationale
+
+
+def test_parse_implementability_override_preserves_original_rationale(isc):
+    """Overridden rationale embeds the model's original rationale."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _make_step2_response(
+        evidence=_EVIDENCE_FIXTURE, verdict="no",
+        rationale="text says it's just an overview",
+    )
+    _verdict, rationale, _evidence = parse(response)
+    assert "text says it's just an overview" in rationale
+
+
+def test_parse_implementability_returns_evidence_list(isc):
+    """Parser returns the evidence list verbatim."""
+    parse = getattr(isc, "_parse_implementability")
+    items = [
+        {"quote": "Q1", "why_testable": "W1"},
+        {"quote": "Q2", "why_testable": "W2"},
+    ]
+    response = _make_step2_response(evidence=items, verdict="no")
+    _verdict, _rationale, evidence = parse(response)
+    assert evidence == items
+
+
+def test_parse_implementability_yes_verdict_no_evidence_accepted(isc):
+    """Yes verdict with empty evidence is accepted (false positive recoverable)."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _make_step2_response(evidence=[], verdict="yes")
+    verdict, _rationale, _evidence = parse(response)
+    assert verdict == "yes"
+
+
+def test_parse_implementability_strips_markdown_fence(isc):
+    """Parser strips ```json fences before parsing."""
+    parse = getattr(isc, "_parse_implementability")
+    payload = json.dumps({
+        "evidence": [], "verdict": "no", "rationale": "overview only.",
+    })
+    fenced = f"```json\n{payload}\n```"
+    response = json.dumps({"result": fenced})
+    verdict, _rationale, _evidence = parse(response)
+    assert verdict == "no"
+
+
+def _step2_envelope(payload):
+    """Wrap a payload object in the Claude CLI result envelope."""
+    return json.dumps({"result": json.dumps(payload)})
+
+
+def test_parse_implementability_raises_on_missing_evidence_key(isc):
+    """Missing evidence key raises ValueError."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _step2_envelope({"verdict": "no", "rationale": "x"})
+    with pytest.raises(ValueError):
+        parse(response)
+
+
+def test_parse_implementability_raises_on_missing_verdict_key(isc):
+    """Missing verdict key raises ValueError."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _step2_envelope({"evidence": [], "rationale": "x"})
+    with pytest.raises(ValueError):
+        parse(response)
+
+
+def test_parse_implementability_raises_on_missing_rationale_key(isc):
+    """Missing rationale key raises ValueError."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _step2_envelope({"evidence": [], "verdict": "no"})
+    with pytest.raises(ValueError):
+        parse(response)
+
+
+def test_parse_implementability_raises_on_evidence_item_missing_quote(isc):
+    """Evidence item missing 'quote' raises ValueError."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _step2_envelope({
+        "evidence": [{"why_testable": "W"}],
+        "verdict": "yes",
+        "rationale": "r",
+    })
+    with pytest.raises(ValueError):
+        parse(response)
+
+
+def test_parse_implementability_raises_on_evidence_item_missing_why(isc):
+    """Evidence item missing 'why_testable' raises ValueError."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _step2_envelope({
+        "evidence": [{"quote": "Q"}],
+        "verdict": "yes",
+        "rationale": "r",
+    })
+    with pytest.raises(ValueError):
+        parse(response)
+
+
+def test_parse_implementability_raises_on_invalid_verdict(isc):
+    """Verdict other than yes/no raises ValueError."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _step2_envelope({
+        "evidence": [], "verdict": "maybe", "rationale": "r",
+    })
+    with pytest.raises(ValueError):
+        parse(response)
+
+
+def test_parse_implementability_raises_on_malformed_json(isc):
+    """Non-JSON response body raises ValueError."""
+    parse = getattr(isc, "_parse_implementability")
+    response = json.dumps({"result": "this is not json at all"})
+    with pytest.raises(ValueError):
+        parse(response)
+
+
+def test_parse_implementability_raises_on_non_dict_evidence_item(isc):
+    """Evidence item that is not a dict raises ValueError."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _step2_envelope({
+        "evidence": ["just a string, not a dict"],
+        "verdict": "yes",
+        "rationale": "r",
+    })
+    with pytest.raises(ValueError):
+        parse(response)
+
+
+def test_parse_implementability_raises_on_evidence_not_a_list(isc):
+    """Evidence that is not a list raises ValueError."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _step2_envelope({
+        "evidence": "not a list", "verdict": "yes", "rationale": "r",
+    })
+    with pytest.raises(ValueError):
+        parse(response)
+
+
+def test_parse_implementability_raises_on_top_level_not_dict(isc):
+    """Top-level non-object payload raises ValueError."""
+    parse = getattr(isc, "_parse_implementability")
+    response = json.dumps({"result": json.dumps([])})
+    with pytest.raises(ValueError):
+        parse(response)
+
+
+def test_parse_implementability_raises_on_empty_rationale(isc):
+    """Empty rationale string raises ValueError."""
+    parse = getattr(isc, "_parse_implementability")
+    response = _step2_envelope({
+        "evidence": [], "verdict": "no", "rationale": "   ",
+    })
+    with pytest.raises(ValueError):
+        parse(response)
+
+
+# ---- _handle_step2 (new dispatch) -----------------------------------------
+
+
+def test_handle_step2_returns_none_on_yes(isc):
+    """Yes verdict returns None."""
+    handle = getattr(isc, "_handle_step2")
+    response = _make_step2_response(evidence=_EVIDENCE_FIXTURE, verdict="yes")
+    assert handle(response) is None
+
+
+def test_handle_step2_returns_sentinel_on_no(isc):
+    """No verdict with empty evidence returns NotImplementable sentinel."""
+    handle = getattr(isc, "_handle_step2")
+    response = _make_step2_response(evidence=[], verdict="no")
+    assert isinstance(handle(response), isc.NotImplementable)
+
+
+def test_handle_step2_sentinel_carries_rationale(isc):
+    """Sentinel carries the rationale from the response."""
+    handle = getattr(isc, "_handle_step2")
+    response = _make_step2_response(
+        evidence=[], verdict="no", rationale="overview only here",
+    )
+    assert handle(response).rationale == "overview only here"
+
+
+def test_handle_step2_sentinel_carries_evidence(isc):
+    """Sentinel carries the (empty) evidence list."""
+    handle = getattr(isc, "_handle_step2")
+    response = _make_step2_response(evidence=[], verdict="no")
+    assert handle(response).evidence == []
+
+
+def test_handle_step2_override_returns_none(isc):
+    """Override case (no with evidence) returns None, not sentinel."""
+    handle = getattr(isc, "_handle_step2")
+    response = _make_step2_response(evidence=_EVIDENCE_FIXTURE, verdict="no")
+    assert handle(response) is None
+
+
+def test_handle_step2_exits_on_schema_violation(isc):
+    """Schema violation exits the process non-zero."""
+    handle = getattr(isc, "_handle_step2")
+    response = _step2_envelope({"verdict": "no"})
+    with pytest.raises(SystemExit):
+        handle(response)
+
+
+# ---- NotImplementable dataclass --------------------------------------------
+
+
+def test_not_implementable_has_rationale_field(isc):
+    """NotImplementable carries the rationale."""
+    sentinel = isc.NotImplementable(rationale="r", evidence=[])
+    assert sentinel.rationale == "r"
+
+
+def test_not_implementable_has_evidence_field(isc):
+    """NotImplementable carries the evidence list."""
+    items = [{"quote": "Q", "why_testable": "W"}]
+    sentinel = isc.NotImplementable(rationale="r", evidence=items)
+    assert sentinel.evidence == items
+
+
+def test_not_implementable_evidence_defaults_empty(isc):
+    """NotImplementable.evidence defaults to an empty list."""
+    sentinel = isc.NotImplementable(rationale="r")
+    assert sentinel.evidence == []
+
+
+# ---- build_steps Step 2 prompt ---------------------------------------------
+
+
+def _step2_prompt(isc, tmp_path):
+    """Return the Step 2 prompt produced by build_steps."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    steps = isc.build_steps("12.2", str(lrm))
+    return next(p for d, p in steps if d == "Checking implementability")
+
+
+def test_build_steps_step2_prompt_requests_evidence_field(isc, tmp_path):
+    """Step 2 prompt asks for an 'evidence' field."""
+    assert "evidence" in _step2_prompt(isc, tmp_path)
+
+
+def test_build_steps_step2_prompt_requests_verdict_field(isc, tmp_path):
+    """Step 2 prompt asks for a 'verdict' field."""
+    assert "verdict" in _step2_prompt(isc, tmp_path)
+
+
+def test_build_steps_step2_prompt_states_override_rule(isc, tmp_path):
+    """Step 2 prompt states the 'evidence non-empty → verdict yes' rule."""
+    assert "non-empty" in _step2_prompt(isc, tmp_path)
+
+
+def test_build_steps_step2_prompt_warns_against_dismissing_definitions(isc, tmp_path):
+    """Step 2 prompt warns against the 'merely definitional' failure mode."""
+    assert "definitional" in _step2_prompt(isc, tmp_path)
 
 
 def test_parse_args_rejects_figures_flag(isc, tmp_path):

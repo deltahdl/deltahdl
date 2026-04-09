@@ -9,7 +9,7 @@ import os
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from lib.python.classify import (
@@ -35,19 +35,18 @@ from lib.python.git import (
 
 CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
 
-_RATIONALE_RE = re.compile(
-    r"RATIONALE:\s*(.*?)\s*IMPLEMENTABLE:\s*(yes|no)\b",
-    re.IGNORECASE | re.DOTALL,
-)
+_FENCE_RE = re.compile(r"```(?:json)?\s*\n?(.*?)\n?```", re.DOTALL)
 
 
 @dataclass
 class NotImplementable:
     """Sentinel returned by run_steps when Step 2 verdicts a subclause as
     not implementable. Carries the rationale Claude was forced to articulate
-    so the close-issue comment can preserve it for human review."""
+    plus the (empty) evidence list so the close-issue comment can preserve
+    both for human review."""
 
     rationale: str
+    evidence: list[dict[str, str]] = field(default_factory=list)
 
 
 
@@ -94,39 +93,50 @@ def build_steps(
         " Do not build or run tests."
     )
 
+    step2_prompt = (
+        f"{read_ctx}\n\n"
+        f"Then find every passage in §{subclause} that"
+        " imposes a constraint, defines a structure, classifies an"
+        " entity, specifies a syntax, prescribes a behavior, or"
+        " otherwise makes a concrete claim that software could be"
+        " written to check or implement against. Each such passage"
+        " is a piece of testable evidence.\n\n"
+        "Respond with EXACTLY this JSON object and nothing else"
+        " (no markdown fence, no surrounding prose):\n\n"
+        "{\n"
+        '  "evidence": [\n'
+        '    {\n'
+        '      "quote": "<verbatim sentence or passage from the spec>",\n'
+        '      "why_testable": "<one sentence: what software could'
+        ' check or implement against this>"\n'
+        '    }\n'
+        '  ],\n'
+        '  "verdict": "yes",\n'
+        '  "rationale": "<2-6 sentences>"\n'
+        "}\n\n"
+        "Rules:\n"
+        "- The schema is taxonomy-free. Whatever shape the"
+        " specification takes — `shall` clauses, MUST/SHOULD in RFC"
+        " 2119 terms, formal grammar productions, state machines,"
+        " type rules, timing diagrams, packet layouts — qualifying"
+        " passages all land in the same `evidence` list.\n"
+        "- Quote each passage verbatim from the spec.\n"
+        "- Do NOT dismiss concrete language as 'merely introductory'"
+        " or 'merely definitional'. A definition is itself a testable"
+        " claim if software can be written to recognize the entity"
+        " it defines.\n"
+        "- If `evidence` is non-empty, `verdict` MUST be `yes`.\n"
+        "- Form the verdict only AFTER enumerating evidence, never"
+        " before.\n"
+        "- If existing tests under test/src/unit/ already cover"
+        f" §{subclause}, that alone is sufficient: add an evidence"
+        " entry quoting the LRM line or block they exercise and set"
+        " `verdict` to `yes`.\n"
+        "- `verdict` must be the literal string `yes` or `no`.\n"
+        "- `rationale` must be a non-empty string."
+    )
     return [
-        ("Reading LRM", read_ctx),
-        ("Checking implementability",
-         f"Does §{subclause} define any requirements that can be"
-         " implemented as software (syntax to parse, semantics to"
-         " simulate, behavior to enforce, constraints to check)?"
-         " A subclause that merely introduces a topic or provides"
-         " a general overview without any concrete requirements"
-         " is NOT implementable. A subclause that defines concrete"
-         " items (e.g., which methods exist, which formats are valid)"
-         " IS implementable even if it references other sections"
-         " for additional details."
-         " A subclause that makes concrete statements — not merely"
-         " introducing a topic for its child subclauses — IS"
-         " implementable."
-         " A subclause that defines classifications, properties, or"
-         " distinctions (e.g., 'X is a Y', 'X has property Z') IS"
-         " implementable — those are testable definitional claims"
-         " even if the text is short."
-         " If existing tests under test/src/unit/ already cover"
-         f" §{subclause}, that is by itself sufficient evidence"
-         " the subclause is implementable.\n\n"
-         "Respond in EXACTLY this format and nothing else:\n\n"
-         "RATIONALE: <2-6 sentences citing specific language from"
-         f" §{subclause} that does or does not impose testable"
-         " requirements. If you claim the section is overview-only,"
-         " you must quote the wording that convinces you of that.>\n"
-         "IMPLEMENTABLE: yes\n\n"
-         "(or `IMPLEMENTABLE: no` after the rationale).\n\n"
-         "Writing the rationale is mandatory — a response missing"
-         " the RATIONALE: line will be rejected. Use the rationale"
-         " to check your own answer: if you cannot articulate why,"
-         " you do not yet know the answer."),
+        ("Checking implementability", step2_prompt),
         ("Auditing src",
          f"Search src/ for existing code that implements §{subclause}."
          " Report what aligns with the LRM and what is missing."
@@ -190,19 +200,6 @@ def build_steps(
          f" If you find any change that acts on descendant content,"
          f" revert it with git checkout."
          + exclude_note + constraints),
-        ("Summarizing actions",
-         "Summarize everything you did as a self-contained bullet list."
-         " Do NOT say 'see above' or refer to prior responses —"
-         " produce the full list here."
-         " Every line MUST include 'because' with a categorical"
-         " rationale. Example format:\n"
-         "- Added <file> because <reason>\n"
-         "- Moved <TestName> from <file> because <reason>\n"
-         "- Deleted <file> because <reason>\n"
-         "- Modified <file> because <reason>\n\n"
-         "Before finalizing, run git diff --stat and only include"
-         " actions that correspond to actual file changes."
-         " Remove any claims not backed by the diff."),
     ]
 
 
@@ -232,58 +229,116 @@ def _format_subclause_label(subclause):
     return f"§{subclause}"
 
 
-def _parse_implementability(stdout: str) -> tuple[str, str]:
-    """Parse a Step 2 response into (verdict, rationale).
+def _strip_fence(text: str) -> str:
+    """Strip a single Markdown fenced code block, if present."""
+    match = _FENCE_RE.search(text)
+    if match:
+        return match.group(1).strip()
+    return text.strip()
 
-    The verdict is the lowercase 'yes' or 'no' value of the IMPLEMENTABLE
-    field. The rationale is the RATIONALE field text. Raises ValueError
-    when either field is missing — Step 2 has a strict contract and a
-    malformed response must not silently degrade into a 'no' verdict.
-    """
-    text = _extract_result_text(stdout)
-    match = _RATIONALE_RE.search(text)
-    if not match:
+
+def _validate_evidence_item(item: object) -> None:
+    """Raise ValueError unless ``item`` is a valid evidence object."""
+    if not isinstance(item, dict):
         raise ValueError(
-            "Step 2 response is missing the required"
-            " 'RATIONALE: <text>\\nIMPLEMENTABLE: yes|no' format."
-            f" Got: {text!r}"
+            "Step 2 evidence items must be JSON objects with"
+            " 'quote' and 'why_testable' fields."
         )
-    rationale = match.group(1).strip()
-    verdict = match.group(2).strip().lower()
-    if not rationale:
-        raise ValueError("Step 2 response had an empty RATIONALE.")
-    return verdict, rationale
+    for key in ("quote", "why_testable"):
+        if key not in item:
+            raise ValueError(
+                f"Step 2 evidence item missing required key {key!r}."
+            )
+
+
+def _validate_step2_envelope(data: object) -> None:
+    """Raise ValueError unless ``data`` matches the Step 2 schema."""
+    if not isinstance(data, dict):
+        raise ValueError("Step 2 response must be a JSON object.")
+    for key in ("evidence", "verdict", "rationale"):
+        if key not in data:
+            raise ValueError(
+                f"Step 2 response missing required key {key!r}."
+            )
+    if not isinstance(data["evidence"], list):
+        raise ValueError("Step 2 'evidence' must be a list.")
+    for item in data["evidence"]:
+        _validate_evidence_item(item)
+    if data["verdict"] not in ("yes", "no"):
+        raise ValueError(
+            "Step 2 'verdict' must be 'yes' or 'no';"
+            f" got {data['verdict']!r}."
+        )
+    if (not isinstance(data["rationale"], str)
+            or not data["rationale"].strip()):
+        raise ValueError(
+            "Step 2 'rationale' must be a non-empty string."
+        )
+
+
+def _parse_implementability(
+    stdout: str,
+) -> tuple[str, str, list[dict[str, str]]]:
+    """Parse a Step 2 JSON response into ``(verdict, rationale, evidence)``.
+
+    Applies the deterministic override: if ``evidence`` is non-empty and
+    the model's ``verdict`` is ``"no"``, the verdict is flipped to
+    ``"yes"`` and the rationale is annotated with the override and the
+    model's original rationale. Raises ``ValueError`` on any schema
+    violation — Step 2 has a strict contract and a malformed response
+    must not silently degrade into a ``"no"`` verdict.
+    """
+    text = _strip_fence(_extract_result_text(stdout))
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"Step 2 response is not valid JSON: {exc.msg}"
+        ) from exc
+    _validate_step2_envelope(data)
+    evidence = data["evidence"]
+    verdict = data["verdict"]
+    rationale = data["rationale"]
+    if evidence and verdict == "no":
+        verdict = "yes"
+        rationale = (
+            f"OVERRIDE: model returned 'no' but enumerated"
+            f" {len(evidence)} testable evidence item(s);"
+            f" verdict flipped to 'yes'."
+            f" Original rationale: {rationale}"
+        )
+    return verdict, rationale, evidence
 
 
 def _handle_step2(stdout: str) -> "NotImplementable | None":
     """Parse the step 2 response; return a sentinel if not implementable."""
     try:
-        verdict, rationale = _parse_implementability(stdout)
+        verdict, rationale, evidence = _parse_implementability(stdout)
     except ValueError as exc:
         print(f"\nERROR: {exc}", file=sys.stderr)
         sys.exit(1)
     else:
         if verdict == "no":
             print(f"Not implementable — {rationale}")
-            return NotImplementable(rationale=rationale)
+            return NotImplementable(rationale=rationale, evidence=evidence)
     return None
 
 
 def run_steps(steps, *, model="opus",
-              continue_session=False) -> "str | NotImplementable":
-    """Run each step as a separate Claude call, return summary text."""
+              continue_session=False) -> "NotImplementable | None":
+    """Run each step as a separate Claude call.
+
+    Returns ``None`` on success, or a ``NotImplementable`` sentinel
+    as soon as the Step 1 implementability gate produces a
+    not-implementable verdict.
+    """
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
 
     total = len(steps)
-    summary = ""
-    not_implementable: NotImplementable | None = None
 
     for i, (description, prompt) in enumerate(steps):
         step_num = i + 1
-
-        if not_implementable is not None and step_num < total:
-            continue
 
         cmd = [
             "claude", "-p",
@@ -309,15 +364,12 @@ def run_steps(steps, *, model="opus",
             )
             sys.exit(1)
 
-        if step_num == 2:
+        if step_num == 1:
             not_implementable = _handle_step2(result.stdout)
+            if not_implementable is not None:
+                return not_implementable
 
-        if step_num == total:
-            summary = _extract_result_text(result.stdout)
-
-    if not_implementable is not None:
-        return not_implementable
-    return summary
+    return None
 
 
 _VALID_EXTENSIONS = (".cpp", ".h", ".py")
@@ -328,6 +380,18 @@ def _is_valid_path(path):
     """Return True if the path has a valid source extension."""
     return (any(path.endswith(ext) for ext in _VALID_EXTENSIONS)
             or any(path.endswith(name) for name in _VALID_NAMES))
+
+
+def build_action_summary(added, modified, deleted) -> str:
+    """Build a deterministic bullet list from filtered git changes."""
+    bullets: list[str] = []
+    for path in sorted(added):
+        bullets.append(f"- Added {path}")
+    for path in sorted(modified):
+        bullets.append(f"- Modified {path}")
+    for path in sorted(deleted):
+        bullets.append(f"- Deleted {path}")
+    return "\n".join(bullets)
 
 
 def commit_implementation(subclause, issue, *, action=""):
@@ -416,20 +480,25 @@ def main(argv=None):
     steps = build_steps(
         args.subclause, str(args.lrm), exclude=args.exclude,
     )
-    action = run_steps(
+    result = run_steps(
         steps, model=args.model,
         continue_session=args.continue_session,
     )
-    if isinstance(action, NotImplementable):
+    if isinstance(result, NotImplementable):
         print("Not implementable — closing issue.")
         comment = (
             "Deemed not implementable.\n\n"
-            f"Rationale:\n{action.rationale}"
+            f"Rationale:\n{result.rationale}"
         )
         subprocess.run(
             ["gh", "issue", "close", str(args.issue), "--comment", comment],
             check=True,
         )
         return
+    added, modified, deleted = get_porcelain_changes()
+    added = [p for p in added if _is_valid_path(p)]
+    modified = [p for p in modified if _is_valid_path(p)]
+    deleted = [p for p in deleted if _is_valid_path(p)]
+    action = build_action_summary(added, modified, deleted)
     print(f"Action summary:\n{action}")
     commit_implementation(args.subclause, args.issue, action=action)

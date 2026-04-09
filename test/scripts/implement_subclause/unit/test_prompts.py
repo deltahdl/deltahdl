@@ -84,12 +84,10 @@ class TestDescendantBoundary:
         audit_idx = names.index("Auditing scope")
         assert audit_idx == impl_idx + 1
 
-    def test_audit_scope_before_summary(self, isc):
-        """Auditing scope comes before Summarizing actions."""
+    def test_audit_scope_is_last(self, isc):
+        """Auditing scope is the final step (no model summary follows)."""
         names = _step_names(isc, "6.3")
-        audit_idx = names.index("Auditing scope")
-        summary_idx = names.index("Summarizing actions")
-        assert audit_idx == summary_idx - 1
+        assert names[-1] == "Auditing scope"
 
     def test_audit_scope_mentions_git_diff(self, isc):
         """Audit step instructs to run git diff."""
