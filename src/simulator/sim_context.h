@@ -173,6 +173,10 @@ class SimContext {
                          Variable* var);
   // §13.5.2: Alias an existing variable into the current scope (pass by ref).
   void AliasLocalVariable(std::string_view name, Variable* var);
+  // §13.3.1: Track enclosing task name for per-variable lifetime qualifiers.
+  void PushFuncName(std::string_view name);
+  void PopFuncName();
+  std::string_view CurrentFuncName() const;
 
   // §7.10.3: Queue ref frame management for function calls.
   void PushQueueRefFrame();
@@ -339,6 +343,8 @@ class SimContext {
   std::unordered_map<std::string_view,
                      std::unordered_map<std::string_view, Variable*>>
       static_frames_;
+  // §13.3.1: Enclosing task name stack for per-variable lifetime qualifiers.
+  std::vector<std::string_view> func_name_stack_;
   std::vector<Process*> final_processes_;
   std::unordered_map<std::string, std::vector<Process*>> sensitivity_map_;
   static const std::vector<Process*> kEmptyProcessList;

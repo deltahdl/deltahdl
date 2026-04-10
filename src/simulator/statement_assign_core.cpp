@@ -992,11 +992,21 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
-  // §13.3.1: Inside a task/function scope, local variables persist in static
-  // scopes — skip re-creation if the variable already exists locally.
-  if (ctx.HasLocalScope() && ctx.FindLocalVariable(stmt->var_name)) {
-    return StmtResult::kDone;
+  // §13.3.1: Explicit static qualifier — reuse persistent variable.
+  auto func_name = ctx.CurrentFuncName();
+  if (stmt->var_is_static && !func_name.empty()) {
+    auto* existing = ctx.FindStaticFuncVar(func_name, stmt->var_name);
+    if (existing) {
+      ctx.AliasLocalVariable(stmt->var_name, existing);
+      return StmtResult::kDone;
+    }
+  } else if (!stmt->var_is_automatic) {
+    // Default lifetime: skip re-creation if the variable already exists locally.
+    if (ctx.HasLocalScope() && ctx.FindLocalVariable(stmt->var_name)) {
+      return StmtResult::kDone;
+    }
   }
+  // var_is_automatic: always create fresh.
   uint32_t width = EvalTypeWidth(stmt->var_decl_type);
   bool is_real = (stmt->var_decl_type.kind == DataTypeKind::kReal ||
                   stmt->var_decl_type.kind == DataTypeKind::kShortreal ||
@@ -1009,6 +1019,10 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     if (stmt->var_init) {
       var->value = EvalExpr(stmt->var_init, ctx, arena);
       if (!var->is_4state) CoerceTo2State(var->value);
+    }
+    // §13.3.1: Save newly created static var to persistent frame.
+    if (stmt->var_is_static && !func_name.empty()) {
+      ctx.SaveStaticFuncVar(func_name, stmt->var_name, var);
     }
   }
   return StmtResult::kDone;

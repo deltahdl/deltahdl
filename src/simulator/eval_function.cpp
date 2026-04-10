@@ -1287,6 +1287,7 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
       ctx.PushScope();
     }
     ctx.PushQueueRefFrame();
+    ctx.PushFuncName(func->name);
     return func;
   }
   if (expr->kind != ExprKind::kCall) return nullptr;
@@ -1300,6 +1301,7 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
     ctx.PushScope();
   }
   ctx.PushQueueRefFrame();
+  ctx.PushFuncName(func->name);
   BindFunctionArgs(func, expr, ctx, arena);
   return func;
 }
@@ -1308,6 +1310,7 @@ void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
                       SimContext& ctx) {
   WritebackOutputArgs(func, expr, ctx);
   WritebackQueueRefs(ctx);
+  ctx.PopFuncName();
   bool is_static = func->is_static && !func->is_automatic;
   if (is_static) {
     ctx.PopStaticScope(func->name);

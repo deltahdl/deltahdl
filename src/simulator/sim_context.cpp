@@ -156,6 +156,18 @@ void SimContext::AliasLocalVariable(std::string_view name, Variable* var) {
   }
 }
 
+void SimContext::PushFuncName(std::string_view name) {
+  func_name_stack_.push_back(name);
+}
+
+void SimContext::PopFuncName() {
+  if (!func_name_stack_.empty()) func_name_stack_.pop_back();
+}
+
+std::string_view SimContext::CurrentFuncName() const {
+  return func_name_stack_.empty() ? std::string_view{} : func_name_stack_.back();
+}
+
 void SimContext::PushQueueRefFrame() { queue_ref_stack_.emplace_back(); }
 
 void SimContext::RecordQueueRef(const QueueRefBinding& binding) {
