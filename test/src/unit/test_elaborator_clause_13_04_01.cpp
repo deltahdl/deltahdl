@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(FunctionDeclParsing, ElabFunctionDeclInModule) {
+TEST(FunctionReturnElaboration, FunctionDeclInModule) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -20,7 +20,7 @@ TEST(FunctionDeclParsing, ElabFunctionDeclInModule) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(StatementElaboration, VoidFunctionReturnWithValueError) {
+TEST(FunctionReturnElaboration, VoidFunctionReturnWithValueError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -32,7 +32,7 @@ TEST(StatementElaboration, VoidFunctionReturnWithValueError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(StatementElaboration, NonVoidFunctionReturnWithValue) {
+TEST(FunctionReturnElaboration, NonVoidFunctionReturnWithValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -45,7 +45,7 @@ TEST(StatementElaboration, NonVoidFunctionReturnWithValue) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SubroutineCallExprElaboration, TfCallAsExprElaborates) {
+TEST(FunctionReturnElaboration, FunctionCallAsExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -60,7 +60,7 @@ TEST(SubroutineCallExprElaboration, TfCallAsExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SubroutineCallExprElaboration, NestedCallsElaborate) {
+TEST(FunctionReturnElaboration, NestedCallsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -101,20 +101,7 @@ TEST(FunctionReturnElaboration, FunctionNameAssignElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(FunctionReturnElaboration, NonVoidReturnWithExpr) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  function int f();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(Lowerer, FunctionCallReturnsValue) {
+TEST(FunctionReturnElaboration, FunctionCallReturnsValue) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -136,7 +123,7 @@ TEST(Lowerer, FunctionCallReturnsValue) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(FunctionReturnValues, ReturnStatementElaborates) {
+TEST(FunctionReturnElaboration, ReturnStatementElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  function int add(int a, int b);\n"
@@ -145,13 +132,97 @@ TEST(FunctionReturnValues, ReturnStatementElaborates) {
              "endmodule\n"));
 }
 
-TEST(FunctionReturnValues, VoidFunctionElaborates) {
+TEST(FunctionReturnElaboration, VoidFunctionElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  function void log(int v);\n"
              "    $display(\"%0d\", v);\n"
              "  endfunction\n"
              "endmodule\n"));
+}
+
+TEST(FunctionReturnElaboration, VoidFunctionBareReturnOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  function void f();\n"
+             "    $display(\"hello\");\n"
+             "    return;\n"
+             "  endfunction\n"
+             "endmodule\n"));
+}
+
+TEST(FunctionReturnElaboration, NonVoidFunctionBareReturnOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  function int f();\n"
+             "    return;\n"
+             "  endfunction\n"
+             "endmodule\n"));
+}
+
+TEST(FunctionReturnElaboration, VoidReturnWithValueInNestedBlockError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    if (1) begin\n"
+      "      return 42;\n"
+      "    end\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionReturnElaboration, VoidFunctionAsOperandError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void nop(); endfunction\n"
+      "  logic [31:0] x;\n"
+      "  initial x = nop();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionReturnElaboration, VoidFunctionAsStatementOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function void nop(); endfunction\n"
+      "  initial begin\n"
+      "    nop();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionReturnElaboration, VoidFunctionInContAssignError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void nop(); endfunction\n"
+      "  wire w;\n"
+      "  assign w = nop();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionReturnElaboration, VoidFunctionAsArgError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void nop(); endfunction\n"
+      "  function int f(int x); return x; endfunction\n"
+      "  logic [31:0] x;\n"
+      "  initial x = f(nop());\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace

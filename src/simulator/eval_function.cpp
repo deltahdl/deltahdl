@@ -1255,7 +1255,9 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   Variable* ret_var = &dummy_ret;
   if (!is_void) {
     auto* existing = is_static ? ctx.FindLocalVariable(func->name) : nullptr;
-    ret_var = existing ? existing : ctx.CreateLocalVariable(func->name, 32);
+    uint32_t ret_width = EvalTypeWidth(func->return_type);
+    if (ret_width == 0) ret_width = 32;
+    ret_var = existing ? existing : ctx.CreateLocalVariable(func->name, ret_width);
   }
 
   ExecFunctionBody(func, ret_var, ctx, arena);

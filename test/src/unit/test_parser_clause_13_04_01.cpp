@@ -5,18 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(NetAndVariableTypeParsing, DataTypeOrVoidReturn) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void do_nothing; endfunction\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
-}
-
-TEST(FunctionDeclParsing, FuncReturnTypeExplicitInt) {
+TEST(FunctionReturnValueParsing, ReturnTypeInt) {
   auto r = Parse(
       "module m;\n  function int foo(); return 0; endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -27,7 +16,7 @@ TEST(FunctionDeclParsing, FuncReturnTypeExplicitInt) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
-TEST(FunctionDeclParsing, FuncReturnTypeVoid) {
+TEST(FunctionReturnValueParsing, ReturnTypeVoid) {
   auto r = Parse("module m;\n  function void bar(); endfunction\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -36,7 +25,7 @@ TEST(FunctionDeclParsing, FuncReturnTypeVoid) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
 }
 
-TEST(FunctionDeclParsing, FuncReturnTypeLogicPacked) {
+TEST(FunctionReturnValueParsing, ReturnTypeLogicPacked) {
   auto r = Parse(
       "module m;\n  function logic [3:0] baz();\n"
       "    return 4'b0;\n  endfunction\nendmodule\n");
@@ -48,7 +37,7 @@ TEST(FunctionDeclParsing, FuncReturnTypeLogicPacked) {
   EXPECT_NE(item->return_type.packed_dim_right, nullptr);
 }
 
-TEST(DesignBuildingBlockParsing, FunctionReturnAndVoidAndDirections) {
+TEST(FunctionReturnValueParsing, FunctionReturnAndVoidAndDirections) {
   auto r = Parse(
       "module m;\n"
       "  function int compute(input int a, output int b,\n"
@@ -74,7 +63,7 @@ TEST(DesignBuildingBlockParsing, FunctionReturnAndVoidAndDirections) {
   EXPECT_EQ(compute->func_args[3].direction, Direction::kRef);
 }
 
-TEST(SchedulingSemanticsParsing, AutoFuncReturningVoid) {
+TEST(FunctionReturnValueParsing, AutomaticVoidFunction) {
   auto r = Parse(
       "module m;\n"
       "  function automatic void log_msg(input int code);\n"
@@ -90,7 +79,7 @@ TEST(SchedulingSemanticsParsing, AutoFuncReturningVoid) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
   EXPECT_EQ(item->name, "log_msg");
 }
-TEST(DataTypeParsing, RealInFunction) {
+TEST(FunctionReturnValueParsing, ReturnTypeReal) {
   auto r = Parse(
       "module t;\n"
       "  function real compute();\n"
@@ -104,19 +93,7 @@ TEST(DataTypeParsing, RealInFunction) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kReal);
 }
 
-TEST(TaskAndFunctionParsing, VoidFunctionReturnTypeKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void empty_func();\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "empty_func");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
-}
-
-TEST(TaskAndFunctionParsing, FunctionCallInContAssign) {
+TEST(FunctionReturnValueParsing, FunctionCallInContAssign) {
   auto r = Parse(
       "module m;\n"
       "  function int add(int a, int b);\n"
@@ -131,7 +108,7 @@ TEST(TaskAndFunctionParsing, FunctionCallInContAssign) {
   EXPECT_EQ(assign->assign_rhs->kind, ExprKind::kCall);
 }
 
-TEST(TaskAndFunctionParsing, NestedFunctionCalls) {
+TEST(FunctionReturnValueParsing, NestedFunctionCalls) {
   auto r = Parse(
       "module m;\n"
       "  function int inc(int x);\n"
@@ -152,7 +129,7 @@ TEST(TaskAndFunctionParsing, NestedFunctionCalls) {
   EXPECT_EQ(stmt->rhs->args[0]->kind, ExprKind::kCall);
 }
 
-TEST(ProcessParsing, BlockWithReturnInFunction) {
+TEST(FunctionReturnValueParsing, BlockWithReturnInFunction) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function int compute(input int a, input int b);\n"
@@ -165,7 +142,7 @@ TEST(ProcessParsing, BlockWithReturnInFunction) {
               "endmodule\n"));
 }
 
-TEST(AggregateTypeParsing, PackedAsFuncReturn) {
+TEST(FunctionReturnValueParsing, PackedStructAsFunctionReturn) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  typedef struct packed {\n"
@@ -179,7 +156,7 @@ TEST(AggregateTypeParsing, PackedAsFuncReturn) {
               "endmodule\n"));
 }
 
-TEST(ProceduralStatementParsing, ReturnWithComplexExpr) {
+TEST(FunctionReturnValueParsing, ReturnWithComplexExpr) {
   auto r = Parse(
       "module t;\n"
       "  function int compute(int a, int b);\n"
@@ -195,7 +172,7 @@ TEST(ProceduralStatementParsing, ReturnWithComplexExpr) {
   EXPECT_EQ(ret->expr->kind, ExprKind::kBinary);
 }
 
-TEST(SubroutineCallExprParsing, TfCallAsExprInAssign) {
+TEST(FunctionReturnValueParsing, FunctionCallAsExprInAssign) {
   auto r = Parse(
       "module m;\n"
       "  initial x = func(1, 2);\n"
@@ -210,7 +187,7 @@ TEST(SubroutineCallExprParsing, TfCallAsExprInAssign) {
   EXPECT_EQ(stmt->rhs->args.size(), 2u);
 }
 
-TEST(PrimaryParsing, PrimaryFunctionCall) {
+TEST(FunctionReturnValueParsing, FunctionCallAsExpression) {
   auto r = Parse(
       "module m;\n"
       "  function int foo(int a); return a + 1; endfunction\n"
@@ -234,32 +211,7 @@ static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
   return nullptr;
 }
 
-TEST(TaskAndFunctionParsing, FunctionReturnTypeInt) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int foo();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "foo");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
-}
-
-TEST(TaskAndFunctionParsing, FunctionReturnTypeVoid) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void bar();\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "bar");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kVoid);
-}
-
-TEST(TaskAndFunctionParsing, FunctionReturnTypeLogicVec) {
+TEST(FunctionReturnValueParsing, FunctionReturnTypeLogicVec) {
   auto r = Parse(
       "module m;\n"
       "  function logic [7:0] get_byte();\n"
@@ -277,7 +229,7 @@ static ModuleItem* NthItem(ParseResult& r, size_t n) {
   return r.cu->modules[0]->items[n];
 }
 
-TEST(AggregateTypeParsing, FunctionReturnStruct) {
+TEST(FunctionReturnValueParsing, FunctionReturnStruct) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct { int x; int y; } point_t;\n"
@@ -292,7 +244,7 @@ TEST(AggregateTypeParsing, FunctionReturnStruct) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
 }
-TEST(DataTypeParsing, VoidFunctionInClass) {
+TEST(FunctionReturnValueParsing, VoidFunctionInClass) {
   auto r = Parse(
       "class C;\n"
       "  function void setup();\n"
@@ -302,7 +254,7 @@ TEST(DataTypeParsing, VoidFunctionInClass) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-TEST(AssignmentParsing, FunctionCallRhs) {
+TEST(FunctionReturnValueParsing, FunctionCallRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] result;\n"
@@ -319,7 +271,7 @@ TEST(AssignmentParsing, FunctionCallRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-TEST(AssignmentParsing, SystemCallRhs) {
+TEST(FunctionReturnValueParsing, SystemCallRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [31:0] val;\n"
@@ -336,22 +288,68 @@ TEST(AssignmentParsing, SystemCallRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-TEST(FunctionDeclaration, VoidFunction) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  function void log(int val);\n"
-              "    $display(\"%0d\", val);\n"
-              "  endfunction\n"
-              "endmodule\n"));
-}
-
-TEST(FunctionDeclaration, NonVoidFunctionUsedAsOperand) {
+TEST(FunctionReturnValueParsing, NonVoidFunctionUsedAsOperand) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function int twice(int v); return v * 2; endfunction\n"
               "  logic [31:0] result;\n"
               "  initial result = twice(5);\n"
               "endmodule\n"));
+}
+
+TEST(FunctionReturnValueParsing, BareReturnInVoidFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f();\n"
+      "    $display(\"hello\");\n"
+      "    return;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FindFunc(r, "f");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_GE(fn->func_body_stmts.size(), 2u);
+  auto* ret = fn->func_body_stmts[1];
+  EXPECT_EQ(ret->kind, StmtKind::kReturn);
+  EXPECT_EQ(ret->expr, nullptr);
+}
+
+TEST(FunctionReturnValueParsing, FunctionNameAssignParsesAsBlockingAssign) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int foo(int a);\n"
+      "    foo = a + 1;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FindFunc(r, "foo");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_GE(fn->func_body_stmts.size(), 1u);
+  auto* stmt = fn->func_body_stmts[0];
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->text, "foo");
+}
+
+TEST(FunctionReturnValueParsing, VoidFunctionCallAsStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void log_it();\n"
+      "    $display(\"hi\");\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    log_it();\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+  ASSERT_NE(stmt->expr, nullptr);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kCall);
 }
 
 }  // namespace

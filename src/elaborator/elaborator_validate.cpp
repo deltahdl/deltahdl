@@ -959,6 +959,31 @@ static void CheckCallArgs(
   CheckOutputArgs(expr, func, positional_count, diag);
 }
 
+// §13.4.1: A void function cannot be used as an expression operand.
+static void CheckVoidCallInExpr(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
+    auto it = func_decls.find(expr->callee);
+    if (it != func_decls.end() &&
+        it->second->kind == ModuleItemKind::kFunctionDecl &&
+        it->second->return_type.kind == DataTypeKind::kVoid) {
+      diag.Error(expr->range.start,
+                 std::format("void function '{}' used as expression operand",
+                             expr->callee));
+    }
+  }
+  CheckVoidCallInExpr(expr->lhs, func_decls, diag);
+  CheckVoidCallInExpr(expr->rhs, func_decls, diag);
+  CheckVoidCallInExpr(expr->condition, func_decls, diag);
+  CheckVoidCallInExpr(expr->true_expr, func_decls, diag);
+  CheckVoidCallInExpr(expr->false_expr, func_decls, diag);
+  for (auto* a : expr->args) CheckVoidCallInExpr(a, func_decls, diag);
+  for (auto* e : expr->elements) CheckVoidCallInExpr(e, func_decls, diag);
+}
+
 // §13.5: Walk expression tree for call validation.
 static void WalkExprForCallArgs(
     const Expr* expr,
@@ -981,6 +1006,16 @@ static void WalkStmtForCallArgs(
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
     DiagEngine& diag) {
   if (!s) return;
+  // §13.4.1: Void function calls are legal only as standalone statements.
+  if (s->kind == StmtKind::kExprStmt && s->expr &&
+      s->expr->kind == ExprKind::kCall) {
+    for (auto* a : s->expr->args) CheckVoidCallInExpr(a, func_decls, diag);
+  } else {
+    CheckVoidCallInExpr(s->expr, func_decls, diag);
+  }
+  CheckVoidCallInExpr(s->rhs, func_decls, diag);
+  CheckVoidCallInExpr(s->condition, func_decls, diag);
+  CheckVoidCallInExpr(s->for_cond, func_decls, diag);
   WalkExprForCallArgs(s->expr, func_decls, diag);
   WalkExprForCallArgs(s->lhs, func_decls, diag);
   WalkExprForCallArgs(s->rhs, func_decls, diag);
@@ -1015,6 +1050,9 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
       for (auto* s : item->func_body_stmts) {
         WalkStmtForCallArgs(s, all_decls, diag_);
       }
+    }
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckVoidCallInExpr(item->assign_rhs, all_decls, diag_);
     }
   }
 }
