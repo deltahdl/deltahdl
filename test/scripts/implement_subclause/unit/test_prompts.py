@@ -72,40 +72,10 @@ class TestDescendantBoundary:
         prompt = _all_prompts(isc, "6.3")
         assert "OFF-LIMITS SUBCLAUSES" not in prompt
 
-    def test_audit_scope_step_exists(self, isc):
-        """An 'Auditing scope' step is present."""
+    def test_no_audit_scope_step(self, isc):
+        """No 'Auditing scope' step exists after removal."""
         names = _step_names(isc, "6.3")
-        assert "Auditing scope" in names
-
-    def test_audit_scope_after_implementation(self, isc):
-        """Auditing scope comes after Implementing missing functionality."""
-        names = _step_names(isc, "6.3")
-        impl_idx = names.index("Implementing missing functionality")
-        audit_idx = names.index("Auditing scope")
-        assert audit_idx == impl_idx + 1
-
-    def test_audit_scope_is_last(self, isc):
-        """Auditing scope is the final step (no model summary follows)."""
-        names = _step_names(isc, "6.3")
-        assert names[-1] == "Auditing scope"
-
-    def test_audit_scope_mentions_git_diff(self, isc):
-        """Audit step instructs to run git diff."""
-        steps = isc.build_steps("6.3", "~/LRM.pdf")
-        audit = next(p for n, p in steps if n == "Auditing scope")
-        assert "git diff" in audit
-
-    def test_audit_scope_mentions_revert(self, isc):
-        """Audit step instructs to revert descendant changes."""
-        steps = isc.build_steps("6.3", "~/LRM.pdf")
-        audit = next(p for n, p in steps if n == "Auditing scope")
-        assert "git checkout" in audit
-
-    def test_audit_scope_includes_exclude_note(self, isc):
-        """Audit step includes exclude note when exclude is provided."""
-        steps = isc.build_steps("6.3", "~/LRM.pdf", exclude="6.3.1")
-        audit = next(p for n, p in steps if n == "Auditing scope")
-        assert "OFF-LIMITS SUBCLAUSES" in audit
+        assert "Auditing scope" not in names
 
 
 def _check_common_structure(prompt, subclause):

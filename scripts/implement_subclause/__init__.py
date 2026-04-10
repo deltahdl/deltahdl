@@ -131,14 +131,6 @@ def build_steps(
          f"Implement any missing functionality for §{subclause}."
          f" Only implement §{subclause}, no other subclauses."
          + exclude_note + constraints),
-        ("Auditing scope",
-         f"Run git diff and review every change you made."
-         f" For each change, verify it acts on content defined by"
-         f" §{subclause} in the LRM — not content defined by any"
-         f" descendant subclause."
-         f" If you find any change that acts on descendant content,"
-         f" revert it with git checkout."
-         + exclude_note + constraints),
     ]
 
 
@@ -153,14 +145,20 @@ def _format_subclause_label(subclause):
     return f"§{subclause}"
 
 
+def _build_env() -> dict:
+    """Build a clean environment for Claude CLI subprocesses."""
+    env = os.environ.copy()
+    env.pop("CLAUDECODE", None)
+    return env
+
+
 def run_steps(steps, *, model="opus", continue_session=False) -> list[str]:
     """Run each step as a separate Claude call.
 
     Streams each step's events live to the user's terminal and
     returns the list of per-step ``.result`` texts.
     """
-    env = os.environ.copy()
-    env.pop("CLAUDECODE", None)
+    env = _build_env()
 
     total = len(steps)
     step_results: list[str] = []
@@ -206,6 +204,56 @@ def build_action_summary(added, modified, deleted) -> str:
     for path in sorted(deleted):
         bullets.append(f"- Deleted {path}")
     return "\n".join(bullets)
+
+
+def build_commit_prompt(subclause, added, modified, deleted) -> str:
+    """Build a prompt that asks Claude to explain each file change."""
+    lines = [
+        f"You just finished implementing §{subclause}.",
+        "Git reports these file changes:\n",
+    ]
+    for path in sorted(added):
+        lines.append(f"  Added: {path}")
+    for path in sorted(modified):
+        lines.append(f"  Modified: {path}")
+    for path in sorted(deleted):
+        lines.append(f"  Deleted: {path}")
+    lines.append(
+        "\nWrite a commit message body as a bullet list."
+        " For each change, write one bullet explaining WHY"
+        " you made that change. Use this exact format:\n"
+        "\n"
+        "- Modified `path` because reason.\n"
+        "- Added `path` because reason.\n"
+        "- Deleted `path` because reason.\n"
+        "\n"
+        "If an added file and a deleted file represent a move,"
+        " combine them into one bullet:\n"
+        "\n"
+        "- Moved `TestName` from `old_path` to `new_path`"
+        " because reason.\n"
+        "\n"
+        "Output ONLY the bullet list."
+        " No preamble, no summary, no trailing text."
+    )
+    return "\n".join(lines)
+
+
+def generate_commit_body(
+    subclause, changes, *, model, env,
+) -> str:
+    """Ask Claude to generate a commit body with 'because' explanations."""
+    added, modified, deleted = changes
+    prompt = build_commit_prompt(subclause, added, modified, deleted)
+    cmd = [
+        "claude", "-p",
+        "--model", model,
+        "--output-format", "stream-json",
+        "--dangerously-skip-permissions",
+        "--continue",
+    ]
+    print("\nGenerating commit message", flush=True)
+    return run_claude_streaming(cmd, prompt, env=env)
 
 
 def commit_implementation(
@@ -295,8 +343,15 @@ def main(argv=None):
     added = [p for p in added if _is_valid_path(p)]
     modified = [p for p in modified if _is_valid_path(p)]
     deleted = [p for p in deleted if _is_valid_path(p)]
-    action = build_action_summary(added, modified, deleted)
-    if not action:
+    if added or modified or deleted:
+        env = _build_env()
+        action = generate_commit_body(
+            args.subclause, (added, modified, deleted),
+            model=args.model, env=env,
+        )
+        if not action.strip():
+            action = build_action_summary(added, modified, deleted)
+    else:
         action = step_results[-1]
     print(f"Action summary:\n{action}")
     commit_implementation(

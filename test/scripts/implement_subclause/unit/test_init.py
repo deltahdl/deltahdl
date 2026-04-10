@@ -182,14 +182,78 @@ def test_build_action_summary_empty(isc):
     assert isc.build_action_summary([], [], []) == ""
 
 
+# ---- build_commit_prompt ----------------------------------------------------
+
+
+def test_build_commit_prompt_includes_subclause(isc):
+    """Prompt contains the target subclause."""
+    prompt = isc.build_commit_prompt("6.3", ["a.cpp"], [], [])
+    assert "§6.3" in prompt
+
+
+def test_build_commit_prompt_lists_added(isc):
+    """Prompt lists an added file path."""
+    prompt = isc.build_commit_prompt("6.3", ["src/foo.cpp"], [], [])
+    assert "src/foo.cpp" in prompt
+
+
+def test_build_commit_prompt_lists_modified(isc):
+    """Prompt lists a modified file path."""
+    prompt = isc.build_commit_prompt("6.3", [], ["src/bar.h"], [])
+    assert "src/bar.h" in prompt
+
+
+def test_build_commit_prompt_lists_deleted(isc):
+    """Prompt lists a deleted file path."""
+    prompt = isc.build_commit_prompt("6.3", [], [], ["old.cpp"])
+    assert "old.cpp" in prompt
+
+
+def test_build_commit_prompt_mentions_because(isc):
+    """Prompt instructs Claude to use 'because' format."""
+    prompt = isc.build_commit_prompt("6.3", ["a.cpp"], [], [])
+    assert "because" in prompt
+
+
+# ---- generate_commit_body ---------------------------------------------------
+
+
+def test_generate_commit_body_calls_streaming(isc):
+    """generate_commit_body invokes run_claude_streaming."""
+    with patch("implement_subclause.run_claude_streaming",
+               return_value="- Added `a.cpp` because reason.") as mock_s:
+        isc.generate_commit_body("6.3", (["a.cpp"], [], []),
+                                 model="opus", env={})
+    assert mock_s.called
+
+
+def test_generate_commit_body_uses_continue(isc):
+    """generate_commit_body passes --continue to the Claude CLI."""
+    with patch("implement_subclause.run_claude_streaming",
+               return_value="body") as mock_s:
+        isc.generate_commit_body("6.3", (["a.cpp"], [], []),
+                                 model="opus", env={})
+    assert "--continue" in mock_s.call_args[0][0]
+
+
+def test_generate_commit_body_returns_result(isc):
+    """generate_commit_body returns the streaming helper's result."""
+    with patch("implement_subclause.run_claude_streaming",
+               return_value="- Added `a.cpp` because reason."):
+        result = isc.generate_commit_body("6.3", (["a.cpp"], [], []),
+                                          model="opus", env={})
+    assert result == "- Added `a.cpp` because reason."
+
+
 # ---- main ------------------------------------------------------------------
 
 
-_STEP_RESULTS = [f"step-{i}-summary" for i in range(1, 10)]
+_STEP_RESULTS = [f"step-{i}-summary" for i in range(1, 9)]
 
 
 def _run_main_success(isc, tmp_path, *, changes=(["foo.cpp"], [], []),
-                      step_results=None):
+                      step_results=None, commit_body="- Added `foo.cpp`"
+                      " because needed."):
     """Run main() with run_steps success and stubbed git changes."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
@@ -199,12 +263,14 @@ def _run_main_success(isc, tmp_path, *, changes=(["foo.cpp"], [], []),
         patch("implement_subclause.commit_implementation") as mock_commit,
         patch("implement_subclause.get_porcelain_changes",
               return_value=changes),
+        patch("implement_subclause.generate_commit_body",
+              return_value=commit_body) as mock_gen,
     ):
         isc.main([
             "--lrm", str(lrm), "--subclause", "6.6.1",
             "--issue", "8", "--model", "opus",
         ])
-    return {"run": mock_run, "commit": mock_commit}
+    return {"run": mock_run, "commit": mock_commit, "gen": mock_gen}
 
 
 def test_main_dispatches_depth_1(isc, tmp_path):
@@ -228,7 +294,7 @@ def test_main_dispatches_depth_1(isc, tmp_path):
 def test_main_uses_step_result_when_porcelain_empty(isc, tmp_path):
     """main() falls back to last step_results entry when porcelain empty."""
     mocks = _run_main_success(isc, tmp_path, changes=([], [], []))
-    assert mocks["commit"].call_args[1]["action"] == "step-9-summary"
+    assert mocks["commit"].call_args[1]["action"] == "step-8-summary"
 
 
 def test_main_prints_step_result_when_porcelain_empty(
@@ -236,13 +302,15 @@ def test_main_prints_step_result_when_porcelain_empty(
 ):
     """main() prints the step_results fallback under Action summary."""
     _run_main_success(isc, tmp_path, changes=([], [], []))
-    assert "step-9-summary" in capsys.readouterr().out
+    assert "step-8-summary" in capsys.readouterr().out
 
 
-def test_main_prefers_porcelain_over_step_results(isc, tmp_path):
-    """main() uses porcelain-derived action when porcelain is non-empty."""
+def test_main_uses_generated_commit_body(isc, tmp_path):
+    """main() uses generate_commit_body output when porcelain is non-empty."""
     mocks = _run_main_success(isc, tmp_path)
-    assert mocks["commit"].call_args[1]["action"] == "- Added foo.cpp"
+    assert mocks["commit"].call_args[1]["action"] == (
+        "- Added `foo.cpp` because needed."
+    )
 
 
 def test_main_calls_commit_implementation_subclause(isc, tmp_path):
@@ -258,15 +326,33 @@ def test_main_calls_commit_implementation_issue(isc, tmp_path):
 
 
 def test_main_passes_action_to_commit(isc, tmp_path):
-    """main() builds the action summary from git status and passes it down."""
+    """main() passes generated commit body to commit_implementation."""
     mocks = _run_main_success(isc, tmp_path)
-    assert mocks["commit"].call_args[1]["action"] == "- Added foo.cpp"
+    assert "because needed" in mocks["commit"].call_args[1]["action"]
 
 
 def test_main_prints_action_summary(isc, tmp_path, capsys):
-    """main() prints the action summary to stdout."""
+    """main() prints the generated commit body to stdout."""
     _run_main_success(isc, tmp_path)
-    assert "- Added foo.cpp" in capsys.readouterr().out
+    assert "because needed" in capsys.readouterr().out
+
+
+def test_main_falls_back_when_commit_body_empty(isc, tmp_path):
+    """main() falls back to build_action_summary when commit body is empty."""
+    mocks = _run_main_success(isc, tmp_path, commit_body="")
+    assert mocks["commit"].call_args[1]["action"] == "- Added foo.cpp"
+
+
+def test_main_falls_back_when_commit_body_whitespace(isc, tmp_path):
+    """main() falls back to build_action_summary when commit body is blank."""
+    mocks = _run_main_success(isc, tmp_path, commit_body="   ")
+    assert mocks["commit"].call_args[1]["action"] == "- Added foo.cpp"
+
+
+def test_main_skips_generate_when_no_porcelain(isc, tmp_path):
+    """main() does not call generate_commit_body when porcelain is empty."""
+    mocks = _run_main_success(isc, tmp_path, changes=([], [], []))
+    assert not mocks["gen"].called
 
 
 def test_parse_args_rejects_figures_flag(isc, tmp_path):

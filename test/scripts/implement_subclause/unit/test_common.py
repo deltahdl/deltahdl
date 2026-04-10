@@ -120,9 +120,9 @@ def test_build_steps_returns_list(isc):
     assert isinstance(steps, list)
 
 
-def test_build_steps_has_9_steps(isc):
-    """build_steps returns exactly 9 steps after gate removal."""
-    assert len(isc.build_steps("4.1", "~/LRM.txt")) == 9
+def test_build_steps_has_8_steps(isc):
+    """build_steps returns exactly 8 steps after audit-scope removal."""
+    assert len(isc.build_steps("4.1", "~/LRM.txt")) == 8
 
 
 def test_build_steps_first_mentions_lrm(isc):
@@ -137,10 +137,10 @@ def test_build_steps_first_is_auditing_src(isc):
     assert steps[0][0] == "Auditing src"
 
 
-def test_build_steps_last_is_audit_scope(isc):
-    """Last step is the model self-audit (Auditing scope)."""
+def test_build_steps_last_is_implementing_functionality(isc):
+    """Last step is Implementing missing functionality."""
     steps = isc.build_steps("4.1", "~/LRM.txt")
-    assert steps[-1][0] == "Auditing scope"
+    assert steps[-1][0] == "Implementing missing functionality"
 
 
 def test_build_steps_each_has_description(isc):
@@ -200,13 +200,13 @@ def _run_steps_with_ok_mock(isc):
 
 
 def test_run_steps_call_count(isc):
-    """run_steps calls run_claude_streaming 9 times (once per step)."""
-    assert _run_steps_with_ok_mock(isc)[0].call_count == 9
+    """run_steps calls run_claude_streaming 8 times (once per step)."""
+    assert _run_steps_with_ok_mock(isc)[0].call_count == 8
 
 
-def test_run_steps_returns_list_of_nine(isc):
-    """run_steps returns a 9-element list after a successful run."""
-    assert len(_run_steps_with_ok_mock(isc)[1]) == 9
+def test_run_steps_returns_list_of_eight(isc):
+    """run_steps returns an 8-element list after a successful run."""
+    assert len(_run_steps_with_ok_mock(isc)[1]) == 8
 
 
 def test_run_steps_returns_result_field(isc):
@@ -215,7 +215,7 @@ def test_run_steps_returns_result_field(isc):
 
 
 def test_run_steps_returns_result_for_all_steps(isc):
-    """All 9 returned entries carry the streaming helper's return value."""
+    """All 8 returned entries carry the streaming helper's return value."""
     results = _run_steps_with_ok_mock(isc)[1]
     assert all(entry == "- Done because needed" for entry in results)
 
@@ -230,7 +230,7 @@ def test_run_steps_uses_stream_json_format(isc):
 def test_run_steps_prints_step_numbers(isc, capsys):
     """run_steps prints step numbers in stdout."""
     _run_steps_with_ok_mock(isc)
-    assert "Step 1/9:" in capsys.readouterr().out
+    assert "Step 1/8:" in capsys.readouterr().out
 
 
 def test_run_steps_first_no_continue(isc):
