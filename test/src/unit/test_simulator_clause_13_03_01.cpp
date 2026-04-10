@@ -123,6 +123,46 @@ TEST(TaskDeclSim, AutoVarInStaticTaskFresh) {
   EXPECT_EQ(val, 1u);
 }
 
+TEST(TaskDeclSim, StaticTaskRetainsValues) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  task static accum(input logic [31:0] v, output logic [31:0] out);\n"
+      "    int sum;\n"
+      "    sum = sum + v;\n"
+      "    out = sum;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    accum(32'd10, result);\n"
+      "    accum(32'd20, result);\n"
+      "    accum(32'd30, result);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+
+  EXPECT_EQ(val, 60u);
+}
+
+TEST(TaskDeclSim, AutomaticTaskFreshVars) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  task automatic accum(input logic [31:0] v, output logic [31:0] out);\n"
+      "    int sum;\n"
+      "    sum = sum + v;\n"
+      "    out = sum;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    accum(32'd10, result);\n"
+      "    accum(32'd20, result);\n"
+      "    accum(32'd30, result);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+
+  EXPECT_EQ(val, 30u);
+}
+
 TEST(TaskDeclSim, SetupReturnsTaskItem) {
   SimFixture f;
   auto* task = f.arena.Create<ModuleItem>();
