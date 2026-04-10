@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(BlockStatementElaboration, ForkJoinNoneAllowedInFunction) {
+TEST(FunctionBackgroundProcessElaboration, ForkJoinNoneOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(BlockStatementElaboration, ForkJoinNoneAllowedInFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(FunctionSideEffectsElaboration, NonblockingAssignAllowedInFunction) {
+TEST(FunctionBackgroundProcessElaboration, NonblockingAssignOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -33,7 +33,7 @@ TEST(FunctionSideEffectsElaboration, NonblockingAssignAllowedInFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(FunctionSideEffectsElaboration, EventTriggerAllowedInFunction) {
+TEST(FunctionBackgroundProcessElaboration, EventTriggerOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -47,13 +47,89 @@ TEST(FunctionSideEffectsElaboration, EventTriggerAllowedInFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(FunctionSideEffectsElaboration, ForkJoinNoneWithDelayInFunction) {
+TEST(FunctionBackgroundProcessElaboration, DelayInsideForkJoinNoneOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  function void spawn_delayed();\n"
       "    fork\n"
       "      #10 $display(\"done\");\n"
+      "    join_none\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionBackgroundProcessElaboration, ForkJoinError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void my_func();\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "    join\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionBackgroundProcessElaboration, ForkJoinAnyError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void my_func();\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "    join_any\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionBackgroundProcessElaboration, TaskEnableInsideForkJoinNoneOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task t(); endtask\n"
+      "  function void f();\n"
+      "    fork\n"
+      "      t();\n"
+      "    join_none\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionBackgroundProcessElaboration, EventControlInsideForkJoinNoneOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  function void f();\n"
+      "    fork\n"
+      "      @(posedge clk) $display(\"tick\");\n"
+      "    join_none\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionBackgroundProcessElaboration, WaitInsideForkJoinNoneOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic ready;\n"
+      "  function void f();\n"
+      "    fork\n"
+      "      wait(ready);\n"
       "    join_none\n"
       "  endfunction\n"
       "endmodule\n",

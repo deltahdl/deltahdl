@@ -21,20 +21,6 @@ TEST(FunctionElaboration, FunctionCallInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(FunctionElaboration, ForkJoinIllegalInFunction) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  function void my_func();\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "    join\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(FunctionElaboration, FunctionWithOutputArgsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -188,20 +174,6 @@ TEST(FunctionElaboration, FunctionCallsFunctionIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(FunctionElaboration, ForkJoinAnyIllegalInFunction) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  function void my_func();\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "    join_any\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(FunctionElaboration, FunctionCallsSystemTaskOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -228,21 +200,6 @@ TEST(FunctionElaboration, FunctionWithNestedTaskEnableError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
-}
-
-TEST(FunctionElaboration, ForkJoinNoneInFunctionOk) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  function void f();\n"
-      "    fork\n"
-      "      $display(\"hi\");\n"
-      "    join_none\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
