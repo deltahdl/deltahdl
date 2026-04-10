@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(TaskDeclParsing, ElabTaskDeclInModule) {
+TEST(TaskElaboration, ElabTaskDeclInModule) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -70,12 +70,17 @@ TEST(TaskElaboration, TaskEnablesTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(TaskDeclarations, EmptyTaskElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  task do_work;\n"
-             "  endtask\n"
-             "endmodule\n"));
+TEST(TaskElaboration, TaskWithRefArgElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  task inc(ref int v);\n"
+      "    v = v + 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

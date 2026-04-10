@@ -136,4 +136,21 @@ TEST(TaskSim, TaskEmptyBody) {
   EXPECT_EQ(val, 2u);
 }
 
+TEST(TaskSim, TaskReturnEarlyExit) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  task maybe_set(input logic [31:0] v);\n"
+      "    if (v == 0) return;\n"
+      "    x = v;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    x = 32'd1;\n"
+      "    maybe_set(32'd0);\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 1u);
+}
+
 }  // namespace
