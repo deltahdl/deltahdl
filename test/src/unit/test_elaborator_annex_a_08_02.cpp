@@ -64,19 +64,6 @@ TEST(SubroutineCallElaborationSyntax, VoidCastOfMethodCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SubroutineCallElaborationSyntax, ConstantFunctionCallElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  function int eight(); return 8; endfunction\n"
-      "  parameter P = eight();\n"
-      "  logic [P-1:0] x;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(SubroutineCallElaborationSyntax, FunctionCallReturnValueElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

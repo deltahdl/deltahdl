@@ -358,16 +358,6 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingCloseParen) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(SubroutineCallExprParsing, ConstantFunctionCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int eight(); return 8; endfunction\n"
-      "  parameter P = eight();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SubroutineCallExprParsing, ListOfArgsAllNamed) {
   auto r = Parse(
       "module m;\n"

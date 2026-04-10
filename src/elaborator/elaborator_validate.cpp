@@ -794,6 +794,21 @@ static bool BodyContainsFork(const Stmt* s) {
   return false;
 }
 
+// §13.4.3: Check if a function body contains nonblocking assignments.
+static bool BodyContainsNonblocking(const Stmt* s) {
+  if (!s) return false;
+  if (s->kind == StmtKind::kNonblockingAssign) return true;
+  for (auto* sub : s->stmts)
+    if (BodyContainsNonblocking(sub)) return true;
+  if (BodyContainsNonblocking(s->then_branch)) return true;
+  if (BodyContainsNonblocking(s->else_branch)) return true;
+  if (BodyContainsNonblocking(s->body)) return true;
+  if (BodyContainsNonblocking(s->for_body)) return true;
+  for (auto& ci : s->case_items)
+    if (BodyContainsNonblocking(ci.body)) return true;
+  return false;
+}
+
 // §13.4.3: Validate that a function meets constant function constraints.
 static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
                                      DiagEngine& diag) {
@@ -816,6 +831,14 @@ static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
       diag.Error(loc,
                  std::format("constant function '{}' shall not contain fork",
                              func->name));
+      return false;
+    }
+    if (BodyContainsNonblocking(s)) {
+      diag.Error(
+          loc,
+          std::format(
+              "constant function '{}' shall not contain nonblocking assignments",
+              func->name));
       return false;
     }
   }
@@ -845,6 +868,37 @@ static void ValidateConstantFuncCallsInExpr(
     ValidateConstantFuncCallsInExpr(elem, loc, func_decls, diag);
 }
 
+// §13.4.3: Recursively scan module items for constant function calls in
+// parameter initializers and generate conditions.
+static void ValidateConstFuncCallsInItems(
+    const std::vector<ModuleItem*>& items,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  for (const auto* item : items) {
+    if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
+      ValidateConstantFuncCallsInExpr(item->init_expr, item->loc, func_decls,
+                                      diag);
+      continue;
+    }
+    if (item->kind == ModuleItemKind::kGenerateIf ||
+        item->kind == ModuleItemKind::kGenerateCase ||
+        item->kind == ModuleItemKind::kGenerateFor) {
+      if (item->gen_cond) {
+        ValidateConstantFuncCallsInExpr(item->gen_cond, item->loc, func_decls,
+                                        diag);
+      }
+      ValidateConstFuncCallsInItems(item->gen_body, func_decls, diag);
+      if (item->gen_else) {
+        ValidateConstFuncCallsInItems(item->gen_else->gen_body, func_decls,
+                                      diag);
+      }
+      for (const auto& ci : item->gen_case_items) {
+        ValidateConstFuncCallsInItems(ci.body, func_decls, diag);
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
   // Check function calls in module header parameter defaults.
   for (const auto& [name, default_expr] : decl->params) {
@@ -853,12 +907,7 @@ void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
                                       func_decls_, diag_);
     }
   }
-  // Check function calls in localparam/parameter item initializers.
-  for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) continue;
-    ValidateConstantFuncCallsInExpr(item->init_expr, item->loc, func_decls_,
-                                    diag_);
-  }
+  ValidateConstFuncCallsInItems(decl->items, func_decls_, diag_);
 }
 
 // §13.5: Check if an expression is a valid LHS for output/inout args.
