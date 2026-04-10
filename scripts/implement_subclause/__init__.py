@@ -4,7 +4,6 @@ Builds an optimized prompt and invokes Claude CLI.
 """
 
 import argparse
-import json
 import os
 import re
 import subprocess
@@ -17,14 +16,13 @@ from lib.python.cli import (
     add_continue_arg,
     add_lrm_arg,
     add_model_arg,
-    run_claude_cli,
-    run_with_dots,
     validate_lrm,
 )
 from lib.python.git import (
     commit_and_push,
     get_porcelain_changes,
 )
+from .streaming import run_claude_streaming
 
 
 # ---------------------------------------------------------------------------
@@ -155,38 +153,11 @@ def _format_subclause_label(subclause):
     return f"§{subclause}"
 
 
-class _StepOutputContractError(RuntimeError):
-    """Raised when a Claude CLI step's JSON output violates its contract."""
-
-
-def _extract_result_text(result) -> str:
-    """Parse Claude CLI JSON stdout and return its ``.result`` field.
-
-    Raises ``_StepOutputContractError`` on any violation of the CLI
-    contract: non-JSON stdout, missing ``result`` key, or empty
-    ``result``.
-    """
-    try:
-        payload = json.loads(result.stdout)
-    except json.JSONDecodeError as exc:
-        raise _StepOutputContractError(
-            "stdout was not valid JSON",
-        ) from exc
-    if not isinstance(payload, dict) or "result" not in payload:
-        raise _StepOutputContractError("JSON lacks a 'result' key")
-    text = payload["result"]
-    if not isinstance(text, str) or not text:
-        raise _StepOutputContractError("'.result' was empty")
-    return text
-
-
 def run_steps(steps, *, model="opus", continue_session=False) -> list[str]:
     """Run each step as a separate Claude call.
 
-    Returns the list of per-step ``.result`` texts extracted from
-    Claude's ``--output-format json`` stdout. All failures (non-zero
-    exit, malformed JSON, missing/empty ``result``) are loud and
-    fatal.
+    Streams each step's events live to the user's terminal and
+    returns the list of per-step ``.result`` texts.
     """
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
@@ -202,37 +173,15 @@ def run_steps(steps, *, model="opus", continue_session=False) -> list[str]:
             "--model", model,
             "--effort", "high",
             "--verbose",
-            "--output-format", "json",
+            "--output-format", "stream-json",
             "--dangerously-skip-permissions",
         ]
         if i > 0 or continue_session:
             cmd.append("--continue")
 
-        print(f"Step {step_num}/{total}: {description}...",
-              end="", flush=True)
+        print(f"\nStep {step_num}/{total}: {description}", flush=True)
 
-        result = run_with_dots(run_claude_cli, cmd, prompt, env=env)
-
-        if result.returncode != 0:
-            print(
-                f"\nERROR: Step {step_num} failed"
-                f" (code {result.returncode})"
-                f"\n--- raw stdout ---\n{result.stdout}"
-                f"\n--- raw stderr ---\n{result.stderr}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-        try:
-            step_results.append(_extract_result_text(result))
-        except _StepOutputContractError as exc:
-            print(
-                f"\nERROR: Step {step_num} {exc}."
-                f"\n--- raw stdout ---\n{result.stdout}"
-                f"\n--- raw stderr ---\n{result.stderr}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+        step_results.append(run_claude_streaming(cmd, prompt, env=env))
 
     return step_results
 
