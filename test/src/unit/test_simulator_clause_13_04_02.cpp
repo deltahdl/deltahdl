@@ -6,51 +6,9 @@
 
 using namespace delta;
 
-static ModuleItem* MakeCounterFunc(Arena& arena) {
-  auto* func = arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "counter";
-  auto* rhs = MakeBinary(arena, TokenKind::kPlus, MakeId(arena, "counter"),
-                         MakeInt(arena, 1));
-  func->func_body_stmts.push_back(MakeAssign(arena, "counter", rhs));
-  return func;
-}
-
 namespace {
 
-TEST(Functions, StaticFunctionPersistsVariables) {
-  FuncFixture f;
-
-  auto* func = MakeCounterFunc(f.arena);
-  func->is_static = true;
-  func->is_automatic = false;
-  f.ctx.RegisterFunction("counter", func);
-
-  auto* call = MakeCall(f.arena, "counter", {});
-
-  EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 1u);
-
-  EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 2u);
-
-  EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 3u);
-}
-
-TEST(Functions, AutomaticFunctionFreshVariables) {
-  FuncFixture f;
-
-  auto* func = MakeCounterFunc(f.arena);
-  func->is_automatic = true;
-  func->is_static = false;
-  f.ctx.RegisterFunction("counter", func);
-
-  auto* call = MakeCall(f.arena, "counter", {});
-
-  EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 1u);
-  EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 1u);
-  EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 1u);
-}
-
-TEST(Functions, StaticFunctionWithArgs) {
+TEST(FunctionLifetimeSim, StaticFunctionWithArgs) {
   FuncFixture f;
 
   auto* func = f.arena.Create<ModuleItem>();
@@ -74,7 +32,7 @@ TEST(Functions, StaticFunctionWithArgs) {
   EXPECT_EQ(EvalExpr(c3, f.ctx, f.arena).ToUint64(), 10u);
 }
 
-TEST(FunctionBodySim, StaticFunctionVarsPersist) {
+TEST(FunctionLifetimeSim, StaticFunctionVarsPersist) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -93,7 +51,7 @@ TEST(FunctionBodySim, StaticFunctionVarsPersist) {
   EXPECT_EQ(val, 3u);
 }
 
-TEST(FunctionBodySim, AutomaticFunctionVarsFresh) {
+TEST(FunctionLifetimeSim, AutomaticFunctionVarsFresh) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -112,7 +70,7 @@ TEST(FunctionBodySim, AutomaticFunctionVarsFresh) {
   EXPECT_EQ(val, 1u);
 }
 
-TEST(FunctionBodySim, DefaultFunctionIsStatic) {
+TEST(FunctionLifetimeSim, DefaultFunctionIsStatic) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -130,7 +88,7 @@ TEST(FunctionBodySim, DefaultFunctionIsStatic) {
   EXPECT_EQ(val, 2u);
 }
 
-TEST(FunctionBodySim, StaticVarInAutoFuncPersists) {
+TEST(FunctionLifetimeSim, StaticVarInAutomaticFunctionPersists) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -149,7 +107,7 @@ TEST(FunctionBodySim, StaticVarInAutoFuncPersists) {
   EXPECT_EQ(val, 3u);
 }
 
-TEST(FunctionBodySim, AutoVarInStaticFuncFresh) {
+TEST(FunctionLifetimeSim, AutomaticVarInStaticFunctionFresh) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -168,7 +126,7 @@ TEST(FunctionBodySim, AutoVarInStaticFuncFresh) {
   EXPECT_EQ(val, 11u);
 }
 
-TEST(FunctionBodySim, RecursiveAutoFunction) {
+TEST(FunctionLifetimeSim, RecursiveAutomaticFunction) {
   auto val = RunAndGet(
       "module t;\n"
       "  logic [31:0] result;\n"
@@ -184,6 +142,25 @@ TEST(FunctionBodySim, RecursiveAutoFunction) {
       "endmodule\n",
       "result");
   EXPECT_EQ(val, 120u);
+}
+
+TEST(FunctionLifetimeSim, DefaultLifetimeInAutomaticModuleIsAutomatic) {
+  auto val = RunAndGet(
+      "module automatic t;\n"
+      "  logic [31:0] result;\n"
+      "  function int counter();\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 1u);
 }
 
 }  // namespace

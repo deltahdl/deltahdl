@@ -10,8 +10,9 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
   decl->range.start = CurrentLoc();
   Expect(TokenKind::kKwInterface);
 
-  // Optional lifetime qualifier (§3.4)
-  Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
+  // Optional lifetime qualifier (§13.4.2)
+  decl->is_automatic = Match(TokenKind::kKwAutomatic);
+  if (!decl->is_automatic) Match(TokenKind::kKwStatic);
 
   decl->name = Expect(TokenKind::kIdentifier).text;
   ParseParamsPortsAndSemicolon(*decl);
@@ -155,8 +156,9 @@ ModuleDecl* Parser::ParseProgramDecl() {
   decl->range.start = CurrentLoc();
   Expect(TokenKind::kKwProgram);
 
-  // Optional lifetime qualifier (§3.4)
-  Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
+  // Optional lifetime qualifier (§13.4.2)
+  decl->is_automatic = Match(TokenKind::kKwAutomatic);
+  if (!decl->is_automatic) Match(TokenKind::kKwStatic);
 
   decl->name = Expect(TokenKind::kIdentifier).text;
   ParseParamsPortsAndSemicolon(*decl);

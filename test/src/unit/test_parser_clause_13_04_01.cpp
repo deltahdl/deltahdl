@@ -63,22 +63,6 @@ TEST(FunctionReturnValueParsing, FunctionReturnAndVoidAndDirections) {
   EXPECT_EQ(compute->func_args[3].direction, Direction::kRef);
 }
 
-TEST(FunctionReturnValueParsing, AutomaticVoidFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic void log_msg(input int code);\n"
-      "    $display(\"code=%0d\", code);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_automatic);
-  EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
-  EXPECT_EQ(item->name, "log_msg");
-}
 TEST(FunctionReturnValueParsing, ReturnTypeReal) {
   auto r = Parse(
       "module t;\n"

@@ -658,6 +658,15 @@ static void CheckFuncBodyStmt(
                std::format("declaration of '{}' conflicts with function name",
                            func_name));
   }
+  // §13.4.2: Static variable initializer must be a constant expression.
+  if (s->kind == StmtKind::kVarDecl && s->var_is_static && s->var_init) {
+    if (!IsConstantExpr(s->var_init)) {
+      diag.Error(s->range.start,
+                 std::format("static variable '{}' initializer must be a "
+                             "constant expression",
+                             s->var_name));
+    }
+  }
   // §13.4.4: fork/join_none body follows task rules, not function rules.
   if (s->kind == StmtKind::kFork && s->join_kind == TokenKind::kKwJoinNone)
     return;

@@ -5,45 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(FormalSyntaxParsing, FunctionDeclAutomaticParse) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(item->name, "add");
-}
-
-TEST(FormalSyntaxParsing, FunctionDeclAutomaticProps) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_TRUE(item->is_automatic);
-  EXPECT_EQ(item->func_args.size(), 2u);
-}
-
-TEST(TypeDeclParsing, LifetimeInFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int calc; return 0; endfunction\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_TRUE(item->is_automatic);
-}
-
-TEST(FunctionDeclParsing, FuncLifetimeAutomatic) {
+TEST(FunctionLifetimeParsing, AutomaticLifetimeQualifier) {
   auto r = Parse(
       "module m;\n  function automatic int foo();\n"
       "    return 1;\n  endfunction\nendmodule\n");
@@ -54,7 +16,7 @@ TEST(FunctionDeclParsing, FuncLifetimeAutomatic) {
   EXPECT_FALSE(item->is_static);
 }
 
-TEST(FunctionDeclParsing, FuncLifetimeStatic) {
+TEST(FunctionLifetimeParsing, StaticLifetimeQualifier) {
   auto r = Parse(
       "module m;\n  function static int foo();\n"
       "    return 1;\n  endfunction\nendmodule\n");
@@ -65,7 +27,7 @@ TEST(FunctionDeclParsing, FuncLifetimeStatic) {
   EXPECT_TRUE(item->is_static);
 }
 
-TEST(FunctionDeclParsing, FuncLifetimeDefault) {
+TEST(FunctionLifetimeParsing, NoLifetimeQualifier) {
   auto r = Parse(
       "module m;\n  function int foo();\n"
       "    return 1;\n  endfunction\nendmodule\n");
@@ -76,7 +38,24 @@ TEST(FunctionDeclParsing, FuncLifetimeDefault) {
   EXPECT_FALSE(item->is_static);
 }
 
-TEST(SchedulingSemanticsParsing, RecursiveAutoFuncFibonacci) {
+TEST(FunctionLifetimeParsing, AutomaticVoidFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic void log_msg(input int code);\n"
+      "    $display(\"code=%0d\", code);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_TRUE(item->is_automatic);
+  EXPECT_EQ(item->return_type.kind, DataTypeKind::kVoid);
+  EXPECT_EQ(item->name, "log_msg");
+}
+
+TEST(FunctionLifetimeParsing, RecursiveAutomaticFunction) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int fibonacci(int n);\n"
@@ -99,7 +78,7 @@ TEST(SchedulingSemanticsParsing, RecursiveAutoFuncFibonacci) {
   EXPECT_NE(item->func_body_stmts[0]->else_branch, nullptr);
 }
 
-TEST(SchedulingSemanticsParsing, AutoFuncInClass) {
+TEST(FunctionLifetimeParsing, AutomaticFunctionInClass) {
   EXPECT_TRUE(
       ParseOk("class my_class;\n"
               "  function automatic int get_id();\n"
@@ -108,25 +87,7 @@ TEST(SchedulingSemanticsParsing, AutoFuncInClass) {
               "endclass\n"));
 }
 
-TEST(SchedulingSemanticsParsing, FuncNoExplicitLifetime) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int adder(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->kind, ModuleItemKind::kFunctionDecl);
-
-  EXPECT_FALSE(fn->is_static);
-  EXPECT_FALSE(fn->is_automatic);
-  EXPECT_EQ(fn->name, "adder");
-}
-
-TEST(SchedulingSemanticsParsing, MixedStaticAutoFuncsInModule) {
+TEST(FunctionLifetimeParsing, MixedStaticAndAutomaticInModule) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int auto_fn(int x);\n"
@@ -147,23 +108,7 @@ TEST(SchedulingSemanticsParsing, MixedStaticAutoFuncsInModule) {
   EXPECT_FALSE(static_fn->is_automatic);
 }
 
-TEST(SchedulingSemanticsParsing, FuncNoLifetimeQualifier) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int plain_fn(int x);\n"
-      "    return x;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_FALSE(item->is_automatic);
-  EXPECT_FALSE(item->is_static);
-}
-
-TEST(SchedulingSemanticsParsing, AutoFuncReturningLogic) {
+TEST(FunctionLifetimeParsing, AutomaticFunctionWithLogicReturn) {
   auto r = Parse(
       "module m;\n"
       "  function automatic logic [7:0] get_byte(int idx);\n"
@@ -190,7 +135,7 @@ static ModuleItem* FirstFuncOrTask(ParseResult& r) {
   return nullptr;
 }
 
-TEST(SchedulingSemanticsParsing, StaticFunctionDeclWithLocalVar) {
+TEST(FunctionLifetimeParsing, StaticFunctionWithLocalVar) {
   auto r = Parse(
       "module m;\n"
       "  function static int count();\n"
@@ -209,25 +154,7 @@ TEST(SchedulingSemanticsParsing, StaticFunctionDeclWithLocalVar) {
   EXPECT_EQ(fn->name, "count");
 }
 
-TEST(SchedulingSemanticsParsing, AutomaticFunctionDeclRecursive) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int factorial(int n);\n"
-      "    if (n <= 1) return 1;\n"
-      "    return n * factorial(n - 1);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_EQ(fn->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(fn->is_automatic);
-  EXPECT_FALSE(fn->is_static);
-  EXPECT_EQ(fn->name, "factorial");
-}
-
-TEST(SchedulingSemanticsParsing, ExplicitStaticInAutoFunc) {
+TEST(FunctionLifetimeParsing, StaticVarInAutomaticFunction) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int call_count();\n"
@@ -248,7 +175,7 @@ TEST(SchedulingSemanticsParsing, ExplicitStaticInAutoFunc) {
   EXPECT_EQ(fn->func_body_stmts[0]->var_name, "cnt");
 }
 
-TEST(SchedulingSemanticsParsing, ExplicitAutoInStaticFunc) {
+TEST(FunctionLifetimeParsing, AutomaticVarInStaticFunction) {
   auto r = Parse(
       "module m;\n"
       "  function static int compute(int x);\n"
@@ -268,106 +195,7 @@ TEST(SchedulingSemanticsParsing, ExplicitAutoInStaticFunc) {
   EXPECT_EQ(fn->func_body_stmts[0]->var_name, "tmp");
 }
 
-TEST(SchedulingSemanticsParsing, StaticVsAutomaticFunctionLifetime) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int auto_fn();\n"
-      "    return 1;\n"
-      "  endfunction\n"
-      "  function static int static_fn();\n"
-      "    return 2;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto* auto_fn = r.cu->modules[0]->items[0];
-  auto* static_fn = r.cu->modules[0]->items[1];
-  EXPECT_EQ(auto_fn->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(auto_fn->is_automatic);
-  EXPECT_FALSE(auto_fn->is_static);
-  EXPECT_EQ(static_fn->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(static_fn->is_static);
-  EXPECT_FALSE(static_fn->is_automatic);
-}
-
-TEST(SchedulingSemanticsParsing, AutomaticFunctionDeclSimple) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_automatic);
-  EXPECT_FALSE(item->is_static);
-  EXPECT_EQ(item->name, "add");
-  EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
-}
-
-TEST(SchedulingSemanticsParsing, StaticVarWithInitInFunc) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int get_id();\n"
-      "    static int next_id = 100;\n"
-      "    next_id = next_id + 1;\n"
-      "    return next_id;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  ASSERT_GE(fn->func_body_stmts.size(), 1u);
-  auto* var_stmt = fn->func_body_stmts[0];
-  EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(var_stmt->var_is_static);
-  EXPECT_EQ(var_stmt->var_name, "next_id");
-  EXPECT_NE(var_stmt->var_init, nullptr);
-}
-
-TEST(SchedulingSemanticsParsing, StaticFunctionDeclConstReturn) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int counter();\n"
-      "    return 0;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_static);
-  EXPECT_FALSE(item->is_automatic);
-  EXPECT_EQ(item->name, "counter");
-}
-
-TEST(SchedulingSemanticsParsing, AutoVarWithInitInFunc) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int compute(int a, int b);\n"
-      "    automatic int result = a + b;\n"
-      "    return result;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  ASSERT_GE(fn->func_body_stmts.size(), 1u);
-  auto* var_stmt = fn->func_body_stmts[0];
-  EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(var_stmt->var_is_automatic);
-  EXPECT_EQ(var_stmt->var_name, "result");
-  EXPECT_NE(var_stmt->var_init, nullptr);
-}
-
-TEST(SchedulingSemanticsParsing, AutomaticFuncWithLocalVars) {
+TEST(FunctionLifetimeParsing, AutomaticFunctionWithLocalVars) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int compute(int x);\n"
@@ -389,34 +217,12 @@ TEST(SchedulingSemanticsParsing, AutomaticFuncWithLocalVars) {
   EXPECT_EQ(item->func_body_stmts[1]->kind, StmtKind::kVarDecl);
 }
 
-TEST(SchedulingSemanticsParsing, AutomaticFuncRecursiveCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int factorial(int n);\n"
-      "    if (n <= 1)\n"
-      "      return 1;\n"
-      "    else\n"
-      "      return n * factorial(n - 1);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_automatic);
-  EXPECT_EQ(item->name, "factorial");
-  EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
-  ASSERT_GE(item->func_body_stmts.size(), 1u);
-  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kIf);
-}
-
 static Stmt* FirstBodyStmt(ModuleItem* item) {
   if (!item || item->func_body_stmts.empty()) return nullptr;
   return item->func_body_stmts[0];
 }
 
-TEST(SchedulingSemanticsParsing, StaticFuncWithStaticLocalVar) {
+TEST(FunctionLifetimeParsing, StaticFunctionWithStaticLocalVar) {
   auto r = Parse(
       "module m;\n"
       "  function static int call_count();\n"
@@ -438,7 +244,7 @@ TEST(SchedulingSemanticsParsing, StaticFuncWithStaticLocalVar) {
   EXPECT_NE(var_stmt->var_init, nullptr);
 }
 
-TEST(SchedulingSemanticsParsing, AutomaticFuncInAutoModule) {
+TEST(FunctionLifetimeParsing, FunctionInAutomaticModule) {
   auto r = Parse(
       "module automatic m;\n"
       "  function int add(int a, int b);\n"
@@ -455,66 +261,7 @@ TEST(SchedulingSemanticsParsing, AutomaticFuncInAutoModule) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
-static ModuleItem* FindFunc(ParseResult& r, std::string_view name) {
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind != ModuleItemKind::kFunctionDecl &&
-        item->kind != ModuleItemKind::kTaskDecl) {
-      continue;
-    }
-    if (item->name == name) return item;
-  }
-  return nullptr;
-}
-
-TEST(TaskAndFunctionParsing, AutomaticFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int fact(int n);\n"
-      "    if (n <= 1) return 1;\n"
-      "    return n * fact(n - 1);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "fact");
-  ASSERT_NE(fn, nullptr);
-  EXPECT_TRUE(fn->is_automatic);
-  EXPECT_FALSE(fn->is_static);
-}
-TEST(DataTypeParsing, StaticFunction) {
-  auto r = Parse(
-      "module t;\n"
-      "  function static int counter();\n"
-      "    return 0;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_static);
-}
-
-TEST(SchedulingSemanticsParsing, StaticFuncWithStaticLocal) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int get_seq();\n"
-      "    int seq_num;\n"
-      "    seq_num = seq_num + 1;\n"
-      "    return seq_num;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_TRUE(fn->is_static);
-  EXPECT_EQ(fn->return_type.kind, DataTypeKind::kInt);
-  ASSERT_GE(fn->func_body_stmts.size(), 1u);
-  EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(fn->func_body_stmts[0]->var_name, "seq_num");
-}
-
-TEST(SchedulingSemanticsParsing, FunctionInProgramBlock) {
+TEST(FunctionLifetimeParsing, FunctionInProgramBlock) {
   auto r = Parse(
       "program p;\n"
       "  function int get_value();\n"
@@ -533,7 +280,7 @@ TEST(SchedulingSemanticsParsing, FunctionInProgramBlock) {
   EXPECT_EQ(item->name, "get_value");
 }
 
-TEST(SchedulingSemanticsParsing, AutoFuncMultiTypedLocalVars) {
+TEST(FunctionLifetimeParsing, AutomaticFunctionMultipleVarTypes) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int mixed_locals(int x);\n"
@@ -558,6 +305,22 @@ TEST(SchedulingSemanticsParsing, AutoFuncMultiTypedLocalVars) {
   EXPECT_EQ(item->func_body_stmts[1]->var_decl_type.kind, DataTypeKind::kLogic);
   EXPECT_EQ(item->func_body_stmts[2]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(item->func_body_stmts[2]->var_decl_type.kind, DataTypeKind::kReal);
+}
+
+TEST(FunctionLifetimeParsing, FunctionInInterface) {
+  auto r = Parse(
+      "interface bus;\n"
+      "  function int get_data();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_GE(r.cu->interfaces[0]->items.size(), 1u);
+  auto* item = r.cu->interfaces[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(item->name, "get_data");
 }
 
 }  // namespace

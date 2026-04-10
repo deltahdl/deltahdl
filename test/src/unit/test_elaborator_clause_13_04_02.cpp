@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(FunctionDeclParsing, ElabFunctionAutomaticLifetime) {
+TEST(FunctionLifetimeElaboration, AutomaticFunctionElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -20,7 +20,7 @@ TEST(FunctionDeclParsing, ElabFunctionAutomaticLifetime) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(FunctionBodyElaboration, StaticFunctionElaborates) {
+TEST(FunctionLifetimeElaboration, StaticFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -35,7 +35,7 @@ TEST(FunctionBodyElaboration, StaticFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(FunctionBodyElaboration, StaticVarInAutoFuncElaborates) {
+TEST(FunctionLifetimeElaboration, StaticVarInAutomaticFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -50,7 +50,7 @@ TEST(FunctionBodyElaboration, StaticVarInAutoFuncElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(FunctionBodyElaboration, AutoVarInStaticFuncElaborates) {
+TEST(FunctionLifetimeElaboration, AutomaticVarInStaticFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -64,7 +64,7 @@ TEST(FunctionBodyElaboration, AutoVarInStaticFuncElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(FunctionBodyElaboration, DefaultLifetimeFuncElaborates) {
+TEST(FunctionLifetimeElaboration, DefaultLifetimeFunctionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -75,6 +75,46 @@ TEST(FunctionBodyElaboration, DefaultLifetimeFuncElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionLifetimeElaboration, FunctionInAutomaticModuleElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module automatic m;\n"
+      "  function int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionLifetimeElaboration, RecursiveAutomaticFunctionElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int factorial(int n);\n"
+      "    if (n <= 1) return 1;\n"
+      "    return n * factorial(n - 1);\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionLifetimeElaboration, StaticVarNonConstantInitializerError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function automatic int bad_init(int x);\n"
+      "    static int s = x;\n"
+      "    return s;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace

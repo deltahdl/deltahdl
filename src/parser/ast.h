@@ -696,6 +696,7 @@ struct ModportDecl {
 struct ModuleDecl {
   ModuleDeclKind decl_kind = ModuleDeclKind::kModule;
   bool is_extern = false;           // extern module declaration (§23.2.1)
+  bool is_automatic = false;        // §13.4.2: module automatic
   bool has_wildcard_ports = false;  // (.* ) port form (A.1.2)
   std::string_view name;
   SourceRange range;

@@ -447,6 +447,19 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       func_decls_[item->name] = item;
     }
   }
+  // §13.4.2: Propagate module default lifetime to functions/tasks without
+  // an explicit qualifier.
+  for (auto* item : decl->items) {
+    if ((item->kind == ModuleItemKind::kFunctionDecl ||
+         item->kind == ModuleItemKind::kTaskDecl) &&
+        !item->is_automatic && !item->is_static) {
+      if (decl->is_automatic) {
+        item->is_automatic = true;
+      } else {
+        item->is_static = true;
+      }
+    }
+  }
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }
