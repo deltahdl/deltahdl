@@ -185,13 +185,17 @@ def test_build_action_summary_empty(isc):
 # ---- main ------------------------------------------------------------------
 
 
-def _run_main_success(isc, tmp_path, *, changes=(["foo.cpp"], [], [])):
+_STEP_RESULTS = [f"step-{i}-summary" for i in range(1, 10)]
+
+
+def _run_main_success(isc, tmp_path, *, changes=(["foo.cpp"], [], []),
+                      step_results=None):
     """Run main() with run_steps success and stubbed git changes."""
     lrm = tmp_path / "lrm.pdf"
     lrm.write_text("")
     with (
         patch("implement_subclause.run_steps",
-              return_value=None) as mock_run,
+              return_value=step_results or _STEP_RESULTS) as mock_run,
         patch("implement_subclause.commit_implementation") as mock_commit,
         patch("implement_subclause.get_porcelain_changes",
               return_value=changes),
@@ -209,7 +213,7 @@ def test_main_dispatches_depth_1(isc, tmp_path):
     lrm.write_text("")
     with (
         patch("implement_subclause.run_steps",
-              return_value=None) as mock_run,
+              return_value=_STEP_RESULTS) as mock_run,
         patch("implement_subclause.commit_implementation"),
         patch("implement_subclause.get_porcelain_changes",
               return_value=([], [], [])),
@@ -219,6 +223,26 @@ def test_main_dispatches_depth_1(isc, tmp_path):
             "--issue", "6", "--model", "opus",
         ])
     assert mock_run.call_args[1]["model"] == "opus"
+
+
+def test_main_uses_step_result_when_porcelain_empty(isc, tmp_path):
+    """main() falls back to last step_results entry when porcelain empty."""
+    mocks = _run_main_success(isc, tmp_path, changes=([], [], []))
+    assert mocks["commit"].call_args[1]["action"] == "step-9-summary"
+
+
+def test_main_prints_step_result_when_porcelain_empty(
+    isc, tmp_path, capsys,
+):
+    """main() prints the step_results fallback under Action summary."""
+    _run_main_success(isc, tmp_path, changes=([], [], []))
+    assert "step-9-summary" in capsys.readouterr().out
+
+
+def test_main_prefers_porcelain_over_step_results(isc, tmp_path):
+    """main() uses porcelain-derived action when porcelain is non-empty."""
+    mocks = _run_main_success(isc, tmp_path)
+    assert mocks["commit"].call_args[1]["action"] == "- Added foo.cpp"
 
 
 def test_main_calls_commit_implementation_subclause(isc, tmp_path):
@@ -275,16 +299,19 @@ def _commit_impl_and_capture(isc, *, subclause="6.6.1", action="",
     """Run commit_implementation with standard mocks; return mock dict."""
     if changes is None:
         changes = (["a.cpp"], [], [])
+    added, modified, deleted = changes
     with (
-        patch("implement_subclause.get_porcelain_changes",
-              return_value=changes) as m_files,
         patch("implement_subclause.commit_and_push",
               return_value="abc123") as m_cap,
         patch("implement_subclause.subprocess.run",
               return_value=MagicMock(returncode=0)) as m_gh,
     ):
-        isc.commit_implementation(subclause, 8, action=action)
-    return {"files": m_files, "cap": m_cap, "gh": m_gh}
+        isc.commit_implementation(
+            subclause, 8,
+            changed=added + modified, deleted=deleted,
+            action=action,
+        )
+    return {"cap": m_cap, "gh": m_gh}
 
 
 def test_commit_implementation_calls_commit_and_push(isc):
@@ -314,12 +341,6 @@ def test_commit_implementation_message_has_action(isc):
     assert "- Added foo.cpp" in mocks["cap"].call_args[0][2]
 
 
-def test_commit_implementation_message_omits_action_when_empty(isc):
-    """Commit message has no double blank lines when action is empty."""
-    msg = _commit_impl_and_capture(isc)["cap"].call_args[0][2]
-    assert "\n\n\n" not in msg
-
-
 def test_commit_implementation_changed_includes_added_and_modified(isc):
     """commit_and_push receives added + modified as changed files."""
     mocks = _commit_impl_and_capture(
@@ -334,20 +355,46 @@ def test_commit_implementation_message_closes_issue(isc):
     assert "Closes #8" in msg
 
 
-def test_commit_implementation_filters_garbage_files(isc):
-    """commit_implementation ignores files without valid extensions."""
-    mocks = _commit_impl_and_capture(
-        isc, changes=(["a.cpp", "2", "{a,"], ["b.h"], ["old"]),
-    )
-    assert mocks["cap"].call_args[0][0] == ["a.cpp", "b.h"]
-
-
-def test_commit_implementation_skips_commit_when_no_valid_changes(isc):
-    """commit_implementation skips commit when only garbage files exist."""
-    mocks = _commit_impl_and_capture(
-        isc, changes=(["2", "{a,"], [], ["ev"]),
-    )
+def test_commit_implementation_skips_commit_when_no_changes(isc):
+    """commit_implementation skips commit_and_push when all lists empty."""
+    mocks = _commit_impl_and_capture(isc, changes=([], [], []))
     assert not mocks["cap"].called
+
+
+def test_main_filters_garbage_files(isc, tmp_path):
+    """main() filters garbage paths before calling commit_implementation."""
+    mocks = _run_main_success(
+        isc, tmp_path,
+        changes=(["a.cpp", "2", "{a,"], ["b.h"], ["old"]),
+    )
+    assert mocks["commit"].call_args[1]["changed"] == ["a.cpp", "b.h"]
+
+
+def test_main_filters_garbage_deleted(isc, tmp_path):
+    """main() filters garbage paths from the deleted list."""
+    mocks = _run_main_success(
+        isc, tmp_path,
+        changes=(["a.cpp"], [], ["old", "{a,"]),
+    )
+    assert mocks["commit"].call_args[1]["deleted"] == []
+
+
+def test_main_filters_accepts_cmakelists(isc, tmp_path):
+    """main() accepts CMakeLists.txt as a valid path."""
+    mocks = _run_main_success(
+        isc, tmp_path,
+        changes=(["a.cpp"], ["test/CMakeLists.txt"], []),
+    )
+    assert "test/CMakeLists.txt" in mocks["commit"].call_args[1]["changed"]
+
+
+def test_main_filters_accepts_python(isc, tmp_path):
+    """main() accepts .py files as valid paths."""
+    mocks = _run_main_success(
+        isc, tmp_path,
+        changes=(["foo.py"], [], []),
+    )
+    assert mocks["commit"].call_args[1]["changed"] == ["foo.py"]
 
 
 def test_commit_implementation_closes_issue_when_no_changes(isc):

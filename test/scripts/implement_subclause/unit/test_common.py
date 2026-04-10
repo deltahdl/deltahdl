@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from lib.python.classify import build_hierarchy
 
 
@@ -209,9 +211,63 @@ def test_run_steps_call_count(isc):
     assert _run_steps_with_ok_mock(isc)[0].call_count == 9
 
 
-def test_run_steps_returns_none_on_success(isc):
-    """run_steps returns None after a successful run of all steps."""
-    assert _run_steps_with_ok_mock(isc)[1] is None
+def test_run_steps_returns_list_of_nine(isc):
+    """run_steps returns a 9-element list after a successful run."""
+    assert len(_run_steps_with_ok_mock(isc)[1]) == 9
+
+
+def test_run_steps_returns_result_field(isc):
+    """Each returned entry is the .result field from the stubbed stdout."""
+    assert _run_steps_with_ok_mock(isc)[1][0] == "- Done because needed"
+
+
+def test_run_steps_returns_result_for_all_steps(isc):
+    """All 9 returned entries carry the .result field."""
+    results = _run_steps_with_ok_mock(isc)[1]
+    assert all(entry == "- Done because needed" for entry in results)
+
+
+def _run_steps_with_stdout(isc, stdout):
+    """Return a context manager running run_steps with the given stdout."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    bad = MagicMock(
+        return_value=MagicMock(
+            returncode=0, stdout=stdout, stderr="",
+        ),
+    )
+    return patch("implement_subclause.run_with_dots", bad), steps
+
+
+def test_run_steps_exits_on_malformed_json(isc):
+    """run_steps exits loudly when stdout is not valid JSON."""
+    ctx, steps = _run_steps_with_stdout(isc, "not json at all")
+    with ctx, pytest.raises(SystemExit):
+        isc.run_steps(steps, model="opus")
+
+
+def test_run_steps_dumps_raw_stdout_on_malformed_json(isc, capsys):
+    """Loud-fatal parse failure dumps raw stdout to stderr."""
+    ctx, steps = _run_steps_with_stdout(isc, "UNIQUE_RAW_MARKER_123")
+    try:
+        with ctx:
+            isc.run_steps(steps, model="opus")
+    except SystemExit:
+        pass
+    assert "UNIQUE_RAW_MARKER_123" in capsys.readouterr().err
+
+
+def test_run_steps_exits_on_missing_result_key(isc):
+    """run_steps exits loudly when stdout JSON lacks a .result key."""
+    ctx, steps = _run_steps_with_stdout(isc, '{"other": "field"}')
+    with ctx, pytest.raises(SystemExit):
+        isc.run_steps(steps, model="opus")
+
+
+def test_run_steps_exits_on_empty_result(isc):
+    """run_steps exits loudly when .result is an empty string."""
+    ctx, steps = _run_steps_with_stdout(isc, '{"result": ""}')
+    with ctx, pytest.raises(SystemExit):
+        isc.run_steps(steps, model="opus")
 
 
 def test_run_steps_prints_step_numbers(isc, capsys):
@@ -220,16 +276,15 @@ def test_run_steps_prints_step_numbers(isc, capsys):
     assert "Step 1/9:" in capsys.readouterr().out
 
 
-@patch("implement_subclause.sys.exit")
-def test_run_steps_exits_on_failure(mock_exit, isc):
+def test_run_steps_exits_on_failure(isc):
     """run_steps exits when a step fails."""
     steps = isc.build_steps("4.1", "~/LRM.txt")
     fail = MagicMock(
         return_value=MagicMock(returncode=1, stdout="", stderr="err"),
     )
     with patch("implement_subclause.run_with_dots", fail):
-        isc.run_steps(steps, model="opus")
-    assert mock_exit.called
+        with pytest.raises(SystemExit):
+            isc.run_steps(steps, model="opus")
 
 
 def test_run_steps_first_no_continue(isc):

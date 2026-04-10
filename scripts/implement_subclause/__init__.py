@@ -4,6 +4,7 @@ Builds an optimized prompt and invokes Claude CLI.
 """
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -154,12 +155,44 @@ def _format_subclause_label(subclause):
     return f"§{subclause}"
 
 
-def run_steps(steps, *, model="opus", continue_session=False) -> None:
-    """Run each step as a separate Claude call."""
+class _StepOutputContractError(RuntimeError):
+    """Raised when a Claude CLI step's JSON output violates its contract."""
+
+
+def _extract_result_text(result) -> str:
+    """Parse Claude CLI JSON stdout and return its ``.result`` field.
+
+    Raises ``_StepOutputContractError`` on any violation of the CLI
+    contract: non-JSON stdout, missing ``result`` key, or empty
+    ``result``.
+    """
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise _StepOutputContractError(
+            "stdout was not valid JSON",
+        ) from exc
+    if not isinstance(payload, dict) or "result" not in payload:
+        raise _StepOutputContractError("JSON lacks a 'result' key")
+    text = payload["result"]
+    if not isinstance(text, str) or not text:
+        raise _StepOutputContractError("'.result' was empty")
+    return text
+
+
+def run_steps(steps, *, model="opus", continue_session=False) -> list[str]:
+    """Run each step as a separate Claude call.
+
+    Returns the list of per-step ``.result`` texts extracted from
+    Claude's ``--output-format json`` stdout. All failures (non-zero
+    exit, malformed JSON, missing/empty ``result``) are loud and
+    fatal.
+    """
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
 
     total = len(steps)
+    step_results: list[str] = []
 
     for i, (description, prompt) in enumerate(steps):
         step_num = i + 1
@@ -183,10 +216,25 @@ def run_steps(steps, *, model="opus", continue_session=False) -> None:
         if result.returncode != 0:
             print(
                 f"\nERROR: Step {step_num} failed"
-                f" (code {result.returncode})",
+                f" (code {result.returncode})"
+                f"\n--- raw stdout ---\n{result.stdout}"
+                f"\n--- raw stderr ---\n{result.stderr}",
                 file=sys.stderr,
             )
             sys.exit(1)
+
+        try:
+            step_results.append(_extract_result_text(result))
+        except _StepOutputContractError as exc:
+            print(
+                f"\nERROR: Step {step_num} {exc}."
+                f"\n--- raw stdout ---\n{result.stdout}"
+                f"\n--- raw stderr ---\n{result.stderr}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    return step_results
 
 
 _VALID_EXTENSIONS = (".cpp", ".h", ".py")
@@ -211,29 +259,22 @@ def build_action_summary(added, modified, deleted) -> str:
     return "\n".join(bullets)
 
 
-def commit_implementation(subclause, issue, *, action=""):
+def commit_implementation(
+    subclause, issue, *, changed, deleted, action,
+):
     """Commit, push, and close the issue via the commit message."""
-    added, modified, deleted = get_porcelain_changes()
-    added = [p for p in added if _is_valid_path(p)]
-    modified = [p for p in modified if _is_valid_path(p)]
-    deleted = [p for p in deleted if _is_valid_path(p)]
-
-    if not added and not modified and not deleted:
+    if not changed and not deleted:
         subprocess.run(
-            ["gh", "issue", "close", str(issue),
-             "--comment", action or "No changes needed."],
+            ["gh", "issue", "close", str(issue), "--comment", action],
             check=True,
         )
         return
 
     label = _format_subclause_label(subclause)
-
-    parts = [f"Implement {label}"]
-    if action:
-        parts.append(action)
-    parts.append(f"Closes #{issue}")
-    message = "\n\n".join(parts) + "\n"
-    commit_and_push(added + modified, deleted, message)
+    message = (
+        f"Implement {label}\n\n{action}\n\nCloses #{issue}\n"
+    )
+    commit_and_push(changed, deleted, message)
 
 
 # ---------------------------------------------------------------------------
@@ -297,7 +338,7 @@ def main(argv=None):
     steps = build_steps(
         args.subclause, str(args.lrm), exclude=args.exclude,
     )
-    run_steps(
+    step_results = run_steps(
         steps, model=args.model,
         continue_session=args.continue_session,
     )
@@ -306,5 +347,11 @@ def main(argv=None):
     modified = [p for p in modified if _is_valid_path(p)]
     deleted = [p for p in deleted if _is_valid_path(p)]
     action = build_action_summary(added, modified, deleted)
+    if not action:
+        action = step_results[-1]
     print(f"Action summary:\n{action}")
-    commit_implementation(args.subclause, args.issue, action=action)
+    commit_implementation(
+        args.subclause, args.issue,
+        changed=added + modified, deleted=deleted,
+        action=action,
+    )
