@@ -19,34 +19,6 @@ TEST(BlockStatementElaboration, ForkJoinNoneAllowedInFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(BlockStatementElaboration, ForkJoinAnyIllegalInFunction) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  function void my_func();\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "    join_any\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(FunctionSideEffectsElaboration, ForkJoinNotAllowedInFunction) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  function void my_func();\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "    join\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(FunctionSideEffectsElaboration, NonblockingAssignAllowedInFunction) {
   ElabFixture f;
   auto* design = ElaborateSrc(

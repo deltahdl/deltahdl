@@ -667,8 +667,12 @@ static void CheckFuncBodyStmt(
   CheckFuncBodyStmt(s->else_branch, is_void, task_names, func_name, diag);
   CheckFuncBodyStmt(s->body, is_void, task_names, func_name, diag);
   CheckFuncBodyStmt(s->for_body, is_void, task_names, func_name, diag);
+  CheckFuncBodyStmt(s->assert_pass_stmt, is_void, task_names, func_name, diag);
+  CheckFuncBodyStmt(s->assert_fail_stmt, is_void, task_names, func_name, diag);
   for (auto& ci : s->case_items)
     CheckFuncBodyStmt(ci.body, is_void, task_names, func_name, diag);
+  for (auto& ri : s->randcase_items)
+    CheckFuncBodyStmt(ri.second, is_void, task_names, func_name, diag);
 }
 
 // §13.2: A task shall not return a value.

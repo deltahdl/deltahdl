@@ -301,7 +301,7 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs() {
     Consume();
     return args;
   }
-  Direction sticky_dir = Direction::kNone;
+  Direction sticky_dir = Direction::kInput;
   bool seen_default = false;
   do {
     FunctionArg arg;

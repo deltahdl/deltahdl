@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SubroutineCallExprElaboration, FunctionCallInContAssign) {
+TEST(FunctionElaboration, FunctionCallInContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -21,7 +21,7 @@ TEST(SubroutineCallExprElaboration, FunctionCallInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(BlockStatementElaboration, ForkJoinIllegalInFunction) {
+TEST(FunctionElaboration, ForkJoinIllegalInFunction) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -92,6 +92,138 @@ TEST(FunctionElaboration, FunctionEnablesTaskError) {
       "  task t(); endtask\n"
       "  function void f();\n"
       "    t();\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, EventControlInFunctionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  function void f();\n"
+      "    @(posedge clk);\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, WaitInFunctionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic ready;\n"
+      "  function void f();\n"
+      "    wait(ready);\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, WaitForkInFunctionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    wait fork;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, WaitOrderInFunctionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  event e1, e2;\n"
+      "  function void f();\n"
+      "    wait_order(e1, e2);\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, NestedDelayInFunctionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    if (1) begin\n"
+      "      #5;\n"
+      "    end\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, FunctionWithNoTimeControlIsOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function int add(input int a, input int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionElaboration, FunctionCallsFunctionIsOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function int g(); return 0; endfunction\n"
+      "  function int f(); return g(); endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionElaboration, ForkJoinAnyIllegalInFunction) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void my_func();\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "    join_any\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, FunctionCallsSystemTaskOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    $display(\"hello\");\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FunctionElaboration, FunctionWithNestedTaskEnableError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task t(); endtask\n"
+      "  function void f();\n"
+      "    if (1) begin\n"
+      "      t();\n"
+      "    end\n"
       "  endfunction\n"
       "endmodule\n",
       f);
