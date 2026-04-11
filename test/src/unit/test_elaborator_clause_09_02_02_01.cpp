@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AlwaysCombElaboration, AlwaysWithTimingNoWarning) {
+TEST(GeneralPurposeAlwaysElaboration, AlwaysWithTimingNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(AlwaysCombElaboration, AlwaysWithTimingNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(AlwaysCombElaboration, AlwaysWithSensitivityNoWarning) {
+TEST(GeneralPurposeAlwaysElaboration, AlwaysWithSensitivityNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -28,7 +28,7 @@ TEST(AlwaysCombElaboration, AlwaysWithSensitivityNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(AlwaysCombElaboration, AlwaysWithoutTimingWarns) {
+TEST(GeneralPurposeAlwaysElaboration, AlwaysWithoutTimingWarns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -40,7 +40,7 @@ TEST(AlwaysCombElaboration, AlwaysWithoutTimingWarns) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(AlwaysCombElaboration, AlwaysWithDelayInsideBlockNoWarning) {
+TEST(GeneralPurposeAlwaysElaboration, AlwaysWithDelayInsideBlockNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -55,7 +55,7 @@ TEST(AlwaysCombElaboration, AlwaysWithDelayInsideBlockNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(AlwaysCombElaboration, AlwaysElaboratesToKAlways) {
+TEST(GeneralPurposeAlwaysElaboration, AlwaysElaboratesToKAlways) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -70,6 +70,34 @@ TEST(AlwaysCombElaboration, AlwaysElaboratesToKAlways) {
     if (p.kind == RtlirProcessKind::kAlways) found = true;
   }
   EXPECT_TRUE(found);
+}
+
+TEST(GeneralPurposeAlwaysElaboration, AlwaysWithEventControlInBodyNoWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, d, q;\n"
+      "  always begin\n"
+      "    @(posedge clk) q = d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(GeneralPurposeAlwaysElaboration, AlwaysWithWaitInBodyNoWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic en, q;\n"
+      "  always begin\n"
+      "    wait(en) q = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 }  // namespace

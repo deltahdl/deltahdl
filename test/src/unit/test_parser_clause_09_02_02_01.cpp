@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProcessParsing, AlwaysBlock) {
+TEST(GeneralPurposeAlwaysParsing, AlwaysBlock) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk) q <= d;\n"
@@ -17,7 +17,7 @@ TEST(ProcessParsing, AlwaysBlock) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
 }
 
-TEST(AlwaysCombParsing, AlwaysWithDelayControl) {
+TEST(GeneralPurposeAlwaysParsing, AlwaysWithDelayControl) {
   auto r = Parse(
       "module m;\n"
       "  always #5 clk = ~clk;\n"
@@ -30,7 +30,7 @@ TEST(AlwaysCombParsing, AlwaysWithDelayControl) {
   EXPECT_TRUE(item->sensitivity.empty());
 }
 
-TEST(AlwaysCombParsing, AlwaysBeginEndBlock) {
+TEST(GeneralPurposeAlwaysParsing, AlwaysBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  always begin\n"
@@ -47,7 +47,7 @@ TEST(AlwaysCombParsing, AlwaysBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(AlwaysCombParsing, AlwaysWithoutTimingControl) {
+TEST(GeneralPurposeAlwaysParsing, AlwaysWithoutTimingControl) {
   auto r = Parse(
       "module m;\n"
       "  always areg = ~areg;\n"
@@ -58,7 +58,7 @@ TEST(AlwaysCombParsing, AlwaysWithoutTimingControl) {
   ASSERT_NE(item, nullptr);
 }
 
-TEST(AlwaysCombParsing, AlwaysParameterizedDelay) {
+TEST(GeneralPurposeAlwaysParsing, AlwaysParameterizedDelay) {
   auto r = Parse(
       "module m;\n"
       "  parameter half_period = 50;\n"
@@ -68,12 +68,18 @@ TEST(AlwaysCombParsing, AlwaysParameterizedDelay) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(AlwaysBlock, PosedgeTriggered) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic clk, q, d;\n"
-              "  always @(posedge clk) q <= d;\n"
-              "endmodule\n"));
+TEST(GeneralPurposeAlwaysParsing, NegedgeSensitivity) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(negedge rst) q = 0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
+  ASSERT_FALSE(item->sensitivity.empty());
+  EXPECT_EQ(item->sensitivity[0].edge, Edge::kNegedge);
 }
 
 }  // namespace
