@@ -24,12 +24,18 @@ def test_parse_args_repo(icls, base_argv):
     assert icls.parse_args(base_argv).repo == "r"
 
 
+def test_parse_args_labels(icls, base_argv):
+    """--labels is parsed into a list."""
+    assert icls.parse_args(base_argv).labels == ["IEEE 1800-2023"]
+
+
 def test_parse_args_rejects_missing_lrm(icls, tmp_path):
     """Non-existent LRM file exits."""
     with pytest.raises(SystemExit):
         icls.parse_args([
             "--lrm", str(tmp_path / "no.txt"), "--clauses", "15=17",
             "--organization", "o", "--repo", "r",
+            "--labels", "IEEE 1800-2023",
         ])
 
 
@@ -41,6 +47,7 @@ def test_parse_args_rejects_bad_clauses(icls, tmp_path):
         icls.parse_args([
             "--lrm", str(lrm), "--clauses", "bad=17",
             "--organization", "o", "--repo", "r",
+            "--labels", "IEEE 1800-2023",
         ])
 
 
@@ -52,6 +59,7 @@ def test_parse_args_requires_clauses(icls, tmp_path):
         icls.parse_args([
             "--lrm", str(lrm),
             "--organization", "o", "--repo", "r",
+            "--labels", "IEEE 1800-2023",
         ])
 
 
@@ -101,6 +109,13 @@ def test_main_passes_repo(icls, monkeypatch, base_argv):
     mock_invoke = _patch_main(monkeypatch, icls)
     icls.main(base_argv)
     assert mock_invoke.call_args_list[0][0][0].repo == "r"
+
+
+def test_main_passes_labels(icls, monkeypatch, base_argv):
+    """main() passes labels to invoke_implement_clause."""
+    mock_invoke = _patch_main(monkeypatch, icls)
+    icls.main(base_argv)
+    assert mock_invoke.call_args_list[0][0][0].labels == ["IEEE 1800-2023"]
 
 
 # ---- __main__ guard ---------------------------------------------------------

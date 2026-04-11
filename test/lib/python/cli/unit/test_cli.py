@@ -13,6 +13,7 @@ from lib.python.cli import (
     add_clauses_arg,
     add_continue_arg,
     add_github_args,
+    add_labels_arg,
     add_lrm_arg,
     add_model_arg,
     invoke_implement_clause,
@@ -20,6 +21,7 @@ from lib.python.cli import (
     invoke_implement_subclauses,
     parse_and_validate,
     parse_clause_issues,
+    parse_labels,
     run_claude_cli,
     run_with_dots,
     validate_lrm,
@@ -257,6 +259,7 @@ def test_add_clauses_arg() -> None:
 _CL_PARAMS = ClauseParams(
     lrm="/tmp/lrm.pdf",
     organization="deltahdl", repo="deltahdl",
+    labels=["IEEE 1800-2023"],
 )
 
 
@@ -451,3 +454,53 @@ def test_run_with_dots_prints_dots(capsys):
     with patch("lib.python.cli._DOT_INTERVAL_SECONDS", 0.05):
         run_with_dots(lambda: time.sleep(0.15))
     assert "." in capsys.readouterr().out
+
+
+# ---- parse_labels ----------------------------------------------------------
+
+
+def test_parse_labels_single() -> None:
+    """Single label returns a one-element list."""
+    assert parse_labels("IEEE 1800-2023") == ["IEEE 1800-2023"]
+
+
+def test_parse_labels_multiple() -> None:
+    """Comma-separated labels are split correctly."""
+    assert parse_labels("IEEE 1800-2023,IEEE 1800-2020") == [
+        "IEEE 1800-2023", "IEEE 1800-2020",
+    ]
+
+
+def test_parse_labels_strips_whitespace() -> None:
+    """Whitespace around commas is stripped."""
+    assert parse_labels(" IEEE 1800-2023 , IEEE 1800-2020 ") == [
+        "IEEE 1800-2023", "IEEE 1800-2020",
+    ]
+
+
+# ---- add_labels_arg --------------------------------------------------------
+
+
+def test_add_labels_arg() -> None:
+    """Adds --labels as a required argument parsed into a list."""
+    parser = argparse.ArgumentParser()
+    add_labels_arg(parser)
+    args = parser.parse_args(["--labels", "IEEE 1800-2023,bug"])
+    assert args.labels == ["IEEE 1800-2023", "bug"]
+
+
+def test_add_labels_arg_required() -> None:
+    """--labels is required."""
+    parser = argparse.ArgumentParser()
+    add_labels_arg(parser)
+    with pytest.raises(SystemExit):
+        parser.parse_args([])
+
+
+# ---- invoke_implement_clause with labels -----------------------------------
+
+
+def test_invoke_implement_clause_labels(monkeypatch) -> None:
+    """Passes --labels with comma-joined value."""
+    cmd = _invoke_clause_and_capture(monkeypatch)
+    assert cmd[cmd.index("--labels") + 1] == "IEEE 1800-2023"

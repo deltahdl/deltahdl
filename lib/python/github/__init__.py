@@ -176,10 +176,14 @@ def find_issue_by_title(
 
 def create_issue(
     organization: str, repo: str, title: str, body: str,
+    *, labels: list[str] | None = None,
 ) -> int:
     """Create a GitHub issue and return its number."""
     print(f"Creating issue on {organization}/{repo}...")
-    payload = json.dumps({"title": title, "body": body})
+    data: dict[str, object] = {"title": title, "body": body}
+    if labels is not None:
+        data["labels"] = labels
+    payload = json.dumps(data)
     result = subprocess.run(
         ["gh", "api", f"repos/{organization}/{repo}/issues",
          "-X", "POST", "--input", "-"],
@@ -195,6 +199,26 @@ def create_issue(
     issue_number = json.loads(result.stdout)["number"]
     print(f"Created issue #{issue_number}")
     return issue_number
+
+
+def add_labels(
+    organization: str, repo: str, issue: int, labels: list[str],
+) -> None:
+    """Add labels to a GitHub issue using ``gh api``."""
+    print(f"Adding labels to issue #{issue} on {organization}/{repo}...")
+    payload = json.dumps({"labels": labels})
+    result = subprocess.run(
+        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}/labels",
+         "-X", "POST", "--input", "-"],
+        input=payload,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(f"ERROR: Failed to add labels to issue #{issue}:"
+              f"\n{result.stderr}", file=sys.stderr)
+        sys.exit(1)
 
 
 def update_issue_body(

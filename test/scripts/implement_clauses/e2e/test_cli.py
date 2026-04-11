@@ -37,6 +37,7 @@ def _all_flags(tmp_path, clauses="15=17,16=18"):
         "--clauses", clauses,
         "--organization", "o",
         "--repo", "r",
+        "--labels", "IEEE 1800-2023",
     ]
 
 

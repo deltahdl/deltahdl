@@ -14,6 +14,7 @@ def clause_argv(tmp_path: Path) -> list[str]:
         "--lrm", str(lrm), "--clause", "4",
         "--issue", "1",
         "--organization", "o", "--repo", "r",
+        "--labels", "IEEE 1800-2023",
     ]
 
 
@@ -25,4 +26,5 @@ def clause_argv_no_issue(tmp_path: Path) -> list[str]:
     return [
         "--lrm", str(lrm), "--clause", "4",
         "--organization", "o", "--repo", "r",
+        "--labels", "IEEE 1800-2023",
     ]

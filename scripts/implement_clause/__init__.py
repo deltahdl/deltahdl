@@ -15,6 +15,7 @@ from pathlib import Path
 
 from lib.python.cli import (
     add_continue_arg,
+    add_labels_arg,
     invoke_implement_subclauses,
     run_claude_cli,
     run_with_dots,
@@ -92,6 +93,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="Existing clause issue number (created if absent)")
     parser.add_argument("--organization", required=True)
     parser.add_argument("--repo", required=True)
+    add_labels_arg(parser)
     add_continue_arg(parser)
 
     args = parser.parse_args(argv)
@@ -110,6 +112,7 @@ def _parse_issue_refs(body: str) -> list[int]:
 
 def _ensure_subclause_issues(
     organization, repo, discovered, existing_issues,
+    *, labels=None,
 ):
     """Create missing subclause issues, return the full issue list."""
     covered = set()
@@ -130,6 +133,7 @@ def _ensure_subclause_issues(
             else:
                 issue_num = create_issue(
                     organization, repo, title, "",
+                    labels=labels,
                 )
                 all_issues.append(issue_num)
                 time.sleep(5)
@@ -155,6 +159,7 @@ def main(argv: list[str] | None = None) -> None:
         args.issue = create_issue(
             args.organization, args.repo,
             _issue_title(clause_label), "",
+            labels=args.labels,
         )
 
     discovered = discover_subclauses(lrm, clause)
@@ -172,6 +177,7 @@ def main(argv: list[str] | None = None) -> None:
 
     subclause_issues = _ensure_subclause_issues(
         args.organization, args.repo, discovered, existing,
+        labels=args.labels,
     )
 
     body = "\n".join(f"- #{n}" for n in subclause_issues) + "\n"

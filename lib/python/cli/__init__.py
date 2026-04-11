@@ -77,6 +77,22 @@ class ClauseParams:
     lrm: str
     organization: str
     repo: str
+    labels: list[str]
+
+
+def parse_labels(raw: str) -> list[str]:
+    """Split a comma-separated label string into a list."""
+    return [s.strip() for s in raw.split(",")]
+
+
+def add_labels_arg(parser: argparse.ArgumentParser) -> None:
+    """Add the ``--labels`` argument to *parser*."""
+    parser.add_argument(
+        "--labels",
+        type=parse_labels,
+        required=True,
+        help="Comma-separated GitHub labels (e.g. 'IEEE 1800-2023,bug').",
+    )
 
 
 def add_github_args(parser: argparse.ArgumentParser) -> None:
@@ -236,6 +252,7 @@ def invoke_implement_clause(
         "--issue", str(sub_issue),
         "--organization", params.organization,
         "--repo", params.repo,
+        "--labels", ",".join(params.labels),
     ]
     if continue_session:
         cmd.append("--continue")

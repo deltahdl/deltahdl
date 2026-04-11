@@ -10,6 +10,7 @@ from lib.python.cli import (
     add_clauses_arg,
     add_continue_arg,
     add_github_args,
+    add_labels_arg,
     add_lrm_arg,
     invoke_implement_clause,
     parse_and_validate,
@@ -25,6 +26,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     add_lrm_arg(parser)
     add_clauses_arg(parser)
     add_github_args(parser)
+    add_labels_arg(parser)
     add_continue_arg(parser)
     return parse_and_validate(parser, argv)
 
@@ -33,7 +35,7 @@ def main(argv: list[str] | None = None) -> None:
     """Parse args and invoke implement_clause for each clause."""
     args = parse_args(argv)
     params = ClauseParams(
-        str(args.lrm), args.organization, args.repo,
+        str(args.lrm), args.organization, args.repo, args.labels,
     )
     for i, (clause, sub_issue) in enumerate(args.clauses.items()):
         continue_session = i > 0 or args.continue_session

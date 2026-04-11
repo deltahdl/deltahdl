@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from lib.python.github import (
+    add_labels,
     build_subclause_table,
     build_synced_body,
     create_issue,
@@ -592,3 +593,59 @@ def test_create_issue_exits_on_failure(monkeypatch) -> None:
     monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
     with pytest.raises(SystemExit):
         create_issue("org", "repo", "title", "body")
+
+
+def _create_issue_payload(monkeypatch, **kwargs):
+    """Call create_issue with stubbed subprocess and return the parsed payload."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout='{"number": 7}', stderr="",
+    )
+    captured = []
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda *_a, **kw: (captured.append(kw.get("input", "")), cp)[1],
+    )
+    create_issue("org", "repo", "title", "body", **kwargs)
+    return json.loads(captured[0])
+
+
+def test_create_issue_includes_labels(monkeypatch) -> None:
+    """create_issue includes labels in the payload when provided."""
+    assert _create_issue_payload(
+        monkeypatch, labels=["IEEE 1800-2023"],
+    )["labels"] == ["IEEE 1800-2023"]
+
+
+def test_create_issue_omits_labels_when_none(monkeypatch) -> None:
+    """create_issue omits labels key from payload when None."""
+    assert "labels" not in _create_issue_payload(monkeypatch)
+
+
+# --- add_labels ---
+
+
+def test_add_labels_calls_correct_endpoint() -> None:
+    """Calls gh api with the correct labels endpoint."""
+    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
+    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
+        add_labels("org", "repo", 42, ["IEEE 1800-2023"])
+    assert "repos/org/repo/issues/42/labels" in mock_run.call_args[0][0]
+
+
+def test_add_labels_sends_labels_payload() -> None:
+    """Sends the labels list as a JSON payload."""
+    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
+    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
+        add_labels("org", "repo", 42, ["IEEE 1800-2023", "bug"])
+    payload = json.loads(mock_run.call_args.kwargs["input"])
+    assert payload == {"labels": ["IEEE 1800-2023", "bug"]}
+
+
+def test_add_labels_failure() -> None:
+    """SystemExit raised on add_labels failure."""
+    cp = subprocess.CompletedProcess(
+        args=[], returncode=1, stdout="", stderr="err",
+    )
+    with patch("lib.python.github.subprocess.run", return_value=cp):
+        with pytest.raises(SystemExit):
+            add_labels("org", "repo", 1, ["label"])

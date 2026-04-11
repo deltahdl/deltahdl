@@ -57,6 +57,7 @@ def test_parse_args_clause(ic, tmp_path) -> None:
         "--lrm", str(lrm), "--clause", "4",
         "--issue", "1",
         "--organization", "o", "--repo", "r",
+        "--labels", "IEEE 1800-2023",
     ])
     assert args.clause == "4"
 
@@ -69,6 +70,7 @@ def test_parse_args_annex(ic, tmp_path) -> None:
         "--lrm", str(lrm), "--annex", "A",
         "--issue", "1",
         "--organization", "o", "--repo", "r",
+        "--labels", "IEEE 1800-2023",
     ])
     assert args.annex == "A"
 
@@ -82,6 +84,7 @@ def test_parse_args_clause_and_annex_exclusive(ic, tmp_path) -> None:
             "--lrm", str(lrm), "--clause", "4", "--annex", "A",
             "--issue", "1",
             "--organization", "o", "--repo", "r",
+            "--labels", "IEEE 1800-2023",
         ])
 
 
@@ -92,6 +95,7 @@ def test_parse_args_missing_lrm(ic) -> None:
             "--lrm", "/no/such/file", "--clause", "4",
             "--issue", "1",
             "--organization", "o", "--repo", "r",
+            "--labels", "IEEE 1800-2023",
         ])
 
 
@@ -103,6 +107,7 @@ def test_parse_args_issue_is_int(ic, tmp_path) -> None:
         "--lrm", str(lrm), "--clause", "4",
         "--issue", "42",
         "--organization", "o", "--repo", "r",
+        "--labels", "IEEE 1800-2023",
     ])
     assert args.issue == 42
 
@@ -114,6 +119,7 @@ def test_parse_args_issue_is_optional(ic, tmp_path) -> None:
     args = ic.parse_args([
         "--lrm", str(lrm), "--clause", "4",
         "--organization", "o", "--repo", "r",
+        "--labels", "IEEE 1800-2023",
     ])
     assert args.issue is None
 
@@ -125,6 +131,32 @@ def test_parse_args_no_clause_or_annex(ic, tmp_path) -> None:
     with pytest.raises(SystemExit):
         ic.parse_args([
             "--lrm", str(lrm),
+            "--issue", "1",
+            "--organization", "o", "--repo", "r",
+            "--labels", "IEEE 1800-2023",
+        ])
+
+
+def test_parse_args_labels(ic, tmp_path) -> None:
+    """--labels flag is parsed into a list."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    args = ic.parse_args([
+        "--lrm", str(lrm), "--clause", "4",
+        "--issue", "1",
+        "--organization", "o", "--repo", "r",
+        "--labels", "IEEE 1800-2023,bug",
+    ])
+    assert args.labels == ["IEEE 1800-2023", "bug"]
+
+
+def test_parse_args_labels_required(ic, tmp_path) -> None:
+    """--labels is required."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.write_text("")
+    with pytest.raises(SystemExit):
+        ic.parse_args([
+            "--lrm", str(lrm), "--clause", "4",
             "--issue", "1",
             "--organization", "o", "--repo", "r",
         ])
@@ -143,6 +175,7 @@ def test_parse_args_rejects_removed_flag(ic, tmp_path, flag, value) -> None:
             "--lrm", str(lrm), "--clause", "4",
             "--issue", "1",
             "--organization", "o", "--repo", "r",
+            "--labels", "IEEE 1800-2023",
             flag, value,
         ])
 
@@ -253,6 +286,7 @@ def test_main_annex(ic, monkeypatch, tmp_path) -> None:
     argv = [
         "--lrm", str(lrm), "--annex", "A",
         "--organization", "o", "--repo", "r",
+        "--labels", "IEEE 1800-2023",
     ]
     mock_ds = MagicMock(return_value={"A.1": "General"})
     monkeypatch.setattr(ic, "discover_subclauses", mock_ds)
@@ -348,6 +382,14 @@ def test_ensure_skips_existing(ic, monkeypatch) -> None:
     mock_create = _stub_ensure_deps(monkeypatch, ic)
     ensure("o", "r", {"4.1": "General", "4.2": "Exec"}, [10])
     assert mock_create.call_count == 1
+
+
+def test_ensure_passes_labels_to_create_issue(ic, monkeypatch) -> None:
+    """_ensure_subclause_issues forwards labels to create_issue."""
+    ensure = getattr(ic, "_ensure_subclause_issues")
+    mock_create = _stub_ensure_deps(monkeypatch, ic)
+    ensure("o", "r", {"4.1": "General"}, [], labels=["IEEE 1800-2023"])
+    assert mock_create.call_args.kwargs["labels"] == ["IEEE 1800-2023"]
 
 
 def test_ensure_returns_combined_list(ic, monkeypatch) -> None:
