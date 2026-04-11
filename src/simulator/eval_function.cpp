@@ -425,7 +425,7 @@ static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
 
 // Write back output/inout args, respecting named binding (§13.5.4).
 static void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
-                                SimContext& ctx) {
+                                SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < func->func_args.size(); ++i) {
     auto dir = func->func_args[i].direction;
     if (dir != Direction::kOutput && dir != Direction::kInout) continue;
@@ -434,9 +434,7 @@ static void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
     int ai = ResolveArgIndex(func, expr, i);
     if (ai < 0) continue;
     auto* call_arg = expr->args[static_cast<size_t>(ai)];
-    if (call_arg->kind != ExprKind::kIdentifier) continue;
-    auto* target = ctx.FindVariable(call_arg->text);
-    if (target) target->value = local->value;
+    PerformBlockingAssign(call_arg, local->value, ctx, arena);
   }
 }
 
@@ -959,7 +957,7 @@ static Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
   ctx.PushThis(obj);
   ctx.PushQueueRefFrame();
   ExecClassMethod(method, expr, ctx, arena, out);
-  WritebackOutputArgs(method, expr, ctx);
+  WritebackOutputArgs(method, expr, ctx, arena);
   WritebackQueueRefs(ctx);
   ctx.PopThis();
   ctx.PopScope();
@@ -1261,7 +1259,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
 
   ExecFunctionBody(func, ret_var, ctx, arena);
-  WritebackOutputArgs(func, expr, ctx);
+  WritebackOutputArgs(func, expr, ctx, arena);
   WritebackQueueRefs(ctx);
   result = is_void ? MakeLogic4VecVal(arena, 1, 0) : ret_var->value;
 
@@ -1280,7 +1278,11 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
   // §A.6.9 footnote 42: tf_call without parentheses (bare identifier).
   if (expr->kind == ExprKind::kIdentifier) {
     auto* func = ctx.FindFunction(expr->text);
-    if (!func || func->kind != ModuleItemKind::kTaskDecl) return nullptr;
+    if (!func) return nullptr;
+    bool is_task = func->kind == ModuleItemKind::kTaskDecl;
+    bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
+                        func->return_type.kind == DataTypeKind::kVoid;
+    if (!is_task && !is_void_func) return nullptr;
     // §13.3.1: Static tasks reuse their variable frame across calls.
     bool is_static = func->is_static && !func->is_automatic;
     if (is_static) {
@@ -1309,8 +1311,8 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
 }
 
 void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
-                      SimContext& ctx) {
-  WritebackOutputArgs(func, expr, ctx);
+                      SimContext& ctx, Arena& arena) {
+  WritebackOutputArgs(func, expr, ctx, arena);
   WritebackQueueRefs(ctx);
   ctx.PopFuncName();
   bool is_static = func->is_static && !func->is_automatic;

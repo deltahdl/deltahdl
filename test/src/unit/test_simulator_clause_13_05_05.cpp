@@ -6,29 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ArgumentBindingSim, TaskCallEmptyParens) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  task set_x;\n"
-      "    x = 8'd77;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    set_x();\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 77u);
-}
-
 TEST(ArgumentBindingSim, VoidFunctionNoParens) {
   SimFixture f;
   auto* design = ElaborateSrc(

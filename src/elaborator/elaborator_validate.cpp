@@ -1064,6 +1064,23 @@ static void WalkStmtForCallArgs(
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
     DiagEngine& diag) {
   if (!s) return;
+  // §13.5 footnote 42: bare identifier call must be a task or void function.
+  if (s->kind == StmtKind::kExprStmt && s->expr &&
+      s->expr->kind == ExprKind::kIdentifier) {
+    auto it = func_decls.find(s->expr->text);
+    if (it != func_decls.end()) {
+      const auto* func = it->second;
+      bool is_task = func->kind == ModuleItemKind::kTaskDecl;
+      bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
+                          func->return_type.kind == DataTypeKind::kVoid;
+      if (!is_task && !is_void_func) {
+        diag.Error(s->expr->range.start,
+                   std::format("cannot omit parentheses in call to nonvoid "
+                               "function '{}'",
+                               s->expr->text));
+      }
+    }
+  }
   // §13.4.1: Void function calls are legal only as standalone statements.
   if (s->kind == StmtKind::kExprStmt && s->expr &&
       s->expr->kind == ExprKind::kCall) {

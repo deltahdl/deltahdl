@@ -101,7 +101,7 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
 const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
                                 Arena& arena);
 void TeardownTaskCall(const ModuleItem* func, const Expr* expr,
-                      SimContext& ctx);
+                      SimContext& ctx, Arena& arena);
 
 // §8.7: Allocate a class object and execute constructor. Returns handle.
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,

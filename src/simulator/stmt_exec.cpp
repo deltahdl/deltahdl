@@ -1008,7 +1008,7 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
     auto result = co_await ExecStmt(s, ctx, arena);
     if (result == StmtResult::kReturn) break;
   }
-  TeardownTaskCall(func, expr, ctx);
+  TeardownTaskCall(func, expr, ctx, arena);
   co_return StmtResult::kDone;
 }
 
