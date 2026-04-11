@@ -79,20 +79,6 @@ TEST(FunctionDeclElaboration, FunctionOldStylePorts) {
 
 // --- dpi_import_export ---
 
-TEST(FunctionDeclElaboration, DpiImportFunctionElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  import \"DPI-C\" function int c_func(int x);\n"
-      "endmodule\n"));
-}
-
-TEST(FunctionDeclElaboration, DpiImportTaskElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  import \"DPI-C\" task c_task(int x);\n"
-      "endmodule\n"));
-}
-
 TEST(FunctionDeclElaboration, DpiImportPureElaborates) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
@@ -111,22 +97,6 @@ TEST(FunctionDeclElaboration, DpiImportTaskContextElaborates) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
       "  import \"DPI-C\" context task ctx_task();\n"
-      "endmodule\n"));
-}
-
-TEST(FunctionDeclElaboration, DpiExportFunctionElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  function void my_func(); endfunction\n"
-      "  export \"DPI-C\" function my_func;\n"
-      "endmodule\n"));
-}
-
-TEST(FunctionDeclElaboration, DpiExportTaskElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  task my_task(); endtask\n"
-      "  export \"DPI-C\" task my_task;\n"
       "endmodule\n"));
 }
 

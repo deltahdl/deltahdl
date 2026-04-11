@@ -74,4 +74,38 @@ TEST(ImportExportElaboration, DpiImportWithCNameElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(ImportExportElaboration, DpiExportTaskElaborates) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  task my_task(); endtask\n"
+      "  export \"DPI-C\" task my_task;\n"
+      "endmodule\n"));
+}
+
+TEST(ImportExportElaboration, MultipleImportsElaborate) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_add(int a, int b);\n"
+      "  import \"DPI-C\" function int c_sub(int a, int b);\n"
+      "endmodule\n"));
+}
+
+TEST(ImportExportElaboration, ImportAndExportCoexistElaborate) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_func(int x);\n"
+      "  function void sv_func(); endfunction\n"
+      "  export \"DPI-C\" function sv_func;\n"
+      "endmodule\n"));
+}
+
+TEST(ImportExportElaboration, ImportedFunctionInExpressionElaborates) {
+  EXPECT_TRUE(ElabOk(
+      "module m;\n"
+      "  import \"DPI-C\" function int c_mul(int a, int b);\n"
+      "  int y;\n"
+      "  initial y = c_mul(3, 4) + 1;\n"
+      "endmodule\n"));
+}
+
 }  // namespace
