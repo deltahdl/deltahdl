@@ -260,10 +260,12 @@ ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
     Consume();
     if (Match(TokenKind::kStar)) {
       // @* — implicit sensitivity (§9.4.2.2)
+      item->is_star_sensitivity = true;
     } else if (Check(TokenKind::kLParen)) {
       Consume();
       if (Match(TokenKind::kStar)) {
         // @(*) — implicit sensitivity (§9.4.2.2)
+        item->is_star_sensitivity = true;
       } else {
         item->sensitivity = ParseEventList();
       }

@@ -726,7 +726,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc) {
       break;
     case RtlirProcessKind::kAlways:
       p->kind = ProcessKind::kAlways;
-      if (!proc.sensitivity.empty()) {
+      if (!proc.sensitivity.empty() || proc.is_star_sensitivity) {
         p->coro =
             MakeAlwaysSensCoroutine(proc.body, proc.sensitivity, ctx_, arena_)
                 .Release();

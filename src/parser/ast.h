@@ -583,6 +583,7 @@ struct ModuleItem {
 
   // Always/initial/final blocks
   AlwaysKind always_kind = AlwaysKind::kAlways;
+  bool is_star_sensitivity = false;
   Stmt* body = nullptr;
   std::vector<EventExpr> sensitivity;
 

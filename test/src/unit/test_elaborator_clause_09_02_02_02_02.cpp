@@ -9,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AlwaysLatchTimingElaboration, AlwaysStarIsAlwaysKind) {
+TEST(AlwaysCombVsAlwaysStar, AlwaysStarIsAlwaysKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -23,7 +23,7 @@ TEST(AlwaysLatchTimingElaboration, AlwaysStarIsAlwaysKind) {
   EXPECT_EQ(proc.kind, RtlirProcessKind::kAlways);
 }
 
-TEST(AlwaysLatchTimingElaboration, AlwaysStarNoMultiDriverError) {
+TEST(AlwaysCombVsAlwaysStar, AlwaysStarNoMultiDriverError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -36,7 +36,7 @@ TEST(AlwaysLatchTimingElaboration, AlwaysStarNoMultiDriverError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AlwaysLatchTimingElaboration, AlwaysStarAllowsTimingControl) {
+TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsTimingControl) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -48,7 +48,7 @@ TEST(AlwaysLatchTimingElaboration, AlwaysStarAllowsTimingControl) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AlwaysLatchTimingElaboration, AlwaysCombRejectsTimingControl) {
+TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsTimingControl) {
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -145,7 +145,23 @@ TEST(AlwaysStarSim, AlwaysStarEquivAlwaysComb) {
   EXPECT_EQ(y_star->value.ToUint64(), y_comb->value.ToUint64());
 }
 
-TEST(EventControlElaboration, EventControlInAlwaysCombErrors) {
+TEST(AlwaysCombVsAlwaysStar, ForkJoinInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombVsAlwaysStar, EventControlInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -156,12 +172,66 @@ TEST(EventControlElaboration, EventControlInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(LevelSensitiveEventElaboration, WaitInAlwaysCombErrors) {
+TEST(AlwaysCombVsAlwaysStar, WaitInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
       "  logic ready, a;\n"
       "  always_comb wait (ready) a = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsForkJoin) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always @* begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsWait) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic ready, a;\n"
+      "  always @* wait (ready) a = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsNestedDelay) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a;\n"
+      "  always_comb begin\n"
+      "    if (a)\n"
+      "      #1 a = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsZeroDelay) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a;\n"
+      "  always_comb #0 a = 1;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);

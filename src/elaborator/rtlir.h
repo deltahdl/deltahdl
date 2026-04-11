@@ -128,6 +128,7 @@ struct RtlirAlias {
 
 struct RtlirProcess {
   RtlirProcessKind kind = RtlirProcessKind::kInitial;
+  bool is_star_sensitivity = false;
   Stmt* body = nullptr;
   std::vector<EventExpr> sensitivity;
   std::vector<ResolvedAttribute> attrs;

@@ -508,14 +508,19 @@ void AddProcess(
   proc.kind = kind;
   proc.body = item->body;
   proc.sensitivity = item->sensitivity;
+  proc.is_star_sensitivity = item->is_star_sensitivity;
   bool needs_infer = (kind == RtlirProcessKind::kAlwaysComb ||
                       kind == RtlirProcessKind::kAlwaysLatch);
   if (needs_infer && proc.sensitivity.empty()) {
     proc.sensitivity = InferSensitivity(proc.body, arena, func_map);
   }
+  if (kind == RtlirProcessKind::kAlways && item->is_star_sensitivity &&
+      proc.sensitivity.empty()) {
+    proc.sensitivity = InferSensitivity(proc.body, arena, nullptr);
+  }
   // §9.2.2.1: Warn if a general-purpose always has no timing control.
   if (kind == RtlirProcessKind::kAlways && item->sensitivity.empty() &&
-      !StmtHasTimingControl(proc.body)) {
+      !item->is_star_sensitivity && !StmtHasTimingControl(proc.body)) {
     diag.Warning(item->loc,
                  "always block has no timing control; may cause "
                  "a zero-delay loop");

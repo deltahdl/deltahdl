@@ -8,57 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(AlwaysLatchElaboration, TimingControlInAlwaysCombErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic a;\n"
-      "  always_comb #5 a = 1;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(AlwaysLatchElaboration, EventControlInAlwaysCombErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic clk, a;\n"
-      "  always_comb @(posedge clk) a = 1;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(AlwaysLatchElaboration, WaitInAlwaysCombErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb begin\n"
-      "    wait (a) b = 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(AlwaysLatchElaboration, ForkJoinInAlwaysCombErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb begin\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "      b = 0;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(AlwaysCombLatchWarning, IncompleteIfWarnsLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -335,33 +284,6 @@ TEST(AlwaysCombExtendedSim, AlwaysCombBlockMultipleOutputs) {
   ASSERT_NE(diff, nullptr);
   EXPECT_EQ(sum->value.ToUint64(), 0x25u);
   EXPECT_EQ(diff->value.ToUint64(), 0x1Bu);
-}
-
-TEST(ParallelBlockElaboration, ForkInAlwaysCombErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb begin\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "      b = 0;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(DelayControlElaboration, DelayInAlwaysCombErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb #5 a = b;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
 }
 
 TEST(AlwaysCombProcessInteraction, ProcessInteractionMultipleTimeSteps) {
