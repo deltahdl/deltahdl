@@ -504,8 +504,9 @@ struct ImportItem {
 
 struct FunctionArg {
   Direction direction = Direction::kNone;
-  bool is_const = false;    // const ref (§13.5.2)
-  bool is_default = false;  // §8.3: class_constructor_arg ::= default
+  bool is_const = false;       // const ref (§13.5.2)
+  bool is_ref_static = false;  // ref static (§13.5.2)
+  bool is_default = false;     // §8.3: class_constructor_arg ::= default
   DataType data_type;
   std::string_view name;
   Expr* default_value = nullptr;     // §13.5.3

@@ -251,8 +251,8 @@ TEST(SubroutineCallArgWriteback, FunctionOutputArgWriteback) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "compute";
   func->func_args = {
-      {Direction::kInput, false, false, {}, "a", nullptr, {}},
-      {Direction::kOutput, false, false, {}, "b", nullptr, {}},
+      {Direction::kInput, false, false, false, {}, "a", nullptr, {}},
+      {Direction::kOutput, false, false, false, {}, "b", nullptr, {}},
   };
 
   auto* lhs = f.arena.Create<Expr>();
@@ -355,8 +355,8 @@ TEST(SubroutineCallArgWriteback, NestedFunctionOutputArgs) {
   inner->kind = ModuleItemKind::kFunctionDecl;
   inner->name = "inner";
   inner->func_args = {
-      {Direction::kInput, false, false, {}, "a", nullptr, {}},
-      {Direction::kOutput, false, false, {}, "b", nullptr, {}},
+      {Direction::kInput, false, false, false, {}, "a", nullptr, {}},
+      {Direction::kOutput, false, false, false, {}, "b", nullptr, {}},
   };
   auto* inner_lhs = f.arena.Create<Expr>();
   inner_lhs->kind = ExprKind::kIdentifier;
@@ -383,8 +383,8 @@ TEST(SubroutineCallArgWriteback, NestedFunctionOutputArgs) {
   outer->kind = ModuleItemKind::kFunctionDecl;
   outer->name = "outer";
   outer->func_args = {
-      {Direction::kInput, false, false, {}, "x", nullptr, {}},
-      {Direction::kOutput, false, false, {}, "y", nullptr, {}},
+      {Direction::kInput, false, false, false, {}, "x", nullptr, {}},
+      {Direction::kOutput, false, false, false, {}, "y", nullptr, {}},
   };
   auto* call_arg0 = f.arena.Create<Expr>();
   call_arg0->kind = ExprKind::kIdentifier;
@@ -427,7 +427,7 @@ TEST(SubroutineCallArgWriteback, FunctionInoutArgWriteback) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "increment";
-  func->func_args = {{Direction::kInout, false, false, {}, "v", nullptr, {}}};
+  func->func_args = {{Direction::kInout, false, false, false, {}, "v", nullptr, {}}};
 
   auto* lhs = f.arena.Create<Expr>();
   lhs->kind = ExprKind::kIdentifier;

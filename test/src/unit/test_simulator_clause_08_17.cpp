@@ -33,7 +33,7 @@ TEST(ChainedConstructorSimulation, SuperNewWithArgs) {
   ctor->kind = ModuleItemKind::kFunctionDecl;
   ctor->name = "new";
   ctor->return_type.kind = DataTypeKind::kVoid;
-  ctor->func_args = {{Direction::kInput, false, false, {}, "s", nullptr, {}}};
+  ctor->func_args = {{Direction::kInput, false, false, false, {}, "s", nullptr, {}}};
   ctor->func_body_stmts.push_back(
       MakeAssign(f.arena, "speed", MkId(f.arena, "s")));
   base->methods["new"] = ctor;

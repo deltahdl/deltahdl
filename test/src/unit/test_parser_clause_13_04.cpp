@@ -439,21 +439,6 @@ TEST(FunctionDeclParsing, FunctionMultipleStmtsSequential) {
   ASSERT_GE(fn->func_body_stmts.size(), 3u);
 }
 
-TEST(FunctionDeclParsing, FunctionRefArg) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void f(ref int a);\n"
-      "    a = a + 1;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FindFunc(r, "f");
-  ASSERT_NE(fn, nullptr);
-  ASSERT_EQ(fn->func_args.size(), 1u);
-  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
-}
-
 TEST(FunctionDeclParsing, IntReturnWithArgs) {
   auto r = Parse(
       "module m;\n"

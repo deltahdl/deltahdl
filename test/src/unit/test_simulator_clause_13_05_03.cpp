@@ -15,8 +15,8 @@ TEST(Functions, DefaultArgumentValue) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "add";
   func->func_args = {
-      {Direction::kInput, false, false, {}, "a", nullptr, {}},
-      {Direction::kInput, false, false, {}, "b", MakeInt(f.arena, 10), {}},
+      {Direction::kInput, false, false, false, {}, "a", nullptr, {}},
+      {Direction::kInput, false, false, false, {}, "b", MakeInt(f.arena, 10), {}},
   };
   auto* body_expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "a"),
                                MakeId(f.arena, "b"));
@@ -38,9 +38,9 @@ TEST(Functions, DefaultArgumentMultiple) {
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "compute";
   func->func_args = {
-      {Direction::kInput, false, false, {}, "a", MakeInt(f.arena, 1), {}},
-      {Direction::kInput, false, false, {}, "b", MakeInt(f.arena, 2), {}},
-      {Direction::kInput, false, false, {}, "c", MakeInt(f.arena, 3), {}},
+      {Direction::kInput, false, false, false, {}, "a", MakeInt(f.arena, 1), {}},
+      {Direction::kInput, false, false, false, {}, "b", MakeInt(f.arena, 2), {}},
+      {Direction::kInput, false, false, false, {}, "c", MakeInt(f.arena, 3), {}},
   };
   auto* ab = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "a"),
                         MakeId(f.arena, "b"));

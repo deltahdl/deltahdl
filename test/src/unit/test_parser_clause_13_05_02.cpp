@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(FunctionDeclParsing, FuncBodyNewStyleConstRef) {
+TEST(FunctionDeclParsing, ConstRefOnFunction) {
   auto r = Parse(
       "module m;\n"
       "  function void foo(const ref int x);\n"
@@ -20,7 +20,7 @@ TEST(FunctionDeclParsing, FuncBodyNewStyleConstRef) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
-TEST(TaskDeclParsing, TaskBodyNewStyleConstRef) {
+TEST(TaskDeclParsing, ConstRefOnTask) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(const ref int x);\n"
@@ -34,7 +34,7 @@ TEST(TaskDeclParsing, TaskBodyNewStyleConstRef) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
-TEST(TaskDeclParsing, TfPortDirectionConstRefStatic) {
+TEST(TaskDeclParsing, ConstRefStaticOnTask) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(const ref static int x);\n"
@@ -48,7 +48,7 @@ TEST(TaskDeclParsing, TfPortDirectionConstRefStatic) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
-TEST(TaskDeclParsing, TfPortDeclOldStyleConstRef) {
+TEST(TaskDeclParsing, ConstRefOldStyleDeclOnTask) {
   auto r = Parse(
       "module m;\n"
       "  task my_task;\n"
@@ -64,7 +64,7 @@ TEST(TaskDeclParsing, TfPortDeclOldStyleConstRef) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
-TEST(SchedulingSemanticsParsing, AutoFuncWithRefArg) {
+TEST(PassByRefParsing, AutoFuncWithRefArg) {
   auto r = Parse(
       "module m;\n"
       "  function automatic void swap(ref int x, ref int y);\n"
@@ -86,7 +86,7 @@ TEST(SchedulingSemanticsParsing, AutoFuncWithRefArg) {
   EXPECT_EQ(item->func_args[1].name, "y");
 }
 
-TEST(TaskDeclParsing, TfPortDirectionRefStatic) {
+TEST(TaskDeclParsing, RefStaticOnTask) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(ref static int x);\n"
@@ -117,7 +117,7 @@ TEST(TaskAndFunctionParsing, AutomaticFunctionWithRef) {
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
 }
 
-TEST(SchedulingSemanticsParsing, AutoFuncWithConstRefArg) {
+TEST(PassByRefParsing, AutoFuncWithConstRefArg) {
   auto r = Parse(
       "module m;\n"
       "  function automatic int read_only(const ref int data);\n"
@@ -206,6 +206,69 @@ TEST(TaskAndFunctionParsing, RefArgOnFunction) {
   ASSERT_EQ(fn->func_args.size(), 2u);
   EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
   EXPECT_EQ(fn->func_args[1].direction, Direction::kRef);
+}
+
+TEST(PassByRefParsing, RefDoesNotStickyToNextArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic void f(ref int x, int y);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FindFunc(r, "f");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 2u);
+  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
+  EXPECT_EQ(fn->func_args[1].direction, Direction::kInput);
+}
+
+TEST(FunctionDeclParsing, RefOldStyleDeclOnFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void foo;\n"
+      "    ref int x;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = r.cu->modules[0]->items[0];
+  ASSERT_EQ(fn->func_args.size(), 1u);
+  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
+  EXPECT_FALSE(fn->func_args[0].is_const);
+}
+
+TEST(PassByRefParsing, RefArgWithUnpackedArrayDims) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int crc(ref byte packet [1000:1]);\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FindFunc(r, "crc");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 1u);
+  EXPECT_EQ(fn->func_args[0].direction, Direction::kRef);
+  EXPECT_FALSE(fn->func_args[0].unpacked_dims.empty());
+}
+
+TEST(PassByRefParsing, RefIsNotConstByDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f(ref int a, const ref int b, ref int c);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* fn = FindFunc(r, "f");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->func_args.size(), 3u);
+  EXPECT_FALSE(fn->func_args[0].is_const);
+  EXPECT_TRUE(fn->func_args[1].is_const);
+  EXPECT_FALSE(fn->func_args[2].is_const);
 }
 
 }  // namespace

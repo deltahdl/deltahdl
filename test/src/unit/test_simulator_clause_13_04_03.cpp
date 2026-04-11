@@ -13,7 +13,7 @@ TEST(ConstantFunctionSim, EvalAtElaboration) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "double_val";
-  func->func_args = {{Direction::kInput, false, false, {}, "x", nullptr, {}}};
+  func->func_args = {{Direction::kInput, false, false, false, {}, "x", nullptr, {}}};
   auto* body = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "x"),
                           MakeInt(f.arena, 2));
   func->func_body_stmts.push_back(MakeReturn(f.arena, body));
@@ -42,8 +42,8 @@ TEST(ConstantFunctionSim, MultipleArgFunction) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "add";
-  func->func_args = {{Direction::kInput, false, false, {}, "a", nullptr, {}},
-                     {Direction::kInput, false, false, {}, "b", nullptr, {}}};
+  func->func_args = {{Direction::kInput, false, false, false, {}, "a", nullptr, {}},
+                     {Direction::kInput, false, false, false, {}, "b", nullptr, {}}};
   auto* body = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "a"),
                           MakeId(f.arena, "b"));
   func->func_body_stmts.push_back(MakeReturn(f.arena, body));

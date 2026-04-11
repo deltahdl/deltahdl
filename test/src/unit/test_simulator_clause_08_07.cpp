@@ -20,8 +20,8 @@ TEST(ClassConstructorSim, ConstructorMethodRegistered) {
   ctor->name = "new";
   ctor->return_type.kind = DataTypeKind::kVoid;
   ctor->func_args = {
-      {Direction::kInput, false, false, {}, "h", nullptr, {}},
-      {Direction::kInput, false, false, {}, "p", nullptr, {}},
+      {Direction::kInput, false, false, false, {}, "h", nullptr, {}},
+      {Direction::kInput, false, false, false, {}, "p", nullptr, {}},
   };
   ctor->func_body_stmts.push_back(
       MakeAssign(f.arena, "header", MkId(f.arena, "h")));
@@ -42,7 +42,7 @@ TEST(ClassConstructorSim, ConstructorBodyExecutesStatements) {
   ctor->kind = ModuleItemKind::kFunctionDecl;
   ctor->name = "new";
   ctor->return_type.kind = DataTypeKind::kVoid;
-  ctor->func_args = {{Direction::kInput, false, false, {}, "v", nullptr, {}}};
+  ctor->func_args = {{Direction::kInput, false, false, false, {}, "v", nullptr, {}}};
   ctor->func_body_stmts.push_back(
       MakeAssign(f.arena, "val", MkId(f.arena, "v")));
   type->methods["new"] = ctor;

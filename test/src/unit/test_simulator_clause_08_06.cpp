@@ -47,7 +47,7 @@ TEST(ClassSim, MethodWithArgs) {
   method->kind = ModuleItemKind::kFunctionDecl;
   method->name = "add";
   method->return_type.kind = DataTypeKind::kVoid;
-  method->func_args = {{Direction::kInput, false, false, {}, "v", nullptr, {}}};
+  method->func_args = {{Direction::kInput, false, false, false, {}, "v", nullptr, {}}};
   auto* rhs = MkBin(f.arena, TokenKind::kPlus, MkId(f.arena, "total"),
                     MkId(f.arena, "v"));
   method->func_body_stmts.push_back(MakeAssign(f.arena, "total", rhs));

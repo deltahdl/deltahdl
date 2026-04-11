@@ -287,7 +287,7 @@ Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir) {
   if (Check(TokenKind::kKwRef)) {
     arg.direction = Direction::kRef;
     Consume();
-    Match(TokenKind::kKwStatic);  // A.2.7: ref [static]
+    arg.is_ref_static = Match(TokenKind::kKwStatic);  // A.2.7: ref [static]
     return Direction::kRef;
   }
   arg.direction = sticky_dir;
@@ -559,12 +559,14 @@ void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
       dir = Direction::kRef;
     }
     Consume();
+    bool is_ref_static = (dir == Direction::kRef) && Match(TokenKind::kKwStatic);
     Match(TokenKind::kKwVar);  // A.2.7 tf_port_declaration: [var]
     DataType dt = ParseDataType();
     // list_of_tf_variable_identifiers: comma-separated port names
     do {
       FunctionArg arg;
       arg.is_const = is_const;
+      arg.is_ref_static = is_ref_static;
       arg.direction = dir;
       arg.data_type = dt;
       arg.name = Expect(TokenKind::kIdentifier).text;

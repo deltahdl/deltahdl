@@ -117,6 +117,9 @@ class DiagEngine;
 struct ModuleItem;
 void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag);
 
+// §13.5.2: Reject writes to const ref arguments.
+void ValidateConstRefWriteProtection(const ModuleItem* func, DiagEngine& diag);
+
 // String <-> Logic4Vec conversion (eval_string.cpp).
 Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str);
 
