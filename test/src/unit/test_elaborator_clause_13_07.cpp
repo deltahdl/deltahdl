@@ -70,4 +70,35 @@ TEST(TaskFunctionNameElaboration, MutuallyRecursiveFunctions) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(TaskFunctionNameElaboration, ForwardVoidFunctionCallAsStatement) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  initial clear_x();\n"
+      "  function void clear_x;\n"
+      "    x = 8'd0;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(TaskFunctionNameElaboration, MultipleForwardReferencesToSameFunction) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int x, y;\n"
+      "  initial x = add(1, 2);\n"
+      "  initial y = add(3, 4);\n"
+      "  function int add(int a, int b);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

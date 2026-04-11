@@ -53,4 +53,23 @@ TEST(TaskFunctionNameSim, FunctionCallsForwardFunction) {
   LowerRunAndCheck(f, design, {{"x", 31u}});
 }
 
+TEST(TaskFunctionNameSim, MutuallyRecursiveFunctionsSimulate) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function logic [7:0] is_even(input logic [7:0] n);\n"
+      "    if (n == 8'd0) return 8'd1;\n"
+      "    return is_odd(n - 8'd1);\n"
+      "  endfunction\n"
+      "  function logic [7:0] is_odd(input logic [7:0] n);\n"
+      "    if (n == 8'd0) return 8'd0;\n"
+      "    return is_even(n - 8'd1);\n"
+      "  endfunction\n"
+      "  initial x = is_even(8'd4);\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 1u}});
+}
+
 }  // namespace
