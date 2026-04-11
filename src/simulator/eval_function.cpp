@@ -1296,6 +1296,7 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
     }
     ctx.PushQueueRefFrame();
     ctx.PushFuncName(func->name);
+    if (!func->func_args.empty()) BindFunctionArgs(func, expr, ctx, arena);
     return func;
   }
   if (expr->kind != ExprKind::kCall) return nullptr;

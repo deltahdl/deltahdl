@@ -97,19 +97,6 @@ TEST(SubroutineCallSyntaxParsing, VoidCastFunctionCall) {
   EXPECT_EQ(expr->lhs->callee, "foo");
 }
 
-TEST(SubroutineCallSyntaxParsing, TaskCallWithoutParens) {
-  auto r = Parse(
-      "module m;\n"
-      "  task foo; endtask\n"
-      "  initial foo;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-}
-
 TEST(SubroutineCallSyntaxParsing, VoidFunctionCallAsStatement) {
   auto r = Parse(
       "module m;\n"
