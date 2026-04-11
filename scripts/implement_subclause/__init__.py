@@ -248,6 +248,7 @@ def generate_commit_body(
     cmd = [
         "claude", "-p",
         "--model", model,
+        "--verbose",
         "--output-format", "stream-json",
         "--dangerously-skip-permissions",
         "--continue",

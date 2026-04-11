@@ -236,6 +236,15 @@ def test_generate_commit_body_uses_continue(isc):
     assert "--continue" in mock_s.call_args[0][0]
 
 
+def test_generate_commit_body_uses_verbose(isc):
+    """generate_commit_body passes --verbose to the Claude CLI."""
+    with patch("implement_subclause.run_claude_streaming",
+               return_value="body") as mock_s:
+        isc.generate_commit_body("6.3", (["a.cpp"], [], []),
+                                 model="opus", env={})
+    assert "--verbose" in mock_s.call_args[0][0]
+
+
 def test_generate_commit_body_returns_result(isc):
     """generate_commit_body returns the streaming helper's result."""
     with patch("implement_subclause.run_claude_streaming",
