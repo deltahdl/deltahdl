@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(Parser, ModuleWithInitialBlock) {
+TEST(InitialProcedureParsing, ModuleWithInitialBlock) {
   auto r = Parse(
       "module hello;\n"
       "  initial $display(\"Hello\");\n"
@@ -14,7 +14,7 @@ TEST(Parser, ModuleWithInitialBlock) {
   ASSERT_EQ(r.cu->modules[0]->items.size(), 1);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
 }
-TEST(ProceduralAssignAndControlParsing, StructuredProcMultipleInitial) {
+TEST(InitialProcedureParsing, MultipleInitialBlocks) {
   auto r = Parse(
       "module m;\n"
       "  initial a = 0;\n"
@@ -30,7 +30,7 @@ TEST(ProceduralAssignAndControlParsing, StructuredProcMultipleInitial) {
   EXPECT_EQ(count, 3);
 }
 
-TEST(ProcessTimingAndControlParsing, InitialWithTaskCall) {
+TEST(InitialProcedureParsing, InitialWithTaskCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  task my_task;\n"
@@ -42,7 +42,7 @@ TEST(ProcessTimingAndControlParsing, InitialWithTaskCall) {
               "endmodule\n"));
 }
 
-TEST(ProcessParsing, InitialBlock) {
+TEST(InitialProcedureParsing, SingleStatementHasBody) {
   auto r = Parse(
       "module m;\n"
       "  initial x = 1;\n"
@@ -59,7 +59,7 @@ TEST(ProcessParsing, InitialBlock) {
   EXPECT_TRUE(found);
 }
 
-TEST(InitialProcedureParsing, InitialBeginEndWithInit) {
+TEST(InitialProcedureParsing, BeginEndWithLoopStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -105,9 +105,11 @@ TEST(InitialProcedureParsing, InitialNullStatement) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
   ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kNull);
 }
 
-TEST(InitialBlock, SimpleAssignment) {
+TEST(InitialProcedureParsing, SimpleAssignment) {
   auto r = Parse(
       "module m;\n"
       "  logic a;\n"
@@ -116,6 +118,29 @@ TEST(InitialBlock, SimpleAssignment) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kInitialBlock);
+}
+
+TEST(InitialProcedureParsing, InitialWithDelayControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial #10 x = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+}
+
+TEST(InitialProcedureParsing, InitialWithNestedBeginEnd) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  initial begin\n"
+              "    begin\n"
+              "      x = 1;\n"
+              "    end\n"
+              "  end\n"
+              "endmodule\n"));
 }
 
 }  // namespace

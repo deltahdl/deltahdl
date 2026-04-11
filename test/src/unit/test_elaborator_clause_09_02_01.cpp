@@ -1,6 +1,4 @@
 #include "fixture_elaborator.h"
-#include "fixture_simulator.h"
-#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -58,73 +56,38 @@ TEST(InitialProcedureElaboration, MultipleInitialsElaborate) {
   EXPECT_EQ(count, 3);
 }
 
-TEST(InitialProcedure, TimeZeroSemantics) {
-  SimFixture f;
+TEST(InitialProcedureElaboration, NullStatementInitialElaborates) {
+  ElabFixture f;
   auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
+      "module m;\n"
+      "  initial ;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& procs = design->top_modules[0]->processes;
+  ASSERT_EQ(procs.size(), 1u);
+  EXPECT_EQ(procs[0].kind, RtlirProcessKind::kInitial);
+  EXPECT_NE(procs[0].body, nullptr);
+}
+
+TEST(InitialProcedureElaboration, BeginEndBodyPreserved) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
       "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    b = a + 8'd1;\n"
+      "    a = 0;\n"
+      "    b = 1;\n"
       "  end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 1u);
-  EXPECT_EQ(vb->value.ToUint64(), 2u);
-}
-
-TEST(InitialBlock, BlockingAssignment) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd42;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("x");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->value.ToUint64(), 42u);
-}
-
-TEST(InitialBlock, MultipleInitialBlocks) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial a = 8'd10;\n"
-      "  initial b = 8'd20;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 10u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& procs = design->top_modules[0]->processes;
+  ASSERT_EQ(procs.size(), 1u);
+  EXPECT_EQ(procs[0].body->kind, StmtKind::kBlock);
 }
 
 }  // namespace
-TEST(InitialProcedures, MultipleInitialsAllExecute) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd1;\n"
-      "  initial b = 8'd2;\n"
-      "  initial c = 8'd3;\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
-}

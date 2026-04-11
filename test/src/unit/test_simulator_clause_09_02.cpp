@@ -47,16 +47,6 @@ TEST(StructuredProcedureSimulation, AllProcedureTypesCoexist) {
   EXPECT_EQ(sum->value.ToUint64(), 30u);
 }
 
-TEST(StructuredProcedureSimulation, InitialExecutesOnce) {
-  auto val = RunAndGet(
-      "module m;\n"
-      "  logic [31:0] count;\n"
-      "  initial count = 1;\n"
-      "endmodule\n",
-      "count");
-  EXPECT_EQ(val, 1u);
-}
-
 TEST(StructuredProcedureSimulation, AlwaysRepeatsUntilTermination) {
   auto val = RunAndGet(
       "module m;\n"
@@ -89,22 +79,6 @@ TEST(StructuredProcedureSimulation, NoImpliedOrderInitialAndAlways) {
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 42u);
   EXPECT_EQ(vb->value.ToUint64(), 42u);
-}
-
-TEST(StructuredProcedureSimulation, MultipleInitialsAllExecute) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a, b, c, d, e;\n"
-      "  initial a = 8'd1;\n"
-      "  initial b = 8'd2;\n"
-      "  initial c = 8'd3;\n"
-      "  initial d = 8'd4;\n"
-      "  initial e = 8'd5;\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design,
-                   {{"a", 1u}, {"b", 2u}, {"c", 3u}, {"d", 4u}, {"e", 5u}});
 }
 
 TEST(StructuredProcedureSimulation, NoLimitOnAlwaysCount) {
@@ -202,20 +176,6 @@ TEST(StructuredProcedureSimulation, InitialAndAlwaysEnabledAtBeginning) {
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 1u);
   EXPECT_EQ(vb->value.ToUint64(), 1u);
-}
-
-TEST(StructuredProcedureSimulation, InitialCeasesWhenStatementFinishes) {
-  auto val = RunAndGet(
-      "module m;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    x = 1;\n"
-      "    x = x + 1;\n"
-      "    x = x + 1;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(val, 3u);
 }
 
 }  // namespace

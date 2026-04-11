@@ -6,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StructuredProcedureLexing, InitialKeyword) {
-  auto r = LexOne("initial ");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwInitial);
-  EXPECT_EQ(r.token.text, "initial");
-}
-
 TEST(StructuredProcedureLexing, AlwaysKeyword) {
   auto r = LexOne("always ");
   EXPECT_EQ(r.token.kind, TokenKind::kKwAlways);

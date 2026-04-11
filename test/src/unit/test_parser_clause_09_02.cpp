@@ -91,20 +91,6 @@ TEST(StructuredProcedureParsing, AlwaysKeywordVariants) {
   EXPECT_TRUE(HasAlwaysOfKind(items, AlwaysKind::kAlwaysFF));
 }
 
-TEST(StructuredProcedureParsing, InitialWithNullStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial ;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kNull);
-}
-
 TEST(StructuredProcedureParsing, MixedProcedureOrdering) {
   auto r = Parse(
       "module m;\n"
@@ -123,23 +109,6 @@ TEST(StructuredProcedureParsing, MixedProcedureOrdering) {
   EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kFinalBlock));
   EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysCombBlock));
   EXPECT_EQ(CountItemsByKind(items, ModuleItemKind::kInitialBlock), 2u);
-}
-
-TEST(StructuredProcedureParsing, InitialWithBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = 0;\n"
-      "    b = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
 TEST(StructuredProcedureParsing, AlwaysWithStatement) {
