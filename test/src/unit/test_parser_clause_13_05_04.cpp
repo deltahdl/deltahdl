@@ -128,22 +128,6 @@ TEST(SubroutineCallExprParsing, ListOfArgsMixed) {
   EXPECT_EQ(expr->arg_names[0], "b");
 }
 
-TEST(TaskAndFunctionParsing, NamedArgBindingParses) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void foo(int a, int b);\n"
-      "  endfunction\n"
-      "  initial foo(.b(2), .a(1));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-  auto* call = stmt->expr;
-  ASSERT_NE(call, nullptr);
-  EXPECT_EQ(call->kind, ExprKind::kCall);
-}
-
 TEST(TaskAndFunctionParsing, NamedArgBindingNames) {
   auto r = Parse(
       "module m;\n"
@@ -163,21 +147,6 @@ TEST(TaskAndFunctionParsing, NamedArgBindingNames) {
   }
 }
 
-TEST(TaskAndFunctionParsing, PositionalArgsHaveEmptyNames) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void foo(int a, int b);\n"
-      "  endfunction\n"
-      "  initial foo(1, 2);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* call = stmt->expr;
-  ASSERT_NE(call, nullptr);
-  EXPECT_EQ(call->kind, ExprKind::kCall);
-}
-
 TEST(TaskAndFunctionParsing, PositionalArgsNoNamedArgs) {
   auto r = Parse(
       "module m;\n"
@@ -192,6 +161,19 @@ TEST(TaskAndFunctionParsing, PositionalArgsNoNamedArgs) {
   ASSERT_EQ(call->args.size(), 2u);
 
   EXPECT_TRUE(call->arg_names.empty());
+}
+
+TEST(TaskAndFunctionParsing, PositionalAfterNamedIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int fun(int j = 1, string s = \"no\");\n"
+      "    return j;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = fun(.s(\"yes\"), 2);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace
