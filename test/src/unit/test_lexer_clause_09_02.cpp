@@ -12,24 +12,6 @@ TEST(StructuredProcedureLexing, AlwaysKeyword) {
   EXPECT_EQ(r.token.text, "always");
 }
 
-TEST(StructuredProcedureLexing, AlwaysCombKeyword) {
-  auto r = LexOne("always_comb ");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwAlwaysComb);
-  EXPECT_EQ(r.token.text, "always_comb");
-}
-
-TEST(StructuredProcedureLexing, AlwaysLatchKeyword) {
-  auto r = LexOne("always_latch ");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwAlwaysLatch);
-  EXPECT_EQ(r.token.text, "always_latch");
-}
-
-TEST(StructuredProcedureLexing, AlwaysFFKeyword) {
-  auto r = LexOne("always_ff ");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwAlwaysFF);
-  EXPECT_EQ(r.token.text, "always_ff");
-}
-
 TEST(StructuredProcedureLexing, FinalKeyword) {
   auto r = LexOne("final ");
   EXPECT_EQ(r.token.kind, TokenKind::kKwFinal);

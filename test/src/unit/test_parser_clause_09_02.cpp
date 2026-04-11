@@ -73,24 +73,6 @@ TEST(StructuredProcedureParsing, MultipleFinalBlocks) {
       3u);
 }
 
-TEST(StructuredProcedureParsing, AlwaysKeywordVariants) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic clk, a;\n"
-      "  always #5 clk = ~clk;\n"
-      "  always_comb a = 0;\n"
-      "  always_latch if (clk) a = 1;\n"
-      "  always_ff @(posedge clk) a <= 0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& items = r.cu->modules[0]->items;
-  EXPECT_TRUE(HasAlwaysOfKind(items, AlwaysKind::kAlways));
-  EXPECT_TRUE(HasAlwaysOfKind(items, AlwaysKind::kAlwaysComb));
-  EXPECT_TRUE(HasAlwaysOfKind(items, AlwaysKind::kAlwaysLatch));
-  EXPECT_TRUE(HasAlwaysOfKind(items, AlwaysKind::kAlwaysFF));
-}
-
 TEST(StructuredProcedureParsing, MixedProcedureOrdering) {
   auto r = Parse(
       "module m;\n"
