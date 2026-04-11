@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DeclarationListParsing, ListOfTfVariableIdentifiersWithDefaults) {
+TEST(DeclarationListParsing, MultipleArgsAllWithDefaults) {
   auto r = Parse(
       "module m;\n"
       "  function int compute(input int a = 1, input int b = 2);\n"
@@ -20,7 +20,7 @@ TEST(DeclarationListParsing, ListOfTfVariableIdentifiersWithDefaults) {
   EXPECT_NE(item->func_args[1].default_value, nullptr);
 }
 
-TEST(FunctionDeclParsing, FuncBodyNewStyleWithDefaultValue) {
+TEST(FunctionDeclParsing, FunctionSingleArgWithDefault) {
   auto r = Parse(
       "module m;\n"
       "  function int foo(input int x = 5);\n"
@@ -33,7 +33,7 @@ TEST(FunctionDeclParsing, FuncBodyNewStyleWithDefaultValue) {
   EXPECT_NE(item->func_args[0].default_value, nullptr);
 }
 
-TEST(TaskDeclParsing, TaskBodyNewStyleDefaultValue) {
+TEST(TaskDeclParsing, TaskSingleArgWithDefault) {
   auto r = Parse(
       "module m;\n"
       "  task my_task(input int x = 5);\n"
@@ -44,25 +44,6 @@ TEST(TaskDeclParsing, TaskBodyNewStyleDefaultValue) {
   auto* item = r.cu->modules[0]->items[0];
   ASSERT_EQ(item->func_args.size(), 1u);
   EXPECT_NE(item->func_args[0].default_value, nullptr);
-}
-
-TEST(SchedulingSemanticsParsing, AutoFuncWithDefaultArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int scale(int x, int factor = 2);\n"
-      "    return x * factor;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_automatic);
-  ASSERT_EQ(item->func_args.size(), 2u);
-  EXPECT_EQ(item->func_args[0].name, "x");
-  EXPECT_EQ(item->func_args[0].default_value, nullptr);
-  EXPECT_EQ(item->func_args[1].name, "factor");
-  EXPECT_NE(item->func_args[1].default_value, nullptr);
 }
 
 TEST(TaskAndFunctionParsing, MixedDefaultAndNonDefaultArgs) {
@@ -96,20 +77,6 @@ TEST(TaskAndFunctionParsing, DefaultArgWithExpression) {
   EXPECT_EQ(fn->func_args[0].default_value->kind, ExprKind::kBinary);
 }
 
-TEST(TaskAndFunctionParsing, DefaultArgValues) {
-  auto r = Parse(
-      "module m;\n"
-      "  function void foo(int a = 0, int b = 1);\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* fn = FindFunc(r, "foo");
-  ASSERT_NE(fn, nullptr);
-  ASSERT_EQ(fn->func_args.size(), 2u);
-  EXPECT_NE(fn->func_args[0].default_value, nullptr);
-  EXPECT_NE(fn->func_args[1].default_value, nullptr);
-}
-
 TEST(TaskAndFunctionParsing, DefaultArgValueOnTask) {
   auto r = Parse(
       "module m;\n"
@@ -136,6 +103,59 @@ TEST(TaskAndFunctionParsing, DefaultArgNoDefault) {
   ASSERT_EQ(fn->func_args.size(), 2u);
   EXPECT_EQ(fn->func_args[0].default_value, nullptr);
   EXPECT_EQ(fn->func_args[1].default_value, nullptr);
+}
+
+TEST(TaskAndFunctionParsing, OutputArgWithDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a;\n"
+      "  task t1(output logic o = a);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* tk = FindFunc(r, "t1");
+  ASSERT_NE(tk, nullptr);
+  ASSERT_EQ(tk->func_args.size(), 1u);
+  EXPECT_EQ(tk->func_args[0].direction, Direction::kOutput);
+  ASSERT_NE(tk->func_args[0].default_value, nullptr);
+  EXPECT_EQ(tk->func_args[0].default_value->kind, ExprKind::kIdentifier);
+}
+
+TEST(TaskAndFunctionParsing, InoutArgWithDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic w;\n"
+      "  task t3(inout logic io = w);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* tk = FindFunc(r, "t3");
+  ASSERT_NE(tk, nullptr);
+  ASSERT_EQ(tk->func_args.size(), 1u);
+  EXPECT_EQ(tk->func_args[0].direction, Direction::kInout);
+  ASSERT_NE(tk->func_args[0].default_value, nullptr);
+  EXPECT_EQ(tk->func_args[0].default_value->kind, ExprKind::kIdentifier);
+}
+
+TEST(TaskAndFunctionParsing, EmptyPlaceholderArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  task read(int j = 0, int k, int data = 1);\n"
+      "  endtask\n"
+      "  initial read(, 5);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* call = stmt->expr;
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(call->kind, ExprKind::kCall);
+  ASSERT_EQ(call->args.size(), 2u);
+  EXPECT_EQ(call->args[0], nullptr);
+  ASSERT_NE(call->args[1], nullptr);
 }
 
 }  // namespace

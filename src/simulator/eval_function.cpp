@@ -283,6 +283,7 @@ static bool TryBindRefArg(const Expr* expr, int arg_index,
                           std::string_view param_name, SimContext& ctx) {
   if (arg_index < 0) return false;
   auto* call_arg = expr->args[static_cast<size_t>(arg_index)];
+  if (!call_arg) return false;
   if (call_arg->kind != ExprKind::kIdentifier) return false;
   auto* target = ctx.FindVariable(call_arg->text);
   if (!target) return false;
@@ -298,6 +299,7 @@ static bool TryBindQueueElementRef(const Expr* expr, int arg_index,
                                    Arena& arena) {
   if (arg_index < 0) return false;
   auto* call_arg = expr->args[static_cast<size_t>(arg_index)];
+  if (!call_arg) return false;
   if (call_arg->kind != ExprKind::kSelect) return false;
   if (!call_arg->base || call_arg->base->kind != ExprKind::kIdentifier)
     return false;
@@ -339,7 +341,7 @@ static void WritebackQueueRefs(SimContext& ctx) {
 // §13.5.3: Evaluate call-site arg, use default value, or X.
 static Logic4Vec ResolveArgValue(const FunctionArg& param, const Expr* expr,
                                  int arg_index, SimContext& ctx, Arena& arena) {
-  if (arg_index >= 0) {
+  if (arg_index >= 0 && expr->args[static_cast<size_t>(arg_index)] != nullptr) {
     return EvalExpr(expr->args[static_cast<size_t>(arg_index)], ctx, arena);
   }
   if (param.default_value) return EvalExpr(param.default_value, ctx, arena);
@@ -432,9 +434,11 @@ static void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
     auto* local = ctx.FindLocalVariable(func->func_args[i].name);
     if (!local) continue;
     int ai = ResolveArgIndex(func, expr, i);
-    if (ai < 0) continue;
-    auto* call_arg = expr->args[static_cast<size_t>(ai)];
-    PerformBlockingAssign(call_arg, local->value, ctx, arena);
+    const Expr* wb_target = nullptr;
+    if (ai >= 0) wb_target = expr->args[static_cast<size_t>(ai)];
+    if (!wb_target) wb_target = func->func_args[i].default_value;
+    if (!wb_target) continue;
+    PerformBlockingAssign(wb_target, local->value, ctx, arena);
   }
 }
 

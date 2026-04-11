@@ -435,6 +435,7 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
 
   if (Check(TokenKind::kLParen)) {
     item->func_args = ParseFunctionArgs();
+    item->is_ansi_ports = true;
   }
   Expect(TokenKind::kSemicolon);
 
@@ -469,6 +470,7 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
 
   if (Check(TokenKind::kLParen)) {
     item->func_args = ParseFunctionArgs();
+    item->is_ansi_ports = true;
   }
   Expect(TokenKind::kSemicolon);
 

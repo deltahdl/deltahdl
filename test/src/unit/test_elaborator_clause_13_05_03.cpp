@@ -48,4 +48,42 @@ TEST(DefaultArgumentElaboration, AllDefaultsNoArgsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(DefaultArgumentElaboration, EmptyPlaceholderWithDefaultOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task read(int j = 0, int k, int data = 1);\n"
+      "  endtask\n"
+      "  initial read(, 5);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DefaultArgumentElaboration, EmptyPlaceholderNoDefaultError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task read(int j = 0, int k, int data = 1);\n"
+      "  endtask\n"
+      "  initial read(1, , 7);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(DefaultArgumentElaboration, DefaultOnNonAnsiDeclError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int foo;\n"
+      "    input int x = 5;\n"
+      "    foo = x;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace

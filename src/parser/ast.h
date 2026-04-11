@@ -628,6 +628,7 @@ struct ModuleItem {
 
   // Function/task
   DataType return_type;
+  bool is_ansi_ports = false;
   std::vector<FunctionArg> func_args;
   std::vector<Stmt*> func_body_stmts;
 

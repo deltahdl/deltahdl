@@ -753,6 +753,12 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
                     "weak_reference type parameter shall be a class type");
       }
     }
+    if (arg.default_value && !item->is_ansi_ports) {
+      diag_.Error(item->loc,
+                  std::format("default argument values are only allowed with "
+                              "ANSI-style port declarations for '{}'",
+                              arg.name));
+    }
   }
 
   if (item->kind == ModuleItemKind::kTaskDecl) {
@@ -920,8 +926,9 @@ static bool IsValidOutputArg(const Expr* e) {
 // §13.5: Check whether parameter i is provided by the call expression.
 static bool IsArgProvided(const Expr* expr, size_t i, std::string_view name,
                           size_t positional_count) {
-  if (expr->arg_names.empty()) return (i < expr->args.size());
-  if (i < positional_count) return true;
+  if (expr->arg_names.empty())
+    return (i < expr->args.size()) && (expr->args[i] != nullptr);
+  if (i < positional_count) return (expr->args[i] != nullptr);
   for (size_t j = 0; j < expr->arg_names.size(); ++j) {
     if (expr->arg_names[j] == name) return true;
   }

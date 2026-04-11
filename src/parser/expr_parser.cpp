@@ -675,13 +675,21 @@ void Parser::ParseCallArgs(Expr* call) {
     call->args.push_back(expr);
     return;
   }
-  call->args.push_back(ParseExpr());
+  if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
+    call->args.push_back(nullptr);
+  } else {
+    call->args.push_back(ParseExpr());
+  }
   while (Match(TokenKind::kComma)) {
     if (Check(TokenKind::kDot)) {
       ParseTrailingNamedArgs(call);
       break;
     }
-    call->args.push_back(ParseExpr());
+    if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
+      call->args.push_back(nullptr);
+    } else {
+      call->args.push_back(ParseExpr());
+    }
   }
 }
 
