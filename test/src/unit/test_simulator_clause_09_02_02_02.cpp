@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Lowerer, AlwaysCombRetrigger) {
+TEST(AlwaysCombLowering, AlwaysCombRetrigger) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -30,7 +30,7 @@ TEST(Lowerer, AlwaysCombRetrigger) {
   EXPECT_EQ(b->value.ToUint64(), 6u);
 }
 
-TEST(Lowerer, AlwaysCombAutoTriggerTimeZero) {
+TEST(AlwaysCombLowering, AlwaysCombAutoTriggerTimeZero) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -50,7 +50,7 @@ TEST(Lowerer, AlwaysCombAutoTriggerTimeZero) {
   EXPECT_EQ(b->value.ToUint64(), 42u);
 }
 
-TEST(Lowerer, SensitivityMapPopulated) {
+TEST(AlwaysCombLowering, SensitivityMapPopulated) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -67,7 +67,7 @@ TEST(Lowerer, SensitivityMapPopulated) {
   EXPECT_FALSE(procs.empty());
 }
 
-TEST(SchedulingSemanticsSim, InitialAndAlwaysCombConcurrent) {
+TEST(AlwaysCombSim, InitialAndAlwaysCombConcurrent) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -85,28 +85,7 @@ TEST(SchedulingSemanticsSim, InitialAndAlwaysCombConcurrent) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-TEST(SchedulingSemanticsSim, CombAndSequentialAbstractions) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, sum;\n"
-      "  initial begin\n"
-      "    a = 8'd3;\n"
-      "    b = 8'd4;\n"
-      "  end\n"
-      "  always_comb sum = a + b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sum");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 7u);
-}
-
-TEST(SchedulingSemanticsSim, ConcurrentAlwaysCombBlocks) {
+TEST(AlwaysCombSim, ConcurrentAlwaysCombBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -124,7 +103,7 @@ TEST(SchedulingSemanticsSim, ConcurrentAlwaysCombBlocks) {
   EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 12u);
 }
 
-TEST(SchedulingSemanticsSim, AlwaysCombWithBeginEnd) {
+TEST(AlwaysCombSim, AlwaysCombWithBeginEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -145,7 +124,7 @@ TEST(SchedulingSemanticsSim, AlwaysCombWithBeginEnd) {
   EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 7u);
 }
 
-TEST(AlwaysLatchSim, AlwaysCombTriggersAfterInitial) {
+TEST(AlwaysCombSim, AlwaysCombTriggersAfterInitial) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -164,7 +143,7 @@ TEST(AlwaysLatchSim, AlwaysCombTriggersAfterInitial) {
   EXPECT_EQ(b->value.ToUint64(), 99u);
 }
 
-TEST(AlwaysLatchSim, AlwaysCombRetriggersOnChange) {
+TEST(AlwaysCombSim, AlwaysCombRetriggersOnChange) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -186,7 +165,7 @@ TEST(AlwaysLatchSim, AlwaysCombRetriggersOnChange) {
   EXPECT_EQ(b->value.ToUint64(), 11u);
 }
 
-TEST(AlwaysLatchSim, AlwaysCombMuxPattern) {
+TEST(AlwaysCombSim, AlwaysCombMuxPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -231,6 +210,29 @@ TEST(AlwaysCombBasicSim, AlwaysCombResultWidth8) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
+TEST(AlwaysCombSim, AlwaysCombChainedDependency) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  always_comb b = a + 8'd1;\n"
+      "  always_comb c = b + 8'd1;\n"
+      "  initial begin\n"
+      "    a = 8'd0;\n"
+      "    #1 a = 8'd10;\n"
+      "    #1 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 12u);
 }
 
 }  // namespace

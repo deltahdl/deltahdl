@@ -4,21 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StratifiedSchedulerElaboration, AlwaysCombInfersSensitivityFromBody) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb b = a;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  EXPECT_FALSE(mod->processes[0].sensitivity.empty());
-}
-
 TEST(StratifiedSchedulerElaboration, AlwaysLatchInfersSensitivityFromBody) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -93,21 +78,6 @@ TEST(StratifiedSchedulerElaboration, FinalHasNoSensitivity) {
   EXPECT_TRUE(mod->processes[0].sensitivity.empty());
 }
 
-TEST(StratifiedSchedulerElaboration, AlwaysCombMultipleReadsInferMultipleSensitivities) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b, c;\n"
-      "  always_comb c = a + b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  EXPECT_GE(mod->processes[0].sensitivity.size(), 2u);
-}
-
 TEST(StratifiedSchedulerElaboration, AlwaysFFNegedgeSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -122,21 +92,6 @@ TEST(StratifiedSchedulerElaboration, AlwaysFFNegedgeSensitivity) {
   ASSERT_EQ(mod->processes.size(), 1u);
   ASSERT_FALSE(mod->processes[0].sensitivity.empty());
   EXPECT_EQ(mod->processes[0].sensitivity[0].edge, Edge::kNegedge);
-}
-
-TEST(StratifiedSchedulerElaboration, InferredSensitivityEdgeIsNone) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb b = a;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  ASSERT_FALSE(mod->processes[0].sensitivity.empty());
-  EXPECT_EQ(mod->processes[0].sensitivity[0].edge, Edge::kNone);
 }
 
 TEST(StratifiedSchedulerElaboration, AlwaysFFWithResetSensitivity) {
@@ -173,23 +128,6 @@ TEST(StratifiedSchedulerElaboration, AlwaysCombDoesNotIncludeWrittenVarsInSensit
 
   ASSERT_FALSE(mod->processes[0].sensitivity.empty());
   EXPECT_EQ(mod->processes[0].sensitivity.size(), 1u);
-}
-
-TEST(StratifiedSchedulerElaboration, MultipleAlwaysCombProcessesIndependentSensitivity) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b, c, d;\n"
-      "  always_comb c = a;\n"
-      "  always_comb d = b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 2u);
-  EXPECT_FALSE(mod->processes[0].sensitivity.empty());
-  EXPECT_FALSE(mod->processes[1].sensitivity.empty());
 }
 
 TEST(StratifiedSchedulerElaboration, PlainAlwaysWithStarSensitivity) {

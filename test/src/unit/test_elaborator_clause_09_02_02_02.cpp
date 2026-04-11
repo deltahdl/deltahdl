@@ -59,7 +59,7 @@ TEST(AlwaysLatchElaboration, ForkJoinInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(AlwaysLatchElaboration, IncompleteIfWarnsLatch) {
+TEST(AlwaysCombLatchWarning, IncompleteIfWarnsLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -72,7 +72,7 @@ TEST(AlwaysLatchElaboration, IncompleteIfWarnsLatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(AlwaysLatchElaboration, CompleteIfElseNoWarning) {
+TEST(AlwaysCombLatchWarning, CompleteIfElseNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -87,7 +87,7 @@ TEST(AlwaysLatchElaboration, CompleteIfElseNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(AlwaysLatchElaboration, CaseWithoutDefaultWarnsLatch) {
+TEST(AlwaysCombLatchWarning, CaseWithoutDefaultWarnsLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -104,7 +104,7 @@ TEST(AlwaysLatchElaboration, CaseWithoutDefaultWarnsLatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(AlwaysLatchElaboration, CaseWithDefaultNoWarning) {
+TEST(AlwaysCombLatchWarning, CaseWithDefaultNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -123,7 +123,7 @@ TEST(AlwaysLatchElaboration, CaseWithDefaultNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(AlwaysLatchElaboration, MultiDriverTwoAlwaysCombErrors) {
+TEST(AlwaysCombMultiDriver, MultiDriverTwoAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -135,7 +135,7 @@ TEST(AlwaysLatchElaboration, MultiDriverTwoAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(AlwaysLatchElaboration, MultiDriverCombAndContAssignErrors) {
+TEST(AlwaysCombMultiDriver, MultiDriverCombAndContAssignErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -147,7 +147,7 @@ TEST(AlwaysLatchElaboration, MultiDriverCombAndContAssignErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(AlwaysLatchElaboration, DifferentVarsInSeparateCombOk) {
+TEST(AlwaysCombMultiDriver, DifferentVarsInSeparateCombOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -160,7 +160,7 @@ TEST(AlwaysLatchElaboration, DifferentVarsInSeparateCombOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AlwaysLatchElaboration, AlwaysCombElaboratesToCorrectKind) {
+TEST(AlwaysCombElaboration, AlwaysCombElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -178,7 +178,7 @@ TEST(AlwaysLatchElaboration, AlwaysCombElaboratesToCorrectKind) {
   EXPECT_TRUE(found);
 }
 
-TEST(AlwaysLatchElaboration, AlwaysCombNoTimingControlNoZeroDelayWarning) {
+TEST(AlwaysCombElaboration, ValidAlwaysCombNoWarnings) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -563,20 +563,6 @@ TEST(AlwaysCombIfElseFalseBranch, AlwaysCombIfElseFalseBranch) {
   EXPECT_EQ(y->value.ToUint64(), 0xBBu);
 }
 
-TEST(AlwaysCombIsAlwaysCombKind, AlwaysCombIsAlwaysCombKind) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic a, y;\n"
-      "  always_comb y = a;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  ASSERT_FALSE(design->top_modules.empty());
-  auto& proc = design->top_modules[0]->processes[0];
-  EXPECT_EQ(proc.kind, RtlirProcessKind::kAlwaysComb);
-}
-
 TEST(AlwaysCombMuxIfElse, AlwaysCombMuxIfElse) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -605,7 +591,7 @@ TEST(AlwaysCombMuxIfElse, AlwaysCombMuxIfElse) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(AlwaysCombIfElse, AlwaysCombIfElseBranch) {
+TEST(AlwaysCombIfElse, AlwaysCombIfElseFalseBranch) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -657,46 +643,6 @@ TEST(AlwaysCombCaseDecode, AlwaysCombCaseDecode) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
-}
-
-TEST(AlwaysCombZeroAssignTime, AlwaysCombZeroAssignTime0) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] y;\n"
-      "  always_comb y = 0;\n"
-      "  initial #1 $finish;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0u);
-}
-
-TEST(AlwaysCombOutputAfterRun, AlwaysCombOutputAfterRun) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  always_comb result = 100;\n"
-      "  initial #1 $finish;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* result = f.ctx.FindVariable("result");
-  ASSERT_NE(result, nullptr);
-  EXPECT_EQ(result->value.ToUint64(), 100u);
 }
 
 TEST(AlwaysCombTimeZeroExecution, AlwaysCombTimeZeroExecution) {
@@ -756,6 +702,158 @@ TEST(AlwaysComb, SimpleExpression) {
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 7u);
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 8u);
+}
+
+TEST(AlwaysCombSensitivity, AlwaysCombInfersSensitivityFromBody) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb b = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->processes.size(), 1u);
+  EXPECT_FALSE(mod->processes[0].sensitivity.empty());
+}
+
+TEST(AlwaysCombSensitivity, AlwaysCombMultipleReadsInferMultipleSensitivities) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, c;\n"
+      "  always_comb c = a + b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->processes.size(), 1u);
+  EXPECT_GE(mod->processes[0].sensitivity.size(), 2u);
+}
+
+TEST(AlwaysCombSensitivity, InferredSensitivityEdgeIsNone) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb b = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->processes.size(), 1u);
+  ASSERT_FALSE(mod->processes[0].sensitivity.empty());
+  EXPECT_EQ(mod->processes[0].sensitivity[0].edge, Edge::kNone);
+}
+
+TEST(AlwaysCombSensitivity, MultipleAlwaysCombProcessesIndependentSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, c, d;\n"
+      "  always_comb c = a;\n"
+      "  always_comb d = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->processes.size(), 2u);
+  EXPECT_FALSE(mod->processes[0].sensitivity.empty());
+  EXPECT_FALSE(mod->processes[1].sensitivity.empty());
+}
+
+TEST(AlwaysCombMultiDriver, MultiDriverAlwaysCombAndAlwaysFFErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, y;\n"
+      "  always_comb y = a;\n"
+      "  always_ff @(posedge clk) y <= 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, MultiDriverAlwaysCombAndAlwaysLatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic en, a, y;\n"
+      "  always_comb y = a;\n"
+      "  always_latch if (en) y = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, SameVarWrittenTwiceInSameProcessOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic sel, a, b, y;\n"
+      "  always_comb begin\n"
+      "    y = a;\n"
+      "    if (sel) y = b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, IndependentElementsNoConflict) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_comb arr[0] = 8'd1;\n"
+      "  always_comb arr[1] = 8'd2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, OverlappingElementsConflict) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_comb arr[0] = 8'd1;\n"
+      "  always_comb arr[0] = 8'd2;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombMultiDriver, WholeArrayAndElementConflict) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] arr [0:1];\n"
+      "  always_comb arr[0] = 8'd1;\n"
+      "  always_comb arr = '{8'd3, 8'd4};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombLatchWarning, NestedIncompleteIfWarnsLatch) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, y;\n"
+      "  always_comb\n"
+      "    if (a)\n"
+      "      if (b) y = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
 }  // namespace

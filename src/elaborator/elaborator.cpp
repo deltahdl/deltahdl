@@ -530,6 +530,38 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
   mod->processes.push_back(proc);
 }
 
+static void CollectStmtLhsPrefixes(const Stmt* stmt,
+                                   std::unordered_set<std::string>& out) {
+  if (!stmt) return;
+  if (stmt->kind == StmtKind::kBlockingAssign ||
+      stmt->kind == StmtKind::kNonblockingAssign) {
+    if (stmt->lhs) {
+      std::string prefix = LongestStaticPrefix(stmt->lhs);
+      if (!prefix.empty()) out.insert(std::move(prefix));
+    }
+  }
+  for (const auto* s : stmt->stmts) CollectStmtLhsPrefixes(s, out);
+  CollectStmtLhsPrefixes(stmt->then_branch, out);
+  CollectStmtLhsPrefixes(stmt->else_branch, out);
+  CollectStmtLhsPrefixes(stmt->body, out);
+  CollectStmtLhsPrefixes(stmt->for_body, out);
+  for (auto* fi : stmt->for_inits) CollectStmtLhsPrefixes(fi, out);
+  for (auto* fs : stmt->for_steps) CollectStmtLhsPrefixes(fs, out);
+  for (const auto& ci : stmt->case_items) CollectStmtLhsPrefixes(ci.body, out);
+  for (const auto* s : stmt->fork_stmts) CollectStmtLhsPrefixes(s, out);
+}
+
+static bool PrefixesOverlap(const std::string& a, const std::string& b) {
+  if (a == b) return true;
+  if (a.size() < b.size())
+    return b.compare(0, a.size(), a) == 0 &&
+           (b[a.size()] == '.' || b[a.size()] == '[');
+  if (b.size() < a.size())
+    return a.compare(0, b.size(), b) == 0 &&
+           (a[b.size()] == '.' || a[b.size()] == '[');
+  return false;
+}
+
 struct ProcInfo {
   SourceLoc loc;
   std::unordered_set<std::string> lhs;
@@ -557,27 +589,29 @@ static void CollectProcessLhsInfo(
       ProcInfo info;
       info.loc = item->loc;
       info.kind = item->kind;
-      CollectWrittenNames(item->body, info.lhs);
+      CollectStmtLhsPrefixes(item->body, info.lhs);
       procs.push_back(std::move(info));
     }
     if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
-      const Expr* e = item->assign_lhs;
-      while (e->kind == ExprKind::kSelect && e->base) e = e->base;
-      if (e->kind == ExprKind::kIdentifier && !e->text.empty())
-        cont_assign_lhs.insert(std::string(e->text));
+      std::string prefix = LongestStaticPrefix(item->assign_lhs);
+      if (!prefix.empty()) cont_assign_lhs.insert(std::move(prefix));
     }
   }
 }
 
-static void CheckMultiProcDriver(const std::string& var, size_t i,
+static void CheckMultiProcDriver(const std::string& prefix, size_t i,
                                  const std::vector<ProcInfo>& procs,
                                  DiagEngine& diag) {
   for (size_t j = i + 1; j < procs.size(); ++j) {
-    if (procs[j].lhs.count(var)) {
-      diag.Error(procs[j].loc, std::format("variable '{}' driven by multiple "
-                                           "always_comb/always_latch/always_ff "
-                                           "processes",
-                                           var));
+    for (const auto& other : procs[j].lhs) {
+      if (PrefixesOverlap(prefix, other)) {
+        diag.Error(procs[j].loc,
+                   std::format("variable '{}' driven by multiple "
+                               "always_comb/always_latch/always_ff "
+                               "processes",
+                               prefix));
+        break;
+      }
     }
   }
 }
@@ -587,11 +621,14 @@ static void CheckDriverConflicts(
     const std::unordered_set<std::string>& cont_assign_lhs, DiagEngine& diag) {
   for (size_t i = 0; i < procs.size(); ++i) {
     for (const auto& var : procs[i].lhs) {
-      if (cont_assign_lhs.count(var)) {
-        diag.Error(procs[i].loc,
-                   std::format("variable '{}' driven by {} and "
-                               "continuous assignment",
-                               var, ProcessKindLabel(procs[i].kind)));
+      for (const auto& ca : cont_assign_lhs) {
+        if (PrefixesOverlap(var, ca)) {
+          diag.Error(procs[i].loc,
+                     std::format("variable '{}' driven by {} and "
+                                 "continuous assignment",
+                                 var, ProcessKindLabel(procs[i].kind)));
+          break;
+        }
       }
       CheckMultiProcDriver(var, i, procs, diag);
     }
