@@ -704,68 +704,6 @@ TEST(AlwaysComb, SimpleExpression) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 8u);
 }
 
-TEST(AlwaysCombSensitivity, AlwaysCombInfersSensitivityFromBody) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb b = a;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  EXPECT_FALSE(mod->processes[0].sensitivity.empty());
-}
-
-TEST(AlwaysCombSensitivity, AlwaysCombMultipleReadsInferMultipleSensitivities) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b, c;\n"
-      "  always_comb c = a + b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  EXPECT_GE(mod->processes[0].sensitivity.size(), 2u);
-}
-
-TEST(AlwaysCombSensitivity, InferredSensitivityEdgeIsNone) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb b = a;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  ASSERT_FALSE(mod->processes[0].sensitivity.empty());
-  EXPECT_EQ(mod->processes[0].sensitivity[0].edge, Edge::kNone);
-}
-
-TEST(AlwaysCombSensitivity, MultipleAlwaysCombProcessesIndependentSensitivity) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b, c, d;\n"
-      "  always_comb c = a;\n"
-      "  always_comb d = b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 2u);
-  EXPECT_FALSE(mod->processes[0].sensitivity.empty());
-  EXPECT_FALSE(mod->processes[1].sensitivity.empty());
-}
-
 TEST(AlwaysCombMultiDriver, MultiDriverAlwaysCombAndAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(

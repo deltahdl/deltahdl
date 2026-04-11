@@ -45,7 +45,9 @@ void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out) {
 
 void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
   if (!stmt) return;
-  CollectExprReads(stmt->condition, out);
+  if (stmt->kind != StmtKind::kWait) {
+    CollectExprReads(stmt->condition, out);
+  }
   CollectExprReads(stmt->rhs, out);
   CollectExprReads(stmt->expr, out);
   CollectExprReads(stmt->for_cond, out);
@@ -57,15 +59,11 @@ void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
   for (auto* fs : stmt->for_steps) CollectStmtReads(fs, out);
   CollectStmtReads(stmt->body, out);
   for (auto* s : stmt->fork_stmts) CollectStmtReads(s, out);
-  // §9.2.2.2.2: Case item patterns and bodies contribute to sensitivity.
   for (const auto& ci : stmt->case_items) {
     for (const auto* pat : ci.patterns) CollectExprReads(pat, out);
     CollectStmtReads(ci.body, out);
   }
-  // §9.2.2.2.2: Immediate assertion expressions contribute to sensitivity.
   CollectExprReads(stmt->assert_expr, out);
-  CollectStmtReads(stmt->assert_pass_stmt, out);
-  CollectStmtReads(stmt->assert_fail_stmt, out);
 }
 
 std::vector<std::string> CollectReadSignals(const Stmt* body) {
@@ -118,20 +116,101 @@ static void CollectBlockLocalNames(const Stmt* stmt,
   for (const auto& ci : stmt->case_items) CollectBlockLocalNames(ci.body, out);
 }
 
-std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena) {
-  auto signals = CollectReadSignals(body);
+static void CollectCallNamesFromExpr(
+    const Expr* expr, std::unordered_set<std::string_view>& out) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
+    out.insert(expr->callee);
+  }
+  CollectCallNamesFromExpr(expr->lhs, out);
+  CollectCallNamesFromExpr(expr->rhs, out);
+  CollectCallNamesFromExpr(expr->condition, out);
+  CollectCallNamesFromExpr(expr->true_expr, out);
+  CollectCallNamesFromExpr(expr->false_expr, out);
+  CollectCallNamesFromExpr(expr->base, out);
+  CollectCallNamesFromExpr(expr->index, out);
+  for (auto* arg : expr->args) CollectCallNamesFromExpr(arg, out);
+  for (auto* elem : expr->elements) CollectCallNamesFromExpr(elem, out);
+}
 
-  // §9.2.2.2.1(a): Exclude variables declared within the block.
+static void CollectCallNamesFromStmt(
+    const Stmt* stmt, std::unordered_set<std::string_view>& out) {
+  if (!stmt) return;
+  if (stmt->kind != StmtKind::kWait) {
+    CollectCallNamesFromExpr(stmt->condition, out);
+  }
+  CollectCallNamesFromExpr(stmt->rhs, out);
+  CollectCallNamesFromExpr(stmt->expr, out);
+  CollectCallNamesFromExpr(stmt->for_cond, out);
+  CollectCallNamesFromExpr(stmt->assert_expr, out);
+  for (auto* s : stmt->stmts) CollectCallNamesFromStmt(s, out);
+  CollectCallNamesFromStmt(stmt->then_branch, out);
+  CollectCallNamesFromStmt(stmt->else_branch, out);
+  CollectCallNamesFromStmt(stmt->for_body, out);
+  for (auto* fi : stmt->for_inits) CollectCallNamesFromStmt(fi, out);
+  for (auto* fs : stmt->for_steps) CollectCallNamesFromStmt(fs, out);
+  CollectCallNamesFromStmt(stmt->body, out);
+  for (auto* s : stmt->fork_stmts) CollectCallNamesFromStmt(s, out);
+  for (const auto& ci : stmt->case_items)
+    CollectCallNamesFromStmt(ci.body, out);
+}
+
+static std::unordered_set<std::string_view> ResolveCalledFunctions(
+    const Stmt* body, const FuncMap& funcs) {
+  std::unordered_set<std::string_view> visited;
+  std::unordered_set<std::string_view> pending;
+  CollectCallNamesFromStmt(body, pending);
+  while (!pending.empty()) {
+    std::unordered_set<std::string_view> next;
+    for (auto& name : pending) {
+      if (visited.count(name)) continue;
+      auto it = funcs.find(name);
+      if (it == funcs.end()) continue;
+      visited.insert(name);
+      for (auto* s : it->second->func_body_stmts) {
+        CollectCallNamesFromStmt(s, next);
+      }
+    }
+    pending = std::move(next);
+  }
+  return visited;
+}
+
+std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
+                                        const FuncMap* funcs) {
+  std::unordered_set<std::string> reads;
+  CollectStmtReads(body, reads);
+
   std::unordered_set<std::string> locals;
   CollectBlockLocalNames(body, locals);
 
-  // §9.2.2.2.1(b): Exclude variables also written within the block.
   std::unordered_set<std::string> written;
   CollectWrittenNames(body, written);
 
+  if (funcs && !funcs->empty()) {
+    auto called = ResolveCalledFunctions(body, *funcs);
+    for (auto& fname : called) {
+      auto it = funcs->find(fname);
+      if (it == funcs->end()) continue;
+      const auto* func = it->second;
+      for (auto* s : func->func_body_stmts) {
+        CollectStmtReads(s, reads);
+      }
+      for (const auto& arg : func->func_args) {
+        if (!arg.name.empty()) locals.insert(std::string(arg.name));
+      }
+      for (auto* s : func->func_body_stmts) {
+        CollectBlockLocalNames(s, locals);
+      }
+      for (auto* s : func->func_body_stmts) {
+        CollectWrittenNames(s, written);
+      }
+    }
+  }
+
   std::vector<EventExpr> events;
-  events.reserve(signals.size());
-  for (const auto& name : signals) {
+  events.reserve(reads.size());
+  for (const auto& name : reads) {
     if (locals.count(name)) continue;
     if (written.count(name)) continue;
     auto* expr = arena.Create<Expr>();

@@ -221,7 +221,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kAlwaysCombBlock:
     case ModuleItemKind::kAlwaysFFBlock:
     case ModuleItemKind::kAlwaysLatchBlock:
-      AddProcess(MapAlwaysKind(item->always_kind), item, mod, arena_, diag_);
+      AddProcess(MapAlwaysKind(item->always_kind), item, mod, arena_, diag_,
+                 &func_decls_);
       break;
     case ModuleItemKind::kModuleInst:
       ElaborateModuleInst(item, mod);

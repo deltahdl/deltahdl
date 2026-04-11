@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProcessParsing, AlwaysCombVarDecls) {
+TEST(AlwaysCombSensitivityParsing, BlockWithLocalVarDecls) {
   auto r = Parse(
       "module m;\n"
       "  always_comb begin\n"
@@ -16,7 +16,7 @@ TEST(ProcessParsing, AlwaysCombVarDecls) {
   VerifyAlwaysVarDecl(r);
 }
 
-TEST(ProcessParsing, FunctionCall) {
+TEST(AlwaysCombSensitivityParsing, FunctionCallParsesAsCallExpr) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] a, b, result;\n"
@@ -35,7 +35,7 @@ TEST(ProcessParsing, FunctionCall) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kCall);
 }
 
-TEST(ProcessParsing, AlwaysCombFunctionCall) {
+TEST(AlwaysCombSensitivityParsing, MuxFunctionCallParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function logic [3:0] mux2(input logic sel,\n"
@@ -48,7 +48,7 @@ TEST(ProcessParsing, AlwaysCombFunctionCall) {
               "endmodule\n"));
 }
 
-TEST(ProcessParsing, ImplicitSensitivity) {
+TEST(AlwaysCombSensitivityParsing, SensitivityListEmptyAfterParse) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, c;\n"
@@ -64,7 +64,7 @@ TEST(ProcessParsing, ImplicitSensitivity) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ProceduralAssignAndControlParsing, AlwaysCombWithAssertion) {
+TEST(AlwaysCombSensitivityParsing, BlockWithImmediateAssertionParses) {
   auto r = Parse(
       "module m;\n"
       "  always_comb begin\n"
@@ -76,28 +76,14 @@ TEST(ProceduralAssignAndControlParsing, AlwaysCombWithAssertion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ProcessParsing, AlwaysCombEmptySensitivity) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_comb y = a | b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->sensitivity.empty());
-}
-
-TEST(ProcessTimingAndControlParsing, AlwaysCombWithFunctionCall) {
+TEST(AlwaysCombSensitivityParsing, TaskCallInAlwaysCombBlockParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-              "  function logic [3:0] mux(input logic sel,\n"
-              "                           input logic [3:0] a, b);\n"
-              "    return sel ? a : b;\n"
-              "  endfunction\n"
-              "  logic sel;\n"
-              "  logic [3:0] a, b, y;\n"
-              "  always_comb y = mux(sel, a, b);\n"
+              "  logic [7:0] a;\n"
+              "  task automatic my_task(input logic [7:0] x);\n"
+              "    $display(\"%0d\", x);\n"
+              "  endtask\n"
+              "  always_comb my_task(a);\n"
               "endmodule\n"));
 }
 

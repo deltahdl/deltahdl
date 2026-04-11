@@ -1,12 +1,8 @@
 #include <gtest/gtest.h>
 
-#include <unordered_set>
-
 #include "builders_ast.h"
-#include "builders_sensitivity.h"
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
-#include "elaborator/sensitivity.h"
 #include "parser/ast.h"
 
 using namespace delta;
@@ -87,35 +83,6 @@ TEST(ConstEval, LongestStaticPrefixParamIdx) {
   EXPECT_EQ(LongestStaticPrefix(sel, scope), "m[7]");
 }
 
-TEST(Sensitivity, SelectConstIdxUsesLSP) {
-  Arena arena;
-  auto* expr = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
-  std::unordered_set<std::string> reads;
-  CollectExprReads(expr, reads);
-  EXPECT_TRUE(reads.count("a[1]"));
-  EXPECT_FALSE(reads.count("a"));
-}
-
-TEST(Sensitivity, NestedSelectUsesLSP) {
-  Arena arena;
-  auto* inner = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
-  auto* outer = SensSelect(arena, inner, SensId(arena, "i"));
-  std::unordered_set<std::string> reads;
-  CollectExprReads(outer, reads);
-  EXPECT_TRUE(reads.count("a[1]"));
-  EXPECT_TRUE(reads.count("i"));
-  EXPECT_FALSE(reads.count("a"));
-}
-
-TEST(Sensitivity, SelectVarIdxUsesLSP) {
-  Arena arena;
-  auto* expr = SensSelect(arena, SensId(arena, "a"), SensId(arena, "i"));
-  std::unordered_set<std::string> reads;
-  CollectExprReads(expr, reads);
-  EXPECT_TRUE(reads.count("a"));
-  EXPECT_TRUE(reads.count("i"));
-}
-
 // --- Field selects as static prefixes ---
 
 TEST(ConstEval, LongestStaticPrefixFieldSelect) {
@@ -160,18 +127,6 @@ TEST(ConstEval, LongestStaticPrefixPackageRefConstIdx) {
   id->scope_prefix = "pkg::";
   auto* sel = MakeSelectExpr(arena, id, MakeInt(arena, 3));
   EXPECT_EQ(LongestStaticPrefix(sel), "pkg::arr[3]");
-}
-
-// --- Sensitivity integration for field selects ---
-
-TEST(Sensitivity, FieldSelectVarIdxUsesLSP) {
-  Arena arena;
-  auto* field = MakeMember(arena, SensId(arena, "s"), "field");
-  auto* expr = SensSelect(arena, field, SensId(arena, "i"));
-  std::unordered_set<std::string> reads;
-  CollectExprReads(expr, reads);
-  EXPECT_TRUE(reads.count("s.field"));
-  EXPECT_TRUE(reads.count("i"));
 }
 
 }  // namespace

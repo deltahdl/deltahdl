@@ -500,8 +500,10 @@ static void ValidateFinalProcess(ModuleItem* item, const RtlirProcess& proc,
   }
 }
 
-void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
-                Arena& arena, DiagEngine& diag) {
+void AddProcess(
+    RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod, Arena& arena,
+    DiagEngine& diag,
+    const std::unordered_map<std::string_view, const ModuleItem*>* func_map) {
   RtlirProcess proc;
   proc.kind = kind;
   proc.body = item->body;
@@ -509,7 +511,7 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
   bool needs_infer = (kind == RtlirProcessKind::kAlwaysComb ||
                       kind == RtlirProcessKind::kAlwaysLatch);
   if (needs_infer && proc.sensitivity.empty()) {
-    proc.sensitivity = InferSensitivity(proc.body, arena);
+    proc.sensitivity = InferSensitivity(proc.body, arena, func_map);
   }
   // §9.2.2.1: Warn if a general-purpose always has no timing control.
   if (kind == RtlirProcessKind::kAlways && item->sensitivity.empty() &&

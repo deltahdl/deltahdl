@@ -460,8 +460,11 @@ std::vector<ResolvedAttribute> ResolveAttributes(
     const std::vector<Attribute>& attrs, DiagEngine& diag);
 uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
 RtlirProcessKind MapAlwaysKind(AlwaysKind ak);
-void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
-                Arena& arena, DiagEngine& diag);
+void AddProcess(
+    RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod, Arena& arena,
+    DiagEngine& diag,
+    const std::unordered_map<std::string_view, const ModuleItem*>* func_map =
+        nullptr);
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
 

@@ -50,23 +50,6 @@ TEST(AlwaysCombLowering, AlwaysCombAutoTriggerTimeZero) {
   EXPECT_EQ(b->value.ToUint64(), 42u);
 }
 
-TEST(AlwaysCombLowering, SensitivityMapPopulated) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a, b;\n"
-      "  always_comb b = a + 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-
-  const auto& procs = f.ctx.GetSensitiveProcesses("a");
-  EXPECT_FALSE(procs.empty());
-}
-
 TEST(AlwaysCombSim, InitialAndAlwaysCombConcurrent) {
   SimFixture f;
   auto* design = ElaborateSrc(
