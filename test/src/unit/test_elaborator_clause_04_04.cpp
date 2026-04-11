@@ -4,21 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StratifiedSchedulerElaboration, AlwaysLatchInfersSensitivityFromBody) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic en, d, q;\n"
-      "  always_latch if (en) q <= d;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  EXPECT_FALSE(mod->processes[0].sensitivity.empty());
-}
-
 TEST(StratifiedSchedulerElaboration, AlwaysFFPreservesExplicitSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(

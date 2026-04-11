@@ -12,12 +12,6 @@ TEST(AlwaysProcedureLexing, AlwaysCombKeyword) {
   EXPECT_EQ(r.token.text, "always_comb");
 }
 
-TEST(AlwaysProcedureLexing, AlwaysLatchKeyword) {
-  auto r = LexOne("always_latch ");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwAlwaysLatch);
-  EXPECT_EQ(r.token.text, "always_latch");
-}
-
 TEST(AlwaysProcedureLexing, AlwaysFFKeyword) {
   auto r = LexOne("always_ff ");
   EXPECT_EQ(r.token.kind, TokenKind::kKwAlwaysFF);

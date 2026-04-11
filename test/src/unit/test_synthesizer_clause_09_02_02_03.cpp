@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SynthLower, AlwaysLatchCreatesLatch) {
+TEST(AlwaysLatchSynthesis, AlwaysLatchCreatesLatch) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(input en, input d, output reg q);\n"

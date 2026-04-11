@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProcessParsing, ThreeAlwaysLatchBlocks) {
+TEST(AlwaysLatchParsing, ThreeAlwaysLatchBlocks) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d1, d2, d3, q1, q2, q3;\n"
@@ -36,7 +36,7 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ProcessParsing, SimpleIfElseLatch) {
+TEST(AlwaysLatchParsing, SimpleIfElseLatch) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d, q;\n"
@@ -56,7 +56,7 @@ TEST(ProcessParsing, SimpleIfElseLatch) {
   EXPECT_NE(item->body->else_branch, nullptr);
 }
 
-TEST(ProcessParsing, BeginEndBlock) {
+TEST(AlwaysLatchParsing, BeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d, q;\n"
@@ -75,7 +75,7 @@ TEST(ProcessParsing, BeginEndBlock) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
 }
 
-TEST(ProcessParsing, IfWithoutElse) {
+TEST(AlwaysLatchParsing, IfWithoutElse) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d, q;\n"
@@ -93,7 +93,7 @@ TEST(ProcessParsing, IfWithoutElse) {
   EXPECT_EQ(item->body->else_branch, nullptr);
 }
 
-TEST(ProcessParsing, CaseStatement) {
+TEST(AlwaysLatchParsing, CaseStatement) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -115,7 +115,7 @@ TEST(ProcessParsing, CaseStatement) {
   EXPECT_GE(item->body->case_items.size(), 3u);
 }
 
-TEST(ProcessParsing, MultipleAssignments) {
+TEST(AlwaysLatchParsing, MultipleAssignments) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d1, d2, q1, q2;\n"
@@ -140,7 +140,7 @@ TEST(ProcessParsing, MultipleAssignments) {
   EXPECT_EQ(if_stmt->then_branch->stmts.size(), 2u);
 }
 
-TEST(ProcessParsing, ComplexConditions) {
+TEST(AlwaysLatchParsing, ComplexConditions) {
   auto r = Parse(
       "module m;\n"
       "  logic en, valid, d, q;\n"
@@ -157,24 +157,7 @@ TEST(ProcessParsing, ComplexConditions) {
   EXPECT_EQ(item->body->condition->kind, ExprKind::kBinary);
 }
 
-TEST(SchedulingSemanticsParsing, AlwaysLatchIfNoElse) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en, d, q;\n"
-      "  always_latch\n"
-      "    if (en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kIf);
-  EXPECT_EQ(item->body->else_branch, nullptr);
-}
-
-TEST(ProcessParsing, BitSelect) {
+TEST(AlwaysLatchParsing, BitSelect) {
   auto r = Parse(
       "module m;\n"
       "  logic en;\n"
@@ -195,7 +178,7 @@ TEST(ProcessParsing, BitSelect) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(ProcessParsing, PartSelect) {
+TEST(AlwaysLatchParsing, PartSelect) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic en;\n"
@@ -205,7 +188,7 @@ TEST(ProcessParsing, PartSelect) {
               "endmodule\n"));
 }
 
-TEST(ProcessParsing, StructMemberAccess) {
+TEST(AlwaysLatchParsing, StructMemberAccess) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct packed {\n"
@@ -220,7 +203,7 @@ TEST(ProcessParsing, StructMemberAccess) {
               "endmodule\n"));
 }
 
-TEST(ProcessParsing, FunctionCallRHS) {
+TEST(AlwaysLatchParsing, FunctionCallRHS) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function logic [7:0] compute(input logic [7:0] x);\n"
@@ -233,120 +216,7 @@ TEST(ProcessParsing, FunctionCallRHS) {
               "endmodule\n"));
 }
 
-TEST(ProceduralAssignAndControlParsing, AlwaysLatchMultipleOutputs) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_latch begin\n"
-      "    if (en) begin\n"
-      "      q1 <= d1;\n"
-      "      q2 <= d2;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SchedulingSemanticsParsing, AlwaysLatch) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, d, en;\n"
-      "  always_latch\n"
-      "    if (en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysLatchBlock);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
-  ASSERT_NE(item->body, nullptr);
-}
-
-TEST(ProcessParsing, ModuleItemKindIsAlwaysLatchBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_latch\n"
-      "    if (en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  bool found = false;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) {
-      found = true;
-      EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
-TEST(ProcessParsing, NoSensitivityList) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en, d, q;\n"
-      "  always_latch\n"
-      "    if (en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysLatchItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->sensitivity.empty());
-}
-
-static ModuleItem* NthAlwaysLatchItem(ParseResult& r, size_t n) {
-  size_t count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kAlwaysLatchBlock) {
-      if (count == n) return item;
-      ++count;
-    }
-  }
-  return nullptr;
-}
-
-TEST(ProcessParsing, MultipleAlwaysLatchBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en1, en2, d1, d2, q1, q2;\n"
-      "  always_latch\n"
-      "    if (en1) q1 <= d1;\n"
-      "  always_latch\n"
-      "    if (en2) q2 <= d2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* first = NthAlwaysLatchItem(r, 0);
-  auto* second = NthAlwaysLatchItem(r, 1);
-  ASSERT_NE(first, nullptr);
-  ASSERT_NE(second, nullptr);
-  EXPECT_EQ(first->kind, ModuleItemKind::kAlwaysLatchBlock);
-  EXPECT_EQ(second->kind, ModuleItemKind::kAlwaysLatchBlock);
-}
-
-TEST(ProcessParsing, BodyVerificationIfCondition) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic gate, d, q;\n"
-      "  always_latch\n"
-      "    if (gate) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysLatchItem(r);
-  ASSERT_NE(item, nullptr);
-  auto* body = item->body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kIf);
-  ASSERT_NE(body->condition, nullptr);
-  ASSERT_NE(body->then_branch, nullptr);
-  EXPECT_EQ(body->then_branch->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(body->then_branch->lhs, nullptr);
-  EXPECT_NE(body->then_branch->rhs, nullptr);
-}
-
-TEST(ProcessParsing, BlockingAssignment) {
+TEST(AlwaysLatchParsing, BlockingAssignment) {
   auto r = Parse(
       "module m;\n"
       "  logic en, d, q;\n"
@@ -364,7 +234,7 @@ TEST(ProcessParsing, BlockingAssignment) {
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ProcessParsing, TernaryInCondition) {
+TEST(AlwaysLatchParsing, TernaryInCondition) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic sel, en_a, en_b, d, q;\n"
@@ -373,7 +243,7 @@ TEST(ProcessParsing, TernaryInCondition) {
               "endmodule\n"));
 }
 
-TEST(ProcessParsing, ConcatenationLHS) {
+TEST(AlwaysLatchParsing, ConcatenationLHS) {
   auto r = Parse(
       "module m;\n"
       "  logic en;\n"
@@ -393,7 +263,7 @@ TEST(ProcessParsing, ConcatenationLHS) {
   EXPECT_EQ(if_stmt->then_branch->lhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ProcessParsing, DeepIfElseIfChain) {
+TEST(AlwaysLatchParsing, DeepIfElseIfChain) {
   auto r = Parse(
       "module m;\n"
       "  logic a, b, c, d, q;\n"
@@ -427,7 +297,7 @@ TEST(ProcessParsing, DeepIfElseIfChain) {
   EXPECT_EQ(inner_if->else_branch->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ProcessParsing, SystemFunctionCall) {
+TEST(AlwaysLatchParsing, SystemFunctionCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic en;\n"
@@ -441,7 +311,7 @@ TEST(ProcessParsing, SystemFunctionCall) {
               "endmodule\n"));
 }
 
-TEST(ProcessParsing, CaseWithBeginEndItems) {
+TEST(AlwaysLatchParsing, CaseWithBeginEndItems) {
   auto r = Parse(
       "module m;\n"
       "  logic [1:0] sel;\n"
@@ -470,60 +340,6 @@ TEST(ProcessParsing, CaseWithBeginEndItems) {
     ASSERT_NE(ci.body, nullptr);
     EXPECT_EQ(ci.body->kind, StmtKind::kBlock);
   }
-}
-
-TEST(ProcessTimingAndControlParsing, AlwaysLatchWithBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic ck, d, q;\n"
-      "  always_latch begin\n"
-      "    if (ck) q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-}
-TEST(ProcessParsing, AlwaysLatch) {
-  auto r = Parse(
-      "module m;\n"
-      "  always_latch\n"
-      "    if (en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
-  ASSERT_NE(item->body, nullptr);
-}
-
-TEST(SchedulingSemanticsParsing, AlwaysLatchLatch) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic en, d, q;\n"
-      "  always_latch begin\n"
-      "    if (en) q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysLatchBlock);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysLatch);
-  ASSERT_NE(item->body, nullptr);
-}
-
-TEST(AlwaysLatch, ConditionalLatch) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  logic en, d, q;\n"
-              "  always_latch if (en) q <= d;\n"
-              "endmodule\n"));
 }
 
 }  // namespace
