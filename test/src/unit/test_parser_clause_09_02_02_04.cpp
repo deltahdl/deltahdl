@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProcessParsing, BlockInAlwaysFFWithSensitivity) {
+TEST(AlwaysFFParsing, BlockInAlwaysFFWithSensitivity) {
   auto r = Parse(
       "module m;\n"
       "  always_ff @(posedge clk or negedge rst_n) begin\n"
@@ -25,7 +25,7 @@ TEST(ProcessParsing, BlockInAlwaysFFWithSensitivity) {
   ASSERT_GE(item->body->stmts.size(), 1u);
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
 }
-TEST(Parser, AlwaysFFBlock) {
+TEST(AlwaysFFParsing, AlwaysFFBlock) {
   auto r = Parse(
       "module counter(input logic clk, rst);\n"
       "  logic [7:0] count;\n"
@@ -45,7 +45,7 @@ TEST(Parser, AlwaysFFBlock) {
   EXPECT_TRUE(found_ff);
 }
 
-TEST(AssignmentParsing, AlwaysFFResetPattern) {
+TEST(AlwaysFFParsing, AlwaysFFResetPattern) {
   auto r = Parse(
       "module m;\n"
       "  always_ff @(posedge clk or negedge rst_n) begin\n"
@@ -74,7 +74,7 @@ TEST(AssignmentParsing, AlwaysFFResetPattern) {
   EXPECT_EQ(if_stmt->else_branch->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(SchedulingSemanticsParsing, AlwaysFfWithIfElseChain) {
+TEST(AlwaysFFParsing, AlwaysFFParsingWithIfElseChain) {
   auto r = Parse(
       "module m;\n"
       "  logic clk, rst, d, q;\n"
@@ -94,7 +94,7 @@ TEST(SchedulingSemanticsParsing, AlwaysFfWithIfElseChain) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
 }
 
-TEST(DataTypeParsing, VarDrivenByAlwaysFF) {
+TEST(AlwaysFFParsing, VarDrivenByAlwaysFF) {
   auto r = Parse(
       "module t;\n"
       "  logic clk, q, d;\n"
@@ -112,7 +112,7 @@ TEST(DataTypeParsing, VarDrivenByAlwaysFF) {
   }
   EXPECT_TRUE(found_ff);
 }
-TEST(ProcessTimingAndControlParsing, AlwaysFFSimplePosedge) {
+TEST(AlwaysFFParsing, AlwaysFFSimplePosedge) {
   auto r = Parse(
       "module m;\n"
       "  logic clk;\n"
@@ -129,7 +129,7 @@ TEST(ProcessTimingAndControlParsing, AlwaysFFSimplePosedge) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
 }
 
-TEST(SchedulingSemanticsParsing, AlwaysFF) {
+TEST(AlwaysFFParsing, AlwaysFF) {
   auto r = Parse(
       "module m;\n"
       "  reg q, d, clk;\n"
@@ -145,14 +145,14 @@ TEST(SchedulingSemanticsParsing, AlwaysFF) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
 }
 
-TEST(ProcessTimingAndControlParsing, AlwaysFFWithNegedge) {
+TEST(AlwaysFFParsing, AlwaysFFWithNegedge) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  always_ff @(negedge clk)\n"
               "    q <= d;\n"
               "endmodule\n"));
 }
-TEST(ProcessParsing, AlwaysFF) {
+TEST(AlwaysFFParsing, AlwaysFF) {
   auto r = Parse(
       "module m;\n"
       "  always_ff @(posedge clk) q <= d;\n"
@@ -165,7 +165,7 @@ TEST(ProcessParsing, AlwaysFF) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
 }
 
-TEST(SchedulingSemanticsParsing, AlwaysFfFlipFlop) {
+TEST(AlwaysFFParsing, AlwaysFFParsingFlipFlop) {
   auto r = Parse(
       "module m;\n"
       "  logic clk, d, q;\n"
@@ -183,7 +183,7 @@ TEST(SchedulingSemanticsParsing, AlwaysFfFlipFlop) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
-TEST(AlwaysFf, PosedgeTriggered) {
+TEST(AlwaysFFParsing, PosedgeTriggered) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic clk, d, q;\n"

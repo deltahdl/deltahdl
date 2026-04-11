@@ -558,6 +558,62 @@ static void CollectStmtLhsPrefixes(const Stmt* stmt,
   for (const auto* s : stmt->fork_stmts) CollectStmtLhsPrefixes(s, out);
 }
 
+static void CollectCallNamesExpr(
+    const Expr* expr, std::unordered_set<std::string_view>& out) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty())
+    out.insert(expr->callee);
+  CollectCallNamesExpr(expr->lhs, out);
+  CollectCallNamesExpr(expr->rhs, out);
+  CollectCallNamesExpr(expr->condition, out);
+  CollectCallNamesExpr(expr->true_expr, out);
+  CollectCallNamesExpr(expr->false_expr, out);
+  CollectCallNamesExpr(expr->base, out);
+  CollectCallNamesExpr(expr->index, out);
+  for (auto* arg : expr->args) CollectCallNamesExpr(arg, out);
+  for (auto* elem : expr->elements) CollectCallNamesExpr(elem, out);
+}
+
+static void CollectCallNamesStmt(
+    const Stmt* stmt, std::unordered_set<std::string_view>& out) {
+  if (!stmt) return;
+  CollectCallNamesExpr(stmt->expr, out);
+  CollectCallNamesExpr(stmt->rhs, out);
+  CollectCallNamesExpr(stmt->condition, out);
+  CollectCallNamesExpr(stmt->for_cond, out);
+  for (const auto* s : stmt->stmts) CollectCallNamesStmt(s, out);
+  CollectCallNamesStmt(stmt->then_branch, out);
+  CollectCallNamesStmt(stmt->else_branch, out);
+  CollectCallNamesStmt(stmt->body, out);
+  CollectCallNamesStmt(stmt->for_body, out);
+  for (auto* fi : stmt->for_inits) CollectCallNamesStmt(fi, out);
+  for (auto* fs : stmt->for_steps) CollectCallNamesStmt(fs, out);
+  for (const auto& ci : stmt->case_items) CollectCallNamesStmt(ci.body, out);
+  for (const auto* s : stmt->fork_stmts) CollectCallNamesStmt(s, out);
+}
+
+static void CollectFuncLhsPrefixes(
+    const Stmt* body, const FuncMap& funcs,
+    std::unordered_set<std::string>& out) {
+  std::unordered_set<std::string_view> pending;
+  CollectCallNamesStmt(body, pending);
+  std::unordered_set<std::string_view> visited;
+  while (!pending.empty()) {
+    std::unordered_set<std::string_view> next;
+    for (auto& name : pending) {
+      if (visited.count(name)) continue;
+      visited.insert(name);
+      auto it = funcs.find(name);
+      if (it == funcs.end()) continue;
+      for (auto* s : it->second->func_body_stmts) {
+        CollectStmtLhsPrefixes(s, out);
+        CollectCallNamesStmt(s, next);
+      }
+    }
+    pending = std::move(next);
+  }
+}
+
 static bool PrefixesOverlap(const std::string& a, const std::string& b) {
   if (a == b) return true;
   if (a.size() < b.size())
@@ -588,7 +644,8 @@ static const char* ProcessKindLabel(ModuleItemKind k) {
 
 static void CollectProcessLhsInfo(
     const ModuleDecl* decl, std::vector<ProcInfo>& procs,
-    std::unordered_set<std::string>& cont_assign_lhs) {
+    std::unordered_set<std::string>& cont_assign_lhs,
+    const FuncMap* func_map) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
@@ -597,6 +654,8 @@ static void CollectProcessLhsInfo(
       info.loc = item->loc;
       info.kind = item->kind;
       CollectStmtLhsPrefixes(item->body, info.lhs);
+      if (func_map && !func_map->empty())
+        CollectFuncLhsPrefixes(item->body, *func_map, info.lhs);
       procs.push_back(std::move(info));
     }
     if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
@@ -648,7 +707,7 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
                                             RtlirModule* /*mod*/) {
   std::vector<ProcInfo> procs;
   std::unordered_set<std::string> cont_assign_lhs;
-  CollectProcessLhsInfo(decl, procs, cont_assign_lhs);
+  CollectProcessLhsInfo(decl, procs, cont_assign_lhs, &func_decls_);
   CheckDriverConflicts(procs, cont_assign_lhs, diag_);
 }
 

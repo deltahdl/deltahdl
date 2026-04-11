@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AlwaysBlockSim, TriggersOnPosedgeClock) {
+TEST(AlwaysFFSimulation, TriggersOnPosedgeClock) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -31,7 +31,7 @@ TEST(AlwaysBlockSim, TriggersOnPosedgeClock) {
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
-TEST(AlwaysBlockSim, AsyncResetPattern) {
+TEST(AlwaysFFSimulation, AsyncResetPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -61,7 +61,7 @@ TEST(AlwaysBlockSim, AsyncResetPattern) {
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
-TEST(AlwaysBlockSim, NonblockingAssignSemantics) {
+TEST(AlwaysFFSimulation, NonblockingAssignSemantics) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

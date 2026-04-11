@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SynthLower, AlwaysFFRegistersLatch) {
+TEST(AlwaysFFSynthesis, AlwaysFFRegistersLatch) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(input clk, input d, output reg q);\n"
@@ -17,7 +17,7 @@ TEST(SynthLower, AlwaysFFRegistersLatch) {
                            "  end\n"
                            "endmodule");
   ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
+  AlwaysFFSynthesis synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
   EXPECT_EQ(aig->outputs.size(), 1);

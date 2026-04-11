@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AlwaysBlockElaboration, MissingEventControlErrors) {
+TEST(AlwaysFFElaboration, MissingEventControlErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -15,7 +15,7 @@ TEST(AlwaysBlockElaboration, MissingEventControlErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(AlwaysBlockElaboration, BlockingTimingControlInBodyErrors) {
+TEST(AlwaysFFElaboration, BlockingTimingControlInBodyErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -26,7 +26,7 @@ TEST(AlwaysBlockElaboration, BlockingTimingControlInBodyErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(AlwaysBlockElaboration, ForkJoinInAlwaysFFErrors) {
+TEST(AlwaysFFElaboration, ForkJoinInAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -42,7 +42,7 @@ TEST(AlwaysBlockElaboration, ForkJoinInAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(AlwaysBlockElaboration, ValidPosedgeClockNoErrors) {
+TEST(AlwaysFFElaboration, ValidPosedgeClockNoErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -54,7 +54,7 @@ TEST(AlwaysBlockElaboration, ValidPosedgeClockNoErrors) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AlwaysBlockElaboration, ElaboratesToCorrectKind) {
+TEST(AlwaysFFElaboration, ElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -72,7 +72,7 @@ TEST(AlwaysBlockElaboration, ElaboratesToCorrectKind) {
   EXPECT_TRUE(found);
 }
 
-TEST(AlwaysBlockElaboration, SensitivityListPreserved) {
+TEST(AlwaysFFElaboration, SensitivityListPreserved) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -98,7 +98,7 @@ TEST(AlwaysBlockElaboration, SensitivityListPreserved) {
   EXPECT_TRUE(found);
 }
 
-TEST(AlwaysBlockElaboration, NoEdgeWarnsNotSequential) {
+TEST(AlwaysFFElaboration, NoEdgeWarnsNotSequential) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -111,7 +111,7 @@ TEST(AlwaysBlockElaboration, NoEdgeWarnsNotSequential) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(AlwaysBlockElaboration, PosedgeClockNoWarning) {
+TEST(AlwaysFFElaboration, PosedgeClockNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -124,7 +124,7 @@ TEST(AlwaysBlockElaboration, PosedgeClockNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-TEST(AlwaysBlockElaboration, MultiDriverTwoAlwaysFFErrors) {
+TEST(AlwaysFFElaboration, MultiDriverTwoAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -136,7 +136,7 @@ TEST(AlwaysBlockElaboration, MultiDriverTwoAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(AlwaysBlockElaboration, MultiDriverFFAndContAssignErrors) {
+TEST(AlwaysFFElaboration, MultiDriverFFAndContAssignErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -148,7 +148,7 @@ TEST(AlwaysBlockElaboration, MultiDriverFFAndContAssignErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(AlwaysBlockElaboration, MultiDriverFFAndCombErrors) {
+TEST(AlwaysFFElaboration, MultiDriverFFAndCombErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -160,7 +160,7 @@ TEST(AlwaysBlockElaboration, MultiDriverFFAndCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(AlwaysBlockElaboration, DifferentVarsInSeparateFFOk) {
+TEST(AlwaysFFElaboration, DifferentVarsInSeparateFFOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -173,23 +173,61 @@ TEST(AlwaysBlockElaboration, DifferentVarsInSeparateFFOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ParallelBlockElaboration, ForkInAlwaysFFErrors) {
+TEST(AlwaysFFElaboration, SecondEventControlInBodyErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
-      "  logic clk, a, b;\n"
+      "  logic clk, d, q;\n"
       "  always_ff @(posedge clk) begin\n"
-      "    fork\n"
-      "      a <= 1;\n"
-      "      b <= 0;\n"
-      "    join\n"
+      "    @(negedge clk) q <= d;\n"
       "  end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(WaitForkElaboration, WaitForkInAlwaysFFErrors) {
+TEST(AlwaysFFElaboration, WaitStatementInBodyErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, en, d, q;\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    wait (en);\n"
+      "    q <= d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysFFElaboration, MultiDriverFFAndLatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, en, d, q;\n"
+      "  always_ff @(posedge clk) q <= d;\n"
+      "  always_latch if (en) q = d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysFFElaboration, MultiDriverViaFunctionCallErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, d, q;\n"
+      "  function void set_q(input logic val);\n"
+      "    q = val;\n"
+      "  endfunction\n"
+      "  always_ff @(posedge clk) set_q(d);\n"
+      "  always_comb q = 0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysFFElaboration, WaitForkInAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
