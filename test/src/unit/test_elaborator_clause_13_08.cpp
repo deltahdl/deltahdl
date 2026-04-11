@@ -112,4 +112,46 @@ TEST(ParameterizedSubroutineElaboration, ParamInForLoopBound) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(ParameterizedSubroutineElaboration, DependentDefaultParamElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "virtual class C#(parameter DECODE_W = 8,\n"
+      "                 parameter ENCODE_W = $clog2(DECODE_W));\n"
+      "  static function logic [ENCODE_W-1:0] ENCODER_f(\n"
+      "      input logic [DECODE_W-1:0] DecodeIn);\n"
+      "    ENCODER_f = '0;\n"
+      "    for (int i = 0; i < DECODE_W; i++) begin\n"
+      "      if (DecodeIn[i]) begin\n"
+      "        ENCODER_f = i[ENCODE_W-1:0];\n"
+      "      end\n"
+      "    end\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  logic [7:0] encoder_in;\n"
+      "  logic [2:0] encoder_out;\n"
+      "  assign encoder_out = C#(8)::ENCODER_f(encoder_in);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ParameterizedSubroutineElaboration, NonVirtualClassElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C#(parameter W = 8);\n"
+      "  static function logic [W-1:0] identity(input logic [W-1:0] x);\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  logic [7:0] val;\n"
+      "  assign val = C#(8)::identity(8'hAB);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
