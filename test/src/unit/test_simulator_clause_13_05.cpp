@@ -499,4 +499,21 @@ TEST(SubroutineCallSim, FunctionOutputArgEndToEnd) {
   LowerRunAndCheck(f, design, {{"x", 21u}});
 }
 
+TEST(SubroutineCallSim, InoutCopyInOut) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  function void inc(inout logic [7:0] v);\n"
+      "    v = v + 8'd1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = 8'd10;\n"
+      "    inc(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"x", 11u}});
+}
+
 }  // namespace
