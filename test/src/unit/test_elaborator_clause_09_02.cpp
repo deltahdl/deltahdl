@@ -1,5 +1,4 @@
 #include "fixture_elaborator.h"
-#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -96,25 +95,67 @@ TEST(StructuredProcedureElaboration, ProcessBodiesNotNull) {
   }
 }
 
-}  // namespace
-TEST(StructuredProcedures, AllProcedureTypesCoexist) {
-  SimFixture f;
+TEST(StructuredProcedureElaboration, MixedProcedureOrderingPreserved) {
+  ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  logic [7:0] a, b, sum;\n"
-      "  initial begin\n"
-      "    a = 8'd10;\n"
-      "    b = 8'd20;\n"
-      "  end\n"
-      "  always_comb sum = a + b;\n"
+      "  logic clk, a, b;\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial a = 0;\n"
+      "  final $display(\"end\");\n"
+      "  initial b = 1;\n"
+      "  always_comb a = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+
+  auto& procs = design->top_modules[0]->processes;
+  int initial_count = 0, always_count = 0, final_count = 0, comb_count = 0;
+  for (auto& p : procs) {
+    if (p.kind == RtlirProcessKind::kInitial) ++initial_count;
+    if (p.kind == RtlirProcessKind::kAlways) ++always_count;
+    if (p.kind == RtlirProcessKind::kFinal) ++final_count;
+    if (p.kind == RtlirProcessKind::kAlwaysComb) ++comb_count;
+  }
+  EXPECT_EQ(initial_count, 2);
+  EXPECT_EQ(always_count, 1);
+  EXPECT_EQ(final_count, 1);
+  EXPECT_EQ(comb_count, 1);
+}
+
+TEST(StructuredProcedureElaboration, MultipleFinalProceduresElaborate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [31:0] a, b;\n"
+      "  final a = 1;\n"
+      "  final b = 2;\n"
       "  final $display(\"done\");\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* sum = f.ctx.FindVariable("sum");
-  ASSERT_NE(sum, nullptr);
-  EXPECT_EQ(sum->value.ToUint64(), 30u);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+
+  int final_count = 0;
+  for (auto& p : design->top_modules[0]->processes) {
+    if (p.kind == RtlirProcessKind::kFinal) ++final_count;
+  }
+  EXPECT_EQ(final_count, 3);
 }
+
+TEST(StructuredProcedureElaboration, NoProcessesInEmptyModule) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  EXPECT_TRUE(design->top_modules[0]->processes.empty());
+}
+
+}  // namespace

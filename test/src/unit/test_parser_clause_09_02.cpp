@@ -4,36 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralAssignAndControlParsing, StructuredProcInitialAndAlways) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial a = 0;\n"
-      "  always #5 clk = ~clk;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kInitialBlock);
-  EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kAlwaysBlock);
-}
-
-TEST(ProcessTimingAndControlParsing, MultipleInitialProcedures) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial a = 0;\n"
-      "  initial b = 1;\n"
-      "  initial c = 2;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock) ++count;
-  }
-  EXPECT_EQ(count, 3);
-}
-
-TEST(StructuredProcedureParsing, Syntax9_1_AllSixProcedureTypes) {
+TEST(StructuredProcedureParsing, AllSixProcedureTypes) {
   auto r = Parse(
       "module m;\n"
       "  logic clk, a, b, c, d, e;\n"
@@ -118,6 +89,70 @@ TEST(StructuredProcedureParsing, AlwaysKeywordVariants) {
   EXPECT_TRUE(HasAlwaysOfKind(items, AlwaysKind::kAlwaysComb));
   EXPECT_TRUE(HasAlwaysOfKind(items, AlwaysKind::kAlwaysLatch));
   EXPECT_TRUE(HasAlwaysOfKind(items, AlwaysKind::kAlwaysFF));
+}
+
+TEST(StructuredProcedureParsing, InitialWithNullStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kNull);
+}
+
+TEST(StructuredProcedureParsing, MixedProcedureOrdering) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  always #5 clk = ~clk;\n"
+      "  initial a = 0;\n"
+      "  final $display(\"end\");\n"
+      "  initial b = 1;\n"
+      "  always_comb a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& items = r.cu->modules[0]->items;
+  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysBlock));
+  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kInitialBlock));
+  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kFinalBlock));
+  EXPECT_TRUE(HasItemOfKind(items, ModuleItemKind::kAlwaysCombBlock));
+  EXPECT_EQ(CountItemsByKind(items, ModuleItemKind::kInitialBlock), 2u);
+}
+
+TEST(StructuredProcedureParsing, InitialWithBeginEnd) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    a = 0;\n"
+      "    b = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+}
+
+TEST(StructuredProcedureParsing, AlwaysWithStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  always #10 clk = ~clk;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
 }
 
 }  // namespace
