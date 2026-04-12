@@ -696,6 +696,13 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   }
   for (auto* seq_decl : mod->sequence_decls) {
     ctx_.RegisterSequenceDecl(seq_decl->name, seq_decl);
+    // §9.4.4: Create the __seq_ endpoint event variable so that
+    // wait(seq.triggered) and @(seq) can reference it immediately.
+    std::string ep_name = std::string("__seq_") + std::string(seq_decl->name);
+    if (!ctx_.FindVariable(ep_name)) {
+      auto* ep_var = ctx_.CreateVariable(ep_name, 1);
+      ep_var->is_event = true;
+    }
   }
   for (auto* cls : mod->class_decls) {
     LowerClassDecl(cls);

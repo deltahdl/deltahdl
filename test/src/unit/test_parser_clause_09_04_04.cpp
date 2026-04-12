@@ -64,4 +64,50 @@ TEST(ProcessTimingAndControlParsing, WaitTriggeredInLoop) {
               "endmodule\n"));
 }
 
+TEST(ProcessParsing, WaitSequenceTriggeredWithDirectBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence abc;\n"
+      "    @(posedge clk) a ##1 b ##1 c;\n"
+      "  endsequence\n"
+      "  initial\n"
+      "    wait(abc.triggered) $display(\"matched\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWait);
+  EXPECT_NE(stmt->body, nullptr);
+}
+
+TEST(ProcessParsing, WaitSequenceTriggeredNullBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence abc;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  initial\n"
+      "    wait(abc.triggered) ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kWait);
+}
+
+TEST(ProcessParsing, WaitSequenceTriggeredIfCheck) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence abc;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    wait(abc.triggered);\n"
+      "    if (abc.triggered) $display(\"ok\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+}
+
 }  // namespace

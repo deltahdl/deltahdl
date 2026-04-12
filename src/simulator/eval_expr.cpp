@@ -321,6 +321,14 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
     return MakeLogic4VecVal(arena, 1,
                             ctx.IsEventTriggered(base_name) ? 1u : 0u);
   }
+  // §9.4.4: sequence.triggered returns 1'b1 when the sequence has reached
+  // its endpoint in the current time step.
+  if (!base_var && field_name == "triggered" &&
+      ctx.FindSequenceDecl(base_name)) {
+    std::string ep_name = std::string("__seq_") + std::string(base_name);
+    return MakeLogic4VecVal(arena, 1,
+                            ctx.IsEventTriggered(ep_name) ? 1u : 0u);
+  }
   if (TryClassPropertyAccess(base_var, field_name, base_name, ctx, arena, out))
     return out;
   if (TryClassEnumAccess(base_var, field_name, ctx, arena, out)) return out;

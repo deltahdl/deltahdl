@@ -910,6 +910,25 @@ static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (labeled) ctx.PushStaticScope(stmt->label);
   std::unordered_set<std::string> reads;
   CollectExprReads(stmt->condition, reads);
+  // §9.4.4: Map sequence names to their __seq_ endpoint event variables so
+  // AnyChangeAwaiter watches the internal event rather than the (non-existent)
+  // sequence identifier.
+  std::unordered_set<std::string> seq_adds;
+  std::unordered_set<std::string> seq_removes;
+  for (const auto& name : reads) {
+    if (ctx.FindSequenceDecl(name)) {
+      std::string ep_name = "__seq_" + name;
+      auto* ep_var = ctx.FindVariable(ep_name);
+      if (!ep_var) {
+        ep_var = ctx.CreateVariable(ep_name, 1);
+        ep_var->is_event = true;
+      }
+      seq_adds.insert(ep_name);
+      seq_removes.insert(name);
+    }
+  }
+  for (const auto& r : seq_removes) reads.erase(r);
+  for (auto& a : seq_adds) reads.insert(std::move(a));
   std::vector<std::string_view> read_vars(reads.begin(), reads.end());
   while (!ctx.StopRequested()) {
     auto cond = EvalExpr(stmt->condition, ctx, arena);

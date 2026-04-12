@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(EventTriggeredElaboration, WaitSequenceTriggeredElaborates) {
+TEST(SequenceTriggeredElaboration, WaitSequenceTriggeredElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -21,7 +21,7 @@ TEST(EventTriggeredElaboration, WaitSequenceTriggeredElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(EventTriggeredElaboration, WaitMultipleTriggeredElaborates) {
+TEST(SequenceTriggeredElaboration, WaitMultipleTriggeredElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -41,7 +41,7 @@ TEST(EventTriggeredElaboration, WaitMultipleTriggeredElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(EventTriggeredElaboration, WaitTriggeredWithActionElaborates) {
+TEST(SequenceTriggeredElaboration, WaitTriggeredWithActionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -52,6 +52,68 @@ TEST(EventTriggeredElaboration, WaitTriggeredWithActionElaborates) {
       "  initial begin\n"
       "    wait(req_ack.triggered);\n"
       "    $display(\"handshake complete\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(SequenceTriggeredElaboration, WaitTriggeredInForkElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b, c, d;\n"
+      "  sequence s1;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  sequence s2;\n"
+      "    @(posedge clk) c ##1 d;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      wait(s1.triggered);\n"
+      "      wait(s2.triggered);\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(SequenceTriggeredElaboration, WaitTriggeredWithDirectBodyElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  sequence ab;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  initial\n"
+      "    wait(ab.triggered) $display(\"done\");\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(SequenceTriggeredElaboration, TriggeredCheckAfterWaitElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b, c, d;\n"
+      "  logic [7:0] which;\n"
+      "  sequence s1;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  sequence s2;\n"
+      "    @(posedge clk) c ##1 d;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    wait(s1.triggered || s2.triggered);\n"
+      "    if (s1.triggered) which = 8'd1;\n"
+      "    else if (s2.triggered) which = 8'd2;\n"
       "  end\n"
       "endmodule\n",
       f);
