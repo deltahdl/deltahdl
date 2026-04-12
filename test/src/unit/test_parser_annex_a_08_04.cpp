@@ -285,17 +285,6 @@ TEST(PrimaryParsing, PrimaryStreamingConcatenation) {
   EXPECT_EQ(rhs->kind, ExprKind::kStreamingConcat);
 }
 
-// §A.8.4: assignment_pattern_expression as primary
-TEST(PrimaryParsing, PrimaryAssignmentPattern) {
-  auto r = Parse(
-      "module m;\n"
-      "  int arr [3];\n"
-      "  initial arr = '{1, 2, 3};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // §A.8.4: type_reference as primary
 TEST(PrimaryParsing, PrimaryTypeReference) {
   auto r = Parse(

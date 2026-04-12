@@ -588,6 +588,19 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       }
     }
 
+    // §10.9: Assignment pattern expressions shall not be used in port
+    // expressions.
+    if (conn_expr) {
+      bool is_pattern = conn_expr->kind == ExprKind::kAssignmentPattern ||
+                        (conn_expr->kind == ExprKind::kCast && conn_expr->lhs &&
+                         conn_expr->lhs->kind == ExprKind::kAssignmentPattern);
+      if (is_pattern) {
+        diag_.Error(conn_expr->range.start,
+                    "assignment pattern expression shall not be used in a "
+                    "port expression");
+      }
+    }
+
     // §10.3.2: Track variables driven by module output ports.
     if (conn_expr && conn_expr->kind == ExprKind::kIdentifier &&
         binding.direction != Direction::kInput &&

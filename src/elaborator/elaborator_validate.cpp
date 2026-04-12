@@ -17,7 +17,8 @@ namespace delta {
 static bool IsTypeKeyword(std::string_view key) {
   return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
          key == "byte" || key == "shortint" || key == "longint" ||
-         key == "bit" || key == "real" || key == "shortreal" || key == "string";
+         key == "bit" || key == "real" || key == "shortreal" ||
+         key == "time" || key == "realtime" || key == "string";
 }
 
 // §5.11: Check if an assignment pattern is a replication or named form.
@@ -520,6 +521,33 @@ void Elaborator::ValidateInterconnectContAssign(const ModuleItem* item) {
   }
 }
 
+// §10.9: LHS assignment patterns shall use positional notation only.
+static void CheckLhsPatternNamedKeys(const Expr* lhs, DiagEngine& diag) {
+  if (!lhs) return;
+  const Expr* pat = lhs;
+  if (pat->kind == ExprKind::kCast && pat->lhs)
+    pat = pat->lhs;
+  if (pat->kind == ExprKind::kAssignmentPattern &&
+      !pat->pattern_keys.empty()) {
+    diag.Error(lhs->range.start,
+               "LHS assignment pattern shall use positional notation only");
+  }
+}
+
+static void WalkStmtsForLhsPatternKeys(const Stmt* s, DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    CheckLhsPatternNamedKeys(s->lhs, diag);
+  }
+  for (auto* sub : s->stmts) WalkStmtsForLhsPatternKeys(sub, diag);
+  WalkStmtsForLhsPatternKeys(s->then_branch, diag);
+  WalkStmtsForLhsPatternKeys(s->else_branch, diag);
+  WalkStmtsForLhsPatternKeys(s->body, diag);
+  WalkStmtsForLhsPatternKeys(s->for_body, diag);
+  for (auto& ci : s->case_items) WalkStmtsForLhsPatternKeys(ci.body, diag);
+}
+
 void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
   bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                  item->kind == ModuleItemKind::kInitialBlock;
@@ -528,6 +556,8 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
     // §6.6.8: interconnect cannot be target of force/release/assign/deassign.
     CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);
     CheckProceduralAssignLhs(item->body, diag_);
+    // §10.9: LHS assignment patterns must use positional notation.
+    WalkStmtsForLhsPatternKeys(item->body, diag_);
   }
   ValidateEdgeOnReal(item);
   ValidateChandleContAssign(item);
@@ -728,7 +758,7 @@ static bool ExprContainsHierRef(const Expr* e) {
 }
 
 void Elaborator::ValidateValueParams(const ModuleDecl* decl,
-                                     const RtlirModule* /*mod*/) {
+                                     const RtlirModule* mod) {
   // §6.20.2: Body value parameters must have a default value.
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kParamDecl) continue;
@@ -747,6 +777,15 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
       diag_.Error(item->loc,
                   std::format("parameter '{}' value contains a hierarchical "
                               "reference",
+                              item->name));
+    }
+    // §10.9: constant_assignment_pattern_expression elements must be constant.
+    if (item->is_localparam &&
+        item->init_expr->kind == ExprKind::kAssignmentPattern &&
+        !IsConstantExpr(item->init_expr, BuildParamScope(mod))) {
+      diag_.Error(item->loc,
+                  std::format("localparam '{}' initializer is not a constant "
+                              "expression",
                               item->name));
     }
   }

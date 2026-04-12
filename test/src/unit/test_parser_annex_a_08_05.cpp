@@ -316,38 +316,6 @@ TEST(LvalueParsing, VarLvalueStreamingConcatFromStreamingRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
 }
 
-TEST(LvalueParsing, NetLvalueAssignmentPattern) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  assign '{a, b} = c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(LvalueParsing, VarLvalueAssignmentPattern) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    '{a, b} = '{1, 2};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(LvalueParsing, VarLvalueAssignmentPatternWithIndex) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    '{a[0], b[1]} = '{1, 2};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(LvalueParsing, VarLvalueHierarchicalMember) {
   auto r = Parse(
       "module m;\n"

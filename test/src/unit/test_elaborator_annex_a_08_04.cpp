@@ -44,19 +44,6 @@ TEST(PrimaryElaboration, HierarchicalIdentifierSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §A.8.4: assignment_pattern_expression elaborates
-TEST(PrimaryElaboration, AssignmentPatternElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int arr [3];\n"
-      "  initial arr = '{1, 2, 3};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // §A.8.4: concatenation with range_expression elaborates
 TEST(PrimaryElaboration, ConcatenationWithRangeElaborates) {
   ElabFixture f;

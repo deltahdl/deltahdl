@@ -895,6 +895,10 @@ static bool IsAssignmentPatternKey(TokenKind k) {
     case TokenKind::kKwLongint:
     case TokenKind::kKwShortreal:
     case TokenKind::kKwInteger:
+    case TokenKind::kKwBit:
+    case TokenKind::kKwReg:
+    case TokenKind::kKwTime:
+    case TokenKind::kKwRealtime:
     case TokenKind::kKwString:
     case TokenKind::kStringLiteral:
       return true;

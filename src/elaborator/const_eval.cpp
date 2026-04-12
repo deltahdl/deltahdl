@@ -586,6 +586,8 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
       return IsConstantSysCallExpr(expr, scope);
     case ExprKind::kCast:
       return IsConstantExpr(expr->lhs, scope);
+    case ExprKind::kAssignmentPattern:
+      return AllElementsConstant(expr->elements, scope);
     default:
       return false;
   }
