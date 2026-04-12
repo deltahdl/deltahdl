@@ -302,22 +302,33 @@ static ExecTask ExecPriorityIf(const Stmt* stmt, SimContext& ctx,
 }
 
 static ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   auto qual = stmt->qualifier;
 
   if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
-    co_return co_await ExecUniqueIf(stmt, qual, ctx, arena);
+    auto r = co_await ExecUniqueIf(stmt, qual, ctx, arena);
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    co_return r;
   }
   if (qual == CaseQualifier::kPriority) {
-    co_return co_await ExecPriorityIf(stmt, ctx, arena);
+    auto r = co_await ExecPriorityIf(stmt, ctx, arena);
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    co_return r;
   }
 
   auto cond = EvalExpr(stmt->condition, ctx, arena);
   if (cond.IsTruthy()) {
-    co_return co_await ExecStmt(stmt->then_branch, ctx, arena);
+    auto r = co_await ExecStmt(stmt->then_branch, ctx, arena);
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    co_return r;
   }
   if (stmt->else_branch) {
-    co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
+    auto r = co_await ExecStmt(stmt->else_branch, ctx, arena);
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    co_return r;
   }
+  if (labeled) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
 }
 
@@ -557,13 +568,19 @@ static ExecTask ExecStandardCase(const Stmt* stmt, const Logic4Vec& sel,
 }
 
 static ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   auto qual = stmt->qualifier;
   auto sel = EvalExpr(stmt->condition, ctx, arena);
 
+  StmtResult r;
   if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
-    co_return co_await ExecUniqueCase(stmt, sel, qual, ctx, arena);
+    r = co_await ExecUniqueCase(stmt, sel, qual, ctx, arena);
+  } else {
+    r = co_await ExecStandardCase(stmt, sel, qual, ctx, arena);
   }
-  co_return co_await ExecStandardCase(stmt, sel, qual, ctx, arena);
+  if (labeled) ctx.PopStaticScope(stmt->label);
+  co_return r;
 }
 
 // --- Loops ---
@@ -589,6 +606,8 @@ static bool HasTypedForInit(const Stmt* stmt) {
 }
 
 static ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   bool scoped = HasTypedForInit(stmt);
   if (scoped) ctx.PushScope();
   CreateForInitVars(stmt, ctx);
@@ -603,62 +622,80 @@ static ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
       if (scoped) ctx.PopScope();
+      if (labeled) ctx.PopStaticScope(stmt->label);
       co_return result;
     }
     for (auto* step : stmt->for_steps)
       co_await ExecStmt(step, ctx, arena);
   }
   if (scoped) ctx.PopScope();
+  if (labeled) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
 }
 
 static ExecTask ExecWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   while (!ctx.StopRequested()) {
     auto cond = EvalExpr(stmt->condition, ctx, arena);
     if (!cond.IsTruthy()) break;
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
+      if (labeled) ctx.PopStaticScope(stmt->label);
       co_return result;
     }
   }
+  if (labeled) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
 }
 
 static ExecTask ExecForever(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   while (!ctx.StopRequested()) {
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
+      if (labeled) ctx.PopStaticScope(stmt->label);
       co_return result;
     }
   }
+  if (labeled) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
 }
 
 static ExecTask ExecRepeat(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   auto count_val = EvalExpr(stmt->condition, ctx, arena);
   uint64_t count = count_val.IsKnown() ? count_val.ToUint64() : 0;
   for (uint64_t i = 0; i < count && !ctx.StopRequested(); ++i) {
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
+      if (labeled) ctx.PopStaticScope(stmt->label);
       co_return result;
     }
   }
+  if (labeled) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
 }
 
 static ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   do {
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
+      if (labeled) ctx.PopStaticScope(stmt->label);
       co_return result;
     }
     auto cond = EvalExpr(stmt->condition, ctx, arena);
     if (!cond.IsTruthy()) break;
   } while (!ctx.StopRequested());
+  if (labeled) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
 }
 
@@ -686,6 +723,8 @@ static uint32_t GetArraySize(const Stmt* stmt, SimContext& ctx) {
 }
 
 static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   std::string arr_name = GetForeachArrayName(stmt->expr);
   if (!arr_name.empty()) {
     auto* aa = ctx.FindAssocArray(arr_name);
@@ -693,11 +732,15 @@ static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       ctx.GetDiag().Error(
           {}, "foreach not allowed on wildcard associative array '" +
                   arr_name + "'");
+      if (labeled) ctx.PopStaticScope(stmt->label);
       co_return StmtResult::kDone;
     }
   }
   uint32_t size = GetArraySize(stmt, ctx);
-  if (size == 0) co_return StmtResult::kDone;
+  if (size == 0) {
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    co_return StmtResult::kDone;
+  }
 
   // Determine loop variable name (first non-empty foreach_vars entry).
   std::string_view iter_name;
@@ -719,11 +762,13 @@ static ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
       ctx.PopScope();
+      if (labeled) ctx.PopStaticScope(stmt->label);
       co_return result;
     }
   }
 
   ctx.PopScope();
+  if (labeled) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
 }
 
@@ -846,18 +891,26 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
 // --- Wait (IEEE §9.4.3) ---
 
 static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   std::unordered_set<std::string> reads;
   CollectExprReads(stmt->condition, reads);
   std::vector<std::string_view> read_vars(reads.begin(), reads.end());
   while (!ctx.StopRequested()) {
     auto cond = EvalExpr(stmt->condition, ctx, arena);
     if (cond.ToUint64() != 0) break;
-    if (read_vars.empty()) co_return StmtResult::kDone;
+    if (read_vars.empty()) {
+      if (labeled) ctx.PopStaticScope(stmt->label);
+      co_return StmtResult::kDone;
+    }
     co_await AnyChangeAwaiter{ctx, read_vars};
   }
   if (stmt->body) {
-    co_return co_await ExecStmt(stmt->body, ctx, arena);
+    auto r = co_await ExecStmt(stmt->body, ctx, arena);
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    co_return r;
   }
+  if (labeled) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
 }
 
@@ -959,7 +1012,12 @@ static bool IsForkBlockItemDecl(const Stmt* s) {
 }
 
 static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  if (stmt->fork_stmts.empty()) co_return StmtResult::kDone;
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (stmt->fork_stmts.empty()) {
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    co_return StmtResult::kDone;
+  }
 
   // §9.3.2: Initialize block_item_declaration variables before spawning.
   uint32_t process_count = 0;
@@ -971,7 +1029,10 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
   }
 
-  if (process_count == 0) co_return StmtResult::kDone;
+  if (process_count == 0) {
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    co_return StmtResult::kDone;
+  }
 
   auto* state = arena.Create<ForkJoinState>();
   state->remaining = process_count;
@@ -990,6 +1051,7 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->join_kind != TokenKind::kKwJoinNone) {
     co_await ForkJoinAwaiter{state};
   }
+  if (labeled) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
 }
 

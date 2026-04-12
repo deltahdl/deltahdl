@@ -59,6 +59,7 @@ Stmt* Parser::ParseStmt() {
   if (Match(TokenKind::kSemicolon)) {
     auto* stmt = arena_.Create<Stmt>();
     stmt->kind = StmtKind::kNull;
+    stmt->label = prefix_label;
     stmt->attrs = std::move(attrs);
     return stmt;
   }

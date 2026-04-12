@@ -517,13 +517,21 @@ static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var,
 static bool ExecFuncIf(const Stmt* stmt, Variable* ret_var,
                        std::string_view func_name, SimContext& ctx,
                        Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   auto cond = EvalExpr(stmt->condition, ctx, arena);
   bool taken = cond.ToUint64() != 0;
-  if (taken)
-    return ExecFuncStmt(stmt->then_branch, ret_var, func_name, ctx, arena);
-  if (stmt->else_branch) {
-    return ExecFuncStmt(stmt->else_branch, ret_var, func_name, ctx, arena);
+  if (taken) {
+    bool r = ExecFuncStmt(stmt->then_branch, ret_var, func_name, ctx, arena);
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    return r;
   }
+  if (stmt->else_branch) {
+    bool r = ExecFuncStmt(stmt->else_branch, ret_var, func_name, ctx, arena);
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    return r;
+  }
+  if (labeled) ctx.PopStaticScope(stmt->label);
   return false;
 }
 
@@ -546,6 +554,8 @@ static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var,
 static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
                         std::string_view func_name, SimContext& ctx,
                         Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   bool scoped = false;
   for (const auto& t : stmt->for_init_types) {
     if (t.kind != DataTypeKind::kImplicit) { scoped = true; break; }
@@ -569,12 +579,14 @@ static bool ExecFuncFor(const Stmt* stmt, Variable* ret_var,
     if (stmt->for_body &&
         ExecFuncStmt(stmt->for_body, ret_var, func_name, ctx, arena)) {
       if (scoped) ctx.PopScope();
+      if (labeled) ctx.PopStaticScope(stmt->label);
       return true;
     }
     for (auto* step : stmt->for_steps)
       ExecFuncStmt(step, ret_var, func_name, ctx, arena);
   }
   if (scoped) ctx.PopScope();
+  if (labeled) ctx.PopStaticScope(stmt->label);
   return false;
 }
 
@@ -639,46 +651,63 @@ static std::string GetForeachArrayName(const Expr* expr) {
 static bool ExecFuncWhile(const Stmt* stmt, Variable* ret_var,
                           std::string_view func_name, SimContext& ctx,
                           Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   while (stmt->condition &&
          EvalExpr(stmt->condition, ctx, arena).IsTruthy()) {
     if (stmt->body &&
         ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
+      if (labeled) ctx.PopStaticScope(stmt->label);
       return true;
     }
   }
+  if (labeled) ctx.PopStaticScope(stmt->label);
   return false;
 }
 
 static bool ExecFuncDoWhile(const Stmt* stmt, Variable* ret_var,
                             std::string_view func_name, SimContext& ctx,
                             Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   do {
     if (stmt->body &&
         ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
+      if (labeled) ctx.PopStaticScope(stmt->label);
       return true;
     }
   } while (stmt->condition &&
            EvalExpr(stmt->condition, ctx, arena).IsTruthy());
+  if (labeled) ctx.PopStaticScope(stmt->label);
   return false;
 }
 
 static bool ExecFuncForever(const Stmt* stmt, Variable* ret_var,
                             std::string_view func_name, SimContext& ctx,
                             Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   for (;;) {
     if (stmt->body &&
         ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
+      if (labeled) ctx.PopStaticScope(stmt->label);
       return true;
     }
   }
+  if (labeled) ctx.PopStaticScope(stmt->label);
   return false;
 }
 
 static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
                             std::string_view func_name, SimContext& ctx,
                             Arena& arena) {
+  bool labeled = !stmt->label.empty();
+  if (labeled) ctx.PushStaticScope(stmt->label);
   std::string name = GetForeachArrayName(stmt->expr);
-  if (name.empty()) return false;
+  if (name.empty()) {
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    return false;
+  }
   uint32_t size = 0;
   auto* info = ctx.FindArrayInfo(name);
   if (info) {
@@ -687,7 +716,10 @@ static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
     auto* var = ctx.FindVariable(name);
     if (var) size = var->value.width;
   }
-  if (size == 0) return false;
+  if (size == 0) {
+    if (labeled) ctx.PopStaticScope(stmt->label);
+    return false;
+  }
 
   std::string_view iter_name;
   if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
@@ -707,11 +739,13 @@ static bool ExecFuncForeach(const Stmt* stmt, Variable* ret_var,
     if (stmt->body &&
         ExecFuncStmt(stmt->body, ret_var, func_name, ctx, arena)) {
       ctx.PopScope();
+      if (labeled) ctx.PopStaticScope(stmt->label);
       return true;
     }
   }
 
   ctx.PopScope();
+  if (labeled) ctx.PopStaticScope(stmt->label);
   return false;
 }
 

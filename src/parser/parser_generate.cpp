@@ -5,8 +5,30 @@ namespace delta {
 void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body) {
   // generate_block_or_null: ';' produces an empty body (§A.4.2)
   if (Match(TokenKind::kSemicolon)) return;
+
+  // §9.3.5: label before generate begin-end block (identifier ':' 'begin')
+  bool has_gen_label = false;
+  if (CheckIdentifier()) {
+    auto saved = lexer_.SavePos();
+    Consume();
+    if (Check(TokenKind::kColon)) {
+      Consume();
+      if (Check(TokenKind::kKwBegin)) {
+        has_gen_label = true;
+      } else {
+        lexer_.RestorePos(saved);
+      }
+    } else {
+      lexer_.RestorePos(saved);
+    }
+  }
+
   if (Match(TokenKind::kKwBegin)) {
-    if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
+    if (!has_gen_label && Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
+    if (has_gen_label && Check(TokenKind::kColon)) {
+      diag_.Error(CurrentLoc(),
+                  "cannot have both a generate block label and a block name");
+    }
     while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
       ParseModuleItem(body);
     }
