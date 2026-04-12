@@ -239,24 +239,6 @@ TEST(TimingControlSyntaxParsing, ClockingEventNegedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
 }
 
-TEST(TimingControlSyntaxParsing, EventExpressionOr) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(a or b) c = a & b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TimingControlSyntaxParsing, EventExpressionComma) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(a, b) c = a & b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(TimingControlSyntaxParsing, EventExpressionWithIff) {
   auto r = Parse(
       "module m;\n"
@@ -264,67 +246,6 @@ TEST(TimingControlSyntaxParsing, EventExpressionWithIff) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprOr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk_a or posedge clk_b) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 2u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_EQ(stmt->events[1].edge, Edge::kPosedge);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprComma) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(a, b, c) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 3u);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprMixedOrComma) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(a or b, c) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 3u);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprPosedgeComma) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge clk, negedge rstn) x <= 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 2u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
 }
 
 TEST(TimingControlSyntaxParsing, EventExprEdge) {
@@ -732,24 +653,6 @@ TEST(TimingControlSyntaxParsing, EventControlHierarchicalSignal) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-TEST(TimingControlSyntaxParsing, EventExprMultipleEdgesOrComma) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge a or negedge b, edge c or d) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 4u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
-  EXPECT_EQ(stmt->events[2].edge, Edge::kEdge);
-  EXPECT_EQ(stmt->events[3].edge, Edge::kNone);
-}
-
 TEST(TimingControlSyntaxParsing, EventExprMultipleIffGuards) {
   auto r = Parse(
       "module m;\n"
@@ -937,24 +840,6 @@ TEST(TimingControlSyntaxParsing, ParenthesizedEventExprNested) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   ASSERT_EQ(stmt->events.size(), 1u);
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-}
-
-TEST(TimingControlSyntaxParsing, ParenthesizedEventExprMixed) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @((posedge a or negedge b), c) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 3u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
-  EXPECT_EQ(stmt->events[2].edge, Edge::kNone);
 }
 
 }  // namespace

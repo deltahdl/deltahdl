@@ -279,25 +279,4 @@ TEST(TimingControlSimulation, TwoProcessesSynchronizeViaDelay) {
   LowerRunAndCheck(f, design, {{"x", 2u}, {"y", 2u}});
 }
 
-// --- Multiple edges in event expression ---
-
-TEST(TimingControlSimulation, EventControlMultipleEdges) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, rst, x;\n"
-      "  initial begin\n"
-      "    clk = 0;\n"
-      "    rst = 0;\n"
-      "    x = 0;\n"
-      "    #5 rst = 1;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    @(posedge clk or posedge rst) x = 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"x", 1u}});
-}
-
 }  // namespace

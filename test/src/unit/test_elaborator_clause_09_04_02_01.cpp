@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ImplicitEventExprElaboration, OrSeparatedSensitivityElaborates) {
+TEST(EventOrOperatorElaboration, OrSeparatedSensitivityElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -16,7 +16,7 @@ TEST(ImplicitEventExprElaboration, OrSeparatedSensitivityElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ImplicitEventExprElaboration, CommaSeparatedSensitivityElaborates) {
+TEST(EventOrOperatorElaboration, CommaSeparatedSensitivityElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -28,7 +28,7 @@ TEST(ImplicitEventExprElaboration, CommaSeparatedSensitivityElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ImplicitEventExprElaboration, MixedOrAndCommaElaborates) {
+TEST(EventOrOperatorElaboration, MixedOrAndCommaElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -40,7 +40,7 @@ TEST(ImplicitEventExprElaboration, MixedOrAndCommaElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ImplicitEventExprElaboration, EdgeEventsWithOrElaborates) {
+TEST(EventOrOperatorElaboration, EdgeEventsWithOrElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -52,7 +52,7 @@ TEST(ImplicitEventExprElaboration, EdgeEventsWithOrElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ImplicitEventExprElaboration, SensitivityListPreservedInRtlir) {
+TEST(EventOrOperatorElaboration, SensitivityListPreservedInRtlir) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -70,6 +70,38 @@ TEST(ImplicitEventExprElaboration, SensitivityListPreservedInRtlir) {
       EXPECT_EQ(p.sensitivity.size(), 2u);
     }
   }
+}
+
+TEST(EventOrOperatorElaboration, CommaSensitivityCountPreserved) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, c, d, e, y;\n"
+      "  always @(a, b, c, d, e) y = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& procs = design->top_modules[0]->processes;
+  ASSERT_EQ(procs.size(), 1u);
+  EXPECT_EQ(procs[0].sensitivity.size(), 5u);
+}
+
+TEST(EventOrOperatorElaboration, MixedOrCommaCountPreserved) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, c, d, e, y;\n"
+      "  always @(a or b, c, d or e) y = a;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& procs = design->top_modules[0]->processes;
+  ASSERT_EQ(procs.size(), 1u);
+  EXPECT_EQ(procs[0].sensitivity.size(), 5u);
 }
 
 }  // namespace

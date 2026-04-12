@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProcessTimingAndControlParsing, EventControlMultipleOrExpressions) {
+TEST(EventOrOperatorParsing, EventControlMultipleOrExpressions) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -19,7 +19,7 @@ TEST(ProcessTimingAndControlParsing, EventControlMultipleOrExpressions) {
   EXPECT_GE(stmt->events.size(), 3u);
 }
 
-TEST(ProcessTimingAndControlParsing, EventControlMixedEdgesComma) {
+TEST(EventOrOperatorParsing, EventControlMixedEdgesComma) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -36,7 +36,7 @@ TEST(ProcessTimingAndControlParsing, EventControlMixedEdgesComma) {
   EXPECT_EQ(stmt->events[2].edge, Edge::kNone);
 }
 
-TEST(SchedulingSemanticsParsing, MultipleEventControlInAlways) {
+TEST(EventOrOperatorParsing, OrInAlwaysSensitivityList) {
   auto r = Parse(
       "module m;\n"
       "  reg clk, rst, a;\n"
@@ -56,7 +56,7 @@ TEST(SchedulingSemanticsParsing, MultipleEventControlInAlways) {
   EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
 }
 
-TEST(InterprocessSyncParsing, WaitForEventOrExpr) {
+TEST(EventOrOperatorParsing, OrWithNamedEvents) {
   auto r = Parse(
       "module m;\n"
       "  event e1, e2;\n"
@@ -70,7 +70,7 @@ TEST(InterprocessSyncParsing, WaitForEventOrExpr) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   EXPECT_GE(stmt->events.size(), 2u);
 }
-TEST(ProcessParsing, EventControlMultiple) {
+TEST(EventOrOperatorParsing, OrWithEdgeQualifiedSignals) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -88,7 +88,7 @@ TEST(ProcessParsing, EventControlMultiple) {
   }
 }
 
-TEST(ProcessParsing, EventControlComma) {
+TEST(EventOrOperatorParsing, EventControlComma) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -100,6 +100,83 @@ TEST(ProcessParsing, EventControlComma) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   ASSERT_GE(stmt->events.size(), 2u);
+}
+
+TEST(EventOrOperatorParsing, EventExprMixedOrComma) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(a or b, c) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->events.size(), 3u);
+}
+
+TEST(EventOrOperatorParsing, EventExprMultipleEdgesOrComma) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge a or negedge b, edge c or d) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->events.size(), 4u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
+  EXPECT_EQ(stmt->events[2].edge, Edge::kEdge);
+  EXPECT_EQ(stmt->events[3].edge, Edge::kNone);
+}
+
+TEST(EventOrOperatorParsing, ParenthesizedOrGroupWithComma) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @((posedge a or negedge b), c) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 3u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+  EXPECT_EQ(stmt->events[1].edge, Edge::kNegedge);
+  EXPECT_EQ(stmt->events[2].edge, Edge::kNone);
+}
+
+TEST(EventOrOperatorParsing, FiveSignalCommaSeparated) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(a, b, c, d, e) x = a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 5u);
+  for (size_t i = 0; i < 5; ++i) {
+    EXPECT_EQ(item->sensitivity[i].edge, Edge::kNone) << "event " << i;
+  }
+}
+
+TEST(EventOrOperatorParsing, InterleavedOrGroupsWithComma) {
+  auto r = Parse(
+      "module m;\n"
+      "  always @(a or b, c, d or e) x = a;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->sensitivity.size(), 5u);
 }
 
 }  // namespace
