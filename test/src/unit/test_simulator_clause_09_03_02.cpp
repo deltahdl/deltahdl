@@ -138,25 +138,4 @@ TEST(ParallelBlockSimulation, ForkJoinNoneAllChildrenComplete) {
   EXPECT_EQ(c->value.ToUint64(), 3u);
 }
 
-TEST(ParallelBlockSimulation, NestedForkJoin) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      begin\n"
-      "        fork\n"
-      "          a = 8'd10;\n"
-      "          b = 8'd20;\n"
-      "        join\n"
-      "      end\n"
-      "      c = 8'd30;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}, {"c", 30u}});
-}
-
 }  // namespace

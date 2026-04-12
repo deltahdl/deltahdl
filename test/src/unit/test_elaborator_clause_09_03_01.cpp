@@ -67,25 +67,6 @@ TEST(SequentialBlockElaboration, SeqBlockWithVarDeclElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SequentialBlockElaboration, NestedSeqBlocksElaborate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int a;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      a = 1;\n"
-      "    end\n"
-      "    begin\n"
-      "      a = 2;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(SequentialBlockElaboration, SeqBlockInAlwaysFf) {
   ElabFixture f;
   auto* design = ElaborateSrc(

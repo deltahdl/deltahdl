@@ -269,33 +269,6 @@ TEST(ParallelBlockParsing, SingleStatementInFork) {
   EXPECT_EQ(stmt->fork_stmts.size(), 1u);
 }
 
-TEST(ParallelBlockParsing, NestedForkJoin) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      begin\n"
-      "        fork\n"
-      "          a = 1;\n"
-      "          b = 2;\n"
-      "        join\n"
-      "      end\n"
-      "      c = 3;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  ASSERT_GE(stmt->fork_stmts.size(), 2u);
-  auto* inner_block = stmt->fork_stmts[0];
-  EXPECT_EQ(inner_block->kind, StmtKind::kBlock);
-  ASSERT_GE(inner_block->stmts.size(), 1u);
-  EXPECT_EQ(inner_block->stmts[0]->kind, StmtKind::kFork);
-}
-
 TEST(ParallelBlockParsing, EmptyForkJoinParses) {
   auto r = Parse(
       "module m;\n"

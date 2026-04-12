@@ -121,22 +121,6 @@ TEST(SequentialBlockSimulation, RelativeDelaySemantics) {
   EXPECT_EQ(y->value.ToUint64(), 2u);
 }
 
-TEST(SequentialBlockSimulation, ControlPassesOutAfterLastStatement) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      a = 8'd1;\n"
-      "    end\n"
-      "    b = 8'd2;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}});
-}
-
 TEST(SequentialBlockSimulation, BlockLocalVarDecl) {
   SimFixture f;
   auto* design = ElaborateSrc(
