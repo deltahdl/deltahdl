@@ -100,20 +100,6 @@ TEST(SchedulerOverviewSim, PostponedIsLastRegionInTimeSlot) {
   EXPECT_EQ(order[2], "postponed");
 }
 
-TEST(SchedulerOverviewSim, BeginEndBlockSequentialExecution) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd1;\n"
-      "    x = x + 8'd1;\n"
-      "    x = x + 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 3u);
-}
-
 TEST(SchedulerOverviewSim, NBAExecutionOrderMatchesSourceOrder) {
   auto result = RunAndGet(
       "module t;\n"

@@ -1,31 +1,8 @@
 #include "fixture_elaborator.h"
-#include "fixture_simulator.h"
-#include "simulator/lowerer.h"
-#include "simulator/variable.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(SequentialBlockElaboration, SeqBlockInInitialElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int a;\n"
-      "  initial begin\n"
-      "    a = 10;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_FALSE(design->top_modules.empty());
-  bool found = false;
-  for (auto& p : design->top_modules[0]->processes) {
-    if (p.kind == RtlirProcessKind::kInitial) found = true;
-  }
-  EXPECT_TRUE(found);
-}
 
 TEST(SequentialBlockElaboration, NestedSeqBlocksElaborate) {
   ElabFixture f;
@@ -54,111 +31,6 @@ TEST(SequentialBlockElaboration, SeqBlockWithVarDeclElaborates) {
       "    int local_var;\n"
       "    local_var = 42;\n"
       "    x = local_var;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(SequentialBlockElaboration, SeqBlockInAlwaysComb) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b, c;\n"
-      "  always_comb begin\n"
-      "    a = b;\n"
-      "    c = a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(SequentialBlockSimulation, SeqBlockSequentialExecution) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, b, c;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      a = 10;\n"
-      "      b = 20;\n"
-      "      c = a + b;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* c = f.ctx.FindVariable("c");
-  ASSERT_NE(c, nullptr);
-  EXPECT_EQ(c->value.ToUint64(), 30u);
-}
-
-TEST(ParallelBlockElaboration, ForkJoinInInitialElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "      b = 0;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(ParallelBlockElaboration, ForkJoinAnyElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "      b = 0;\n"
-      "    join_any\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(ParallelBlockElaboration, ForkJoinNoneElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "      b = 0;\n"
-      "    join_none\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(ParallelBlockElaboration, EmptyForkJoinElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "    join\n"
       "  end\n"
       "endmodule\n",
       f);

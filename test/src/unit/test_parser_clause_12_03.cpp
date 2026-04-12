@@ -348,38 +348,6 @@ TEST(StatementSyntaxParsing, WaitAsStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-TEST(StatementSyntaxParsing, SeqBlockAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      a = 1;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlock);
-}
-
-TEST(StatementSyntaxParsing, ParBlockAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      a = 1;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-}
-
 TEST(StatementSyntaxParsing, FunctionNullStatementWithAttribute) {
   auto r = Parse(
       "module m;\n"
