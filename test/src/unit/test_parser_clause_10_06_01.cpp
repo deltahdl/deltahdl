@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, ProceduralAssign_WithBitSelect) {
+TEST(ProceduralAssignDeassignParsing, AssignWithBitSelectLhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin assign q[0] = d; end\n"
@@ -17,7 +17,7 @@ TEST(ProceduralBlockSyntaxParsing, ProceduralAssign_WithBitSelect) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(AssignmentParsing, AssignInTaskBody) {
+TEST(ProceduralAssignDeassignParsing, AssignInTaskBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  reg q;\n"
@@ -30,7 +30,7 @@ TEST(AssignmentParsing, AssignInTaskBody) {
               "endmodule\n"));
 }
 
-TEST(AssignmentParsing, InterleavedWithNonblocking) {
+TEST(ProceduralAssignDeassignParsing, InterleavedWithNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  reg q, d;\n"
@@ -50,7 +50,7 @@ TEST(AssignmentParsing, InterleavedWithNonblocking) {
   EXPECT_EQ(s3->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(AssignmentParsing, FullDFlipFlopPattern) {
+TEST(ProceduralAssignDeassignParsing, FullDFlipFlopPattern) {
   auto r = Parse(
       "module dff_full(output reg q, input d, clr, pre, clk);\n"
       "  always @(clr or pre) begin\n"
@@ -76,7 +76,7 @@ TEST(AssignmentParsing, FullDFlipFlopPattern) {
   EXPECT_GE(always_count, 2);
 }
 
-TEST(AssignmentParsing, AssignInAlwaysBlock) {
+TEST(ProceduralAssignDeassignParsing, AssignInAlwaysBlock) {
   auto r = Parse(
       "module dff(output q, input d, clear, preset, clock);\n"
       "  logic q;\n"
@@ -90,7 +90,7 @@ TEST(AssignmentParsing, AssignInAlwaysBlock) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->name, "dff");
 }
-TEST(AssignmentParsing, AssignConcatLhs) {
+TEST(ProceduralAssignDeassignParsing, AssignConcatLhs) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -106,7 +106,7 @@ TEST(AssignmentParsing, AssignConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(AssignmentParsing, AssignInInitialBlock) {
+TEST(ProceduralAssignDeassignParsing, AssignInInitialBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg q;\n"
@@ -124,7 +124,7 @@ TEST(AssignmentParsing, AssignInInitialBlock) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(AssignmentParsing, DeassignInInitialBlock) {
+TEST(ProceduralAssignDeassignParsing, DeassignInInitialBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg q;\n"
@@ -142,7 +142,7 @@ TEST(AssignmentParsing, DeassignInInitialBlock) {
   EXPECT_EQ(stmt->rhs, nullptr);
 }
 
-TEST(AssignmentParsing, AssignExpressionRhs) {
+TEST(ProceduralAssignDeassignParsing, AssignExpressionRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] a, b, c;\n"
@@ -159,7 +159,7 @@ TEST(AssignmentParsing, AssignExpressionRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-TEST(AssignmentParsing, AssignConcatenationRhs) {
+TEST(ProceduralAssignDeassignParsing, AssignConcatenationRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [3:0] out;\n"
@@ -177,7 +177,7 @@ TEST(AssignmentParsing, AssignConcatenationRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(AssignmentParsing, AssignBitSelect) {
+TEST(ProceduralAssignDeassignParsing, AssignBitSelect) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] data;\n"
@@ -195,7 +195,7 @@ TEST(AssignmentParsing, AssignBitSelect) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(AssignmentParsing, AssignPartSelect) {
+TEST(ProceduralAssignDeassignParsing, AssignPartSelect) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] data;\n"
@@ -213,7 +213,7 @@ TEST(AssignmentParsing, AssignPartSelect) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(AssignmentParsing, AssignConcatLhsThreeRegs) {
+TEST(ProceduralAssignDeassignParsing, AssignConcatLhsThreeRegs) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -231,7 +231,7 @@ TEST(AssignmentParsing, AssignConcatLhsThreeRegs) {
   EXPECT_EQ(stmt->lhs->elements.size(), 3u);
 }
 
-TEST(AssignmentParsing, DeassignConcatLhsThreeRegs) {
+TEST(ProceduralAssignDeassignParsing, DeassignConcatLhsThreeRegs) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -249,7 +249,7 @@ TEST(AssignmentParsing, DeassignConcatLhsThreeRegs) {
   EXPECT_EQ(stmt->lhs->elements.size(), 3u);
 }
 
-TEST(AssignmentParsing, AssignInIfElse) {
+TEST(ProceduralAssignDeassignParsing, AssignInIfElse) {
   auto r = Parse(
       "module m;\n"
       "  reg q, sel;\n"
@@ -271,7 +271,7 @@ TEST(AssignmentParsing, AssignInIfElse) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kAssign);
 }
 
-TEST(AssignmentParsing, AssignInCase) {
+TEST(ProceduralAssignDeassignParsing, AssignInCase) {
   auto r = Parse(
       "module m;\n"
       "  reg [1:0] sel;\n"
@@ -296,7 +296,7 @@ TEST(AssignmentParsing, AssignInCase) {
 }
 
 
-TEST(AssignmentParsing, AssignInAlwaysWithEvent) {
+TEST(ProceduralAssignDeassignParsing, AssignInAlwaysWithEvent) {
   auto r = Parse(
       "module m;\n"
       "  reg q, clear;\n"
@@ -319,7 +319,7 @@ TEST(AssignmentParsing, AssignInAlwaysWithEvent) {
   ASSERT_NE(always_item->body, nullptr);
 }
 
-TEST(AssignmentParsing, MultipleAssignsDifferentVars) {
+TEST(ProceduralAssignDeassignParsing, MultipleAssignsDifferentVars) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -345,7 +345,7 @@ TEST(AssignmentParsing, MultipleAssignsDifferentVars) {
   EXPECT_EQ(s2->lhs->text, "c");
 }
 
-TEST(AssignmentParsing, DeassignThenProceduralAssign) {
+TEST(ProceduralAssignDeassignParsing, DeassignThenProceduralAssign) {
   auto r = Parse(
       "module m;\n"
       "  reg q;\n"
@@ -364,7 +364,7 @@ TEST(AssignmentParsing, DeassignThenProceduralAssign) {
   EXPECT_EQ(s1->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(AssignmentParsing, AssignTernaryRhs) {
+TEST(ProceduralAssignDeassignParsing, AssignTernaryRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg q, sel, a, b;\n"
@@ -381,7 +381,7 @@ TEST(AssignmentParsing, AssignTernaryRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(AssignmentParsing, AssignFunctionCallRhs) {
+TEST(ProceduralAssignDeassignParsing, AssignFunctionCallRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] q;\n"
@@ -398,7 +398,7 @@ TEST(AssignmentParsing, AssignFunctionCallRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-TEST(AssignmentParsing, AssignUnaryRhs) {
+TEST(ProceduralAssignDeassignParsing, AssignUnaryRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg a, q;\n"
@@ -415,7 +415,7 @@ TEST(AssignmentParsing, AssignUnaryRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kUnary);
 }
 
-TEST(AssignmentParsing, AssignInsideForLoop) {
+TEST(ProceduralAssignDeassignParsing, AssignInsideForLoop) {
   auto r = Parse(
       "module m;\n"
       "  reg [3:0] q;\n"
@@ -433,7 +433,7 @@ TEST(AssignmentParsing, AssignInsideForLoop) {
   EXPECT_EQ(stmt->for_body->kind, StmtKind::kAssign);
 }
 
-TEST(AssignmentParsing, DFlipFlopClearPreset) {
+TEST(ProceduralAssignDeassignParsing, DFlipFlopClearPreset) {
   EXPECT_TRUE(
       ParseOk("module dff_cp(output reg q, input d, clear, preset, clock);\n"
               "  always @(clear or preset)\n"
@@ -448,7 +448,7 @@ TEST(AssignmentParsing, DFlipFlopClearPreset) {
               "endmodule\n"));
 }
 
-TEST(AssignmentParsing, AssignInNamedBlock) {
+TEST(ProceduralAssignDeassignParsing, AssignInNamedBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg q;\n"
@@ -463,7 +463,7 @@ TEST(AssignmentParsing, AssignInNamedBlock) {
   EXPECT_EQ(stmt->kind, StmtKind::kAssign);
 }
 
-TEST(AssignmentParsing, AssignInForkJoin) {
+TEST(ProceduralAssignDeassignParsing, AssignInForkJoin) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -486,7 +486,7 @@ TEST(AssignmentParsing, AssignInForkJoin) {
 
 }
 
-TEST(AssignmentParsing, DeassignConcatLhs) {
+TEST(ProceduralAssignDeassignParsing, DeassignConcatLhs) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -502,7 +502,7 @@ TEST(AssignmentParsing, DeassignConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(AssignmentParsing, AssignSystemFuncRhs) {
+TEST(ProceduralAssignDeassignParsing, AssignSystemFuncRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [31:0] q;\n"
@@ -519,7 +519,7 @@ TEST(AssignmentParsing, AssignSystemFuncRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
 }
 
-TEST(AssignmentParsing, MultipleAssignsSameVar) {
+TEST(ProceduralAssignDeassignParsing, MultipleAssignsSameVar) {
   auto r = Parse(
       "module m;\n"
       "  reg q;\n"
@@ -540,7 +540,7 @@ TEST(AssignmentParsing, MultipleAssignsSameVar) {
   EXPECT_EQ(s1->lhs->text, "q");
 }
 
-TEST(AssignmentParsing, DeassignMultipleVars) {
+TEST(ProceduralAssignDeassignParsing, DeassignMultipleVars) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -566,7 +566,7 @@ TEST(AssignmentParsing, DeassignMultipleVars) {
   EXPECT_EQ(s2->lhs->text, "c");
 }
 
-TEST(AssignmentParsing, DelayBeforeAssign) {
+TEST(ProceduralAssignDeassignParsing, DelayBeforeAssign) {
   auto r = Parse(
       "module m;\n"
       "  reg q;\n"
@@ -578,7 +578,7 @@ TEST(AssignmentParsing, DelayBeforeAssign) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(AssignmentParsing, AssignNestedIfElse) {
+TEST(ProceduralAssignDeassignParsing, AssignNestedIfElse) {
   auto r = Parse(
       "module m;\n"
       "  reg q, a, b;\n"
@@ -608,7 +608,7 @@ TEST(AssignmentParsing, AssignNestedIfElse) {
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kDeassign);
 }
 
-TEST(AssignmentParsing, AssignReductionRhs) {
+TEST(ProceduralAssignDeassignParsing, AssignReductionRhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] data;\n"
@@ -626,7 +626,7 @@ TEST(AssignmentParsing, AssignReductionRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kUnary);
 }
 
-TEST(AssignmentParsing, AssignToVector) {
+TEST(ProceduralAssignDeassignParsing, AssignToVector) {
   auto r = Parse(
       "module m;\n"
       "  reg [15:0] vec;\n"
@@ -642,6 +642,60 @@ TEST(AssignmentParsing, AssignToVector) {
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "vec");
   ASSERT_NE(stmt->rhs, nullptr);
+}
+
+TEST(ProceduralAssignDeassignParsing, DeassignSingularVariable) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q;\n"
+      "  initial begin\n"
+      "    deassign q;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
+}
+
+TEST(ProceduralAssignDeassignParsing, AssignSingularVariableLhs) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q;\n"
+      "  initial begin\n"
+      "    assign q = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
+  ASSERT_NE(stmt->lhs, nullptr);
+  EXPECT_EQ(stmt->lhs->kind, ExprKind::kIdentifier);
+}
+
+TEST(ProceduralAssignDeassignParsing, ReAssignSameVariableSyntax) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg q;\n"
+      "  initial begin\n"
+      "    assign q = 0;\n"
+      "    assign q = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* s0 = NthInitialStmt(r, 0);
+  auto* s1 = NthInitialStmt(r, 1);
+  ASSERT_NE(s0, nullptr);
+  ASSERT_NE(s1, nullptr);
+  EXPECT_EQ(s0->kind, StmtKind::kAssign);
+  EXPECT_EQ(s1->kind, StmtKind::kAssign);
+  EXPECT_EQ(s0->lhs->text, s1->lhs->text);
 }
 
 }  // namespace

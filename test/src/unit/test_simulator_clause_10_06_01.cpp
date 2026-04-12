@@ -14,7 +14,7 @@ using namespace delta;
 
 namespace {
 
-TEST(StmtExec, ProceduralAssignSetsValue) {
+TEST(ProceduralAssignDeassignSim, ProceduralAssignSetsValue) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("a", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
@@ -29,7 +29,7 @@ TEST(StmtExec, ProceduralAssignSetsValue) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(StmtExec, DeassignReleasesProceduralAssign) {
+TEST(ProceduralAssignDeassignSim, DeassignReleasesProceduralAssign) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("b", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 50);
@@ -44,7 +44,7 @@ TEST(StmtExec, DeassignReleasesProceduralAssign) {
   EXPECT_FALSE(var->is_forced);
 }
 
-TEST(StmtExec, DeassignNullLhsNoOp) {
+TEST(ProceduralAssignDeassignSim, DeassignNullLhsNoOp) {
   StmtFixture f;
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kDeassign;
@@ -54,7 +54,7 @@ TEST(StmtExec, DeassignNullLhsNoOp) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-TEST(StmtExec, AssignDeassignBlockingAssign) {
+TEST(ProceduralAssignDeassignSim, AssignDeassignBlockingAssign) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("adb", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
@@ -182,6 +182,159 @@ TEST(ProceduralContinuousAssignSim, AssignExpressionRhs) {
   auto* c = f.ctx.FindVariable("c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 42u);
+}
+
+TEST(ProceduralAssignDeassignSim, AssignBlocksBlockingAssign) {
+  StmtFixture f;
+  auto* var = f.ctx.CreateVariable("q", 32);
+  var->value = MakeLogic4VecVal(f.arena, 32, 0);
+
+  auto* assign_stmt = f.arena.Create<Stmt>();
+  assign_stmt->kind = StmtKind::kAssign;
+  assign_stmt->lhs = MakeId(f.arena, "q");
+  assign_stmt->rhs = MakeInt(f.arena, 42);
+  RunStmt(assign_stmt, f.ctx, f.arena);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+
+  auto* blocking_stmt = MakeBlockAssign(f.arena, "q", 99);
+  RunStmt(blocking_stmt, f.ctx, f.arena);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(ProceduralContinuousAssignSim, AssignBlocksBlockingAssignFullSim) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q;\n"
+      "  initial begin\n"
+      "    assign q = 8'd42;\n"
+      "    q = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 42u);
+}
+
+TEST(ProceduralContinuousAssignSim, AssignBlocksNonblockingAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q;\n"
+      "  initial begin\n"
+      "    assign q = 8'd42;\n"
+      "    q <= 8'd99;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 42u);
+}
+
+TEST(ProceduralAssignDeassignSim, AssignNullLhsNoOp) {
+  StmtFixture f;
+  auto* stmt = f.arena.Create<Stmt>();
+  stmt->kind = StmtKind::kAssign;
+  stmt->lhs = nullptr;
+  stmt->rhs = MakeInt(f.arena, 1);
+
+  auto result = RunStmt(stmt, f.ctx, f.arena);
+  EXPECT_EQ(result, StmtResult::kDone);
+}
+
+TEST(ProceduralAssignDeassignSim, DeassignUnknownVarNoOp) {
+  StmtFixture f;
+  auto* stmt = f.arena.Create<Stmt>();
+  stmt->kind = StmtKind::kDeassign;
+  stmt->lhs = MakeId(f.arena, "nonexistent");
+
+  auto result = RunStmt(stmt, f.ctx, f.arena);
+  EXPECT_EQ(result, StmtResult::kDone);
+}
+
+TEST(ProceduralContinuousAssignSim, DeassignRetainsValueThenBlockingOverwrites) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q;\n"
+      "  initial begin\n"
+      "    assign q = 8'd50;\n"
+      "    deassign q;\n"
+      "    q = 8'd77;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 77u);
+}
+
+TEST(ProceduralContinuousAssignSim, DFlipFlopClearPresetPattern) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic q;\n"
+      "  logic clear, preset;\n"
+      "  initial begin\n"
+      "    clear = 0;\n"
+      "    preset = 1;\n"
+      "  end\n"
+      "  always @(clear or preset)\n"
+      "    if (!clear)\n"
+      "      assign q = 0;\n"
+      "    else if (!preset)\n"
+      "      assign q = 1;\n"
+      "    else\n"
+      "      deassign q;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 0u);
+  EXPECT_TRUE(q->is_forced);
+}
+
+TEST(ProceduralContinuousAssignSim, ReAssignClearsOldRhsWatcher) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, q;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    b = 8'd2;\n"
+      "    assign q = a;\n"
+      "    assign q = b;\n"
+      "    #1;\n"
+      "    a = 8'd100;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 2u);
 }
 
 }  // namespace

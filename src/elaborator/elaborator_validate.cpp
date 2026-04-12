@@ -224,6 +224,22 @@ static void CheckInterconnectProcContAssign(
     CheckInterconnectProcContAssign(ci.body, interconnect_names, diag);
 }
 
+static void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kAssign && s->lhs &&
+      s->lhs->kind == ExprKind::kSelect) {
+    diag.Error(s->range.start,
+               "bit-select or part-select in procedural assign LHS");
+  }
+  for (auto* sub : s->stmts) CheckProceduralAssignLhs(sub, diag);
+  for (auto* sub : s->fork_stmts) CheckProceduralAssignLhs(sub, diag);
+  CheckProceduralAssignLhs(s->then_branch, diag);
+  CheckProceduralAssignLhs(s->else_branch, diag);
+  CheckProceduralAssignLhs(s->body, diag);
+  CheckProceduralAssignLhs(s->for_body, diag);
+  for (auto& ci : s->case_items) CheckProceduralAssignLhs(ci.body, diag);
+}
+
 // §6.6.8: check if an expression tree contains an interconnect identifier.
 static bool ExprUsesInterconnect(
     const Expr* e,
@@ -511,6 +527,7 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
     CollectProcTargets(item->body, proc_assign_targets_);
     // §6.6.8: interconnect cannot be target of force/release/assign/deassign.
     CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);
+    CheckProceduralAssignLhs(item->body, diag_);
   }
   ValidateEdgeOnReal(item);
   ValidateChandleContAssign(item);
@@ -918,6 +935,11 @@ static void CheckFuncBodyStmt(
                              s->var_name));
     }
   }
+  if (s->kind == StmtKind::kAssign && s->lhs &&
+      s->lhs->kind == ExprKind::kSelect) {
+    diag.Error(s->range.start,
+               "bit-select or part-select in procedural assign LHS");
+  }
   // §9.3.2: Return is illegal inside any fork-join body.
   if (s->kind == StmtKind::kFork) {
     for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
@@ -964,6 +986,11 @@ static void CheckTaskBodyStmt(
       diag.Error(s->range.start,
                  "automatic variable in procedural continuous assignment");
     }
+  }
+  if (s->kind == StmtKind::kAssign && s->lhs &&
+      s->lhs->kind == ExprKind::kSelect) {
+    diag.Error(s->range.start,
+               "bit-select or part-select in procedural assign LHS");
   }
   // §9.3.2: Return is illegal inside any fork-join body.
   if (s->kind == StmtKind::kFork) {

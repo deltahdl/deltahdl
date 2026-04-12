@@ -51,33 +51,6 @@ TEST(ProceduralContinuousAssignmentParsing, AllSixForms) {
   EXPECT_EQ(stmts[3]->kind, StmtKind::kRelease);
 }
 
-TEST(ProceduralContinuousAssignmentParsing, AssignVariableAssignment) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin assign q = d; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-  EXPECT_NE(stmt->lhs, nullptr);
-  EXPECT_NE(stmt->rhs, nullptr);
-}
-
-TEST(ProceduralContinuousAssignmentParsing, DeassignVariableLvalue) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin deassign q; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
-  EXPECT_NE(stmt->lhs, nullptr);
-}
-
 TEST(ProceduralContinuousAssignmentParsing, ForceNetAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -100,20 +73,6 @@ TEST(ProceduralContinuousAssignmentParsing, ReleaseNetLvalue) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kRelease);
-}
-
-TEST(ProceduralContinuousAssignmentParsing, AssignWithBinaryExpressionRhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin assign c = a + b; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
 TEST(ProceduralContinuousAssignmentParsing, ForceWithFuncCallExpressionRhs) {
