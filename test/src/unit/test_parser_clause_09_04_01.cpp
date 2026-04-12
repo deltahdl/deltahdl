@@ -12,22 +12,7 @@ TEST(DelayParsing, DelayValueInStatement) {
               "endmodule"));
 }
 
-TEST(ProcessTimingAndControlParsing, ZeroDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #0 a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
-  EXPECT_NE(stmt->delay, nullptr);
-}
-
-TEST(ProcessTimingAndControlParsing, ChainedDelayControls) {
+TEST(DelayControlParsing, ChainedDelayControls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -46,7 +31,7 @@ TEST(ProcessTimingAndControlParsing, ChainedDelayControls) {
   }
 }
 
-TEST(ProcessTimingAndControlParsing, DelayWithExpression) {
+TEST(DelayControlParsing, DelayWithExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -61,7 +46,7 @@ TEST(ProcessTimingAndControlParsing, DelayWithExpression) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(SchedulingSemanticsParsing, ZeroDelayControl) {
+TEST(DelayControlParsing, ZeroDelayControl) {
   auto r = Parse(
       "module m;\n"
       "  reg a;\n"
@@ -78,7 +63,7 @@ TEST(SchedulingSemanticsParsing, ZeroDelayControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(SchedulingSemanticsParsing, UnitDelayControl) {
+TEST(DelayControlParsing, UnitDelayControl) {
   auto r = Parse(
       "module m;\n"
       "  reg a;\n"
@@ -95,7 +80,7 @@ TEST(SchedulingSemanticsParsing, UnitDelayControl) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ProcessParsing, DelayControlReal) {
+TEST(DelayControlParsing, DelayControlReal) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -121,7 +106,7 @@ static ModuleItem* FindInitialBlock(ParseResult& r) {
   return FindItemByKindFromResult(r, ModuleItemKind::kInitialBlock);
 }
 
-TEST(SchedulingSemanticsParsing, InitialBlockWithDelays) {
+TEST(DelayControlParsing, InitialBlockWithDelays) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -142,24 +127,7 @@ TEST(SchedulingSemanticsParsing, InitialBlockWithDelays) {
 }
 
 
-TEST(ProcessParsing, BlockWithDelayControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    #5 a = 1;\n"
-      "    #10 b = 2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kDelay);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDelay);
-}
-
-TEST(ProcessParsing, DelayControl) {
+TEST(DelayControlParsing, DelayControl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -172,6 +140,53 @@ TEST(ProcessParsing, DelayControl) {
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
   EXPECT_NE(stmt->body, nullptr);
+}
+
+TEST(DelayControlParsing, DelayWithNullStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #10;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
+  EXPECT_NE(stmt->delay, nullptr);
+}
+
+TEST(DelayControlParsing, ParenthesizedMintypmax) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #(1:2:3) a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_EQ(stmt->delay->kind, ExprKind::kMinTypMax);
+}
+
+TEST(DelayControlParsing, IdentifierAsDelayValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    #tDelay a = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kDelay);
+  EXPECT_NE(stmt->delay, nullptr);
+  EXPECT_EQ(stmt->delay->kind, ExprKind::kIdentifier);
 }
 
 }  // namespace

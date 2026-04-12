@@ -229,39 +229,6 @@ TEST(EventSimulationSim, NoDelayExecutesAtTimeZero) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 1u);
 }
 
-TEST(EventSimulationSim, DelayAdvancesSimulationTime) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    #10 x = 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 1u);
-}
-
-TEST(EventSimulationSim, MultipleDelaysAccumulate) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    #5 x = 8'd1;\n"
-      "    #5 x = 8'd2;\n"
-      "    #5 x = 8'd3;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 3u);
-}
-
 TEST(EventSimulationSim, EventsExecuteInChronologicalOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(

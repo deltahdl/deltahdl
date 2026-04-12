@@ -197,22 +197,4 @@ TEST(InactiveRegionSim, InactiveRegionHoldsMultipleEvents) {
   EXPECT_EQ(count, 5);
 }
 
-TEST(TimingControlSim, DelayControlZero) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd1;\n"
-      "    #0 x = 8'd2;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 2u);
-}
+

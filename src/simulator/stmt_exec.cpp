@@ -794,7 +794,9 @@ static ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   uint64_t ticks = 0;
   if (stmt->delay) {
     auto val = EvalExpr(stmt->delay, ctx, arena);
-    ticks = val.ToUint64();
+    if (val.IsKnown()) {
+      ticks = val.ToUint64();
+    }
   }
   co_await DelayAwaiter{ctx, ticks};
   if (stmt->body) {
