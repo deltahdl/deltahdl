@@ -90,6 +90,13 @@ enum class ProcessKind : uint8_t {
   kContAssign,
 };
 
+// --- Wait-fork synchronization state (§9.6.1) ---
+
+struct WaitForkState {
+  uint32_t remaining = 0;
+  std::coroutine_handle<> waiter;
+};
+
 // --- Process: a schedulable simulation process ---
 
 struct Process {
@@ -99,6 +106,9 @@ struct Process {
   uint32_t id = 0;
   bool active = true;
   bool is_reactive = false;
+
+  // §9.6.1: Tracks join_none children for wait fork.
+  WaitForkState wait_fork_state;
 
   // §12.4.2.1: Pending violation reports awaiting Observed region maturation.
   std::vector<std::string> pending_violations;

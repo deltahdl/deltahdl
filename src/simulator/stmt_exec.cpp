@@ -1030,7 +1030,9 @@ static ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 // --- Fork/join (IEEE §9.3.2) ---
 
 static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
-                                       Arena& arena, ForkJoinState* state) {
+                                       Arena& arena, ForkJoinState* state,
+                                       WaitForkState* parent_wfs,
+                                       Process* parent_proc) {
   co_await ExecStmt(body, ctx, arena);
   state->remaining--;
   bool should_resume =
@@ -1038,6 +1040,10 @@ static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
   if (should_resume && state->parent) {
     state->resumed = true;
     state->parent.resume();
+  }
+  if (parent_wfs && --parent_wfs->remaining == 0 && parent_wfs->waiter) {
+    ctx.SetCurrentProcess(parent_proc);
+    parent_wfs->waiter.resume();
   }
 }
 
@@ -1072,13 +1078,26 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   state->remaining = process_count;
   state->join_any = (stmt->join_kind == TokenKind::kKwJoinAny);
 
+  WaitForkState* parent_wfs = nullptr;
+  Process* parent_proc = nullptr;
+  if (stmt->join_kind == TokenKind::kKwJoinNone) {
+    parent_proc = ctx.CurrentProcess();
+    if (parent_proc) parent_wfs = &parent_proc->wait_fork_state;
+  }
+
   for (auto* s : stmt->fork_stmts) {
     if (IsForkBlockItemDecl(s)) continue;
+    if (parent_wfs) parent_wfs->remaining++;
     auto* p = arena.Create<Process>();
     p->kind = ProcessKind::kInitial;
-    p->coro = ForkChildCoroutine(s, ctx, arena, state).Release();
+    p->coro =
+        ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
+            .Release();
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-    event->callback = [p]() { p->Resume(); };
+    event->callback = [p, &ctx]() {
+      ctx.SetCurrentProcess(p);
+      p->Resume();
+    };
     ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive, event);
   }
 
@@ -1086,6 +1105,15 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     co_await ForkJoinAwaiter{state};
   }
   if (labeled) ctx.PopStaticScope(stmt->label);
+  co_return StmtResult::kDone;
+}
+
+// --- Wait fork (IEEE §9.6.1) ---
+
+static ExecTask ExecWaitFork(SimContext& ctx) {
+  auto* proc = ctx.CurrentProcess();
+  if (!proc) co_return StmtResult::kDone;
+  co_await WaitForkAwaiter{&proc->wait_fork_state};
   co_return StmtResult::kDone;
 }
 
@@ -1278,8 +1306,9 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kTimingControl:
     case StmtKind::kDisable:
     case StmtKind::kDisableFork:
-    case StmtKind::kWaitFork:
       return ExecTask::Immediate(StmtResult::kDone);
+    case StmtKind::kWaitFork:
+      return ExecWaitFork(ctx);
     case StmtKind::kBreak:
       return ExecTask::Immediate(StmtResult::kBreak);
     case StmtKind::kContinue:

@@ -269,20 +269,6 @@ TEST(TimingControlSyntaxParsing, EventExprAnyChange) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
 }
 
-TEST(TimingControlSyntaxParsing, WaitFork) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait fork;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWaitFork);
-}
-
 TEST(TimingControlSyntaxParsing, WaitOrder) {
   auto r = Parse(
       "module m;\n"
@@ -313,16 +299,6 @@ TEST(TimingControlSyntaxParsing, EventControlMissingRParen) {
       "  initial @(posedge clk a = 1;\n"
       "endmodule\n").has_errors);
 }
-
-TEST(TimingControlSyntaxParsing, WaitForkMissingSemicolon) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait fork\n"
-      "  end\n"
-      "endmodule\n").has_errors);
-}
-
 
 TEST(TimingControlSyntaxParsing, WaitOrderMissingLParen) {
   EXPECT_TRUE(Parse(

@@ -168,22 +168,6 @@ TEST(TimingControlElaboration, WaitInFunctionError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(TimingControlElaboration, WaitForkInInitialElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      #10 ;\n"
-      "    join_none\n"
-      "    wait fork;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(TimingControlElaboration, WaitForkInAlwaysCombError) {
   ElabFixture f;
   ElaborateSrc(

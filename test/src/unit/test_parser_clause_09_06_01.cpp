@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralAssignAndControlParsing, WaitForkStatement) {
+TEST(WaitForkParsing, WaitForkStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -22,7 +22,7 @@ TEST(ProceduralAssignAndControlParsing, WaitForkStatement) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kWaitFork);
 }
 
-TEST(ProceduralAssignAndControlParsing, ForkJoinNoneWithWaitFork) {
+TEST(WaitForkParsing, ForkJoinNoneWithWaitFork) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -38,7 +38,7 @@ TEST(ProceduralAssignAndControlParsing, ForkJoinNoneWithWaitFork) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ProcessParsing, ForkJoinNoneThenWaitFork) {
+TEST(WaitForkParsing, ForkJoinNoneThenWaitFork) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -57,6 +57,15 @@ TEST(ProcessParsing, ForkJoinNoneThenWaitFork) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kFork);
   EXPECT_EQ(body->stmts[0]->join_kind, TokenKind::kKwJoinNone);
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kWaitFork);
+}
+
+TEST(WaitForkParsing, WaitForkMissingSemicolon) {
+  EXPECT_TRUE(Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    wait fork\n"
+      "  end\n"
+      "endmodule\n").has_errors);
 }
 
 }  // namespace

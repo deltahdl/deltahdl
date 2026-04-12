@@ -8,6 +8,7 @@
 
 #include "common/types.h"
 #include "parser/ast.h"
+#include "simulator/process.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/clocking.h"
@@ -248,6 +249,18 @@ struct ForkJoinAwaiter {
   bool await_ready() const noexcept { return state->remaining == 0; }
 
   void await_suspend(std::coroutine_handle<> h) noexcept { state->parent = h; }
+
+  void await_resume() const noexcept {}
+};
+
+// Awaiter for wait fork (§9.6.1). Suspends the parent coroutine until all
+// immediate child subprocesses spawned by fork/join_none have terminated.
+struct WaitForkAwaiter {
+  WaitForkState* state;
+
+  bool await_ready() const noexcept { return state->remaining == 0; }
+
+  void await_suspend(std::coroutine_handle<> h) noexcept { state->waiter = h; }
 
   void await_resume() const noexcept {}
 };
