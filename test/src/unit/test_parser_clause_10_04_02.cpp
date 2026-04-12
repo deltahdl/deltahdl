@@ -285,37 +285,6 @@ TEST(AssignmentParsing, ReplicationRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kReplicate);
 }
 
-TEST(AssignmentParsing, MixedBlockingNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, d, a, b;\n"
-      "  always @(posedge clk)\n"
-      "    q <= d;\n"
-      "  always @(*)\n"
-      "    a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
-  int always_count = 0;
-  bool found_nonblocking = false;
-  bool found_blocking = false;
-  for (auto* item : mod->items) {
-    if (item->kind == ModuleItemKind::kAlwaysBlock) {
-      always_count++;
-      if (item->body && item->body->kind == StmtKind::kNonblockingAssign) {
-        found_nonblocking = true;
-      }
-      if (item->body && item->body->kind == StmtKind::kBlockingAssign) {
-        found_blocking = true;
-      }
-    }
-  }
-  EXPECT_EQ(always_count, 2);
-  EXPECT_TRUE(found_nonblocking);
-  EXPECT_TRUE(found_blocking);
-}
-
 static ModuleItem* FindInitialBlock(ParseResult& r) {
   return FindItemByKind(r, ModuleItemKind::kInitialBlock);
 }

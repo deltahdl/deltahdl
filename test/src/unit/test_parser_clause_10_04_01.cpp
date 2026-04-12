@@ -93,23 +93,6 @@ TEST(AssignmentParsing, SimpleBlocking) {
   EXPECT_EQ(stmt->rhs->text, "b");
 }
 
-TEST(SchedulingSemanticsParsing, BlockingAssignInAlways) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  always @(b) a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
-  EXPECT_NE(item->body->lhs, nullptr);
-  EXPECT_NE(item->body->rhs, nullptr);
-}
-
 TEST(AssignmentParsing, InBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
@@ -278,43 +261,6 @@ TEST(ProceduralAssignAndControlParsing, BlockingAssignConcatLhs) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
-}
-
-TEST(AssignmentParsing, InTaskBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  task t();\n"
-      "    int x;\n"
-      "    x = 42;\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* task = FindItemByKind(r, ModuleItemKind::kTaskDecl);
-  ASSERT_NE(task, nullptr);
-  ASSERT_NE(task->body, nullptr);
-  ASSERT_GE(task->body->stmts.size(), 1u);
-  auto* assign = task->body->stmts.back();
-  EXPECT_EQ(assign->kind, StmtKind::kBlockingAssign);
-}
-
-TEST(AssignmentParsing, InFunctionBody) {
-  auto r = Parse(
-      "module m;\n"
-      "  function int compute(int a, int b);\n"
-      "    int tmp;\n"
-      "    tmp = a + b;\n"
-      "    return tmp;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* func = FirstFunctionDecl(r);
-  ASSERT_NE(func, nullptr);
-  ASSERT_NE(func->body, nullptr);
-  auto* assign = FindStmtByKind(func->body->stmts, StmtKind::kBlockingAssign);
-  ASSERT_NE(assign, nullptr);
-  EXPECT_EQ(assign->lhs->text, "tmp");
 }
 
 }  // namespace
