@@ -269,115 +269,6 @@ TEST(TimingControlSyntaxParsing, EventExprAnyChange) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
 }
 
-TEST(TimingControlSyntaxParsing, IntraAssignDelayBlocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = #5 b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_NE(stmt->delay, nullptr);
-  EXPECT_NE(stmt->rhs, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, IntraAssignEventBlocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = @(posedge clk) b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_FALSE(stmt->events.empty());
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-}
-
-TEST(TimingControlSyntaxParsing, IntraAssignRepeatEventBlocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = repeat(3) @(posedge clk) b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_NE(stmt->repeat_event_count, nullptr);
-  EXPECT_FALSE(stmt->events.empty());
-}
-
-TEST(TimingControlSyntaxParsing, IntraAssignDelayNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <= #5 b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(stmt->delay, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, IntraAssignEventNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <= @(posedge clk) b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_FALSE(stmt->events.empty());
-}
-
-TEST(TimingControlSyntaxParsing, IntraAssignRepeatEventNonblocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <= repeat(5) @(posedge clk) data;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(stmt->repeat_event_count, nullptr);
-  EXPECT_FALSE(stmt->events.empty());
-}
-
-TEST(TimingControlSyntaxParsing, RepeatEventControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <= repeat(3) @(posedge clk) b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(stmt->repeat_event_count, nullptr);
-}
-
 TEST(TimingControlSyntaxParsing, WaitFork) {
   auto r = Parse(
       "module m;\n"
@@ -527,15 +418,6 @@ TEST(TimingControlSyntaxParsing, IntraAssignCycleDelayNonblocking) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(TimingControlSyntaxParsing, IntraAssignRepeatEventMissingAt) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <= repeat(3) (posedge clk) b;\n"
-      "  end\n"
-      "endmodule\n").has_errors);
-}
-
 TEST(TimingControlSyntaxParsing, EventControlHierarchicalSignal) {
   auto r = Parse(
       "module m;\n"
@@ -637,37 +519,6 @@ TEST(TimingControlSyntaxParsing, DelayControlRealLiteral) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, IntraAssignDelayParenBlocking) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a = #(1:2:3) b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  EXPECT_NE(stmt->delay, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, IntraAssignRepeatEventMultipleEvents) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    a <= repeat(2) @(posedge clk or negedge rst) b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(stmt->repeat_event_count, nullptr);
-  ASSERT_GE(stmt->events.size(), 2u);
 }
 
 // --- Parenthesized event_expression (§A.6.5) ---

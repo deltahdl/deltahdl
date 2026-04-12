@@ -1129,7 +1129,7 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-// §10.4.1: Blocking assignment with intra-assignment delay.
+// §9.4.5: Blocking assignment with intra-assignment delay.
 // Evaluates RHS before the delay, then assigns after the delay.
 static ExecTask ExecBlockingAssignTimed(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
@@ -1138,6 +1138,85 @@ static ExecTask ExecBlockingAssignTimed(const Stmt* stmt, SimContext& ctx,
   co_await DelayAwaiter{ctx, delay_val.ToUint64()};
   PerformBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
   co_return StmtResult::kDone;
+}
+
+// §9.4.5: Blocking assignment with intra-assignment event control.
+static ExecTask ExecBlockingAssignEvent(const Stmt* stmt, SimContext& ctx,
+                                        Arena& arena) {
+  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+  co_await EventAwaiter{ctx, stmt->events, arena};
+  PerformBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
+  co_return StmtResult::kDone;
+}
+
+// §9.4.5: Evaluate a repeat count, returning 0 if the assignment should
+// bypass the repeat (count ≤ 0 for signed, or unknown/high-impedance).
+static uint64_t EvalRepeatCount(const Expr* count_expr, SimContext& ctx,
+                                Arena& arena) {
+  auto val = EvalExpr(count_expr, ctx, arena);
+  if (!val.IsKnown()) return 0;
+  uint64_t count = val.ToUint64();
+  if (val.is_signed && static_cast<int64_t>(count) <= 0) return 0;
+  return count;
+}
+
+// §9.4.5: Blocking assignment with repeat intra-assignment event control.
+static ExecTask ExecBlockingAssignRepeatEvent(const Stmt* stmt,
+                                              SimContext& ctx, Arena& arena) {
+  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+  uint64_t count = EvalRepeatCount(stmt->repeat_event_count, ctx, arena);
+  for (uint64_t i = 0; i < count; ++i) {
+    co_await EventAwaiter{ctx, stmt->events, arena};
+  }
+  PerformBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
+  co_return StmtResult::kDone;
+}
+
+// §9.4.5: Background coroutine for nonblocking intra-assignment event.
+static SimCoroutine NbaEventCoroutine(const Stmt* stmt, Logic4Vec rhs_val,
+                                      SimContext& ctx, Arena& arena) {
+  co_await EventAwaiter{ctx, stmt->events, arena};
+  ScheduleNonblockingAssign(stmt, rhs_val, 0, ctx, arena);
+}
+
+// §9.4.5: Background coroutine for nonblocking repeat intra-assignment event.
+static SimCoroutine NbaRepeatEventCoroutine(const Stmt* stmt,
+                                            Logic4Vec rhs_val, uint64_t count,
+                                            SimContext& ctx, Arena& arena) {
+  for (uint64_t i = 0; i < count; ++i) {
+    co_await EventAwaiter{ctx, stmt->events, arena};
+  }
+  ScheduleNonblockingAssign(stmt, rhs_val, 0, ctx, arena);
+}
+
+// §9.4.5: Spawn a background process for nonblocking intra-assignment event.
+static void SpawnNbaEventProcess(SimCoroutine coro, SimContext& ctx,
+                                 Arena& arena) {
+  auto* p = arena.Create<Process>();
+  p->kind = ProcessKind::kInitial;
+  p->coro = coro.Release();
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->callback = [p]() { p->Resume(); };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive, event);
+}
+
+// §9.4.5: Nonblocking assignment with intra-assignment event or repeat event.
+static StmtResult ExecNbaWithEvent(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+  if (stmt->repeat_event_count) {
+    uint64_t count = EvalRepeatCount(stmt->repeat_event_count, ctx, arena);
+    if (count == 0) {
+      ScheduleNonblockingAssign(stmt, rhs_val, 0, ctx, arena);
+      return StmtResult::kDone;
+    }
+    SpawnNbaEventProcess(
+        NbaRepeatEventCoroutine(stmt, rhs_val, count, ctx, arena), ctx, arena);
+  } else {
+    SpawnNbaEventProcess(NbaEventCoroutine(stmt, rhs_val, ctx, arena), ctx,
+                         arena);
+  }
+  return StmtResult::kDone;
 }
 
 // --- Main dispatch ---
@@ -1168,8 +1247,15 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return ExecDoWhile(stmt, ctx, arena);
     case StmtKind::kBlockingAssign:
       if (stmt->delay) return ExecBlockingAssignTimed(stmt, ctx, arena);
+      if (!stmt->events.empty()) {
+        if (stmt->repeat_event_count)
+          return ExecBlockingAssignRepeatEvent(stmt, ctx, arena);
+        return ExecBlockingAssignEvent(stmt, ctx, arena);
+      }
       return ExecTask::Immediate(ExecBlockingAssignImpl(stmt, ctx, arena));
     case StmtKind::kNonblockingAssign:
+      if (!stmt->events.empty())
+        return ExecTask::Immediate(ExecNbaWithEvent(stmt, ctx, arena));
       return ExecTask::Immediate(ExecNonblockingAssignImpl(stmt, ctx, arena));
     case StmtKind::kExprStmt:
       return ExecInlineTaskCall(stmt, ctx, arena);

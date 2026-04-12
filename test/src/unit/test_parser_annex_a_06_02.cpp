@@ -105,19 +105,6 @@ TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(ProceduralBlockSyntaxParsing, NonblockingWithIntraDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin q <= #10 d; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(stmt->delay, nullptr);
-}
-
 TEST(ProceduralBlockSyntaxParsing, OperatorAssignment) {
   auto r = Parse(
       "module m;\n"

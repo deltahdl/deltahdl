@@ -335,48 +335,4 @@ TEST(TimingControlElaboration, EventControlNestedInForeverFuncError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- delay_or_event_control (intra-assignment) elaboration ---
-
-TEST(TimingControlElaboration, IntraAssignDelayElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  initial begin\n"
-      "    a = #5 b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TimingControlElaboration, IntraAssignEventElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, a, b;\n"
-      "  initial begin\n"
-      "    a <= @(posedge clk) b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TimingControlElaboration, IntraAssignRepeatEventElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, a, b;\n"
-      "  initial begin\n"
-      "    a <= repeat(3) @(posedge clk) b;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }  // namespace

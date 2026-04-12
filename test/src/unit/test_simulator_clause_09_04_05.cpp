@@ -12,27 +12,27 @@ uint64_t EvaluateRepeatCount(int64_t count, bool is_signed, bool is_unknown,
 
 namespace {
 
-TEST(TimingControl, RepeatCountZeroNoRepeat) {
+TEST(IntraAssignRepeatCountEvaluation, RepeatCountZeroNoRepeat) {
   EXPECT_EQ(EvaluateRepeatCount(0, true, false, false), 0u);
 }
 
-TEST(TimingControl, RepeatCountNegativeSignedNoRepeat) {
+TEST(IntraAssignRepeatCountEvaluation, RepeatCountNegativeSignedNoRepeat) {
   EXPECT_EQ(EvaluateRepeatCount(-3, true, false, false), 0u);
 }
 
-TEST(TimingControl, RepeatCountUnknownNoRepeat) {
+TEST(IntraAssignRepeatCountEvaluation, RepeatCountUnknownNoRepeat) {
   EXPECT_EQ(EvaluateRepeatCount(0, false, true, false), 0u);
 }
 
-TEST(TimingControl, RepeatCountHighZNoRepeat) {
+TEST(IntraAssignRepeatCountEvaluation, RepeatCountHighZNoRepeat) {
   EXPECT_EQ(EvaluateRepeatCount(0, false, false, true), 0u);
 }
 
-TEST(TimingControl, RepeatCountPositivePassesThrough) {
+TEST(IntraAssignRepeatCountEvaluation, RepeatCountPositivePassesThrough) {
   EXPECT_EQ(EvaluateRepeatCount(5, true, false, false), 5u);
 }
 
-TEST(TimingControl, RepeatCountNegativeUnsignedExecutes) {
+TEST(IntraAssignRepeatCountEvaluation, RepeatCountNegativeUnsignedExecutes) {
   uint64_t result = EvaluateRepeatCount(-3, false, false, false);
   EXPECT_GT(result, 0u);
 }

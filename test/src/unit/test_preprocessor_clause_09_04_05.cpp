@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AssignmentParsing, BlockingIntraAssignDelayKind) {
+TEST(IntraAssignTimingPreprocessing, BlockingIntraAssignDelayKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b;\n"
@@ -20,7 +20,7 @@ TEST(AssignmentParsing, BlockingIntraAssignDelayKind) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(AssignmentParsing, BlockingIntraAssignDelayOperands) {
+TEST(IntraAssignTimingPreprocessing, BlockingIntraAssignDelayOperands) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b;\n"
@@ -35,7 +35,7 @@ TEST(AssignmentParsing, BlockingIntraAssignDelayOperands) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(AssignmentParsing, NonblockingIntraAssignDelayKind) {
+TEST(IntraAssignTimingPreprocessing, NonblockingIntraAssignDelayKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b;\n"
@@ -50,7 +50,7 @@ TEST(AssignmentParsing, NonblockingIntraAssignDelayKind) {
   EXPECT_NE(stmt->delay, nullptr);
 }
 
-TEST(AssignmentParsing, NonblockingIntraAssignDelayOperands) {
+TEST(IntraAssignTimingPreprocessing, NonblockingIntraAssignDelayOperands) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b;\n"
@@ -65,7 +65,7 @@ TEST(AssignmentParsing, NonblockingIntraAssignDelayOperands) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(AssignmentParsing, BlockingIntraAssignEventKind) {
+TEST(IntraAssignTimingPreprocessing, BlockingIntraAssignEventKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b, clk;\n"
@@ -81,7 +81,7 @@ TEST(AssignmentParsing, BlockingIntraAssignEventKind) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(AssignmentParsing, BlockingIntraAssignEventEdge) {
+TEST(IntraAssignTimingPreprocessing, BlockingIntraAssignEventEdge) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b, clk;\n"
@@ -96,7 +96,7 @@ TEST(AssignmentParsing, BlockingIntraAssignEventEdge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-TEST(AssignmentParsing, NonblockingIntraAssignEventKind) {
+TEST(IntraAssignTimingPreprocessing, NonblockingIntraAssignEventKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b, clk;\n"
@@ -112,7 +112,7 @@ TEST(AssignmentParsing, NonblockingIntraAssignEventKind) {
   EXPECT_NE(stmt->rhs, nullptr);
 }
 
-TEST(AssignmentParsing, NonblockingIntraAssignEventEdge) {
+TEST(IntraAssignTimingPreprocessing, NonblockingIntraAssignEventEdge) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  reg a, b, clk;\n"
@@ -125,6 +125,70 @@ TEST(AssignmentParsing, NonblockingIntraAssignEventEdge) {
   ASSERT_NE(stmt, nullptr);
   ASSERT_FALSE(stmt->events.empty());
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
+}
+
+TEST(IntraAssignTimingPreprocessing, BlockingRepeatEventKind) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  initial begin\n"
+      "    a = repeat(3) @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  ASSERT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+}
+
+TEST(IntraAssignTimingPreprocessing, BlockingRepeatEventOperands) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  reg clk, a, b;\n"
+      "  initial begin\n"
+      "    a = repeat(3) @(posedge clk) b;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->lhs, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
+}
+
+TEST(IntraAssignTimingPreprocessing, NonblockingRepeatEventKind) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  reg clk, q, d;\n"
+      "  initial begin\n"
+      "    q <= repeat(5) @(posedge clk) d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
+  EXPECT_NE(stmt->repeat_event_count, nullptr);
+  ASSERT_FALSE(stmt->events.empty());
+  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
+}
+
+TEST(IntraAssignTimingPreprocessing, NonblockingRepeatEventOperands) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  reg clk, q, d;\n"
+      "  initial begin\n"
+      "    q <= repeat(5) @(posedge clk) d;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_NE(stmt->lhs, nullptr);
+  EXPECT_NE(stmt->rhs, nullptr);
 }
 
 }  // namespace

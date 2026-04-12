@@ -183,36 +183,6 @@ TEST(TimingControlSimulation, ReturnVoidExitsFunction) {
   EXPECT_EQ(val, 44u);
 }
 
-// --- delay_or_event_control (intra-assignment) simulation ---
-
-TEST(TimingControlSimulation, IntraAssignDelayBlockingEvaluatesRhsFirst) {
-  auto val = RunAndGet(
-      "module m;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    b = 8'd10;\n"
-      "    a = #5 b;\n"
-      "  end\n"
-      "endmodule\n",
-      "a");
-  EXPECT_EQ(val, 10u);
-}
-
-TEST(TimingControlSimulation, IntraAssignDelayNonblocking) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    b = 8'd20;\n"
-      "    a <= #1 b;\n"
-      "    #5 ;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"a", 20u}});
-}
-
 // --- Ordering of delay and concurrent processes ---
 
 TEST(TimingControlSimulation, TwoProcessesSynchronizeViaDelay) {

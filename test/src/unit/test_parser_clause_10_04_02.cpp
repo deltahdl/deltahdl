@@ -4,33 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_WithIntraDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin q <= #5 d; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(stmt->delay, nullptr);
-  EXPECT_NE(stmt->rhs, nullptr);
-}
-
-TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_WithIntraEvent) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin q <= @(posedge clk) d; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_FALSE(stmt->events.empty());
-}
-
 TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_ConcatLhs) {
   auto r = Parse(
       "module m;\n"
@@ -490,24 +463,6 @@ TEST(AssignmentParsing, SimpleNonblocking) {
   EXPECT_EQ(stmt->lhs->text, "q");
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(stmt->rhs->text, "d");
-}
-
-TEST(AssignmentParsing, IntraAssignDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg q, d;\n"
-      "  initial begin\n"
-      "    q <= #10 d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
-  EXPECT_NE(stmt->delay, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->text, "d");
 }
 static Stmt* FirstAlwaysStmt(ParseResult& r) {
