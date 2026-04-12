@@ -420,6 +420,12 @@ static void BindFunctionArgs(const ModuleItem* func, const Expr* expr,
       continue;
     }
     auto val = ResolveArgValue(func->func_args[i], expr, ai, ctx, arena);
+    const auto& dt = func->func_args[i].data_type;
+    if (dt.kind != DataTypeKind::kImplicit) {
+      uint32_t formal_width = EvalTypeWidth(dt);
+      if (formal_width > 0 && formal_width != val.width)
+        val = ResizeToWidth(val, formal_width, arena);
+    }
     auto* var = ctx.CreateLocalVariable(func->func_args[i].name, val.width);
     var->value = val;
   }
@@ -756,7 +762,9 @@ static bool ExecFuncStmt(const Stmt* stmt, Variable* ret_var,
   if (!stmt) return false;
   switch (stmt->kind) {
     case StmtKind::kReturn:
-      if (stmt->expr) ret_var->value = EvalExpr(stmt->expr, ctx, arena);
+      if (stmt->expr)
+        ret_var->value =
+            EvalExpr(stmt->expr, ctx, arena, ret_var->value.width);
       return true;
     case StmtKind::kBlockingAssign:
       ExecFuncBlockingAssign(stmt, ctx, arena);

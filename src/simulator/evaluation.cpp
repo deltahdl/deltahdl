@@ -896,9 +896,9 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
 }
 // §7.3.2/§11.9: Evaluate tagged union expression — return member value.
 static Logic4Vec EvalTaggedExpr(const Expr* expr, SimContext& ctx,
-                                Arena& arena) {
+                                Arena& arena, uint32_t context_width = 0) {
   // expr->rhs = member name identifier, expr->lhs = optional value.
-  if (expr->lhs) return EvalExpr(expr->lhs, ctx, arena);
+  if (expr->lhs) return EvalExpr(expr->lhs, ctx, arena, context_width);
   // Void member (no value) — return 0.
   return MakeLogic4VecVal(arena, 1, 0);
 }
@@ -973,12 +973,14 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
     case ExprKind::kAssignmentPattern:
       return EvalAssignmentPattern(expr, ctx, arena);
     case ExprKind::kTagged:
-      return EvalTaggedExpr(expr, ctx, arena);
+      return EvalTaggedExpr(expr, ctx, arena, context_width);
     case ExprKind::kMinTypMax: {
       DelayMode mode = ctx.GetDelayMode();
-      if (mode == DelayMode::kMin) return EvalExpr(expr->lhs, ctx, arena);
-      if (mode == DelayMode::kMax) return EvalExpr(expr->rhs, ctx, arena);
-      return EvalExpr(expr->condition, ctx, arena);
+      if (mode == DelayMode::kMin)
+        return EvalExpr(expr->lhs, ctx, arena, context_width);
+      if (mode == DelayMode::kMax)
+        return EvalExpr(expr->rhs, ctx, arena, context_width);
+      return EvalExpr(expr->condition, ctx, arena, context_width);
     }
     default:
       return MakeLogic4Vec(arena, 1);
