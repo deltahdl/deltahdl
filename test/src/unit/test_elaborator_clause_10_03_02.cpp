@@ -4,30 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, VarMultiContAssign_Error) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  int v;\n"
-      "  assign v = 12;\n"
-      "  assign v = 13;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(Elaboration, VarSingleContAssign_Ok) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  int v;\n"
-      "  assign v = 12;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(ContinuousAssignmentElaboration, MultipleContAssigns) {
+TEST(ContAssignStatementElaboration, MultipleContAssigns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -40,7 +17,7 @@ TEST(ContinuousAssignmentElaboration, MultipleContAssigns) {
   ASSERT_GE(mod->assigns.size(), 2u);
 }
 
-TEST(NetAssignmentElaboration, VarWithInitAndContAssign_Error) {
+TEST(ContAssignStatementElaboration, VarWithInitializerAndContAssignErrors) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -51,7 +28,7 @@ TEST(NetAssignmentElaboration, VarWithInitAndContAssign_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(NetAssignmentElaboration, VarNoInitAndContAssign_Ok) {
+TEST(ContAssignStatementElaboration, VarWithoutInitializerAndContAssignSucceeds) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -63,7 +40,7 @@ TEST(NetAssignmentElaboration, VarNoInitAndContAssign_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(NetAssignmentElaboration, NetMultipleContAssign_Ok) {
+TEST(ContAssignStatementElaboration, NetAllowsMultipleContAssigns) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -76,7 +53,7 @@ TEST(NetAssignmentElaboration, NetMultipleContAssign_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(NetAssignmentElaboration, VarMultiContAssign_Error) {
+TEST(ContAssignStatementElaboration, VarMultipleContAssignsErrors) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -88,7 +65,7 @@ TEST(NetAssignmentElaboration, VarMultiContAssign_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(NetAssignmentElaboration, NettypeLhsWithSelect_Error) {
+TEST(ContAssignStatementElaboration, NettypeLhsWithSelectErrors) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -100,7 +77,7 @@ TEST(NetAssignmentElaboration, NettypeLhsWithSelect_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(NetAssignmentElaboration, NettypeLhsNoSelect_Ok) {
+TEST(ContAssignStatementElaboration, NettypeLhsWithoutSelectSucceeds) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -113,7 +90,7 @@ TEST(NetAssignmentElaboration, NettypeLhsNoSelect_Ok) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(NetAssignmentElaboration, VarContAndProcAssign_Error) {
+TEST(ContAssignStatementElaboration, VarContAndProceduralAssignErrors) {
   ElabFixture f;
   Elaborate(
       "module t;\n"
@@ -125,23 +102,7 @@ TEST(NetAssignmentElaboration, VarContAndProcAssign_Error) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elaborator, DriveStrengthOnContAssign) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  wire w;\n"
-      "  assign (strong0, weak1) w = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->assigns.empty());
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 4u);
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 2u);
-}
-
-TEST(ContinuousAssign, ModuleWithContinuousAssignElaborates) {
+TEST(ContAssignStatementElaboration, ModuleWithContinuousAssignElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -154,7 +115,7 @@ TEST(ContinuousAssign, ModuleWithContinuousAssignElaborates) {
   EXPECT_FALSE(design->top_modules[0]->assigns.empty());
 }
 
-TEST(InterfaceContinuousAssign, ContAssignInInterfaceElaborates) {
+TEST(ContAssignStatementElaboration, ContAssignInInterfaceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc;\n"
@@ -167,21 +128,136 @@ TEST(InterfaceContinuousAssign, ContAssignInInterfaceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ContinuousAssignment, SimpleAssignStatement) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+TEST(ContAssignStatementElaboration, VarContAssignAndAlwaysBlockErrors) {
+  ElabFixture f;
+  Elaborate(
       "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial a = 8'd5;\n"
-      "  assign b = a;\n"
+      "  logic v;\n"
+      "  assign v = 1'b0;\n"
+      "  always @(*) v = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ContAssignStatementElaboration, VarContAssignAndNonblockingErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  logic v;\n"
+      "  assign v = 1'b0;\n"
+      "  always @(*) v <= 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ContAssignStatementElaboration, NetThreeContAssignsAllowed) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  wire w;\n"
+      "  assign w = 1'b0;\n"
+      "  assign w = 1'b1;\n"
+      "  assign w = 1'b0;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 5u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 5u);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ContAssignStatementElaboration, NetDeclAssignAndContAssignAllowed) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  wire w = 1'b0;\n"
+      "  assign w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ContAssignStatementElaboration, NettypeLhsWithMemberAccessErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  nettype logic mytype;\n"
+      "  mytype n;\n"
+      "  assign n.a = 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ContAssignStatementElaboration, VarOutputPortAndContAssignErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module child(output logic y);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic v;\n"
+      "  child c(.y(v));\n"
+      "  assign v = 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ContAssignStatementElaboration, VarMultipleOutputPortsErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module child(output logic y);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic v;\n"
+      "  child c1(.y(v));\n"
+      "  child c2(.y(v));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ContAssignStatementElaboration, VarOutputPortWithInitializerErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module child(output logic y);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic v = 1'b0;\n"
+      "  child c(.y(v));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ContAssignStatementElaboration, VarOutputPortWithProceduralErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module child(output logic y);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic v;\n"
+      "  child c(.y(v));\n"
+      "  initial v = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ContAssignStatementElaboration, NetOutputPortAndContAssignAllowed) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module child(output logic y);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire w;\n"
+      "  child c(.y(w));\n"
+      "  assign w = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

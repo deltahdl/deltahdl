@@ -114,6 +114,15 @@ void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
                   "indexing or select");
     }
   }
+  if (item->assign_lhs->kind == ExprKind::kMemberAccess) {
+    auto* base = item->assign_lhs->lhs;
+    if (base && base->kind == ExprKind::kIdentifier &&
+        nettype_net_names_.count(base->text) != 0) {
+      diag_.Error(item->loc,
+                  "continuous assignment to a nettype net shall not contain "
+                  "indexing or select");
+    }
+  }
   if (item->assign_lhs->kind == ExprKind::kIdentifier &&
       nettype_net_names_.count(item->assign_lhs->text) != 0) {
     if (item->assign_delay_fall || item->assign_delay_decay) {
@@ -445,6 +454,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   class_var_names_.clear();
   class_var_types_.clear();
   var_init_names_.clear();
+  output_port_targets_.clear();
   nettype_net_names_.clear();
   interconnect_names_.clear();
   scalar_var_names_.clear();
@@ -575,6 +585,18 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         diag_.Error(conn_expr->range.start,
                     "replication shall not appear in an output or inout "
                     "port connection");
+      }
+    }
+
+    // §10.3.2: Track variables driven by module output ports.
+    if (conn_expr && conn_expr->kind == ExprKind::kIdentifier &&
+        binding.direction != Direction::kInput &&
+        net_names_.count(conn_expr->text) == 0) {
+      auto name = conn_expr->text;
+      if (!output_port_targets_.emplace(name, item->loc).second) {
+        diag_.Error(item->loc,
+                    std::format("variable '{}' driven by multiple outputs",
+                                name));
       }
     }
 

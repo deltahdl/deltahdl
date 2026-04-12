@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SynthLower, AssignDirectWire) {
+TEST(ContAssignStatementSynth, AssignDirectWire) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(input a, output y);\n"
@@ -23,7 +23,7 @@ TEST(SynthLower, AssignDirectWire) {
   EXPECT_EQ(aig->outputs[0], AigLit(aig->inputs[0], false));
 }
 
-TEST(SynthLower, AssignConstant) {
+TEST(ContAssignStatementSynth, AssignConstant) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(output y);\n"
@@ -36,7 +36,7 @@ TEST(SynthLower, AssignConstant) {
   EXPECT_EQ(aig->outputs[0], AigGraph::kConstTrue);
 }
 
-TEST(SynthLower, AssignConstantZero) {
+TEST(ContAssignStatementSynth, AssignConstantZero) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(output y);\n"
@@ -49,7 +49,7 @@ TEST(SynthLower, AssignConstantZero) {
   EXPECT_EQ(aig->outputs[0], AigGraph::kConstFalse);
 }
 
-TEST(ContinuousAssign, Passthrough) {
+TEST(ContAssignStatementSynth, PassthroughWire) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
       "module m(input a, output y);\n"
@@ -63,7 +63,7 @@ TEST(ContinuousAssign, Passthrough) {
   EXPECT_EQ(aig->outputs.size(), 1);
 }
 
-TEST(ContinuousAssign, ConstantZero) {
+TEST(ContAssignStatementSynth, ConstantZeroOutputCount) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
       "module m(output y);\n"

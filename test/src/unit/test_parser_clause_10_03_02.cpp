@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(DataTypeParsing, VariableContinuousAssign) {
+TEST(ContAssignStatementParsing, VariableContinuousAssign) {
   auto r = Parse(
       "module t;\n"
       "  logic vw;\n"
@@ -19,7 +19,7 @@ TEST(DataTypeParsing, VariableContinuousAssign) {
   EXPECT_TRUE(found_ca);
 }
 
-TEST(AssignmentParsing, ContinuousAssignMultipleTargets) {
+TEST(ContAssignStatementParsing, ContinuousAssignMultipleTargets) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, c, d;\n"
@@ -45,7 +45,7 @@ static ModuleItem* FindContAssign(ParseResult& r) {
   return FindItemByKindFromResult(r, ModuleItemKind::kContAssign);
 }
 
-TEST(SchedulingSemanticsParsing, ContinuousAssign) {
+TEST(ContAssignStatementParsing, WireWithBinaryExpression) {
   auto r = Parse(
       "module m;\n"
       "  wire y;\n"
@@ -60,7 +60,7 @@ TEST(SchedulingSemanticsParsing, ContinuousAssign) {
   EXPECT_NE(ca->assign_rhs, nullptr);
 }
 
-TEST(DataTypeParsing, RealVariableContinuousAssign) {
+TEST(ContAssignStatementParsing, RealVariableContinuousAssign) {
   auto r = Parse(
       "module t;\n"
       "  real circ;\n"
@@ -75,21 +75,7 @@ TEST(DataTypeParsing, RealVariableContinuousAssign) {
   EXPECT_TRUE(found_ca);
 }
 
-TEST(AssignmentParsing, ContinuousAssignExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire [3:0] a, b, sum;\n"
-      "  assign sum = a + b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* ca =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign);
-  ASSERT_NE(ca, nullptr);
-  ASSERT_NE(ca->assign_rhs, nullptr);
-  EXPECT_EQ(ca->assign_rhs->kind, ExprKind::kBinary);
-}
-
-TEST(AssignmentParsing, ContinuousAssignTernary) {
+TEST(ContAssignStatementParsing, ContinuousAssignTernary) {
   auto r = Parse(
       "module m;\n"
       "  wire a, b, sel, y;\n"
@@ -102,7 +88,7 @@ TEST(AssignmentParsing, ContinuousAssignTernary) {
   ASSERT_NE(ca->assign_rhs, nullptr);
 }
 
-TEST(DataTypeParsing, NetDrivenByContAssign) {
+TEST(ContAssignStatementParsing, NetDrivenByContAssign) {
   auto r = Parse(
       "module t;\n"
       "  wire out;\n"
@@ -118,7 +104,7 @@ TEST(DataTypeParsing, NetDrivenByContAssign) {
   ASSERT_NE(items[1]->assign_rhs, nullptr);
 }
 
-TEST(DataTypeParsing, VarWithContAssign) {
+TEST(ContAssignStatementParsing, VarWithContAssign) {
   auto r = Parse(
       "module t;\n"
       "  logic y;\n"
@@ -140,7 +126,7 @@ static Expr* FirstContAssignRHS(ParseResult& r) {
   return nullptr;
 }
 
-TEST(SubroutineCallExprParsing, TfCallInContAssign) {
+TEST(ContAssignStatementParsing, FunctionCallInRhs) {
   auto r = Parse(
       "module m;\n"
       "  wire [7:0] y;\n"
@@ -157,7 +143,7 @@ TEST(SubroutineCallExprParsing, TfCallInContAssign) {
   EXPECT_EQ(rhs->callee, "compute");
 }
 
-TEST(ExpressionParsing, ExprInContAssign) {
+TEST(ContAssignStatementParsing, BinaryExprInRhs) {
   auto r = Parse(
       "module m;\n"
       "  wire [7:0] y;\n"
@@ -178,7 +164,7 @@ static ModuleItem* FirstContAssign(ParseResult& r) {
   return nullptr;
 }
 
-TEST(OperatorAndExpressionParsing, BitSelectInContAssignLhs) {
+TEST(ContAssignStatementParsing, BitSelectInContAssignLhs) {
   auto r = Parse(
       "module t;\n"
       "  wire [7:0] vec;\n"
@@ -194,24 +180,13 @@ TEST(OperatorAndExpressionParsing, BitSelectInContAssignLhs) {
   EXPECT_EQ(ca->assign_lhs->index_end, nullptr);
 }
 
-TEST(AggregateTypeParsing, PackedContAssign) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  typedef struct packed {\n"
-              "    logic [7:0] a;\n"
-              "    logic [7:0] b;\n"
-              "  } pair_t;\n"
-              "  pair_t p;\n"
-              "  assign p = 16'h1234;\n"
-              "endmodule\n"));
-}
 static ModuleItem* NthItem(ParseResult& r, size_t n) {
   if (!r.cu || r.cu->modules.empty() || r.cu->modules[0]->items.size() <= n)
     return nullptr;
   return r.cu->modules[0]->items[n];
 }
 
-TEST(AggregateTypeParsing, ContinuousAssign) {
+TEST(ContAssignStatementParsing, PackedStructAssign) {
   auto r = Parse(
       "module t;\n"
       "  typedef struct packed { logic [3:0] a; logic [3:0] b; } s_t;\n"

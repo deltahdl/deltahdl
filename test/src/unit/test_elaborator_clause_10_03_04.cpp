@@ -178,4 +178,20 @@ TEST(Elaborator, DriveStrengthHighz0Strong1Valid) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 4u);
 }
 
+TEST(Elaborator, DriveStrengthOnContAssign) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  wire w;\n"
+      "  assign (strong0, weak1) w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->assigns.empty());
+  EXPECT_EQ(mod->assigns[0].drive_strength0, 4u);
+  EXPECT_EQ(mod->assigns[0].drive_strength1, 2u);
+}
+
 }  // namespace

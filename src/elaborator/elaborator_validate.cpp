@@ -510,6 +510,26 @@ void Elaborator::ValidateMixedAssignments() {
                                    name));
     }
   }
+  for (const auto& [name, loc] : output_port_targets_) {
+    if (cont_assign_targets_.find(name) != cont_assign_targets_.end()) {
+      diag_.Error(loc,
+                  std::format("variable '{}' driven by both output port and "
+                              "continuous assignment",
+                              name));
+    }
+    if (var_init_names_.count(name) != 0) {
+      diag_.Error(loc,
+                  std::format("variable '{}' driven by output port has an "
+                              "initializer",
+                              name));
+    }
+    if (proc_assign_targets_.find(name) != proc_assign_targets_.end()) {
+      diag_.Error(loc,
+                  std::format("variable '{}' driven by output port has "
+                              "procedural assignments",
+                              name));
+    }
+  }
 }
 
 // §9.6.2 R8: Recursively check for disable statements targeting functions.

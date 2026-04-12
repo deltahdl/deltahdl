@@ -22,30 +22,4 @@ TEST(NettypeElaboration, NettypeDeclRegistersType) {
   EXPECT_TRUE(found);
 }
 
-TEST(NettypeElaboration, ContAssignIndexingNettypeNetIsError) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  nettype logic [7:0] mynet;\n"
-      "  mynet x;\n"
-      "  assign x[0] = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(NettypeElaboration, ContAssignWholeNettypeNetIsOk) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  nettype logic [7:0] mynet;\n"
-      "  mynet x;\n"
-      "  assign x = 8'hFF;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }  // namespace
