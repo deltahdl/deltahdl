@@ -711,6 +711,17 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (auto* cls : mod->class_decls) {
     LowerClassDecl(cls);
   }
+  {
+    // §9.7: Register synthetic ClassTypeInfo for the built-in process class.
+    auto* proc_type = arena_.Create<ClassTypeInfo>();
+    proc_type->name = "process";
+    proc_type->enum_members["FINISHED"] = 0;
+    proc_type->enum_members["RUNNING"] = 1;
+    proc_type->enum_members["WAITING"] = 2;
+    proc_type->enum_members["SUSPENDED"] = 3;
+    proc_type->enum_members["KILLED"] = 4;
+    ctx_.RegisterClassType("process", proc_type);
+  }
   LowerAliases(mod);
   LowerProcesses(mod->processes);
   for (const auto& ca : mod->assigns) {

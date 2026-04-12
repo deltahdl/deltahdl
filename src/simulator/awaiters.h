@@ -309,6 +309,23 @@ struct CycleDelayAwaiter {
   void await_resume() const noexcept {}
 };
 
+// §9.7: Awaiter for process.await(). Suspends the caller until the
+// target process reaches FINISHED or KILLED state.
+struct ProcessAwaitAwaiter {
+  Process* target;
+
+  bool await_ready() {
+    return !target || target->sv_state == ProcessState::kFinished ||
+           target->sv_state == ProcessState::kKilled;
+  }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    target->await_waiters.push_back(h);
+  }
+
+  void await_resume() const noexcept {}
+};
+
 // §15.3.3: Awaiter for semaphore get(). Suspends the coroutine when
 // insufficient keys are available; resumes when Put() adds enough keys.
 struct SemaphoreGetAwaiter {

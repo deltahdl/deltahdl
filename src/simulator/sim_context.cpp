@@ -651,6 +651,22 @@ ClassObject* SimContext::CurrentThis() const {
   return this_stack_.empty() ? nullptr : this_stack_.back();
 }
 
+// §9.7: Process handle registry for fine-grain process control.
+
+uint64_t SimContext::RegisterProcessHandle(Process* proc) {
+  for (auto& [id, p] : process_handles_) {
+    if (p == proc) return id;
+  }
+  uint64_t id = next_process_handle_id_++;
+  process_handles_[id] = proc;
+  return id;
+}
+
+Process* SimContext::FindProcessByHandle(uint64_t handle) const {
+  auto it = process_handles_.find(handle);
+  return it != process_handles_.end() ? it->second : nullptr;
+}
+
 // §12.4.2.1: Deferred violation reports.
 
 void SimContext::AddPendingViolation(std::string msg) {

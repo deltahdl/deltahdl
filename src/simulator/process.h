@@ -90,6 +90,16 @@ enum class ProcessKind : uint8_t {
   kContAssign,
 };
 
+// --- §9.7: SV-visible process state enumeration ---
+
+enum class ProcessState : uint8_t {
+  kFinished = 0,
+  kRunning = 1,
+  kWaiting = 2,
+  kSuspended = 3,
+  kKilled = 4,
+};
+
 // --- Wait-fork synchronization state (§9.6.1) ---
 
 struct WaitForkState {
@@ -113,6 +123,11 @@ struct Process {
   // §9.6.3: Dynamic parent-child tracking for disable fork.
   std::vector<Process*> children;
 
+  // §9.7: SV-visible process state and await synchronization.
+  ProcessState sv_state = ProcessState::kRunning;
+  bool is_suspended = false;
+  std::vector<std::coroutine_handle<>> await_waiters;
+
   // §12.4.2.1: Pending violation reports awaiting Observed region maturation.
   std::vector<std::string> pending_violations;
 
@@ -127,7 +142,7 @@ struct Process {
   bool Done() const { return !coro || coro.done(); }
 
   void Resume() {
-    if (active && coro && !coro.done()) {
+    if (active && !is_suspended && coro && !coro.done()) {
       coro.resume();
     }
   }

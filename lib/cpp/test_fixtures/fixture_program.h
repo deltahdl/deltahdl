@@ -37,6 +37,7 @@ using ApiParseTest = ProgramTestParse;
 using VerifyParseTest = ProgramTestParse;
 using CheckerParseTest = ProgramTestParse;
 
+using FineGrainProcessControlParseTest = ProgramTestParse;
 using ConfigParseTest = ProgramTestParse;
 using SpecifyParseTest = ProgramTestParse;
 

@@ -626,16 +626,22 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
                   "operator is not allowed on class object handles");
     }
     // §8.26.5: Interface class objects shall not be constructed.
+    // §9.7: process objects shall not be constructed with new.
     if (s->rhs && s->rhs->kind == ExprKind::kCall && s->rhs->text == "new") {
       auto lhs_name = ExprIdent(s->lhs);
       auto lt = class_var_types_.find(lhs_name);
       if (lt != class_var_types_.end()) {
-        const auto* cls = FindClassDecl(lt->second, unit_);
-        if (cls && cls->is_interface) {
+        if (lt->second == "process") {
           diag_.Error(s->range.start,
-                      std::format("cannot construct object of interface class "
-                                  "'{}'",
-                                  cls->name));
+                      "cannot construct a process object with 'new'");
+        } else {
+          const auto* cls = FindClassDecl(lt->second, unit_);
+          if (cls && cls->is_interface) {
+            diag_.Error(s->range.start,
+                        std::format("cannot construct object of interface class "
+                                    "'{}'",
+                                    cls->name));
+          }
         }
       }
     }
@@ -924,6 +930,11 @@ void Elaborator::ValidateThisUsage(const ModuleDecl* decl) {
 void Elaborator::ValidateFinalClassExtension() {
   auto check = [&](const ClassDecl* cls) {
     if (cls->base_class.empty()) return;
+    // §9.7: process is a built-in :final class and shall not be extended.
+    if (cls->base_class == "process") {
+      diag_.Error(cls->range.start, "cannot extend a class declared ':final'");
+      return;
+    }
     const auto* base = FindClassDecl(cls->base_class, unit_);
     if (base && base->is_final) {
       diag_.Error(cls->range.start, "cannot extend a class declared ':final'");

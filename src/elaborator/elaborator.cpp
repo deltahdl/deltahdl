@@ -196,6 +196,8 @@ void Elaborator::RegisterCuScopeItems() {
   class_names_.insert("mailbox");
   // §8.30.1: weak_reference is a built-in parameterized class in the std package.
   class_names_.insert("weak_reference");
+  // §9.7: process is a built-in :final class.
+  class_names_.insert("process");
   for (auto* item : unit_->cu_items) {
     if (!item->name.empty()) cu_scope_names_.insert(item->name);
     if (item->kind == ModuleItemKind::kTypedef) {

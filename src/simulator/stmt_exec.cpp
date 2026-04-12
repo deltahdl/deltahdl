@@ -1065,6 +1065,15 @@ static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
                                        WaitForkState* parent_wfs,
                                        Process* parent_proc) {
   co_await ExecStmt(body, ctx, arena);
+  // §9.7: Mark the child process as finished and wake await waiters.
+  auto* child_proc = ctx.CurrentProcess();
+  if (child_proc && child_proc->sv_state != ProcessState::kKilled) {
+    child_proc->sv_state = ProcessState::kFinished;
+    for (auto& w : child_proc->await_waiters) {
+      if (w) w.resume();
+    }
+    child_proc->await_waiters.clear();
+  }
   state->remaining--;
   bool should_resume =
       state->join_any ? !state->resumed : (state->remaining == 0);
@@ -1206,10 +1215,38 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
+// §9.7: Check if an expression is a process.await() call and execute it.
+static ExecTask ExecProcessAwait(const Expr* expr, SimContext& ctx,
+                                 Arena& arena) {
+  MethodCallParts parts;
+  if (ExtractMethodCallParts(expr, parts) &&
+      ctx.GetVariableClassType(parts.var_name) == "process" &&
+      parts.method_name == "await") {
+    auto* var = ctx.FindVariable(parts.var_name);
+    if (var) {
+      auto proc_handle = var->value.ToUint64();
+      auto* proc = ctx.FindProcessByHandle(proc_handle);
+      if (proc) {
+        co_await ProcessAwaitAwaiter{proc};
+      }
+    }
+  }
+  co_return StmtResult::kDone;
+}
+
 // §13: Inline task call — executes task body through coroutine dispatcher.
 static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   auto* expr = stmt->expr;
+  // §9.7: Intercept process.await() before general task dispatch.
+  {
+    MethodCallParts parts;
+    if (ExtractMethodCallParts(expr, parts) &&
+        ctx.GetVariableClassType(parts.var_name) == "process" &&
+        parts.method_name == "await") {
+      co_return co_await ExecProcessAwait(expr, ctx, arena);
+    }
+  }
   auto* func = SetupTaskCall(expr, ctx, arena);
   if (!func) {
     EvalExpr(expr, ctx, arena);

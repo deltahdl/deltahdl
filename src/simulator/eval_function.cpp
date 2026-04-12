@@ -1164,9 +1164,106 @@ static bool TryEvalWeakRefStaticCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §9.7: Dispatch process::self() static call.
+static bool TryEvalProcessStaticCall(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, Logic4Vec& out) {
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kMemberAccess) return false;
+  auto* access = expr->lhs;
+  if (!access->lhs || access->lhs->kind != ExprKind::kIdentifier) return false;
+  if (access->lhs->text != "process") return false;
+  if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
+  if (access->rhs->text != "self") return false;
+  auto* proc = ctx.CurrentProcess();
+  if (!proc) {
+    out = MakeLogic4VecVal(arena, 64, 0);
+    return true;
+  }
+  uint64_t handle = ctx.RegisterProcessHandle(proc);
+  out = MakeLogic4VecVal(arena, 64, handle);
+  return true;
+}
+
+// §9.7: Dispatch process instance method calls (status/kill/suspend/resume).
+static bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, Logic4Vec& out) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (ctx.GetVariableClassType(parts.var_name) != "process") return false;
+  auto* var = ctx.FindVariable(parts.var_name);
+  if (!var) return false;
+  auto proc_handle = var->value.ToUint64();
+  auto* proc = ctx.FindProcessByHandle(proc_handle);
+  if (parts.method_name == "status") {
+    uint64_t state_val = 0;
+    if (proc) {
+      state_val = static_cast<uint64_t>(proc->sv_state);
+    }
+    out = MakeLogic4VecVal(arena, 32, state_val);
+    return true;
+  }
+  if (parts.method_name == "kill") {
+    if (proc && proc->sv_state != ProcessState::kFinished &&
+        proc->sv_state != ProcessState::kKilled) {
+      proc->active = false;
+      proc->sv_state = ProcessState::kKilled;
+      // Kill all descendants recursively.
+      std::vector<Process*> stack(proc->children.begin(), proc->children.end());
+      while (!stack.empty()) {
+        auto* child = stack.back();
+        stack.pop_back();
+        if (child->sv_state != ProcessState::kFinished &&
+            child->sv_state != ProcessState::kKilled) {
+          child->active = false;
+          child->sv_state = ProcessState::kKilled;
+          for (auto* gc : child->children) stack.push_back(gc);
+        }
+      }
+      // Wake any processes waiting on await().
+      for (auto& w : proc->await_waiters) {
+        if (w) w.resume();
+      }
+      proc->await_waiters.clear();
+    }
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  if (parts.method_name == "suspend") {
+    if (proc && proc->sv_state != ProcessState::kFinished &&
+        proc->sv_state != ProcessState::kKilled) {
+      proc->is_suspended = true;
+      proc->sv_state = ProcessState::kSuspended;
+    }
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  if (parts.method_name == "resume") {
+    if (proc && proc->is_suspended) {
+      proc->is_suspended = false;
+      if (proc->sv_state == ProcessState::kSuspended) {
+        proc->sv_state = ProcessState::kRunning;
+      }
+      // Re-schedule the process to continue execution.
+      auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+      Process* target = proc;
+      event->callback = [target, &ctx]() {
+        if (target->active && !target->Done()) {
+          ctx.SetCurrentProcess(target);
+          target->Resume();
+        }
+      };
+      ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive,
+                                       event);
+    }
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  return false;
+}
+
 // Try dispatching to built-in type methods (enum, string, array, queue).
 static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
+  if (TryEvalProcessMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalEnumMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalStringMethodCall(expr, ctx, arena, out)) return true;
@@ -1260,6 +1357,7 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   if (TryEvalSuperMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefStaticCall(expr, ctx, arena, out)) return true;
+  if (TryEvalProcessStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassScopeCall(expr, ctx, arena, out)) return true;
   if (TryEvalParameterizedScopeCall(expr, ctx, arena, out)) return true;
   auto* let_decl = ctx.FindLetDecl(expr->callee);
