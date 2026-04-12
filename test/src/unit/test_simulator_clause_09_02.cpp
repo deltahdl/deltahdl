@@ -96,67 +96,6 @@ TEST(StructuredProcedureSimulation, NoLimitOnAlwaysCount) {
   LowerRunAndCheck(f, design, {{"a", 5u}, {"b", 10u}, {"c", 15u}});
 }
 
-TEST(StructuredProcedureSimulation, FinalExecutesAtEndOfSimulation) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 42;\n"
-      "  final x = 99;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-
-  f.ctx.RunFinalBlocks();
-  EXPECT_EQ(var->value.ToUint64(), 99u);
-}
-
-TEST(StructuredProcedureSimulation, FinalNotScheduledAtTimeZero) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 10;\n"
-      "  final x = 77;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);
-}
-
-TEST(StructuredProcedureSimulation, FinalExecutesOnlyOnce) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [31:0] x;\n"
-      "  initial x = 0;\n"
-      "  final x = x + 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  f.ctx.RunFinalBlocks();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
 TEST(StructuredProcedureSimulation, InitialAndAlwaysEnabledAtBeginning) {
   SimFixture f;
   auto* design = ElaborateSrc(

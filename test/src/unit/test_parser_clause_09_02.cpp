@@ -46,33 +46,6 @@ TEST(StructuredProcedureParsing, NoLimitOnProcedureCount) {
   EXPECT_EQ(CountItemsByKind(items, ModuleItemKind::kAlwaysBlock), 4u);
 }
 
-TEST(StructuredProcedureParsing, FinalBlockParsing) {
-  auto r = Parse(
-      "module m;\n"
-      "  final $display(\"end\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-}
-
-TEST(StructuredProcedureParsing, MultipleFinalBlocks) {
-  auto r = Parse(
-      "module m;\n"
-      "  final $display(\"a\");\n"
-      "  final $display(\"b\");\n"
-      "  final $display(\"c\");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(
-      CountItemsByKind(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock),
-      3u);
-}
-
 TEST(StructuredProcedureParsing, MixedProcedureOrdering) {
   auto r = Parse(
       "module m;\n"

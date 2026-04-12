@@ -138,7 +138,7 @@ TEST(FinalProcedureElaboration, FinalAndInitialCoexist) {
   EXPECT_TRUE(has_final);
 }
 
-TEST(ParallelBlockElaboration, ForkInFinalErrors) {
+TEST(FinalProcedureElaboration, ForkInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -154,7 +154,7 @@ TEST(ParallelBlockElaboration, ForkInFinalErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(WaitForkElaboration, WaitForkInFinalErrors) {
+TEST(FinalProcedureElaboration, WaitForkInFinalErrors) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -166,6 +166,89 @@ TEST(WaitForkElaboration, WaitForkInFinalErrors) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FinalProcedureElaboration, ForkJoinAnyInFinalErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  final begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FinalProcedureElaboration, ForkJoinNoneInFinalErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  final begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FinalProcedureElaboration, NestedDelayInFinalErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  final begin\n"
+      "    x = 0;\n"
+      "    #1 x = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FinalProcedureElaboration, DelayInNestedIfErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  final begin\n"
+      "    if (x)\n"
+      "      #1 x = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FinalProcedureElaboration, IfStatementInFinalValid) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic x, y;\n"
+      "  final if (x) y = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(FinalProcedureElaboration, DisplayCallInFinalValid) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  final $display(\"statistics\");\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

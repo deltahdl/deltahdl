@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProcessTimingAndControlParsing, FinalBlockWithBeginEnd) {
+TEST(FinalProcedureParsing, FinalBlockWithBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  final begin\n"
@@ -21,7 +21,7 @@ TEST(ProcessTimingAndControlParsing, FinalBlockWithBeginEnd) {
   EXPECT_GE(final_item->body->stmts.size(), 2u);
 }
 
-TEST(ProcessTimingAndControlParsing, MultipleFinalBlocks) {
+TEST(FinalProcedureParsing, MultipleFinalBlocks) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"final1\");\n"
@@ -36,7 +36,7 @@ TEST(ProcessTimingAndControlParsing, MultipleFinalBlocks) {
   EXPECT_EQ(count, 2);
 }
 
-TEST(SchedulingSemanticsParsing, ProgramWithFinalBlock) {
+TEST(FinalProcedureParsing, ProgramWithFinalBlock) {
   auto r = Parse(
       "program p;\n"
       "  final begin\n"
@@ -49,7 +49,7 @@ TEST(SchedulingSemanticsParsing, ProgramWithFinalBlock) {
   ASSERT_EQ(r.cu->programs[0]->items.size(), 1u);
   EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
 }
-TEST(ProcessParsing, BlockInFinalBlock) {
+TEST(FinalProcedureParsing, BeginEndWithMultipleStatements) {
   auto r = Parse(
       "module m;\n"
       "  final begin\n"
@@ -71,7 +71,7 @@ TEST(ProcessParsing, BlockInFinalBlock) {
   EXPECT_TRUE(found);
 }
 
-TEST(ProceduralAssignAndControlParsing, StructuredProcFinalBlock) {
+TEST(FinalProcedureParsing, SingleStatement) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"done\");\n"
@@ -82,7 +82,7 @@ TEST(ProceduralAssignAndControlParsing, StructuredProcFinalBlock) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
 }
 
-TEST(SchedulingSemanticsParsing, FinalBlock) {
+TEST(FinalProcedureParsing, BeginEndHasBody) {
   auto r = Parse(
       "module m;\n"
       "  final begin\n"
@@ -97,7 +97,7 @@ TEST(SchedulingSemanticsParsing, FinalBlock) {
   ASSERT_NE(item->body, nullptr);
 }
 
-TEST(ProcessParsing, FinalBlock) {
+TEST(FinalProcedureParsing, FinalBlockSingleStatement) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"done\");\n"
@@ -114,7 +114,7 @@ TEST(ProcessParsing, FinalBlock) {
   EXPECT_TRUE(found);
 }
 
-TEST(FinalBlock, DisplayCall) {
+TEST(FinalProcedureParsing, DisplayCall) {
   auto r = Parse(
       "module m;\n"
       "  final $display(\"done\");\n"
@@ -122,6 +122,61 @@ TEST(FinalBlock, DisplayCall) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kFinalBlock);
+}
+
+TEST(FinalProcedureParsing, FinalWithIfStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic x;\n"
+      "  final if (x) $display(\"set\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kFinalBlock);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kIf);
+}
+
+TEST(FinalProcedureParsing, FinalWithCaseStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [1:0] sel;\n"
+      "  final case (sel)\n"
+      "    2'b00: $display(\"zero\");\n"
+      "    default: $display(\"other\");\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kFinalBlock);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+}
+
+TEST(FinalProcedureParsing, FinalWithBlockingAssignment) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [31:0] x;\n"
+      "  final x = 0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kFinalBlock);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->body, nullptr);
+}
+
+TEST(FinalProcedureParsing, SourceLocationTracked) {
+  auto r = Parse(
+      "module m;\n"
+      "  final $display(\"done\");\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kFinalBlock);
+  ASSERT_NE(item, nullptr);
+  EXPECT_NE(item->loc.file_id, FileId{});
 }
 
 }  // namespace

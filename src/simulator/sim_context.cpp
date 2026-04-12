@@ -202,8 +202,10 @@ bool SimContext::IsReactiveContext() const {
 }
 
 void SimContext::RunFinalBlocks() {
+  stop_requested_ = false;
   for (auto* proc : final_processes_) {
     proc->Resume();
+    if (stop_requested_) break;
   }
 }
 

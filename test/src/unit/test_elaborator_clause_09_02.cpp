@@ -125,27 +125,6 @@ TEST(StructuredProcedureElaboration, MixedProcedureOrderingPreserved) {
   EXPECT_EQ(comb_count, 1);
 }
 
-TEST(StructuredProcedureElaboration, MultipleFinalProceduresElaborate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [31:0] a, b;\n"
-      "  final a = 1;\n"
-      "  final b = 2;\n"
-      "  final $display(\"done\");\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_FALSE(design->top_modules.empty());
-
-  int final_count = 0;
-  for (auto& p : design->top_modules[0]->processes) {
-    if (p.kind == RtlirProcessKind::kFinal) ++final_count;
-  }
-  EXPECT_EQ(final_count, 3);
-}
-
 TEST(StructuredProcedureElaboration, NoProcessesInEmptyModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(

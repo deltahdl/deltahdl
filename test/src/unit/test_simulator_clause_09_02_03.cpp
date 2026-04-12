@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Lowerer, FinalBlockExecutesAfterRun) {
+TEST(FinalProcedureSimulation,FinalBlockExecutesAfterRun) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -29,7 +29,7 @@ TEST(Lowerer, FinalBlockExecutesAfterRun) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(Lowerer, FinalBlockNotScheduledAtTimeZero) {
+TEST(FinalProcedureSimulation,FinalBlockNotScheduledAtTimeZero) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -49,7 +49,7 @@ TEST(Lowerer, FinalBlockNotScheduledAtTimeZero) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(Lowerer, FinalBlocksFIFOOrder) {
+TEST(FinalProcedureSimulation,FinalBlocksFIFOOrder) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -71,7 +71,7 @@ TEST(Lowerer, FinalBlocksFIFOOrder) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(Lowerer, FinalDoesNotAffectNormalSim) {
+TEST(FinalProcedureSimulation,FinalDoesNotAffectNormalSim) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -94,7 +94,7 @@ TEST(Lowerer, FinalDoesNotAffectNormalSim) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(Lowerer, FinalBlockMultipleAssignments) {
+TEST(FinalProcedureSimulation,FinalBlockMultipleAssignments) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -118,6 +118,119 @@ TEST(Lowerer, FinalBlockMultipleAssignments) {
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 11u);
   EXPECT_EQ(b->value.ToUint64(), 22u);
+}
+
+TEST(FinalProcedureSimulation,FinalExecutesOnlyOnce) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 0;\n"
+      "  final x = x + 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(FinalProcedureSimulation, ExecutesInZeroSimulationTime) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "    #10 $finish;\n"
+      "  end\n"
+      "  final x = 99;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto time_before = f.scheduler.CurrentTime();
+  f.ctx.RunFinalBlocks();
+  auto time_after = f.scheduler.CurrentTime();
+
+  EXPECT_EQ(time_before, time_after);
+}
+
+TEST(FinalProcedureSimulation, NoEventsRemainAfterFinals) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 5;\n"
+      "  final x = 10;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
+
+  EXPECT_FALSE(f.scheduler.HasEvents());
+}
+
+TEST(FinalProcedureSimulation, TriggeredByFinish) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    x = 42;\n"
+      "    #5 $finish;\n"
+      "  end\n"
+      "  final x = 100;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
+
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(var->value.ToUint64(), 100u);
+}
+
+TEST(FinalProcedureSimulation, FinishInsideFinalStopsRemainingFinals) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = 0;\n"
+      "  final $finish;\n"
+      "  final x = 99;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
+
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 }  // namespace
