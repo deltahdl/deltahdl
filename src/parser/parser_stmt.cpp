@@ -794,7 +794,7 @@ Stmt* Parser::ParseCycleDelayStmt() {
   } else {
     stmt->cycle_delay = ParsePrimaryExpr();
   }
-  Expect(TokenKind::kSemicolon);
+  stmt->body = ParseStmt();
   return stmt;
 }
 

@@ -784,6 +784,9 @@ static ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx,
   if (cycles > 0) {
     co_await CycleDelayAwaiter{ctx, cycles};
   }
+  if (stmt->body) {
+    co_return co_await ExecStmt(stmt->body, ctx, arena);
+  }
   co_return StmtResult::kDone;
 }
 
