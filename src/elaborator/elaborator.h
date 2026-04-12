@@ -224,6 +224,7 @@ class Elaborator {
 
   /// §10.2 Table 10-1: Procedural assignment to a net is illegal.
   void ValidateProceduralNetAssign();
+  void ValidateDynamicArrayNba(const ModuleDecl* decl);
 
   /// §10.2 Table 10-1: Continuous assignment LHS selects must be constant.
   void ValidateContAssignConstSelect(const ModuleDecl* decl);

@@ -143,6 +143,45 @@ std::string_view ExprIdent(const Expr* e) {
   return {};
 }
 
+// §10.4.2: Walk through select/member-access chains to find the base variable.
+static std::string_view LhsBaseName(const Expr* e) {
+  while (e) {
+    if (e->kind == ExprKind::kIdentifier) return e->text;
+    if (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
+      e = e->base;
+      continue;
+    }
+    break;
+  }
+  return {};
+}
+
+// §10.4.2: It shall be illegal to make nonblocking assignments to elements of
+// dynamically sized array variables.
+static void CheckNbaDynamicArrayTarget(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& dyn_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kNonblockingAssign && s->lhs &&
+      s->lhs->kind == ExprKind::kSelect) {
+    auto name = LhsBaseName(s->lhs);
+    if (!name.empty() && dyn_names.count(name) != 0) {
+      diag.Error(s->range.start,
+                 "nonblocking assignment to element of dynamic array");
+    }
+  }
+  for (auto* sub : s->stmts) CheckNbaDynamicArrayTarget(sub, dyn_names, diag);
+  for (auto* sub : s->fork_stmts)
+    CheckNbaDynamicArrayTarget(sub, dyn_names, diag);
+  CheckNbaDynamicArrayTarget(s->then_branch, dyn_names, diag);
+  CheckNbaDynamicArrayTarget(s->else_branch, dyn_names, diag);
+  CheckNbaDynamicArrayTarget(s->body, dyn_names, diag);
+  CheckNbaDynamicArrayTarget(s->for_body, dyn_names, diag);
+  for (auto& ci : s->case_items)
+    CheckNbaDynamicArrayTarget(ci.body, dyn_names, diag);
+}
+
 static void CollectProcTargets(
     const Stmt* s, std::unordered_map<std::string_view, SourceLoc>& out) {
   if (!s) return;
@@ -588,6 +627,20 @@ void Elaborator::ValidateProceduralNetAssign() {
                                    "procedural assignment",
                                    name));
     }
+  }
+}
+
+void Elaborator::ValidateDynamicArrayNba(const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> dyn_names;
+  for (const auto& [name, info] : var_array_info_) {
+    if (info.is_dynamic) dyn_names.insert(name);
+  }
+  if (dyn_names.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->body)
+      CheckNbaDynamicArrayTarget(item->body, dyn_names, diag_);
+    for (auto* s : item->func_body_stmts)
+      CheckNbaDynamicArrayTarget(s, dyn_names, diag_);
   }
 }
 

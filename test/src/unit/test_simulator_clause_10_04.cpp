@@ -4,20 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ProceduralAssignSim, BlockingImmediateNonblockingDeferred) {
-  auto b_val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 10;\n"
-      "    b <= a;\n"
-      "    a = 99;\n"
-      "  end\n"
-      "endmodule\n",
-      "b");
-  EXPECT_EQ(b_val, 10u);
-}
-
 TEST(ProceduralAssignSim, AssignInCalledTask) {
   auto result = RunAndGet(
       "module t;\n"

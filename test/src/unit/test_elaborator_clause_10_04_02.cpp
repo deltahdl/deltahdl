@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Lowerer, NbaDefersUpdate) {
+TEST(NonblockingAssignSim, NbaDefersUpdate) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -31,7 +31,7 @@ TEST(Lowerer, NbaDefersUpdate) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(Lowerer, NbaAppliesToValue) {
+TEST(NonblockingAssignSim, NbaAppliesToValue) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -45,7 +45,7 @@ TEST(Lowerer, NbaAppliesToValue) {
   LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 20u}});
 }
 
-TEST(NonblockingAssignSim, SimpleNBA) {
+TEST(NonblockingAssignSim, SingleAssignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -290,27 +290,6 @@ TEST(NonblockingAssignSim, NBAInAlwaysFF) {
   auto* var = f.ctx.FindVariable("q");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
-}
-
-TEST(NonblockingAssignSim, NBAInInitialBlock) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    x <= 123;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 123u);
 }
 
 TEST(NonblockingAssignSim, NBAWithIfElse) {
@@ -655,7 +634,7 @@ TEST(NonblockingAssignSim, NBARegisterFilePattern) {
   EXPECT_EQ(r3->value.ToUint64(), 400u);
 }
 
-TEST(NonblockingAssignSim, NBAWidthAndToUint64) {
+TEST(NonblockingAssignSim, DifferentWidths) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -760,6 +739,50 @@ TEST(NonblockingAssignSim, NBAReplicationRHS) {
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
+}
+
+TEST(NonblockingAssignSim, MixedBlockingAndNBA) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] a;\n"
+      "  logic [31:0] b;\n"
+      "  initial begin\n"
+      "    a = 5;\n"
+      "    b <= a + 1;\n"
+      "    a = 10;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 10u}, {"b", 6u}});
+}
+
+TEST(NonblockingAssignSim, AutomaticVariableNbaIsError) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  task automatic set_val();\n"
+      "    int x;\n"
+      "    x <= 42;\n"
+      "  endtask\n"
+      "  initial set_val();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(NonblockingAssignSim, DynamicArrayElementNbaIsError) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int dyn[];\n"
+      "  initial begin\n"
+      "    dyn = new[4];\n"
+      "    dyn[0] <= 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace

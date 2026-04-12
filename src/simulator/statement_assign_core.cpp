@@ -847,12 +847,49 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
 
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
   if (is_select && !elem) {
-    // §10.4.2: Bit-select NBA callback.
+    // §10.4.2: Evaluate LHS index at schedule time, not at callback time.
     const Expr* lhs = stmt->lhs;
-    event->callback = [var, lhs, rhs_val, &ctx, &arena]() {
-      WriteBitSelect(var, lhs, rhs_val, ctx, arena);
-      var->NotifyWatchers();
-    };
+    auto idx_val = EvalExpr(lhs->index, ctx, arena);
+    if (HasUnknownBits(idx_val)) return;
+    uint32_t idx = static_cast<uint32_t>(idx_val.ToUint64());
+
+    if (!lhs->index_end) {
+      // Single bit-select: capture evaluated index.
+      event->callback = [var, idx, rhs_val, &arena]() {
+        if (idx >= var->value.width) return;
+        uint64_t old_val = var->value.ToUint64();
+        uint64_t bit = rhs_val.ToUint64() & 1;
+        uint64_t cleared = old_val & ~(uint64_t{1} << idx);
+        var->value =
+            MakeLogic4VecVal(arena, var->value.width, cleared | (bit << idx));
+        var->NotifyWatchers();
+      };
+    } else {
+      // Part-select: compute lo and width at schedule time.
+      uint32_t end_val = static_cast<uint32_t>(
+          EvalExpr(lhs->index_end, ctx, arena).ToUint64());
+      uint32_t lo = idx;
+      uint32_t w = end_val;
+      if (lhs->is_part_select_plus) {
+        // [idx +: w] — lo stays idx.
+      } else if (lhs->is_part_select_minus) {
+        lo = (idx >= w - 1) ? idx - w + 1 : 0;
+      } else {
+        lo = std::min(idx, end_val);
+        w = std::max(idx, end_val) - lo + 1;
+      }
+      if (w == 0 || lo >= var->value.width) return;
+      if (lo + w > var->value.width) w = var->value.width - lo;
+      event->callback = [var, lo, w, rhs_val, &arena]() {
+        uint64_t mask = (w >= 64) ? ~uint64_t{0} : (uint64_t{1} << w) - 1;
+        uint64_t old_val = var->value.ToUint64();
+        uint64_t new_bits = (rhs_val.ToUint64() & mask) << lo;
+        uint64_t cleared = old_val & ~(mask << lo);
+        var->value =
+            MakeLogic4VecVal(arena, var->value.width, cleared | new_bits);
+        var->NotifyWatchers();
+      };
+    }
   } else {
     auto converted = ConvertRealOnAssign(rhs_val, stmt->lhs, var->value.width,
                                          ctx, arena);
