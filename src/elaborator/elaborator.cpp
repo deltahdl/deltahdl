@@ -920,6 +920,9 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
     ca.width = net.width;
     ca.drive_strength0 = item->data_type.drive_strength0;
     ca.drive_strength1 = item->data_type.drive_strength1;
+    ca.delay = item->net_delay;
+    ca.delay_fall = item->net_delay_fall;
+    ca.delay_decay = item->net_delay_decay;
     mod->assigns.push_back(ca);
   }
 }

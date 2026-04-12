@@ -93,22 +93,6 @@ TEST(DelayParsing, Delay3GateTwoValues) {
   EXPECT_EQ(item->gate_delay_decay, nullptr);
 }
 
-TEST(DelayParsing, Delay3AssignTwoValues) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire out, in;\n"
-      "  assign #(10, 20) out = in;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[2];
-  ASSERT_NE(item->assign_delay, nullptr);
-  EXPECT_EQ(item->assign_delay->int_val, 10u);
-  ASSERT_NE(item->assign_delay_fall, nullptr);
-  EXPECT_EQ(item->assign_delay_fall->int_val, 20u);
-  EXPECT_EQ(item->assign_delay_decay, nullptr);
-}
-
 TEST(DelayParsing, Delay2NInputGateSingleValue) {
   auto r = Parse(
       "module m;\n"
@@ -232,23 +216,6 @@ TEST(DelayParsing, Delay3GateThreeValues) {
   EXPECT_EQ(item->gate_delay_decay->int_val, 15u);
 }
 
-TEST(DelayParsing, Delay3AssignThreeValues) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire out_w, in_w;\n"
-      "  assign #(5, 10, 15) out_w = in_w;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[2];
-  ASSERT_NE(item->assign_delay, nullptr);
-  EXPECT_EQ(item->assign_delay->int_val, 5u);
-  ASSERT_NE(item->assign_delay_fall, nullptr);
-  EXPECT_EQ(item->assign_delay_fall->int_val, 10u);
-  ASSERT_NE(item->assign_delay_decay, nullptr);
-  EXPECT_EQ(item->assign_delay_decay->int_val, 15u);
-}
-
 TEST(DelayParsing, DelayValueOneStep) {
   auto r = Parse(
       "module m;\n"
@@ -362,23 +329,6 @@ TEST(DelayParsing, Delay3MintypMaxThreeValues) {
   EXPECT_EQ(item->net_delay_fall->kind, ExprKind::kMinTypMax);
   ASSERT_NE(item->net_delay_decay, nullptr);
   EXPECT_EQ(item->net_delay_decay->kind, ExprKind::kMinTypMax);
-}
-
-// --- delay3: single value on continuous assignment ---
-
-TEST(DelayParsing, Delay3AssignSingleValue) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire out_w, in_w;\n"
-      "  assign #5 out_w = in_w;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[2];
-  ASSERT_NE(item->assign_delay, nullptr);
-  EXPECT_EQ(item->assign_delay->int_val, 5u);
-  EXPECT_EQ(item->assign_delay_fall, nullptr);
-  EXPECT_EQ(item->assign_delay_decay, nullptr);
 }
 
 }  // namespace

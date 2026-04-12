@@ -2,6 +2,7 @@
 
 #include <coroutine>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -241,6 +242,56 @@ struct AnyChangeAwaiter {
   }
 
   void await_resume() const noexcept {}
+};
+
+// §10.3.3: Awaiter for inertial delay on continuous assignments. Schedules a
+// delay event AND watches RHS variables simultaneously. Resumes when either the
+// delay expires or an RHS variable changes, whichever comes first.
+struct InertialDelayAwaiter {
+  SimContext& ctx;
+  uint64_t delay_ticks;
+  const std::vector<std::string_view>& var_names;
+  std::shared_ptr<bool> fired_ = std::make_shared<bool>(false);
+  std::shared_ptr<bool> expired_ = std::make_shared<bool>(false);
+
+  bool await_ready() const noexcept { return false; }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    auto* proc = ctx.CurrentProcess();
+
+    // Schedule the delay event.
+    auto time = ctx.CurrentTime() + SimTime{delay_ticks};
+    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+    auto f = fired_;
+    auto e = expired_;
+    event->callback = [h, proc, f, e, &ctx = ctx]() mutable {
+      if (*f) return;
+      *f = true;
+      *e = true;
+      if (proc && !proc->active) return;
+      if (proc) ctx.SetCurrentProcess(proc);
+      h.resume();
+    };
+    ctx.GetScheduler().ScheduleEvent(time, Region::kActive, event);
+
+    // Register watchers on RHS variables.
+    for (auto name : var_names) {
+      auto* var = ctx.FindVariable(name);
+      if (!var) continue;
+      var->prev_value = var->value;
+      auto f2 = fired_;
+      var->AddWatcher([h, proc, f2]() mutable {
+        if (*f2) return true;
+        *f2 = true;
+        if (proc && !proc->active) return true;
+        h.resume();
+        return true;
+      });
+    }
+  }
+
+  // Returns true if the delay expired, false if an RHS variable changed.
+  bool await_resume() const noexcept { return *expired_; }
 };
 
 // Shared state for fork/join synchronization.

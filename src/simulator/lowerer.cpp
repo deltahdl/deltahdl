@@ -82,6 +82,17 @@ static Strength ParserStrToStrength(uint8_t s) {
   }
 }
 
+// §10.3.3: Bit-exact comparison of two Logic4Vec values.
+static bool Logic4VecEqual(const Logic4Vec& a, const Logic4Vec& b) {
+  if (a.nwords != b.nwords) return false;
+  for (uint32_t i = 0; i < a.nwords; ++i) {
+    if (a.words[i].aval != b.words[i].aval ||
+        a.words[i].bval != b.words[i].bval)
+      return false;
+  }
+  return true;
+}
+
 // §10.3.3: Check if all bits are high-Z (aval=0, bval=1 for each word).
 static bool IsAllHighZ(const Logic4Vec& v) {
   for (uint32_t i = 0; i < v.nwords; ++i) {
@@ -112,31 +123,49 @@ struct ContAssignParams {
   const Expr* rhs;
   DriverStrength ds;
   ContAssignDelayExprs delays;
+  uint32_t width = 0;
 };
 
 // §10.3.3: Select the appropriate delay for a continuous assignment based on
 // the transition from old_val to new_val.
 static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
                                       const Logic4Vec& new_val,
-                                      const ContAssignDelays& d) {
+                                      const ContAssignDelays& d,
+                                      uint32_t width) {
   if (!d.has_fall) return d.rise;  // Single delay for all transitions.
-  uint64_t new_bits = new_val.ToUint64();
-  bool new_has_x = HasUnknownBits(new_val);
+
   bool new_is_z = IsAllHighZ(new_val);
-  uint64_t old_bits = old_val.ToUint64();
-  bool old_has_x = HasUnknownBits(old_val);
-  if (new_is_z && d.has_decay) return d.decay;
-  if (new_has_x) {
-    uint64_t m = std::min(d.rise, d.fall);
-    if (d.has_decay) m = std::min(m, d.decay);
-    return m;
-  }
-  if (old_has_x || IsAllHighZ(old_val)) {
+  if (new_is_z) {
+    if (d.has_decay) return d.decay;
     return std::min(d.rise, d.fall);
   }
-  if (new_bits > old_bits) return d.rise;
-  if (new_bits < old_bits) return d.fall;
-  return d.rise;  // No change — use rise as default.
+
+  if (width <= 1) {
+    // Scalar net: gate delay rules (§28.16).
+    bool new_has_x = HasUnknownBits(new_val);
+    if (new_has_x) {
+      uint64_t m = std::min(d.rise, d.fall);
+      if (d.has_decay) m = std::min(m, d.decay);
+      return m;
+    }
+    if (HasUnknownBits(old_val) || IsAllHighZ(old_val)) {
+      return std::min(d.rise, d.fall);
+    }
+    uint64_t nv = new_val.ToUint64();
+    uint64_t ov = old_val.ToUint64();
+    if (nv > ov) return d.rise;
+    if (nv < ov) return d.fall;
+    return d.rise;
+  }
+
+  // Vector net: §10.3.3 rules.
+  // Nonzero-to-zero uses fall; all other transitions use rise.
+  if (!HasUnknownBits(new_val) && new_val.ToUint64() == 0 &&
+      !HasUnknownBits(old_val) && !IsAllHighZ(old_val) &&
+      old_val.ToUint64() != 0) {
+    return d.fall;
+  }
+  return d.rise;
 }
 
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
@@ -156,7 +185,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   while (!ctx.StopRequested()) {
     auto val = EvalExpr(params.rhs, ctx, arena);
 
-    // §10.3.3: Apply continuous assignment delay if specified.
+    // §10.3.3: Apply continuous assignment delay with inertial semantics.
     if (params.delays.rise) {
       ContAssignDelays d;
       d.rise = EvalExpr(params.delays.rise, ctx, arena).ToUint64();
@@ -176,8 +205,27 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
       else if (net && net->resolved)
         old_val = net->resolved->value;
 
-      uint64_t ticks = SelectContAssignDelay(old_val, val, d);
-      if (ticks > 0) {
+      uint64_t ticks = SelectContAssignDelay(old_val, val, d, params.width);
+      if (ticks > 0 && !read_vars.empty()) {
+        // §10.3.3: Inertial delay — if the RHS changes before the delay
+        // expires, cancel the pending assignment and reschedule.
+        SimTime target = ctx.CurrentTime() + SimTime{ticks};
+        while (true) {
+          uint64_t remaining = (target.ticks > ctx.CurrentTime().ticks)
+                                   ? (target.ticks - ctx.CurrentTime().ticks)
+                                   : 0;
+          if (remaining == 0) break;
+          bool expired =
+              co_await InertialDelayAwaiter{ctx, remaining, read_vars};
+          if (expired) break;
+          auto new_val = EvalExpr(params.rhs, ctx, arena);
+          if (!Logic4VecEqual(new_val, val)) {
+            val = new_val;
+            ticks = SelectContAssignDelay(old_val, val, d, params.width);
+            target = ctx.CurrentTime() + SimTime{ticks};
+          }
+        }
+      } else if (ticks > 0) {
         co_await DelayAwaiter{ctx, ticks};
       }
     }
@@ -812,6 +860,7 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca) {
   cap.ds = {ParserStrToStrength(ca.drive_strength0),
             ParserStrToStrength(ca.drive_strength1)};
   cap.delays = {ca.delay, ca.delay_fall, ca.delay_decay};
+  cap.width = ca.width;
   p->coro = MakeContAssignCoroutine(cap, ctx_, arena_).Release();
 
   ScheduleProcess(p, ctx_);
