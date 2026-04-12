@@ -21,7 +21,8 @@ StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx, Arena& arena);
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena);
 StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena);
-StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx);
+StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
+                                     Arena& arena);
 
 // §10.4.1: Perform the LHS assignment portion of a blocking assign using a
 // pre-evaluated RHS value (used by intra-assignment delay/event).

@@ -29,6 +29,10 @@ struct Variable {
   // (assign/force). Used by watchers to reevaluate on RHS variable changes.
   const Expr* proc_cont_rhs = nullptr;
 
+  // RHS of an active assign procedural continuous assignment, preserved across
+  // force so that release can reestablish it.
+  const Expr* assign_cont_rhs = nullptr;
+
   // Watchers return true if consumed (should be removed), false to keep.
   std::vector<std::function<bool()>> watchers;
 

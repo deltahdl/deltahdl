@@ -10,7 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(LvalueSim, VarLvalueForce) {
+TEST(ForceReleaseSim, VarLvalueForce) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -167,7 +167,7 @@ static TwoNets MakeTwoWireNets() {
   return tn;
 }
 
-TEST(ForceRelease, NormativeExampleForceAndRelease_InitialState) {
+TEST(ForceRelease, NormativeExampleInitialState) {
   auto tn = MakeTwoWireNets();
 
   ReleaseNet(tn.net_d, tn.arena);
@@ -176,7 +176,7 @@ TEST(ForceRelease, NormativeExampleForceAndRelease_InitialState) {
   EXPECT_EQ(ValOf(*tn.ve), kVal0);
 }
 
-TEST(ForceRelease, NormativeExampleForceAndRelease_ForceAndRelease) {
+TEST(ForceRelease, NormativeExampleForceThenRelease) {
   auto tn = MakeTwoWireNets();
 
   ForceNet(tn.net_d, MakeLogic4VecVal(tn.arena, 1, 1), tn.arena);
@@ -190,7 +190,7 @@ TEST(ForceRelease, NormativeExampleForceAndRelease_ForceAndRelease) {
   EXPECT_EQ(ValOf(*tn.ve), kVal0);
 }
 
-TEST(StmtExec, ForceOverridesValue) {
+TEST(ForceReleaseExec, ForceOverridesValue) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("x", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 10);
@@ -206,7 +206,7 @@ TEST(StmtExec, ForceOverridesValue) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(StmtExec, ForceNullLhsNoOp) {
+TEST(ForceReleaseExec, ForceNullLhsNoOp) {
   StmtFixture f;
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kForce;
@@ -217,7 +217,7 @@ TEST(StmtExec, ForceNullLhsNoOp) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-TEST(StmtExec, ReleaseClearsForce) {
+TEST(ForceReleaseExec, ReleaseClearsForce) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("y", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
@@ -232,7 +232,7 @@ TEST(StmtExec, ReleaseClearsForce) {
   EXPECT_FALSE(var->is_forced);
 }
 
-TEST(StmtExec, ReleaseUnknownVarNoOp) {
+TEST(ForceReleaseExec, ReleaseUnknownVarNoOp) {
   StmtFixture f;
   auto* stmt = f.arena.Create<Stmt>();
   stmt->kind = StmtKind::kRelease;
@@ -242,7 +242,7 @@ TEST(StmtExec, ReleaseUnknownVarNoOp) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-TEST(StmtExec, ForcePreventsNormalAssign) {
+TEST(ForceReleaseExec, ForcePreventsNormalAssign) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("fv", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
@@ -261,7 +261,7 @@ TEST(StmtExec, ForcePreventsNormalAssign) {
   EXPECT_EQ(var->forced_value.ToUint64(), 50u);
 }
 
-TEST(StmtExec, ForceReleaseThenAssign) {
+TEST(ForceReleaseExec, ForceReleaseThenAssign) {
   StmtFixture f;
   auto* var = f.ctx.CreateVariable("fra", 32);
   var->value = MakeLogic4VecVal(f.arena, 32, 0);
@@ -285,7 +285,60 @@ TEST(StmtExec, ForceReleaseThenAssign) {
   EXPECT_EQ(var->value.ToUint64(), 75u);
 }
 
-TEST(ProceduralContinuousAssignSim, ForceOverridesBlockingAssign) {
+TEST(ForceReleaseExec, ReleaseNullLhsNoOp) {
+  StmtFixture f;
+  auto* stmt = f.arena.Create<Stmt>();
+  stmt->kind = StmtKind::kRelease;
+  stmt->lhs = nullptr;
+
+  auto result = RunStmt(stmt, f.ctx, f.arena);
+  EXPECT_EQ(result, StmtResult::kDone);
+}
+
+TEST(ForceReleaseSim, ForcePreventsNonblockingAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    x <= 8'd100;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+  EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
+TEST(ForceReleaseSim, ReforceUpdatesValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    force x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_TRUE(x->is_forced);
+  EXPECT_EQ(x->value.ToUint64(), 99u);
+}
+
+TEST(ForceReleaseSim, ForceOverridesBlockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -306,7 +359,7 @@ TEST(ProceduralContinuousAssignSim, ForceOverridesBlockingAssign) {
   EXPECT_TRUE(x->is_forced);
 }
 
-TEST(ProceduralContinuousAssignSim, ReleaseVariableHoldsValue) {
+TEST(ForceReleaseSim, ReleaseVariableHoldsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -328,7 +381,7 @@ TEST(ProceduralContinuousAssignSim, ReleaseVariableHoldsValue) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-TEST(ProceduralContinuousAssignSim, ForceReleaseThenAssign) {
+TEST(ForceReleaseSim, ForceReleaseThenAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -350,7 +403,7 @@ TEST(ProceduralContinuousAssignSim, ForceReleaseThenAssign) {
   EXPECT_EQ(x->value.ToUint64(), 75u);
 }
 
-TEST(ProceduralContinuousAssignSim, ForceOverridesAssign) {
+TEST(ForceReleaseSim, ForceOverridesAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -370,7 +423,7 @@ TEST(ProceduralContinuousAssignSim, ForceOverridesAssign) {
   EXPECT_EQ(x->value.ToUint64(), 99u);
 }
 
-TEST(ProceduralContinuousAssignSim, ForcePreventsBlockingAssign) {
+TEST(ForceReleaseSim, ForcePreventsBlockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -392,7 +445,7 @@ TEST(ProceduralContinuousAssignSim, ForcePreventsBlockingAssign) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-TEST(ProceduralContinuousAssignSim, ForceExpressionRhs) {
+TEST(ForceReleaseSim, ForceExpressionRhs) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -410,6 +463,28 @@ TEST(ProceduralContinuousAssignSim, ForceExpressionRhs) {
   auto* b = f.ctx.FindVariable("b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 0xFFu);
+}
+
+TEST(ForceReleaseSim, ReleaseReestablishesAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    assign x = 8'd10;\n"
+      "    force x = 8'd99;\n"
+      "    release x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_FALSE(x->is_forced);
+  EXPECT_EQ(x->value.ToUint64(), 10u);
 }
 
 }  // namespace

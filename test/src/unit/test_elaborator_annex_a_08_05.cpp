@@ -116,18 +116,6 @@ TEST(LvalueElaboration, VarLvalueNonblockingElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(LvalueElaboration, VarLvalueForceReleaseElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  initial begin force x = 1; release x; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(LvalueElaboration, VarLvalueStreamingConcatElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

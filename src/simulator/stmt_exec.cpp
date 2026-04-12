@@ -1501,7 +1501,7 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       return ExecTask::Immediate(ExecForceOrAssignImpl(stmt, ctx, arena));
     case StmtKind::kRelease:
     case StmtKind::kDeassign:
-      return ExecTask::Immediate(ExecReleaseOrDeassignImpl(stmt, ctx));
+      return ExecTask::Immediate(ExecReleaseOrDeassignImpl(stmt, ctx, arena));
     case StmtKind::kRandcase:
       return ExecRandcase(stmt, ctx, arena);
     case StmtKind::kRandsequence:

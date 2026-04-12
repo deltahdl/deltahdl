@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(AssignmentParsing, ForceKind) {
+TEST(ForceReleaseParsing, ForceKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire w;\n"
@@ -20,7 +20,7 @@ TEST(AssignmentParsing, ForceKind) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(AssignmentParsing, ForceLhs) {
+TEST(ForceReleaseParsing, ForceLhs) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire w;\n"
@@ -35,7 +35,7 @@ TEST(AssignmentParsing, ForceLhs) {
   EXPECT_EQ(stmt->lhs->text, "w");
 }
 
-TEST(AssignmentParsing, ReleaseKind) {
+TEST(ForceReleaseParsing, ReleaseKind) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire w;\n"
@@ -50,7 +50,7 @@ TEST(AssignmentParsing, ReleaseKind) {
   EXPECT_EQ(stmt->rhs, nullptr);
 }
 
-TEST(AssignmentParsing, ReleaseLhs) {
+TEST(ForceReleaseParsing, ReleaseLhs) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire w;\n"
@@ -64,7 +64,7 @@ TEST(AssignmentParsing, ReleaseLhs) {
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->text, "w");
 }
-TEST(AssignmentParsing, ForceThenRelease) {
+TEST(ForceReleaseParsing, ForceThenRelease) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  wire w;\n"
