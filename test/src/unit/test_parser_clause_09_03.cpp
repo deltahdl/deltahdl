@@ -5,22 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(BlockStatementParsing, SeqBlockAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    begin\n"
-      "      a = 1;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlock);
-}
-
 TEST(BlockStatementParsing, ParBlockAsStatement) {
   auto r = Parse(
       "module m;\n"
@@ -69,26 +53,6 @@ TEST(BlockStatementParsing, ParBlockJoinNoneAsStatement) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kFork);
   EXPECT_EQ(stmt->join_kind, TokenKind::kKwJoinNone);
-}
-
-TEST(BlockStatementParsing, SeqBlockGroupsAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    if (1) begin\n"
-      "      a = 1;\n"
-      "      b = 2;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kIf);
-  ASSERT_NE(stmt->then_branch, nullptr);
-  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
-  EXPECT_EQ(stmt->then_branch->stmts.size(), 2u);
 }
 
 TEST(BlockStatementParsing, ParBlockGroupsAsStatement) {

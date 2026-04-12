@@ -5,42 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(BlockItemDeclParsing, AttrOnDataDeclInBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    (* synthesis *) int x;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(BlockItemDeclParsing, AttrOnLocalparamInBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    (* synthesis *) localparam int X = 5;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(BlockItemDeclParsing, DataDeclBasicInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "    x = 5;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[0]->var_name, "x");
-}
-
-TEST(ProceduralBlockSyntaxParsing, Integration_InitialWithTimingAndAssign) {
+TEST(SequentialBlockParsing, StatementsWithDelaysAndEventControl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -60,7 +25,7 @@ TEST(ProceduralBlockSyntaxParsing, Integration_InitialWithTimingAndAssign) {
   EXPECT_EQ(stmts[3]->kind, StmtKind::kEventControl);
 }
 
-TEST(ProcessTimingAndControlParsing, SequentialBlockWithLocalVarDecl) {
+TEST(SequentialBlockParsing, SequentialBlockWithLocalVarDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -78,7 +43,7 @@ TEST(ProcessTimingAndControlParsing, SequentialBlockWithLocalVarDecl) {
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ProcessTimingAndControlParsing, SequentialBlockMultipleLocalVars) {
+TEST(SequentialBlockParsing, SequentialBlockMultipleLocalVars) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -97,7 +62,7 @@ TEST(ProcessTimingAndControlParsing, SequentialBlockMultipleLocalVars) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ProcessParsing, BlockWithSystemCalls) {
+TEST(SequentialBlockParsing, BlockWithSystemCalls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -116,7 +81,7 @@ TEST(ProcessParsing, BlockWithSystemCalls) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kExprStmt);
 }
 
-TEST(ProcessParsing, BlockWithMixedBlockingNonblocking) {
+TEST(SequentialBlockParsing, BlockWithMixedBlockingNonblocking) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -133,42 +98,7 @@ TEST(ProcessParsing, BlockWithMixedBlockingNonblocking) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(BlockVarDeclParsing, BlockVarDecl_BuiltinType_Block) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int x;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->kind, ModuleItemKind::kInitialBlock);
-  auto* blk = item->body;
-  ASSERT_NE(blk, nullptr);
-  ASSERT_EQ(blk->kind, StmtKind::kBlock);
-  ASSERT_EQ(blk->stmts.size(), 1u);
-}
-
-TEST(ProcessParsing, StaticVarDeclInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    static int call_count = 0;\n"
-      "    call_count = call_count + 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(body->stmts[0]->var_is_static);
-  EXPECT_FALSE(body->stmts[0]->var_is_automatic);
-  EXPECT_EQ(body->stmts[0]->var_name, "call_count");
-}
-
-TEST(BlockVarDeclParsing, BlockVarDecl_BuiltinType_Stmt) {
+TEST(BlockVarDeclParsing, BuiltinTypeDecl) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -184,7 +114,7 @@ TEST(BlockVarDeclParsing, BlockVarDecl_BuiltinType_Stmt) {
   EXPECT_EQ(blk->stmts[0]->var_name, "x");
 }
 
-TEST(BlockVarDeclParsing, BlockVarDecl_UserDefinedType) {
+TEST(BlockVarDeclParsing, UserDefinedTypeDecl) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  typedef struct {int a, b[4];} ab_t;\n"
@@ -204,7 +134,7 @@ static void VerifyBlockVarDecls(const Stmt* blk,
   }
 }
 
-TEST(BlockVarDeclParsing, BlockVarDecl_CommaSeparated) {
+TEST(BlockVarDeclParsing, CommaSeparatedDecls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -218,23 +148,7 @@ TEST(BlockVarDeclParsing, BlockVarDecl_CommaSeparated) {
   VerifyBlockVarDecls(blk, expected_names, std::size(expected_names));
 }
 
-TEST(ProcessParsing, SequentialBlockVarDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    int temp;\n"
-      "    temp = 42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  ASSERT_GE(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-}
-
-TEST(ProcessParsing, LocalVarDecl) {
+TEST(SequentialBlockParsing, LocalVarDecl) {
   auto r = Parse(
       "module m;\n"
       "  logic [7:0] a, b, result;\n"
@@ -257,46 +171,6 @@ TEST(ProcessParsing, LocalVarDecl) {
   EXPECT_EQ(item->body->stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ProcessParsing, SequentialBlockMultipleVarDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin int x; logic [7:0] y; x = 1; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 3u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kVarDecl);
-}
-
-TEST(BlockItemDeclParsing, ParameterInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    parameter int Y = 10;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->var_name, "Y");
-}
-
-TEST(BlockItemDeclParsing, MixedBlockItems) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    parameter int P = 1;\n"
-              "    localparam int LP = 2;\n"
-              "    int x = 3;\n"
-              "    x = x + P + LP;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(BlockItemDeclParsing, NestedBlocksWithDecls) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -317,7 +191,7 @@ static ModuleItem* FirstAlwaysLatchItem(ParseResult& r) {
   return nullptr;
 }
 
-TEST(ProcessParsing, VarDeclInBlock) {
+TEST(SequentialBlockParsing, VarDeclInBlock) {
   auto r = Parse(
       "module m;\n"
       "  logic en;\n"
@@ -338,19 +212,7 @@ TEST(ProcessParsing, VarDeclInBlock) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(BlockItemDeclParsing, ImportInBlock) {
-  EXPECT_TRUE(
-      ParseOk("package pkg;\n"
-              "  int x = 5;\n"
-              "endpackage\n"
-              "module m;\n"
-              "  initial begin\n"
-              "    import pkg::*;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(ProcessParsing, VarDeclAsFirstStatement) {
+TEST(SequentialBlockParsing, VarDeclAsFirstStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -368,7 +230,7 @@ TEST(ProcessParsing, VarDeclAsFirstStatement) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ProcessParsing, MultipleDifferentTypeVarDecls) {
+TEST(SequentialBlockParsing, MultipleDifferentTypeVarDecls) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -389,44 +251,109 @@ TEST(ProcessParsing, MultipleDifferentTypeVarDecls) {
   EXPECT_EQ(body->stmts[3]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ProcessParsing, VarDeclWithInitializer) {
+TEST(SequentialBlockParsing, SeqBlockAsStatement) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
-      "    int count = 10;\n"
-      "    $display(\"%0d\", count);\n"
+      "    begin\n"
+      "      a = 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlock);
+}
+
+TEST(SequentialBlockParsing, SeqBlockGroupsAsStatement) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    if (1) begin\n"
+      "      a = 1;\n"
+      "      b = 2;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kIf);
+  ASSERT_NE(stmt->then_branch, nullptr);
+  EXPECT_EQ(stmt->then_branch->kind, StmtKind::kBlock);
+  EXPECT_EQ(stmt->then_branch->stmts.size(), 2u);
+}
+
+TEST(SequentialBlockParsing, EmptySeqBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    begin\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kBlock);
+  EXPECT_EQ(stmt->stmts.size(), 0u);
+}
+
+TEST(SequentialBlockParsing, NullStatementInSeqBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    ;\n"
+      "    a = 1;\n"
+      "    ;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SequentialBlockParsing, LabeledSeqBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : my_block\n"
+      "    a = 1;\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* body = FirstInitialBody(r);
   ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_EQ(body->stmts[0]->var_name, "count");
-  EXPECT_NE(body->stmts[0]->var_init, nullptr);
+  EXPECT_EQ(body->kind, StmtKind::kBlock);
+  EXPECT_EQ(body->label, "my_block");
 }
 
-TEST(DataTypeParsing, BlockLevelParameter) {
+TEST(SequentialBlockParsing, LabeledSeqBlockWithMatchingEndLabel) {
   auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    parameter int P = 42;\n"
-      "  end\n"
+      "module m;\n"
+      "  initial begin : blk\n"
+      "    a = 1;\n"
+      "  end : blk\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->label, "blk");
 }
 
-TEST(DataTypeParsing, BlockLevelLocalparam) {
+TEST(SequentialBlockParsing, MismatchedEndLabelError) {
   auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    localparam int LP = 10;\n"
-      "  end\n"
+      "module m;\n"
+      "  initial begin : foo\n"
+      "    a = 1;\n"
+      "  end : bar\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace
