@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_ConcatLhs) {
+TEST(BlockingAssignParsing, ConcatenationLhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin {a, b} = {c, d}; end\n"
@@ -20,7 +20,7 @@ TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_ConcatLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_BitSelectLhs) {
+TEST(BlockingAssignParsing, BitSelectLhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin mem[3] = 8'hFF; end\n"
@@ -33,7 +33,7 @@ TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_BitSelectLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_PartSelectLhs) {
+TEST(BlockingAssignParsing, PartSelectLhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin data[7:0] = 8'hAB; end\n"
@@ -46,7 +46,7 @@ TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_PartSelectLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
 }
 
-TEST(ProceduralBlockSyntaxParsing, VariableAssignment_SimpleExpr) {
+TEST(BlockingAssignParsing, BinaryExpressionRhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = a + b * c; end\n"
@@ -59,7 +59,7 @@ TEST(ProceduralBlockSyntaxParsing, VariableAssignment_SimpleExpr) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
 }
 
-TEST(ProceduralBlockSyntaxParsing, VariableAssignment_CallRhs) {
+TEST(BlockingAssignParsing, FunctionCallRhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin x = func(a, b); end\n"
@@ -72,7 +72,7 @@ TEST(ProceduralBlockSyntaxParsing, VariableAssignment_CallRhs) {
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kCall);
 }
 
-TEST(AssignmentParsing, SimpleBlocking) {
+TEST(BlockingAssignParsing, SimpleBlocking) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -93,7 +93,7 @@ TEST(AssignmentParsing, SimpleBlocking) {
   EXPECT_EQ(stmt->rhs->text, "b");
 }
 
-TEST(AssignmentParsing, InBeginEndBlock) {
+TEST(BlockingAssignParsing, InBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] x, y;\n"
@@ -114,7 +114,7 @@ TEST(AssignmentParsing, InBeginEndBlock) {
   EXPECT_EQ(s1->lhs->text, "y");
 }
 
-TEST(AssignmentParsing, MultipleSequential) {
+TEST(BlockingAssignParsing, MultipleSequential) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -138,7 +138,7 @@ TEST(AssignmentParsing, MultipleSequential) {
   EXPECT_EQ(s3->lhs->text, "a");
 }
 
-TEST(AssignmentParsing, ArrayElementLhs) {
+TEST(BlockingAssignParsing, ArrayElementLhs) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] arr [0:3];\n"
@@ -157,7 +157,7 @@ TEST(AssignmentParsing, ArrayElementLhs) {
 }
 
 
-TEST(AssignmentParsing, NestedStructMemberLhs) {
+TEST(BlockingAssignParsing, NestedStructMemberLhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -173,7 +173,7 @@ TEST(AssignmentParsing, NestedStructMemberLhs) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(AssignmentParsing, ComplexLhsRhsCombinations) {
+TEST(BlockingAssignParsing, ComplexLhsRhsCombinations) {
   auto r = Parse(
       "module m;\n"
       "  reg [15:0] data;\n"
@@ -197,20 +197,7 @@ TEST(AssignmentParsing, ComplexLhsRhsCombinations) {
   EXPECT_EQ(s1->rhs->kind, ExprKind::kBinary);
 }
 
-TEST(ProceduralAssignAndControlParsing, BlockingAssignSimple) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    rega = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
-TEST(AssignmentParsing, StructMemberLhs) {
+TEST(BlockingAssignParsing, StructMemberLhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -224,43 +211,6 @@ TEST(AssignmentParsing, StructMemberLhs) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
   ASSERT_NE(stmt->lhs, nullptr);
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
-}
-
-TEST(ProceduralAssignAndControlParsing, BlockingAssignBitSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial rega[3] = 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kSelect);
-}
-
-TEST(ProceduralAssignAndControlParsing, BlockingAssignPartSelect) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial rega[3:5] = 7;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-}
-
-TEST(ProceduralAssignAndControlParsing, BlockingAssignConcatLhs) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial {carry, acc} = rega + regb;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kConcatenation);
 }
 
 }  // namespace

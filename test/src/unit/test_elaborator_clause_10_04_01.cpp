@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(PatternSim, PatternInBlockingAssignment) {
+TEST(BlockingAssignSim, SequentialOverwriteTwoVars) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -164,29 +164,6 @@ TEST(BlockingAssignSim, BlockingAssignFunctionCall) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-TEST(BlockingAssignSim, BlockingAssignLastWins) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x;\n"
-      "  initial begin\n"
-      "    x = 1;\n"
-      "    x = 2;\n"
-      "    x = 3;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 3u);
-}
-
 TEST(BlockingAssignSim, BlockingAssignChain) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -200,6 +177,48 @@ TEST(BlockingAssignSim, BlockingAssignChain) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 1u}, {"c", 1u}});
+}
+
+TEST(BlockingAssignSim, ConcatenationLhsCarryPattern) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic carry;\n"
+      "  logic [7:0] acc, rega, regb;\n"
+      "  initial begin\n"
+      "    rega = 8'd128;\n"
+      "    regb = 8'd128;\n"
+      "    {carry, acc} = rega + regb;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* carry_var = f.ctx.FindVariable("carry");
+  auto* acc_var = f.ctx.FindVariable("acc");
+  ASSERT_NE(carry_var, nullptr);
+  ASSERT_NE(acc_var, nullptr);
+  EXPECT_EQ(carry_var->value.ToUint64(), 1u);
+  EXPECT_EQ(acc_var->value.ToUint64(), 0u);
+}
+
+TEST(BlockingAssignSim, VariableIndexArrayElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] mem [0:3];\n"
+      "  int idx;\n"
+      "  logic [7:0] out;\n"
+      "  initial begin\n"
+      "    idx = 2;\n"
+      "    mem[idx] = 8'hFF;\n"
+      "    out = mem[2];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"out", 0xFFu}});
 }
 
 }  // namespace
