@@ -75,25 +75,13 @@ TEST(ProceduralAssignAndControlParsing, ForkJoinAnyWithDisableFork) {
   EXPECT_EQ(fork_stmt->join_kind, TokenKind::kKwJoinAny);
 }
 
-TEST(ProcessParsing, ForkJoinNoneThenDisableFork) {
-  auto r = Parse(
+TEST(DisableForkParsing, DisableForkMissingSemicolon) {
+  EXPECT_TRUE(Parse(
       "module m;\n"
       "  initial begin\n"
-      "    fork\n"
-      "      #100 a = 1;\n"
-      "      #200 b = 2;\n"
-      "    join_none\n"
-      "    #50;\n"
-      "    disable fork;\n"
+      "    disable fork\n"
       "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 3u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kFork);
-  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kDisableFork);
+      "endmodule\n").has_errors);
 }
 
 }  // namespace

@@ -1109,10 +1109,12 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   state->remaining = process_count;
   state->join_any = (stmt->join_kind == TokenKind::kKwJoinAny);
 
+  auto* spawning_proc = ctx.CurrentProcess();
+
   WaitForkState* parent_wfs = nullptr;
   Process* parent_proc = nullptr;
   if (stmt->join_kind == TokenKind::kKwJoinNone) {
-    parent_proc = ctx.CurrentProcess();
+    parent_proc = spawning_proc;
     if (parent_proc) parent_wfs = &parent_proc->wait_fork_state;
   }
 
@@ -1120,6 +1122,7 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     if (IsForkBlockItemDecl(s)) continue;
     if (parent_wfs) parent_wfs->remaining++;
     auto* p = arena.Create<Process>();
+    if (spawning_proc) spawning_proc->children.push_back(p);
     p->kind = ProcessKind::kInitial;
     p->coro =
         ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
@@ -1364,6 +1367,24 @@ static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
   return StmtResult::kDone;
 }
 
+// --- Disable fork statement (IEEE §9.6.3) ---
+
+static void DisableDescendants(Process* proc) {
+  for (auto* child : proc->children) {
+    child->active = false;
+    DisableDescendants(child);
+  }
+}
+
+static StmtResult ExecDisableForkImpl(SimContext& ctx) {
+  auto* proc = ctx.CurrentProcess();
+  if (!proc) return StmtResult::kDone;
+  DisableDescendants(proc);
+  proc->wait_fork_state.remaining = 0;
+  proc->children.clear();
+  return StmtResult::kDone;
+}
+
 // --- Main dispatch ---
 
 ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -1425,7 +1446,7 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kDisable:
       return ExecTask::Immediate(ExecDisableImpl(stmt, ctx));
     case StmtKind::kDisableFork:
-      return ExecTask::Immediate(StmtResult::kDone);
+      return ExecTask::Immediate(ExecDisableForkImpl(ctx));
     case StmtKind::kWaitFork:
       return ExecWaitFork(ctx);
     case StmtKind::kBreak:

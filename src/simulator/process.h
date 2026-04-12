@@ -110,6 +110,9 @@ struct Process {
   // §9.6.1: Tracks join_none children for wait fork.
   WaitForkState wait_fork_state;
 
+  // §9.6.3: Dynamic parent-child tracking for disable fork.
+  std::vector<Process*> children;
+
   // §12.4.2.1: Pending violation reports awaiting Observed region maturation.
   std::vector<std::string> pending_violations;
 
