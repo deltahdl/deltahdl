@@ -67,7 +67,7 @@ TEST(EventControlElaboration, EdgeSensitivityPreservedInRtlir) {
   }
 }
 
-TEST(Lowerer, PosedgeWakeup) {
+TEST(EventControlLowering, PosedgeWakeup) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -92,6 +92,39 @@ TEST(Lowerer, PosedgeWakeup) {
   auto* count = f.ctx.FindVariable("count");
   ASSERT_NE(count, nullptr);
   EXPECT_EQ(count->value.ToUint64(), 1u);
+}
+
+TEST(EventControlElaboration, EdgeEventControlElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, q, d;\n"
+      "  always @(edge clk) q <= d;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  bool found = false;
+  for (auto& p : design->top_modules[0]->processes) {
+    if (!p.sensitivity.empty()) {
+      EXPECT_EQ(p.sensitivity[0].edge, Edge::kEdge);
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST(EventControlElaboration, NamedEventElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  event ev;\n"
+      "  initial @(ev) ;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

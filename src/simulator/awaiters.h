@@ -92,11 +92,37 @@ struct EventAwaiter {
   void await_resume() const noexcept {}
 
   static bool CheckEdge(const Variable* var, Edge edge) {
-    uint64_t prev = var->prev_value.ToUint64();
-    uint64_t cur = var->value.ToUint64();
-    if (edge == Edge::kPosedge) return (prev & 1) == 0 && (cur & 1) == 1;
-    if (edge == Edge::kNegedge) return (prev & 1) == 1 && (cur & 1) == 0;
-    return prev != cur;  // any change
+    if (edge == Edge::kNone) {
+      const auto& prev = var->prev_value;
+      const auto& cur = var->value;
+      if (prev.nwords != cur.nwords) return true;
+      for (uint32_t i = 0; i < prev.nwords; ++i) {
+        if (prev.words[i].aval != cur.words[i].aval ||
+            prev.words[i].bval != cur.words[i].bval)
+          return true;
+      }
+      return false;
+    }
+    // Edge events: Table 9-2, detected only on the LSB.
+    uint64_t pa = 0, pb = 0, ca = 0, cb = 0;
+    if (var->prev_value.nwords > 0) {
+      pa = var->prev_value.words[0].aval & 1;
+      pb = var->prev_value.words[0].bval & 1;
+    }
+    if (var->value.nwords > 0) {
+      ca = var->value.words[0].aval & 1;
+      cb = var->value.words[0].bval & 1;
+    }
+    bool prev_is_0 = (pa == 0 && pb == 0);
+    bool prev_is_1 = (pa == 1 && pb == 0);
+    bool prev_is_xz = (pb == 1);
+    bool cur_is_0 = (ca == 0 && cb == 0);
+    bool cur_is_1 = (ca == 1 && cb == 0);
+    bool pos = (prev_is_0 && !cur_is_0) || (prev_is_xz && cur_is_1);
+    bool neg = (prev_is_1 && !cur_is_1) || (prev_is_xz && cur_is_0);
+    if (edge == Edge::kPosedge) return pos;
+    if (edge == Edge::kNegedge) return neg;
+    return pos || neg;  // Edge::kEdge
   }
 
   static bool HandleEdgeEvent(std::coroutine_handle<>& h, Variable* var,
