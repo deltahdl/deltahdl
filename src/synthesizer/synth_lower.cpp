@@ -531,6 +531,11 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
       case RtlirProcessKind::kAlwaysComb:
         LowerAlwaysComb(proc, *aig);
         break;
+      case RtlirProcessKind::kAlways:
+        if (proc.is_star_sensitivity) {
+          LowerAlwaysComb(proc, *aig);
+        }
+        break;
       case RtlirProcessKind::kAlwaysFF:
         LowerAlwaysFF(proc, *aig);
         break;

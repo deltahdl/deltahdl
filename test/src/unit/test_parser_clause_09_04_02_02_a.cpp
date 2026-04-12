@@ -4,29 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_ImplicitSensitivityStar) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @* y = a + b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item, nullptr);
-}
-
-TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_ImplicitSensitivityParenStar) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(*) y = a + b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItem(r.cu->modules[0]->items, ModuleItemKind::kAlwaysBlock);
-  ASSERT_NE(item, nullptr);
-}
-
-TEST(ProcessParsing, AtStarAlwaysSimple) {
+TEST(ImplicitEventParsing, AtStarAlwaysSimple) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -42,7 +20,7 @@ TEST(ProcessParsing, AtStarAlwaysSimple) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ProcessParsing, AtStarParenAlwaysSimple) {
+TEST(ImplicitEventParsing, AtStarParenAlwaysSimple) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -58,7 +36,7 @@ TEST(ProcessParsing, AtStarParenAlwaysSimple) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ProcessParsing, AtStarStmtLevelInitial) {
+TEST(ImplicitEventParsing, AtStarStmtLevelInitial) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -75,7 +53,7 @@ TEST(ProcessParsing, AtStarStmtLevelInitial) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-TEST(ProcessParsing, AlwaysStarVarDecls) {
+TEST(ImplicitEventParsing, AlwaysStarVarDecls) {
   auto r = Parse(
       "module m;\n"
       "  always @* begin\n"
@@ -87,7 +65,7 @@ TEST(ProcessParsing, AlwaysStarVarDecls) {
   VerifyAlwaysVarDecl(r);
 }
 
-TEST(ProcessParsing, AtStarParenStmtLevel) {
+TEST(ImplicitEventParsing, AtStarParenStmtLevel) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -104,7 +82,7 @@ TEST(ProcessParsing, AtStarParenStmtLevel) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-TEST(ProcessParsing, AtStarBeginEndBlock) {
+TEST(ImplicitEventParsing, AtStarBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -123,7 +101,7 @@ TEST(ProcessParsing, AtStarBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ProcessParsing, AtStarParenBeginEndBlock) {
+TEST(ImplicitEventParsing, AtStarParenBeginEndBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -142,7 +120,7 @@ TEST(ProcessParsing, AtStarParenBeginEndBlock) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ProcessParsing, AlwaysStarFunctionCall) {
+TEST(ImplicitEventParsing, AlwaysStarFunctionCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  function logic [3:0] mux2(input logic sel,\n"
@@ -155,7 +133,7 @@ TEST(ProcessParsing, AlwaysStarFunctionCall) {
               "endmodule\n"));
 }
 
-TEST(ProcessParsing, AtStarIfElseBody) {
+TEST(ImplicitEventParsing, AtStarIfElseBody) {
   auto r = Parse(
       "module m;\n"
       "  reg sel, a, b, out;\n"
@@ -173,7 +151,7 @@ TEST(ProcessParsing, AtStarIfElseBody) {
   EXPECT_NE(item->body->else_branch, nullptr);
 }
 
-TEST(ProcessParsing, AtStarCaseBody) {
+TEST(ImplicitEventParsing, AtStarCaseBody) {
   auto r = Parse(
       "module m;\n"
       "  reg [1:0] sel;\n"
@@ -194,7 +172,7 @@ TEST(ProcessParsing, AtStarCaseBody) {
   EXPECT_EQ(item->body->case_items.size(), 3u);
 }
 
-TEST(ProcessParsing, AlwaysStarMultipleAssigns) {
+TEST(ImplicitEventParsing, AlwaysStarMultipleAssigns) {
   auto r = Parse(
       "module m;\n"
       "  always @* begin\n"
@@ -206,7 +184,7 @@ TEST(ProcessParsing, AlwaysStarMultipleAssigns) {
   VerifyAlwaysMultiAssigns(r);
 }
 
-TEST(ProcessParsing, AtStarParenMultipleAssignments) {
+TEST(ImplicitEventParsing, AtStarParenMultipleAssignments) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c, d, x, y, z;\n"
@@ -226,39 +204,7 @@ TEST(ProcessParsing, AtStarParenMultipleAssignments) {
   EXPECT_EQ(item->body->stmts.size(), 3u);
 }
 
-static void VerifyStarEventControl(ParseResult& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  auto* stmt = body->stmts[0];
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_TRUE(stmt->is_star_event);
-  EXPECT_TRUE(stmt->events.empty());
-}
-
-TEST(ProcessParsing, StmtLevelStarEventIsStarTrue) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @* a = b;\n"
-      "  end\n"
-      "endmodule\n");
-  VerifyStarEventControl(r);
-}
-
-TEST(ProcessParsing, StmtLevelStarParenEventIsStarTrue) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(*) a = b;\n"
-      "  end\n"
-      "endmodule\n");
-  VerifyStarEventControl(r);
-}
-
-TEST(ProcessParsing, AtStarInInitialBlock) {
+TEST(ImplicitEventParsing, AtStarInInitialBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -276,7 +222,7 @@ TEST(ProcessParsing, AtStarInInitialBlock) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-TEST(ProcessParsing, AtStarParenInInitialBlock) {
+TEST(ImplicitEventParsing, AtStarParenInInitialBlock) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -291,7 +237,7 @@ TEST(ProcessParsing, AtStarParenInInitialBlock) {
   EXPECT_TRUE(stmt->events.empty());
 }
 
-TEST(ProcessParsing, AlwaysStarNestedIfElseInBlock) {
+TEST(ImplicitEventParsing, AlwaysStarNestedIfElseInBlock) {
   auto r = Parse(
       "module m;\n"
       "  always @* begin\n"
@@ -305,35 +251,7 @@ TEST(ProcessParsing, AlwaysStarNestedIfElseInBlock) {
   VerifyAlwaysNestedIfElse(r);
 }
 
-TEST(ProcessParsing, AtStarAlwaysSensitivityEmpty) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  always @* a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->sensitivity.size(), 0u);
-  ASSERT_NE(item->body, nullptr);
-}
-
-TEST(ProcessParsing, AtStarParenAlwaysSensitivityEmpty) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  always @(*) a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->sensitivity.size(), 0u);
-  ASSERT_NE(item->body, nullptr);
-}
-
-TEST(ProcessParsing, AtStarNestedBlocks) {
+TEST(ImplicitEventParsing, AtStarNestedBlocks) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -358,7 +276,7 @@ TEST(ProcessParsing, AtStarNestedBlocks) {
   EXPECT_EQ(item->body->stmts[1]->kind, StmtKind::kBlock);
 }
 
-TEST(ProcessParsing, AtStarVarDeclInBody) {
+TEST(ImplicitEventParsing, AtStarVarDeclInBody) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -378,7 +296,7 @@ TEST(ProcessParsing, AtStarVarDeclInBody) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kVarDecl);
 }
 
-TEST(ProcessParsing, AtStarParenComplexCombLogic) {
+TEST(ImplicitEventParsing, AtStarParenComplexCombLogic) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] a, b, c, sum, product;\n"
@@ -397,7 +315,7 @@ TEST(ProcessParsing, AtStarParenComplexCombLogic) {
   EXPECT_EQ(item->body->stmts.size(), 2u);
 }
 
-TEST(ProcessParsing, AtStarFunctionCalls) {
+TEST(ImplicitEventParsing, AtStarFunctionCalls) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] a, result;\n"
@@ -414,7 +332,7 @@ TEST(ProcessParsing, AtStarFunctionCalls) {
   EXPECT_EQ(item->body->kind, StmtKind::kBlock);
 }
 
-TEST(ProcessParsing, AtStarForLoop) {
+TEST(ImplicitEventParsing, AtStarForLoop) {
   auto r = Parse(
       "module m;\n"
       "  reg [7:0] data [0:3];\n"
@@ -445,7 +363,7 @@ static ModuleItem* NthAlwaysItem(ParseResult& r, size_t n) {
   return nullptr;
 }
 
-TEST(ProcessParsing, MultipleAtStarBlocks) {
+TEST(ImplicitEventParsing, MultipleAtStarBlocks) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c, x, y;\n"
@@ -464,7 +382,7 @@ TEST(ProcessParsing, MultipleAtStarBlocks) {
   ASSERT_NE(item1->body, nullptr);
 }
 
-TEST(ProcessParsing, AtStarCaseInside) {
+TEST(ImplicitEventParsing, AtStarCaseInside) {
   auto r = Parse(
       "module m;\n"
       "  reg [1:0] sel;\n"
@@ -483,7 +401,7 @@ TEST(ProcessParsing, AtStarCaseInside) {
   EXPECT_EQ(case_stmt->case_items.size(), 4u);
 }
 
-TEST(ProcessParsing, AtStarPriorityCase) {
+TEST(ImplicitEventParsing, AtStarPriorityCase) {
   auto r = Parse(
       "module m;\n"
       "  reg [1:0] sel;\n"
@@ -500,7 +418,7 @@ TEST(ProcessParsing, AtStarPriorityCase) {
   EXPECT_EQ(case_stmt->qualifier, CaseQualifier::kPriority);
 }
 
-TEST(ProcessParsing, AtStarConcatenation) {
+TEST(ImplicitEventParsing, AtStarConcatenation) {
   auto r = Parse(
       "module m;\n"
       "  reg [3:0] a, b;\n"
@@ -518,7 +436,7 @@ TEST(ProcessParsing, AtStarConcatenation) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kConcatenation);
 }
 
-TEST(ProcessParsing, AtStarTernary) {
+TEST(ImplicitEventParsing, AtStarTernary) {
   auto r = Parse(
       "module m;\n"
       "  reg sel, a, b, out;\n"
@@ -535,24 +453,7 @@ TEST(ProcessParsing, AtStarTernary) {
   EXPECT_EQ(item->body->rhs->kind, ExprKind::kTernary);
 }
 
-TEST(ProcessParsing, IsStarEventTrueAtStarParen) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    @(*) a = b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_TRUE(stmt->is_star_event);
-  EXPECT_EQ(stmt->events.size(), 0u);
-}
-
-TEST(ProcessParsing, AtStarStmtBodyPresent) {
+TEST(ImplicitEventParsing, AtStarStmtBodyPresent) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b;\n"
@@ -569,7 +470,7 @@ TEST(ProcessParsing, AtStarStmtBodyPresent) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ProcessParsing, AtStarStmtLevelBeginEnd) {
+TEST(ImplicitEventParsing, AtStarStmtLevelBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c;\n"
@@ -591,24 +492,7 @@ TEST(ProcessParsing, AtStarStmtLevelBeginEnd) {
   EXPECT_EQ(stmt->body->stmts.size(), 2u);
 }
 
-TEST(SchedulingSemanticsParsing, StarEventControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    @* a = b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_TRUE(stmt->is_star_event);
-  EXPECT_TRUE(stmt->events.empty());
-}
-
-TEST(ProcessParsing, MultipleAtStarInInitial) {
+TEST(ImplicitEventParsing, MultipleAtStarInInitial) {
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c, d;\n"
@@ -629,7 +513,7 @@ TEST(ProcessParsing, MultipleAtStarInInitial) {
   EXPECT_TRUE(s1->is_star_event);
 }
 
-TEST(ProcessParsing, ParseOkAtStarCombiModule) {
+TEST(ImplicitEventParsing, ParseOkAtStarCombiModule) {
   EXPECT_TRUE(
       ParseOk("module mux4(\n"
               "  input [1:0] sel,\n"
@@ -647,24 +531,7 @@ TEST(ProcessParsing, ParseOkAtStarCombiModule) {
               "endmodule\n"));
 }
 
-TEST(SchedulingSemanticsParsing, ParenStarEventControl) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg a, b;\n"
-      "  initial begin\n"
-      "    @(*) a = b;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  EXPECT_TRUE(stmt->is_star_event);
-  EXPECT_TRUE(stmt->events.empty());
-}
-
-TEST(ProcessParsing, ParseOkAtStarParenCombiModule) {
+TEST(ImplicitEventParsing, ParseOkAtStarParenCombiModule) {
   EXPECT_TRUE(
       ParseOk("module adder(\n"
               "  input [7:0] a, b,\n"
@@ -676,7 +543,7 @@ TEST(ProcessParsing, ParseOkAtStarParenCombiModule) {
               "endmodule\n"));
 }
 
-TEST(AssignmentParsing, FullPatternAlwaysComb) {
+TEST(ImplicitEventParsing, FullPatternAlwaysComb) {
   EXPECT_TRUE(
       ParseOk("module m(\n"
               "  input [7:0] a, b,\n"
@@ -693,29 +560,101 @@ TEST(AssignmentParsing, FullPatternAlwaysComb) {
               "endmodule\n"));
 }
 
-TEST(ProcessParsing, AlwaysStarEmptySensitivity) {
+TEST(ImplicitEventParsing, NestedAtStarParsesAsEventControl) {
   auto r = Parse(
       "module m;\n"
-      "  always @* y = a | b;\n"
+      "  reg a, b, c, d, x;\n"
+      "  always @* begin\n"
+      "    x = a ^ b;\n"
+      "    @* x = c ^ d;\n"
+      "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->sensitivity.empty());
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_GE(item->body->stmts.size(), 2u);
+  auto* nested = item->body->stmts[1];
+  EXPECT_EQ(nested->kind, StmtKind::kEventControl);
+  EXPECT_TRUE(nested->is_star_event);
+  EXPECT_TRUE(nested->events.empty());
+  ASSERT_NE(nested->body, nullptr);
+  EXPECT_EQ(nested->body->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ProcessParsing, AlwaysStarParenEquivalent) {
+TEST(ImplicitEventParsing, NestedAtStarParenParsesAsEventControl) {
   auto r = Parse(
       "module m;\n"
-      "  always @(*) y = a & b;\n"
+      "  reg a, b, c, d, x;\n"
+      "  always @(*) begin\n"
+      "    x = a ^ b;\n"
+      "    @(*) x = c ^ d;\n"
+      "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
+  ASSERT_NE(item->body, nullptr);
+  ASSERT_GE(item->body->stmts.size(), 2u);
+  auto* nested = item->body->stmts[1];
+  EXPECT_EQ(nested->kind, StmtKind::kEventControl);
+  EXPECT_TRUE(nested->is_star_event);
+}
+
+TEST(ImplicitEventParsing, AtStarWithLhsIndexSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [7:0] y;\n"
+      "  reg [2:0] a;\n"
+      "  reg en;\n"
+      "  always @* begin\n"
+      "    y = 8'hff;\n"
+      "    y[a] = !en;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
   EXPECT_TRUE(item->sensitivity.empty());
+  ASSERT_NE(item->body, nullptr);
+  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
+  ASSERT_EQ(item->body->stmts.size(), 2u);
+  auto* assign = item->body->stmts[1];
+  EXPECT_EQ(assign->kind, StmtKind::kBlockingAssign);
+  ASSERT_NE(assign->lhs, nullptr);
+  EXPECT_EQ(assign->lhs->kind, ExprKind::kSelect);
+}
+
+TEST(ImplicitEventParsing, AtStarCaseOneHotPattern) {
+  auto r = Parse(
+      "module m;\n"
+      "  reg [3:0] state, next;\n"
+      "  reg go, ws;\n"
+      "  always @* begin\n"
+      "    next = 4'b0;\n"
+      "    case (1'b1)\n"
+      "      state[0]: if (go) next[1] = 1'b1;\n"
+      "                else    next[0] = 1'b1;\n"
+      "      state[1]:         next[2] = 1'b1;\n"
+      "      state[2]: if (!ws) next[3] = 1'b1;\n"
+      "                else     next[1] = 1'b1;\n"
+      "      state[3]:         next[0] = 1'b1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstAlwaysItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->sensitivity.empty());
+  auto* case_stmt = item->body->stmts[1];
+  EXPECT_EQ(case_stmt->kind, StmtKind::kCase);
+  EXPECT_EQ(case_stmt->case_items.size(), 4u);
 }
 
 }  // namespace

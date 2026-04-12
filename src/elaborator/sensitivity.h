@@ -27,6 +27,7 @@ void CollectWrittenNames(const Stmt* stmt,
 std::vector<std::string> CollectReadSignals(const Stmt* body);
 
 std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
-                                        const FuncMap* funcs = nullptr);
+                                        const FuncMap* funcs = nullptr,
+                                        bool exclude_written = true);
 
 }  // namespace delta

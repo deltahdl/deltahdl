@@ -4,7 +4,7 @@
 
 namespace {
 
-TEST(TimingControl, ImplicitSensitivityIncludesRHS) {
+TEST(ImplicitSensitivity, ImplicitSensitivityIncludesRHS) {
   std::vector<VarRef> refs = {
       {"a", ExprRole::kRHS},
       {"b", ExprRole::kPureLHS},
@@ -14,7 +14,7 @@ TEST(TimingControl, ImplicitSensitivityIncludesRHS) {
   EXPECT_EQ(result[0], "a");
 }
 
-TEST(TimingControl, ImplicitSensitivityIncludesSubroutineArgs) {
+TEST(ImplicitSensitivity, ImplicitSensitivityIncludesSubroutineArgs) {
   std::vector<VarRef> refs = {
       {"f_arg", ExprRole::kSubroutineArg},
   };
@@ -23,7 +23,7 @@ TEST(TimingControl, ImplicitSensitivityIncludesSubroutineArgs) {
   EXPECT_EQ(result[0], "f_arg");
 }
 
-TEST(TimingControl, ImplicitSensitivityIncludesCaseExpr) {
+TEST(ImplicitSensitivity, ImplicitSensitivityIncludesCaseExpr) {
   std::vector<VarRef> refs = {
       {"sel", ExprRole::kCaseExpr},
   };
@@ -32,7 +32,7 @@ TEST(TimingControl, ImplicitSensitivityIncludesCaseExpr) {
   EXPECT_EQ(result[0], "sel");
 }
 
-TEST(TimingControl, ImplicitSensitivityIncludesConditionalExpr) {
+TEST(ImplicitSensitivity, ImplicitSensitivityIncludesConditionalExpr) {
   std::vector<VarRef> refs = {
       {"cond", ExprRole::kConditionalExpr},
   };
@@ -41,7 +41,7 @@ TEST(TimingControl, ImplicitSensitivityIncludesConditionalExpr) {
   EXPECT_EQ(result[0], "cond");
 }
 
-TEST(TimingControl, ImplicitSensitivityIncludesLHSIndex) {
+TEST(ImplicitSensitivity, ImplicitSensitivityIncludesLHSIndex) {
   std::vector<VarRef> refs = {
       {"idx", ExprRole::kLHSIndex},
   };
@@ -50,7 +50,7 @@ TEST(TimingControl, ImplicitSensitivityIncludesLHSIndex) {
   EXPECT_EQ(result[0], "idx");
 }
 
-TEST(TimingControl, ImplicitSensitivityExcludesTimingControl) {
+TEST(ImplicitSensitivity, ImplicitSensitivityExcludesTimingControl) {
   std::vector<VarRef> refs = {
       {"a", ExprRole::kRHS},
       {"clk", ExprRole::kTimingControl},
@@ -60,7 +60,7 @@ TEST(TimingControl, ImplicitSensitivityExcludesTimingControl) {
   EXPECT_EQ(result[0], "a");
 }
 
-TEST(TimingControl, ImplicitSensitivityExcludesPureLHS) {
+TEST(ImplicitSensitivity, ImplicitSensitivityExcludesPureLHS) {
   std::vector<VarRef> refs = {
       {"out", ExprRole::kPureLHS},
       {"in", ExprRole::kRHS},
@@ -70,7 +70,7 @@ TEST(TimingControl, ImplicitSensitivityExcludesPureLHS) {
   EXPECT_EQ(result[0], "in");
 }
 
-TEST(TimingControl, ImplicitSensitivityMixedRoles) {
+TEST(ImplicitSensitivity, ImplicitSensitivityMixedRoles) {
   std::vector<VarRef> refs = {
       {"a", ExprRole::kRHS},      {"b", ExprRole::kSubroutineArg},
       {"c", ExprRole::kPureLHS},  {"d", ExprRole::kTimingControl},
@@ -78,6 +78,112 @@ TEST(TimingControl, ImplicitSensitivityMixedRoles) {
   };
   auto result = ComputeImplicitSensitivity(refs);
   EXPECT_EQ(result.size(), 3u);
+}
+
+TEST(ImplicitSensitivity, AllExcludedRolesProduceEmptyList) {
+  std::vector<VarRef> refs = {
+      {"out", ExprRole::kPureLHS},
+      {"clk", ExprRole::kTimingControl},
+  };
+  auto result = ComputeImplicitSensitivity(refs);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+TEST(ImplicitSensitivity, AllIncludedRolesProduceFullList) {
+  std::vector<VarRef> refs = {
+      {"a", ExprRole::kRHS},
+      {"b", ExprRole::kSubroutineArg},
+      {"c", ExprRole::kCaseExpr},
+      {"d", ExprRole::kConditionalExpr},
+      {"e", ExprRole::kLHSIndex},
+  };
+  auto result = ComputeImplicitSensitivity(refs);
+  EXPECT_EQ(result.size(), 5u);
+}
+
+TEST(ImplicitSensitivity, EmptyRefsProduceEmptyList) {
+  std::vector<VarRef> refs = {};
+  auto result = ComputeImplicitSensitivity(refs);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+TEST(ImplicitSensitivity, SingleRhsOnly) {
+  std::vector<VarRef> refs = {
+      {"x", ExprRole::kRHS},
+  };
+  auto result = ComputeImplicitSensitivity(refs);
+  EXPECT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0], "x");
+}
+
+TEST(ImplicitSensitivity, PureLhsOnlyProducesEmpty) {
+  std::vector<VarRef> refs = {
+      {"out", ExprRole::kPureLHS},
+  };
+  auto result = ComputeImplicitSensitivity(refs);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+TEST(ImplicitSensitivity, TimingControlOnlyProducesEmpty) {
+  std::vector<VarRef> refs = {
+      {"clk", ExprRole::kTimingControl},
+  };
+  auto result = ComputeImplicitSensitivity(refs);
+  EXPECT_EQ(result.size(), 0u);
+}
+
+TEST(ImplicitSensitivity, MultipleTimingControlsAllExcluded) {
+  std::vector<VarRef> refs = {
+      {"clk", ExprRole::kTimingControl},
+      {"rst", ExprRole::kTimingControl},
+      {"a", ExprRole::kRHS},
+  };
+  auto result = ComputeImplicitSensitivity(refs);
+  EXPECT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0], "a");
+}
+
+TEST(ImplicitSensitivity, MultiplePureLhsAllExcluded) {
+  std::vector<VarRef> refs = {
+      {"out1", ExprRole::kPureLHS},
+      {"out2", ExprRole::kPureLHS},
+      {"in", ExprRole::kRHS},
+  };
+  auto result = ComputeImplicitSensitivity(refs);
+  EXPECT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0], "in");
+}
+
+TEST(ImplicitSensitivity, CaseExprWithPureLhs) {
+  std::vector<VarRef> refs = {
+      {"sel", ExprRole::kCaseExpr},
+      {"out", ExprRole::kPureLHS},
+      {"a", ExprRole::kRHS},
+      {"b", ExprRole::kRHS},
+  };
+  auto result = ComputeImplicitSensitivity(refs);
+  EXPECT_EQ(result.size(), 3u);
+}
+
+TEST(ImplicitSensitivity, ConditionalExprWithTimingControl) {
+  std::vector<VarRef> refs = {
+      {"cond", ExprRole::kConditionalExpr},
+      {"clk", ExprRole::kTimingControl},
+  };
+  auto result = ComputeImplicitSensitivity(refs);
+  EXPECT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0], "cond");
+}
+
+TEST(ImplicitSensitivity, LhsIndexWithTimingControl) {
+  std::vector<VarRef> refs = {
+      {"idx", ExprRole::kLHSIndex},
+      {"clk", ExprRole::kTimingControl},
+      {"out", ExprRole::kPureLHS},
+  };
+  auto result = ComputeImplicitSensitivity(refs);
+  EXPECT_EQ(result.size(), 1u);
+  EXPECT_EQ(result[0], "idx");
 }
 
 }  // namespace

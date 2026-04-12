@@ -516,7 +516,8 @@ void AddProcess(
   }
   if (kind == RtlirProcessKind::kAlways && item->is_star_sensitivity &&
       proc.sensitivity.empty()) {
-    proc.sensitivity = InferSensitivity(proc.body, arena, nullptr);
+    proc.sensitivity =
+        InferSensitivity(proc.body, arena, nullptr, /*exclude_written=*/false);
   }
   // §9.2.2.1: Warn if a general-purpose always has no timing control.
   if (kind == RtlirProcessKind::kAlways && item->sensitivity.empty() &&

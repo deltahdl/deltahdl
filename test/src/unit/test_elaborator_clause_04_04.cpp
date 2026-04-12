@@ -98,19 +98,4 @@ TEST(StratifiedSchedulerElaboration, AlwaysFFWithResetSensitivity) {
   EXPECT_EQ(mod->processes[0].sensitivity[1].edge, Edge::kNegedge);
 }
 
-TEST(StratifiedSchedulerElaboration, PlainAlwaysWithStarSensitivity) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always @(*) b = a;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  EXPECT_FALSE(mod->processes[0].sensitivity.empty());
-}
-
 }  // namespace

@@ -43,8 +43,24 @@ void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out) {
   for (auto* elem : expr->elements) CollectExprReads(elem, out);
 }
 
+// §9.4.2.2: Collect reads from index sub-expressions on the LHS of an
+// assignment (e.g. y[a] = ... makes 'a' a read), but not the base identifier
+// itself (it is a write target).
+static void CollectLhsIndexReads(const Expr* lhs,
+                                 std::unordered_set<std::string>& out) {
+  const Expr* cur = lhs;
+  while (cur && cur->kind == ExprKind::kSelect) {
+    if (cur->index) CollectExprReads(cur->index, out);
+    cur = cur->base;
+  }
+}
+
 void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
   if (!stmt) return;
+  if (stmt->kind == StmtKind::kBlockingAssign ||
+      stmt->kind == StmtKind::kNonblockingAssign) {
+    CollectLhsIndexReads(stmt->lhs, out);
+  }
   if (stmt->kind != StmtKind::kWait) {
     CollectExprReads(stmt->condition, out);
   }
@@ -177,7 +193,8 @@ static std::unordered_set<std::string_view> ResolveCalledFunctions(
 }
 
 std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
-                                        const FuncMap* funcs) {
+                                        const FuncMap* funcs,
+                                        bool exclude_written) {
   std::unordered_set<std::string> reads;
   CollectStmtReads(body, reads);
 
@@ -185,7 +202,9 @@ std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
   CollectBlockLocalNames(body, locals);
 
   std::unordered_set<std::string> written;
-  CollectWrittenNames(body, written);
+  if (exclude_written) {
+    CollectWrittenNames(body, written);
+  }
 
   if (funcs && !funcs->empty()) {
     auto called = ResolveCalledFunctions(body, *funcs);
@@ -202,8 +221,10 @@ std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
       for (auto* s : func->func_body_stmts) {
         CollectBlockLocalNames(s, locals);
       }
-      for (auto* s : func->func_body_stmts) {
-        CollectWrittenNames(s, written);
+      if (exclude_written) {
+        for (auto* s : func->func_body_stmts) {
+          CollectWrittenNames(s, written);
+        }
       }
     }
   }
@@ -212,7 +233,7 @@ std::vector<EventExpr> InferSensitivity(const Stmt* body, Arena& arena,
   events.reserve(reads.size());
   for (const auto& name : reads) {
     if (locals.count(name)) continue;
-    if (written.count(name)) continue;
+    if (exclude_written && written.count(name)) continue;
     auto* expr = arena.Create<Expr>();
     expr->kind = ExprKind::kIdentifier;
     expr->text = std::string_view(arena.AllocString(name.data(), name.size()),
