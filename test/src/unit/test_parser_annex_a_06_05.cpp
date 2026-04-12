@@ -378,53 +378,6 @@ TEST(TimingControlSyntaxParsing, RepeatEventControl) {
   EXPECT_NE(stmt->repeat_event_count, nullptr);
 }
 
-TEST(TimingControlSyntaxParsing, WaitStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait(done) $display(\"done\");\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-  EXPECT_NE(stmt->condition, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, WaitConditionStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait (ready) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-  EXPECT_NE(stmt->condition, nullptr);
-  EXPECT_NE(stmt->body, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, WaitConditionNull) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait (ready) ;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-  EXPECT_NE(stmt->body, nullptr);
-  EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
-}
-
 TEST(TimingControlSyntaxParsing, WaitFork) {
   auto r = Parse(
       "module m;\n"
@@ -467,20 +420,6 @@ TEST(TimingControlSyntaxParsing, EventControlMissingRParen) {
   EXPECT_TRUE(Parse(
       "module m;\n"
       "  initial @(posedge clk a = 1;\n"
-      "endmodule\n").has_errors);
-}
-
-TEST(TimingControlSyntaxParsing, WaitMissingLParen) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial wait ready a = 1;\n"
-      "endmodule\n").has_errors);
-}
-
-TEST(TimingControlSyntaxParsing, WaitMissingRParen) {
-  EXPECT_TRUE(Parse(
-      "module m;\n"
-      "  initial wait(ready a = 1;\n"
       "endmodule\n").has_errors);
 }
 
@@ -698,26 +637,6 @@ TEST(TimingControlSyntaxParsing, DelayControlRealLiteral) {
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDelay);
   EXPECT_NE(stmt->delay, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, WaitWithBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    wait(done) begin\n"
-      "      x = 1;\n"
-      "      y = 2;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-  EXPECT_NE(stmt->condition, nullptr);
-  ASSERT_NE(stmt->body, nullptr);
-  EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
 TEST(TimingControlSyntaxParsing, IntraAssignDelayParenBlocking) {

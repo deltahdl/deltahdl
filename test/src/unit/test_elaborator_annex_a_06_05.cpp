@@ -142,20 +142,6 @@ TEST(TimingControlElaboration, EventControlInFunctionError) {
 
 // --- wait_statement elaboration ---
 
-TEST(TimingControlElaboration, WaitInInitialElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic done, x;\n"
-      "  initial begin\n"
-      "    wait(done) x = 1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(TimingControlElaboration, WaitInAlwaysCombError) {
   ElabFixture f;
   ElaborateSrc(

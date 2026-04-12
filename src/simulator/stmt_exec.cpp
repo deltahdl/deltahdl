@@ -913,7 +913,7 @@ static ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   std::vector<std::string_view> read_vars(reads.begin(), reads.end());
   while (!ctx.StopRequested()) {
     auto cond = EvalExpr(stmt->condition, ctx, arena);
-    if (cond.ToUint64() != 0) break;
+    if (cond.IsTruthy()) break;
     if (read_vars.empty()) {
       if (labeled) ctx.PopStaticScope(stmt->label);
       co_return StmtResult::kDone;

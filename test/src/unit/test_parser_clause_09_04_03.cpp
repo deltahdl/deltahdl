@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(ProcessParsing, WaitStatementWithBlock) {
+TEST(LevelSensitiveEventParsing, WaitStatementWithBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -23,24 +23,7 @@ TEST(ProcessParsing, WaitStatementWithBlock) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kBlock);
 }
 
-TEST(SchedulingSemanticsParsing, WaitStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg done, a;\n"
-      "  initial begin\n"
-      "    wait (done) a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kWait);
-  EXPECT_NE(stmt->condition, nullptr);
-  EXPECT_NE(stmt->body, nullptr);
-}
-
-TEST(InterprocessSyncParsing, WaitOnEvent) {
+TEST(LevelSensitiveEventParsing, WaitNullBody) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -53,7 +36,7 @@ TEST(InterprocessSyncParsing, WaitOnEvent) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-TEST(ProceduralAssignAndControlParsing, WaitStatementBasic) {
+TEST(LevelSensitiveEventParsing, WaitNegatedCondition) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -67,7 +50,7 @@ TEST(ProceduralAssignAndControlParsing, WaitStatementBasic) {
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
 }
 
-TEST(ProceduralAssignAndControlParsing, WaitStatementExpression) {
+TEST(LevelSensitiveEventParsing, WaitComparisonCondition) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -83,7 +66,7 @@ TEST(ProceduralAssignAndControlParsing, WaitStatementExpression) {
 }
 
 
-TEST(Parser, WaitStatement) {
+TEST(LevelSensitiveEventParsing, WaitWithAssignment) {
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -98,17 +81,34 @@ TEST(Parser, WaitStatement) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-TEST(ProcessParsing, WaitExprStillWorks) {
+TEST(LevelSensitiveEventParsing, WaitConditionNull) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
-      "    wait (done) x = 1;\n"
+      "    wait (ready) ;\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kWait);
+  EXPECT_NE(stmt->body, nullptr);
+  EXPECT_EQ(stmt->body->kind, StmtKind::kNull);
+}
+
+TEST(LevelSensitiveEventParsing, WaitMissingLParen) {
+  EXPECT_TRUE(Parse(
+      "module m;\n"
+      "  initial wait ready a = 1;\n"
+      "endmodule\n").has_errors);
+}
+
+TEST(LevelSensitiveEventParsing, WaitMissingRParen) {
+  EXPECT_TRUE(Parse(
+      "module m;\n"
+      "  initial wait(ready a = 1;\n"
+      "endmodule\n").has_errors);
 }
 
 }  // namespace

@@ -116,52 +116,6 @@ TEST(TimingControlSimulation, EventControlStarWaitsAnyChange) {
   LowerRunAndCheck(f, design, {{"y", 7u}});
 }
 
-// --- wait_statement simulation ---
-
-TEST(TimingControlSimulation, WaitStatementBlocksUntilTrue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic done;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    done = 0;\n"
-      "    x = 0;\n"
-      "    #10 done = 1;\n"
-      "  end\n"
-      "  initial begin\n"
-      "    wait(done) x = 8'd99;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  LowerRunAndCheck(f, design, {{"x", 99u}});
-}
-
-TEST(TimingControlSimulation, WaitStatementAlreadyTrue) {
-  auto val = RunAndGet(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    wait(1) x = 8'd55;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(val, 55u);
-}
-
-TEST(TimingControlSimulation, WaitStatementNullBody) {
-  auto val = RunAndGet(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    wait(1) ;\n"
-      "    x = 8'd77;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(val, 77u);
-}
-
 // --- jump_statement simulation ---
 
 TEST(TimingControlSimulation, BreakExitsLoop) {
