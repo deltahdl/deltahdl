@@ -74,12 +74,6 @@ TEST(AssertionKeywordLexing, WeakKeyword) {
   EXPECT_EQ(r.token.text, "weak");
 }
 
-TEST(AssertionKeywordLexing, DisableKeyword) {
-  auto r = LexOne("disable");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwDisable);
-  EXPECT_EQ(r.token.text, "disable");
-}
-
 TEST(AssertionKeywordLexing, IffKeyword) {
   auto r = LexOne("iff");
   EXPECT_EQ(r.token.kind, TokenKind::kKwIff);

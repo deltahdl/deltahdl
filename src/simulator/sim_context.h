@@ -197,6 +197,27 @@ class SimContext {
   Process* CurrentProcess() const { return current_process_; }
   bool IsReactiveContext() const;
 
+  // §9.6.2: Disable target tracking for same-process propagation.
+  void SetDisableTarget(std::string_view name) { disable_target_ = name; }
+  std::string_view GetDisableTarget() const { return disable_target_; }
+  void ClearDisableTarget() { disable_target_ = {}; }
+
+  // §9.6.2: Named-block/task → Process registry for cross-process disable.
+  void RegisterNamedScope(std::string_view name, Process* proc);
+  void UnregisterNamedScope(std::string_view name, Process* proc);
+  const std::vector<Process*>& FindNamedScopeProcesses(
+      std::string_view name) const;
+
+  // §9.6.2: Active named scope stack for registering fork children
+  // under enclosing named blocks (R3: nested activities are terminated).
+  void PushActiveNamedScope(std::string_view name) {
+    active_scope_stack_.push_back(name);
+  }
+  void PopActiveNamedScope() { active_scope_stack_.pop_back(); }
+  const std::vector<std::string_view>& ActiveNamedScopes() const {
+    return active_scope_stack_;
+  }
+
   // §12.4.2.1: Deferred violation reports.
   void AddPendingViolation(std::string msg);
   void FlushPendingViolations();
@@ -411,6 +432,13 @@ class SimContext {
   class ClockingManager* clocking_mgr_ = nullptr;
   // §19: Coverage database.
   class CoverageDB* coverage_db_ = nullptr;
+  // §9.6.2: Current disable target for same-process propagation.
+  std::string_view disable_target_;
+  // §9.6.2: Named-scope → process list for cross-process disable.
+  std::unordered_map<std::string, std::vector<Process*>> named_scope_map_;
+  static const std::vector<Process*> kEmptyNamedScopeList;
+  // §9.6.2: Active named scope stack for fork child registration.
+  std::vector<std::string_view> active_scope_stack_;
 };
 
 }  // namespace delta

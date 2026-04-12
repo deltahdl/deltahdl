@@ -31,7 +31,12 @@ struct DelayAwaiter {
     auto time = ctx.CurrentTime() + SimTime{delay_ticks};
     auto region = SelectDelayRegion();
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-    event->callback = [h]() mutable { h.resume(); };
+    auto* proc = ctx.CurrentProcess();
+    event->callback = [h, proc, &ctx]() mutable {
+      if (proc && !proc->active) return;
+      if (proc) ctx.SetCurrentProcess(proc);
+      h.resume();
+    };
     ctx.GetScheduler().ScheduleEvent(time, region, event);
   }
 
@@ -54,6 +59,7 @@ struct EventAwaiter {
   bool await_ready() const noexcept { return false; }
 
   void await_suspend(std::coroutine_handle<> h) {
+    auto* proc = ctx.CurrentProcess();
     for (const auto& ev : events) {
       if (!ev.signal) continue;
       Variable* var = nullptr;
@@ -76,7 +82,8 @@ struct EventAwaiter {
       }
       if (!var) continue;
       if (var->is_event) {
-        var->AddWatcher([h]() mutable {
+        var->AddWatcher([h, proc]() mutable {
+          if (proc && !proc->active) return true;
           h.resume();
           return true;
         });
@@ -85,7 +92,8 @@ struct EventAwaiter {
       var->prev_value = var->value;
       auto* ctx_ptr = &ctx;
       var->AddWatcher([h, var, edge = ev.edge, iff_cond = ev.iff_condition,
-                       ctx_ptr]() mutable {
+                       ctx_ptr, proc]() mutable {
+        if (proc && !proc->active) return true;
         return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr);
       });
     }
@@ -219,11 +227,13 @@ struct AnyChangeAwaiter {
   bool await_ready() const noexcept { return false; }
 
   void await_suspend(std::coroutine_handle<> h) {
+    auto* proc = ctx.CurrentProcess();
     for (auto name : var_names) {
       auto* var = ctx.FindVariable(name);
       if (!var) continue;
       var->prev_value = var->value;
-      var->AddWatcher([h]() mutable {
+      var->AddWatcher([h, proc]() mutable {
+        if (proc && !proc->active) return true;
         h.resume();
         return true;
       });

@@ -233,20 +233,6 @@ TEST(StatementSyntaxParsing, ConditionalAsStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kIf);
 }
 
-TEST(StatementSyntaxParsing, DisableAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    disable my_block;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
-}
-
 TEST(StatementSyntaxParsing, BlockingTriggerAsStatement) {
   auto r = Parse(
       "module m;\n"

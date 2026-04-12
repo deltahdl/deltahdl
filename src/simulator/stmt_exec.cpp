@@ -209,19 +209,50 @@ static ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx,
 
 static ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool named = !stmt->label.empty();
-  if (named) ctx.PushStaticScope(stmt->label);
+  if (named) {
+    ctx.PushStaticScope(stmt->label);
+    ctx.RegisterNamedScope(stmt->label, ctx.CurrentProcess());
+    ctx.PushActiveNamedScope(stmt->label);
+  }
   for (auto* s : stmt->stmts) {
     auto result = co_await ExecStmt(s, ctx, arena);
+    if (result == StmtResult::kDisable) {
+      if (named && ctx.GetDisableTarget() == stmt->label) {
+        ctx.ClearDisableTarget();
+        ctx.PopActiveNamedScope();
+        ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
+        ctx.PopStaticScope(stmt->label);
+        co_return StmtResult::kDone;
+      }
+      if (named) {
+        ctx.PopActiveNamedScope();
+        ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
+        ctx.PopStaticScope(stmt->label);
+      }
+      co_return StmtResult::kDisable;
+    }
     if (result != StmtResult::kDone) {
-      if (named) ctx.PopStaticScope(stmt->label);
+      if (named) {
+        ctx.PopActiveNamedScope();
+        ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
+        ctx.PopStaticScope(stmt->label);
+      }
       co_return result;
     }
     if (ctx.StopRequested()) {
-      if (named) ctx.PopStaticScope(stmt->label);
+      if (named) {
+        ctx.PopActiveNamedScope();
+        ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
+        ctx.PopStaticScope(stmt->label);
+      }
       co_return StmtResult::kDone;
     }
   }
-  if (named) ctx.PopStaticScope(stmt->label);
+  if (named) {
+    ctx.PopActiveNamedScope();
+    ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
+    ctx.PopStaticScope(stmt->label);
+  }
   co_return StmtResult::kDone;
 }
 
@@ -1093,8 +1124,40 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     p->coro =
         ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
             .Release();
+    // §9.6.2: Pre-register named scopes for fork children so that
+    // disable can target them before they start executing.
+    if (s->kind == StmtKind::kExprStmt && s->expr) {
+      std::string_view task_name;
+      if (s->expr->kind == ExprKind::kCall)
+        task_name = s->expr->callee;
+      else if (s->expr->kind == ExprKind::kIdentifier)
+        task_name = s->expr->text;
+      if (!task_name.empty() && ctx.FindFunction(task_name))
+        ctx.RegisterNamedScope(task_name, p);
+    }
+    if (s->kind == StmtKind::kBlock && !s->label.empty())
+      ctx.RegisterNamedScope(s->label, p);
+    // §9.6.2 R3: Register fork children under enclosing named scopes
+    // so that disabling a parent block also terminates forked activities.
+    for (auto scope : ctx.ActiveNamedScopes())
+      ctx.RegisterNamedScope(scope, p);
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-    event->callback = [p, &ctx]() {
+    event->callback = [p, &ctx, state, parent_wfs, parent_proc]() {
+      if (!p->active) {
+        // §9.6.2: Process was disabled before it started.
+        state->remaining--;
+        bool should_resume =
+            state->join_any ? !state->resumed : (state->remaining == 0);
+        if (should_resume && state->parent) {
+          state->resumed = true;
+          state->parent.resume();
+        }
+        if (parent_wfs && --parent_wfs->remaining == 0 && parent_wfs->waiter) {
+          ctx.SetCurrentProcess(parent_proc);
+          parent_wfs->waiter.resume();
+        }
+        return;
+      }
       ctx.SetCurrentProcess(p);
       p->Resume();
     };
@@ -1149,9 +1212,30 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
     EvalExpr(expr, ctx, arena);
     co_return StmtResult::kDone;
   }
+  bool has_name = !func->name.empty();
+  if (has_name) {
+    ctx.RegisterNamedScope(func->name, ctx.CurrentProcess());
+    ctx.PushActiveNamedScope(func->name);
+  }
   for (auto* s : func->func_body_stmts) {
     auto result = co_await ExecStmt(s, ctx, arena);
     if (result == StmtResult::kReturn) break;
+    if (result == StmtResult::kDisable) {
+      if (has_name && ctx.GetDisableTarget() == func->name) {
+        ctx.ClearDisableTarget();
+        break;
+      }
+      if (has_name) {
+        ctx.PopActiveNamedScope();
+        ctx.UnregisterNamedScope(func->name, ctx.CurrentProcess());
+      }
+      TeardownTaskCall(func, expr, ctx, arena);
+      co_return StmtResult::kDisable;
+    }
+  }
+  if (has_name) {
+    ctx.PopActiveNamedScope();
+    ctx.UnregisterNamedScope(func->name, ctx.CurrentProcess());
   }
   TeardownTaskCall(func, expr, ctx, arena);
   co_return StmtResult::kDone;
@@ -1247,6 +1331,39 @@ static StmtResult ExecNbaWithEvent(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
+// --- Disable statement (IEEE §9.6.2) ---
+
+static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
+  if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier)
+    return StmtResult::kDone;
+
+  auto target = stmt->expr->text;
+  if (target.empty()) return StmtResult::kDone;
+
+  auto* current = ctx.CurrentProcess();
+  // Copy the list since cross-process disable may modify registrations.
+  auto procs = ctx.FindNamedScopeProcesses(target);
+  bool self_disable = false;
+
+  for (auto* proc : procs) {
+    if (proc == current) {
+      self_disable = true;
+      continue;
+    }
+    // Cross-process disable: mark the other process as inactive.
+    // The coroutine is NOT destroyed — stale awaiter callbacks check
+    // proc->active and skip resume when false.
+    proc->active = false;
+  }
+
+  if (self_disable) {
+    ctx.SetDisableTarget(target);
+    return StmtResult::kDisable;
+  }
+
+  return StmtResult::kDone;
+}
+
 // --- Main dispatch ---
 
 ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -1304,7 +1421,9 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kWaitOrder:
       return ExecWaitOrder(stmt, ctx, arena);
     case StmtKind::kTimingControl:
+      return ExecTask::Immediate(StmtResult::kDone);
     case StmtKind::kDisable:
+      return ExecTask::Immediate(ExecDisableImpl(stmt, ctx));
     case StmtKind::kDisableFork:
       return ExecTask::Immediate(StmtResult::kDone);
     case StmtKind::kWaitFork:

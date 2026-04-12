@@ -243,6 +243,9 @@ class Elaborator {
   /// §9.2.2.2: Check multi-driver violations on always_comb LHS variables.
   void CheckAlwaysCombMultiDriver(const ModuleDecl* decl, RtlirModule* mod);
 
+  /// §9.6.2 R8: Validate disable statements do not target functions.
+  void ValidateDisableTargets(const ModuleDecl* decl);
+
   /// §13.2/§13.4.1/§13.4.4: Validate function/task body constraints.
   void ValidateFunctionBody(const ModuleItem* item);
   /// §13.4.3: Validate constant function calls in parameter expressions.

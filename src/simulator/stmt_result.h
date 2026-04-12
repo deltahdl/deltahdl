@@ -11,6 +11,7 @@ enum class StmtResult : uint8_t {
   kBreak,
   kContinue,
   kReturn,
+  kDisable,
 };
 
 }  // namespace delta

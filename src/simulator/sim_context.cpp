@@ -1,5 +1,7 @@
 #include "simulator/sim_context.h"
 
+#include <algorithm>
+
 #include "common/diagnostic.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
@@ -199,6 +201,7 @@ void SimContext::AddSensitivity(std::string_view signal, Process* proc) {
 }
 
 const std::vector<Process*> SimContext::kEmptyProcessList;
+const std::vector<Process*> SimContext::kEmptyNamedScopeList;
 
 const std::vector<Process*>& SimContext::GetSensitiveProcesses(
     std::string_view signal) const {
@@ -208,6 +211,23 @@ const std::vector<Process*>& SimContext::GetSensitiveProcesses(
 
 bool SimContext::IsReactiveContext() const {
   return current_process_ && current_process_->is_reactive;
+}
+
+void SimContext::RegisterNamedScope(std::string_view name, Process* proc) {
+  named_scope_map_[std::string(name)].push_back(proc);
+}
+
+void SimContext::UnregisterNamedScope(std::string_view name, Process* proc) {
+  auto it = named_scope_map_.find(std::string(name));
+  if (it == named_scope_map_.end()) return;
+  auto& vec = it->second;
+  vec.erase(std::remove(vec.begin(), vec.end(), proc), vec.end());
+}
+
+const std::vector<Process*>& SimContext::FindNamedScopeProcesses(
+    std::string_view name) const {
+  auto it = named_scope_map_.find(std::string(name));
+  return (it != named_scope_map_.end()) ? it->second : kEmptyNamedScopeList;
 }
 
 void SimContext::RunFinalBlocks() {

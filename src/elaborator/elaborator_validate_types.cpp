@@ -19,6 +19,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
     ValidateItemConstraints(item);
   }
   ValidateMixedAssignments();
+  ValidateDisableTargets(decl);
   ValidateProceduralNetAssign();
   ValidateContAssignConstSelect(decl);
   ValidateSpecparamInParams(decl);

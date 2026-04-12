@@ -124,7 +124,7 @@ struct Process {
   bool Done() const { return !coro || coro.done(); }
 
   void Resume() {
-    if (coro && !coro.done()) {
+    if (active && coro && !coro.done()) {
       coro.resume();
     }
   }

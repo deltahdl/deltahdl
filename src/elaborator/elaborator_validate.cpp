@@ -512,6 +512,50 @@ void Elaborator::ValidateMixedAssignments() {
   }
 }
 
+// §9.6.2 R8: Recursively check for disable statements targeting functions.
+static void CheckDisableTargets(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kDisable && s->expr &&
+      s->expr->kind == ExprKind::kIdentifier) {
+    if (func_decls.count(s->expr->text) != 0) {
+      diag.Error(s->range.start,
+                 "disable statement shall not be used to disable a function");
+    }
+  }
+  for (auto* sub : s->stmts) CheckDisableTargets(sub, func_decls, diag);
+  for (auto* sub : s->fork_stmts) CheckDisableTargets(sub, func_decls, diag);
+  CheckDisableTargets(s->then_branch, func_decls, diag);
+  CheckDisableTargets(s->else_branch, func_decls, diag);
+  CheckDisableTargets(s->body, func_decls, diag);
+  CheckDisableTargets(s->for_body, func_decls, diag);
+  for (auto& ci : s->case_items)
+    CheckDisableTargets(ci.body, func_decls, diag);
+  for (auto& ri : s->randcase_items)
+    CheckDisableTargets(ri.second, func_decls, diag);
+}
+
+void Elaborator::ValidateDisableTargets(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kFinalBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      if (item->body)
+        CheckDisableTargets(item->body, func_decls_, diag_);
+    }
+    if (item->kind == ModuleItemKind::kTaskDecl ||
+        item->kind == ModuleItemKind::kFunctionDecl) {
+      for (auto* s : item->func_body_stmts)
+        CheckDisableTargets(s, func_decls_, diag_);
+    }
+  }
+}
+
 void Elaborator::ValidateProceduralNetAssign() {
   for (const auto& [name, loc] : proc_assign_targets_) {
     if (net_names_.count(name) != 0) {

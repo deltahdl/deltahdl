@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(TimingControlSyntaxParsing, DisableBlock) {
+TEST(DisableStatementParsing, DisableBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -20,7 +20,7 @@ TEST(TimingControlSyntaxParsing, DisableBlock) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-TEST(ProcessParsing, BlockWithDisableOwnName) {
+TEST(DisableStatementParsing, BlockWithDisableOwnName) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : my_blk\n"
@@ -40,7 +40,7 @@ TEST(ProcessParsing, BlockWithDisableOwnName) {
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ProcessParsing, NamedForkDisabledByName) {
+TEST(DisableStatementParsing, NamedForkDisabledByName) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -61,25 +61,7 @@ TEST(ProcessParsing, NamedForkDisabledByName) {
   EXPECT_EQ(fork_stmt->label, "my_fork");
   EXPECT_EQ(body->stmts[2]->kind, StmtKind::kDisable);
 }
-TEST(ProcessTimingAndControlParsing, DisableLabeledBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : block_name\n"
-      "    a = b;\n"
-      "    disable block_name;\n"
-      "    c = a;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->label, "block_name");
-  ASSERT_GE(body->stmts.size(), 3u);
-  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDisable);
-}
-
-TEST(ProcessParsing, DisableNamedBlock) {
+TEST(DisableStatementParsing, DisableNamedBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : blk\n"
@@ -92,7 +74,7 @@ TEST(ProcessParsing, DisableNamedBlock) {
   ASSERT_GE(body->stmts.size(), 1u);
   EXPECT_EQ(body->stmts[0]->kind, StmtKind::kDisable);
 }
-TEST(ProcessParsing, DisableTaskName) {
+TEST(DisableStatementParsing, DisableTaskName) {
   auto r = Parse(
       "module m;\n"
       "  task my_task;\n"
@@ -107,7 +89,7 @@ TEST(ProcessParsing, DisableTaskName) {
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
 }
 
-TEST(ProcessTimingAndControlParsing, DisableBlockFromOutside) {
+TEST(DisableStatementParsing, DisableBlockFromOutside) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : outer\n"
@@ -130,7 +112,7 @@ TEST(ProcessTimingAndControlParsing, DisableBlockFromOutside) {
   EXPECT_EQ(second_init->body->stmts[1]->kind, StmtKind::kDisable);
 }
 
-TEST(ProcessTimingAndControlParsing, DisableWithIfCondition) {
+TEST(DisableStatementParsing, DisableWithIfCondition) {
   auto r = Parse(
       "module m;\n"
       "  initial begin : block_name\n"
@@ -150,7 +132,7 @@ TEST(ProcessTimingAndControlParsing, DisableWithIfCondition) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kIf);
 }
 
-TEST(ProcessTimingAndControlParsing, DisableHierarchicalTaskName) {
+TEST(DisableStatementParsing, DisableHierarchicalTaskName) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  task my_task;\n"
@@ -167,39 +149,11 @@ TEST(ProcessTimingAndControlParsing, DisableHierarchicalTaskName) {
               "endmodule\n"));
 }
 
-
-TEST(Parser, DisableStatement) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    disable blk;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
-  EXPECT_NE(stmt->expr, nullptr);
-}
-
-TEST(ProcessParsing, DisableIdentStillWorks) {
+TEST(DisableStatementParsing, DisableHierarchicalBlockPath) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
-      "    disable my_block;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDisable);
-}
-
-TEST(SchedulingSemanticsParsing, DisableStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : blk\n"
-      "    disable blk;\n"
+      "    disable m.always1;\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -207,6 +161,79 @@ TEST(SchedulingSemanticsParsing, DisableStatement) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->kind, StmtKind::kDisable);
+  EXPECT_NE(stmt->expr, nullptr);
+}
+
+TEST(DisableStatementParsing, DisableInsideAlwaysBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  always begin : monostable\n"
+      "    #250 q = 0;\n"
+      "  end\n"
+      "  always @(posedge clk) begin\n"
+      "    disable monostable;\n"
+      "    q = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(DisableStatementParsing, DisableNamedBlockWithinFunction) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function int f(input int x);\n"
+              "    begin : blk\n"
+              "      if (x == 0) disable blk;\n"
+              "      return x;\n"
+              "    end\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
+TEST(DisableStatementParsing, DisableInsideForLoop) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : outer_block\n"
+      "    for (int i = 0; i < 10; i = i + 1) begin : inner_block\n"
+      "      if (i == 5) disable inner_block;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(DisableStatementParsing, DisableOuterBlockFromLoop) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin : outer_block\n"
+      "    for (int i = 0; i < 10; i = i + 1) begin : inner_block\n"
+      "      if (i == 5) disable outer_block;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(DisableStatementParsing, MultipleDisablesInSequence) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    disable blk1;\n"
+      "    disable blk2;\n"
+      "    disable blk3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = FirstInitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_GE(body->stmts.size(), 3u);
+  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kDisable);
+  EXPECT_EQ(body->stmts[1]->kind, StmtKind::kDisable);
+  EXPECT_EQ(body->stmts[2]->kind, StmtKind::kDisable);
 }
 
 }  // namespace
