@@ -1,5 +1,4 @@
 #include "fixture_parser.h"
-#include "helpers_parser_verify.h"
 
 using namespace delta;
 
@@ -35,31 +34,6 @@ TEST(DeclarationAssignmentParsing, NetDeclAssignmentDimsAndInit) {
   EXPECT_NE(item->init_expr, nullptr);
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
-TEST(DataTypeParsing, NetWithImplicitContAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire w = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
-TEST(DataTypeParsing, WireImplicitContAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire w = 1'b1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_TRUE(item->data_type.is_net);
-  ASSERT_NE(item->init_expr, nullptr);
-}
 TEST(AssignmentParsing, NetDeclAssignmentWithRange) {
   auto r = Parse(
       "module m;\n"
@@ -71,18 +45,26 @@ TEST(AssignmentParsing, NetDeclAssignmentWithRange) {
   EXPECT_NE(mod->items[0]->init_expr, nullptr);
 }
 
-TEST(DataTypeParsing, WireWithInitializer) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire w = 1'b1;\n"
-      "endmodule\n");
+TEST(DeclarationAssignmentParsing, TriNetDeclAssignment) {
+  auto r = Parse("module m; tri w = 1'b0; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
   EXPECT_EQ(item->name, "w");
-  ASSERT_NE(item->init_expr, nullptr);
+  EXPECT_NE(item->init_expr, nullptr);
+}
+
+TEST(DeclarationAssignmentParsing, NetDeclAssignmentWithDriveStrength) {
+  auto r = Parse("module m; wire (strong1, pull0) mynet = 1'b1; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
+  EXPECT_EQ(item->name, "mynet");
+  EXPECT_NE(item->init_expr, nullptr);
+  EXPECT_NE(item->data_type.drive_strength0, 0);
+  EXPECT_NE(item->data_type.drive_strength1, 0);
 }
 
 }  // namespace

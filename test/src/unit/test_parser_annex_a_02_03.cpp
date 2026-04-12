@@ -126,16 +126,6 @@ TEST(DeclarationListParsing, ListOfNetDeclAssignmentsMultiple) {
   EXPECT_EQ(count, 3);
 }
 
-TEST(DeclarationListParsing, ListOfNetDeclAssignmentsWithInit) {
-  auto r = Parse("module m; wire a = 1'b0, b = 1'b1; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* a = r.cu->modules[0]->items[0];
-  auto* b = r.cu->modules[0]->items[1];
-  EXPECT_NE(a->init_expr, nullptr);
-  EXPECT_NE(b->init_expr, nullptr);
-}
-
 TEST(DeclarationListParsing, ListOfParamAssignmentsMultiple) {
   auto r = Parse("module m; parameter A = 1, B = 2, C = 3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

@@ -98,19 +98,6 @@ TEST(NetsAndVariables, VariableInitIsNotContinuousAssignment) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(NetsAndVariables, NetDeclAssignmentIsContAssign) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  wire w = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1u);
-}
-
 TEST(NetsAndVariables, RedeclarationOfVariableAsNetError) {
   ElabFixture f;
   ElaborateSrc(

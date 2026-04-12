@@ -19,8 +19,6 @@ TEST(DeclarationListElaboration, MultipleVariablesElaborate) {
   EXPECT_EQ(mod->variables.size(), 3u);
 }
 
-// --- list_of_net_decl_assignments elaboration ---
-
 TEST(DeclarationListElaboration, MultipleNetsElaborate) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -32,20 +30,6 @@ TEST(DeclarationListElaboration, MultipleNetsElaborate) {
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
   EXPECT_EQ(mod->nets.size(), 3u);
-}
-
-TEST(DeclarationListElaboration, NetDeclAssignmentsWithInit) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire a = 1'b0, b = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  EXPECT_EQ(mod->nets.size(), 2u);
-  EXPECT_EQ(mod->assigns.size(), 2u);
 }
 
 // --- list_of_param_assignments elaboration ---

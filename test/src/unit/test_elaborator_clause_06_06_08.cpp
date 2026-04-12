@@ -39,16 +39,6 @@ TEST(InterconnectElaboration, DeclCreatesNet) {
   EXPECT_TRUE(found);
 }
 
-TEST(InterconnectElaboration, DeclWithInitIsError) {
-  ElabFixture f;
-  Elaborate(
-      "module t;\n"
-      "  interconnect sig = 1;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(InterconnectElaboration, NoDataType) {
   NetDeclInfo info;
   info.is_interconnect = true;

@@ -4,36 +4,6 @@ using namespace delta;
 
 namespace {
 
-// --- net_decl_assignment ---
-
-TEST(DeclarationAssignmentElaboration, NetDeclAssignmentCreatesContAssign) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire w = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  EXPECT_EQ(mod->nets.size(), 1u);
-  EXPECT_EQ(mod->assigns.size(), 1u);
-}
-
-TEST(DeclarationAssignmentElaboration, NetDeclAssignmentNoInit) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire w;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  EXPECT_EQ(mod->nets.size(), 1u);
-  EXPECT_EQ(mod->assigns.size(), 0u);
-}
-
 TEST(DeclarationAssignmentElaboration, NetDeclAssignmentWithUnpackedDims) {
   ElabFixture f;
   auto* design = Elaborate(

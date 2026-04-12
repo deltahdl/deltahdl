@@ -34,29 +34,6 @@ TEST(DeclarationAssignmentParsing, ParamAssignmentBasic) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-// --- net_decl_assignment ---
-
-TEST(DeclarationAssignmentParsing, NetDeclAssignmentWithInit) {
-  auto r = Parse("module m; wire w = 1'b0; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_EQ(item->name, "w");
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
-TEST(DeclarationAssignmentParsing, NetDeclAssignmentWithDimsAndInit) {
-  auto r = Parse("module m; wire [7:0] w [3:0] = '{default: 0}; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_EQ(item->name, "w");
-  EXPECT_GE(item->unpacked_dims.size(), 1u);
-  EXPECT_NE(item->init_expr, nullptr);
-}
-
 // --- param_assignment ---
 
 TEST(DeclarationAssignmentParsing, ParamAssignmentNoDefault) {

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ContinuousAssignDeclElaboration, NetDeclAssign_CreatesContAssign) {
+TEST(ContinuousAssignDeclElaboration, NetDeclAssignCreatesContAssign) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -21,7 +21,7 @@ TEST(ContinuousAssignDeclElaboration, NetDeclAssign_CreatesContAssign) {
   EXPECT_NE(mod->assigns[0].rhs, nullptr);
 }
 
-TEST(ContinuousAssignDeclElaboration, NetDeclAssign_LhsIsNetName) {
+TEST(ContinuousAssignDeclElaboration, NetDeclAssignLhsIsNetName) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -38,7 +38,7 @@ TEST(ContinuousAssignDeclElaboration, NetDeclAssign_LhsIsNetName) {
   EXPECT_EQ(ca.lhs->text, "mynet");
 }
 
-TEST(ContinuousAssignDeclElaboration, NetDeclAssign_Width) {
+TEST(ContinuousAssignDeclElaboration, NetDeclAssignWidth) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -52,7 +52,7 @@ TEST(ContinuousAssignDeclElaboration, NetDeclAssign_Width) {
   EXPECT_EQ(mod->assigns[0].width, 8u);
 }
 
-TEST(ContinuousAssignDeclElaboration, NetDeclAssign_DriveStrength) {
+TEST(ContinuousAssignDeclElaboration, NetDeclAssignDriveStrength) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -67,7 +67,7 @@ TEST(ContinuousAssignDeclElaboration, NetDeclAssign_DriveStrength) {
   EXPECT_NE(mod->assigns[0].drive_strength1, 0);
 }
 
-TEST(ContinuousAssignDeclElaboration, NetDeclNoInit_NoContAssign) {
+TEST(ContinuousAssignDeclElaboration, NetDeclNoInitNoContAssign) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
@@ -104,15 +104,39 @@ TEST(ContinuousAssignDeclElaboration, NetDeclAssignConflictsWithProcAssign) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(Elaborator, DriveStrengthOnNetDeclWithAssignIsValid) {
+TEST(ContinuousAssignDeclElaboration, InterconnectNetDeclAssignIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  interconnect sig = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ContinuousAssignDeclElaboration, TriNetDeclAssignCreatesContAssign) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
-      "  wire (strong0, pull1) w = 1'b1;\n"
+      "  tri w = 1'b0;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->assigns.size(), 1u);
+  EXPECT_NE(mod->assigns[0].lhs, nullptr);
+  EXPECT_NE(mod->assigns[0].rhs, nullptr);
+}
+
+TEST(ContinuousAssignDeclElaboration, InterconnectVectorNetDeclAssignIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  interconnect [3:0] bus = 4'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace
