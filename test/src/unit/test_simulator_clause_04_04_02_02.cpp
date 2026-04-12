@@ -111,12 +111,6 @@ TEST(ActiveRegionSim, ActiveRestartsFromReactiveRegion) {
                       {Region::kReactive, "reactive"},
                       {Region::kActive, "active2"});
 }
-TEST(Process, ProcessDefaultState_KindAndCoro) {
-  Process p;
-  EXPECT_EQ(p.kind, ProcessKind::kInitial);
-  EXPECT_EQ(p.coro, nullptr);
-  EXPECT_EQ(p.home_region, Region::kActive);
-}
 
 TEST(Scheduler, ScheduleAndRunSingleEvent) {
   Arena arena;

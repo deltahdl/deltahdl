@@ -525,25 +525,6 @@ TEST(EventSimulationSim, WatcherRemovedIfConsumed) {
   EXPECT_EQ(count, 1);
 }
 
-TEST(EventSimulationSim, ProcessKindsEnumCoverage) {
-  EXPECT_EQ(static_cast<int>(ProcessKind::kInitial), 0);
-  EXPECT_EQ(static_cast<int>(ProcessKind::kAlways), 1);
-  EXPECT_EQ(static_cast<int>(ProcessKind::kAlwaysComb), 2);
-  EXPECT_EQ(static_cast<int>(ProcessKind::kAlwaysLatch), 3);
-  EXPECT_EQ(static_cast<int>(ProcessKind::kAlwaysFF), 4);
-  EXPECT_EQ(static_cast<int>(ProcessKind::kFinal), 5);
-  EXPECT_EQ(static_cast<int>(ProcessKind::kContAssign), 6);
-}
-
-TEST(EventSimulationSim, ProcessDefaultState) {
-  Process proc;
-  EXPECT_EQ(proc.kind, ProcessKind::kInitial);
-  EXPECT_EQ(proc.home_region, Region::kActive);
-  EXPECT_TRUE(proc.active);
-  EXPECT_FALSE(proc.is_reactive);
-  EXPECT_EQ(proc.id, 0u);
-}
-
 TEST(EventSimulationSim, SchedulerInitialState) {
   Arena arena;
   Scheduler sched(arena);

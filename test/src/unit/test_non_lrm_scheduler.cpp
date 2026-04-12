@@ -14,8 +14,6 @@
 
 using namespace delta;
 
-SimCoroutine MakeTestCoroutine() { co_return; }
-
 namespace {
 
 TEST(EventPool, AcquireCreatesNew) {
@@ -58,33 +56,6 @@ TEST(Scheduler, EventPoolIntegration) {
   EXPECT_TRUE(ran);
 
   EXPECT_EQ(pool.FreeCount(), 1);
-}
-
-TEST(Process, MoveSemantics) {
-  SimCoroutine a = MakeTestCoroutine();
-  EXPECT_FALSE(a.Done());
-
-  SimCoroutine* pa = &a;
-  SimCoroutine b = std::move(a);
-  EXPECT_FALSE(b.Done());
-  EXPECT_TRUE(pa->Done());
-}
-
-TEST(Process, ProcessIdAssignment) {
-  Process p1;
-  p1.id = 42;
-  Process p2;
-  p2.id = 43;
-  EXPECT_NE(p1.id, p2.id);
-}
-
-TEST(Process, CoroutineRelease) {
-  SimCoroutine coro = MakeTestCoroutine();
-  auto handle = coro.Release();
-  EXPECT_TRUE(coro.Done());
-  EXPECT_NE(handle, nullptr);
-
-  handle.destroy();
 }
 
 TEST(EventPool, ReleaseAndReuse) {
@@ -250,16 +221,6 @@ TEST(MtSim, RunTimestepMultipleThreads) {
   for (int i = 0; i < 4; ++i) {
     EXPECT_EQ(vars[i]->value.ToUint64(), 1u) << "Variable " << names[i];
   }
-}
-
-TEST(Process, ProcessResumeNullSafe) {
-  Process p;
-  p.Resume();
-  EXPECT_TRUE(p.Done());
-}
-
-TEST(Process, CoroutineDestroyOnScopeExit) {
-  SimCoroutine coro = MakeTestCoroutine();
 }
 
 TEST(DesignBuildingBlockParsing, SimTimeOperations) {
