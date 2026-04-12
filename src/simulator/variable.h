@@ -8,6 +8,8 @@
 
 namespace delta {
 
+struct Expr;
+
 // --- Variable: storage for reg/logic/integer simulation objects ---
 
 struct Variable {
@@ -22,6 +24,10 @@ struct Variable {
   bool is_signed = false;
   bool is_4state = true;
   uint64_t triggered_ticks = UINT64_MAX;
+
+  // §10.6: RHS expression of the active procedural continuous assignment
+  // (assign/force). Used by watchers to reevaluate on RHS variable changes.
+  const Expr* proc_cont_rhs = nullptr;
 
   // Watchers return true if consumed (should be removed), false to keep.
   std::vector<std::function<bool()>> watchers;

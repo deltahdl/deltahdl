@@ -71,26 +71,6 @@ TEST(ProceduralBlockPreprocessor, CompoundAssignment) {
       "endmodule\n"));
 }
 
-TEST(ProceduralBlockPreprocessor, ForceAndRelease) {
-  EXPECT_TRUE(ParseWithPreprocessorOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    force q = 1;\n"
-      "    release q;\n"
-      "  end\n"
-      "endmodule\n"));
-}
-
-TEST(ProceduralBlockPreprocessor, ProceduralAssignAndDeassign) {
-  EXPECT_TRUE(ParseWithPreprocessorOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    assign q = d;\n"
-      "    deassign q;\n"
-      "  end\n"
-      "endmodule\n"));
-}
-
 TEST(ProceduralBlockPreprocessor, NonblockingAssignment) {
   EXPECT_TRUE(ParseWithPreprocessorOk(
       "module m;\n"

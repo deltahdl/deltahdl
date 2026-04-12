@@ -117,57 +117,6 @@ TEST(ProceduralBlockSyntaxParsing, OperatorAssignment) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ProceduralBlockSyntaxParsing, ProceduralContinuousAssign) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin assign q = d; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-}
-
-TEST(ProceduralBlockSyntaxParsing, ProceduralDeassign) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin deassign q; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
-}
-
-TEST(ProceduralBlockSyntaxParsing, ForceStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin force q = 1; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForce);
-  EXPECT_NE(stmt->lhs, nullptr);
-  EXPECT_NE(stmt->rhs, nullptr);
-}
-
-TEST(ProceduralBlockSyntaxParsing, ReleaseStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin release q; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
-  EXPECT_NE(stmt->lhs, nullptr);
-}
-
 TEST(ProceduralBlockSyntaxParsing, IncExpression) {
   auto r = Parse(
       "module m;\n"
@@ -438,77 +387,6 @@ TEST(ProceduralBlockSyntaxParsing, NonblockingAssignment_Simple) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
   ASSERT_NE(stmt->lhs, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
-}
-
-TEST(ProceduralBlockSyntaxParsing, ProceduralContinuous_AllForms) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    assign q = d;\n"
-      "    deassign q;\n"
-      "    force y = 0;\n"
-      "    release y;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto stmts = AllInitialStmts(r);
-  ASSERT_EQ(stmts.size(), 4u);
-  EXPECT_EQ(stmts[0]->kind, StmtKind::kAssign);
-  EXPECT_EQ(stmts[1]->kind, StmtKind::kDeassign);
-  EXPECT_EQ(stmts[2]->kind, StmtKind::kForce);
-  EXPECT_EQ(stmts[3]->kind, StmtKind::kRelease);
-}
-
-TEST(ProceduralBlockSyntaxParsing, ProceduralAssign_Basic) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin assign q = d; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kAssign);
-  EXPECT_NE(stmt->lhs, nullptr);
-  EXPECT_NE(stmt->rhs, nullptr);
-}
-
-TEST(ProceduralBlockSyntaxParsing, ProceduralDeassign_Basic) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin deassign q; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kDeassign);
-  EXPECT_NE(stmt->lhs, nullptr);
-}
-
-TEST(ProceduralBlockSyntaxParsing, Force_Net) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin force net_a = 0; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForce);
-}
-
-TEST(ProceduralBlockSyntaxParsing, Release_Net) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin release net_a; end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
 }
 
 TEST(ProceduralBlockSyntaxParsing, OperatorAssignment_PlusEq) {

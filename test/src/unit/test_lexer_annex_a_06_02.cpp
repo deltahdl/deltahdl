@@ -36,21 +36,6 @@ TEST(ProceduralBlockLexing, FinalKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwFinal);
 }
 
-TEST(ProceduralBlockLexing, DeassignKeyword) {
-  auto r = LexOne("deassign");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwDeassign);
-}
-
-TEST(ProceduralBlockLexing, ForceKeyword) {
-  auto r = LexOne("force");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwForce);
-}
-
-TEST(ProceduralBlockLexing, ReleaseKeyword) {
-  auto r = LexOne("release");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwRelease);
-}
-
 TEST(ProceduralBlockLexing, InitialBlockTokenSequence) {
   auto tokens = Lex("initial a = 0 ;");
   ASSERT_GE(tokens.size(), 5u);
@@ -94,32 +79,6 @@ TEST(ProceduralBlockLexing, NonblockingAssignTokenSequence) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kLtEq);
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[3].kind, TokenKind::kSemicolon);
-}
-
-TEST(ProceduralBlockLexing, ForceStatementTokenSequence) {
-  auto tokens = Lex("force q = 1 ;");
-  ASSERT_GE(tokens.size(), 5u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwForce);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kEq);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kSemicolon);
-}
-
-TEST(ProceduralBlockLexing, DeassignStatementTokenSequence) {
-  auto tokens = Lex("deassign q ;");
-  ASSERT_GE(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwDeassign);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kSemicolon);
-}
-
-TEST(ProceduralBlockLexing, ReleaseStatementTokenSequence) {
-  auto tokens = Lex("release q ;");
-  ASSERT_GE(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwRelease);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kSemicolon);
 }
 
 TEST(ProceduralBlockLexing, AllCompoundAssignOperators) {

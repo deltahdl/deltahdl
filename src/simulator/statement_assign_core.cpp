@@ -1065,7 +1065,30 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return StmtResult::kDone;
 }
 
-// --- Force / Release (IEEE §10.6.2) ---
+// --- Force / Release (IEEE §10.6) ---
+
+// §10.6: Collect all Variable* referenced by identifiers in an expression tree.
+static void CollectExprVars(const Expr* expr, SimContext& ctx,
+                            std::vector<Variable*>& vars) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kIdentifier) {
+    auto* var = ctx.FindVariable(expr->text);
+    if (var) vars.push_back(var);
+    return;
+  }
+  CollectExprVars(expr->lhs, ctx, vars);
+  CollectExprVars(expr->rhs, ctx, vars);
+  CollectExprVars(expr->condition, ctx, vars);
+  CollectExprVars(expr->true_expr, ctx, vars);
+  CollectExprVars(expr->false_expr, ctx, vars);
+  CollectExprVars(expr->base, ctx, vars);
+  CollectExprVars(expr->index, ctx, vars);
+  CollectExprVars(expr->index_end, ctx, vars);
+  CollectExprVars(expr->with_expr, ctx, vars);
+  CollectExprVars(expr->repeat_count, ctx, vars);
+  for (auto* e : expr->elements) CollectExprVars(e, ctx, vars);
+  for (auto* a : expr->args) CollectExprVars(a, ctx, vars);
+}
 
 StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
@@ -1078,6 +1101,34 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   var->forced_value = rhs_val;
   var->value = rhs_val;
   if (!var->is_4state) CoerceTo2State(var->value);
+  var->proc_cont_rhs = stmt->rhs;
+  var->NotifyWatchers();
+
+  // §10.6: Set up continuous reevaluation — if any RHS variable changes,
+  // reevaluate the expression and update the target while active.
+  std::vector<Variable*> rhs_vars;
+  CollectExprVars(stmt->rhs, ctx, rhs_vars);
+  // Deduplicate and exclude the target variable itself.
+  std::sort(rhs_vars.begin(), rhs_vars.end());
+  rhs_vars.erase(std::unique(rhs_vars.begin(), rhs_vars.end()), rhs_vars.end());
+  rhs_vars.erase(std::remove(rhs_vars.begin(), rhs_vars.end(), var),
+                 rhs_vars.end());
+
+  const Expr* rhs = stmt->rhs;
+  auto* ctx_ptr = &ctx;
+  auto* arena_ptr = &arena;
+  for (auto* rhs_var : rhs_vars) {
+    rhs_var->AddWatcher([var, rhs, ctx_ptr, arena_ptr]() {
+      if (!var->is_forced || var->proc_cont_rhs != rhs) return true;
+      auto new_val = EvalExpr(rhs, *ctx_ptr, *arena_ptr);
+      var->forced_value = new_val;
+      var->value = new_val;
+      if (!var->is_4state) CoerceTo2State(var->value);
+      var->NotifyWatchers();
+      return false;
+    });
+  }
+
   return StmtResult::kDone;
 }
 
@@ -1087,6 +1138,7 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx) {
   if (!var) return StmtResult::kDone;
 
   var->is_forced = false;
+  var->proc_cont_rhs = nullptr;
   return StmtResult::kDone;
 }
 
