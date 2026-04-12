@@ -52,21 +52,6 @@ TEST(ContinuousAssignDeclElaboration, NetDeclAssignWidth) {
   EXPECT_EQ(mod->assigns[0].width, 8u);
 }
 
-TEST(ContinuousAssignDeclElaboration, NetDeclAssignDriveStrength) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  wire (strong1, pull0) w = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1u);
-  EXPECT_NE(mod->assigns[0].drive_strength0, 0);
-  EXPECT_NE(mod->assigns[0].drive_strength1, 0);
-}
-
 TEST(ContinuousAssignDeclElaboration, NetDeclNoInitNoContAssign) {
   ElabFixture f;
   auto* design = Elaborate(

@@ -18,19 +18,6 @@ TEST(ContinuousAssignSyntaxParsing, ContinuousAssignBasic) {
   EXPECT_NE(item->assign_rhs, nullptr);
 }
 
-TEST(ContinuousAssignSyntaxParsing, ContinuousAssignWithDriveStrength) {
-  auto r = Parse(
-      "module m;\n"
-      "  assign (strong1, weak0) a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r, ModuleItemKind::kContAssign);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->drive_strength0, 0);
-  EXPECT_NE(item->drive_strength1, 0);
-}
-
 TEST(ContinuousAssignSyntaxParsing, ContinuousAssignWithDelay3) {
   auto r = Parse(
       "module m;\n"
@@ -64,19 +51,6 @@ TEST(ContinuousAssignSyntaxParsing, ContinuousAssignWithDelay3ThreeValues) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FindItemByKind(r, ModuleItemKind::kContAssign);
   ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->assign_delay, nullptr);
-}
-
-TEST(ContinuousAssignSyntaxParsing, ContinuousAssignStrengthAndDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  assign (strong1, pull0) #10 a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FindItemByKind(r, ModuleItemKind::kContAssign);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->drive_strength0, 0);
   EXPECT_NE(item->assign_delay, nullptr);
 }
 

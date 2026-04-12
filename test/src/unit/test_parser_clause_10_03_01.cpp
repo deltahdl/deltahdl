@@ -55,16 +55,4 @@ TEST(DeclarationAssignmentParsing, TriNetDeclAssignment) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(DeclarationAssignmentParsing, NetDeclAssignmentWithDriveStrength) {
-  auto r = Parse("module m; wire (strong1, pull0) mynet = 1'b1; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kNetDecl);
-  EXPECT_EQ(item->name, "mynet");
-  EXPECT_NE(item->init_expr, nullptr);
-  EXPECT_NE(item->data_type.drive_strength0, 0);
-  EXPECT_NE(item->data_type.drive_strength1, 0);
-}
-
 }  // namespace

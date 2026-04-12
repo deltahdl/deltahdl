@@ -485,6 +485,11 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
     diag_.Error(item->loc,
                 "drive strength on net declaration requires an assignment");
   }
+  // §10.3.4: (highz0, highz1) and (highz1, highz0) are illegal.
+  if (item->kind == ModuleItemKind::kNetDecl &&
+      item->drive_strength0 == 1 && item->drive_strength1 == 1) {
+    diag_.Error(item->loc, "drive strength (highz0, highz1) is illegal");
+  }
   if (item->kind == ModuleItemKind::kContAssign) {
     CheckRealSelect(item->assign_rhs, var_types_, diag_);
     CheckScalarSelect(item->assign_rhs, scalar_var_names_, diag_);
