@@ -352,7 +352,10 @@ Stmt* Parser::ParseBlockStmt() {
   // §9.3.4: Optional end label must match block name.
   if (Match(TokenKind::kColon)) {
     auto end_id = ExpectIdentifier();
-    if (!stmt->label.empty() && end_id.text != stmt->label) {
+    if (stmt->label.empty()) {
+      diag_.Error(end_id.loc, "end label '" + std::string(end_id.text) +
+                                  "' specified for unnamed block");
+    } else if (end_id.text != stmt->label) {
       diag_.Error(end_id.loc, "end label '" + std::string(end_id.text) +
                                   "' does not match block name '" +
                                   std::string(stmt->label) + "'");
@@ -532,7 +535,10 @@ Stmt* Parser::ParseForkStmt() {
   // §9.3.4: Optional end label must match fork name.
   if (Match(TokenKind::kColon)) {
     auto end_id = ExpectIdentifier();
-    if (!stmt->label.empty() && end_id.text != stmt->label) {
+    if (stmt->label.empty()) {
+      diag_.Error(end_id.loc, "end label '" + std::string(end_id.text) +
+                                  "' specified for unnamed block");
+    } else if (end_id.text != stmt->label) {
       diag_.Error(end_id.loc, "end label '" + std::string(end_id.text) +
                                   "' does not match block name '" +
                                   std::string(stmt->label) + "'");

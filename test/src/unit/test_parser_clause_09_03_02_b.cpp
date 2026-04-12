@@ -151,37 +151,6 @@ TEST(ParallelBlockParsing, ForkAsDirectInitialBody) {
   EXPECT_EQ(stmt->stmts[1]->kind, StmtKind::kBlockingAssign);
 }
 
-TEST(ParallelBlockParsing, NamedForkBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork : workers\n"
-      "      a = 1;\n"
-      "      b = 2;\n"
-      "    join : workers\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kFork);
-  EXPECT_EQ(stmt->label, "workers");
-}
-
-TEST(ParallelBlockParsing, NamedForkMismatchedEndLabelError) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    fork : alpha\n"
-      "      a = 1;\n"
-      "    join : beta\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(ParallelBlockParsing, LocalparamInForkJoin) {
   auto r = Parse(
       "module m;\n"

@@ -208,11 +208,20 @@ static ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx,
 // --- Container coroutines (return ExecTask, support suspension) ---
 
 static ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  bool named = !stmt->label.empty();
+  if (named) ctx.PushStaticScope(stmt->label);
   for (auto* s : stmt->stmts) {
     auto result = co_await ExecStmt(s, ctx, arena);
-    if (result != StmtResult::kDone) co_return result;
-    if (ctx.StopRequested()) co_return StmtResult::kDone;
+    if (result != StmtResult::kDone) {
+      if (named) ctx.PopStaticScope(stmt->label);
+      co_return result;
+    }
+    if (ctx.StopRequested()) {
+      if (named) ctx.PopStaticScope(stmt->label);
+      co_return StmtResult::kDone;
+    }
   }
+  if (named) ctx.PopStaticScope(stmt->label);
   co_return StmtResult::kDone;
 }
 

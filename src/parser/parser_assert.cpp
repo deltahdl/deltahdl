@@ -281,7 +281,7 @@ ModuleItem* Parser::ParsePropertyDecl() {
     Consume();
   }
   Expect(TokenKind::kKwEndproperty);
-  if (Match(TokenKind::kColon)) ExpectIdentifier();
+  MatchEndLabel(item->name);
   return item;
 }
 
@@ -318,7 +318,7 @@ ModuleItem* Parser::ParseSequenceDecl() {
     Consume();
   }
   Expect(TokenKind::kKwEndsequence);
-  if (Match(TokenKind::kColon)) ExpectIdentifier();
+  MatchEndLabel(item->name);
   return item;
 }
 

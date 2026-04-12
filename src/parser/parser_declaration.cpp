@@ -416,7 +416,20 @@ void Parser::ParseFuncBody(ModuleItem* item) {
   }
   Expect(TokenKind::kKwEndfunction);
   if (Match(TokenKind::kColon)) {
-    if (!Match(TokenKind::kKwNew)) ExpectIdentifier();
+    std::string_view end_name;
+    SourceLoc end_loc = CurrentLoc();
+    if (Match(TokenKind::kKwNew)) {
+      end_name = "new";
+    } else {
+      auto end_id = ExpectIdentifier();
+      end_name = end_id.text;
+      end_loc = end_id.loc;
+    }
+    if (end_name != item->name) {
+      diag_.Error(end_loc, "end label '" + std::string(end_name) +
+                               "' does not match '" +
+                               std::string(item->name) + "'");
+    }
   }
 }
 
@@ -488,10 +501,7 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
     }
   }
   Expect(TokenKind::kKwEndtask);
-  // Optional end label: ": name"
-  if (Match(TokenKind::kColon)) {
-    ExpectIdentifier();
-  }
+  MatchEndLabel(item->name);
   return item;
 }
 

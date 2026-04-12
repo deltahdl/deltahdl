@@ -530,9 +530,15 @@ static bool ExecFuncIf(const Stmt* stmt, Variable* ret_var,
 static bool ExecFuncBlock(const Stmt* stmt, Variable* ret_var,
                           std::string_view func_name, SimContext& ctx,
                           Arena& arena) {
+  bool named = !stmt->label.empty();
+  if (named) ctx.PushStaticScope(stmt->label);
   for (auto* c : stmt->stmts) {
-    if (ExecFuncStmt(c, ret_var, func_name, ctx, arena)) return true;
+    if (ExecFuncStmt(c, ret_var, func_name, ctx, arena)) {
+      if (named) ctx.PopStaticScope(stmt->label);
+      return true;
+    }
   }
+  if (named) ctx.PopStaticScope(stmt->label);
   return false;
 }
 

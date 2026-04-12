@@ -89,7 +89,7 @@ ModuleItem* Parser::ParseClockingDecl() {
   }
 
   Expect(TokenKind::kKwEndclocking);
-  if (Match(TokenKind::kColon)) ExpectIdentifier();
+  MatchEndLabel(item->name);
   return item;
 }
 

@@ -276,7 +276,7 @@ ClassDecl* Parser::ParseClassDecl() {
     if (lexer_.SavePos().pos == before) Consume();
   }
   Expect(TokenKind::kKwEndclass);
-  if (Match(TokenKind::kColon)) ExpectIdentifier();
+  MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;
 }

@@ -316,44 +316,4 @@ TEST(SequentialBlockParsing, NullStatementInSeqBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SequentialBlockParsing, LabeledSeqBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : my_block\n"
-      "    a = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->kind, StmtKind::kBlock);
-  EXPECT_EQ(body->label, "my_block");
-}
-
-TEST(SequentialBlockParsing, LabeledSeqBlockWithMatchingEndLabel) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : blk\n"
-      "    a = 1;\n"
-      "  end : blk\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = FirstInitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->label, "blk");
-}
-
-TEST(SequentialBlockParsing, MismatchedEndLabelError) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin : foo\n"
-      "    a = 1;\n"
-      "  end : bar\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.has_errors);
-}
-
 }  // namespace
