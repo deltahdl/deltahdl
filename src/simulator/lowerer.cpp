@@ -141,51 +141,71 @@ static uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
 
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
-  auto val = EvalExpr(params.rhs, ctx, arena);
   if (!params.lhs || params.lhs->kind != ExprKind::kIdentifier) co_return;
 
-  // §10.3.3: Apply continuous assignment delay if specified.
-  if (params.delays.rise) {
-    ContAssignDelays d;
-    d.rise = EvalExpr(params.delays.rise, ctx, arena).ToUint64();
-    d.fall = params.delays.fall
-                 ? EvalExpr(params.delays.fall, ctx, arena).ToUint64()
-                 : 0;
-    d.decay = params.delays.decay
-                  ? EvalExpr(params.delays.decay, ctx, arena).ToUint64()
-                  : 0;
-    d.has_fall = params.delays.fall != nullptr;
-    d.has_decay = params.delays.decay != nullptr;
+  // §10.3: Collect RHS read signals for re-evaluation sensitivity.
+  std::unordered_set<std::string> read_strs;
+  CollectExprReads(params.rhs, read_strs);
+  std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
 
-    // Get old value for transition detection.
-    Logic4Vec old_val = MakeLogic4VecVal(arena, 1, 0);
-    auto* var = ctx.FindVariable(params.lhs->text);
-    auto* net = ctx.FindNet(params.lhs->text);
-    if (var)
-      old_val = var->value;
-    else if (net && net->resolved)
-      old_val = net->resolved->value;
-
-    uint64_t ticks = SelectContAssignDelay(old_val, val, d);
-    if (ticks > 0) {
-      co_await DelayAwaiter{ctx, ticks};
-    }
-  }
-
-  // §10.3.4: If target is a net, add as a strength-aware driver.
+  // Track the net driver index so updates replace rather than append.
   auto* net = ctx.FindNet(params.lhs->text);
-  if (net) {
-    net->drivers.push_back(val);
-    net->driver_strengths.push_back(params.ds);
-    net->Resolve(arena);
-    co_return;
+  size_t driver_idx = net ? net->drivers.size() : 0;
+  bool first = true;
+
+  while (!ctx.StopRequested()) {
+    auto val = EvalExpr(params.rhs, ctx, arena);
+
+    // §10.3.3: Apply continuous assignment delay if specified.
+    if (params.delays.rise) {
+      ContAssignDelays d;
+      d.rise = EvalExpr(params.delays.rise, ctx, arena).ToUint64();
+      d.fall = params.delays.fall
+                   ? EvalExpr(params.delays.fall, ctx, arena).ToUint64()
+                   : 0;
+      d.decay = params.delays.decay
+                    ? EvalExpr(params.delays.decay, ctx, arena).ToUint64()
+                    : 0;
+      d.has_fall = params.delays.fall != nullptr;
+      d.has_decay = params.delays.decay != nullptr;
+
+      Logic4Vec old_val = MakeLogic4VecVal(arena, 1, 0);
+      auto* var = ctx.FindVariable(params.lhs->text);
+      if (var)
+        old_val = var->value;
+      else if (net && net->resolved)
+        old_val = net->resolved->value;
+
+      uint64_t ticks = SelectContAssignDelay(old_val, val, d);
+      if (ticks > 0) {
+        co_await DelayAwaiter{ctx, ticks};
+      }
+    }
+
+    // §10.3.4: If target is a net, add/update as a strength-aware driver.
+    if (net) {
+      if (first) {
+        net->drivers.push_back(val);
+        net->driver_strengths.push_back(params.ds);
+      } else {
+        net->drivers[driver_idx] = val;
+        net->driver_strengths[driver_idx] = params.ds;
+      }
+      net->Resolve(arena);
+    } else {
+      auto* var = ctx.FindVariable(params.lhs->text);
+      if (var) {
+        var->value = val;
+        var->NotifyWatchers();
+      }
+    }
+
+    first = false;
+
+    // §10.3: Re-evaluate whenever the RHS changes.
+    if (read_vars.empty()) break;
+    co_await AnyChangeAwaiter{ctx, read_vars};
   }
-  auto* var = ctx.FindVariable(params.lhs->text);
-  if (var) {
-    var->value = val;
-    var->NotifyWatchers();
-  }
-  co_return;
 }
 
 // --- Schedule helper ---

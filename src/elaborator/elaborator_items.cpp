@@ -148,6 +148,21 @@ void Elaborator::ValidateContAssignDriveStrength(ModuleItem* item,
 void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
   if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
     ValidateContAssignIdentLhs(item, mod);
+    // §10.3 Syntax 10-1: The variable form of continuous_assign does not
+    // permit drive_strength or delay3.
+    bool is_var_target = net_names_.count(item->assign_lhs->text) == 0;
+    if (is_var_target) {
+      if (item->drive_strength0 != 0 || item->drive_strength1 != 0) {
+        diag_.Error(item->loc,
+                    "drive strength not allowed on continuous assignment "
+                    "to a variable");
+      }
+      if (item->assign_delay_fall || item->assign_delay_decay) {
+        diag_.Error(item->loc,
+                    "multiple delays not allowed on continuous assignment "
+                    "to a variable");
+      }
+    }
   }
   if (item->assign_lhs) {
     ValidateContAssignNettypeAndDelay(item);

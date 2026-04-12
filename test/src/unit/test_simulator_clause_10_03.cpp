@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Lowerer, ContAssignExecutes) {
+TEST(ContinuousAssignSim, ContAssignExecutes) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -24,6 +24,73 @@ TEST(Lowerer, ContAssignExecutes) {
   auto* var = f.ctx.FindVariable("y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+TEST(ContinuousAssignSim, DrivesScalarNet) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire w;\n"
+      "  assign w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* var = f.ctx.FindVariable("w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(ContinuousAssignSim, DrivesScalarVariable) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic v;\n"
+      "  assign v = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* var = f.ctx.FindVariable("v");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(ContinuousAssignSim, DrivesVectorVariable) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] v;\n"
+      "  assign v = 16'hBEEF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* var = f.ctx.FindVariable("v");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xBEEFu);
+}
+
+TEST(ContinuousAssignSim, ReEvaluatesOnRhsChange) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  assign b = a;\n"
+      "  initial begin\n"
+      "    a = 8'd10;\n"
+      "    #1;\n"
+      "    a = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 42u);
 }
 
 }  // namespace
