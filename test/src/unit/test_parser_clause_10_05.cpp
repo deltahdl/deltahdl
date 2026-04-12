@@ -14,7 +14,7 @@ TEST(DeclarationAssignmentParsing, VarDeclAssignmentWithInit) {
   EXPECT_EQ(item->name, "x");
   EXPECT_NE(item->init_expr, nullptr);
 }
-TEST(DataTypeParsing, VariableInitialization) {
+TEST(VarDeclAssignmentParsing, VariableInitialization) {
   auto r = Parse(
       "module t;\n"
       "  logic v = 1'b1;\n"
@@ -25,19 +25,7 @@ TEST(DataTypeParsing, VariableInitialization) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-TEST(SchedulingSemanticsParsing, VarInitAtDeclaration) {
-  auto r = Parse(
-      "module m;\n"
-      "  int x = 42;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kInt);
-  EXPECT_NE(item->init_expr, nullptr);
-}
-TEST(BlockVarDeclParsing, BlockVarDecl_WithInit) {
+TEST(VarDeclAssignmentParsing, BlockVarDeclWithInit) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

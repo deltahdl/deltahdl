@@ -24,24 +24,6 @@ TEST(VariableDeclaration, VariableCreation) {
   ASSERT_NE(var, nullptr);
 }
 
-TEST(VariableDeclaration, VariableWithInitializer) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x = 42;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
 TEST(VariableDeclaration, MultipleVariableCreation) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -171,42 +153,6 @@ TEST(VariableDeclaration, EventDefaultIsNewEvent) {
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->is_event);
   EXPECT_FALSE(var->is_null_event);
-}
-
-// Static variable initializer executes before initial blocks.
-TEST(VariableDeclaration, StaticInitBeforeInitialBlock) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x = 10;\n"
-      "  int y;\n"
-      "  initial y = x;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 10u);
-}
-
-// Runtime expression as initializer.
-TEST(VariableDeclaration, RuntimeExpressionInitializer) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x = 3 + 4 * 2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
 }  // namespace

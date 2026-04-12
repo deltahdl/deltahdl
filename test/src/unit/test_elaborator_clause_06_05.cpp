@@ -86,18 +86,6 @@ TEST(NetsAndVariables, VariableMixedContinuousAndProceduralError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(NetsAndVariables, VariableInitIsNotContinuousAssignment) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module t;\n"
-      "  logic v = 1'b1;\n"
-      "  always_comb v = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(NetsAndVariables, RedeclarationOfVariableAsNetError) {
   ElabFixture f;
   ElaborateSrc(

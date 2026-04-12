@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -123,6 +124,70 @@ TEST(VariableInitSim, VarInitBeforeAlwaysBlock) {
   ASSERT_NE(result, nullptr);
 
   EXPECT_EQ(result->value.ToUint64(), 5u);
+}
+
+TEST(VariableInitSim, RuntimeExpressionInitializer) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x = 3 + 4 * 2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 11u);
+}
+
+TEST(VariableInitSim, VarInitOverwrittenByProceduralAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x = 100;\n"
+      "  initial x = 200;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 200u);
+}
+
+TEST(VariableInitSim, BlockLevelVarInit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    int local_var = 77;\n"
+      "    result = local_var;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* result = f.ctx.FindVariable("result");
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->value.ToUint64(), 77u);
+}
+
+TEST(VariableInitSim, StaticClassMemberInitBeforeInitialBlock) {
+  EXPECT_EQ(RunAndGet(
+      "class C;\n"
+      "  static int val = 55;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int result;\n"
+      "  initial result = C::val;\n"
+      "endmodule\n", "result"), 55u);
 }
 
 }  // namespace
