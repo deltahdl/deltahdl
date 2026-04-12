@@ -239,15 +239,6 @@ TEST(TimingControlSyntaxParsing, ClockingEventNegedge) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kNegedge);
 }
 
-TEST(TimingControlSyntaxParsing, EventExpressionWithIff) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk iff en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(TimingControlSyntaxParsing, EventExprEdge) {
   auto r = Parse(
       "module m;\n"
@@ -276,37 +267,6 @@ TEST(TimingControlSyntaxParsing, EventExprAnyChange) {
   ASSERT_NE(stmt, nullptr);
   ASSERT_EQ(stmt->events.size(), 1u);
   EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprIff) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(a iff enable) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprPosedgeIff) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge a iff enable == 1) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
 
 TEST(TimingControlSyntaxParsing, IntraAssignDelayBlocking) {
@@ -651,22 +611,6 @@ TEST(TimingControlSyntaxParsing, EventControlHierarchicalSignal) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   ASSERT_EQ(stmt->events.size(), 1u);
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
-}
-
-TEST(TimingControlSyntaxParsing, EventExprMultipleIffGuards) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(posedge a iff en1 or negedge b iff en2) x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_EQ(stmt->events.size(), 2u);
-  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
-  EXPECT_NE(stmt->events[1].iff_condition, nullptr);
 }
 
 TEST(TimingControlSyntaxParsing, WaitOrderWithActionBlock) {

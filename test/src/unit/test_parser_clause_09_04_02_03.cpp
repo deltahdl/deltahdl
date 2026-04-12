@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ProcessParsing, IffGuardCommaStmtLevel) {
+TEST(ConditionalEventIffParsing, IffGuardCommaStmtLevel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -22,7 +22,7 @@ TEST(ProcessParsing, IffGuardCommaStmtLevel) {
   EXPECT_EQ(stmt->events[1].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardOrStmtLevel) {
+TEST(ConditionalEventIffParsing, IffGuardOrStmtLevel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -39,7 +39,7 @@ TEST(ProcessParsing, IffGuardOrStmtLevel) {
   EXPECT_EQ(stmt->events[1].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardAlwaysFF) {
+TEST(ConditionalEventIffParsing, IffGuardAlwaysFF) {
   auto r = Parse(
       "module m;\n"
       "  always_ff @(posedge clock iff reset == 0 or posedge reset) begin\n"
@@ -59,7 +59,7 @@ TEST(ProcessParsing, IffGuardAlwaysFF) {
   EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardBeginEnd) {
+TEST(ConditionalEventIffParsing, IffGuardBeginEnd) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff en) begin\n"
@@ -78,7 +78,7 @@ TEST(ProcessParsing, IffGuardBeginEnd) {
   EXPECT_GE(item->body->stmts.size(), 2u);
 }
 
-TEST(ProcessParsing, IffConditionFieldPosedge) {
+TEST(ConditionalEventIffParsing, IffConditionFieldPosedge) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff reset == 0) q <= d;\n"
@@ -94,7 +94,7 @@ TEST(ProcessParsing, IffConditionFieldPosedge) {
   EXPECT_EQ(ev.iff_condition->kind, ExprKind::kBinary);
 }
 
-TEST(ProcessParsing, SignalFieldPopulated) {
+TEST(ConditionalEventIffParsing, SignalFieldPopulated) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff en) q <= d;\n"
@@ -110,7 +110,7 @@ TEST(ProcessParsing, SignalFieldPopulated) {
   EXPECT_EQ(ev.signal->text, "clk");
 }
 
-TEST(ProcessParsing, EdgeFieldNegedge) {
+TEST(ConditionalEventIffParsing, EdgeFieldNegedge) {
   auto r = Parse(
       "module m;\n"
       "  always @(negedge rst_n iff mode) q <= d;\n"
@@ -125,7 +125,7 @@ TEST(ProcessParsing, EdgeFieldNegedge) {
   EXPECT_EQ(item->sensitivity[0].signal->text, "rst_n");
 }
 
-TEST(ProcessParsing, MixedIffPresence) {
+TEST(ConditionalEventIffParsing, MixedIffPresence) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff en, negedge rst, edge sig iff guard)\n"
@@ -147,7 +147,7 @@ TEST(ProcessParsing, MixedIffPresence) {
   EXPECT_NE(item->sensitivity[2].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardLogicalOr) {
+TEST(ConditionalEventIffParsing, IffGuardLogicalOr) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff (a || b)) q <= d;\n"
@@ -160,7 +160,7 @@ TEST(ProcessParsing, IffGuardLogicalOr) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardNotEqual) {
+TEST(ConditionalEventIffParsing, IffGuardNotEqual) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff state != 0) q <= d;\n"
@@ -174,7 +174,7 @@ TEST(ProcessParsing, IffGuardNotEqual) {
   EXPECT_EQ(item->sensitivity[0].iff_condition->kind, ExprKind::kBinary);
 }
 
-TEST(ProcessParsing, IffGuardAlwaysFFSingleEdge) {
+TEST(ConditionalEventIffParsing, IffGuardAlwaysFFSingleEdge) {
   auto r = Parse(
       "module m;\n"
       "  always_ff @(posedge clk iff en)\n"
@@ -190,7 +190,7 @@ TEST(ProcessParsing, IffGuardAlwaysFFSingleEdge) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardNoEdgeStmtComparison) {
+TEST(ConditionalEventIffParsing, IffGuardNoEdgeStmtComparison) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -207,7 +207,7 @@ TEST(ProcessParsing, IffGuardNoEdgeStmtComparison) {
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardUnaryNegation) {
+TEST(ConditionalEventIffParsing, IffGuardUnaryNegation) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff !bypass) q <= d;\n"
@@ -221,7 +221,7 @@ TEST(ProcessParsing, IffGuardUnaryNegation) {
   EXPECT_EQ(item->sensitivity[0].iff_condition->kind, ExprKind::kUnary);
 }
 
-TEST(ProcessParsing, IffGuardBitwiseAnd) {
+TEST(ConditionalEventIffParsing, IffGuardBitwiseAnd) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff (mask & enable)) q <= d;\n"
@@ -234,7 +234,7 @@ TEST(ProcessParsing, IffGuardBitwiseAnd) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardThreeEventsOr) {
+TEST(ConditionalEventIffParsing, IffGuardThreeEventsOr) {
   EXPECT_TRUE(ParseOk(
       "module m;\n"
       "  always @(posedge a iff g1 or negedge b iff g2 or edge c iff g3)\n"
@@ -242,15 +242,7 @@ TEST(ProcessParsing, IffGuardThreeEventsOr) {
       "endmodule\n"));
 }
 
-TEST(ProcessParsing, IffGuardNonblockingAssign) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  always @(posedge clk iff valid)\n"
-              "    data_out <= data_in;\n"
-              "endmodule\n"));
-}
-
-TEST(ProcessParsing, NoIffConditionWhenAbsent) {
+TEST(ConditionalEventIffParsing, NoIffConditionWhenAbsent) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk) q <= d;\n"
@@ -264,7 +256,7 @@ TEST(ProcessParsing, NoIffConditionWhenAbsent) {
   EXPECT_EQ(item->sensitivity[0].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardStmtLevelBody) {
+TEST(ConditionalEventIffParsing, IffGuardStmtLevelBody) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -287,28 +279,7 @@ TEST(ProcessParsing, IffGuardStmtLevelBody) {
   EXPECT_GE(stmt->body->stmts.size(), 2u);
 }
 
-TEST(ProcessTimingAndControlParsing, AlwaysFFWithReset) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic clock, reset;\n"
-      "  logic [7:0] r1, r2;\n"
-      "  always_ff @(posedge clock iff reset == 0 or posedge reset) begin\n"
-      "    r1 <= reset ? 0 : r2 + 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
-  ASSERT_EQ(item->sensitivity.size(), 2u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-  EXPECT_EQ(item->sensitivity[1].edge, Edge::kPosedge);
-  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
-}
-
-TEST(ProcessParsing, IffGuardPosedgeBasic) {
+TEST(ConditionalEventIffParsing, IffGuardPosedgeBasic) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff reset == 0) q <= d;\n"
@@ -323,21 +294,7 @@ TEST(ProcessParsing, IffGuardPosedgeBasic) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardPosedgeEnable) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk iff en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 1u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-}
-
-TEST(ProcessParsing, IffGuardNegedge) {
+TEST(ConditionalEventIffParsing, IffGuardNegedge) {
   auto r = Parse(
       "module m;\n"
       "  always @(negedge clk iff !rst) q <= d;\n"
@@ -351,7 +308,7 @@ TEST(ProcessParsing, IffGuardNegedge) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardEdgeKeyword) {
+TEST(ConditionalEventIffParsing, IffGuardEdgeKeyword) {
   auto r = Parse(
       "module m;\n"
       "  always @(edge sig iff guard) q <= d;\n"
@@ -365,54 +322,7 @@ TEST(ProcessParsing, IffGuardEdgeKeyword) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-TEST(ProcessTimingAndControlParsing, IffGuardStmtLevelNoEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    @(a iff enable == 1) y = a;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
-  ASSERT_EQ(stmt->events.size(), 1u);
-  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
-  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
-}
-
-TEST(ProceduralAssignAndControlParsing, ConditionalEventIffBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(a iff enable == 1)\n"
-      "    y <= a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_GE(item->sensitivity.size(), 1u);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-}
-
-TEST(ProcessTimingAndControlParsing, IffGuardAlwaysFF) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic clk, en;\n"
-      "  logic [3:0] q, d;\n"
-      "  always_ff @(posedge clk iff en) q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlwaysFF);
-  ASSERT_EQ(item->sensitivity.size(), 1u);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-}
-
-TEST(ProcessParsing, IffGuardNoEdge) {
+TEST(ConditionalEventIffParsing, IffGuardNoEdge) {
   auto r = Parse(
       "module m;\n"
       "  always @(sig iff en) q <= d;\n"
@@ -427,22 +337,7 @@ TEST(ProcessParsing, IffGuardNoEdge) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-TEST(ProceduralAssignAndControlParsing, ConditionalEventIffWithEdge) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk iff reset == 0)\n"
-      "    q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_GE(item->sensitivity.size(), 1u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-}
-
-TEST(ProcessParsing, IffGuardComplexCondition) {
+TEST(ConditionalEventIffParsing, IffGuardComplexCondition) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff (a && b)) q <= d;\n"
@@ -456,20 +351,7 @@ TEST(ProcessParsing, IffGuardComplexCondition) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-TEST(ProceduralAssignAndControlParsing, ConditionalEventIffMultipleEvents) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk iff en or negedge rst)\n"
-      "    q <= d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_GE(item->sensitivity.size(), 2u);
-}
-
-TEST(ProcessParsing, IffGuardMultipleOrFirst) {
+TEST(ConditionalEventIffParsing, IffGuardMultipleOrFirst) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff en or negedge rst) q <= d;\n"
@@ -485,7 +367,7 @@ TEST(ProcessParsing, IffGuardMultipleOrFirst) {
   EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardMultipleOrSecond) {
+TEST(ConditionalEventIffParsing, IffGuardMultipleOrSecond) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk or negedge rst iff !en) q <= d;\n"
@@ -501,7 +383,7 @@ TEST(ProcessParsing, IffGuardMultipleOrSecond) {
   EXPECT_NE(item->sensitivity[1].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardBothComma) {
+TEST(ConditionalEventIffParsing, IffGuardBothComma) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff en, negedge rst iff !mode) q <= d;\n"
@@ -515,7 +397,7 @@ TEST(ProcessParsing, IffGuardBothComma) {
   EXPECT_NE(item->sensitivity[1].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardComparison) {
+TEST(ConditionalEventIffParsing, IffGuardComparison) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff state == 2'b01) q <= d;\n"
@@ -528,27 +410,7 @@ TEST(ProcessParsing, IffGuardComparison) {
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardAlwaysSensitivity) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(posedge clk iff reset == 0 or posedge reset) begin\n"
-      "    q <= d;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-
-  ASSERT_EQ(item->sensitivity.size(), 2u);
-
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-
-  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
-  EXPECT_EQ(item->sensitivity[1].edge, Edge::kPosedge);
-}
-
-TEST(ProcessParsing, IffGuardStmtLevel) {
+TEST(ConditionalEventIffParsing, IffGuardStmtLevel) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -565,100 +427,60 @@ TEST(ProcessParsing, IffGuardStmtLevel) {
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardPosedgeEdge) {
+TEST(ConditionalEventIffParsing, PosedgeIffSimpleParseOk) {
   auto r = Parse(
       "module m;\n"
-      "  reg clk, reset, a, b;\n"
-      "  always @(posedge clk iff reset == 0) a <= b;\n"
+      "  always @(posedge clk iff en) q <= d;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-
-  ASSERT_EQ(item->sensitivity.size(), 1u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
+  EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ProcessParsing, IffGuardPosedgeFields) {
+TEST(ConditionalEventIffParsing, NoEdgeIffConditionPresent) {
   auto r = Parse(
       "module m;\n"
-      "  reg clk, reset, a, b;\n"
-      "  always @(posedge clk iff reset == 0) a <= b;\n"
+      "  initial begin\n"
+      "    @(a iff enable) x = 1;\n"
+      "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 1u);
-  EXPECT_NE(item->sensitivity[0].signal, nullptr);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-}
-
-TEST(ProcessParsing, IffGuardNoEdgeWithRegDecls) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg clk, en, a, b;\n"
-      "  always @(clk iff en) a <= b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 1u);
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kNone);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-}
-
-TEST(ProcessParsing, IffGuardMultipleEventsFirst) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg clk, reset, a, b;\n"
-      "  always @(posedge clk iff reset == 0 or negedge reset) a <= b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 2u);
-  EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-}
-
-TEST(ProcessParsing, IffGuardMultipleEventsSecond) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg clk, reset, a, b;\n"
-      "  always @(posedge clk iff reset == 0 or negedge reset) a <= b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->sensitivity.size(), 2u);
-  EXPECT_EQ(item->sensitivity[1].iff_condition, nullptr);
-  EXPECT_EQ(item->sensitivity[1].edge, Edge::kNegedge);
-}
-
-TEST(ProcessParsing, IffGuardStmtLevelKind) {
-  auto r = Parse(
-      "module m;\n"
-      "  reg clk, reset, a, b;\n"
-      "  initial @(posedge clk iff reset == 0) a <= b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
   ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
 
-TEST(ProcessParsing, IffGuardStmtLevelEvent) {
+TEST(ConditionalEventIffParsing, PosedgeIffEqualityCondition) {
   auto r = Parse(
       "module m;\n"
-      "  reg clk, reset, a, b;\n"
-      "  initial @(posedge clk iff reset == 0) a <= b;\n"
+      "  initial begin\n"
+      "    @(posedge a iff enable == 1) x = 1;\n"
+      "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_EQ(stmt->events.size(), 1u);
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
+}
+
+TEST(ConditionalEventIffParsing, TwoEventsOrBothWithIff) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    @(posedge a iff en1 or negedge b iff en2) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_EQ(stmt->events.size(), 2u);
+  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
+  EXPECT_NE(stmt->events[1].iff_condition, nullptr);
 }
 
 }  // namespace
