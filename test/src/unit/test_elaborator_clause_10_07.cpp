@@ -9,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, WidthInference_ContAssignWidth) {
+TEST(AssignmentExtensionTruncation, ContAssignInfersLhsWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -23,7 +23,7 @@ TEST(Elaboration, WidthInference_ContAssignWidth) {
   EXPECT_EQ(mod->assigns[0].width, 8);
 }
 
-TEST(BlockingAssignSim, BlockingAssignTruncation) {
+TEST(AssignmentExtensionTruncation, BlockingAssignTruncation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -46,7 +46,7 @@ TEST(BlockingAssignSim, BlockingAssignTruncation) {
   EXPECT_EQ(var->value.ToUint64(), 0xFu);
 }
 
-TEST(NonblockingAssignSim, NBAWidthExtension) {
+TEST(AssignmentExtensionTruncation, NBAWidthExtension) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -69,7 +69,7 @@ TEST(NonblockingAssignSim, NBAWidthExtension) {
   EXPECT_EQ(var->value.width, 32u);
 }
 
-TEST(NonblockingAssignSim, NBAPreservesWidth) {
+TEST(AssignmentExtensionTruncation, NBAPreservesWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -95,6 +95,36 @@ TEST(NonblockingAssignSim, NBAPreservesWidth) {
   EXPECT_EQ(a->value.ToUint64(), 0xCAFEu);
   EXPECT_EQ(b->value.width, 8u);
   EXPECT_EQ(b->value.ToUint64(), 0xBEu);
+}
+
+TEST(AssignmentExtensionTruncation, ContAssignInfersLhsWidthWhenWiderThanRhs) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [15:0] wide;\n"
+      "  logic [3:0] narrow;\n"
+      "  assign wide = narrow;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->assigns.size(), 1);
+  EXPECT_EQ(mod->assigns[0].width, 16);
+}
+
+TEST(AssignmentExtensionTruncation, ContAssignInfersLhsWidthWhenNarrowerThanRhs) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [3:0] narrow;\n"
+      "  logic [15:0] wide;\n"
+      "  assign narrow = wide;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->assigns.size(), 1);
+  EXPECT_EQ(mod->assigns[0].width, 4);
 }
 
 }  // namespace

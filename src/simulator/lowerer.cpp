@@ -17,6 +17,7 @@
 #include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
 
 namespace delta {
@@ -183,7 +184,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   bool first = true;
 
   while (!ctx.StopRequested()) {
-    auto val = EvalExpr(params.rhs, ctx, arena);
+    auto val = EvalExpr(params.rhs, ctx, arena, params.width);
 
     // §10.3.3: Apply continuous assignment delay with inertial semantics.
     if (params.delays.rise) {
@@ -218,7 +219,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
           bool expired =
               co_await InertialDelayAwaiter{ctx, remaining, read_vars};
           if (expired) break;
-          auto new_val = EvalExpr(params.rhs, ctx, arena);
+          auto new_val = EvalExpr(params.rhs, ctx, arena, params.width);
           if (!Logic4VecEqual(new_val, val)) {
             val = new_val;
             ticks = SelectContAssignDelay(old_val, val, d, params.width);
@@ -243,7 +244,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     } else {
       auto* var = ctx.FindVariable(params.lhs->text);
       if (var) {
-        var->value = val;
+        var->value = ResizeToWidth(val, var->value.width, arena);
         var->NotifyWatchers();
       }
     }

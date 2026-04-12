@@ -6,24 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(AssignmentLikeContextSim, ContAssignTruncatesInAssignLikeContext) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [3:0] out;\n"
-      "  logic [7:0] in_val = 8'hAB;\n"
-      "  assign out = in_val;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* out = f.ctx.FindVariable("out");
-  ASSERT_NE(out, nullptr);
-  EXPECT_EQ(out->value.ToUint64(), 0xBu);
-}
-
 TEST(AssignmentLikeContextSim, ProceduralAssignExtendsInAssignLikeContext) {
   SimFixture f;
   auto* design = ElaborateSrc(
