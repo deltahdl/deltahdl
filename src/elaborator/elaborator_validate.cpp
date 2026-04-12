@@ -623,6 +623,135 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
   }
 }
 
+// §9.3.2: Return statement inside a fork-join block is illegal.
+static void CheckNoReturnInFork(const Stmt* s, DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kReturn) {
+    diag.Error(s->range.start,
+               "return statement is not allowed inside a fork-join block");
+    return;
+  }
+  for (auto* sub : s->stmts) CheckNoReturnInFork(sub, diag);
+  for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
+  CheckNoReturnInFork(s->then_branch, diag);
+  CheckNoReturnInFork(s->else_branch, diag);
+  CheckNoReturnInFork(s->body, diag);
+  CheckNoReturnInFork(s->for_body, diag);
+  for (auto& ci : s->case_items)
+    CheckNoReturnInFork(ci.body, diag);
+  for (auto& ri : s->randcase_items)
+    CheckNoReturnInFork(ri.second, diag);
+  CheckNoReturnInFork(s->assert_pass_stmt, diag);
+  CheckNoReturnInFork(s->assert_fail_stmt, diag);
+}
+
+// §9.3.2: Check if an expression references any name from a set.
+static void CheckExprForRefArgs(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& ref_names,
+    DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kIdentifier && ref_names.count(e->text)) {
+    diag.Error(e->range.start,
+               std::format("ref argument '{}' cannot be used inside a "
+                           "fork-join_any or fork-join_none block",
+                           e->text));
+    return;
+  }
+  CheckExprForRefArgs(e->lhs, ref_names, diag);
+  CheckExprForRefArgs(e->rhs, ref_names, diag);
+  CheckExprForRefArgs(e->condition, ref_names, diag);
+  CheckExprForRefArgs(e->true_expr, ref_names, diag);
+  CheckExprForRefArgs(e->false_expr, ref_names, diag);
+  CheckExprForRefArgs(e->base, ref_names, diag);
+  CheckExprForRefArgs(e->index, ref_names, diag);
+  CheckExprForRefArgs(e->index_end, ref_names, diag);
+  CheckExprForRefArgs(e->with_expr, ref_names, diag);
+  CheckExprForRefArgs(e->repeat_count, ref_names, diag);
+  for (auto* arg : e->args) CheckExprForRefArgs(arg, ref_names, diag);
+  for (auto* elem : e->elements) CheckExprForRefArgs(elem, ref_names, diag);
+}
+
+// §9.3.2: Check a statement tree for references to ref arguments.
+// is_fork_block_item: true for top-level fork block_item_declarations whose
+// initializers are exempt from the restriction.
+static void CheckStmtForRefArgs(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& ref_names,
+    bool is_fork_block_item, DiagEngine& diag) {
+  if (!s) return;
+  if (!(is_fork_block_item && s->kind == StmtKind::kVarDecl))
+    CheckExprForRefArgs(s->var_init, ref_names, diag);
+  CheckExprForRefArgs(s->expr, ref_names, diag);
+  CheckExprForRefArgs(s->lhs, ref_names, diag);
+  CheckExprForRefArgs(s->rhs, ref_names, diag);
+  CheckExprForRefArgs(s->delay, ref_names, diag);
+  CheckExprForRefArgs(s->cycle_delay, ref_names, diag);
+  CheckExprForRefArgs(s->condition, ref_names, diag);
+  CheckExprForRefArgs(s->for_cond, ref_names, diag);
+  CheckExprForRefArgs(s->assert_expr, ref_names, diag);
+  CheckExprForRefArgs(s->repeat_event_count, ref_names, diag);
+  for (auto* dim : s->var_unpacked_dims)
+    CheckExprForRefArgs(dim, ref_names, diag);
+  for (auto& ev : s->events) {
+    CheckExprForRefArgs(ev.signal, ref_names, diag);
+    CheckExprForRefArgs(ev.iff_condition, ref_names, diag);
+  }
+  for (auto& ci : s->case_items)
+    for (auto* p : ci.patterns) CheckExprForRefArgs(p, ref_names, diag);
+  for (auto& ri : s->randcase_items)
+    CheckExprForRefArgs(ri.first, ref_names, diag);
+  for (auto* we : s->wait_order_events)
+    CheckExprForRefArgs(we, ref_names, diag);
+  for (auto* sub : s->stmts)
+    CheckStmtForRefArgs(sub, ref_names, false, diag);
+  for (auto* sub : s->fork_stmts)
+    CheckStmtForRefArgs(sub, ref_names, false, diag);
+  CheckStmtForRefArgs(s->then_branch, ref_names, false, diag);
+  CheckStmtForRefArgs(s->else_branch, ref_names, false, diag);
+  CheckStmtForRefArgs(s->body, ref_names, false, diag);
+  CheckStmtForRefArgs(s->for_body, ref_names, false, diag);
+  for (auto* init : s->for_inits)
+    CheckStmtForRefArgs(init, ref_names, false, diag);
+  for (auto* step : s->for_steps)
+    CheckStmtForRefArgs(step, ref_names, false, diag);
+  for (auto& ci : s->case_items)
+    CheckStmtForRefArgs(ci.body, ref_names, false, diag);
+  for (auto& ri : s->randcase_items)
+    CheckStmtForRefArgs(ri.second, ref_names, false, diag);
+  CheckStmtForRefArgs(s->assert_pass_stmt, ref_names, false, diag);
+  CheckStmtForRefArgs(s->assert_fail_stmt, ref_names, false, diag);
+}
+
+// §9.3.2: In fork-join_any/join_none, ref args (not ref static) are illegal
+// except in block_item_declaration initializers.
+static void CheckRefArgsInForkBlocks(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& ref_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kFork &&
+      (s->join_kind == TokenKind::kKwJoinAny ||
+       s->join_kind == TokenKind::kKwJoinNone)) {
+    for (auto* fs : s->fork_stmts) {
+      bool is_block_item = (fs->kind == StmtKind::kVarDecl);
+      CheckStmtForRefArgs(fs, ref_names, is_block_item, diag);
+    }
+  }
+  for (auto* sub : s->stmts)
+    CheckRefArgsInForkBlocks(sub, ref_names, diag);
+  for (auto* sub : s->fork_stmts)
+    CheckRefArgsInForkBlocks(sub, ref_names, diag);
+  CheckRefArgsInForkBlocks(s->then_branch, ref_names, diag);
+  CheckRefArgsInForkBlocks(s->else_branch, ref_names, diag);
+  CheckRefArgsInForkBlocks(s->body, ref_names, diag);
+  CheckRefArgsInForkBlocks(s->for_body, ref_names, diag);
+  for (auto& ci : s->case_items)
+    CheckRefArgsInForkBlocks(ci.body, ref_names, diag);
+  for (auto& ri : s->randcase_items)
+    CheckRefArgsInForkBlocks(ri.second, ref_names, diag);
+}
+
 // §13.2/§13.4.1/§13.4.4: Check function body for illegal constructs.
 static void CheckFuncBodyStmt(
     const Stmt* s, bool is_void,
@@ -667,6 +796,10 @@ static void CheckFuncBodyStmt(
                              s->var_name));
     }
   }
+  // §9.3.2: Return is illegal inside any fork-join body.
+  if (s->kind == StmtKind::kFork) {
+    for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
+  }
   // §13.4.4: fork/join_none body follows task rules, not function rules.
   if (s->kind == StmtKind::kFork && s->join_kind == TokenKind::kKwJoinNone)
     return;
@@ -710,7 +843,12 @@ static void CheckTaskBodyStmt(
                  "automatic variable in procedural continuous assignment");
     }
   }
+  // §9.3.2: Return is illegal inside any fork-join body.
+  if (s->kind == StmtKind::kFork) {
+    for (auto* sub : s->fork_stmts) CheckNoReturnInFork(sub, diag);
+  }
   for (auto* sub : s->stmts) CheckTaskBodyStmt(sub, auto_vars, diag);
+  for (auto* sub : s->fork_stmts) CheckTaskBodyStmt(sub, auto_vars, diag);
   CheckTaskBodyStmt(s->then_branch, auto_vars, diag);
   CheckTaskBodyStmt(s->else_branch, auto_vars, diag);
   CheckTaskBodyStmt(s->body, auto_vars, diag);
@@ -758,6 +896,20 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
                   std::format("default argument values are only allowed with "
                               "ANSI-style port declarations for '{}'",
                               arg.name));
+    }
+  }
+
+  // §9.3.2: Ref args (not ref static) restricted in fork-join_any/join_none.
+  {
+    std::unordered_set<std::string_view> ref_names;
+    for (const auto& arg : item->func_args) {
+      if (arg.direction == Direction::kRef && !arg.is_ref_static) {
+        ref_names.insert(arg.name);
+      }
+    }
+    if (!ref_names.empty()) {
+      for (auto* s : item->func_body_stmts)
+        CheckRefArgsInForkBlocks(s, ref_names, diag_);
     }
   }
 

@@ -5,7 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(SchedulingSemanticsParsing, AutoVarInForkBlock) {
+TEST(ParallelBlockParsing, AutoVarInForkBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -33,7 +33,7 @@ TEST(SchedulingSemanticsParsing, AutoVarInForkBlock) {
   EXPECT_TRUE(branch0->stmts[0]->var_is_automatic);
 }
 
-TEST(ProcessParsing, ForkInTaskBody) {
+TEST(ParallelBlockParsing, ForkInTaskBody) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  task automatic run_parallel;\n"
@@ -46,7 +46,7 @@ TEST(ProcessParsing, ForkInTaskBody) {
               "endmodule\n"));
 }
 
-TEST(ProcessParsing, ForkInAlwaysBlock) {
+TEST(ParallelBlockParsing, ForkInAlwaysBlock) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk) begin\n"
@@ -67,7 +67,7 @@ TEST(ProcessParsing, ForkInAlwaysBlock) {
   EXPECT_EQ(item->body->stmts[0]->join_kind, TokenKind::kKwJoinNone);
 }
 
-TEST(ProcessParsing, ForkWithSystemCalls) {
+TEST(ParallelBlockParsing, ForkWithSystemCalls) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial begin\n"
@@ -79,7 +79,7 @@ TEST(ProcessParsing, ForkWithSystemCalls) {
               "endmodule\n"));
 }
 
-TEST(SchedulingSemanticsParsing, AutomaticTaskWithForkJoin) {
+TEST(ParallelBlockParsing, AutomaticTaskWithForkJoin) {
   auto r = Parse(
       "module m;\n"
       "  task automatic parallel_work(input int a, input int b);\n"
@@ -102,7 +102,7 @@ TEST(SchedulingSemanticsParsing, AutomaticTaskWithForkJoin) {
   EXPECT_GE(fork_stmt->fork_stmts.size(), 2u);
 }
 
-TEST(BlockItemDeclParsing, TypedefInForkJoin) {
+TEST(ParallelBlockParsing, TypedefInForkJoin) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  initial fork\n"
@@ -111,7 +111,7 @@ TEST(BlockItemDeclParsing, TypedefInForkJoin) {
               "endmodule\n"));
 }
 
-TEST(ProcessParsing, AutomaticVarInForkBlock) {
+TEST(ParallelBlockParsing, AutomaticVarInForkBlock) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -133,7 +133,7 @@ TEST(ProcessParsing, AutomaticVarInForkBlock) {
   EXPECT_TRUE(stmt->fork_stmts[0]->var_is_automatic);
 }
 
-TEST(AssignmentParsing, InForkJoinBlock) {
+TEST(ParallelBlockParsing, ForkAsDirectInitialBody) {
   auto r = Parse(
       "module m;\n"
       "  initial fork\n"
@@ -149,6 +149,191 @@ TEST(AssignmentParsing, InForkJoinBlock) {
   ASSERT_GE(stmt->stmts.size(), 2u);
   EXPECT_EQ(stmt->stmts[0]->kind, StmtKind::kBlockingAssign);
   EXPECT_EQ(stmt->stmts[1]->kind, StmtKind::kBlockingAssign);
+}
+
+TEST(ParallelBlockParsing, NamedForkBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : workers\n"
+      "      a = 1;\n"
+      "      b = 2;\n"
+      "    join : workers\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->label, "workers");
+}
+
+TEST(ParallelBlockParsing, NamedForkMismatchedEndLabelError) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork : alpha\n"
+      "      a = 1;\n"
+      "    join : beta\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(ParallelBlockParsing, LocalparamInForkJoin) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      localparam int N = 4;\n"
+      "      a = N;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  ASSERT_GE(stmt->fork_stmts.size(), 2u);
+  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
+}
+
+TEST(ParallelBlockParsing, ParameterInForkJoin) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      parameter int W = 8;\n"
+      "      a = W;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  ASSERT_GE(stmt->fork_stmts.size(), 2u);
+  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
+}
+
+TEST(ParallelBlockParsing, LetDeclInForkJoin) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      let inc(x) = x + 1;\n"
+      "      a = inc(0);\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  ASSERT_GE(stmt->fork_stmts.size(), 2u);
+  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kLetDecl);
+}
+
+TEST(ParallelBlockParsing, ReturnInForkBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t;\n"
+      "    fork\n"
+      "      return;\n"
+      "    join\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ParallelBlockParsing, SingleStatementInFork) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->fork_stmts.size(), 1u);
+}
+
+TEST(ParallelBlockParsing, NestedForkJoin) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      begin\n"
+      "        fork\n"
+      "          a = 1;\n"
+      "          b = 2;\n"
+      "        join\n"
+      "      end\n"
+      "      c = 3;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  ASSERT_GE(stmt->fork_stmts.size(), 2u);
+  auto* inner_block = stmt->fork_stmts[0];
+  EXPECT_EQ(inner_block->kind, StmtKind::kBlock);
+  ASSERT_GE(inner_block->stmts.size(), 1u);
+  EXPECT_EQ(inner_block->stmts[0]->kind, StmtKind::kFork);
+}
+
+TEST(ParallelBlockParsing, EmptyForkJoinParses) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  EXPECT_EQ(stmt->fork_stmts.size(), 0u);
+}
+
+TEST(ParallelBlockParsing, MultipleBlockItemDeclarationsBeforeStmts) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    fork\n"
+      "      int x;\n"
+      "      int y;\n"
+      "      x = 1;\n"
+      "      y = 2;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kFork);
+  ASSERT_GE(stmt->fork_stmts.size(), 4u);
+  EXPECT_EQ(stmt->fork_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(stmt->fork_stmts[1]->kind, StmtKind::kVarDecl);
+  EXPECT_EQ(stmt->fork_stmts[2]->kind, StmtKind::kBlockingAssign);
+  EXPECT_EQ(stmt->fork_stmts[3]->kind, StmtKind::kBlockingAssign);
 }
 
 }  // namespace

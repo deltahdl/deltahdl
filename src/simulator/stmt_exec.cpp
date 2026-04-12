@@ -945,9 +945,31 @@ static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
   }
 }
 
-static void SpawnForkChildren(const Stmt* stmt, SimContext& ctx, Arena& arena,
-                              ForkJoinState* state) {
+static bool IsForkBlockItemDecl(const Stmt* s) {
+  return s->kind == StmtKind::kVarDecl || s->kind == StmtKind::kBlockItemDecl;
+}
+
+static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (stmt->fork_stmts.empty()) co_return StmtResult::kDone;
+
+  // §9.3.2: Initialize block_item_declaration variables before spawning.
+  uint32_t process_count = 0;
   for (auto* s : stmt->fork_stmts) {
+    if (IsForkBlockItemDecl(s)) {
+      co_await ExecStmt(s, ctx, arena);
+    } else {
+      process_count++;
+    }
+  }
+
+  if (process_count == 0) co_return StmtResult::kDone;
+
+  auto* state = arena.Create<ForkJoinState>();
+  state->remaining = process_count;
+  state->join_any = (stmt->join_kind == TokenKind::kKwJoinAny);
+
+  for (auto* s : stmt->fork_stmts) {
+    if (IsForkBlockItemDecl(s)) continue;
     auto* p = arena.Create<Process>();
     p->kind = ProcessKind::kInitial;
     p->coro = ForkChildCoroutine(s, ctx, arena, state).Release();
@@ -955,16 +977,6 @@ static void SpawnForkChildren(const Stmt* stmt, SimContext& ctx, Arena& arena,
     event->callback = [p]() { p->Resume(); };
     ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive, event);
   }
-}
-
-static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  if (stmt->fork_stmts.empty()) co_return StmtResult::kDone;
-
-  auto* state = arena.Create<ForkJoinState>();
-  state->remaining = static_cast<uint32_t>(stmt->fork_stmts.size());
-  state->join_any = (stmt->join_kind == TokenKind::kKwJoinAny);
-
-  SpawnForkChildren(stmt, ctx, arena, state);
 
   if (stmt->join_kind != TokenKind::kKwJoinNone) {
     co_await ForkJoinAwaiter{state};
