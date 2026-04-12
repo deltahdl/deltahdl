@@ -85,14 +85,10 @@ bool SynthLower::CheckCaseSynth(const Stmt* stmt) {
 
 bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
   for (const auto& proc : mod->processes) {
-    if (proc.kind == RtlirProcessKind::kInitial) {
-      diag_.Error(SourceLoc{}, "'initial' block is not synthesizable");
-      return false;
-    }
-    if (proc.kind == RtlirProcessKind::kFinal) {
-      diag_.Error(SourceLoc{}, "'final' block is not synthesizable");
-      return false;
-    }
+    // Initial and final blocks are simulation-only; skip silently.
+    if (proc.kind == RtlirProcessKind::kInitial ||
+        proc.kind == RtlirProcessKind::kFinal)
+      continue;
     if (!CheckStmtSynthesizable(proc.body)) return false;
   }
   return true;

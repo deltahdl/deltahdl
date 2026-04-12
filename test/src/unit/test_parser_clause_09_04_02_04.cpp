@@ -5,19 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(ProcessTimingAndControlParsing, SequenceEventParenthesized) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  sequence s1;\n"
-              "    @(posedge clk) a ##1 b;\n"
-              "  endsequence\n"
-              "  initial begin\n"
-              "    @(s1) $display(\"matched\");\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
-TEST(ProceduralAssignAndControlParsing, SequenceEventInEventControl) {
+TEST(SequenceEventParsing, SequenceEventInEventControl) {
   auto r = Parse(
       "module m;\n"
       "  sequence abc;\n"
@@ -27,6 +15,67 @@ TEST(ProceduralAssignAndControlParsing, SequenceEventInEventControl) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SequenceEventParsing, SequenceEventAstStructure) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence abc;\n"
+      "    @(posedge clk) a ##1 b ##1 c;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    @(abc) $display(\"match\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+  ASSERT_NE(stmt->events[0].signal, nullptr);
+  EXPECT_EQ(stmt->events[0].signal->kind, ExprKind::kIdentifier);
+}
+
+TEST(SequenceEventParsing, SequenceEventWithIffGuard) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence abc;\n"
+      "    @(posedge clk) a ##1 b ##1 c;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    @(abc iff en) $display(\"match\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 1u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+  EXPECT_NE(stmt->events[0].iff_condition, nullptr);
+}
+
+TEST(SequenceEventParsing, SequenceEventOrRegularEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence abc;\n"
+      "    @(posedge clk) a ##1 b ##1 c;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    @(abc or posedge clk) $display(\"match\");\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kEventControl);
+  ASSERT_EQ(stmt->events.size(), 2u);
+  EXPECT_EQ(stmt->events[0].edge, Edge::kNone);
+  EXPECT_EQ(stmt->events[1].edge, Edge::kPosedge);
 }
 
 }  // namespace

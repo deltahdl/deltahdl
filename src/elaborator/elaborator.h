@@ -328,6 +328,8 @@ class Elaborator {
   void ValidateRegularClassInheritance(const ClassDecl* cls);
   void ValidateImplementsInterfaceMethods(const ClassDecl* cls);
 
+  void ValidateSequenceEventArgs(const ModuleDecl* decl);
+
   /// §14.3: Validate clocking block declaration constraints.
   void ValidateClockingBlock(ModuleItem* item);
 
@@ -438,6 +440,7 @@ class Elaborator {
   std::unordered_set<std::string_view> interconnect_names_;
   std::unordered_set<std::string_view> scalar_var_names_;  // §11.5.1
   std::unordered_set<std::string_view> task_names_;  // §13.2
+  std::unordered_set<std::string_view> sequence_names_;
   // §13.4.3: Function declarations by name for constant function validation.
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
   std::unordered_map<std::string_view, std::string_view>

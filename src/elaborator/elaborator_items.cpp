@@ -267,11 +267,15 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       mod->aliases.push_back(alias);
       break;
     }
+    case ModuleItemKind::kSequenceDecl:
+      sequence_names_.insert(item->name);
+      mod->sequence_decls.push_back(item);
+      ValidateClockingBlock(item);
+      break;
     case ModuleItemKind::kDefparam:
     case ModuleItemKind::kImportDecl:
     case ModuleItemKind::kExportDecl:
     case ModuleItemKind::kPropertyDecl:
-    case ModuleItemKind::kSequenceDecl:
     case ModuleItemKind::kAssertProperty:
     case ModuleItemKind::kAssumeProperty:
     case ModuleItemKind::kCoverProperty:
@@ -432,6 +436,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   var_named_types_.clear();
   clocking_signals_.clear();
   task_names_.clear();
+  sequence_names_.clear();
   func_decls_.clear();
   // §6.20: Parameter port list names are constants that never change.
   for (const auto& [pname, pval] : decl->params) {
@@ -474,6 +479,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ValidateDuplicateGlobalClocking(decl);
   ValidateContAssignToClockvar(decl);
   ValidateConstantFunctionCalls(decl);
+  ValidateSequenceEventArgs(decl);
 }
 
 // --- Module instantiation ---

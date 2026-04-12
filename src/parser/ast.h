@@ -247,6 +247,7 @@ struct EventExpr {
   Edge edge = Edge::kNone;
   Expr* signal = nullptr;
   Expr* iff_condition = nullptr;  // §9.4.2 iff guard
+  bool is_sequence_event = false;
 };
 
 struct CaseItem {

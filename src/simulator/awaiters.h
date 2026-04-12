@@ -2,6 +2,7 @@
 
 #include <coroutine>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -160,6 +161,49 @@ struct NamedEventAwaiter {
       h.resume();
       return true;
     });
+  }
+
+  void await_resume() const noexcept {}
+};
+
+// §9.4.2.4: Awaiter for sequence events (@(seq_name)). Blocks the process
+// until the sequence reaches its end point (R2), then resumes following the
+// Observed region (R3) — i.e. in the Reactive region.  The sequence is
+// instantiated as if by assert property (R4); its endpoint fires an internal
+// named event that this awaiter watches.
+struct SequenceEventAwaiter {
+  SimContext& ctx;
+  const std::vector<EventExpr>& events;
+
+  bool await_ready() const noexcept { return false; }
+
+  void await_suspend(std::coroutine_handle<> h) {
+    for (const auto& ev : events) {
+      if (!ev.is_sequence_event || !ev.signal) continue;
+      std::string_view seq_name;
+      if (ev.signal->kind == ExprKind::kIdentifier)
+        seq_name = ev.signal->text;
+      else if (ev.signal->kind == ExprKind::kCall)
+        seq_name = ev.signal->callee;
+      if (seq_name.empty()) continue;
+
+      // Create or find the endpoint event variable for this sequence.
+      std::string ep_name = std::string("__seq_") + std::string(seq_name);
+      auto* ep_var = ctx.FindVariable(ep_name);
+      if (!ep_var) {
+        ep_var = ctx.CreateVariable(ep_name, 1);
+        ep_var->is_event = true;
+      }
+      // R3: Resume in the Reactive region (following Observed).
+      auto* sched = &ctx.GetScheduler();
+      auto* ctx_ptr = &ctx;
+      ep_var->AddWatcher([h, sched, ctx_ptr]() mutable {
+        auto* event = sched->GetEventPool().Acquire();
+        event->callback = [h]() mutable { h.resume(); };
+        sched->ScheduleEvent(ctx_ptr->CurrentTime(), Region::kReactive, event);
+        return true;
+      });
+    }
   }
 
   void await_resume() const noexcept {}

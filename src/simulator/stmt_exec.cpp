@@ -816,10 +816,20 @@ static bool IsNamedEvent(const Stmt* stmt, SimContext& ctx) {
   return var && var->is_event;
 }
 
+// §9.4.2.4: Check if any event in the list is a sequence event.
+static bool HasSequenceEvent(const Stmt* stmt) {
+  for (const auto& ev : stmt->events) {
+    if (ev.is_sequence_event) return true;
+  }
+  return false;
+}
+
 static ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
   if (!stmt->events.empty()) {
-    if (IsNamedEvent(stmt, ctx)) {
+    if (HasSequenceEvent(stmt)) {
+      co_await SequenceEventAwaiter{ctx, stmt->events};
+    } else if (IsNamedEvent(stmt, ctx)) {
       co_await NamedEventAwaiter{ctx, stmt->events[0].signal->text};
     } else {
       co_await EventAwaiter{ctx, stmt->events, arena};

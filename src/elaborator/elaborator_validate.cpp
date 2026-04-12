@@ -1481,4 +1481,64 @@ void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
   }
 }
 
+// §9.4.2.4: Walk a statement tree marking sequence events and checking R5.
+static void WalkStmtsForSequenceEvents(
+    Stmt* s, const std::unordered_set<std::string_view>& seq_names,
+    bool in_automatic, DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kEventControl) {
+    for (auto& ev : s->events) {
+      if (!ev.signal) continue;
+      std::string_view name;
+      bool has_args = false;
+      if (ev.signal->kind == ExprKind::kIdentifier) {
+        name = ev.signal->text;
+      } else if (ev.signal->kind == ExprKind::kCall) {
+        name = ev.signal->callee;
+        has_args = !ev.signal->args.empty();
+      }
+      if (!name.empty() && seq_names.count(name) != 0) {
+        ev.is_sequence_event = true;
+        // R5: Arguments to a sequence instance in an event expression
+        // shall be static — automatic variables are illegal.
+        if (has_args && in_automatic) {
+          diag.Error(s->range.start,
+                     "sequence event arguments shall not reference "
+                     "automatic variables");
+        }
+      }
+    }
+  }
+  for (auto* sub : s->stmts)
+    WalkStmtsForSequenceEvents(sub, seq_names, in_automatic, diag);
+  WalkStmtsForSequenceEvents(s->then_branch, seq_names, in_automatic, diag);
+  WalkStmtsForSequenceEvents(s->else_branch, seq_names, in_automatic, diag);
+  WalkStmtsForSequenceEvents(s->body, seq_names, in_automatic, diag);
+  WalkStmtsForSequenceEvents(s->for_body, seq_names, in_automatic, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForSequenceEvents(ci.body, seq_names, in_automatic, diag);
+}
+
+void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl) {
+  if (sequence_names_.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+        item->kind == ModuleItemKind::kFinalBlock) {
+      if (item->body) {
+        WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body),
+                                   sequence_names_, false, diag_);
+      }
+    }
+    // R5: Check tasks — automatic tasks cannot pass automatic vars.
+    if (item->kind == ModuleItemKind::kTaskDecl && item->body) {
+      WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body),
+                                 sequence_names_, item->is_automatic, diag_);
+    }
+  }
+}
+
 }  // namespace delta

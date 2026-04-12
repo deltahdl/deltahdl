@@ -93,6 +93,15 @@ ModuleItem* SimContext::FindLetDecl(std::string_view name) {
   return (it != let_decls_.end()) ? it->second : nullptr;
 }
 
+void SimContext::RegisterSequenceDecl(std::string_view name, ModuleItem* item) {
+  sequence_decls_[name] = item;
+}
+
+ModuleItem* SimContext::FindSequenceDecl(std::string_view name) {
+  auto it = sequence_decls_.find(name);
+  return (it != sequence_decls_.end()) ? it->second : nullptr;
+}
+
 void SimContext::PushScope() { scope_stack_.emplace_back(); }
 
 void SimContext::PopScope() {

@@ -190,6 +190,7 @@ struct RtlirModule {
   std::vector<RtlirParamDecl> params;
   std::vector<ModuleItem*> function_decls;
   std::vector<ModuleItem*> let_decls;  // §A.2.12: let declarations in module.
+  std::vector<ModuleItem*> sequence_decls;
   std::vector<ClassDecl*> class_decls;  // §8: class declarations in module.
   // §6.19/§6.24.2: enum type → members, for $cast and enum methods.
   std::unordered_map<std::string_view, std::vector<RtlirEnumMember>> enum_types;
