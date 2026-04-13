@@ -87,6 +87,7 @@ struct RtlirVariable {
   bool is_chandle = false;          // §6.14: chandle type (defaults to null).
   const Expr* init_expr = nullptr;  // Module-level variable initializer.
   const DataType* dtype = nullptr;  // Full type for struct/union layout.
+  DataTypeKind elem_type_kind = DataTypeKind::kImplicit;  // §10.9.1: element type for type-key matching.
   uint32_t unpacked_size = 0;       // §7.4: unpacked array element count.
   uint32_t unpacked_lo = 0;         // §7.4: unpacked array low index.
   bool is_descending = false;       // §7.4: true for [hi:lo] range.

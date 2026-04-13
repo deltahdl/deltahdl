@@ -105,6 +105,7 @@ struct ArrayInfo {
   bool is_dynamic = false;     // §7.5: dynamic array (new/delete).
   bool is_queue = false;       // §7.10: queue ($).
   bool is_4state = true;       // §7.4.5 Table 7-1: 4-state vs 2-state default.
+  DataTypeKind elem_type_kind = DataTypeKind::kImplicit;  // §10.9.1: element type for type-key matching.
 };
 
 // §11.11: Delay mode for min:typ:max expression evaluation.

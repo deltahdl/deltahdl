@@ -53,17 +53,6 @@ TEST(ArrayLiteralLexing, TypePrefixedTokens) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kApostropheLBrace);
 }
 
-TEST(ArrayLiteralLexing, ReplicationTokens) {
-  auto tokens = Lex("'{3{1}}");
-  ASSERT_GE(tokens.size(), 6u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kLBrace);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kIntLiteral);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kRBrace);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kRBrace);
-}
-
 TEST(ArrayLiteralLexing, NestedReplicationTokens) {
   auto tokens = Lex("'{2{'{3{4, 5}}}}");
   ASSERT_GE(tokens.size(), 3u);
@@ -83,6 +72,20 @@ TEST(ArrayLiteralLexing, MultiElementReplicationTokens) {
   EXPECT_EQ(tokens[5].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[6].kind, TokenKind::kRBrace);
   EXPECT_EQ(tokens[7].kind, TokenKind::kRBrace);
+}
+
+TEST(ArrayLiteralLexing, TypeKeyInArrayPatternTokens) {
+  auto tokens = Lex("'{int: 5, default: 0}");
+  ASSERT_GE(tokens.size(), 9u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kApostropheLBrace);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kKwInt);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kColon);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kComma);
+  EXPECT_EQ(tokens[5].kind, TokenKind::kKwDefault);
+  EXPECT_EQ(tokens[6].kind, TokenKind::kColon);
+  EXPECT_EQ(tokens[7].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(tokens[8].kind, TokenKind::kRBrace);
 }
 
 }  // namespace

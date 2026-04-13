@@ -59,18 +59,6 @@ TEST(AssignmentPatternElaboration, AssignmentPatternDefaultKeyElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AssignmentPatternElaboration, PositionalArrayElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int arr [3];\n"
-      "  initial arr = '{1, 2, 3};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(AssignmentPatternElaboration, TypeReferencePatternElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(

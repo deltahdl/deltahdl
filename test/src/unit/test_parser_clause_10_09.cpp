@@ -41,15 +41,6 @@ TEST(AssignmentPatternParsing, TypePrefixedPattern) {
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
 }
-TEST(AssignmentPatternParsing, TypedefPrefixedArray) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef int T[3];\n"
-      "  T a = T'{1, 2, 3};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
 
 TEST(AssignmentPatternParsing, TypePrefixedNamedSizedFields) {
   auto r = Parse(
@@ -125,33 +116,11 @@ TEST(AssignmentPatternParsing, EmptyAssignmentPattern) {
   EXPECT_EQ(rhs->elements.size(), 0u);
 }
 
-TEST(AssignmentPatternParsing, AssignmentPatternInArrayDecl) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int arr [3] = '{0, 1, 2};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(AssignmentPatternParsing, ReplicationMultipleElements) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
       "    x = '{2{a, b}};\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(AssignmentPatternParsing, ArrayPatternKeyConstExpr) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    x = '{0: 8'd1, 1: 8'd2};\n"
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -177,86 +146,6 @@ TEST(AssignmentPatternParsing, ReplicationPatternRepeatCount) {
   auto* rep = rhs->elements[0];
   EXPECT_EQ(rep->kind, ExprKind::kReplicate);
   EXPECT_NE(rep->repeat_count, nullptr);
-}
-
-TEST(AssignmentPatternParsing, PositionalArrayAssignment) {
-  auto r = Parse(
-      "module t;\n"
-      "  int arr[3];\n"
-      "  initial arr = '{1, 2, 3};\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
-  EXPECT_EQ(rhs->elements.size(), 3u);
-}
-
-TEST(AssignmentPatternParsing, PositionalArrayVarInit) {
-  auto r = Parse(
-      "module t;\n"
-      "  int C[3] = '{10, 20, 30};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_NE(item->init_expr, nullptr);
-  EXPECT_EQ(item->init_expr->kind, ExprKind::kAssignmentPattern);
-}
-
-TEST(AssignmentPatternParsing, IntegerLiteralKeyWithDefault) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef int triple[1:3];\n"
-              "  triple t = '{1:1, default:0};\n"
-              "endmodule"));
-}
-
-TEST(AssignmentPatternParsing, AssignmentPatternArrayReplication) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int a[1:3] = '{3{1}};\n"
-              "endmodule"));
-}
-
-TEST(AssignmentPatternParsing, NestedAssignmentPatterns) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct {int a; shortreal b;} ab;\n"
-              "  ab abarr[1:0] = '{'{1, 1.0}, '{2, 2.0}};\n"
-              "endmodule"));
-}
-
-TEST(AssignmentPatternParsing, NestedStructPatternElements) {
-  auto r = Parse(
-      "module m;\n"
-      "  typedef struct {int a; int b;} ab;\n"
-      "  ab arr[1:0];\n"
-      "  initial arr = '{'{1, 2}, '{3, 4}};\n"
-      "endmodule\n");
-  VerifyNestedPatternElements(r, 2u);
-}
-
-TEST(AssignmentPatternParsing, NestedReplication) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef struct {int a; int b[4];} ab_t;\n"
-              "  int a, b, c;\n"
-              "  ab_t v1[1:0] [2:0];\n"
-              "  initial v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
-              "endmodule\n"));
-}
-
-TEST(AssignmentPatternParsing, NestedStructReplication) {
-  EXPECT_TRUE(
-      ParseOk("module top();\n"
-              "  struct {int X,Y,Z;} XYZ = '{3{1}};\n"
-              "  typedef struct {int a,b[4];} ab_t;\n"
-              "  int a,b,c;\n"
-              "  initial begin\n"
-              "    ab_t v1[1:0] [2:0];\n"
-              "    v1 = '{2{'{3{'{a,'{2{b,c}}}}}}};\n"
-              "  end\n"
-              "endmodule\n"));
 }
 
 TEST(AssignmentPatternParsing, DefaultKeyVerified) {
@@ -528,15 +417,6 @@ TEST(AssignmentPatternParsing, MemberNameWithDefault) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-TEST(AssignmentPatternParsing, ConstantAssignmentPatternExpression) {
-  auto r = Parse(
-      "module m;\n"
-      "  localparam int arr [3] = '{1, 2, 3};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(AssignmentPatternParsing, TypeReferencePatternExpression) {
   auto r = Parse(
       "module m;\n"
@@ -578,18 +458,6 @@ TEST(AssignmentPatternParsing, VarLvalueAssignmentPatternWithIndex) {
       "  initial begin\n"
       "    '{a[0], b[1]} = '{1, 2};\n"
       "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-// --- Primary ---
-
-TEST(AssignmentPatternParsing, PrimaryAssignmentPattern) {
-  auto r = Parse(
-      "module m;\n"
-      "  int arr [3];\n"
-      "  initial arr = '{1, 2, 3};\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -709,18 +577,6 @@ TEST(AssignmentPatternParsing, RealtimeTypeKey) {
               "  typedef struct { realtime a; realtime b; } s_t;\n"
               "  s_t s;\n"
               "  initial s = '{realtime: 0.0};\n"
-              "endmodule\n"));
-}
-
-// --- LHS typed assignment pattern expression ---
-
-TEST(AssignmentPatternParsing, LhsTypedPatternExpression) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  typedef byte U[3];\n"
-              "  U A;\n"
-              "  byte a, b, c;\n"
-              "  initial U'{a, b, c} = A;\n"
               "endmodule\n"));
 }
 

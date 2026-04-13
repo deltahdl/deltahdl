@@ -323,7 +323,35 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
   elem->value = EvalExpr(rep->elements[elem_idx % inner_count], ctx, arena);
 }
 
-// §5.11: Initialize array element from named pattern (index keys / default).
+// §10.9.1: Check if a pattern key is a type keyword (int, logic, etc.).
+static bool IsTypeKeyword(std::string_view key) {
+  return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
+         key == "byte" || key == "shortint" || key == "longint" ||
+         key == "bit" || key == "real" || key == "shortreal" ||
+         key == "time" || key == "realtime" || key == "string";
+}
+
+// §10.9.1: Check if a type keyword string matches a DataTypeKind.
+static bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kInt: return key == "int";
+    case DataTypeKind::kInteger: return key == "integer";
+    case DataTypeKind::kLogic: return key == "logic";
+    case DataTypeKind::kReg: return key == "reg";
+    case DataTypeKind::kByte: return key == "byte";
+    case DataTypeKind::kShortint: return key == "shortint";
+    case DataTypeKind::kLongint: return key == "longint";
+    case DataTypeKind::kBit: return key == "bit";
+    case DataTypeKind::kReal: return key == "real";
+    case DataTypeKind::kShortreal: return key == "shortreal";
+    case DataTypeKind::kTime: return key == "time";
+    case DataTypeKind::kRealtime: return key == "realtime";
+    case DataTypeKind::kString: return key == "string";
+    default: return false;
+  }
+}
+
+// §10.9.1: Initialize array element from named pattern (index/type/default keys).
 static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
                                Variable* elem, SimContext& ctx, Arena& arena) {
   auto* init = var.init_expr;
@@ -331,14 +359,24 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
     auto& key = init->pattern_keys[i];
-    if (key == "default") continue;
+    if (key == "default" || IsTypeKeyword(key)) continue;
     auto key_idx = static_cast<uint32_t>(std::stoul(std::string(key)));
     if (key_idx == idx) {
       elem->value = EvalExpr(init->elements[i], ctx, arena);
       return;
     }
   }
-  // Pass 2: default key.
+  // Pass 2: type key — matches if element type matches the keyword.
+  for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
+    if (i >= init->elements.size()) break;
+    auto& key = init->pattern_keys[i];
+    if (IsTypeKeyword(key) &&
+        TypeKeyMatchesKind(key, var.elem_type_kind)) {
+      elem->value = EvalExpr(init->elements[i], ctx, arena);
+      return;
+    }
+  }
+  // Pass 3: default key.
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
     if (init->pattern_keys[i] == "default") {
@@ -359,6 +397,7 @@ static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
   info.elem_width = var.width;
   info.is_descending = var.is_descending;
   info.is_4state = var.is_4state;
+  info.elem_type_kind = var.elem_type_kind;
   ctx.RegisterArray(var.name, info);
   // §5.11: Detect replication and named array pattern forms.
   bool named = var.init_expr && !var.init_expr->pattern_keys.empty();

@@ -54,11 +54,40 @@ static void CheckArrayPatternDuplicateIndices(const Expr* init, SourceLoc loc,
   }
 }
 
+// §10.9.1: Verify every element is covered by an index key, type key, or default.
+static void CheckArrayPatternCoverage(const ModuleItem* item, SourceLoc loc,
+                                      DiagEngine& diag) {
+  if (item->init_expr->pattern_keys.empty()) return;
+  if (item->unpacked_dims.empty()) return;
+  const auto* dim = item->unpacked_dims[0];
+  if (!dim) return;
+  auto dim_size = ComputeDimSize(dim);
+  if (!dim_size) return;
+
+  bool has_default = false;
+  bool has_type_key = false;
+  std::unordered_set<std::string_view> index_keys;
+  for (auto key : item->init_expr->pattern_keys) {
+    if (key == "default") {
+      has_default = true;
+    } else if (IsTypeKeyword(key)) {
+      has_type_key = true;
+    } else {
+      index_keys.insert(key);
+    }
+  }
+  if (has_default || has_type_key) return;
+  if (static_cast<int64_t>(index_keys.size()) < *dim_size) {
+    diag.Error(loc, "keyed array pattern does not cover all elements");
+  }
+}
+
 void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
   if (!item->init_expr || item->unpacked_dims.empty()) return;
   if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
   if (IsArrayPatternSpecial(item->init_expr)) {
     CheckArrayPatternDuplicateIndices(item->init_expr, item->loc, diag_);
+    CheckArrayPatternCoverage(item, item->loc, diag_);
     return;
   }
 

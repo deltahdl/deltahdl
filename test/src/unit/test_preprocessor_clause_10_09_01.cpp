@@ -1,39 +1,41 @@
+#include <gtest/gtest.h>
+
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(Lexical, AssignmentPattern_Positional) {
+TEST(ArrayLiteralPreprocessor, MacroInArrayLiteral) {
   auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  logic [3:0] a;\n"
-      "  initial a = '{1, 0, 1, 0};\n"
+      "`define VAL0 10\n"
+      "`define VAL1 20\n"
+      "`define VAL2 30\n"
+      "module m;\n"
+      "  int arr [0:2] = '{`VAL0, `VAL1, `VAL2};\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_FALSE(r.has_errors);
 }
 
-TEST(Lexical, AssignmentPattern_Named) {
+TEST(ArrayLiteralPreprocessor, MacroExpandsToReplicationCount) {
   auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  initial begin\n"
-      "    logic [7:0] x;\n"
-      "    x = '{default: 'x};\n"
-      "  end\n"
+      "`define N 3\n"
+      "module m;\n"
+      "  int arr [0:2] = '{`N{0}};\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
-TEST(Lexical, AssignmentPattern_DefaultZero) {
+TEST(ArrayLiteralPreprocessor, MacroExpandsToDefaultValue) {
   auto r = ParseWithPreprocessor(
-      "module top;\n"
-      "  logic [7:0] a;\n"
-      "  initial a = '{default: 0};\n"
+      "`define VAL 42\n"
+      "module m;\n"
+      "  int arr [0:2] = '{default: `VAL};\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-
-  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

@@ -300,19 +300,54 @@ static void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,
   }
 }
 
-// §5.11: Find value for array index from named pattern (index/default keys).
+// §10.9.1: Check if a pattern key is a type keyword (int, logic, etc.).
+static bool IsTypeKeyword(std::string_view key) {
+  return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
+         key == "byte" || key == "shortint" || key == "longint" ||
+         key == "bit" || key == "real" || key == "shortreal" ||
+         key == "time" || key == "realtime" || key == "string";
+}
+
+// §10.9.1: Check if a type keyword string matches a DataTypeKind.
+static bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kInt: return key == "int";
+    case DataTypeKind::kInteger: return key == "integer";
+    case DataTypeKind::kLogic: return key == "logic";
+    case DataTypeKind::kReg: return key == "reg";
+    case DataTypeKind::kByte: return key == "byte";
+    case DataTypeKind::kShortint: return key == "shortint";
+    case DataTypeKind::kLongint: return key == "longint";
+    case DataTypeKind::kBit: return key == "bit";
+    case DataTypeKind::kReal: return key == "real";
+    case DataTypeKind::kShortreal: return key == "shortreal";
+    case DataTypeKind::kTime: return key == "time";
+    case DataTypeKind::kRealtime: return key == "realtime";
+    case DataTypeKind::kString: return key == "string";
+    default: return false;
+  }
+}
+
+// §10.9.1: Find value for array index from named pattern (index/type/default keys).
 static Logic4Vec FindArrayKeyedValue(const Expr* rhs, uint32_t idx,
-                                     uint32_t width, SimContext& ctx,
-                                     Arena& arena) {
+                                     uint32_t width, DataTypeKind elem_type,
+                                     SimContext& ctx, Arena& arena) {
   // Pass 1: explicit index key.
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
     auto& key = rhs->pattern_keys[i];
-    if (key == "default") continue;
+    if (key == "default" || IsTypeKeyword(key)) continue;
     if (static_cast<uint32_t>(std::stoul(std::string(key))) == idx)
       return EvalExpr(rhs->elements[i], ctx, arena);
   }
-  // Pass 2: default key.
+  // Pass 2: type key — matches if element type matches the keyword.
+  for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
+    if (i >= rhs->elements.size()) break;
+    auto& key = rhs->pattern_keys[i];
+    if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, elem_type))
+      return EvalExpr(rhs->elements[i], ctx, arena);
+  }
+  // Pass 3: default key.
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
     if (rhs->pattern_keys[i] == "default")
@@ -338,7 +373,8 @@ static void DistributePatternToArray(std::string_view arr_name,
     if (!elem) continue;
     if (named) {
       elem->value = ResizeToWidth(
-          FindArrayKeyedValue(rhs, idx, info.elem_width, ctx, arena),
+          FindArrayKeyedValue(rhs, idx, info.elem_width, info.elem_type_kind,
+                              ctx, arena),
           info.elem_width, arena);
     } else if (replicate && inner_count > 0) {
       auto val =

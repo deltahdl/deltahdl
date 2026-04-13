@@ -1087,6 +1087,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
                  item->data_type.kind == DataTypeKind::kShortreal ||
                  item->data_type.kind == DataTypeKind::kRealtime);
   var.is_signed = IsSignedType(item->data_type, typedefs_);
+  var.elem_type_kind = item->data_type.kind;
   var.init_expr = item->init_expr;
   // §10.3.2: Track variables with initializers.
   if (item->init_expr) {
