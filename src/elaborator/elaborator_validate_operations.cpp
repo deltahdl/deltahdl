@@ -501,7 +501,21 @@ void Elaborator::WalkExprForUnsizedInConcat(const Expr* expr) {
 
 void Elaborator::WalkStmtsForUnsizedInConcat(const Stmt* s) {
   if (!s) return;
-  WalkExprForUnsizedInConcat(s->rhs);
+  // §10.10.2: When the RHS concatenation targets an unpacked array, it acts as
+  // an unpacked array concatenation under §10.10 rules — the §11.4.12
+  // unsized-constant restriction does not apply to its direct items.
+  bool is_array_concat_rhs =
+      s->rhs && s->rhs->kind == ExprKind::kConcatenation &&
+      s->lhs && s->lhs->kind == ExprKind::kIdentifier &&
+      (s->kind == StmtKind::kBlockingAssign ||
+       s->kind == StmtKind::kNonblockingAssign) &&
+      var_array_info_.count(s->lhs->text);
+  if (is_array_concat_rhs) {
+    for (auto* elem : s->rhs->elements)
+      WalkExprForUnsizedInConcat(elem);
+  } else {
+    WalkExprForUnsizedInConcat(s->rhs);
+  }
   WalkExprForUnsizedInConcat(s->lhs);
   WalkExprForUnsizedInConcat(s->expr);
   WalkExprForUnsizedInConcat(s->condition);

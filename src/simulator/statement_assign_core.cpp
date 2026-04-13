@@ -775,8 +775,86 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
+// §10.10.2: Schedule per-element NBA events for array concatenation targets.
+static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
+  if (!stmt->rhs || stmt->rhs->kind != ExprKind::kConcatenation) return false;
+
+  auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
+  auto* q = ctx.FindQueue(stmt->lhs->text);
+  if (!ainfo && !q) return false;
+
+  // Collect flattened elements from the concatenation.
+  std::vector<Logic4Vec> elems;
+  for (auto* item : stmt->rhs->elements) {
+    if (item->kind == ExprKind::kIdentifier) {
+      auto* src_arr = ctx.FindArrayInfo(item->text);
+      if (src_arr) {
+        for (uint32_t i = 0; i < src_arr->size; ++i) {
+          uint32_t idx = src_arr->is_descending
+                             ? (src_arr->lo + src_arr->size - 1 - i)
+                             : (src_arr->lo + i);
+          auto name =
+              std::string(item->text) + "[" + std::to_string(idx) + "]";
+          auto* v = ctx.FindVariable(name);
+          if (v) elems.push_back(v->value);
+        }
+        continue;
+      }
+      auto* src_q = ctx.FindQueue(item->text);
+      if (src_q) {
+        elems.insert(elems.end(), src_q->elements.begin(),
+                     src_q->elements.end());
+        continue;
+      }
+    }
+    elems.push_back(EvalExpr(item, ctx, arena));
+  }
+
+  uint64_t delay = 0;
+  if (stmt->delay) delay = EvalExpr(stmt->delay, ctx, arena).ToUint64();
+  auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
+  auto schedule_time = ctx.CurrentTime() + SimTime{delay};
+
+  if (ainfo) {
+    if (elems.size() != ainfo->size) {
+      ctx.GetDiag().Error(
+          {}, "unpacked array concatenation size mismatch: expected " +
+                  std::to_string(ainfo->size) + " elements, got " +
+                  std::to_string(elems.size()));
+      return true;
+    }
+    for (uint32_t i = 0; i < ainfo->size; ++i) {
+      uint32_t idx = ainfo->is_descending
+                         ? (ainfo->lo + ainfo->size - 1 - i)
+                         : (ainfo->lo + i);
+      auto name =
+          std::string(stmt->lhs->text) + "[" + std::to_string(idx) + "]";
+      auto* var = ctx.FindVariable(name);
+      if (!var) continue;
+      auto val = ResizeToWidth(elems[i], ainfo->elem_width, arena);
+      auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+      SetupWholeVarNbaCallback(event, var, val);
+      ctx.GetScheduler().ScheduleEvent(schedule_time, nba_region, event);
+    }
+  } else {
+    // Queue target: schedule a single callback that replaces all elements.
+    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+    event->callback = [q, elems = std::move(elems)]() {
+      q->elements = elems;
+      q->element_ids.clear();
+      ++q->generation;
+    };
+    ctx.GetScheduler().ScheduleEvent(schedule_time, nba_region, event);
+  }
+  return true;
+}
+
 StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
+  // §10.10.2: Concatenation targeting an unpacked array acts as array concat.
+  if (TryArrayConcatNba(stmt, ctx, arena)) return StmtResult::kDone;
+
   auto rhs_val = EvalRhsWithStructContext(stmt, ctx, arena);
   // §10.4.2: Intra-assignment delay offsets the NBA schedule time.
   uint64_t delay = 0;
