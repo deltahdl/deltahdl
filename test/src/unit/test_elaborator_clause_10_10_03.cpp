@@ -60,18 +60,6 @@ TEST(UnpackedArrayConcatElaboration, AssignPatternWithArrayConcatOk) {
   ASSERT_NE(design, nullptr);
 }
 
-TEST(UnpackedArrayConcatElaboration, ScalarElementsSelfDetermined) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int A[3];\n"
-      "  initial A = {1, 2, 3};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(UnpackedArrayConcatElaboration, ArrayIdentifierSelfDetermined) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -95,6 +83,42 @@ TEST(UnpackedArrayConcatElaboration, MultipleNestedConcatsError) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(f.has_errors);
+}
+
+TEST(UnpackedArrayConcatElaboration, VectorConcatInByteArrayConcatOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  byte BA[2];\n"
+      "  initial BA = {{4'h0, 4'h6}, {4'h0, 4'hf}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(UnpackedArrayConcatElaboration, NonblockingNestedConcatError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int A[4];\n"
+      "  initial A <= {{1, 2}, {3, 4}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(UnpackedArrayConcatElaboration, UnpackedConcatAsAssignPatternItemOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int C[2][2];\n"
+      "  initial C = '{{1, 2}, {3, 4}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

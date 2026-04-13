@@ -5,6 +5,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -438,8 +439,13 @@ void Elaborator::CheckArrayConcatNestingInAssign(const Stmt* s) {
   auto it = var_array_info_.find(s->lhs->text);
   if (it == var_array_info_.end()) return;
   if (it->second.elem_type == DataTypeKind::kString) return;
+  const auto& info = it->second;
   for (auto* elem : s->rhs->elements) {
     if (elem->kind == ExprKind::kConcatenation) {
+      if (info.num_unpacked_dims == 1 && info.elem_width > 0 &&
+          InferExprWidth(elem, typedefs_) == info.elem_width) {
+        continue;
+      }
       diag_.Error(elem->range.start,
                   "nested concatenation in unpacked array "
                   "concatenation is not self-determined");

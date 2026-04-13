@@ -55,4 +55,24 @@ TEST(UnpackedArrayConcatSim, UnpackedArrayConcatInAssignPattern) {
   EXPECT_EQ(c11->value.ToUint64(), 4u);
 }
 
+TEST(UnpackedArrayConcatSim, VectorConcatInByteArrayConcat) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte BA[2];\n"
+      "  initial BA = {{4'h0, 4'h6}, {4'h0, 4'hf}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* ba0 = f.ctx.FindVariable("BA[0]");
+  auto* ba1 = f.ctx.FindVariable("BA[1]");
+  ASSERT_NE(ba0, nullptr);
+  ASSERT_NE(ba1, nullptr);
+  EXPECT_EQ(ba0->value.ToUint64(), 6u);
+  EXPECT_EQ(ba1->value.ToUint64(), 15u);
+}
+
 }  // namespace

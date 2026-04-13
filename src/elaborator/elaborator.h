@@ -428,6 +428,7 @@ class Elaborator {
     DataTypeKind elem_type = DataTypeKind::kImplicit;
     uint32_t unpacked_size = 0;  // 0 = scalar or dynamic
     uint32_t num_unpacked_dims = 0;
+    uint32_t elem_width = 0;
     bool is_dynamic = false;
     bool is_assoc = false;
     std::string_view assoc_index_type;  // §7.9.9: e.g. "int", "string", "*"
