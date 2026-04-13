@@ -351,6 +351,15 @@ class Elaborator {
   void WalkStmtsForAssocConcatTarget(const Stmt* s);
   void CheckAssocConcatTargetInAssign(const Stmt* s);
 
+  /// §10.10.1: Reject array items in assignment patterns targeting unpacked
+  /// arrays, and reject replication targeting unpacked arrays.
+  void ValidateArrayPatternElemType(const ModuleDecl* decl);
+  void WalkStmtsForArrayPatternElemType(const Stmt* s);
+  void CheckArrayPatternElemTypeInAssign(const Stmt* s);
+  void ValidateReplicateTargetingArray(const ModuleDecl* decl);
+  void WalkStmtsForReplicateTargetingArray(const Stmt* s);
+  void CheckReplicateTargetingArrayInAssign(const Stmt* s);
+
   /// §10.10.3: Validate nesting of unpacked array concatenations.
   void ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl);
   void WalkStmtsForArrayConcatNesting(const Stmt* s);
@@ -418,6 +427,7 @@ class Elaborator {
   struct VarArrayInfo {
     DataTypeKind elem_type = DataTypeKind::kImplicit;
     uint32_t unpacked_size = 0;  // 0 = scalar or dynamic
+    uint32_t num_unpacked_dims = 0;
     bool is_dynamic = false;
     bool is_assoc = false;
     std::string_view assoc_index_type;  // §7.9.9: e.g. "int", "string", "*"

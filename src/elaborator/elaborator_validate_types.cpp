@@ -30,6 +30,8 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateAssocArraySlices(decl);
   ValidateAssocWildcardTraversal(decl);
   ValidateAssocConcatTarget(decl);
+  ValidateArrayPatternElemType(decl);
+  ValidateReplicateTargetingArray(decl);
   ValidateUnpackedArrayConcatNesting(decl);
   ValidateClassHandleOps(decl);
   ValidateChandleOps(decl);

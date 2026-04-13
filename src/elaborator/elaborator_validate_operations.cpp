@@ -332,6 +332,103 @@ void Elaborator::ValidateAssocConcatTarget(const ModuleDecl* decl) {
   }
 }
 
+// §10.10.1: Check that assignment patterns targeting unpacked arrays do not
+// contain array-typed identifiers as elements (positional or replicated).
+// Only applies when the target is a 1D unpacked array — for multi-dimensional
+// targets, elements matching the element type (itself an array) are valid.
+void Elaborator::CheckArrayPatternElemTypeInAssign(const Stmt* s) {
+  if (!s->lhs || !s->rhs) return;
+  if (s->lhs->kind != ExprKind::kIdentifier) return;
+  if (s->rhs->kind != ExprKind::kAssignmentPattern) return;
+  auto it = var_array_info_.find(s->lhs->text);
+  if (it == var_array_info_.end()) return;
+  if (it->second.num_unpacked_dims != 1) return;
+  // Check positional elements.
+  for (auto* elem : s->rhs->elements) {
+    if (elem->kind == ExprKind::kReplicate) {
+      // Replicated assignment pattern: '{N{expr}} — check inner elements.
+      for (auto* inner : elem->elements) {
+        if (inner->kind == ExprKind::kIdentifier &&
+            var_array_info_.count(inner->text)) {
+          diag_.Error(inner->range.start,
+                      "array-typed identifier in assignment pattern targeting "
+                      "unpacked array");
+        }
+      }
+    } else if (elem->kind == ExprKind::kIdentifier &&
+               var_array_info_.count(elem->text)) {
+      diag_.Error(elem->range.start,
+                  "array-typed identifier in assignment pattern targeting "
+                  "unpacked array");
+    }
+  }
+}
+
+void Elaborator::WalkStmtsForArrayPatternElemType(const Stmt* s) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    CheckArrayPatternElemTypeInAssign(s);
+  }
+  for (auto* sub : s->stmts) WalkStmtsForArrayPatternElemType(sub);
+  WalkStmtsForArrayPatternElemType(s->then_branch);
+  WalkStmtsForArrayPatternElemType(s->else_branch);
+  WalkStmtsForArrayPatternElemType(s->body);
+  WalkStmtsForArrayPatternElemType(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForArrayPatternElemType(ci.body);
+}
+
+void Elaborator::ValidateArrayPatternElemType(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kFinalBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      WalkStmtsForArrayPatternElemType(item->body);
+    }
+  }
+}
+
+// §10.10.1: Reject replication expressions targeting unpacked arrays.
+void Elaborator::CheckReplicateTargetingArrayInAssign(const Stmt* s) {
+  if (!s->lhs || !s->rhs) return;
+  if (s->lhs->kind != ExprKind::kIdentifier) return;
+  if (s->rhs->kind != ExprKind::kReplicate) return;
+  auto it = var_array_info_.find(s->lhs->text);
+  if (it == var_array_info_.end()) return;
+  diag_.Error(s->rhs->range.start,
+              "replication cannot target an unpacked array");
+}
+
+void Elaborator::WalkStmtsForReplicateTargetingArray(const Stmt* s) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    CheckReplicateTargetingArrayInAssign(s);
+  }
+  for (auto* sub : s->stmts) WalkStmtsForReplicateTargetingArray(sub);
+  WalkStmtsForReplicateTargetingArray(s->then_branch);
+  WalkStmtsForReplicateTargetingArray(s->else_branch);
+  WalkStmtsForReplicateTargetingArray(s->body);
+  WalkStmtsForReplicateTargetingArray(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForReplicateTargetingArray(ci.body);
+}
+
+void Elaborator::ValidateReplicateTargetingArray(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kFinalBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      WalkStmtsForReplicateTargetingArray(item->body);
+    }
+  }
+}
+
 // §10.10.3: Check a single assignment for nested concatenation in unpacked
 // array context.
 void Elaborator::CheckArrayConcatNestingInAssign(const Stmt* s) {

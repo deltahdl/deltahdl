@@ -1023,6 +1023,7 @@ void Elaborator::TrackVarArrayInfo(const ModuleItem* item,
   if (item->unpacked_dims.empty()) return;
   VarArrayInfo info{item->data_type.kind,
                     var.unpacked_size,
+                    static_cast<uint32_t>(item->unpacked_dims.size()),
                     var.is_dynamic,
                     var.is_assoc,
                     {}};
