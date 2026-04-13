@@ -95,6 +95,7 @@ def run_claude_streaming(cmd, prompt, *, env) -> str:
         proc.stdin.close()
 
         result_text: str | None = None
+        content_filter_line: str | None = None
         for raw in proc.stdout:
             line = raw.strip()
             if not line:
@@ -102,6 +103,8 @@ def run_claude_streaming(cmd, prompt, *, env) -> str:
             try:
                 event = json.loads(line)
             except json.JSONDecodeError:
+                if "blocked by content filtering" in line:
+                    content_filter_line = line
                 continue
             print_event(event)
             extracted = extract_result(event)
@@ -112,8 +115,11 @@ def run_claude_streaming(cmd, prompt, *, env) -> str:
         return_code = proc.wait()
 
     if return_code != 0:
-        if "blocked by content filtering" in stderr:
-            raise ContentFilterError(stderr)
+        if ("blocked by content filtering" in stderr
+                or content_filter_line is not None):
+            raise ContentFilterError(
+                stderr or content_filter_line or "",
+            )
         exit_with_error(
             f"Claude CLI exited with code {return_code}", stderr,
         )

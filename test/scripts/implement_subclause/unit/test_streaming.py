@@ -327,3 +327,31 @@ def test_run_claude_streaming_dumps_stderr_when_no_result(streaming, capsys):
     except SystemExit:
         pass
     assert "UNIQUE_NORESULT_STDERR" in capsys.readouterr().err
+
+
+# ---- stdout content filter detection ----------------------------------------
+
+
+_FILTER_STDOUT = [
+    'API Error: 400 {"type":"error","error":{"type":'
+    '"invalid_request_error","message":'
+    '"Output blocked by content filtering policy"}}\n',
+]
+
+
+def test_run_claude_streaming_stdout_content_filter_raises(streaming):
+    """Content filter in stdout raises ContentFilterError."""
+    with pytest.raises(streaming.ContentFilterError):
+        _run(streaming, _FILTER_STDOUT, returncode=1)
+
+
+def test_run_claude_streaming_stdout_content_filter_not_system_exit(streaming):
+    """Content filter in stdout does not raise SystemExit."""
+    raised_system_exit = False
+    try:
+        _run(streaming, _FILTER_STDOUT, returncode=1)
+    except SystemExit:
+        raised_system_exit = True
+    except streaming.ContentFilterError:
+        pass
+    assert not raised_system_exit
