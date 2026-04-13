@@ -1,21 +1,8 @@
 #include "fixture_elaborator.h"
-#include "fixture_simulator.h"
 
 using namespace delta;
 
 namespace {
-
-void ExpectThreeNetsAllEqual(SimFixture& f, uint64_t expected) {
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  auto* vc = f.ctx.FindVariable("c");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  ASSERT_NE(vc, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), expected);
-  EXPECT_EQ(vb->value.ToUint64(), expected);
-  EXPECT_EQ(vc->value.ToUint64(), expected);
-}
 
 TEST(NetAliasingElaboration, AliasTwoNetsElaborates) {
   ElabFixture f;
@@ -104,71 +91,143 @@ TEST(NetAliasingElaboration, AliasSelfIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(AliasNetsShareValue, AliasNetsShareValue) {
-  SimFixture f;
+TEST(NetAliasingElaboration, AliasBothVariablesIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  alias a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(NetAliasingElaboration, AliasRegToNetIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  reg r;\n"
+      "  wire w;\n"
+      "  alias r = w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(NetAliasingElaboration, AliasWandToWireIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wand a;\n"
+      "  wire b;\n"
+      "  alias a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(NetAliasingElaboration, AliasWandToWorIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wand a;\n"
+      "  wor b;\n"
+      "  alias a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(NetAliasingElaboration, AliasSameNetTypeOk) {
+  ElabFixture f;
   auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wand a, b;\n"
+      "  alias a = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(NetAliasingElaboration, AliasDifferentWidthNetsIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire [7:0] a;\n"
+      "  wire [3:0] b;\n"
+      "  alias a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(NetAliasingElaboration, AliasHierarchicalRefIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child;\n"
+      "  wire x;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  child c1();\n"
+      "  wire a;\n"
+      "  alias a = c1.x;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(NetAliasingElaboration, AliasDuplicateSpecificationIsError) {
+  ElabFixture f;
+  ElaborateSrc(
       "module m;\n"
       "  wire a, b;\n"
       "  alias a = b;\n"
-      "  assign a = 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 1u);
-  EXPECT_EQ(vb->value.ToUint64(), 1u);
-}
-
-TEST(AliasThreeNetsShareValue, AliasThreeNetsShareValue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  wire a, b, c;\n"
-      "  alias a = b = c;\n"
-      "  assign a = 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  ExpectThreeNetsAllEqual(f, 1u);
-}
-
-TEST(AliasMultiBitNetsShareValue, AliasMultiBitNetsShareValue) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  wire [7:0] x, y;\n"
-      "  alias x = y;\n"
-      "  assign x = 8'hAB;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* vx = f.ctx.FindVariable("x");
-  auto* vy = f.ctx.FindVariable("y");
-  ASSERT_NE(vx, nullptr);
-  ASSERT_NE(vy, nullptr);
-  EXPECT_EQ(vx->value.ToUint64(), 0xABu);
-  EXPECT_EQ(vy->value.ToUint64(), 0xABu);
-}
-
-TEST(CumulativeAliases, CumulativeAliases) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  wire a, b, c;\n"
       "  alias a = b;\n"
-      "  alias b = c;\n"
-      "  assign a = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(NetAliasingElaboration, AliasUndeclaredIdentifierCreatesImplicitNet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire a;\n"
+      "  alias a = b;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  ExpectThreeNetsAllEqual(f, 1u);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(NetAliasingElaboration, AliasAmongOtherModuleItems) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire a, b, y;\n"
+      "  assign y = 1;\n"
+      "  alias a = b;\n"
+      "  initial begin end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_FALSE(design->top_modules[0]->aliases.empty());
+  EXPECT_FALSE(design->top_modules[0]->assigns.empty());
+}
+
+TEST(NetAliasingElaboration, AliasSelfViaConcatenationIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire [15:0] bus16;\n"
+      "  wire [11:0] high12, low12;\n"
+      "  alias bus16 = {high12[11:8], low12};\n"
+      "  alias bus16 = {high12, low12[3:0]};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace

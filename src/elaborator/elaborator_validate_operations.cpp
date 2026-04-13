@@ -272,7 +272,37 @@ static std::string_view AliasNetIdent(const Expr* e) {
   return {};
 }
 
-void Elaborator::ValidateAlias(const ModuleItem* item) {
+static bool ExprContainsHierarchicalRef(const Expr* e) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kMemberAccess) return true;
+  if (ExprContainsHierarchicalRef(e->lhs)) return true;
+  if (ExprContainsHierarchicalRef(e->rhs)) return true;
+  if (ExprContainsHierarchicalRef(e->base)) return true;
+  for (auto* elem : e->elements) {
+    if (ExprContainsHierarchicalRef(elem)) return true;
+  }
+  return false;
+}
+
+static NetType DataTypeKindToNetType(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kTri: return NetType::kTri;
+    case DataTypeKind::kWand: return NetType::kWand;
+    case DataTypeKind::kWor: return NetType::kWor;
+    case DataTypeKind::kTriand: return NetType::kTriand;
+    case DataTypeKind::kTrior: return NetType::kTrior;
+    case DataTypeKind::kTri0: return NetType::kTri0;
+    case DataTypeKind::kTri1: return NetType::kTri1;
+    case DataTypeKind::kSupply0: return NetType::kSupply0;
+    case DataTypeKind::kSupply1: return NetType::kSupply1;
+    case DataTypeKind::kTrireg: return NetType::kTrireg;
+    case DataTypeKind::kUwire: return NetType::kUwire;
+    default: return NetType::kWire;
+  }
+}
+
+void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
+  // Self-aliasing: same identifier appears more than once.
   std::unordered_set<std::string_view> seen;
   for (auto* net : item->alias_nets) {
     auto name = AliasNetIdent(net);
@@ -281,7 +311,13 @@ void Elaborator::ValidateAlias(const ModuleItem* item) {
       diag_.Error(item->loc, std::format("net '{}' aliased to itself", name));
     }
   }
+
+  // Variables and hierarchical references cannot be used.
   for (auto* net : item->alias_nets) {
+    if (ExprContainsHierarchicalRef(net)) {
+      diag_.Error(item->loc,
+                  "hierarchical references cannot be used in alias statements");
+    }
     auto name = AliasNetIdent(net);
     if (name.empty()) continue;
     if (!net_names_.count(name) && declared_names_.count(name)) {
@@ -289,6 +325,74 @@ void Elaborator::ValidateAlias(const ModuleItem* item) {
                   std::format("'{}' is a variable, not a net; "
                               "variables cannot appear in alias statements",
                               name));
+    }
+  }
+
+  // Net type compatibility: all nets must be the same net type.
+  std::vector<std::string_view> ident_names;
+  for (auto* net : item->alias_nets) {
+    auto name = AliasNetIdent(net);
+    if (!name.empty() && net_names_.count(name)) ident_names.push_back(name);
+  }
+  if (ident_names.size() >= 2) {
+    auto first_type_it = var_types_.find(ident_names[0]);
+    NetType first_net_type = NetType::kWire;
+    if (first_type_it != var_types_.end())
+      first_net_type = DataTypeKindToNetType(first_type_it->second);
+    for (size_t i = 1; i < ident_names.size(); ++i) {
+      NetType cur_net_type = NetType::kWire;
+      auto cur_type_it = var_types_.find(ident_names[i]);
+      if (cur_type_it != var_types_.end())
+        cur_net_type = DataTypeKindToNetType(cur_type_it->second);
+      if (cur_net_type != first_net_type) {
+        diag_.Error(
+            item->loc,
+            std::format(
+                "nets in alias statement have incompatible types; "
+                "'{}' and '{}' are different net types",
+                ident_names[0], ident_names[i]));
+        break;
+      }
+    }
+  }
+
+  // Size equality: all members must be the same size.
+  if (ident_names.size() >= 2) {
+    auto scoped_first = ScopedName(ident_names[0]);
+    uint32_t first_width = 0;
+    for (const auto& n : mod->nets) {
+      if (n.name == scoped_first) { first_width = n.width; break; }
+    }
+    for (size_t i = 1; i < ident_names.size(); ++i) {
+      auto scoped = ScopedName(ident_names[i]);
+      uint32_t w = 0;
+      for (const auto& n : mod->nets) {
+        if (n.name == scoped) { w = n.width; break; }
+      }
+      if (w != first_width) {
+        diag_.Error(
+            item->loc,
+            std::format(
+                "nets in alias statement have different widths; "
+                "'{}' has width {} but '{}' has width {}",
+                ident_names[0], first_width, ident_names[i], w));
+        break;
+      }
+    }
+  }
+
+  // Duplicate alias detection: same pair must not be specified more than once.
+  for (size_t i = 0; i < ident_names.size(); ++i) {
+    for (size_t j = i + 1; j < ident_names.size(); ++j) {
+      auto a = ident_names[i];
+      auto b = ident_names[j];
+      auto pair = (a < b) ? std::make_pair(a, b) : std::make_pair(b, a);
+      if (!alias_pairs_.insert(pair).second) {
+        diag_.Error(item->loc,
+                    std::format("alias between '{}' and '{}' "
+                                "specified more than once",
+                                a, b));
+      }
     }
   }
 }

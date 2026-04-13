@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <set>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -233,7 +234,7 @@ class Elaborator {
   void ValidateElabSystemTask(const ModuleItem* item);
 
   /// §10.11: Validate alias statement operands.
-  void ValidateAlias(const ModuleItem* item);
+  void ValidateAlias(const ModuleItem* item, RtlirModule* mod);
 
   /// Check specparam not used in parameter expressions (§6.20.5).
   void ValidateSpecparamInParams(const ModuleDecl* decl);
@@ -467,6 +468,8 @@ class Elaborator {
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
   std::unordered_map<std::string_view, std::string_view>
       var_named_types_;  // §11.2.2: var name → named type for aggregate checks
+  std::set<std::pair<std::string_view, std::string_view>>
+      alias_pairs_;  // §10.11: ordered (min,max) net name pairs already aliased
 
   // §14.3: Clocking block signal directions for clockvar access validation.
   struct ClockingSignalInfo {

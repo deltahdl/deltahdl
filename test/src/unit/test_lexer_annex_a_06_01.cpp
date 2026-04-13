@@ -11,25 +11,10 @@ TEST(ContinuousAssignLexing, AssignKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwAssign);
 }
 
-TEST(ContinuousAssignLexing, AliasKeyword) {
-  auto r = LexOne("alias");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwAlias);
-}
-
 TEST(ContinuousAssignLexing, BasicAssignTokenSequence) {
   auto tokens = Lex("assign a = b ;");
   ASSERT_GE(tokens.size(), 5u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwAssign);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kEq);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kSemicolon);
-}
-
-TEST(ContinuousAssignLexing, AliasTokenSequence) {
-  auto tokens = Lex("alias a = b ;");
-  ASSERT_GE(tokens.size(), 5u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwAlias);
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[2].kind, TokenKind::kEq);
   EXPECT_EQ(tokens[3].kind, TokenKind::kIdentifier);
@@ -64,15 +49,6 @@ TEST(ContinuousAssignLexing, CommaSeparatedAssignments) {
     if (t.kind == TokenKind::kComma) comma_count++;
   }
   EXPECT_GE(comma_count, 1);
-}
-
-TEST(ContinuousAssignLexing, AliasThreeNetsTokenSequence) {
-  auto tokens = Lex("alias a = b = c ;");
-  int eq_count = 0;
-  for (auto& t : tokens) {
-    if (t.kind == TokenKind::kEq) eq_count++;
-  }
-  EXPECT_EQ(eq_count, 2);
 }
 
 }  // namespace

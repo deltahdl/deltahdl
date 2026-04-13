@@ -285,7 +285,12 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateSpecparam(item, mod);
       break;
     case ModuleItemKind::kAlias: {
-      ValidateAlias(item);
+      for (auto* net : item->alias_nets) {
+        if (net && net->kind == ExprKind::kIdentifier) {
+          MaybeCreateImplicitNet(net->text, item->loc, mod);
+        }
+      }
+      ValidateAlias(item, mod);
       RtlirAlias alias;
       alias.nets = item->alias_nets;
       mod->aliases.push_back(alias);
@@ -459,6 +464,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   interconnect_names_.clear();
   scalar_var_names_.clear();
   var_named_types_.clear();
+  alias_pairs_.clear();
   clocking_signals_.clear();
   task_names_.clear();
   sequence_names_.clear();

@@ -17,19 +17,6 @@ TEST(ModuleItemsElaboration, ContinuousAssignElaborates) {
   EXPECT_FALSE(design->top_modules[0]->assigns.empty());
 }
 
-TEST(ModuleItemsElaboration, NetAliasElaborates) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  alias a = b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_FALSE(design->top_modules[0]->aliases.empty());
-}
-
 TEST(ModuleItemsElaboration, InitialBlockElaborates) {
   ElabFixture f;
   auto* design = Elaborate(

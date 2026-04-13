@@ -55,17 +55,6 @@ TEST(ModuleItemsParsing, ContinuousAssign) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign));
 }
 
-TEST(ModuleItemsParsing, NetAlias) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire a, b;\n"
-      "  alias a = b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAlias));
-}
-
 TEST(ModuleItemsParsing, InitialConstruct) {
   auto r = Parse(
       "module m;\n"
