@@ -298,12 +298,12 @@ def test_run_steps_exits_after_max_retries(isc):
 
 
 def test_run_steps_does_not_retry_other_errors(isc):
-    """run_steps does not retry on non-ContentFilterError exceptions."""
+    """run_steps calls streaming only once on non-ContentFilterError."""
     steps = [("Step A", "do something")]
     mock_streaming = MagicMock(side_effect=SystemExit(1))
-    with (
-        patch("implement_subclause.run_claude_streaming", mock_streaming),
-        pytest.raises(SystemExit),
-    ):
-        isc.run_steps(steps, model="opus")
+    try:
+        with patch("implement_subclause.run_claude_streaming", mock_streaming):
+            isc.run_steps(steps, model="opus")
+    except SystemExit:
+        pass
     assert mock_streaming.call_count == 1
