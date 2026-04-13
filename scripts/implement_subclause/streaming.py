@@ -11,6 +11,10 @@ import sys
 from typing import NoReturn
 
 
+class ContentFilterError(Exception):
+    """Raised when the API blocks output due to content filtering."""
+
+
 _TOOL_ARG_KEYS = (
     "file_path", "path", "command", "pattern", "url", "query",
 )
@@ -108,6 +112,8 @@ def run_claude_streaming(cmd, prompt, *, env) -> str:
         return_code = proc.wait()
 
     if return_code != 0:
+        if "blocked by content filtering" in stderr:
+            raise ContentFilterError(stderr)
         exit_with_error(
             f"Claude CLI exited with code {return_code}", stderr,
         )

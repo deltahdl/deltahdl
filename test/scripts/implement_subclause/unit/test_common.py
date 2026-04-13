@@ -2,6 +2,9 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from implement_subclause.streaming import ContentFilterError
 from lib.python.classify import build_hierarchy
 
 
@@ -243,3 +246,64 @@ def test_run_steps_second_uses_continue(isc):
     """Second step uses --continue."""
     mock_streaming, _ = _run_steps_with_ok_mock(isc)
     assert "--continue" in mock_streaming.call_args_list[1][0][0]
+
+
+# ---- run_steps content filter retry -----------------------------------------
+
+
+def test_run_steps_retries_on_content_filter(isc):
+    """run_steps retries a step when ContentFilterError is raised."""
+    steps = [("Step A", "do something")]
+    mock_streaming = MagicMock(
+        side_effect=[ContentFilterError("blocked"), "ok"],
+    )
+    with patch("implement_subclause.run_claude_streaming", mock_streaming):
+        result = isc.run_steps(steps, model="opus")
+    assert result == ["ok"]
+
+
+def test_run_steps_retry_uses_continue(isc):
+    """Retry attempt uses --continue flag."""
+    steps = [("Step A", "do something")]
+    mock_streaming = MagicMock(
+        side_effect=[ContentFilterError("blocked"), "ok"],
+    )
+    with patch("implement_subclause.run_claude_streaming", mock_streaming):
+        isc.run_steps(steps, model="opus")
+    retry_cmd = mock_streaming.call_args_list[1][0][0]
+    assert "--continue" in retry_cmd
+
+
+def test_run_steps_retry_uses_retry_prompt(isc):
+    """Retry attempt uses the content filter retry prompt."""
+    steps = [("Step A", "do something")]
+    mock_streaming = MagicMock(
+        side_effect=[ContentFilterError("blocked"), "ok"],
+    )
+    with patch("implement_subclause.run_claude_streaming", mock_streaming):
+        isc.run_steps(steps, model="opus")
+    retry_prompt = mock_streaming.call_args_list[1][0][1]
+    assert "content filter" in retry_prompt.lower()
+
+
+def test_run_steps_exits_after_max_retries(isc):
+    """run_steps exits when all retry attempts are exhausted."""
+    steps = [("Step A", "do something")]
+    mock_streaming = MagicMock(side_effect=ContentFilterError("blocked"))
+    with (
+        patch("implement_subclause.run_claude_streaming", mock_streaming),
+        pytest.raises(SystemExit),
+    ):
+        isc.run_steps(steps, model="opus")
+
+
+def test_run_steps_does_not_retry_other_errors(isc):
+    """run_steps does not retry on non-ContentFilterError exceptions."""
+    steps = [("Step A", "do something")]
+    mock_streaming = MagicMock(side_effect=SystemExit(1))
+    with (
+        patch("implement_subclause.run_claude_streaming", mock_streaming),
+        pytest.raises(SystemExit),
+    ):
+        isc.run_steps(steps, model="opus")
+    assert mock_streaming.call_count == 1

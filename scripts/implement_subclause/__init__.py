@@ -22,7 +22,7 @@ from lib.python.git import (
     commit_and_push,
     get_porcelain_changes,
 )
-from .streaming import run_claude_streaming
+from .streaming import ContentFilterError, run_claude_streaming
 
 
 # ---------------------------------------------------------------------------
@@ -30,6 +30,14 @@ from .streaming import run_claude_streaming
 # ---------------------------------------------------------------------------
 
 CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
+
+_MAX_CONTENT_FILTER_RETRIES = 2
+
+CONTENT_FILTER_RETRY_PROMPT = (
+    "Your previous response was blocked by the API content filter."
+    " Please try again. Avoid reproducing LRM text verbatim —"
+    " paraphrase or summarize instead. Be concise."
+)
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +187,32 @@ def run_steps(steps, *, model="opus", continue_session=False) -> list[str]:
 
         print(f"\nStep {step_num}/{total}: {description}", flush=True)
 
-        step_results.append(run_claude_streaming(cmd, prompt, env=env))
+        retry_prompt = prompt
+        attempt = 0
+        while True:
+            try:
+                result = run_claude_streaming(cmd, retry_prompt, env=env)
+                break
+            except ContentFilterError:
+                if attempt >= _MAX_CONTENT_FILTER_RETRIES:
+                    print(
+                        f"ERROR: Step {step_num} blocked by content"
+                        f" filter after"
+                        f" {_MAX_CONTENT_FILTER_RETRIES + 1} attempts.",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+                print(
+                    f"WARNING: Content filter triggered on step"
+                    f" {step_num} (attempt {attempt + 1}), retrying...",
+                    file=sys.stderr,
+                )
+                if "--continue" not in cmd:
+                    cmd.append("--continue")
+                retry_prompt = CONTENT_FILTER_RETRY_PROMPT
+                attempt += 1
+
+        step_results.append(result)
 
     return step_results
 

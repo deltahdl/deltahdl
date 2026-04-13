@@ -277,6 +277,26 @@ def test_run_claude_streaming_exits_on_nonzero(streaming):
         _run(streaming, _OK_STREAM, returncode=1, stderr="boom")
 
 
+def test_run_claude_streaming_raises_content_filter_error(streaming):
+    """Content filter stderr raises ContentFilterError, not SystemExit."""
+    with pytest.raises(streaming.ContentFilterError):
+        _run(streaming, _OK_STREAM, returncode=1,
+             stderr="Output blocked by content filtering policy")
+
+
+def test_run_claude_streaming_content_filter_not_system_exit(streaming):
+    """Content filter errors do not raise SystemExit."""
+    raised_system_exit = False
+    try:
+        _run(streaming, _OK_STREAM, returncode=1,
+             stderr="blocked by content filtering")
+    except SystemExit:
+        raised_system_exit = True
+    except streaming.ContentFilterError:
+        pass
+    assert not raised_system_exit
+
+
 def test_run_claude_streaming_dumps_stderr_on_nonzero(streaming, capsys):
     """Non-zero exit dumps stderr to the terminal."""
     try:
