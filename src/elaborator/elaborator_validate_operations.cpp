@@ -292,6 +292,46 @@ void Elaborator::ValidateAlias(const ModuleItem* item) {
   }
 }
 
+// §10.10: Check a single assignment for concatenation to associative array.
+void Elaborator::CheckAssocConcatTargetInAssign(const Stmt* s) {
+  if (!s->lhs || !s->rhs) return;
+  if (s->lhs->kind != ExprKind::kIdentifier) return;
+  if (s->rhs->kind != ExprKind::kConcatenation) return;
+  auto it = var_array_info_.find(s->lhs->text);
+  if (it == var_array_info_.end()) return;
+  if (!it->second.is_assoc) return;
+  diag_.Error(s->rhs->range.start,
+              "unpacked array concatenation cannot target an associative array");
+}
+
+// §10.10: Walk statements for associative array concatenation targets.
+void Elaborator::WalkStmtsForAssocConcatTarget(const Stmt* s) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    CheckAssocConcatTargetInAssign(s);
+  }
+  for (auto* sub : s->stmts) WalkStmtsForAssocConcatTarget(sub);
+  WalkStmtsForAssocConcatTarget(s->then_branch);
+  WalkStmtsForAssocConcatTarget(s->else_branch);
+  WalkStmtsForAssocConcatTarget(s->body);
+  WalkStmtsForAssocConcatTarget(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForAssocConcatTarget(ci.body);
+}
+
+void Elaborator::ValidateAssocConcatTarget(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kFinalBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock ||
+        item->kind == ModuleItemKind::kAlwaysCombBlock ||
+        item->kind == ModuleItemKind::kAlwaysFFBlock ||
+        item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+      WalkStmtsForAssocConcatTarget(item->body);
+    }
+  }
+}
+
 // §10.10.3: Check a single assignment for nested concatenation in unpacked
 // array context.
 void Elaborator::CheckArrayConcatNestingInAssign(const Stmt* s) {

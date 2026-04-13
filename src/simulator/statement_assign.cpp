@@ -422,17 +422,20 @@ static void DistributeConcatToArray(std::string_view arr_name,
                                     const ArrayInfo& info, const Expr* rhs,
                                     SimContext& ctx, Arena& arena) {
   auto elems = CollectConcatElements(rhs, ctx, arena);
+  if (elems.size() != info.size) {
+    ctx.GetDiag().Error(
+        {}, "unpacked array concatenation size mismatch: expected " +
+                std::to_string(info.size) + " elements, got " +
+                std::to_string(elems.size()));
+    return;
+  }
   for (uint32_t i = 0; i < info.size; ++i) {
     uint32_t idx =
         info.is_descending ? (info.lo + info.size - 1 - i) : (info.lo + i);
     auto name = std::string(arr_name) + "[" + std::to_string(idx) + "]";
     auto* elem = ctx.FindVariable(name);
     if (!elem) continue;
-    if (i < elems.size()) {
-      elem->value = ResizeToWidth(elems[i], info.elem_width, arena);
-    } else {
-      elem->value = MakeLogic4VecVal(arena, info.elem_width, 0);
-    }
+    elem->value = ResizeToWidth(elems[i], info.elem_width, arena);
     elem->NotifyWatchers();
   }
 }

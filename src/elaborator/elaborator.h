@@ -346,6 +346,11 @@ class Elaborator {
   void WalkStmtsForClockvarAccess(const Stmt* s);
   void CheckClockvarAccessExpr(const Expr* e, bool is_lvalue);
 
+  /// §10.10: Reject unpacked array concatenation targeting associative arrays.
+  void ValidateAssocConcatTarget(const ModuleDecl* decl);
+  void WalkStmtsForAssocConcatTarget(const Stmt* s);
+  void CheckAssocConcatTargetInAssign(const Stmt* s);
+
   /// §10.10.3: Validate nesting of unpacked array concatenations.
   void ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl);
   void WalkStmtsForArrayConcatNesting(const Stmt* s);

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-TEST(UnpackedArrayConcatElaboration, EmptyUnpackedArrayConcatElab) {
+TEST(UnpackedArrayConcatElaboration, EmptyConcatElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -19,7 +19,7 @@ TEST(UnpackedArrayConcatElaboration, EmptyUnpackedArrayConcatElab) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(UnpackedArrayConcatElaborates, UnpackedArrayConcatElaborates) {
+TEST(UnpackedArrayConcatElaboration, ScalarItemsElaborate) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -30,7 +30,7 @@ TEST(UnpackedArrayConcatElaborates, UnpackedArrayConcatElaborates) {
   ASSERT_NE(design, nullptr);
 }
 
-TEST(UnpackedArrayConcatArrayExpansion, UnpackedArrayConcatArrayExpansion) {
+TEST(UnpackedArrayConcatElaboration, ArrayItemExpansion) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -58,6 +58,42 @@ TEST(UnpackedArrayConcatArrayExpansion, UnpackedArrayConcatArrayExpansion) {
   EXPECT_EQ(c1->value.ToUint64(), 20u);
   EXPECT_EQ(c2->value.ToUint64(), 30u);
   EXPECT_EQ(c3->value.ToUint64(), 40u);
+}
+
+TEST(UnpackedArrayConcatElaboration, AssociativeArrayTargetError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int aa[string];\n"
+      "  initial aa = {1, 2, 3};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(UnpackedArrayConcatElaboration, QueueTargetElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int q[$];\n"
+      "  initial q = {1, 2, 3};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(UnpackedArrayConcatElaboration, DynamicArrayTargetElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int d[];\n"
+      "  initial d = {1, 2, 3};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

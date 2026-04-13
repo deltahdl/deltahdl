@@ -4,7 +4,7 @@
 using namespace delta;
 namespace {
 
-TEST(AssignmentParsing, UnpackedArrayConcat) {
+TEST(UnpackedArrayConcatParsing, ScalarItems) {
   auto r = Parse(
       "module m;\n"
       "  int A[3];\n"
@@ -17,20 +17,7 @@ TEST(AssignmentParsing, UnpackedArrayConcat) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(AssignmentParsing, UnpackedArrayConcatEmpty) {
-  auto r = Parse(
-      "module m;\n"
-      "  int q[$];\n"
-      "  initial q = {};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
-}
-
-TEST(AssignmentParsing, UnpackedArrayConcatNested) {
+TEST(UnpackedArrayConcatParsing, ArrayItems) {
   auto r = Parse(
       "module m;\n"
       "  int A[2], B[2], C[4];\n"
@@ -42,7 +29,7 @@ TEST(AssignmentParsing, UnpackedArrayConcatNested) {
   ASSERT_NE(stmt->rhs, nullptr);
 }
 
-TEST(AggregateTypeParsing, EmptyConcatClearQueue_Rhs) {
+TEST(UnpackedArrayConcatParsing, EmptyConcat) {
   auto r = Parse(
       "module t;\n"
       "  int q[$];\n"
@@ -52,16 +39,6 @@ TEST(AggregateTypeParsing, EmptyConcatClearQueue_Rhs) {
   auto* stmt = FirstInitialStmt(r);
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
-  EXPECT_TRUE(stmt->rhs->elements.empty());
-}
-
-TEST(ConcatenationParsing, EmptyUnpackedArrayConcatenation) {
-  auto r = Parse("module m; initial x = {}; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kConcatenation);
   EXPECT_TRUE(stmt->rhs->elements.empty());
 }
