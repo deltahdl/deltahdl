@@ -10,35 +10,7 @@ using namespace delta;
 
 namespace {
 
-TEST(PatternElaboration, StructPositionalPatternElaborates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
-      "  pair_t p;\n"
-      "  initial begin\n"
-      "    p = '{8'd10, 8'd20};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-}
-
-TEST(PatternElaboration, TypedPatternExpressionElaborates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  typedef struct packed { logic [7:0] x; logic [7:0] y; } coord_t;\n"
-      "  coord_t c;\n"
-      "  initial begin\n"
-      "    c = coord_t'{x: 8'd5, y: 8'd10};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-}
-
-TEST(PatternSim, NamedStructPatternInit) {
+TEST(StructPatternSimulation, NamedStructPatternInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -59,7 +31,7 @@ TEST(PatternSim, NamedStructPatternInit) {
   EXPECT_EQ(var->value.ToUint64(), 2580u);
 }
 
-TEST(PatternSim, NamedStructPatternReversedOrder) {
+TEST(StructPatternSimulation, NamedStructPatternReversedOrder) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -80,7 +52,7 @@ TEST(PatternSim, NamedStructPatternReversedOrder) {
   EXPECT_EQ(var->value.ToUint64(), 2580u);
 }
 
-TEST(PatternSim, PositionalStructPatternInit) {
+TEST(StructPatternSimulation, PositionalStructPatternInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -101,7 +73,7 @@ TEST(PatternSim, PositionalStructPatternInit) {
   EXPECT_EQ(var->value.ToUint64(), 775u);
 }
 
-TEST(PatternSim, ThreeFieldStructNamedPattern) {
+TEST(StructPatternSimulation, ThreeFieldStructNamedPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -126,7 +98,7 @@ TEST(PatternSim, ThreeFieldStructNamedPattern) {
   EXPECT_EQ(var->value.ToUint64(), 0x010203u);
 }
 
-TEST(PatternSim, ConstPatternInVarDeclInit) {
+TEST(StructPatternSimulation, ConstPatternInVarDeclInit) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -144,7 +116,7 @@ TEST(PatternSim, ConstPatternInVarDeclInit) {
   EXPECT_EQ(var->value.ToUint64(), 25800u);
 }
 
-TEST(Elaboration, StructPattern_InvalidMemberName) {
+TEST(StructPatternValidation, InvalidMemberName) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -155,7 +127,7 @@ TEST(Elaboration, StructPattern_InvalidMemberName) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, StructPattern_DuplicateKey) {
+TEST(StructPatternValidation, DuplicateKey) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -166,7 +138,7 @@ TEST(Elaboration, StructPattern_DuplicateKey) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Elaboration, StructPattern_UncoveredMember) {
+TEST(StructPatternValidation, UncoveredMember) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -177,21 +149,77 @@ TEST(Elaboration, StructPattern_UncoveredMember) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(PatternElaboration, StructNamedPatternElaborates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
+TEST(StructPatternValidation, DefaultSatisfiesCoverage) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
-      "  pair_t p;\n"
-      "  initial begin\n"
-      "    p = pair_t'{a: 8'd1, b: 8'd2};\n"
-      "  end\n"
+      "  pair_t s = '{default: 8'h00};\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AssignmentPatternSim, StructTypeKeyedPattern) {
+TEST(StructPatternValidation, TypeKeySatisfiesCoverage) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct packed { int a; int b; } pair_t;\n"
+      "  pair_t s = '{int: 0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(StructPatternValidation, MemberAndTypeKeyCoverage) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct packed { int a; int b; } pair_t;\n"
+      "  pair_t s = '{a: 1, int: 0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(StructPatternValidation, AllThreeKeyTypesCoverage) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct packed {\n"
+      "    int a;\n"
+      "    int b;\n"
+      "    logic [7:0] c;\n"
+      "  } s_t;\n"
+      "  s_t s = '{a: 1, int: 0, default: 8'd99};\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(StructPatternValidation, PositionalWrongCountTooMany) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t s = '{8'h01, 8'h02, 8'h03};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(StructPatternValidation, PositionalWrongCountTooFew) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "  pair_t s = '{8'h01};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(StructPatternSimulation, StructTypeKeyedPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

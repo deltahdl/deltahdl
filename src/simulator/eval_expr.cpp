@@ -963,6 +963,8 @@ static DataTypeKind TypeKeyToKind(std::string_view key) {
   if (key == "real") return DataTypeKind::kReal;
   if (key == "shortreal") return DataTypeKind::kShortreal;
   if (key == "string") return DataTypeKind::kString;
+  if (key == "time") return DataTypeKind::kTime;
+  if (key == "realtime") return DataTypeKind::kRealtime;
   return DataTypeKind::kImplicit;
 }
 
@@ -997,12 +999,19 @@ static void ApplyMemberKeys(const Expr* expr, const StructTypeInfo* info,
 }
 
 // Pass 2: Assign unset fields by type key (middle precedence).
+// §10.9.2: If the same type key appears more than once, the last value is
+// used.  Scan backwards so only the final occurrence of each kind is applied.
 static void ApplyTypeKeys(const Expr* expr, const StructTypeInfo* info,
                           PatternState& s) {
-  for (size_t i = 0; i < expr->pattern_keys.size(); ++i) {
-    if (i >= expr->elements.size()) break;
+  size_t n = std::min(expr->pattern_keys.size(), expr->elements.size());
+  bool seen[256] = {};
+  for (size_t ri = n; ri > 0; --ri) {
+    size_t i = ri - 1;
     auto kind = TypeKeyToKind(expr->pattern_keys[i]);
     if (kind == DataTypeKind::kImplicit) continue;
+    auto u = static_cast<uint8_t>(kind);
+    if (seen[u]) continue;
+    seen[u] = true;
     auto val = EvalExpr(expr->elements[i], s.ctx, s.arena);
     for (size_t fi = 0; fi < info->fields.size(); ++fi) {
       if (s.assigned[fi] || info->fields[fi].type_kind != kind) continue;

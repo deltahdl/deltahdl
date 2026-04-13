@@ -46,19 +46,6 @@ TEST(AssignmentPatternElaboration, ConstantAssignmentPatternElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AssignmentPatternElaboration, AssignmentPatternDefaultKeyElaborates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  typedef struct { int a; int b; int c; } tri_t;\n"
-      "  tri_t v;\n"
-      "  initial v = '{default: 0};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(AssignmentPatternElaboration, TypeReferencePatternElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -153,16 +153,36 @@ static void CheckPatternKeys(const ModuleItem* item,
 void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
   if (!item->init_expr) return;
   if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
-  if (item->init_expr->pattern_keys.empty()) return;
-  const auto& members = item->data_type.struct_members;
-  if (!members.empty()) {
-    CheckPatternKeys(item, members, diag_);
+
+  // Resolve struct members from the type or typedef.
+  const std::vector<StructMember>* members = nullptr;
+  if (!item->data_type.struct_members.empty()) {
+    members = &item->data_type.struct_members;
+  } else if (item->data_type.kind == DataTypeKind::kNamed) {
+    auto td = typedefs_.find(item->data_type.type_name);
+    if (td != typedefs_.end() && !td->second.struct_members.empty())
+      members = &td->second.struct_members;
+  }
+  if (!members) return;
+
+  if (item->init_expr->pattern_keys.empty()) {
+    // Positional pattern — skip replication patterns.
+    bool is_replication =
+        item->init_expr->repeat_count ||
+        (item->init_expr->elements.size() == 1 &&
+         item->init_expr->elements[0]->kind == ExprKind::kReplicate);
+    if (is_replication) return;
+    if (item->init_expr->elements.size() != members->size()) {
+      diag_.Error(item->loc,
+                  std::format("positional struct pattern has {} elements, "
+                              "but struct has {} members",
+                              item->init_expr->elements.size(),
+                              members->size()));
+    }
     return;
   }
-  if (item->data_type.kind != DataTypeKind::kNamed) return;
-  auto td = typedefs_.find(item->data_type.type_name);
-  if (td == typedefs_.end() || td->second.struct_members.empty()) return;
-  CheckPatternKeys(item, td->second.struct_members, diag_);
+
+  CheckPatternKeys(item, *members, diag_);
 }
 
 // --- §6 validation helpers ---
