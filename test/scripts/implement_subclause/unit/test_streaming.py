@@ -355,3 +355,30 @@ def test_run_claude_streaming_stdout_content_filter_not_system_exit(streaming):
     except streaming.ContentFilterError:
         pass
     assert not raised_system_exit
+
+
+# ---- JSON-encoded content filter detection -----------------------------------
+
+
+_FILTER_JSON_STDOUT = [
+    '{"type":"result","subtype":"error_api","is_error":true,'
+    '"errors":["Output blocked by content filtering policy"]}\n',
+]
+
+
+def test_run_claude_streaming_json_content_filter_raises(streaming):
+    """Content filter in a valid JSON event raises ContentFilterError."""
+    with pytest.raises(streaming.ContentFilterError):
+        _run(streaming, _FILTER_JSON_STDOUT, returncode=1)
+
+
+def test_run_claude_streaming_json_content_filter_not_system_exit(streaming):
+    """Content filter in a valid JSON event does not raise SystemExit."""
+    raised_system_exit = False
+    try:
+        _run(streaming, _FILTER_JSON_STDOUT, returncode=1)
+    except SystemExit:
+        raised_system_exit = True
+    except streaming.ContentFilterError:
+        pass
+    assert not raised_system_exit

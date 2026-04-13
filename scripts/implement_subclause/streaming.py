@@ -100,11 +100,11 @@ def run_claude_streaming(cmd, prompt, *, env) -> str:
             line = raw.strip()
             if not line:
                 continue
+            if "blocked by content filtering" in line:
+                content_filter_line = line
             try:
                 event = json.loads(line)
             except json.JSONDecodeError:
-                if "blocked by content filtering" in line:
-                    content_filter_line = line
                 continue
             print_event(event)
             extracted = extract_result(event)
