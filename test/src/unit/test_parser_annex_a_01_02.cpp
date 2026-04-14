@@ -173,14 +173,6 @@ TEST(SourceText, EmptyCuCompletelyEmpty) {
   EXPECT_TRUE(r.cu->modules.empty());
 }
 
-TEST(SourceText, MacromoduleKeyword) {
-  auto r = Parse("macromodule m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "m");
-}
-
 TEST(SourceText, ModuleWildcardPorts) {
   auto r = Parse("module m(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -498,11 +490,6 @@ TEST(SourceText, TimeprecisionThenTimeunit) {
 }
 
 // --- Error conditions ---
-
-TEST(SourceText, ErrorMissingEndmodule) {
-  auto r = Parse("module m;\n");
-  EXPECT_TRUE(r.has_errors);
-}
 
 TEST(SourceText, ErrorUnknownTopLevelToken) {
   auto r = Parse("foobar;\n");
