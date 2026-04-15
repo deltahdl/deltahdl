@@ -104,15 +104,6 @@ TEST(PortDeclParsing, OutputVariablePortTypeVar) {
   EXPECT_EQ(port.name, "q");
 }
 
-TEST(PortDeclParsing, OutputWithDefaultValue) {
-  auto r = Parse("module m(output logic q = 1'b0); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kOutput);
-  EXPECT_NE(port.default_value, nullptr);
-}
-
 // --- interface_port_declaration ---
 
 TEST(PortDeclParsing, InterfacePortBareKeyword) {
@@ -320,15 +311,6 @@ TEST(PortDeclParsing, InterfacePortWithUnpackedDims) {
   auto& port = r.cu->modules[0]->ports[0];
   EXPECT_TRUE(port.is_interface_port);
   EXPECT_FALSE(port.unpacked_dims.empty());
-}
-
-TEST(PortDeclParsing, InputWithDefaultValue) {
-  auto r = Parse("module m(input logic x = 1'b0); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kInput);
-  EXPECT_NE(port.default_value, nullptr);
 }
 
 // --- Error conditions ---

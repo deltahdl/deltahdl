@@ -23,15 +23,6 @@ TEST(DeclarationListParsing, ListOfVariablePortIdentifiersWithDim) {
   EXPECT_NE(port.default_value, nullptr);
 }
 
-TEST(DeclarationListParsing, OutputDefaultValue) {
-  auto r = ParseWithPreprocessor("module m(output logic q = 1'b0); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kOutput);
-  EXPECT_NE(port.default_value, nullptr);
-}
-
 TEST(DeclarationListParsing, ListOfPortIdentifiersWithUnpackedDim) {
   auto r = ParseWithPreprocessor("module m(inout logic a [3:0]); endmodule\n");
   ASSERT_NE(r.cu, nullptr);

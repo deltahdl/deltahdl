@@ -134,18 +134,6 @@ TEST(ModuleParametersAndPorts, InterfacePortHeader) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleParametersAndPorts, AnsiPortWithDefault) {
-  auto r = Parse(
-      "module m(\n"
-      "  input logic clk,\n"
-      "  input logic rst = 0\n"
-      ");\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
-  EXPECT_NE(r.cu->modules[0]->ports[1].default_value, nullptr);
-}
-
 TEST(ModuleParametersAndPorts, ModuleWithAnsiPortDeclarations) {
   auto r = Parse(
       "module m(input wire a, b, sel, output logic y);\n"

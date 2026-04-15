@@ -71,13 +71,6 @@ TEST(DeclarationListElaboration, MultiplePortsElaborate) {
   EXPECT_EQ(mod->ports.size(), 3u);
 }
 
-// --- list_of_variable_port_identifiers elaboration ---
-
-TEST(DeclarationListElaboration, PortsWithDefaultsElaborate) {
-  EXPECT_TRUE(ElabOk(
-      "module m(output logic a = 1'b0, output logic b = 1'b1); endmodule"));
-}
-
 // --- list_of_type_assignments elaboration ---
 
 TEST(DeclarationListElaboration, TypeParamsElaborate) {

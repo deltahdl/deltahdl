@@ -360,12 +360,42 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
       }
     }
 
+    if (port.default_value) {
+      if (port.direction != Direction::kInput) {
+        diag_.Error(port.loc,
+                    std::format("default value on {} port '{}'; defaults are "
+                                "only allowed on input ports",
+                                port.direction == Direction::kOutput  ? "output"
+                                : port.direction == Direction::kInout ? "inout"
+                                                                     : "ref",
+                                port.name));
+      }
+      if (decl->is_non_ansi_ports) {
+        diag_.Error(port.loc,
+                    std::format("default value on port '{}'; defaults are "
+                                "only allowed with ANSI-style port "
+                                "declarations",
+                                port.name));
+      }
+      if (port.data_type.is_interconnect) {
+        diag_.Error(port.loc,
+                    std::format("default value on interconnect port '{}'",
+                                port.name));
+      }
+      if (!port.unpacked_dims.empty() || !IsSingularType(port.data_type)) {
+        diag_.Error(port.loc,
+                    std::format("default value on non-singular port '{}'",
+                                port.name));
+      }
+    }
+
     RtlirPort rp;
     rp.name = port.name;
     rp.direction = port.direction;
     rp.type_kind = port.data_type.kind;
     rp.width = EvalTypeWidth(port.data_type, typedefs_);
     rp.is_signed = port.data_type.is_signed;
+    rp.default_value = port.default_value;
     mod->ports.push_back(rp);
   }
 }

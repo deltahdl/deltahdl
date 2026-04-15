@@ -622,6 +622,11 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       }
     }
 
+    if (!binding.connection && binding.direction == Direction::kInput &&
+        it != child_ports.end() && it->default_value) {
+      binding.connection = it->default_value;
+    }
+
     // §22.9: Pull unconnected input ports.
     if (has_pull && !binding.connection &&
         binding.direction == Direction::kInput) {
@@ -631,23 +636,29 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
     inst.port_bindings.push_back(binding);
   }
 
-  // §22.9: Add pull bindings for input ports not mentioned in the connection.
-  if (has_pull) {
-    for (const auto& port : child_ports) {
-      if (port.direction != Direction::kInput) continue;
-      bool connected = false;
-      for (const auto& [pname, _] : item->inst_ports) {
-        if (pname == port.name) {
-          connected = true;
-          break;
-        }
+  for (const auto& port : child_ports) {
+    if (port.direction != Direction::kInput) continue;
+    bool connected = false;
+    for (const auto& [pname, _] : item->inst_ports) {
+      if (pname == port.name) {
+        connected = true;
+        break;
       }
-      if (connected) continue;
-      RtlirPortBinding binding;
-      binding.port_name = port.name;
-      binding.direction = port.direction;
-      binding.width = port.width;
+    }
+    if (connected) continue;
+
+    RtlirPortBinding binding;
+    binding.port_name = port.name;
+    binding.direction = port.direction;
+    binding.width = port.width;
+
+    if (port.default_value) {
+      binding.connection = port.default_value;
+    } else if (has_pull) {
       binding.connection = MakePullExpr(unit_->unconnected_drive);
+    }
+
+    if (binding.connection) {
       inst.port_bindings.push_back(binding);
     }
   }
