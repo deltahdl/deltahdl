@@ -557,18 +557,41 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
   const auto& child_ports = inst.resolved->ports;
   const bool has_pull = unit_->unconnected_drive != NetType::kWire;
 
-  for (auto& [port_name, conn_expr] : item->inst_ports) {
+  const bool is_ordered =
+      !item->inst_ports.empty() && item->inst_ports[0].first.empty();
+
+  for (size_t i = 0; i < item->inst_ports.size(); ++i) {
+    auto& [port_name, conn_expr] = item->inst_ports[i];
     // §6.10: Create implicit nets for undeclared identifiers in connections.
     if (conn_expr && conn_expr->kind == ExprKind::kIdentifier) {
       MaybeCreateImplicitNet(conn_expr->text, item->loc, parent_mod);
     }
     RtlirPortBinding binding;
-    binding.port_name = port_name;
     binding.connection = conn_expr;
 
-    auto it =
-        std::find_if(child_ports.begin(), child_ports.end(),
-                     [&](const RtlirPort& p) { return p.name == port_name; });
+    auto it = child_ports.end();
+    if (is_ordered) {
+      if (i < child_ports.size()) {
+        it = child_ports.begin() + static_cast<ptrdiff_t>(i);
+        binding.port_name = it->name;
+      } else {
+        diag_.Warning(
+            item->loc,
+            std::format(
+                "too many ordered port connections for module '{}'"
+                " (expected {}, got {})",
+                inst.module_name, child_ports.size(),
+                item->inst_ports.size()));
+        break;
+      }
+    } else {
+      binding.port_name = port_name;
+      it = std::find_if(child_ports.begin(), child_ports.end(),
+                         [&](const RtlirPort& p) {
+                           return p.name == port_name;
+                         });
+    }
+
     if (it == child_ports.end()) {
       diag_.Warning(item->loc, std::format("port '{}' not found on module '{}'",
                                            port_name, inst.module_name));
@@ -636,16 +659,21 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
     inst.port_bindings.push_back(binding);
   }
 
-  for (const auto& port : child_ports) {
+  size_t first_unconnected = is_ordered ? item->inst_ports.size() : 0;
+  for (size_t i = first_unconnected; i < child_ports.size(); ++i) {
+    const auto& port = child_ports[i];
     if (port.direction != Direction::kInput) continue;
-    bool connected = false;
-    for (const auto& [pname, _] : item->inst_ports) {
-      if (pname == port.name) {
-        connected = true;
-        break;
+
+    if (!is_ordered) {
+      bool connected = false;
+      for (const auto& [pname, _] : item->inst_ports) {
+        if (pname == port.name) {
+          connected = true;
+          break;
+        }
       }
+      if (connected) continue;
     }
-    if (connected) continue;
 
     RtlirPortBinding binding;
     binding.port_name = port.name;

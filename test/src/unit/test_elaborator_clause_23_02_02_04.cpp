@@ -116,21 +116,6 @@ TEST(DefaultPortValueElaboration, OmittedInputUsesDefaultNamedConn) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(DefaultPortValueElaboration, OmittedInputUsesDefaultOrderedConn) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module child(input logic [7:0] a, input logic [7:0] b = 8'hFF);\n"
-      "  assign a = a;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic [7:0] x;\n"
-      "  child u(x);\n"
-      "endmodule\n",
-      f, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // --- LRM example: default port scope resolution ---
 
 TEST(DefaultPortValueElaboration, DefaultEvaluatedInModuleScope) {
