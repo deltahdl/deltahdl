@@ -596,6 +596,7 @@ struct ModuleItem {
   std::string_view inst_name;
   std::vector<std::pair<std::string_view, Expr*>> inst_params;
   std::vector<std::pair<std::string_view, Expr*>> inst_ports;
+  std::vector<bool> inst_ports_implicit;
   bool inst_wildcard = false;        // .* port connection (§23.3.2.4)
   Expr* inst_range_left = nullptr;   // First dimension left bound
   Expr* inst_range_right = nullptr;  // First dimension right bound

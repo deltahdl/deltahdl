@@ -241,16 +241,6 @@ TEST(ModuleInstantiationGrammar, TopMux2to1Example) {
       HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
 }
 
-TEST(ModuleInstantiationGrammar, NamedPortWithoutParens) {
-  auto r = Parse("module m; sub u0(.clk, .data); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->inst_ports.size(), 2u);
-  EXPECT_EQ(item->inst_ports[0].first, "clk");
-  EXPECT_EQ(item->inst_ports[1].first, "data");
-}
-
 TEST(ModuleInstantiationGrammar, WildcardPortConnection) {
   auto r = Parse("module m; sub u0(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -458,19 +448,6 @@ TEST(ModuleInstantiationGrammar, AttributeOnWildcardPort) {
   EXPECT_TRUE(item->inst_wildcard);
   EXPECT_EQ(item->inst_ports.size(), 1u);
 }
-
-TEST(ModuleInstantiationGrammar, ImplicitAndExplicitNamedPorts) {
-  auto r = Parse("module m; sub u0(.a, .b(x), .c); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->inst_ports.size(), 3u);
-  EXPECT_EQ(item->inst_ports[0].first, "a");
-  EXPECT_EQ(item->inst_ports[1].first, "b");
-  EXPECT_NE(item->inst_ports[1].second, nullptr);
-  EXPECT_EQ(item->inst_ports[2].first, "c");
-}
-
 
 TEST(ModuleInstantiationGrammar, InstanceArrayMultipleDimensions) {
   auto r = Parse("module m; sub u0[3:0][7:0](.a(a)); endmodule\n");

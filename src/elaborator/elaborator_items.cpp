@@ -59,6 +59,43 @@ static bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {
   return false;
 }
 
+static uint32_t FindSignalWidth(std::string_view name, const RtlirModule* mod) {
+  for (const auto& v : mod->variables) {
+    if (v.name == name) return v.width;
+  }
+  for (const auto& n : mod->nets) {
+    if (n.name == name) return n.width;
+  }
+  for (const auto& p : mod->ports) {
+    if (p.name == name) return p.width;
+  }
+  return 0;
+}
+
+static NetType FindSignalNetType(std::string_view name,
+                                 const RtlirModule* mod) {
+  for (const auto& n : mod->nets) {
+    if (n.name == name) return n.net_type;
+  }
+  return NetType::kNone;
+}
+
+static NetType PortNetType(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kWire: return NetType::kWire;
+    case DataTypeKind::kTri: return NetType::kTri;
+    case DataTypeKind::kWand: return NetType::kWand;
+    case DataTypeKind::kTriand: return NetType::kTriand;
+    case DataTypeKind::kWor: return NetType::kWor;
+    case DataTypeKind::kTrior: return NetType::kTrior;
+    case DataTypeKind::kTri0: return NetType::kTri0;
+    case DataTypeKind::kTri1: return NetType::kTri1;
+    case DataTypeKind::kTrireg: return NetType::kTrireg;
+    case DataTypeKind::kUwire: return NetType::kUwire;
+    default: return NetType::kNone;
+  }
+}
+
 bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                                         RtlirModule* mod) {
   if (IsNameDeclared(name, mod)) return true;
@@ -562,9 +599,22 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
 
   for (size_t i = 0; i < item->inst_ports.size(); ++i) {
     auto& [port_name, conn_expr] = item->inst_ports[i];
-    // §6.10: Create implicit nets for undeclared identifiers in connections.
+    const bool is_implicit = i < item->inst_ports_implicit.size() &&
+                             item->inst_ports_implicit[i];
+
     if (conn_expr && conn_expr->kind == ExprKind::kIdentifier) {
-      MaybeCreateImplicitNet(conn_expr->text, item->loc, parent_mod);
+      if (is_implicit) {
+        if (!IsNameDeclared(conn_expr->text, parent_mod)) {
+          diag_.Error(
+              item->loc,
+              std::format(
+                  "implicit named port connection '.{}' requires "
+                  "signal '{}' to be declared in the instantiating scope",
+                  port_name, conn_expr->text));
+        }
+      } else {
+        MaybeCreateImplicitNet(conn_expr->text, item->loc, parent_mod);
+      }
     }
     RtlirPortBinding binding;
     binding.connection = conn_expr;
@@ -600,6 +650,31 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
     } else {
       binding.direction = it->direction;
       binding.width = it->width;
+
+      if (is_implicit && conn_expr &&
+          IsNameDeclared(conn_expr->text, parent_mod)) {
+        uint32_t sig_width = FindSignalWidth(conn_expr->text, parent_mod);
+        if (sig_width != 0 && sig_width != it->width) {
+          diag_.Error(
+              item->loc,
+              std::format("implicit named port connection '.{}' requires "
+                          "equivalent data types (port width {}, "
+                          "signal width {})",
+                          port_name, it->width, sig_width));
+        }
+
+        NetType pnet = PortNetType(it->type_kind);
+        if (pnet != NetType::kNone) {
+          NetType snet = FindSignalNetType(conn_expr->text, parent_mod);
+          if (snet != NetType::kNone && snet != pnet) {
+            diag_.Error(
+                item->loc,
+                std::format("implicit named port connection '.{}' between "
+                            "dissimilar net types",
+                            port_name));
+          }
+        }
+      }
     }
 
     // §11.4.12.1: Replication shall not appear on output/inout port connections.

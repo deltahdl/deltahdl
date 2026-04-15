@@ -135,17 +135,24 @@ bool Parser::ParsePortConnection(ModuleItem* item) {
       }
       Expect(TokenKind::kRParen);
       item->inst_ports.push_back({name.text, expr});
+      item->inst_ports_implicit.push_back(false);
     } else {
-      // .name shorthand — implicit connection (§23.3.2.3)
-      item->inst_ports.push_back({name.text, nullptr});
+      auto* expr = arena_.Create<Expr>();
+      expr->kind = ExprKind::kIdentifier;
+      expr->text = name.text;
+      expr->range.start = name.loc;
+      item->inst_ports.push_back({name.text, expr});
+      item->inst_ports_implicit.push_back(true);
     }
     return true;
   }
   // Ordered port: blank position (empty expression) or expression
   if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
     item->inst_ports.push_back({{}, nullptr});
+    item->inst_ports_implicit.push_back(false);
   } else {
     item->inst_ports.push_back({{}, ParseExpr()});
+    item->inst_ports_implicit.push_back(false);
   }
   return false;
 }
