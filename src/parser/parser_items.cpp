@@ -145,7 +145,28 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
+    bool validate = current_module_ &&
+                    current_module_->decl_kind == ModuleDeclKind::kModule;
+    bool was_unit_set = validate && current_module_->has_timeunit;
+    bool was_prec_set = validate && current_module_->has_timeprecision;
+    TimeUnit old_unit = was_unit_set ? current_module_->time_unit : TimeUnit{};
+    TimeUnit old_prec = was_prec_set ? current_module_->time_prec : TimeUnit{};
+    auto loc = CurrentLoc();
     ParseTimeunitDecl(current_module_);
+    if (validate) {
+      if (current_module_->has_timeunit && !was_unit_set)
+        diag_.Error(loc,
+                    "timeunit as module item requires a matching prior "
+                    "declaration in the same scope");
+      else if (was_unit_set && current_module_->time_unit != old_unit)
+        diag_.Error(loc, "timeunit does not match prior declaration");
+      if (current_module_->has_timeprecision && !was_prec_set)
+        diag_.Error(loc,
+                    "timeprecision as module item requires a matching prior "
+                    "declaration in the same scope");
+      else if (was_prec_set && current_module_->time_prec != old_prec)
+        diag_.Error(loc, "timeprecision does not match prior declaration");
+    }
     return true;
   }
   if (Check(TokenKind::kKwLet)) {

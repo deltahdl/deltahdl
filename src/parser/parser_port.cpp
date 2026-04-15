@@ -513,6 +513,18 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
   auto* prev_module = current_module_;
   current_module_ = &mod;
   bool non_ansi = HasNonAnsiPorts(mod);
+  // [ timeunits_declaration ] — header area per module_declaration grammar
+  if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
+    bool first_is_unit = Check(TokenKind::kKwTimeunit);
+    ParseTimeunitDecl(&mod);
+    if (first_is_unit && !mod.has_timeprecision &&
+        Check(TokenKind::kKwTimeprecision)) {
+      ParseTimeunitDecl(&mod);
+    } else if (!first_is_unit && !mod.has_timeunit &&
+               Check(TokenKind::kKwTimeunit)) {
+      ParseTimeunitDecl(&mod);
+    }
+  }
   while (!Check(TokenKind::kKwEndmodule) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;  // null module item
     if (non_ansi && IsPortDirection(CurrentToken().kind)) {
