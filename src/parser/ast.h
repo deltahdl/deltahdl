@@ -405,7 +405,8 @@ struct PortDecl {
   Expr* default_value = nullptr;
   Expr* port_expr = nullptr;       // §A.1.3: port expression (.name(expr), {a,b}, a[3:0])
   bool is_interface_port = false;  // §A.1.3: bare 'interface' keyword port header
-  bool is_explicit_named = false;  // §23.2.2.1: .name(expr) form in non-ANSI port list
+  bool is_explicit_named = false;  // .name(expr) form in port list
+  bool has_explicit_var = false;
   SourceLoc loc;
 };
 

@@ -229,6 +229,46 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
   Expect(TokenKind::kSemicolon);
 }
 
+// §23.2.2.3: Apply default direction, port kind, and data type to a port.
+// If prev is non-null, direction is inherited from the previous port when
+// omitted.  Port kind and data type always follow first-port rules.
+static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev) {
+  if (port.is_interface_port) return;
+  if (port.data_type.kind == DataTypeKind::kNamed &&
+      !port.data_type.modport_name.empty())
+    return;
+
+  if (port.is_explicit_named) {
+    if (prev && port.direction == Direction::kNone)
+      port.direction = prev->direction;
+    return;
+  }
+
+  // F1 / S2: direction defaults to inout (first) or inherits (subsequent).
+  if (port.direction == Direction::kNone)
+    port.direction = prev ? prev->direction : Direction::kInout;
+
+  // F3–F6: port kind (is_net) — must run before F2 to see kImplicit.
+  if (!port.has_explicit_var && !port.data_type.is_net) {
+    switch (port.direction) {
+      case Direction::kInput:
+      case Direction::kInout:
+        port.data_type.is_net = true;
+        break;
+      case Direction::kOutput:
+        if (port.data_type.kind == DataTypeKind::kImplicit)
+          port.data_type.is_net = true;
+        break;
+      default:
+        break;
+    }
+  }
+
+  // F2: implicit data type defaults to logic.
+  if (port.data_type.kind == DataTypeKind::kImplicit)
+    port.data_type.kind = DataTypeKind::kLogic;
+}
+
 void Parser::ParsePortList(ModuleDecl& mod) {
   Expect(TokenKind::kLParen);
   if (Check(TokenKind::kRParen)) {
@@ -266,8 +306,36 @@ void Parser::ParsePortList(ModuleDecl& mod) {
     }
   }
   mod.ports.push_back(ParsePortDecl());
+  ResolvePortDefaults(mod.ports.back(), nullptr);
   while (Match(TokenKind::kComma)) {
+    PortDecl prev = mod.ports.back();
+    // §23.2.2.3 S1: detect all-omitted subsequent port (bare identifier
+    // possibly followed by unpacked dims / default value).
+    if (CheckIdentifier() && known_types_.count(CurrentToken().text) == 0) {
+      auto saved = lexer_.SavePos();
+      Consume();
+      bool looks_bare = Check(TokenKind::kLBracket) || Check(TokenKind::kEq) ||
+                        Check(TokenKind::kComma) || Check(TokenKind::kRParen);
+      lexer_.RestorePos(saved);
+      if (looks_bare) {
+        PortDecl port;
+        port.loc = CurrentLoc();
+        port.name = ExpectIdentifier().text;
+        ParseUnpackedDims(port.unpacked_dims);
+        if (Match(TokenKind::kEq)) port.default_value = ParseExpr();
+        if (!prev.is_explicit_named) {
+          port.direction = prev.direction;
+          port.data_type = prev.data_type;
+        } else {
+          // E2: after an explicit port, inherit only direction.
+          ResolvePortDefaults(port, &prev);
+        }
+        mod.ports.push_back(port);
+        continue;
+      }
+    }
     mod.ports.push_back(ParsePortDecl());
+    ResolvePortDefaults(mod.ports.back(), &prev);
   }
   Expect(TokenKind::kRParen);
 }
@@ -334,6 +402,7 @@ PortDecl Parser::ParsePortDecl() {
 
   // §A.1.3 ansi_port_declaration: [direction] . port_identifier ( [expression] )
   if (Check(TokenKind::kDot)) {
+    port.is_explicit_named = true;
     Consume();
     port.name = ExpectIdentifier().text;
     Expect(TokenKind::kLParen);
@@ -388,14 +457,11 @@ PortDecl Parser::ParsePortDecl() {
   // A.2.1.2: variable_port_type ::= var_data_type
   // var_data_type ::= data_type | var data_type_or_implicit
   if (Match(TokenKind::kKwVar)) {
+    port.has_explicit_var = true;
     port.data_type = ParseDataType();
-    // §6.8: implicit_data_type — bare packed dims after 'var'
     if (port.data_type.kind == DataTypeKind::kImplicit &&
         Check(TokenKind::kLBracket)) {
       ParsePackedDims(port.data_type);
-    }
-    if (port.data_type.kind == DataTypeKind::kImplicit) {
-      port.data_type.kind = DataTypeKind::kLogic;
     }
   } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
     port.data_type = ParseStructOrUnionType();
@@ -410,20 +476,14 @@ PortDecl Parser::ParsePortDecl() {
     port.data_type.modport_name = ExpectIdentifier().text;
   }
 
-  // Handle implicit type with packed dims: input [3:0] a (§6.10)
-  // Also handles signing already parsed: input signed [7:0] a (A.2.2.1)
-  if (port.data_type.kind == DataTypeKind::kImplicit) {
-    if (port.data_type.packed_dim_left) {
-      // Packed dims already parsed by ParseDataType (signing path)
-      port.data_type.kind = DataTypeKind::kLogic;
-    } else if (Check(TokenKind::kLBracket)) {
-      port.data_type.kind = DataTypeKind::kLogic;
-      Consume();
-      port.data_type.packed_dim_left = ParseExpr();
-      Expect(TokenKind::kColon);
-      port.data_type.packed_dim_right = ParseExpr();
-      Expect(TokenKind::kRBracket);
-    }
+  // Handle implicit type with bare packed dims: input [3:0] a (§6.10)
+  if (port.data_type.kind == DataTypeKind::kImplicit &&
+      !port.data_type.packed_dim_left && Check(TokenKind::kLBracket)) {
+    Consume();
+    port.data_type.packed_dim_left = ParseExpr();
+    Expect(TokenKind::kColon);
+    port.data_type.packed_dim_right = ParseExpr();
+    Expect(TokenKind::kRBracket);
   }
 
   auto name_tok = ExpectIdentifier();

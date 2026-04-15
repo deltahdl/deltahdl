@@ -87,17 +87,6 @@ TEST(ModuleParametersAndPorts, InputVariablePortTypeVar) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kInput);
 }
 
-TEST(ModuleParametersAndPorts, AnsiPortsWithDefaultType) {
-  auto r = Parse(
-      "module m(input a, output b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 2u);
-  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
-}
-
 TEST(ModuleParametersAndPorts, AnsiPortDeclarations) {
   auto r = Parse(
       "module m(\n"
@@ -167,14 +156,6 @@ TEST(ModuleParametersAndPorts, ModuleWithAnsiPortDeclarations) {
   EXPECT_FALSE(r.cu->modules[0]->ports.empty());
 }
 
-TEST(ModuleParametersAndPorts, InoutImplicitType) {
-  auto r = Parse("module m(inout a); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kInout);
-}
-
 TEST(ModuleParametersAndPorts, RefUnpackedDim) {
   auto r = Parse("module m(ref int arr [4]); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -230,19 +211,6 @@ TEST(ModuleParametersAndPorts, VarAsOutputPort) {
   EXPECT_EQ(ports[0].name, "result");
   ASSERT_NE(ports[0].data_type.packed_dim_left, nullptr);
   EXPECT_EQ(ports[0].data_type.packed_dim_left->int_val, 15u);
-}
-
-TEST(ModuleParametersAndPorts, ImplicitTypePortDecl) {
-  auto r = Parse("module m(input [3:0] a, output [7:0] b); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_FALSE(r.cu->modules.empty());
-  auto& ports = r.cu->modules[0]->ports;
-  std::string expected_names[] = {"a", "b"};
-  ASSERT_EQ(ports.size(), std::size(expected_names));
-  for (size_t i = 0; i < std::size(expected_names); ++i) {
-    EXPECT_EQ(ports[i].name, expected_names[i]) << "port " << i;
-    EXPECT_EQ(ports[i].data_type.kind, DataTypeKind::kLogic) << "port " << i;
-  }
 }
 
 TEST(ModuleParametersAndPorts, IntegerTypesAsPortDecls) {

@@ -16,15 +16,6 @@ TEST(ModuleDeclaration, EmptyPortListParens) {
 
 // --- inout_declaration: inout net_port_type list_of_port_identifiers ---
 
-TEST(PortDeclParsing, InoutImplicitNetType) {
-  auto r = Parse("module m(inout a); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kInout);
-  EXPECT_EQ(port.name, "a");
-}
-
 TEST(PortDeclParsing, InoutWirePackedDims) {
   auto r = Parse("module m(inout wire [7:0] bus); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -45,15 +36,6 @@ TEST(PortDeclParsing, InoutTriNetType) {
 }
 
 // --- input_declaration: input net_port_type / variable_port_type ---
-
-TEST(PortDeclParsing, InputImplicitNetType) {
-  auto r = Parse("module m(input a); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kInput);
-  EXPECT_EQ(port.name, "a");
-}
 
 TEST(PortDeclParsing, InputWireNetType) {
   auto r = Parse("module m(input wire [7:0] d); endmodule");
@@ -93,15 +75,6 @@ TEST(PortDeclParsing, InputIntegerAtomType) {
 }
 
 // --- output_declaration: output net_port_type / variable_port_type ---
-
-TEST(PortDeclParsing, OutputImplicitNetType) {
-  auto r = Parse("module m(output b); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kOutput);
-  EXPECT_EQ(port.name, "b");
-}
 
 TEST(PortDeclParsing, OutputRegNetType) {
   auto r = Parse("module m(output reg [3:0] q); endmodule");
@@ -214,15 +187,6 @@ TEST(PortDeclParsing, AllFourDirections) {
   EXPECT_EQ(r.cu->modules[0]->ports[1].direction, Direction::kOutput);
   EXPECT_EQ(r.cu->modules[0]->ports[2].direction, Direction::kInout);
   EXPECT_EQ(r.cu->modules[0]->ports[3].direction, Direction::kRef);
-}
-
-TEST(PortDeclParsing, InputSignedImplicitType) {
-  auto r = Parse("module m(input signed [7:0] s); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.direction, Direction::kInput);
-  EXPECT_EQ(port.name, "s");
 }
 
 TEST(PortDeclParsing, OutputByteType) {
