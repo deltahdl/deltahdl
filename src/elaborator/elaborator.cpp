@@ -307,12 +307,48 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
 // --- Port elaboration ---
 
 void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
+  // §23.2.2.1 R5: Duplicate explicit port name check for non-ANSI modules.
+  if (decl->is_non_ansi_ports) {
+    std::unordered_set<std::string_view> explicit_names;
+    for (const auto& port : decl->ports) {
+      if (port.is_explicit_named && !port.name.empty()) {
+        if (!explicit_names.insert(port.name).second) {
+          diag_.Error(port.loc,
+                      std::format("duplicate port name '.{}'", port.name));
+        }
+      }
+    }
+  }
+
   for (const auto& port : decl->ports) {
     // §6.14: chandle cannot be used as a port type.
     if (port.data_type.kind == DataTypeKind::kChandle) {
       diag_.Error(port.loc, "chandle cannot be used as a port type");
       continue;
     }
+
+    // §23.2.2.1 R9: Non-ANSI implicit ports must have a direction declared
+    // in the module body.
+    if (decl->is_non_ansi_ports && !port.name.empty() &&
+        !port.is_explicit_named && port.direction == Direction::kNone) {
+      diag_.Error(port.loc,
+                  std::format("port '{}' has no direction declaration in the "
+                              "module body",
+                              port.name));
+    }
+
+    // §23.2.2.1 R11/R12: Track complete vs partial port declarations for
+    // body-level net/variable redeclaration validation.
+    if (decl->is_non_ansi_ports && !port.name.empty() &&
+        port.direction != Direction::kNone) {
+      if (port.data_type.kind != DataTypeKind::kImplicit) {
+        non_ansi_complete_ports_.insert(port.name);
+      } else {
+        non_ansi_partial_ports_[port.name] =
+            EvalTypeWidth(port.data_type, typedefs_);
+      }
+    }
+
     RtlirPort rp;
     rp.name = port.name;
     rp.direction = port.direction;
@@ -825,7 +861,27 @@ static void ComputeUnpackedDims(
 }
 
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
-  if (!declared_names_.insert(item->name).second) {
+  // §23.2.2.1 R11: A complete port declaration cannot be redeclared.
+  if (non_ansi_complete_ports_.count(item->name)) {
+    diag_.Error(
+        item->loc,
+        std::format("redeclaration of port '{}' that has a complete port "
+                    "declaration",
+                    item->name));
+  }
+  // §23.2.2.1 R12: A partial port declaration allows a net/variable
+  // redeclaration only if the vector ranges match.
+  auto it = non_ansi_partial_ports_.find(item->name);
+  if (it != non_ansi_partial_ports_.end()) {
+    uint32_t net_width = EvalTypeWidth(item->data_type, typedefs_);
+    if (net_width != it->second) {
+      diag_.Error(
+          item->loc,
+          std::format(
+              "vector range of net '{}' does not match its port declaration",
+              item->name));
+    }
+  } else if (!declared_names_.insert(item->name).second) {
     diag_.Error(item->loc, std::format("redeclaration of '{}'", item->name));
   }
   net_names_.insert(item->name);
@@ -1060,7 +1116,27 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     diag_.Error(item->loc,
                 "automatic lifetime is not allowed on module-level variables");
   }
-  if (!declared_names_.insert(item->name).second) {
+  // §23.2.2.1 R11: A complete port declaration cannot be redeclared.
+  if (non_ansi_complete_ports_.count(item->name)) {
+    diag_.Error(
+        item->loc,
+        std::format("redeclaration of port '{}' that has a complete port "
+                    "declaration",
+                    item->name));
+  }
+  // §23.2.2.1 R12: A partial port declaration allows a variable
+  // redeclaration only if the vector ranges match.
+  auto partial_it = non_ansi_partial_ports_.find(item->name);
+  if (partial_it != non_ansi_partial_ports_.end()) {
+    uint32_t var_width = EvalTypeWidth(item->data_type, typedefs_);
+    if (var_width != partial_it->second) {
+      diag_.Error(
+          item->loc,
+          std::format("vector range of variable '{}' does not match its port "
+                      "declaration",
+                      item->name));
+    }
+  } else if (!declared_names_.insert(item->name).second) {
     diag_.Error(item->loc, std::format("redeclaration of '{}'", item->name));
   }
   // §6.20.6: Const variables must have an initializer.

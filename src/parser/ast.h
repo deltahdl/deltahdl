@@ -405,6 +405,7 @@ struct PortDecl {
   Expr* default_value = nullptr;
   Expr* port_expr = nullptr;       // §A.1.3: port expression (.name(expr), {a,b}, a[3:0])
   bool is_interface_port = false;  // §A.1.3: bare 'interface' keyword port header
+  bool is_explicit_named = false;  // §23.2.2.1: .name(expr) form in non-ANSI port list
   SourceLoc loc;
 };
 
@@ -702,6 +703,7 @@ struct ModuleDecl {
   bool is_extern = false;           // extern module declaration (§23.2.1)
   bool is_automatic = false;        // §13.4.2: module automatic
   bool has_wildcard_ports = false;  // (.* ) port form (A.1.2)
+  bool is_non_ansi_ports = false;  // §23.2.2.1: list_of_ports syntax
   std::string_view name;
   SourceRange range;
   std::vector<Attribute> attrs;  // §5.12: Attributes on module definition.

@@ -1,3 +1,4 @@
+#include <format>
 #include <optional>
 
 #include "common/types.h"
@@ -272,12 +273,21 @@ void Parser::ParsePortList(ModuleDecl& mod) {
 }
 
 void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
+  mod.is_non_ansi_ports = true;
   // §A.1.3 list_of_ports: port { , port }
   do {
+    // §23.2.2.1: Empty port slots are allowed (e.g., module m(a, , b)).
+    if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
+      PortDecl port;
+      port.loc = CurrentLoc();
+      mod.ports.push_back(port);
+      continue;
+    }
     PortDecl port;
     port.loc = CurrentLoc();
     if (Match(TokenKind::kDot)) {
       // §A.1.3 port: . port_identifier ( [ port_expression ] )
+      port.is_explicit_named = true;
       port.name = ExpectIdentifier().text;
       Expect(TokenKind::kLParen);
       if (!Check(TokenKind::kRParen)) {
@@ -477,15 +487,23 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
   // Parse comma-separated names with optional unpacked dims: input [7:0] a, b;
   // A.2.1.2: list_of_port_identifiers / list_of_variable_port_identifiers
   do {
+    auto loc = CurrentLoc();
     auto name = Expect(TokenKind::kIdentifier).text;
     std::vector<Expr*> dims;
     ParseUnpackedDims(dims);
+    bool found = false;
     for (auto& port : mod.ports) {
       if (port.name != name) continue;
+      // §23.2.2.1 R13: A port shall not be declared in more than one
+      // port declaration.
+      if (!found && port.direction != Direction::kNone) {
+        diag_.Error(loc,
+                    std::format("duplicate port declaration for '{}'", name));
+      }
+      found = true;
       port.direction = dir;
       port.data_type = dtype;
-      port.unpacked_dims = std::move(dims);
-      break;
+      port.unpacked_dims = dims;
     }
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kSemicolon);
