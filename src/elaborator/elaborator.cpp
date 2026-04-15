@@ -390,12 +390,23 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
       }
     }
 
+    bool port_is_var =
+        !port.data_type.is_net && !port.data_type.is_interconnect;
+
+    if (port.direction == Direction::kInout && port_is_var) {
+      diag_.Error(port.loc,
+                  std::format("variable data type is not permitted on "
+                              "inout port '{}'",
+                              port.name));
+    }
+
     RtlirPort rp;
     rp.name = port.name;
     rp.direction = port.direction;
     rp.type_kind = port.data_type.kind;
     rp.width = EvalTypeWidth(port.data_type, typedefs_, param_scope);
     rp.is_signed = port.data_type.is_signed;
+    rp.is_var = port_is_var;
     rp.default_value = port.default_value;
     mod->ports.push_back(rp);
   }

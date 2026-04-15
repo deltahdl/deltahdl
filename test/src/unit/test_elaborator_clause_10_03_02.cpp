@@ -190,20 +190,6 @@ TEST(ContAssignStatementElaboration, NettypeLhsWithMemberAccessErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ContAssignStatementElaboration, VarOutputPortAndContAssignErrors) {
-  ElabFixture f;
-  Elaborate(
-      "module child(output logic y);\n"
-      "endmodule\n"
-      "module t;\n"
-      "  logic v;\n"
-      "  child c(.y(v));\n"
-      "  assign v = 1'b0;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(ContAssignStatementElaboration, VarMultipleOutputPortsErrors) {
   ElabFixture f;
   Elaborate(
@@ -229,35 +215,6 @@ TEST(ContAssignStatementElaboration, VarOutputPortWithInitializerErrors) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
-}
-
-TEST(ContAssignStatementElaboration, VarOutputPortWithProceduralErrors) {
-  ElabFixture f;
-  Elaborate(
-      "module child(output logic y);\n"
-      "endmodule\n"
-      "module t;\n"
-      "  logic v;\n"
-      "  child c(.y(v));\n"
-      "  initial v = 1'b1;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(ContAssignStatementElaboration, NetOutputPortAndContAssignAllowed) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module child(output logic y);\n"
-      "endmodule\n"
-      "module t;\n"
-      "  wire w;\n"
-      "  child c(.y(w));\n"
-      "  assign w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

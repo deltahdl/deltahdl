@@ -730,6 +730,33 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                         "to inout port '{}'",
                         conn_expr->text, binding.port_name));
       }
+
+      if (it->direction == Direction::kInout &&
+          var_types_.count(conn_expr->text) &&
+          net_names_.count(conn_expr->text) == 0) {
+        diag_.Error(
+            item->loc,
+            std::format("variable '{}' cannot be connected to "
+                        "inout port '{}'",
+                        conn_expr->text, binding.port_name));
+      }
+
+      if (it->direction == Direction::kRef &&
+          net_names_.count(conn_expr->text)) {
+        diag_.Error(
+            item->loc,
+            std::format("net '{}' cannot be connected to ref port "
+                        "'{}'; ref port requires a variable",
+                        conn_expr->text, binding.port_name));
+      }
+
+      if (it->is_var && interconnect_names_.count(conn_expr->text)) {
+        diag_.Error(
+            item->loc,
+            std::format("port variable '{}' cannot be connected to "
+                        "interconnect net '{}'",
+                        binding.port_name, conn_expr->text));
+      }
     }
 
     // §11.4.12.1: Replication shall not appear on output/inout port connections.
@@ -838,6 +865,33 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                           port.name, port.name));
         }
 
+        if (port.direction == Direction::kInout &&
+            var_types_.count(port.name) &&
+            net_names_.count(port.name) == 0) {
+          diag_.Error(
+              item->loc,
+              std::format("variable '{}' cannot be connected to "
+                          "inout port '{}'",
+                          port.name, port.name));
+        }
+
+        if (port.direction == Direction::kRef &&
+            net_names_.count(port.name)) {
+          diag_.Error(
+              item->loc,
+              std::format("net '{}' cannot be connected to ref port "
+                          "'{}'; ref port requires a variable",
+                          port.name, port.name));
+        }
+
+        if (port.is_var && interconnect_names_.count(port.name)) {
+          diag_.Error(
+              item->loc,
+              std::format("port variable '{}' cannot be connected to "
+                          "interconnect net '{}'",
+                          port.name, port.name));
+        }
+
         auto* expr = arena_.Create<Expr>();
         expr->kind = ExprKind::kIdentifier;
         expr->text = port.name;
@@ -893,6 +947,23 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       if (binding.connection) {
         inst.port_bindings.push_back(binding);
       }
+    }
+  }
+
+  for (const auto& port : child_ports) {
+    if (port.direction != Direction::kRef) continue;
+    bool connected = false;
+    for (const auto& binding : inst.port_bindings) {
+      if (binding.port_name == port.name && binding.connection) {
+        connected = true;
+        break;
+      }
+    }
+    if (!connected) {
+      diag_.Error(item->loc,
+                  std::format("ref port '{}' of module '{}' cannot be "
+                              "left unconnected",
+                              port.name, inst.module_name));
     }
   }
 }

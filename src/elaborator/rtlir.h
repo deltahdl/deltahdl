@@ -51,6 +51,7 @@ struct RtlirPort {
   DataTypeKind type_kind;
   uint32_t width = 1;
   bool is_signed = false;
+  bool is_var = false;
   Expr* default_value = nullptr;
   std::vector<ResolvedAttribute> attrs;
 };

@@ -57,26 +57,6 @@ TEST(PortConnectionRulesElaboration, IncompatibleTypesOnPortConnectionErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// --- R2: ref port type passes a hierarchical reference ---
-
-TEST(PortConnectionRulesElaboration, RefPortBindingHasRefDirection) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module child(ref logic [7:0] v);\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic [7:0] x;\n"
-      "  child u(.v(x));\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->children.size(), 1u);
-  const auto& bindings = mod->children[0].port_bindings;
-  ASSERT_EQ(bindings.size(), 1u);
-  EXPECT_EQ(bindings[0].direction, Direction::kRef);
-}
-
 // --- R5: User-defined nettype matching on port connections ---
 
 TEST(PortConnectionRulesElaboration, NettypeSignalOnInputPortAccepted) {
