@@ -387,6 +387,9 @@ PortDecl Parser::ParsePortDecl() {
     if (port.data_type.kind == DataTypeKind::kImplicit) {
       port.data_type.kind = DataTypeKind::kLogic;
     }
+  } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+    port.data_type = ParseStructOrUnionType();
+    ParsePackedDims(port.data_type);
   } else {
     port.data_type = ParseDataType();
   }
