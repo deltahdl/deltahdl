@@ -735,12 +735,8 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
     inst.port_bindings.push_back(binding);
   }
 
-  size_t first_unconnected = is_ordered ? item->inst_ports.size() : 0;
-  for (size_t i = first_unconnected; i < child_ports.size(); ++i) {
-    const auto& port = child_ports[i];
-    if (port.direction != Direction::kInput) continue;
-
-    if (!is_ordered) {
+  if (item->inst_wildcard) {
+    for (const auto& port : child_ports) {
       bool connected = false;
       for (const auto& [pname, _] : item->inst_ports) {
         if (pname == port.name) {
@@ -749,21 +745,90 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         }
       }
       if (connected) continue;
+
+      RtlirPortBinding binding;
+      binding.port_name = port.name;
+      binding.direction = port.direction;
+      binding.width = port.width;
+
+      if (IsNameDeclared(port.name, parent_mod)) {
+        uint32_t sig_width = FindSignalWidth(port.name, parent_mod);
+        if (sig_width != 0 && sig_width != port.width) {
+          diag_.Error(
+              item->loc,
+              std::format("implicit .* port connection '.{}' requires "
+                          "equivalent data types (port width {}, "
+                          "signal width {})",
+                          port.name, port.width, sig_width));
+        }
+
+        NetType pnet = PortNetType(port.type_kind);
+        if (pnet != NetType::kNone) {
+          NetType snet = FindSignalNetType(port.name, parent_mod);
+          if (snet != NetType::kNone && snet != pnet) {
+            diag_.Error(
+                item->loc,
+                std::format("implicit .* port connection '.{}' between "
+                            "dissimilar net types",
+                            port.name));
+          }
+        }
+
+        auto* expr = arena_.Create<Expr>();
+        expr->kind = ExprKind::kIdentifier;
+        expr->text = port.name;
+        binding.connection = expr;
+
+        if (binding.direction != Direction::kInput &&
+            net_names_.count(port.name) == 0) {
+          if (!output_port_targets_.emplace(port.name, item->loc).second) {
+            diag_.Error(
+                item->loc,
+                std::format("variable '{}' driven by multiple outputs",
+                            port.name));
+          }
+        }
+      } else if (port.default_value) {
+        binding.connection = port.default_value;
+      } else if (has_pull && port.direction == Direction::kInput) {
+        binding.connection = MakePullExpr(unit_->unconnected_drive);
+      }
+
+      if (binding.connection) {
+        inst.port_bindings.push_back(binding);
+      }
     }
+  } else {
+    size_t first_unconnected = is_ordered ? item->inst_ports.size() : 0;
+    for (size_t i = first_unconnected; i < child_ports.size(); ++i) {
+      const auto& port = child_ports[i];
+      if (port.direction != Direction::kInput) continue;
 
-    RtlirPortBinding binding;
-    binding.port_name = port.name;
-    binding.direction = port.direction;
-    binding.width = port.width;
+      if (!is_ordered) {
+        bool connected = false;
+        for (const auto& [pname, _] : item->inst_ports) {
+          if (pname == port.name) {
+            connected = true;
+            break;
+          }
+        }
+        if (connected) continue;
+      }
 
-    if (port.default_value) {
-      binding.connection = port.default_value;
-    } else if (has_pull) {
-      binding.connection = MakePullExpr(unit_->unconnected_drive);
-    }
+      RtlirPortBinding binding;
+      binding.port_name = port.name;
+      binding.direction = port.direction;
+      binding.width = port.width;
 
-    if (binding.connection) {
-      inst.port_bindings.push_back(binding);
+      if (port.default_value) {
+        binding.connection = port.default_value;
+      } else if (has_pull) {
+        binding.connection = MakePullExpr(unit_->unconnected_drive);
+      }
+
+      if (binding.connection) {
+        inst.port_bindings.push_back(binding);
+      }
     }
   }
 }

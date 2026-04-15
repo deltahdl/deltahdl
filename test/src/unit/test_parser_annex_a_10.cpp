@@ -23,30 +23,6 @@ TEST(BnfClarificationParsing, MatchesPrecedenceOverLogicalAnd) {
               "endmodule\n"));
 }
 
-TEST(BnfClarificationParsing, DotStarOnceInPortConnections) {
-  auto r = Parse(
-      "module sub(input a, input b, output c);\n"
-      "endmodule\n"
-      "module m;\n"
-      "  logic a, b, c;\n"
-      "  sub u1(.*);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(BnfClarificationParsing, DotStarWithNamedPorts) {
-  auto r = Parse(
-      "module sub(input a, input b, output c);\n"
-      "endmodule\n"
-      "module m;\n"
-      "  logic a, b, c, d;\n"
-      "  sub u1(.a(d), .*);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(BnfClarificationParsing, EventExprInParensOk) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

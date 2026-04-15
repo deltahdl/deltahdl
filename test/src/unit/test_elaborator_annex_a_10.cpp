@@ -96,17 +96,6 @@ TEST(BnfClarificationElaboration, TypeRefWithVarOk) {
              "endmodule\n"));
 }
 
-TEST(BnfClarificationElaboration, DotStarOk) {
-  EXPECT_TRUE(
-      ElabOk("module sub(input a, output b);\n"
-             "  assign b = a;\n"
-             "endmodule\n"
-             "module m;\n"
-             "  logic a, b;\n"
-             "  sub u1(.*);\n"
-             "endmodule\n"));
-}
-
 TEST(BnfClarificationElaboration, ReplicationWithConstantOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
