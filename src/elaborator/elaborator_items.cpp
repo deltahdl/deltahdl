@@ -467,6 +467,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   alias_pairs_.clear();
   non_ansi_complete_ports_.clear();
   non_ansi_partial_ports_.clear();
+  ansi_port_names_.clear();
   clocking_signals_.clear();
   task_names_.clear();
   sequence_names_.clear();

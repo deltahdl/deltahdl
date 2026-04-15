@@ -320,6 +320,17 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     }
   }
 
+  if (!decl->is_non_ansi_ports) {
+    for (const auto& port : decl->ports) {
+      if (!port.name.empty()) {
+        if (!ansi_port_names_.insert(port.name).second) {
+          diag_.Error(port.loc,
+                      std::format("duplicate port name '{}'", port.name));
+        }
+      }
+    }
+  }
+
   for (const auto& port : decl->ports) {
     // §6.14: chandle cannot be used as a port type.
     if (port.data_type.kind == DataTypeKind::kChandle) {
@@ -861,6 +872,10 @@ static void ComputeUnpackedDims(
 }
 
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
+  if (ansi_port_names_.count(item->name)) {
+    diag_.Error(item->loc,
+                std::format("redeclaration of ANSI port '{}'", item->name));
+  }
   // §23.2.2.1 R11: A complete port declaration cannot be redeclared.
   if (non_ansi_complete_ports_.count(item->name)) {
     diag_.Error(
@@ -1115,6 +1130,10 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   if (item->is_automatic) {
     diag_.Error(item->loc,
                 "automatic lifetime is not allowed on module-level variables");
+  }
+  if (ansi_port_names_.count(item->name)) {
+    diag_.Error(item->loc,
+                std::format("redeclaration of ANSI port '{}'", item->name));
   }
   // §23.2.2.1 R11: A complete port declaration cannot be redeclared.
   if (non_ansi_complete_ports_.count(item->name)) {

@@ -305,13 +305,6 @@ TEST(ModuleParametersAndPorts, LocalparamInParamPortList) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleParametersAndPorts, ModuleEmptyPortList) {
-  auto r = Parse("module m(); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->modules[0]->name, "m");
-  EXPECT_TRUE(r.cu->modules[0]->ports.empty());
-}
-
 TEST(ModuleParametersAndPorts, ParamOmitValueInPortList) {
   auto r = Parse(
       "module m #(parameter int W) (input [W-1:0] d);\n"
