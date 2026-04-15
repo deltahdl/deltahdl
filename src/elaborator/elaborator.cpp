@@ -307,6 +307,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
 // --- Port elaboration ---
 
 void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
+  auto param_scope = BuildParamScope(mod);
   // §23.2.2.1 R5: Duplicate explicit port name check for non-ANSI modules.
   if (decl->is_non_ansi_ports) {
     std::unordered_set<std::string_view> explicit_names;
@@ -356,7 +357,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
         non_ansi_complete_ports_.insert(port.name);
       } else {
         non_ansi_partial_ports_[port.name] =
-            EvalTypeWidth(port.data_type, typedefs_);
+            EvalTypeWidth(port.data_type, typedefs_, param_scope);
       }
     }
 
@@ -393,7 +394,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     rp.name = port.name;
     rp.direction = port.direction;
     rp.type_kind = port.data_type.kind;
-    rp.width = EvalTypeWidth(port.data_type, typedefs_);
+    rp.width = EvalTypeWidth(port.data_type, typedefs_, param_scope);
     rp.is_signed = port.data_type.is_signed;
     rp.default_value = port.default_value;
     mod->ports.push_back(rp);

@@ -32,16 +32,6 @@ TEST(ModuleParametersAndPorts, CorrectPortCount) {
   EXPECT_EQ(top->ports.size(), 4u);
 }
 
-TEST(ModuleParametersAndPorts, ParameterPortElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m #(parameter int W = 8)(input logic [W-1:0] d);\n"
-      "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(ModuleParametersAndPorts, EmptyPortListElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

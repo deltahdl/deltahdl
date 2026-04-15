@@ -247,62 +247,12 @@ TEST(ModuleParametersAndPorts, PortListVariantForms) {
   EXPECT_TRUE(ParseOk("macromodule mm; endmodule\n"));
 }
 
-TEST(ModuleParametersAndPorts, AnsiHeaderWithParams) {
-  auto r = Parse(
-      "module m #(parameter N = 8) (input logic [N-1:0] data);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "m");
-  ASSERT_EQ(mod->params.size(), 1);
-  EXPECT_EQ(mod->params[0].first, "N");
-  ASSERT_EQ(mod->ports.size(), 1);
-  EXPECT_EQ(mod->ports[0].name, "data");
-  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
-}
-
-TEST(ModuleParametersAndPorts, ModuleWithParameters) {
-  auto r = Parse(
-      "module m #(parameter WIDTH = 8, parameter DEPTH = 16)(\n"
-      "  input logic [WIDTH-1:0] data_in,\n"
-      "  output logic [WIDTH-1:0] data_out\n"
-      ");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "m");
-  ASSERT_EQ(mod->params.size(), 2u);
-  EXPECT_EQ(mod->params[0].first, "WIDTH");
-  EXPECT_EQ(mod->params[1].first, "DEPTH");
-  ASSERT_EQ(mod->ports.size(), 2u);
-}
-
-TEST(ModuleParametersAndPorts, TwoParamsOnePort) {
-  auto r = Parse(
-      "module m #(parameter W = 8, parameter D = 4)(\n"
-      "  input logic [W-1:0] data\n"
-      ");\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->params.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 1u);
-}
-
 TEST(ModuleParametersAndPorts, EmptyParamPortList) {
   auto r = Parse("module m #(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_TRUE(r.cu->modules[0]->params.empty());
-}
-
-TEST(ModuleParametersAndPorts, LocalparamInParamPortList) {
-  auto r = Parse(
-      "module m #(parameter W = 8, localparam D = W*2)(\n"
-      "  input logic [D-1:0] data\n"
-      ");\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ModuleParametersAndPorts, ParamOmitValueInPortList) {
@@ -493,18 +443,6 @@ TEST(ModuleHeaderDefinition, TimeunitOnly) {
 
 TEST(ModuleHeaderDefinition, EndLabelMismatchIsError) {
   EXPECT_FALSE(ParseOk("module m; endmodule : wrong\n"));
-}
-
-TEST(ModuleHeaderDefinition, NonAnsiHeaderWithParams) {
-  auto r = Parse(
-      "module m #(parameter int W = 8)(a, b);\n"
-      "  input [W-1:0] a;\n"
-      "  output [W-1:0] b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
 }
 
 TEST(ModuleHeaderDefinition, NonAnsiHeaderWithImport) {

@@ -4,6 +4,8 @@
 #include <string_view>
 #include <unordered_map>
 
+#include "elaborator/const_eval.h"
+
 namespace delta {
 
 // Forward declarations
@@ -23,6 +25,10 @@ uint32_t EvalStructMemberWidth(const StructMember& m);
 
 /// Overload that resolves kNamed types via the typedef map.
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs);
+
+/// Overload that also resolves parameter identifiers in dimension ranges.
+uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
+                        const ScopeMap& scope);
 
 /// Return true if the type kind uses 4-state values (0, 1, x, z).
 /// logic, reg, integer, time are 4-state.  bit, int, byte, etc. are 2-state.

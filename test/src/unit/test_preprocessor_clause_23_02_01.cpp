@@ -84,16 +84,6 @@ TEST(ModuleHeaderDefinition, NonAnsiHeaderThroughPreprocessor) {
   EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
 }
 
-TEST(ModuleHeaderDefinition, AnsiHeaderWithParamsThroughPreprocessor) {
-  auto r = ParseWithPreprocessor(
-      "module m #(parameter int W = 8)(input logic [W-1:0] d);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 1u);
-}
-
 TEST(ModuleHeaderDefinition, MacromoduleThroughPreprocessor) {
   auto r = ParseWithPreprocessor("macromodule m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

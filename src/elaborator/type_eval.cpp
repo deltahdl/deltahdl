@@ -71,6 +71,14 @@ static uint32_t EvalRangeWidth(const Expr* left_expr, const Expr* right_expr) {
   return static_cast<uint32_t>(std::abs(*left - *right) + 1);
 }
 
+static uint32_t EvalRangeWidth(const Expr* left_expr, const Expr* right_expr,
+                               const ScopeMap& scope) {
+  auto left = ConstEvalInt(left_expr, scope);
+  auto right = ConstEvalInt(right_expr, scope);
+  if (!left || !right) return 0;
+  return static_cast<uint32_t>(std::abs(*left - *right) + 1);
+}
+
 uint32_t EvalTypeWidth(const DataType& dtype) {
   // If explicit packed dimensions are present, compute from range.
   if (dtype.packed_dim_left && dtype.packed_dim_right) {
@@ -169,6 +177,21 @@ static const DataType* ResolveNamed(const DataType& dtype,
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
   return resolved ? EvalTypeWidth(*resolved, typedefs) : EvalTypeWidth(dtype);
+}
+
+uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
+                        const ScopeMap& scope) {
+  const auto* resolved = ResolveNamed(dtype, typedefs);
+  if (resolved) return EvalTypeWidth(*resolved, typedefs, scope);
+  if (dtype.packed_dim_left && dtype.packed_dim_right) {
+    uint32_t w =
+        EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right, scope);
+    for (const auto& [left, right] : dtype.extra_packed_dims) {
+      w *= EvalRangeWidth(left, right, scope);
+    }
+    if (w > 0) return w;
+  }
+  return EvalTypeWidth(dtype);
 }
 
 bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
