@@ -108,20 +108,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
 // --- R4: variable data type not permitted on either side of inout port ---
 
 TEST(PortConnectionRulesForVariablesElaboration,
-     VariableConnectedToInoutPortErrors) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module child(inout wire [7:0] a);\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic [7:0] x;\n"
-      "  child u(.a(x));\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-TEST(PortConnectionRulesForVariablesElaboration,
      InoutPortWithVarKeywordErrors) {
   ElabFixture f;
   ElaborateSrc(

@@ -83,6 +83,7 @@ class Elaborator {
 
   /// Create a pull0/pull1 constant expression for §22.9.
   Expr* MakePullExpr(NetType drive);
+  Expr* MakeHighZExpr();
 
   /// Bind instance ports to continuous assignments.
   void BindPorts(RtlirModuleInst& inst, const ModuleItem* item,

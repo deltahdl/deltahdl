@@ -607,6 +607,13 @@ Expr* Elaborator::MakePullExpr(NetType drive) {
   return expr;
 }
 
+Expr* Elaborator::MakeHighZExpr() {
+  auto* expr = arena_.Create<Expr>();
+  expr->kind = ExprKind::kUnbasedUnsizedLiteral;
+  expr->text = "'z";
+  return expr;
+}
+
 void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                            RtlirModule* parent_mod) {
   if (!inst.resolved) return;
@@ -814,6 +821,12 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       binding.connection = MakePullExpr(unit_->unconnected_drive);
     }
 
+    if (!binding.connection && binding.direction == Direction::kInput &&
+        it != child_ports.end() && !it->is_var &&
+        PortNetType(it->type_kind) != NetType::kNone) {
+      binding.connection = MakeHighZExpr();
+    }
+
     inst.port_bindings.push_back(binding);
   }
 
@@ -910,6 +923,9 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         binding.connection = port.default_value;
       } else if (has_pull && port.direction == Direction::kInput) {
         binding.connection = MakePullExpr(unit_->unconnected_drive);
+      } else if (port.direction == Direction::kInput && !port.is_var &&
+                 PortNetType(port.type_kind) != NetType::kNone) {
+        binding.connection = MakeHighZExpr();
       }
 
       if (binding.connection) {
@@ -942,6 +958,9 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         binding.connection = port.default_value;
       } else if (has_pull) {
         binding.connection = MakePullExpr(unit_->unconnected_drive);
+      } else if (!port.is_var &&
+                 PortNetType(port.type_kind) != NetType::kNone) {
+        binding.connection = MakeHighZExpr();
       }
 
       if (binding.connection) {
