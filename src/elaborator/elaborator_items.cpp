@@ -524,9 +524,18 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   non_ansi_partial_ports_.clear();
   ansi_port_names_.clear();
   clocking_signals_.clear();
+  interface_inst_types_.clear();
   task_names_.clear();
   sequence_names_.clear();
   func_decls_.clear();
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kModuleInst) {
+      auto* child = FindModule(item->inst_module);
+      if (child && child->decl_kind == ModuleDeclKind::kInterface) {
+        interface_inst_types_[item->inst_name] = item->inst_module;
+      }
+    }
+  }
   // §6.20: Parameter port list names are constants that never change.
   for (const auto& [pname, pval] : decl->params) {
     const_names_.insert(pname);
@@ -638,7 +647,7 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                   "signal '{}' to be declared in the instantiating scope",
                   port_name, conn_expr->text));
         }
-      } else {
+      } else if (!interface_inst_types_.count(conn_expr->text)) {
         MaybeCreateImplicitNet(conn_expr->text, item->loc, parent_mod);
       }
     }
@@ -704,7 +713,7 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
     }
 
     if (conn_expr && conn_expr->kind == ExprKind::kIdentifier &&
-        it != child_ports.end()) {
+        it != child_ports.end() && !it->is_interface_port) {
       DataTypeKind port_kind = NormalizeForCompatibility(it->type_kind);
       if (port_kind != DataTypeKind::kImplicit) {
         DataTypeKind sig_kind = DataTypeKind::kImplicit;
@@ -983,6 +992,68 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                   std::format("ref port '{}' of module '{}' cannot be "
                               "left unconnected",
                               port.name, inst.module_name));
+    }
+  }
+
+  for (const auto& port : child_ports) {
+    if (!port.is_interface_port) continue;
+
+    Expr* conn = nullptr;
+    for (const auto& binding : inst.port_bindings) {
+      if (binding.port_name == port.name) {
+        conn = binding.connection;
+        break;
+      }
+    }
+
+    if (!conn) {
+      diag_.Error(item->loc,
+                  std::format("interface port '{}' of module '{}' cannot be "
+                              "left unconnected",
+                              port.name, inst.module_name));
+      continue;
+    }
+
+    if (conn->kind != ExprKind::kIdentifier) {
+      diag_.Error(item->loc,
+                  std::format("interface port '{}' must be connected to an "
+                              "interface instance or interface port",
+                              port.name));
+      continue;
+    }
+
+    std::string_view conn_name = conn->text;
+    std::string_view conn_ifc_type;
+
+    auto iit = interface_inst_types_.find(conn_name);
+    if (iit != interface_inst_types_.end()) {
+      conn_ifc_type = iit->second;
+    } else {
+      bool is_ifc_port = false;
+      for (const auto& pp : parent_mod->ports) {
+        if (pp.name == conn_name && pp.is_interface_port) {
+          conn_ifc_type = pp.interface_type_name;
+          is_ifc_port = true;
+          break;
+        }
+      }
+      if (!is_ifc_port) {
+        diag_.Error(
+            item->loc,
+            std::format("interface port '{}' must be connected to an "
+                        "interface instance or interface port",
+                        port.name));
+        continue;
+      }
+    }
+
+    if (!port.interface_type_name.empty() && !conn_ifc_type.empty() &&
+        port.interface_type_name != conn_ifc_type) {
+      diag_.Error(
+          item->loc,
+          std::format("interface port '{}' requires interface type '{}' "
+                      "but is connected to instance of type '{}'",
+                      port.name, port.interface_type_name, conn_ifc_type));
     }
   }
 }

@@ -52,6 +52,8 @@ struct RtlirPort {
   uint32_t width = 1;
   bool is_signed = false;
   bool is_var = false;
+  bool is_interface_port = false;
+  std::string_view interface_type_name;
   Expr* default_value = nullptr;
   std::vector<ResolvedAttribute> attrs;
 };

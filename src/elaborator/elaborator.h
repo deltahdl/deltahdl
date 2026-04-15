@@ -481,6 +481,8 @@ class Elaborator {
 
   std::unordered_set<std::string_view> ansi_port_names_;
 
+  std::unordered_map<std::string_view, std::string_view> interface_inst_types_;
+
   // §14.3: Clocking block signal directions for clockvar access validation.
   struct ClockingSignalInfo {
     Direction direction;

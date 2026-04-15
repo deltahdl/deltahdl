@@ -408,6 +408,19 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     rp.is_signed = port.data_type.is_signed;
     rp.is_var = port_is_var;
     rp.default_value = port.default_value;
+
+    if (port.is_interface_port) {
+      rp.is_interface_port = true;
+    } else if (port.direction == Direction::kNone &&
+               port.data_type.kind == DataTypeKind::kNamed &&
+               !port.data_type.type_name.empty()) {
+      auto* ifc_decl = FindModule(port.data_type.type_name);
+      if (ifc_decl && ifc_decl->decl_kind == ModuleDeclKind::kInterface) {
+        rp.is_interface_port = true;
+        rp.interface_type_name = port.data_type.type_name;
+      }
+    }
+
     mod->ports.push_back(rp);
   }
 }
