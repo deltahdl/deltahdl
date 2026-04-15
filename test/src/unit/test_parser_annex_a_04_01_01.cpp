@@ -97,7 +97,7 @@ ModuleItem* FindModuleInst(const std::vector<ModuleItem*>& items) {
   return nullptr;
 }
 
-TEST(ModuleInstantiationGrammar, ElaborationInstanceArray) {
+TEST(ModuleInstantiationGrammar, InstanceArrayWithRangeAndPorts) {
   auto r = Parse(
       "module sub(input a, output b);\n"
       "  assign b = a;\n"
@@ -166,7 +166,7 @@ TEST(ModuleInstantiationGrammar, EmptyParameterValueAssignment) {
   EXPECT_EQ(item->inst_params.size(), 0u);
 }
 
-TEST(ModuleInstantiationGrammar, FullCombination) {
+TEST(ModuleInstantiationGrammar, ParametersArrayAndWildcardCombined) {
   auto r = Parse(
       "module m;\n"
       "  sub #(.W(8)) u0[3:0](.clk(clk), .*);\n"
@@ -204,32 +204,6 @@ TEST(ModuleInstantiationGrammar, MultipleInstancesSharedParams) {
   EXPECT_EQ(i1->inst_params[0].first, "W");
 }
 
-TEST(ModuleInstantiationGrammar, InstanceArraySingle) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub inst[8] (.a(a));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_name, "inst");
-  EXPECT_NE(item->inst_range_left, nullptr);
-
-  EXPECT_EQ(item->inst_range_right, nullptr);
-}
-
-TEST(ModuleInstantiationGrammar, ModuleInstanceEmptyPorts) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub u1 ();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_name, "u1");
-  EXPECT_TRUE(item->inst_ports.empty());
-}
-
 TEST(ModuleInstantiationGrammar, SimpleInstanceNoConnections) {
   auto r = Parse(
       "module sub; endmodule\n"
@@ -239,18 +213,6 @@ TEST(ModuleInstantiationGrammar, SimpleInstanceNoConnections) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[1]->items[0]->kind, ModuleItemKind::kModuleInst);
-}
-
-TEST(ModuleInstantiationGrammar, ModuleInstantiatesModule) {
-  auto r = Parse(
-      "module sub; endmodule\n"
-      "module top;\n"
-      "  sub u0();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
 }
 
 TEST(ModuleInstantiationGrammar, MultipleLevelsOfHierarchy) {
@@ -713,7 +675,7 @@ TEST(ModuleInstantiationGrammar, OrderedParamsNamedPorts) {
   EXPECT_EQ(item->inst_ports.size(), 1u);
 }
 
-TEST(ModuleInstantiationGrammar, ElaborationParamOverrideOrdered) {
+TEST(ModuleInstantiationGrammar, OrderedParameterOverrideMultiModule) {
   auto r = Parse(
       "module sub #(parameter W = 1)(input [W-1:0] d);\n"
       "endmodule\n"
@@ -729,18 +691,6 @@ TEST(ModuleInstantiationGrammar, ElaborationParamOverrideOrdered) {
   EXPECT_NE(inst->inst_params[0].second, nullptr);
 }
 
-TEST(ModuleInstantiationGrammar, ModuleInstWithParamOverride) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub #(8, 16) u1(.a(w1));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "sub");
-  ASSERT_EQ(item->inst_params.size(), 2u);
-}
-
 TEST(ModuleInstantiationGrammar, ModuleInstanceWithParameters) {
   auto r = Parse(
       "module top;\n"
@@ -754,7 +704,7 @@ TEST(ModuleInstantiationGrammar, ModuleInstanceWithParameters) {
   ASSERT_EQ(item->inst_params.size(), 2);
 }
 
-TEST(ModuleInstantiationGrammar, ElaborationParamOverrideNamed) {
+TEST(ModuleInstantiationGrammar, NamedParameterOverrideMultiModule) {
   auto r = Parse(
       "module sub #(parameter W = 1)(input [W-1:0] d);\n"
       "endmodule\n"
@@ -801,17 +751,6 @@ TEST(ModuleInstantiationGrammar, InstanceArrayKind) {
   EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
   EXPECT_EQ(item->inst_module, "sub");
   EXPECT_EQ(item->inst_name, "inst");
-}
-
-TEST(ModuleInstantiationGrammar, InstanceArrayRange) {
-  auto r = Parse(
-      "module top;\n"
-      "  sub inst[3:0] (.a(a), .b(b));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_NE(item->inst_range_left, nullptr);
-  EXPECT_NE(item->inst_range_right, nullptr);
 }
 
 TEST(ModuleInstantiationGrammar, AttributeOnOrderedPort) {
@@ -891,12 +830,12 @@ TEST(ModuleInstantiationGrammar, InstanceArrayMultipleDimensions) {
   EXPECT_EQ(item->inst_range_right, item->inst_dims[0].second);
 }
 
-TEST(ModuleInstantiationGrammar, Error_MissingInstanceName) {
+TEST(ModuleInstantiationGrammar, ErrorMissingInstanceName) {
   auto r = Parse("module m; sub(a, b); endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ModuleInstantiationGrammar, Error_MissingPortParentheses) {
+TEST(ModuleInstantiationGrammar, ErrorMissingPortParentheses) {
   auto r = Parse("module m; sub u0; endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }

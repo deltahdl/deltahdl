@@ -226,7 +226,7 @@ class Parser {
       std::vector<std::pair<std::string_view, Expr*>>& out);
   void ParseOrderedParamValues(
       std::vector<std::pair<std::string_view, Expr*>>& out);
-  void ParsePortConnection(ModuleItem* item);
+  bool ParsePortConnection(ModuleItem* item);
   void ParseUnpackedDims(std::vector<Expr*>& dims);
   void ParseParenList(std::vector<Expr*>& out);
   std::vector<DataType> ParseTypeParamList();

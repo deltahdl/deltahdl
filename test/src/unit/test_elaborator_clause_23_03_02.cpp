@@ -8,7 +8,7 @@ using namespace delta;
 
 namespace {
 
-TEST(Elaboration, PortBinding_UnknownModule) {
+TEST(ModuleInstantiationElaboration, UnknownModuleNotResolved) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -22,7 +22,7 @@ TEST(Elaboration, PortBinding_UnknownModule) {
   EXPECT_EQ(mod->children[0].resolved, nullptr);
 }
 
-TEST(BuildingBlockElaboration, ModuleWithChildInstanceElaborates) {
+TEST(ModuleInstantiationElaboration, ModuleWithChildInstanceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child; endmodule\n"
@@ -37,7 +37,7 @@ TEST(BuildingBlockElaboration, ModuleWithChildInstanceElaborates) {
   EXPECT_FALSE(design->top_modules[0]->children.empty());
 }
 
-TEST(BuildingBlockElaboration, NestedHierarchyTwoLevelsDeep) {
+TEST(ModuleInstantiationElaboration, NestedHierarchyTwoLevelsDeep) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module leaf; endmodule\n"
@@ -53,7 +53,7 @@ TEST(BuildingBlockElaboration, NestedHierarchyTwoLevelsDeep) {
   EXPECT_EQ(design->top_modules[0]->name, "top");
 }
 
-TEST(BuildingBlockElaboration, MultipleSameChildInstancesElaborate) {
+TEST(ModuleInstantiationElaboration, MultipleSameChildInstancesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child; endmodule\n"
@@ -68,7 +68,7 @@ TEST(BuildingBlockElaboration, MultipleSameChildInstancesElaborate) {
   EXPECT_GE(design->top_modules[0]->children.size(), 2u);
 }
 
-TEST(BuildingBlockElaboration, DiamondInstantiationElaborates) {
+TEST(ModuleInstantiationElaboration, DiamondInstantiationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module leaf; endmodule\n"
@@ -106,15 +106,48 @@ TEST(ModuleInstantiation, TwoLevelHierarchyElaborates) {
   EXPECT_FALSE(design->top_modules[0]->children.empty());
 }
 
-TEST(ModuleInstantiation, ThreeLevelHierarchyElaborates) {
+TEST(ModuleInstantiationElaboration, ForwardDeclaredModuleResolves) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module leaf; endmodule\n"
-      "module mid; leaf u0(); endmodule\n"
-      "module top; mid u0(); endmodule\n",
-      f);
+      "module top;\n"
+      "  child c0();\n"
+      "endmodule\n"
+      "module child; endmodule\n",
+      f, "top");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
+  EXPECT_NE(design->top_modules[0]->children[0].resolved, nullptr);
+  EXPECT_EQ(design->top_modules[0]->children[0].resolved->name, "child");
+}
+
+TEST(ModuleInstantiationElaboration, InstanceArrayElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child; endmodule\n"
+      "module top;\n"
+      "  child c0 [3:0] ();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  EXPECT_FALSE(design->top_modules[0]->children.empty());
+}
+
+TEST(ModuleInstantiationElaboration, PortConnectionsToPortlessModuleWarns) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child; endmodule\n"
+      "module top;\n"
+      "  logic x;\n"
+      "  child u0(.a(x));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
+  EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
 }  // namespace

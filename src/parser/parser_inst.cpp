@@ -38,9 +38,16 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
     }
     Expect(TokenKind::kLParen);
     if (!Check(TokenKind::kRParen)) {
-      ParsePortConnection(item);
+      bool named = ParsePortConnection(item);
+      bool mixed = false;
       while (Match(TokenKind::kComma)) {
-        ParsePortConnection(item);
+        auto conn_loc = CurrentLoc();
+        bool next_named = ParsePortConnection(item);
+        if (!mixed && next_named != named) {
+          diag_.Error(conn_loc,
+                      "ordered and named port connections cannot be mixed");
+          mixed = true;
+        }
       }
     }
     Expect(TokenKind::kRParen);
@@ -105,13 +112,18 @@ void Parser::ParseParamValueAssignment(
   Expect(TokenKind::kRParen);
 }
 
-void Parser::ParsePortConnection(ModuleItem* item) {
+bool Parser::ParsePortConnection(ModuleItem* item) {
   ParseAttributes();  // §5.12: attribute on port connection
   if (Check(TokenKind::kDotStar)) {
-    // .* wildcard port connection (§23.3.2.4)
+    auto loc = CurrentLoc();
     Consume();
+    if (item->inst_wildcard) {
+      diag_.Error(loc,
+                  ".* port connection shall appear at most once in a "
+                  "port connection list");
+    }
     item->inst_wildcard = true;
-    return;
+    return true;
   }
   if (Match(TokenKind::kDot)) {
     auto name = Expect(TokenKind::kIdentifier);
@@ -127,14 +139,15 @@ void Parser::ParsePortConnection(ModuleItem* item) {
       // .name shorthand — implicit connection (§23.3.2.3)
       item->inst_ports.push_back({name.text, nullptr});
     }
-  } else {
-    // Ordered port: blank position (empty expression) or expression
-    if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
-      item->inst_ports.push_back({{}, nullptr});
-    } else {
-      item->inst_ports.push_back({{}, ParseExpr()});
-    }
+    return true;
   }
+  // Ordered port: blank position (empty expression) or expression
+  if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
+    item->inst_ports.push_back({{}, nullptr});
+  } else {
+    item->inst_ports.push_back({{}, ParseExpr()});
+  }
+  return false;
 }
 
 // §10.3.4: Check if a token is a strength-0 keyword.
