@@ -31,3 +31,61 @@ def test_lrm_read_includes_subclause() -> None:
     """Instruction includes the subclause number."""
     result = build_lrm_read_instruction("9.2.1", "/lrm.pdf")
     assert "§9.2.1" in result
+
+
+def test_lrm_read_includes_target_page_range(make_pdf, nested_outline) -> None:
+    """Target subclause page range appears when outline is available."""
+    path = make_pdf("a.pdf", 200, nested_outline)
+    result = build_lrm_read_instruction("23.2.2", path)
+    assert "pages 112-129" in result
+
+
+def test_lrm_read_includes_ancestor_page_range(
+    make_pdf, nested_outline,
+) -> None:
+    """Ancestor page range appears, de-overlapped against the target."""
+    path = make_pdf("a.pdf", 200, nested_outline)
+    result = build_lrm_read_instruction("23.2.2", path)
+    assert "pages 110-111" in result
+
+
+def test_lrm_read_omits_missing_clause_pages(make_pdf) -> None:
+    """A clause missing from the outline gets no page range."""
+    outline = [
+        (1, "23 Tasks and functions", 100),
+        (1, "24 Classes", 130),
+    ]
+    path = make_pdf("a.pdf", 200, outline)
+    result = build_lrm_read_instruction("23.2.2", path)
+    assert "(pages" not in result
+
+
+def test_lrm_read_omits_ancestor_pages_when_overlap_total(make_pdf) -> None:
+    """Ancestor that shares its start page with the target gets no range."""
+    outline = [
+        (1, "23 Tasks", 100),
+        (2, "23.2 Tasks", 110),
+        (3, "23.2.1 Decl", 110),
+        (1, "24 Classes", 130),
+    ]
+    path = make_pdf("a.pdf", 200, outline)
+    result = build_lrm_read_instruction("23.2.1", path)
+    assert "§23.2)" in result
+
+
+def test_lrm_read_formats_single_page_clause(make_pdf) -> None:
+    """A clause spanning exactly one page renders as 'page N' (singular)."""
+    outline = [
+        (1, "1 Overview", 5),
+        (1, "2 Body", 6),
+    ]
+    path = make_pdf("a.pdf", 10, outline)
+    result = build_lrm_read_instruction("1", path)
+    assert "page 5)" in result
+
+
+def test_lrm_read_falls_back_when_outline_empty(blank_pdf) -> None:
+    """Empty outline → instruction matches the no-PDF fallback."""
+    fallback = build_lrm_read_instruction("9.2.1", "/nope.pdf")
+    real = build_lrm_read_instruction("9.2.1", blank_pdf)
+    assert real.replace(blank_pdf, "/nope.pdf") == fallback
