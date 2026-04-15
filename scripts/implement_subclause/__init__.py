@@ -9,9 +9,8 @@ import re
 import subprocess
 import sys
 
-from lib.python.classify import (
-    STAGE_TO_PREFIX, build_lrm_read_instruction, clause_to_filename,
-)
+from lib.python.clause import STAGE_TO_PREFIX, clause_to_filename
+from lib.python.lrm import build_lrm_read_instruction
 from lib.python.cli import (
     add_continue_arg,
     add_lrm_arg,

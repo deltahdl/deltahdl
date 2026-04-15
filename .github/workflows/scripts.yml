@@ -147,7 +147,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/classify_files/e2e/ -v
   test-classify-test:
-    needs: [test-lib-classify, test-lib-git, test-lib-github]
+    needs: [test-lib-classify, test-lib-clause, test-lib-git, test-lib-github]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -275,7 +275,7 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/implement_clauses/e2e/ -v
   test-implement-subclause:
-    needs: [test-lib-classify, test-lib-cli, test-lib-git]
+    needs: [test-lib-clause, test-lib-cli, test-lib-git, test-lib-lrm]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -361,6 +361,29 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+  test-lib-clause:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-lib-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/python/clause/unit/ -v
+          --cov=lib.python.clause
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   test-lib-cli:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -427,6 +450,29 @@ jobs:
         run: >-
           python3 -m pytest test/lib/python/github/unit/ -v
           --cov=lib.python.github
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  test-lib-lrm:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-lib-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/python/lrm/unit/ -v
+          --cov=lib.python.lrm
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100

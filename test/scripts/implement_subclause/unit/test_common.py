@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from implement_subclause.streaming import ContentFilterError
-from lib.python.classify import build_hierarchy
+from lib.python.clause import build_hierarchy
 
 
 # ---- build_hierarchy --------------------------------------------------------

@@ -1,36 +1,6 @@
 """Shared argparse and command-building helpers for classify scripts."""
 
 import argparse
-import re
-
-
-STAGE_TO_PREFIX: dict[str, str] = {
-    "preprocessor": "test_preprocessor_",
-    "lexer": "test_lexer_",
-    "parser": "test_parser_",
-    "elaborator": "test_elaborator_",
-    "simulator": "test_simulator_",
-    "synthesizer": "test_synthesizer_",
-}
-
-
-def clause_to_filename(prefix: str, clause: str) -> str:
-    """Convert prefix + clause to a target filename (without .cpp)."""
-    if clause.startswith("non-lrm"):
-        topic = clause.split(":", 1)[1] if ":" in clause else "misc"
-        return f"test_non_lrm_{topic}"
-    prefix = prefix.rstrip("_")
-    if re.match(r"^[A-Z]$", clause):
-        return f"{prefix}_annex_{clause.lower()}"
-    annex_match = re.match(r"^([A-Z])\.(.+)$", clause)
-    if annex_match:
-        letter = annex_match.group(1).lower()
-        parts = annex_match.group(2).split(".")
-        padded = "_".join(p.zfill(2) for p in parts)
-        return f"{prefix}_annex_{letter}_{padded}"
-    parts = clause.split(".")
-    padded = "_".join(p.zfill(2) for p in parts)
-    return f"{prefix}_clause_{padded}"
 
 
 def add_output_args(parser: argparse.ArgumentParser) -> None:
@@ -88,63 +58,3 @@ def append_classify_cmd_flags(
         cmd.append("--dry-run")
     if args.no_commit:
         cmd.append("--no-commit")
-
-
-def build_hierarchy(clause: str) -> dict:
-    """Derive template variables from a clause string.
-
-    Returns a dict with keys:
-    - is_annex, subclause (always present)
-    - Numeric: clause_number, ancestors
-    - Annex: collection, letter, ancestors
-    """
-    parts = clause.split(".")
-    is_annex = parts[0][0].isalpha() and parts[0][0].isupper()
-    depth = len(parts)
-
-    result: dict = {"is_annex": is_annex, "subclause": clause}
-
-    if is_annex:
-        letter = parts[0]
-        result["collection"] = f"Annex {letter}"
-        result["letter"] = letter
-        ancestors = []
-        for k in range(2, depth):
-            ancestors.append(".".join(parts[:k]))
-        result["ancestors"] = ancestors
-    else:
-        result["clause_number"] = parts[0]
-        ancestors = []
-        for k in range(2, depth):
-            ancestors.append(".".join(parts[:k]))
-        result["ancestors"] = ancestors
-
-    return result
-
-
-def build_lrm_read_instruction(subclause: str, lrm: str) -> str:
-    """Build an instruction to read the relevant LRM sections."""
-    h = build_hierarchy(subclause)
-    page_hint = (
-        " When reading the PDF, read one page at a time"
-        " (never request more than 2 pages per Read call)"
-        " to avoid content filtering errors."
-    )
-    if h["ancestors"]:
-        ancestors_str = ", ".join(f"§{a}" for a in h["ancestors"])
-        return (
-            f"Read §{subclause} and its ancestor subclauses"
-            f" ({ancestors_str}) in the LRM at {lrm}."
-            " Also read any General or Overview subclauses"
-            " at each level."
-            + page_hint
-        )
-    parts = subclause.split(".")
-    is_general = len(parts) == 2 and parts[1] == "1"
-    instruction = f"Read §{subclause} in the LRM at {lrm}."
-    if not is_general:
-        instruction += (
-            " Also read any General or Overview subclauses"
-            " for context."
-        )
-    return instruction + page_hint

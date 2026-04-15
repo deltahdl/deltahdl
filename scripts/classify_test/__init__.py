@@ -20,12 +20,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from lib.python.classify import (
-    STAGE_TO_PREFIX,
     add_github_args,
     add_output_args,
     add_run_mode_args,
-    clause_to_filename,
 )
+from lib.python.clause import STAGE_TO_PREFIX, clause_to_filename
 from lib.python.cli import add_continue_arg, run_claude_cli, run_with_dots
 from ._github import (
     _validate_issue_args,
