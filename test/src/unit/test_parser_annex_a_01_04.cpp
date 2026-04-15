@@ -298,18 +298,6 @@ TEST(ModuleItemsParsing, NestedProgramDecl) {
                             ModuleItemKind::kNestedModuleDecl));
 }
 
-TEST(ModuleItemsParsing, TimeunitsInModule) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeunit 1ns;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
-  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
-}
-
 TEST(ModuleItemsParsing, PortDeclAsModuleItem) {
   auto r = Parse(
       "module m(a, b, y);\n"

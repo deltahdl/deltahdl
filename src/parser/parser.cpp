@@ -490,6 +490,8 @@ ModuleDecl* Parser::ParseExternModuleDecl() {
   if (!Match(TokenKind::kKwMacromodule)) {
     Expect(TokenKind::kKwModule);
   }
+  mod->is_automatic = Match(TokenKind::kKwAutomatic);
+  if (!mod->is_automatic) Match(TokenKind::kKwStatic);
   mod->name = Expect(TokenKind::kIdentifier).text;
   ParseParamsPortsAndSemicolon(*mod);
   mod->range.end = CurrentLoc();

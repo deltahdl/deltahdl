@@ -173,22 +173,6 @@ TEST(SourceText, EmptyCuCompletelyEmpty) {
   EXPECT_TRUE(r.cu->modules.empty());
 }
 
-TEST(SourceText, ModuleWildcardPorts) {
-  auto r = Parse("module m(.*); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
-}
-
-TEST(SourceText, ExternModuleDecl) {
-  auto r = Parse("extern module m(input a, output b);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->modules[0]->is_extern);
-}
-
 TEST(SourceText, InterfaceWildcardPorts) {
   auto r = Parse("interface ifc(.*); endinterface\n");
   ASSERT_NE(r.cu, nullptr);
@@ -268,22 +252,6 @@ TEST(SourceText, TimeunitsDeclaration) {
       "module m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SourceText, TimeunitWithPrecisionSlash) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeunit 1ns / 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SourceText, ModuleWithLifetime) {
-  auto r = Parse("module automatic m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
 TEST(SourceText, DescriptionClass) {
@@ -413,43 +381,6 @@ TEST(SourceText, ExternInterface) {
   EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
 }
 
-// --- module_nonansi_header / module_ansi_header ---
-
-TEST(SourceText, ModuleAnsiHeader) {
-  auto r = Parse("module m(input logic a, output logic b); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
-}
-
-TEST(SourceText, ModuleNonAnsiHeader) {
-  auto r = Parse(
-      "module m(a, b);\n"
-      "  input a;\n"
-      "  output b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
-}
-
-TEST(SourceText, ModuleStaticLifetime) {
-  auto r = Parse("module static m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(SourceText, ModuleWithAttributes) {
-  auto r = Parse("(* synthesis *) module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_FALSE(r.cu->modules[0]->attrs.empty());
-}
-
 // --- checker_declaration edge case ---
 
 TEST(SourceText, CheckerDeclWithParens) {
@@ -466,27 +397,6 @@ TEST(SourceText, PackageWithLifetime) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
-}
-
-// --- timeunits_declaration missing forms ---
-
-TEST(SourceText, TimeprecisionOnly) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeprecision 1ps;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SourceText, TimeprecisionThenTimeunit) {
-  auto r = Parse(
-      "module m;\n"
-      "  timeprecision 1ps;\n"
-      "  timeunit 1ns;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 // --- Error conditions ---

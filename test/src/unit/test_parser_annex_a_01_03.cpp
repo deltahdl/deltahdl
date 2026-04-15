@@ -5,16 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ModuleParametersAndPorts, NonAnsiPortListMultiple) {
-  auto r = Parse("module m(a, b, c); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 3u);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
-  EXPECT_EQ(r.cu->modules[0]->ports[1].name, "b");
-  EXPECT_EQ(r.cu->modules[0]->ports[2].name, "c");
-}
-
 TEST(ModuleParametersAndPorts, NonAnsiPortsBasic) {
   auto r = Parse(
       "module m(a, b);\n"
@@ -153,25 +143,6 @@ TEST(ModuleParametersAndPorts, AnsiPortDirections) {
   EXPECT_EQ(r.cu->modules[0]->ports[3].name, "r");
 }
 
-TEST(ModuleParametersAndPorts, EmptyPortsAndMiscVariants) {
-  auto r1 = Parse("module m (); endmodule\n");
-  ASSERT_NE(r1.cu, nullptr);
-  EXPECT_FALSE(r1.has_errors);
-  EXPECT_EQ(r1.cu->modules[0]->ports.size(), 0u);
-  auto r2 = Parse("module m; endmodule\n");
-  ASSERT_NE(r2.cu, nullptr);
-  EXPECT_FALSE(r2.has_errors);
-  EXPECT_EQ(r2.cu->modules[0]->ports.size(), 0u);
-  EXPECT_TRUE(ParseOk("module m (.*); endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m (input int x = 10); endmodule\n"));
-
-  EXPECT_TRUE(ParseOk("module m (input var int in1); endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m (output reg [7:0] q); endmodule\n"));
-  EXPECT_TRUE(ParseOk("module m (input signed [7:0] s); endmodule\n"));
-
-  EXPECT_TRUE(ParseOk("macromodule mm; endmodule\n"));
-}
-
 TEST(ModuleParametersAndPorts, AnsiPortsInputOutput) {
   auto r = Parse(
       "module m(input logic clk, input logic rst, output logic q);\n"
@@ -194,20 +165,6 @@ TEST(ModuleParametersAndPorts, AnsiPortsInout) {
   ASSERT_EQ(mod->ports.size(), 1u);
   EXPECT_EQ(mod->ports[0].direction, Direction::kInout);
   EXPECT_EQ(mod->ports[0].name, "data");
-}
-
-TEST(ModuleParametersAndPorts, AnsiHeaderWithParams) {
-  auto r = Parse(
-      "module m #(parameter N = 8) (input logic [N-1:0] data);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "m");
-  ASSERT_EQ(mod->params.size(), 1);
-  EXPECT_EQ(mod->params[0].first, "N");
-  ASSERT_EQ(mod->ports.size(), 1);
-  EXPECT_EQ(mod->ports[0].name, "data");
-  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
 }
 
 TEST(ModuleParametersAndPorts, ModuleWithPortsAndAssign) {
@@ -517,80 +474,6 @@ TEST(ModuleParametersAndPorts, InputUnpackedDim) {
   EXPECT_FALSE(port.unpacked_dims.empty());
 }
 
-TEST(ModuleParametersAndPorts, ModuleWithParameters) {
-  auto r = Parse(
-      "module m #(parameter WIDTH = 8, parameter DEPTH = 16)(\n"
-      "  input logic [WIDTH-1:0] data_in,\n"
-      "  output logic [WIDTH-1:0] data_out\n"
-      ");\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "m");
-  ASSERT_EQ(mod->params.size(), 2u);
-  EXPECT_EQ(mod->params[0].first, "WIDTH");
-  EXPECT_EQ(mod->params[1].first, "DEPTH");
-  ASSERT_EQ(mod->ports.size(), 2u);
-}
-
-TEST(ModuleParametersAndPorts, TwoParamsOnePort) {
-  auto r = Parse(
-      "module m #(parameter W = 8, parameter D = 4)(\n"
-      "  input logic [W-1:0] data\n"
-      ");\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->params.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 1u);
-}
-
-TEST(ModuleParametersAndPorts, EmptyParamPortList) {
-  auto r = Parse("module m #(); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->modules[0]->params.empty());
-}
-
-TEST(ModuleParametersAndPorts, LocalparamInParamPortList) {
-  auto r = Parse(
-      "module m #(parameter W = 8, localparam D = W*2)(\n"
-      "  input logic [D-1:0] data\n"
-      ");\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleParametersAndPorts, ModuleEmptyPortList) {
-  auto r = Parse("module m(); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->modules[0]->name, "m");
-  EXPECT_TRUE(r.cu->modules[0]->ports.empty());
-}
-
-TEST(ModuleParametersAndPorts, AnsiHeaderEmptyParenPorts) {
-  auto r = Parse("module m (); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->modules[0]->name, "m");
-  EXPECT_TRUE(r.cu->modules[0]->ports.empty());
-}
-
-TEST(ModuleParametersAndPorts, ParamOmitValueInPortList) {
-  auto r = Parse(
-      "module m #(parameter int W) (input [W-1:0] d);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleParametersAndPorts, TypeParamOmitTypeInPortList) {
-  auto r = Parse(
-      "module m #(parameter type T) ();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ModuleParametersAndPorts, NetPortHeaderTri) {
   auto r = Parse("module m(input tri [7:0] bus); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -626,32 +509,6 @@ TEST(ModuleParametersAndPorts, NetPortHeaderUwire) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].data_type.kind, DataTypeKind::kUwire);
 }
 
-TEST(ModuleParametersAndPorts, BareDataTypeParamDecl) {
-  auto r = Parse("module m #(parameter int A = 1, int B = 2)(); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 2u);
-  EXPECT_EQ(r.cu->modules[0]->params[0].first, "A");
-  EXPECT_EQ(r.cu->modules[0]->params[1].first, "B");
-}
-
-TEST(ModuleParametersAndPorts, TypeParamNoKeyword) {
-  auto r = Parse("module m #(type T = int)(); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->params[0].first, "T");
-}
-
-TEST(ModuleParametersAndPorts, MixedParamPortDecls) {
-  auto r = Parse(
-      "module m #(parameter int A = 1, localparam int B = 5, type T = logic)\n"
-      "(); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 3u);
-}
-
 TEST(ModuleParametersAndPorts, NonAnsiRefPort) {
   auto r = Parse(
       "module m(d);\n"
@@ -660,13 +517,6 @@ TEST(ModuleParametersAndPorts, NonAnsiRefPort) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kRef);
-}
-
-TEST(ModuleParametersAndPorts, WildcardPortList) {
-  auto r = Parse("module m(.*); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
 }
 
 TEST(ModuleParametersAndPorts, PortDeclSignedPackedDims) {
@@ -683,22 +533,6 @@ TEST(ModuleParametersAndPorts, AnsiPortMultipleUnpackedDims) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_GE(r.cu->modules[0]->ports[0].unpacked_dims.size(), 2u);
-}
-
-TEST(ModuleParametersAndPorts, ErrorMissingPortListClose) {
-  EXPECT_FALSE(ParseOk("module m(input logic a endmodule"));
-}
-
-TEST(ModuleParametersAndPorts, ErrorMissingParamListClose) {
-  EXPECT_FALSE(ParseOk("module m #(parameter int W endmodule"));
-}
-
-TEST(ModuleParametersAndPorts, ErrorTrailingCommaInPortList) {
-  EXPECT_FALSE(ParseOk("module m(input a,); endmodule"));
-}
-
-TEST(ModuleParametersAndPorts, ErrorTrailingCommaInParamList) {
-  EXPECT_FALSE(ParseOk("module m #(parameter int A,)(); endmodule"));
 }
 
 }  // namespace

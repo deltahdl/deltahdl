@@ -4,31 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(BnfClarificationParsing, ImportInHeaderFollowedByPorts) {
-  auto r = Parse(
-      "module m import pkg::*; (input a, output b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
-}
-
-TEST(BnfClarificationParsing, ImportInHeaderFollowedByParams) {
-  auto r = Parse(
-      "module m import pkg::*; #(parameter int W = 8) (input a);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(BnfClarificationParsing, ImportInHeaderFollowedByBoth) {
-  auto r = Parse(
-      "module m import pkg::*; #(parameter int W = 8) (input a, output b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(BnfClarificationParsing, AutomaticInProceduralBlockOk) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

@@ -66,4 +66,45 @@ TEST(ModuleParametersAndPorts, EmptyPortListElaborates) {
   EXPECT_TRUE(design->top_modules[0]->ports.empty());
 }
 
+TEST(ModuleHeaderDefinition, AutomaticLifetimeElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module automatic m(input logic a, output logic y);\n"
+      "  assign y = a;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ModuleHeaderDefinition, ModuleWithTimeunitsElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ModuleHeaderDefinition, WildcardPortsElaborate) {
+  EXPECT_TRUE(ElabOk("module m(.*); endmodule\n"));
+}
+
+TEST(ModuleHeaderDefinition, ModuleEndLabelElaborates) {
+  EXPECT_TRUE(ElabOk("module m; endmodule : m\n"));
+}
+
+TEST(ModuleHeaderDefinition, ModuleWithAttributesElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "(* synthesis *) module m; endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_FALSE(design->top_modules[0]->attrs.empty());
+}
+
 }  // namespace

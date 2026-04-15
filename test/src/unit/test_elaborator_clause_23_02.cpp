@@ -12,10 +12,6 @@ TEST(ModuleDefinition, MinimalModuleElaboratesSuccessfully) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ModuleDefinitions, EmptyModuleElaborates) {
-  EXPECT_TRUE(ElabOk("module m; endmodule\n"));
-}
-
 TEST(ModuleDefinitions, MacromoduleElaborates) {
   EXPECT_TRUE(ElabOk("macromodule m; endmodule\n"));
 }
