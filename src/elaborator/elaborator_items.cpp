@@ -645,8 +645,9 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       }
     }
 
-    if (!binding.connection && binding.direction == Direction::kInput &&
-        it != child_ports.end() && it->default_value) {
+    if (is_ordered && !binding.connection &&
+        binding.direction == Direction::kInput && it != child_ports.end() &&
+        it->default_value) {
       binding.connection = it->default_value;
     }
 
