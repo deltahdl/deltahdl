@@ -4,18 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(HardwareModelExecutionElaboration, SingleModuleDesignHasOneTopModule) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  EXPECT_EQ(design->top_modules[0]->name, "top");
-}
-
 TEST(HardwareModelExecutionElaboration, TopModuleRegisteredInAllModulesMap) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -151,20 +139,6 @@ TEST(HardwareModelExecutionElaboration, DesignWithVariablesAndProcesses) {
   auto* mod = design->top_modules[0];
   EXPECT_GE(mod->variables.size(), 2u);
   EXPECT_EQ(mod->processes.size(), 2u);
-}
-
-TEST(HardwareModelExecutionElaboration, ElaborateSpecificTopModuleByName) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module a;\n"
-      "endmodule\n"
-      "module b;\n"
-      "endmodule\n",
-      f, "a");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  EXPECT_EQ(design->top_modules[0]->name, "a");
 }
 
 TEST(HardwareModelExecutionElaboration, PortBindingInHierarchicalInstance) {

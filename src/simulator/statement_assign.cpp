@@ -24,6 +24,10 @@ namespace delta {
 // Build a dotted name from a MemberAccess expression tree (e.g., "s.a.b").
 void BuildLhsName(const Expr* expr, std::string& out) {
   if (expr->kind == ExprKind::kIdentifier) {
+    if (!expr->scope_prefix.empty()) {
+      out += expr->scope_prefix;
+      out += ".";
+    }
     out += expr->text;
     return;
   }
@@ -32,6 +36,18 @@ void BuildLhsName(const Expr* expr, std::string& out) {
     out += ".";
     BuildLhsName(expr->rhs, out);
   }
+}
+
+static std::string StripRootPrefix(const std::string& name) {
+  constexpr std::string_view kPrefix = "$root.";
+  if (name.size() > kPrefix.size() &&
+      std::string_view(name).substr(0, kPrefix.size()) == kPrefix) {
+    auto rest = std::string_view(name).substr(kPrefix.size());
+    auto dot = rest.find('.');
+    if (dot != std::string_view::npos) return std::string(rest.substr(dot + 1));
+    return std::string(rest);
+  }
+  return name;
 }
 
 // §7.4: Try to resolve an array element variable (e.g. "A[0]").
@@ -81,7 +97,8 @@ Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
   if (lhs->kind == ExprKind::kMemberAccess) {
     std::string name;
     BuildLhsName(lhs, name);
-    return ctx.FindVariable(name);
+    auto resolved = StripRootPrefix(name);
+    return ctx.FindVariable(resolved);
   }
   if (lhs->kind == ExprKind::kSelect && lhs->base) {
     return ResolveLhsVariable(lhs->base, ctx);

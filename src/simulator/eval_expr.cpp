@@ -148,6 +148,10 @@ Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena) {
 
 static void BuildMemberName(const Expr* expr, std::string& out) {
   if (expr->kind == ExprKind::kIdentifier) {
+    if (!expr->scope_prefix.empty()) {
+      out += expr->scope_prefix;
+      out += ".";
+    }
     out += expr->text;
     return;
   }
@@ -156,6 +160,18 @@ static void BuildMemberName(const Expr* expr, std::string& out) {
     out += ".";
     BuildMemberName(expr->rhs, out);
   }
+}
+
+static std::string StripRootPrefix(const std::string& name) {
+  constexpr std::string_view kPrefix = "$root.";
+  if (name.size() > kPrefix.size() &&
+      std::string_view(name).substr(0, kPrefix.size()) == kPrefix) {
+    auto rest = std::string_view(name).substr(kPrefix.size());
+    auto dot = rest.find('.');
+    if (dot != std::string_view::npos) return std::string(rest.substr(dot + 1));
+    return std::string(rest);
+  }
+  return name;
 }
 
 // §7.2: Extract a packed struct/union field from the base variable.
@@ -341,13 +357,14 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string name;
   BuildMemberName(expr, name);
-  auto* var = ctx.FindVariable(name);
+  auto resolved = StripRootPrefix(name);
+  auto* var = ctx.FindVariable(resolved);
   if (var) return var->value;
 
-  auto dot = name.find('.');
+  auto dot = resolved.find('.');
   if (dot == std::string::npos) return MakeLogic4Vec(arena, 1);
-  auto base_name = std::string_view(name).substr(0, dot);
-  auto field_name = std::string_view(name).substr(dot + 1);
+  auto base_name = std::string_view(resolved).substr(0, dot);
+  auto field_name = std::string_view(resolved).substr(dot + 1);
   return ResolveMemberByType(base_name, field_name, ctx, arena);
 }
 

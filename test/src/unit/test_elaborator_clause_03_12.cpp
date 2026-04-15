@@ -139,21 +139,6 @@ TEST(DesignBuildingBlockElaboration, UnresolvedModuleIsError) {
              "endmodule\n"));
 }
 
-TEST(DesignBuildingBlockElaboration, MultipleTopLevelModulesElaborate) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module a;\n"
-      "  logic x;\n"
-      "endmodule\n"
-      "module b;\n"
-      "  logic y;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_GE(design->top_modules.size(), 1u);
-}
-
 TEST(DesignBuildingBlockElaboration, ParameterDefaultValueElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

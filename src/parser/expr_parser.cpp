@@ -781,6 +781,20 @@ Expr* Parser::ParseSystemCall() {
     expr->range.start = tok.loc;
     return expr;
   }
+  if (tok.text == "$root" && Check(TokenKind::kDot)) {
+    Consume();  // .
+    auto id = ExpectIdentifier();
+    auto* expr = arena_.Create<Expr>();
+    expr->kind = ExprKind::kIdentifier;
+    expr->text = id.text;
+    expr->scope_prefix = tok.text;
+    expr->range.start = tok.loc;
+    while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
+      expr = MakeMemberAccess(expr);
+    }
+    if (Check(TokenKind::kLBracket)) expr = ParseSelectExpr(expr);
+    return expr;
+  }
   auto* call = arena_.Create<Expr>();
   call->kind = ExprKind::kSystemCall;
   call->callee = tok.text;
