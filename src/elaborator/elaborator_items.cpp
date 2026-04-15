@@ -80,6 +80,24 @@ static NetType FindSignalNetType(std::string_view name,
   return NetType::kNone;
 }
 
+static DataTypeKind NormalizeForCompatibility(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kWire:
+    case DataTypeKind::kTri:
+    case DataTypeKind::kWand:
+    case DataTypeKind::kTriand:
+    case DataTypeKind::kWor:
+    case DataTypeKind::kTrior:
+    case DataTypeKind::kTri0:
+    case DataTypeKind::kTri1:
+    case DataTypeKind::kTrireg:
+    case DataTypeKind::kUwire:
+      return DataTypeKind::kLogic;
+    default:
+      return kind;
+  }
+}
+
 static NetType PortNetType(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kWire: return NetType::kWire;
@@ -677,6 +695,42 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       }
     }
 
+    if (conn_expr && conn_expr->kind == ExprKind::kIdentifier &&
+        it != child_ports.end()) {
+      DataTypeKind port_kind = NormalizeForCompatibility(it->type_kind);
+      if (port_kind != DataTypeKind::kImplicit) {
+        DataTypeKind sig_kind = DataTypeKind::kImplicit;
+        auto vt = var_types_.find(conn_expr->text);
+        if (vt != var_types_.end()) {
+          sig_kind = NormalizeForCompatibility(vt->second);
+        } else if (net_names_.count(conn_expr->text)) {
+          sig_kind = DataTypeKind::kLogic;
+        }
+        if (sig_kind != DataTypeKind::kImplicit) {
+          DataType port_dt{};
+          port_dt.kind = port_kind;
+          DataType sig_dt{};
+          sig_dt.kind = sig_kind;
+          if (!IsAssignmentCompatible(sig_dt, port_dt)) {
+            diag_.Error(
+                item->loc,
+                std::format("port connection type is not assignment "
+                            "compatible with port '{}'",
+                            binding.port_name));
+          }
+        }
+      }
+
+      if (it->direction == Direction::kInout &&
+          nettype_net_names_.count(conn_expr->text)) {
+        diag_.Error(
+            item->loc,
+            std::format("user-defined nettype signal '{}' cannot connect "
+                        "to inout port '{}'",
+                        conn_expr->text, binding.port_name));
+      }
+    }
+
     // §11.4.12.1: Replication shall not appear on output/inout port connections.
     if (conn_expr && binding.direction != Direction::kInput) {
       std::function<bool(const Expr*)> has_rep = [&](const Expr* e) -> bool {
@@ -772,6 +826,15 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                             "dissimilar net types",
                             port.name));
           }
+        }
+
+        if (port.direction == Direction::kInout &&
+            nettype_net_names_.count(port.name)) {
+          diag_.Error(
+              item->loc,
+              std::format("user-defined nettype signal '{}' cannot connect "
+                          "to inout port '{}'",
+                          port.name, port.name));
         }
 
         auto* expr = arena_.Create<Expr>();
