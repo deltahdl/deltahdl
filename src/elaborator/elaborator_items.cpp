@@ -594,6 +594,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   ParamList child_params;
   inst.resolved = ElaborateModule(child_decl, child_params);
   BindPorts(inst, item, mod);
+  CheckPortCoercion(inst, item->loc);
   // §5.12: Resolve attributes.
   inst.attrs = ResolveAttributes(item->attrs, diag_);
   mod->children.push_back(inst);
@@ -892,6 +893,36 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       if (binding.connection) {
         inst.port_bindings.push_back(binding);
       }
+    }
+  }
+}
+
+void Elaborator::CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc) {
+  if (!inst.resolved) return;
+
+  std::unordered_set<std::string_view> child_assign_targets;
+  for (const auto& ca : inst.resolved->assigns) {
+    if (ca.lhs && ca.lhs->kind == ExprKind::kIdentifier)
+      child_assign_targets.insert(ca.lhs->text);
+  }
+
+  for (const auto& binding : inst.port_bindings) {
+    if (binding.direction == Direction::kInput &&
+        child_assign_targets.count(binding.port_name)) {
+      diag_.Warning(
+          loc, std::format("port '{}' is declared as input but is driven "
+                           "inside module '{}'",
+                           binding.port_name, inst.module_name));
+    }
+
+    if (binding.direction == Direction::kOutput && binding.connection &&
+        binding.connection->kind == ExprKind::kIdentifier &&
+        cont_assign_targets_.count(binding.connection->text)) {
+      diag_.Warning(
+          loc,
+          std::format("port '{}' is declared as output but its connection "
+                      "'{}' is also driven externally",
+                      binding.port_name, binding.connection->text));
     }
   }
 }

@@ -88,6 +88,9 @@ class Elaborator {
   void BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                  RtlirModule* parent_mod);
 
+  /// §23.3.3.1: Warn when a port's declared direction does not match usage.
+  void CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc);
+
   /// Build a scope map from CU-scope and module parameters.
   ScopeMap BuildParamScope(const RtlirModule* mod) const;
 
