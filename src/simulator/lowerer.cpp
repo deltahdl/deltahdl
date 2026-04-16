@@ -797,7 +797,8 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (const auto& var : mod->variables) LowerVar(var);
   for (const auto& port : mod->ports) {
     if (!ctx_.FindVariable(port.name)) {
-      ctx_.CreateVariable(port.name, port.width);
+      auto* v = ctx_.CreateVariable(port.name, port.width);
+      if (port.is_signed) v->is_signed = true;
     }
   }
   for (auto* func : mod->function_decls) {
