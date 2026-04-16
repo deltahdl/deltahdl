@@ -48,6 +48,9 @@ class Elaborator {
   /// Find a module declaration by name in the compilation unit.
   ModuleDecl* FindModule(std::string_view name) const;
 
+  /// Find a module by name, checking nested module scope first.
+  ModuleDecl* FindModuleInScope(std::string_view name) const;
+
   /// Elaborate a single module declaration into an RtlirModule.
   RtlirModule* ElaborateModule(const ModuleDecl* decl, const ParamList& params);
 
@@ -502,6 +505,7 @@ class Elaborator {
   std::unordered_set<std::string_view> ansi_port_names_;
 
   std::unordered_map<std::string_view, std::string_view> interface_inst_types_;
+  std::unordered_map<std::string_view, ModuleDecl*> nested_module_decls_;
 
   // §14.3: Clocking block signal directions for clockvar access validation.
   struct ClockingSignalInfo {

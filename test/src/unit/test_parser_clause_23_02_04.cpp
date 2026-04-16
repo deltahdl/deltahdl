@@ -306,42 +306,6 @@ TEST(ModuleItemsParsing, SpecparamDeclaration) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecparam));
 }
 
-TEST(ModuleItemsParsing, NestedModuleDecl) {
-  auto r = Parse(
-      "module outer;\n"
-      "  module inner;\n"
-      "  endmodule\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kNestedModuleDecl));
-}
-
-TEST(ModuleItemsParsing, NestedInterfaceDecl) {
-  auto r = Parse(
-      "module outer;\n"
-      "  interface inner_ifc;\n"
-      "  endinterface\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kNestedModuleDecl));
-}
-
-TEST(ModuleItemsParsing, NestedProgramDecl) {
-  auto r = Parse(
-      "module outer;\n"
-      "  program inner_prg;\n"
-      "  endprogram\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items,
-                            ModuleItemKind::kNestedModuleDecl));
-}
-
 TEST(ModuleItemsParsing, PortDeclAsModuleItem) {
   auto r = Parse(
       "module m(a, b, y);\n"

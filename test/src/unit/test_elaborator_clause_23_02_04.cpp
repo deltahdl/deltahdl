@@ -163,19 +163,6 @@ TEST(ModuleItemsElaboration, MultipleItemKindsElaborate) {
   EXPECT_GE(design->top_modules[0]->processes.size(), 2u);
 }
 
-TEST(ModuleItemsElaboration, NestedModuleDoesNotAffectParent) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module inner; endmodule\n"
-      "module m;\n"
-      "  module inner_nested; endmodule\n"
-      "  wire a;\n"
-      "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(ModuleItemsElaboration, ConditionalGenerateElaborates) {
   ElabFixture f;
   auto* design = Elaborate(

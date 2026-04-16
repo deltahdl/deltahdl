@@ -424,6 +424,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kDefaultDisableIff:
     case ModuleItemKind::kNestedModuleDecl:
+      break;
     case ModuleItemKind::kClassDecl:
       if (item->class_decl) {
         class_names_.insert(item->class_decl->name);
@@ -569,12 +570,20 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ansi_port_names_.clear();
   clocking_signals_.clear();
   interface_inst_types_.clear();
+  nested_module_decls_.clear();
   task_names_.clear();
   sequence_names_.clear();
   func_decls_.clear();
   for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl) {
+      nested_module_decls_[item->nested_module_decl->name] =
+          item->nested_module_decl;
+    }
+  }
+  for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kModuleInst) {
-      auto* child = FindModule(item->inst_module);
+      auto* child = FindModuleInScope(item->inst_module);
       if (child && child->decl_kind == ModuleDeclKind::kInterface) {
         interface_inst_types_[item->inst_name] = item->inst_module;
       }
@@ -608,8 +617,31 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       }
     }
   }
+  // §23.4: Save nested module list before the main loop since recursive
+  // ElaborateModule calls during child instantiation clear per-module state.
+  std::vector<std::pair<std::string_view, ModuleDecl*>> local_nested_modules(
+      nested_module_decls_.begin(), nested_module_decls_.end());
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
+  }
+  // §23.4: Implicitly instantiate portless nested modules that were not
+  // explicitly instantiated.
+  for (const auto& [name, nested_decl] : local_nested_modules) {
+    if (!nested_decl->ports.empty()) continue;
+    bool explicitly_instantiated = false;
+    for (const auto& child : mod->children) {
+      if (child.module_name == name) {
+        explicitly_instantiated = true;
+        break;
+      }
+    }
+    if (explicitly_instantiated) continue;
+    RtlirModuleInst inst;
+    inst.module_name = name;
+    inst.inst_name = name;
+    ParamList empty_params;
+    inst.resolved = ElaborateModule(nested_decl, empty_params);
+    mod->children.push_back(inst);
   }
   // §9.2.2.2: Check for multi-driver violations on always_comb LHS variables.
   CheckAlwaysCombMultiDriver(decl, mod);
@@ -644,7 +676,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   inst.module_name = item->inst_module;
   inst.inst_name = item->inst_name;
 
-  auto* child_decl = FindModule(item->inst_module);
+  auto* child_decl = FindModuleInScope(item->inst_module);
   if (!child_decl) {
     if (item->inst_scope.empty())
       diag_.Error(item->loc,
@@ -657,8 +689,10 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
     return;
   }
 
+  auto saved_nested = nested_module_decls_;
   ParamList child_params;
   inst.resolved = ElaborateModule(child_decl, child_params);
+  nested_module_decls_ = std::move(saved_nested);
   BindPorts(inst, item, mod);
 
   std::vector<uint32_t> inst_dim_sizes;

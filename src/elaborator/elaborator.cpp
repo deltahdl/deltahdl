@@ -250,6 +250,12 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
   return nullptr;
 }
 
+ModuleDecl* Elaborator::FindModuleInScope(std::string_view name) const {
+  auto it = nested_module_decls_.find(name);
+  if (it != nested_module_decls_.end()) return it->second;
+  return FindModule(name);
+}
+
 static std::optional<int64_t> FindParamOverride(
     const Elaborator::ParamList& params, std::string_view name) {
   for (const auto& [oname, oval] : params) {
