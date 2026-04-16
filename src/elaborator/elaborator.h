@@ -99,6 +99,9 @@ class Elaborator {
                                   const ModuleItem* item,
                                   RtlirModule* parent_mod);
 
+  void ResolveInterconnectPrimitiveTerminals(
+      const std::vector<Expr*>& terminals, RtlirModule* mod);
+
   void ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
                                   const ModuleItem* item,
                                   RtlirModule* parent_mod);

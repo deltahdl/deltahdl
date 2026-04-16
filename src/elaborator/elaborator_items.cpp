@@ -373,8 +373,10 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kGateInst:
       ElaborateGateInst(item, mod, arena_);
+      ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       break;
     case ModuleItemKind::kUdpInst:
+      ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       break;
     case ModuleItemKind::kSpecparam:
       specparam_names_.insert(item->name);
@@ -1249,6 +1251,22 @@ void Elaborator::CheckInterconnectPortMerge(const RtlirModuleInst& inst,
                       "interconnect type at end of elaboration",
                       binding.port_name, inst.inst_name));
     }
+  }
+}
+
+void Elaborator::ResolveInterconnectPrimitiveTerminals(
+    const std::vector<Expr*>& terminals, RtlirModule* mod) {
+  for (const auto* term : terminals) {
+    if (!term || term->kind != ExprKind::kIdentifier) continue;
+    if (interconnect_names_.count(term->text) == 0) continue;
+    auto scoped = ScopedName(term->text);
+    for (auto& net : mod->nets) {
+      if (net.name == scoped && net.net_type == NetType::kInterconnect) {
+        net.net_type = NetType::kWire;
+        break;
+      }
+    }
+    interconnect_names_.erase(term->text);
   }
 }
 
