@@ -409,6 +409,24 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     rp.is_var = port_is_var;
     rp.default_value = port.default_value;
 
+    for (auto* dim : port.unpacked_dims) {
+      if (!dim) continue;
+      if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+        auto lv = ConstEvalInt(dim->lhs);
+        auto rv = ConstEvalInt(dim->rhs);
+        if (lv && rv) {
+          rp.unpacked_dim_sizes.push_back(
+              static_cast<uint32_t>(std::abs(*lv - *rv) + 1));
+        }
+      } else {
+        auto sv = ConstEvalInt(dim);
+        if (sv && *sv > 0)
+          rp.unpacked_dim_sizes.push_back(static_cast<uint32_t>(*sv));
+      }
+    }
+    rp.num_unpacked_dims =
+        static_cast<uint32_t>(rp.unpacked_dim_sizes.size());
+
     if (port.is_interface_port) {
       rp.is_interface_port = true;
     } else if (port.direction == Direction::kNone &&
@@ -1153,10 +1171,26 @@ void Elaborator::TrackVarArrayInfo(const ModuleItem* item,
                     var.width,
                     var.is_dynamic,
                     var.is_assoc,
+                    {},
                     {}};
   if (var.is_assoc && item->unpacked_dims[0] &&
       item->unpacked_dims[0]->kind == ExprKind::kIdentifier) {
     info.assoc_index_type = item->unpacked_dims[0]->text;
+  }
+  for (auto* dim : item->unpacked_dims) {
+    if (!dim) continue;
+    if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
+      auto lv = ConstEvalInt(dim->lhs);
+      auto rv = ConstEvalInt(dim->rhs);
+      if (lv && rv) {
+        info.dim_sizes.push_back(
+            static_cast<uint32_t>(std::abs(*lv - *rv) + 1));
+      }
+    } else {
+      auto sv = ConstEvalInt(dim);
+      if (sv && *sv > 0)
+        info.dim_sizes.push_back(static_cast<uint32_t>(*sv));
+    }
   }
   var_array_info_[item->name] = info;
 }

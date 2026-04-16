@@ -56,6 +56,8 @@ struct RtlirPort {
   std::string_view interface_type_name;
   Expr* default_value = nullptr;
   std::vector<ResolvedAttribute> attrs;
+  uint32_t num_unpacked_dims = 0;
+  std::vector<uint32_t> unpacked_dim_sizes;
 };
 
 // --- Net ---

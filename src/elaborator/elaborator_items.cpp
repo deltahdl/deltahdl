@@ -582,6 +582,19 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
 
 // --- Module instantiation ---
 
+static uint32_t EvalInstDimSize(const Expr* left, const Expr* right) {
+  if (left && right) {
+    auto lv = ConstEvalInt(left);
+    auto rv = ConstEvalInt(right);
+    if (lv && rv)
+      return static_cast<uint32_t>(std::abs(*lv - *rv) + 1);
+  } else if (left) {
+    auto v = ConstEvalInt(left);
+    if (v && *v > 0) return static_cast<uint32_t>(*v);
+  }
+  return 0;
+}
+
 void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;
@@ -603,6 +616,24 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   ParamList child_params;
   inst.resolved = ElaborateModule(child_decl, child_params);
   BindPorts(inst, item, mod);
+
+  std::vector<uint32_t> inst_dim_sizes;
+  uint32_t total_instances = 1;
+  for (const auto& [left, right] : item->inst_dims) {
+    uint32_t sz = EvalInstDimSize(left, right);
+    if (sz > 0) {
+      inst_dim_sizes.push_back(sz);
+      total_instances *= sz;
+    }
+  }
+
+  if (!item->inst_dims.empty()) {
+    ValidateInstanceArrayPorts(inst, item, mod, inst_dim_sizes,
+                               total_instances);
+  } else {
+    ValidateUnpackedArrayPorts(inst, item, mod);
+  }
+
   CheckPortCoercion(inst, item->loc);
   // §5.12: Resolve attributes.
   inst.attrs = ResolveAttributes(item->attrs, diag_);
@@ -1084,6 +1115,150 @@ void Elaborator::CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc) {
           std::format("port '{}' is declared as output but its connection "
                       "'{}' is also driven externally",
                       binding.port_name, binding.connection->text));
+    }
+  }
+}
+
+void Elaborator::ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
+                                            const ModuleItem* item,
+                                            RtlirModule* parent_mod) {
+  if (!inst.resolved) return;
+  const auto& child_ports = inst.resolved->ports;
+
+  for (const auto& binding : inst.port_bindings) {
+    auto port_it = std::find_if(
+        child_ports.begin(), child_ports.end(),
+        [&](const RtlirPort& p) { return p.name == binding.port_name; });
+    if (port_it == child_ports.end()) continue;
+    if (port_it->num_unpacked_dims == 0) continue;
+
+    if (!binding.connection ||
+        binding.connection->kind != ExprKind::kIdentifier) {
+      diag_.Error(item->loc,
+                  std::format("unpacked array port '{}' requires a matching "
+                              "unpacked array connection",
+                              binding.port_name));
+      continue;
+    }
+
+    auto it = var_array_info_.find(binding.connection->text);
+    if (it == var_array_info_.end()) {
+      diag_.Error(item->loc,
+                  std::format("unpacked array port '{}' requires a matching "
+                              "unpacked array connection",
+                              binding.port_name));
+      continue;
+    }
+
+    const auto& conn_info = it->second;
+    if (conn_info.num_unpacked_dims != port_it->num_unpacked_dims) {
+      diag_.Error(
+          item->loc,
+          std::format("unpacked array port '{}' has {} unpacked dimension(s) "
+                      "but connection has {}",
+                      binding.port_name, port_it->num_unpacked_dims,
+                      conn_info.num_unpacked_dims));
+      continue;
+    }
+
+    for (uint32_t d = 0; d < port_it->num_unpacked_dims; ++d) {
+      if (d < port_it->unpacked_dim_sizes.size() &&
+          d < conn_info.dim_sizes.size() &&
+          port_it->unpacked_dim_sizes[d] != conn_info.dim_sizes[d]) {
+        diag_.Error(
+            item->loc,
+            std::format("unpacked array port '{}' dimension {} has size {} "
+                        "but connection has size {}",
+                        binding.port_name, d, port_it->unpacked_dim_sizes[d],
+                        conn_info.dim_sizes[d]));
+        break;
+      }
+    }
+  }
+}
+
+void Elaborator::ValidateInstanceArrayPorts(
+    const RtlirModuleInst& inst, const ModuleItem* item,
+    RtlirModule* parent_mod, const std::vector<uint32_t>& inst_dim_sizes,
+    uint32_t total_instances) {
+  if (!inst.resolved) return;
+  const auto& child_ports = inst.resolved->ports;
+
+  for (const auto& binding : inst.port_bindings) {
+    if (!binding.connection) continue;
+
+    auto port_it = std::find_if(
+        child_ports.begin(), child_ports.end(),
+        [&](const RtlirPort& p) { return p.name == binding.port_name; });
+    if (port_it == child_ports.end()) continue;
+
+    bool conn_is_unpacked = false;
+    uint32_t conn_num_dims = 0;
+    const std::vector<uint32_t>* conn_dim_sizes_ptr = nullptr;
+    uint32_t conn_width = 0;
+
+    if (binding.connection->kind == ExprKind::kIdentifier) {
+      auto it = var_array_info_.find(binding.connection->text);
+      if (it != var_array_info_.end()) {
+        conn_is_unpacked = true;
+        conn_num_dims = it->second.num_unpacked_dims;
+        conn_dim_sizes_ptr = &it->second.dim_sizes;
+      }
+      conn_width = FindSignalWidth(binding.connection->text, parent_mod);
+    }
+
+    if (conn_is_unpacked) {
+      uint32_t expected_dims =
+          static_cast<uint32_t>(inst_dim_sizes.size()) +
+          port_it->num_unpacked_dims;
+      if (conn_num_dims != expected_dims) {
+        diag_.Error(
+            item->loc,
+            std::format("unpacked array connection to port '{}' has {} "
+                        "dimension(s) but expected {}",
+                        binding.port_name, conn_num_dims, expected_dims));
+        continue;
+      }
+      if (conn_dim_sizes_ptr) {
+        for (size_t d = 0; d < inst_dim_sizes.size(); ++d) {
+          if (d < conn_dim_sizes_ptr->size() &&
+              (*conn_dim_sizes_ptr)[d] != inst_dim_sizes[d]) {
+            diag_.Error(
+                item->loc,
+                std::format("unpacked array connection to port '{}' "
+                            "dimension {} has size {} but instance array "
+                            "has size {}",
+                            binding.port_name, d, (*conn_dim_sizes_ptr)[d],
+                            inst_dim_sizes[d]));
+            break;
+          }
+        }
+        for (uint32_t d = 0; d < port_it->num_unpacked_dims; ++d) {
+          uint32_t ci = static_cast<uint32_t>(inst_dim_sizes.size()) + d;
+          if (ci < conn_dim_sizes_ptr->size() &&
+              d < port_it->unpacked_dim_sizes.size() &&
+              (*conn_dim_sizes_ptr)[ci] != port_it->unpacked_dim_sizes[d]) {
+            diag_.Error(
+                item->loc,
+                std::format("unpacked array connection to port '{}' "
+                            "port dimension {} has size {} but port "
+                            "expects {}",
+                            binding.port_name, d, (*conn_dim_sizes_ptr)[ci],
+                            port_it->unpacked_dim_sizes[d]));
+            break;
+          }
+        }
+      }
+    } else if (conn_width != 0 && conn_width != port_it->width) {
+      uint32_t expected_width = port_it->width * total_instances;
+      if (conn_width != expected_width) {
+        diag_.Error(
+            item->loc,
+            std::format("packed array connection to port '{}' has width {} "
+                        "but expected {} ({} instances * port width {})",
+                        binding.port_name, conn_width, expected_width,
+                        total_instances, port_it->width));
+      }
     }
   }
 }

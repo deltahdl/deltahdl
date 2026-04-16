@@ -92,6 +92,15 @@ class Elaborator {
   /// §23.3.3.1: Warn when a port's declared direction does not match usage.
   void CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc);
 
+  void ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
+                                  const ModuleItem* item,
+                                  RtlirModule* parent_mod);
+  void ValidateInstanceArrayPorts(const RtlirModuleInst& inst,
+                                  const ModuleItem* item,
+                                  RtlirModule* parent_mod,
+                                  const std::vector<uint32_t>& inst_dim_sizes,
+                                  uint32_t total_instances);
+
   /// Build a scope map from CU-scope and module parameters.
   ScopeMap BuildParamScope(const RtlirModule* mod) const;
 
@@ -437,6 +446,7 @@ class Elaborator {
     bool is_dynamic = false;
     bool is_assoc = false;
     std::string_view assoc_index_type;  // §7.9.9: e.g. "int", "string", "*"
+    std::vector<uint32_t> dim_sizes;
   };
 
   // Per-module validation state (cleared in ElaborateItems).
