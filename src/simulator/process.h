@@ -131,6 +131,9 @@ struct Process {
   // §12.4.2.1: Pending violation reports awaiting Observed region maturation.
   std::vector<std::string> pending_violations;
 
+  // §23.6: Instance hierarchy prefix for child module processes.
+  std::string inst_prefix;
+
   ~Process() {
     if (coro) coro.destroy();
   }

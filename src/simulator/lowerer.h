@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace delta {
@@ -39,10 +40,12 @@ class Lowerer {
   void InitAssocDefault(const Expr* init, AssocArrayObject* aa);
   void RegisterEnumForCast(const RtlirVariable& var);
   void RegisterEnumTypes(const RtlirModule* mod);
+  void LowerChildModules(const RtlirModule* mod);
 
   SimContext& ctx_;
   Arena& arena_;
   uint32_t next_id_ = 0;
+  std::string inst_prefix_;
 };
 
 }  // namespace delta

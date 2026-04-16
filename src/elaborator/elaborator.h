@@ -442,6 +442,12 @@ class Elaborator {
   void WalkExprForStreamingContext(const Expr* expr, bool is_valid_context);
   void WalkStmtsForStreamingContext(const Stmt* s);
 
+  /// §23.6 R15: Hierarchical references into checkers prohibited.
+  void ValidateHierRefIntoChecker(const ModuleDecl* decl);
+
+  /// §23.6 R12: Objects in automatic tasks/functions inaccessible by hier ref.
+  void ValidateHierRefToAutomatic(const ModuleDecl* decl);
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 
@@ -508,6 +514,8 @@ class Elaborator {
   std::unordered_set<std::string_view> ansi_port_names_;
 
   std::unordered_map<std::string_view, std::string_view> interface_inst_types_;
+  std::unordered_set<std::string_view> checker_inst_names_;
+  std::unordered_set<std::string_view> auto_task_func_names_;
   std::unordered_map<std::string_view, ModuleDecl*> nested_module_decls_;
 
   // §14.3: Clocking block signal directions for clockvar access validation.

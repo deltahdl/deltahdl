@@ -14,6 +14,7 @@
 #include "simulator/scheduler.h"
 #include "simulator/clocking.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 #include "simulator/sync_objects.h"
 #include "simulator/variable.h"
 
@@ -66,18 +67,25 @@ struct EventAwaiter {
       Variable* var = nullptr;
       if (ev.signal->kind == ExprKind::kIdentifier) {
         var = ctx.FindVariable(ev.signal->text);
-      } else if (ev.signal->kind == ExprKind::kMemberAccess && ev.signal->lhs &&
-                 ev.signal->lhs->kind == ExprKind::kIdentifier) {
-        // §14.15: @(cb.signal) — resolve through clocking manager.
-        auto* mgr = ctx.GetClockingManager();
-        std::string_view member;
-        if (ev.signal->rhs && ev.signal->rhs->kind == ExprKind::kIdentifier)
-          member = ev.signal->rhs->text;
-        else if (!ev.signal->text.empty())
-          member = ev.signal->text;
-        if (mgr && !member.empty())
-          var = mgr->ResolveClockingMember(ev.signal->lhs->text, member, ctx);
-        if (!var) var = ctx.FindVariable(ev.signal->lhs->text);
+      } else if (ev.signal->kind == ExprKind::kMemberAccess) {
+        // §14.15: @(cb.signal) — try clocking manager first.
+        if (ev.signal->lhs &&
+            ev.signal->lhs->kind == ExprKind::kIdentifier) {
+          auto* mgr = ctx.GetClockingManager();
+          std::string_view member;
+          if (ev.signal->rhs && ev.signal->rhs->kind == ExprKind::kIdentifier)
+            member = ev.signal->rhs->text;
+          else if (!ev.signal->text.empty())
+            member = ev.signal->text;
+          if (mgr && !member.empty())
+            var = mgr->ResolveClockingMember(ev.signal->lhs->text, member, ctx);
+        }
+        // §23.6: Hierarchical name in event expression.
+        if (!var) {
+          std::string hier_name;
+          BuildLhsName(ev.signal, hier_name);
+          var = ctx.FindVariable(hier_name);
+        }
       } else {
         continue;
       }

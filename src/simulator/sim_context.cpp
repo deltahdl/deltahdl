@@ -17,6 +17,12 @@ Variable* SimContext::FindVariable(std::string_view name) {
   if (local) return local;
   auto it = variables_.find(name);
   if (it != variables_.end()) return it->second;
+  // §23.6: Try with instance prefix for child module variable access.
+  if (current_process_ && !current_process_->inst_prefix.empty()) {
+    std::string prefixed = current_process_->inst_prefix + std::string(name);
+    it = variables_.find(prefixed);
+    if (it != variables_.end()) return it->second;
+  }
   return nullptr;
 }
 

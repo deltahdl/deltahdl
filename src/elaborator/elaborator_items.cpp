@@ -570,6 +570,8 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ansi_port_names_.clear();
   clocking_signals_.clear();
   interface_inst_types_.clear();
+  checker_inst_names_.clear();
+  auto_task_func_names_.clear();
   nested_module_decls_.clear();
   task_names_.clear();
   sequence_names_.clear();
@@ -586,6 +588,9 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       auto* child = FindModuleInScope(item->inst_module);
       if (child && child->decl_kind == ModuleDeclKind::kInterface) {
         interface_inst_types_[item->inst_name] = item->inst_module;
+      }
+      if (child && child->decl_kind == ModuleDeclKind::kChecker) {
+        checker_inst_names_.insert(item->inst_name);
       }
     }
   }
@@ -615,6 +620,14 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       } else {
         item->is_static = true;
       }
+    }
+  }
+  // §23.6 R12: Collect automatic task/function names for hier ref validation.
+  for (const auto* item : decl->items) {
+    if ((item->kind == ModuleItemKind::kTaskDecl ||
+         item->kind == ModuleItemKind::kFunctionDecl) &&
+        item->is_automatic) {
+      auto_task_func_names_.insert(item->name);
     }
   }
   // §23.4: Save nested module list before the main loop since recursive
@@ -654,6 +667,8 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ValidateContAssignToClockvar(decl);
   ValidateConstantFunctionCalls(decl);
   ValidateSequenceEventArgs(decl);
+  ValidateHierRefIntoChecker(decl);
+  ValidateHierRefToAutomatic(decl);
 }
 
 // --- Module instantiation ---

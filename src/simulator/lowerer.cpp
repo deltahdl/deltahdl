@@ -836,6 +836,8 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (const auto& ca : mod->assigns) {
     LowerContAssign(ca);
   }
+  // §23.6: Recursively lower child module instances for hierarchical access.
+  LowerChildModules(mod);
 }
 
 // --- Process lowering ---
@@ -852,6 +854,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc) {
   auto* p = arena_.Create<Process>();
   p->id = next_id_++;
   p->home_region = Region::kActive;
+  p->inst_prefix = inst_prefix_;
 
   switch (proc.kind) {
     case RtlirProcessKind::kInitial:
@@ -905,6 +908,49 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca) {
   p->coro = MakeContAssignCoroutine(cap, ctx_, arena_).Release();
 
   ScheduleProcess(p, ctx_);
+}
+
+// --- §23.6: Recursive child module lowering for hierarchical access ---
+
+void Lowerer::LowerChildModules(const RtlirModule* mod) {
+  for (const auto& child : mod->children) {
+    if (!child.resolved) continue;
+    auto saved_prefix = inst_prefix_;
+    inst_prefix_ = inst_prefix_ + std::string(child.inst_name) + ".";
+
+    // Create child variables with hierarchical prefix.
+    for (const auto& var : child.resolved->variables) {
+      auto* name =
+          arena_.Create<std::string>(inst_prefix_ + std::string(var.name));
+      uint32_t width = var.class_type_name.empty() ? var.width : 64;
+      if (var.is_real && width < 64) width = 64;
+      auto* v = ctx_.CreateVariable(*name, width);
+      if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle)
+        v->value = MakeLogic4VecVal(arena_, width, 0);
+      if (var.is_chandle) v->value = MakeLogic4VecVal(arena_, width, 0);
+      v->is_4state = var.is_4state;
+      if (var.is_event) v->is_event = true;
+      if (var.is_signed) v->is_signed = true;
+    }
+
+    // Create child ports with hierarchical prefix.
+    for (const auto& port : child.resolved->ports) {
+      auto* name =
+          arena_.Create<std::string>(inst_prefix_ + std::string(port.name));
+      if (!ctx_.FindVariable(*name)) {
+        auto* v = ctx_.CreateVariable(*name, port.width);
+        if (port.is_signed) v->is_signed = true;
+      }
+    }
+
+    // Lower child processes (inst_prefix_ is set on each Process).
+    LowerProcesses(child.resolved->processes);
+
+    // Recurse into grandchildren.
+    LowerChildModules(child.resolved);
+
+    inst_prefix_ = saved_prefix;
+  }
 }
 
 // --- Design lowering ---

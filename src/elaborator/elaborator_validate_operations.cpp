@@ -1068,4 +1068,140 @@ void Elaborator::ValidateStreamingConcatContext(const ModuleDecl* decl) {
   }
 }
 
+// --- §23.6 R15: Hierarchical references into checkers prohibited ---
+
+static std::string_view HierRefLeftmost(const Expr* e) {
+  if (e->kind == ExprKind::kIdentifier) return e->text;
+  if (e->kind == ExprKind::kMemberAccess && e->lhs)
+    return HierRefLeftmost(e->lhs);
+  return {};
+}
+
+static bool ExprRefersToChecker(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& checker_names) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kMemberAccess) {
+    auto leftmost = HierRefLeftmost(e);
+    if (!leftmost.empty() && checker_names.count(leftmost)) return true;
+  }
+  if (ExprRefersToChecker(e->lhs, checker_names)) return true;
+  if (ExprRefersToChecker(e->rhs, checker_names)) return true;
+  if (ExprRefersToChecker(e->base, checker_names)) return true;
+  for (auto* elem : e->elements) {
+    if (ExprRefersToChecker(elem, checker_names)) return true;
+  }
+  return false;
+}
+
+static void WalkStmtsForCheckerRef(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& checker_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  if (s->lhs && ExprRefersToChecker(s->lhs, checker_names))
+    diag.Error(s->range.start,
+               "hierarchical reference into a checker is not permitted");
+  if (s->rhs && ExprRefersToChecker(s->rhs, checker_names))
+    diag.Error(s->range.start,
+               "hierarchical reference into a checker is not permitted");
+  for (auto* child : s->children)
+    WalkStmtsForCheckerRef(child, checker_names, diag);
+  if (s->if_body) WalkStmtsForCheckerRef(s->if_body, checker_names, diag);
+  if (s->else_body) WalkStmtsForCheckerRef(s->else_body, checker_names, diag);
+}
+
+void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
+  if (checker_inst_names_.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      if (ExprRefersToChecker(item->assign_lhs, checker_inst_names_))
+        diag_.Error(item->loc,
+                    "hierarchical reference into a checker is not permitted");
+      if (ExprRefersToChecker(item->assign_rhs, checker_inst_names_))
+        diag_.Error(item->loc,
+                    "hierarchical reference into a checker is not permitted");
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body)
+      WalkStmtsForCheckerRef(item->body, checker_inst_names_, diag_);
+  }
+}
+
+// --- §23.6 R12: Objects in automatic tasks/functions inaccessible by
+//     hierarchical reference ---
+
+static void CollectHierPathComponents(const Expr* e,
+                                      std::vector<std::string_view>& out) {
+  if (!e) return;
+  if (e->kind == ExprKind::kIdentifier) {
+    out.push_back(e->text);
+    return;
+  }
+  if (e->kind == ExprKind::kMemberAccess) {
+    CollectHierPathComponents(e->lhs, out);
+    CollectHierPathComponents(e->rhs, out);
+  }
+}
+
+static bool ExprRefersToAutomatic(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& auto_names) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kMemberAccess) {
+    std::vector<std::string_view> components;
+    CollectHierPathComponents(e, components);
+    for (size_t i = 0; i + 1 < components.size(); ++i) {
+      if (auto_names.count(components[i])) return true;
+    }
+  }
+  if (ExprRefersToAutomatic(e->lhs, auto_names)) return true;
+  if (ExprRefersToAutomatic(e->rhs, auto_names)) return true;
+  if (ExprRefersToAutomatic(e->base, auto_names)) return true;
+  for (auto* elem : e->elements) {
+    if (ExprRefersToAutomatic(elem, auto_names)) return true;
+  }
+  return false;
+}
+
+static void WalkStmtsForAutoRef(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& auto_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  if (s->lhs && ExprRefersToAutomatic(s->lhs, auto_names))
+    diag.Error(s->range.start,
+               "hierarchical reference to object in automatic task or "
+               "function is not permitted");
+  if (s->rhs && ExprRefersToAutomatic(s->rhs, auto_names))
+    diag.Error(s->range.start,
+               "hierarchical reference to object in automatic task or "
+               "function is not permitted");
+  for (auto* child : s->children)
+    WalkStmtsForAutoRef(child, auto_names, diag);
+  if (s->if_body) WalkStmtsForAutoRef(s->if_body, auto_names, diag);
+  if (s->else_body) WalkStmtsForAutoRef(s->else_body, auto_names, diag);
+}
+
+void Elaborator::ValidateHierRefToAutomatic(const ModuleDecl* decl) {
+  if (auto_task_func_names_.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      if (ExprRefersToAutomatic(item->assign_lhs, auto_task_func_names_))
+        diag_.Error(item->loc,
+                    "hierarchical reference to object in automatic task or "
+                    "function is not permitted");
+      if (ExprRefersToAutomatic(item->assign_rhs, auto_task_func_names_))
+        diag_.Error(item->loc,
+                    "hierarchical reference to object in automatic task or "
+                    "function is not permitted");
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body)
+      WalkStmtsForAutoRef(item->body, auto_task_func_names_, diag_);
+  }
+}
+
 }  // namespace delta
