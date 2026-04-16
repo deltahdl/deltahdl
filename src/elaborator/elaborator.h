@@ -45,6 +45,9 @@ class Elaborator {
   /// §3.12.1: Register CU-scope typedefs/classes before module elaboration.
   void RegisterCuScopeItems();
 
+  /// §23.5: Resolve extern module declarations against actual definitions.
+  void ResolveExternModules();
+
   /// Find a module declaration by name in the compilation unit.
   ModuleDecl* FindModule(std::string_view name) const;
 

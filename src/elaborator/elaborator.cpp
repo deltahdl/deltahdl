@@ -155,6 +155,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // §8.27: Validate forward class typedefs are resolved.
   ValidateForwardClassTypedefs();
 
+  ResolveExternModules();
+
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {
     diag_.Error({}, std::format("top module '{}' not found", top_module_name));
@@ -227,10 +229,68 @@ ModuleItem* Elaborator::FindCuScopeItem(std::string_view name) const {
   return nullptr;
 }
 
+void Elaborator::ResolveExternModules() {
+  for (auto* mod : unit_->modules) {
+    if (mod->is_extern) continue;
+
+    ModuleDecl* extern_decl = nullptr;
+    for (auto* other : unit_->modules) {
+      if (other->is_extern && other->name == mod->name) {
+        extern_decl = other;
+        break;
+      }
+    }
+    if (!extern_decl) continue;
+
+    if (mod->has_wildcard_ports) {
+      mod->ports = extern_decl->ports;
+      if (mod->params.empty() && !extern_decl->params.empty()) {
+        mod->params = extern_decl->params;
+        mod->type_param_names = extern_decl->type_param_names;
+        mod->has_param_port_list = extern_decl->has_param_port_list;
+      }
+      continue;
+    }
+
+    if (extern_decl->ports.size() != mod->ports.size()) {
+      diag_.Error(mod->range.start,
+                  std::format("module '{}' port count ({}) does not match "
+                              "extern declaration ({})",
+                              mod->name, mod->ports.size(),
+                              extern_decl->ports.size()));
+      continue;
+    }
+    for (size_t i = 0; i < mod->ports.size(); ++i) {
+      if (!mod->ports[i].name.empty() && !extern_decl->ports[i].name.empty() &&
+          mod->ports[i].name != extern_decl->ports[i].name) {
+        diag_.Error(mod->range.start,
+                    std::format("module '{}' port '{}' at position {} does not "
+                                "match extern declaration port '{}'",
+                                mod->name, mod->ports[i].name, i,
+                                extern_decl->ports[i].name));
+        break;
+      }
+    }
+    if (extern_decl->params.size() != mod->params.size()) {
+      diag_.Error(
+          mod->range.start,
+          std::format("module '{}' parameter count ({}) does not match "
+                      "extern declaration ({})",
+                      mod->name, mod->params.size(),
+                      extern_decl->params.size()));
+    }
+  }
+}
+
 ModuleDecl* Elaborator::FindModule(std::string_view name) const {
-  auto it = std::find_if(unit_->modules.begin(), unit_->modules.end(),
-                         [name](auto* mod) { return mod->name == name; });
-  if (it != unit_->modules.end()) return *it;
+  ModuleDecl* extern_decl = nullptr;
+  for (auto* mod : unit_->modules) {
+    if (mod->name == name) {
+      if (!mod->is_extern) return mod;
+      if (!extern_decl) extern_decl = mod;
+    }
+  }
+  if (extern_decl) return extern_decl;
 
   // §24: Programs can be instantiated like modules.
   auto pit = std::find_if(unit_->programs.begin(), unit_->programs.end(),

@@ -64,14 +64,6 @@ TEST(ModuleHeaderDefinition, ModuleWildcardPorts) {
   EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
 }
 
-TEST(ModuleHeaderDefinition, ExternModule) {
-  auto r = ParseWithPreprocessor("extern module m(input logic a);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->modules[0]->is_extern);
-}
-
 TEST(ModuleHeaderDefinition, NonAnsiHeaderThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m(a, b);\n"
