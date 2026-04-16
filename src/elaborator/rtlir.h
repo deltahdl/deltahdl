@@ -176,6 +176,13 @@ struct RtlirModuleInst {
 
 // --- Module ---
 
+// §23.7: Import declaration for package-scope name resolution.
+struct RtlirImport {
+  std::string_view package_name;
+  std::string_view item_name;  // Empty for wildcard imports.
+  bool is_wildcard = false;
+};
+
 // §6.19: Enum member info for lowerer → SimContext registration.
 struct RtlirEnumMember {
   std::string_view name;
@@ -200,6 +207,7 @@ struct RtlirModule {
   std::vector<ModuleItem*> let_decls;  // §A.2.12: let declarations in module.
   std::vector<ModuleItem*> sequence_decls;
   std::vector<ClassDecl*> class_decls;  // §8: class declarations in module.
+  std::vector<RtlirImport> imports;    // §23.7: import declarations.
   // §6.19/§6.24.2: enum type → members, for $cast and enum methods.
   std::unordered_map<std::string_view, std::vector<RtlirEnumMember>> enum_types;
 };
@@ -215,6 +223,8 @@ struct RtlirDesign {
   std::vector<ModuleItem*> cu_function_decls;
   // §11.12: CU-scope let declarations visible to all modules.
   std::vector<ModuleItem*> cu_let_decls;
+  // §23.7: Package declarations for import resolution.
+  std::vector<PackageDecl*> packages;
 };
 
 }  // namespace delta

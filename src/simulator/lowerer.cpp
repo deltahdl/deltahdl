@@ -820,6 +820,8 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (auto* cls : mod->class_decls) {
     LowerClassDecl(cls);
   }
+  // §23.7: Register items from imported packages.
+  LowerImports(mod);
   {
     // §9.7: Register synthetic ClassTypeInfo for the built-in process class.
     auto* proc_type = arena_.Create<ClassTypeInfo>();
@@ -910,6 +912,50 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca) {
   ScheduleProcess(p, ctx_);
 }
 
+// --- §23.7: Import resolution for package-scope name access ---
+
+PackageDecl* Lowerer::FindPackage(std::string_view name) const {
+  if (!design_) return nullptr;
+  for (auto* pkg : design_->packages) {
+    if (pkg->name == name) return pkg;
+  }
+  return nullptr;
+}
+
+void Lowerer::LowerPackageItem(ModuleItem* item) {
+  if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
+    if (!ctx_.FindClassType(item->class_decl->name)) {
+      LowerClassDecl(item->class_decl);
+    }
+  } else if (item->kind == ModuleItemKind::kFunctionDecl ||
+             item->kind == ModuleItemKind::kTaskDecl) {
+    if (!ctx_.FindFunction(item->name)) {
+      ctx_.RegisterFunction(item->name, item);
+    }
+  }
+}
+
+void Lowerer::LowerImports(const RtlirModule* mod) {
+  for (const auto& imp : mod->imports) {
+    auto* pkg = FindPackage(imp.package_name);
+    if (!pkg) continue;
+    if (imp.is_wildcard) {
+      for (auto* item : pkg->items) {
+        LowerPackageItem(item);
+      }
+    } else {
+      for (auto* item : pkg->items) {
+        if (item->name == imp.item_name ||
+            (item->kind == ModuleItemKind::kClassDecl && item->class_decl &&
+             item->class_decl->name == imp.item_name)) {
+          LowerPackageItem(item);
+          break;
+        }
+      }
+    }
+  }
+}
+
 // --- §23.6: Recursive child module lowering for hierarchical access ---
 
 void Lowerer::LowerChildModules(const RtlirModule* mod) {
@@ -957,6 +1003,7 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
 
 void Lowerer::Lower(const RtlirDesign* design) {
   if (!design) return;
+  design_ = design;
   for (const auto& [name, width] : design->type_widths) {
     ctx_.RegisterTypeWidth(name, width);
   }

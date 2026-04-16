@@ -401,7 +401,16 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ValidateClockingBlock(item);
       break;
     case ModuleItemKind::kDefparam:
-    case ModuleItemKind::kImportDecl:
+      break;
+    case ModuleItemKind::kImportDecl: {
+      // §23.7: Collect import declarations for dotted name resolution.
+      RtlirImport imp;
+      imp.package_name = item->import_item.package_name;
+      imp.item_name = item->import_item.item_name;
+      imp.is_wildcard = item->import_item.is_wildcard;
+      mod->imports.push_back(imp);
+      break;
+    }
     case ModuleItemKind::kExportDecl:
     case ModuleItemKind::kPropertyDecl:
     case ModuleItemKind::kAssertProperty:

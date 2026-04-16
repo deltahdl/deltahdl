@@ -186,6 +186,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   for (const auto& [name, dtype] : typedefs_) {
     design->type_widths[name] = EvalTypeWidth(dtype, typedefs_);
   }
+  // §23.7: Pass package declarations for import resolution in the lowerer.
+  design->packages = unit_->packages;
   return design;
 }
 

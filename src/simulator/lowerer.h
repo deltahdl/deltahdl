@@ -10,6 +10,7 @@ class Arena;
 class DiagEngine;
 class SimContext;
 struct RtlirContAssign;
+struct PackageDecl;
 struct RtlirDesign;
 struct RtlirModule;
 struct RtlirProcess;
@@ -36,6 +37,9 @@ class Lowerer {
   void LowerProcess(const RtlirProcess& proc);
   void LowerContAssign(const RtlirContAssign& ca);
   void LowerClassDecl(const ClassDecl* cls);
+  void LowerImports(const RtlirModule* mod);
+  void LowerPackageItem(ModuleItem* item);
+  PackageDecl* FindPackage(std::string_view name) const;
   void LowerDynArrayInit(const RtlirVariable& var);
   void InitAssocDefault(const Expr* init, AssocArrayObject* aa);
   void RegisterEnumForCast(const RtlirVariable& var);
@@ -44,6 +48,7 @@ class Lowerer {
 
   SimContext& ctx_;
   Arena& arena_;
+  const RtlirDesign* design_ = nullptr;
   uint32_t next_id_ = 0;
   std::string inst_prefix_;
 };
