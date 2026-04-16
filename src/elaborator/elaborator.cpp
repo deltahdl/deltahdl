@@ -188,6 +188,9 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   }
   // §23.7: Pass package declarations for import resolution in the lowerer.
   design->packages = unit_->packages;
+  // §23.7.1: Pass CU-scope class declarations for scope resolution.
+  design->cu_class_decls.insert(design->cu_class_decls.end(),
+                                unit_->classes.begin(), unit_->classes.end());
   return design;
 }
 
@@ -221,6 +224,20 @@ void Elaborator::RegisterCuScopeItems() {
     class_names_.insert(cls->name);
     cu_scope_names_.insert(cls->name);
     if (!cls->params.empty()) parameterized_class_names_.insert(cls->name);
+  }
+  // §23.7.1: Register package parameters with qualified names for
+  // scope-prefixed constant evaluation (e.g., pkg::WIDTH in dimensions).
+  for (auto* pkg : unit_->packages) {
+    for (auto* item : pkg->items) {
+      if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
+        auto val = ConstEvalInt(item->init_expr, cu_param_scope_);
+        if (val) {
+          auto* qname = arena_.Create<std::string>(
+              std::string(pkg->name) + "." + std::string(item->name));
+          cu_param_scope_[*qname] = *val;
+        }
+      }
+    }
   }
 }
 

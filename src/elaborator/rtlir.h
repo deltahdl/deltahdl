@@ -225,6 +225,8 @@ struct RtlirDesign {
   std::vector<ModuleItem*> cu_let_decls;
   // §23.7: Package declarations for import resolution.
   std::vector<PackageDecl*> packages;
+  // §23.7.1: CU-scope class declarations for scope resolution.
+  std::vector<ClassDecl*> cu_class_decls;
 };
 
 }  // namespace delta

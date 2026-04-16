@@ -374,6 +374,19 @@ static std::optional<ConstVal> ConstEvalFull(const Expr* expr,
       if (!val) return std::nullopt;
       return ConstVal{*val, 32, true};
     }
+    case ExprKind::kMemberAccess: {
+      // §23.7.1: Resolve scope-prefixed names (e.g., pkg::WIDTH) by
+      // building a qualified key and looking it up in the scope map.
+      if (expr->lhs && expr->rhs &&
+          expr->lhs->kind == ExprKind::kIdentifier &&
+          expr->rhs->kind == ExprKind::kIdentifier) {
+        std::string compound =
+            std::string(expr->lhs->text) + "." + std::string(expr->rhs->text);
+        auto it = scope.find(compound);
+        if (it != scope.end()) return ConstVal{it->second, 32, true};
+      }
+      return std::nullopt;
+    }
     default:
       return std::nullopt;
   }
@@ -588,6 +601,16 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
       return IsConstantExpr(expr->lhs, scope);
     case ExprKind::kAssignmentPattern:
       return AllElementsConstant(expr->elements, scope);
+    case ExprKind::kMemberAccess: {
+      if (expr->lhs && expr->rhs &&
+          expr->lhs->kind == ExprKind::kIdentifier &&
+          expr->rhs->kind == ExprKind::kIdentifier) {
+        std::string compound =
+            std::string(expr->lhs->text) + "." + std::string(expr->rhs->text);
+        return scope.count(compound) > 0;
+      }
+      return false;
+    }
     default:
       return false;
   }

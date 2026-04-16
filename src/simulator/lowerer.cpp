@@ -1007,6 +1007,25 @@ void Lowerer::Lower(const RtlirDesign* design) {
   for (const auto& [name, width] : design->type_widths) {
     ctx_.RegisterTypeWidth(name, width);
   }
+  // §23.7.1: Register package parameters as variables with qualified names
+  // (e.g., "pkg.WIDTH") so scope-prefixed access resolves at runtime.
+  for (auto* pkg : design->packages) {
+    for (auto* item : pkg->items) {
+      if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
+        auto* qname = arena_.Create<std::string>(
+            std::string(pkg->name) + "." + std::string(item->name));
+        auto* var = ctx_.CreateVariable(*qname, 32);
+        var->value = EvalExpr(item->init_expr, ctx_, arena_);
+      }
+    }
+  }
+  // §23.7.1: Lower CU-scope class declarations so scope resolution
+  // (e.g., ClassName::member) can find their static properties.
+  for (auto* cls : design->cu_class_decls) {
+    if (!ctx_.FindClassType(cls->name)) {
+      LowerClassDecl(cls);
+    }
+  }
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }
