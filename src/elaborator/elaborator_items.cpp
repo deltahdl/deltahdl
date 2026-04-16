@@ -635,6 +635,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   }
 
   CheckPortCoercion(inst, item->loc);
+  CheckUwirePortMerge(inst, item, mod);
   // §5.12: Resolve attributes.
   inst.attrs = ResolveAttributes(item->attrs, diag_);
   mod->children.push_back(inst);
@@ -1115,6 +1116,44 @@ void Elaborator::CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc) {
           std::format("port '{}' is declared as output but its connection "
                       "'{}' is also driven externally",
                       binding.port_name, binding.connection->text));
+    }
+  }
+}
+
+void Elaborator::CheckUwirePortMerge(const RtlirModuleInst& inst,
+                                     const ModuleItem* item,
+                                     RtlirModule* parent_mod) {
+  if (!inst.resolved) return;
+  const auto& child_ports = inst.resolved->ports;
+
+  for (const auto& binding : inst.port_bindings) {
+    if (!binding.connection) continue;
+
+    auto port_it = std::find_if(
+        child_ports.begin(), child_ports.end(),
+        [&](const RtlirPort& p) { return p.name == binding.port_name; });
+    if (port_it == child_ports.end()) continue;
+
+    NetType internal_net = PortNetType(port_it->type_kind);
+    bool internal_is_uwire = (internal_net == NetType::kUwire);
+
+    bool external_is_net = false;
+    bool external_is_uwire = false;
+    if (binding.connection->kind == ExprKind::kIdentifier) {
+      NetType ext = FindSignalNetType(binding.connection->text, parent_mod);
+      external_is_net = (ext != NetType::kNone);
+      external_is_uwire = (ext == NetType::kUwire);
+    }
+
+    if (!internal_is_uwire && !external_is_uwire) continue;
+
+    bool merged = (internal_net != NetType::kNone) && external_is_net;
+    if (!merged) {
+      diag_.Warning(
+          item->loc,
+          std::format("uwire net on port '{}' of instance '{}' is not "
+                      "merged into a single net",
+                      binding.port_name, inst.inst_name));
     }
   }
 }

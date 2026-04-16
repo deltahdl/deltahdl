@@ -92,6 +92,9 @@ class Elaborator {
   /// §23.3.3.1: Warn when a port's declared direction does not match usage.
   void CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc);
 
+  void CheckUwirePortMerge(const RtlirModuleInst& inst,
+                           const ModuleItem* item, RtlirModule* parent_mod);
+
   void ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
                                   const ModuleItem* item,
                                   RtlirModule* parent_mod);
