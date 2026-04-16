@@ -91,11 +91,51 @@ static DataTypeKind NormalizeForCompatibility(DataTypeKind kind) {
     case DataTypeKind::kTri0:
     case DataTypeKind::kTri1:
     case DataTypeKind::kTrireg:
+    case DataTypeKind::kSupply0:
+    case DataTypeKind::kSupply1:
     case DataTypeKind::kUwire:
       return DataTypeKind::kLogic;
     default:
       return kind;
   }
+}
+
+static int NetTypeGroup(NetType t) {
+  switch (t) {
+    case NetType::kWire:
+    case NetType::kTri: return 0;
+    case NetType::kWand:
+    case NetType::kTriand: return 1;
+    case NetType::kWor:
+    case NetType::kTrior: return 2;
+    case NetType::kTrireg: return 3;
+    case NetType::kTri0: return 4;
+    case NetType::kTri1: return 5;
+    case NetType::kUwire: return 6;
+    case NetType::kSupply0: return 7;
+    case NetType::kSupply1: return 8;
+    default: return -1;
+  }
+}
+
+static bool DissimilarNetTypeRequiresWarning(NetType internal,
+                                             NetType external) {
+  static constexpr bool kWarnTable[9][9] = {
+      // ext: wire  wand   wor  trireg tri0   tri1  uwire  sup0   sup1
+      {false, false, false, false, false, false, false, false, false},  // wire
+      {false, false, true,  true,  true,  true,  true,  false, false},  // wand
+      {false, true,  false, true,  true,  true,  true,  false, false},  // wor
+      {false, true,  true,  false, false, false, true,  false, false},  // trireg
+      {false, true,  true,  false, false, true,  true,  false, false},  // tri0
+      {false, true,  true,  false, true,  false, true,  false, false},  // tri1
+      {false, true,  true,  true,  true,  true,  false, false, false},  // uwire
+      {false, false, false, false, false, false, false, false, true},   // supply0
+      {false, false, false, false, false, false, false, true,  false},  // supply1
+  };
+  int ig = NetTypeGroup(internal);
+  int eg = NetTypeGroup(external);
+  if (ig < 0 || eg < 0) return false;
+  return kWarnTable[ig][eg];
 }
 
 static NetType PortNetType(DataTypeKind kind) {
@@ -109,6 +149,8 @@ static NetType PortNetType(DataTypeKind kind) {
     case DataTypeKind::kTri0: return NetType::kTri0;
     case DataTypeKind::kTri1: return NetType::kTri1;
     case DataTypeKind::kTrireg: return NetType::kTrireg;
+    case DataTypeKind::kSupply0: return NetType::kSupply0;
+    case DataTypeKind::kSupply1: return NetType::kSupply1;
     case DataTypeKind::kUwire: return NetType::kUwire;
     default: return NetType::kNone;
   }
@@ -739,6 +781,23 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                 std::format("implicit named port connection '.{}' between "
                             "dissimilar net types",
                             port_name));
+          }
+        }
+      }
+
+      if (!is_implicit && conn_expr &&
+          conn_expr->kind == ExprKind::kIdentifier) {
+        NetType pnet = PortNetType(it->type_kind);
+        if (pnet != NetType::kNone) {
+          NetType snet = FindSignalNetType(conn_expr->text, parent_mod);
+          if (snet != NetType::kNone && snet != pnet) {
+            if (DissimilarNetTypeRequiresWarning(pnet, snet)) {
+              diag_.Warning(
+                  item->loc,
+                  std::format("port '{}' connected between dissimilar "
+                              "net types",
+                              binding.port_name));
+            }
           }
         }
       }
