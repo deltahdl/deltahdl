@@ -678,6 +678,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
 
   CheckPortCoercion(inst, item->loc);
   CheckUwirePortMerge(inst, item, mod);
+  CheckInterconnectPortMerge(inst, item, mod);
   // §5.12: Resolve attributes.
   inst.attrs = ResolveAttributes(item->attrs, diag_);
   mod->children.push_back(inst);
@@ -775,7 +776,8 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         NetType pnet = PortNetType(it->type_kind);
         if (pnet != NetType::kNone) {
           NetType snet = FindSignalNetType(conn_expr->text, parent_mod);
-          if (snet != NetType::kNone && snet != pnet) {
+          if (snet != NetType::kNone && snet != pnet &&
+              snet != NetType::kInterconnect && !it->is_interconnect) {
             diag_.Error(
                 item->loc,
                 std::format("implicit named port connection '.{}' between "
@@ -960,7 +962,8 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
         NetType pnet = PortNetType(port.type_kind);
         if (pnet != NetType::kNone) {
           NetType snet = FindSignalNetType(port.name, parent_mod);
-          if (snet != NetType::kNone && snet != pnet) {
+          if (snet != NetType::kNone && snet != pnet &&
+              snet != NetType::kInterconnect && !port.is_interconnect) {
             diag_.Error(
                 item->loc,
                 std::format("implicit .* port connection '.{}' between "
@@ -1212,6 +1215,38 @@ void Elaborator::CheckUwirePortMerge(const RtlirModuleInst& inst,
           item->loc,
           std::format("uwire net on port '{}' of instance '{}' is not "
                       "merged into a single net",
+                      binding.port_name, inst.inst_name));
+    }
+  }
+}
+
+void Elaborator::CheckInterconnectPortMerge(const RtlirModuleInst& inst,
+                                            const ModuleItem* item,
+                                            RtlirModule* parent_mod) {
+  if (!inst.resolved) return;
+  const auto& child_ports = inst.resolved->ports;
+
+  for (const auto& binding : inst.port_bindings) {
+    if (!binding.connection) continue;
+
+    auto port_it = std::find_if(
+        child_ports.begin(), child_ports.end(),
+        [&](const RtlirPort& p) { return p.name == binding.port_name; });
+    if (port_it == child_ports.end()) continue;
+
+    bool internal_is_interconnect = port_it->is_interconnect;
+
+    bool external_is_interconnect = false;
+    if (binding.connection->kind == ExprKind::kIdentifier) {
+      external_is_interconnect =
+          interconnect_names_.count(binding.connection->text) != 0;
+    }
+
+    if (internal_is_interconnect && external_is_interconnect) {
+      diag_.Error(
+          item->loc,
+          std::format("simulated net for port '{}' of instance '{}' has "
+                      "interconnect type at end of elaboration",
                       binding.port_name, inst.inst_name));
     }
   }

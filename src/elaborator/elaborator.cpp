@@ -407,6 +407,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     rp.width = EvalTypeWidth(port.data_type, typedefs_, param_scope);
     rp.is_signed = port.data_type.is_signed;
     rp.is_var = port_is_var;
+    rp.is_interconnect = port.data_type.is_interconnect;
     rp.default_value = port.default_value;
 
     for (auto* dim : port.unpacked_dims) {

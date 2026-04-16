@@ -95,6 +95,10 @@ class Elaborator {
   void CheckUwirePortMerge(const RtlirModuleInst& inst,
                            const ModuleItem* item, RtlirModule* parent_mod);
 
+  void CheckInterconnectPortMerge(const RtlirModuleInst& inst,
+                                  const ModuleItem* item,
+                                  RtlirModule* parent_mod);
+
   void ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
                                   const ModuleItem* item,
                                   RtlirModule* parent_mod);
