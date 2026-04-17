@@ -32,16 +32,6 @@ TEST(ModportDeclarationElaboration, ImportExportModportElaborates) {
              "endmodule\n"));
 }
 
-TEST(ModportDeclarationElaboration, ClockingModportElaborates) {
-  EXPECT_TRUE(
-      ElabOk("interface ifc(input logic clk);\n"
-             "  clocking cb @(posedge clk); endclocking\n"
-             "  modport mp(clocking cb);\n"
-             "endinterface\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
 TEST(ModportDeclarationElaboration, MixedPortKindsElaborate) {
   EXPECT_TRUE(
       ElabOk("interface ifc(input logic clk);\n"

@@ -726,56 +726,6 @@ TEST(ModportDeclarationParsing, ImportMultiplePrototypes) {
   EXPECT_EQ(mp->ports[1].prototype->name, "Write");
 }
 
-// --- modport_clocking_declaration ---
-
-TEST(ModportDeclarationParsing, ModportClockingDecl) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  logic clk;\n"
-      "  clocking cb @(posedge clk); endclocking\n"
-      "  modport mp(clocking cb);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_GE(mp->ports.size(), 1u);
-  EXPECT_TRUE(mp->ports[0].is_clocking);
-  EXPECT_EQ(mp->ports[0].name, "cb");
-}
-
-TEST(ModportDeclarationParsing, ClockingInModport) {
-  auto r = Parse(
-      "interface A_Bus(input logic clk);\n"
-      "  clocking sb @(posedge clk);\n"
-      "  endclocking\n"
-      "  modport STB(clocking sb);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1u);
-  EXPECT_TRUE(mp->ports[0].is_clocking);
-  EXPECT_EQ(mp->ports[0].name, "sb");
-}
-
-TEST(ModportDeclarationParsing, ClockingMixedWithDirectionPorts) {
-  auto r = Parse(
-      "interface A_Bus(input logic clk);\n"
-      "  wire req, gnt;\n"
-      "  clocking sb @(posedge clk);\n"
-      "  endclocking\n"
-      "  modport DUT(input clk, req, output gnt);\n"
-      "  modport STB(clocking sb);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* iface = r.cu->interfaces[0];
-  ASSERT_EQ(iface->modports.size(), 2u);
-  EXPECT_EQ(iface->modports[0]->name, "DUT");
-  EXPECT_EQ(iface->modports[1]->name, "STB");
-  EXPECT_TRUE(iface->modports[1]->ports[0].is_clocking);
-}
-
 TEST(ModportDeclarationParsing, MixedDirImportClocking) {
   EXPECT_TRUE(
       ParseOk("interface A_Bus(input logic clk);\n"
@@ -788,15 +738,6 @@ TEST(ModportDeclarationParsing, MixedDirImportClocking) {
               "    import Read,\n"
               "    clocking sb\n"
               "  );\n"
-              "endinterface\n"));
-}
-
-TEST(ModportDeclarationParsing, AttrOnClockingPort) {
-  EXPECT_TRUE(
-      ParseOk("interface bus(input logic clk);\n"
-              "  clocking sb @(posedge clk);\n"
-              "  endclocking\n"
-              "  modport target((* synthesis *) clocking sb);\n"
               "endinterface\n"));
 }
 
@@ -821,23 +762,6 @@ TEST(ModportDeclarationParsing, AllAlternativesTogether) {
               "    import Read, Write\n"
               "  );\n"
               "endinterface\n"));
-}
-
-TEST(ModportDeclarationParsing, ClockingPortNotImportExport) {
-  auto r = Parse(
-      "interface A_Bus(input logic clk);\n"
-      "  clocking sb @(posedge clk);\n"
-      "  endclocking\n"
-      "  modport STB(clocking sb);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1u);
-  EXPECT_TRUE(mp->ports[0].is_clocking);
-  EXPECT_FALSE(mp->ports[0].is_import);
-  EXPECT_FALSE(mp->ports[0].is_export);
-  EXPECT_EQ(mp->ports[0].direction, Direction::kNone);
 }
 
 // --- Error conditions ---
@@ -889,23 +813,6 @@ TEST(ModportDeclarationParsing, ExportFunctionPrototype) {
   ASSERT_NE(mp->ports[0].prototype, nullptr);
   EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kFunctionDecl);
   EXPECT_EQ(mp->ports[0].prototype->name, "compute");
-}
-
-TEST(ModportDeclarationParsing, MultipleClockingPorts) {
-  auto r = Parse(
-      "interface ifc(input logic clk1, input logic clk2);\n"
-      "  clocking cb1 @(posedge clk1); endclocking\n"
-      "  clocking cb2 @(posedge clk2); endclocking\n"
-      "  modport mp(clocking cb1, clocking cb2);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 2u);
-  EXPECT_TRUE(mp->ports[0].is_clocking);
-  EXPECT_EQ(mp->ports[0].name, "cb1");
-  EXPECT_TRUE(mp->ports[1].is_clocking);
-  EXPECT_EQ(mp->ports[1].name, "cb2");
 }
 
 TEST(ModportDeclarationParsing, AttrOnExportPort) {

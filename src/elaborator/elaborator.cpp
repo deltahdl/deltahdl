@@ -163,6 +163,13 @@ void Elaborator::ValidateModports() {
     }
   };
   for (auto* iface : unit_->interfaces) {
+    std::unordered_set<std::string_view> clocking_names;
+    for (const auto* item : iface->items) {
+      if (item->kind == ModuleItemKind::kClockingBlock &&
+          !item->name.empty()) {
+        clocking_names.insert(item->name);
+      }
+    }
     for (auto* mp : iface->modports) {
       std::unordered_set<std::string_view> port_names;
       for (const auto& port : mp->ports) {
@@ -181,6 +188,13 @@ void Elaborator::ValidateModports() {
                           "expression and cannot be declared as output or "
                           "inout",
                           port.name, mp->name));
+        }
+        if (port.is_clocking && !clocking_names.contains(port.name)) {
+          diag_.Error(
+              mp->loc,
+              std::format("clocking identifier '{}' in modport '{}' is not "
+                          "declared in interface '{}'",
+                          port.name, mp->name, iface->name));
         }
       }
     }
@@ -205,7 +219,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateNameSpaces();
   // §24.6: Anonymous program items share the surrounding scope's name space.
   ValidateAnonymousProgramNameSharing();
-  // §25.5.4: Validate modport port-id uniqueness and direction legality.
+  // §25.5.4, §25.5.5: Validate modport port-id uniqueness, direction
+  // legality, and clocking-block references.
   ValidateModports();
   // §3.12.1: Register CU-scope typedefs and classes before module elaboration.
   RegisterCuScopeItems();
