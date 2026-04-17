@@ -48,12 +48,12 @@ RtlirParamDecl* Elaborator::ResolveDefparamPath(RtlirModule* root,
   return nullptr;
 }
 
-void Elaborator::ApplyDefparams(RtlirModule* top, const ModuleDecl* decl) {
-  ScopeMap scope = BuildParamScope(top);
+void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
+  ScopeMap scope = BuildParamScope(mod);
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kDefparam) continue;
     for (const auto& [path_expr, val_expr] : item->defparam_assigns) {
-      auto* param = ResolveDefparamPath(top, path_expr);
+      auto* param = ResolveDefparamPath(mod, path_expr);
       if (!param) {
         diag_.Warning(item->loc, "defparam target not found");
         continue;
@@ -76,6 +76,16 @@ void Elaborator::ApplyDefparams(RtlirModule* top, const ModuleDecl* decl) {
       param->is_resolved = true;
       param->from_override = false;
     }
+  }
+}
+
+void Elaborator::ApplyDefparamsRecursively(RtlirModule* mod) {
+  if (!mod) return;
+  if (auto* decl = FindModule(mod->name)) {
+    ApplyDefparams(mod, decl);
+  }
+  for (auto& child : mod->children) {
+    ApplyDefparamsRecursively(child.resolved);
   }
 }
 

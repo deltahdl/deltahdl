@@ -137,7 +137,10 @@ class Elaborator {
                               RtlirModule* mod, const ScopeMap& scope);
 
   /// Apply defparam overrides after hierarchy is built.
-  void ApplyDefparams(RtlirModule* top, const ModuleDecl* decl);
+  void ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl);
+
+  /// Walk the hierarchy and apply each instance's defparams.
+  void ApplyDefparamsRecursively(RtlirModule* mod);
 
   /// Resolve a hierarchical path to find the target module and param name.
   RtlirParamDecl* ResolveDefparamPath(RtlirModule* root, const Expr* path_expr);

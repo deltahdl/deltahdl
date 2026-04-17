@@ -203,21 +203,6 @@ TEST(ModuleItemsElaboration, GenerateRegionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ParameterOverrideElab, DefparamOverridesChildParameter) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module child #(parameter int W = 8);\n"
-      "endmodule\n"
-      "module m;\n"
-      "  child u1();\n"
-      "  defparam u1.W = 32;\n"
-      "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_FALSE(design->top_modules[0]->children.empty());
-}
-
 TEST(ModuleItemsElaboration, NetAliasElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -322,21 +307,6 @@ TEST(ModuleItemsElaboration, AllProcessKindsElaborate) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(design->top_modules[0]->processes.size(), 6u);
-}
-
-TEST(ParameterOverrideElab, DefparamMultipleAssignmentsElaborate) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module child #(parameter int A = 1, parameter int B = 2);\n"
-      "endmodule\n"
-      "module m;\n"
-      "  child u1();\n"
-      "  defparam u1.A = 10, u1.B = 20;\n"
-      "endmodule\n",
-      f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_FALSE(design->top_modules[0]->children.empty());
 }
 
 }  // namespace

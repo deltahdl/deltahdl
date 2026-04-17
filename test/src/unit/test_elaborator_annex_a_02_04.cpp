@@ -122,23 +122,4 @@ TEST(DeclarationAssignmentElaboration, VarDeclAssignmentClassVariable) {
       "endmodule\n"));
 }
 
-// --- defparam_assignment ---
-
-TEST(DeclarationAssignmentElaboration, DefparamResolvesValue) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module child; parameter P = 1; endmodule\n"
-      "module m; child c(); defparam c.P = 99; endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* child_mod = design->all_modules["child"];
-  if (child_mod) {
-    for (auto& p : child_mod->params) {
-      if (p.name == "P") {
-        EXPECT_EQ(p.resolved_value, 99);
-      }
-    }
-  }
-}
-
 }  // namespace

@@ -168,7 +168,7 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   auto* top = ElaborateModule(mod_decl, empty_params);
   if (!top) return nullptr;
 
-  ApplyDefparams(top, mod_decl);
+  ApplyDefparamsRecursively(top);
 
   design->top_modules.push_back(top);
   // §3.1: Register the full instantiation hierarchy in the design's module map.
