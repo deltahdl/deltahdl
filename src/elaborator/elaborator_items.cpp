@@ -429,13 +429,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateParamDecl(item, mod);
       break;
     case ModuleItemKind::kGenerateIf:
-      ElaborateGenerateIf(item, mod, BuildParamScope(mod));
-      break;
     case ModuleItemKind::kGenerateCase:
-      ElaborateGenerateCase(item, mod, BuildParamScope(mod));
-      break;
     case ModuleItemKind::kGenerateFor:
-      ElaborateGenerateFor(item, mod, BuildParamScope(mod));
+      pending_generates_.push_back({item, mod});
       break;
     case ModuleItemKind::kTypedef:
       ElaborateTypedef(item, mod);
@@ -1644,6 +1640,23 @@ ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
     }
   }
   return scope;
+}
+
+void Elaborator::ProcessPendingGenerate(ModuleItem* item, RtlirModule* mod) {
+  auto scope = BuildParamScope(mod);
+  switch (item->kind) {
+    case ModuleItemKind::kGenerateIf:
+      ElaborateGenerateIf(item, mod, scope);
+      break;
+    case ModuleItemKind::kGenerateCase:
+      ElaborateGenerateCase(item, mod, scope);
+      break;
+    case ModuleItemKind::kGenerateFor:
+      ElaborateGenerateFor(item, mod, scope);
+      break;
+    default:
+      break;
+  }
 }
 
 void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,

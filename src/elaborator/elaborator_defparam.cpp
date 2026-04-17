@@ -72,24 +72,27 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
   ScopeMap scope = BuildParamScope(mod);
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kDefparam) continue;
-    for (const auto& [path_expr, val_expr] : item->defparam_assigns) {
+    for (size_t idx = 0; idx < item->defparam_assigns.size(); ++idx) {
+      auto key = std::make_tuple(mod, item, idx);
+      if (applied_defparams_.count(key)) continue;
+      const auto& [path_expr, val_expr] = item->defparam_assigns[idx];
       RtlirModule* target_mod = nullptr;
       auto* param = ResolveDefparamPath(mod, path_expr, &target_mod);
-      if (!param) {
-        diag_.Warning(item->loc, "defparam target not found");
-        continue;
-      }
+      if (!param) continue;
       if (param->is_type_param) {
         diag_.Error(item->loc, "defparam cannot override a type parameter");
+        applied_defparams_.insert(key);
         continue;
       }
       if (param->is_localparam) {
         diag_.Error(item->loc, "defparam cannot override a local parameter");
+        applied_defparams_.insert(key);
         continue;
       }
       auto val = ConstEvalInt(val_expr, scope);
       if (!val) {
         diag_.Warning(item->loc, "defparam value is not constant");
+        applied_defparams_.insert(key);
         continue;
       }
       // §23.10: defparam wins over a module instance parameter assignment.
@@ -98,6 +101,7 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
       param->from_override = true;
       // §23.10.3: recompute dependent parameters now that the source changed.
       RecomputeDependentParams(target_mod);
+      applied_defparams_.insert(key);
     }
   }
 }
@@ -109,6 +113,24 @@ void Elaborator::ApplyDefparamsRecursively(RtlirModule* mod) {
   }
   for (auto& child : mod->children) {
     ApplyDefparamsRecursively(child.resolved);
+  }
+}
+
+void Elaborator::WarnUnresolvedDefparams(RtlirModule* mod) {
+  if (!mod) return;
+  if (auto* decl = FindModule(mod->name)) {
+    for (const auto* item : decl->items) {
+      if (item->kind != ModuleItemKind::kDefparam) continue;
+      for (size_t idx = 0; idx < item->defparam_assigns.size(); ++idx) {
+        auto key = std::make_tuple(mod, item, idx);
+        if (!applied_defparams_.count(key)) {
+          diag_.Warning(item->loc, "defparam target not found");
+        }
+      }
+    }
+  }
+  for (auto& child : mod->children) {
+    WarnUnresolvedDefparams(child.resolved);
   }
 }
 

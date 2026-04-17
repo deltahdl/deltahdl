@@ -4,6 +4,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -141,6 +142,13 @@ class Elaborator {
 
   /// Walk the hierarchy and apply each instance's defparams.
   void ApplyDefparamsRecursively(RtlirModule* mod);
+
+  /// Walk the hierarchy emitting warnings for defparams whose target
+  /// never resolved across all iterations of the elaboration algorithm.
+  void WarnUnresolvedDefparams(RtlirModule* mod);
+
+  /// Evaluate a deferred generate construct.
+  void ProcessPendingGenerate(ModuleItem* item, RtlirModule* mod);
 
   /// Resolve a hierarchical path to find the target module and param name.
   /// If out_mod is non-null, receives the module that owns the returned param.
@@ -539,6 +547,20 @@ class Elaborator {
   std::unordered_map<std::string_view,
                      std::unordered_map<std::string_view, ClockingSignalInfo>>
       clocking_signals_;  // block_name → (signal_name → info)
+
+  // §23.10.4.1: generate constructs encountered during step (b) hierarchy
+  // expansion are enqueued here and evaluated in step (c).
+  struct PendingGenerate {
+    ModuleItem* item;
+    RtlirModule* mod;
+  };
+  std::vector<PendingGenerate> pending_generates_;
+
+  // §23.10.4.1: defparam assignments that have been applied; used to
+  // defer unresolvable targets across iterations and to emit warnings
+  // for those that never resolve.
+  std::set<std::tuple<RtlirModule*, const ModuleItem*, size_t>>
+      applied_defparams_;
 };
 
 // Free functions shared across elaborator translation units.

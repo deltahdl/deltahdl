@@ -165,10 +165,21 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
 
   auto* design = arena_.Create<RtlirDesign>();
   ParamList empty_params;
+  pending_generates_.clear();
+  applied_defparams_.clear();
   auto* top = ElaborateModule(mod_decl, empty_params);
   if (!top) return nullptr;
 
-  ApplyDefparamsRecursively(top);
+  while (true) {
+    ApplyDefparamsRecursively(top);
+    if (pending_generates_.empty()) break;
+    std::vector<PendingGenerate> batch;
+    batch.swap(pending_generates_);
+    for (auto& pg : batch) {
+      ProcessPendingGenerate(pg.item, pg.mod);
+    }
+  }
+  WarnUnresolvedDefparams(top);
 
   design->top_modules.push_back(top);
   // §3.1: Register the full instantiation hierarchy in the design's module map.
