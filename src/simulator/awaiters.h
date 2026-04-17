@@ -43,7 +43,9 @@ struct DelayAwaiter {
   }
 
   Region SelectDelayRegion() const {
-    if (delay_ticks != 0) return Region::kActive;
+    if (delay_ticks != 0) {
+      return ctx.IsReactiveContext() ? Region::kReactive : Region::kActive;
+    }
     return ctx.IsReactiveContext() ? Region::kReInactive : Region::kInactive;
   }
 
@@ -91,9 +93,10 @@ struct EventAwaiter {
       }
       if (!var) continue;
       if (var->is_event) {
-        var->AddWatcher([h, proc]() mutable {
+        auto* ctx_ptr = &ctx;
+        var->AddWatcher([h, proc, ctx_ptr]() mutable {
           if (proc && !proc->active) return true;
-          h.resume();
+          ResumeMaybeReactive(h, proc, *ctx_ptr);
           return true;
         });
         continue;
@@ -103,7 +106,7 @@ struct EventAwaiter {
       var->AddWatcher([h, var, edge = ev.edge, iff_cond = ev.iff_condition,
                        ctx_ptr, proc]() mutable {
         if (proc && !proc->active) return true;
-        return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr);
+        return HandleEdgeEvent(h, var, edge, iff_cond, *ctx_ptr, proc);
       });
     }
   }
@@ -146,7 +149,7 @@ struct EventAwaiter {
 
   static bool HandleEdgeEvent(std::coroutine_handle<>& h, Variable* var,
                               Edge edge, const Expr* iff_cond,
-                              SimContext& ctx) {
+                              SimContext& ctx, Process* proc) {
     if (!CheckEdge(var, edge)) {
       var->prev_value = var->value;
       return false;
@@ -158,8 +161,24 @@ struct EventAwaiter {
         return false;
       }
     }
-    h.resume();
+    ResumeMaybeReactive(h, proc, ctx);
     return true;
+  }
+
+  static void ResumeMaybeReactive(std::coroutine_handle<> h, Process* proc,
+                                  SimContext& ctx) {
+    if (proc && proc->is_reactive) {
+      auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+      event->callback = [h, proc, &ctx]() mutable {
+        if (!proc->active) return;
+        ctx.SetCurrentProcess(proc);
+        h.resume();
+      };
+      ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kReactive,
+                                       event);
+      return;
+    }
+    h.resume();
   }
 };
 
@@ -237,13 +256,14 @@ struct AnyChangeAwaiter {
 
   void await_suspend(std::coroutine_handle<> h) {
     auto* proc = ctx.CurrentProcess();
+    auto* ctx_ptr = &ctx;
     for (auto name : var_names) {
       auto* var = ctx.FindVariable(name);
       if (!var) continue;
       var->prev_value = var->value;
-      var->AddWatcher([h, proc]() mutable {
+      var->AddWatcher([h, proc, ctx_ptr]() mutable {
         if (proc && !proc->active) return true;
-        h.resume();
+        EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
         return true;
       });
     }

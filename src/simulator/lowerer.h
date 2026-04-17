@@ -36,7 +36,7 @@ class Lowerer {
   void LowerProcesses(const std::vector<RtlirProcess>& procs,
                       bool from_program);
   void LowerProcess(const RtlirProcess& proc, bool from_program);
-  void LowerContAssign(const RtlirContAssign& ca);
+  void LowerContAssign(const RtlirContAssign& ca, bool from_program);
   void LowerClassDecl(const ClassDecl* cls);
   void LowerImports(const RtlirModule* mod);
   void LowerPackageItem(ModuleItem* item);

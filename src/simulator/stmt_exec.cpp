@@ -889,10 +889,11 @@ static StmtResult ExecEventTriggerImpl(const Stmt* stmt, SimContext& ctx) {
   auto pending = std::move(var->watchers);
   var->watchers.clear();
   auto& sched = ctx.GetScheduler();
+  auto region = ctx.IsReactiveContext() ? Region::kReactive : Region::kActive;
   for (auto& cb : pending) {
     auto* event = sched.GetEventPool().Acquire();
     event->callback = std::move(cb);
-    sched.ScheduleEvent(ctx.CurrentTime(), Region::kActive, event);
+    sched.ScheduleEvent(ctx.CurrentTime(), region, event);
   }
   return StmtResult::kDone;
 }
@@ -918,19 +919,22 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
   auto time = ctx.CurrentTime();
   time.ticks += delay;
 
+  bool reactive = ctx.IsReactiveContext();
   auto* nba_event = sched.GetEventPool().Acquire();
-  nba_event->callback = [var, event_name, &ctx]() {
+  nba_event->callback = [var, event_name, reactive, &ctx]() {
     ctx.SetEventTriggered(event_name);
     auto pending = std::move(var->watchers);
     var->watchers.clear();
     auto& s = ctx.GetScheduler();
+    auto wake_region = reactive ? Region::kReactive : Region::kActive;
     for (auto& cb : pending) {
       auto* ev = s.GetEventPool().Acquire();
       ev->callback = std::move(cb);
-      s.ScheduleEvent(ctx.CurrentTime(), Region::kActive, ev);
+      s.ScheduleEvent(ctx.CurrentTime(), wake_region, ev);
     }
   };
-  sched.ScheduleEvent(time, Region::kNBA, nba_event);
+  sched.ScheduleEvent(time, reactive ? Region::kReNBA : Region::kNBA,
+                      nba_event);
   return StmtResult::kDone;
 }
 
@@ -1133,6 +1137,10 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     auto* p = arena.Create<Process>();
     if (spawning_proc) spawning_proc->children.push_back(p);
     p->kind = ProcessKind::kInitial;
+    if (spawning_proc) {
+      p->is_reactive = spawning_proc->is_reactive;
+      p->home_region = spawning_proc->home_region;
+    }
     p->coro =
         ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)
             .Release();
@@ -1173,7 +1181,10 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       ctx.SetCurrentProcess(p);
       p->Resume();
     };
-    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive, event);
+    auto fork_region =
+        (spawning_proc && spawning_proc->is_reactive) ? Region::kReactive
+                                                      : Region::kActive;
+    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), fork_region, event);
   }
 
   if (stmt->join_kind != TokenKind::kKwJoinNone) {
@@ -1347,9 +1358,17 @@ static void SpawnNbaEventProcess(SimCoroutine coro, SimContext& ctx,
   auto* p = arena.Create<Process>();
   p->kind = ProcessKind::kInitial;
   p->coro = coro.Release();
+  auto* parent = ctx.CurrentProcess();
+  if (parent && parent->is_reactive) {
+    p->is_reactive = true;
+    p->home_region = Region::kReactive;
+  }
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-  event->callback = [p]() { p->Resume(); };
-  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive, event);
+  event->callback = [p, &ctx]() {
+    ctx.SetCurrentProcess(p);
+    p->Resume();
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), p->home_region, event);
 }
 
 // §9.4.5: Nonblocking assignment with intra-assignment event or repeat event.

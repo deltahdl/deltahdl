@@ -274,7 +274,7 @@ static void ScheduleProcess(Process* proc, SimContext& ctx) {
     ctx.SetCurrentProcess(proc);
     proc->Resume();
   };
-  sched.ScheduleEvent(SimTime{0}, Region::kActive, event);
+  sched.ScheduleEvent(SimTime{0}, proc->home_region, event);
 }
 
 // --- Module lowering ---
@@ -854,7 +854,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   LowerAliases(mod);
   LowerProcesses(mod->processes, mod->is_program);
   for (const auto& ca : mod->assigns) {
-    LowerContAssign(ca);
+    LowerContAssign(ca, mod->is_program);
   }
   // §23.6: Recursively lower child module instances for hierarchical access.
   LowerChildModules(mod);
@@ -873,7 +873,8 @@ static void RegisterSensitivity(const RtlirProcess& proc, Process* p,
 void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program) {
   auto* p = arena_.Create<Process>();
   p->id = next_id_++;
-  p->home_region = Region::kActive;
+  p->home_region = from_program ? Region::kReactive : Region::kActive;
+  p->is_reactive = from_program;
   p->inst_prefix = inst_prefix_;
 
   switch (proc.kind) {
@@ -919,11 +920,12 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program) {
 
 // --- Continuous assignment lowering ---
 
-void Lowerer::LowerContAssign(const RtlirContAssign& ca) {
+void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   auto* p = arena_.Create<Process>();
   p->kind = ProcessKind::kContAssign;
   p->id = next_id_++;
-  p->home_region = Region::kActive;
+  p->home_region = from_program ? Region::kReactive : Region::kActive;
+  p->is_reactive = from_program;
   ContAssignParams cap;
   cap.lhs = ca.lhs;
   cap.rhs = ca.rhs;
@@ -1022,6 +1024,9 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
 
     // Lower child processes (inst_prefix_ is set on each Process).
     LowerProcesses(child.resolved->processes, child.resolved->is_program);
+    for (const auto& ca : child.resolved->assigns) {
+      LowerContAssign(ca, child.resolved->is_program);
+    }
 
     // Recurse into grandchildren.
     LowerChildModules(child.resolved);
