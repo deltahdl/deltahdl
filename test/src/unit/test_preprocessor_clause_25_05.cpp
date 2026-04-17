@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, Modport) {
+TEST(InterfaceModport, MasterSlaveModportDeclarations) {
   auto r = ParseWithPreprocessor(
       "interface myif;\n"
       "  logic [7:0] data;\n"

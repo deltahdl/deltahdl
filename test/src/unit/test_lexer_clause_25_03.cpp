@@ -32,11 +32,6 @@ TEST(InterfaceItemsLexing, EndinterfaceKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndinterface);
 }
 
-TEST(InterfaceItemsLexing, ModportKeyword) {
-  auto r = LexOne("modport");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwModport);
-}
-
 TEST(InterfaceItemsLexing, InterfaceKeywordSequence) {
   auto tokens = Lex("interface endinterface modport extern");
   ASSERT_GE(tokens.size(), 4u);

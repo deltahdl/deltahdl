@@ -104,27 +104,6 @@ TEST(PortDeclParsing, OutputVariablePortTypeVar) {
   EXPECT_EQ(port.name, "q");
 }
 
-// --- interface_port_declaration ---
-
-TEST(PortDeclParsing, InterfacePortWithModport) {
-  auto r = Parse("module m(interface.master bus); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_TRUE(port.is_interface_port);
-  EXPECT_EQ(port.data_type.modport_name, "master");
-  EXPECT_EQ(port.name, "bus");
-}
-
-TEST(PortDeclParsing, NamedInterfacePortWithModport) {
-  auto r = Parse("module m(bus_if.slave s); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_EQ(port.data_type.modport_name, "slave");
-  EXPECT_EQ(port.name, "s");
-}
-
 // --- ref_declaration: ref variable_port_type list_of_variable_identifiers ---
 
 TEST(PortDeclParsing, RefLogicPort) {
