@@ -148,6 +148,45 @@ void Elaborator::ValidateAnonymousProgramNameSharing() {
   }
 }
 
+void Elaborator::ValidateModports() {
+  auto is_literal_expr = [](const Expr* e) {
+    if (!e) return false;
+    switch (e->kind) {
+      case ExprKind::kIntegerLiteral:
+      case ExprKind::kRealLiteral:
+      case ExprKind::kTimeLiteral:
+      case ExprKind::kStringLiteral:
+      case ExprKind::kUnbasedUnsizedLiteral:
+        return true;
+      default:
+        return false;
+    }
+  };
+  for (auto* iface : unit_->interfaces) {
+    for (auto* mp : iface->modports) {
+      std::unordered_set<std::string_view> port_names;
+      for (const auto& port : mp->ports) {
+        if (port.name.empty()) continue;
+        if (!port_names.insert(port.name).second) {
+          diag_.Error(mp->loc,
+                      std::format("duplicate port-id '{}' in modport '{}'",
+                                  port.name, mp->name));
+        }
+        if (is_literal_expr(port.expr) &&
+            (port.direction == Direction::kOutput ||
+             port.direction == Direction::kInout)) {
+          diag_.Error(
+              mp->loc,
+              std::format("port-id '{}' in modport '{}' has a constant port "
+                          "expression and cannot be declared as output or "
+                          "inout",
+                          port.name, mp->name));
+        }
+      }
+    }
+  }
+}
+
 // §3.1: Recursively collect all elaborated modules from the instantiation
 // hierarchy into the design's all_modules map.
 static void CollectAllModules(
@@ -166,6 +205,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateNameSpaces();
   // §24.6: Anonymous program items share the surrounding scope's name space.
   ValidateAnonymousProgramNameSharing();
+  // §25.5.4: Validate modport port-id uniqueness and direction legality.
+  ValidateModports();
   // §3.12.1: Register CU-scope typedefs and classes before module elaboration.
   RegisterCuScopeItems();
   // §8.13: Check that no class extends a :final class.

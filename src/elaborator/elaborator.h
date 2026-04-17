@@ -48,6 +48,10 @@ class Elaborator {
   /// are an error.
   void ValidateAnonymousProgramNameSharing();
 
+  /// §25.5.4: Validate per-modport port-id uniqueness and reject constant
+  /// port expressions paired with output or inout direction.
+  void ValidateModports();
+
   /// §3.12.1: Register CU-scope typedefs/classes before module elaboration.
   void RegisterCuScopeItems();
 
