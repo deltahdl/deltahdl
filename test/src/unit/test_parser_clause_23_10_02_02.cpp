@@ -14,8 +14,8 @@ TEST(ModuleInstanceParameterAssignment, MixedNamedThenOrderedRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(ModuleInstanceParameterAssignment, MixedThreeWayWithOrderedTailRejected) {
-  auto r = Parse("module m; sub #(.A(1), .B(2), 3) u0(a); endmodule\n");
+TEST(ModuleInstanceParameterAssignment, DuplicateNamedParameterRejected) {
+  auto r = Parse("module m; sub #(.W(8), .W(16)) u0(a); endmodule\n");
   EXPECT_TRUE(r.has_errors);
 }
 

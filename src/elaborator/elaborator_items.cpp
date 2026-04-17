@@ -860,7 +860,18 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
       if (val) child_params.push_back({targets[i], *val});
     }
   } else {
+    std::unordered_set<std::string_view> overridable;
+    for (const auto& [dname, dexpr] : child_decl->params) {
+      if (child_decl->localparam_port_names.count(dname) > 0) continue;
+      overridable.insert(dname);
+    }
     for (const auto& [pname, pexpr] : item->inst_params) {
+      if (overridable.count(pname) == 0) {
+        diag_.Error(item->loc,
+                    std::format("module '{}' has no parameter '{}'",
+                                item->inst_module, pname));
+        continue;
+      }
       if (!pexpr) continue;
       auto val = ConstEvalInt(pexpr, parent_scope);
       if (val) child_params.push_back({pname, *val});

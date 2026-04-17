@@ -1,3 +1,5 @@
+#include <format>
+
 #include "parser/parser.h"
 
 namespace delta {
@@ -95,12 +97,16 @@ bool Parser::ParseParamValueEntry(
 
 void Parser::ParseParamValueAssignment(
     std::vector<std::pair<std::string_view, Expr*>>& out) {
+  size_t start = out.size();
+  std::vector<SourceLoc> entry_locs;
   Expect(TokenKind::kLParen);
   if (!Check(TokenKind::kRParen)) {
+    entry_locs.push_back(CurrentLoc());
     bool named = ParseParamValueEntry(out);
     bool mixed = false;
     while (Match(TokenKind::kComma)) {
       auto entry_loc = CurrentLoc();
+      entry_locs.push_back(entry_loc);
       bool next_named = ParseParamValueEntry(out);
       if (!mixed && next_named != named) {
         diag_.Error(
@@ -111,6 +117,20 @@ void Parser::ParseParamValueAssignment(
     }
   }
   Expect(TokenKind::kRParen);
+  for (size_t i = 0; i < entry_locs.size(); ++i) {
+    auto name = out[start + i].first;
+    if (name.empty()) continue;
+    for (size_t j = i + 1; j < entry_locs.size(); ++j) {
+      if (out[start + j].first == name) {
+        diag_.Error(
+            entry_locs[j],
+            std::format("duplicate parameter name '{}' in parameter value "
+                        "assignment",
+                        name));
+        break;
+      }
+    }
+  }
 }
 
 bool Parser::ParsePortConnection(ModuleItem* item) {

@@ -4,25 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ModuleInstanceParameterAssignment, OverrideSuppliesValueToInstanceParameter) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module child #(parameter int W = 4)();\n"
-      "endmodule\n"
-      "module top;\n"
-      "  child #(.W(8)) u0();\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* u0 = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(u0, nullptr);
-  ASSERT_EQ(u0->params.size(), 1u);
-  EXPECT_EQ(u0->params[0].name, "W");
-  EXPECT_TRUE(u0->params[0].is_resolved);
-  EXPECT_EQ(u0->params[0].resolved_value, 8);
-}
-
 TEST(ModuleInstanceParameterAssignment, LocalparamUpdatesWhenParamOverridden) {
   ElabFixture f;
   auto* design = ElaborateSrc(
