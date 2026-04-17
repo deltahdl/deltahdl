@@ -708,6 +708,13 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       if (child && child->decl_kind == ModuleDeclKind::kProgram) {
         program_inst_names_.insert(item->inst_name);
       }
+      if (decl->decl_kind == ModuleDeclKind::kInterface && child &&
+          child->decl_kind == ModuleDeclKind::kModule) {
+        diag_.Error(item->loc,
+                    std::format("module '{}' cannot be instantiated inside "
+                                "interface '{}'",
+                                item->inst_module, decl->name));
+      }
     }
     // §24.3: Portless nested programs are implicitly instantiated under
     // their declaration name.
@@ -716,6 +723,15 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
         item->nested_module_decl->decl_kind == ModuleDeclKind::kProgram &&
         item->nested_module_decl->ports.empty()) {
       program_inst_names_.insert(item->nested_module_decl->name);
+    }
+    if (decl->decl_kind == ModuleDeclKind::kInterface &&
+        item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl &&
+        item->nested_module_decl->decl_kind == ModuleDeclKind::kModule) {
+      diag_.Error(item->loc,
+                  std::format("module '{}' cannot be declared inside "
+                              "interface '{}'",
+                              item->nested_module_decl->name, decl->name));
     }
   }
   // §6.20: Parameter port list names are constants that never change.
@@ -763,8 +779,10 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   }
   // §23.4: Implicitly instantiate portless nested modules that were not
   // explicitly instantiated.
+  // §25.3: Interfaces are never implicitly instantiated.
   for (const auto& [name, nested_decl] : local_nested_modules) {
     if (!nested_decl->ports.empty()) continue;
+    if (nested_decl->decl_kind == ModuleDeclKind::kInterface) continue;
     bool explicitly_instantiated = false;
     for (const auto& child : mod->children) {
       if (child.module_name == name) {

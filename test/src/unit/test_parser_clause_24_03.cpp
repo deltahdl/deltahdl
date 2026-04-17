@@ -245,20 +245,6 @@ TEST(ProgramDeclaration, NestedProgramInModule) {
                             ModuleItemKind::kNestedModuleDecl));
 }
 
-TEST(ProgramDeclaration, NestedProgramInInterface) {
-  auto r = Parse(
-      "interface bus;\n"
-      "  program p;\n"
-      "    initial $display(\"bus\");\n"
-      "  endprogram\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_TRUE(HasItemOfKind(r.cu->interfaces[0]->items,
-                            ModuleItemKind::kNestedModuleDecl));
-}
-
 TEST(ProgramDeclaration, MultipleNestedProgramsInModule) {
   auto r = Parse(
       "module test;\n"

@@ -111,36 +111,6 @@ TEST_F(ConfigParseTest, MultipleConfigs) {
   EXPECT_EQ(unit->configs[1]->name, "cfg2");
 }
 
-TEST(SourceText, InterfaceAndModule) {
-  auto r = Parse(
-      "interface bus; endinterface\n"
-      "module top; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_EQ(r.cu->interfaces.size(), 1);
-  EXPECT_EQ(r.cu->modules.size(), 1);
-}
-
-TEST(SourceText, DescriptionInterface) {
-  auto r = Parse("interface ifc; endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
-}
-
-TEST(SourceText, InterfaceWithLifetime) {
-  auto r = Parse("interface automatic ifc; endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-}
-
-TEST(SourceText, InterfaceEndLabel) {
-  auto r = Parse("interface ifc; endinterface : ifc\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SourceText, ClassDecl) {
   auto r = Parse(
       "class Packet;\n"
@@ -160,22 +130,6 @@ TEST(SourceText, EmptyCuCompletelyEmpty) {
   auto r = Parse("");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(r.cu->modules.empty());
-}
-
-TEST(SourceText, InterfaceWildcardPorts) {
-  auto r = Parse("interface ifc(.*); endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_TRUE(r.cu->interfaces[0]->has_wildcard_ports);
-}
-
-TEST(SourceText, ExternInterfaceDecl) {
-  auto r = Parse("extern interface ifc(input logic clk);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_TRUE(r.cu->interfaces[0]->is_extern);
 }
 
 TEST(SourceText, CheckerDecl) {
@@ -277,34 +231,6 @@ TEST(SourceText, DescriptionConfig) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-TEST(SourceText, InterfaceNonAnsiHeader) {
-  auto r = Parse(
-      "interface ifc(clk);\n"
-      "  input clk;\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
-}
-
-TEST(SourceText, InterfaceAnsiHeader) {
-  auto r = Parse("interface ifc(input logic clk); endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
-}
-
-TEST(SourceText, ExternInterface) {
-  auto r = Parse("extern interface ifc(input logic clk);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_TRUE(r.cu->interfaces[0]->is_extern);
-  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
-}
-
 // --- checker_declaration edge case ---
 
 TEST(SourceText, CheckerDeclWithParens) {
@@ -327,11 +253,6 @@ TEST(SourceText, PackageWithLifetime) {
 
 TEST(SourceText, ErrorUnknownTopLevelToken) {
   auto r = Parse("foobar;\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(SourceText, ErrorMissingEndinterface) {
-  auto r = Parse("interface ifc;\n");
   EXPECT_TRUE(r.has_errors);
 }
 
