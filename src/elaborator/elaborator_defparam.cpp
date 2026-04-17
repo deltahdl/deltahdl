@@ -102,6 +102,19 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
       // §23.10.3: recompute dependent parameters now that the source changed.
       RecomputeDependentParams(target_mod);
       applied_defparams_.insert(key);
+      early_defparam_resolutions_.push_back(
+          {mod, path_expr, param, item->loc});
+    }
+  }
+}
+
+void Elaborator::VerifyEarlyResolvedDefparams() {
+  for (const auto& rec : early_defparam_resolutions_) {
+    auto* now = ResolveDefparamPath(rec.root, rec.path_expr);
+    if (now != nullptr && now != rec.resolved) {
+      diag_.Error(rec.loc,
+                  "defparam hierarchical name resolves differently after "
+                  "full elaboration than during early resolution");
     }
   }
 }

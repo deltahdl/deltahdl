@@ -147,6 +147,10 @@ class Elaborator {
   /// never resolved across all iterations of the elaboration algorithm.
   void WarnUnresolvedDefparams(RtlirModule* mod);
 
+  /// §23.10.4.2: error if any early-resolved defparam path now binds to a
+  /// different parameter once elaboration has completed.
+  void VerifyEarlyResolvedDefparams();
+
   /// Evaluate a deferred generate construct.
   void ProcessPendingGenerate(ModuleItem* item, RtlirModule* mod);
 
@@ -561,6 +565,16 @@ class Elaborator {
   // for those that never resolve.
   std::set<std::tuple<RtlirModule*, const ModuleItem*, size_t>>
       applied_defparams_;
+
+  // §23.10.4.2: snapshot of each defparam path's early-resolved target so
+  // we can detect bindings that change after the hierarchy is complete.
+  struct EarlyDefparamResolution {
+    RtlirModule* root;
+    const Expr* path_expr;
+    RtlirParamDecl* resolved;
+    SourceLoc loc;
+  };
+  std::vector<EarlyDefparamResolution> early_defparam_resolutions_;
 };
 
 // Free functions shared across elaborator translation units.
