@@ -188,6 +188,11 @@ bool Parser::TryParseMiscKeywordItem(std::vector<ModuleItem*>& items) {
     ParseVarDeclList(items, dtype);
     return true;
   }
+  if (Check(TokenKind::kKwBind)) {
+    auto* bd = ParseBindDirective();
+    if (current_module_) current_module_->bind_directives.push_back(bd);
+    return true;
+  }
   return false;
 }
 

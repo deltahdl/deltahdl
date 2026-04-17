@@ -477,6 +477,14 @@ class Elaborator {
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 
+  /// §23.11: After elaboration, walk the hierarchy and apply bind directives.
+  void ApplyBindDirectives(RtlirModule* top);
+  void WalkForBind(RtlirModule* mod, const std::string& hier_path,
+                   const std::vector<BindDirective*>& binds,
+                   bool under_bind,
+                   std::unordered_set<RtlirModule*>& visited);
+  void ApplyBindInstance(BindDirective* bd, RtlirModule* target);
+
   Arena& arena_;
   DiagEngine& diag_;
   CompilationUnit* unit_;

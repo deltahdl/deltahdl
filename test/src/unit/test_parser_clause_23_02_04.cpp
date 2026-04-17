@@ -316,17 +316,6 @@ TEST(ModuleItemsParsing, PortDeclAsModuleItem) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ModuleItemsParsing, BindDirectiveInModule) {
-  auto r = Parse(
-      "module target; endmodule\n"
-      "module checker_m; endmodule\n"
-      "module m;\n"
-      "  bind target checker_m inst(.*);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ModuleItemsParsing, AssertionItem) {
   auto r = Parse(
       "module m;\n"

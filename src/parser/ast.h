@@ -19,6 +19,7 @@ struct Stmt;
 struct ModuleItem;
 struct ModuleDecl;
 struct SpecifyItem;
+struct BindDirective;
 
 // --- Expressions ---
 
@@ -717,6 +718,7 @@ struct ModuleDecl {
   std::unordered_set<std::string_view> localparam_port_names;  // §6.20.4
   bool has_param_port_list = false;  // §6.20.1: #(...) was present.
   std::vector<ModportDecl*> modports;
+  std::vector<BindDirective*> bind_directives;  // §23.11
 
   bool is_cell = false;  // §22.10: tagged by `celldefine
 

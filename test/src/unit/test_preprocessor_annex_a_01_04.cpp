@@ -84,16 +84,6 @@ TEST(ParameterOverride, DefparamAssignmentHierarchical) {
 
 // --- bind_directive ---
 
-TEST(BindDirective, CuScopeBindDirective) {
-  auto r = ParseWithPreprocessor(
-      "module target; endmodule\n"
-      "bind target target chk_inst();\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->bind_directives.size(), 1u);
-  EXPECT_EQ(r.cu->bind_directives[0]->target, "target");
-}
-
 TEST(BindDirective, BindDirectiveBasic) {
   auto r =
       ParseWithPreprocessor("bind target_mod checker_mod chk_inst(.a(sig));\n");

@@ -183,6 +183,9 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   VerifyEarlyResolvedDefparams();
   WarnUnresolvedDefparams(top);
 
+  // §23.11: Bind directives are applied after normal elaboration.
+  ApplyBindDirectives(top);
+
   design->top_modules.push_back(top);
   // §3.1: Register the full instantiation hierarchy in the design's module map.
   CollectAllModules(top, design->all_modules);
@@ -1441,6 +1444,213 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ValidateStructInitPattern(item);
   TrackEnumVariable(item);
   ValidateVarDeclTypes(item);
+}
+
+// --- §23.11: bind directives ---
+
+static bool IsBindTargetScope(std::string_view target,
+                              const CompilationUnit* unit) {
+  if (target.find('.') != std::string_view::npos) return false;
+  for (auto* m : unit->modules)
+    if (m->name == target) return true;
+  for (auto* i : unit->interfaces)
+    if (i->name == target) return true;
+  for (auto* c : unit->checkers)
+    if (c->name == target) return true;
+  for (auto* p : unit->programs)
+    if (p->name == target) return true;
+  return false;
+}
+
+static std::unordered_set<std::string_view> CollectDeclaredNames(
+    const RtlirModule* mod) {
+  std::unordered_set<std::string_view> names;
+  for (const auto& v : mod->variables) names.insert(v.name);
+  for (const auto& n : mod->nets) names.insert(n.name);
+  for (const auto& p : mod->ports) names.insert(p.name);
+  for (const auto& c : mod->children) {
+    if (!c.inst_name.empty()) names.insert(c.inst_name);
+  }
+  return names;
+}
+
+void Elaborator::ApplyBindDirectives(RtlirModule* top) {
+  if (!top) return;
+  std::vector<BindDirective*> binds;
+  for (auto* bd : unit_->bind_directives) binds.push_back(bd);
+  for (auto* m : unit_->modules)
+    for (auto* bd : m->bind_directives) binds.push_back(bd);
+  for (auto* i : unit_->interfaces)
+    for (auto* bd : i->bind_directives) binds.push_back(bd);
+  for (auto* p : unit_->programs)
+    for (auto* bd : p->bind_directives) binds.push_back(bd);
+  if (binds.empty()) return;
+  std::unordered_set<RtlirModule*> visited;
+  WalkForBind(top, std::string(top->name), binds, /*under_bind=*/false,
+              visited);
+}
+
+void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
+                             const std::vector<BindDirective*>& binds,
+                             bool under_bind,
+                             std::unordered_set<RtlirModule*>& visited) {
+  if (!mod) return;
+  if (!visited.insert(mod).second) return;
+
+  // Determine which binds apply at this scope (hier_path / module name).
+  for (auto* bd : binds) {
+    bool applies = false;
+    bool has_instances = !bd->target_instances.empty();
+    bool is_scope = IsBindTargetScope(bd->target, unit_);
+    if (is_scope && !has_instances) {
+      // Form 1 designwide: apply to every instance of the named scope.
+      if (mod->name == bd->target) applies = true;
+    } else if (is_scope && has_instances) {
+      // Form 1 with instance list: apply if hier_path matches an instance.
+      if (mod->name == bd->target) {
+        for (auto inst_path : bd->target_instances) {
+          if (hier_path == inst_path) {
+            applies = true;
+            break;
+          }
+        }
+      }
+    } else {
+      // Form 2: target is a hierarchical instance path; match exactly.
+      if (hier_path == bd->target) applies = true;
+    }
+    if (!applies) continue;
+    if (under_bind) {
+      diag_.Error(bd->loc,
+                  "bind target shall not be a scope created by a bind");
+      continue;
+    }
+    ApplyBindInstance(bd, mod);
+  }
+
+  // Snapshot current children; binds applied during recursion are added to
+  // deeper modules, not this one, so index-based iteration over the current
+  // children is safe after all top-level binds at this scope are applied.
+  size_t n = mod->children.size();
+  for (size_t i = 0; i < n; ++i) {
+    auto& c = mod->children[i];
+    if (!c.resolved) continue;
+    bool child_under_bind = under_bind || c.is_bound;
+    std::string child_path = hier_path;
+    child_path.push_back('.');
+    child_path.append(c.inst_name.data(), c.inst_name.size());
+    WalkForBind(c.resolved, child_path, binds, child_under_bind, visited);
+  }
+}
+
+void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
+  auto* item = bd->instantiation;
+  if (!item) return;
+
+  // §23.11 footnote 4: if the bind target scope is an interface, only
+  // interface or checker instantiations are allowed.
+  auto* target_decl = FindModule(target->name);
+  if (target_decl && target_decl->decl_kind == ModuleDeclKind::kInterface) {
+    auto* bound_decl = FindModule(item->inst_module);
+    if (bound_decl && bound_decl->decl_kind != ModuleDeclKind::kInterface &&
+        bound_decl->decl_kind != ModuleDeclKind::kChecker) {
+      diag_.Error(bd->loc,
+                  std::format("cannot bind non-interface/non-checker '{}' "
+                              "into interface '{}'",
+                              item->inst_module, target->name));
+      return;
+    }
+  }
+
+  // Name clash check: the bound instance's name must not collide with any
+  // existing name in the target scope, including previously-bound instances.
+  auto declared = CollectDeclaredNames(target);
+  if (!item->inst_name.empty() && declared.count(item->inst_name)) {
+    diag_.Error(bd->loc, std::format("bind instance name '{}' clashes with "
+                                     "existing name in target scope '{}'",
+                                     item->inst_name, target->name));
+    return;
+  }
+
+  auto* child_decl = FindModule(item->inst_module);
+  if (!child_decl) {
+    diag_.Error(bd->loc,
+                std::format("bind refers to unknown module '{}'",
+                            item->inst_module));
+    return;
+  }
+
+  // §23.11: actual signal references in the bound instantiation resolve in
+  // the target scope.  Identifier connections must be visible there; $unit
+  // scope declarations are not visible.
+  for (const auto& [pname, conn_expr] : item->inst_ports) {
+    if (!conn_expr || conn_expr->kind != ExprKind::kIdentifier) continue;
+    auto name = conn_expr->text;
+    bool found = false;
+    for (const auto& v : target->variables) {
+      if (v.name == name) { found = true; break; }
+    }
+    if (!found) {
+      for (const auto& n : target->nets) {
+        if (n.name == name) { found = true; break; }
+      }
+    }
+    if (!found) {
+      for (const auto& p : target->ports) {
+        if (p.name == name) { found = true; break; }
+      }
+    }
+    if (!found) {
+      diag_.Error(bd->loc,
+                  std::format("bind port connection '{}' references "
+                              "undeclared signal '{}' in target scope '{}'",
+                              pname, name, target->name));
+      return;
+    }
+  }
+
+  // Elaborate the bound module fresh.
+  ParamList empty_params;
+  auto* resolved = ElaborateModule(child_decl, empty_params);
+  RtlirModuleInst inst;
+  inst.module_name = item->inst_module;
+  inst.inst_name = item->inst_name;
+  inst.resolved = resolved;
+  inst.is_bound = true;
+
+  // Populate port bindings mirroring BindPorts's basic behavior (name lookup).
+  if (resolved) {
+    const auto& child_ports = resolved->ports;
+    const bool is_ordered =
+        !item->inst_ports.empty() && item->inst_ports[0].first.empty();
+    for (size_t i = 0; i < item->inst_ports.size(); ++i) {
+      auto& [port_name, conn_expr] = item->inst_ports[i];
+      RtlirPortBinding binding;
+      binding.connection = conn_expr;
+      auto it = child_ports.end();
+      if (is_ordered) {
+        if (i < child_ports.size()) {
+          it = child_ports.begin() + static_cast<ptrdiff_t>(i);
+          binding.port_name = it->name;
+        }
+      } else {
+        binding.port_name = port_name;
+        it = std::find_if(
+            child_ports.begin(), child_ports.end(),
+            [&](const RtlirPort& p) { return p.name == port_name; });
+      }
+      if (it != child_ports.end()) {
+        binding.direction = it->direction;
+        binding.width = it->width;
+      } else {
+        binding.direction = Direction::kInput;
+        binding.width = 1;
+      }
+      inst.port_bindings.push_back(binding);
+    }
+  }
+
+  target->children.push_back(inst);
 }
 
 }  // namespace delta

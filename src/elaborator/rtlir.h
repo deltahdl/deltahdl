@@ -177,6 +177,7 @@ struct RtlirModuleInst {
   struct RtlirModule* resolved = nullptr;
   std::vector<RtlirPortBinding> port_bindings;
   std::vector<ResolvedAttribute> attrs;
+  bool is_bound = false;  // §23.11: inserted by a bind directive.
 };
 
 // --- Module ---
