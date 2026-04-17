@@ -345,6 +345,28 @@ static std::optional<int64_t> FindParamOverride(
   return std::nullopt;
 }
 
+void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype) {
+  pd.has_decl_range = dtype.packed_dim_left != nullptr;
+  pd.has_decl_type = dtype.kind != DataTypeKind::kImplicit || dtype.is_signed;
+  pd.decl_is_signed = dtype.is_signed;
+  if (pd.has_decl_range || pd.has_decl_type) {
+    pd.decl_width = EvalTypeWidth(dtype);
+  }
+}
+
+int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd) {
+  if (!pd.has_decl_type && !pd.has_decl_range) return value;
+  uint32_t w = pd.decl_width;
+  if (w == 0 || w >= 64) return value;
+  uint64_t mask = (uint64_t{1} << w) - 1;
+  uint64_t masked = static_cast<uint64_t>(value) & mask;
+  if (pd.decl_is_signed) {
+    uint64_t sign_bit = uint64_t{1} << (w - 1);
+    if (masked & sign_bit) masked |= ~mask;
+  }
+  return static_cast<int64_t>(masked);
+}
+
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   auto* mod = arena_.Create<RtlirModule>();
@@ -355,17 +377,21 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // §5.12: Resolve attributes on module definition.
   mod->attrs = ResolveAttributes(decl->attrs, diag_);
 
-  for (const auto& [pname, pval] : decl->params) {
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    const auto& [pname, pval] = decl->params[i];
     RtlirParamDecl pd;
     pd.name = pname;
     pd.default_value = pval;
     pd.is_resolved = false;
     pd.is_type_param = decl->type_param_names.count(pname) > 0;
     pd.is_localparam = decl->localparam_port_names.count(pname) > 0;
+    if (!pd.is_type_param && i < decl->param_types.size()) {
+      PopulateParamTypeInfo(pd, decl->param_types[i]);
+    }
 
     auto override_val = FindParamOverride(params, pname);
     if (override_val) {
-      pd.resolved_value = *override_val;
+      pd.resolved_value = ConvertOverrideValue(*override_val, pd);
       pd.is_resolved = true;
       pd.from_override = true;
     }

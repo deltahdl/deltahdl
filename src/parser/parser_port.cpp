@@ -171,7 +171,8 @@ void Parser::ParseParamPortDecl(
     std::vector<std::pair<std::string_view, Expr*>>& params,
     std::unordered_set<std::string_view>& type_param_names,
     std::unordered_set<std::string_view>& localparam_port_names,
-    bool& is_localparam_group) {
+    bool& is_localparam_group,
+    std::vector<DataType>* param_types) {
   if (Match(TokenKind::kKwLocalparam)) {
     is_localparam_group = true;
   } else if (Match(TokenKind::kKwParameter)) {
@@ -188,18 +189,20 @@ void Parser::ParseParamPortDecl(
       }
     }
     params.push_back({name.text, nullptr});
+    if (param_types) param_types->push_back(DataType{});
     type_param_names.insert(name.text);
     if (is_localparam_group) localparam_port_names.insert(name.text);
     known_types_.insert(name.text);
     return;
   }
-  ParseDataType();  // consume optional type (not stored in params)
+  DataType dtype = ParseDataType();
   auto name = Expect(TokenKind::kIdentifier);
   Expr* default_val = nullptr;
   if (Match(TokenKind::kEq)) {
     default_val = ParseExpr();
   }
   params.push_back({name.text, default_val});
+  if (param_types) param_types->push_back(dtype);
   if (is_localparam_group) localparam_port_names.insert(name.text);
 }
 
@@ -215,10 +218,12 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
     if (!Check(TokenKind::kRParen)) {
       bool is_lp_group = false;
       ParseParamPortDecl(decl.params, decl.type_param_names,
-                         decl.localparam_port_names, is_lp_group);
+                         decl.localparam_port_names, is_lp_group,
+                         &decl.param_types);
       while (Match(TokenKind::kComma)) {
         ParseParamPortDecl(decl.params, decl.type_param_names,
-                           decl.localparam_port_names, is_lp_group);
+                           decl.localparam_port_names, is_lp_group,
+                           &decl.param_types);
       }
     }
     Expect(TokenKind::kRParen);

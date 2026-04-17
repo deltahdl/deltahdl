@@ -712,6 +712,7 @@ struct ModuleDecl {
   std::vector<PortDecl> ports;
   std::vector<ModuleItem*> items;
   std::vector<std::pair<std::string_view, Expr*>> params;
+  std::vector<DataType> param_types;  // Parallel to params; type/range per param.
   std::unordered_set<std::string_view> type_param_names;  // §6.20.3
   std::unordered_set<std::string_view> localparam_port_names;  // §6.20.4
   bool has_param_port_list = false;  // §6.20.1: #(...) was present.

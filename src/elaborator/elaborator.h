@@ -547,6 +547,12 @@ void AddProcess(
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
 
+// §23.10: capture declared type/range info on a value-parameter decl.
+void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype);
+
+// §23.10: convert an override value to the parameter's declared type/range.
+int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd);
+
 // Shared validation helpers.
 std::string_view ExprIdent(const Expr* e);
 const ClassDecl* FindClassDecl(std::string_view name,

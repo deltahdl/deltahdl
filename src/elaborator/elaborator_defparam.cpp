@@ -58,7 +58,6 @@ void Elaborator::ApplyDefparams(RtlirModule* top, const ModuleDecl* decl) {
         diag_.Warning(item->loc, "defparam target not found");
         continue;
       }
-      if (param->from_override) continue;  // Instance #(...) takes priority.
       if (param->is_type_param) {
         diag_.Error(item->loc, "defparam cannot override a type parameter");
         continue;
@@ -72,8 +71,10 @@ void Elaborator::ApplyDefparams(RtlirModule* top, const ModuleDecl* decl) {
         diag_.Warning(item->loc, "defparam value is not constant");
         continue;
       }
-      param->resolved_value = *val;
+      // §23.10: defparam wins over a module instance parameter assignment.
+      param->resolved_value = ConvertOverrideValue(*val, *param);
       param->is_resolved = true;
+      param->from_override = false;
     }
   }
 }

@@ -378,6 +378,9 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.20.1: Body parameter becomes localparam when parameter_port_list exists.
   pd.is_localparam = item->is_localparam || mod->has_param_port_list;
   pd.default_value = item->init_expr;
+  if (!is_type) {
+    PopulateParamTypeInfo(pd, item->data_type);
+  }
   // §6.20.7: detect $ as unbounded parameter value.
   if (item->init_expr && item->init_expr->kind == ExprKind::kIdentifier &&
       item->init_expr->text == "$") {

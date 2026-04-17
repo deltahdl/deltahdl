@@ -153,6 +153,11 @@ struct RtlirParamDecl {
   bool from_override = false;  // True when set via instance #(...) override.
   bool is_unbounded = false;   // §6.20.7: parameter assigned $.
   bool is_type_param = false;  // §6.20.3: type parameter.
+  // §23.10: declared type/range info for value-parameter override conversion.
+  uint32_t decl_width = 0;
+  bool decl_is_signed = false;
+  bool has_decl_type = false;
+  bool has_decl_range = false;
 };
 
 // --- Port binding (for module instances) ---
