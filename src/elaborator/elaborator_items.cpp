@@ -1371,7 +1371,14 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       continue;
     }
 
-    if (conn->kind != ExprKind::kIdentifier) {
+    std::string_view conn_name;
+    if (conn->kind == ExprKind::kIdentifier) {
+      conn_name = conn->text;
+    } else if (conn->kind == ExprKind::kMemberAccess && conn->lhs &&
+               conn->lhs->kind == ExprKind::kIdentifier && conn->rhs &&
+               conn->rhs->kind == ExprKind::kIdentifier) {
+      conn_name = conn->lhs->text;
+    } else {
       diag_.Error(item->loc,
                   std::format("interface port '{}' must be connected to an "
                               "interface instance or interface port",
@@ -1379,7 +1386,6 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       continue;
     }
 
-    std::string_view conn_name = conn->text;
     std::string_view conn_ifc_type;
 
     auto iit = interface_inst_types_.find(conn_name);
