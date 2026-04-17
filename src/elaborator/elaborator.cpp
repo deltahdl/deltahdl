@@ -354,6 +354,17 @@ void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype) {
   }
 }
 
+void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,
+                           const TypedefMap& typedefs,
+                           const ScopeMap& scope) {
+  pd.has_decl_range = dtype.packed_dim_left != nullptr;
+  pd.has_decl_type = dtype.kind != DataTypeKind::kImplicit || dtype.is_signed;
+  pd.decl_is_signed = dtype.is_signed;
+  if (pd.has_decl_range || pd.has_decl_type) {
+    pd.decl_width = EvalTypeWidth(dtype, typedefs, scope);
+  }
+}
+
 int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd) {
   if (!pd.has_decl_type && !pd.has_decl_range) return value;
   uint32_t w = pd.decl_width;
@@ -385,8 +396,13 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
     pd.is_resolved = false;
     pd.is_type_param = decl->type_param_names.count(pname) > 0;
     pd.is_localparam = decl->localparam_port_names.count(pname) > 0;
+
+    // §23.10.3: build scope from already-resolved earlier parameters so that
+    // range/type expressions and default values can reference them.
+    auto scope = BuildParamScope(mod);
+
     if (!pd.is_type_param && i < decl->param_types.size()) {
-      PopulateParamTypeInfo(pd, decl->param_types[i]);
+      PopulateParamTypeInfo(pd, decl->param_types[i], typedefs_, scope);
     }
 
     auto override_val = FindParamOverride(params, pname);
@@ -399,8 +415,6 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
       if (pval->kind == ExprKind::kIdentifier && pval->text == "$") {
         pd.is_unbounded = true;
       } else {
-        // §6.20.1: Parameters can depend on earlier parameters.
-        auto scope = BuildParamScope(mod);
         auto val = ConstEvalInt(pval, scope);
         pd.resolved_value = val.value_or(0);
         pd.is_resolved = val.has_value();

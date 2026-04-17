@@ -150,7 +150,7 @@ struct RtlirParamDecl {
   int64_t resolved_value = 0;
   bool is_resolved = false;
   bool is_localparam = false;  // §A.2.1.1: localparam vs parameter.
-  bool from_override = false;  // True when set via instance #(...) override.
+  bool from_override = false;  // Set via instance #(...) or defparam override.
   bool is_unbounded = false;   // §6.20.7: parameter assigned $.
   bool is_type_param = false;  // §6.20.3: type parameter.
   // §23.10: declared type/range info for value-parameter override conversion.

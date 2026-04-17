@@ -22,7 +22,8 @@ static void CollectPathComponents(const Expr* expr,
 }
 
 RtlirParamDecl* Elaborator::ResolveDefparamPath(RtlirModule* root,
-                                                const Expr* path_expr) {
+                                                const Expr* path_expr,
+                                                RtlirModule** out_mod) {
   std::vector<std::string_view> parts;
   CollectPathComponents(path_expr, parts);
   if (parts.size() < 2) return nullptr;
@@ -43,9 +44,28 @@ RtlirParamDecl* Elaborator::ResolveDefparamPath(RtlirModule* root,
 
   auto param_name = parts.back();
   for (auto& p : cur->params) {
-    if (p.name == param_name) return &p;
+    if (p.name == param_name) {
+      if (out_mod) *out_mod = cur;
+      return &p;
+    }
   }
   return nullptr;
+}
+
+void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
+  if (!mod) return;
+  for (auto& p : mod->params) {
+    if (p.from_override) continue;
+    if (p.is_type_param) continue;
+    if (p.is_unbounded) continue;
+    if (!p.default_value) continue;
+    auto scope = BuildParamScope(mod);
+    auto val = ConstEvalInt(p.default_value, scope);
+    if (val) {
+      p.resolved_value = *val;
+      p.is_resolved = true;
+    }
+  }
 }
 
 void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
@@ -53,7 +73,8 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kDefparam) continue;
     for (const auto& [path_expr, val_expr] : item->defparam_assigns) {
-      auto* param = ResolveDefparamPath(mod, path_expr);
+      RtlirModule* target_mod = nullptr;
+      auto* param = ResolveDefparamPath(mod, path_expr, &target_mod);
       if (!param) {
         diag_.Warning(item->loc, "defparam target not found");
         continue;
@@ -74,7 +95,9 @@ void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
       // §23.10: defparam wins over a module instance parameter assignment.
       param->resolved_value = ConvertOverrideValue(*val, *param);
       param->is_resolved = true;
-      param->from_override = false;
+      param->from_override = true;
+      // §23.10.3: recompute dependent parameters now that the source changed.
+      RecomputeDependentParams(target_mod);
     }
   }
 }

@@ -143,7 +143,14 @@ class Elaborator {
   void ApplyDefparamsRecursively(RtlirModule* mod);
 
   /// Resolve a hierarchical path to find the target module and param name.
-  RtlirParamDecl* ResolveDefparamPath(RtlirModule* root, const Expr* path_expr);
+  /// If out_mod is non-null, receives the module that owns the returned param.
+  RtlirParamDecl* ResolveDefparamPath(RtlirModule* root, const Expr* path_expr,
+                                      RtlirModule** out_mod = nullptr);
+
+  /// §23.10.3: Re-resolve non-override parameters and localparams so that
+  /// values whose expressions depend on a just-overridden parameter pick up
+  /// the new scope.
+  void RecomputeDependentParams(RtlirModule* mod);
 
   /// §6.10: Create an implicit scalar net if the identifier is undeclared.
   /// Returns false if `default_nettype none and the name is undeclared.
@@ -552,6 +559,11 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
 
 // §23.10: capture declared type/range info on a value-parameter decl.
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype);
+
+// §23.10.3: capture declared type/range info using a typedef map and scope
+// so that ranges which depend on earlier parameters resolve correctly.
+void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,
+                           const TypedefMap& typedefs, const ScopeMap& scope);
 
 // §23.10: convert an override value to the parameter's declared type/range.
 int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd);
