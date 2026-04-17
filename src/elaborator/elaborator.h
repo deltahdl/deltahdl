@@ -52,6 +52,10 @@ class Elaborator {
   /// port expressions paired with output or inout direction.
   void ValidateModports();
 
+  /// §25.6: Reject ref-direction module ports used as specify-block
+  /// terminals.
+  void ValidateSpecifyBlocks();
+
   /// §3.12.1: Register CU-scope typedefs/classes before module elaboration.
   void RegisterCuScopeItems();
 

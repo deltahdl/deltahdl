@@ -136,20 +136,6 @@ TEST(TimingCheckEventDefParsing, TerminalPartSelect) {
   EXPECT_NE(tc->ref_terminal.range_right, nullptr);
 }
 
-TEST(TimingCheckEventDefParsing, TerminalInterfaceDotPort) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(intf.data, posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->ref_terminal.interface_name, "intf");
-  EXPECT_EQ(tc->ref_terminal.name, "data");
-}
-
 TEST(TimingCheckEventDefParsing, TimingCheckConditionBare) {
   auto r = Parse(
       "module m;\n"

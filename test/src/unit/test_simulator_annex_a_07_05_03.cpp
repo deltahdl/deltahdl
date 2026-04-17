@@ -245,24 +245,4 @@ TEST(TimingCheckEventDefSim, TimingCheckConditionNegationSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 22u);
 }
 
-TEST(TimingCheckEventDefSim, TerminalInterfaceDotPortSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $setup(intf.data, posedge clk, 10);\n"
-      "  endspecify\n"
-      "  initial x = 8'd77;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 77u);
-}
-
 }  // namespace

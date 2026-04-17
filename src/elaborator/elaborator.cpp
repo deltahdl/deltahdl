@@ -201,6 +201,44 @@ void Elaborator::ValidateModports() {
   }
 }
 
+void Elaborator::ValidateSpecifyBlocks() {
+  auto check_modules = [&](const std::vector<ModuleDecl*>& modules) {
+    for (auto* mod : modules) {
+      std::unordered_set<std::string_view> ref_ports;
+      for (const auto& p : mod->ports) {
+        if (p.direction == Direction::kRef && !p.name.empty()) {
+          ref_ports.insert(p.name);
+        }
+      }
+      if (ref_ports.empty()) continue;
+      auto check_terminal = [&](const SpecifyTerminal& t, SourceLoc loc) {
+        if (!t.interface_name.empty()) return;
+        if (ref_ports.contains(t.name)) {
+          diag_.Error(loc,
+                      std::format("ref port '{}' cannot be used as a "
+                                  "terminal in a specify block",
+                                  t.name));
+        }
+      };
+      for (auto* item : mod->items) {
+        if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+        for (auto* si : item->specify_items) {
+          if (si->kind == SpecifyItemKind::kPathDecl) {
+            for (const auto& t : si->path.src_ports) check_terminal(t, si->loc);
+            for (const auto& t : si->path.dst_ports) check_terminal(t, si->loc);
+          } else if (si->kind == SpecifyItemKind::kTimingCheck) {
+            check_terminal(si->timing_check.ref_terminal, si->loc);
+            check_terminal(si->timing_check.data_terminal, si->loc);
+          }
+        }
+      }
+    }
+  };
+  check_modules(unit_->modules);
+  check_modules(unit_->interfaces);
+  check_modules(unit_->programs);
+}
+
 // §3.1: Recursively collect all elaborated modules from the instantiation
 // hierarchy into the design's all_modules map.
 static void CollectAllModules(
@@ -222,6 +260,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // §25.5.4, §25.5.5: Validate modport port-id uniqueness, direction
   // legality, and clocking-block references.
   ValidateModports();
+  // §25.6: Reject ref-direction module ports used as specify terminals.
+  ValidateSpecifyBlocks();
   // §3.12.1: Register CU-scope typedefs and classes before module elaboration.
   RegisterCuScopeItems();
   // §8.13: Check that no class extends a :final class.
