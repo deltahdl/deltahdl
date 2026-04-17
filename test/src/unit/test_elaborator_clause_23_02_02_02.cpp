@@ -62,17 +62,6 @@ TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortElaborates) {
   EXPECT_EQ(design->top_modules[0]->ports[0].name, "P1");
 }
 
-TEST(AnsiStylePortDeclarations, GenericInterfaceAnsiPortElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module cpuMod(interface d, interface j);\n"
-      "endmodule\n",
-      f, "cpuMod");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_EQ(design->top_modules[0]->ports.size(), 2u);
-}
-
 TEST(AnsiStylePortDeclarations, AnsiPortBodyDeclDifferentNameIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(

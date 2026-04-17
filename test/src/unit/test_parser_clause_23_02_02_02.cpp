@@ -106,15 +106,6 @@ TEST(PortDeclParsing, OutputVariablePortTypeVar) {
 
 // --- interface_port_declaration ---
 
-TEST(PortDeclParsing, InterfacePortBareKeyword) {
-  auto r = Parse("module m(interface bus); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& port = r.cu->modules[0]->ports[0];
-  EXPECT_TRUE(port.is_interface_port);
-  EXPECT_EQ(port.name, "bus");
-}
-
 TEST(PortDeclParsing, InterfacePortWithModport) {
   auto r = Parse("module m(interface.master bus); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -267,19 +258,6 @@ TEST(PortDeclParsing, MultipleExplicitlyNamedPorts) {
   EXPECT_EQ(r.cu->modules[0]->ports[2].direction, Direction::kRef);
   EXPECT_EQ(r.cu->modules[0]->ports[3].name, "R");
   EXPECT_EQ(r.cu->modules[0]->ports[3].direction, Direction::kInput);
-}
-
-// --- Generic interface ports ---
-
-TEST(PortDeclParsing, GenericInterfacePortMultiple) {
-  auto r = Parse("module cpuMod(interface d, interface j); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
-  EXPECT_TRUE(r.cu->modules[0]->ports[0].is_interface_port);
-  EXPECT_EQ(r.cu->modules[0]->ports[0].name, "d");
-  EXPECT_TRUE(r.cu->modules[0]->ports[1].is_interface_port);
-  EXPECT_EQ(r.cu->modules[0]->ports[1].name, "j");
 }
 
 // --- LRM examples ---

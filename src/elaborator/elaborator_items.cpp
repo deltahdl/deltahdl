@@ -1199,7 +1199,13 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       binding.width = port.width;
 
       if (port.is_interface_port) {
-        if (interface_inst_types_.count(port.name)) {
+        if (port.interface_type_name.empty()) {
+          diag_.Error(
+              item->loc,
+              std::format("implicit .* port connection cannot reference "
+                          "generic interface port '{}' of module '{}'",
+                          port.name, inst.module_name));
+        } else if (interface_inst_types_.count(port.name)) {
           auto* expr = arena_.Create<Expr>();
           expr->kind = ExprKind::kIdentifier;
           expr->text = port.name;
