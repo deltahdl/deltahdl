@@ -1198,7 +1198,14 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
       binding.direction = port.direction;
       binding.width = port.width;
 
-      if (IsNameDeclared(port.name, parent_mod)) {
+      if (port.is_interface_port) {
+        if (interface_inst_types_.count(port.name)) {
+          auto* expr = arena_.Create<Expr>();
+          expr->kind = ExprKind::kIdentifier;
+          expr->text = port.name;
+          binding.connection = expr;
+        }
+      } else if (IsNameDeclared(port.name, parent_mod)) {
         uint32_t sig_width = FindSignalWidth(port.name, parent_mod);
         if (sig_width != 0 && sig_width != port.width) {
           diag_.Error(
