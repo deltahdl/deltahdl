@@ -247,6 +247,16 @@ static ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       }
       co_return StmtResult::kDone;
     }
+    // §24.7: If $exit marked the current process inactive, stop executing
+    // subsequent statements in this block.
+    if (auto* cur = ctx.CurrentProcess(); cur && !cur->active) {
+      if (named) {
+        ctx.PopActiveNamedScope();
+        ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
+        ctx.PopStaticScope(stmt->label);
+      }
+      co_return StmtResult::kDone;
+    }
   }
   if (named) {
     ctx.PopActiveNamedScope();
@@ -1140,6 +1150,7 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     if (spawning_proc) {
       p->is_reactive = spawning_proc->is_reactive;
       p->home_region = spawning_proc->home_region;
+      p->program_block_id = spawning_proc->program_block_id;
     }
     p->coro =
         ForkChildCoroutine(s, ctx, arena, state, parent_wfs, parent_proc)

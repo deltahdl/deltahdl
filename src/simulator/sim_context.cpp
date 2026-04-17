@@ -282,12 +282,45 @@ static void KillDescendants(Process* proc) {
   }
 }
 
+void SimContext::RegisterProgramInitial(uint32_t program_block_id,
+                                        Process* proc) {
+  ++pending_program_initials_;
+  if (proc && program_block_id != 0) {
+    proc->program_block_id = program_block_id;
+    program_initials_by_block_[program_block_id].push_back(proc);
+  }
+}
+
 void SimContext::OnProgramInitialComplete(Process* proc) {
-  if (proc) KillDescendants(proc);
+  if (proc) {
+    KillDescendants(proc);
+    if (proc->program_block_id != 0) {
+      auto it = program_initials_by_block_.find(proc->program_block_id);
+      if (it != program_initials_by_block_.end()) {
+        auto& vec = it->second;
+        vec.erase(std::remove(vec.begin(), vec.end(), proc), vec.end());
+      }
+    }
+  }
   if (pending_program_initials_ > 0) {
     --pending_program_initials_;
     if (pending_program_initials_ == 0) stop_requested_ = true;
   }
+}
+
+void SimContext::ExitProgramBlock(uint32_t program_block_id) {
+  if (program_block_id == 0) return;
+  auto it = program_initials_by_block_.find(program_block_id);
+  if (it == program_initials_by_block_.end()) return;
+  auto procs = std::move(it->second);
+  it->second.clear();
+  for (auto* proc : procs) {
+    if (!proc) continue;
+    KillDescendants(proc);
+    proc->active = false;
+    if (pending_program_initials_ > 0) --pending_program_initials_;
+  }
+  if (pending_program_initials_ == 0) stop_requested_ = true;
 }
 
 void SimContext::RunFinalBlocks() {

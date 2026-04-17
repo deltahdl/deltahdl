@@ -250,6 +250,16 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ctx.RequestStop();
     return MakeLogic4VecVal(arena, 1, 0);
   }
+  if (name == "$exit") {
+    // §24.7: Terminate all initial procedures (and their descendants) in the
+    // program block this thread originated in; calls from outside any program
+    // initial are ignored.
+    auto* cur = ctx.CurrentProcess();
+    if (cur && cur->program_block_id != 0) {
+      ctx.ExitProgramBlock(cur->program_block_id);
+    }
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
   if (name == "$fatal" || name == "$error" || name == "$warning" ||
       name == "$info") {
     return EvalSeveritySysCall(expr, ctx, arena, name);

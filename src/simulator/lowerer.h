@@ -33,9 +33,10 @@ class Lowerer {
   void LowerVar(const RtlirVariable& var);
   void LowerVarInit(const RtlirVariable& var, Variable* v, uint32_t width);
   void LowerVarAggregate(const RtlirVariable& var);
-  void LowerProcesses(const std::vector<RtlirProcess>& procs,
-                      bool from_program);
-  void LowerProcess(const RtlirProcess& proc, bool from_program);
+  void LowerProcesses(const std::vector<RtlirProcess>& procs, bool from_program,
+                      uint32_t program_block_id);
+  void LowerProcess(const RtlirProcess& proc, bool from_program,
+                    uint32_t program_block_id);
   void LowerContAssign(const RtlirContAssign& ca, bool from_program);
   void LowerClassDecl(const ClassDecl* cls);
   void LowerImports(const RtlirModule* mod);
@@ -51,6 +52,7 @@ class Lowerer {
   Arena& arena_;
   const RtlirDesign* design_ = nullptr;
   uint32_t next_id_ = 0;
+  uint32_t next_program_block_id_ = 1;
   std::string inst_prefix_;
 };
 

@@ -117,6 +117,8 @@ struct Process {
   bool active = true;
   bool is_reactive = false;
 
+  uint32_t program_block_id = 0;
+
   // §9.6.1: Tracks join_none children for wait fork.
   WaitForkState wait_fork_state;
 

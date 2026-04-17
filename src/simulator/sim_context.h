@@ -141,8 +141,12 @@ class SimContext {
 
   // §24.3: Program initial tracking for implicit $finish and descendant
   // termination.
-  void RegisterProgramInitial() { ++pending_program_initials_; }
+  void RegisterProgramInitial(uint32_t program_block_id, Process* proc);
   void OnProgramInitialComplete(Process* proc);
+
+  // §24.7: Terminate all initials (and their descendants) belonging to the
+  // given program block. A block id of 0 indicates a non-program context.
+  void ExitProgramBlock(uint32_t program_block_id);
 
   void SetDelayMode(DelayMode mode) { delay_mode_ = mode; }
   DelayMode GetDelayMode() const { return delay_mode_; }
@@ -395,6 +399,8 @@ class SimContext {
   Process* current_process_ = nullptr;
   bool stop_requested_ = false;
   uint32_t pending_program_initials_ = 0;  // §24.3
+  // §24.7: Per-program-block list of active initials for targeted termination.
+  std::unordered_map<uint32_t, std::vector<Process*>> program_initials_by_block_;
   DelayMode delay_mode_ = DelayMode::kTyp;
   std::vector<std::string> plus_args_;
   std::unordered_map<int, FILE*> file_descriptors_;

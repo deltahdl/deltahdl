@@ -756,14 +756,14 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
 }
 
 void Lowerer::LowerProcesses(const std::vector<RtlirProcess>& procs,
-                             bool from_program) {
+                             bool from_program, uint32_t program_block_id) {
   for (const auto& proc : procs) {
     if (proc.kind != RtlirProcessKind::kInitial)
-      LowerProcess(proc, from_program);
+      LowerProcess(proc, from_program, program_block_id);
   }
   for (const auto& proc : procs) {
     if (proc.kind == RtlirProcessKind::kInitial)
-      LowerProcess(proc, from_program);
+      LowerProcess(proc, from_program, program_block_id);
   }
 }
 
@@ -852,7 +852,8 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
     ctx_.RegisterClassType("process", proc_type);
   }
   LowerAliases(mod);
-  LowerProcesses(mod->processes, mod->is_program);
+  uint32_t program_block_id = mod->is_program ? next_program_block_id_++ : 0;
+  LowerProcesses(mod->processes, mod->is_program, program_block_id);
   for (const auto& ca : mod->assigns) {
     LowerContAssign(ca, mod->is_program);
   }
@@ -870,7 +871,8 @@ static void RegisterSensitivity(const RtlirProcess& proc, Process* p,
   }
 }
 
-void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program) {
+void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
+                           uint32_t program_block_id) {
   auto* p = arena_.Create<Process>();
   p->id = next_id_++;
   p->home_region = from_program ? Region::kReactive : Region::kActive;
@@ -881,7 +883,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program) {
     case RtlirProcessKind::kInitial:
       p->kind = ProcessKind::kInitial;
       if (from_program) {
-        ctx_.RegisterProgramInitial();
+        ctx_.RegisterProgramInitial(program_block_id, p);
         p->coro =
             MakeProgramInitialCoroutine(proc.body, ctx_, arena_).Release();
       } else {
@@ -1023,7 +1025,10 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     }
 
     // Lower child processes (inst_prefix_ is set on each Process).
-    LowerProcesses(child.resolved->processes, child.resolved->is_program);
+    uint32_t child_block_id =
+        child.resolved->is_program ? next_program_block_id_++ : 0;
+    LowerProcesses(child.resolved->processes, child.resolved->is_program,
+                   child_block_id);
     for (const auto& ca : child.resolved->assigns) {
       LowerContAssign(ca, child.resolved->is_program);
     }
