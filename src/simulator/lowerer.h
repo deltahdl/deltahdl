@@ -33,8 +33,9 @@ class Lowerer {
   void LowerVar(const RtlirVariable& var);
   void LowerVarInit(const RtlirVariable& var, Variable* v, uint32_t width);
   void LowerVarAggregate(const RtlirVariable& var);
-  void LowerProcesses(const std::vector<RtlirProcess>& procs);
-  void LowerProcess(const RtlirProcess& proc);
+  void LowerProcesses(const std::vector<RtlirProcess>& procs,
+                      bool from_program);
+  void LowerProcess(const RtlirProcess& proc, bool from_program);
   void LowerContAssign(const RtlirContAssign& ca);
   void LowerClassDecl(const ClassDecl* cls);
   void LowerImports(const RtlirModule* mod);

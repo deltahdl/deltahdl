@@ -208,8 +208,18 @@ void Parser::ParseParamPortDecl(
 
 void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
   // Optional package imports in module header (§26.4)
+  SourceLoc import_loc;
+  bool has_header_import = false;
   while (Check(TokenKind::kKwImport)) {
+    if (!has_header_import) import_loc = CurrentLoc();
+    has_header_import = true;
     ParseImportDecl(decl.items);
+  }
+  if (has_header_import && !Check(TokenKind::kHash) &&
+      !Check(TokenKind::kLParen)) {
+    diag_.Error(import_loc,
+                "package_import_declaration in ansi header must be followed "
+                "by parameter_port_list or list_of_port_declarations");
   }
   if (Check(TokenKind::kHash)) {
     Consume();

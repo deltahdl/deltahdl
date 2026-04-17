@@ -474,6 +474,10 @@ class Elaborator {
   /// §23.6 R12: Objects in automatic tasks/functions inaccessible by hier ref.
   void ValidateHierRefToAutomatic(const ModuleDecl* decl);
 
+  /// §24.3: Hierarchical references to program signals from outside the
+  /// program scope are not permitted.
+  void ValidateHierRefIntoProgram(const ModuleDecl* decl);
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 
@@ -549,6 +553,7 @@ class Elaborator {
 
   std::unordered_map<std::string_view, std::string_view> interface_inst_types_;
   std::unordered_set<std::string_view> checker_inst_names_;
+  std::unordered_set<std::string_view> program_inst_names_;  // §24.3
   std::unordered_set<std::string_view> auto_task_func_names_;
   std::unordered_map<std::string_view, ModuleDecl*> nested_module_decls_;
 

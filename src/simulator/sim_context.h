@@ -139,6 +139,11 @@ class SimContext {
   void RequestStop() { stop_requested_ = true; }
   bool StopRequested() const { return stop_requested_; }
 
+  // §24.3: Program initial tracking for implicit $finish and descendant
+  // termination.
+  void RegisterProgramInitial() { ++pending_program_initials_; }
+  void OnProgramInitialComplete(Process* proc);
+
   void SetDelayMode(DelayMode mode) { delay_mode_ = mode; }
   DelayMode GetDelayMode() const { return delay_mode_; }
 
@@ -389,6 +394,7 @@ class SimContext {
   DpiContext* dpi_context_ = nullptr;
   Process* current_process_ = nullptr;
   bool stop_requested_ = false;
+  uint32_t pending_program_initials_ = 0;  // §24.3
   DelayMode delay_mode_ = DelayMode::kTyp;
   std::vector<std::string> plus_args_;
   std::unordered_map<int, FILE*> file_descriptors_;

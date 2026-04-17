@@ -41,17 +41,6 @@ TEST(SourceText, AllDescriptionTypes) {
   EXPECT_EQ(r.cu->bind_directives.size(), 1u);
 }
 
-TEST(SourceText, ProgramDecl) {
-  auto r = Parse(
-      "program test_prog(input logic clk);\n"
-      "  initial $display(\"Hello\");\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->name, "test_prog");
-}
-
 TEST(SourceText, CompilationUnitMultipleItems) {
   auto r = Parse(
       "package p; endpackage\n"
@@ -189,22 +178,6 @@ TEST(SourceText, ExternInterfaceDecl) {
   EXPECT_TRUE(r.cu->interfaces[0]->is_extern);
 }
 
-TEST(SourceText, ProgramWildcardPorts) {
-  auto r = Parse("program prg(.*); endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_TRUE(r.cu->programs[0]->has_wildcard_ports);
-}
-
-TEST(SourceText, ExternProgramDecl) {
-  auto r = Parse("extern program prg(input logic clk);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_TRUE(r.cu->programs[0]->is_extern);
-}
-
 TEST(SourceText, CheckerDecl) {
   auto r = Parse(
       "checker my_chk(input clk, input rst);\n"
@@ -270,14 +243,6 @@ TEST(SourceText, DescriptionChecker) {
   EXPECT_EQ(r.cu->checkers[0]->name, "chk");
 }
 
-TEST(SourceText, DescriptionProgram) {
-  auto r = Parse("program prg; endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->name, "prg");
-}
-
 TEST(SourceText, DescriptionPackage) {
   auto r = Parse("package pkg; endpackage\n");
   ASSERT_NE(r.cu, nullptr);
@@ -310,47 +275,6 @@ TEST(SourceText, DescriptionConfig) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs.size(), 1u);
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
-}
-
-TEST(SourceText, ProgramWithLifetime) {
-  auto r = Parse("program automatic prg; endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-}
-
-TEST(SourceText, ProgramEndLabel) {
-  auto r = Parse("program prg; endprogram : prg\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SourceText, ExternProgram) {
-  auto r = Parse("extern program prg(input logic clk);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_TRUE(r.cu->programs[0]->is_extern);
-  EXPECT_EQ(r.cu->programs[0]->name, "prg");
-}
-
-TEST(SourceText, ProgramAnsiHeader) {
-  auto r = Parse("program prg(input logic clk); endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
-}
-
-TEST(SourceText, ProgramNonAnsiHeader) {
-  auto r = Parse(
-      "program prg(clk);\n"
-      "  input clk;\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
 }
 
 TEST(SourceText, InterfaceNonAnsiHeader) {
@@ -408,11 +332,6 @@ TEST(SourceText, ErrorUnknownTopLevelToken) {
 
 TEST(SourceText, ErrorMissingEndinterface) {
   auto r = Parse("interface ifc;\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(SourceText, ErrorMissingEndprogram) {
-  auto r = Parse("program prg;\n");
   EXPECT_TRUE(r.has_errors);
 }
 

@@ -1129,6 +1129,66 @@ void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
   }
 }
 
+// --- §24.3: Hierarchical references to program signals prohibited ---
+
+static bool ExprRefersToProgram(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& program_names) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kMemberAccess) {
+    auto leftmost = HierRefLeftmost(e);
+    if (!leftmost.empty() && program_names.count(leftmost)) return true;
+  }
+  if (ExprRefersToProgram(e->lhs, program_names)) return true;
+  if (ExprRefersToProgram(e->rhs, program_names)) return true;
+  if (ExprRefersToProgram(e->base, program_names)) return true;
+  for (auto* elem : e->elements) {
+    if (ExprRefersToProgram(elem, program_names)) return true;
+  }
+  return false;
+}
+
+static void WalkStmtsForProgramRef(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& program_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  if (s->lhs && ExprRefersToProgram(s->lhs, program_names))
+    diag.Error(s->range.start,
+               "hierarchical reference to program signal from outside the "
+               "program is not permitted");
+  if (s->rhs && ExprRefersToProgram(s->rhs, program_names))
+    diag.Error(s->range.start,
+               "hierarchical reference to program signal from outside the "
+               "program is not permitted");
+  for (auto* child : s->children)
+    WalkStmtsForProgramRef(child, program_names, diag);
+  if (s->if_body) WalkStmtsForProgramRef(s->if_body, program_names, diag);
+  if (s->else_body) WalkStmtsForProgramRef(s->else_body, program_names, diag);
+}
+
+void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
+  if (program_inst_names_.empty()) return;
+  if (decl->decl_kind == ModuleDeclKind::kProgram) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      if (ExprRefersToProgram(item->assign_lhs, program_inst_names_))
+        diag_.Error(item->loc,
+                    "hierarchical reference to program signal from outside "
+                    "the program is not permitted");
+      if (ExprRefersToProgram(item->assign_rhs, program_inst_names_))
+        diag_.Error(item->loc,
+                    "hierarchical reference to program signal from outside "
+                    "the program is not permitted");
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body)
+      WalkStmtsForProgramRef(item->body, program_inst_names_, diag_);
+  }
+}
+
 // --- §23.6 R12: Objects in automatic tasks/functions inaccessible by
 //     hierarchical reference ---
 

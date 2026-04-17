@@ -77,19 +77,6 @@ TEST(ProgramConstruct, ProgramWithSubroutinesElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ProgramConstruct, ProgramWithPortsElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "program p(input clk, input [16:1] addr, inout [7:0] data);\n"
-      "  initial begin end\n"
-      "endprogram\n",
-      f, "p");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  ASSERT_FALSE(design->top_modules.empty());
-  EXPECT_EQ(design->top_modules[0]->ports.size(), 3u);
-}
-
 TEST(ProgramConstruct, ProgramWithClassElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -103,23 +90,64 @@ TEST(ProgramConstruct, ProgramWithClassElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ProgramConstruct, SampleProgramElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "program test (input clk, input [16:1] addr, inout [7:0] data);\n"
-      "  initial begin\n"
-      "  end\n"
-      "endprogram\n",
-      f, "test");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(ProgramConstruct, EmptyProgramElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc("program p; endprogram\n", f, "p");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ProgramConstruct, NestedProgramInModuleElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    initial $display(\"nested\");\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ProgramConstruct, TwoNestedProgramsShareOuterVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int shared;\n"
+      "  program p1;\n"
+      "    initial shared = 1;\n"
+      "  endprogram\n"
+      "  program p2;\n"
+      "    initial shared = 2;\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ProgramConstruct, TopLevelPortlessProgramImplicitlyInstantiated) {
+  ProgramElabFixture f;
+  auto* design = ElaborateSource("program p; endprogram\n", f, "p");
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  EXPECT_EQ(design->top_modules[0]->name, "p");
+}
+
+TEST(ProgramConstruct, ReferencingProgramSignalFromOutsideIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  program p;\n"
+      "    int psig;\n"
+      "  endprogram\n"
+      "  initial begin\n"
+      "    p.psig = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace

@@ -272,6 +272,24 @@ const std::vector<Process*>& SimContext::FindNamedScopeProcesses(
   return (it != named_scope_map_.end()) ? it->second : kEmptyNamedScopeList;
 }
 
+// §24.3: When a program's main initial thread completes, kill its spawned
+// descendants.  When all program initials across the design have completed,
+// implicitly request $finish.
+static void KillDescendants(Process* proc) {
+  for (auto* child : proc->children) {
+    child->active = false;
+    KillDescendants(child);
+  }
+}
+
+void SimContext::OnProgramInitialComplete(Process* proc) {
+  if (proc) KillDescendants(proc);
+  if (pending_program_initials_ > 0) {
+    --pending_program_initials_;
+    if (pending_program_initials_ == 0) stop_requested_ = true;
+  }
+}
+
 void SimContext::RunFinalBlocks() {
   stop_requested_ = false;
   for (auto* proc : final_processes_) {

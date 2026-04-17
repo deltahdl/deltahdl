@@ -32,6 +32,14 @@ static SimCoroutine MakeInitialCoroutine(const Stmt* body, SimContext& ctx,
   co_await ExecStmt(body, ctx, arena);
 }
 
+// §24.3: Program initials track completion so the simulator can terminate
+// spawned descendants and implicitly request $finish once all complete.
+static SimCoroutine MakeProgramInitialCoroutine(const Stmt* body,
+                                                SimContext& ctx, Arena& arena) {
+  co_await ExecStmt(body, ctx, arena);
+  ctx.OnProgramInitialComplete(ctx.CurrentProcess());
+}
+
 static SimCoroutine MakeAlwaysCoroutine(const Stmt* body, SimContext& ctx,
                                         Arena& arena) {
   while (!ctx.StopRequested()) {
@@ -747,12 +755,15 @@ void Lowerer::LowerClassDecl(const ClassDecl* cls) {
   }
 }
 
-void Lowerer::LowerProcesses(const std::vector<RtlirProcess>& procs) {
+void Lowerer::LowerProcesses(const std::vector<RtlirProcess>& procs,
+                             bool from_program) {
   for (const auto& proc : procs) {
-    if (proc.kind != RtlirProcessKind::kInitial) LowerProcess(proc);
+    if (proc.kind != RtlirProcessKind::kInitial)
+      LowerProcess(proc, from_program);
   }
   for (const auto& proc : procs) {
-    if (proc.kind == RtlirProcessKind::kInitial) LowerProcess(proc);
+    if (proc.kind == RtlirProcessKind::kInitial)
+      LowerProcess(proc, from_program);
   }
 }
 
@@ -841,7 +852,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
     ctx_.RegisterClassType("process", proc_type);
   }
   LowerAliases(mod);
-  LowerProcesses(mod->processes);
+  LowerProcesses(mod->processes, mod->is_program);
   for (const auto& ca : mod->assigns) {
     LowerContAssign(ca);
   }
@@ -859,7 +870,7 @@ static void RegisterSensitivity(const RtlirProcess& proc, Process* p,
   }
 }
 
-void Lowerer::LowerProcess(const RtlirProcess& proc) {
+void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program) {
   auto* p = arena_.Create<Process>();
   p->id = next_id_++;
   p->home_region = Region::kActive;
@@ -868,7 +879,13 @@ void Lowerer::LowerProcess(const RtlirProcess& proc) {
   switch (proc.kind) {
     case RtlirProcessKind::kInitial:
       p->kind = ProcessKind::kInitial;
-      p->coro = MakeInitialCoroutine(proc.body, ctx_, arena_).Release();
+      if (from_program) {
+        ctx_.RegisterProgramInitial();
+        p->coro =
+            MakeProgramInitialCoroutine(proc.body, ctx_, arena_).Release();
+      } else {
+        p->coro = MakeInitialCoroutine(proc.body, ctx_, arena_).Release();
+      }
       break;
     case RtlirProcessKind::kAlways:
       p->kind = ProcessKind::kAlways;
@@ -1004,7 +1021,7 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     }
 
     // Lower child processes (inst_prefix_ is set on each Process).
-    LowerProcesses(child.resolved->processes);
+    LowerProcesses(child.resolved->processes, child.resolved->is_program);
 
     // Recurse into grandchildren.
     LowerChildModules(child.resolved);

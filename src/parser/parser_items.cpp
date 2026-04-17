@@ -213,6 +213,9 @@ bool Parser::TryParseClassOrVerification(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwInterface)) {
+    if (InProgramBlock())
+      diag_.Error(CurrentLoc(),
+                  "interface declarations not allowed in programs");
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kNestedModuleDecl;
     item->loc = CurrentLoc();
@@ -266,6 +269,8 @@ bool Parser::TryParseNonPortItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
+    if (InProgramBlock())
+      diag_.Error(CurrentLoc(), "module declarations not allowed in programs");
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kNestedModuleDecl;
     item->loc = CurrentLoc();
@@ -274,6 +279,8 @@ bool Parser::TryParseNonPortItem(std::vector<ModuleItem*>& items) {
     return true;
   }
   if (Check(TokenKind::kKwProgram)) {
+    if (InProgramBlock())
+      diag_.Error(CurrentLoc(), "program declarations not allowed in programs");
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kNestedModuleDecl;
     item->loc = CurrentLoc();

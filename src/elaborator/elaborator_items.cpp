@@ -683,6 +683,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   clocking_signals_.clear();
   interface_inst_types_.clear();
   checker_inst_names_.clear();
+  program_inst_names_.clear();
   auto_task_func_names_.clear();
   nested_module_decls_.clear();
   task_names_.clear();
@@ -704,6 +705,17 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       if (child && child->decl_kind == ModuleDeclKind::kChecker) {
         checker_inst_names_.insert(item->inst_name);
       }
+      if (child && child->decl_kind == ModuleDeclKind::kProgram) {
+        program_inst_names_.insert(item->inst_name);
+      }
+    }
+    // §24.3: Portless nested programs are implicitly instantiated under
+    // their declaration name.
+    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl &&
+        item->nested_module_decl->decl_kind == ModuleDeclKind::kProgram &&
+        item->nested_module_decl->ports.empty()) {
+      program_inst_names_.insert(item->nested_module_decl->name);
     }
   }
   // §6.20: Parameter port list names are constants that never change.
@@ -780,6 +792,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ValidateConstantFunctionCalls(decl);
   ValidateSequenceEventArgs(decl);
   ValidateHierRefIntoChecker(decl);
+  ValidateHierRefIntoProgram(decl);
   ValidateHierRefToAutomatic(decl);
 }
 
