@@ -15,13 +15,49 @@ SimContext::SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
 Variable* SimContext::FindVariable(std::string_view name) {
   auto* local = FindLocalVariable(name);
   if (local) return local;
+  std::string prefix;
+  if (current_process_) prefix = current_process_->inst_prefix;
+  // §23.6: Current module scope first — prefix + name resolves a name declared
+  // in the enclosing module before checking top-level globals with the same
+  // bare name (required by §23.8 shadowing when multiple enclosing modules
+  // declare items with the same identifier).
+  if (!prefix.empty()) {
+    std::string prefixed = prefix + std::string(name);
+    auto it = variables_.find(prefixed);
+    if (it != variables_.end()) return it->second;
+  }
   auto it = variables_.find(name);
   if (it != variables_.end()) return it->second;
-  // §23.6: Try with instance prefix for child module variable access.
-  if (current_process_ && !current_process_->inst_prefix.empty()) {
-    std::string prefixed = current_process_->inst_prefix + std::string(name);
-    it = variables_.find(prefixed);
-    if (it != variables_.end()) return it->second;
+  // §23.8: Upward walk. At each ancestor prefix try:
+  //   (a) module_identifier.item_name — ancestor's module type matches the
+  //       head of `name`; resolve the remainder beneath the ancestor.
+  //   (b) scope_name.item_name — the ancestor contains a scope named head;
+  //       resolve head.rest beneath the ancestor.
+  auto dot = name.find('.');
+  if (dot == std::string_view::npos) return nullptr;
+  std::string_view head = name.substr(0, dot);
+  std::string_view rest = name.substr(dot + 1);
+  std::string p = prefix;
+  while (!p.empty()) {
+    size_t last = (p.size() >= 2) ? p.find_last_of('.', p.size() - 2)
+                                  : std::string::npos;
+    if (last == std::string::npos) {
+      p.clear();
+    } else {
+      p = p.substr(0, last + 1);
+    }
+    std::string prefix_no_dot = p;
+    if (!prefix_no_dot.empty() && prefix_no_dot.back() == '.')
+      prefix_no_dot.pop_back();
+    auto type_it = instance_types_.find(prefix_no_dot);
+    if (type_it != instance_types_.end() && type_it->second == head) {
+      std::string cand = p + std::string(rest);
+      auto cit = variables_.find(cand);
+      if (cit != variables_.end()) return cit->second;
+    }
+    std::string cand = p + std::string(name);
+    auto cit = variables_.find(cand);
+    if (cit != variables_.end()) return cit->second;
   }
   return nullptr;
 }
@@ -337,6 +373,19 @@ void SimContext::RegisterTypeWidth(std::string_view name, uint32_t width) {
 uint32_t SimContext::FindTypeWidth(std::string_view name) const {
   auto it = type_widths_.find(name);
   return (it != type_widths_.end()) ? it->second : 0;
+}
+
+// --- §23.8: Instance-path → module-type registry ---
+
+void SimContext::RegisterInstanceType(std::string_view prefix,
+                                      std::string_view type) {
+  instance_types_[std::string(prefix)] = std::string(type);
+}
+
+std::string_view SimContext::FindInstanceType(std::string_view prefix) const {
+  auto it = instance_types_.find(std::string(prefix));
+  return (it != instance_types_.end()) ? std::string_view(it->second)
+                                       : std::string_view{};
 }
 
 // --- §7.4/§7.5/§7.10: Array metadata ---

@@ -284,6 +284,12 @@ class SimContext {
   void RegisterTypeWidth(std::string_view name, uint32_t width);
   uint32_t FindTypeWidth(std::string_view name) const;
 
+  // §23.8: Record the module type at a given instance-path prefix. The prefix
+  // is the fully-qualified instance path without a trailing dot; the root is
+  // the empty string.
+  void RegisterInstanceType(std::string_view prefix, std::string_view type);
+  std::string_view FindInstanceType(std::string_view prefix) const;
+
   // Plus-args (§20.11)
   void AddPlusArg(std::string arg);
   const std::vector<std::string>& GetPlusArgs() const { return plus_args_; }
@@ -434,6 +440,8 @@ class SimContext {
   std::vector<std::vector<QueueRefBinding>> queue_ref_stack_;
   // §20.6.2: Type name → bit width for $bits(type).
   std::unordered_map<std::string_view, uint32_t> type_widths_;
+  // §23.8: Instance-path prefix → module type name, for upward name lookup.
+  std::unordered_map<std::string, std::string> instance_types_;
   // §16.3: Immediate assertion failure counter.
   int assertion_fail_count_ = 0;
   // §14: Clocking manager.

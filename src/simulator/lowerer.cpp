@@ -788,6 +788,13 @@ void Lowerer::LowerAliases(const RtlirModule* mod) {
 }
 
 void Lowerer::LowerModule(const RtlirModule* mod) {
+  // §23.8: Record the module type at this instance-path prefix so that
+  // upward name lookups can match module_identifier.item_name forms.
+  {
+    std::string key = inst_prefix_;
+    if (!key.empty() && key.back() == '.') key.pop_back();
+    ctx_.RegisterInstanceType(key, mod->name);
+  }
   LowerParams(mod);
   for (const auto& net : mod->nets) {
     ctx_.CreateNet(net.name, net.net_type, net.width, net.charge_strength,
@@ -963,6 +970,13 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     if (!child.resolved) continue;
     auto saved_prefix = inst_prefix_;
     inst_prefix_ = inst_prefix_ + std::string(child.inst_name) + ".";
+
+    // §23.8: Record this child's module type at its instance-path prefix.
+    {
+      std::string key = inst_prefix_;
+      if (!key.empty() && key.back() == '.') key.pop_back();
+      ctx_.RegisterInstanceType(key, child.resolved->name);
+    }
 
     // Create child variables with hierarchical prefix.
     for (const auto& var : child.resolved->variables) {
