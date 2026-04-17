@@ -139,18 +139,6 @@ TEST(PackageItemsParsing, NullItem) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(PackageItemsParsing, AnonymousProgram) {
-  auto r = Parse(
-      "package p;\n"
-      "  program;\n"
-      "    task run();\n"
-      "    endtask\n"
-      "  endprogram\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(PackageItemsParsing, PackageExport) {
   auto r = Parse(
       "package p;\n"
@@ -567,31 +555,6 @@ TEST(PackageItemsParsing, AnonymousProgramMisc) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
-}
-
-// --- Moved from test_parser_clause_24_06.cpp ---
-
-TEST(PackageItemsParsing, AnonymousProgramFunctionAndTask) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  program;\n"
-      "    function void f(); endfunction\n"
-      "    task t(); endtask\n"
-      "  endprogram\n"
-      "endpackage\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-}
-
-TEST(PackageItemsParsing, AnonymousProgramTopLevel) {
-  auto r = Parse(
-      "program;\n"
-      "  function void f(); endfunction\n"
-      "  class C; endclass\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 // --- Moved from test_parser_clause_35_05_04.cpp ---

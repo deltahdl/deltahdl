@@ -542,6 +542,9 @@ struct ModuleItem {
   SourceLoc loc;
   std::vector<Attribute> attrs;
 
+  // §24.6: item was declared inside an anonymous program block.
+  bool from_anonymous_program = false;
+
   // Lifetime qualifiers (§6.21)
   bool is_automatic = false;
   bool is_static = false;

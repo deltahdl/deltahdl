@@ -120,6 +120,34 @@ void Elaborator::ValidateNameSpaces() {
   }
 }
 
+void Elaborator::ValidateAnonymousProgramNameSharing() {
+  auto check_scope = [&](const std::vector<ModuleItem*>& items) {
+    std::unordered_map<std::string_view, const ModuleItem*> seen;
+    for (const auto* item : items) {
+      if (item->name.empty()) continue;
+      if (item->kind != ModuleItemKind::kFunctionDecl &&
+          item->kind != ModuleItemKind::kTaskDecl) {
+        continue;
+      }
+      auto [it, inserted] = seen.try_emplace(item->name, item);
+      if (inserted) continue;
+      if (item->from_anonymous_program ||
+          it->second->from_anonymous_program) {
+        diag_.Error(
+            item->loc,
+            std::format(
+                "'{}' declared in anonymous program collides with name in "
+                "surrounding package or compilation-unit scope",
+                item->name));
+      }
+    }
+  };
+  check_scope(unit_->cu_items);
+  for (const auto* pkg : unit_->packages) {
+    check_scope(pkg->items);
+  }
+}
+
 // §3.1: Recursively collect all elaborated modules from the instantiation
 // hierarchy into the design's all_modules map.
 static void CollectAllModules(
@@ -136,6 +164,8 @@ static void CollectAllModules(
 RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // §3.13: Validate definitions and package name spaces.
   ValidateNameSpaces();
+  // §24.6: Anonymous program items share the surrounding scope's name space.
+  ValidateAnonymousProgramNameSharing();
   // §3.12.1: Register CU-scope typedefs and classes before module elaboration.
   RegisterCuScopeItems();
   // §8.13: Check that no class extends a :final class.

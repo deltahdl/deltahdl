@@ -19,7 +19,7 @@ class Parser {
  private:
   void ParseTopLevel(CompilationUnit* unit);
   bool TryParsePrimaryTopLevel(CompilationUnit* unit);
-  bool TryParseAnonymousProgram();
+  bool TryParseAnonymousProgram(CompilationUnit* unit);
   void ParseExternTopLevel(CompilationUnit* unit);
   bool TryParseSecondaryTopLevel(CompilationUnit* unit);
   bool TryParseCuScopeDataDecl(CompilationUnit* unit);

@@ -297,7 +297,7 @@ bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {
 }
 
 // anonymous_program: program ; { ... } endprogram (A.1.11)
-bool Parser::TryParseAnonymousProgram() {
+bool Parser::TryParseAnonymousProgram(CompilationUnit* unit) {
   auto saved = lexer_.SavePos();
   Consume();
   if (!Check(TokenKind::kSemicolon)) {
@@ -307,8 +307,11 @@ bool Parser::TryParseAnonymousProgram() {
   Consume();
   while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
-    std::vector<ModuleItem*> discard;
-    ParseModuleItem(discard);
+    size_t before = unit->cu_items.size();
+    ParseModuleItem(unit->cu_items);
+    for (size_t i = before; i < unit->cu_items.size(); ++i) {
+      unit->cu_items[i]->from_anonymous_program = true;
+    }
   }
   Expect(TokenKind::kKwEndprogram);
   return true;
@@ -336,7 +339,7 @@ bool Parser::TryParsePrimaryTopLevel(CompilationUnit* unit) {
     return true;
   }
   if (Check(TokenKind::kKwProgram)) {
-    if (TryParseAnonymousProgram()) return true;
+    if (TryParseAnonymousProgram(unit)) return true;
     unit->programs.push_back(ParseProgramDecl());
     return true;
   }
@@ -529,7 +532,11 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
     Expect(TokenKind::kSemicolon);
     while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
       if (Match(TokenKind::kSemicolon)) continue;
+      size_t before = items.size();
       ParseModuleItem(items);
+      for (size_t i = before; i < items.size(); ++i) {
+        items[i]->from_anonymous_program = true;
+      }
     }
     Expect(TokenKind::kKwEndprogram);
     return true;

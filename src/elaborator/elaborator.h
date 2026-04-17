@@ -43,6 +43,11 @@ class Elaborator {
   /// §3.13: Check definitions and package name spaces for duplicates.
   void ValidateNameSpaces();
 
+  /// §24.6: Anonymous program items share the surrounding package or
+  /// compilation-unit name space; collisions with that surrounding scope
+  /// are an error.
+  void ValidateAnonymousProgramNameSharing();
+
   /// §3.12.1: Register CU-scope typedefs/classes before module elaboration.
   void RegisterCuScopeItems();
 
