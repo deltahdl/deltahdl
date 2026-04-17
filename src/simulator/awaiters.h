@@ -178,6 +178,19 @@ struct EventAwaiter {
                                        event);
       return;
     }
+    // §24.3.2: design process woken by a reactive-context write defers to
+    // the Active region of the next scheduling-loop iteration.
+    if (proc && ctx.IsReactiveContext()) {
+      auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+      event->callback = [h, proc, &ctx]() mutable {
+        if (!proc->active) return;
+        ctx.SetCurrentProcess(proc);
+        h.resume();
+      };
+      ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive,
+                                       event);
+      return;
+    }
     h.resume();
   }
 };
