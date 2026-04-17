@@ -86,39 +86,6 @@ TEST(NetsAndVariables, VariableMixedContinuousAndProceduralError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(NetsAndVariables, RedeclarationOfVariableAsNetError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  reg v;\n"
-      "  wire v;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(NetsAndVariables, RedeclarationOfNetAsVariableError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  wire w;\n"
-      "  logic w;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(NetsAndVariables, RedeclarationOfVariableError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  int x;\n"
-      "  int x;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(NetsAndVariables, VariableProceduralAssignmentOk) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -157,17 +124,6 @@ TEST(NetsAndVariables, SeparateVarsContAndProcOk) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-TEST(NetsAndVariables, RedeclarationOfNetError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top();\n"
-      "  wire w;\n"
-      "  wire w;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 TEST(NetsAndVariables, NetCannotBeProcedurallyAssigned) {

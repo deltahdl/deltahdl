@@ -442,6 +442,10 @@ class Elaborator {
   void WalkExprForStreamingContext(const Expr* expr, bool is_valid_context);
   void WalkStmtsForStreamingContext(const Stmt* s);
 
+  /// §23.9: Named block labels share the scope's name space; direct
+  /// variable references must resolve within the current module scope.
+  void ValidateScopeRules(const ModuleDecl* decl);
+
   /// §23.6 R15: Hierarchical references into checkers prohibited.
   void ValidateHierRefIntoChecker(const ModuleDecl* decl);
 

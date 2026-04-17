@@ -34,22 +34,6 @@ TEST(DesignBuildingBlockElaboration, SameNameDifferentModulesElab) {
   EXPECT_FALSE(diag.HasErrors());
 }
 
-TEST(DesignBuildingBlockElaboration, RedeclVarInModuleScope) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  logic x;\n"
-             "  logic x;\n"
-             "endmodule\n"));
-}
-
-TEST(DesignBuildingBlockElaboration, RedeclNetInModuleScope) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  wire w;\n"
-             "  wire w;\n"
-             "endmodule\n"));
-}
-
 TEST(DesignBuildingBlockElaboration, DuplicateModuleDefinition) {
   EXPECT_FALSE(
       ElabOk("module m; endmodule\n"

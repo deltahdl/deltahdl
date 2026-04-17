@@ -156,6 +156,80 @@ static NetType PortNetType(DataTypeKind kind) {
   }
 }
 
+namespace {
+
+struct ScopeWalk {
+  std::vector<std::pair<std::string_view, SourceLoc>> block_labels;
+  std::unordered_set<std::string_view> local_names;
+  std::vector<std::pair<std::string_view, SourceLoc>> proc_lhs;
+};
+
+void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlock && !s->label.empty()) {
+    out.block_labels.emplace_back(s->label, s->range.start);
+  }
+  if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
+    out.local_names.insert(s->var_name);
+  }
+  if ((s->kind == StmtKind::kBlockingAssign ||
+       s->kind == StmtKind::kNonblockingAssign) &&
+      s->lhs && s->lhs->kind == ExprKind::kIdentifier) {
+    out.proc_lhs.emplace_back(s->lhs->text, s->range.start);
+  }
+  for (const auto* sub : s->stmts) CollectScopeWalk(sub, out);
+  for (const auto* sub : s->fork_stmts) CollectScopeWalk(sub, out);
+  CollectScopeWalk(s->then_branch, out);
+  CollectScopeWalk(s->else_branch, out);
+  CollectScopeWalk(s->body, out);
+  CollectScopeWalk(s->for_body, out);
+  for (const auto* fi : s->for_inits) CollectScopeWalk(fi, out);
+  for (const auto* fs : s->for_steps) CollectScopeWalk(fs, out);
+  for (const auto& ci : s->case_items) CollectScopeWalk(ci.body, out);
+}
+
+bool IsProcBodyItem(ModuleItemKind k) {
+  return k == ModuleItemKind::kInitialBlock ||
+         k == ModuleItemKind::kFinalBlock ||
+         k == ModuleItemKind::kAlwaysBlock ||
+         k == ModuleItemKind::kAlwaysCombBlock ||
+         k == ModuleItemKind::kAlwaysFFBlock ||
+         k == ModuleItemKind::kAlwaysLatchBlock;
+}
+
+}  // namespace
+
+void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
+  ScopeWalk walk;
+  for (const auto* item : decl->items) {
+    if (IsProcBodyItem(item->kind)) {
+      CollectScopeWalk(item->body, walk);
+    }
+  }
+  for (const auto& [label, loc] : walk.block_labels) {
+    if (!declared_names_.insert(label).second) {
+      diag_.Error(loc, std::format("redeclaration of '{}'", label));
+    }
+  }
+  for (const auto& [name, loc] : walk.proc_lhs) {
+    if (walk.local_names.count(name)) continue;
+    if (declared_names_.count(name)) continue;
+    if (ansi_port_names_.count(name)) continue;
+    if (non_ansi_complete_ports_.count(name)) continue;
+    if (non_ansi_partial_ports_.count(name)) continue;
+    if (const_names_.count(name)) continue;
+    if (enum_member_names_.count(name)) continue;
+    if (specparam_names_.count(name)) continue;
+    if (class_names_.count(name)) continue;
+    if (class_var_names_.count(name)) continue;
+    if (task_names_.count(name)) continue;
+    if (func_decls_.count(name)) continue;
+    if (interface_inst_types_.count(name)) continue;
+    if (checker_inst_names_.count(name)) continue;
+    diag_.Error(loc, std::format("undeclared identifier '{}'", name));
+  }
+}
+
 bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                                         RtlirModule* mod) {
   if (IsNameDeclared(name, mod)) return true;
@@ -368,14 +442,44 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:
+      // §23.9: Task/function names share the same scope as variables/nets.
+      if (!item->name.empty() &&
+          !declared_names_.insert(item->name).second) {
+        diag_.Error(item->loc,
+                    std::format("redeclaration of '{}'", item->name));
+      }
       ValidateFunctionBody(item);
       mod->function_decls.push_back(item);
       break;
     case ModuleItemKind::kGateInst:
+      // §23.9: A gate instance name cannot be the same as its output net.
+      if (!item->gate_inst_name.empty() && !item->gate_terminals.empty() &&
+          item->gate_terminals[0] &&
+          item->gate_terminals[0]->kind == ExprKind::kIdentifier &&
+          item->gate_terminals[0]->text == item->gate_inst_name) {
+        diag_.Error(item->loc,
+                    std::format("gate instance name '{}' conflicts with its "
+                                "output net",
+                                item->gate_inst_name));
+      }
+      // §23.9: Gate instance names occupy the enclosing scope's name space.
+      if (!item->gate_inst_name.empty() &&
+          !declared_names_.insert(item->gate_inst_name).second) {
+        diag_.Error(item->loc,
+                    std::format("redeclaration of '{}'",
+                                item->gate_inst_name));
+      }
       ElaborateGateInst(item, mod, arena_);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       break;
     case ModuleItemKind::kUdpInst:
+      // §23.9: UDP instance names occupy the enclosing scope's name space.
+      if (!item->gate_inst_name.empty() &&
+          !declared_names_.insert(item->gate_inst_name).second) {
+        diag_.Error(item->loc,
+                    std::format("redeclaration of '{}'",
+                                item->gate_inst_name));
+      }
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       break;
     case ModuleItemKind::kSpecparam:
@@ -696,6 +800,12 @@ static uint32_t EvalInstDimSize(const Expr* left, const Expr* right) {
 }
 
 void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
+  // §23.9: Instance names share the enclosing scope's name space.
+  if (!item->inst_name.empty() &&
+      !declared_names_.insert(item->inst_name).second) {
+    diag_.Error(item->loc,
+                std::format("redeclaration of '{}'", item->inst_name));
+  }
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;
   inst.inst_name = item->inst_name;

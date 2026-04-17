@@ -18,6 +18,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     ValidateItemConstraints(item);
   }
+  ValidateScopeRules(decl);
   ValidateMixedAssignments();
   ValidateDisableTargets(decl);
   ValidateProceduralNetAssign();
