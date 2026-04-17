@@ -478,6 +478,10 @@ class Elaborator {
   /// program scope are not permitted.
   void ValidateHierRefIntoProgram(const ModuleDecl* decl);
 
+  /// §24.5: Calling program subroutines from within design modules is
+  /// illegal and shall result in an error.
+  void ValidateProgramSubroutineCall(const ModuleDecl* decl);
+
   /// §3.12.1: Find a CU-scope item by name.
   ModuleItem* FindCuScopeItem(std::string_view name) const;
 

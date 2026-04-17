@@ -793,6 +793,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ValidateSequenceEventArgs(decl);
   ValidateHierRefIntoChecker(decl);
   ValidateHierRefIntoProgram(decl);
+  ValidateProgramSubroutineCall(decl);
   ValidateHierRefToAutomatic(decl);
 }
 

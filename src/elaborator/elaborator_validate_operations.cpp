@@ -1264,4 +1264,89 @@ void Elaborator::ValidateHierRefToAutomatic(const ModuleDecl* decl) {
   }
 }
 
+// --- §24.5: Calling program subroutines from design modules prohibited ---
+
+static bool IsProgramSubroutineCallExpr(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& program_names) {
+  if (!e || e->kind != ExprKind::kCall) return false;
+  const Expr* callee = e->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
+  auto leftmost = HierRefLeftmost(callee);
+  return !leftmost.empty() && program_names.count(leftmost) > 0;
+}
+
+static void WalkExprForProgramCall(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& program_names,
+    DiagEngine& diag, SourceLoc loc) {
+  if (!e) return;
+  if (IsProgramSubroutineCallExpr(e, program_names)) {
+    diag.Error(loc,
+               "calling a program subroutine from within a design module is "
+               "not permitted");
+  }
+  WalkExprForProgramCall(e->lhs, program_names, diag, loc);
+  WalkExprForProgramCall(e->rhs, program_names, diag, loc);
+  WalkExprForProgramCall(e->condition, program_names, diag, loc);
+  WalkExprForProgramCall(e->true_expr, program_names, diag, loc);
+  WalkExprForProgramCall(e->false_expr, program_names, diag, loc);
+  WalkExprForProgramCall(e->base, program_names, diag, loc);
+  WalkExprForProgramCall(e->index, program_names, diag, loc);
+  WalkExprForProgramCall(e->index_end, program_names, diag, loc);
+  WalkExprForProgramCall(e->with_expr, program_names, diag, loc);
+  WalkExprForProgramCall(e->repeat_count, program_names, diag, loc);
+  for (auto* arg : e->args)
+    WalkExprForProgramCall(arg, program_names, diag, loc);
+  for (auto* elem : e->elements)
+    WalkExprForProgramCall(elem, program_names, diag, loc);
+}
+
+static void WalkStmtForProgramCall(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& program_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  auto loc = s->range.start;
+  WalkExprForProgramCall(s->lhs, program_names, diag, loc);
+  WalkExprForProgramCall(s->rhs, program_names, diag, loc);
+  WalkExprForProgramCall(s->expr, program_names, diag, loc);
+  WalkExprForProgramCall(s->condition, program_names, diag, loc);
+  for (auto* sub : s->stmts)
+    WalkStmtForProgramCall(sub, program_names, diag);
+  WalkStmtForProgramCall(s->then_branch, program_names, diag);
+  WalkStmtForProgramCall(s->else_branch, program_names, diag);
+  WalkStmtForProgramCall(s->body, program_names, diag);
+  WalkStmtForProgramCall(s->for_body, program_names, diag);
+  for (auto* init : s->for_inits)
+    WalkStmtForProgramCall(init, program_names, diag);
+  for (auto* step : s->for_steps)
+    WalkStmtForProgramCall(step, program_names, diag);
+  for (auto* fs : s->fork_stmts)
+    WalkStmtForProgramCall(fs, program_names, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtForProgramCall(ci.body, program_names, diag);
+}
+
+void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
+  if (program_inst_names_.empty()) return;
+  if (decl->decl_kind == ModuleDeclKind::kProgram) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      WalkExprForProgramCall(item->assign_lhs, program_inst_names_, diag_,
+                             item->loc);
+      WalkExprForProgramCall(item->assign_rhs, program_inst_names_, diag_,
+                             item->loc);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc && item->body)
+      WalkStmtForProgramCall(item->body, program_inst_names_, diag_);
+  }
+}
+
 }  // namespace delta
