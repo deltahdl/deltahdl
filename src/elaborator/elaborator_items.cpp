@@ -828,6 +828,12 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
 
   auto saved_nested = nested_module_decls_;
   ParamList child_params;
+  auto parent_scope = BuildParamScope(mod);
+  for (const auto& [pname, pexpr] : item->inst_params) {
+    if (!pexpr) continue;
+    auto val = ConstEvalInt(pexpr, parent_scope);
+    if (val) child_params.push_back({pname, *val});
+  }
   inst.resolved = ElaborateModule(child_decl, child_params);
   nested_module_decls_ = std::move(saved_nested);
   BindPorts(inst, item, mod);

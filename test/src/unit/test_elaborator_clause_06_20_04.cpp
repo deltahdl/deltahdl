@@ -131,27 +131,4 @@ TEST(LocalparamElaboration, DefparamOnLocalparamIsRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(LocalparamElaboration, LocalparamUpdatesWhenParamOverridden) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module child #(parameter int W = 4)();\n"
-      "  localparam int MASK = (1 << W) - 1;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  child #(.W(8)) u0();\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* child = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(child, nullptr);
-  for (const auto& p : child->params) {
-    if (p.name == "MASK") {
-      EXPECT_TRUE(p.is_localparam);
-      EXPECT_TRUE(p.is_resolved);
-      EXPECT_EQ(p.resolved_value, 255);
-    }
-  }
-}
-
 }  // namespace

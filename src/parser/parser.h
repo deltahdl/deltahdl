@@ -223,9 +223,7 @@ class Parser {
                                   std::vector<ModuleItem*>* extra_items);
   void ParseParamValueAssignment(
       std::vector<std::pair<std::string_view, Expr*>>& out);
-  void ParseNamedParamValues(
-      std::vector<std::pair<std::string_view, Expr*>>& out);
-  void ParseOrderedParamValues(
+  bool ParseParamValueEntry(
       std::vector<std::pair<std::string_view, Expr*>>& out);
   bool ParsePortConnection(ModuleItem* item);
   void ParseUnpackedDims(std::vector<Expr*>& dims);

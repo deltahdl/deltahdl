@@ -76,10 +76,9 @@ void Parser::ParseParenList(std::vector<Expr*>& out) {
   Expect(TokenKind::kRParen);
 }
 
-void Parser::ParseNamedParamValues(
+bool Parser::ParseParamValueEntry(
     std::vector<std::pair<std::string_view, Expr*>>& out) {
-  do {
-    Expect(TokenKind::kDot);
+  if (Match(TokenKind::kDot)) {
     auto name = Expect(TokenKind::kIdentifier);
     Expect(TokenKind::kLParen);
     Expr* expr = nullptr;
@@ -88,25 +87,27 @@ void Parser::ParseNamedParamValues(
     }
     Expect(TokenKind::kRParen);
     out.push_back({name.text, expr});
-  } while (Match(TokenKind::kComma));
-}
-
-void Parser::ParseOrderedParamValues(
-    std::vector<std::pair<std::string_view, Expr*>>& out) {
-  out.push_back({{}, ParseExpr()});
-  while (Match(TokenKind::kComma)) {
-    out.push_back({{}, ParseExpr()});
+    return true;
   }
+  out.push_back({{}, ParseExpr()});
+  return false;
 }
 
 void Parser::ParseParamValueAssignment(
     std::vector<std::pair<std::string_view, Expr*>>& out) {
   Expect(TokenKind::kLParen);
   if (!Check(TokenKind::kRParen)) {
-    if (Check(TokenKind::kDot)) {
-      ParseNamedParamValues(out);
-    } else {
-      ParseOrderedParamValues(out);
+    bool named = ParseParamValueEntry(out);
+    bool mixed = false;
+    while (Match(TokenKind::kComma)) {
+      auto entry_loc = CurrentLoc();
+      bool next_named = ParseParamValueEntry(out);
+      if (!mixed && next_named != named) {
+        diag_.Error(
+            entry_loc,
+            "ordered and named parameter value assignments cannot be mixed");
+        mixed = true;
+      }
     }
   }
   Expect(TokenKind::kRParen);
