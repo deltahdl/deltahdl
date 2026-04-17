@@ -547,12 +547,11 @@ def test_discover_subclauses_default_model_is_opus(ic, monkeypatch) -> None:
     assert cmd[idx + 1] == "opus"
 
 
-def test_discover_subclauses_passes_effort_high(ic, monkeypatch) -> None:
-    """discover_subclauses passes --effort high to Claude CLI."""
+def test_discover_subclauses_omits_effort_flag(ic, monkeypatch) -> None:
+    """discover_subclauses does not pass --effort to Claude CLI."""
     mock_run = _discover_subclauses_cmd(ic, monkeypatch)
     cmd = mock_run.call_args[0][0]
-    idx = cmd.index("--effort")
-    assert cmd[idx + 1] == "high"
+    assert "--effort" not in cmd
 
 
 def test_discover_subclauses_uses_dangerously_skip_permissions(

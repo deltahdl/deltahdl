@@ -431,7 +431,7 @@ def _call_claude(prompt, schema=None, continue_session=False):
     """Call Claude CLI and return parsed JSON response."""
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
-    cmd = ["claude", "-p", "--model", "opus", "--effort", "high",
+    cmd = ["claude", "-p", "--model", "opus",
            "--output-format", "json", "--dangerously-skip-permissions"]
     if continue_session:
         cmd.append("--continue")

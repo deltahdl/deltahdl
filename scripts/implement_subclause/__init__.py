@@ -176,7 +176,6 @@ def run_steps(steps, *, model="opus", continue_session=False) -> list[str]:
         cmd = [
             "claude", "-p",
             "--model", model,
-            "--effort", "high",
             "--verbose",
             "--output-format", "stream-json",
             "--dangerously-skip-permissions",
