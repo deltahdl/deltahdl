@@ -829,10 +829,42 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   auto saved_nested = nested_module_decls_;
   ParamList child_params;
   auto parent_scope = BuildParamScope(mod);
+
+  bool is_positional = false;
   for (const auto& [pname, pexpr] : item->inst_params) {
-    if (!pexpr) continue;
-    auto val = ConstEvalInt(pexpr, parent_scope);
-    if (val) child_params.push_back({pname, *val});
+    if (pname.empty() && pexpr) {
+      is_positional = true;
+      break;
+    }
+  }
+
+  if (is_positional) {
+    std::vector<std::string_view> targets;
+    for (const auto& [dname, dexpr] : child_decl->params) {
+      if (child_decl->localparam_port_names.count(dname) > 0) continue;
+      targets.push_back(dname);
+    }
+    if (item->inst_params.size() > targets.size()) {
+      diag_.Error(
+          item->loc,
+          std::format("too many positional parameter overrides for module "
+                      "'{}': {} provided, {} allowed",
+                      item->inst_module, item->inst_params.size(),
+                      targets.size()));
+    }
+    size_t n = std::min(item->inst_params.size(), targets.size());
+    for (size_t i = 0; i < n; ++i) {
+      auto* pexpr = item->inst_params[i].second;
+      if (!pexpr) continue;
+      auto val = ConstEvalInt(pexpr, parent_scope);
+      if (val) child_params.push_back({targets[i], *val});
+    }
+  } else {
+    for (const auto& [pname, pexpr] : item->inst_params) {
+      if (!pexpr) continue;
+      auto val = ConstEvalInt(pexpr, parent_scope);
+      if (val) child_params.push_back({pname, *val});
+    }
   }
   inst.resolved = ElaborateModule(child_decl, child_params);
   nested_module_decls_ = std::move(saved_nested);
