@@ -1040,6 +1040,13 @@ void Lowerer::Lower(const RtlirDesign* design) {
       LowerClassDecl(cls);
     }
   }
+  // §23.8.1: Make CU-scope tasks/functions callable by bare name from
+  // within modules. Registered before module lowering so that a module-
+  // local task/function with the same name overwrites and takes precedence.
+  for (auto* item : design->cu_function_decls) {
+    if (!item->method_class.empty()) continue;
+    ctx_.RegisterFunction(item->name, item);
+  }
   for (auto* mod : design->top_modules) {
     LowerModule(mod);
   }

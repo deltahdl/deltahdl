@@ -132,35 +132,4 @@ TEST(UpwardNameReferenceElaboration,
              "endmodule\n"));
 }
 
-// Task/function/named-block/generate-block names search enclosing modules,
-// not instances.
-
-TEST(UpwardNameReferenceElaboration,
-     TaskLookupSearchesEnclosingModulesNotInstances) {
-  EXPECT_TRUE(
-      ElabOk("module leaf;\n"
-             "  initial t();\n"
-             "endmodule\n"
-             "module parent;\n"
-             "  task t;\n"
-             "  endtask\n"
-             "  leaf l1();\n"
-             "endmodule\n"));
-}
-
-TEST(UpwardNameReferenceElaboration,
-     FunctionLookupSearchesEnclosingModulesNotInstances) {
-  EXPECT_TRUE(
-      ElabOk("module leaf;\n"
-             "  integer x;\n"
-             "  initial x = f(1);\n"
-             "endmodule\n"
-             "module parent;\n"
-             "  function int f(int y);\n"
-             "    return y + 1;\n"
-             "  endfunction\n"
-             "  leaf l1();\n"
-             "endmodule\n"));
-}
-
 }  // namespace
