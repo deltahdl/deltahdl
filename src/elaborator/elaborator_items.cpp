@@ -352,11 +352,21 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
           break;
         }
         if (seen_decls.count(name)) {
-          diag_.Error(
-              item->loc,
-              std::format("explicit import of '{}::{}' collides with "
-                          "existing declaration of '{}'",
-                          pkg_name, name, name));
+          auto wit = wildcard_claimed_.find(name);
+          if (wit != wildcard_claimed_.end()) {
+            diag_.Error(
+                item->loc,
+                std::format("explicit import of '{}::{}' is illegal because "
+                            "'{}' was already referenced through a wildcard "
+                            "package import",
+                            pkg_name, name, name));
+          } else {
+            diag_.Error(
+                item->loc,
+                std::format("explicit import of '{}::{}' collides with "
+                            "existing declaration of '{}'",
+                            pkg_name, name, name));
+          }
           break;
         }
         explicit_imports_[name] = {pkg_name, item->loc};
