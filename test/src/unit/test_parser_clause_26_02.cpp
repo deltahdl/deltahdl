@@ -28,13 +28,6 @@ TEST(PackageParsing, MultiplePackages) {
   EXPECT_EQ(r.cu->packages[1]->name, "b");
 }
 
-TEST(ModuleAndHierarchyParsing, EndLabelPackage) {
-  auto r = Parse("package mypkg; endpackage : mypkg\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1);
-  EXPECT_EQ(r.cu->packages[0]->name, "mypkg");
-}
-
 TEST(SourceText, PackageAutomaticLifetime) {
   auto r = Parse("package automatic pkg; endpackage\n");
   ASSERT_NE(r.cu, nullptr);
@@ -49,12 +42,6 @@ TEST(SourceText, PackageStaticLifetime) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
-}
-
-TEST(SourceText, PackageEndLabel) {
-  auto r = Parse("package pkg; endpackage : pkg\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(FormalSyntaxParsing, PackageDecl) {
@@ -76,15 +63,6 @@ TEST(PackageParsing, EmptyPackage) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_EQ(r.cu->packages[0]->name, "pkg");
-}
-
-TEST(PackageParsing, PackageWithEndLabel) {
-  auto r = Parse(
-      "package my_pkg;\n"
-      "endpackage : my_pkg\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "my_pkg");
 }
 
 static bool ParseOk5(const std::string& src) {
@@ -114,12 +92,28 @@ TEST(PackageDeclaration, MissingEndpackageIsError) {
   EXPECT_FALSE(ParseOk("package p;"));
 }
 
-TEST(PackageDeclarations, PackageKeywordIntroducesPackage) {
-  auto r = Parse("package pkg; endpackage");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+TEST(PackageDeclaration, PackageNotAllowedInsideModule) {
+  EXPECT_FALSE(ParseOk(
+      "module m;\n"
+      "  package inner;\n"
+      "  endpackage\n"
+      "endmodule\n"));
+}
+
+TEST(PackageDeclaration, PackageNotAllowedInsideInterface) {
+  EXPECT_FALSE(ParseOk(
+      "interface ifc;\n"
+      "  package inner;\n"
+      "  endpackage\n"
+      "endinterface\n"));
+}
+
+TEST(PackageDeclaration, PackageNotAllowedInsideProgram) {
+  EXPECT_FALSE(ParseOk(
+      "program prg;\n"
+      "  package inner;\n"
+      "  endpackage\n"
+      "endprogram\n"));
 }
 
 }  // namespace

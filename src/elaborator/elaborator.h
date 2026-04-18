@@ -48,6 +48,10 @@ class Elaborator {
   /// are an error.
   void ValidateAnonymousProgramNameSharing();
 
+  /// §26.2: Reject package items that are nets with implicit continuous
+  /// assignments or processes (initial, final, always*).
+  void ValidatePackageItems();
+
   /// §25.5.4: Validate per-modport port-id uniqueness and reject constant
   /// port expressions paired with output or inout direction.
   void ValidateModports();

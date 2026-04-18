@@ -148,6 +148,26 @@ void Elaborator::ValidateAnonymousProgramNameSharing() {
   }
 }
 
+void Elaborator::ValidatePackageItems() {
+  for (const auto* pkg : unit_->packages) {
+    for (const auto* item : pkg->items) {
+      if (item->kind == ModuleItemKind::kNetDecl && item->init_expr) {
+        diag_.Error(item->loc,
+                    "net declaration with implicit continuous assignment is "
+                    "not allowed in a package");
+      }
+      if (item->kind == ModuleItemKind::kInitialBlock ||
+          item->kind == ModuleItemKind::kFinalBlock ||
+          item->kind == ModuleItemKind::kAlwaysBlock ||
+          item->kind == ModuleItemKind::kAlwaysCombBlock ||
+          item->kind == ModuleItemKind::kAlwaysFFBlock ||
+          item->kind == ModuleItemKind::kAlwaysLatchBlock) {
+        diag_.Error(item->loc, "process is not allowed in a package");
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateModports() {
   auto is_literal_expr = [](const Expr* e) {
     if (!e) return false;
@@ -257,6 +277,9 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateNameSpaces();
   // §24.6: Anonymous program items share the surrounding scope's name space.
   ValidateAnonymousProgramNameSharing();
+  // §26.2: Reject package items that are nets with implicit continuous
+  // assignments or processes (initial, final, always*).
+  ValidatePackageItems();
   // §25.5.4, §25.5.5: Validate modport port-id uniqueness, direction
   // legality, and clocking-block references.
   ValidateModports();
