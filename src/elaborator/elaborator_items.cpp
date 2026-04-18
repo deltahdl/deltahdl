@@ -682,6 +682,29 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                     std::format("redeclaration of '{}'",
                                 item->gate_inst_name));
       }
+      // §28.3.6: For an array-of-instances, each terminal's port expression
+      // must be either the per-instance port width (broadcast) or the array
+      // length times that width (part-select). Built-in gate terminals are
+      // one bit per instance, so valid widths are 1 or the array length.
+      if (item->inst_range_left && item->inst_range_right) {
+        auto lhi = ConstEvalInt(item->inst_range_left);
+        auto rhi = ConstEvalInt(item->inst_range_right);
+        if (lhi && rhi) {
+          uint32_t array_len =
+              static_cast<uint32_t>(std::abs(*lhi - *rhi) + 1);
+          for (auto* term : item->gate_terminals) {
+            uint32_t w = LookupLhsWidth(term, mod);
+            if (w == 0) continue;
+            if (w != 1 && w != array_len) {
+              diag_.Error(item->loc,
+                          "gate array terminal width does not match either "
+                          "the per-instance port width or the instance-array "
+                          "length");
+              break;
+            }
+          }
+        }
+      }
       ElaborateGateInst(item, mod, arena_);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       break;
