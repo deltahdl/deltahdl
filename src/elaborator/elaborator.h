@@ -506,6 +506,13 @@ class Elaborator {
                    std::unordered_set<RtlirModule*>& visited);
   void ApplyBindInstance(BindDirective* bd, RtlirModule* target);
 
+  /// §25.7.4: After hierarchy is built, reject multi-module exports of the
+  /// same modport-exported task unless declared `extern forkjoin`, and reject
+  /// any multi-module export of a function.
+  void ValidateModportExportConflicts(RtlirModule* top);
+  void WalkForExportConflicts(RtlirModule* mod,
+                              std::unordered_set<RtlirModule*>& visited);
+
   Arena& arena_;
   DiagEngine& diag_;
   CompilationUnit* unit_;

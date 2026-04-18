@@ -312,6 +312,9 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // §23.11: Bind directives are applied after normal elaboration.
   ApplyBindDirectives(top);
 
+  // §25.7.4: Detect duplicate modport exports across modules.
+  ValidateModportExportConflicts(top);
+
   design->top_modules.push_back(top);
   // §3.1: Register the full instantiation hierarchy in the design's module map.
   CollectAllModules(top, design->all_modules);
@@ -1778,6 +1781,186 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
   }
 
   target->children.push_back(inst);
+}
+
+namespace {
+
+struct ExportKey {
+  std::string_view iface_inst;
+  std::string_view modport;
+  std::string_view name;
+  bool operator==(const ExportKey& o) const {
+    return iface_inst == o.iface_inst && modport == o.modport && name == o.name;
+  }
+};
+
+struct ExportKeyHash {
+  size_t operator()(const ExportKey& k) const {
+    std::hash<std::string_view> h;
+    return h(k.iface_inst) ^ (h(k.modport) << 1) ^ (h(k.name) << 2);
+  }
+};
+
+struct ExportSite {
+  std::string_view child_inst;
+  bool is_task = false;
+  SourceLoc loc;
+};
+
+const ModportDecl* FindModportInInterface(const ModuleDecl* iface,
+                                          std::string_view name) {
+  for (const auto* mp : iface->modports) {
+    if (mp->name == name) return mp;
+  }
+  return nullptr;
+}
+
+const ModuleItem* FindInterfaceExternPrototype(const ModuleDecl* iface,
+                                               std::string_view name) {
+  for (const auto* item : iface->items) {
+    if (!item->is_extern) continue;
+    if (item->kind != ModuleItemKind::kTaskDecl &&
+        item->kind != ModuleItemKind::kFunctionDecl)
+      continue;
+    if (item->name == name) return item;
+  }
+  return nullptr;
+}
+
+const ModuleItem* FindOutOfBlockBodyInChild(const ModuleDecl* child,
+                                            std::string_view iface_port_name,
+                                            std::string_view method_name) {
+  for (const auto* item : child->items) {
+    if (item->kind != ModuleItemKind::kTaskDecl &&
+        item->kind != ModuleItemKind::kFunctionDecl)
+      continue;
+    if (item->method_class == iface_port_name && item->name == method_name)
+      return item;
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+void Elaborator::ValidateModportExportConflicts(RtlirModule* top) {
+  if (!top) return;
+  std::unordered_set<RtlirModule*> visited;
+  WalkForExportConflicts(top, visited);
+}
+
+void Elaborator::WalkForExportConflicts(
+    RtlirModule* mod, std::unordered_set<RtlirModule*>& visited) {
+  if (!mod) return;
+  if (!visited.insert(mod).second) return;
+
+  std::unordered_map<std::string_view, std::string_view>
+      iface_inst_to_type;
+  for (const auto& c : mod->children) {
+    if (auto* cd = FindModule(c.module_name);
+        cd && cd->decl_kind == ModuleDeclKind::kInterface) {
+      iface_inst_to_type[c.inst_name] = c.module_name;
+    }
+  }
+
+  std::unordered_map<ExportKey, std::vector<ExportSite>, ExportKeyHash> buckets;
+
+  for (const auto& child : mod->children) {
+    if (!child.resolved) continue;
+    auto* child_decl = FindModule(child.module_name);
+    if (!child_decl) continue;
+    if (child_decl->decl_kind == ModuleDeclKind::kInterface) continue;
+
+    for (const auto& binding : child.port_bindings) {
+      if (!binding.connection) continue;
+      const auto* conn = binding.connection;
+
+      std::string_view iface_inst_name;
+      std::string_view modport_name;
+      if (conn->kind == ExprKind::kIdentifier) {
+        iface_inst_name = conn->text;
+      } else if (conn->kind == ExprKind::kMemberAccess && conn->lhs &&
+                 conn->lhs->kind == ExprKind::kIdentifier && conn->rhs &&
+                 conn->rhs->kind == ExprKind::kIdentifier) {
+        iface_inst_name = conn->lhs->text;
+        modport_name = conn->rhs->text;
+      } else {
+        continue;
+      }
+
+      auto it = iface_inst_to_type.find(iface_inst_name);
+      if (it == iface_inst_to_type.end()) continue;
+
+      auto* iface_decl = FindModule(it->second);
+      if (!iface_decl) continue;
+
+      auto collect_exports =
+          [&](const std::vector<ModportPort>& mp_ports) {
+            for (const auto& pp : mp_ports) {
+              if (!pp.is_export) continue;
+              if (pp.name.empty()) continue;
+              const auto* body = FindOutOfBlockBodyInChild(
+                  child_decl, binding.port_name, pp.name);
+              if (!body) continue;
+              ExportKey key{iface_inst_name, modport_name, pp.name};
+              ExportSite site;
+              site.child_inst = child.inst_name;
+              site.is_task = body->kind == ModuleItemKind::kTaskDecl;
+              site.loc = body->loc;
+              buckets[key].push_back(site);
+            }
+          };
+
+      if (!modport_name.empty()) {
+        const auto* mp = FindModportInInterface(iface_decl, modport_name);
+        if (!mp) continue;
+        collect_exports(mp->ports);
+      } else {
+        for (const auto* mp : iface_decl->modports) {
+          collect_exports(mp->ports);
+        }
+      }
+    }
+  }
+
+  for (const auto& [key, sites] : buckets) {
+    if (sites.size() < 2) continue;
+
+    auto type_it = iface_inst_to_type.find(key.iface_inst);
+    if (type_it == iface_inst_to_type.end()) continue;
+    auto* iface_decl = FindModule(type_it->second);
+    if (!iface_decl) continue;
+
+    const ModuleItem* prototype =
+        FindInterfaceExternPrototype(iface_decl, key.name);
+    bool is_task_export = sites[0].is_task;
+    bool is_forkjoin_task = prototype && prototype->is_extern &&
+                            prototype->is_forkjoin &&
+                            prototype->kind == ModuleItemKind::kTaskDecl;
+
+    if (is_task_export && is_forkjoin_task) continue;
+
+    if (!is_task_export) {
+      diag_.Error(
+          sites[0].loc,
+          std::format("function '{}' exported by more than one module "
+                      "connected to interface instance '{}' (§25.7.4: "
+                      "multiple export of functions is not allowed)",
+                      key.name, key.iface_inst));
+    } else {
+      diag_.Error(
+          sites[0].loc,
+          std::format("task '{}' exported by more than one module connected "
+                      "to interface instance '{}' (§25.7.4: declare the task "
+                      "as `extern forkjoin` in the interface to allow "
+                      "multiple exports)",
+                      key.name, key.iface_inst));
+    }
+  }
+
+  for (const auto& child : mod->children) {
+    if (!child.resolved) continue;
+    WalkForExportConflicts(child.resolved, visited);
+  }
 }
 
 }  // namespace delta
