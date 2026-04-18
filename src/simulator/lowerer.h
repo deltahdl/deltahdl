@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
+#include <unordered_set>
 #include <vector>
 
 namespace delta {
@@ -9,6 +11,7 @@ namespace delta {
 class Arena;
 class DiagEngine;
 class SimContext;
+struct ModuleItem;
 struct RtlirContAssign;
 struct PackageDecl;
 struct RtlirDesign;
@@ -42,6 +45,14 @@ class Lowerer {
   void LowerImports(const RtlirModule* mod);
   void LowerPackageItem(ModuleItem* item);
   PackageDecl* FindPackage(std::string_view name) const;
+  // §26.6: Lower the single item named `name` visible through `pkg` — either
+  // a direct package item, or an item re-exported from another package.
+  void LowerImportedName(PackageDecl* pkg, std::string_view name,
+                         std::unordered_set<const PackageDecl*>& visited);
+  // §26.6: Lower all items visible when wildcard-importing from `pkg`,
+  // following any `export p::*` or `export *::*` declarations in `pkg`.
+  void LowerAllImported(PackageDecl* pkg,
+                        std::unordered_set<const PackageDecl*>& visited);
   void LowerDynArrayInit(const RtlirVariable& var);
   void InitAssocDefault(const Expr* init, AssocArrayObject* aa);
   void RegisterEnumForCast(const RtlirVariable& var);

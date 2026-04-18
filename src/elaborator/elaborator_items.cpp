@@ -724,6 +724,9 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
       break;
     }
     case ModuleItemKind::kExportDecl:
+      // §26.6: Export declarations only carry meaning inside packages; they
+      // are validated in ValidatePackageExports. No module-level lowering.
+      break;
     case ModuleItemKind::kPropertyDecl:
     case ModuleItemKind::kAssertProperty:
     case ModuleItemKind::kAssumeProperty:

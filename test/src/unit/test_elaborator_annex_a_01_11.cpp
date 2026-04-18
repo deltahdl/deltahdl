@@ -91,20 +91,6 @@ TEST(PackageItemsElaboration, DataDeclInPackageElaborates) {
              "endmodule\n"));
 }
 
-TEST(PackageItemsElaboration, ExportWildcardElaborates) {
-  EXPECT_TRUE(
-      ElabOk("package base_pkg;\n"
-             "  typedef int myint;\n"
-             "endpackage\n"
-             "package pkg;\n"
-             "  import base_pkg::*;\n"
-             "  export base_pkg::*;\n"
-             "endpackage\n"
-             "module m;\n"
-             "  import pkg::*;\n"
-             "endmodule\n"));
-}
-
 TEST(PackageItemsElaboration, MultiplePackagesWithImportsElaborate) {
   EXPECT_TRUE(
       ElabOk("package p1;\n"

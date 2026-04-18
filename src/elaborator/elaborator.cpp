@@ -3,7 +3,11 @@
 #include <algorithm>
 #include <cstdlib>
 #include <format>
+#include <functional>
 #include <optional>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -168,6 +172,109 @@ void Elaborator::ValidatePackageItems() {
   }
 }
 
+void Elaborator::ValidatePackageExports() {
+  // Build a map of package name to declaration for quick lookup.
+  std::unordered_map<std::string_view, const PackageDecl*> pkg_by_name;
+  for (const auto* pkg : unit_->packages) {
+    pkg_by_name[pkg->name] = pkg;
+  }
+
+  // Decide whether `name` can be exported from `src_pkg` — either because
+  // `src_pkg` declares it natively, or because `src_pkg` re-exports it
+  // through its own export/import declarations. The recursion lets a name
+  // travel down an arbitrarily long chain of re-exports; `visited` blocks
+  // cycles through mutually-importing packages.
+  std::function<bool(const PackageDecl*, std::string_view,
+                     std::unordered_set<const PackageDecl*>&)> provides;
+  provides = [&](const PackageDecl* src_pkg, std::string_view name,
+                 std::unordered_set<const PackageDecl*>& visited) -> bool {
+    if (!visited.insert(src_pkg).second) return false;
+    for (const auto* it : src_pkg->items) {
+      if (it->kind == ModuleItemKind::kImportDecl ||
+          it->kind == ModuleItemKind::kExportDecl) continue;
+      if (it->kind == ModuleItemKind::kClassDecl && it->class_decl &&
+          it->class_decl->name == name) return true;
+      if (!it->name.empty() && it->name == name) return true;
+    }
+    for (const auto* it : src_pkg->items) {
+      if (it->kind != ModuleItemKind::kExportDecl) continue;
+      const auto& ex = it->import_item;
+      if (ex.package_name == "*") {
+        // `export *::*;` — any of this package's imports may supply the name.
+        for (const auto* imp : src_pkg->items) {
+          if (imp->kind != ModuleItemKind::kImportDecl) continue;
+          auto sit = pkg_by_name.find(imp->import_item.package_name);
+          if (sit == pkg_by_name.end()) continue;
+          auto sub = visited;
+          if (provides(sit->second, name, sub)) return true;
+        }
+      } else {
+        auto sit = pkg_by_name.find(ex.package_name);
+        if (sit == pkg_by_name.end()) continue;
+        if (ex.is_wildcard || ex.item_name == name) {
+          auto sub = visited;
+          if (provides(sit->second, name, sub)) return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  for (const auto* pkg : unit_->packages) {
+    // Gather what this package imports: direct "src::name" targets and the
+    // set of source packages referenced by wildcard imports.
+    std::unordered_set<std::string> direct_imports;
+    std::unordered_set<std::string_view> wildcard_sources;
+    for (const auto* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kImportDecl) continue;
+      const auto& imp = item->import_item;
+      if (imp.is_wildcard) {
+        wildcard_sources.insert(imp.package_name);
+      } else {
+        direct_imports.insert(std::string(imp.package_name) +
+                              "::" + std::string(imp.item_name));
+      }
+    }
+
+    for (const auto* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kExportDecl) continue;
+      const auto& ex = item->import_item;
+      // Forms `export *::*;` and `export p::*;` have no per-name validation;
+      // they export whatever is actually imported.
+      if (ex.package_name == "*" || ex.is_wildcard) continue;
+
+      auto src_it = pkg_by_name.find(ex.package_name);
+      if (src_it == pkg_by_name.end()) {
+        diag_.Error(item->loc,
+                    std::format("export from unknown package '{}'",
+                                ex.package_name));
+        continue;
+      }
+      std::unordered_set<const PackageDecl*> visited;
+      if (!provides(src_it->second, ex.item_name, visited)) {
+        diag_.Error(
+            item->loc,
+            std::format("'{}' is not a candidate for import from package '{}'",
+                        ex.item_name, ex.package_name));
+        continue;
+      }
+      auto key = std::string(ex.package_name) + "::" + std::string(ex.item_name);
+      // A direct import of the same name, or any wildcard import from the
+      // source package, satisfies the "actually imported" requirement; for
+      // an unreferenced wildcard candidate the export itself counts as the
+      // reference that completes the import.
+      if (direct_imports.count(key) == 0 &&
+          wildcard_sources.count(ex.package_name) == 0) {
+        diag_.Error(
+            item->loc,
+            std::format(
+                "export '{}::{}': '{}' is not imported in package '{}'",
+                ex.package_name, ex.item_name, ex.item_name, pkg->name));
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateModports() {
   auto is_literal_expr = [](const Expr* e) {
     if (!e) return false;
@@ -280,6 +387,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // §26.2: Reject package items that are nets with implicit continuous
   // assignments or processes (initial, final, always*).
   ValidatePackageItems();
+  // §26.6: Validate package export declarations against the package's imports.
+  ValidatePackageExports();
   // §25.5.4, §25.5.5: Validate modport port-id uniqueness, direction
   // legality, and clocking-block references.
   ValidateModports();

@@ -52,6 +52,12 @@ class Elaborator {
   /// assignments or processes (initial, final, always*).
   void ValidatePackageItems();
 
+  /// §26.6: Validate package export declarations. For `export p::name`:
+  /// the name must exist in `p` as an import candidate, and the package must
+  /// import it either explicitly (`import p::name`) or via wildcard
+  /// (`import p::*`). An export can precede its matching import.
+  void ValidatePackageExports();
+
   /// §26.3: Validate package import declarations inside a module:
   ///   - explicit-import collisions with local decls and other explicit imports
   ///   - local decl that shadows a name already referenced via wildcard import

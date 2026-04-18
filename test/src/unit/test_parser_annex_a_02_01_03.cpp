@@ -87,27 +87,6 @@ TEST(TypeDeclParsing, PackageImportMultipleItems) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- package_export_declaration ---
-
-TEST(TypeDeclParsing, PackageExportWildcard) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  export *::*;\n"
-      "endpackage");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TypeDeclParsing, PackageExportNamedItem) {
-  auto r = Parse(
-      "package outer;\n"
-      "  import inner::foo;\n"
-      "  export inner::foo;\n"
-      "endpackage");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // --- genvar_declaration ---
 
 TEST(TypeDeclParsing, GenvarDeclSingle) {

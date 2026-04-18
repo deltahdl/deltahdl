@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
@@ -963,23 +964,97 @@ void Lowerer::LowerPackageItem(ModuleItem* item) {
   }
 }
 
+// §26.6: Test whether an item matches a simple name, including the class-decl
+// naming pattern where the name lives inside item->class_decl.
+static bool PackageItemHasName(const ModuleItem* item, std::string_view name) {
+  if (item->name == name) return true;
+  if (item->kind == ModuleItemKind::kClassDecl && item->class_decl &&
+      item->class_decl->name == name) return true;
+  return false;
+}
+
+void Lowerer::LowerImportedName(
+    PackageDecl* pkg, std::string_view name,
+    std::unordered_set<const PackageDecl*>& visited) {
+  if (!visited.insert(pkg).second) return;
+  for (auto* item : pkg->items) {
+    if (item->kind == ModuleItemKind::kImportDecl ||
+        item->kind == ModuleItemKind::kExportDecl) continue;
+    if (PackageItemHasName(item, name)) {
+      LowerPackageItem(item);
+      return;
+    }
+  }
+  // §26.6: Not a direct declaration — try to resolve through export paths.
+  for (auto* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kExportDecl) continue;
+    const auto& ex = item->import_item;
+    if (ex.package_name == "*") {
+      // §26.6: `export *::*;` re-exports whatever this package imports.
+      for (auto* imp_item : pkg->items) {
+        if (imp_item->kind != ModuleItemKind::kImportDecl) continue;
+        auto* src = FindPackage(imp_item->import_item.package_name);
+        if (!src) continue;
+        auto sub = visited;
+        LowerImportedName(src, name, sub);
+      }
+    } else if (ex.is_wildcard) {
+      auto* src = FindPackage(ex.package_name);
+      if (!src) continue;
+      auto sub = visited;
+      LowerImportedName(src, name, sub);
+    } else if (ex.item_name == name) {
+      auto* src = FindPackage(ex.package_name);
+      if (!src) continue;
+      auto sub = visited;
+      LowerImportedName(src, name, sub);
+    }
+  }
+}
+
+void Lowerer::LowerAllImported(
+    PackageDecl* pkg, std::unordered_set<const PackageDecl*>& visited) {
+  if (!visited.insert(pkg).second) return;
+  for (auto* item : pkg->items) {
+    if (item->kind == ModuleItemKind::kImportDecl ||
+        item->kind == ModuleItemKind::kExportDecl) continue;
+    LowerPackageItem(item);
+  }
+  // §26.6: Follow exports to bring in re-exported items from source packages.
+  for (auto* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kExportDecl) continue;
+    const auto& ex = item->import_item;
+    if (ex.package_name == "*") {
+      for (auto* imp_item : pkg->items) {
+        if (imp_item->kind != ModuleItemKind::kImportDecl) continue;
+        auto* src = FindPackage(imp_item->import_item.package_name);
+        if (!src) continue;
+        auto sub = visited;
+        LowerAllImported(src, sub);
+      }
+    } else {
+      auto* src = FindPackage(ex.package_name);
+      if (!src) continue;
+      if (ex.is_wildcard) {
+        auto sub = visited;
+        LowerAllImported(src, sub);
+      } else {
+        auto sub = visited;
+        LowerImportedName(src, ex.item_name, sub);
+      }
+    }
+  }
+}
+
 void Lowerer::LowerImports(const RtlirModule* mod) {
   for (const auto& imp : mod->imports) {
     auto* pkg = FindPackage(imp.package_name);
     if (!pkg) continue;
+    std::unordered_set<const PackageDecl*> visited;
     if (imp.is_wildcard) {
-      for (auto* item : pkg->items) {
-        LowerPackageItem(item);
-      }
+      LowerAllImported(pkg, visited);
     } else {
-      for (auto* item : pkg->items) {
-        if (item->name == imp.item_name ||
-            (item->kind == ModuleItemKind::kClassDecl && item->class_decl &&
-             item->class_decl->name == imp.item_name)) {
-          LowerPackageItem(item);
-          break;
-        }
-      }
+      LowerImportedName(pkg, imp.item_name, visited);
     }
   }
 }

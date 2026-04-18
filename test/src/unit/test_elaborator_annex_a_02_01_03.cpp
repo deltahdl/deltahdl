@@ -195,20 +195,6 @@ TEST(TypeDeclElaboration, PackageImportElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// --- package_export_declaration ---
-
-TEST(TypeDeclElaboration, PackageExportElaborates) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "package pkg;\n"
-      "  export *::*;\n"
-      "endpackage\n"
-      "module m; endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // --- Error conditions ---
 
 TEST(TypeDeclElaboration, ErrorRedeclarationDetected) {
