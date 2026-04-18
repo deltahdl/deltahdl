@@ -31,23 +31,6 @@ TEST(PassEnableSwitches, TooManyTerminals) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// --- Pass/enable switch error for wrong strength/delay combinations ---
-TEST(PassSwitches, DelayNotAllowed) {
-  auto r = Parse(
-      "module m;\n"
-      "  tran #5 (a, b);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PassSwitches, RtranDelayNotAllowed) {
-  auto r = Parse(
-      "module m;\n"
-      "  rtran #5 (a, b);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(PassEnableSwitches, MultipleInstances) {
   auto r = Parse(
       "module m;\n"
@@ -57,18 +40,6 @@ TEST(PassEnableSwitches, MultipleInstances) {
   EXPECT_FALSE(r.has_errors);
   auto gates = FindAllGates(r.cu->modules[0]->items);
   EXPECT_EQ(gates.size(), 2u);
-}
-
-TEST(PassEnableSwitches, TwoValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  tranif0 #(10, 20) t1(a, b, en);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
 }
 
 }  // namespace

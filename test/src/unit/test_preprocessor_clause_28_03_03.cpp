@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(GateLevelModelingParsing, GateWithDelay) {
+TEST(GateDelayParsing, GateWithDelay) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and #5 g1(out, a, b);\n"
@@ -18,7 +18,7 @@ TEST(GateLevelModelingParsing, GateWithDelay) {
   ASSERT_EQ(item->gate_terminals.size(), 3);
 }
 
-TEST(GateDelay, MacroExpandedDelay) {
+TEST(GateDelayParsing, MacroExpandedDelay) {
   auto r = ParseWithPreprocessor(
       "`define DELAY 5\n"
       "module m;\n"
@@ -30,6 +30,66 @@ TEST(GateDelay, MacroExpandedDelay) {
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
   ASSERT_NE(g, nullptr);
   EXPECT_NE(g->gate_delay, nullptr);
+}
+
+TEST(GateDelayParsing, GateNandWithDelay) {
+  auto r =
+      ParseWithPreprocessor("module t; nand #(5) g2(out, a, b); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->gate_kind, GateKind::kNand);
+  EXPECT_EQ(item->gate_inst_name, "g2");
+  EXPECT_NE(item->gate_delay, nullptr);
+  EXPECT_EQ(item->gate_terminals.size(), 3u);
+}
+
+TEST(GateDelayParsing, GateWithTwoDelays) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  and #(10, 12) a2(out, in1, in2);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->gate_kind, GateKind::kAnd);
+  EXPECT_NE(item->gate_delay, nullptr);
+}
+
+TEST(GateDelayParsing, GateWithThreeDelays) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  bufif0 #(10, 12, 11) b3(out, in, ctrl);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->gate_kind, GateKind::kBufif0);
+  EXPECT_NE(item->gate_delay, nullptr);
+}
+
+TEST(DelayParsing, Bufif1GateThreeValueDelay) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  bufif1 #(10, 20, 30) g1(y, a, b);\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[3];
+  ASSERT_NE(item->gate_delay, nullptr);
+  EXPECT_EQ(item->gate_delay->int_val, 10u);
+  ASSERT_NE(item->gate_delay_fall, nullptr);
+  EXPECT_EQ(item->gate_delay_fall->int_val, 20u);
+  ASSERT_NE(item->gate_delay_decay, nullptr);
+  EXPECT_EQ(item->gate_delay_decay->int_val, 30u);
+}
+
+TEST(GateDelayParsing, GateWithParenDelay) {
+  auto r = ParseWithPreprocessor(
+      "module m;\n"
+      "  or #(10) g1(out, a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_NE(item->gate_delay, nullptr);
 }
 
 }  // namespace

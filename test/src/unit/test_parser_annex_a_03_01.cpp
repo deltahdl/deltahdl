@@ -52,18 +52,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_XnorBasic) {
               "endmodule\n"));
 }
 
-TEST(PrimitiveInstantiationParsing, GateInst_NInputWithDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  or #(3, 5) o1(out, a, b);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kOr);
-  ASSERT_NE(g, nullptr);
-  EXPECT_NE(g->gate_delay, nullptr);
-  EXPECT_NE(g->gate_delay_fall, nullptr);
-}
-
 TEST(PrimitiveInstantiationParsing, GateInst_NInputMultipleInputs) {
   auto r = Parse(
       "module m;\n"
@@ -146,21 +134,6 @@ TEST(GateInstantiationParsing, GateInst_NInputGateCount) {
     if (item->kind == ModuleItemKind::kGateInst) gate_count++;
   }
   EXPECT_EQ(gate_count, 3);
-}
-
-TEST(GateDelayParsing, NInputGateRiseFallDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y, a, b;\n"
-      "  or #(3, 5) g1(y, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[3];
-  ASSERT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_delay->int_val, 3u);
-  ASSERT_NE(item->gate_delay_fall, nullptr);
-  EXPECT_EQ(item->gate_delay_fall->int_val, 5u);
 }
 
 TEST(NInputGateInstantiation, NandGateBasic) {
@@ -1091,46 +1064,6 @@ TEST(PrimitiveInstantiationParsing, Error_StrengthOnPassEnSwitch) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(PrimitiveInstantiationParsing, Error_DelayOnPassSwitch) {
-  auto r = Parse(
-      "module m;\n"
-      "  tran #5 t1(a, b);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveInstantiationParsing, Error_DelayOnPullup) {
-  auto r = Parse(
-      "module m;\n"
-      "  pullup #5 pu1(net1);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveInstantiationParsing, Error_DelayOnPulldown) {
-  auto r = Parse(
-      "module m;\n"
-      "  pulldown #5 pd1(net1);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveInstantiationParsing, Error_ThreeValueDelayOnNInputGate) {
-  auto r = Parse(
-      "module m;\n"
-      "  and #(1, 2, 3) a1(o, i1, i2);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveInstantiationParsing, Error_ThreeValueDelayOnNOutputGate) {
-  auto r = Parse(
-      "module m;\n"
-      "  buf #(1, 2, 3) b1(o, i);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(PrimitiveInstantiationParsing, Error_PullGateTooManyTerminals) {
   auto r = Parse(
       "module m;\n"
@@ -1169,85 +1102,6 @@ TEST(PrimitiveInstantiationParsing, Error_NInputGateSingleTerminal) {
       "  and (o);\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
-}
-
-// --- Delay coverage ---
-
-TEST(PrimitiveInstantiationParsing, GateInst_NOutputSingleDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  buf #5 b1(out, in);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBuf);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  EXPECT_EQ(g->gate_delay->int_val, 5u);
-  EXPECT_EQ(g->gate_delay_fall, nullptr);
-}
-
-TEST(PrimitiveInstantiationParsing, GateInst_PassEnSingleDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  tranif0 #7 t1(a, b, c);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  EXPECT_EQ(g->gate_delay->int_val, 7u);
-  EXPECT_EQ(g->gate_delay_fall, nullptr);
-}
-
-TEST(PrimitiveInstantiationParsing, Error_PassEnThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  tranif1 #(2, 4, 6) t1(a, b, c);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(PrimitiveInstantiationParsing, GateInst_MosTwoValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  nmos #(3, 5) n1(o, i, g);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  EXPECT_EQ(g->gate_delay->int_val, 3u);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  EXPECT_EQ(g->gate_delay_fall->int_val, 5u);
-  EXPECT_EQ(g->gate_delay_decay, nullptr);
-}
-
-TEST(PrimitiveInstantiationParsing, GateInst_MosThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  pmos #(2, 3, 4) p1(o, i, g);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_NE(g->gate_delay, nullptr);
-  EXPECT_NE(g->gate_delay_fall, nullptr);
-  EXPECT_NE(g->gate_delay_decay, nullptr);
-}
-
-TEST(PrimitiveInstantiationParsing, GateInst_CmosTwoValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  cmos #(3, 5) c1(o, i, n, p);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kCmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  EXPECT_EQ(g->gate_delay->int_val, 3u);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  EXPECT_EQ(g->gate_delay_fall->int_val, 5u);
-  EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
 // --- Structural coverage ---

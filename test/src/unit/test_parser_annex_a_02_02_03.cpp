@@ -61,51 +61,6 @@ TEST(DelayParsing, Delay3NetThreeValues) {
   EXPECT_EQ(item->net_delay_decay->int_val, 30u);
 }
 
-TEST(DelayParsing, Delay3GateSingleValue) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y, a, b;\n"
-      "  and #5 g1(y, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-
-  auto* item = r.cu->modules[0]->items[3];
-  ASSERT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_delay->int_val, 5u);
-  EXPECT_EQ(item->gate_delay_fall, nullptr);
-  EXPECT_EQ(item->gate_delay_decay, nullptr);
-}
-
-TEST(DelayParsing, Delay3GateTwoValues) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y, a, b;\n"
-      "  and #(10, 20) g1(y, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[3];
-  ASSERT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_delay->int_val, 10u);
-  ASSERT_NE(item->gate_delay_fall, nullptr);
-  EXPECT_EQ(item->gate_delay_fall->int_val, 20u);
-  EXPECT_EQ(item->gate_delay_decay, nullptr);
-}
-
-TEST(DelayParsing, Delay2NInputGateSingleValue) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y, a, b;\n"
-      "  xor #7 g1(y, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[3];
-  ASSERT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_delay->int_val, 7u);
-}
-
 TEST(DelayParsing, NoDelayDefault) {
   auto r = Parse(
       "module m;\n"
@@ -197,23 +152,6 @@ TEST(DelayParsing, Delay3MintypMaxExpression) {
   auto* item = r.cu->modules[0]->items[0];
   ASSERT_NE(item->net_delay, nullptr);
   EXPECT_EQ(item->net_delay->kind, ExprKind::kMinTypMax);
-}
-
-TEST(DelayParsing, Delay3GateThreeValues) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y, a, b;\n"
-      "  bufif0 #(5, 10, 15) g1(y, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[3];
-  ASSERT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_delay->int_val, 5u);
-  ASSERT_NE(item->gate_delay_fall, nullptr);
-  EXPECT_EQ(item->gate_delay_fall->int_val, 10u);
-  ASSERT_NE(item->gate_delay_decay, nullptr);
-  EXPECT_EQ(item->gate_delay_decay->int_val, 15u);
 }
 
 TEST(DelayParsing, DelayValueOneStep) {

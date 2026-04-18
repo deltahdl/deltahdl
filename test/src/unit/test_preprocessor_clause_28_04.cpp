@@ -61,28 +61,6 @@ TEST(Parser, GateAndInst) {
   EXPECT_EQ(item->gate_terminals.size(), 3u);
 }
 
-TEST(Parser, GateNandWithDelay) {
-  auto r =
-      ParseWithPreprocessor("module t; nand #(5) g2(out, a, b); endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->gate_kind, GateKind::kNand);
-  EXPECT_EQ(item->gate_inst_name, "g2");
-  EXPECT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_terminals.size(), 3u);
-}
-
-TEST(GateLevelModelingParsing, GateWithTwoDelays) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  and #(10, 12) a2(out, in1, in2);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->gate_kind, GateKind::kAnd);
-  EXPECT_NE(item->gate_delay, nullptr);
-}
-
 TEST(NInputGates, AndGateInstantiation) {
   auto r = ParseWithPreprocessor(
       "module m;\n"

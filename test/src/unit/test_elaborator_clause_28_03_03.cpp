@@ -4,13 +4,46 @@
 
 namespace {
 
-TEST(GateDecl, MaxDelaysByGateType) {
+TEST(GateDelayValidity, MaxDelaysByGateType) {
+  // Every gate type in Table 28-4 is covered so any edit to MaxDelays
+  // surfaces immediately as a test failure.
   struct {
     GateType gate;
     uint32_t expected;
   } const kCases[] = {
-      {GateType::kPullup, 0u}, {GateType::kPulldown, 0u}, {GateType::kAnd, 2u},
-      {GateType::kBufif0, 3u}, {GateType::kNmos, 3u},
+      // Pull gates: no delay spec.
+      {GateType::kPullup, 0u},
+      {GateType::kPulldown, 0u},
+      // Pass switches: no delay spec.
+      {GateType::kTran, 0u},
+      {GateType::kRtran, 0u},
+      // N-input gates: up to 2 delays.
+      {GateType::kAnd, 2u},
+      {GateType::kNand, 2u},
+      {GateType::kOr, 2u},
+      {GateType::kNor, 2u},
+      {GateType::kXor, 2u},
+      {GateType::kXnor, 2u},
+      // N-output gates: up to 2 delays.
+      {GateType::kBuf, 2u},
+      {GateType::kNot, 2u},
+      // Enable gates: up to 3 delays.
+      {GateType::kBufif0, 3u},
+      {GateType::kBufif1, 3u},
+      {GateType::kNotif0, 3u},
+      {GateType::kNotif1, 3u},
+      // MOS / CMOS switches: up to 3 delays.
+      {GateType::kNmos, 3u},
+      {GateType::kPmos, 3u},
+      {GateType::kRnmos, 3u},
+      {GateType::kRpmos, 3u},
+      {GateType::kCmos, 3u},
+      {GateType::kRcmos, 3u},
+      // Pass-enable switches: up to 2 delays.
+      {GateType::kTranif0, 2u},
+      {GateType::kTranif1, 2u},
+      {GateType::kRtranif0, 2u},
+      {GateType::kRtranif1, 2u},
   };
   for (const auto& c : kCases) {
     EXPECT_EQ(MaxDelays(c.gate), c.expected);
@@ -18,7 +51,7 @@ TEST(GateDecl, MaxDelaysByGateType) {
 }
 
 // --- Gate with delay elaborates normally ---
-TEST(GateElaboration, GateWithDelayStillProducesAssign) {
+TEST(GateDelayElaboration, GateWithDelayStillProducesAssign) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
