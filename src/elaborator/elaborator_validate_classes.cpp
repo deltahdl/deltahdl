@@ -1482,7 +1482,28 @@ static void ValidateOutOfBlockSignature(const ModuleItem* proto,
   }
 }
 
+static const ModuleDecl* FindInterfaceDecl(std::string_view name,
+                                           const CompilationUnit* unit) {
+  for (const auto* ifc : unit->interfaces) {
+    if (ifc->name == name) return ifc;
+  }
+  return nullptr;
+}
+
+static const ModuleItem* FindInterfaceExternPrototype(const ModuleDecl* ifc,
+                                                      std::string_view name) {
+  for (const auto* it : ifc->items) {
+    if ((it->kind == ModuleItemKind::kFunctionDecl ||
+         it->kind == ModuleItemKind::kTaskDecl) &&
+        it->is_extern && it->name == name) {
+      return it;
+    }
+  }
+  return nullptr;
+}
+
 // §8.24: Validate out-of-block method declarations.
+// §25.7: Also validate hierarchical interface subroutine bodies.
 void Elaborator::ValidateOutOfBlockDeclarations() {
   std::unordered_set<std::string> linked;
   for (auto* item : unit_->cu_items) {
@@ -1492,6 +1513,30 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
     if (!is_func && !is_task) continue;
     const auto* cls = FindClassDecl(item->method_class, unit_);
     if (!cls) {
+      const auto* ifc = FindInterfaceDecl(item->method_class, unit_);
+      if (ifc) {
+        const auto* proto = FindInterfaceExternPrototype(ifc, item->name);
+        if (!proto) {
+          diag_.Error(
+              item->loc,
+              std::format("no matching extern prototype for '{}.{}' in "
+                          "interface '{}'",
+                          item->method_class, item->name, item->method_class));
+          continue;
+        }
+        auto key =
+            std::string(item->method_class) + "." + std::string(item->name);
+        if (linked.count(key)) {
+          diag_.Error(
+              item->loc,
+              std::format("duplicate hierarchical body for '{}.{}'",
+                          item->method_class, item->name));
+          continue;
+        }
+        linked.insert(key);
+        ValidateOutOfBlockSignature(proto, item, item->method_class, diag_);
+        continue;
+      }
       diag_.Error(item->loc,
                   std::format("out-of-block declaration for unknown class '{}'",
                               item->method_class));

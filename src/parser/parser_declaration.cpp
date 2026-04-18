@@ -402,6 +402,11 @@ void Parser::ParseFuncName(ModuleItem* item) {
     item->name =
         Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
   }
+  // §25.7 interface subroutine bodies: interface_identifier . function_identifier
+  if (Match(TokenKind::kDot)) {
+    item->method_class = item->name;
+    item->name = Expect(TokenKind::kIdentifier).text;
+  }
 }
 
 // Parse function body: old-style ports, statements, endfunction label.
@@ -471,8 +476,9 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   }
 
   item->name = Expect(TokenKind::kIdentifier).text;
-  // A.2.7: interface_identifier . task_identifier
+  // §25.7 interface subroutine bodies: interface_identifier . task_identifier
   if (Match(TokenKind::kDot)) {
+    item->method_class = item->name;
     item->name = Expect(TokenKind::kIdentifier).text;
   }
   // §8.24 out-of-block methods: class_name::method_name

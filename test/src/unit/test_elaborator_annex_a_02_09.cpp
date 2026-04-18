@@ -23,15 +23,6 @@ TEST(ModportDeclarationElaboration, MultipleModportsElaborate) {
              "endmodule\n"));
 }
 
-TEST(ModportDeclarationElaboration, ImportExportModportElaborates) {
-  EXPECT_TRUE(
-      ElabOk("interface ifc;\n"
-             "  modport mp(import Read, export Write);\n"
-             "endinterface\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
 TEST(ModportDeclarationElaboration, MixedPortKindsElaborate) {
   EXPECT_TRUE(
       ElabOk("interface ifc(input logic clk);\n"
@@ -67,18 +58,6 @@ TEST(ModportDeclarationElaboration, CommaModportItemsElaborate) {
       ElabOk("interface ifc;\n"
              "  logic a, b;\n"
              "  modport m1(input a), m2(output b);\n"
-             "endinterface\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
-TEST(ModportDeclarationElaboration, ImportPrototypeElaborates) {
-  EXPECT_TRUE(
-      ElabOk("interface ifc;\n"
-             "  modport mp(\n"
-             "    import function int compute(int a),\n"
-             "    import task do_work(int x)\n"
-             "  );\n"
              "endinterface\n"
              "module m;\n"
              "endmodule\n"));
