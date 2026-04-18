@@ -447,6 +447,13 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
     if (gate_kind == GateKind::kPullup && str1 == 0 && str0 != 0)
       diag_.Error(loc,
                   "pullup single-strength must be a strength1 keyword");
+    // Every gate except pullup/pulldown requires both a strength0 and a
+    // strength1 keyword; a single-strength form is not allowed for them.
+    if (GateAllowsStrength(gate_kind) && gate_kind != GateKind::kPullup &&
+        gate_kind != GateKind::kPulldown && (str0 == 0 || str1 == 0))
+      diag_.Error(loc,
+                  "drive strength on this gate type requires both a "
+                  "strength0 and a strength1 keyword");
   }
 
   Expr* delay = nullptr;

@@ -1326,6 +1326,11 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
       diag_.Error(item->loc, "drive strength (highz0, highz1) is illegal");
     }
   }
+  // Gate instances share the same forbidden-combo rule on their strength spec.
+  if (item->kind == ModuleItemKind::kGateInst &&
+      item->drive_strength0 == 1 && item->drive_strength1 == 1) {
+    diag_.Error(item->loc, "drive strength (highz0, highz1) is illegal");
+  }
   if (is_proc && item->body) {
     CheckScalarSelectStmt(item->body, scalar_var_names_, diag_);
     CheckIndexedPartSelectWidthStmt(item->body, diag_);

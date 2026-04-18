@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-TEST(GateLevelModelingParsing, StrengthWithDelay) {
+TEST(DriveStrengthParsing, StrengthWithDelay) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and (strong0, strong1) #5 g1(out, a, b);\n"
@@ -19,7 +19,7 @@ TEST(GateLevelModelingParsing, StrengthWithDelay) {
   ASSERT_EQ(item->gate_terminals.size(), 3);
 }
 
-TEST(GateLevelModelingParsing, StrengthSpec) {
+TEST(DriveStrengthParsing, StrengthSpec) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  and (strong0, weak1) g1(out, a, b);\n"
@@ -32,7 +32,7 @@ TEST(GateLevelModelingParsing, StrengthSpec) {
   EXPECT_EQ(item->gate_inst_name, "g1");
 }
 
-TEST(GateLevelModelingParsing, StrengthSpecSupply) {
+TEST(DriveStrengthParsing, StrengthSpecSupply) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  nand (supply0, supply1) g1(out, a, b);\n"
@@ -43,7 +43,7 @@ TEST(GateLevelModelingParsing, StrengthSpecSupply) {
   EXPECT_EQ(item->drive_strength1, 5);
 }
 
-TEST(GateLevelModelingParsing, StrengthSpecHighz) {
+TEST(DriveStrengthParsing, StrengthSpecHighz) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
       "  or (highz0, pull1) g1(out, a, b);\n"
@@ -52,21 +52,6 @@ TEST(GateLevelModelingParsing, StrengthSpecHighz) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->drive_strength0, 1);
   EXPECT_EQ(item->drive_strength1, 3);
-}
-
-TEST(GateDriveStrength, StrengthAndDelay) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  and (strong0, strong1) #10 g1(y, a, b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);
-  ASSERT_NE(g, nullptr);
-  EXPECT_EQ(g->drive_strength0, 4u);
-  EXPECT_EQ(g->drive_strength1, 4u);
-  EXPECT_NE(g->gate_delay, nullptr);
 }
 
 }  // namespace
