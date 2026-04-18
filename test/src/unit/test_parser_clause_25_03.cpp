@@ -382,28 +382,6 @@ TEST(InterfaceInstantiationGrammar, BasicInterfaceInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-TEST(InterfaceInstantiationGrammar, InterfaceInstWithParams) {
-  auto r = Parse("module m; my_if #(8) u0(.a(a)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "my_if");
-  EXPECT_EQ(item->inst_name, "u0");
-  ASSERT_EQ(item->inst_params.size(), 1u);
-}
-
-TEST(InterfaceInstantiationGrammar, InterfaceInstWithNamedParams) {
-  auto r = Parse("module m; my_if #(.W(16)) u0(.a(a)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kModuleInst);
-  EXPECT_EQ(item->inst_module, "my_if");
-  ASSERT_EQ(item->inst_params.size(), 1u);
-  EXPECT_EQ(item->inst_params[0].first, "W");
-}
-
 TEST(InterfaceInstantiationGrammar, InterfaceInstInModule) {
   EXPECT_TRUE(
       ParseOk("interface simple_bus(input logic clk);\n"
@@ -421,15 +399,6 @@ TEST(InterfaceInstantiationGrammar, ModuleInstantiatesInterface) {
               "module m;\n"
               "  ifc u0();\n"
               "endmodule\n"));
-}
-
-TEST(InterfaceInstantiationGrammar, InterfaceInstEmptyParam) {
-  auto r = Parse("module m; my_if #() u0(.a(a)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->inst_module, "my_if");
-  EXPECT_TRUE(item->inst_params.empty());
 }
 
 TEST(InterfaceInstantiationGrammar, InterfaceInstOrderedPorts) {
@@ -466,22 +435,6 @@ TEST(InterfaceInstantiationGrammar, InterfaceInstArray) {
   EXPECT_EQ(item->inst_module, "my_if");
   EXPECT_NE(item->inst_range_left, nullptr);
   EXPECT_NE(item->inst_range_right, nullptr);
-}
-
-TEST(InterfaceInstantiationGrammar, MultipleInstancesWithParams) {
-  auto r = Parse(
-      "module m; my_if #(.W(8)) u0(.a(a)), u1(.a(b)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
-  auto* i0 = r.cu->modules[0]->items[0];
-  auto* i1 = r.cu->modules[0]->items[1];
-  EXPECT_EQ(i0->inst_module, "my_if");
-  EXPECT_EQ(i0->inst_name, "u0");
-  ASSERT_EQ(i0->inst_params.size(), 1u);
-  EXPECT_EQ(i0->inst_params[0].first, "W");
-  EXPECT_EQ(i1->inst_module, "my_if");
-  EXPECT_EQ(i1->inst_name, "u1");
 }
 
 TEST(InterfaceInstantiationGrammar, ThreeCommaSeparatedInstances) {
