@@ -47,10 +47,18 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body) {
 }
 
 void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
+  auto loc = CurrentLoc();
   Expect(TokenKind::kKwGenerate);
+  // §27.3: generate regions shall not nest.
+  if (in_generate_region_) {
+    diag_.Error(loc, "generate regions shall not nest");
+  }
+  bool saved = in_generate_region_;
+  in_generate_region_ = true;
   while (!Check(TokenKind::kKwEndgenerate) && !AtEnd()) {
     ParseModuleItem(items);
   }
+  in_generate_region_ = saved;
   Expect(TokenKind::kKwEndgenerate);
 }
 

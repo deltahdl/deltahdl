@@ -375,6 +375,10 @@ class Parser {
   // Nonzero while parsing the body of a loop/conditional generate construct.
   int generate_block_depth_ = 0;
   bool InGenerateBlock() const { return generate_block_depth_ > 0; }
+
+  // True while parsing items inside a generate...endgenerate region.
+  // Used to enforce §27.3's rule that generate regions do not nest.
+  bool in_generate_region_ = false;
 };
 
 inline bool IsPortDirection(TokenKind tk) {
