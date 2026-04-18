@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(GateLevelModelingParsing, ElaborateAndGate) {
+TEST(NInputGateElaboration, ElaborateAndGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -24,21 +24,7 @@ TEST(GateLevelModelingParsing, ElaborateAndGate) {
   EXPECT_EQ(ca.rhs->op, TokenKind::kAmp);
 }
 
-TEST(GateLevelModelingParsing, ElaborateOrGate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  wire out, a, b;\n"
-      "  or g1(out, a, b);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1);
-  EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kPipe);
-}
-
-TEST(GateLevelModelingParsing, ElaborateNandGate) {
+TEST(NInputGateElaboration, ElaborateNandGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -56,7 +42,7 @@ TEST(GateLevelModelingParsing, ElaborateNandGate) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kAmp);
 }
 
-TEST(GateLevelModelingParsing, ElaborateXorGate) {
+TEST(NInputGateElaboration, ElaborateXorGate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -70,24 +56,8 @@ TEST(GateLevelModelingParsing, ElaborateXorGate) {
   EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kCaret);
 }
 
-TEST(GateLevelModelingParsing, ElaborateMultiInputAnd) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  wire out, a, b, c;\n"
-      "  and g1(out, a, b, c);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1);
-
-  auto* rhs = mod->assigns[0].rhs;
-  EXPECT_EQ(rhs->op, TokenKind::kAmp);
-}
-
 // --- N-input gate chain depth ---
-TEST(GateElaboration, FourInputAndProducesThreeNodeChain) {
+TEST(NInputGateElaboration, FourInputAndProducesThreeNodeChain) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -109,7 +79,7 @@ TEST(GateElaboration, FourInputAndProducesThreeNodeChain) {
   EXPECT_EQ(ca.rhs->lhs->lhs->kind, ExprKind::kBinary);
 }
 
-TEST(GateElaboration, TwoInputOrProducesSingleBinary) {
+TEST(NInputGateElaboration, TwoInputOrProducesSingleBinary) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -130,12 +100,72 @@ TEST(GateElaboration, TwoInputOrProducesSingleBinary) {
 }
 
 // --- Full pipeline: elaborate through preprocessor ---
-TEST(GateElaboration, GateThroughFullPipeline) {
+TEST(NInputGateElaboration, NandGateElaboratesThroughFullPipeline) {
   EXPECT_TRUE(ElabOk(
       "module m;\n"
       "  wire a, b, y;\n"
       "  nand g1(y, a, b);\n"
       "endmodule\n"));
+}
+
+// nor and xnor complete the six n-input gates; each inverts its base gate's
+// binary-chain expression.
+TEST(NInputGateElaboration, ElaborateNorGate) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  nor g1(y, a, b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->assigns.size(), 1u);
+  auto* rhs = mod->assigns[0].rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kTilde);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->op, TokenKind::kPipe);
+}
+
+TEST(NInputGateElaboration, ElaborateXnorGate) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  xnor g1(y, a, b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->assigns.size(), 1u);
+  auto* rhs = mod->assigns[0].rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kTilde);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->op, TokenKind::kCaret);
+}
+
+// The first terminal drives the output, so the elaborated continuous
+// assignment must use it as the lhs.
+TEST(NInputGateElaboration, FirstTerminalIsOutputLhs) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  and g1(y, a, b);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->assigns.size(), 1u);
+  auto* lhs = mod->assigns[0].lhs;
+  ASSERT_NE(lhs, nullptr);
+  EXPECT_EQ(lhs->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(lhs->text, "y");
 }
 
 }  // namespace

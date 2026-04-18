@@ -59,4 +59,30 @@ TEST(NInputGateLexing, UnnamedOrGateTokenSequence) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
 }
 
+// Each of the six n-input gate keywords must lex to its own token kind so
+// later stages can distinguish them.
+TEST(NInputGateLexing, NandKeyword) {
+  auto tokens = Lex("nand");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwNand);
+}
+
+TEST(NInputGateLexing, NorKeyword) {
+  auto tokens = Lex("nor");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwNor);
+}
+
+TEST(NInputGateLexing, XorKeyword) {
+  auto tokens = Lex("xor");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwXor);
+}
+
+TEST(NInputGateLexing, XnorKeyword) {
+  auto tokens = Lex("xnor");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwXnor);
+}
+
 }  // namespace
