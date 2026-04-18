@@ -68,7 +68,8 @@ class Parser {
 
   // Generate blocks (parser_generate.cpp)
   void ParseGenerateRegion(std::vector<ModuleItem*>& items);
-  void ParseGenerateBody(std::vector<ModuleItem*>& body);
+  void ParseGenerateBody(std::vector<ModuleItem*>& body,
+                         std::string_view& out_label);
   ModuleItem* ParseGenerateFor();
   ModuleItem* ParseGenerateIf();
   void ParseGenerateCaseLabel(GenerateCaseItem& ci);

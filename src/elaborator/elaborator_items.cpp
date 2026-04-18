@@ -2121,6 +2121,39 @@ std::string_view Elaborator::ScopedName(std::string_view base) {
   return {arena_.AllocString(full.c_str(), full.size()), full.size()};
 }
 
+static bool IsGenerateConstruct(ModuleItemKind k) {
+  return k == ModuleItemKind::kGenerateIf ||
+         k == ModuleItemKind::kGenerateFor ||
+         k == ModuleItemKind::kGenerateCase;
+}
+
+void Elaborator::AssignGenerateBlockNames(const ModuleDecl* decl) {
+  // Names that `genblk<n>` must not collide with: ports, parameters, and
+  // any named module item (including explicitly labeled generate blocks).
+  std::unordered_set<std::string_view> used;
+  for (const auto& port : decl->ports) used.insert(port.name);
+  for (const auto& p : decl->params) used.insert(p.first);
+  for (auto* it : decl->items) {
+    if (!it->name.empty()) used.insert(it->name);
+  }
+
+  int64_t n = 0;
+  for (auto* it : decl->items) {
+    if (!IsGenerateConstruct(it->kind)) continue;
+    ++n;
+    if (!it->name.empty()) continue;  // explicit label kept as-is
+    std::string digits = std::to_string(n);
+    std::string candidate = "genblk" + digits;
+    while (used.count(candidate)) {
+      digits = "0" + digits;
+      candidate = "genblk" + digits;
+    }
+    auto* buf = arena_.AllocString(candidate.c_str(), candidate.size());
+    it->name = std::string_view(buf, candidate.size());
+    used.insert(it->name);
+  }
+}
+
 static constexpr int64_t kMaxGenerateIterations = 65536;
 
 // True if `e` (or any subexpression) is an identifier reference to `name`.

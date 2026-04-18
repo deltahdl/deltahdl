@@ -176,6 +176,12 @@ class Elaborator {
   void ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
                               RtlirModule* mod, const ScopeMap& scope);
 
+  /// §27.6: Assign `genblk<n>` names to unnamed generate constructs in the
+  /// module's scope, numbering them in textual order.  When the default name
+  /// collides with an explicitly declared identifier in the same scope,
+  /// leading zeros are inserted in front of <n> until the name is unique.
+  void AssignGenerateBlockNames(const ModuleDecl* decl);
+
   /// Apply defparam overrides after hierarchy is built.
   void ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl);
 

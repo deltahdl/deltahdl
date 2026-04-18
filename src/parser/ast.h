@@ -525,6 +525,9 @@ struct GenerateCaseItem {
   std::vector<Expr*> patterns;
   bool is_default = false;
   std::vector<ModuleItem*> body;
+  // §27.6: label captured from `begin : label` / `label : begin`; empty when
+  // the case-item body is unnamed and awaits a default genblk<n> assignment.
+  std::string_view label;
 };
 
 // Clocking signal entry within a clocking block (§14.3)

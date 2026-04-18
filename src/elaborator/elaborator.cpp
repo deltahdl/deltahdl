@@ -756,6 +756,9 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   }
 
   ElaboratePorts(decl, mod);
+  // §27.6: assign external names to unnamed generate blocks before their
+  // bodies are elaborated, so downstream uses of the name see a stable value.
+  AssignGenerateBlockNames(decl);
   ElaborateItems(decl, mod);
   return mod;
 }

@@ -2,7 +2,8 @@
 
 namespace delta {
 
-void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body) {
+void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
+                               std::string_view& out_label) {
   // RAII guard so §27.2 rules apply across all return paths.
   struct DepthGuard {
     int& d;
@@ -17,11 +18,14 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body) {
   bool has_gen_label = false;
   if (CheckIdentifier()) {
     auto saved = lexer_.SavePos();
-    Consume();
+    auto ident = Consume();
     if (Check(TokenKind::kColon)) {
       Consume();
       if (Check(TokenKind::kKwBegin)) {
         has_gen_label = true;
+        // §27.6: capture the prefix label so elaboration can use it as the
+        // block's external name instead of assigning a default genblk<n>.
+        out_label = ident.text;
       } else {
         lexer_.RestorePos(saved);
       }
@@ -31,7 +35,12 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body) {
   }
 
   if (Match(TokenKind::kKwBegin)) {
-    if (!has_gen_label && Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
+    if (!has_gen_label && Match(TokenKind::kColon)) {
+      // §27.6: the alternative `begin : name` form also names the block.
+      if (CheckIdentifier()) {
+        out_label = Consume().text;
+      }
+    }
     if (has_gen_label && Check(TokenKind::kColon)) {
       diag_.Error(CurrentLoc(),
                   "cannot have both a generate block label and a block name");
@@ -74,7 +83,7 @@ ModuleItem* Parser::ParseGenerateFor() {
   Expect(TokenKind::kSemicolon);
   item->gen_step = ParseAssignmentOrExprNoSemi();
   Expect(TokenKind::kRParen);
-  ParseGenerateBody(item->gen_body);
+  ParseGenerateBody(item->gen_body, item->name);
   return item;
 }
 
@@ -86,7 +95,7 @@ ModuleItem* Parser::ParseGenerateIf() {
   Expect(TokenKind::kLParen);
   item->gen_cond = ParseExpr();
   Expect(TokenKind::kRParen);
-  ParseGenerateBody(item->gen_body);
+  ParseGenerateBody(item->gen_body, item->name);
   if (!Match(TokenKind::kKwElse)) return item;
   if (Check(TokenKind::kKwIf)) {
     item->gen_else = ParseGenerateIf();
@@ -94,7 +103,7 @@ ModuleItem* Parser::ParseGenerateIf() {
     auto* else_item = arena_.Create<ModuleItem>();
     else_item->kind = ModuleItemKind::kGenerateIf;
     else_item->loc = CurrentLoc();
-    ParseGenerateBody(else_item->gen_body);
+    ParseGenerateBody(else_item->gen_body, else_item->name);
     item->gen_else = else_item;
   }
   return item;
@@ -124,7 +133,7 @@ ModuleItem* Parser::ParseGenerateCase() {
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     GenerateCaseItem ci;
     ParseGenerateCaseLabel(ci);
-    ParseGenerateBody(ci.body);
+    ParseGenerateBody(ci.body, ci.label);
     item->gen_case_items.push_back(std::move(ci));
   }
   Expect(TokenKind::kKwEndcase);
