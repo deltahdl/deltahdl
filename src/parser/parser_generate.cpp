@@ -3,6 +3,13 @@
 namespace delta {
 
 void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body) {
+  // RAII guard so §27.2 rules apply across all return paths.
+  struct DepthGuard {
+    int& d;
+    explicit DepthGuard(int& d) : d(d) { ++d; }
+    ~DepthGuard() { --d; }
+  } guard(generate_block_depth_);
+
   // generate_block_or_null: ';' produces an empty body (§A.4.2)
   if (Match(TokenKind::kSemicolon)) return;
 

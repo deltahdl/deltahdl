@@ -28,10 +28,18 @@ static std::optional<AlwaysKind> TokenToAlwaysKind(TokenKind tk) {
 
 bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwSpecify)) {
+    if (InGenerateBlock()) {
+      diag_.Error(CurrentLoc(),
+                  "specify block not allowed inside a generate block");
+    }
     items.push_back(ParseSpecifyBlock());
     return true;
   }
   if (Check(TokenKind::kKwSpecparam)) {
+    if (InGenerateBlock()) {
+      diag_.Error(CurrentLoc(),
+                  "specparam declaration not allowed inside a generate block");
+    }
     items.push_back(ParseSpecparamDecl());
     return true;
   }

@@ -504,6 +504,8 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
   bool localparam = Check(TokenKind::kKwLocalparam);
   Consume();  // parameter or localparam
+  // §27.2 / §6.20.4: treat as localparam if declared inside a generate block.
+  if (InGenerateBlock()) localparam = true;
   // type_parameter_declaration: type [forward_type] list_of_type_assignments
   if (Match(TokenKind::kKwType)) {
     ParseTypeParamDecl(items, loc, localparam);

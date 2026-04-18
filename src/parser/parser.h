@@ -371,6 +371,10 @@ class Parser {
     return current_module_ &&
            current_module_->decl_kind == ModuleDeclKind::kProgram;
   }
+
+  // Nonzero while parsing the body of a loop/conditional generate construct.
+  int generate_block_depth_ = 0;
+  bool InGenerateBlock() const { return generate_block_depth_ > 0; }
 };
 
 inline bool IsPortDirection(TokenKind tk) {
