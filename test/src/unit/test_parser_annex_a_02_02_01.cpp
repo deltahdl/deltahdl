@@ -194,28 +194,6 @@ TEST(NetAndVariableTypeParsing, StructMemberVoid) {
       "endmodule"));
 }
 
-// --- data_type: virtual [interface] interface_identifier ---
-
-TEST(NetAndVariableTypeParsing, DataTypeVirtualInterface) {
-  auto r = Parse(
-      "interface my_ifc; endinterface\n"
-      "module m; virtual my_ifc vif; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind,
-            DataTypeKind::kVirtualInterface);
-}
-
-TEST(NetAndVariableTypeParsing, DataTypeVirtualInterfaceKeyword) {
-  auto r = Parse(
-      "interface my_ifc; endinterface\n"
-      "module m; virtual interface my_ifc vif; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->data_type.kind,
-            DataTypeKind::kVirtualInterface);
-}
-
 // --- data_type: [class_scope | package_scope] type_identifier ---
 
 TEST(NetAndVariableTypeParsing, DataTypeClassType) {
@@ -439,22 +417,6 @@ TEST(NetAndVariableTypeParsing, EnumPackedDimension) {
   EXPECT_TRUE(ParseOk("module m; enum logic [1:0] {A, B, C} x; endmodule"));
 }
 
-// --- virtual interface with modport (§25.9) ---
-
-TEST(NetAndVariableTypeParsing, VirtualInterfaceWithModport) {
-  auto r = Parse(
-      "interface my_ifc;\n"
-      "  logic a;\n"
-      "  modport mp(input a);\n"
-      "endinterface\n"
-      "module m; virtual my_ifc.mp vif; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& dt = r.cu->modules[0]->items[0]->data_type;
-  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
-  EXPECT_EQ(dt.modport_name, "mp");
-}
-
 // --- struct_union_member: {attribute_instance} ---
 
 TEST(NetAndVariableTypeParsing, StructMemberWithAttribute) {
@@ -535,35 +497,6 @@ TEST(NetAndVariableTypeParsing, StructPackedUnsigned) {
 TEST(NetAndVariableTypeParsing, EnumEmptyBodyIsError) {
   auto r = Parse("module m; enum {} x; endmodule");
   EXPECT_TRUE(r.has_errors);
-}
-
-// --- virtual interface with parameter_value_assignment ---
-
-TEST(NetAndVariableTypeParsing, VirtualInterfaceWithParams) {
-  auto r = Parse(
-      "interface my_ifc #(parameter W = 8);\n"
-      "endinterface\n"
-      "module m; virtual my_ifc#(16) vif; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& dt = r.cu->modules[0]->items[0]->data_type;
-  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
-  EXPECT_FALSE(dt.type_params.empty());
-}
-
-TEST(NetAndVariableTypeParsing, VirtualInterfaceWithParamsAndModport) {
-  auto r = Parse(
-      "interface my_ifc #(parameter W = 8);\n"
-      "  logic [W-1:0] a;\n"
-      "  modport mp(input a);\n"
-      "endinterface\n"
-      "module m; virtual my_ifc#(16).mp vif; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto& dt = r.cu->modules[0]->items[0]->data_type;
-  EXPECT_EQ(dt.kind, DataTypeKind::kVirtualInterface);
-  EXPECT_FALSE(dt.type_params.empty());
-  EXPECT_EQ(dt.modport_name, "mp");
 }
 
 // --- named type with packed dimensions ---

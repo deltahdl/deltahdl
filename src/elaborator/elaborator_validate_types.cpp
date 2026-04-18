@@ -36,6 +36,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateUnpackedArrayConcatNesting(decl);
   ValidateClassHandleOps(decl);
   ValidateChandleOps(decl);
+  ValidateVirtualInterfaceOps(decl);
   ValidateAggregateComparisons(decl);
   ValidateRealOperatorRestrictions(decl);
   ValidateAssignInExprRestrictions(decl);
@@ -644,6 +645,19 @@ void Elaborator::ValidateChandleInUnion(const DataType& dtype, SourceLoc loc) {
     }
     if (m.type_kind == DataTypeKind::kString) {
       diag_.Error(loc, "string type can only be used in tagged unions");
+      return;
+    }
+  }
+}
+
+// §25.9: Virtual interfaces shall not be used as members of unions.
+void Elaborator::ValidateVirtualInterfaceInUnion(const DataType& dtype,
+                                                 SourceLoc loc) {
+  if (dtype.kind != DataTypeKind::kUnion) return;
+  for (const auto& m : dtype.struct_members) {
+    if (m.type_kind == DataTypeKind::kVirtualInterface) {
+      diag_.Error(loc,
+                  "virtual interface cannot be used as a member of a union");
       return;
     }
   }

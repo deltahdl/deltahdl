@@ -609,6 +609,11 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
       diag_.Error(port.loc, "chandle cannot be used as a port type");
       continue;
     }
+    if (port.data_type.kind == DataTypeKind::kVirtualInterface) {
+      diag_.Error(port.loc,
+                  "virtual interface cannot be used as a port type");
+      continue;
+    }
 
     // §23.2.2.1 R9: Non-ANSI implicit ports must have a direction declared
     // in the module body.
@@ -1428,6 +1433,7 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item) {
     ValidatePackedDimRequiresPackedKeyword(item->data_type, item->loc);
     ValidatePackedStructMemberTypes(item->data_type, item->loc);
     ValidateChandleInUnion(item->data_type, item->loc);
+    ValidateVirtualInterfaceInUnion(item->data_type, item->loc);
     ValidatePackedUnion(item->data_type, item->loc);
   }
   ValidatePackedDimOnPredefinedType(item->data_type, item->loc);
@@ -1533,6 +1539,33 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     scalar_var_names_.insert(item->name);
   if (item->data_type.kind == DataTypeKind::kNamed)
     var_named_types_[item->name] = item->data_type.type_name;
+  if (item->data_type.kind == DataTypeKind::kVirtualInterface) {
+    auto iface_name = item->data_type.type_name;
+    auto modport_name = item->data_type.modport_name;
+    vi_var_interface_types_[item->name] = iface_name;
+    vi_var_modports_[item->name] = modport_name;
+    auto* iface_decl = FindModule(iface_name);
+    if (!iface_decl ||
+        iface_decl->decl_kind != ModuleDeclKind::kInterface) {
+      diag_.Error(item->loc,
+                  std::format("unknown interface '{}' in virtual interface "
+                              "declaration",
+                              iface_name));
+    } else if (!modport_name.empty()) {
+      bool found = false;
+      for (const auto* mp : iface_decl->modports) {
+        if (mp && mp->name == modport_name) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        diag_.Error(item->loc,
+                    std::format("modport '{}' not found in interface '{}'",
+                                modport_name, iface_name));
+      }
+    }
+  }
   RtlirVariable var;
   var.name = ScopedName(item->name);
   var.width = EvalTypeWidth(item->data_type, typedefs_);

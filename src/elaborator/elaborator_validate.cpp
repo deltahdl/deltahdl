@@ -554,6 +554,179 @@ void Elaborator::ValidateChandleOps(const ModuleDecl* decl) {
   }
 }
 
+static bool IsVirtualInterfaceVar(const Expr* e, const TypeMap& types) {
+  auto name = ExprIdent(e);
+  if (name.empty()) return false;
+  auto it = types.find(name);
+  return it != types.end() && it->second == DataTypeKind::kVirtualInterface;
+}
+
+static bool ExprUsesVirtualInterface(const Expr* e, const TypeMap& types) {
+  if (!e) return false;
+  if (IsVirtualInterfaceVar(e, types)) return true;
+  if (e->kind == ExprKind::kMemberAccess && e->lhs &&
+      IsVirtualInterfaceVar(e->lhs, types)) {
+    return true;
+  }
+  if (ExprUsesVirtualInterface(e->lhs, types)) return true;
+  if (ExprUsesVirtualInterface(e->rhs, types)) return true;
+  if (ExprUsesVirtualInterface(e->base, types)) return true;
+  if (ExprUsesVirtualInterface(e->index, types)) return true;
+  if (ExprUsesVirtualInterface(e->condition, types)) return true;
+  if (ExprUsesVirtualInterface(e->true_expr, types)) return true;
+  if (ExprUsesVirtualInterface(e->false_expr, types)) return true;
+  for (const auto* elem : e->elements) {
+    if (ExprUsesVirtualInterface(elem, types)) return true;
+  }
+  return false;
+}
+
+void Elaborator::ValidateVirtualInterfaceContAssign(const ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kContAssign) return;
+  if (ExprUsesVirtualInterface(item->assign_lhs, var_types_) ||
+      ExprUsesVirtualInterface(item->assign_rhs, var_types_)) {
+    diag_.Error(item->loc,
+                "virtual interface cannot be used in continuous assignment");
+  }
+}
+
+void Elaborator::ValidateVirtualInterfaceSensitivity(const ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kAlwaysBlock) return;
+  for (const auto& ev : item->sensitivity) {
+    if (ExprUsesVirtualInterface(ev.signal, var_types_)) {
+      diag_.Error(item->loc,
+                  "virtual interface cannot appear in event expression");
+    }
+  }
+}
+
+static bool IsAllowedVirtualInterfaceBinaryOp(TokenKind op) {
+  return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
+         op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq;
+}
+
+static void CheckVirtualInterfaceExpr(const Expr* e, const TypeMap& types,
+                                      DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kBinary) {
+    bool lhs_vi = e->lhs && IsVirtualInterfaceVar(e->lhs, types);
+    bool rhs_vi = e->rhs && IsVirtualInterfaceVar(e->rhs, types);
+    if ((lhs_vi || rhs_vi) && !IsAllowedVirtualInterfaceBinaryOp(e->op)) {
+      diag.Error(e->range.start,
+                 "operator is not allowed on virtual interface");
+    }
+  }
+  if (e->kind == ExprKind::kUnary && IsVirtualInterfaceVar(e->lhs, types)) {
+    diag.Error(e->range.start,
+               "operator is not allowed on virtual interface");
+  }
+  if (e->kind == ExprKind::kPostfixUnary &&
+      IsVirtualInterfaceVar(e->lhs, types)) {
+    diag.Error(e->range.start,
+               "operator is not allowed on virtual interface");
+  }
+  if (e->kind == ExprKind::kSelect && e->base &&
+      IsVirtualInterfaceVar(e->base, types)) {
+    diag.Error(e->range.start, "bit-select on virtual interface is illegal");
+  }
+  CheckVirtualInterfaceExpr(e->lhs, types, diag);
+  CheckVirtualInterfaceExpr(e->rhs, types, diag);
+  CheckVirtualInterfaceExpr(e->base, types, diag);
+  CheckVirtualInterfaceExpr(e->index, types, diag);
+  CheckVirtualInterfaceExpr(e->condition, types, diag);
+  CheckVirtualInterfaceExpr(e->true_expr, types, diag);
+  CheckVirtualInterfaceExpr(e->false_expr, types, diag);
+  for (const auto* elem : e->elements) {
+    CheckVirtualInterfaceExpr(elem, types, diag);
+  }
+}
+
+void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
+  if (!s) return;
+  if ((s->kind == StmtKind::kBlockingAssign ||
+       s->kind == StmtKind::kNonblockingAssign) &&
+      s->lhs && s->rhs) {
+    bool lhs_vi = IsVirtualInterfaceVar(s->lhs, var_types_);
+    bool rhs_vi = IsVirtualInterfaceVar(s->rhs, var_types_);
+    auto rhs_name = ExprIdent(s->rhs);
+    bool rhs_is_iface_inst =
+        !rhs_name.empty() && interface_inst_types_.count(rhs_name) != 0;
+    if (lhs_vi && !rhs_vi && !rhs_is_iface_inst && !IsNullLiteral(s->rhs)) {
+      diag_.Error(s->range.start,
+                  "virtual interface can only be assigned from another "
+                  "virtual interface, an interface instance, or null");
+    }
+    if (lhs_vi && rhs_vi) {
+      auto lhs_name = ExprIdent(s->lhs);
+      auto lit = vi_var_interface_types_.find(lhs_name);
+      auto rit = vi_var_interface_types_.find(rhs_name);
+      if (lit != vi_var_interface_types_.end() &&
+          rit != vi_var_interface_types_.end() && lit->second != rit->second) {
+        diag_.Error(s->range.start,
+                    "virtual interface assignment between incompatible "
+                    "interface types");
+      }
+      auto lmp = vi_var_modports_.find(lhs_name);
+      auto rmp = vi_var_modports_.find(rhs_name);
+      bool lhs_has_mp =
+          lmp != vi_var_modports_.end() && !lmp->second.empty();
+      bool rhs_has_mp =
+          rmp != vi_var_modports_.end() && !rmp->second.empty();
+      if (!lhs_has_mp && rhs_has_mp) {
+        diag_.Error(s->range.start,
+                    "virtual interface with modport cannot be assigned to "
+                    "virtual interface without modport");
+      } else if (lhs_has_mp && rhs_has_mp && lmp->second != rmp->second) {
+        diag_.Error(s->range.start,
+                    "virtual interface modports do not match");
+      }
+    }
+    if (lhs_vi && rhs_is_iface_inst) {
+      auto lhs_name = ExprIdent(s->lhs);
+      auto lit = vi_var_interface_types_.find(lhs_name);
+      auto iit = interface_inst_types_.find(rhs_name);
+      if (lit != vi_var_interface_types_.end() &&
+          iit != interface_inst_types_.end() && lit->second != iit->second) {
+        diag_.Error(s->range.start,
+                    "virtual interface assignment from interface instance of "
+                    "incompatible type");
+      }
+    }
+    if (!lhs_vi && rhs_vi) {
+      diag_.Error(s->range.start,
+                  "virtual interface cannot be assigned to a non-virtual-"
+                  "interface variable");
+    }
+  }
+  CheckVirtualInterfaceExpr(s->rhs, var_types_, diag_);
+  CheckVirtualInterfaceExpr(s->expr, var_types_, diag_);
+  CheckVirtualInterfaceExpr(s->condition, var_types_, diag_);
+  for (auto* sub : s->stmts) WalkStmtsForVirtualInterfaceOps(sub);
+  WalkStmtsForVirtualInterfaceOps(s->then_branch);
+  WalkStmtsForVirtualInterfaceOps(s->else_branch);
+  WalkStmtsForVirtualInterfaceOps(s->body);
+  WalkStmtsForVirtualInterfaceOps(s->for_body);
+  for (auto& ci : s->case_items) WalkStmtsForVirtualInterfaceOps(ci.body);
+}
+
+void Elaborator::ValidateVirtualInterfaceOps(const ModuleDecl* decl) {
+  bool has_vi = false;
+  for (const auto& [name, kind] : var_types_) {
+    if (kind == DataTypeKind::kVirtualInterface) {
+      has_vi = true;
+      break;
+    }
+  }
+  if (!has_vi) return;
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) {
+      WalkStmtsForVirtualInterfaceOps(item->body);
+    }
+  }
+}
+
 // §6.6.8: interconnect nets cannot appear in continuous assignments.
 void Elaborator::ValidateInterconnectContAssign(const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kContAssign) return;
@@ -611,6 +784,8 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
   ValidateEdgeOnReal(item);
   ValidateChandleContAssign(item);
   ValidateChandleSensitivity(item);
+  ValidateVirtualInterfaceContAssign(item);
+  ValidateVirtualInterfaceSensitivity(item);
   ValidateInterconnectContAssign(item);
   ValidateClassHandleContAssign(item);
   // §6.3.2.2: Drive strength on a net declaration requires an initializer.

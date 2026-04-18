@@ -560,6 +560,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     ValidatePackedDimRequiresPackedKeyword(item->typedef_type, item->loc);
     ValidatePackedStructMemberTypes(item->typedef_type, item->loc);
     ValidateChandleInUnion(item->typedef_type, item->loc);
+    ValidateVirtualInterfaceInUnion(item->typedef_type, item->loc);
     ValidatePackedUnion(item->typedef_type, item->loc);
   }
   ValidatePackedDimOnPredefinedType(item->typedef_type, item->loc);
@@ -682,6 +683,8 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ansi_port_names_.clear();
   clocking_signals_.clear();
   interface_inst_types_.clear();
+  vi_var_interface_types_.clear();
+  vi_var_modports_.clear();
   checker_inst_names_.clear();
   program_inst_names_.clear();
   auto_task_func_names_.clear();
@@ -694,6 +697,13 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
         item->nested_module_decl) {
       nested_module_decls_[item->nested_module_decl->name] =
           item->nested_module_decl;
+    }
+    // §25.9: virtual interface shall not be used as an interface item.
+    if (decl->decl_kind == ModuleDeclKind::kInterface &&
+        item->kind == ModuleItemKind::kVarDecl &&
+        item->data_type.kind == DataTypeKind::kVirtualInterface) {
+      diag_.Error(item->loc,
+                  "virtual interface cannot be declared inside an interface");
     }
   }
   for (const auto* item : decl->items) {

@@ -228,6 +228,21 @@ class Elaborator {
   /// §7.3: Chandle types only in tagged unions.
   void ValidateChandleInUnion(const DataType& dtype, SourceLoc loc);
 
+  /// §25.9: Virtual interfaces shall not be used as members of unions.
+  void ValidateVirtualInterfaceInUnion(const DataType& dtype, SourceLoc loc);
+
+  /// §25.9: Virtual interface variable cannot appear in continuous assignment.
+  void ValidateVirtualInterfaceContAssign(const ModuleItem* item);
+
+  /// §25.9: Virtual interface variable cannot appear in sensitivity list.
+  void ValidateVirtualInterfaceSensitivity(const ModuleItem* item);
+
+  /// §25.9: Allowed operations on virtual interface variables (=, ==, !=).
+  void ValidateVirtualInterfaceOps(const ModuleDecl* decl);
+
+  /// §25.9: Walk statements for virtual interface operation restrictions.
+  void WalkStmtsForVirtualInterfaceOps(const Stmt* s);
+
   /// Validate packed union constraints (§7.3.1).
   void ValidatePackedUnion(const DataType& dtype, SourceLoc loc);
 
@@ -576,6 +591,10 @@ class Elaborator {
   std::unordered_set<std::string_view> ansi_port_names_;
 
   std::unordered_map<std::string_view, std::string_view> interface_inst_types_;
+  // §25.9: virtual interface variable name -> interface type name.
+  std::unordered_map<std::string_view, std::string_view> vi_var_interface_types_;
+  // §25.9: virtual interface variable name -> selected modport name (or empty).
+  std::unordered_map<std::string_view, std::string_view> vi_var_modports_;
   std::unordered_set<std::string_view> checker_inst_names_;
   std::unordered_set<std::string_view> program_inst_names_;  // §24.3
   std::unordered_set<std::string_view> auto_task_func_names_;
