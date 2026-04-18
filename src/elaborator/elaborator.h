@@ -243,6 +243,18 @@ class Elaborator {
   /// §25.9: Walk statements for virtual interface operation restrictions.
   void WalkStmtsForVirtualInterfaceOps(const Stmt* s);
 
+  /// §25.9.1: Validate vif.clocking_block.signal member-access chains and
+  /// array-of-virtual-interface assignment-pattern initializers.
+  void ValidateVirtualInterfaceClocking(const ModuleDecl* decl);
+
+  /// §25.9.1: Walk statements to validate vif-clocking access and array-of-vif
+  /// assignment-pattern initializers.
+  void WalkStmtsForVirtualInterfaceClocking(const Stmt* s);
+
+  /// §25.9.1: Validate an array-of-virtual-interface assignment-pattern
+  /// initializer on a block-level variable declaration statement.
+  void ValidateArrayOfVifInitStmt(const Stmt* s);
+
   /// Validate packed union constraints (§7.3.1).
   void ValidatePackedUnion(const DataType& dtype, SourceLoc loc);
 

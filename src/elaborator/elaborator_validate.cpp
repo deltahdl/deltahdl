@@ -727,6 +727,230 @@ void Elaborator::ValidateVirtualInterfaceOps(const ModuleDecl* decl) {
   }
 }
 
+// =============================================================================
+// §25.9.1 — Virtual interfaces and clocking blocks
+// =============================================================================
+
+namespace {
+
+using VifTypeMap = std::unordered_map<std::string_view, std::string_view>;
+
+std::string_view ResolveVifInterfaceType(const DataType& dt,
+                                         const TypedefMap& typedefs) {
+  if (dt.kind == DataTypeKind::kVirtualInterface) return dt.type_name;
+  if (dt.kind == DataTypeKind::kNamed) {
+    auto it = typedefs.find(dt.type_name);
+    if (it != typedefs.end() &&
+        it->second.kind == DataTypeKind::kVirtualInterface) {
+      return it->second.type_name;
+    }
+  }
+  return {};
+}
+
+const ModuleDecl* FindInterfaceDeclByName(const CompilationUnit* unit,
+                                          std::string_view name) {
+  if (!unit) return nullptr;
+  for (const auto* i : unit->interfaces) {
+    if (i && i->name == name) return i;
+  }
+  for (const auto* m : unit->modules) {
+    if (m && m->name == name &&
+        m->decl_kind == ModuleDeclKind::kInterface) {
+      return m;
+    }
+  }
+  return nullptr;
+}
+
+void CheckVifClockingExpr(const Expr* e, const VifTypeMap& vifs,
+                          const CompilationUnit* unit, DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kMemberAccess && e->lhs &&
+      e->lhs->kind == ExprKind::kMemberAccess && e->lhs->lhs &&
+      e->lhs->lhs->kind == ExprKind::kIdentifier) {
+    auto vif_it = vifs.find(e->lhs->lhs->text);
+    if (vif_it != vifs.end()) {
+      std::string_view block_name;
+      if (e->lhs->rhs && e->lhs->rhs->kind == ExprKind::kIdentifier) {
+        block_name = e->lhs->rhs->text;
+      } else if (!e->lhs->text.empty()) {
+        block_name = e->lhs->text;
+      }
+      std::string_view sig_name;
+      if (e->rhs && e->rhs->kind == ExprKind::kIdentifier) {
+        sig_name = e->rhs->text;
+      } else if (!e->text.empty()) {
+        sig_name = e->text;
+      }
+      const auto* iface = FindInterfaceDeclByName(unit, vif_it->second);
+      if (iface && !block_name.empty()) {
+        const ModuleItem* cb_item = nullptr;
+        bool member_exists = false;
+        for (const auto* it : iface->items) {
+          if (it->kind == ModuleItemKind::kClockingBlock &&
+              it->name == block_name) {
+            cb_item = it;
+            break;
+          }
+          if ((it->kind == ModuleItemKind::kVarDecl ||
+               it->kind == ModuleItemKind::kNetDecl) &&
+              it->name == block_name) {
+            member_exists = true;
+          }
+        }
+        if (!cb_item && !member_exists) {
+          diag.Error(e->range.start,
+                     std::format("'{}' is not a clocking block or member of "
+                                 "interface '{}'",
+                                 block_name, vif_it->second));
+        } else if (cb_item && !sig_name.empty()) {
+          bool signal_found = false;
+          for (const auto& sig : cb_item->clocking_signals) {
+            if (sig.name == sig_name) {
+              signal_found = true;
+              break;
+            }
+          }
+          if (!signal_found) {
+            diag.Error(e->range.start,
+                       std::format(
+                           "'{}' is not a signal of clocking block '{}' in "
+                           "interface '{}'",
+                           sig_name, block_name, vif_it->second));
+          }
+        }
+      }
+    }
+  }
+  CheckVifClockingExpr(e->lhs, vifs, unit, diag);
+  CheckVifClockingExpr(e->rhs, vifs, unit, diag);
+  CheckVifClockingExpr(e->base, vifs, unit, diag);
+  CheckVifClockingExpr(e->index, vifs, unit, diag);
+  CheckVifClockingExpr(e->condition, vifs, unit, diag);
+  CheckVifClockingExpr(e->true_expr, vifs, unit, diag);
+  CheckVifClockingExpr(e->false_expr, vifs, unit, diag);
+  for (const auto* elem : e->elements) {
+    CheckVifClockingExpr(elem, vifs, unit, diag);
+  }
+  for (const auto* arg : e->args) {
+    CheckVifClockingExpr(arg, vifs, unit, diag);
+  }
+}
+
+void WalkStmtsForVifClocking(const Stmt* s, const VifTypeMap& vifs,
+                             const CompilationUnit* unit, DiagEngine& diag) {
+  if (!s) return;
+  CheckVifClockingExpr(s->lhs, vifs, unit, diag);
+  CheckVifClockingExpr(s->rhs, vifs, unit, diag);
+  CheckVifClockingExpr(s->expr, vifs, unit, diag);
+  CheckVifClockingExpr(s->condition, vifs, unit, diag);
+  CheckVifClockingExpr(s->var_init, vifs, unit, diag);
+  for (const auto* sub : s->stmts) WalkStmtsForVifClocking(sub, vifs, unit, diag);
+  WalkStmtsForVifClocking(s->then_branch, vifs, unit, diag);
+  WalkStmtsForVifClocking(s->else_branch, vifs, unit, diag);
+  WalkStmtsForVifClocking(s->body, vifs, unit, diag);
+  WalkStmtsForVifClocking(s->for_body, vifs, unit, diag);
+  for (auto& ci : s->case_items) {
+    WalkStmtsForVifClocking(ci.body, vifs, unit, diag);
+  }
+}
+
+}  // namespace
+
+void Elaborator::ValidateArrayOfVifInitStmt(const Stmt* s) {
+  if (!s || s->kind != StmtKind::kVarDecl) return;
+  if (!s->var_init) return;
+  if (s->var_init->kind != ExprKind::kAssignmentPattern) return;
+  std::string_view iface_type =
+      ResolveVifInterfaceType(s->var_decl_type, typedefs_);
+  if (iface_type.empty()) return;
+  if (s->var_unpacked_dims.empty()) return;
+
+  auto size_opt = ComputeDimSize(s->var_unpacked_dims.front());
+  if (size_opt && static_cast<int64_t>(s->var_init->elements.size()) !=
+                      *size_opt) {
+    diag_.Error(
+        s->var_init->range.start,
+        std::format(
+            "array-of-virtual-interface initializer has {} elements but "
+            "'{}' has size {}",
+            s->var_init->elements.size(), s->var_name, *size_opt));
+  }
+
+  for (const auto* elem : s->var_init->elements) {
+    if (!elem) continue;
+    if (elem->kind != ExprKind::kIdentifier) continue;
+    auto inst_it = interface_inst_types_.find(elem->text);
+    if (inst_it != interface_inst_types_.end()) {
+      if (inst_it->second != iface_type) {
+        diag_.Error(
+            elem->range.start,
+            std::format(
+                "interface instance '{}' of type '{}' is not compatible "
+                "with virtual interface element type '{}'",
+                elem->text, inst_it->second, iface_type));
+      }
+      continue;
+    }
+    auto vif_it = vi_var_interface_types_.find(elem->text);
+    if (vif_it != vi_var_interface_types_.end()) {
+      if (vif_it->second != iface_type) {
+        diag_.Error(
+            elem->range.start,
+            std::format(
+                "virtual interface '{}' of type '{}' is not compatible "
+                "with element type '{}'",
+                elem->text, vif_it->second, iface_type));
+      }
+    }
+  }
+}
+
+static void WalkStmtsForArrayOfVifInit(const Stmt* s, Elaborator* elab) {
+  if (!s) return;
+  elab->ValidateArrayOfVifInitStmt(s);
+  for (const auto* sub : s->stmts) WalkStmtsForArrayOfVifInit(sub, elab);
+  WalkStmtsForArrayOfVifInit(s->then_branch, elab);
+  WalkStmtsForArrayOfVifInit(s->else_branch, elab);
+  WalkStmtsForArrayOfVifInit(s->body, elab);
+  WalkStmtsForArrayOfVifInit(s->for_body, elab);
+  for (auto& ci : s->case_items) WalkStmtsForArrayOfVifInit(ci.body, elab);
+}
+
+void Elaborator::WalkStmtsForVirtualInterfaceClocking(const Stmt* s) {
+  WalkStmtsForArrayOfVifInit(s, this);
+}
+
+void Elaborator::ValidateVirtualInterfaceClocking(const ModuleDecl* decl) {
+  VifTypeMap module_vifs = vi_var_interface_types_;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kTaskDecl ||
+        item->kind == ModuleItemKind::kFunctionDecl) {
+      VifTypeMap scoped = module_vifs;
+      for (const auto& a : item->func_args) {
+        auto t = ResolveVifInterfaceType(a.data_type, typedefs_);
+        if (!t.empty()) scoped[a.name] = t;
+      }
+      if (item->body) {
+        WalkStmtsForVifClocking(item->body, scoped, unit_, diag_);
+        WalkStmtsForVirtualInterfaceClocking(item->body);
+      }
+    } else {
+      bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                     item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                     item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                     item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                     item->kind == ModuleItemKind::kInitialBlock ||
+                     item->kind == ModuleItemKind::kFinalBlock;
+      if (is_proc && item->body) {
+        WalkStmtsForVifClocking(item->body, module_vifs, unit_, diag_);
+        WalkStmtsForVirtualInterfaceClocking(item->body);
+      }
+    }
+  }
+}
+
 // §6.6.8: interconnect nets cannot appear in continuous assignments.
 void Elaborator::ValidateInterconnectContAssign(const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kContAssign) return;

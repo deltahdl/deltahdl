@@ -37,6 +37,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl) {
   ValidateClassHandleOps(decl);
   ValidateChandleOps(decl);
   ValidateVirtualInterfaceOps(decl);
+  ValidateVirtualInterfaceClocking(decl);
   ValidateAggregateComparisons(decl);
   ValidateRealOperatorRestrictions(decl);
   ValidateAssignInExprRestrictions(decl);
