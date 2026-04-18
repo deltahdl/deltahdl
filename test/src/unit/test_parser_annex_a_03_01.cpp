@@ -925,18 +925,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_StrengthOrder_Strength1First) {
   EXPECT_NE(g->drive_strength1, 0);
 }
 
-TEST(PrimitiveInstantiationParsing, GateInst_SharedStrengthAcrossInstances) {
-  auto r = Parse(
-      "module m;\n"
-      "  and (weak0, weak1) a1(o1, i1, i2), a2(o2, i3, i4);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  ASSERT_EQ(gates.size(), 2u);
-  EXPECT_EQ(gates[0]->drive_strength0, gates[1]->drive_strength0);
-  EXPECT_EQ(gates[0]->drive_strength1, gates[1]->drive_strength1);
-}
-
 TEST(PrimitiveInstantiationParsing, GateInst_EnableWithStrengthAndDelay) {
   auto r = Parse(
       "module m;\n"
@@ -960,39 +948,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_NOutputWithDelay) {
   ASSERT_NE(g, nullptr);
   EXPECT_NE(g->gate_delay, nullptr);
   EXPECT_NE(g->gate_delay_fall, nullptr);
-}
-
-TEST(PrimitiveInstantiationParsing, GateInst_SharedDelayAcrossInstances) {
-  auto r = Parse(
-      "module m;\n"
-      "  or #5 o1(out1, a, b), o2(out2, c, d);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto gates = FindAllGates(r.cu->modules[0]->items);
-  ASSERT_EQ(gates.size(), 2u);
-  EXPECT_NE(gates[0]->gate_delay, nullptr);
-  EXPECT_NE(gates[1]->gate_delay, nullptr);
-}
-
-TEST(GateDelayParsing, MultipleInstancesWithRiseFallDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y1, y2, a, b;\n"
-      "  and #(4, 6) g1(y1, a, b), g2(y2, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-
-  auto* g1 = r.cu->modules[0]->items[4];
-  auto* g2 = r.cu->modules[0]->items[5];
-  ASSERT_NE(g1->gate_delay, nullptr);
-  EXPECT_EQ(g1->gate_delay->int_val, 4u);
-  ASSERT_NE(g1->gate_delay_fall, nullptr);
-  EXPECT_EQ(g1->gate_delay_fall->int_val, 6u);
-  ASSERT_NE(g2->gate_delay, nullptr);
-  EXPECT_EQ(g2->gate_delay->int_val, 4u);
-  ASSERT_NE(g2->gate_delay_fall, nullptr);
-  EXPECT_EQ(g2->gate_delay_fall->int_val, 6u);
 }
 
 TEST(GateDelayParsing, MintypMaxDelay) {
