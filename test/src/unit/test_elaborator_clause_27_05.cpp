@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(GenerateElaboration, ElaborationGenerateIfTrue) {
+TEST(GenerateElaboration, GenerateIfTrueSelectsThenBranch) {
   ElabFixture f;
   auto* design = Elaborate(
       "module top #(parameter W = 16) ();\n"
@@ -24,7 +24,7 @@ TEST(GenerateElaboration, ElaborationGenerateIfTrue) {
   EXPECT_TRUE(found_wide);
 }
 
-TEST(GenerateElaboration, ElaborationGenerateIfFalse) {
+TEST(GenerateElaboration, GenerateIfFalseSelectsElseBranch) {
   ElabFixture f;
   auto* design = Elaborate(
       "module top #(parameter W = 4) ();\n"
@@ -44,7 +44,7 @@ TEST(GenerateElaboration, ElaborationGenerateIfFalse) {
   EXPECT_TRUE(found_narrow);
 }
 
-TEST(GenerateElaboration, ElaborationGenerateCase) {
+TEST(GenerateElaboration, GenerateCaseMatchesPattern) {
   ElabFixture f;
   auto* design = Elaborate(
       "module top #(parameter SEL = 1) ();\n"
@@ -64,7 +64,7 @@ TEST(GenerateElaboration, ElaborationGenerateCase) {
   EXPECT_TRUE(found_bus1);
 }
 
-TEST(GenerateElaboration, ElaborationGenerateCaseDefault) {
+TEST(GenerateElaboration, GenerateCaseSelectsDefault) {
   ElabFixture f;
   auto* design = Elaborate(
       "module top #(parameter SEL = 99) ();\n"
@@ -139,6 +139,75 @@ TEST(GenerateElaboration, GenerateIfTrueNoElse) {
   bool found = false;
   for (const auto& v : mod->variables) {
     if (v.name == "enabled") found = true;
+  }
+  EXPECT_TRUE(found);
+}
+
+// §27.5: else binds to the nearest preceding if, so the middle arm of an
+// if / else-if / else chain is taken when its condition is the first to hold.
+TEST(GenerateElaboration, GenerateIfElseIfChainSelectsMiddle) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top #(parameter SEL = 1) ();\n"
+      "  if (SEL == 0) begin\n"
+      "    logic [7:0] zero;\n"
+      "  end else if (SEL == 1) begin\n"
+      "    logic [7:0] one;\n"
+      "  end else begin\n"
+      "    logic [7:0] other;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  bool found_zero = false, found_one = false, found_other = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "zero") found_zero = true;
+    if (v.name == "one") found_one = true;
+    if (v.name == "other") found_other = true;
+  }
+  EXPECT_FALSE(found_zero);
+  EXPECT_TRUE(found_one);
+  EXPECT_FALSE(found_other);
+}
+
+// §27.5: a case-generate item with a comma-separated list of constant
+// expressions selects its body when any pattern equals the controlling value.
+TEST(GenerateElaboration, GenerateCaseMultiplePatternsPerItem) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top #(parameter SEL = 2) ();\n"
+      "  case (SEL)\n"
+      "    0, 1, 2: logic [7:0] early;\n"
+      "    default: logic [7:0] late;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  bool found_early = false, found_late = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "early") found_early = true;
+    if (v.name == "late") found_late = true;
+  }
+  EXPECT_TRUE(found_early);
+  EXPECT_FALSE(found_late);
+}
+
+// §27.5: the generate_block body may be a single generate_item with no
+// surrounding begin/end.
+TEST(GenerateElaboration, GenerateIfBodyWithoutBeginEnd) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top ();\n"
+      "  if (1) logic [7:0] bare;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (const auto& v : mod->variables) {
+    if (v.name == "bare") found = true;
   }
   EXPECT_TRUE(found);
 }
