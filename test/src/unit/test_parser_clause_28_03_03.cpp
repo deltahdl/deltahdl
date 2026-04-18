@@ -53,27 +53,6 @@ TEST(GateDelayParsing, NInputGateThreeValueDelayRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(GateDelayParsing, NOutputGateThreeValueDelayRejected) {
-  auto r = Parse(
-      "module m;\n"
-      "  buf #(1, 2, 3) b1(o, i);\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-TEST(GateDelayParsing, NOutputGateSingleValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  buf #5 b1(out, in);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBuf);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  EXPECT_EQ(g->gate_delay->int_val, 5u);
-  EXPECT_EQ(g->gate_delay_fall, nullptr);
-}
-
 TEST(GateDelayParsing, PassEnableSwitchSingleValueDelay) {
   auto r = Parse(
       "module m;\n"

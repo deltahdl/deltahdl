@@ -74,21 +74,16 @@ static Expr* BuildNInputGateExpr(Arena& arena, GateKind kind,
   return invert ? WrapInvert(arena, chain) : chain;
 }
 
-/// Build RHS for buf/not/bufif/notif/pull gates.
+/// Build RHS for bufif/notif/pull gates (all single-output).
 static Expr* BuildOutputGateExpr(Arena& arena, GateKind kind,
                                  const std::vector<Expr*>& terminals) {
   switch (kind) {
-    case GateKind::kBuf:
-      return (terminals.size() >= 2) ? terminals.back() : nullptr;
-    case GateKind::kNot:
-      return (terminals.size() >= 2) ? WrapInvert(arena, terminals.back())
-                                     : nullptr;
     case GateKind::kPullup:
       return MakeIntLiteral(arena, 1);
     case GateKind::kPulldown:
       return MakeIntLiteral(arena, 0);
     default:
-      return nullptr;
+      return (terminals.size() >= 2) ? terminals.back() : nullptr;
   }
 }
 
@@ -96,6 +91,24 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   auto kind = item->gate_kind;
   auto& terms = item->gate_terminals;
   if (terms.empty()) return;
+
+  // §28.5: buf and not have one input (last terminal) and one or more
+  // outputs (all preceding terminals); emit one continuous assign per
+  // output.
+  if (kind == GateKind::kBuf || kind == GateKind::kNot) {
+    if (terms.size() < 2) return;
+    auto* input = terms.back();
+    for (size_t i = 0; i + 1 < terms.size(); ++i) {
+      Expr* rhs =
+          (kind == GateKind::kNot) ? WrapInvert(arena, input) : input;
+      RtlirContAssign ca;
+      ca.lhs = terms[i];
+      ca.rhs = rhs;
+      ca.width = LookupLhsWidth(ca.lhs, mod);
+      mod->assigns.push_back(ca);
+    }
+    return;
+  }
 
   Expr* rhs = nullptr;
   switch (kind) {
