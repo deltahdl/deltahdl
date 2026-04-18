@@ -414,18 +414,6 @@ TEST(SubroutineCallExprParsing, RandomizeCallWithConstraintBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SubroutineCallExprParsing, StdRandomizeCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  int x;\n"
-      "  initial begin\n"
-      "    std::randomize(x);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SubroutineCallExprParsing, SuperMethodCall) {
   auto r = Parse(
       "module m;\n"

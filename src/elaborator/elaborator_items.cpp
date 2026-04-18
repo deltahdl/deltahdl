@@ -265,6 +265,10 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
   explicit_imports_.clear();
   wildcard_packages_.clear();
   wildcard_claimed_.clear();
+  // §26.7: the built-in std package is implicitly wildcard-imported into
+  // the compilation-unit scope of every compilation unit, which makes its
+  // declarations visible here without an explicit import.
+  wildcard_packages_.push_back("std");
 
   auto provides = [&](std::string_view pkg_name,
                       std::string_view name) -> bool {

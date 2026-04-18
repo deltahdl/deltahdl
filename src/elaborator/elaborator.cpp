@@ -121,6 +121,13 @@ void Elaborator::ValidateNameSpaces() {
       diag_.Error(pkg->range.start,
                   std::format("duplicate package '{}'", pkg->name));
     }
+    // §26.7: the name std is reserved for the built-in package; users
+    // cannot insert additional declarations into it.
+    if (pkg->name == "std") {
+      diag_.Error(pkg->range.start,
+                  "'std' is reserved for the built-in package and cannot "
+                  "be declared by the user");
+    }
   }
 }
 
@@ -700,6 +707,13 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   mod->delay_mode = unit_->delay_mode_directive;
   // §5.12: Resolve attributes on module definition.
   mod->attrs = ResolveAttributes(decl->attrs, diag_);
+
+  // §26.7: every compilation unit wildcard-imports the built-in std package
+  // implicitly, so the lowerer must see it among the module's imports.
+  RtlirImport std_import;
+  std_import.package_name = "std";
+  std_import.is_wildcard = true;
+  mod->imports.push_back(std_import);
 
   // §26.4: Header imports are visible throughout the module, including in
   // parameter and port declarations that follow.
