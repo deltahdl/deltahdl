@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <format>
 #include <optional>
+#include <unordered_set>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -2122,6 +2123,35 @@ std::string_view Elaborator::ScopedName(std::string_view base) {
 
 static constexpr int64_t kMaxGenerateIterations = 65536;
 
+// True if `e` (or any subexpression) is an identifier reference to `name`.
+static bool ExprReferencesName(const Expr* e, std::string_view name) {
+  if (!e) return false;
+  if (e->kind == ExprKind::kIdentifier && e->text == name) return true;
+  if (ExprReferencesName(e->lhs, name)) return true;
+  if (ExprReferencesName(e->rhs, name)) return true;
+  for (const auto* a : e->args) {
+    if (ExprReferencesName(a, name)) return true;
+  }
+  return false;
+}
+
+// LHS identifier assigned by a genvar_iteration step statement.
+static std::string_view StepLhsName(const Stmt* step) {
+  if (!step) return {};
+  if (step->lhs && step->lhs->kind == ExprKind::kIdentifier) {
+    return step->lhs->text;
+  }
+  if (step->expr) {
+    const auto* e = step->expr;
+    if ((e->kind == ExprKind::kUnary ||
+         e->kind == ExprKind::kPostfixUnary) &&
+        e->lhs && e->lhs->kind == ExprKind::kIdentifier) {
+      return e->lhs->text;
+    }
+  }
+  return {};
+}
+
 void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
                                       const ScopeMap& scope) {
   if (!item->gen_init || !item->gen_init->lhs) {
@@ -2129,6 +2159,25 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     return;
   }
   auto genvar_name = item->gen_init->lhs->text;
+
+  // §27.4: the initialization assignment shall not reference the loop
+  // index on the right-hand side.
+  if (ExprReferencesName(item->gen_init->rhs, genvar_name)) {
+    diag_.Error(item->loc,
+                "generate-for init shall not reference the loop index on the "
+                "right-hand side");
+    return;
+  }
+
+  // §27.4: both the initialization and iteration assignments shall assign
+  // to the same genvar.
+  auto step_lhs = StepLhsName(item->gen_step);
+  if (!step_lhs.empty() && step_lhs != genvar_name) {
+    diag_.Error(item->loc,
+                "generate-for init and step shall assign to the same genvar");
+    return;
+  }
+
   auto init_val = ConstEvalInt(item->gen_init->rhs, scope);
   if (!init_val) {
     diag_.Warning(item->loc, "generate-for init is not constant");
@@ -2139,9 +2188,20 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   loop_scope[genvar_name] = *init_val;
   std::string saved_prefix = gen_prefix_;
 
-  for (int64_t iter = 0; iter < kMaxGenerateIterations; ++iter) {
+  // §27.4: error if a genvar value is repeated during loop evaluation.
+  std::unordered_set<int64_t> seen_values;
+
+  int64_t iter = 0;
+  for (; iter < kMaxGenerateIterations; ++iter) {
     auto cond = ConstEvalInt(item->gen_cond, loop_scope);
     if (!cond || !*cond) break;
+
+    if (!seen_values.insert(loop_scope[genvar_name]).second) {
+      diag_.Error(item->loc,
+                  "generate-for genvar value is repeated during evaluation");
+      gen_prefix_ = saved_prefix;
+      return;
+    }
 
     gen_prefix_ = std::format("{}{}_{}_", saved_prefix, genvar_name,
                               loop_scope[genvar_name]);
@@ -2168,6 +2228,11 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     }
     if (!next) break;
     loop_scope[genvar_name] = *next;
+  }
+
+  // §27.4: non-termination shall be an error.
+  if (iter == kMaxGenerateIterations) {
+    diag_.Error(item->loc, "generate-for loop did not terminate");
   }
 
   gen_prefix_ = saved_prefix;
