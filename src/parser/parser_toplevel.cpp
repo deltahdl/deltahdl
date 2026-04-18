@@ -321,8 +321,28 @@ void Parser::ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
     diag_.Error(loc, "incorrect number of terminals for gate instance");
   ValidateGateTerminalLvalues(kind, item->gate_terminals, diag_, loc);
   items.push_back(item);
+  // First instance here is unnamed (anonymous); follow-ups may be arrays and
+  // must obey the one-identifier-per-range rule.
+  std::vector<std::string_view> array_names;
   while (Match(TokenKind::kComma)) {
-    items.push_back(ParseOneGateInstance(kind, loc));
+    auto* next = ParseOneGateInstance(kind, loc);
+    if (!next->gate_inst_name.empty() && next->inst_range_left != nullptr) {
+      bool dup = false;
+      for (auto n : array_names) {
+        if (n == next->gate_inst_name) {
+          dup = true;
+          break;
+        }
+      }
+      if (dup) {
+        diag_.Error(next->loc,
+                    "instance identifier reused for another array of "
+                    "instances in the same declaration");
+      } else {
+        array_names.push_back(next->gate_inst_name);
+      }
+    }
+    items.push_back(next);
   }
   Expect(TokenKind::kSemicolon);
 }
@@ -333,9 +353,17 @@ ModuleItem* Parser::ParseOneGateInstance(GateKind kind, SourceLoc loc) {
   item->loc = loc;
   item->gate_kind = kind;
 
-  // Optional instance name.
+  // Optional name_of_instance: instance_identifier [ unpacked_dimension ].
   if (Check(TokenKind::kIdentifier)) {
     item->gate_inst_name = Consume().text;
+    if (Check(TokenKind::kLBracket)) {
+      Consume();
+      item->inst_range_left = ParseExpr();
+      if (Match(TokenKind::kColon)) {
+        item->inst_range_right = ParseExpr();
+      }
+      Expect(TokenKind::kRBracket);
+    }
   }
 
   // Terminal list.
@@ -465,6 +493,22 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
   if (delay_decay && !GateUsesDelay3(gate_kind))
     diag_.Error(loc, "this gate type allows at most 2 delay values");
 
+  // Track array instance identifiers declared in this statement; an identifier
+  // may associate with only one range specification.
+  std::vector<std::string_view> array_names;
+  auto check_continuous_range = [&](ModuleItem* mi) {
+    if (mi->gate_inst_name.empty() || mi->inst_range_left == nullptr) return;
+    for (const auto& n : array_names) {
+      if (n == mi->gate_inst_name) {
+        diag_.Error(mi->loc,
+                    "instance identifier reused for another array of "
+                    "instances in the same declaration");
+        return;
+      }
+    }
+    array_names.push_back(mi->gate_inst_name);
+  };
+
   // Parse comma-separated instances.
   auto* first = ParseOneGateInstance(gate_kind, loc);
   first->drive_strength0 = str0;
@@ -472,6 +516,7 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
   first->gate_delay = delay;
   first->gate_delay_fall = delay_fall;
   first->gate_delay_decay = delay_decay;
+  check_continuous_range(first);
   items.push_back(first);
 
   while (Match(TokenKind::kComma)) {
@@ -481,6 +526,7 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
     next->gate_delay = delay;
     next->gate_delay_fall = delay_fall;
     next->gate_delay_decay = delay_decay;
+    check_continuous_range(next);
     items.push_back(next);
   }
   Expect(TokenKind::kSemicolon);
