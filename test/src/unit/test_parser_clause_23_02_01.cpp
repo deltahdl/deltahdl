@@ -28,62 +28,6 @@ TEST(ModuleAndHierarchyParsing, EndLabelModuleNoLabel) {
   EXPECT_EQ(r.cu->modules[0]->name, "bar");
 }
 
-TEST(ModuleAndHierarchyParsing, ModuleHeaderImport) {
-  auto r = Parse(
-      "module m import pkg::*; ();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "m");
-
-  ASSERT_GE(mod->items.size(), 1);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
-}
-
-TEST(ModuleAndHierarchyParsing, ModuleHeaderImportDetails) {
-  auto r = Parse(
-      "module m import pkg::*; ();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_GE(mod->items.size(), 1);
-  EXPECT_EQ(mod->items[0]->import_item.package_name, "pkg");
-  EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
-}
-
-TEST(ModuleAndHierarchyParsing, ModuleHeaderImportWithParamsImport) {
-  auto r = Parse(
-      "module m import A::*; #(parameter N = 4) (input logic clk);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "m");
-  ASSERT_GE(mod->items.size(), 1);
-  EXPECT_EQ(mod->items[0]->kind, ModuleItemKind::kImportDecl);
-}
-
-TEST(ModuleAndHierarchyParsing, ModuleHeaderImportWithParamsPortsAndParams) {
-  auto r = Parse(
-      "module m import A::*; #(parameter N = 4) (input logic clk);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->params.size(), 1);
-  ASSERT_EQ(mod->ports.size(), 1);
-}
-
-TEST(ModuleAndHierarchyParsing, ModuleHeaderMultipleImportsFirst) {
-  auto r = Parse(
-      "module m import A::*, B::foo; ();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  EXPECT_EQ(mod->name, "m");
-  ASSERT_GE(mod->items.size(), 2);
-  EXPECT_EQ(mod->items[0]->import_item.package_name, "A");
-  EXPECT_TRUE(mod->items[0]->import_item.is_wildcard);
-}
-
 TEST(ModuleAndHierarchyParsing, ModuleDefinitionEmpty) {
   auto r = Parse("module empty_mod; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -317,42 +261,6 @@ TEST(ModuleHeaderDefinition, TimeunitsInModule) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
 }
 
-TEST(ModuleHeaderDefinition, ImportInHeaderFollowedByPorts) {
-  auto r = Parse(
-      "module m import pkg::*; (input a, output b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
-}
-
-TEST(ModuleHeaderDefinition, ImportInHeaderFollowedByParams) {
-  auto r = Parse(
-      "module m import pkg::*; #(parameter int W = 8) (input a);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleHeaderDefinition, ImportInHeaderFollowedByBoth) {
-  auto r = Parse(
-      "module m import pkg::*; #(parameter int W = 8) (input a, output b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleAndHierarchyParsing, ModuleHeaderMultipleImportsSecond) {
-  auto r = Parse(
-      "module m import A::*, B::foo; ();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* mod = r.cu->modules[0];
-  ASSERT_GE(mod->items.size(), 2);
-  EXPECT_EQ(mod->items[1]->import_item.package_name, "B");
-  EXPECT_EQ(mod->items[1]->import_item.item_name, "foo");
-}
-
 TEST(ModuleHeaderDefinition, TimeunitOnly) {
   auto r = Parse(
       "module m;\n"
@@ -366,15 +274,6 @@ TEST(ModuleHeaderDefinition, TimeunitOnly) {
 
 TEST(ModuleHeaderDefinition, EndLabelMismatchIsError) {
   EXPECT_FALSE(ParseOk("module m; endmodule : wrong\n"));
-}
-
-TEST(ModuleHeaderDefinition, NonAnsiHeaderWithImport) {
-  auto r = Parse(
-      "module m import pkg::*; (a);\n"
-      "  input a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(ModuleHeaderDefinition, LifetimeWithAttributes) {

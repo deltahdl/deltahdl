@@ -504,6 +504,7 @@ struct ImportItem {
   std::string_view package_name;
   std::string_view item_name;
   bool is_wildcard = false;
+  bool is_header = false;
 };
 
 struct FunctionArg {

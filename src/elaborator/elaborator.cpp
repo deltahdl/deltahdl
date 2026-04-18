@@ -546,6 +546,41 @@ int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd) {
   return static_cast<int64_t>(masked);
 }
 
+void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
+  auto register_item = [&](const ModuleItem* pi, std::string_view name) {
+    if (pi->kind == ModuleItemKind::kTypedef) {
+      typedefs_[name] = pi->typedef_type;
+    } else if (pi->kind == ModuleItemKind::kParamDecl && pi->init_expr) {
+      auto val = ConstEvalInt(pi->init_expr, cu_param_scope_);
+      if (val) cu_param_scope_[name] = *val;
+    }
+  };
+
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    if (!item->import_item.is_header) continue;
+    auto pkg_name = item->import_item.package_name;
+    const ModuleDecl* pkg = nullptr;
+    for (const auto* p : unit_->packages) {
+      if (p->name == pkg_name) { pkg = p; break; }
+    }
+    if (!pkg) continue;
+    if (item->import_item.is_wildcard) {
+      for (const auto* pi : pkg->items) {
+        if (!pi->name.empty()) register_item(pi, pi->name);
+      }
+    } else {
+      auto target = item->import_item.item_name;
+      for (const auto* pi : pkg->items) {
+        if (pi->name == target) {
+          register_item(pi, target);
+          break;
+        }
+      }
+    }
+  }
+}
+
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   auto* mod = arena_.Create<RtlirModule>();
@@ -556,6 +591,10 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   mod->delay_mode = unit_->delay_mode_directive;
   // §5.12: Resolve attributes on module definition.
   mod->attrs = ResolveAttributes(decl->attrs, diag_);
+
+  // §26.4: Header imports are visible throughout the module, including in
+  // parameter and port declarations that follow.
+  ApplyHeaderImports(decl);
 
   for (size_t i = 0; i < decl->params.size(); ++i) {
     const auto& [pname, pval] = decl->params[i];

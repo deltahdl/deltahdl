@@ -63,6 +63,11 @@ class Elaborator {
   void ValidateHierRefToImportedName(const ModuleDecl* decl,
                                      const RtlirModule* mod);
 
+  /// §26.4: Make package items imported in a module/interface/program header
+  /// visible to the parameter and port declarations that follow. Applied
+  /// before parameter and port elaboration.
+  void ApplyHeaderImports(const ModuleDecl* decl);
+
   /// §25.5.4: Validate per-modport port-id uniqueness and reject constant
   /// port expressions paired with output or inout direction.
   void ValidateModports();

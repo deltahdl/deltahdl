@@ -213,7 +213,11 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
   while (Check(TokenKind::kKwImport)) {
     if (!has_header_import) import_loc = CurrentLoc();
     has_header_import = true;
+    size_t before = decl.items.size();
     ParseImportDecl(decl.items);
+    for (size_t i = before; i < decl.items.size(); ++i) {
+      decl.items[i]->import_item.is_header = true;
+    }
   }
   if (has_header_import && !Check(TokenKind::kHash) &&
       !Check(TokenKind::kLParen)) {

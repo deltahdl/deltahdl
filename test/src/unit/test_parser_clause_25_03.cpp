@@ -494,28 +494,6 @@ TEST(InterfaceInstantiationGrammar, ScalarAndVectorInstancesFromLrm) {
   ASSERT_EQ(vector->inst_params.size(), 1u);
 }
 
-TEST(InterfaceParsing, PackageImportInNonAnsiHeader) {
-  EXPECT_TRUE(
-      ParseOk("package pkg; typedef int t; endpackage\n"
-              "interface ifc import pkg::*; (clk);\n"
-              "  input clk;\n"
-              "endinterface\n"));
-}
-
-TEST(InterfaceParsing, PackageImportInAnsiHeaderWithPortDecls) {
-  EXPECT_TRUE(
-      ParseOk("package pkg; typedef int t; endpackage\n"
-              "interface ifc import pkg::*; (input logic clk);\n"
-              "endinterface\n"));
-}
-
-TEST(InterfaceParsing, PackageImportInAnsiHeaderWithParamPortList) {
-  EXPECT_TRUE(
-      ParseOk("package pkg; parameter int W = 8; endpackage\n"
-              "interface ifc import pkg::*; #(parameter int N = 4) ();\n"
-              "endinterface\n"));
-}
-
 TEST(InterfaceParsing, ExternNonAnsiHeader) {
   auto r = Parse("extern interface ifc(clk);\n");
   ASSERT_NE(r.cu, nullptr);

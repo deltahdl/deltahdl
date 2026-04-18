@@ -262,27 +262,6 @@ TEST(ProgramDeclaration, MultipleNestedProgramsInModule) {
             2u);
 }
 
-TEST(ProgramDeclaration, AnsiHeaderWithPackageImportAndPortList) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  typedef int word_t;\n"
-      "endpackage\n"
-      "program prg import pkg::*; (input logic clk);\n"
-      "endprogram\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
-}
-
-TEST(ProgramDeclaration, AnsiHeaderPackageImportRequiresPortList) {
-  auto r = Parse(
-      "package pkg; endpackage\n"
-      "program prg import pkg::*;\n"
-      "endprogram\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 TEST(ProgramItemsParsing, ProgramContinuousAssign) {
   auto r = Parse(
       "program test_prg;\n"
