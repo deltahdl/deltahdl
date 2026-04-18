@@ -734,6 +734,7 @@ void Elaborator::ValidateVirtualInterfaceOps(const ModuleDecl* decl) {
 namespace {
 
 using VifTypeMap = std::unordered_map<std::string_view, std::string_view>;
+using VifModportMap = std::unordered_map<std::string_view, std::string_view>;
 
 std::string_view ResolveVifInterfaceType(const DataType& dt,
                                          const TypedefMap& typedefs) {
@@ -743,6 +744,19 @@ std::string_view ResolveVifInterfaceType(const DataType& dt,
     if (it != typedefs.end() &&
         it->second.kind == DataTypeKind::kVirtualInterface) {
       return it->second.type_name;
+    }
+  }
+  return {};
+}
+
+std::string_view ResolveVifModport(const DataType& dt,
+                                   const TypedefMap& typedefs) {
+  if (dt.kind == DataTypeKind::kVirtualInterface) return dt.modport_name;
+  if (dt.kind == DataTypeKind::kNamed) {
+    auto it = typedefs.find(dt.type_name);
+    if (it != typedefs.end() &&
+        it->second.kind == DataTypeKind::kVirtualInterface) {
+      return it->second.modport_name;
     }
   }
   return {};
@@ -764,6 +778,7 @@ const ModuleDecl* FindInterfaceDeclByName(const CompilationUnit* unit,
 }
 
 void CheckVifClockingExpr(const Expr* e, const VifTypeMap& vifs,
+                          const VifModportMap& vif_mps,
                           const CompilationUnit* unit, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->lhs &&
@@ -785,6 +800,20 @@ void CheckVifClockingExpr(const Expr* e, const VifTypeMap& vifs,
       }
       const auto* iface = FindInterfaceDeclByName(unit, vif_it->second);
       if (iface && !block_name.empty()) {
+        std::string_view modport_name;
+        auto mp_it = vif_mps.find(e->lhs->lhs->text);
+        if (mp_it != vif_mps.end()) modport_name = mp_it->second;
+
+        const ModportDecl* modport = nullptr;
+        if (!modport_name.empty()) {
+          for (const auto* mp : iface->modports) {
+            if (mp && mp->name == modport_name) {
+              modport = mp;
+              break;
+            }
+          }
+        }
+
         const ModuleItem* cb_item = nullptr;
         bool member_exists = false;
         for (const auto* it : iface->items) {
@@ -799,6 +828,26 @@ void CheckVifClockingExpr(const Expr* e, const VifTypeMap& vifs,
             member_exists = true;
           }
         }
+
+        if (cb_item && modport) {
+          bool clocking_in_modport = false;
+          for (const auto& p : modport->ports) {
+            if (p.is_clocking && p.name == block_name) {
+              clocking_in_modport = true;
+              break;
+            }
+          }
+          if (!clocking_in_modport) {
+            diag.Error(
+                e->range.start,
+                std::format(
+                    "clocking block '{}' is not accessible through modport "
+                    "'{}' of interface '{}'",
+                    block_name, modport_name, vif_it->second));
+            cb_item = nullptr;
+          }
+        }
+
         if (!cb_item && !member_exists) {
           diag.Error(e->range.start,
                      std::format("'{}' is not a clocking block or member of "
@@ -823,36 +872,38 @@ void CheckVifClockingExpr(const Expr* e, const VifTypeMap& vifs,
       }
     }
   }
-  CheckVifClockingExpr(e->lhs, vifs, unit, diag);
-  CheckVifClockingExpr(e->rhs, vifs, unit, diag);
-  CheckVifClockingExpr(e->base, vifs, unit, diag);
-  CheckVifClockingExpr(e->index, vifs, unit, diag);
-  CheckVifClockingExpr(e->condition, vifs, unit, diag);
-  CheckVifClockingExpr(e->true_expr, vifs, unit, diag);
-  CheckVifClockingExpr(e->false_expr, vifs, unit, diag);
+  CheckVifClockingExpr(e->lhs, vifs, vif_mps, unit, diag);
+  CheckVifClockingExpr(e->rhs, vifs, vif_mps, unit, diag);
+  CheckVifClockingExpr(e->base, vifs, vif_mps, unit, diag);
+  CheckVifClockingExpr(e->index, vifs, vif_mps, unit, diag);
+  CheckVifClockingExpr(e->condition, vifs, vif_mps, unit, diag);
+  CheckVifClockingExpr(e->true_expr, vifs, vif_mps, unit, diag);
+  CheckVifClockingExpr(e->false_expr, vifs, vif_mps, unit, diag);
   for (const auto* elem : e->elements) {
-    CheckVifClockingExpr(elem, vifs, unit, diag);
+    CheckVifClockingExpr(elem, vifs, vif_mps, unit, diag);
   }
   for (const auto* arg : e->args) {
-    CheckVifClockingExpr(arg, vifs, unit, diag);
+    CheckVifClockingExpr(arg, vifs, vif_mps, unit, diag);
   }
 }
 
 void WalkStmtsForVifClocking(const Stmt* s, const VifTypeMap& vifs,
+                             const VifModportMap& vif_mps,
                              const CompilationUnit* unit, DiagEngine& diag) {
   if (!s) return;
-  CheckVifClockingExpr(s->lhs, vifs, unit, diag);
-  CheckVifClockingExpr(s->rhs, vifs, unit, diag);
-  CheckVifClockingExpr(s->expr, vifs, unit, diag);
-  CheckVifClockingExpr(s->condition, vifs, unit, diag);
-  CheckVifClockingExpr(s->var_init, vifs, unit, diag);
-  for (const auto* sub : s->stmts) WalkStmtsForVifClocking(sub, vifs, unit, diag);
-  WalkStmtsForVifClocking(s->then_branch, vifs, unit, diag);
-  WalkStmtsForVifClocking(s->else_branch, vifs, unit, diag);
-  WalkStmtsForVifClocking(s->body, vifs, unit, diag);
-  WalkStmtsForVifClocking(s->for_body, vifs, unit, diag);
+  CheckVifClockingExpr(s->lhs, vifs, vif_mps, unit, diag);
+  CheckVifClockingExpr(s->rhs, vifs, vif_mps, unit, diag);
+  CheckVifClockingExpr(s->expr, vifs, vif_mps, unit, diag);
+  CheckVifClockingExpr(s->condition, vifs, vif_mps, unit, diag);
+  CheckVifClockingExpr(s->var_init, vifs, vif_mps, unit, diag);
+  for (const auto* sub : s->stmts)
+    WalkStmtsForVifClocking(sub, vifs, vif_mps, unit, diag);
+  WalkStmtsForVifClocking(s->then_branch, vifs, vif_mps, unit, diag);
+  WalkStmtsForVifClocking(s->else_branch, vifs, vif_mps, unit, diag);
+  WalkStmtsForVifClocking(s->body, vifs, vif_mps, unit, diag);
+  WalkStmtsForVifClocking(s->for_body, vifs, vif_mps, unit, diag);
   for (auto& ci : s->case_items) {
-    WalkStmtsForVifClocking(ci.body, vifs, unit, diag);
+    WalkStmtsForVifClocking(ci.body, vifs, vif_mps, unit, diag);
   }
 }
 
@@ -924,16 +975,21 @@ void Elaborator::WalkStmtsForVirtualInterfaceClocking(const Stmt* s) {
 
 void Elaborator::ValidateVirtualInterfaceClocking(const ModuleDecl* decl) {
   VifTypeMap module_vifs = vi_var_interface_types_;
+  VifModportMap module_mps = vi_var_modports_;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl) {
       VifTypeMap scoped = module_vifs;
+      VifModportMap scoped_mps = module_mps;
       for (const auto& a : item->func_args) {
         auto t = ResolveVifInterfaceType(a.data_type, typedefs_);
-        if (!t.empty()) scoped[a.name] = t;
+        if (!t.empty()) {
+          scoped[a.name] = t;
+          scoped_mps[a.name] = ResolveVifModport(a.data_type, typedefs_);
+        }
       }
       if (item->body) {
-        WalkStmtsForVifClocking(item->body, scoped, unit_, diag_);
+        WalkStmtsForVifClocking(item->body, scoped, scoped_mps, unit_, diag_);
         WalkStmtsForVirtualInterfaceClocking(item->body);
       }
     } else {
@@ -944,7 +1000,8 @@ void Elaborator::ValidateVirtualInterfaceClocking(const ModuleDecl* decl) {
                      item->kind == ModuleItemKind::kInitialBlock ||
                      item->kind == ModuleItemKind::kFinalBlock;
       if (is_proc && item->body) {
-        WalkStmtsForVifClocking(item->body, module_vifs, unit_, diag_);
+        WalkStmtsForVifClocking(item->body, module_vifs, module_mps, unit_,
+                                diag_);
         WalkStmtsForVirtualInterfaceClocking(item->body);
       }
     }
