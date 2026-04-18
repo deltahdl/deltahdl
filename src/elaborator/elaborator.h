@@ -255,6 +255,10 @@ class Elaborator {
   /// initializer on a block-level variable declaration statement.
   void ValidateArrayOfVifInitStmt(const Stmt* s);
 
+  /// §25.10: Validate member access through interface ports and virtual
+  /// interfaces against any selected modport's member list.
+  void ValidateInterfaceObjectAccess(const ModuleDecl* decl);
+
   /// Validate packed union constraints (§7.3.1).
   void ValidatePackedUnion(const DataType& dtype, SourceLoc loc);
 
