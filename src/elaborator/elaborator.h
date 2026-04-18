@@ -52,6 +52,17 @@ class Elaborator {
   /// assignments or processes (initial, final, always*).
   void ValidatePackageItems();
 
+  /// §26.3: Validate package import declarations inside a module:
+  ///   - explicit-import collisions with local decls and other explicit imports
+  ///   - local decl that shadows a name already referenced via wildcard import
+  ///   - ambiguous references resolvable through multiple wildcard imports
+  void ValidatePackageImportRules(const ModuleDecl* decl);
+
+  /// §26.3: Reject hierarchical references that resolve to a name imported
+  /// (explicitly or via wildcard) into a child module.
+  void ValidateHierRefToImportedName(const ModuleDecl* decl,
+                                     const RtlirModule* mod);
+
   /// §25.5.4: Validate per-modport port-id uniqueness and reject constant
   /// port expressions paired with output or inout direction.
   void ValidateModports();
@@ -619,6 +630,17 @@ class Elaborator {
   std::unordered_set<std::string_view> program_inst_names_;  // §24.3
   std::unordered_set<std::string_view> auto_task_func_names_;
   std::unordered_map<std::string_view, ModuleDecl*> nested_module_decls_;
+
+  // §26.3: package → set of names that package provides (built lazily).
+  std::unordered_map<std::string_view,
+                     std::unordered_set<std::string_view>> pkg_provided_names_;
+  // §26.3: per-module explicit imports: name → (package, loc).
+  std::unordered_map<std::string_view,
+                     std::pair<std::string_view, SourceLoc>> explicit_imports_;
+  // §26.3: per-module wildcard-imported package names, in order.
+  std::vector<std::string_view> wildcard_packages_;
+  // §26.3: per-module names claimed by a reference through a wildcard import.
+  std::unordered_map<std::string_view, SourceLoc> wildcard_claimed_;
 
   // §14.3: Clocking block signal directions for clockvar access validation.
   struct ClockingSignalInfo {

@@ -467,6 +467,14 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
 void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   // §A.1.9: class_item ::= { attribute_instance } class_property | ...
   ParseAttributes();
+  // §26.3: package import declarations shall not appear in class scope.
+  if (Check(TokenKind::kKwImport)) {
+    diag_.Error(CurrentLoc(),
+                "package import declaration is not allowed in class scope");
+    while (!Check(TokenKind::kSemicolon) && !AtEnd()) Consume();
+    Match(TokenKind::kSemicolon);
+    return;
+  }
   auto* member = arena_.Create<ClassMember>();
   member->loc = CurrentLoc();
   bool proto = ParseClassQualifiers(member);

@@ -4,7 +4,7 @@ using namespace delta;
 
 namespace {
 
-TEST(DesignBuildingBlockParsing, ImportIntoModuleAndPackage) {
+TEST(PackageImport, ImportIntoModuleAndPackage) {
   auto r = ParseWithPreprocessor(
       "package A; typedef int myint; endpackage\n"
       "package B; import A::*; endpackage\n"

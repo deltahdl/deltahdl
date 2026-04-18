@@ -55,20 +55,6 @@ TEST(BnfClarificationElaboration, AutomaticInInitialBlockOk) {
              "endmodule\n"));
 }
 
-TEST(BnfClarificationElaboration, ImportInClassScopeError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "package pkg;\n"
-      "  parameter int X = 1;\n"
-      "endpackage\n"
-      "class c;\n"
-      "  import pkg::*;\n"
-      "endclass\n"
-      "module m; endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(BnfClarificationElaboration, StructPackedWithDimOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

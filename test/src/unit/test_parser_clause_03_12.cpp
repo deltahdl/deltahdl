@@ -44,22 +44,6 @@ TEST(DesignBuildingBlockParsing, ParameterOverrideCompiles) {
       HasItemOfKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst));
 }
 
-TEST(DesignBuildingBlockParsing, PackagePrecedesImport) {
-  auto r = Parse(
-      "package pkg;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  import pkg::*;\n"
-      "  byte_t data;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_TRUE(
-      HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
-}
-
 TEST(DesignBuildingBlockParsing, OrderOfDesignElements) {
   auto r = Parse(
       "package p; endpackage\n"
