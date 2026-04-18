@@ -140,10 +140,50 @@ def test_build_steps_first_is_auditing_src(isc):
     assert steps[0][0] == "Auditing src"
 
 
-def test_build_steps_last_is_implementing_functionality(isc):
-    """Last step is Implementing missing functionality."""
+def test_build_steps_last_is_writing_missing_functionality(isc):
+    """Last step is Writing missing functionality."""
     steps = isc.build_steps("4.1", "~/LRM.txt")
-    assert steps[-1][0] == "Implementing missing functionality"
+    assert steps[-1][0] == "Writing missing functionality"
+
+
+def test_build_steps_step_7_label_uses_writing(isc):
+    """Step 7 label is Writing missing tests."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    assert steps[6][0] == "Writing missing tests"
+
+
+def test_build_steps_constraints_omit_git_mention(isc):
+    """The word 'git' does not appear in any step prompt."""
+    steps = isc.build_steps("4.1", "~/LRM.txt", exclude="4.1.1")
+    joined = " ".join(p for _, p in steps)
+    assert "git" not in joined.lower()
+
+
+def test_build_steps_constraints_omit_build_mention(isc):
+    """The word 'build' does not appear in any step prompt."""
+    steps = isc.build_steps("4.1", "~/LRM.txt", exclude="4.1.1")
+    joined = " ".join(p for _, p in steps)
+    assert "build" not in joined.lower()
+
+
+def test_build_steps_constraints_positive_scope(isc):
+    """Constraints state the positive scope of file operations."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    joined = " ".join(p for _, p in steps)
+    assert "creating, editing, or removing" in joined
+
+
+def test_build_steps_step_8_body_uses_write_or_edit(isc):
+    """Step 8 body uses 'Write or edit the source files' phrasing."""
+    steps = isc.build_steps("4.1", "~/LRM.txt")
+    assert "Write or edit the source files" in steps[7][1]
+
+
+def test_build_steps_prompts_omit_implement_verb(isc):
+    """The verb 'implement' (any case) is absent from every step prompt."""
+    steps = isc.build_steps("4.1", "~/LRM.txt", exclude="4.1.1")
+    joined = " ".join(p for _, p in steps)
+    assert "implement" not in joined.lower()
 
 
 def test_build_steps_each_has_description(isc):
@@ -246,6 +286,58 @@ def test_run_steps_second_uses_continue(isc):
     """Second step uses --continue."""
     mock_streaming, _ = _run_steps_with_ok_mock(isc)
     assert "--continue" in mock_streaming.call_args_list[1][0][0]
+
+
+# ---- run_steps --disallowedTools --------------------------------------------
+
+
+def _disallowed_value(isc):
+    """Return the value passed to --disallowedTools from the first cmd."""
+    mock_streaming, _ = _run_steps_with_ok_mock(isc)
+    cmd = mock_streaming.call_args_list[0][0][0]
+    return cmd[cmd.index("--disallowedTools") + 1]
+
+
+def test_run_steps_passes_disallowed_tools(isc):
+    """run_steps passes --disallowedTools to the Claude CLI."""
+    mock_streaming, _ = _run_steps_with_ok_mock(isc)
+    cmd = mock_streaming.call_args_list[0][0][0]
+    assert "--disallowedTools" in cmd
+
+
+def test_run_steps_disallowed_includes_git_commit(isc):
+    """run_steps disallows Bash(git commit *)."""
+    assert "Bash(git commit *)" in _disallowed_value(isc)
+
+
+def test_run_steps_disallowed_includes_git_push(isc):
+    """run_steps disallows Bash(git push *)."""
+    assert "Bash(git push *)" in _disallowed_value(isc)
+
+
+def test_run_steps_disallowed_includes_cmake(isc):
+    """run_steps disallows Bash(cmake *)."""
+    assert "Bash(cmake *)" in _disallowed_value(isc)
+
+
+def test_run_steps_disallowed_includes_make(isc):
+    """run_steps disallows Bash(make *)."""
+    assert "Bash(make *)" in _disallowed_value(isc)
+
+
+def test_run_steps_disallowed_includes_ninja(isc):
+    """run_steps disallows Bash(ninja *)."""
+    assert "Bash(ninja *)" in _disallowed_value(isc)
+
+
+def test_run_steps_disallowed_includes_ctest(isc):
+    """run_steps disallows Bash(ctest *)."""
+    assert "Bash(ctest *)" in _disallowed_value(isc)
+
+
+def test_run_steps_disallowed_includes_pytest(isc):
+    """run_steps disallows Bash(pytest *)."""
+    assert "Bash(pytest *)" in _disallowed_value(isc)
 
 
 # ---- run_steps content filter retry -----------------------------------------

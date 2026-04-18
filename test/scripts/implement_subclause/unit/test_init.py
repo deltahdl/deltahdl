@@ -254,6 +254,15 @@ def test_generate_commit_body_returns_result(isc):
     assert result == "- Added `a.cpp` because reason."
 
 
+def test_generate_commit_body_passes_disallowed_tools(isc):
+    """generate_commit_body passes --disallowedTools to the Claude CLI."""
+    with patch("implement_subclause.run_claude_streaming",
+               return_value="body") as mock_s:
+        isc.generate_commit_body("6.3", (["a.cpp"], [], []),
+                                 model="opus", env={})
+    assert "--disallowedTools" in mock_s.call_args[0][0]
+
+
 # ---- main ------------------------------------------------------------------
 
 

@@ -56,16 +56,10 @@ class TestDescendantBoundary:
         prompt = _all_prompts(isc, "6.3", exclude="6.3.1,6.3.2")
         assert "§6.3.2" in prompt
 
-    def test_exclude_note_forbids_all_actions(self, isc):
-        """Exclude note forbids implement, move, delete, rename."""
-        prompt = _all_prompts(isc, "6.3", exclude="6.3.1")
-        for verb in ("implement", "move", "delete", "rename"):
-            assert verb in prompt.lower()
-
-    def test_exclude_note_says_leave_as_is(self, isc):
+    def test_exclude_note_names_leave_as_is(self, isc):
         """Exclude note tells Claude to leave descendant content as-is."""
         prompt = _all_prompts(isc, "6.3", exclude="6.3.1")
-        assert "Leave it exactly as-is" in prompt
+        assert "Leave their content exactly as-is" in prompt
 
     def test_no_exclude_omits_off_limits(self, isc):
         """Without --exclude, OFF-LIMITS label does not appear."""

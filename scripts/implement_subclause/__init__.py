@@ -32,6 +32,11 @@ CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
 
 _MAX_CONTENT_FILTER_RETRIES = 2
 
+_DISALLOWED_TOOLS = (
+    "Bash(git commit *) Bash(git push *) Bash(cmake *) "
+    "Bash(make *) Bash(ninja *) Bash(ctest *) Bash(pytest *)"
+)
+
 CONTENT_FILTER_RETRY_PROMPT = (
     "Your previous response was blocked by the API content filter."
     " Please try again. Avoid reproducing LRM text verbatim —"
@@ -63,12 +68,12 @@ def build_steps(
         excluded = [f"§{s.strip()}" for s in exclude.split(",")]
         exclude_note = (
             f"\n\nOFF-LIMITS SUBCLAUSES: {', '.join(excluded)}."
-            " These are descendant subclauses that will be implemented"
-            f" separately. Requirements defined by these subclauses"
-            f" belong to THEM, not to §{subclause}."
-            " Do NOT implement, move, delete, rename, or otherwise"
-            " act on their content — even if you find it misplaced"
-            " in other files. Leave it exactly as-is."
+            " These descendant subclauses are handled in separate runs."
+            f" Requirements defined by them belong to them,"
+            f" not to §{subclause}."
+            " Leave their content exactly as-is — even if you find it"
+            " misplaced in another file, it is not yours to touch in"
+            " this run."
         )
 
     constraints = (
@@ -76,15 +81,15 @@ def build_steps(
         f" §{subclause} in the LRM — not requirements defined by"
         f" any descendant subclause (§{subclause}.1, §{subclause}.2, etc.)."
         " A requirement belongs to the subclause whose LRM text defines it."
-        " Do not make git commits or push."
-        " Do not copy LRM prose into source comments."
-        " Do not build or run tests."
+        " In this step your only action is creating, editing, or removing"
+        " files on disk. When those changes are saved, stop."
+        " Write original comments; do not copy LRM prose into source files."
     )
 
     return [
         ("Auditing src",
          f"{read_ctx}\n\n"
-         f"Then search src/ for existing code that implements §{subclause}."
+         f"Then search src/ for existing code that handles §{subclause}."
          " Report what aligns with the LRM and what is missing."
          + constraints),
         ("Auditing tests",
@@ -126,7 +131,7 @@ def build_steps(
          " Do NOT include clause or annex numbers."
          " Do NOT rename or modify tests that belong to other subclauses."
          + exclude_note + constraints),
-        ("Implementing missing tests",
+        ("Writing missing tests",
          f"Write missing unit tests for §{subclause} requirements."
          f" Place them in: {filenames}."
          " Cover all affected pipeline stages."
@@ -134,9 +139,10 @@ def build_steps(
          f" If §{subclause} defines no testable requirements of its own"
          " (only its descendants do), do NOT create any test files."
          + exclude_note + constraints),
-        ("Implementing missing functionality",
-         f"Implement any missing functionality for §{subclause}."
-         f" Only implement §{subclause}, no other subclauses."
+        ("Writing missing functionality",
+         f"Write or edit the source files to add any missing functionality"
+         f" defined in §{subclause}."
+         f" Act only on §{subclause}, no other subclauses."
          + exclude_note + constraints),
     ]
 
@@ -179,6 +185,7 @@ def run_steps(steps, *, model="opus", continue_session=False) -> list[str]:
             "--verbose",
             "--output-format", "stream-json",
             "--dangerously-skip-permissions",
+            "--disallowedTools", _DISALLOWED_TOOLS,
         ]
         if i > 0 or continue_session:
             cmd.append("--continue")
@@ -240,7 +247,7 @@ def build_action_summary(added, modified, deleted) -> str:
 def build_commit_prompt(subclause, added, modified, deleted) -> str:
     """Build a prompt that asks Claude to explain each file change."""
     lines = [
-        f"You just finished implementing §{subclause}.",
+        f"You just finished editing source files for §{subclause}.",
         "Git reports these file changes:\n",
     ]
     for path in sorted(added):
@@ -282,6 +289,7 @@ def generate_commit_body(
         "--verbose",
         "--output-format", "stream-json",
         "--dangerously-skip-permissions",
+        "--disallowedTools", _DISALLOWED_TOOLS,
         "--continue",
     ]
     print("\nGenerating commit message", flush=True)
