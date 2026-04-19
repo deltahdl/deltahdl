@@ -698,6 +698,14 @@ void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
 }
 
 void Parser::ParseUdpPortDecls(UdpDecl* udp) {
+  // Record each reg declaration's identifier so the reg-names-the-output
+  // check can run after the output port declaration has been seen, since
+  // the reg and output declarations may appear in either order.
+  struct PendingReg {
+    std::string_view name;
+    SourceLoc loc;
+  };
+  std::vector<PendingReg> reg_decls;
   while (!Check(TokenKind::kKwTable) && !Check(TokenKind::kKwInitial) &&
          !AtEnd()) {
     ParseAttributes();
@@ -713,7 +721,8 @@ void Parser::ParseUdpPortDecls(UdpDecl* udp) {
       Expect(TokenKind::kSemicolon);
     } else if (Match(TokenKind::kKwReg)) {
       udp->is_sequential = true;
-      Expect(TokenKind::kIdentifier);
+      auto id_tok = Expect(TokenKind::kIdentifier);
+      reg_decls.push_back({id_tok.text, id_tok.loc});
       Expect(TokenKind::kSemicolon);
     } else if (Check(TokenKind::kKwInout)) {
       RejectUdpInoutPort();
@@ -722,6 +731,13 @@ void Parser::ParseUdpPortDecls(UdpDecl* udp) {
       Match(TokenKind::kSemicolon);
     } else {
       break;
+    }
+  }
+  // §29.3.2: a reg declaration in a UDP body must name the output port.
+  for (const auto& reg : reg_decls) {
+    if (!udp->output_name.empty() && reg.name != udp->output_name) {
+      diag_.Error(reg.loc,
+                  "UDP reg declaration shall name the output port");
     }
   }
 }

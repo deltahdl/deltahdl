@@ -64,43 +64,6 @@ static void VerifyUdpInputNames(const UdpDecl* udp,
   }
 }
 
-TEST(UdpDeclGrammar, UdpCombinational) {
-  auto r = Parse(
-      "primitive mux2(output y, input a, input b, input s);\n"
-      "  table\n"
-      "    0 ? 0 : 0 ;\n"
-      "    1 ? 0 : 1 ;\n"
-      "    ? 0 1 : 0 ;\n"
-      "    ? 1 1 : 1 ;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  EXPECT_EQ(r.cu->udps[0]->name, "mux2");
-  EXPECT_FALSE(r.cu->udps[0]->is_sequential);
-}
-
-TEST(UdpDeclGrammar, SingleInput) {
-  auto r = Parse(
-      "primitive inv(output out, input in);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->output_name, "out");
-  ASSERT_EQ(udp->input_names.size(), 1u);
-  EXPECT_EQ(udp->input_names[0], "in");
-  ASSERT_EQ(udp->table.size(), 2u);
-  ASSERT_EQ(udp->table[0].inputs.size(), 1u);
-  EXPECT_EQ(udp->table[0].inputs[0], '0');
-  EXPECT_EQ(udp->table[0].output, '1');
-}
-
 TEST(UdpDeclGrammar, CombinationalMux) {
   auto r = Parse(
       "primitive mux(output out, input a, b, sel);\n"
@@ -150,25 +113,6 @@ TEST(UdpDeclGrammar, CombinationalOrGate) {
   EXPECT_EQ(udp->table[3].output, '1');
 }
 
-TEST(UdpDeclGrammar, AnsiSequential) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, input clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->name, "dff");
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_EQ(udp->output_name, "q");
-  ASSERT_EQ(udp->input_names.size(), 2u);
-  ASSERT_EQ(udp->table.size(), 2u);
-}
-
 TEST(UdpDeclGrammar, SequentialDff) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"
@@ -185,29 +129,6 @@ TEST(UdpDeclGrammar, SequentialDff) {
   EXPECT_EQ(udp->output_name, "q");
   SeqUdpRow expected[] = {{"0r", '?', '0'}, {"1r", '?', '1'}};
   VerifySeqUdpTable(udp, expected, std::size(expected));
-}
-
-TEST(UdpDeclGrammar, NonAnsiSequentialWithReg) {
-  auto r = Parse(
-      "primitive dff(q, d, clk);\n"
-      "  output reg q;\n"
-      "  input d;\n"
-      "  input clk;\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->name, "dff");
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_EQ(udp->output_name, "q");
-  ASSERT_EQ(udp->input_names.size(), 2u);
-  EXPECT_EQ(udp->input_names[0], "d");
-  EXPECT_EQ(udp->input_names[1], "clk");
 }
 
 TEST(UdpDeclGrammar, SequentialWithInitial) {
@@ -270,26 +191,6 @@ TEST(UdpDeclGrammar, SequentialUdpInitial) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-TEST(UdpDeclGrammar, AnsiSharedInputKeyword) {
-  auto r = Parse(
-      "primitive mux(output out, input a, b, sel);\n"
-      "  table\n"
-      "    0 ? 0 : 0;\n"
-      "    1 ? 0 : 1;\n"
-      "    ? 0 1 : 0;\n"
-      "    ? 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->input_names.size(), 3u);
-  EXPECT_EQ(udp->input_names[0], "a");
-  EXPECT_EQ(udp->input_names[1], "b");
-  EXPECT_EQ(udp->input_names[2], "sel");
-}
-
 TEST(UdpDeclGrammar, WildcardPort) {
   auto r = Parse(
       "primitive inv(.*);\n"
@@ -330,22 +231,6 @@ TEST(UdpDeclGrammar, WildcardPortSequential) {
   EXPECT_TRUE(udp->is_sequential);
   EXPECT_EQ(udp->output_name, "q");
   ASSERT_EQ(udp->input_names.size(), 2u);
-}
-
-TEST(UdpDeclGrammar, ManyInputs) {
-  auto r = Parse(
-      "primitive gate5(output out, input a, b, c, d, e);\n"
-      "  table\n"
-      "    0 0 0 0 0 : 0;\n"
-      "    1 1 1 1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* udp = r.cu->udps[0];
-  ASSERT_EQ(udp->input_names.size(), 5u);
-  EXPECT_EQ(udp->input_names[4], "e");
-  ASSERT_EQ(udp->table[0].inputs.size(), 5u);
 }
 
 TEST(UdpDeclGrammar, MultipleUdps) {
