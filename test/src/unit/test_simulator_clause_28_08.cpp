@@ -6,24 +6,24 @@
 
 namespace {
 
-TEST(BidrectionalSwitches, TranIsBidirectional) {
+TEST(BidirectionalSwitches, TranIsBidirectional) {
   EXPECT_TRUE(IsBidirectional(SwitchType::kTran));
   EXPECT_TRUE(IsBidirectional(SwitchType::kRtran));
   EXPECT_TRUE(IsBidirectional(SwitchType::kTranif0));
   EXPECT_TRUE(IsBidirectional(SwitchType::kTranif1));
 }
 
-TEST(BidrectionalSwitches, MosSwitchesNotBidirectional) {
+TEST(BidirectionalSwitches, MosSwitchesNotBidirectional) {
   EXPECT_FALSE(IsBidirectional(SwitchType::kNmos));
   EXPECT_FALSE(IsBidirectional(SwitchType::kPmos));
 }
 
-TEST(BidrectionalSwitches, TranNoDelays) {
+TEST(BidirectionalSwitches, TranNoDelays) {
   EXPECT_FALSE(AcceptsDelaySpec(SwitchType::kTran));
   EXPECT_FALSE(AcceptsDelaySpec(SwitchType::kRtran));
 }
 
-TEST(BidrectionalSwitches, TranifAcceptsDelays) {
+TEST(BidirectionalSwitches, TranifAcceptsDelays) {
   EXPECT_TRUE(AcceptsDelaySpec(SwitchType::kTranif0));
   EXPECT_TRUE(AcceptsDelaySpec(SwitchType::kTranif1));
   EXPECT_EQ(MaxSwitchDelays(SwitchType::kTranif0), 2u);
@@ -130,7 +130,15 @@ TEST(SwitchProcessing, UserDefinedNetZControlTreatedAsOff) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
-TEST(SwitchProcessing, UserDefinedNetControlOnSingleNet) {
+TEST(SwitchProcessing, UserDefinedNetXControlTreatedAsOff) {
+  auto np = MakeNetPair(1);
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 1}, true});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
+}
+
+TEST(SwitchProcessing, UserDefinedNetControlOneConducts) {
   auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
   sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 0}, true});
@@ -138,12 +146,62 @@ TEST(SwitchProcessing, UserDefinedNetControlOnSingleNet) {
   EXPECT_EQ(ValOf(*np.vb), kVal1);
 }
 
-TEST(SwitchProcessing, UserDefinedNetControlOffSeparate) {
+TEST(SwitchProcessing, UserDefinedNetControlZeroBlocks) {
   auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;
   sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 0}, true});
   ResolveSwitchNetwork(sw, np.arena);
   EXPECT_EQ(ValOf(*np.vb), kValZ);
+}
+
+// Resistive variants differ only in strength (not modeled here); conductivity
+// behavior must match their full-strength counterparts.
+TEST(SwitchProcessing, RtranPropagatesDrivenToUndriven) {
+  auto np = MakeNetPair(1);
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kRtran, {}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kVal1);
+}
+
+TEST(SwitchProcessing, Rtranif1ConductsWhenControlHigh) {
+  auto np = MakeNetPair(1);
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kRtranif1, {1, 0}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kVal1);
+}
+
+TEST(SwitchProcessing, Rtranif1BlocksWhenControlLow) {
+  auto np = MakeNetPair(1);
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kRtranif1, {0, 0}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
+}
+
+TEST(SwitchProcessing, Rtranif0ConductsWhenControlLow) {
+  auto np = MakeNetPair(1);
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kRtranif0, {0, 0}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kVal1);
+}
+
+TEST(SwitchProcessing, Rtranif0BlocksWhenControlHigh) {
+  auto np = MakeNetPair(1);
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kRtranif0, {1, 0}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
+}
+
+// The AcceptsDelaySpec predicate must cover resistive variants too.
+TEST(BidirectionalSwitches, RtranifAcceptsDelays) {
+  EXPECT_TRUE(AcceptsDelaySpec(SwitchType::kRtranif0));
+  EXPECT_TRUE(AcceptsDelaySpec(SwitchType::kRtranif1));
+  EXPECT_EQ(MaxSwitchDelays(SwitchType::kRtranif0), 2u);
+  EXPECT_EQ(MaxSwitchDelays(SwitchType::kRtranif1), 2u);
 }
 
 }  // namespace

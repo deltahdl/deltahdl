@@ -153,6 +153,15 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     return;
   }
 
+  // §28.8: bidirectional pass switches have no unique driven terminal, so
+  // they cannot be lowered to a continuous assignment. Skip emitting any
+  // driver here; switch-network resolution happens at simulation time.
+  if (kind == GateKind::kTran || kind == GateKind::kRtran ||
+      kind == GateKind::kTranif0 || kind == GateKind::kTranif1 ||
+      kind == GateKind::kRtranif0 || kind == GateKind::kRtranif1) {
+    return;
+  }
+
   // §28.7: MOS switches take (output, data, control) and pass data through
   // only when conducting; otherwise the output is high-Z. nmos/rnmos
   // conduct on control==1; pmos/rpmos conduct on control==0. MOS switches
