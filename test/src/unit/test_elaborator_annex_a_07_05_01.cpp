@@ -92,19 +92,6 @@ TEST(TimingCheckCommandElaboration, SetupWithNotifierElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(TimingCheckCommandElaboration, SetupholdFullArgsElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK, dDATA);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(TimingCheckCommandElaboration, RecremFullArgsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -174,6 +174,12 @@ class SpecifyManager {
                            std::string_view data, uint64_t data_time) const;
   bool CheckHoldViolation(std::string_view ref, uint64_t ref_time,
                           std::string_view data, uint64_t data_time) const;
+  // §31.3.3: $setuphold combines the $setup and $hold windows in a single
+  // check whose active branch is selected by which event occurred first.
+  // `limit` holds the setup limit and `limit2` holds the hold limit on the
+  // stored TimingCheckEntry.
+  bool CheckSetupholdViolation(std::string_view ref, uint64_t ref_time,
+                               std::string_view data, uint64_t data_time) const;
 
   uint32_t PathDelayCount() const {
     return static_cast<uint32_t>(path_delays_.size());

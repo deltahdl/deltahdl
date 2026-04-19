@@ -557,6 +557,16 @@ SpecifyItem* Parser::ParseTimingCheck() {
   // ParseMinTypMaxExpr() handles both forms uniformly.
   item->timing_check.limits.push_back(ParseMinTypMaxExpr());
   ParseTimingCheckTrailingArgs(item->timing_check);
+
+  // §31.3.3 Syntax 31-5: `$setuphold` requires two timing_check_limit args
+  // (setup_limit and hold_limit). Other check kinds police their own limit
+  // counts in their owning subclauses.
+  if (item->timing_check.check_kind == TimingCheckKind::kSetuphold &&
+      item->timing_check.limits.size() < 2) {
+    diag_.Error(item->loc,
+                "$setuphold requires two timing_check_limit arguments");
+  }
+
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kSemicolon);
   return item;
