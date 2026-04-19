@@ -448,6 +448,65 @@ void Elaborator::ValidateSpecifyBlocks() {
           }
         }
       }
+
+      // §30.4.4.4: Endpoints of an ifnone path must match its companion
+      // if(cond) paths within the same specify block, and cannot coexist
+      // with an unconditional path on the same endpoints.
+      auto same_endpoints = [](const SpecifyPathDecl& a,
+                                const SpecifyPathDecl& b) {
+        if (a.src_ports.size() != b.src_ports.size()) return false;
+        if (a.dst_ports.size() != b.dst_ports.size()) return false;
+        for (size_t i = 0; i < a.src_ports.size(); ++i) {
+          if (a.src_ports[i].name != b.src_ports[i].name) return false;
+          if (a.src_ports[i].interface_name != b.src_ports[i].interface_name)
+            return false;
+        }
+        for (size_t i = 0; i < a.dst_ports.size(); ++i) {
+          if (a.dst_ports[i].name != b.dst_ports[i].name) return false;
+          if (a.dst_ports[i].interface_name != b.dst_ports[i].interface_name)
+            return false;
+        }
+        return true;
+      };
+      for (auto* item : mod->items) {
+        if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+        std::vector<SpecifyItem*> ifnones;
+        std::vector<SpecifyItem*> conditionals;
+        std::vector<SpecifyItem*> unconditionals;
+        for (auto* si : item->specify_items) {
+          if (si->kind != SpecifyItemKind::kPathDecl) continue;
+          if (si->path.is_ifnone) {
+            ifnones.push_back(si);
+          } else if (si->path.condition != nullptr) {
+            conditionals.push_back(si);
+          } else {
+            unconditionals.push_back(si);
+          }
+        }
+        for (auto* ifn : ifnones) {
+          for (auto* un : unconditionals) {
+            if (same_endpoints(ifn->path, un->path)) {
+              diag_.Error(ifn->loc,
+                          "ifnone path conflicts with an unconditional "
+                          "path on the same endpoints");
+              break;
+            }
+          }
+          if (conditionals.empty()) continue;
+          bool matched = false;
+          for (auto* c : conditionals) {
+            if (same_endpoints(ifn->path, c->path)) {
+              matched = true;
+              break;
+            }
+          }
+          if (!matched) {
+            diag_.Error(ifn->loc,
+                        "ifnone path endpoints do not match any companion "
+                        "state-dependent path");
+          }
+        }
+      }
     }
   };
   check_modules(unit_->modules);

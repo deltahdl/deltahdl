@@ -361,9 +361,17 @@ SpecifyItem* Parser::ParseConditionalPathDecl(Expr* cond) {
 
 // Parse: ifnone ( path ) = delay ;
 SpecifyItem* Parser::ParseIfnonePathDecl() {
+  auto loc = CurrentLoc();
   Expect(TokenKind::kKwIfnone);
   auto* item = ParseSpecifyPathDecl();
   item->path.is_ifnone = true;
+  // §30.4.4.4: ifnone only admits a simple_path_declaration; edge-sensitive
+  // and data-source forms are disallowed even when the companion state-
+  // dependent path uses them.
+  if (item->path.edge != SpecifyEdge::kNone ||
+      item->path.data_source != nullptr) {
+    diag_.Error(loc, "ifnone requires a simple path declaration");
+  }
   return item;
 }
 
