@@ -184,6 +184,29 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     return;
   }
 
+  // §28.9: cmos/rcmos are an nmos+pmos pair sharing the data input/output
+  // with separate n- and p-channel controls. Terminals are (out, data,
+  // ncontrol, pcontrol). The nmos half conducts on ncontrol==1; the pmos
+  // half conducts on pcontrol==0. The combined output is data whenever
+  // either half conducts, otherwise high-Z. Equivalently:
+  //   ncontrol ? data : (pcontrol ? 'z : data)
+  // Strength reduction for rcmos is handled elsewhere.
+  if (kind == GateKind::kCmos || kind == GateKind::kRcmos) {
+    if (terms.size() != 4) return;
+    auto* data = terms[1];
+    auto* nctrl = terms[2];
+    auto* pctrl = terms[3];
+    Expr* hi_z = MakeHighZ(arena);
+    Expr* pmos_branch = MakeTernary(arena, pctrl, hi_z, data);
+    Expr* rhs = MakeTernary(arena, nctrl, data, pmos_branch);
+    RtlirContAssign ca;
+    ca.lhs = terms[0];
+    ca.rhs = rhs;
+    ca.width = LookupLhsWidth(ca.lhs, mod);
+    mod->assigns.push_back(ca);
+    return;
+  }
+
   Expr* rhs = nullptr;
   switch (kind) {
     case GateKind::kAnd:
