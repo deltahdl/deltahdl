@@ -201,8 +201,9 @@ bool SpecifyManager::CheckSetupViolation(std::string_view ref,
     if (check.kind != TimingCheckKind::kSetup) continue;
     if (check.ref_signal != ref) continue;
     if (check.data_signal != data) continue;
-    // Setup: data must be stable `limit` time units before ref edge.
-    if (ref_time - data_time < check.limit) return true;
+    // §31.3.1: window is (ref_time - limit, ref_time); endpoints are not
+    // part of the violation region, so both inequalities are strict.
+    if (data_time < ref_time && ref_time - data_time < check.limit) return true;
   }
   return false;
 }

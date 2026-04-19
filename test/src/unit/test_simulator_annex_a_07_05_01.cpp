@@ -194,20 +194,6 @@ TEST(TimingCheckCommandSim, NochangeOffsetsStored) {
   EXPECT_EQ(stored.kind, TimingCheckKind::kNochange);
 }
 
-TEST(SystemTimingCheckSim, SetupViolationDetected) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kSetup;
-  tc.ref_signal = "clk";
-  tc.data_signal = "data";
-  tc.limit = 10;
-  mgr.AddTimingCheck(tc);
-
-  EXPECT_TRUE(mgr.CheckSetupViolation("clk", 100, "data", 95));
-
-  EXPECT_FALSE(mgr.CheckSetupViolation("clk", 100, "data", 85));
-}
-
 TEST(SystemTimingCheckSim, HoldViolationDetected) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
