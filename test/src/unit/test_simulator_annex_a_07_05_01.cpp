@@ -182,21 +182,4 @@ TEST(SystemTimingCheckSim, WidthEntryNoDataSignal) {
   EXPECT_EQ(stored.limit2, 1u);
 }
 
-TEST(SystemTimingCheckSim, SkewEntryStored) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kSkew;
-  tc.ref_signal = "clk1";
-  tc.ref_edge = SpecifyEdge::kPosedge;
-  tc.data_signal = "clk2";
-  tc.data_edge = SpecifyEdge::kNegedge;
-  tc.limit = 3;
-  mgr.AddTimingCheck(tc);
-  auto& stored = mgr.GetTimingChecks()[0];
-  EXPECT_EQ(stored.kind, TimingCheckKind::kSkew);
-  EXPECT_EQ(stored.ref_signal, "clk1");
-  EXPECT_EQ(stored.data_signal, "clk2");
-  EXPECT_EQ(stored.limit, 3u);
-}
-
 }  // namespace

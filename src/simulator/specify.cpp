@@ -283,6 +283,22 @@ bool SpecifyManager::CheckRecremViolation(std::string_view ref,
   return false;
 }
 
+bool SpecifyManager::CheckSkewViolation(std::string_view ref, uint64_t ref_time,
+                                        std::string_view data,
+                                        uint64_t data_time) const {
+  for (const auto& check : timing_checks_) {
+    if (check.kind != TimingCheckKind::kSkew) continue;
+    if (check.ref_signal != ref) continue;
+    if (check.data_signal != data) continue;
+    // §31.4.1: a violation occurs when the data event follows the reference
+    // event by strictly more than `limit`. The strict inequality also
+    // implements the zero-limit carve-out: when `limit` is zero, simultaneous
+    // transitions produce `0 > 0` (false) and therefore do not violate.
+    if (data_time > ref_time && data_time - ref_time > check.limit) return true;
+  }
+  return false;
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,

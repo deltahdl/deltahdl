@@ -508,9 +508,15 @@ void Parser::ParseExtendedTimingCheckArgs(TimingCheckDecl& tc) {
   if (tc.check_kind == TimingCheckKind::kTimeskew ||
       tc.check_kind == TimingCheckKind::kFullskew) {
     ParseTimeskewExtendedArgs(tc);
-  } else {
-    ParseSetupholdExtendedArgs(tc);
+    return;
   }
+  // §31.4.1 Syntax 31-9: $skew takes nothing past the notifier — it has
+  // neither the $timeskew/$fullskew event/remain flags nor the
+  // $setuphold/$recrem condition and delayed-terminal arguments.
+  if (tc.check_kind == TimingCheckKind::kSkew) {
+    return;
+  }
+  ParseSetupholdExtendedArgs(tc);
 }
 
 // Parse: $setup(data [&&& cond], posedge clk [&&& cond], limit ...) ;

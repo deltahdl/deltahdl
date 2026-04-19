@@ -197,6 +197,13 @@ class SpecifyManager {
   // `$recrem(ref, data, recovery_limit, removal_limit)`).
   bool CheckRecremViolation(std::string_view ref, uint64_t ref_time,
                             std::string_view data, uint64_t data_time) const;
+  // §31.4.1: $skew. `ref`/`ref_time` identify the reference_event (the
+  // timestamp event); `data`/`data_time` identify the data_event (the
+  // timecheck event). A violation is reported when the data event follows
+  // the reference event by strictly more than `limit`. Callers should invoke
+  // this helper once per data event with the most recent ref_time.
+  bool CheckSkewViolation(std::string_view ref, uint64_t ref_time,
+                          std::string_view data, uint64_t data_time) const;
 
   uint32_t PathDelayCount() const {
     return static_cast<uint32_t>(path_delays_.size());
