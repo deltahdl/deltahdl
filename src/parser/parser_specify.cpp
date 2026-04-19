@@ -114,8 +114,15 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
     items.push_back(ParseSpecifyPathDecl());
     return;
   }
-  // Unknown token inside specify - skip to avoid infinite loop.
-  Consume();
+  // No specify_item alternative matched — flag once and resync to the next
+  // statement boundary (or an end-keyword) to keep error output compact.
+  diag_.Error(CurrentLoc(), "unexpected token in specify block");
+  while (!AtEnd() && !Check(TokenKind::kSemicolon) &&
+         !Check(TokenKind::kKwEndspecify) &&
+         !Check(TokenKind::kKwEndmodule)) {
+    Consume();
+  }
+  if (Check(TokenKind::kSemicolon)) Consume();
 }
 
 // A.7.5.3: Parse a single edge_descriptor inside edge [ ... ].

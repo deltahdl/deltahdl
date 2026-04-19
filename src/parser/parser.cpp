@@ -571,6 +571,14 @@ PackageDecl* Parser::ParsePackageDecl() {
   Expect(TokenKind::kSemicolon);
   while (!Check(TokenKind::kKwEndpackage) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;  // null item (A.1.11)
+    // A specify block is only valid as a module item; reject it here before
+    // the shared module-item dispatcher would silently accept it.
+    if (Check(TokenKind::kKwSpecify)) {
+      diag_.Error(CurrentLoc(),
+                  "specify block must appear inside a module declaration");
+      ParseSpecifyBlock();
+      continue;
+    }
     if (!TryParsePackageBodyItem(pkg->items)) {
       ParseModuleItem(pkg->items);
     }
