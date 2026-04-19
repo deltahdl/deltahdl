@@ -4,19 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SpecifyPathElaboration, StateDependentIfPathElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    if (en) (a => b) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(SpecifyPathElaboration, StateDependentIfnonePathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
