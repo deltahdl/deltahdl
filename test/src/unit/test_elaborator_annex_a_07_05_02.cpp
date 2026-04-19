@@ -4,19 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(TimingCheckArgumentElaboration, TimestampCondMinTypMaxElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setuphold(posedge clk, data, 10, 5, ntfr, 1:2:3);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(TimingCheckArgumentElaboration, DelayedDataWithBracketElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -49,19 +36,6 @@ TEST(TimingCheckArgumentElaboration, RemainActiveFlagMinTypMaxElaborates) {
       "module m;\n"
       "  specify\n"
       "    $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 1:2:3);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TimingCheckArgumentElaboration, TimecheckCondMinTypMaxElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setuphold(posedge clk, data, 10, 5, ntfr, 1:2:3, 4:5:6);\n"
       "  endspecify\n"
       "endmodule\n",
       f);

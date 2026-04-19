@@ -348,6 +348,47 @@ bool NegativeTimingWindowCanYieldViolation(int64_t lower, int64_t upper,
 // no delays are required at all.
 bool ZeroSmallestNegativeTimingLimit(std::vector<int64_t>& limits);
 
+// §31.9.2: which of the two sides of a $setuphold or $recrem check a
+// post-notifier condition argument gates. The condition pairs up with
+// the delayed signal whose transition it qualifies, and which side that
+// is depends on the signed setup/hold limits: with both non-negative
+// the equivalent $setup + $hold pair both consult the condition
+// (kBoth); a negative setup collapses the window entirely onto the
+// hold-like side so only one delayed signal is in play (kData for the
+// timecheck, kRef for the timestamp); a negative hold mirrors that on
+// the setup-like side (kRef for the timecheck, kData for the
+// timestamp). kNone is reserved for the mutually inconsistent
+// both-negative configuration, which §31.9.1's resolver must rewrite
+// before the role is meaningful.
+enum class NegativeTimingConditionRole : uint8_t {
+  kData,
+  kRef,
+  kBoth,
+  kNone,
+};
+
+// §31.9.2: classify which side the timestamp_condition argument of a
+// $setuphold or $recrem invocation is associated with. The timestamp
+// condition gates the delayed signal that transitions first: the data
+// signal in the setup-like direction and the reference signal in the
+// hold-like direction. With both limits non-negative both decomposed
+// checks fire, so the condition gates both sides (kBoth). A single
+// negative on either limit collapses the window to one direction and
+// the role narrows to that single side. Both-negative is flagged as
+// kNone because §31.9.1's resolver has not yet chosen which limit to
+// zero.
+NegativeTimingConditionRole TimestampConditionRole(int64_t signed_setup,
+                                                   int64_t signed_hold);
+
+// §31.9.2: classify which side the timecheck_condition argument of a
+// $setuphold or $recrem invocation is associated with. Symmetric to
+// TimestampConditionRole, but gates the delayed signal that transitions
+// second: reference in the setup-like direction and data in the
+// hold-like direction. Negative setup therefore lands on data (the
+// post-ref window) and negative hold on reference (the pre-ref window).
+NegativeTimingConditionRole TimecheckConditionRole(int64_t signed_setup,
+                                                   int64_t signed_hold);
+
 // =============================================================================
 // SDF annotation entry (§32)
 // =============================================================================

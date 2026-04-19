@@ -652,6 +652,39 @@ bool ZeroSmallestNegativeTimingLimit(std::vector<int64_t>& limits) {
   return true;
 }
 
+// =============================================================================
+// §31.9.2 timestamp/timecheck condition role classification
+// =============================================================================
+
+NegativeTimingConditionRole TimestampConditionRole(int64_t signed_setup,
+                                                   int64_t signed_hold) {
+  // Both negative is mutually inconsistent per §31.9.1 — the resolver
+  // must zero one side before the window direction is defined.
+  if (signed_setup < 0 && signed_hold < 0) {
+    return NegativeTimingConditionRole::kNone;
+  }
+  // Negative setup shifts the window past the reference edge, so the
+  // reference is the first-to-transition delayed signal.
+  if (signed_setup < 0) return NegativeTimingConditionRole::kRef;
+  // Negative hold shifts the window before the reference edge, so data
+  // is the first-to-transition delayed signal.
+  if (signed_hold < 0) return NegativeTimingConditionRole::kData;
+  // Non-negative on both sides: the equivalent $setup + $hold
+  // decomposition exposes both sides to the timestamp condition.
+  return NegativeTimingConditionRole::kBoth;
+}
+
+NegativeTimingConditionRole TimecheckConditionRole(int64_t signed_setup,
+                                                   int64_t signed_hold) {
+  // Second-to-transition is the mirror image of TimestampConditionRole.
+  if (signed_setup < 0 && signed_hold < 0) {
+    return NegativeTimingConditionRole::kNone;
+  }
+  if (signed_setup < 0) return NegativeTimingConditionRole::kData;
+  if (signed_hold < 0) return NegativeTimingConditionRole::kRef;
+  return NegativeTimingConditionRole::kBoth;
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,
