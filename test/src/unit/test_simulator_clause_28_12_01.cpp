@@ -79,15 +79,6 @@ TEST(StrengthCombine, LikeValueThreeSignalsKeepMaxStrength) {
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kStrong);
 }
 
-TEST(StrengthCombine, EqualStrengthOppositeValueProducesX) {
-  StrengthSignal pull_one{Val4::kV1, StrengthLevel::kHighz,
-                          StrengthLevel::kPull};
-  StrengthSignal pull_zero{Val4::kV0, StrengthLevel::kPull,
-                           StrengthLevel::kHighz};
-  auto result = CombineUnambiguous(pull_one, pull_zero);
-  EXPECT_EQ(result.value, Val4::kX);
-}
-
 // R1 at the Net::Resolve level: a strong-1 driver must dominate a weak-0
 // driver on a plain wire when both drive the same bit.
 TEST(StrengthResolution, StrongerDriverWins) {

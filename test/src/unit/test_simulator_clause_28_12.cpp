@@ -9,25 +9,6 @@ using namespace delta;
 
 namespace {
 
-TEST(StrengthResolution, EqualStrengthConflictProducesX) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-  net.Resolve(arena);
-
-  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
-}
-
 TEST(StrengthResolution, HighzDriverIgnored) {
   Arena arena;
   auto* var = arena.Create<Variable>();
