@@ -898,7 +898,35 @@ bool Elaborator::NettypesMatch(std::string_view a, std::string_view b) const {
   return ca == cb;
 }
 
+UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
+  for (auto* u : unit_->udps) {
+    if (u->name == name) return u;
+  }
+  return nullptr;
+}
+
+void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
+  for (auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kModuleInst) continue;
+    if (!FindUdpByName(item->inst_module)) continue;
+    // UDP instantiation has no parameter value assignment in the LRM; ignore
+    // any inst_params the parser collected and let the UDP path report
+    // problems through its own diagnostics.
+    item->kind = ModuleItemKind::kUdpInst;
+    item->gate_inst_name = item->inst_name;
+    item->inst_name = {};
+    item->gate_terminals.clear();
+    item->gate_terminals.reserve(item->inst_ports.size());
+    for (const auto& [pname, pexpr] : item->inst_ports) {
+      item->gate_terminals.push_back(pexpr);
+    }
+    item->inst_ports.clear();
+    item->inst_ports_implicit.clear();
+  }
+}
+
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
+  ReclassifyForwardUdpInstances(decl);
   declared_names_.clear();
   net_names_.clear();
   cont_assign_targets_.clear();

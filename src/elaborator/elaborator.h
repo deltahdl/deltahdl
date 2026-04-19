@@ -127,6 +127,15 @@ class Elaborator {
   /// Elaborate a module instantiation (resolve child, bind ports).
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
 
+  /// §29.3: Find a UDP declaration by name in the compilation unit.
+  UdpDecl* FindUdpByName(std::string_view name) const;
+
+  /// §29.3: A UDP may be instantiated before its definition appears in the
+  /// source; the parser records such forward references as module instances.
+  /// Rewrite any item whose `inst_module` matches a compilation-unit UDP into
+  /// a UDP-instance shape so the elaborator and simulator see them uniformly.
+  void ReclassifyForwardUdpInstances(const ModuleDecl* decl);
+
   /// Create a pull0/pull1 constant expression for §22.9.
   Expr* MakePullExpr(NetType drive);
   Expr* MakeHighZExpr();
