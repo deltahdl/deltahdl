@@ -38,6 +38,24 @@ static Expr* MakeIntLiteral(Arena& arena, uint64_t val) {
   return lit;
 }
 
+/// Create an unbased-unsized high-Z literal ('z).
+static Expr* MakeHighZ(Arena& arena) {
+  auto* lit = arena.Create<Expr>();
+  lit->kind = ExprKind::kUnbasedUnsizedLiteral;
+  lit->text = "'z";
+  return lit;
+}
+
+/// Build a ternary (cond ? t : f) expression.
+static Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
+  auto* tern = arena.Create<Expr>();
+  tern->kind = ExprKind::kTernary;
+  tern->condition = cond;
+  tern->true_expr = t;
+  tern->false_expr = f;
+  return tern;
+}
+
 /// Build the RHS expression for an N-input gate (and/nand/or/nor/xor/xnor).
 static Expr* BuildNInputGateExpr(Arena& arena, GateKind kind,
                                  const std::vector<Expr*>& terminals) {
@@ -107,6 +125,31 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
       ca.width = LookupLhsWidth(ca.lhs, mod);
       mod->assigns.push_back(ca);
     }
+    return;
+  }
+
+  // §28.6: tri-state gates take (output, data, control). When control
+  // asserts the gate conducts (optionally inverting for notif); otherwise
+  // the output is high-Z. Suffix 1 conducts on control==1, suffix 0 on
+  // control==0.
+  if (kind == GateKind::kBufif0 || kind == GateKind::kBufif1 ||
+      kind == GateKind::kNotif0 || kind == GateKind::kNotif1) {
+    if (terms.size() != 3) return;
+    auto* data = terms[1];
+    auto* ctrl = terms[2];
+    bool invert =
+        (kind == GateKind::kNotif0 || kind == GateKind::kNotif1);
+    bool conduct_on_one =
+        (kind == GateKind::kBufif1 || kind == GateKind::kNotif1);
+    Expr* pass = invert ? WrapInvert(arena, data) : data;
+    Expr* hi_z = MakeHighZ(arena);
+    Expr* rhs = conduct_on_one ? MakeTernary(arena, ctrl, pass, hi_z)
+                               : MakeTernary(arena, ctrl, hi_z, pass);
+    RtlirContAssign ca;
+    ca.lhs = terms[0];
+    ca.rhs = rhs;
+    ca.width = LookupLhsWidth(ca.lhs, mod);
+    mod->assigns.push_back(ca);
     return;
   }
 

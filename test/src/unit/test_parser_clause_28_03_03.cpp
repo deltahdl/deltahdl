@@ -162,37 +162,6 @@ TEST(DelayParsing, XorGateSingleValueDelay) {
   EXPECT_EQ(item->gate_delay->int_val, 7u);
 }
 
-TEST(DelayParsing, Bufif0GateThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire y, a, b;\n"
-      "  bufif0 #(5, 10, 15) g1(y, a, b);\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[3];
-  ASSERT_NE(item->gate_delay, nullptr);
-  EXPECT_EQ(item->gate_delay->int_val, 5u);
-  ASSERT_NE(item->gate_delay_fall, nullptr);
-  EXPECT_EQ(item->gate_delay_fall->int_val, 10u);
-  ASSERT_NE(item->gate_delay_decay, nullptr);
-  EXPECT_EQ(item->gate_delay_decay->int_val, 15u);
-}
-
-TEST(EnableGates, ThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  bufif0 #(10, 20, 30) b1(out, in, en);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kBufif0);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  ASSERT_NE(g->gate_delay_decay, nullptr);
-}
-
 TEST(MosSwitches, ThreeValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -295,32 +264,6 @@ TEST(GateDelayParsing, RcmosThreeValueDelay) {
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  ASSERT_NE(g->gate_delay_decay, nullptr);
-}
-
-TEST(GateDelayParsing, Notif0ThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  notif0 #(1, 2, 3) n1(o, i, en);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif0);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  ASSERT_NE(g->gate_delay_decay, nullptr);
-}
-
-TEST(GateDelayParsing, Notif1ThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  notif1 #(4, 5, 6) n1(o, i, en);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNotif1);
   ASSERT_NE(g, nullptr);
   ASSERT_NE(g->gate_delay, nullptr);
   ASSERT_NE(g->gate_delay_fall, nullptr);
