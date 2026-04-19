@@ -693,6 +693,11 @@ static bool UdpInputIsEdge(char c) {
 
 static bool UdpSymbolIsZ(char c) { return c == 'z' || c == 'Z'; }
 
+static bool UdpIsLevelSymbol(char c) {
+  return c == '0' || c == '1' || c == 'x' || c == 'X' ||
+         c == '?' || c == 'b' || c == 'B';
+}
+
 char Parser::ParseUdpInitialValue(TokenKind stop1, TokenKind stop2) {
   char result = '0';
   while (!Check(stop1) && !Check(stop2) && !AtEnd()) {
@@ -841,6 +846,44 @@ void Parser::ParseUdpTableRow(UdpDecl* udp) {
     if (all_x && row.output != 'x' && row.output != 'X') {
       diag_.Error(row_loc,
                   "UDP table row with all-x inputs shall specify x output");
+    }
+  }
+
+  // §29.3.6: - is confined to the output field of a sequential row.
+  for (char c : row.inputs) {
+    if (c == '-') {
+      diag_.Error(row_loc, "- shall not appear in a UDP input field");
+      break;
+    }
+  }
+  if (udp->is_sequential) {
+    char cs = row.current_state;
+    if (cs == '-') {
+      diag_.Error(row_loc, "- shall not appear in the current-state field");
+    } else if (UdpInputIsEdge(cs)) {
+      diag_.Error(row_loc,
+                  "edge symbols shall not appear in the current-state field");
+    }
+  }
+
+  // §29.3.6: output field is 0/1/x; sequential UDPs additionally accept -.
+  {
+    char out = row.output;
+    bool ok = (out == '0' || out == '1' || out == 'x' || out == 'X');
+    if (udp->is_sequential && out == '-') ok = true;
+    if (!ok) {
+      diag_.Error(row_loc,
+                  "UDP output field shall be 0, 1, or x (- is sequential only)");
+    }
+  }
+
+  // §29.3.6: (vw) edge endpoints must be level symbols.
+  for (const auto& pe : row.paren_edges) {
+    if (pe.first == 0 && pe.second == 0) continue;
+    if (!UdpIsLevelSymbol(pe.first) || !UdpIsLevelSymbol(pe.second)) {
+      diag_.Error(row_loc,
+                  "parenthesized edge endpoints shall be level symbols");
+      break;
     }
   }
 
