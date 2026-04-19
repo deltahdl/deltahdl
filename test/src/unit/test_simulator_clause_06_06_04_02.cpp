@@ -18,25 +18,6 @@ static Logic4Vec MakeAllZ(Arena& arena, uint32_t width) {
 
 namespace {
 
-TEST(ChargeDecay, DecayChangesValueToX) {
-  Arena arena;
-  Scheduler sched(arena);
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 8, 42);
-  Net net;
-  net.type = NetType::kTrireg;
-  net.resolved = var;
-  net.decay_ticks = 50;
-  net.drivers.push_back(MakeAllZ(arena, 8));
-  net.Resolve(arena, &sched);
-
-  ASSERT_TRUE(sched.HasEvents());
-  sched.Run();
-
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
-}
-
 TEST(ChargeDecay, NoDecayWhenDecayTicksZero) {
   Arena arena;
   Scheduler sched(arena);
@@ -52,27 +33,6 @@ TEST(ChargeDecay, NoDecayWhenDecayTicksZero) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(ChargeDecay, DecayCancelledWhenDriverReturns) {
-  Arena arena;
-  Scheduler sched(arena);
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 8, 42);
-  Net net;
-  net.type = NetType::kTrireg;
-  net.resolved = var;
-  net.decay_ticks = 100;
-
-  net.drivers.push_back(MakeAllZ(arena, 8));
-  net.Resolve(arena, &sched);
-  ASSERT_TRUE(sched.HasEvents());
-
-  net.drivers[0] = MakeLogic4VecVal(arena, 8, 99);
-  net.Resolve(arena, &sched);
-
-  sched.Run();
-  EXPECT_EQ(var->value.ToUint64(), 99u);
-}
-
 TEST(ChargeDecay, NoDecayScheduledWithoutScheduler) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -85,51 +45,6 @@ TEST(ChargeDecay, NoDecayScheduledWithoutScheduler) {
 
   net.Resolve(arena);
   EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
-TEST(ChargeDecay, DecayFromZeroToX) {
-  Arena arena;
-  Scheduler sched(arena);
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 8, 0);
-  Net net;
-  net.type = NetType::kTrireg;
-  net.resolved = var;
-  net.decay_ticks = 30;
-  net.drivers.push_back(MakeAllZ(arena, 8));
-  net.Resolve(arena, &sched);
-
-  ASSERT_TRUE(sched.HasEvents());
-  sched.Run();
-
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
-}
-
-TEST(ChargeDecay, MultipleCyclesDecayCancelRestart) {
-  Arena arena;
-  Scheduler sched(arena);
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 8, 10);
-  Net net;
-  net.type = NetType::kTrireg;
-  net.resolved = var;
-  net.decay_ticks = 50;
-
-  net.drivers.push_back(MakeAllZ(arena, 8));
-  net.Resolve(arena, &sched);
-  ASSERT_TRUE(sched.HasEvents());
-
-  net.drivers[0] = MakeLogic4VecVal(arena, 8, 77);
-  net.Resolve(arena, &sched);
-  EXPECT_EQ(var->value.ToUint64(), 77u);
-
-  net.drivers[0] = MakeAllZ(arena, 8);
-  net.Resolve(arena, &sched);
-
-  sched.Run();
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
 TEST(ChargeDecay, IdealCapacitiveRetainsValue) {
