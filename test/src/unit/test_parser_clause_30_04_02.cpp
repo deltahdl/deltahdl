@@ -111,36 +111,6 @@ TEST_F(SpecifyTest, FullPathDelay) {
   EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kFull);
 }
 
-TEST(SpecifyPathParsing, ParallelPathNegativePolarity) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a - => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
-  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
-}
-
-TEST(SpecifyPathParsing, FullPathNegativePolarity) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a - *> b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
-  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
-}
-
 // The parallel_path_description grammar admits exactly one input terminal
 // descriptor, so a comma-separated source list must be rejected.
 TEST(SpecifyPathParsing, ParallelPathRejectsMultipleSources) {

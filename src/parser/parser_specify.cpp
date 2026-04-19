@@ -308,25 +308,27 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   // Optional polarity operator before => or *>
   item->path.polarity = ParseSpecifyPolarity();
 
-  // §30.4.7.2: the LRM writes `+=>` with no whitespace, which the lexer's
-  // max-munch rule tokenizes as kPlusEq + kGt. Recognize that sequence as
-  // polarity `+` followed by the `=>` connection.
-  bool plus_eq_gt_handled = false;
+  // §30.4.7.2 / §30.4.7.3: the LRM writes `+=>` and `-=>` with no whitespace,
+  // which the lexer's max-munch rule tokenizes as kPlusEq+kGt and kMinusEq+kGt.
+  // Recognize those sequences as a polarity operator followed by `=>`.
+  bool polarity_eq_gt_handled = false;
   if (item->path.polarity == SpecifyPolarity::kNone &&
-      Check(TokenKind::kPlusEq)) {
+      (Check(TokenKind::kPlusEq) || Check(TokenKind::kMinusEq))) {
     auto saved = lexer_.SavePos();
+    bool is_plus = Check(TokenKind::kPlusEq);
     Consume();
     if (Match(TokenKind::kGt)) {
-      item->path.polarity = SpecifyPolarity::kPositive;
+      item->path.polarity =
+          is_plus ? SpecifyPolarity::kPositive : SpecifyPolarity::kNegative;
       item->path.path_kind = SpecifyPathKind::kParallel;
-      plus_eq_gt_handled = true;
+      polarity_eq_gt_handled = true;
     } else {
       lexer_.RestorePos(saved);
     }
   }
 
   // => (parallel) or *> (full)
-  if (!plus_eq_gt_handled) {
+  if (!polarity_eq_gt_handled) {
     if (Match(TokenKind::kEqGt)) {
       item->path.path_kind = SpecifyPathKind::kParallel;
     } else if (Match(TokenKind::kStarGt)) {
