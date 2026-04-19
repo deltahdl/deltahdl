@@ -560,6 +560,71 @@ void Elaborator::ValidateSpecifyBlocks() {
           }
         }
       }
+
+      // §30.5: delay values shall be constant expressions containing literals
+      // or specparams. Any bare identifier must resolve to a specparam
+      // declared in the same specify block.
+      for (auto* item : mod->items) {
+        if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+        std::unordered_set<std::string_view> specparams;
+        for (auto* si : item->specify_items) {
+          if (si->kind == SpecifyItemKind::kSpecparam &&
+              !si->param_name.empty()) {
+            specparams.insert(si->param_name);
+          }
+        }
+        std::function<void(const Expr*, SourceLoc)> check_delay_expr =
+            [&](const Expr* e, SourceLoc loc) {
+          if (!e) return;
+          switch (e->kind) {
+            case ExprKind::kIdentifier:
+              if (!specparams.contains(e->text)) {
+                diag_.Error(loc,
+                            std::format("module path delay operand '{}' is "
+                                        "not a specparam",
+                                        e->text));
+              }
+              return;
+            case ExprKind::kUnary:
+            case ExprKind::kPostfixUnary:
+              check_delay_expr(e->lhs, loc);
+              return;
+            case ExprKind::kBinary:
+              check_delay_expr(e->lhs, loc);
+              check_delay_expr(e->rhs, loc);
+              return;
+            case ExprKind::kTernary:
+              check_delay_expr(e->condition, loc);
+              check_delay_expr(e->true_expr, loc);
+              check_delay_expr(e->false_expr, loc);
+              return;
+            case ExprKind::kMinTypMax:
+              check_delay_expr(e->lhs, loc);
+              check_delay_expr(e->condition, loc);
+              check_delay_expr(e->rhs, loc);
+              return;
+            case ExprKind::kSelect:
+              check_delay_expr(e->base, loc);
+              check_delay_expr(e->index, loc);
+              check_delay_expr(e->index_end, loc);
+              return;
+            case ExprKind::kConcatenation:
+            case ExprKind::kAssignmentPattern:
+              for (auto* el : e->elements) check_delay_expr(el, loc);
+              return;
+            case ExprKind::kReplicate:
+              check_delay_expr(e->repeat_count, loc);
+              for (auto* el : e->elements) check_delay_expr(el, loc);
+              return;
+            default:
+              return;
+          }
+        };
+        for (auto* si : item->specify_items) {
+          if (si->kind != SpecifyItemKind::kPathDecl) continue;
+          for (auto* d : si->path.delays) check_delay_expr(d, si->loc);
+        }
+      }
     }
   };
   check_modules(unit_->modules);
