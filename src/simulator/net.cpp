@@ -253,8 +253,10 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
 
   if (ResolveSpecialNet(*this, arena, sched)) return;
 
-  // Strength-aware path.
-  if (!driver_strengths.empty()) {
+  // §28.12: user-defined nettypes shall not carry strength levels, so any
+  // per-driver strength on such a net is ignored — skip the strength-aware
+  // path and fall through to value-only resolution.
+  if (!is_user_nettype && !driver_strengths.empty()) {
     auto result = MakeLogic4Vec(arena, resolved->value.width);
     for (uint32_t b = 0; b < result.width; ++b) {
       ResolveStrengthBit(drivers, driver_strengths, result, b);
