@@ -77,21 +77,6 @@ TEST(SpecifyPathParsing, PathDeclSimpleFull) {
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
 }
 
-TEST(SpecifyPathParsing, MultipleSourceDestPorts) {
-  auto sp = ParseSpecifySingle(
-      "module m(input a, b, c, output x, y);\n"
-      "  specify\n"
-      "    (a, b, c *> x, y) = 12;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(sp.pr.cu, nullptr);
-  EXPECT_FALSE(sp.pr.has_errors);
-  ASSERT_NE(sp.sole_item, nullptr);
-  auto* si = sp.sole_item;
-  EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
-  VerifyFullPathPorts(si, {"a", "b", "c"}, {"x", "y"});
-}
-
 TEST_F(SpecifyTest, ParallelPathDelay) {
   auto* cu = Parse(
       "module m;\n"

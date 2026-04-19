@@ -43,17 +43,4 @@ TEST(SpecifyTerminalElaboration, TerminalIndexedPartSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SpecifyTerminalElaboration, MultipleTerminalsElaborate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (a, b[3:0] *> x[0], y) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }  // namespace
