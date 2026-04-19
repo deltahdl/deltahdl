@@ -5,7 +5,7 @@
 
 namespace {
 
-TEST(MosSwitches, NmosConductsWhenControlHigh) {
+TEST(MosSwitchSimulation, NmosConductsWhenControlHigh) {
   EXPECT_EQ(EvalMosSwitch(SwitchType::kNmos, Val4::kV0, Val4::kV1),
             Val4Ext::kV0);
   EXPECT_EQ(EvalMosSwitch(SwitchType::kNmos, Val4::kV1, Val4::kV1),
@@ -13,33 +13,33 @@ TEST(MosSwitches, NmosConductsWhenControlHigh) {
   EXPECT_EQ(EvalMosSwitch(SwitchType::kNmos, Val4::kX, Val4::kV1), Val4Ext::kX);
 }
 
-TEST(MosSwitches, NmosBlocksWhenControlLow) {
+TEST(MosSwitchSimulation, NmosBlocksWhenControlLow) {
   EXPECT_EQ(EvalMosSwitch(SwitchType::kNmos, Val4::kV0, Val4::kV0),
             Val4Ext::kZ);
   EXPECT_EQ(EvalMosSwitch(SwitchType::kNmos, Val4::kV1, Val4::kV0),
             Val4Ext::kZ);
 }
 
-TEST(MosSwitches, NmosXControlProducesLOrH) {
+TEST(MosSwitchSimulation, NmosXControlProducesLOrH) {
   EXPECT_EQ(EvalMosSwitch(SwitchType::kNmos, Val4::kV0, Val4::kX), Val4Ext::kL);
   EXPECT_EQ(EvalMosSwitch(SwitchType::kNmos, Val4::kV1, Val4::kX), Val4Ext::kH);
 }
 
-TEST(MosSwitches, PmosConductsWhenControlLow) {
+TEST(MosSwitchSimulation, PmosConductsWhenControlLow) {
   EXPECT_EQ(EvalMosSwitch(SwitchType::kPmos, Val4::kV0, Val4::kV0),
             Val4Ext::kV0);
   EXPECT_EQ(EvalMosSwitch(SwitchType::kPmos, Val4::kV1, Val4::kV0),
             Val4Ext::kV1);
 }
 
-TEST(MosSwitches, PmosBlocksWhenControlHigh) {
+TEST(MosSwitchSimulation, PmosBlocksWhenControlHigh) {
   EXPECT_EQ(EvalMosSwitch(SwitchType::kPmos, Val4::kV0, Val4::kV1),
             Val4Ext::kZ);
   EXPECT_EQ(EvalMosSwitch(SwitchType::kPmos, Val4::kV1, Val4::kV1),
             Val4Ext::kZ);
 }
 
-TEST(MosSwitches, ZDataAlwaysZ) {
+TEST(MosSwitchSimulation, ZDataAlwaysZ) {
   EXPECT_EQ(EvalMosSwitch(SwitchType::kNmos, Val4::kZ, Val4::kV0), Val4Ext::kZ);
   EXPECT_EQ(EvalMosSwitch(SwitchType::kNmos, Val4::kZ, Val4::kV1), Val4Ext::kZ);
   EXPECT_EQ(EvalMosSwitch(SwitchType::kPmos, Val4::kZ, Val4::kV0), Val4Ext::kZ);

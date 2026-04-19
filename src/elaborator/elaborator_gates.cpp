@@ -153,6 +153,28 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     return;
   }
 
+  // §28.7: MOS switches take (output, data, control) and pass data through
+  // only when conducting; otherwise the output is high-Z. nmos/rnmos
+  // conduct on control==1; pmos/rpmos conduct on control==0. MOS switches
+  // do not invert data (strength attenuation is modeled elsewhere).
+  if (kind == GateKind::kNmos || kind == GateKind::kPmos ||
+      kind == GateKind::kRnmos || kind == GateKind::kRpmos) {
+    if (terms.size() != 3) return;
+    auto* data = terms[1];
+    auto* ctrl = terms[2];
+    bool conduct_on_one =
+        (kind == GateKind::kNmos || kind == GateKind::kRnmos);
+    Expr* hi_z = MakeHighZ(arena);
+    Expr* rhs = conduct_on_one ? MakeTernary(arena, ctrl, data, hi_z)
+                               : MakeTernary(arena, ctrl, hi_z, data);
+    RtlirContAssign ca;
+    ca.lhs = terms[0];
+    ca.rhs = rhs;
+    ca.width = LookupLhsWidth(ca.lhs, mod);
+    mod->assigns.push_back(ca);
+    return;
+  }
+
   Expr* rhs = nullptr;
   switch (kind) {
     case GateKind::kAnd:

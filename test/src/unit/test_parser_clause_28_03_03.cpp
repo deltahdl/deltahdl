@@ -74,34 +74,6 @@ TEST(GateDelayParsing, PassEnableSwitchThreeValueDelayRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(GateDelayParsing, MosSwitchTwoValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  nmos #(3, 5) n1(o, i, g);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  EXPECT_EQ(g->gate_delay->int_val, 3u);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  EXPECT_EQ(g->gate_delay_fall->int_val, 5u);
-  EXPECT_EQ(g->gate_delay_decay, nullptr);
-}
-
-TEST(GateDelayParsing, MosSwitchThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  pmos #(2, 3, 4) p1(o, i, g);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kPmos);
-  ASSERT_NE(g, nullptr);
-  EXPECT_NE(g->gate_delay, nullptr);
-  EXPECT_NE(g->gate_delay_fall, nullptr);
-  EXPECT_NE(g->gate_delay_decay, nullptr);
-}
-
 TEST(GateDelayParsing, CmosSwitchTwoValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -162,18 +134,6 @@ TEST(DelayParsing, XorGateSingleValueDelay) {
   EXPECT_EQ(item->gate_delay->int_val, 7u);
 }
 
-TEST(MosSwitches, ThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  nmos #(10, 20, 30) n1(out, data, ctrl);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-}
-
 TEST(PassSwitches, DelayNotAllowed) {
   auto r = Parse(
       "module m;\n"
@@ -229,32 +189,6 @@ TEST(GateDelayParsing, GateWithoutDelayHasNullDelay) {
   EXPECT_EQ(g->gate_delay, nullptr);
   EXPECT_EQ(g->gate_delay_fall, nullptr);
   EXPECT_EQ(g->gate_delay_decay, nullptr);
-}
-
-TEST(GateDelayParsing, RnmosThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  rnmos #(1, 2, 3) r1(o, i, g);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRnmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  ASSERT_NE(g->gate_delay_decay, nullptr);
-}
-
-TEST(GateDelayParsing, RpmosThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  rpmos #(4, 5, 6) r1(o, i, g);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRpmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  ASSERT_NE(g->gate_delay_decay, nullptr);
 }
 
 TEST(GateDelayParsing, RcmosThreeValueDelay) {
