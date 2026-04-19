@@ -256,6 +256,33 @@ bool SpecifyManager::CheckRecoveryViolation(std::string_view ref,
   return false;
 }
 
+bool SpecifyManager::CheckRecremViolation(std::string_view ref,
+                                          uint64_t ref_time,
+                                          std::string_view data,
+                                          uint64_t data_time) const {
+  for (const auto& check : timing_checks_) {
+    if (check.kind != TimingCheckKind::kRecrem) continue;
+    if (check.ref_signal != ref) continue;
+    if (check.data_signal != data) continue;
+    // §31.3.6: both limits zero — $recrem shall never issue a violation.
+    if (check.limit == 0 && check.limit2 == 0) continue;
+    if (data_time <= ref_time) {
+      // Data event first (or simultaneous with the reference): the reference
+      // is the timecheck event and the active window is
+      //   (ref_time - removal_limit, ref_time]
+      // The end of the window is included, so simultaneous events with a
+      // positive removal_limit fall inside the violation region.
+      if (ref_time - data_time < check.limit2) return true;
+    } else {
+      // Data event second: the reference is the timestamp event and the
+      // active window is [ref_time, ref_time + recovery_limit), with only the
+      // end excluded.
+      if (data_time - ref_time < check.limit) return true;
+    }
+  }
+  return false;
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,

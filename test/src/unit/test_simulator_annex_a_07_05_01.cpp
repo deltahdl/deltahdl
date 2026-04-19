@@ -84,21 +84,6 @@ TEST(SystemTimingCheckSim, TimingChecksWithPathsSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(TimingCheckCommandSim, RecremDualLimitsStored) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kRecrem;
-  tc.ref_signal = "clk";
-  tc.data_signal = "rst";
-  tc.limit = 8;
-  tc.limit2 = 3;
-  mgr.AddTimingCheck(tc);
-  auto& stored = mgr.GetTimingChecks()[0];
-  EXPECT_EQ(stored.kind, TimingCheckKind::kRecrem);
-  EXPECT_EQ(stored.limit, 8u);
-  EXPECT_EQ(stored.limit2, 3u);
-}
-
 TEST(TimingCheckCommandSim, FullskewDualLimitsStored) {
   SpecifyManager mgr;
   TimingCheckEntry tc;

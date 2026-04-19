@@ -566,6 +566,13 @@ SpecifyItem* Parser::ParseTimingCheck() {
     diag_.Error(item->loc,
                 "$setuphold requires two timing_check_limit arguments");
   }
+  // §31.3.6 Syntax 31-8: `$recrem` requires two timing_check_limit args
+  // (recovery_limit and removal_limit).
+  if (item->timing_check.check_kind == TimingCheckKind::kRecrem &&
+      item->timing_check.limits.size() < 2) {
+    diag_.Error(item->loc,
+                "$recrem requires two timing_check_limit arguments");
+  }
 
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kSemicolon);

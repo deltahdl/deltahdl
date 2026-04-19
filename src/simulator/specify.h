@@ -190,6 +190,13 @@ class SpecifyManager {
   // the data_event (the timecheck event, typically a clock).
   bool CheckRecoveryViolation(std::string_view ref, uint64_t ref_time,
                               std::string_view data, uint64_t data_time) const;
+  // §31.3.6: $recrem combines the $recovery and $removal windows in a single
+  // check whose active branch is selected by which event occurred first.
+  // `limit` holds the recovery_limit and `limit2` holds the removal_limit on
+  // the stored TimingCheckEntry (matching the invocation argument order
+  // `$recrem(ref, data, recovery_limit, removal_limit)`).
+  bool CheckRecremViolation(std::string_view ref, uint64_t ref_time,
+                            std::string_view data, uint64_t data_time) const;
 
   uint32_t PathDelayCount() const {
     return static_cast<uint32_t>(path_delays_.size());
