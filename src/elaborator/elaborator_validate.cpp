@@ -1310,8 +1310,14 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
     diag_.Error(item->loc,
                 "drive strength on net declaration requires an assignment");
   }
-  // §10.3.4: (highz0, highz1) and (highz1, highz0) are illegal.
-  if (item->kind == ModuleItemKind::kNetDecl &&
+  // §28.11: the (highz0, highz1) pair — in either source ordering, since both
+  // normalize to s0==1 && s1==1 in the parser — is illegal wherever a drive
+  // strength spec may appear: net decls, continuous assigns, and gate/UDP
+  // instances.
+  if ((item->kind == ModuleItemKind::kNetDecl ||
+       item->kind == ModuleItemKind::kContAssign ||
+       item->kind == ModuleItemKind::kGateInst ||
+       item->kind == ModuleItemKind::kUdpInst) &&
       item->drive_strength0 == 1 && item->drive_strength1 == 1) {
     diag_.Error(item->loc, "drive strength (highz0, highz1) is illegal");
   }
@@ -1321,15 +1327,6 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
     CheckScalarSelect(item->assign_lhs, scalar_var_names_, diag_);
     CheckIndexedPartSelectWidth(item->assign_rhs, diag_);
     CheckIndexedPartSelectWidth(item->assign_lhs, diag_);
-    // §10.3.4: (highz0, highz1) and (highz1, highz0) are illegal.
-    if (item->drive_strength0 == 1 && item->drive_strength1 == 1) {
-      diag_.Error(item->loc, "drive strength (highz0, highz1) is illegal");
-    }
-  }
-  // Gate instances share the same forbidden-combo rule on their strength spec.
-  if (item->kind == ModuleItemKind::kGateInst &&
-      item->drive_strength0 == 1 && item->drive_strength1 == 1) {
-    diag_.Error(item->loc, "drive strength (highz0, highz1) is illegal");
   }
   if (is_proc && item->body) {
     CheckScalarSelectStmt(item->body, scalar_var_names_, diag_);
