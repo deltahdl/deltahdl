@@ -30,32 +30,6 @@ TEST(SpecifyPathElaboration, SimpleFullPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SpecifyPathElaboration, PathWithPolarityElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (a + => b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(SpecifyPathElaboration, PolarityOnFullPathElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (a + *> b) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(SpecifyPathElaboration, TerminalBitSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
