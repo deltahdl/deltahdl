@@ -139,6 +139,25 @@ struct TimingCheckEntry {
   std::string notifier;
 };
 
+// §31.4.2: classify whether a single $timeskew observation interval
+// reports a violation. `ref_time` is the timestamp event time;
+// `next_event_time` is the time of the next observed event, with
+// `next_event_is_data` distinguishing a data event (timecheck event,
+// true) from a fresh reference event (false). `limit` is the configured
+// non-negative skew limit. With `event_based_flag` false (the default),
+// $timeskew is timer-based: a violation is reported when any event —
+// data or a fresh reference — arrives strictly past the elapsed limit,
+// and the boundary case where the next event lands exactly at
+// `ref_time + limit` does not violate. With `event_based_flag` set,
+// $timeskew behaves like $skew: only a data event strictly past the
+// limit can violate, and a fresh reference event silently re-arms the
+// wait. This helper captures the per-interval classification only;
+// multi-interval dormancy (the quiet period until the next reference
+// event after a violation) is the caller's responsibility.
+bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
+                              bool next_event_is_data, uint64_t limit,
+                              bool event_based_flag);
+
 // =============================================================================
 // SDF annotation entry (§32)
 // =============================================================================
@@ -204,6 +223,17 @@ class SpecifyManager {
   // this helper once per data event with the most recent ref_time.
   bool CheckSkewViolation(std::string_view ref, uint64_t ref_time,
                           std::string_view data, uint64_t data_time) const;
+  // §31.4.2: $timeskew. `ref`/`ref_time` identify the reference_event
+  // (timestamp event); `data`/`data_time` identify the data_event
+  // (timecheck event). The violation predicate is the strict inequality
+  //   (timecheck time) - (timestamp time) > limit
+  // which also implements §31.4.2's two carve-outs in one expression: the
+  // simultaneous-transition rule (no violation when both events coincide,
+  // even at zero limit) and the exact-expiration rule (no violation when a
+  // new timestamp event lands precisely at the elapsed-limit boundary).
+  bool CheckTimeskewViolation(std::string_view ref, uint64_t ref_time,
+                              std::string_view data,
+                              uint64_t data_time) const;
 
   uint32_t PathDelayCount() const {
     return static_cast<uint32_t>(path_delays_.size());

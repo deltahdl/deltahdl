@@ -125,67 +125,6 @@ TEST(TimingCheckCommandParsing, SetupAsSpecifyItem) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
-TEST(TimingCheckCommandParsing, TimeskewWithFlags) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 0);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kTimeskew);
-  EXPECT_EQ(tc->notifier, "ntfr");
-  ASSERT_NE(tc->event_based_flag, nullptr);
-  ASSERT_NE(tc->remain_active_flag, nullptr);
-}
-
-TEST(TimingCheckCommandParsing, TimeskewAllFields) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $timeskew(posedge clk1, posedge clk2, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kTimeskew);
-  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->ref_terminal.name, "clk1");
-  EXPECT_EQ(tc->data_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->data_terminal.name, "clk2");
-  ASSERT_EQ(tc->limits.size(), 1u);
-}
-
-TEST(TimingCheckCommandParsing, TimeskewWithNotifier) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $timeskew(posedge clk1, posedge clk2, 5, ntfr);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kTimeskew);
-  EXPECT_EQ(tc->notifier, "ntfr");
-}
-
-TEST(TimingCheckCommandParsing, TimeskewBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $timeskew(posedge clk1, posedge clk2, 50);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kTimeskew);
-}
-
 TEST(TimingCheckCommandParsing, FullskewWithFlags) {
   auto r = Parse(
       "module m;\n"

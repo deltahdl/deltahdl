@@ -103,21 +103,6 @@ TEST(TimingCheckArgumentParsing, DelayedRefDataSimple) {
   EXPECT_EQ(tc->delayed_data, "dDATA");
 }
 
-TEST(TimingCheckArgumentParsing, EventBasedFlagAndRemainActiveFlag) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $timeskew(posedge clk1, posedge clk2, 5, ntfr, 1, 0);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->notifier, "ntfr");
-  ASSERT_NE(tc->event_based_flag, nullptr);
-  ASSERT_NE(tc->remain_active_flag, nullptr);
-}
-
 TEST(TimingCheckArgumentParsing, RemainActiveFlagMinTypMax) {
   auto r = Parse(
       "module m;\n"

@@ -299,6 +299,49 @@ bool SpecifyManager::CheckSkewViolation(std::string_view ref, uint64_t ref_time,
   return false;
 }
 
+bool SpecifyManager::CheckTimeskewViolation(std::string_view ref,
+                                            uint64_t ref_time,
+                                            std::string_view data,
+                                            uint64_t data_time) const {
+  for (const auto& check : timing_checks_) {
+    if (check.kind != TimingCheckKind::kTimeskew) continue;
+    if (check.ref_signal != ref) continue;
+    if (check.data_signal != data) continue;
+    // §31.4.2: a violation is reported only when
+    //   (timecheck time) - (timestamp time) > limit
+    // The strict inequality folds in both carve-outs the LRM names
+    // explicitly: simultaneous transitions never violate (even at zero
+    // limit), and a new timestamp event arriving exactly at the elapsed
+    // limit boundary does not violate.
+    if (data_time > ref_time && data_time - ref_time > check.limit) return true;
+  }
+  return false;
+}
+
+bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
+                              bool next_event_is_data, uint64_t limit,
+                              bool event_based_flag) {
+  // Bail out for events that aren't strictly later than the reference
+  // event. This subsumes §31.4.2's simultaneous-transition rule (no
+  // violation when both events coincide, even at zero limit) and ignores
+  // out-of-order inputs.
+  if (next_event_time <= ref_time) return false;
+  uint64_t elapsed = next_event_time - ref_time;
+  if (event_based_flag) {
+    // Event-based mode: the check waits for a data event before
+    // evaluating the predicate, mirroring $skew. A new reference event
+    // simply re-arms the wait without producing a violation.
+    return next_event_is_data && elapsed > limit;
+  }
+  // Timer-based default: the implicit timer fires at ref_time + limit.
+  // Any observed event past that boundary witnesses a violation
+  // (whether data or a fresh reference). Events arriving at exactly the
+  // boundary do not violate, matching the strict inequality of the
+  // §31.4.2 violation predicate and the explicit exact-expiration rule
+  // for new timestamp events.
+  return elapsed > limit;
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,
