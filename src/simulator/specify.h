@@ -27,6 +27,17 @@ struct PathDelay {
   // [6]=t0x, [7]=tx1, [8]=t1x, [9]=tx0, [10]=txz, [11]=tzx
 };
 
+// §30.5.1: a path delay expression that evaluates to a negative value shall
+// be treated as zero. Callers that have reduced a delay expression to a
+// signed integer funnel through this helper before writing to PathDelay.
+uint64_t ClampPathDelay(int64_t signed_value);
+
+// §30.5.1 / Table 30-2: expand an N-delay input (N in {1,2,3}) across the
+// six non-x transition slots of `pd.delays`. For N in {6,12} the expansion
+// is an identity. Slots [6..11] (x-transition slots) are outside §30.5.1 and
+// are never written by this helper.
+void ExpandTransitionDelays(PathDelay& pd);
+
 // =============================================================================
 // Runtime timing check entry (§31)
 // =============================================================================
