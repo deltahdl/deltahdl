@@ -599,8 +599,13 @@ void Parser::ParseUdpInstList(const Token& udp_tok,
   // Optional delay2: #delay or #(rise, fall)
   Expr* delay = nullptr;
   Expr* delay_fall = nullptr;
-  Expr* unused_decay = nullptr;
-  ParseGateDelay(delay, delay_fall, unused_decay);
+  Expr* decay = nullptr;
+  ParseGateDelay(delay, delay_fall, decay);
+  // §29.8: a third delay describes transitions to z, which UDPs cannot
+  // produce, so only the two-delay form is accepted here.
+  if (decay != nullptr) {
+    diag_.Error(loc, "UDP instantiation shall have at most two delays");
+  }
 
   // Parse comma-separated udp_instance entries.
   auto apply_common = [&](ModuleItem* item) {
