@@ -25,6 +25,14 @@ struct PathDelay {
   // [0]=rise/t01, [1]=fall/t10, [2]=z/t0z,
   // [3]=tz1, [4]=t1z, [5]=tz0,
   // [6]=t0x, [7]=tx1, [8]=t1x, [9]=tx0, [10]=txz, [11]=tzx
+
+  // §30.7: per-transition pulse filtering limits. Indexed identically to
+  // `delays`. The runtime invariant is error_limit[i] >= reject_limit[i]
+  // for every slot. Both default to the matching `delays[i]` until a
+  // descendant mechanism (PATHPULSE$, invocation options, or SDF) revises
+  // them.
+  uint64_t reject_limit[12] = {};
+  uint64_t error_limit[12] = {};
 };
 
 // §30.5.1: a path delay expression that evaluates to a negative value shall
@@ -63,6 +71,29 @@ uint64_t SelectPathDelay(const std::vector<PathCandidate>& candidates,
 // path delay and the pre-summed distributed delay for the same path.
 uint64_t SelectEffectivePathDelay(uint64_t module_path_delay,
                                   uint64_t distributed_delay_sum);
+
+// §30.7: outcome of filtering a pulse observed on a module path output.
+// kPropagate emits the pulse unchanged; kForceX drives the destination to
+// logic x for the duration the pulse would have lasted; kReject suppresses
+// the pulse entirely.
+enum class PulseClassification : uint8_t {
+  kPropagate,
+  kForceX,
+  kReject,
+};
+
+// §30.7: classify a pulse of width `pulse_width` against the limits taken
+// from the trailing-edge transition slot. Callers must enforce the
+// invariant error_limit >= reject_limit; when they coincide the X band is
+// empty and the classifier returns either kPropagate or kReject only.
+PulseClassification ClassifyPulse(uint64_t pulse_width,
+                                  uint64_t reject_limit,
+                                  uint64_t error_limit);
+
+// §30.7: copy every `delays[i]` into the matching `reject_limit[i]` and
+// `error_limit[i]` slot, establishing the default inertial-delay behavior
+// in which any pulse narrower than the path delay is rejected.
+void InitDefaultPulseLimits(PathDelay& pd);
 
 // =============================================================================
 // Runtime timing check entry (§31)

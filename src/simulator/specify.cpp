@@ -101,6 +101,24 @@ uint64_t SelectEffectivePathDelay(uint64_t module_path_delay,
 }
 
 // =============================================================================
+// §30.7 pulse filtering
+// =============================================================================
+
+PulseClassification ClassifyPulse(uint64_t pulse_width, uint64_t reject_limit,
+                                  uint64_t error_limit) {
+  if (pulse_width >= error_limit) return PulseClassification::kPropagate;
+  if (pulse_width >= reject_limit) return PulseClassification::kForceX;
+  return PulseClassification::kReject;
+}
+
+void InitDefaultPulseLimits(PathDelay& pd) {
+  for (int i = 0; i < 12; ++i) {
+    pd.reject_limit[i] = pd.delays[i];
+    pd.error_limit[i] = pd.delays[i];
+  }
+}
+
+// =============================================================================
 // SpecifyManager
 // =============================================================================
 
