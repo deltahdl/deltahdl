@@ -149,6 +149,21 @@ void ApplyGlobalPulseLimits(PathDelay& pd, uint8_t reject_pct,
 }
 
 // =============================================================================
+// §30.7.3 SDF pulse-limit annotation
+// =============================================================================
+
+void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
+                         uint64_t error) {
+  // Mirror reject to the error slot when SDF omitted the error limit, so the
+  // X band is never undefined for downstream classification.
+  const uint64_t effective_error = has_error ? error : reject;
+  for (int i = 0; i < 12; ++i) {
+    pd.reject_limit[i] = reject;
+    pd.error_limit[i] = effective_error;
+  }
+}
+
+// =============================================================================
 // SpecifyManager
 // =============================================================================
 

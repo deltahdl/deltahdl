@@ -114,6 +114,16 @@ void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
 void ApplyGlobalPulseLimits(PathDelay& pd, uint8_t reject_pct,
                             uint8_t error_pct);
 
+// §30.7.3: apply SDF-annotated pulse limits. `reject` is written to every
+// `reject_limit[i]`; `error_limit[i]` receives `error` when the SDF entry
+// supplied both values (`has_error == true`) and mirrors `reject` otherwise.
+// Callers must invoke this helper after both `ApplyGlobalPulseLimits` and
+// `ApplyPulseControlOverride` so that SDF values take precedence whenever
+// all three mechanisms apply to the same path. The propagation delays in
+// `pd.delays` are not touched.
+void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
+                         uint64_t error);
+
 // =============================================================================
 // Runtime timing check entry (§31)
 // =============================================================================
