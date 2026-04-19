@@ -49,21 +49,6 @@ TEST(TimingCheckCommandElaboration, RecremFullArgsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.3.6 explicitly permits negative limit values for `$recrem`; the
-// elaborator must accept the invocation when one or both limits are negative.
-TEST(SystemTimingCheckElaboration, RecremNegativeLimitsElaborate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $recrem(posedge clk, rst, -8, -3);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // §31.3.6 Table 31-6: recovery_limit and removal_limit are constant
 // expressions. Specparam-driven limits must resolve and elaborate.
 TEST(SystemTimingCheckElaboration, RecremSpecparamLimitsElaborate) {

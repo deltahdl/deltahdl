@@ -136,6 +136,18 @@ struct TimingCheckEntry {
   SpecifyEdge data_edge = SpecifyEdge::kNone;
   uint64_t limit = 0;
   uint64_t limit2 = 0;  // Second limit for $setuphold/$recrem
+  // §31.9: sign-preserving variants of `limit` / `limit2` for $setuphold
+  // and $recrem only. When `negative_timing_check_enabled` is true, the
+  // runtime reads the effective setup/hold (or recovery/removal) limits
+  // from `signed_limit` and `signed_limit2` and ignores the two unsigned
+  // fields above. Allowing the limits to be negative lets the violation
+  // window sit entirely before or after the reference edge instead of
+  // straddling it, matching the LRM's picture of disparate internal
+  // clock and data delays. The flag defaults to off so every existing
+  // non-negative entry continues through the baseline §31.3 path.
+  bool negative_timing_check_enabled = false;
+  int64_t signed_limit = 0;
+  int64_t signed_limit2 = 0;
   // §31.4.4: $width glitch-suppression threshold. Defaults to zero per the
   // LRM, so unset entries behave as if no threshold was supplied and every
   // pulse narrower than `limit` witnesses a violation.
@@ -311,6 +323,15 @@ class SpecifyManager {
   // check whose active branch is selected by which event occurred first.
   // `limit` holds the setup limit and `limit2` holds the hold limit on the
   // stored TimingCheckEntry.
+  //
+  // §31.9: when the stored entry has `negative_timing_check_enabled` set,
+  // the effective setup / hold limits are taken with sign from
+  // `signed_limit` and `signed_limit2` and the check evaluates the open
+  // interval (ref - setup, ref + hold). Negative limits therefore shift
+  // the interval off the reference edge rather than straddling it, and
+  // the two kinds ($setuphold and $recrem) agree on one interval
+  // formula so they behave identically for any given pair of signed
+  // values.
   bool CheckSetupholdViolation(std::string_view ref, uint64_t ref_time,
                                std::string_view data, uint64_t data_time) const;
   // §31.3.4: $removal. `ref`/`ref_time` identify the reference_event (the
@@ -328,6 +349,14 @@ class SpecifyManager {
   // `limit` holds the recovery_limit and `limit2` holds the removal_limit on
   // the stored TimingCheckEntry (matching the invocation argument order
   // `$recrem(ref, data, recovery_limit, removal_limit)`).
+  //
+  // §31.9: when `negative_timing_check_enabled` is set on the stored
+  // entry, `signed_limit` and `signed_limit2` supply the signed
+  // recovery / removal limits and the check evaluates the same open
+  // interval (ref - recovery, ref + removal) as the $setuphold path.
+  // The shared formula is what guarantees the LRM's requirement that
+  // $setuphold and $recrem behave identically with respect to negative
+  // values.
   bool CheckRecremViolation(std::string_view ref, uint64_t ref_time,
                             std::string_view data, uint64_t data_time) const;
   // §31.4.1: $skew. `ref`/`ref_time` identify the reference_event (the

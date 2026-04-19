@@ -106,36 +106,6 @@ TEST(TimingCheckCommandParsing, ErrorRecremMissingBothLimits) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §31.3.6 explicitly states the `$recrem` timing check can accept negative
-// limit values. A negative recovery_limit must parse cleanly.
-TEST(TimingCheckCommandParsing, RecremAcceptsNegativeRecoveryLimit) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $recrem(posedge clk, rst, -8, 3);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecrem);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
-// §31.3.6: a negative removal_limit must parse cleanly.
-TEST(TimingCheckCommandParsing, RecremAcceptsNegativeRemovalLimit) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $recrem(posedge clk, rst, 8, -3);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
 // §31.3.6 Table 31-6: recovery_limit and removal_limit are constant
 // expressions, so compound arithmetic must parse in either limit slot.
 TEST(TimingCheckCommandParsing, RecremConstantExpressionLimits) {

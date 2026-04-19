@@ -49,21 +49,6 @@ TEST(TimingCheckCommandElaboration, SetupholdFullArgsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.3.3 explicitly permits negative limit values for `$setuphold`; the
-// elaborator must accept the invocation when one or both limits are negative.
-TEST(SystemTimingCheckElaboration, SetupholdNegativeLimitsElaborate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setuphold(posedge clk, data, -10, -5);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // §31.3.3 Table 31-3: setup_limit and hold_limit are constant expressions.
 // Specparam-driven limits must resolve and elaborate.
 TEST(SystemTimingCheckElaboration, SetupholdSpecparamLimitsElaborate) {

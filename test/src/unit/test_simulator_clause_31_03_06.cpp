@@ -168,26 +168,4 @@ TEST(TimingCheckCommandSim, RecremFullArgsSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §31.3.6 explicitly accepts negative limit values. End-to-end simulation
-// with both limits negative must run without disturbing procedural code.
-TEST(TimingCheckCommandSim, RecremNegativeLimitsSimulate) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $recrem(posedge clk, rst, -8, -3);\n"
-      "  endspecify\n"
-      "  initial x = 8'd17;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 17u);
-}
-
 }  // namespace

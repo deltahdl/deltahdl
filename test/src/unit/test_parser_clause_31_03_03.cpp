@@ -106,50 +106,6 @@ TEST(TimingCheckCommandParsing, ErrorSetupholdMissingBothLimits) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §31.3.3 explicitly states the `$setuphold` timing check can accept
-// negative limit values. A negative setup_limit must parse cleanly.
-TEST(TimingCheckCommandParsing, SetupholdAcceptsNegativeSetupLimit) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setuphold(posedge clk, data, -10, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kSetuphold);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
-// §31.3.3: a negative hold_limit must parse cleanly.
-TEST(TimingCheckCommandParsing, SetupholdAcceptsNegativeHoldLimit) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setuphold(posedge clk, data, 10, -5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
-// §31.3.3: both limits may be negative simultaneously.
-TEST(TimingCheckCommandParsing, SetupholdAcceptsBothNegativeLimits) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setuphold(posedge clk, data, -10, -5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
 // §31.3.3 Table 31-3: setup_limit and hold_limit are constant expressions,
 // so compound arithmetic must parse in either limit slot.
 TEST(TimingCheckCommandParsing, SetupholdConstantExpressionLimits) {

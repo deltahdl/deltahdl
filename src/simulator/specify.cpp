@@ -264,6 +264,20 @@ bool SpecifyManager::CheckRecremViolation(std::string_view ref,
     if (check.kind != TimingCheckKind::kRecrem) continue;
     if (check.ref_signal != ref) continue;
     if (check.data_signal != data) continue;
+    if (check.negative_timing_check_enabled) {
+      // §31.9: $recrem shares the $setuphold signed-window formula —
+      // the two checks must behave identically for negative values, so
+      // this branch is a literal mirror of the $setuphold one with
+      // `signed_limit` read as the recovery limit and `signed_limit2`
+      // as the removal limit. See CheckSetupholdViolation for the
+      // endpoint-strictness reasoning.
+      const int64_t ref_t = static_cast<int64_t>(ref_time);
+      const int64_t data_t = static_cast<int64_t>(data_time);
+      const int64_t lower = ref_t - check.signed_limit;
+      const int64_t upper = ref_t + check.signed_limit2;
+      if (data_t > lower && data_t < upper) return true;
+      continue;
+    }
     // §31.3.6: both limits zero — $recrem shall never issue a violation.
     if (check.limit == 0 && check.limit2 == 0) continue;
     if (data_time <= ref_time) {
@@ -575,6 +589,26 @@ bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
     if (check.kind != TimingCheckKind::kSetuphold) continue;
     if (check.ref_signal != ref) continue;
     if (check.data_signal != data) continue;
+    if (check.negative_timing_check_enabled) {
+      // §31.9: evaluate the signed violation interval
+      //   (ref_time - setup, ref_time + hold)
+      // where `setup` is `signed_limit` and `hold` is `signed_limit2`.
+      // Both endpoints are strict, so zero on either side collapses
+      // the corresponding half to empty — in particular, both-zero
+      // reproduces the §31.3.3 never-violate rule without a special
+      // case. A negative setup leaves `lower > ref_time`, placing the
+      // window entirely after the reference edge; a negative hold
+      // leaves `upper < ref_time`, placing the window entirely before
+      // it. The reference edge itself falls inside the interval only
+      // when the window straddles it, which is exactly the baseline
+      // positive-value shape.
+      const int64_t ref_t = static_cast<int64_t>(ref_time);
+      const int64_t data_t = static_cast<int64_t>(data_time);
+      const int64_t lower = ref_t - check.signed_limit;
+      const int64_t upper = ref_t + check.signed_limit2;
+      if (data_t > lower && data_t < upper) return true;
+      continue;
+    }
     // §31.3.3: both limits zero — $setuphold shall never issue a violation.
     if (check.limit == 0 && check.limit2 == 0) continue;
     if (data_time <= ref_time) {
