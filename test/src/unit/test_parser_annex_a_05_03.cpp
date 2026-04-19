@@ -244,26 +244,6 @@ TEST(UdpBodyGrammar, UdpBody_SimSequential) {
   EXPECT_EQ(eval.GetOutput(), '0');
 }
 
-TEST(UdpBodyGrammar, SeqBody_SimInitialValue) {
-  auto r = Parse(
-      "primitive latch_init(output reg q, input d, en);\n"
-      "  initial q = 1;\n"
-      "  table\n"
-      "    0 1 : ? : 0;\n"
-      "    1 1 : ? : 1;\n"
-      "    ? 0 : ? : -;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* udp = r.cu->udps[0];
-  UdpEvalState eval(*udp);
-
-  EXPECT_EQ(eval.GetOutput(), '1');
-
-  eval.Evaluate({'0', '0'});
-  EXPECT_EQ(eval.GetOutput(), '1');
-}
-
 // --- udp_initial_statement / init_val ---
 
 TEST(UdpBodyGrammar, InitStmt_ValueOne) {

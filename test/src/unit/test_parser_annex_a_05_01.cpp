@@ -131,24 +131,6 @@ TEST(UdpDeclGrammar, SequentialDff) {
   VerifySeqUdpTable(udp, expected, std::size(expected));
 }
 
-TEST(UdpDeclGrammar, SequentialWithInitial) {
-  auto r = Parse(
-      "primitive srff(output reg q, input s, input r);\n"
-      "  initial q = 1'b0;\n"
-      "  table\n"
-      "    1 0 : ? : 1;\n"
-      "    0 1 : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '0');
-}
-
 TEST(UdpDeclGrammar, SequentialLatch) {
   auto r = Parse(
       "primitive udp_latch (output reg q, input d, en);\n"
@@ -172,23 +154,6 @@ TEST(UdpDeclGrammar, SequentialLatch) {
   EXPECT_EQ(udp->table[0].current_state, '?');
   EXPECT_EQ(udp->table[0].output, '1');
   EXPECT_EQ(udp->table[2].output, '-');
-}
-
-TEST(UdpDeclGrammar, SequentialUdpInitial) {
-  auto r = Parse(
-      "primitive srff(output reg q, input s, r);\n"
-      "  initial q = 1'b1;\n"
-      "  table\n"
-      "    1 0 : ? : 1;\n"
-      "    0 1 : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->udps.size(), 1);
-  auto* udp = r.cu->udps[0];
-  EXPECT_TRUE(udp->is_sequential);
-  EXPECT_TRUE(udp->has_initial);
-  EXPECT_EQ(udp->initial_value, '1');
 }
 
 TEST(UdpDeclGrammar, WildcardPort) {

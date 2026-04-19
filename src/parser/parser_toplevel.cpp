@@ -849,7 +849,12 @@ UdpDecl* Parser::ParseUdpDecl() {
 
   if (Match(TokenKind::kKwInitial)) {
     udp->has_initial = true;
-    Expect(TokenKind::kIdentifier);
+    auto id_tok = Expect(TokenKind::kIdentifier);
+    // §29.3.3: the initial statement assigns to the output port.
+    if (!udp->output_name.empty() && id_tok.text != udp->output_name) {
+      diag_.Error(id_tok.loc,
+                  "UDP initial statement shall target the output port");
+    }
     Expect(TokenKind::kEq);
     udp->initial_value =
         ParseUdpInitialValue(TokenKind::kSemicolon, TokenKind::kSemicolon);
