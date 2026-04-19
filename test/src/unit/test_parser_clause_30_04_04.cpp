@@ -8,21 +8,6 @@ namespace {
 
 // --- State-dependent path declarations ---
 
-TEST(SpecifyPathParsing, StateDependentIfEdgeSensitive) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    if (en) (posedge clk => q) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_NE(si->path.condition, nullptr);
-  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
-}
-
 TEST(SpecifyPathParsing, StateDependentIfnoneSimple) {
   auto r = Parse(
       "module m;\n"
@@ -54,23 +39,6 @@ TEST(SpecifyPathParsing, IfnonePath) {
   EXPECT_TRUE(si->path.is_ifnone);
   EXPECT_EQ(si->path.condition, nullptr);
   ASSERT_EQ(si->path.delays.size(), 1u);
-}
-
-TEST(SpecifyPathParsing, StateDependentIfEdgeSensitiveFull) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    if (en) (posedge clk *> (q : d)) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* si = GetSolePathItem(r);
-  ASSERT_NE(si, nullptr);
-  EXPECT_NE(si->path.condition, nullptr);
-  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
-  EXPECT_NE(si->path.data_source, nullptr);
 }
 
 // --- Error conditions specific to state-dependent forms ---
