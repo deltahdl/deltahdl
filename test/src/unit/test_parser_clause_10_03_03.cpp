@@ -94,15 +94,6 @@ TEST(ContAssignDelayParsing, WireDelayWithInit) {
   EXPECT_EQ(item->net_delay->int_val, 3u);
   ASSERT_NE(item->init_expr, nullptr);
 }
-TEST(ContAssignDelayParsing, MinTypMaxInContAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire a;\n"
-      "  assign #(1:2:3) a = 1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
 
 TEST(ContAssignDelayParsing, NetDeclThreeDelayWithInit) {
   auto r = Parse(

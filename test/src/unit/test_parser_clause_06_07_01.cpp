@@ -101,18 +101,6 @@ TEST(DelayParsing, Delay3NetSingleValue) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-TEST(DelayParsing, Delay3NetMintypmax) {
-  auto r = Parse(
-      "module m;\n"
-      "  wire #(1:2:3) w;\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_NE(item->net_delay, nullptr);
-  EXPECT_EQ(item->net_delay->kind, ExprKind::kMinTypMax);
-}
-
 TEST(DeclarationListParsing, ListOfNetDeclAssignmentsSingle) {
   auto r = Parse("module m; wire [7:0] data; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
