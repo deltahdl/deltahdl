@@ -224,6 +224,21 @@ bool SpecifyManager::CheckHoldViolation(std::string_view ref, uint64_t ref_time,
   return false;
 }
 
+bool SpecifyManager::CheckRemovalViolation(std::string_view ref,
+                                           uint64_t ref_time,
+                                           std::string_view data,
+                                           uint64_t data_time) const {
+  for (const auto& check : timing_checks_) {
+    if (check.kind != TimingCheckKind::kRemoval) continue;
+    if (check.ref_signal != ref) continue;
+    if (check.data_signal != data) continue;
+    // §31.3.4: window is (ref_time - limit, ref_time); endpoints are not
+    // part of the violation region, so both inequalities are strict.
+    if (data_time < ref_time && ref_time - data_time < check.limit) return true;
+  }
+  return false;
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,
