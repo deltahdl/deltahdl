@@ -656,6 +656,24 @@ void Parser::ValidateUdpHeader(UdpDecl* udp) {
   }
 }
 
+void Parser::ValidateUdpTable(UdpDecl* udp) {
+  // §29.3.4: the same combination of inputs (and current state, when
+  // sequential) shall not specify different outputs on two different rows.
+  for (size_t i = 0; i < udp->table.size(); ++i) {
+    for (size_t j = i + 1; j < udp->table.size(); ++j) {
+      const auto& a = udp->table[i];
+      const auto& b = udp->table[j];
+      if (a.inputs == b.inputs && a.paren_edges == b.paren_edges &&
+          a.current_state == b.current_state && a.output != b.output) {
+        diag_.Error(udp->range.start,
+                    "UDP table rows with identical inputs shall not specify "
+                    "different outputs");
+        return;
+      }
+    }
+  }
+}
+
 static char UdpCharFromToken(const Token& tok) {
   if (tok.kind == TokenKind::kStar) return '*';
   if (tok.kind == TokenKind::kMinus) return '-';
@@ -663,6 +681,17 @@ static char UdpCharFromToken(const Token& tok) {
   if (!tok.text.empty()) return tok.text[0];
   return '?';
 }
+
+static bool UdpInputIsEdge(char c) {
+  // Single-char edge symbols plus the \x01 placeholder for parenthesized
+  // edge indicators.
+  if (c == 'r' || c == 'R' || c == 'f' || c == 'F') return true;
+  if (c == 'p' || c == 'P' || c == 'n' || c == 'N') return true;
+  if (c == '*' || c == '\x01') return true;
+  return false;
+}
+
+static bool UdpSymbolIsZ(char c) { return c == 'z' || c == 'Z'; }
 
 char Parser::ParseUdpInitialValue(TokenKind stop1, TokenKind stop2) {
   char result = '0';
@@ -744,6 +773,7 @@ void Parser::ParseUdpPortDecls(UdpDecl* udp) {
 
 void Parser::ParseUdpTableRow(UdpDecl* udp) {
   UdpTableRow row;
+  SourceLoc row_loc = CurrentLoc();
   while (!Check(TokenKind::kColon) && !AtEnd()) {
     if (Check(TokenKind::kLParen)) {
       Consume();
@@ -773,6 +803,47 @@ void Parser::ParseUdpTableRow(UdpDecl* udp) {
   }
   row.output = UdpCharFromToken(Consume());
   Expect(TokenKind::kSemicolon);
+
+  // §29.3.4: the z state is excluded from UDP tables.
+  bool saw_z = false;
+  for (char c : row.inputs) {
+    if (UdpSymbolIsZ(c)) saw_z = true;
+  }
+  for (const auto& pe : row.paren_edges) {
+    if (UdpSymbolIsZ(pe.first) || UdpSymbolIsZ(pe.second)) saw_z = true;
+  }
+  if (UdpSymbolIsZ(row.current_state) || UdpSymbolIsZ(row.output)) {
+    saw_z = true;
+  }
+  if (saw_z) {
+    diag_.Error(row_loc, "UDP table row shall not contain z");
+  }
+
+  // §29.3.4: at most one input transition per row.
+  int edge_count = 0;
+  for (char c : row.inputs) {
+    if (UdpInputIsEdge(c)) ++edge_count;
+  }
+  if (edge_count > 1) {
+    diag_.Error(row_loc,
+                "UDP table row shall contain at most one input transition");
+  }
+
+  // §29.3.4: all-x input row shall specify x as the output.
+  if (!row.inputs.empty()) {
+    bool all_x = true;
+    for (char c : row.inputs) {
+      if (c != 'x' && c != 'X') {
+        all_x = false;
+        break;
+      }
+    }
+    if (all_x && row.output != 'x' && row.output != 'X') {
+      diag_.Error(row_loc,
+                  "UDP table row with all-x inputs shall specify x output");
+    }
+  }
+
   udp->table.push_back(row);
 }
 
@@ -833,8 +904,9 @@ UdpDecl* Parser::ParseUdpDecl() {
       auto first_tok = Expect(TokenKind::kIdentifier);
       std::string_view first_name = first_tok.text;
       SourceLoc first_loc = first_tok.loc;
+      std::vector<std::string_view> port_list_inputs;
       while (Match(TokenKind::kComma)) {
-        Expect(TokenKind::kIdentifier);
+        port_list_inputs.push_back(Expect(TokenKind::kIdentifier).text);
       }
       Expect(TokenKind::kRParen);
       Expect(TokenKind::kSemicolon);
@@ -843,6 +915,21 @@ UdpDecl* Parser::ParseUdpDecl() {
           first_name != udp->output_name) {
         diag_.Error(first_loc,
                     "UDP output port shall be the first port in the port list");
+      }
+      // §29.3.4: input field positions in the state table follow the port
+      // list in the header, not the order of the input port declarations.
+      std::vector<std::string_view> reordered;
+      reordered.reserve(port_list_inputs.size());
+      for (auto name : port_list_inputs) {
+        for (auto decl_name : udp->input_names) {
+          if (decl_name == name) {
+            reordered.push_back(decl_name);
+            break;
+          }
+        }
+      }
+      if (reordered.size() == udp->input_names.size()) {
+        udp->input_names = std::move(reordered);
       }
     }
   }
@@ -866,6 +953,7 @@ UdpDecl* Parser::ParseUdpDecl() {
   MatchEndLabel(udp->name);
   udp->range.end = CurrentLoc();
   ValidateUdpHeader(udp);
+  ValidateUdpTable(udp);
   return udp;
 }
 

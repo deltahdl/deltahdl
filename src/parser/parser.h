@@ -126,6 +126,8 @@ class Parser {
   void RejectUdpInoutPort();
   // Post-parse structural checks on a UDP header.
   void ValidateUdpHeader(UdpDecl* udp);
+  // Post-parse cross-row checks on a UDP state table.
+  void ValidateUdpTable(UdpDecl* udp);
   bool TryParseStrengthSpec(uint8_t& str0, uint8_t& str1);
   ModuleItem* ParseOneUdpInstance(const Token& udp_tok, SourceLoc loc);
   void ParseUdpInstList(const Token& udp_tok, std::vector<ModuleItem*>& items);
