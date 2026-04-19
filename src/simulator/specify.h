@@ -57,6 +57,13 @@ struct PathCandidate {
 uint64_t SelectPathDelay(const std::vector<PathCandidate>& candidates,
                          uint8_t transition_slot);
 
+// §30.6: for an input-to-output path that has both a specify-block module
+// path delay and one or more distributed (gate instance) delays along it,
+// the runtime must use the larger of the two. Callers supply the module
+// path delay and the pre-summed distributed delay for the same path.
+uint64_t SelectEffectivePathDelay(uint64_t module_path_delay,
+                                  uint64_t distributed_delay_sum);
+
 // =============================================================================
 // Runtime timing check entry (§31)
 // =============================================================================

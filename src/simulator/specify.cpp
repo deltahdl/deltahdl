@@ -92,6 +92,15 @@ uint64_t SelectPathDelay(const std::vector<PathCandidate>& candidates,
 }
 
 // =============================================================================
+// §30.6 mixing module path delays and distributed delays
+// =============================================================================
+
+uint64_t SelectEffectivePathDelay(uint64_t module_path_delay,
+                                  uint64_t distributed_delay_sum) {
+  return std::max(module_path_delay, distributed_delay_sum);
+}
+
+// =============================================================================
 // SpecifyManager
 // =============================================================================
 
