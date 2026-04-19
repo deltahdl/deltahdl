@@ -335,6 +335,20 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   Expect(TokenKind::kEq);
   ParsePathDelays(item->path.delays);
   Expect(TokenKind::kSemicolon);
+
+  // §30.4.2: parallel_path_description binds a single input terminal to a
+  // single output terminal. Only enforced for non-edge simple paths; the
+  // edge-sensitive variant is governed by §30.4.3.
+  if (item->path.path_kind == SpecifyPathKind::kParallel &&
+      item->path.edge == SpecifyEdge::kNone &&
+      item->path.data_source == nullptr) {
+    if (item->path.src_ports.size() != 1 || item->path.dst_ports.size() != 1) {
+      diag_.Error(item->loc,
+                  "parallel path '=>' requires a single source and "
+                  "destination terminal");
+    }
+  }
+
   return item;
 }
 

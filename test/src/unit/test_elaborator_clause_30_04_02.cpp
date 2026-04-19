@@ -4,12 +4,12 @@ using namespace delta;
 
 namespace {
 
-TEST(SpecifyPathElaboration, EdgeSensitivePathElaborates) {
+TEST(SpecifyPathElaboration, SimpleParallelPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
-      "    (posedge clk => q) = 5;\n"
+      "    (a => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n",
       f);
@@ -17,12 +17,12 @@ TEST(SpecifyPathElaboration, EdgeSensitivePathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SpecifyPathElaboration, EdgeSensitiveWithDataSourceElaborates) {
+TEST(SpecifyPathElaboration, SimpleFullPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
-      "    (posedge clk => (q : d)) = 5;\n"
+      "    (a, b *> c) = 10;\n"
       "  endspecify\n"
       "endmodule\n",
       f);
@@ -30,12 +30,12 @@ TEST(SpecifyPathElaboration, EdgeSensitiveWithDataSourceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SpecifyPathElaboration, StateDependentIfPathElaborates) {
+TEST(SpecifyPathElaboration, PathWithPolarityElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
-      "    if (en) (a => b) = 10;\n"
+      "    (a + => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n",
       f);
@@ -43,12 +43,12 @@ TEST(SpecifyPathElaboration, StateDependentIfPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SpecifyPathElaboration, StateDependentIfnonePathElaborates) {
+TEST(SpecifyPathElaboration, PolarityOnFullPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
-      "    ifnone (a => b) = 15;\n"
+      "    (a + *> b) = 5;\n"
       "  endspecify\n"
       "endmodule\n",
       f);
@@ -56,12 +56,12 @@ TEST(SpecifyPathElaboration, StateDependentIfnonePathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SpecifyPathElaboration, IfnoneFullPathElaborates) {
+TEST(SpecifyPathElaboration, TerminalBitSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
-      "    ifnone (a, b *> c) = 10;\n"
+      "    (a[3] => b[0]) = 5;\n"
       "  endspecify\n"
       "endmodule\n",
       f);
@@ -69,25 +69,12 @@ TEST(SpecifyPathElaboration, IfnoneFullPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SpecifyPathElaboration, EdgeSensitiveFullWithOutputPolarityElaborates) {
+TEST(SpecifyPathElaboration, TerminalPartSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
-      "    (posedge clk *> (q + : d)) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(SpecifyPathElaboration, StateDependentIfEdgeSensitiveFullElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    if (en) (posedge clk *> (q : d)) = 5;\n"
+      "    (a[7:0] => b[7:0]) = 5;\n"
       "  endspecify\n"
       "endmodule\n",
       f);

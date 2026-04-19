@@ -9,15 +9,15 @@ using namespace delta;
 
 namespace {
 
-TEST(SpecifyPathSim, EdgeSensitivePathSimulates) {
+TEST(SpecifyPathSim, SimpleParallelPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
-      "    (posedge clk => q) = 5;\n"
+      "    (a => b) = 5;\n"
       "  endspecify\n"
-      "  initial x = 8'd33;\n"
+      "  initial x = 8'd42;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -26,19 +26,18 @@ TEST(SpecifyPathSim, EdgeSensitivePathSimulates) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 33u);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(SpecifyPathSim, StateDependentPathSimulates) {
+TEST(SpecifyPathSim, SimpleFullPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
-      "    if (en) (a => b) = 10;\n"
-      "    ifnone (a => b) = 15;\n"
+      "    (a, b *> c) = 10;\n"
       "  endspecify\n"
-      "  initial x = 8'd77;\n"
+      "  initial x = 8'd55;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -47,18 +46,19 @@ TEST(SpecifyPathSim, StateDependentPathSimulates) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 77u);
+  EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-TEST(SpecifyPathSim, IfnoneFullPathSimulates) {
+TEST(SpecifyPathSim, PolarityPathSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
-      "    ifnone (a, b *> c) = 10;\n"
+      "    (a + => b) = 5;\n"
+      "    (c - *> d) = 10;\n"
       "  endspecify\n"
-      "  initial x = 8'd99;\n"
+      "  initial x = 8'd88;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -67,18 +67,18 @@ TEST(SpecifyPathSim, IfnoneFullPathSimulates) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
+  EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-TEST(SpecifyPathSim, EdgeSensitiveWithDataSourceSimulates) {
+TEST(SpecifyPathSim, TerminalBitSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
-      "    (posedge clk *> (q + : d)) = 5;\n"
+      "    (a[3] => b[0]) = 5;\n"
       "  endspecify\n"
-      "  initial x = 8'd66;\n"
+      "  initial x = 8'd17;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -87,7 +87,7 @@ TEST(SpecifyPathSim, EdgeSensitiveWithDataSourceSimulates) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 66u);
+  EXPECT_EQ(var->value.ToUint64(), 17u);
 }
 
 }  // namespace
