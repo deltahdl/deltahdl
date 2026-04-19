@@ -1,0 +1,38 @@
+#include "fixture_elaborator.h"
+
+using namespace delta;
+
+namespace {
+
+TEST(SpecifyBlockDeclElaboration, SpecifyBlockWithShowcancelledElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    showcancelled out1;\n"
+      "    noshowcancelled out2;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(SpecifyBlockDeclElaboration, ShowcancelledAfterModulePathIsError) {
+  // A module path drives `o` with its default (noshowcancelled) policy; a
+  // later showcancelled declaration for `o` would be contradictory for that
+  // same destination, so the elaborator must flag it.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input a, output o);\n"
+      "  specify\n"
+      "    (a => o) = 5;\n"
+      "    showcancelled o;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  (void)design;
+  EXPECT_TRUE(f.has_errors);
+}
+
+}  // namespace
