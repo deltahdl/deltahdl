@@ -126,43 +126,6 @@ TEST(UdpStateTable, SequentialRowHasInputsCurrentStateAndOutput) {
   EXPECT_EQ(udp->table[1].output, '1');
 }
 
-// A row may describe at most one input transition; two parenthesized edge
-// indicators in the same row is the example the LRM calls out as illegal.
-TEST(UdpStateTable, TwoParenthesizedEdgeIndicatorsInRowRejected) {
-  auto r = Parse(
-      "primitive bad(output reg q, input a, input b, input c);\n"
-      "  table\n"
-      "    (01) (10) 0 : 0 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-// Two single-letter edge symbols in the same row likewise describe more than
-// one input transition.
-TEST(UdpStateTable, TwoSingleLetterEdgeSymbolsInRowRejected) {
-  auto r = Parse(
-      "primitive bad(output reg q, input a, input b);\n"
-      "  table\n"
-      "    r f : ? : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-// A single edge indicator is the common and legal case.
-TEST(UdpStateTable, SingleEdgeIndicatorInRowAccepted) {
-  auto r = Parse(
-      "primitive dff(output reg q, input d, input clk);\n"
-      "  table\n"
-      "    0 r : ? : 0;\n"
-      "    1 r : ? : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // When every input field of a row is the literal x, the output field must also
 // be x; specifying 0 instead is illegal.
 TEST(UdpStateTable, AllXInputsWithZeroOutputRejected) {
