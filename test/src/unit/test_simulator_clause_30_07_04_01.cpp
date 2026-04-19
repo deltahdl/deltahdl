@@ -7,16 +7,16 @@ using namespace delta;
 
 namespace {
 
-TEST(SpecifyBlockDeclSim, SpecifyWithShowcancelledSimulates) {
+TEST(SpecifyBlockDeclSim, SpecifyWithPulsestyleSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
-      "    showcancelled out1;\n"
-      "    noshowcancelled out2;\n"
+      "    pulsestyle_onevent out1;\n"
+      "    pulsestyle_ondetect out2;\n"
       "  endspecify\n"
-      "  initial x = 8'd88;\n"
+      "  initial x = 8'd77;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -25,7 +25,7 @@ TEST(SpecifyBlockDeclSim, SpecifyWithShowcancelledSimulates) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 88u);
+  EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
 }  // namespace

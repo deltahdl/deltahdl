@@ -4,20 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SpecifyBlockDeclElaboration, SpecifyBlockWithPulsestyleElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    pulsestyle_onevent out1;\n"
-      "    pulsestyle_ondetect out2;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(SpecifyBlockDeclElaboration, SpecifyBlockWithShowcancelledElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

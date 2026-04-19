@@ -561,6 +561,31 @@ void Elaborator::ValidateSpecifyBlocks() {
         }
       }
 
+      // §30.7.4.1: pulse-filter style and module path delay are mutually
+      // exclusive owners of the pulse semantics on an output. Collect every
+      // destination driven by a module path, then reject any pulsestyle whose
+      // signal list overlaps that set.
+      for (auto* item : mod->items) {
+        if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+        std::unordered_set<std::string_view> path_dsts;
+        for (auto* si : item->specify_items) {
+          if (si->kind != SpecifyItemKind::kPathDecl) continue;
+          for (const auto& t : si->path.dst_ports) path_dsts.insert(t.name);
+        }
+        for (auto* si : item->specify_items) {
+          if (si->kind != SpecifyItemKind::kPulsestyle) continue;
+          for (std::string_view sig : si->signal_list) {
+            if (path_dsts.contains(sig)) {
+              diag_.Error(si->loc,
+                          std::format("pulsestyle declaration for '{}' "
+                                      "conflicts with a module path that "
+                                      "drives the same output",
+                                      sig));
+            }
+          }
+        }
+      }
+
       // §30.5: delay values shall be constant expressions containing literals
       // or specparams. Any bare identifier must resolve to a specparam
       // declared in the same specify block.
