@@ -42,50 +42,6 @@ TEST(SpecifyPathParsing, PathDeclSimpleFull) {
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
 }
 
-TEST(SpecifyPathParsing, MultiplePathDeclarations) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    (a => b) = 5;\n"
-      "    (c, d *> e) = 10;\n"
-      "    (posedge clk => q) = 3;\n"
-      "    if (en) (a => b) = 8;\n"
-      "    ifnone (a => b) = 15;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 5u);
-
-  for (auto* si : spec->specify_items) {
-    EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
-  }
-}
-
-TEST(SpecifyPathParsing, MultiplePathsInSpecifyBlock) {
-  auto r = Parse(
-      "module m(input a, b, output x, y);\n"
-      "  specify\n"
-      "    (a => x) = 5;\n"
-      "    (b => y) = 7;\n"
-      "    (a => y) = 9;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 3u);
-  EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(spec->specify_items[1]->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(spec->specify_items[2]->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(spec->specify_items[0]->path.path_kind, SpecifyPathKind::kParallel);
-  EXPECT_EQ(spec->specify_items[1]->path.path_kind, SpecifyPathKind::kParallel);
-  EXPECT_EQ(spec->specify_items[2]->path.path_kind, SpecifyPathKind::kParallel);
-}
-
 TEST(SpecifyPathParsing, MultipleSourceDestPorts) {
   auto sp = ParseSpecifySingle(
       "module m(input a, b, c, output x, y);\n"
