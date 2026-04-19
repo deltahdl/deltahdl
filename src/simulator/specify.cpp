@@ -685,6 +685,22 @@ NegativeTimingConditionRole TimecheckConditionRole(int64_t signed_setup,
   return NegativeTimingConditionRole::kBoth;
 }
 
+// =============================================================================
+// §31.9.3 notifier-toggle source rule
+// =============================================================================
+
+bool NegativeTimingCheckNotifierShouldToggle(
+    bool delayed_adjusted_violation,
+    bool /*undelayed_original_violation*/) {
+  // The undelayed-signal / original-limit evaluation is accepted as
+  // an argument so the two inputs named by the LRM are visible at
+  // the call site, but the rule forbids it from driving the toggle —
+  // consulting it here would reintroduce the exact behaviour §31.9.3
+  // rules out. Only the delayed-signal / adjusted-limit evaluation
+  // determines whether the notifier toggles.
+  return delayed_adjusted_violation;
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,

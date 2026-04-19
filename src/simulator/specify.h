@@ -389,6 +389,23 @@ NegativeTimingConditionRole TimestampConditionRole(int64_t signed_setup,
 NegativeTimingConditionRole TimecheckConditionRole(int64_t signed_setup,
                                                    int64_t signed_hold);
 
+// §31.9.3: decide whether the notifier of a negative timing check
+// should be toggled given the two candidate violation evaluations
+// the LRM names. `delayed_adjusted_violation` is the evaluation
+// performed against the internally delayed copies of the reference
+// and data signals using the adjusted timing check limits — the
+// only evaluation §31.9.3 allows to drive the toggle. Callers still
+// pass `undelayed_original_violation`, the evaluation against the
+// undelayed model-input signals using the original limits, so the
+// helper acts as a single-point guard at the call site: the rule is
+// violated only by code that consults the undelayed argument, which
+// this helper never does. Returns true exactly when the delayed
+// evaluation reports a violation; the undelayed evaluation cannot
+// change the outcome.
+bool NegativeTimingCheckNotifierShouldToggle(
+    bool delayed_adjusted_violation,
+    bool undelayed_original_violation);
+
 // =============================================================================
 // SDF annotation entry (§32)
 // =============================================================================
