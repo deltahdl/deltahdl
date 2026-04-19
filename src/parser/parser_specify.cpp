@@ -143,19 +143,35 @@ static bool IsZorX(char c) {
 static bool IsZeroOrOne(char c) { return c == '0' || c == '1'; }
 
 // A.7.5.3: Parse the bracket list in edge [ edge_descriptor {, ...} ].
+// §31.5: the list is bounded by "from one to six pairs of edge transitions"
+// — the grammar rules out an empty bracket list by requiring at least one
+// edge_descriptor, and six is the number of distinct non-identity pairs over
+// {0, 1, x} (with z folded into x), so a longer list must contain a duplicate
+// and is rejected.
 void Parser::ParseEdgeDescriptorList(
     std::vector<std::pair<char, char>>& descriptors) {
+  auto list_loc = CurrentLoc();
   do {
+    // Reaching `]` here means the list is empty or has a trailing comma; let
+    // the empty-list diagnostic and the closing Expect handle it.
+    if (Check(TokenKind::kRBracket)) break;
     auto text = CurrentToken().text;
+    auto tok_loc = CurrentLoc();
     // Single 2-char token: "01"/"10" (IntLiteral) or "x0"/"z1" (Identifier).
+    // The `zero_or_one zero_or_one` alternative is restricted to the
+    // literals `01` and `10` — the two digits must differ — so `00` and
+    // `11` fall through to the diagnostic below.
     if ((Check(TokenKind::kIntLiteral) || Check(TokenKind::kIdentifier)) &&
-        text.size() == 2 && (IsZeroOrOne(text[0]) || IsZorX(text[0])) &&
-        IsZeroOrOne(text[1])) {
+        text.size() == 2 &&
+        ((IsZorX(text[0]) && IsZeroOrOne(text[1])) ||
+         (IsZeroOrOne(text[0]) && IsZeroOrOne(text[1]) &&
+          text[0] != text[1]))) {
       descriptors.push_back({text[0], text[1]});
       Consume();
     } else if (Check(TokenKind::kIntLiteral) && text.size() == 1 &&
                IsZeroOrOne(text[0])) {
-      // Two-token form: "0"+"x", "1"+"z", etc.
+      // Two-token form: "0"+"x", "1"+"z", etc. — the lexer splits these
+      // when a digit is followed by an identifier letter.
       char first = text[0];
       Consume();
       auto next_text = CurrentToken().text;
@@ -163,11 +179,22 @@ void Parser::ParseEdgeDescriptorList(
           IsZorX(next_text[0])) {
         descriptors.push_back({first, next_text[0]});
         Consume();
+      } else {
+        diag_.Error(tok_loc, "invalid edge_descriptor");
       }
     } else {
+      diag_.Error(tok_loc, "invalid edge_descriptor");
       Consume();
     }
   } while (Match(TokenKind::kComma));
+  if (descriptors.empty()) {
+    diag_.Error(list_loc,
+                "edge-control specifier requires at least one edge_descriptor");
+  }
+  if (descriptors.size() > 6) {
+    diag_.Error(list_loc,
+                "edge-control specifier accepts at most six edge_descriptors");
+  }
   Expect(TokenKind::kRBracket);
 }
 

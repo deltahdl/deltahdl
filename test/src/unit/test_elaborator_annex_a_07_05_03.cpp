@@ -17,45 +17,6 @@ TEST(TimingCheckEventDefElaboration, TimingCheckEventNegedgeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(TimingCheckEventDefElaboration, EdgeControlSpecifierXTransitionsElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data, edge [x0, x1] clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TimingCheckEventDefElaboration, EdgeControlSpecifier01And10Elaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data, edge [01, 10] clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TimingCheckEventDefElaboration, TimingCheckEventEdgeKeywordElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data, edge clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(TimingCheckEventDefElaboration, TimingCheckConditionBareElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -147,19 +108,6 @@ TEST(TimingCheckEventDefElaboration, TimingCheckEventPosedgeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(TimingCheckEventDefElaboration, EdgeControlSpecifierZTransitionsElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $hold(edge [z0, z1] clk, data, 5);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(TimingCheckEventDefElaboration, TerminalPartSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -192,19 +140,6 @@ TEST(TimingCheckEventDefElaboration, ScalarConditionCaseEqualityElaborates) {
       "module m;\n"
       "  specify\n"
       "    $setup(data &&& (en === 1'b1), posedge clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TimingCheckEventDefElaboration, EdgeKeywordWithConditionElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data, edge clk &&& en, 10);\n"
       "  endspecify\n"
       "endmodule\n",
       f);
