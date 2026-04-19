@@ -507,6 +507,59 @@ void Elaborator::ValidateSpecifyBlocks() {
           }
         }
       }
+
+      // §30.4.5: a parallel connection (=>) requires matching bit counts on
+      // the source and destination. Full connections (*>) impose no such
+      // constraint. If either side references a terminal whose width cannot
+      // be determined at elaboration, skip the check rather than diagnose.
+      auto terminal_width = [&](const SpecifyTerminal& t) -> uint32_t {
+        if (t.range_kind == SpecifyRangeKind::kBitSelect) return 1;
+        if (t.range_kind == SpecifyRangeKind::kPartSelect) {
+          auto l = ConstEvalInt(t.range_left);
+          auto r = ConstEvalInt(t.range_right);
+          if (!l || !r) return 0;
+          auto hi = std::max(*l, *r);
+          auto lo = std::min(*l, *r);
+          return static_cast<uint32_t>(hi - lo + 1);
+        }
+        if (t.range_kind == SpecifyRangeKind::kPlusIndexed ||
+            t.range_kind == SpecifyRangeKind::kMinusIndexed) {
+          auto w = ConstEvalInt(t.range_right);
+          if (!w || *w <= 0) return 0;
+          return static_cast<uint32_t>(*w);
+        }
+        if (!t.interface_name.empty()) return 0;
+        auto it = port_map.find(t.name);
+        if (it == port_map.end()) return 0;
+        return EvalTypeWidth(it->second->data_type);
+      };
+      auto sum_widths = [&](const std::vector<SpecifyTerminal>& ts,
+                             bool& known) {
+        uint32_t total = 0;
+        for (const auto& t : ts) {
+          uint32_t w = terminal_width(t);
+          if (w == 0) { known = false; return uint32_t{0}; }
+          total += w;
+        }
+        return total;
+      };
+      for (auto* item : mod->items) {
+        if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+        for (auto* si : item->specify_items) {
+          if (si->kind != SpecifyItemKind::kPathDecl) continue;
+          if (si->path.path_kind != SpecifyPathKind::kParallel) continue;
+          if (si->path.data_source != nullptr) continue;
+          bool src_known = true;
+          bool dst_known = true;
+          uint32_t src_bits = sum_widths(si->path.src_ports, src_known);
+          uint32_t dst_bits = sum_widths(si->path.dst_ports, dst_known);
+          if (src_known && dst_known && src_bits != dst_bits) {
+            diag_.Error(si->loc,
+                        "parallel path source and destination must have "
+                        "equal bit widths");
+          }
+        }
+      }
     }
   };
   check_modules(unit_->modules);

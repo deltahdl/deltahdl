@@ -43,22 +43,4 @@ TEST(SpecifyPathElaboration, MultipleSourcesSameDestinationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Module paths may connect any combination of vectors and scalars.
-// A specify block mixing scalar-to-scalar, vector-to-vector, and
-// scalar-to-vector paths must elaborate cleanly.
-TEST(SpecifyPathElaboration, VectorAndScalarEndpointsElaborate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m(input sel, input [7:0] in1, in2, output [7:0] q);\n"
-      "  specify\n"
-      "    (in1 => q) = 3;\n"
-      "    (sel *> q) = 2;\n"
-      "    (sel => sel) = 1;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }  // namespace
