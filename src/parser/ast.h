@@ -929,6 +929,16 @@ struct SpecifyItem {
   // Specparam inside specify
   std::string_view param_name;
   Expr* param_value = nullptr;
+
+  // §30.7.1 pulse_control_specparam decomposition. Populated when this
+  // specparam is a PATHPULSE$: `pathpulse_input` and `pathpulse_output` are
+  // the split terminals (both empty for module-wide PATHPULSE$), and
+  // `pathpulse_error` is nullptr when the source gave only a reject value.
+  bool is_pathpulse = false;
+  std::string_view pathpulse_input;
+  std::string_view pathpulse_output;
+  Expr* pathpulse_reject = nullptr;
+  Expr* pathpulse_error = nullptr;
 };
 
 // --- User-Defined Primitives (§29) ---

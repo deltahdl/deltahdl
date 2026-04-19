@@ -95,6 +95,14 @@ PulseClassification ClassifyPulse(uint64_t pulse_width,
 // in which any pulse narrower than the path delay is rejected.
 void InitDefaultPulseLimits(PathDelay& pd);
 
+// §30.7.1: apply a pulse_control_specparam override. `reject` is written to
+// every `reject_limit[i]`; `error_limit[i]` is set to `error` when the source
+// supplied both limits (`has_error == true`) and mirrors `reject` otherwise,
+// reflecting the LRM rule that a single-value PATHPULSE$ collapses the X band
+// to zero. The propagation delays in `pd.delays` are not touched.
+void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
+                               uint64_t error);
+
 // =============================================================================
 // Runtime timing check entry (§31)
 // =============================================================================

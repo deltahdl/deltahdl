@@ -615,9 +615,26 @@ SpecifyItem* Parser::ParseSpecparamInSpecify() {
   Expect(TokenKind::kEq);
   // pulse_control_specparam: PATHPULSE$ = ( reject [, error] ) (A.2.4)
   if (first->param_name.starts_with("PATHPULSE$")) {
+    first->is_pathpulse = true;
+    // Split `PATHPULSE$input$output` into its terminals; an unadorned
+    // `PATHPULSE$` leaves both terminals empty for module-wide scope.
+    constexpr std::string_view kPrefix = "PATHPULSE$";
+    std::string_view rest = first->param_name.substr(kPrefix.size());
+    if (!rest.empty()) {
+      auto sep = rest.find('$');
+      if (sep == std::string_view::npos) {
+        first->pathpulse_input = rest;
+      } else {
+        first->pathpulse_input = rest.substr(0, sep);
+        first->pathpulse_output = rest.substr(sep + 1);
+      }
+    }
     Expect(TokenKind::kLParen);
-    first->param_value = ParseMinTypMaxExpr();
-    if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
+    first->pathpulse_reject = ParseMinTypMaxExpr();
+    first->param_value = first->pathpulse_reject;
+    if (Match(TokenKind::kComma)) {
+      first->pathpulse_error = ParseMinTypMaxExpr();
+    }
     Expect(TokenKind::kRParen);
   } else {
     first->param_value = ParseMinTypMaxExpr();

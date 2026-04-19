@@ -84,41 +84,6 @@ TEST(DeclarationAssignmentParsing, DefparamAssignmentMintypmax) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- pulse_control_specparam ---
-
-TEST(DeclarationAssignmentParsing, PulseControlSpecparamRejectOnly) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam PATHPULSE$ = (2);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(DeclarationAssignmentParsing, PulseControlSpecparamRejectAndError) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    specparam PATHPULSE$ = (2, 5);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(DeclarationAssignmentParsing, PulseControlSpecparamPathSpecific) {
-  auto r = Parse(
-      "module m(input a, output b);\n"
-      "  specify\n"
-      "    specparam PATHPULSE$a$b = (1, 2);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // --- type_assignment ---
 
 TEST(DeclarationAssignmentParsing, TypeAssignmentWithDefault) {

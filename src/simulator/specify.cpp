@@ -119,6 +119,21 @@ void InitDefaultPulseLimits(PathDelay& pd) {
 }
 
 // =============================================================================
+// §30.7.1 PATHPULSE$ override
+// =============================================================================
+
+void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
+                               uint64_t error) {
+  // A reject-only PATHPULSE$ collapses the X band to zero; mirror the reject
+  // value into the error slot so ClassifyPulse can never observe has_error.
+  const uint64_t effective_error = has_error ? error : reject;
+  for (int i = 0; i < 12; ++i) {
+    pd.reject_limit[i] = reject;
+    pd.error_limit[i] = effective_error;
+  }
+}
+
+// =============================================================================
 // SpecifyManager
 // =============================================================================
 

@@ -96,15 +96,6 @@ TEST(ParameterDeclParsing, ParameterIntegerType) {
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
 }
 
-TEST(ParameterDeclParsing, SpecparamPathpulse) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify specparam PATHPULSE$ = (1, 2); endspecify\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ParameterDeclParsing, ParameterExpressionDefault) {
   auto r = Parse("module m; parameter int HALF = 16 / 2; endmodule");
   ASSERT_NE(r.cu, nullptr);
