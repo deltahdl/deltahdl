@@ -874,6 +874,31 @@ enum class TimingCheckKind : uint8_t {
   kFullskew,
 };
 
+// §31.3: the six timing checks whose semantics are expressed as a stability
+// window on a reference signal against which the data signal's transition is
+// evaluated. Downstream stages rely on this grouping to share the generic
+// "define window, check transition, report violation" pipeline; the remaining
+// six kinds belong to §31.4 and implement their own event-based rules.
+inline bool IsStabilityWindowTimingCheck(TimingCheckKind kind) {
+  switch (kind) {
+    case TimingCheckKind::kSetup:
+    case TimingCheckKind::kHold:
+    case TimingCheckKind::kSetuphold:
+    case TimingCheckKind::kRecovery:
+    case TimingCheckKind::kRemoval:
+    case TimingCheckKind::kRecrem:
+      return true;
+    case TimingCheckKind::kWidth:
+    case TimingCheckKind::kPeriod:
+    case TimingCheckKind::kSkew:
+    case TimingCheckKind::kNochange:
+    case TimingCheckKind::kTimeskew:
+    case TimingCheckKind::kFullskew:
+      return false;
+  }
+  return false;
+}
+
 struct TimingCheckDecl {
   TimingCheckKind check_kind = TimingCheckKind::kSetup;
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
