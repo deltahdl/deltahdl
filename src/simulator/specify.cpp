@@ -134,6 +134,21 @@ void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
 }
 
 // =============================================================================
+// §30.7.2 global pulse-limit invocation options
+// =============================================================================
+
+void ApplyGlobalPulseLimits(PathDelay& pd, uint8_t reject_pct,
+                            uint8_t error_pct) {
+  // Silently raise an under-specified error percentage so the resulting X
+  // band is well-formed regardless of how the CLI options were supplied.
+  if (error_pct < reject_pct) error_pct = reject_pct;
+  for (int i = 0; i < 12; ++i) {
+    pd.reject_limit[i] = pd.delays[i] * reject_pct / 100;
+    pd.error_limit[i] = pd.delays[i] * error_pct / 100;
+  }
+}
+
+// =============================================================================
 // SpecifyManager
 // =============================================================================
 

@@ -103,6 +103,17 @@ void InitDefaultPulseLimits(PathDelay& pd);
 void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
                                uint64_t error);
 
+// §30.7.2: apply the two global pulse-limit invocation percentages to `pd`.
+// `reject_pct` and `error_pct` are integers in [0, 100]. Each transition
+// slot's reject/error limit is derived by scaling the matching `delays[i]`
+// by the corresponding percentage. When `error_pct < reject_pct` the error
+// percentage is silently raised to the reject percentage so the resulting
+// X band is never invalid. Callers are expected to order this helper after
+// `InitDefaultPulseLimits` and before `ApplyPulseControlOverride`, so that
+// PATHPULSE$ values take precedence when both are present.
+void ApplyGlobalPulseLimits(PathDelay& pd, uint8_t reject_pct,
+                            uint8_t error_pct);
+
 // =============================================================================
 // Runtime timing check entry (§31)
 // =============================================================================
