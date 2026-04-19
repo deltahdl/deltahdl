@@ -287,6 +287,16 @@ class SpecifyManager {
   // violation.
   bool CheckWidthViolation(std::string_view ref, uint64_t ref_time,
                            uint64_t data_time) const;
+  // §31.4.5: $period. `ref`/`ref_time` identify the reference event
+  // (timestamp event on the reference signal); `data_time` is the time
+  // of the derived data event — the same-edge transition on the same
+  // reference signal. The violation predicate is the strict inequality
+  //   (timecheck time) - (timestamp time) < limit
+  // which witnesses a period shorter than `limit`. A non-greater
+  // `data_time` is treated as "no period closed yet" so callers need not
+  // pre-filter.
+  bool CheckPeriodViolation(std::string_view ref, uint64_t ref_time,
+                            uint64_t data_time) const;
 
   uint32_t PathDelayCount() const {
     return static_cast<uint32_t>(path_delays_.size());

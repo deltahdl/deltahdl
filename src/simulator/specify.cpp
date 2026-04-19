@@ -365,6 +365,26 @@ bool SpecifyManager::CheckWidthViolation(std::string_view ref,
   return false;
 }
 
+bool SpecifyManager::CheckPeriodViolation(std::string_view ref,
+                                          uint64_t ref_time,
+                                          uint64_t data_time) const {
+  for (const auto& check : timing_checks_) {
+    if (check.kind != TimingCheckKind::kPeriod) continue;
+    if (check.ref_signal != ref) continue;
+    // §31.4.5: the data event is the same-edge transition on the same
+    // reference signal, so it must follow the reference event. Treat a
+    // non-greater data_time as "no period closed yet" so callers need
+    // not pre-filter.
+    if (data_time <= ref_time) continue;
+    // §31.4.5 violation predicate:
+    //   (timecheck time) - (timestamp time) < limit
+    // The strict inequality encodes "elapsed >= limit avoids a
+    // violation": a period at or above the limit is long enough.
+    if (data_time - ref_time < check.limit) return true;
+  }
+  return false;
+}
+
 bool ReportsFullskewViolation(uint64_t timestamp_time,
                               uint64_t next_event_time,
                               bool next_event_is_timecheck, uint64_t limit,

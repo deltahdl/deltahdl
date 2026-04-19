@@ -92,19 +92,6 @@ TEST(TimingCheckCommandElaboration, SetupWithNotifierElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SystemTimingCheckElaboration, PeriodElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $period(posedge clk, 50);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(SystemTimingCheckElaboration, NochangeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

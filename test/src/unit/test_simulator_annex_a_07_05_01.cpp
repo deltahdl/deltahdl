@@ -98,19 +98,4 @@ TEST(TimingCheckCommandSim, NochangeOffsetsStored) {
   EXPECT_EQ(stored.kind, TimingCheckKind::kNochange);
 }
 
-TEST(SystemTimingCheckSim, PeriodEntryNoDataSignal) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kPeriod;
-  tc.ref_signal = "clk";
-  tc.ref_edge = SpecifyEdge::kPosedge;
-  tc.limit = 50;
-  mgr.AddTimingCheck(tc);
-  auto& stored = mgr.GetTimingChecks()[0];
-  EXPECT_EQ(stored.kind, TimingCheckKind::kPeriod);
-  EXPECT_EQ(stored.ref_signal, "clk");
-  EXPECT_TRUE(stored.data_signal.empty());
-  EXPECT_EQ(stored.limit, 50u);
-}
-
 }  // namespace

@@ -603,6 +603,15 @@ SpecifyItem* Parser::ParseTimingCheck() {
     diag_.Error(item->loc,
                 "$width reference_event must be an edge specification");
   }
+  // §31.4.5 Syntax 31-13 / Table 31-11: `$period` derives its data event
+  // as the same edge on the reference signal, so the reference event
+  // must carry an edge specification — a missing edge is a compilation
+  // error.
+  if (item->timing_check.check_kind == TimingCheckKind::kPeriod &&
+      item->timing_check.ref_edge == SpecifyEdge::kNone) {
+    diag_.Error(item->loc,
+                "$period reference_event must be an edge specification");
+  }
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kSemicolon);
   return item;
