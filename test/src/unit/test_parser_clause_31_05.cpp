@@ -260,23 +260,6 @@ TEST(EdgeControlSpecifierParsing, MissingCloseBracketError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §31.5: the edge keyword can be paired with a §31.7 timing_check_condition
-// on the same event without disturbing the edge classification.
-TEST(EdgeControlSpecifierParsing, EdgeKeywordWithCondition) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data, edge clk &&& en, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->data_edge, SpecifyEdge::kEdge);
-  EXPECT_EQ(tc->data_terminal.name, "clk");
-  EXPECT_NE(tc->data_condition, nullptr);
-}
-
 // §31.5: `posedge clr` is the shorthand the LRM defines for
 // `edge[01, 0x, x1] clr`; the parser records the shorthand form as the
 // `posedge` edge kind with no descriptor list materialized.

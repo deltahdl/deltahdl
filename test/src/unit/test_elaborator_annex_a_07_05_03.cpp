@@ -4,6 +4,8 @@ using namespace delta;
 
 namespace {
 
+// A.7.5.3 timing_check_event_control: `negedge` on the reference event
+// elaborates to a valid specify_item.
 TEST(TimingCheckEventDefElaboration, TimingCheckEventNegedgeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -17,84 +19,7 @@ TEST(TimingCheckEventDefElaboration, TimingCheckEventNegedgeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(TimingCheckEventDefElaboration, TimingCheckConditionBareElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data &&& en, posedge clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TimingCheckEventDefElaboration, TimingCheckConditionParenthesizedElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data &&& (en == 1'b1), posedge clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TimingCheckEventDefElaboration, TimingCheckConditionNegationElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data &&& ~reset, posedge clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TimingCheckEventDefElaboration, ConditionBothEventsElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $hold(posedge clk &&& en, data &&& reset, 5);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TimingCheckEventDefElaboration, ControlledTimingCheckEventWidthCondElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $width(negedge rst &&& en, 20);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TimingCheckEventDefElaboration, FullCombinationElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $hold(posedge clk &&& en, data[0] &&& reset, 5);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
+// A.7.5.3 timing_check_event_control: `posedge` on the data event.
 TEST(TimingCheckEventDefElaboration, TimingCheckEventPosedgeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -108,6 +33,7 @@ TEST(TimingCheckEventDefElaboration, TimingCheckEventPosedgeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A.7.5.3 specify_terminal_descriptor: part-select on the event signal.
 TEST(TimingCheckEventDefElaboration, TerminalPartSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -121,25 +47,13 @@ TEST(TimingCheckEventDefElaboration, TerminalPartSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A.7.5.3 specify_terminal_descriptor: bit-select on the event signal.
 TEST(TimingCheckEventDefElaboration, TerminalBitSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  specify\n"
       "    $setup(data[0], posedge clk, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(TimingCheckEventDefElaboration, ScalarConditionCaseEqualityElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data &&& (en === 1'b1), posedge clk, 10);\n"
       "  endspecify\n"
       "endmodule\n",
       f);

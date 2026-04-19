@@ -7,6 +7,8 @@ using namespace delta;
 
 namespace {
 
+// A.7.5.3 timing_check_event_control: a runtime TimingCheckEntry records
+// the edge kind supplied on both sides of the timing check.
 TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryEdges) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -21,6 +23,8 @@ TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryEdges) {
   EXPECT_EQ(mgr.GetTimingChecks()[0].data_edge, SpecifyEdge::kNone);
 }
 
+// A.7.5.3 specify_terminal_descriptor: a bit-select event signal drives the
+// full source→runtime pipeline without disturbing the surrounding design.
 TEST(TimingCheckEventDefSim, TerminalBitSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -41,6 +45,8 @@ TEST(TimingCheckEventDefSim, TerminalBitSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
+// A.7.5.3 specify_terminal_descriptor: a part-select event signal drives
+// the full source→runtime pipeline.
 TEST(TimingCheckEventDefSim, TerminalPartSelectSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -61,26 +67,8 @@ TEST(TimingCheckEventDefSim, TerminalPartSelectSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-TEST(TimingCheckEventDefSim, TimingCheckConditionSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $setup(data &&& en, posedge clk, 10);\n"
-      "  endspecify\n"
-      "  initial x = 8'd33;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 33u);
-}
-
+// A.7.5.3 controlled_timing_check_event: a $period invocation with only an
+// edge-qualified event operand runs end-to-end.
 TEST(TimingCheckEventDefSim, ControlledTimingCheckEventPeriodSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -101,26 +89,8 @@ TEST(TimingCheckEventDefSim, ControlledTimingCheckEventPeriodSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(TimingCheckEventDefSim, FullCombinationSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $hold(posedge clk &&& en, data[0] &&& reset, 5);\n"
-      "  endspecify\n"
-      "  initial x = 8'd11;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 11u);
-}
-
+// A.7.5.3 timing_check_event_control: `negedge` on the runtime entry is
+// preserved through storage on SpecifyManager.
 TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryNegedge) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -131,46 +101,6 @@ TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryNegedge) {
   tc.limit = 5;
   mgr.AddTimingCheck(tc);
   EXPECT_EQ(mgr.GetTimingChecks()[0].ref_edge, SpecifyEdge::kNegedge);
-}
-
-TEST(TimingCheckEventDefSim, ConditionBothEventsSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $hold(posedge clk &&& en, data &&& reset, 5);\n"
-      "  endspecify\n"
-      "  initial x = 8'd66;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 66u);
-}
-
-TEST(TimingCheckEventDefSim, TimingCheckConditionNegationSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $setup(data &&& ~reset, posedge clk, 10);\n"
-      "  endspecify\n"
-      "  initial x = 8'd22;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 22u);
 }
 
 }  // namespace

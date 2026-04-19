@@ -493,6 +493,54 @@ Logic4Word ToggleNotifierOnViolation(Logic4Word current) {
   return result;
 }
 
+// =============================================================================
+// §31.7 conditioned-event enablement helpers
+// =============================================================================
+
+bool IsDeterministicTimingCheckCondition(TimingCheckConditionKind kind) {
+  switch (kind) {
+    case TimingCheckConditionKind::kPlain:
+    case TimingCheckConditionKind::kNegate:
+    case TimingCheckConditionKind::kCaseEq:
+    case TimingCheckConditionKind::kCaseNeq:
+      return true;
+    case TimingCheckConditionKind::kEq:
+    case TimingCheckConditionKind::kNeq:
+      return false;
+  }
+  return false;
+}
+
+bool TimingCheckConditionEnables(TimingCheckConditionKind kind,
+                                 Logic4Word conditioning_lsb,
+                                 uint8_t scalar_constant_bit) {
+  // Reduce the dual-rail encoding to the three cases §31.7 distinguishes:
+  // known 0, known 1, or an unknown value. The LRM rule is phrased in
+  // terms of the conditioning signal carrying an x, and the decision on x
+  // is fixed by the operator's deterministic-vs-nondeterministic label —
+  // regardless of what a literal four-valued evaluation of the operator
+  // would produce.
+  const bool known = (conditioning_lsb.bval & 1u) == 0u;
+  if (!known) {
+    return !IsDeterministicTimingCheckCondition(kind);
+  }
+  const uint8_t bit = static_cast<uint8_t>(conditioning_lsb.aval & 1u);
+  const uint8_t rhs = static_cast<uint8_t>(scalar_constant_bit & 1u);
+  switch (kind) {
+    case TimingCheckConditionKind::kPlain:
+      return bit == 1u;
+    case TimingCheckConditionKind::kNegate:
+      return bit == 0u;
+    case TimingCheckConditionKind::kEq:
+    case TimingCheckConditionKind::kCaseEq:
+      return bit == rhs;
+    case TimingCheckConditionKind::kNeq:
+    case TimingCheckConditionKind::kCaseNeq:
+      return bit != rhs;
+  }
+  return false;
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,

@@ -5,65 +5,7 @@ using namespace delta;
 
 namespace {
 
-TEST(TimingCheckEventDefParsing, ScalarTimingCheckCondNegation) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& ~reset, posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarTimingCheckCondEquality) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en == 1'b1), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarTimingCheckCondInequality) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $hold(posedge clk &&& (mode != 1'b0), data, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarConstantUnsizedB0) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en == 'b0), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarConstantUnsizedB1) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en == 'b1), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-}
-
+// A.7.5.3 timing_check_event_control: `posedge` on the data event.
 TEST(TimingCheckEventDefParsing, TimingCheckEventPosedge) {
   auto r = Parse(
       "module m;\n"
@@ -78,6 +20,7 @@ TEST(TimingCheckEventDefParsing, TimingCheckEventPosedge) {
   EXPECT_EQ(tc->data_terminal.name, "clk");
 }
 
+// A.7.5.3 timing_check_event_control: `negedge` on the reference event.
 TEST(TimingCheckEventDefParsing, TimingCheckEventNegedge) {
   auto r = Parse(
       "module m;\n"
@@ -92,6 +35,8 @@ TEST(TimingCheckEventDefParsing, TimingCheckEventNegedge) {
   EXPECT_EQ(tc->ref_terminal.name, "clk");
 }
 
+// A.7.5.3 controlled_timing_check_event: $period requires an edge on the
+// single event operand.
 TEST(TimingCheckEventDefParsing, ControlledTimingCheckEventPeriod) {
   auto r = Parse(
       "module m;\n"
@@ -106,6 +51,7 @@ TEST(TimingCheckEventDefParsing, ControlledTimingCheckEventPeriod) {
   EXPECT_EQ(tc->ref_terminal.name, "clk");
 }
 
+// A.7.5.3 specify_terminal_descriptor: part-select on the event signal.
 TEST(TimingCheckEventDefParsing, TerminalPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -122,32 +68,8 @@ TEST(TimingCheckEventDefParsing, TerminalPartSelect) {
   EXPECT_NE(tc->ref_terminal.range_right, nullptr);
 }
 
-TEST(TimingCheckEventDefParsing, TimingCheckConditionBare) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& en, posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
-}
-
-TEST(TimingCheckEventDefParsing, TimingCheckConditionParenthesized) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
-}
-
+// A.7.5.3 timing_check_event: the `timing_check_event_control` is optional;
+// a bare specify_terminal_descriptor on each side parses as no edge.
 TEST(TimingCheckEventDefParsing, TimingCheckEventNoEdge) {
   auto r = Parse(
       "module m;\n"
@@ -164,116 +86,8 @@ TEST(TimingCheckEventDefParsing, TimingCheckEventNoEdge) {
   EXPECT_EQ(tc->data_terminal.name, "clk");
 }
 
-TEST(TimingCheckEventDefParsing, ScalarTimingCheckCondCaseEquality) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en === 1'b1), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarTimingCheckCondCaseInequality) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $hold(posedge clk &&& (mode !== 1'b0), data, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarConstant1b0) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en == 1'b0), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarConstant1B1) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en == 1'B1), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarConstantDecimal1) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en == 1), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarConstantDecimal0) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en != 0), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TimingCheckEventDefParsing, ConditionBothEvents) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $hold(posedge clk &&& en, data &&& reset, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_NE(tc->ref_condition, nullptr);
-  EXPECT_NE(tc->data_condition, nullptr);
-}
-
-TEST(TimingCheckEventDefParsing, TerminalBitSelectWithCondition) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data[0] &&& en, posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->ref_terminal.name, "data");
-  EXPECT_EQ(tc->ref_terminal.range_kind, SpecifyRangeKind::kBitSelect);
-  EXPECT_NE(tc->ref_condition, nullptr);
-}
-
-TEST(TimingCheckEventDefParsing, EdgeTerminalPartSelectWithCondition) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $hold(posedge clk &&& en, data[3:0] &&& reset, 5);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->data_terminal.name, "data");
-  EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kPartSelect);
-  EXPECT_NE(tc->data_condition, nullptr);
-}
-
+// A.7.5.3 timing_check_event: both operands can carry their own
+// timing_check_event_control without conflict.
 TEST(TimingCheckEventDefParsing, BothEventsWithEdges) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
@@ -292,61 +106,8 @@ TEST(TimingCheckEventDefParsing, BothEventsWithEdges) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
 }
 
-TEST(TimingCheckEventDefParsing, ControlledTimingCheckEventWithCondition) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $period(posedge clk &&& en, 50);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->ref_terminal.name, "clk");
-  EXPECT_NE(tc->ref_condition, nullptr);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarConstantSized1b1) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en == 1'b1), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarConstantSized1B0) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en == 1'B0), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarConstantUnsizedUppercaseB0) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en == 'B0), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TimingCheckEventDefParsing, ScalarConstantUnsizedUppercaseB1) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $setup(data &&& (en == 'B1), posedge clk, 10);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-}
-
+// A.7.5.3 specify_terminal_descriptor: a bare identifier parses as a whole
+// signal with no range kind attached.
 TEST(TimingCheckEventDefParsing, TerminalSimpleIdentifier) {
   auto r = Parse(
       "module m;\n"

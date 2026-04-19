@@ -201,6 +201,44 @@ bool ReportsFullskewViolation(uint64_t timestamp_time,
 // unconnected notifier cannot be driven by violations.
 Logic4Word ToggleNotifierOnViolation(Logic4Word current);
 
+// §31.7: the syntactic form of a `&&&` scalar_timing_check_condition,
+// enumerated so the downstream enablement decision can dispatch on the
+// top-level operator of the condition expression. The six members cover
+// the full scalar_timing_check_condition grammar production: a bare
+// expression, its bitwise negation, and the two case-{equality,
+// inequality} and two plain-{equality, inequality} comparison forms
+// against a scalar_constant.
+enum class TimingCheckConditionKind : uint8_t {
+  kPlain,    // expression
+  kNegate,   // ~ expression
+  kEq,       // expression ==  scalar_constant
+  kCaseEq,   // expression === scalar_constant
+  kNeq,      // expression !=  scalar_constant
+  kCaseNeq,  // expression !== scalar_constant
+};
+
+// §31.7: classify a condition by the LRM's deterministic-vs-nondeterministic
+// split. The plain, negated, case-equality, and case-inequality forms are
+// deterministic — an x on the conditioning signal must not enable the
+// timing check. The equality and inequality forms are nondeterministic —
+// an x on the conditioning signal must still enable the timing check.
+// The two classes drive different handling inside TimingCheckConditionEnables.
+bool IsDeterministicTimingCheckCondition(TimingCheckConditionKind kind);
+
+// §31.7: decide whether a `&&&`-conditioned timing check is enabled, given
+// the kind of the scalar_timing_check_condition, the LSB of the
+// conditioning signal's value (already reduced to a single bit per the
+// LRM's multibit-to-LSB rule), and — for the four comparison forms — the
+// scalar_constant operand as a 0/1 bit. When the LSB is a known 0 or 1
+// the decision matches the operator's four-valued arithmetic. When the
+// LSB is x, the deterministic operators return false and the
+// nondeterministic operators return true, overriding whatever the
+// operator's natural evaluation would yield; the scalar_constant_bit
+// argument is ignored for the non-comparison forms.
+bool TimingCheckConditionEnables(TimingCheckConditionKind kind,
+                                 Logic4Word conditioning_lsb,
+                                 uint8_t scalar_constant_bit);
+
 // =============================================================================
 // SDF annotation entry (§32)
 // =============================================================================

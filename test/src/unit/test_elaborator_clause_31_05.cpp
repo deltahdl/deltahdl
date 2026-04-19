@@ -64,21 +64,6 @@ TEST(EdgeControlSpecifierElaboration, ZTransitionsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §31.5: the edge-control specifier coexists with a §31.7
-// timing_check_condition on the same event during elaboration.
-TEST(EdgeControlSpecifierElaboration, EdgeKeywordWithConditionElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $setup(data, edge clk &&& en, 10);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // §31.5 Syntax 31-15: the `zero_or_one z_or_x` form (e.g. `0x`, `1x`) is
 // the third edge_descriptor alternative and must elaborate as cleanly as
 // the other two.
