@@ -38,6 +38,25 @@ uint64_t ClampPathDelay(int64_t signed_value);
 // are never written by this helper.
 void ExpandTransitionDelays(PathDelay& pd);
 
+// §30.5.3: a candidate specify path considered during delay selection. The
+// caller supplies one entry per path that could drive the output now being
+// scheduled, annotating each with the input's most-recent transition time
+// and the runtime-evaluated truth of the path's condition. Unconditioned
+// paths always set `condition_true` to true.
+struct PathCandidate {
+  const PathDelay* path = nullptr;
+  uint64_t last_transition_time = 0;
+  bool condition_true = true;
+};
+
+// §30.5.3: returns the smallest `delays[transition_slot]` among the active
+// candidates. A candidate is active when its input transitioned at the
+// latest timestamp seen in `candidates` and its condition is true. Returns
+// zero when no active candidate exists (including when the list is empty
+// or every survivor's condition is false).
+uint64_t SelectPathDelay(const std::vector<PathCandidate>& candidates,
+                         uint8_t transition_slot);
+
 // =============================================================================
 // Runtime timing check entry (§31)
 // =============================================================================

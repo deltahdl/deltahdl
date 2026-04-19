@@ -63,6 +63,35 @@ void ExpandTransitionDelays(PathDelay& pd) {
 }
 
 // =============================================================================
+// §30.5.3 delay selection
+// =============================================================================
+
+uint64_t SelectPathDelay(const std::vector<PathCandidate>& candidates,
+                         uint8_t transition_slot) {
+  if (candidates.empty()) return 0;
+  // "Most recently" is a single timestamp across every candidate — condition
+  // truth does not enter until the filter below, so an earlier-but-true path
+  // stays inactive when a later input transitioned, regardless of its guard.
+  uint64_t max_time = 0;
+  for (const auto& c : candidates) {
+    if (c.last_transition_time > max_time) max_time = c.last_transition_time;
+  }
+  bool have_active = false;
+  uint64_t best = 0;
+  for (const auto& c : candidates) {
+    if (c.path == nullptr) continue;
+    if (c.last_transition_time != max_time) continue;
+    if (!c.condition_true) continue;
+    uint64_t d = c.path->delays[transition_slot];
+    if (!have_active || d < best) {
+      best = d;
+      have_active = true;
+    }
+  }
+  return have_active ? best : 0;
+}
+
+// =============================================================================
 // SpecifyManager
 // =============================================================================
 
