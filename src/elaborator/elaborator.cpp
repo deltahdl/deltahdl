@@ -338,31 +338,113 @@ void Elaborator::ValidateModports() {
 void Elaborator::ValidateSpecifyBlocks() {
   auto check_modules = [&](const std::vector<ModuleDecl*>& modules) {
     for (auto* mod : modules) {
-      std::unordered_set<std::string_view> ref_ports;
+      std::unordered_map<std::string_view, const PortDecl*> port_map;
       for (const auto& p : mod->ports) {
-        if (p.direction == Direction::kRef && !p.name.empty()) {
-          ref_ports.insert(p.name);
+        if (!p.name.empty()) port_map[p.name] = &p;
+      }
+      // Identifiers declared locally in the module body but not as ports —
+      // used to distinguish "declared but not a port" (reject) from
+      // "never declared" (handled by name resolution elsewhere).
+      std::unordered_set<std::string_view> local_signals;
+      for (auto* mi : mod->items) {
+        if ((mi->kind == ModuleItemKind::kNetDecl ||
+             mi->kind == ModuleItemKind::kVarDecl) &&
+            !mi->name.empty() && !port_map.contains(mi->name)) {
+          local_signals.insert(mi->name);
         }
       }
-      if (ref_ports.empty()) continue;
-      auto check_terminal = [&](const SpecifyTerminal& t, SourceLoc loc) {
+
+      // §30.4.1: source shall be a net connected to an input or inout port.
+      auto check_source = [&](const SpecifyTerminal& t, SourceLoc loc) {
         if (!t.interface_name.empty()) return;
-        if (ref_ports.contains(t.name)) {
+        auto it = port_map.find(t.name);
+        if (it != port_map.end()) {
+          const PortDecl* p = it->second;
+          if (p->direction == Direction::kRef) {
+            diag_.Error(loc,
+                        std::format("ref port '{}' cannot be used as a "
+                                    "terminal in a specify block",
+                                    t.name));
+            return;
+          }
+          if (p->direction != Direction::kInput &&
+              p->direction != Direction::kInout) {
+            diag_.Error(loc,
+                        std::format("module path source '{}' must be "
+                                    "connected to an input or inout port",
+                                    t.name));
+            return;
+          }
+          bool is_var = !p->data_type.is_net && !p->data_type.is_interconnect;
+          if (is_var) {
+            diag_.Error(loc,
+                        std::format("module path source '{}' must be a net",
+                                    t.name));
+          }
+          return;
+        }
+        if (local_signals.contains(t.name)) {
+          diag_.Error(loc,
+                      std::format("module path source '{}' is not connected "
+                                  "to an input or inout port",
+                                  t.name));
+        }
+      };
+
+      // §30.4.1: destination shall be a net or variable connected to an
+      // output or inout port.
+      auto check_destination = [&](const SpecifyTerminal& t, SourceLoc loc) {
+        if (!t.interface_name.empty()) return;
+        auto it = port_map.find(t.name);
+        if (it != port_map.end()) {
+          const PortDecl* p = it->second;
+          if (p->direction == Direction::kRef) {
+            diag_.Error(loc,
+                        std::format("ref port '{}' cannot be used as a "
+                                    "terminal in a specify block",
+                                    t.name));
+            return;
+          }
+          if (p->direction != Direction::kOutput &&
+              p->direction != Direction::kInout) {
+            diag_.Error(loc,
+                        std::format("module path destination '{}' must be "
+                                    "connected to an output or inout port",
+                                    t.name));
+          }
+          return;
+        }
+        if (local_signals.contains(t.name)) {
+          diag_.Error(loc,
+                      std::format("module path destination '{}' is not "
+                                  "connected to an output or inout port",
+                                  t.name));
+        }
+      };
+
+      // Timing-check terminals retain the prior ref-port rejection.
+      auto check_timing_terminal = [&](const SpecifyTerminal& t,
+                                       SourceLoc loc) {
+        if (!t.interface_name.empty()) return;
+        auto it = port_map.find(t.name);
+        if (it != port_map.end() && it->second->direction == Direction::kRef) {
           diag_.Error(loc,
                       std::format("ref port '{}' cannot be used as a "
                                   "terminal in a specify block",
                                   t.name));
         }
       };
+
       for (auto* item : mod->items) {
         if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
         for (auto* si : item->specify_items) {
           if (si->kind == SpecifyItemKind::kPathDecl) {
-            for (const auto& t : si->path.src_ports) check_terminal(t, si->loc);
-            for (const auto& t : si->path.dst_ports) check_terminal(t, si->loc);
+            for (const auto& t : si->path.src_ports) check_source(t, si->loc);
+            for (const auto& t : si->path.dst_ports)
+              check_destination(t, si->loc);
           } else if (si->kind == SpecifyItemKind::kTimingCheck) {
-            check_terminal(si->timing_check.ref_terminal, si->loc);
-            check_terminal(si->timing_check.data_terminal, si->loc);
+            check_timing_terminal(si->timing_check.ref_terminal, si->loc);
+            check_timing_terminal(si->timing_check.data_terminal, si->loc);
           }
         }
       }
@@ -399,7 +481,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // §25.5.4, §25.5.5: Validate modport port-id uniqueness, direction
   // legality, and clocking-block references.
   ValidateModports();
-  // §25.6: Reject ref-direction module ports used as specify terminals.
+  // §30.4.1: Enforce module path source/destination port-direction and
+  // net-kind restrictions.
   ValidateSpecifyBlocks();
   // §3.12.1: Register CU-scope typedefs and classes before module elaboration.
   RegisterCuScopeItems();
