@@ -698,6 +698,16 @@ static bool UdpIsLevelSymbol(char c) {
          c == '?' || c == 'b' || c == 'B';
 }
 
+static bool IsValidUdpInitialLiteral(std::string_view text) {
+  if (text == "0" || text == "1") return true;
+  if (text.size() == 4 && text[0] == '1' && text[1] == '\'' &&
+      (text[2] == 'b' || text[2] == 'B')) {
+    char d = text[3];
+    return d == '0' || d == '1' || d == 'x' || d == 'X';
+  }
+  return false;
+}
+
 char Parser::ParseUdpInitialValue(TokenKind stop1, TokenKind stop2) {
   char result = '0';
   while (!Check(stop1) && !Check(stop2) && !AtEnd()) {
@@ -979,6 +989,18 @@ UdpDecl* Parser::ParseUdpDecl() {
 
   if (Match(TokenKind::kKwInitial)) {
     udp->has_initial = true;
+    // §29.7: the body is a single procedural assignment; a sequential
+    // block introduces multiple statements and is not permitted.
+    if (Check(TokenKind::kKwBegin)) {
+      diag_.Error(
+          CurrentLoc(),
+          "UDP initial statement shall be a single procedural assignment");
+    }
+    // §29.7: no delay control may precede the assignment.
+    if (Check(TokenKind::kHash)) {
+      diag_.Error(CurrentLoc(),
+                  "UDP initial statement shall not contain delay control");
+    }
     auto id_tok = Expect(TokenKind::kIdentifier);
     // §29.3.3: the initial statement assigns to the output port.
     if (!udp->output_name.empty() && id_tok.text != udp->output_name) {
@@ -986,8 +1008,16 @@ UdpDecl* Parser::ParseUdpDecl() {
                   "UDP initial statement shall target the output port");
     }
     Expect(TokenKind::kEq);
-    udp->initial_value =
-        ParseUdpInitialValue(TokenKind::kSemicolon, TokenKind::kSemicolon);
+    // §29.7: the RHS is restricted to 0, 1, or the single-bit sized
+    // forms 1'b0, 1'b1, 1'bx, 1'bX (and capitalized base specifier).
+    auto rhs_tok = CurrentToken();
+    udp->initial_value = ParseUdpInitialValue(TokenKind::kSemicolon,
+                                              TokenKind::kSemicolon);
+    if (!IsValidUdpInitialLiteral(rhs_tok.text)) {
+      diag_.Error(rhs_tok.loc,
+                  "UDP initial statement RHS shall be 0, 1, or a single-bit "
+                  "literal");
+    }
     Expect(TokenKind::kSemicolon);
   }
 

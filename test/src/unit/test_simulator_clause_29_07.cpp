@@ -22,7 +22,7 @@ struct UdpBuilder {
   }
 };
 
-TEST(UdpInit, DefaultIsX) {
+TEST(UdpInitialStatement, DefaultIsX) {
   UdpBuilder b;
   b.SetSequential();
 
@@ -30,12 +30,28 @@ TEST(UdpInit, DefaultIsX) {
   EXPECT_EQ(state.GetOutput(), 'x');
 }
 
-TEST(UdpInit, InitialValueOne) {
+TEST(UdpInitialStatement, InitialValueOne) {
   UdpBuilder b;
   b.SetSequential().SetInitial('1');
 
   UdpEvalState state(b.decl);
   EXPECT_EQ(state.GetOutput(), '1');
+}
+
+TEST(UdpInitialStatement, OutputIsZeroAtSimulationStart) {
+  UdpBuilder b;
+  b.SetSequential().SetInitial('0');
+
+  UdpEvalState state(b.decl);
+  EXPECT_EQ(state.GetOutput(), '0');
+}
+
+TEST(UdpInitialStatement, OutputIsXAtSimulationStart) {
+  UdpBuilder b;
+  b.SetSequential().SetInitial('x');
+
+  UdpEvalState state(b.decl);
+  EXPECT_EQ(state.GetOutput(), 'x');
 }
 
 }  // namespace

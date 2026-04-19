@@ -22,7 +22,7 @@ TEST(UdpInitialStatement, CapturesInitialValueOne) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-TEST(UdpInitialStatement, SimInitialValueOne) {
+TEST(UdpInitialStatement, InitialOneDrivesOutputAtStart) {
   auto r = Parse(
       "primitive latch_init(output reg q, input d, en);\n"
       "  initial q = 1;\n"
@@ -42,7 +42,7 @@ TEST(UdpInitialStatement, SimInitialValueOne) {
   EXPECT_EQ(eval.GetOutput(), '1');
 }
 
-TEST(UdpInitialStatement, SimInitialValueZero) {
+TEST(UdpInitialStatement, InitialZeroDrivesOutputAtStart) {
   auto r = Parse(
       "primitive latch(output reg q, input d, input en);\n"
       "  initial q = 1'b0;\n"
@@ -104,7 +104,7 @@ TEST(UdpInitialStatement, CapturesInitialValueX) {
 
 // An x initial value shall appear on the output at simulation start before
 // any input transitions occur.
-TEST(UdpInitialStatement, SimInitialValueX) {
+TEST(UdpInitialStatement, InitialXDrivesOutputAtStart) {
   auto r = Parse(
       "primitive latch_x(output reg q, input d, en);\n"
       "  initial q = 1'bx;\n"
@@ -118,6 +118,62 @@ TEST(UdpInitialStatement, SimInitialValueX) {
   auto* udp = r.cu->udps[0];
   UdpEvalState eval(*udp);
   EXPECT_EQ(eval.GetOutput(), 'x');
+}
+
+// The body of a UDP initial statement is a single procedural assignment,
+// not a sequential block of statements.
+TEST(UdpInitialStatement, RejectsBlockStatementInInitial) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  initial begin q = 1'b0; end\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// The assignment shall not be preceded by any delay control; the initial
+// value is established at simulation start, before any time advances.
+TEST(UdpInitialStatement, RejectsDelayBeforeAssignment) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  initial #5 q = 1'b1;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// Only the literal values 0, 1, and x (or their sized single-bit forms) are
+// allowed as the RHS; an integer outside this set is illegal.
+TEST(UdpInitialStatement, RejectsIntegerOutOfRangeRhs) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  initial q = 2;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// The single-bit sized form requires width 1; a wider sized literal does
+// not represent a single-bit initial value.
+TEST(UdpInitialStatement, RejectsMultiBitSizedLiteralRhs) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  initial q = 2'b10;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace
