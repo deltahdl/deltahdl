@@ -153,9 +153,24 @@ static uint8_t EffectiveStrength(uint8_t val, DriverStrength ds) {
   return 0;                                  // z: no strength
 }
 
+// §28.12.4: 4-valued AND/OR used by wand/triand/wor/trior to resolve
+// same-strength conflicts instead of falling back to x.
+static uint8_t WiredAnd(uint8_t a, uint8_t b) {
+  if (a == 0 || b == 0) return 0;
+  if (a == 1 && b == 1) return 1;
+  return 2;
+}
+
+static uint8_t WiredOr(uint8_t a, uint8_t b) {
+  if (a == 1 || b == 1) return 1;
+  if (a == 0 && b == 0) return 0;
+  return 2;
+}
+
 static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
                                const std::vector<DriverStrength>& strengths,
-                               Logic4Vec& result, uint32_t bit) {
+                               Logic4Vec& result, uint32_t bit,
+                               NetType net_type) {
   uint8_t max_str = 0;
   uint8_t max_val = 3;  // z
   bool conflict = false;
@@ -168,7 +183,16 @@ static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
       max_val = bv.val;
       conflict = false;
     } else if (str == max_str && bv.val != max_val) {
-      conflict = true;
+      // §28.12.4: wired-logic net types resolve same-strength value
+      // disagreements by applying AND/OR over the driver values rather than
+      // producing x. For plain wire/tri/trireg the conflict propagates as x.
+      if (net_type == NetType::kWand || net_type == NetType::kTriand) {
+        max_val = WiredAnd(max_val, bv.val);
+      } else if (net_type == NetType::kWor || net_type == NetType::kTrior) {
+        max_val = WiredOr(max_val, bv.val);
+      } else {
+        conflict = true;
+      }
     }
   }
   SetBit(result, bit, conflict ? 2 : max_val);
@@ -259,7 +283,7 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (!is_user_nettype && !driver_strengths.empty()) {
     auto result = MakeLogic4Vec(arena, resolved->value.width);
     for (uint32_t b = 0; b < result.width; ++b) {
-      ResolveStrengthBit(drivers, driver_strengths, result, b);
+      ResolveStrengthBit(drivers, driver_strengths, result, b, type);
     }
     FixupTriPull(result, type);
     resolved->value = result;
