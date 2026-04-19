@@ -406,6 +406,22 @@ bool NegativeTimingCheckNotifierShouldToggle(
     bool delayed_adjusted_violation,
     bool undelayed_original_violation);
 
+// §31.9.4: whether the simulator's negative-value handling for
+// $setuphold and $recrem is active for the current run. The LRM
+// gates the feature on two independent invocation options:
+// `negative_timing_check_option_enabled` is the option a user
+// flips on to opt in to negative limits, and
+// `all_timing_checks_disabled` is the separate option that turns
+// off all timing checks. Negative handling is active only when the
+// first is on and the second is off. Every other combination
+// degrades to the fallback mode the clause describes, in which any
+// declared or implicit delayed reference and data signals collapse
+// to copies of the originals so a model written against negative
+// values can still simulate without the option set.
+bool NegativeTimingCheckOptionActive(
+    bool negative_timing_check_option_enabled,
+    bool all_timing_checks_disabled);
+
 // =============================================================================
 // SDF annotation entry (§32)
 // =============================================================================

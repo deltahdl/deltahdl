@@ -701,6 +701,22 @@ bool NegativeTimingCheckNotifierShouldToggle(
   return delayed_adjusted_violation;
 }
 
+// =============================================================================
+// §31.9.4 invocation-option gating
+// =============================================================================
+
+bool NegativeTimingCheckOptionActive(
+    bool negative_timing_check_option_enabled,
+    bool all_timing_checks_disabled) {
+  // Two invocation options participate: one opts in to negative
+  // values and the other turns off all timing checks. The LRM says
+  // an all-checks-off run produces the same collapse as leaving
+  // the negative option unset, so the disable flag wins over the
+  // enable flag and the feature activates only when the first is
+  // on while the second is off.
+  return negative_timing_check_option_enabled && !all_timing_checks_disabled;
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,
