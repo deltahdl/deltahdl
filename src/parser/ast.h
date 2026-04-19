@@ -899,6 +899,30 @@ inline bool IsStabilityWindowTimingCheck(TimingCheckKind kind) {
   return false;
 }
 
+// §31.4: the six timing checks for clock and control signals that share the
+// generic three-step procedure (elapsed time, compare to limit, report
+// violation). The group is the complement of §31.3's stability-window set;
+// descendant-subclause logic uses this classifier to gate shared behaviour.
+inline bool IsClockControlTimingCheck(TimingCheckKind kind) {
+  switch (kind) {
+    case TimingCheckKind::kSkew:
+    case TimingCheckKind::kTimeskew:
+    case TimingCheckKind::kFullskew:
+    case TimingCheckKind::kPeriod:
+    case TimingCheckKind::kWidth:
+    case TimingCheckKind::kNochange:
+      return true;
+    case TimingCheckKind::kSetup:
+    case TimingCheckKind::kHold:
+    case TimingCheckKind::kSetuphold:
+    case TimingCheckKind::kRecovery:
+    case TimingCheckKind::kRemoval:
+    case TimingCheckKind::kRecrem:
+      return false;
+  }
+  return false;
+}
+
 struct TimingCheckDecl {
   TimingCheckKind check_kind = TimingCheckKind::kSetup;
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
