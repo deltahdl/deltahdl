@@ -12,7 +12,7 @@ TEST(PullGates, PulldownOutputsZero) {
   EXPECT_EQ(EvalPullSource(PullKind::kPulldown), Val4::kV0);
 }
 
-TEST(PullGates, DefaultStrengthIsPull) {
+TEST(PullGates, PullupDefaultStrengthIsPull) {
   PullSourceInfo info;
   info.kind = PullKind::kPullup;
   EXPECT_EQ(GetPullSourceStrength(info), StrengthLevel::kPull);

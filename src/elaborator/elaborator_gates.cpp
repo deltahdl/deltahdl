@@ -184,6 +184,27 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     return;
   }
 
+  // §28.10: pullup places logic 1 on its net; pulldown places logic 0.
+  // When no strength is specified these sources drive at pull strength.
+  // For pullup, only the strength1 side is meaningful — any strength0 is
+  // ignored (and vice versa for pulldown) because these sources only ever
+  // drive a single logic level. Delay specifications are not permitted and
+  // are already rejected during parsing.
+  if (kind == GateKind::kPullup || kind == GateKind::kPulldown) {
+    if (terms.size() != 1) return;
+    bool is_up = (kind == GateKind::kPullup);
+    uint8_t driving = is_up ? item->drive_strength1 : item->drive_strength0;
+    if (driving == 0) driving = 3;  // pull
+    RtlirContAssign ca;
+    ca.lhs = terms[0];
+    ca.rhs = MakeIntLiteral(arena, is_up ? 1 : 0);
+    ca.width = LookupLhsWidth(ca.lhs, mod);
+    ca.drive_strength0 = is_up ? 0 : driving;
+    ca.drive_strength1 = is_up ? driving : 0;
+    mod->assigns.push_back(ca);
+    return;
+  }
+
   // §28.9: cmos/rcmos are an nmos+pmos pair sharing the data input/output
   // with separate n- and p-channel controls. Terminals are (out, data,
   // ncontrol, pcontrol). The nmos half conducts on ncontrol==1; the pmos

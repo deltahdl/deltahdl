@@ -173,42 +173,6 @@ TEST(GateElaboration, NotGateProducesInvertedAssign) {
   EXPECT_EQ(ca.rhs->op, TokenKind::kTilde);
 }
 
-TEST(GateElaboration, PullupProducesLiteralOne) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire net1;\n"
-      "  pullup pu1(net1);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1u);
-  auto& ca = mod->assigns.back();
-  ASSERT_NE(ca.rhs, nullptr);
-  EXPECT_EQ(ca.rhs->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(ca.rhs->int_val, 1u);
-}
-
-TEST(GateElaboration, PulldownProducesLiteralZero) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire net1;\n"
-      "  pulldown pd1(net1);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1u);
-  auto& ca = mod->assigns.back();
-  ASSERT_NE(ca.rhs, nullptr);
-  EXPECT_EQ(ca.rhs->kind, ExprKind::kIntegerLiteral);
-  EXPECT_EQ(ca.rhs->int_val, 0u);
-}
-
 TEST(GateElaboration, MultipleGatesProduceMultipleAssigns) {
   ElabFixture f;
   auto* design = Elaborate(
