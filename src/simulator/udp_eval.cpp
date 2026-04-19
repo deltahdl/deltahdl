@@ -14,6 +14,17 @@ static bool IsEdgeSymbol(char symbol) {
          symbol == '*' || symbol == '\x01';
 }
 
+// §29.2: a z on a UDP input is observed as x for table matching and edge
+// detection.
+static char CoerceUdpInput(char value) { return value == 'z' ? 'x' : value; }
+
+static std::vector<char> CoerceUdpInputs(const std::vector<char>& inputs) {
+  std::vector<char> coerced;
+  coerced.reserve(inputs.size());
+  for (char v : inputs) coerced.push_back(CoerceUdpInput(v));
+  return coerced;
+}
+
 static bool MatchLevel(char symbol, char value) {
   if (symbol == value) return true;
   if (symbol == '?') return value == '0' || value == '1' || value == 'x';
@@ -37,7 +48,7 @@ static bool MatchEdge(char symbol, char prev, char curr) {
 }
 
 void UdpEvalState::SetInputs(const std::vector<char>& inputs) {
-  prev_inputs_ = inputs;
+  prev_inputs_ = CoerceUdpInputs(inputs);
 }
 
 // Check if all level symbols in a row match the given input values.
@@ -65,15 +76,16 @@ static char ResolveOutput(char row_output, char current_output) {
 
 // §29.4: Combinational evaluation — pure level lookup.
 char UdpEvalState::Evaluate(const std::vector<char>& inputs) {
+  auto coerced = CoerceUdpInputs(inputs);
   for (const auto& row : decl_.table) {
-    if (!MatchAllLevels(row, inputs)) continue;
+    if (!MatchAllLevels(row, coerced)) continue;
     if (!MatchState(decl_, row, output_)) continue;
     output_ = ResolveOutput(row.output, output_);
-    prev_inputs_ = inputs;
+    prev_inputs_ = coerced;
     return output_;
   }
   output_ = 'x';
-  prev_inputs_ = inputs;
+  prev_inputs_ = coerced;
   return output_;
 }
 
@@ -110,12 +122,15 @@ static bool MatchRowWithEdge(const UdpTableRow& row,
 // §29.9/§29.10: Evaluate with edge detection and level-sensitive dominance.
 char UdpEvalState::EvaluateWithEdge(const std::vector<char>& new_inputs,
                                     uint32_t changed_idx, char prev_value) {
+  auto coerced_new = CoerceUdpInputs(new_inputs);
+  char coerced_prev = CoerceUdpInput(prev_value);
   char edge_result = 0;
   char level_result = 0;
 
   for (const auto& row : decl_.table) {
     bool has_edge = false;
-    if (!MatchRowWithEdge(row, new_inputs, changed_idx, prev_value, has_edge))
+    if (!MatchRowWithEdge(row, coerced_new, changed_idx, coerced_prev,
+                          has_edge))
       continue;
     if (!MatchState(decl_, row, output_)) continue;
     char result = ResolveOutput(row.output, output_);
@@ -132,7 +147,7 @@ char UdpEvalState::EvaluateWithEdge(const std::vector<char>& new_inputs,
     output_ = 'x';
   }
 
-  prev_inputs_ = new_inputs;
+  prev_inputs_ = coerced_new;
   return output_;
 }
 
