@@ -541,6 +541,32 @@ bool TimingCheckConditionEnables(TimingCheckConditionKind kind,
   return false;
 }
 
+// =============================================================================
+// §31.8 vector-signal expansion helpers
+// =============================================================================
+
+bool IsSingleSignalTimingCheck(TimingCheckKind kind) {
+  // The LRM names $period and $width as the single-signal checks: their
+  // data event is the opposite-/same-edge transition on the same
+  // reference signal, so the invocation only carries one signal even
+  // though the underlying check still has two events.
+  return kind == TimingCheckKind::kWidth ||
+         kind == TimingCheckKind::kPeriod;
+}
+
+uint64_t TimingCheckExpandedCount(TimingCheckKind kind, uint32_t ref_width,
+                                  uint32_t data_width,
+                                  TimingCheckVectorMode mode) {
+  if (mode == TimingCheckVectorMode::kSingle) return 1u;
+  // Per-bit expansion: a single-signal check has only the reference width
+  // to fan out across, so the data-side argument is ignored. A two-signal
+  // check fans out across the cross-product of the two widths.
+  if (IsSingleSignalTimingCheck(kind)) {
+    return static_cast<uint64_t>(ref_width);
+  }
+  return static_cast<uint64_t>(ref_width) * static_cast<uint64_t>(data_width);
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,

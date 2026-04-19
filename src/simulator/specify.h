@@ -239,6 +239,39 @@ bool TimingCheckConditionEnables(TimingCheckConditionKind kind,
                                  Logic4Word conditioning_lsb,
                                  uint8_t scalar_constant_bit);
 
+// §31.8: whether a timing check takes its reference and data events from
+// the same signal. The LRM calls these "timing checks with only a single
+// signal" and names $period and $width as the exemplars. The classifier
+// drives the vector-expansion count below: a single-signal check of width
+// N expands to N per-bit checks, while a two-signal check of widths M
+// and N expands to M*N. Kinds not listed here are two-signal.
+bool IsSingleSignalTimingCheck(TimingCheckKind kind);
+
+// §31.8: the two ways an implementation treats a vector terminal in a
+// timing check. `kSingle` is the default: a vector participates as a
+// unified signal, and a transition on any bit is considered a single
+// transition of that vector, yielding one timing check per invocation.
+// `kPerBit` is the optional mode the LRM allows a simulator to expose,
+// in which a vector is expanded bit-by-bit so that each bit becomes
+// its own timing check.
+enum class TimingCheckVectorMode : uint8_t {
+  kSingle,
+  kPerBit,
+};
+
+// §31.8: number of unique timing-check instances produced for a single
+// invocation given the reference and data terminal widths. In `kSingle`
+// mode the answer is always one, regardless of the widths. In `kPerBit`
+// mode the answer is `ref_width` for a single-signal check (the data
+// event is derived from the reference signal, so the data width does
+// not contribute) and `ref_width * data_width` for a two-signal check.
+// A zero width on either input collapses the product to zero so callers
+// that cannot determine a width upstream observe "no expansion" rather
+// than a spurious count.
+uint64_t TimingCheckExpandedCount(TimingCheckKind kind, uint32_t ref_width,
+                                  uint32_t data_width,
+                                  TimingCheckVectorMode mode);
+
 // =============================================================================
 // SDF annotation entry (§32)
 // =============================================================================
