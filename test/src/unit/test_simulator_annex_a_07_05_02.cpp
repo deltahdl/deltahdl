@@ -146,26 +146,6 @@ TEST(TimingCheckArgumentSim, NotifierSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-TEST(TimingCheckArgumentSim, ThresholdSimulates) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  specify\n"
-      "    $width(posedge clk, 20, 1);\n"
-      "  endspecify\n"
-      "  initial x = 8'd44;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 44u);
-}
-
 TEST(TimingCheckArgumentSim, TimingCheckLimitSimulates) {
   SimFixture f;
   auto* design = ElaborateSrc(

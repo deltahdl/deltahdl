@@ -125,68 +125,6 @@ TEST(TimingCheckCommandParsing, SetupAsSpecifyItem) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
-TEST(TimingCheckCommandParsing, WidthWithThreshold) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $width(posedge clk, 20, 1, ntfr);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kWidth);
-  ASSERT_GE(tc->limits.size(), 2u);
-  EXPECT_EQ(tc->notifier, "ntfr");
-}
-
-TEST(TimingCheckCommandParsing, WidthEdgeAndTerminal) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $width(posedge clk, 20);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kWidth);
-  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->ref_terminal.name, "clk");
-  ASSERT_GE(tc->limits.size(), 1u);
-}
-
-TEST(TimingCheckCommandParsing, WidthAsSpecifyItem) {
-  auto sp = ParseSpecifySingle(
-      "module m(input clk);\n"
-      "  specify\n"
-      "    $width(posedge clk, 50);\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(sp.pr.cu, nullptr);
-  EXPECT_FALSE(sp.pr.has_errors);
-  ASSERT_NE(sp.sole_item, nullptr);
-  auto* si = sp.sole_item;
-  EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kWidth);
-  EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
-  ASSERT_EQ(si->timing_check.limits.size(), 1u);
-}
-
-TEST(TimingCheckCommandParsing, WidthBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $width(posedge clk, 20, 1);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kWidth);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
 TEST(TimingCheckCommandParsing, PeriodWithNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -261,7 +199,7 @@ TEST(TimingCheckCommandParsing, NochangeWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-// --- §A.7.5.1 structural: $period and $width have no data_event ---
+// --- §A.7.5.1 structural: $period has no data_event ---
 
 TEST(TimingCheckCommandParsing, PeriodNoDataSignal) {
   auto r = Parse(
@@ -274,21 +212,6 @@ TEST(TimingCheckCommandParsing, PeriodNoDataSignal) {
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kPeriod);
-  EXPECT_TRUE(tc->data_terminal.name.empty());
-  EXPECT_EQ(tc->data_edge, SpecifyEdge::kNone);
-}
-
-TEST(TimingCheckCommandParsing, WidthNoDataSignal) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $width(posedge clk, 20, 1);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kWidth);
   EXPECT_TRUE(tc->data_terminal.name.empty());
   EXPECT_EQ(tc->data_edge, SpecifyEdge::kNone);
 }

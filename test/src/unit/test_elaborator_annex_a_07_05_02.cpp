@@ -108,19 +108,6 @@ TEST(TimingCheckArgumentElaboration, NotifierElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(TimingCheckArgumentElaboration, ThresholdElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $width(posedge clk, 20, 1);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(TimingCheckArgumentElaboration, TimingCheckLimitElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

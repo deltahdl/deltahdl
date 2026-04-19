@@ -453,7 +453,14 @@ bool Parser::CheckNextIsCommaOrRParen() {
 void Parser::ParseTimingCheckTrailingArgs(TimingCheckDecl& tc) {
   while (Match(TokenKind::kComma)) {
     if (Check(TokenKind::kRParen)) break;
-    if (Check(TokenKind::kIdentifier) && CheckNextIsCommaOrRParen()) {
+    // §31.4.4 Syntax 31-12: `$width(ref, limit, threshold [, [notifier]])` —
+    // the positional threshold slot is a constant_expression, which may be an
+    // identifier referencing a specparam. Don't let the generic
+    // identifier-before-`)` notifier heuristic swallow that slot.
+    bool width_needs_threshold =
+        tc.check_kind == TimingCheckKind::kWidth && tc.limits.size() < 2;
+    if (!width_needs_threshold && Check(TokenKind::kIdentifier) &&
+        CheckNextIsCommaOrRParen()) {
       tc.notifier = Consume().text;
       ParseExtendedTimingCheckArgs(tc);
       break;
@@ -587,7 +594,15 @@ SpecifyItem* Parser::ParseTimingCheck() {
     diag_.Error(item->loc,
                 "$fullskew requires two timing_check_limit arguments");
   }
-
+  // §31.4.4 Syntax 31-12 / Table 31-10: `$width` derives its data event
+  // as the opposite edge on the reference signal, so the reference event
+  // must carry an edge specification — a missing edge is a compilation
+  // error.
+  if (item->timing_check.check_kind == TimingCheckKind::kWidth &&
+      item->timing_check.ref_edge == SpecifyEdge::kNone) {
+    diag_.Error(item->loc,
+                "$width reference_event must be an edge specification");
+  }
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kSemicolon);
   return item;

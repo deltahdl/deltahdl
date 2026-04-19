@@ -343,6 +343,28 @@ bool SpecifyManager::CheckFullskewViolation(std::string_view ref,
   return false;
 }
 
+bool SpecifyManager::CheckWidthViolation(std::string_view ref,
+                                         uint64_t ref_time,
+                                         uint64_t data_time) const {
+  for (const auto& check : timing_checks_) {
+    if (check.kind != TimingCheckKind::kWidth) continue;
+    if (check.ref_signal != ref) continue;
+    // §31.4.4: the data event is the opposite-edge transition on the
+    // same reference signal, and the LRM states the two events shall
+    // never occur at the same simulation time. Treat a non-greater
+    // data_time as "no pulse closed yet" so callers need not pre-filter.
+    if (data_time <= ref_time) continue;
+    uint64_t elapsed = data_time - ref_time;
+    // §31.4.4: violation predicate is the two-sided strict inequality
+    //   threshold < elapsed < limit
+    // The strict upper bound encodes "pulse width >= limit avoids a
+    // violation"; the strict lower bound implements the glitch
+    // carve-out that suppresses pulses at or below `threshold`.
+    if (elapsed > check.threshold && elapsed < check.limit) return true;
+  }
+  return false;
+}
+
 bool ReportsFullskewViolation(uint64_t timestamp_time,
                               uint64_t next_event_time,
                               bool next_event_is_timecheck, uint64_t limit,

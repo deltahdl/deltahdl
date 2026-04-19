@@ -136,6 +136,10 @@ struct TimingCheckEntry {
   SpecifyEdge data_edge = SpecifyEdge::kNone;
   uint64_t limit = 0;
   uint64_t limit2 = 0;  // Second limit for $setuphold/$recrem
+  // §31.4.4: $width glitch-suppression threshold. Defaults to zero per the
+  // LRM, so unset entries behave as if no threshold was supplied and every
+  // pulse narrower than `limit` witnesses a violation.
+  uint64_t threshold = 0;
   std::string notifier;
 };
 
@@ -270,6 +274,19 @@ class SpecifyManager {
   bool CheckFullskewViolation(std::string_view ref, uint64_t ref_time,
                               std::string_view data,
                               uint64_t data_time) const;
+  // §31.4.4: $width. `ref`/`ref_time` identify the reference event
+  // (timestamp event on the reference signal); `data_time` is the time
+  // of the derived data event — the opposite edge on the same reference
+  // signal. The violation predicate is the two-sided strict inequality
+  //   threshold < (timecheck time) - (timestamp time) < limit
+  // The strict upper bound encodes "pulse width >= limit avoids a
+  // violation" and the strict lower bound implements the glitch
+  // carve-out (pulses at or below `threshold` are ignored). The LRM also
+  // forbids the reference and data events from occurring at the same
+  // simulation time; callers passing a non-greater `data_time` see no
+  // violation.
+  bool CheckWidthViolation(std::string_view ref, uint64_t ref_time,
+                           uint64_t data_time) const;
 
   uint32_t PathDelayCount() const {
     return static_cast<uint32_t>(path_delays_.size());

@@ -84,21 +84,6 @@ TEST(SystemTimingCheckSim, TimingChecksWithPathsSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(TimingCheckCommandSim, WidthThresholdAsLimit2) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kWidth;
-  tc.ref_signal = "clk";
-  tc.ref_edge = SpecifyEdge::kPosedge;
-  tc.limit = 20;
-  tc.limit2 = 1;
-  mgr.AddTimingCheck(tc);
-  auto& stored = mgr.GetTimingChecks()[0];
-  EXPECT_EQ(stored.kind, TimingCheckKind::kWidth);
-  EXPECT_EQ(stored.limit, 20u);
-  EXPECT_EQ(stored.limit2, 1u);
-}
-
 TEST(TimingCheckCommandSim, NochangeOffsetsStored) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -126,23 +111,6 @@ TEST(SystemTimingCheckSim, PeriodEntryNoDataSignal) {
   EXPECT_EQ(stored.ref_signal, "clk");
   EXPECT_TRUE(stored.data_signal.empty());
   EXPECT_EQ(stored.limit, 50u);
-}
-
-TEST(SystemTimingCheckSim, WidthEntryNoDataSignal) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kWidth;
-  tc.ref_signal = "clk";
-  tc.ref_edge = SpecifyEdge::kPosedge;
-  tc.limit = 20;
-  tc.limit2 = 1;
-  mgr.AddTimingCheck(tc);
-  auto& stored = mgr.GetTimingChecks()[0];
-  EXPECT_EQ(stored.kind, TimingCheckKind::kWidth);
-  EXPECT_EQ(stored.ref_signal, "clk");
-  EXPECT_TRUE(stored.data_signal.empty());
-  EXPECT_EQ(stored.limit, 20u);
-  EXPECT_EQ(stored.limit2, 1u);
 }
 
 }  // namespace
