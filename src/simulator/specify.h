@@ -191,6 +191,16 @@ bool ReportsFullskewViolation(uint64_t timestamp_time,
                               bool next_event_is_timecheck, uint64_t limit,
                               bool event_based_flag);
 
+// §31.6 Table 31-13: compute the post-violation value of a scalar notifier
+// variable given its pre-violation value, expressed as a single-bit
+// Logic4Word (only the low bit of aval/bval is consulted). The three
+// non-z pre-states toggle deterministically: 0 becomes 1, 1 becomes 0,
+// and x becomes 0 — the latter resolving the LRM's "Either 0 or 1"
+// allowance in the direction that lets the following violation re-enter
+// the 0↔1 cycle. A z pre-state is returned unchanged so an
+// unconnected notifier cannot be driven by violations.
+Logic4Word ToggleNotifierOnViolation(Logic4Word current);
+
 // =============================================================================
 // SDF annotation entry (§32)
 // =============================================================================

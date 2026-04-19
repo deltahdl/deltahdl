@@ -464,6 +464,35 @@ bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
   return elapsed > limit;
 }
 
+// =============================================================================
+// §31.6 notifier-update helper
+// =============================================================================
+
+Logic4Word ToggleNotifierOnViolation(Logic4Word current) {
+  const bool pre_a = (current.aval & 1u) != 0u;
+  const bool pre_b = (current.bval & 1u) != 0u;
+  Logic4Word result;
+  if (pre_a && pre_b) {
+    // z pre-state: preserve the dual-rail z encoding (aval=1, bval=1).
+    result.aval = 1u;
+    result.bval = 1u;
+  } else if (pre_b) {
+    // x pre-state: resolve to 0 so that successive violations drive the
+    // observable 0→1→0 toggle sequence.
+    result.aval = 0u;
+    result.bval = 0u;
+  } else if (pre_a) {
+    // 1 pre-state flips to 0.
+    result.aval = 0u;
+    result.bval = 0u;
+  } else {
+    // 0 pre-state flips to 1.
+    result.aval = 1u;
+    result.bval = 0u;
+  }
+  return result;
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,
