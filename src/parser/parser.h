@@ -120,6 +120,12 @@ class Parser {
   void ParseUdpPortDecls(UdpDecl* udp);
   void ParseUdpTable(UdpDecl* udp);
   void ParseUdpTableRow(UdpDecl* udp);
+  // Diagnose and skip a packed-range on a UDP port so parsing can continue.
+  void RejectUdpPortDimension();
+  // Diagnose and swallow an `inout` keyword appearing on a UDP port.
+  void RejectUdpInoutPort();
+  // Post-parse structural checks on a UDP header.
+  void ValidateUdpHeader(UdpDecl* udp);
   bool TryParseStrengthSpec(uint8_t& str0, uint8_t& str1);
   ModuleItem* ParseOneUdpInstance(const Token& udp_tok, SourceLoc loc);
   void ParseUdpInstList(const Token& udp_tok, std::vector<ModuleItem*>& items);

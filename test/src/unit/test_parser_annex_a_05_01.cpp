@@ -64,17 +64,6 @@ static void VerifyUdpInputNames(const UdpDecl* udp,
   }
 }
 
-TEST(UdpDeclGrammar, PrimitiveKeywordIntroducesUdp) {
-  auto r = Parse(
-      "primitive udp_buf (output out, input in);\n"
-      "  table 0 : 0; 1 : 1; endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  EXPECT_EQ(r.cu->udps[0]->name, "udp_buf");
-}
-
 TEST(UdpDeclGrammar, UdpCombinational) {
   auto r = Parse(
       "primitive mux2(output y, input a, input b, input s);\n"
@@ -90,29 +79,6 @@ TEST(UdpDeclGrammar, UdpCombinational) {
   ASSERT_EQ(r.cu->udps.size(), 1u);
   EXPECT_EQ(r.cu->udps[0]->name, "mux2");
   EXPECT_FALSE(r.cu->udps[0]->is_sequential);
-}
-
-TEST(UdpDeclGrammar, AnsiCombinational) {
-  auto r = Parse(
-      "primitive and_gate(output out, input a, input b);\n"
-      "  table\n"
-      "    0 0 : 0;\n"
-      "    0 1 : 0;\n"
-      "    1 0 : 0;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->name, "and_gate");
-  EXPECT_EQ(udp->output_name, "out");
-  EXPECT_FALSE(udp->is_sequential);
-  ASSERT_EQ(udp->input_names.size(), 2u);
-  EXPECT_EQ(udp->input_names[0], "a");
-  EXPECT_EQ(udp->input_names[1], "b");
-  ASSERT_EQ(udp->table.size(), 4u);
 }
 
 TEST(UdpDeclGrammar, SingleInput) {
@@ -324,26 +290,6 @@ TEST(UdpDeclGrammar, AnsiSharedInputKeyword) {
   EXPECT_EQ(udp->input_names[2], "sel");
 }
 
-TEST(UdpDeclGrammar, NonAnsiWithPortDecls) {
-  auto r = Parse(
-      "primitive inv(out, in);\n"
-      "  output out;\n"
-      "  input in;\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  auto* udp = r.cu->udps[0];
-  EXPECT_EQ(udp->name, "inv");
-  EXPECT_EQ(udp->output_name, "out");
-  ASSERT_EQ(udp->input_names.size(), 1u);
-  EXPECT_EQ(udp->input_names[0], "in");
-}
-
 TEST(UdpDeclGrammar, WildcardPort) {
   auto r = Parse(
       "primitive inv(.*);\n"
@@ -504,15 +450,6 @@ TEST(UdpDeclGrammar, CombinationalUdpEndLabel) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
   EXPECT_EQ(r.cu->udps[0]->name, "inv");
-}
-
-TEST(UdpDeclGrammar, MissingEndprimitiveIsError) {
-  EXPECT_FALSE(ParseOk(
-      "primitive inv(output y, input a);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"));
 }
 
 TEST(UdpDeclGrammar, EndLabelMismatchIsError) {

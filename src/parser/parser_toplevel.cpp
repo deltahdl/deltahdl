@@ -623,6 +623,39 @@ void Parser::ParseUdpInstList(const Token& udp_tok,
 
 // --- UDP declaration (§29) ---
 
+void Parser::RejectUdpPortDimension() {
+  // §29.3.1: a UDP port shall be scalar; skip any range so the rest of the
+  // port declaration can still parse.
+  if (!Check(TokenKind::kLBracket)) return;
+  diag_.Error(CurrentLoc(),
+              "UDP port shall be scalar; vector range not permitted");
+  int depth = 0;
+  do {
+    if (Check(TokenKind::kLBracket))
+      ++depth;
+    else if (Check(TokenKind::kRBracket))
+      --depth;
+    Consume();
+  } while (depth > 0 && !AtEnd());
+}
+
+void Parser::RejectUdpInoutPort() {
+  // §29.3.1: bidirectional ports are not legal on a UDP.
+  diag_.Error(CurrentLoc(),
+              "UDP ports shall be input or output; inout not permitted");
+  Consume();
+}
+
+void Parser::ValidateUdpHeader(UdpDecl* udp) {
+  // §29.3.1: every UDP has exactly one output and one or more inputs.
+  if (udp->output_name.empty()) {
+    diag_.Error(udp->range.start, "UDP shall have exactly one output port");
+  }
+  if (udp->input_names.empty()) {
+    diag_.Error(udp->range.start, "UDP shall have at least one input port");
+  }
+}
+
 static char UdpCharFromToken(const Token& tok) {
   if (tok.kind == TokenKind::kStar) return '*';
   if (tok.kind == TokenKind::kMinus) return '-';
@@ -649,7 +682,13 @@ void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
   if (Match(TokenKind::kKwReg)) {
     udp->is_sequential = true;
   }
-  udp->output_name = Expect(TokenKind::kIdentifier).text;
+  RejectUdpPortDimension();
+  auto id_tok = Expect(TokenKind::kIdentifier);
+  // §29.3.1: a UDP has exactly one output port.
+  if (!udp->output_name.empty()) {
+    diag_.Error(id_tok.loc, "UDP shall have exactly one output port");
+  }
+  udp->output_name = id_tok.text;
   if (Match(TokenKind::kEq)) {
     udp->has_initial = true;
     udp->initial_value =
@@ -665,8 +704,10 @@ void Parser::ParseUdpPortDecls(UdpDecl* udp) {
     if (Match(TokenKind::kKwOutput)) {
       ParseUdpOutputDecl(udp);
     } else if (Match(TokenKind::kKwInput)) {
+      RejectUdpPortDimension();
       udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
       while (Match(TokenKind::kComma)) {
+        RejectUdpPortDimension();
         udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
       }
       Expect(TokenKind::kSemicolon);
@@ -674,6 +715,11 @@ void Parser::ParseUdpPortDecls(UdpDecl* udp) {
       udp->is_sequential = true;
       Expect(TokenKind::kIdentifier);
       Expect(TokenKind::kSemicolon);
+    } else if (Check(TokenKind::kKwInout)) {
+      RejectUdpInoutPort();
+      // Recover by skipping to the terminating semicolon.
+      while (!Check(TokenKind::kSemicolon) && !AtEnd()) Consume();
+      Match(TokenKind::kSemicolon);
     } else {
       break;
     }
@@ -736,11 +782,16 @@ UdpDecl* Parser::ParseUdpDecl() {
     ParseUdpPortDecls(udp);
   } else {
     ParseAttributes();
+    if (Check(TokenKind::kKwInout)) {
+      // §29.3.1: output must be the first port, and inout is never legal.
+      RejectUdpInoutPort();
+    }
     if (Check(TokenKind::kKwOutput)) {
       Consume();
       if (Match(TokenKind::kKwReg)) {
         udp->is_sequential = true;
       }
+      RejectUdpPortDimension();
       udp->output_name = Expect(TokenKind::kIdentifier).text;
       if (Match(TokenKind::kEq)) {
         udp->has_initial = true;
@@ -749,19 +800,34 @@ UdpDecl* Parser::ParseUdpDecl() {
       }
       while (Match(TokenKind::kComma)) {
         ParseAttributes();
-        Match(TokenKind::kKwInput);
+        if (Check(TokenKind::kKwInout)) {
+          RejectUdpInoutPort();
+        } else {
+          Match(TokenKind::kKwInput);
+        }
+        RejectUdpPortDimension();
         udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
       }
       Expect(TokenKind::kRParen);
       Expect(TokenKind::kSemicolon);
     } else {
-      Expect(TokenKind::kIdentifier);
+      // Non-ANSI port list: plain identifiers. §29.3.1 requires that the
+      // first of these identifies the output port; remember it so the
+      // subsequent declarations can be checked.
+      auto first_tok = Expect(TokenKind::kIdentifier);
+      std::string_view first_name = first_tok.text;
+      SourceLoc first_loc = first_tok.loc;
       while (Match(TokenKind::kComma)) {
         Expect(TokenKind::kIdentifier);
       }
       Expect(TokenKind::kRParen);
       Expect(TokenKind::kSemicolon);
       ParseUdpPortDecls(udp);
+      if (!udp->output_name.empty() && !first_name.empty() &&
+          first_name != udp->output_name) {
+        diag_.Error(first_loc,
+                    "UDP output port shall be the first port in the port list");
+      }
     }
   }
 
@@ -778,6 +844,7 @@ UdpDecl* Parser::ParseUdpDecl() {
   Expect(TokenKind::kKwEndprimitive);
   MatchEndLabel(udp->name);
   udp->range.end = CurrentLoc();
+  ValidateUdpHeader(udp);
   return udp;
 }
 
@@ -790,20 +857,30 @@ UdpDecl* Parser::ParseExternUdpDecl() {
   // Port list (forward declaration only — no body/table).
   Expect(TokenKind::kLParen);
   ParseAttributes();
+  if (Check(TokenKind::kKwInout)) {
+    RejectUdpInoutPort();
+  }
   if (Check(TokenKind::kKwOutput)) {
     // ANSI form: (output [reg] name, input in1, ...)
     Consume();
     if (Match(TokenKind::kKwReg)) {
       udp->is_sequential = true;
     }
+    RejectUdpPortDimension();
     udp->output_name = Expect(TokenKind::kIdentifier).text;
     while (Match(TokenKind::kComma)) {
       ParseAttributes();
-      Match(TokenKind::kKwInput);
+      if (Check(TokenKind::kKwInout)) {
+        RejectUdpInoutPort();
+      } else {
+        Match(TokenKind::kKwInput);
+      }
+      RejectUdpPortDimension();
       udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
     }
   } else {
-    // Non-ANSI form: plain identifiers
+    // Non-ANSI form: plain identifiers. The first identifier names the
+    // output port per §29.3.1.
     udp->output_name = Expect(TokenKind::kIdentifier).text;
     while (Match(TokenKind::kComma)) {
       udp->input_names.push_back(Expect(TokenKind::kIdentifier).text);
@@ -812,6 +889,7 @@ UdpDecl* Parser::ParseExternUdpDecl() {
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kSemicolon);
   udp->range.end = CurrentLoc();
+  ValidateUdpHeader(udp);
   return udp;
 }
 
