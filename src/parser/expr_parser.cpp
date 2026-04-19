@@ -770,6 +770,13 @@ Expr* Parser::ParseSelectExpr(Expr* base) {
 
 Expr* Parser::ParseSystemCall() {
   auto tok = Consume();
+  // §31.2: timing check names only appear inside specify blocks, which drive
+  // their own parser. Hitting one here means it is being used as a system
+  // task in procedural or expression context — diagnose, then parse the
+  // remaining tokens as a system call to keep downstream recovery sane.
+  if (IsTimingCheckName(tok.text)) {
+    diag_.Error(tok.loc, "timing check cannot appear in procedural code");
+  }
   // §3.12.1: $unit::identifier — scope-qualified reference to CU scope.
   if (tok.text == "$unit" && Check(TokenKind::kColonColon)) {
     Consume();  // ::

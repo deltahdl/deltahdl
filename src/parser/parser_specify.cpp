@@ -2,8 +2,8 @@
 
 namespace delta {
 
-// Determine if a system identifier is a timing check keyword.
-static bool IsTimingCheckName(std::string_view name) {
+// Determine if a system identifier is a timing check keyword (§31.2).
+bool Parser::IsTimingCheckName(std::string_view name) {
   return name == "$setup" || name == "$hold" || name == "$setuphold" ||
          name == "$recovery" || name == "$removal" || name == "$recrem" ||
          name == "$width" || name == "$period" || name == "$skew" ||
@@ -87,13 +87,22 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
     items.push_back(ParseSpecparamInSpecify());
     return;
   }
-  // Timing checks: $setup, $hold, etc.
+  // Timing checks: $setup, $hold, etc. §31.2 bars any other system task from a
+  // specify block — emit a targeted diagnostic before resyncing below.
   if (Check(TokenKind::kSystemIdentifier)) {
     auto name = CurrentToken().text;
     if (IsTimingCheckName(name)) {
       items.push_back(ParseTimingCheck());
       return;
     }
+    diag_.Error(CurrentLoc(), "system task cannot appear in specify block");
+    while (!AtEnd() && !Check(TokenKind::kSemicolon) &&
+           !Check(TokenKind::kKwEndspecify) &&
+           !Check(TokenKind::kKwEndmodule)) {
+      Consume();
+    }
+    if (Check(TokenKind::kSemicolon)) Consume();
+    return;
   }
   // ifnone path
   if (Check(TokenKind::kKwIfnone)) {

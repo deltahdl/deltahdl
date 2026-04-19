@@ -169,6 +169,7 @@ class Parser {
   void ParseEdgeDescriptorList(std::vector<std::pair<char, char>>& descriptors);
   SpecifyPolarity ParseSpecifyPolarity();
   TimingCheckKind ParseTimingCheckKind(std::string_view name);
+  static bool IsTimingCheckName(std::string_view name);
   bool CheckNextIsCommaOrRParen();
   void ParseTimingCheckTrailingArgs(TimingCheckDecl& tc);
   void ParseExtendedTimingCheckArgs(TimingCheckDecl& tc);
