@@ -239,6 +239,23 @@ bool SpecifyManager::CheckRemovalViolation(std::string_view ref,
   return false;
 }
 
+bool SpecifyManager::CheckRecoveryViolation(std::string_view ref,
+                                            uint64_t ref_time,
+                                            std::string_view data,
+                                            uint64_t data_time) const {
+  for (const auto& check : timing_checks_) {
+    if (check.kind != TimingCheckKind::kRecovery) continue;
+    if (check.ref_signal != ref) continue;
+    if (check.data_signal != data) continue;
+    // §31.3.5: window is [ref_time, ref_time + limit); only the end is
+    // excluded from the violation region, so the lower bound is inclusive
+    // and the upper bound is strict.
+    if (data_time >= ref_time && data_time - ref_time < check.limit)
+      return true;
+  }
+  return false;
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,

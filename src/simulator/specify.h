@@ -185,6 +185,11 @@ class SpecifyManager {
   // the data_event (the timestamp event, typically a clock).
   bool CheckRemovalViolation(std::string_view ref, uint64_t ref_time,
                              std::string_view data, uint64_t data_time) const;
+  // §31.3.5: $recovery. `ref`/`ref_time` identify the reference_event (the
+  // timestamp event, typically a control signal); `data`/`data_time` identify
+  // the data_event (the timecheck event, typically a clock).
+  bool CheckRecoveryViolation(std::string_view ref, uint64_t ref_time,
+                              std::string_view data, uint64_t data_time) const;
 
   uint32_t PathDelayCount() const {
     return static_cast<uint32_t>(path_delays_.size());
