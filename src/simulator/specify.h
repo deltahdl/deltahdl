@@ -140,6 +140,12 @@ struct TimingCheckEntry {
   // LRM, so unset entries behave as if no threshold was supplied and every
   // pulse narrower than `limit` witnesses a violation.
   uint64_t threshold = 0;
+  // §31.4.6: $nochange start_edge_offset and end_edge_offset. Signed
+  // because the LRM explicitly allows negative offsets to shrink the
+  // violation region; zero-initialised, leaving the region equal to the
+  // reference signal's level interval when unset.
+  int64_t start_edge_offset = 0;
+  int64_t end_edge_offset = 0;
   std::string notifier;
 };
 
@@ -297,6 +303,21 @@ class SpecifyManager {
   // pre-filter.
   bool CheckPeriodViolation(std::string_view ref, uint64_t ref_time,
                             uint64_t data_time) const;
+  // §31.4.6: $nochange. `ref`/`leading_ref_time`/`trailing_ref_time`
+  // identify the three-transition reference event (the leading edge
+  // opens the time window, the trailing edge closes it); `data`/
+  // `data_time` identify the data event. The violation predicate is
+  //   (leading_ref_time - start_edge_offset) < data_time
+  //     < (trailing_ref_time + end_edge_offset)
+  // with strict inequalities on both endpoints, folding in §31.4.6's
+  // "end points of the time window are not included" rule and the
+  // example's simultaneous-edge carve-out when offsets are zero.
+  // `start_edge_offset` and `end_edge_offset` on the stored entry are
+  // signed: a positive value extends the window past the reference
+  // edge, and a negative value shrinks the window inward.
+  bool CheckNochangeViolation(std::string_view ref, uint64_t leading_ref_time,
+                              uint64_t trailing_ref_time,
+                              std::string_view data, uint64_t data_time) const;
 
   uint32_t PathDelayCount() const {
     return static_cast<uint32_t>(path_delays_.size());

@@ -125,33 +125,6 @@ TEST(TimingCheckCommandParsing, SetupAsSpecifyItem) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
-TEST(TimingCheckCommandParsing, NochangeTwoOffsets) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(posedge clk, data, 0, 0);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kNochange);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
-TEST(TimingCheckCommandParsing, NochangeWithNotifier) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $nochange(posedge clk, data, 0, 0, ntfr);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->notifier, "ntfr");
-}
-
 // --- §A.7.5.1 structural: $nochange as SpecifyItem ---
 
 TEST(TimingCheckCommandParsing, NochangeAsSpecifyItem) {

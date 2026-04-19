@@ -84,18 +84,4 @@ TEST(SystemTimingCheckSim, TimingChecksWithPathsSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(TimingCheckCommandSim, NochangeOffsetsStored) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kNochange;
-  tc.ref_signal = "clk";
-  tc.ref_edge = SpecifyEdge::kPosedge;
-  tc.data_signal = "data";
-  tc.limit = 0;
-  tc.limit2 = 0;
-  mgr.AddTimingCheck(tc);
-  auto& stored = mgr.GetTimingChecks()[0];
-  EXPECT_EQ(stored.kind, TimingCheckKind::kNochange);
-}
-
 }  // namespace

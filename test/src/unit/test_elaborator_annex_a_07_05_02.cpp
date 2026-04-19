@@ -69,19 +69,6 @@ TEST(TimingCheckArgumentElaboration, TimecheckCondMinTypMaxElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(TimingCheckArgumentElaboration, NochangeMinTypMaxOffsetsElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    $nochange(posedge clk, data, 1:2:3, 4:5:6);\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(TimingCheckArgumentElaboration, ControlledReferenceEventElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

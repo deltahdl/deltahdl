@@ -365,6 +365,39 @@ bool SpecifyManager::CheckWidthViolation(std::string_view ref,
   return false;
 }
 
+bool SpecifyManager::CheckNochangeViolation(std::string_view ref,
+                                            uint64_t leading_ref_time,
+                                            uint64_t trailing_ref_time,
+                                            std::string_view data,
+                                            uint64_t data_time) const {
+  for (const auto& check : timing_checks_) {
+    if (check.kind != TimingCheckKind::kNochange) continue;
+    if (check.ref_signal != ref) continue;
+    if (check.data_signal != data) continue;
+    // §31.4.6 violation predicate:
+    //   (leading_ref - start_edge_offset) < data_time
+    //     < (trailing_ref + end_edge_offset)
+    // Offsets are signed — a positive start_edge_offset extends the
+    // window earlier, and a negative one shrinks the window's start
+    // later; the end_edge_offset is symmetric about the trailing edge.
+    // Compute in int64_t so that negative offsets applied to a small
+    // reference-edge time do not underflow.
+    int64_t begin = static_cast<int64_t>(leading_ref_time) -
+                    check.start_edge_offset;
+    int64_t end = static_cast<int64_t>(trailing_ref_time) +
+                  check.end_edge_offset;
+    int64_t t = static_cast<int64_t>(data_time);
+    // Strict inequalities encode §31.4.6's "end points of the time
+    // window are not included" rule. The same exclusion also
+    // implements the example's simultaneous-edge carve-out: when both
+    // offsets are zero, a data event at the leading or trailing
+    // reference edge lands exactly on an endpoint and does not
+    // violate.
+    if (begin < t && t < end) return true;
+  }
+  return false;
+}
+
 bool SpecifyManager::CheckPeriodViolation(std::string_view ref,
                                           uint64_t ref_time,
                                           uint64_t data_time) const {

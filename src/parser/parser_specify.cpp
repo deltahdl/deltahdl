@@ -612,6 +612,25 @@ SpecifyItem* Parser::ParseTimingCheck() {
     diag_.Error(item->loc,
                 "$period reference_event must be an edge specification");
   }
+  // §31.4.6 Syntax 31-14 / Table 31-12: `$nochange` requires both
+  // start_edge_offset and end_edge_offset as mandatory positional
+  // arguments, and the reference_event is described as "Edge triggered"
+  // and limited to the posedge or negedge keyword — the edge-control
+  // specifiers of §31.5 (`edge` with or without a descriptor list) are
+  // explicitly disallowed.
+  if (item->timing_check.check_kind == TimingCheckKind::kNochange) {
+    if (item->timing_check.limits.size() < 2) {
+      diag_.Error(item->loc,
+                  "$nochange requires both start_edge_offset and "
+                  "end_edge_offset arguments");
+    }
+    if (item->timing_check.ref_edge != SpecifyEdge::kPosedge &&
+        item->timing_check.ref_edge != SpecifyEdge::kNegedge) {
+      diag_.Error(item->loc,
+                  "$nochange reference_event must use posedge or negedge "
+                  "(edge-control specifiers are not allowed)");
+    }
+  }
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kSemicolon);
   return item;
