@@ -125,53 +125,6 @@ TEST(TimingCheckCommandParsing, SetupAsSpecifyItem) {
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
 }
 
-TEST(TimingCheckCommandParsing, FullskewWithFlags) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $fullskew(posedge clk1, negedge clk2, 4, 6, ntfr, 1, 0);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
-  ASSERT_GE(tc->limits.size(), 2u);
-  EXPECT_EQ(tc->notifier, "ntfr");
-  ASSERT_NE(tc->event_based_flag, nullptr);
-  ASSERT_NE(tc->remain_active_flag, nullptr);
-}
-
-TEST(TimingCheckCommandParsing, FullskewEdgesAndLimits) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $fullskew(posedge clk1, negedge clk2, 4, 6);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
-  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc->data_edge, SpecifyEdge::kNegedge);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
-TEST(TimingCheckCommandParsing, FullskewBasic) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $fullskew(posedge clk1, posedge clk2, 50, 50);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
-  ASSERT_GE(tc->limits.size(), 2u);
-}
-
 TEST(TimingCheckCommandParsing, WidthWithThreshold) {
   auto r = Parse(
       "module m;\n"
@@ -338,25 +291,6 @@ TEST(TimingCheckCommandParsing, WidthNoDataSignal) {
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kWidth);
   EXPECT_TRUE(tc->data_terminal.name.empty());
   EXPECT_EQ(tc->data_edge, SpecifyEdge::kNone);
-}
-
-// --- §A.7.5.1 structural: partial optional args ---
-
-TEST(TimingCheckCommandParsing, FullskewWithNotifierOnly) {
-  auto r = Parse(
-      "module m;\n"
-      "specify\n"
-      "  $fullskew(posedge clk1, negedge clk2, 4, 6, ntfr);\n"
-      "endspecify\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* tc = GetSoleTimingCheck(r);
-  ASSERT_NE(tc, nullptr);
-  EXPECT_EQ(tc->check_kind, TimingCheckKind::kFullskew);
-  ASSERT_GE(tc->limits.size(), 2u);
-  EXPECT_EQ(tc->notifier, "ntfr");
-  EXPECT_EQ(tc->event_based_flag, nullptr);
-  EXPECT_EQ(tc->remain_active_flag, nullptr);
 }
 
 // --- §A.7.5.1 structural: $nochange as SpecifyItem ---

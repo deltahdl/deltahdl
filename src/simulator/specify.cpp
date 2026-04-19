@@ -318,6 +318,53 @@ bool SpecifyManager::CheckTimeskewViolation(std::string_view ref,
   return false;
 }
 
+bool SpecifyManager::CheckFullskewViolation(std::string_view ref,
+                                            uint64_t ref_time,
+                                            std::string_view data,
+                                            uint64_t data_time) const {
+  for (const auto& check : timing_checks_) {
+    if (check.kind != TimingCheckKind::kFullskew) continue;
+    if (check.ref_signal != ref) continue;
+    if (check.data_signal != data) continue;
+    // §31.4.3: the reference and data events can transition in either
+    // order. When the reference transitions first it is the timestamp
+    // event and the active window is bounded by limit 1; when the data
+    // event transitions first the roles invert and limit 2 applies. The
+    // strict inequality also encodes both carve-outs the LRM spells out:
+    // simultaneous transitions never violate (even at zero limit), and a
+    // new timestamp event arriving exactly at the elapsed boundary does
+    // not violate.
+    if (ref_time < data_time) {
+      if (data_time - ref_time > check.limit) return true;
+    } else if (data_time < ref_time) {
+      if (ref_time - data_time > check.limit2) return true;
+    }
+  }
+  return false;
+}
+
+bool ReportsFullskewViolation(uint64_t timestamp_time,
+                              uint64_t next_event_time,
+                              bool next_event_is_timecheck, uint64_t limit,
+                              bool event_based_flag) {
+  // §31.4.3: events at or before the timestamp do not open a window.
+  // This subsumes the simultaneous-transition carve-out (no violation
+  // when both events coincide, even at zero limit).
+  if (next_event_time <= timestamp_time) return false;
+  uint64_t elapsed = next_event_time - timestamp_time;
+  if (event_based_flag) {
+    // Event-based mode behaves like $skew for this window: only a
+    // timecheck event past the limit witnesses a violation; a fresh
+    // timestamp event silently begins a new window.
+    return next_event_is_timecheck && elapsed > limit;
+  }
+  // Timer-based default: once the timer elapses any later event — a
+  // timecheck or a fresh timestamp — witnesses a violation. Events
+  // arriving exactly at the boundary do not violate, matching the
+  // strict inequality and the explicit exact-expiration rule.
+  return elapsed > limit;
+}
+
 bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
                               bool next_event_is_data, uint64_t limit,
                               bool event_based_flag) {

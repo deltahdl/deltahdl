@@ -579,6 +579,14 @@ SpecifyItem* Parser::ParseTimingCheck() {
     diag_.Error(item->loc,
                 "$recrem requires two timing_check_limit arguments");
   }
+  // §31.4.3 Syntax 31-11: `$fullskew` takes two timing_check_limit args —
+  // limit 1 bounds the data-after-reference window and limit 2 bounds the
+  // reference-after-data window. Both slots are positional and mandatory.
+  if (item->timing_check.check_kind == TimingCheckKind::kFullskew &&
+      item->timing_check.limits.size() < 2) {
+    diag_.Error(item->loc,
+                "$fullskew requires two timing_check_limit arguments");
+  }
 
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kSemicolon);

@@ -158,6 +158,29 @@ bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
                               bool next_event_is_data, uint64_t limit,
                               bool event_based_flag);
 
+// §31.4.3: classify whether a single $fullskew observation interval
+// reports a violation. `timestamp_time` is the time of the timestamp
+// event (whichever of the reference_event or data_event transitioned
+// first for this interval); `next_event_time` is the time of the next
+// observed event, with `next_event_is_timecheck` distinguishing the
+// timecheck event of the same interval (true) from a fresh timestamp
+// event (false). `limit` is the configured non-negative skew limit —
+// callers pass limit 1 when the reference transitioned first and
+// limit 2 when the data event transitioned first, matching the two
+// directional windows §31.4.3 defines. With `event_based_flag` false
+// (the default), $fullskew is timer-based: a violation is reported
+// when any event — timecheck or a fresh timestamp — arrives strictly
+// past the elapsed limit, and the exact-expiration boundary is
+// excluded. With `event_based_flag` set, $fullskew behaves like $skew
+// for that window: only a timecheck event strictly past the limit can
+// violate, and a fresh timestamp event silently re-arms the wait.
+// This helper captures the per-interval classification only;
+// multi-interval dormancy is the caller's responsibility.
+bool ReportsFullskewViolation(uint64_t timestamp_time,
+                              uint64_t next_event_time,
+                              bool next_event_is_timecheck, uint64_t limit,
+                              bool event_based_flag);
+
 // =============================================================================
 // SDF annotation entry (§32)
 // =============================================================================
@@ -232,6 +255,19 @@ class SpecifyManager {
   // even at zero limit) and the exact-expiration rule (no violation when a
   // new timestamp event lands precisely at the elapsed-limit boundary).
   bool CheckTimeskewViolation(std::string_view ref, uint64_t ref_time,
+                              std::string_view data,
+                              uint64_t data_time) const;
+  // §31.4.3: $fullskew. `ref`/`ref_time` identify the reference_event,
+  // `data`/`data_time` identify the data_event; either may transition
+  // first. The active window uses `limit` (limit 1) when the reference
+  // transitions first and `limit2` (limit 2) when the data event
+  // transitions first, consistent with §31.4.3's direction-dependent
+  // definition. The violation predicate is the strict inequality
+  //   (timecheck time) - (timestamp time) > limit
+  // which also folds in §31.4.3's simultaneous-transition carve-out
+  // (no violation when both events coincide, even at zero limit) and
+  // the exact-expiration rule for a new timestamp event.
+  bool CheckFullskewViolation(std::string_view ref, uint64_t ref_time,
                               std::string_view data,
                               uint64_t data_time) const;
 
