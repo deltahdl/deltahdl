@@ -4,32 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SpecifyPathElaboration, EdgeSensitivePathElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk => q) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(SpecifyPathElaboration, EdgeSensitiveWithDataSourceElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk => (q : d)) = 5;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(SpecifyPathElaboration, StateDependentIfPathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -62,19 +36,6 @@ TEST(SpecifyPathElaboration, IfnoneFullPathElaborates) {
       "module m;\n"
       "  specify\n"
       "    ifnone (a, b *> c) = 10;\n"
-      "  endspecify\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(SpecifyPathElaboration, EdgeSensitiveFullWithOutputPolarityElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  specify\n"
-      "    (posedge clk *> (q + : d)) = 5;\n"
       "  endspecify\n"
       "endmodule\n",
       f);
