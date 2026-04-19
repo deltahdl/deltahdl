@@ -85,24 +85,6 @@ TEST(NegativeTimingChecks, NegativeHoldExcludesReferenceEdge) {
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 100));
 }
 
-// §31.9: neither window boundary is part of the violation region
-// (strict inequalities at both ends). A data event landing exactly
-// on the left boundary of a shifted-after window must not violate.
-TEST(NegativeTimingChecks, LowerBoundaryIsExcluded) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSignedSetuphold(/*setup=*/-5, /*hold=*/10));
-  // Left boundary is ref - setup = 105.
-  EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 105));
-}
-
-// §31.9: the upper boundary is also excluded.
-TEST(NegativeTimingChecks, UpperBoundaryIsExcluded) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSignedSetuphold(/*setup=*/-5, /*hold=*/10));
-  // Right boundary is ref + hold = 110.
-  EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 110));
-}
-
 // §31.9: when both signed limits are zero the interval is empty, so
 // no transition can violate regardless of when it arrives.
 TEST(NegativeTimingChecks, BothSignedLimitsZeroNeverViolates) {

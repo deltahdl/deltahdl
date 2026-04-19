@@ -581,6 +581,77 @@ uint64_t TimingCheckExpandedCount(TimingCheckKind kind, uint32_t ref_width,
   return static_cast<uint64_t>(ref_width) * static_cast<uint64_t>(data_width);
 }
 
+// =============================================================================
+// §31.9.1 negative-timing-check helpers
+// =============================================================================
+
+bool TimingCheckUsesDelayedSignals(TimingCheckKind kind) {
+  switch (kind) {
+    // Window-based and single-signal kinds — limits are adjusted so the
+    // notifier fires at the proper moment against the delayed signals.
+    case TimingCheckKind::kSetup:
+    case TimingCheckKind::kHold:
+    case TimingCheckKind::kSetuphold:
+    case TimingCheckKind::kRecovery:
+    case TimingCheckKind::kRemoval:
+    case TimingCheckKind::kRecrem:
+    case TimingCheckKind::kWidth:
+    case TimingCheckKind::kPeriod:
+    case TimingCheckKind::kNochange:
+      return true;
+    // Event-order kinds — delaying the inputs can reverse the observed
+    // order of transitions, so the LRM forbids using the delayed copies
+    // for these checks.
+    case TimingCheckKind::kSkew:
+    case TimingCheckKind::kFullskew:
+    case TimingCheckKind::kTimeskew:
+      return false;
+  }
+  return false;
+}
+
+AdjustedNegativeTimingLimit AdjustNegativeTimingCheckLimit(
+    int64_t adjusted_limit) {
+  // The LRM collapses "adjusted below zero" and "exactly zero" into one
+  // case: both drop the limit to zero and require a warning. Only a
+  // strictly positive input is accepted unchanged.
+  if (adjusted_limit <= 0) {
+    return {0u, true};
+  }
+  return {static_cast<uint64_t>(adjusted_limit), false};
+}
+
+bool NegativeTimingWindowCanYieldViolation(int64_t lower, int64_t upper,
+                                           uint64_t precision_ticks) {
+  // An empty or inverted interval has no interior, so no sample point
+  // can ever lie strictly between the endpoints.
+  if (upper <= lower) return false;
+  // Rule (a): the interval must span at least two units of simulation
+  // precision for any sample point to fall strictly inside the open
+  // window. Scaling the two-unit floor by the caller's precision keeps
+  // the rule correct regardless of the underlying tick size.
+  const int64_t min_width = 2 * static_cast<int64_t>(precision_ticks);
+  return (upper - lower) >= min_width;
+}
+
+bool ZeroSmallestNegativeTimingLimit(std::vector<int64_t>& limits) {
+  // Track the index of the negative entry nearest to zero — the
+  // conservative "least change" choice. Ties keep the earliest index
+  // because the later entries compare as "strictly greater" against
+  // the already-recorded value only when they actually are closer to
+  // zero.
+  size_t best_index = limits.size();
+  for (size_t i = 0; i < limits.size(); ++i) {
+    if (limits[i] >= 0) continue;
+    if (best_index == limits.size() || limits[i] > limits[best_index]) {
+      best_index = i;
+    }
+  }
+  if (best_index == limits.size()) return false;
+  limits[best_index] = 0;
+  return true;
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,

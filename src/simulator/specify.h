@@ -284,6 +284,70 @@ uint64_t TimingCheckExpandedCount(TimingCheckKind kind, uint32_t ref_width,
                                   uint32_t data_width,
                                   TimingCheckVectorMode mode);
 
+// §31.9.1: whether a given timing-check kind consumes the delayed
+// versions of its data and reference signals when the negative-timing
+// option is enabled. The nine window-based and single-signal kinds
+// ($setup, $hold, $setuphold, $recovery, $removal, $recrem, $width,
+// $period, $nochange) consume the delayed signals so that their
+// notifiers toggle at the proper moment. The three event-order kinds
+// ($skew, $fullskew, $timeskew) must not, because delaying their
+// inputs can reverse the observed order of transitions and cause the
+// notifiers to fire at the wrong time relative to the rest of the
+// model.
+bool TimingCheckUsesDelayedSignals(TimingCheckKind kind);
+
+// §31.9.1: outcome of adjusting a setup, hold, recovery, or removal
+// limit for the internal shift that makes the violation window overlap
+// the delayed reference signal. `limit` is the non-negative value to
+// install on the TimingCheckEntry — either the unchanged adjusted
+// value when it stays strictly positive, or zero when the LRM's
+// less-than-or-equal-to-zero rule clamps it. `warn` records whether
+// the simulator must emit the warning the LRM requires on every
+// clamp.
+struct AdjustedNegativeTimingLimit {
+  uint64_t limit;
+  bool warn;
+};
+
+// §31.9.1: clamp an adjusted negative-timing-check limit to zero when
+// the adjustment pushed it to or below zero, and signal the warning
+// the LRM requires in that case. A strictly positive input is
+// returned unchanged with `warn` false; any value at or below zero
+// collapses to zero with `warn` set. The helper does not differentiate
+// between the negative-adjustment and exactly-zero paths because the
+// LRM folds both into the same rule.
+AdjustedNegativeTimingLimit AdjustNegativeTimingCheckLimit(
+    int64_t adjusted_limit);
+
+// §31.9.1 rule (a): whether a negative-timing-check violation window
+// is wide enough to ever witness a transition. Callers supply the
+// two signed endpoints of the open interval `(lower, upper)` that
+// the runtime would otherwise evaluate, plus `precision_ticks` — the
+// number of simulation time ticks that make up one unit of
+// simulation precision. Returns true only when the interval spans at
+// least two units of simulation precision, reflecting the LRM's
+// statement that narrower windows cannot yield timing violations
+// because no sample point falls strictly between the two endpoints.
+// An empty or inverted interval (`upper <= lower`) returns false.
+bool NegativeTimingWindowCanYieldViolation(int64_t lower, int64_t upper,
+                                           uint64_t precision_ticks);
+
+// §31.9.1: one step of the resolution procedure for a mutually
+// inconsistent set of negative timing-check limits. `limits` is an
+// in/out vector of the signed limits participating in the solve.
+// The helper locates the negative entry closest to zero — i.e. the
+// smallest negative in magnitude, the conservative "least change"
+// choice when multiple negatives are tied the earliest such entry
+// is selected for determinism — and rewrites it to zero. Returns
+// true when a rewrite happened, false when the vector contained no
+// negatives and the caller has therefore already reached a solvable
+// state. Callers drive the outer loop themselves: after each rewrite
+// they re-run their delay solver and invoke this helper again if
+// the inconsistency persists. The LRM guarantees the loop terminates
+// because in the worst case every negative limit ends up zeroed and
+// no delays are required at all.
+bool ZeroSmallestNegativeTimingLimit(std::vector<int64_t>& limits);
+
 // =============================================================================
 // SDF annotation entry (§32)
 // =============================================================================
