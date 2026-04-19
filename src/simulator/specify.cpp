@@ -1,5 +1,6 @@
 #include "simulator/specify.h"
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -15,14 +16,14 @@ uint64_t ClampPathDelay(int64_t signed_value) {
 }
 
 void ExpandTransitionDelays(PathDelay& pd) {
-  // Non-x transition slots per Table 30-2:
+  // §30.5.1 / Table 30-2 — populate non-x transition slots:
   //   [0]=0->1, [1]=1->0, [2]=0->z, [3]=z->1, [4]=1->z, [5]=z->0.
   switch (pd.delay_count) {
     case 1: {
       // Count 1: every basic transition uses the single value.
       const uint64_t t = pd.delays[0];
       for (int i = 1; i < 6; ++i) pd.delays[i] = t;
-      return;
+      break;
     }
     case 2: {
       // Count 2: trise covers 0->1/0->z/z->1; tfall covers 1->0/1->z/z->0.
@@ -32,7 +33,7 @@ void ExpandTransitionDelays(PathDelay& pd) {
       pd.delays[3] = trise;
       pd.delays[4] = tfall;
       pd.delays[5] = tfall;
-      return;
+      break;
     }
     case 3: {
       // Count 3: z-bound transitions share tz; trise/tfall keep their slots.
@@ -42,12 +43,23 @@ void ExpandTransitionDelays(PathDelay& pd) {
       pd.delays[3] = trise;
       pd.delays[4] = tz;
       pd.delays[5] = tfall;
-      return;
+      break;
     }
     default:
       // Counts 6 and 12 arrive already laid out as Table 30-2 expects.
-      return;
+      break;
   }
+
+  // §30.5.2 / Table 30-3 — derive x-transition slots from the non-x slots
+  // using the pessimistic min/max rules. Skip when all twelve delays were
+  // specified explicitly: in that case slots [6..11] are already authoritative.
+  if (pd.delay_count == 12) return;
+  pd.delays[6]  = std::min(pd.delays[2], pd.delays[0]);  // 0->x
+  pd.delays[7]  = std::max(pd.delays[3], pd.delays[0]);  // x->1
+  pd.delays[8]  = std::min(pd.delays[4], pd.delays[1]);  // 1->x
+  pd.delays[9]  = std::max(pd.delays[5], pd.delays[1]);  // x->0
+  pd.delays[10] = std::max(pd.delays[4], pd.delays[2]);  // x->z
+  pd.delays[11] = std::min(pd.delays[3], pd.delays[5]);  // z->x
 }
 
 // =============================================================================
