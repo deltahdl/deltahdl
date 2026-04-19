@@ -215,8 +215,11 @@ bool SpecifyManager::CheckHoldViolation(std::string_view ref, uint64_t ref_time,
     if (check.kind != TimingCheckKind::kHold) continue;
     if (check.ref_signal != ref) continue;
     if (check.data_signal != data) continue;
-    // Hold: data must remain stable `limit` time units after ref edge.
-    if (data_time - ref_time < check.limit) return true;
+    // §31.3.2: window is [ref_time, ref_time + limit); only the end is
+    // excluded from the violation region, so the lower bound is inclusive
+    // and the upper bound is strict.
+    if (data_time >= ref_time && data_time - ref_time < check.limit)
+      return true;
   }
   return false;
 }

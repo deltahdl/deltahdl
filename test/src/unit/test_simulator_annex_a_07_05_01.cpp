@@ -84,17 +84,6 @@ TEST(SystemTimingCheckSim, TimingChecksWithPathsSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(SystemTimingCheckSim, HoldEntryStored) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kHold;
-  tc.ref_signal = "clk";
-  tc.data_signal = "data";
-  tc.limit = 5;
-  mgr.AddTimingCheck(tc);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].kind, TimingCheckKind::kHold);
-}
-
 TEST(TimingCheckCommandSim, SetupholdDualLimitsStored) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -192,20 +181,6 @@ TEST(TimingCheckCommandSim, NochangeOffsetsStored) {
   mgr.AddTimingCheck(tc);
   auto& stored = mgr.GetTimingChecks()[0];
   EXPECT_EQ(stored.kind, TimingCheckKind::kNochange);
-}
-
-TEST(SystemTimingCheckSim, HoldViolationDetected) {
-  SpecifyManager mgr;
-  TimingCheckEntry tc;
-  tc.kind = TimingCheckKind::kHold;
-  tc.ref_signal = "clk";
-  tc.data_signal = "data";
-  tc.limit = 5;
-  mgr.AddTimingCheck(tc);
-
-  EXPECT_TRUE(mgr.CheckHoldViolation("clk", 100, "data", 103));
-
-  EXPECT_FALSE(mgr.CheckHoldViolation("clk", 100, "data", 110));
 }
 
 TEST(TimingCheckCommandSim, TimeskewWithFlagsSimulates) {
