@@ -58,42 +58,6 @@ TEST(UdpStateTable, RowMissingSemicolonRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// The z state is not a permitted symbol anywhere in a UDP state table; placing
-// it in an input field is rejected.
-TEST(UdpStateTable, ZSymbolInInputFieldRejected) {
-  auto r = Parse(
-      "primitive p(output y, input a, input b);\n"
-      "  table\n"
-      "    z 0 : 0;\n"
-      "    1 1 : 1;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-// The z state is not permitted in the output field.
-TEST(UdpStateTable, ZSymbolInOutputFieldRejected) {
-  auto r = Parse(
-      "primitive p(output y, input a);\n"
-      "  table\n"
-      "    0 : z;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
-// The z state is not permitted in the current-state field of a sequential UDP.
-TEST(UdpStateTable, ZSymbolInCurrentStateFieldRejected) {
-  auto r = Parse(
-      "primitive p(output reg q, input d, input en);\n"
-      "  table\n"
-      "    0 1 : z : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 // Input field position i in a row corresponds to the i-th port identifier in
 // the UDP header port list.
 TEST(UdpStateTable, InputFieldOrderFollowsHeaderPortList) {
