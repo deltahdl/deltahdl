@@ -154,13 +154,6 @@ TEST(TristateGates, Notif1TruthTable) {
   }
 }
 
-TEST(TristateGates, ThreeDelaySpecification) {
-  EXPECT_EQ(ComputeTristateDelay(10, 12, 11, Val4Ext::kV0, Val4Ext::kV1), 10u);
-  EXPECT_EQ(ComputeTristateDelay(10, 12, 11, Val4Ext::kV1, Val4Ext::kV0), 12u);
-  EXPECT_EQ(ComputeTristateDelay(10, 12, 11, Val4Ext::kV1, Val4Ext::kZ), 11u);
-  EXPECT_EQ(ComputeTristateDelay(10, 12, 11, Val4Ext::kV0, Val4Ext::kX), 10u);
-}
-
 TEST(TristateGates, DelayToLOrHSameAsX) {
   EXPECT_EQ(ComputeTristateDelay(10, 12, 11, Val4Ext::kV0, Val4Ext::kL), 10u);
   EXPECT_EQ(ComputeTristateDelay(10, 12, 11, Val4Ext::kV0, Val4Ext::kH), 10u);

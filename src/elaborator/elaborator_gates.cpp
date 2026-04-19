@@ -92,6 +92,15 @@ static Expr* BuildNInputGateExpr(Arena& arena, GateKind kind,
   return invert ? WrapInvert(arena, chain) : chain;
 }
 
+// §28.16: Gate primitives lower to continuous assignments; the parsed
+// `#(d1, d2, d3)` on the instance must ride along to the simulator so
+// Table 28-9 selection and the 1/2/3-delay rules apply to the driven net.
+static void ApplyGateDelays(RtlirContAssign& ca, const ModuleItem* item) {
+  ca.delay = item->gate_delay;
+  ca.delay_fall = item->gate_delay_fall;
+  ca.delay_decay = item->gate_delay_decay;
+}
+
 /// Build RHS for bufif/notif/pull gates (all single-output).
 static Expr* BuildOutputGateExpr(Arena& arena, GateKind kind,
                                  const std::vector<Expr*>& terminals) {
@@ -123,6 +132,7 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
       ca.lhs = terms[i];
       ca.rhs = rhs;
       ca.width = LookupLhsWidth(ca.lhs, mod);
+      ApplyGateDelays(ca, item);
       mod->assigns.push_back(ca);
     }
     return;
@@ -149,6 +159,7 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     ca.lhs = terms[0];
     ca.rhs = rhs;
     ca.width = LookupLhsWidth(ca.lhs, mod);
+    ApplyGateDelays(ca, item);
     mod->assigns.push_back(ca);
     return;
   }
@@ -180,6 +191,7 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     ca.lhs = terms[0];
     ca.rhs = rhs;
     ca.width = LookupLhsWidth(ca.lhs, mod);
+    ApplyGateDelays(ca, item);
     mod->assigns.push_back(ca);
     return;
   }
@@ -224,6 +236,7 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     ca.lhs = terms[0];
     ca.rhs = rhs;
     ca.width = LookupLhsWidth(ca.lhs, mod);
+    ApplyGateDelays(ca, item);
     mod->assigns.push_back(ca);
     return;
   }
@@ -249,6 +262,7 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   ca.lhs = terms[0];
   ca.rhs = rhs;
   ca.width = LookupLhsWidth(ca.lhs, mod);
+  ApplyGateDelays(ca, item);
   mod->assigns.push_back(ca);
 }
 

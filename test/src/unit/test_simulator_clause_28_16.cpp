@@ -123,11 +123,53 @@ TEST(GateNetDelays, ThreeDelayZTo1IsD1) {
   EXPECT_EQ(ComputePropagationDelay(spec, Val4::kZ, Val4::kV1), 10u);
 }
 
-TEST(LogicGates, TwoDelayRiseFallAndX) {
+// §28.16 R8 (Table 28-9): a transition where `from == to` is a non-event —
+// no net value change happens, so no delay applies. Covers the
+// multi-delay early-out path that the from/to-differ tests never exercise.
+TEST(GateNetDelays, TwoDelaySameStateIsZero) {
+  DelaySpec spec{10, 20, 0, 2};
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kV0), 0u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kV1), 0u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kX, Val4::kX), 0u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kZ, Val4::kZ), 0u);
+}
+
+TEST(GateNetDelays, ThreeDelaySameStateIsZero) {
+  DelaySpec spec{10, 20, 15, 3};
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kV0), 0u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kV1), 0u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kX, Val4::kX), 0u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kZ, Val4::kZ), 0u);
+}
+
+// §28.16 R4: with a single delay, even a same-state transition returns the
+// delay value — the one-delay form does not implement the "from == to" 0
+// rule because the simulator only schedules a delay when the value
+// actually changes; this pins the model's single-delay branch.
+TEST(GateNetDelays, SingleDelayAppliesToSameState) {
+  DelaySpec spec{10, 0, 0, 1};
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV0, Val4::kV0), 10u);
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kV1, Val4::kV1), 10u);
+}
+
+// §28.16 R6: the three-delay form must still pick d1/d2/d3 correctly for
+// transitions starting from Z, beyond the already-covered X origin cases.
+// This pairs with ThreeDelayZTo0IsD2 and ThreeDelayZTo1IsD1 to fully cover
+// Z as a source state.
+TEST(GateNetDelays, ThreeDelayZToZIsZero) {
+  DelaySpec spec{10, 20, 15, 3};
+  EXPECT_EQ(ComputePropagationDelay(spec, Val4::kZ, Val4::kZ), 0u);
+}
+
+TEST(GateNetDelays, TwoDelayRiseFallAndXViaGateModel) {
   EXPECT_EQ(ComputeGateDelay(10, 12, Val4::kV0, Val4::kV1), 10u);
   EXPECT_EQ(ComputeGateDelay(10, 12, Val4::kV1, Val4::kV0), 12u);
   EXPECT_EQ(ComputeGateDelay(10, 12, Val4::kV0, Val4::kX), 10u);
   EXPECT_EQ(ComputeGateDelay(10, 12, Val4::kV1, Val4::kX), 10u);
+}
+
+TEST(GateNetDelays, NoDelayZeroPropagationViaGateModel) {
+  EXPECT_EQ(ComputeGateDelay(0, 0, Val4::kV0, Val4::kV1), 0u);
 }
 
 }  // namespace
