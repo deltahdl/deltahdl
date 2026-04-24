@@ -59,25 +59,6 @@ TEST(DriveStrengthSim, StrongerDriverWins) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(DriveStrengthSim, EqualStrengthConflictProducesX) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  wire w;\n"
-      "  assign (pull0, pull1) w = 1'b1;\n"
-      "  assign (pull0, pull1) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("w");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_FALSE(var->value.IsKnown());
-}
-
 TEST(DriveStrengthSim, HighzStrengthAllowsOtherDriver) {
   SimFixture f;
   auto* design = ElaborateSrc(

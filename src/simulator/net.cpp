@@ -6,6 +6,23 @@
 
 namespace delta {
 
+// --- NetStrength combination (§28.12.2 R2) ---
+
+NetStrength CombineAmbiguousStrength(NetStrength a, NetStrength b) {
+  auto hi = [](Strength x, Strength y) {
+    return static_cast<uint8_t>(x) > static_cast<uint8_t>(y) ? x : y;
+  };
+  auto lo = [](Strength x, Strength y) {
+    return static_cast<uint8_t>(x) < static_cast<uint8_t>(y) ? x : y;
+  };
+  NetStrength r;
+  r.s0_hi = hi(a.s0_hi, b.s0_hi);
+  r.s1_hi = hi(a.s1_hi, b.s1_hi);
+  r.s0_lo = lo(a.s0_lo, b.s0_lo);
+  r.s1_lo = lo(a.s1_lo, b.s1_lo);
+  return r;
+}
+
 // --- Per-word resolution helpers ---
 
 Logic4Word ResolveWireWord(Logic4Word a, Logic4Word b) {
@@ -167,14 +184,21 @@ static uint8_t WiredOr(uint8_t a, uint8_t b) {
   return 2;
 }
 
-// §28.12 R1: pick the dominant (value, strength) across drivers at bit 0 so
-// the caller can record it as the net's single-level resolved strength. The
-// ambiguous branch of R1 is populated by §28.12.2+ when those rules land.
+// §28.12 R1 at bit 0: pick the dominant (value, strength) across drivers and
+// populate the net's resolved_strength. The unambiguous branch records a
+// single level on the value's side. The ambiguous branch — §28.12.2 R1 —
+// fires when two drivers tie at the max strength with opposite values: the
+// value collapses to x and the result must carry the shared strength level
+// on both sides of the scale together with every smaller level. Wand/wor
+// resolve same-strength disagreements through §28.12.4's AND/OR and stay
+// unambiguous.
 static void ComputeSingleBitStrength(
     const std::vector<Logic4Vec>& drivers,
-    const std::vector<DriverStrength>& strengths, NetStrength& out) {
+    const std::vector<DriverStrength>& strengths, NetStrength& out,
+    NetType net_type) {
   uint8_t max_str = 0;
   uint8_t max_val = 3;
+  bool conflict = false;
   for (size_t d = 0; d < drivers.size(); ++d) {
     uint32_t word = 0;
     uint64_t mask = 1;
@@ -186,13 +210,30 @@ static void ComputeSingleBitStrength(
     if (str > max_str) {
       max_str = str;
       max_val = val;
+      conflict = false;
+    } else if (str == max_str && val != max_val) {
+      if (net_type == NetType::kWand || net_type == NetType::kTriand) {
+        max_val = WiredAnd(max_val, val);
+      } else if (net_type == NetType::kWor || net_type == NetType::kTrior) {
+        max_val = WiredOr(max_val, val);
+      } else {
+        conflict = true;
+      }
     }
   }
   out = NetStrength{};
+  if (max_val == 3) return;
+  auto s = static_cast<Strength>(max_str);
+  if (conflict) {
+    // hi=S on both sides, lo left at kHighz to cover all smaller levels.
+    out.s0_hi = s;
+    out.s1_hi = s;
+    return;
+  }
   if (max_val == 0) {
-    out.s0_hi = out.s0_lo = static_cast<Strength>(max_str);
+    out.s0_hi = out.s0_lo = s;
   } else if (max_val == 1) {
-    out.s1_hi = out.s1_lo = static_cast<Strength>(max_str);
+    out.s1_hi = out.s1_lo = s;
   }
 }
 
@@ -316,7 +357,8 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
     }
     FixupTriPull(result, type);
     resolved->value = result;
-    ComputeSingleBitStrength(drivers, driver_strengths, resolved_strength);
+    ComputeSingleBitStrength(drivers, driver_strengths, resolved_strength,
+                             type);
     resolved->NotifyWatchers();
     return;
   }

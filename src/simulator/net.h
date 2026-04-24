@@ -63,6 +63,11 @@ void PropagateCharge(Net& a, Net& b);
 /// §6.6.4.1: Restore a net's charge strength to its declared value.
 void DisconnectCharge(Net& net);
 
+/// §28.12.2 R2: combine two ambiguous-strength net signals. The result's
+/// per-side range includes every strength level in either input; in the
+/// hi/lo encoding that is hi = max per side, lo = min per side.
+NetStrength CombineAmbiguousStrength(NetStrength a, NetStrength b);
+
 /// Resolve two Logic4Word values using wire/tri semantics (§28.7).
 Logic4Word ResolveWireWord(Logic4Word a, Logic4Word b);
 

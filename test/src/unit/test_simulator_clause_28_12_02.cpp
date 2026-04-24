@@ -211,6 +211,108 @@ TEST(StrengthResolution, EqualStrengthConflictWithWeakerDriverStillProducesX) {
   EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
 }
 
+// §28.12.2 R1 strength-preservation half at the runtime: when equal-strength
+// opposite-value drivers collapse to x on a plain wire, the net's
+// resolved_strength must record the shared strength level on BOTH sides of
+// the scale — covering "the strength levels of both signals" from the rule.
+// The value-only tests above do not observe this field; this test closes the
+// gap between the x value the runtime produces and the strength range the
+// rule requires it to carry.
+TEST(StrengthResolution, EqualStrengthConflictPopulatesAmbiguousResolvedStrength) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
+  EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
+}
+
+// §28.12.2 R1 at the top of the strength scale: a Supply-0 / Supply-1 conflict
+// must populate resolved_strength at Supply on both sides, not cap out or
+// short-circuit to a single side. Pairs with the Pull case above to show the
+// rule is ordinal across the scale.
+TEST(StrengthResolution, EqualSupplyConflictPopulatesAmbiguousResolvedStrength) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kSupply, Strength::kSupply});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kSupply, Strength::kSupply});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kSupply);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kSupply);
+  EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
+}
+
+// §28.12.2 R1 "all smaller strength levels" half: in the hi/lo range encoding
+// the per-side lo left at kHighz spans every level from highz up to the
+// shared level. Pin this explicitly so a future change that e.g. sets lo=hi
+// on conflict — which would discard the "all smaller" portion of the rule —
+// is caught.
+TEST(StrengthResolution, EqualStrengthConflictLeavesLoAtHighz) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
+}
+
+// §28.12.2 R1 with a dominated third driver: a Weak driver loses under
+// §28.12.1 and must not influence the recorded strength level. The conflict
+// occurs between the two Strong drivers; resolved_strength must carry Strong
+// on both sides and must not be pulled down to Weak by the ignored driver.
+TEST(StrengthResolution, EqualStrengthConflictWithDominatedDriverRecordsPeakStrength) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
+}
+
 // §28.12.2 R2 edge case: folding three ambiguous-strength signals pairwise
 // must still yield a result whose per-side range includes every component's
 // level. Inputs have Weak, Pull, and Strong ranges on both sides — the fold
@@ -225,6 +327,63 @@ TEST(StrengthCombine, AmbiguousThreeSignalsFoldPreservesRange) {
   EXPECT_EQ(result.value, Val4::kX);
   EXPECT_EQ(result.strength0_hi, StrengthLevel::kStrong);
   EXPECT_EQ(result.strength1_hi, StrengthLevel::kStrong);
+}
+
+// §28.12.2 R1 inside the charge-storage portion of the strength scale: the
+// rule is ordinal across every level the scale defines, not only driving
+// strengths. Two Medium drivers with opposite values must still collapse to
+// x with both value and strength halves populated at Medium. Closes the gap
+// where the other runtime tests only reach the driving-strength levels and
+// would miss a regression that special-cased or truncated the charge-storage
+// range.
+TEST(StrengthResolution, EqualMediumConflictPopulatesAmbiguousResolvedStrength) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kMedium, Strength::kMedium});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kMedium, Strength::kMedium});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kMedium);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kMedium);
+  EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
+}
+
+// §28.12.2 R1 on a non-wire net type: the rule fires on any net whose
+// resolution path combines signals — §28.12.4 wand/wor only overrides when
+// wired logic is explicitly chosen. A kTri net must honour R1 just like
+// kWire, producing x and marking the resolved_strength ambiguous. Guards
+// against a regression that routed kTri to a different branch or gave it
+// wand/wor-style AND/OR fallback.
+TEST(StrengthResolution, EqualStrengthConflictOnTriNetPopulatesAmbiguous) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kTri;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
 }
 
 }  // namespace
