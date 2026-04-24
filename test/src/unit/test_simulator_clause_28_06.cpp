@@ -159,4 +159,60 @@ TEST(TristateGates, DelayToLOrHSameAsX) {
   EXPECT_EQ(ComputeTristateDelay(10, 12, 11, Val4Ext::kV0, Val4Ext::kH), 10u);
 }
 
+// Three-delay-form slot mapping: each transition direction draws from its
+// own slot regardless of the source value, so only the destination drives
+// which delay is chosen.
+TEST(TristateGates, TransitionToOneUsesRiseDelay) {
+  EXPECT_EQ(ComputeTristateDelay(10, 20, 30, Val4Ext::kV0, Val4Ext::kV1), 10u);
+  EXPECT_EQ(ComputeTristateDelay(10, 20, 30, Val4Ext::kZ, Val4Ext::kV1), 10u);
+}
+
+TEST(TristateGates, TransitionToZeroUsesFallDelay) {
+  EXPECT_EQ(ComputeTristateDelay(10, 20, 30, Val4Ext::kV1, Val4Ext::kV0), 20u);
+  EXPECT_EQ(ComputeTristateDelay(10, 20, 30, Val4Ext::kZ, Val4Ext::kV0), 20u);
+}
+
+TEST(TristateGates, TransitionToZUsesTurnOffDelay) {
+  EXPECT_EQ(ComputeTristateDelay(10, 20, 30, Val4Ext::kV0, Val4Ext::kZ), 30u);
+  EXPECT_EQ(ComputeTristateDelay(10, 20, 30, Val4Ext::kV1, Val4Ext::kZ), 30u);
+}
+
+// Transitions to x take the smallest of the three delays; try several
+// orderings so the test doesn't accidentally pass via a fixed slot.
+TEST(TristateGates, TransitionToXUsesSmallestOfThree) {
+  EXPECT_EQ(ComputeTristateDelay(10, 20, 30, Val4Ext::kV0, Val4Ext::kX), 10u);
+  EXPECT_EQ(ComputeTristateDelay(25, 15, 30, Val4Ext::kV0, Val4Ext::kX), 15u);
+  EXPECT_EQ(ComputeTristateDelay(25, 30, 5, Val4Ext::kV0, Val4Ext::kX), 5u);
+}
+
+// Single-delay form expands to the same value in every slot, so every
+// transition direction yields that one delay.
+TEST(TristateGates, SingleDelayAppliesToAllTransitions) {
+  EXPECT_EQ(ComputeTristateDelay(7, 7, 7, Val4Ext::kV0, Val4Ext::kV1), 7u);
+  EXPECT_EQ(ComputeTristateDelay(7, 7, 7, Val4Ext::kV1, Val4Ext::kV0), 7u);
+  EXPECT_EQ(ComputeTristateDelay(7, 7, 7, Val4Ext::kV0, Val4Ext::kZ), 7u);
+  EXPECT_EQ(ComputeTristateDelay(7, 7, 7, Val4Ext::kV0, Val4Ext::kX), 7u);
+}
+
+// Two-delay form: the caller fills the z slot with min(rise, fall) so that
+// transitions to both z and x (via the min-of-three rule) resolve to the
+// smaller of the two explicit values.
+TEST(TristateGates, TwoDelayFormUsesSmallerForXAndZ) {
+  uint64_t d_rise = 9, d_fall = 4, d_z = 4;
+  EXPECT_EQ(ComputeTristateDelay(d_rise, d_fall, d_z, Val4Ext::kV0,
+                                 Val4Ext::kZ),
+            4u);
+  EXPECT_EQ(ComputeTristateDelay(d_rise, d_fall, d_z, Val4Ext::kV0,
+                                 Val4Ext::kX),
+            4u);
+}
+
+// Absent a delay specification, every slot is zero so no transition
+// accrues any propagation delay.
+TEST(TristateGates, NoDelaySpecMeansZeroPropagation) {
+  EXPECT_EQ(ComputeTristateDelay(0, 0, 0, Val4Ext::kV0, Val4Ext::kV1), 0u);
+  EXPECT_EQ(ComputeTristateDelay(0, 0, 0, Val4Ext::kV1, Val4Ext::kZ), 0u);
+  EXPECT_EQ(ComputeTristateDelay(0, 0, 0, Val4Ext::kV0, Val4Ext::kX), 0u);
+}
+
 }  // namespace

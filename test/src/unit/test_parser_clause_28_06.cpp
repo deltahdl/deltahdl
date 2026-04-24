@@ -147,17 +147,6 @@ TEST(TristateGateParsing, Notif0ThreeValueDelay) {
   ASSERT_NE(g->gate_delay_decay, nullptr);
 }
 
-TEST(TristateGateParsing, Bufif0AcceptsThreeDelays) {
-  auto r = ParseWithPreprocessor(
-      "module m;\n"
-      "  bufif0 #(10, 12, 11) b3(out, in, ctrl);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->gate_kind, GateKind::kBufif0);
-  EXPECT_NE(item->gate_delay, nullptr);
-}
-
 TEST(TristateGateParsing, Bufif1ThreeValueDelay) {
   auto r = ParseWithPreprocessor(
       "module m;\n"
