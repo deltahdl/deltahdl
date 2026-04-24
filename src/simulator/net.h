@@ -18,11 +18,26 @@ struct DriverStrength {
   Strength s1 = Strength::kStrong;
 };
 
+// §28.12 R1: a net's strength is either a single unambiguous level or a range
+// ("ambiguous strength consisting of more than one level"). A single-level
+// side has hi == lo; a range-valued side has hi > lo. The two sides of the
+// strength scale (value-0 and value-1 parts per §28.11 Figure 28-2) are
+// tracked independently so that §28.12.2+ can record outcomes that span both.
+struct NetStrength {
+  Strength s0_hi = Strength::kHighz;
+  Strength s0_lo = Strength::kHighz;
+  Strength s1_hi = Strength::kHighz;
+  Strength s1_lo = Strength::kHighz;
+
+  bool IsAmbiguous() const { return s0_hi != s0_lo || s1_hi != s1_lo; }
+};
+
 struct Net {
   NetType type = NetType::kWire;
   Variable* resolved = nullptr;  // Points to the storage variable.
   std::vector<Logic4Vec> drivers;
   std::vector<DriverStrength> driver_strengths;
+  NetStrength resolved_strength;
 
   // §6.6.4: Trireg charge strength and decay.
   Strength charge_strength = Strength::kMedium;

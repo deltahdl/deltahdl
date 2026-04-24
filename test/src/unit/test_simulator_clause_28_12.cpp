@@ -131,4 +131,57 @@ TEST(UserNettypeStrength, UserNettypeIgnoresStrengthWithThreeDrivers) {
   EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
 }
 
+// R1 disjunction — unambiguous branch. After resolving drivers that all carry
+// single strength levels, the net's resolved strength must report a single
+// level (hi == lo on the value's side, other side unused) and must not read as
+// ambiguous.
+TEST(NetStrengthDisjunction, UnambiguousDriversYieldUnambiguousNetStrength) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kWeak, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kStrong);
+}
+
+// R1 disjunction — ambiguous branch must be representable. The net-strength
+// type has to distinguish a range of levels from a single level; without this,
+// §28.12.2+ has no surface on which to record the "strength levels of both
+// signals and all the smaller strength levels" outcomes.
+TEST(NetStrengthDisjunction, AmbiguousNetStrengthIsRepresentable) {
+  NetStrength ns;
+  ns.s1_hi = Strength::kStrong;
+  ns.s1_lo = Strength::kWeak;
+  EXPECT_TRUE(ns.IsAmbiguous());
+
+  NetStrength single;
+  single.s0_hi = Strength::kPull;
+  single.s0_lo = Strength::kPull;
+  EXPECT_FALSE(single.IsAmbiguous());
+}
+
+// R1 exclusivity — a net cannot be in both states at once. The default state
+// (all highz, both sides equal) is unambiguous; flipping one side's hi-above-lo
+// moves it to the ambiguous state; equalising again returns it to unambiguous.
+// Demonstrates the either/or contract the disjunction promises.
+TEST(NetStrengthDisjunction, NetStrengthMutationTogglesIsAmbiguous) {
+  NetStrength ns;
+  EXPECT_FALSE(ns.IsAmbiguous());
+
+  ns.s0_hi = Strength::kLarge;
+  ns.s0_lo = Strength::kMedium;
+  EXPECT_TRUE(ns.IsAmbiguous());
+
+  ns.s0_lo = Strength::kLarge;
+  EXPECT_FALSE(ns.IsAmbiguous());
+}
+
 }  // namespace

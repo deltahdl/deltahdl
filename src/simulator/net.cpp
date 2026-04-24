@@ -167,6 +167,35 @@ static uint8_t WiredOr(uint8_t a, uint8_t b) {
   return 2;
 }
 
+// §28.12 R1: pick the dominant (value, strength) across drivers at bit 0 so
+// the caller can record it as the net's single-level resolved strength. The
+// ambiguous branch of R1 is populated by §28.12.2+ when those rules land.
+static void ComputeSingleBitStrength(
+    const std::vector<Logic4Vec>& drivers,
+    const std::vector<DriverStrength>& strengths, NetStrength& out) {
+  uint8_t max_str = 0;
+  uint8_t max_val = 3;
+  for (size_t d = 0; d < drivers.size(); ++d) {
+    uint32_t word = 0;
+    uint64_t mask = 1;
+    bool a = (drivers[d].words[word].aval & mask) != 0;
+    bool b = (drivers[d].words[word].bval & mask) != 0;
+    uint8_t val = (!b && !a) ? 0 : (!b && a) ? 1 : (b && !a) ? 2 : 3;
+    if (val == 3) continue;
+    uint8_t str = EffectiveStrength(val, strengths[d]);
+    if (str > max_str) {
+      max_str = str;
+      max_val = val;
+    }
+  }
+  out = NetStrength{};
+  if (max_val == 0) {
+    out.s0_hi = out.s0_lo = static_cast<Strength>(max_str);
+  } else if (max_val == 1) {
+    out.s1_hi = out.s1_lo = static_cast<Strength>(max_str);
+  }
+}
+
 static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
                                const std::vector<DriverStrength>& strengths,
                                Logic4Vec& result, uint32_t bit,
@@ -287,6 +316,7 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
     }
     FixupTriPull(result, type);
     resolved->value = result;
+    ComputeSingleBitStrength(drivers, driver_strengths, resolved_strength);
     resolved->NotifyWatchers();
     return;
   }
