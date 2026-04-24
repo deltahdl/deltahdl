@@ -210,4 +210,53 @@ TEST(StrengthResolution, ThreeDriversStrongestWins) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// R1 at the bottom of the scale: a highz driver contributes no strength, so a
+// weak-1 driver paired with a highz-z driver must resolve to 1 — the highz
+// side loses the dominance comparison outright.
+TEST(StrengthResolution, HighzDriverIgnored) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
+
+  auto z_val = MakeLogic4Vec(arena, 1);
+  z_val.words[0].aval = 1;
+  z_val.words[0].bval = 1;
+  net.drivers.push_back(z_val);
+  net.driver_strengths.push_back({Strength::kHighz, Strength::kHighz});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// R3 boundary: two drivers identical in both value (z) and strength (highz)
+// resolve to that same signal, leaving the net at z. Guards against a path
+// that would synthesize a contributing value out of two non-contributing
+// drivers.
+TEST(StrengthResolution, AllHighzProducesZ) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  auto z_val = MakeLogic4Vec(arena, 1);
+  z_val.words[0].aval = 1;
+  z_val.words[0].bval = 1;
+  net.drivers.push_back(z_val);
+  net.driver_strengths.push_back({Strength::kHighz, Strength::kHighz});
+  net.drivers.push_back(z_val);
+  net.driver_strengths.push_back({Strength::kHighz, Strength::kHighz});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+}
+
 }  // namespace
