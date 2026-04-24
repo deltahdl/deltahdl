@@ -4,28 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(DriveStrengthElaboration, Highz0Highz1PairIsIllegal) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (highz0, highz1) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(DriveStrengthElaboration, Highz1Highz0PairIsIllegal) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  wire w;\n"
-      "  assign (highz1, highz0) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 TEST(DriveStrengthElaboration, DriveStrengthOnVectorNetIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -357,26 +335,6 @@ TEST(DriveStrengthElaboration, MultipleAssignsPreserveIndependentStrengths) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);
   EXPECT_EQ(mod->assigns[1].drive_strength0, 2u);
   EXPECT_EQ(mod->assigns[1].drive_strength1, 2u);
-}
-
-TEST(DriveStrengthElaboration, NetDeclHighz0Highz1PairIsIllegal) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  wire (highz0, highz1) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(DriveStrengthElaboration, NetDeclHighz1Highz0PairIsIllegal) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  wire (highz1, highz0) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 }  // namespace

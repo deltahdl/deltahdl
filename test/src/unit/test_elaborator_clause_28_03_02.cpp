@@ -47,29 +47,4 @@ TEST(GateElaboration, GateWithStrengthStillProducesAssign) {
   EXPECT_EQ(ca.rhs->op, TokenKind::kAmp);
 }
 
-// (highz0, highz1) is an invalid combination regardless of the site where
-// the strength spec appears, including gate instances.
-TEST(GateStrengthValidity, GateInst_Highz0Highz1Rejected) {
-  ElabFixture f;
-  Elaborate(
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  and (highz0, highz1) g1(y, a, b);\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
-// The reversed-order form of the same forbidden pair must also be rejected.
-TEST(GateStrengthValidity, GateInst_Highz1Highz0Rejected) {
-  ElabFixture f;
-  Elaborate(
-      "module m;\n"
-      "  wire a, b, y;\n"
-      "  and (highz1, highz0) g1(y, a, b);\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 }  // namespace

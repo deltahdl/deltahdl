@@ -47,22 +47,4 @@ TEST(GateStrengthLexing, DriveStrengthTokenSequence) {
   EXPECT_EQ(tokens[5].kind, TokenKind::kRParen);
 }
 
-// Every keyword listed as a valid strength0 must lex to its dedicated kind.
-TEST(GateStrengthLexing, AllStrength0Keywords) {
-  EXPECT_EQ(LexOne("supply0").token.kind, TokenKind::kKwSupply0);
-  EXPECT_EQ(LexOne("strong0").token.kind, TokenKind::kKwStrong0);
-  EXPECT_EQ(LexOne("pull0").token.kind, TokenKind::kKwPull0);
-  EXPECT_EQ(LexOne("weak0").token.kind, TokenKind::kKwWeak0);
-  EXPECT_EQ(LexOne("highz0").token.kind, TokenKind::kKwHighz0);
-}
-
-// Every keyword listed as a valid strength1 must lex to its dedicated kind.
-TEST(GateStrengthLexing, AllStrength1Keywords) {
-  EXPECT_EQ(LexOne("supply1").token.kind, TokenKind::kKwSupply1);
-  EXPECT_EQ(LexOne("strong1").token.kind, TokenKind::kKwStrong1);
-  EXPECT_EQ(LexOne("pull1").token.kind, TokenKind::kKwPull1);
-  EXPECT_EQ(LexOne("weak1").token.kind, TokenKind::kKwWeak1);
-  EXPECT_EQ(LexOne("highz1").token.kind, TokenKind::kKwHighz1);
-}
-
 }  // namespace

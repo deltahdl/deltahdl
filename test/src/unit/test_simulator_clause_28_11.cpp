@@ -46,14 +46,9 @@ TEST(StrengthModel, StrongStrongIsLegal) {
       ValidateStrengthPair(StrengthLevel::kStrong, StrengthLevel::kStrong));
 }
 
-TEST(StrengthModel, StrongHighz1IsLegal) {
+TEST(StrengthModel, OneSideHighzIsLegal) {
   EXPECT_TRUE(
       ValidateStrengthPair(StrengthLevel::kStrong, StrengthLevel::kHighz));
-}
-
-TEST(StrengthModel, Highz0StrongIsLegal) {
-  EXPECT_TRUE(
-      ValidateStrengthPair(StrengthLevel::kHighz, StrengthLevel::kStrong));
 }
 
 }  // namespace

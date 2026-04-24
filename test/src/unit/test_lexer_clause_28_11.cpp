@@ -84,4 +84,24 @@ TEST(StrengthKeywordLexing, StrengthPairProducesTwoKeywords) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kRParen);
 }
 
+// The three charge storage strengths are unsuffixed keywords (no 0/1); each
+// must lex to a dedicated token kind, distinct from the drive-strength set.
+TEST(StrengthKeywordLexing, SmallKeyword) {
+  auto tokens = Lex("small");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwSmall);
+}
+
+TEST(StrengthKeywordLexing, MediumKeyword) {
+  auto tokens = Lex("medium");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwMedium);
+}
+
+TEST(StrengthKeywordLexing, LargeKeyword) {
+  auto tokens = Lex("large");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwLarge);
+}
+
 }  // namespace
