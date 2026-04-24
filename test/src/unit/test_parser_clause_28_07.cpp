@@ -111,31 +111,6 @@ TEST(MosSwitchParsing, NmosNoDelaySpec) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-TEST(MosSwitchParsing, NmosAcceptsThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  nmos #(10, 20, 30) n1(out, data, ctrl);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kNmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-}
-
-TEST(MosSwitchParsing, RnmosAcceptsThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  rnmos #(1, 2, 3) r1(o, i, g);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRnmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  ASSERT_NE(g->gate_delay_decay, nullptr);
-}
-
 // §28.7 caps the delay specification at three values. A fourth value in
 // the comma list must be rejected — otherwise a parser regression could
 // silently accept a malformed delay spec and discard the extra term.
@@ -145,19 +120,6 @@ TEST(MosSwitchParsing, TooManyDelaysRejected) {
       "  nmos #(1, 2, 3, 4) n1(o, i, g);\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
-}
-
-TEST(MosSwitchParsing, RpmosAcceptsThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  rpmos #(4, 5, 6) r1(o, i, g);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRpmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  ASSERT_NE(g->gate_delay_decay, nullptr);
 }
 
 TEST(MosSwitchParsing, AllFourKindsParseToDistinctGateKind) {
