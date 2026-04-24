@@ -247,10 +247,73 @@ TEST(StrengthResolution, AmbigUnderStrongerUnambigYieldsUnambigValue) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// Runtime check: when the unambig strength is at or below the conflicting
-// ambig strength, the bit is x — rule a leaves opposite-value levels above
-// the unambig in the result, so the value is unknown.
-TEST(StrengthResolution, AmbigAboveWeakerUnambigYieldsX) {
+// Rule a) at the runtime: when a weaker unambig sits below an ambig formed
+// by an equal-strength conflict, the per-side hi must remain at the conflict
+// level (§28.12.2 R1 strength) and the per-side lo must rise from kHighz to
+// the level required by rule a/b. Vu side merges down to Su (the unambig's
+// level); !Vu side trims to Su+1 (the smallest level not removed by rule b).
+TEST(StrengthResolution, RuleAAndBTrimAmbigLoBoundsPerSide) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kWeak);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kLarge);
+  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+}
+
+// Mirror of the above with Vu=1: confirms rules a/b apply symmetrically. The
+// !Vu side (side 0) must clamp its lo at Su+1 (Large) and the Vu side
+// (side 1) must extend its lo down to Su (Weak) where the unambig sits.
+TEST(StrengthResolution, RuleAAndBTrimAmbigLoBoundsPerSideVuOne) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kLarge);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kWeak);
+  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
+}
+
+// Rule b) at Su = ambig hi - 1: when the unambig sits one level below the
+// conflict's strength, rule a leaves only the conflict level on the !Vu side
+// (lo = hi = Strong) and the Vu-side lo extends down to Su (Pull). This pins
+// the boundary case where rule a's surviving range collapses to a single
+// level on the !Vu side.
+TEST(StrengthResolution, RuleBAtAmbigHiMinusOnePerSide) {
   Arena arena;
   auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 1);
@@ -265,11 +328,16 @@ TEST(StrengthResolution, AmbigAboveWeakerUnambigYieldsX) {
   net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
 
   net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
   net.Resolve(arena);
 
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kStrong);
   EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
   EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
 }
 
 // Per-bit independence at runtime: rules a/b apply at each bit position
@@ -298,6 +366,134 @@ TEST(StrengthResolution, AmbigUnambigPerBitIndependence) {
   net.Resolve(arena);
 
   EXPECT_EQ(var->value.ToUint64() & 0xFu, 0b1010u);
+}
+
+// Rule b)'s complete-elimination outcome: when the unambig sits at or above
+// the ambig hi on both sides, every ambig level disappears and the result
+// collapses to the unambig alone. Pairs strength assertions with the
+// existing value-only AmbigUnderStronger… check so that the post-§28.12.3
+// state — single-level on the Vu side, kHighz on the !Vu side, no longer
+// ambiguous — is also pinned at the runtime.
+TEST(StrengthResolution, RuleBCompleteEliminationProducesUnambigResult) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// When more than one unambig driver sits below the conflict, §28.12.3 must
+// be applied with the *strongest* of them as the single-level component:
+// rule a's surviving range and rule b's lo trim are both anchored at that
+// Su. Drives Pull-0 (the strongest weaker) alongside Weak-0 to detect a
+// regression that picks a different weaker driver — picking Weak-0 would
+// drop the Vu-side lo to Weak instead of Pull.
+TEST(StrengthResolution, StrongestWeakerUnambigSelectedForRuleApplication) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kStrong);
+  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+}
+
+// Rule b's "<=Su" inequality at the smallest non-kHighz level: pins the low
+// end of the strength scale so a regression that special-cased kSmall (e.g.
+// treating Su=Small as Su=HiZ and skipping the trim) would be caught. The
+// !Vu-side lo must rise from kHighz to kMedium (Su+1) and the Vu-side lo
+// must extend down to kSmall (Su) where the unambig contributes.
+TEST(StrengthResolution, RuleAAndBAtSmallestNonHighzSu) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kSmall, Strength::kSmall});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kSmall);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kMedium);
+  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+}
+
+// Net-type independence: §28.12.3 fires on any net whose resolution path
+// folds drivers — kTri must produce the same per-side trimmed range as
+// kWire when the same drivers are present. Guards against a regression
+// that gates the §28.12.3 application on the wire branch.
+TEST(StrengthResolution, RuleAAndBApplyOnTriNet) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kTri;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kWeak);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kLarge);
+  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
 }
 
 }  // namespace

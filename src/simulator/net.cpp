@@ -184,6 +184,106 @@ static uint8_t WiredOr(uint8_t a, uint8_t b) {
   return 2;
 }
 
+// §28.12.3 rule a/b applied to one side of the strength scale: keep ambig
+// levels strictly above Su; lift the per-side lo to max(orig_lo, Su+1) where
+// the side survives; otherwise leave the side empty.
+static void TrimAmbigSide(Strength a_lo, Strength a_hi, uint8_t su,
+                          Strength& r_lo, Strength& r_hi) {
+  if (static_cast<uint8_t>(a_hi) <= su) return;
+  uint8_t lo_idx = std::max<uint8_t>(static_cast<uint8_t>(a_lo),
+                                     static_cast<uint8_t>(su + 1));
+  r_lo = static_cast<Strength>(lo_idx);
+  r_hi = a_hi;
+}
+
+// §28.12.3 rule c: if the !Vu side has a surviving range with lo > Su+1, the
+// gap left between the unambig (at Su on the Vu side) and the surviving
+// ambig portion is filled by lowering the !Vu lo to Su+1.
+static void FillRuleCGap(Strength& r_lo, Strength r_hi, uint8_t su) {
+  if (r_hi == Strength::kHighz) return;
+  if (static_cast<uint8_t>(r_lo) <= su + 1) return;
+  r_lo = static_cast<Strength>(su + 1);
+}
+
+// §28.12.3: combine an ambiguous-strength signal with one component of value
+// Vu and single strength level Su. Rules a/b/c are applied to each side of
+// the strength scale.
+static NetStrength CombineAmbigWithUnambig(NetStrength ambig, uint8_t vu,
+                                           uint8_t su) {
+  NetStrength r;
+  TrimAmbigSide(ambig.s0_lo, ambig.s0_hi, su, r.s0_lo, r.s0_hi);
+  TrimAmbigSide(ambig.s1_lo, ambig.s1_hi, su, r.s1_lo, r.s1_hi);
+
+  auto s_su = static_cast<Strength>(su);
+  Strength& vu_hi = (vu == 0) ? r.s0_hi : r.s1_hi;
+  Strength& vu_lo = (vu == 0) ? r.s0_lo : r.s1_lo;
+  if (vu_hi == Strength::kHighz) vu_hi = s_su;
+  vu_lo = s_su;
+
+  Strength& opp_hi = (vu == 0) ? r.s1_hi : r.s0_hi;
+  Strength& opp_lo = (vu == 0) ? r.s1_lo : r.s0_lo;
+  FillRuleCGap(opp_lo, opp_hi, su);
+  return r;
+}
+
+// Decode a driver bit into the 0/1/2=x/3=z slot for bit 0. Pulled out of
+// the iteration loops to shrink their cognitive complexity.
+static uint8_t DriverBit0Val(const Logic4Vec& drv) {
+  uint64_t mask = 1;
+  bool a = (drv.words[0].aval & mask) != 0;
+  bool b = (drv.words[0].bval & mask) != 0;
+  if (!b && !a) return 0;
+  if (!b && a) return 1;
+  if (b && !a) return 2;
+  return 3;
+}
+
+// §28.12.3: locate the strongest unambig driver (value 0 or 1) whose
+// strength sits strictly below the conflict strength. Returns true and sets
+// vu/su when one exists; returns false otherwise.
+static bool FindWeakerUnambig(const std::vector<Logic4Vec>& drivers,
+                              const std::vector<DriverStrength>& strengths,
+                              uint8_t max_str, uint8_t& vu, uint8_t& su) {
+  vu = 3;
+  su = 0;
+  for (size_t d = 0; d < drivers.size(); ++d) {
+    uint8_t val = DriverBit0Val(drivers[d]);
+    if (val > 1) continue;
+    uint8_t str = EffectiveStrength(val, strengths[d]);
+    if (str < max_str && str > su) {
+      su = str;
+      vu = val;
+    }
+  }
+  return vu < 2 && su > 0;
+}
+
+struct MaxTracker {
+  uint8_t str = 0;
+  uint8_t val = 3;
+  bool conflict = false;
+};
+
+// Update the running tracker for one driver's (val, str) contribution,
+// applying §28.12.4 wand/wor when applicable.
+static void FoldDriverIntoMax(uint8_t val, uint8_t str, NetType net_type,
+                              MaxTracker& m) {
+  if (str > m.str) {
+    m.str = str;
+    m.val = val;
+    m.conflict = false;
+    return;
+  }
+  if (str != m.str || val == m.val) return;
+  if (net_type == NetType::kWand || net_type == NetType::kTriand) {
+    m.val = WiredAnd(m.val, val);
+  } else if (net_type == NetType::kWor || net_type == NetType::kTrior) {
+    m.val = WiredOr(m.val, val);
+  } else {
+    m.conflict = true;
+  }
+}
+
 // §28.12 R1 at bit 0: pick the dominant (value, strength) across drivers and
 // populate the net's resolved_strength. The unambiguous branch records a
 // single level on the value's side. The ambiguous branch — §28.12.2 R1 —
@@ -191,48 +291,35 @@ static uint8_t WiredOr(uint8_t a, uint8_t b) {
 // value collapses to x and the result must carry the shared strength level
 // on both sides of the scale together with every smaller level. Wand/wor
 // resolve same-strength disagreements through §28.12.4's AND/OR and stay
-// unambiguous.
+// unambiguous. After §28.12.2 produces the ambig signal, §28.12.3 folds in
+// the strongest unambig driver below the conflict strength.
 static void ComputeSingleBitStrength(
     const std::vector<Logic4Vec>& drivers,
     const std::vector<DriverStrength>& strengths, NetStrength& out,
     NetType net_type) {
-  uint8_t max_str = 0;
-  uint8_t max_val = 3;
-  bool conflict = false;
+  MaxTracker m;
   for (size_t d = 0; d < drivers.size(); ++d) {
-    uint32_t word = 0;
-    uint64_t mask = 1;
-    bool a = (drivers[d].words[word].aval & mask) != 0;
-    bool b = (drivers[d].words[word].bval & mask) != 0;
-    uint8_t val = (!b && !a) ? 0 : (!b && a) ? 1 : (b && !a) ? 2 : 3;
+    uint8_t val = DriverBit0Val(drivers[d]);
     if (val == 3) continue;
     uint8_t str = EffectiveStrength(val, strengths[d]);
-    if (str > max_str) {
-      max_str = str;
-      max_val = val;
-      conflict = false;
-    } else if (str == max_str && val != max_val) {
-      if (net_type == NetType::kWand || net_type == NetType::kTriand) {
-        max_val = WiredAnd(max_val, val);
-      } else if (net_type == NetType::kWor || net_type == NetType::kTrior) {
-        max_val = WiredOr(max_val, val);
-      } else {
-        conflict = true;
-      }
-    }
+    FoldDriverIntoMax(val, str, net_type, m);
   }
   out = NetStrength{};
-  if (max_val == 3) return;
-  auto s = static_cast<Strength>(max_str);
-  if (conflict) {
-    // hi=S on both sides, lo left at kHighz to cover all smaller levels.
+  if (m.val == 3) return;
+  auto s = static_cast<Strength>(m.str);
+  if (m.conflict) {
     out.s0_hi = s;
     out.s1_hi = s;
+    uint8_t su = 0;
+    uint8_t vu = 3;
+    if (FindWeakerUnambig(drivers, strengths, m.str, vu, su)) {
+      out = CombineAmbigWithUnambig(out, vu, su);
+    }
     return;
   }
-  if (max_val == 0) {
+  if (m.val == 0) {
     out.s0_hi = out.s0_lo = s;
-  } else if (max_val == 1) {
+  } else if (m.val == 1) {
     out.s1_hi = out.s1_lo = s;
   }
 }

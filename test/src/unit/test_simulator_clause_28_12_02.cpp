@@ -185,32 +185,6 @@ TEST(StrengthResolution, EqualStrengthPartialConflictPerBit) {
   EXPECT_EQ(var->value.words[0].bval & 0xFu, 0b0110u);
 }
 
-// §28.12.2 R1 edge case: R1's equal-strength-conflict-to-x rule shall still
-// apply when a weaker third driver is present. The Strong pair conflicts and
-// should resolve to x; the Weak driver is dominated under §28.12.1 and must
-// not rescue the bit to a known value.
-TEST(StrengthResolution, EqualStrengthConflictWithWeakerDriverStillProducesX) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
-  net.Resolve(arena);
-
-  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
-}
-
 // §28.12.2 R1 strength-preservation half at the runtime: when equal-strength
 // opposite-value drivers collapse to x on a plain wire, the net's
 // resolved_strength must record the shared strength level on BOTH sides of
@@ -284,33 +258,6 @@ TEST(StrengthResolution, EqualStrengthConflictLeavesLoAtHighz) {
 
   EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
   EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
-}
-
-// §28.12.2 R1 with a dominated third driver: a Weak driver loses under
-// §28.12.1 and must not influence the recorded strength level. The conflict
-// occurs between the two Strong drivers; resolved_strength must carry Strong
-// on both sides and must not be pulled down to Weak by the ignored driver.
-TEST(StrengthResolution, EqualStrengthConflictWithDominatedDriverRecordsPeakStrength) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
-  net.Resolve(arena);
-
-  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
-  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
-  EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
 }
 
 // §28.12.2 R2 edge case: folding three ambiguous-strength signals pairwise
