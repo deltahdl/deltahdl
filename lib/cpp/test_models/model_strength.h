@@ -37,6 +37,8 @@ inline StrengthSignal CombineUnambiguous(StrengthSignal a, StrengthSignal b);
 inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
                                             WiredLogicKind logic);
 
+inline StrengthSignal CombineAmbiguous(StrengthSignal a, StrengthSignal b);
+
 inline StrengthLevel ReduceNonresistive(StrengthLevel input);
 
 inline StrengthLevel ReduceResistive(StrengthLevel input);
@@ -170,6 +172,20 @@ inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
     result.strength0_hi = StrengthLevel::kHighz;
     result.strength1_hi = eff_a;
   }
+  return result;
+}
+
+// §28.12.2: combining two ambiguous-strength signals yields an ambiguous
+// signal whose strength range on each side of the scale covers both inputs.
+// In the hi-only range encoding used here — the per-side lower bound is
+// implicitly kHighz — widening the range is a max on each side. Values merge
+// with x wherever the inputs disagree, otherwise the shared value carries
+// through.
+inline StrengthSignal CombineAmbiguous(StrengthSignal a, StrengthSignal b) {
+  StrengthSignal result;
+  result.strength0_hi = std::max(a.strength0_hi, b.strength0_hi);
+  result.strength1_hi = std::max(a.strength1_hi, b.strength1_hi);
+  result.value = (a.value == b.value) ? a.value : Val4::kX;
   return result;
 }
 
