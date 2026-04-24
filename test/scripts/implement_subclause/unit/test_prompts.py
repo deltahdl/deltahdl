@@ -244,3 +244,80 @@ class TestDepth5:
             "4.4.3.1.2", "~/LRM.pdf",
         )
         assert not _check_common_structure(prompt, "4.4.3.1.2")
+
+
+# ---------------------------------------------------------------------------
+# Normative implementation discipline
+# ---------------------------------------------------------------------------
+
+
+class TestNormativeImplementation:
+    """Tests that the prompt defines 'done' in positive terms."""
+
+    def test_prompt_replaces_hard_stop_with_completion_statement(self, isc):
+        """Hard stop is replaced with a positive completion statement."""
+        prompt = _all_prompts(isc, "6.3")
+        assert (
+            "This step is complete when the file edits on disk"
+            " land the step's deliverable."
+        ) in prompt
+
+    def test_prompt_defines_normative_statement_as_done(self, isc):
+        """Constraints define when a normative statement is satisfied."""
+        prompt = _all_prompts(isc, "6.3")
+        assert (
+            "A normative statement in §6.3 is satisfied when production"
+            " code applies the rule and a test at the same pipeline stage"
+            " observes the rule being applied by that production code."
+        ) in prompt
+
+    def test_prompt_anchors_stages_in_project_mapping(self, isc):
+        """Constraints anchor pipeline stages in the project mapping."""
+        prompt = _all_prompts(isc, "6.3")
+        assert (
+            "Pipeline stages come from the project's stage-to-file mapping"
+        ) in prompt
+
+    def test_prompt_permits_shared_file_edits_when_text_requires(self, isc):
+        """Constraints permit shared-file edits the subclause text requires."""
+        prompt = _all_prompts(isc, "6.3")
+        assert "edit those shared files in this run" in prompt
+
+    def test_prompt_separates_requirement_ownership_from_file_scope(
+        self, isc,
+    ):
+        """Constraints separate requirement ownership from file scope."""
+        prompt = _all_prompts(isc, "6.3")
+        assert (
+            "Requirement ownership is scoped by subclause; file editing"
+            " is scoped by what §6.3's text requires."
+        ) in prompt
+
+    def test_prompt_requires_normative_enumeration(self, isc):
+        """Functionality step requires enumerating normative statements."""
+        prompt = _all_prompts(isc, "6.3")
+        assert "list every normative statement in §6.3's LRM text" in prompt
+
+    def test_prompt_requires_per_statement_stage_and_file(self, isc):
+        """Functionality step pairs each statement with stage and file."""
+        prompt = _all_prompts(isc, "6.3")
+        assert (
+            "name the pipeline stage the rule applies to and the source"
+            " file that will carry the rule"
+        ) in prompt
+
+    def test_prompt_requires_production_code_applies_rule(self, isc):
+        """Functionality step requires production code to apply each rule."""
+        prompt = _all_prompts(isc, "6.3")
+        assert (
+            "make the source-file edits so the production code applies"
+            " each rule"
+        ) in prompt
+
+    def test_prompt_tests_exercise_production_not_reference(self, isc):
+        """Tests step requires observing production, not a reference."""
+        prompt = _all_prompts(isc, "6.3")
+        assert (
+            "observe the rule being applied by production code, not by"
+            " a reference model or helper"
+        ) in prompt
