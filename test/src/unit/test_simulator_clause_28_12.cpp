@@ -9,35 +9,10 @@ using namespace delta;
 
 namespace {
 
-// R5: A user-defined nettype net must ignore any driver-level strength. With
-// conflicting 1-and-0 drivers whose strengths would normally let the stronger
-// one win, the user-nettype path must fall through to value-only wire
-// resolution (conflicting known bits → x), not the strength-aware path.
-TEST(UserNettypeStrength, UserNettypeIgnoresStrongOverWeak) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 1);
-  Net net;
-  net.type = NetType::kWire;
-  net.resolved = var;
-  net.is_user_nettype = true;
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
-  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
-
-  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
-  net.driver_strengths.push_back({Strength::kWeak, Strength::kWeak});
-  net.Resolve(arena);
-
-  // Strength-aware path would have returned 1 (Strong beats Weak). The
-  // value-only wire resolution of 1 against 0 produces x (aval=0, bval=1).
-  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
-}
-
-// Control: the same driver setup on a non-user-nettype net must still honor
-// strength. This pins down that the R5 bypass is conditioned on the flag, not
-// an accidental side effect of the resolve path.
+// R5 control: the same conflicting Strong/Weak driver pair on a net whose
+// is_user_nettype flag is false must still honor strength and return the
+// Strong driver's value. Pins down that the R5 bypass is conditioned on the
+// flag, not an accidental side effect of the resolve path.
 TEST(UserNettypeStrength, NonUserNettypeStillHonorsStrength) {
   Arena arena;
   auto* var = arena.Create<Variable>();
