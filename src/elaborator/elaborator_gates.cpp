@@ -1,9 +1,135 @@
+#include <format>
+
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
 namespace delta {
+
+static const RtlirNet* FindNetByName(std::string_view name,
+                                     const RtlirModule* mod) {
+  for (const auto& n : mod->nets) {
+    if (n.name == name) return &n;
+  }
+  return nullptr;
+}
+
+// §28.8: Resolve the underlying net referenced by a bidirectional terminal
+// expression. Returns nullptr when the terminal does not reduce to a single
+// net (e.g. concatenation, variable, or unrecognised form).
+static const RtlirNet* TerminalNet(const Expr* term, const RtlirModule* mod) {
+  if (!term) return nullptr;
+  if (term->kind == ExprKind::kIdentifier)
+    return FindNetByName(term->text, mod);
+  if (term->kind == ExprKind::kSelect && term->base &&
+      term->base->kind == ExprKind::kIdentifier)
+    return FindNetByName(term->base->text, mod);
+  return nullptr;
+}
+
+// §28.8: True when `term` is either a scalar net identifier (width 1) or a
+// single-bit select on a net identifier — the only forms permitted on the
+// bidirectional terminals of resistive (rtran/rtranif*) switches.
+static bool IsScalarNetOrBitSelect(const Expr* term, const RtlirModule* mod) {
+  if (!term) return false;
+  if (term->kind == ExprKind::kIdentifier) {
+    auto* net = FindNetByName(term->text, mod);
+    return net != nullptr && net->width == 1;
+  }
+  if (term->kind == ExprKind::kSelect) {
+    if (!term->base || term->base->kind != ExprKind::kIdentifier) return false;
+    if (term->is_part_select_plus || term->is_part_select_minus) return false;
+    if (term->index_end != nullptr) return false;
+    if (term->index == nullptr) return false;
+    return FindNetByName(term->base->text, mod) != nullptr;
+  }
+  return false;
+}
+
+static const RtlirVariable* FindVariableByName(std::string_view name,
+                                               const RtlirModule* mod) {
+  for (const auto& v : mod->variables) {
+    if (v.name == name) return &v;
+  }
+  return nullptr;
+}
+
+// §28.8: Reports the disqualifying type kind when the control terminal
+// directly references a variable whose type cannot serve as a control input
+// (real, string, chandle, event). Returns nullptr for nets, 4-state and
+// 2-state variables, and for terminals that are not a bare identifier — those
+// cases are either explicitly permitted or fall outside this single-signal
+// rule (an arbitrary expression's type is checked elsewhere).
+static const char* DisallowedControlVariableKind(const Expr* term,
+                                                 const RtlirModule* mod) {
+  if (!term || term->kind != ExprKind::kIdentifier) return nullptr;
+  auto* var = FindVariableByName(term->text, mod);
+  if (!var) return nullptr;
+  if (var->is_real) return "real";
+  if (var->is_string) return "string";
+  if (var->is_chandle) return "chandle";
+  if (var->is_event) return "event";
+  return nullptr;
+}
+
+void ValidateBidirectionalSwitchConnections(const ModuleItem* item,
+                                            const RtlirModule* mod,
+                                            DiagEngine& diag) {
+  if (!item || item->kind != ModuleItemKind::kGateInst) return;
+  auto kind = item->gate_kind;
+  bool is_bidir = (kind == GateKind::kTran || kind == GateKind::kRtran ||
+                   kind == GateKind::kTranif0 || kind == GateKind::kTranif1 ||
+                   kind == GateKind::kRtranif0 || kind == GateKind::kRtranif1);
+  if (!is_bidir) return;
+  const auto& terms = item->gate_terminals;
+  if (terms.size() < 2) return;
+
+  bool is_resistive = (kind == GateKind::kRtran ||
+                       kind == GateKind::kRtranif0 ||
+                       kind == GateKind::kRtranif1);
+  if (is_resistive) {
+    for (size_t i = 0; i < 2; ++i) {
+      if (!IsScalarNetOrBitSelect(terms[i], mod)) {
+        diag.Error(item->loc,
+                   "resistive bidirectional pass switch terminal must be a "
+                   "scalar net or a bit-select of a vector net");
+      }
+    }
+  }
+
+  bool has_control = (kind == GateKind::kTranif0 ||
+                      kind == GateKind::kTranif1 ||
+                      kind == GateKind::kRtranif0 ||
+                      kind == GateKind::kRtranif1);
+  if (has_control && terms.size() >= 3) {
+    if (auto* bad = DisallowedControlVariableKind(terms[2], mod)) {
+      diag.Error(item->loc,
+                 std::format("control input of pass-enable switch cannot be "
+                             "of type '{}'; expected a 4-state net, 4-state "
+                             "variable, or 2-state variable",
+                             bad));
+    }
+  }
+
+  auto* n0 = TerminalNet(terms[0], mod);
+  auto* n1 = TerminalNet(terms[1], mod);
+  if (!n0 || !n1) return;
+  if (n0->is_user_nettype != n1->is_user_nettype) {
+    diag.Error(item->loc,
+               "bidirectional pass switch cannot connect a user-defined "
+               "nettype to a built-in net");
+    return;
+  }
+  if (n0->is_user_nettype && n1->is_user_nettype &&
+      n0->nettype_name != n1->nettype_name) {
+    diag.Error(item->loc,
+               std::format("bidirectional pass switch cannot connect "
+                           "different user-defined nettypes ('{}' and '{}')",
+                           n0->nettype_name, n1->nettype_name));
+  }
+}
 
 /// Build a binary expression tree from left-folding the given operand over
 /// all inputs with the given operator.

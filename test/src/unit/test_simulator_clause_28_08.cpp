@@ -13,6 +13,13 @@ TEST(BidirectionalSwitches, TranIsBidirectional) {
   EXPECT_TRUE(IsBidirectional(SwitchType::kTranif1));
 }
 
+// The rtranif* family is enumerated alongside tranif*/tran/rtran but the
+// IsBidirectional sweep above stops short of it.
+TEST(BidirectionalSwitches, RtranifVariantsAreBidirectional) {
+  EXPECT_TRUE(IsBidirectional(SwitchType::kRtranif0));
+  EXPECT_TRUE(IsBidirectional(SwitchType::kRtranif1));
+}
+
 TEST(BidirectionalSwitches, TranNoDelays) {
   EXPECT_FALSE(AcceptsDelaySpec(SwitchType::kTran));
   EXPECT_FALSE(AcceptsDelaySpec(SwitchType::kRtran));
@@ -151,6 +158,22 @@ TEST(SwitchProcessing, UserDefinedNetControlZeroBlocks) {
 
 // Resistive variants differ only in strength (not modeled here); conductivity
 // behavior must match their full-strength counterparts.
+TEST(SwitchProcessing, RtranBidirectionalPropagation) {
+  Arena arena;
+  auto* va = arena.Create<Variable>();
+  va->value = MakeLogic4Vec(arena, 1);
+  auto* vb = arena.Create<Variable>();
+  vb->value = MakeLogic4Vec(arena, 1);
+
+  Net a = MakeUndrivenNet(arena, va);
+  Net b = MakeNet1(arena, vb, 0);
+
+  std::vector<SwitchInst> sw;
+  sw.push_back({&a, &b, SwitchKind::kRtran, {}, false});
+  ResolveSwitchNetwork(sw, arena);
+  EXPECT_EQ(ValOf(*va), kVal0);
+}
+
 TEST(SwitchProcessing, RtranPropagatesDrivenToUndriven) {
   auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;

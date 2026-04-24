@@ -16,7 +16,7 @@ TEST(PassSwitches, TranRejectsSingleTerminal) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(PassEnableSwitches, TooFewTerminals) {
+TEST(PassEnableSwitches, Tranif0RejectsTwoTerminals) {
   auto r = Parse(
       "module m;\n"
       "  tranif0 t1(a, b);\n"
@@ -24,7 +24,7 @@ TEST(PassEnableSwitches, TooFewTerminals) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(PassEnableSwitches, TooManyTerminals) {
+TEST(PassEnableSwitches, Tranif1RejectsFourTerminals) {
   auto r = Parse(
       "module m;\n"
       "  tranif1 t1(a, b, en, extra);\n"
@@ -216,6 +216,49 @@ TEST(PassEnableSwitches, Rtranif1RejectsFourTerminals) {
       "  rtranif1 r1(a, b, en, extra);\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);
+}
+
+// Positive counterpart to RtranAcceptsTwoTerminals.
+TEST(PassSwitches, TranAcceptsTwoTerminals) {
+  auto r = Parse(
+      "module m;\n"
+      "  tran t1(a, b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTran);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_terminals.size(), 2u);
+}
+
+// Mirrors Tranif0AcceptsSingleValueDelay so both enable variants are
+// exercised for the single-delay form.
+TEST(PassEnableSwitches, Tranif1AcceptsSingleValueDelay) {
+  auto r = Parse(
+      "module m;\n"
+      "  tranif1 #4 t1(a, b, en);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif1);
+  ASSERT_NE(g, nullptr);
+  ASSERT_NE(g->gate_delay, nullptr);
+  EXPECT_EQ(g->gate_delay->int_val, 4u);
+  EXPECT_EQ(g->gate_delay_fall, nullptr);
+}
+
+// When the source omits the delay spec entirely all delay slots stay null,
+// matching the no-turn-on / no-turn-off rule for bidirectional pass switches.
+TEST(PassEnableSwitches, Tranif0WithoutDelayLeavesGateDelayNull) {
+  auto r = Parse(
+      "module m;\n"
+      "  tranif0 t1(a, b, en);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kTranif0);
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(g->gate_delay, nullptr);
+  EXPECT_EQ(g->gate_delay_fall, nullptr);
+  EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
 // All six bidirectional pass switch keywords parse to distinct GateKind values

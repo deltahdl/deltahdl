@@ -78,6 +78,9 @@ struct RtlirNet {
   // §6.6.7: User-defined nettype.
   bool is_user_nettype = false;
   std::string_view resolve_func;
+  // §28.8: Original UDNT name, used to detect mixing of two different
+  // user-defined net types on a bidirectional pass switch.
+  std::string_view nettype_name;
   std::vector<ResolvedAttribute> attrs;
 };
 

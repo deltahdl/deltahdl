@@ -717,6 +717,13 @@ void AddProcess(
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
 
+// §28.8: Diagnose connection rules unique to bidirectional pass switches —
+// the resistive variants' scalar/bit-select restriction and the UDNT-mixing
+// prohibition. No-op for non-bidirectional gate kinds.
+void ValidateBidirectionalSwitchConnections(const ModuleItem* item,
+                                            const RtlirModule* mod,
+                                            DiagEngine& diag);
+
 // §23.10: capture declared type/range info on a value-parameter decl.
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype);
 

@@ -1976,6 +1976,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
     // §6.6.7: Tag the RtlirNet with user-nettype info.
     auto& net = mod->nets.back();
     net.is_user_nettype = true;
+    net.nettype_name = item->data_type.type_name;
     auto it = nettype_resolve_funcs_.find(item->data_type.type_name);
     if (it != nettype_resolve_funcs_.end()) {
       net.resolve_func = it->second;
