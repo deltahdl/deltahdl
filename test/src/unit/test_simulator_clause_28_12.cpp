@@ -79,6 +79,32 @@ TEST(UserNettypeStrength, UserNettypeIgnoresStrengthPerBit) {
   EXPECT_EQ(var->value.words[0].bval & 0xFu, 0b0110u);
 }
 
+// R3 direct — a user-nettype net's resolved_strength field must be left at
+// its default (all-highz, both sides equal) after Resolve, even when driver
+// strengths would otherwise populate it with a concrete level. The parent-
+// clause "shall not have strength levels" rule lives in the skipped
+// ComputeSingleBitStrength call; observing the default state confirms the
+// UDNT guard suppresses population, not merely overwrites with highz.
+TEST(UserNettypeStrength, UserNettypeResolveLeavesResolvedStrengthAtDefault) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+  net.is_user_nettype = true;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
+}
+
 // R5 across more than two drivers: the pairwise wire-word fold must still
 // ignore every driver's strength. A strength-aware resolver would have picked
 // the Supply-0 driver as dominant and returned 0; the value-only fold over
@@ -125,6 +151,33 @@ TEST(NetStrengthDisjunction, UnambiguousDriversYieldUnambiguousNetStrength) {
   EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
   EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
   EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kStrong);
+}
+
+// R1 mirror — unambiguous branch for a value-0 dominant driver. The
+// production helper has separate code paths for max_val==0 and max_val==1,
+// and the paired UnambiguousDriversYieldUnambiguousNetStrength test only
+// exercises the value-1 side; without this test the s0 branch of
+// ComputeSingleBitStrength would go unobserved by any test.
+TEST(NetStrengthDisjunction, ValueZeroDominantDriverRecordsStrengthOnSide0) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWire;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kHighz});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kHighz, Strength::kWeak});
+  net.Resolve(arena);
+
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
 }
 
 // R1 disjunction — ambiguous branch must be representable. The net-strength
