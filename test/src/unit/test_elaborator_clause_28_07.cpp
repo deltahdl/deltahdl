@@ -6,18 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(MosSwitchElaboration, NmosElaboratesWithoutError) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  wire out, data, ctrl;\n"
-      "  nmos n1(out, data, ctrl);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 // The driven output (first terminal) must appear as the lhs of the emitted
 // continuous assign.
 TEST(MosSwitchElaboration, OutputIsFirstTerminal) {

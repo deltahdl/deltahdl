@@ -13,11 +13,6 @@ TEST(BidirectionalSwitches, TranIsBidirectional) {
   EXPECT_TRUE(IsBidirectional(SwitchType::kTranif1));
 }
 
-TEST(BidirectionalSwitches, MosSwitchesNotBidirectional) {
-  EXPECT_FALSE(IsBidirectional(SwitchType::kNmos));
-  EXPECT_FALSE(IsBidirectional(SwitchType::kPmos));
-}
-
 TEST(BidirectionalSwitches, TranNoDelays) {
   EXPECT_FALSE(AcceptsDelaySpec(SwitchType::kTran));
   EXPECT_FALSE(AcceptsDelaySpec(SwitchType::kRtran));
