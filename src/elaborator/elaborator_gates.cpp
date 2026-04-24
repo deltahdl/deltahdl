@@ -91,6 +91,17 @@ void ValidateBidirectionalSwitchConnections(const ModuleItem* item,
                        kind == GateKind::kRtranif1);
   if (is_resistive) {
     for (size_t i = 0; i < 2; ++i) {
+      // §28.8: tran/tranif* get the "may also ... user-defined net types"
+      // carve-out; the resistive variants do not, so reject UDNT terminals
+      // before the scalar-net check to give a clearer diagnostic than
+      // "must be a scalar net" for a net that is in fact scalar.
+      auto* net = TerminalNet(terms[i], mod);
+      if (net && net->is_user_nettype) {
+        diag.Error(item->loc,
+                   "resistive bidirectional pass switch terminal cannot "
+                   "connect to a user-defined net type");
+        continue;
+      }
       if (!IsScalarNetOrBitSelect(terms[i], mod)) {
         diag.Error(item->loc,
                    "resistive bidirectional pass switch terminal must be a "

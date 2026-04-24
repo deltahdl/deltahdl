@@ -5,6 +5,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "model_switch_eval.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
 
@@ -25,6 +26,10 @@ struct SwitchInst {
   SwitchKind kind = SwitchKind::kTran;
   Logic4Word control{0, 0};
   bool user_defined_nets = false;
+  // §28.8: Delay spec applies only to the control input. Network resolution
+  // ignores it because the data path through the bidirectional terminals has
+  // no propagation delay; the field exists so tests can assert that property.
+  PassSwitchDelaySpec delay{};
 };
 
 inline bool SwitchConducts(SwitchKind kind, Logic4Word control) {

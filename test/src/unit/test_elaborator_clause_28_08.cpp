@@ -170,6 +170,48 @@ TEST(BidirectionalSwitchTerminals, Rtranif1RejectsPartSelect) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// The resistive variants do not get the user-defined-net-type carve-out that
+// tran/tranif* enjoy, so a rtran whose terminals are UDNT nets must be
+// rejected — even when the UDNT is scalar and would otherwise satisfy the
+// scalar/bit-select rule.
+TEST(BidirectionalSwitchTerminals, RtranRejectsUdnt) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  nettype logic my_net;\n"
+      "  my_net a, b;\n"
+      "  rtran r1(a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(BidirectionalSwitchTerminals, Rtranif0RejectsUdnt) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  nettype logic my_net;\n"
+      "  my_net a, b;\n"
+      "  wire en;\n"
+      "  rtranif0 r1(a, b, en);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(BidirectionalSwitchTerminals, Rtranif1RejectsUdnt) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  nettype logic my_net;\n"
+      "  my_net a, b;\n"
+      "  wire en;\n"
+      "  rtranif1 r1(a, b, en);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 // Non-resistive bidirectional switches are not subject to the scalar/bit-select
 // rule and may connect whole vector nets.
 TEST(BidirectionalSwitchTerminals, TranAcceptsWholeVector) {

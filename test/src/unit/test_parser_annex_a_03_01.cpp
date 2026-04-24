@@ -419,26 +419,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_AllPassEnSwitchTypes) {
               "endmodule\n"));
 }
 
-TEST(BidirectionalPassSwitches, TranAndRtran) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire a, b;\n"
-              "  tran  g1(a, b);\n"
-              "  rtran g2(a, b);\n"
-              "endmodule\n"));
-}
-
-TEST(BidirectionalPassSwitches, ConditionalPassEnables) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire a, b, en;\n"
-              "  tranif0  g1(a, b, en);\n"
-              "  tranif1  g2(a, b, en);\n"
-              "  rtranif0 g3(a, b, en);\n"
-              "  rtranif1 g4(a, b, en);\n"
-              "endmodule\n"));
-}
-
 TEST(PrimitiveInstantiationParsing, GateInst_CmosBasic) {
   auto r = Parse(
       "module m;\n"
