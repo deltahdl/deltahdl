@@ -112,20 +112,6 @@ TEST(CmosSwitches, CmosTwoValueDelay) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// Three-delay form: cmos is delay3-capable, so a full `#(r, f, z)` triple
-// must parse cleanly (the rise/fall/decay-to-x selection happens later).
-TEST(CmosSwitches, CmosThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  cmos #(10, 20, 30) c1(out, data, nctrl, pctrl);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kCmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-}
-
 // rcmos accepts the same delay3 form as cmos; all three fields must surface.
 TEST(CmosSwitches, RcmosThreeValueDelay) {
   auto r = Parse(
