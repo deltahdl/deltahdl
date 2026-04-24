@@ -16,12 +16,18 @@ enum class StrengthLevel : uint8_t {
   kSupply = 7,
 };
 
-// A strength signal carries a value and a range of strength levels.
-// For unambiguous signals, lo == hi. For ambiguous, lo < hi.
+// A strength signal carries a value and a range of strength levels per side.
+// Sides are independent: side 0 carries value-0 levels, side 1 carries value-1
+// levels. Unambiguous signals occupy a single level on the value side and
+// kHighz on the other; ambiguous signals occupy a range on one or both sides.
+// The _lo fields are exposed so §28.12.3 results — which can have a non-kHighz
+// lower bound after rule b) trims a side — are representable.
 struct StrengthSignal {
   Val4 value = Val4::kZ;
   StrengthLevel strength0_hi = StrengthLevel::kHighz;
   StrengthLevel strength1_hi = StrengthLevel::kHighz;
+  StrengthLevel strength0_lo = StrengthLevel::kHighz;
+  StrengthLevel strength1_lo = StrengthLevel::kHighz;
 };
 
 enum class WiredLogicKind : uint8_t { kNone, kAnd, kOr };
@@ -38,6 +44,9 @@ inline StrengthSignal CombineWithWiredLogic(StrengthSignal a, StrengthSignal b,
                                             WiredLogicKind logic);
 
 inline StrengthSignal CombineAmbiguous(StrengthSignal a, StrengthSignal b);
+
+inline StrengthSignal CombineAmbiguousWithUnambiguous(StrengthSignal unambig,
+                                                      StrengthSignal ambig);
 
 inline StrengthLevel ReduceNonresistive(StrengthLevel input);
 
@@ -186,6 +195,80 @@ inline StrengthSignal CombineAmbiguous(StrengthSignal a, StrengthSignal b) {
   result.strength0_hi = std::max(a.strength0_hi, b.strength0_hi);
   result.strength1_hi = std::max(a.strength1_hi, b.strength1_hi);
   result.value = (a.value == b.value) ? a.value : Val4::kX;
+  return result;
+}
+
+// §28.12.3: rules a/b/c for combining a known-value, single-level unambig
+// signal with one component of an ambiguous-strength signal.
+//   a) ambig levels strictly above Su survive on their original side;
+//   b) ambig levels at or below Su disappear (subject to c);
+//   c) if a) and b) leave a gap on the !Vu side because the signals are of
+//      opposite value, the gap is filled down to Su+1.
+// The unambig signal contributes its single level Su on the Vu side. Per-side
+// surviving ranges are merged with that contribution into [lo, hi] form.
+inline StrengthSignal CombineAmbiguousWithUnambiguous(StrengthSignal unambig,
+                                                      StrengthSignal ambig) {
+  StrengthLevel s_u = (unambig.value == Val4::kV0) ? unambig.strength0_hi
+                                                   : unambig.strength1_hi;
+  uint8_t s_u_idx = static_cast<uint8_t>(s_u);
+
+  StrengthSignal result;
+
+  auto apply_rule_ab = [&](StrengthLevel a_lo, StrengthLevel a_hi,
+                           StrengthLevel& r_lo, StrengthLevel& r_hi) {
+    if (static_cast<uint8_t>(a_hi) > s_u_idx) {
+      uint8_t lo_idx = std::max<uint8_t>(static_cast<uint8_t>(a_lo),
+                                         s_u_idx + 1);
+      r_lo = static_cast<StrengthLevel>(lo_idx);
+      r_hi = a_hi;
+    }
+  };
+
+  apply_rule_ab(ambig.strength0_lo, ambig.strength0_hi, result.strength0_lo,
+                result.strength0_hi);
+  apply_rule_ab(ambig.strength1_lo, ambig.strength1_hi, result.strength1_lo,
+                result.strength1_hi);
+
+  // Merge the unambig's single level Su onto its value side. The merge always
+  // extends the lo down to s_u (a same-side surviving lo is at least s_u+1).
+  if (unambig.value == Val4::kV0) {
+    if (result.strength0_hi == StrengthLevel::kHighz) {
+      result.strength0_hi = s_u;
+    }
+    result.strength0_lo = s_u;
+  } else {
+    if (result.strength1_hi == StrengthLevel::kHighz) {
+      result.strength1_hi = s_u;
+    }
+    result.strength1_lo = s_u;
+  }
+
+  // Rule c: opposite-side surviving range with lo > Su+1 leaves a gap; fill
+  // it by lowering the !Vu-side lo to Su+1.
+  StrengthLevel su_plus_1 = static_cast<StrengthLevel>(s_u_idx + 1);
+  if (unambig.value == Val4::kV0) {
+    if (result.strength1_hi != StrengthLevel::kHighz &&
+        static_cast<uint8_t>(result.strength1_lo) >
+            static_cast<uint8_t>(su_plus_1)) {
+      result.strength1_lo = su_plus_1;
+    }
+  } else {
+    if (result.strength0_hi != StrengthLevel::kHighz &&
+        static_cast<uint8_t>(result.strength0_lo) >
+            static_cast<uint8_t>(su_plus_1)) {
+      result.strength0_lo = su_plus_1;
+    }
+  }
+
+  bool has_side0 = result.strength0_hi != StrengthLevel::kHighz;
+  bool has_side1 = result.strength1_hi != StrengthLevel::kHighz;
+  if (has_side0 && has_side1) {
+    result.value = Val4::kX;
+  } else if (has_side0) {
+    result.value = Val4::kV0;
+  } else {
+    result.value = Val4::kV1;
+  }
   return result;
 }
 
