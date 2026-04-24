@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
-#include "model_strength.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
@@ -9,40 +8,6 @@
 using namespace delta;
 
 namespace {
-
-TEST(WiredLogic, WiredAndSameStrength) {
-  StrengthSignal strong_one{Val4::kV1, StrengthLevel::kHighz,
-                            StrengthLevel::kStrong};
-  StrengthSignal strong_zero{Val4::kV0, StrengthLevel::kStrong,
-                             StrengthLevel::kHighz};
-  auto result =
-      CombineWithWiredLogic(strong_one, strong_zero, WiredLogicKind::kAnd);
-  EXPECT_EQ(result.value, Val4::kV0);
-}
-
-TEST(WiredLogic, WiredOrSameStrength) {
-  StrengthSignal strong_one{Val4::kV1, StrengthLevel::kHighz,
-                            StrengthLevel::kStrong};
-  StrengthSignal strong_zero{Val4::kV0, StrengthLevel::kStrong,
-                             StrengthLevel::kHighz};
-  auto result =
-      CombineWithWiredLogic(strong_one, strong_zero, WiredLogicKind::kOr);
-  EXPECT_EQ(result.value, Val4::kV1);
-}
-
-TEST(WiredLogic, WiredAndBothOne) {
-  StrengthSignal a{Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kPull};
-  StrengthSignal b{Val4::kV1, StrengthLevel::kHighz, StrengthLevel::kPull};
-  auto result = CombineWithWiredLogic(a, b, WiredLogicKind::kAnd);
-  EXPECT_EQ(result.value, Val4::kV1);
-}
-
-TEST(WiredLogic, WiredOrBothZero) {
-  StrengthSignal a{Val4::kV0, StrengthLevel::kPull, StrengthLevel::kHighz};
-  StrengthSignal b{Val4::kV0, StrengthLevel::kPull, StrengthLevel::kHighz};
-  auto result = CombineWithWiredLogic(a, b, WiredLogicKind::kOr);
-  EXPECT_EQ(result.value, Val4::kV0);
-}
 
 // R1 at Net::Resolve: on a wand net, two same-strength drivers with opposite
 // values must resolve to AND of their values (0), not to x as a plain wire
@@ -264,6 +229,143 @@ TEST(StrengthResolution, WorOneOrXResolvesToOne) {
   x_val.words[0].aval = 0;
   x_val.words[0].bval = 1;
   net.drivers.push_back(x_val);
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §28.12.4 calls out the "both inputs value 1" case as giving 1 for BOTH
+// types of wired logic. The wand side is exercised by WandBothOnesResolveToOne;
+// this test covers the wor side so the pair of agreeing-drivers cases named
+// by the clause text is symmetric.
+TEST(StrengthResolution, WorBothOnesResolveToOne) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWor;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// Dual of WorBothZerosResolveToZero: two agreeing same-strength 0s on a wand
+// must carry the agreed 0 through rather than fall into the wired-logic
+// branch that handles disagreement.
+TEST(StrengthResolution, WandBothZerosResolveToZero) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWand;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// AND-gate corner case not covered by WandZeroAndXResolvesToZero: unlike 0
+// which dominates AND, the value 1 does not dominate, so 1 AND x leaves the
+// result unknown. Verify wand resolution matches §28.12.4's "result of an
+// and gate with the two signals as inputs" for this case.
+TEST(StrengthResolution, WandOneAndXResolvesToX) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWand;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  auto x_val = MakeLogic4Vec(arena, 1);
+  x_val.words[0].aval = 0;
+  x_val.words[0].bval = 1;
+  net.drivers.push_back(x_val);
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  // x is encoded as aval=0, bval=1.
+  EXPECT_EQ(var->value.words[0].aval, 0u);
+  EXPECT_EQ(var->value.words[0].bval, 1u);
+}
+
+// OR-gate corner case mirror: 0 OR x is unknown because 0 does not dominate
+// OR (only 1 does).
+TEST(StrengthResolution, WorZeroOrXResolvesToX) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWor;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  auto x_val = MakeLogic4Vec(arena, 1);
+  x_val.words[0].aval = 0;
+  x_val.words[0].bval = 1;
+  net.drivers.push_back(x_val);
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.words[0].aval, 0u);
+  EXPECT_EQ(var->value.words[0].bval, 1u);
+}
+
+// §28.12.4 names "multiple drivers" without bounding the count at two.
+// Three same-strength wand drivers (1, 1, 0) must fold as an and gate:
+// AND(1,1,0) = 0.
+TEST(StrengthResolution, WandThreeDriversFoldToAnd) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWand;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// Mirror for wor: three drivers (0, 0, 1) at same strength fold as an or
+// gate → OR(0,0,1) = 1.
+TEST(StrengthResolution, WorThreeDriversFoldToOr) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWor;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
   net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
   net.Resolve(arena);
 
