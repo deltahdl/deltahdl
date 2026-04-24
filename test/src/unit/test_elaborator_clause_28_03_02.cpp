@@ -17,11 +17,6 @@ TEST(GateStrengthValidity, StrengthSpecDisallowedForSwitches) {
   EXPECT_FALSE(CanHaveStrengthSpec(GateType::kCmos));
 }
 
-TEST(GateStrengthValidity, BothHighzStrengthsInvalid) {
-  EXPECT_FALSE(ValidateStrengthSpec(StrengthLvl::kHighz, StrengthLvl::kHighz,
-                                    GateType::kAnd));
-}
-
 TEST(GateStrengthValidity, DefaultStrengthIsStrong) {
   GateDeclInfo info;
   info.has_strength = false;

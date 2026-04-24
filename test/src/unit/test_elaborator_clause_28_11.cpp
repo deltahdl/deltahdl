@@ -99,4 +99,118 @@ TEST(StrengthPairElaboration, GateInstanceStrongPairIsLegal) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// The four driving strengths (supply, strong, pull, weak) each propagate
+// from a gate output. Verifying each in turn ensures none of the four
+// names is accidentally rejected at the elaboration stage.
+TEST(StrengthPairElaboration, GateInstanceSupplyPairIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire o, i;\n"
+      "  buf (supply0, supply1) b1 (o, i);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(StrengthPairElaboration, GateInstancePullPairIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire o, i;\n"
+      "  buf (pull0, pull1) b1 (o, i);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(StrengthPairElaboration, GateInstanceWeakPairIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire o, i;\n"
+      "  buf (weak0, weak1) b1 (o, i);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// Continuous assignment is the other grammar position that carries driving
+// strength. A drive strength on a continuous assign must elaborate cleanly —
+// this is the positive counterpart to the illegal-pair cases above.
+TEST(StrengthPairElaboration, ContAssignStrongPairIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (strong0, strong1) w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// Charge storage strengths (small, medium, large) belong exclusively to the
+// trireg net type. Applying one to a plain wire must be rejected.
+TEST(ChargeStrengthElaboration, SmallOnNonTriregIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire (small) w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ChargeStrengthElaboration, MediumOnNonTriregIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire (medium) w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(ChargeStrengthElaboration, LargeOnNonTriregIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire (large) w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// The same three charge storage strengths are legal on a trireg net, which is
+// the only net type for which they are defined to originate.
+TEST(ChargeStrengthElaboration, SmallOnTriregIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  trireg (small) t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ChargeStrengthElaboration, MediumOnTriregIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  trireg (medium) t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ChargeStrengthElaboration, LargeOnTriregIsLegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  trireg (large) t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
