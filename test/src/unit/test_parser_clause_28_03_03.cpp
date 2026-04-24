@@ -45,21 +45,6 @@ TEST(GateDelayParsing, NInputGateThreeValueDelayRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(GateDelayParsing, CmosSwitchTwoValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  cmos #(3, 5) c1(o, i, n, p);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kCmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  EXPECT_EQ(g->gate_delay->int_val, 3u);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  EXPECT_EQ(g->gate_delay_fall->int_val, 5u);
-  EXPECT_EQ(g->gate_delay_decay, nullptr);
-}
-
 TEST(DelayParsing, AndGateSingleValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -105,18 +90,6 @@ TEST(DelayParsing, XorGateSingleValueDelay) {
   EXPECT_EQ(item->gate_delay->int_val, 7u);
 }
 
-TEST(CmosSwitches, ThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  cmos #(10, 20, 30) c1(out, data, nctrl, pctrl);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kCmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-}
-
 // When no `#` appears, all three delay fields remain null — the zero-delay
 // baseline §28.3.3 permits.
 TEST(GateDelayParsing, GateWithoutDelayHasNullDelay) {
@@ -132,19 +105,6 @@ TEST(GateDelayParsing, GateWithoutDelayHasNullDelay) {
   EXPECT_EQ(g->gate_delay, nullptr);
   EXPECT_EQ(g->gate_delay_fall, nullptr);
   EXPECT_EQ(g->gate_delay_decay, nullptr);
-}
-
-TEST(GateDelayParsing, RcmosThreeValueDelay) {
-  auto r = Parse(
-      "module m;\n"
-      "  rcmos #(7, 8, 9) r1(o, i, n, p);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kRcmos);
-  ASSERT_NE(g, nullptr);
-  ASSERT_NE(g->gate_delay, nullptr);
-  ASSERT_NE(g->gate_delay_fall, nullptr);
-  ASSERT_NE(g->gate_delay_decay, nullptr);
 }
 
 }  // namespace

@@ -504,15 +504,6 @@ TEST(PrimitiveInstantiationParsing, GateInst_AllCmosSwitchTypes) {
               "endmodule\n"));
 }
 
-TEST(CmosSwitches, CmosAndRcmos) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire out, in, nctrl, pctrl;\n"
-              "  cmos  g1(out, in, nctrl, pctrl);\n"
-              "  rcmos g2(out, in, nctrl, pctrl);\n"
-              "endmodule\n"));
-}
-
 TEST(PrimitiveInstantiationParsing, GateInst_PulldownBasic) {
   auto r = Parse(
       "module m;\n"

@@ -40,4 +40,13 @@ TEST(CmosSwitches, CmosBlocksHighZData) {
             Val4Ext::kZ);
 }
 
+// A conducting cmos drives a clean logic 0 when data=0 — the n-half carries
+// the low level through without inversion.
+TEST(CmosSwitches, CmosPassesZeroData) {
+  EXPECT_EQ(EvalMosSwitch(SwitchType::kCmos, Val4::kV0, Val4::kV1),
+            Val4Ext::kV0);
+  EXPECT_EQ(EvalMosSwitch(SwitchType::kRcmos, Val4::kV0, Val4::kV1),
+            Val4Ext::kV0);
+}
+
 }  // namespace
