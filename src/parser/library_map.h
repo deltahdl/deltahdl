@@ -53,6 +53,12 @@ class LibraryMap {
   void TagCompilationUnit(CompilationUnit& cu,
                           std::string_view source_path) const;
 
+  // §33.6.1: list the libraries in declaration order, deduplicated by
+  // first appearance.  The default-binding rule searches libraries in
+  // this order to pick a cell when no configuration is in use.  The
+  // returned views are owned by this LibraryMap.
+  std::vector<std::string_view> LibraryDeclarationOrder() const;
+
  private:
   struct Entry {
     std::string library;

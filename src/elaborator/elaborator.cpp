@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <format>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -99,23 +100,29 @@ Elaborator::Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit)
 
 void Elaborator::ValidateNameSpaces() {
   // §3.13(a): Definitions name space — module, primitive, program, interface
-  // names must be unique across all design elements.
-  std::unordered_map<std::string_view, SourceRange> def_names;
-  auto check_def = [&](std::string_view name, SourceRange range) {
-    auto [it, inserted] = def_names.try_emplace(name, range);
+  // names must be unique across all design elements.  §33.6.1's example
+  // depends on the same cell name appearing in different libraries (e.g.,
+  // `m` lives in rtlLib, aLib, and gateLib simultaneously); the uniqueness
+  // key therefore pairs the library tag with the name so cross-library
+  // duplicates coexist while same-library duplicates still error.
+  std::map<std::pair<std::string_view, std::string_view>, SourceRange>
+      def_names;
+  auto check_def = [&](std::string_view library, std::string_view name,
+                       SourceRange range) {
+    auto [it, inserted] = def_names.try_emplace({library, name}, range);
     if (!inserted) {
       diag_.Error(range.start,
                   std::format("duplicate definition of '{}'", name));
     }
   };
-  for (auto* m : unit_->modules) check_def(m->name, m->range);
-  for (auto* p : unit_->programs) check_def(p->name, p->range);
-  for (auto* i : unit_->interfaces) check_def(i->name, i->range);
-  for (auto* c : unit_->checkers) check_def(c->name, c->range);
-  for (auto* u : unit_->udps) check_def(u->name, u->range);
+  for (auto* m : unit_->modules) check_def(m->library, m->name, m->range);
+  for (auto* p : unit_->programs) check_def(p->library, p->name, p->range);
+  for (auto* i : unit_->interfaces) check_def(i->library, i->name, i->range);
+  for (auto* c : unit_->checkers) check_def(c->library, c->name, c->range);
+  for (auto* u : unit_->udps) check_def(u->library, u->name, u->range);
   // §33.2: a config is a design element peer to modules, so its name shares
   // the same definitions space and must be unique against every other entry.
-  for (auto* cfg : unit_->configs) check_def(cfg->name, cfg->range);
+  for (auto* cfg : unit_->configs) check_def(cfg->library, cfg->name, cfg->range);
 
   // §3.13(b): Package name space — package names must be unique.
   std::unordered_set<std::string_view> pkg_names;
@@ -1100,6 +1107,10 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   return ElaborateTops({mod_decl});
 }
 
+void Elaborator::SetLibraryDeclarationOrder(std::vector<std::string> order) {
+  library_order_ = std::move(order);
+}
+
 RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   RunPreElaborationValidations();
 
@@ -1228,12 +1239,38 @@ void Elaborator::ResolveExternModules() {
 }
 
 ModuleDecl* Elaborator::FindModule(std::string_view name) const {
+  // §33.6.1: "all instances of module adder shall use aLib.adder
+  // (because aLib is the first library specified that contains a cell
+  // named adder)."  Collect every non-extern decl that matches `name`,
+  // then break ties by library declaration order — if no order has been
+  // registered, the first match wins, matching the prior behavior.
   ModuleDecl* extern_decl = nullptr;
+  std::vector<ModuleDecl*> candidates;
   for (auto* mod : unit_->modules) {
-    if (mod->name == name) {
-      if (!mod->is_extern) return mod;
+    if (mod->name != name) continue;
+    if (mod->is_extern) {
       if (!extern_decl) extern_decl = mod;
+    } else {
+      candidates.push_back(mod);
     }
+  }
+  if (!candidates.empty()) {
+    auto priority = [this](std::string_view lib) -> size_t {
+      for (size_t i = 0; i < library_order_.size(); ++i) {
+        if (library_order_[i] == lib) return i;
+      }
+      return library_order_.size();
+    };
+    ModuleDecl* best = candidates.front();
+    size_t best_pri = priority(best->library);
+    for (size_t i = 1; i < candidates.size(); ++i) {
+      size_t pri = priority(candidates[i]->library);
+      if (pri < best_pri) {
+        best = candidates[i];
+        best_pri = pri;
+      }
+    }
+    return best;
   }
   if (extern_decl) return extern_decl;
 
@@ -1343,6 +1380,9 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   auto* mod = arena_.Create<RtlirModule>();
   mod->name = decl->name;
+  // §33.6.1: surface which library the bound cell came from so callers
+  // can verify the default-binding choice.
+  mod->library = decl->library;
   mod->has_param_port_list = decl->has_param_port_list;
   mod->is_program = (decl->decl_kind == ModuleDeclKind::kProgram);
   // §E.4-E.7: propagate delay mode directive.

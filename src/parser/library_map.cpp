@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <system_error>
+#include <unordered_set>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -192,6 +193,17 @@ std::string_view LibraryMap::LibraryForFile(std::string_view path) const {
   if (!found_any) return "work";
   if (ambiguous) return std::string_view{};
   return chosen;
+}
+
+std::vector<std::string_view> LibraryMap::LibraryDeclarationOrder() const {
+  std::vector<std::string_view> order;
+  std::unordered_set<std::string_view> seen;
+  for (const auto& e : entries_) {
+    if (seen.insert(e.library).second) {
+      order.emplace_back(e.library);
+    }
+  }
+  return order;
 }
 
 void LibraryMap::TagCompilationUnit(CompilationUnit& cu,

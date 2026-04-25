@@ -45,6 +45,13 @@ class Elaborator {
   /// cells that happen to share the source files.
   RtlirDesign* Elaborate(const ConfigDecl* cfg);
 
+  /// §33.6.1: register the library declaration order from the lib.map
+  /// (typically obtained via LibraryMap::LibraryDeclarationOrder).  When
+  /// multiple cells share a name across libraries, the elaborator picks
+  /// the candidate whose library appears earliest in this list; an empty
+  /// list leaves source-order resolution intact.
+  void SetLibraryDeclarationOrder(std::vector<std::string> order);
+
  private:
   /// Run the one-shot validation passes that must precede any module
   /// elaboration step, regardless of how the top modules were chosen.
@@ -637,6 +644,9 @@ class Elaborator {
   DiagEngine& diag_;
   CompilationUnit* unit_;
   std::string gen_prefix_;
+  // §33.6.1: library declaration order from the lib.map; consulted by
+  // FindModule when several cells share a name across libraries.
+  std::vector<std::string> library_order_;
   TypedefMap typedefs_;
   std::unordered_set<std::string_view> cu_scope_names_;  // §3.12.1
   ScopeMap cu_param_scope_;  // §3.12.1

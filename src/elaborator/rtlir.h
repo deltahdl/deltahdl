@@ -212,6 +212,10 @@ struct RtlirEnumMember {
 
 struct RtlirModule {
   std::string_view name;
+  // §33.6.1: library that the bound cell came from; empty when the source
+  // was not tagged through a library map.  Tests and downstream tooling
+  // observe binding decisions through this field.
+  std::string_view library;
   bool has_param_port_list = false;  // §6.20.1: #(...) was present.
   bool is_program = false;           // §24.3: program construct.
   std::vector<ResolvedAttribute> attrs;
