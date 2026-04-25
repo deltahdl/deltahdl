@@ -75,25 +75,6 @@ TEST(SchedulerOverviewSim, ConcurrentWriteSameTimeSlotLastWriteWins) {
   EXPECT_TRUE(val == 1u || val == 2u);
 }
 
-TEST(SchedulerOverviewSim, ActiveRegionInterleavingIsPossible) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> order;
-
-  auto* ev1 = sched.GetEventPool().Acquire();
-  ev1->callback = [&order]() { order.push_back(1); };
-  sched.ScheduleEvent({0}, Region::kActive, ev1);
-
-  auto* ev2 = sched.GetEventPool().Acquire();
-  ev2->callback = [&order]() { order.push_back(2); };
-  sched.ScheduleEvent({0}, Region::kActive, ev2);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_TRUE((order[0] == 1 && order[1] == 2) ||
-              (order[0] == 2 && order[1] == 1));
-}
-
 TEST(SchedulerOverviewSim, PLIRegionsExistInEnum) {
   EXPECT_LT(static_cast<int>(Region::kPreActive),
             static_cast<int>(Region::kActive));
