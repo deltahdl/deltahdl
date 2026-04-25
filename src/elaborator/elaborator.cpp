@@ -113,6 +113,9 @@ void Elaborator::ValidateNameSpaces() {
   for (auto* i : unit_->interfaces) check_def(i->name, i->range);
   for (auto* c : unit_->checkers) check_def(c->name, c->range);
   for (auto* u : unit_->udps) check_def(u->name, u->range);
+  // §33.2: a config is a design element peer to modules, so its name shares
+  // the same definitions space and must be unique against every other entry.
+  for (auto* cfg : unit_->configs) check_def(cfg->name, cfg->range);
 
   // §3.13(b): Package name space — package names must be unique.
   std::unordered_set<std::string_view> pkg_names;
