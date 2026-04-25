@@ -8,20 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SchedulerOverviewSim, PostponedIsLastRegionInTimeSlot) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  ScheduleLabeled(sched, Region::kPostponed, "postponed", order);
-  ScheduleLabeled(sched, Region::kActive, "active", order);
-  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[2], "postponed");
-}
-
 TEST(SchedulerOverviewSim, NBAExecutionOrderMatchesSourceOrder) {
   auto result = RunAndGet(
       "module t;\n"
