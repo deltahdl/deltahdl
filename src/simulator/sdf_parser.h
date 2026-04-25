@@ -229,6 +229,156 @@ enum class SdfMtm : uint8_t {
   kMaximum,
 };
 
+// §32.9 Table 32-5: keyword strings parsed from the mtm_spec argument
+// of $sdf_annotate. The four enumerators correspond to the four rows
+// of the table; kToolControl (the LRM default) is distinct from the
+// three named values because it defers the actual MTM choice to
+// whatever the simulator's own delay-mode option selected, rather
+// than naming a slot itself. Resolving the keyword to a concrete
+// SdfMtm therefore requires a second piece of information — the
+// simulator's current default — which ResolveSdfMtm consumes.
+enum class SdfMtmKeyword : uint8_t {
+  kMaximum,
+  kMinimum,
+  kToolControl,
+  kTypical,
+};
+
+// §32.9 Table 32-6: keyword strings parsed from the scale_type
+// argument of $sdf_annotate. The four enumerators correspond to the
+// four rows of the table; kFromMtm (the LRM default) applies each
+// scale factor to its matching min/typ/max slot independently, while
+// the three single-source forms broadcast the named source value
+// through all three multipliers.
+enum class SdfScaleType : uint8_t {
+  kFromMtm,
+  kFromMaximum,
+  kFromMinimum,
+  kFromTypical,
+};
+
+// §32.9 scale_factors argument: triplet of multipliers expressed in
+// SDF as "min:typ:max" (default "1.0:1.0:1.0"). Each factor scales
+// one slot of the SDF triplet selected by scale_type. Stored as
+// double because the LRM example "1.6:1.4:1.2" requires fractional
+// precision, with the result rounded to integer ticks at the moment
+// the scaled value lands back on an SdfDelayValue.
+struct SdfScaleFactors {
+  double min_factor = 1.0;
+  double typ_factor = 1.0;
+  double max_factor = 1.0;
+};
+
+// §32.9 Table 32-5: parse the mtm_spec character string into a
+// keyword. Accepts the four LRM-listed strings exactly. Unknown
+// strings leave `out` unchanged and return false so the caller can
+// fall through to the LRM default (TOOL_CONTROL) instead of silently
+// reinterpreting an unrecognised value as some other slot.
+bool ParseSdfMtmKeyword(std::string_view text, SdfMtmKeyword& out);
+
+// §32.9 Table 32-5 row "TOOL_CONTROL (default)": collapse a parsed
+// mtm_spec keyword down to the SdfMtm slot that downstream code
+// consumes. The three named keywords map directly; kToolControl
+// hands back the caller-supplied `tool_default`, which represents
+// "the value as selected by the simulator". This split lets the
+// SdfMtm enum stay free of knowledge about the simulator's
+// delay-mode option.
+SdfMtm ResolveSdfMtm(SdfMtmKeyword keyword, SdfMtm tool_default);
+
+// §32.9 Table 32-6: parse the scale_type character string into a
+// keyword. Accepts the four LRM-listed strings exactly. Unknown
+// strings leave `out` unchanged and return false so the caller can
+// fall through to the LRM default (FROM_MTM).
+bool ParseSdfScaleType(std::string_view text, SdfScaleType& out);
+
+// §32.9 scale_factors paragraph: parse a "min:typ:max" triple-of-
+// reals string into the three multipliers. An empty string resets
+// `out` to the LRM default 1.0:1.0:1.0 so a caller threading
+// optional arguments can pass the empty string through whenever the
+// $sdf_annotate invocation omitted scale_factors. Returns false only
+// when the text contained unparseable characters where a real number
+// was expected; missing trailing slots inherit the prior default,
+// matching the SDF rvalue convention.
+bool ParseSdfScaleFactors(std::string_view text, SdfScaleFactors& out);
+
+// §32.9 scale_type + scale_factors: produce the post-scaling SDF
+// triplet from `value`. FROM_MTM scales each slot independently; the
+// three single-source forms broadcast the named source value through
+// the three multipliers. Each output slot is rounded to the nearest
+// integer tick (banker's rounding via static_cast after +0.5 on
+// non-negative values), matching the LRM's expectation that
+// annotated delays remain integer time ticks after scaling.
+SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
+                              const SdfScaleFactors& factors);
+
+// §32.9 scale_factors / scale_type composition helper: walk every
+// SdfDelayValue inside `file` (IOPATH delays, INTERCONNECT delays,
+// pulse limits, timing-check limits, specparam values) through
+// ApplySdfScaling and return a fresh SdfFile carrying the scaled
+// triplets. The original file is unchanged so callers can reuse the
+// raw parse output for diagnostics or per-region rescaling.
+SdfFile ScaleSdfFile(const SdfFile& file, SdfScaleType type,
+                     const SdfScaleFactors& factors);
+
+// §32.9 paragraph "log_file": "Each individual annotation of timing
+// data from the SDF file results in an entry in the log file." Walk
+// every backannotation construct in `file` (IOPATH, INTERCONNECT,
+// PATHPULSE, TIMINGCHECK, LABEL/SPECPARAM) and emit one human-readable
+// line per construct to `log_path`. Each line names the construct
+// kind and the timing data that was annotated (port pair / signal
+// names plus the typical-slot delay or limit), so the log is a
+// faithful per-annotation trail of "timing data" rather than just a
+// list of construct names. Returns false when the log file cannot be
+// opened. An empty `log_path` is a no-op returning true so the
+// surrounding annotation flow can pass the path through
+// unconditionally regardless of whether the caller wanted a log.
+bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path);
+
+// §32.9 paragraph "config_file": a configuration file may carry
+// MTM_SPEC, SCALE_FACTORS, and SCALE_TYPE keywords that the LRM
+// names as the targets of the explicit-argument override rules
+// (R14/R19/R22). The format of the configuration file itself is
+// vendor-defined and outside §32.9's scope; this struct is the
+// minimal surface a hypothetical config-file parser must populate to
+// participate in the override resolution below. Empty fields signal
+// "the configuration file did not name this keyword", letting the
+// resolver fall through to the LRM default.
+struct SdfAnnotateConfig {
+  std::string mtm_spec;
+  std::string scale_factors;
+  std::string scale_type;
+};
+
+// §32.9 mtm_spec / scale_factors / scale_type paragraphs: the parsed
+// final values the annotator should use for one $sdf_annotate
+// invocation, after the override rules have been resolved. Carries
+// each of the three argument categories in the typed form the
+// downstream pipeline consumes.
+struct ResolvedSdfAnnotateArgs {
+  SdfMtmKeyword mtm = SdfMtmKeyword::kToolControl;
+  SdfScaleFactors factors;
+  SdfScaleType scale_type = SdfScaleType::kFromMtm;
+};
+
+// §32.9 R14 (mtm_spec) + R19 (scale_factors) + R22 (scale_type): the
+// explicit arguments to $sdf_annotate override any matching keyword
+// supplied by the configuration file. This helper applies that
+// precedence rule for all three argument categories in one place: a
+// non-empty explicit string wins over the config-file value, a
+// non-empty config-file value wins over the LRM default, and an
+// unparseable string at either layer leaves the next-lower layer
+// intact rather than silently substituting an unknown value. Each
+// explicit_* argument is the raw string the simulator received from
+// the SystemVerilog call site (empty when the position was omitted),
+// `config` carries the configuration file's keyword strings (empty
+// when the configuration file did not name the keyword), and the
+// returned struct is the final tuple the annotator uses.
+ResolvedSdfAnnotateArgs ResolveSdfAnnotateArgs(
+    std::string_view explicit_mtm_spec,
+    std::string_view explicit_scale_factors,
+    std::string_view explicit_scale_type,
+    const SdfAnnotateConfig& config);
+
 // =============================================================================
 // SDF parser
 // =============================================================================

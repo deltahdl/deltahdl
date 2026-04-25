@@ -5,8 +5,11 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <cstddef>
+#include <fstream>
 #include <initializer_list>
+#include <string>
 
 #include "simulator/specify.h"
 
@@ -1335,6 +1338,280 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
     }
   }
   return result;
+}
+
+// =============================================================================
+// §32.9 $sdf_annotate argument helpers
+// =============================================================================
+
+bool ParseSdfMtmKeyword(std::string_view text, SdfMtmKeyword& out) {
+  // Table 32-5 lists exactly these four spellings; case is fixed by
+  // the table so no case folding is performed here.
+  if (text == "MAXIMUM") { out = SdfMtmKeyword::kMaximum; return true; }
+  if (text == "MINIMUM") { out = SdfMtmKeyword::kMinimum; return true; }
+  if (text == "TYPICAL") { out = SdfMtmKeyword::kTypical; return true; }
+  if (text == "TOOL_CONTROL") {
+    out = SdfMtmKeyword::kToolControl;
+    return true;
+  }
+  return false;
+}
+
+SdfMtm ResolveSdfMtm(SdfMtmKeyword keyword, SdfMtm tool_default) {
+  // The named keywords each select a fixed slot of the SDF triplet;
+  // TOOL_CONTROL hands back whatever the simulator's own delay-mode
+  // option selected for this run.
+  switch (keyword) {
+    case SdfMtmKeyword::kMaximum:
+      return SdfMtm::kMaximum;
+    case SdfMtmKeyword::kMinimum:
+      return SdfMtm::kMinimum;
+    case SdfMtmKeyword::kTypical:
+      return SdfMtm::kTypical;
+    case SdfMtmKeyword::kToolControl:
+      return tool_default;
+  }
+  return tool_default;
+}
+
+bool ParseSdfScaleType(std::string_view text, SdfScaleType& out) {
+  if (text == "FROM_MTM") { out = SdfScaleType::kFromMtm; return true; }
+  if (text == "FROM_MAXIMUM") {
+    out = SdfScaleType::kFromMaximum;
+    return true;
+  }
+  if (text == "FROM_MINIMUM") {
+    out = SdfScaleType::kFromMinimum;
+    return true;
+  }
+  if (text == "FROM_TYPICAL") {
+    out = SdfScaleType::kFromTypical;
+    return true;
+  }
+  return false;
+}
+
+// Parse one real number from `text` starting at `pos`, advancing `pos`
+// past the consumed characters. Returns true and writes the parsed
+// value to `out`; returns false if no real number could be read.
+static bool ParseRealAt(std::string_view text, std::size_t& pos, double& out) {
+  while (pos < text.size() &&
+         std::isspace(static_cast<unsigned char>(text[pos])) != 0) {
+    ++pos;
+  }
+  std::size_t start = pos;
+  if (pos < text.size() && (text[pos] == '+' || text[pos] == '-')) ++pos;
+  bool saw_digit = false;
+  while (pos < text.size() &&
+         std::isdigit(static_cast<unsigned char>(text[pos])) != 0) {
+    ++pos;
+    saw_digit = true;
+  }
+  if (pos < text.size() && text[pos] == '.') {
+    ++pos;
+    while (pos < text.size() &&
+           std::isdigit(static_cast<unsigned char>(text[pos])) != 0) {
+      ++pos;
+      saw_digit = true;
+    }
+  }
+  if (!saw_digit) return false;
+  out = std::stod(std::string(text.substr(start, pos - start)));
+  return true;
+}
+
+bool ParseSdfScaleFactors(std::string_view text, SdfScaleFactors& out) {
+  // §32.9 default "1.0:1.0:1.0": an empty argument resets every slot
+  // to the LRM default rather than leaving the caller's prior values
+  // in place, so a caller that reuses the same SdfScaleFactors across
+  // calls observes the documented default.
+  out = SdfScaleFactors{};
+  if (text.empty()) return true;
+  std::size_t pos = 0;
+  double v = 0.0;
+  if (!ParseRealAt(text, pos, v)) return false;
+  out.min_factor = v;
+  out.typ_factor = v;
+  out.max_factor = v;
+  while (pos < text.size() &&
+         std::isspace(static_cast<unsigned char>(text[pos])) != 0) {
+    ++pos;
+  }
+  if (pos >= text.size() || text[pos] != ':') return true;
+  ++pos;
+  if (!ParseRealAt(text, pos, v)) return false;
+  out.typ_factor = v;
+  out.max_factor = v;
+  while (pos < text.size() &&
+         std::isspace(static_cast<unsigned char>(text[pos])) != 0) {
+    ++pos;
+  }
+  if (pos >= text.size() || text[pos] != ':') return true;
+  ++pos;
+  if (!ParseRealAt(text, pos, v)) return false;
+  out.max_factor = v;
+  return true;
+}
+
+// Round a non-negative real to the nearest tick for storage on
+// SdfDelayValue's uint64_t slot. Negative inputs would never come
+// from the LRM-defined math (every factor is non-negative and every
+// SDF source value is non-negative), but the std::max guard keeps a
+// downstream cast from wrapping if a caller ever supplies a
+// pathological factor.
+static uint64_t RoundToTicks(double scaled) {
+  if (scaled <= 0.0) return 0;
+  return static_cast<uint64_t>(std::floor(scaled + 0.5));
+}
+
+SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
+                              const SdfScaleFactors& factors) {
+  // Pick the source value each output slot draws from. For FROM_MTM
+  // the three slots stay independent; the three single-source forms
+  // collapse all three source picks to one slot.
+  double src_min = 0.0;
+  double src_typ = 0.0;
+  double src_max = 0.0;
+  switch (type) {
+    case SdfScaleType::kFromMtm:
+      src_min = static_cast<double>(value.min_val);
+      src_typ = static_cast<double>(value.typ_val);
+      src_max = static_cast<double>(value.max_val);
+      break;
+    case SdfScaleType::kFromMinimum:
+      src_min = src_typ = src_max = static_cast<double>(value.min_val);
+      break;
+    case SdfScaleType::kFromTypical:
+      src_min = src_typ = src_max = static_cast<double>(value.typ_val);
+      break;
+    case SdfScaleType::kFromMaximum:
+      src_min = src_typ = src_max = static_cast<double>(value.max_val);
+      break;
+  }
+  SdfDelayValue out;
+  out.min_val = RoundToTicks(src_min * factors.min_factor);
+  out.typ_val = RoundToTicks(src_typ * factors.typ_factor);
+  out.max_val = RoundToTicks(src_max * factors.max_factor);
+  return out;
+}
+
+SdfFile ScaleSdfFile(const SdfFile& file, SdfScaleType type,
+                     const SdfScaleFactors& factors) {
+  SdfFile out = file;
+  for (auto& cell : out.cells) {
+    for (auto& io : cell.iopaths) {
+      io.rise = ApplySdfScaling(io.rise, type, factors);
+      io.fall = ApplySdfScaling(io.fall, type, factors);
+      io.turnoff = ApplySdfScaling(io.turnoff, type, factors);
+      io.rise_reject = ApplySdfScaling(io.rise_reject, type, factors);
+      io.rise_error = ApplySdfScaling(io.rise_error, type, factors);
+      io.fall_reject = ApplySdfScaling(io.fall_reject, type, factors);
+      io.fall_error = ApplySdfScaling(io.fall_error, type, factors);
+    }
+    for (auto& tc : cell.timing_checks) {
+      tc.limit = ApplySdfScaling(tc.limit, type, factors);
+      tc.limit2 = ApplySdfScaling(tc.limit2, type, factors);
+    }
+    for (auto& sp : cell.specparams) {
+      sp.value = ApplySdfScaling(sp.value, type, factors);
+    }
+    for (auto& ic : cell.interconnects) {
+      ic.rise = ApplySdfScaling(ic.rise, type, factors);
+      ic.fall = ApplySdfScaling(ic.fall, type, factors);
+    }
+    for (auto& pl : cell.pulse_limits) {
+      pl.reject = ApplySdfScaling(pl.reject, type, factors);
+      pl.error = ApplySdfScaling(pl.error, type, factors);
+    }
+  }
+  return out;
+}
+
+bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path) {
+  if (log_path.empty()) return true;
+  std::ofstream out{std::string(log_path)};
+  if (!out.is_open()) return false;
+  // One line per individual annotation, prefixed with the cell's
+  // type/instance pair so the reader can tie an entry back to a
+  // specific SDF cell. Each line names the construct kind and the
+  // timing data that was annotated — the typical-slot value or
+  // limit — so the log is a per-annotation trail of timing data
+  // rather than just a list of construct names. The exact format is
+  // implementation-defined; §32.9 only requires that "an entry"
+  // exists per annotation.
+  for (const auto& cell : file.cells) {
+    const std::string prefix = cell.cell_type + "/" + cell.instance + ": ";
+    for (const auto& io : cell.iopaths) {
+      out << prefix << "IOPATH " << io.src_port << " -> " << io.dst_port
+          << " rise=" << io.rise.typ_val
+          << " fall=" << io.fall.typ_val << '\n';
+    }
+    for (const auto& ic : cell.interconnects) {
+      out << prefix << "INTERCONNECT " << ic.src_port << " -> " << ic.dst_port
+          << " rise=" << ic.rise.typ_val
+          << " fall=" << ic.fall.typ_val << '\n';
+    }
+    for (const auto& pl : cell.pulse_limits) {
+      out << prefix << "PATHPULSE " << pl.src_port << " -> " << pl.dst_port
+          << " reject=" << pl.reject.typ_val
+          << " error=" << pl.error.typ_val << '\n';
+    }
+    for (const auto& tc : cell.timing_checks) {
+      out << prefix << "TIMINGCHECK " << tc.data_port << " ref=" << tc.ref_port
+          << " limit=" << tc.limit.typ_val << '\n';
+    }
+    for (const auto& sp : cell.specparams) {
+      out << prefix << "SPECPARAM " << sp.name
+          << " value=" << sp.value.typ_val << '\n';
+    }
+  }
+  return true;
+}
+
+ResolvedSdfAnnotateArgs ResolveSdfAnnotateArgs(
+    std::string_view explicit_mtm_spec,
+    std::string_view explicit_scale_factors,
+    std::string_view explicit_scale_type,
+    const SdfAnnotateConfig& config) {
+  ResolvedSdfAnnotateArgs out;
+
+  // R14: prefer the explicit mtm_spec argument; fall back to the
+  // config-file MTM_SPEC keyword when the explicit argument is
+  // empty; fall back to TOOL_CONTROL (the LRM default) when both
+  // layers are empty or unparseable. Each layer is consulted by
+  // the same per-keyword parser so an unknown spelling at one
+  // layer leaves the lower-precedence resolution intact.
+  if (!config.mtm_spec.empty()) {
+    ParseSdfMtmKeyword(config.mtm_spec, out.mtm);
+  }
+  if (!explicit_mtm_spec.empty()) {
+    ParseSdfMtmKeyword(explicit_mtm_spec, out.mtm);
+  }
+
+  // R19: same precedence for scale_factors. ParseSdfScaleFactors
+  // resets `out.factors` to 1.0:1.0:1.0 on an empty input, so
+  // calling it unconditionally would discard the config-file
+  // values when the explicit argument is omitted. Guard each call
+  // on a non-empty source string instead, leaving the factors
+  // untouched when the layer is silent.
+  if (!config.scale_factors.empty()) {
+    ParseSdfScaleFactors(config.scale_factors, out.factors);
+  }
+  if (!explicit_scale_factors.empty()) {
+    ParseSdfScaleFactors(explicit_scale_factors, out.factors);
+  }
+
+  // R22: same precedence for scale_type, with the LRM default
+  // (FROM_MTM) covered by ResolvedSdfAnnotateArgs's default
+  // initialisation.
+  if (!config.scale_type.empty()) {
+    ParseSdfScaleType(config.scale_type, out.scale_type);
+  }
+  if (!explicit_scale_type.empty()) {
+    ParseSdfScaleType(explicit_scale_type, out.scale_type);
+  }
+
+  return out;
 }
 
 }  // namespace delta
