@@ -341,6 +341,51 @@ static SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
 // Parse DELAY section
 // =============================================================================
 
+// §32.4.4 Table 32-3: parse the body of an (INTERCONNECT src dst delays...)
+// block. The caller has already consumed the leading `(` and the
+// INTERCONNECT keyword, so this helper expects to see the source port,
+// the destination port, and a delay list of one or two triplets, then
+// close the construct's own `)`. Source and destination travel verbatim
+// onto the SdfInterconnect so a downstream stage can validate them
+// against the netlist (the LRM requires source = output/inout and
+// destination = input/inout, with a warn-but-still-annotate fall-through
+// when the source port is unknown or the two endpoints are not on the
+// same net).
+static SdfInterconnect ParseInterconnectEntry(std::string_view& s) {
+  SdfInterconnect ic;
+  ic.kind = SdfInterconnectKind::kInterconnect;
+  ic.src_port = ParseSdfPort(s);
+  ic.dst_port = ParseSdfPort(s);
+  ic.rise = ParseDelayVal(s);
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    ic.fall = ParseDelayVal(s);
+  }
+  Expect(s, SdfTokKind::kRParen);
+  return ic;
+}
+
+// §32.4.4 Table 32-3: parse a (PORT load delays...) or
+// (NETDELAY load delays...) block. Both shapes name only the load port
+// because the LRM defines their semantics as the delay from all sources
+// on the net to the load — there is no per-entry source. The caller has
+// already consumed the leading `(` and the keyword, and supplies the
+// kind so the same helper covers both rows of Table 32-3 without
+// duplicating the parse.
+static SdfInterconnect ParseLoadOnlyInterconnect(std::string_view& s,
+                                                  SdfInterconnectKind kind) {
+  SdfInterconnect ic;
+  ic.kind = kind;
+  ic.dst_port = ParseSdfPort(s);
+  ic.rise = ParseDelayVal(s);
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    ic.fall = ParseDelayVal(s);
+  }
+  Expect(s, SdfTokKind::kRParen);
+  return ic;
+}
+
 // §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT: parse the body of a
 // (PATHPULSE src dst (reject) [(error)]) or PATHPULSEPERCENT block. The
 // caller has already consumed the leading `(` and the keyword token, so
@@ -373,6 +418,23 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
       auto pl = ParsePulseLimit(s);
       pl.is_percent = (kw.text == "PATHPULSEPERCENT");
       cell.pulse_limits.push_back(pl);
+      continue;
+    }
+    // §32.4.4 Table 32-3: INTERCONNECT/PORT/NETDELAY all map to interconnect
+    // delays. Decode them into typed SdfInterconnect entries — they belong
+    // to backannotation, not the §32.3 unannotatable warning channel.
+    if (kw.text == "INTERCONNECT") {
+      cell.interconnects.push_back(ParseInterconnectEntry(s));
+      continue;
+    }
+    if (kw.text == "PORT") {
+      cell.interconnects.push_back(
+          ParseLoadOnlyInterconnect(s, SdfInterconnectKind::kPort));
+      continue;
+    }
+    if (kw.text == "NETDELAY") {
+      cell.interconnects.push_back(
+          ParseLoadOnlyInterconnect(s, SdfInterconnectKind::kNetdelay));
       continue;
     }
     if (kw.text == "IOPATH") {
@@ -861,6 +923,36 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
       delay.dst_port = ic.dst_port;
       delay.rise = SelectMtm(ic.rise, mtm);
       delay.fall = SelectMtm(ic.fall, mtm);
+      // §32.4.4: interconnect delays follow the same fill-in rules as
+      // specify path delays. Borrow the §30.5.1 / Table 30-2 expansion
+      // helper by staging the rise and fall values inside a PathDelay,
+      // letting ExpandTransitionDelays produce the twelve-slot result,
+      // then copy the slots out. A purely-zero fall (the LRM's
+      // single-value SDF input) keeps `delay_count` at 1 so the
+      // expansion broadcasts the rise value across every slot; a
+      // supplied fall switches to the two-value column in which rise
+      // covers the 0->z/z->1 transitions and fall covers 1->z/z->0.
+      PathDelay scratch;
+      scratch.delays[0] = delay.rise;
+      const bool fall_supplied = ic.fall.min_val != 0 || ic.fall.typ_val != 0 ||
+                                 ic.fall.max_val != 0;
+      if (fall_supplied) {
+        scratch.delays[1] = delay.fall;
+        scratch.delay_count = 2;
+      } else {
+        scratch.delay_count = 1;
+      }
+      ExpandTransitionDelays(scratch);
+      for (int i = 0; i < 12; ++i) {
+        delay.delays[i] = scratch.delays[i];
+        // §32.4.4: each of the twelve transition delays carries its own
+        // reject and error pulse limit. Initialise both to the matching
+        // delay so the default inertial-delay behaviour applies — a
+        // pulse narrower than the propagation delay is rejected — until
+        // a later mechanism revises the limits.
+        delay.reject_limit[i] = scratch.delays[i];
+        delay.error_limit[i] = scratch.delays[i];
+      }
       mgr.AddInterconnectDelay(std::move(delay));
     }
     for (const auto& pl : cell.pulse_limits) {

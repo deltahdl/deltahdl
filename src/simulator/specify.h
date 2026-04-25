@@ -461,11 +461,22 @@ struct SpecparamValue {
 // §32.2: an interconnect delay that backannotation has installed onto the
 // design. Keyed by the source/destination port pair; rise and fall are
 // the MTM-selected scalars the SDF file supplied.
+//
+// §32.4.4: interconnect delays follow the same shape as specify path
+// delays — twelve transition slots and per-slot reject/error pulse
+// limits. `delays`, `reject_limit`, and `error_limit` carry the full
+// twelve-slot expansion that the same-rules-as-specify-paths sentence
+// requires; `rise` and `fall` are kept as a convenience that mirror
+// `delays[0]` and `delays[1]` for the two-value SDF inputs §32.2 used
+// before §32.4.4 widened the shape.
 struct InterconnectDelay {
   std::string src_port;
   std::string dst_port;
   uint64_t rise = 0;
   uint64_t fall = 0;
+  uint64_t delays[12] = {};
+  uint64_t reject_limit[12] = {};
+  uint64_t error_limit[12] = {};
 };
 
 // §32.4.2 Table 32-2 expansion target: a single SystemVerilog timing check

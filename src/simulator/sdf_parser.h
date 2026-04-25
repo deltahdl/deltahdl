@@ -89,14 +89,33 @@ struct SdfSpecparam {
   SdfDelayValue value;
 };
 
+// §32.4.4 Table 32-3: which of the three SDF construct shapes produced
+// this interconnect entry. INTERCONNECT names a source/load pair;
+// PORT and NETDELAY name only the load and represent the delay from all
+// sources on the net to that load. The kind survives onto InterconnectDelay
+// so a future stage can apply the form-specific rules (NETDELAY's input/
+// inout-only restriction, PORT's fan-out from all sources, INTERCONNECT's
+// source-port direction and same-net validation).
+enum class SdfInterconnectKind : uint8_t {
+  kInterconnect,
+  kPort,
+  kNetdelay,
+};
+
 // §32.2: SDF interconnect delay between two ports. Same split: §32.4 owns
 // the INTERCONNECT/PORT parsing, §32.2 owns the fact that backannotation
 // names interconnect delays as one of its four update categories.
+//
+// §32.4.4: PORT and NETDELAY entries leave src_port empty — the LRM's
+// "delay from all sources" semantics are encoded by the absence of a
+// named source rather than a synthetic placeholder. The `kind` field
+// distinguishes them from INTERCONNECT for downstream rules.
 struct SdfInterconnect {
   std::string src_port;
   std::string dst_port;
   SdfDelayValue rise;
   SdfDelayValue fall;
+  SdfInterconnectKind kind = SdfInterconnectKind::kInterconnect;
 };
 
 // §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT rows: an SDF entry that
