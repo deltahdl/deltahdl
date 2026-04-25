@@ -134,6 +134,13 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
     ++i;
     return false;
   }
+  // §33.7: %l/%L prints library.cell binding info for the containing module.
+  // No format argument is consumed, mirroring %m.
+  if (fmt[i + 1] == 'l' || fmt[i + 1] == 'L') {
+    out += "<library.cell>";
+    ++i;
+    return false;
+  }
   // Handle %% (literal percent).
   if (fmt[i + 1] == '%') {
     out += '%';

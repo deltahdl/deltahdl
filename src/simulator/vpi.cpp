@@ -286,6 +286,18 @@ const char* VpiContext::GetStr(int property, VpiHandle obj) {
     case kVpiDefName:
       if (obj->type == kVpiModule) return obj->name.data();
       return nullptr;
+    // §33.7: library/cell/config are string properties on vpiModule, similar
+    // to vpiName/vpiFullName. Return a (possibly empty) string rather than a
+    // null pointer so callers can always treat the result as a C string.
+    case kVpiLibrary:
+      if (obj->type != kVpiModule) return nullptr;
+      return obj->library_name.c_str();
+    case kVpiCell:
+      if (obj->type != kVpiModule) return nullptr;
+      return obj->cell_name.empty() ? obj->name.data() : obj->cell_name.c_str();
+    case kVpiConfig:
+      if (obj->type != kVpiModule) return nullptr;
+      return obj->config_name.c_str();
     default:
       return nullptr;
   }

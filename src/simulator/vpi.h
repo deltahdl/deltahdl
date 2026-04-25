@@ -54,6 +54,10 @@ constexpr int kVpiFullName = 3;
 constexpr int kVpiSize = 4;
 constexpr int kVpiDirection = 5;
 constexpr int kVpiDefName = 6;
+// §33.7: library binding info on objects of type vpiModule.
+constexpr int kVpiLibrary = 67;
+constexpr int kVpiConfig = 70;
+constexpr int kVpiCell = 71;
 
 // --- VPI direction constants (IEEE 1800-2023 Section 36.13) ---
 
@@ -99,6 +103,11 @@ struct VpiObject {
   int direction = 0;
   int size = 0;
   int index = 0;
+  // §33.7: library/cell/config binding info exposed via vpi_get_str on
+  // vpiModule objects. cell_name defaults to the module name post-binding.
+  std::string library_name;
+  std::string cell_name;
+  std::string config_name;
   // Iterator state.
   std::vector<VpiObject*> children;
   size_t scan_index = 0;
@@ -309,6 +318,9 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 #define vpiSize 4
 #define vpiDirection 5
 #define vpiDefName 6
+#define vpiLibrary 67
+#define vpiConfig 70
+#define vpiCell 71
 
 #define vpiInput 1
 #define vpiOutput 2
