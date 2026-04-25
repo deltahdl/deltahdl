@@ -1074,7 +1074,14 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
     inst.module_name = name;
     inst.inst_name = name;
     ParamList empty_params;
+    // §33.6.4: implicitly instantiated nested modules also become a
+    // node in the design hierarchy, so push their path onto the
+    // active hier_path for the duration of the recursive elaboration.
+    std::string saved_inst_path = current_inst_path_;
+    if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
+    current_inst_path_.append(name.data(), name.size());
     inst.resolved = ElaborateModule(nested_decl, empty_params);
+    current_inst_path_ = std::move(saved_inst_path);
     mod->children.push_back(inst);
   }
   // §9.2.2.2: Check for multi-driver violations on always_comb LHS variables.
@@ -1231,6 +1238,14 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   inst.module_name = item->inst_module;
   inst.inst_name = item->inst_name;
 
+  // §33.6.4: extend the active hier_path with this instance's name so
+  // FindModuleInScope (and the recursive ElaborateModule below) sees
+  // the inheriting position when matching `instance ... liblist ...`
+  // rules.  Restored at every exit from this function.
+  std::string saved_inst_path = current_inst_path_;
+  if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
+  current_inst_path_.append(item->inst_name.data(), item->inst_name.size());
+
   auto* child_decl = FindModuleInScope(item->inst_module);
   if (!child_decl) {
     if (item->inst_scope.empty())
@@ -1241,6 +1256,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
                   std::format("unknown module '{}::{}'", item->inst_scope,
                               item->inst_module));
     mod->children.push_back(inst);
+    current_inst_path_ = std::move(saved_inst_path);
     return;
   }
 
@@ -1322,6 +1338,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   // §5.12: Resolve attributes.
   inst.attrs = ResolveAttributes(item->attrs, diag_);
   mod->children.push_back(inst);
+  current_inst_path_ = std::move(saved_inst_path);
 }
 
 Expr* Elaborator::MakePullExpr(NetType drive) {

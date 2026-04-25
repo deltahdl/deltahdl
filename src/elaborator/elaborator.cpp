@@ -1046,7 +1046,14 @@ RtlirDesign* Elaborator::ElaborateTops(
   early_defparam_resolutions_.clear();
 
   for (auto* mod_decl : top_decls) {
+    // §33.6.4: an instance-clause path is rooted at the design cell
+    // name (e.g. `instance top.a2`), so seed the active path with the
+    // top module's name before descending so children inherit the
+    // correct prefix.
+    std::string saved_path = std::move(current_inst_path_);
+    current_inst_path_.assign(mod_decl->name.data(), mod_decl->name.size());
     auto* top = ElaborateModule(mod_decl, empty_params);
+    current_inst_path_ = std::move(saved_path);
     if (!top) return nullptr;
     design->top_modules.push_back(top);
   }
@@ -1142,6 +1149,21 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
     if (rule->use_lib.empty() || rule->use_cell.empty()) continue;
     cell_clause_use_overrides_[std::string(rule->cell_name)] = {
         std::string(rule->use_lib), std::string(rule->use_cell)};
+  }
+
+  // §33.6.4: `instance <path> liblist <libs>;` overrides the binding
+  // for the named instance and (because liblists are inherited) for
+  // every descendant that no deeper rule reclaims.  Stash each rule
+  // here keyed by its path; FindModule walks the list per lookup and
+  // picks the most-specific matching prefix.
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kInstance) continue;
+    if (rule->liblist.empty()) continue;
+    std::vector<std::string> libs;
+    libs.reserve(rule->liblist.size());
+    for (auto lib : rule->liblist) libs.emplace_back(lib);
+    instance_liblist_overrides_.emplace_back(std::string(rule->inst_path),
+                                             std::move(libs));
   }
 
   // §33.5.4: the cells named in the config's design statement are the
@@ -1302,41 +1324,100 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
       candidates.push_back(mod);
     }
   }
-  // §33.6.2: when a config's default liblist is active, drop any
-  // candidate whose library is not on the liblist — those cells "shall
-  // not be used" regardless of source order.
-  if (library_order_strict_ && !candidates.empty()) {
+
+  // §33.6.4: pick the most-specific `instance ... liblist ...` rule
+  // whose path equals current_inst_path_ or is a strict prefix of
+  // it.  When such a rule matches, its liblist replaces the default
+  // for this lookup — so libraries excluded by §33.6.2's default
+  // become eligible again, and the inherited liblist follows the
+  // hierarchy down through descendants.
+  const std::vector<std::string>* override_liblist = nullptr;
+  size_t best_match_len = 0;
+  if (!current_inst_path_.empty()) {
+    for (const auto& [rule_path, libs] : instance_liblist_overrides_) {
+      bool matches = false;
+      if (current_inst_path_ == rule_path) {
+        matches = true;
+      } else if (current_inst_path_.size() > rule_path.size() &&
+                 current_inst_path_.compare(0, rule_path.size(), rule_path)
+                     == 0 &&
+                 current_inst_path_[rule_path.size()] == '.') {
+        matches = true;
+      }
+      if (matches && rule_path.size() >= best_match_len) {
+        override_liblist = &libs;
+        best_match_len = rule_path.size();
+      }
+    }
+  }
+
+  if (override_liblist != nullptr && !candidates.empty()) {
     std::vector<ModuleDecl*> filtered;
     filtered.reserve(candidates.size());
     for (auto* c : candidates) {
-      bool listed = false;
-      for (const auto& lib : library_order_) {
+      for (const auto& lib : *override_liblist) {
         if (lib == c->library) {
-          listed = true;
+          filtered.push_back(c);
           break;
         }
       }
-      if (listed) filtered.push_back(c);
     }
     candidates = std::move(filtered);
-  }
-  if (!candidates.empty()) {
-    auto priority = [this](std::string_view lib) -> size_t {
-      for (size_t i = 0; i < library_order_.size(); ++i) {
-        if (library_order_[i] == lib) return i;
+    if (!candidates.empty()) {
+      auto pri = [override_liblist](std::string_view lib) -> size_t {
+        for (size_t i = 0; i < override_liblist->size(); ++i) {
+          if ((*override_liblist)[i] == lib) return i;
+        }
+        return override_liblist->size();
+      };
+      ModuleDecl* best = candidates.front();
+      size_t best_pri = pri(best->library);
+      for (size_t i = 1; i < candidates.size(); ++i) {
+        size_t p = pri(candidates[i]->library);
+        if (p < best_pri) {
+          best = candidates[i];
+          best_pri = p;
+        }
       }
-      return library_order_.size();
-    };
-    ModuleDecl* best = candidates.front();
-    size_t best_pri = priority(best->library);
-    for (size_t i = 1; i < candidates.size(); ++i) {
-      size_t pri = priority(candidates[i]->library);
-      if (pri < best_pri) {
-        best = candidates[i];
-        best_pri = pri;
-      }
+      return best;
     }
-    return best;
+  } else {
+    // §33.6.2: when a config's default liblist is active, drop any
+    // candidate whose library is not on the liblist — those cells "shall
+    // not be used" regardless of source order.
+    if (library_order_strict_ && !candidates.empty()) {
+      std::vector<ModuleDecl*> filtered;
+      filtered.reserve(candidates.size());
+      for (auto* c : candidates) {
+        bool listed = false;
+        for (const auto& lib : library_order_) {
+          if (lib == c->library) {
+            listed = true;
+            break;
+          }
+        }
+        if (listed) filtered.push_back(c);
+      }
+      candidates = std::move(filtered);
+    }
+    if (!candidates.empty()) {
+      auto priority = [this](std::string_view lib) -> size_t {
+        for (size_t i = 0; i < library_order_.size(); ++i) {
+          if (library_order_[i] == lib) return i;
+        }
+        return library_order_.size();
+      };
+      ModuleDecl* best = candidates.front();
+      size_t best_pri = priority(best->library);
+      for (size_t i = 1; i < candidates.size(); ++i) {
+        size_t pri = priority(candidates[i]->library);
+        if (pri < best_pri) {
+          best = candidates[i];
+          best_pri = pri;
+        }
+      }
+      return best;
+    }
   }
   if (extern_decl) return extern_decl;
 

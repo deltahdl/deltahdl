@@ -658,6 +658,20 @@ class Elaborator {
   // library-order priority and the strict-liblist exclusion.
   std::unordered_map<std::string, std::pair<std::string, std::string>>
       cell_clause_use_overrides_;
+  // §33.6.4: instance-clause liblist overrides.  Each entry pairs a
+  // hierarchical instance path with the liblist that the config's
+  // `instance <path> liblist <libs>;` rule attaches to it.  The list
+  // is searched on every FindModule call against the current
+  // hier_path; the most-specific path (longest prefix match) wins so
+  // descendants of the named instance inherit the liblist while a
+  // deeper rule on a sub-path can still rebind the subhierarchy.
+  std::vector<std::pair<std::string, std::vector<std::string>>>
+      instance_liblist_overrides_;
+  // §33.6.4: hier_path of the instance currently being bound.
+  // ElaborateTops seeds it with the top module's name; ElaborateModuleInst
+  // pushes/pops the child path around each descent so that FindModule
+  // can match instance rules against the inheriting position.
+  std::string current_inst_path_;
   TypedefMap typedefs_;
   std::unordered_set<std::string_view> cu_scope_names_;  // §3.12.1
   ScopeMap cu_param_scope_;  // §3.12.1
