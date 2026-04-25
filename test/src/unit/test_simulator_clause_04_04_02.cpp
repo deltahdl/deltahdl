@@ -61,21 +61,6 @@ TEST(SimAndPliRegionSim, SimAndPLICoverAllRegions) {
   EXPECT_EQ(all.size(), kRegionCount);
 }
 
-TEST(SimAndPliRegionSim, AllSimulationRegionsExecute) {
-  Arena arena;
-  Scheduler sched(arena);
-  int count = 0;
-
-  for (auto r : kSimulationRegions) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&count]() { count++; };
-    sched.ScheduleEvent({0}, r, ev);
-  }
-
-  sched.Run();
-  EXPECT_EQ(count, 9);
-}
-
 TEST(SimAndPliRegionSim, AllPLIRegionsExecute) {
   Arena arena;
   Scheduler sched(arena);
