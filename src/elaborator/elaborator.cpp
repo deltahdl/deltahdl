@@ -197,6 +197,29 @@ void Elaborator::ValidateConfigInstanceClauses() {
   }
 }
 
+void Elaborator::ValidateConfigCellClauses() {
+  for (auto* cfg : unit_->configs) {
+    for (auto* rule : cfg->rules) {
+      if (rule->kind != ConfigRuleKind::kCell) continue;
+      if (rule->cell_lib.empty()) continue;
+      // §33.4.1.4: distinguish use-expansion from liblist-expansion by
+      // checking whether any use-clause field was populated; an empty
+      // liblist with `liblist` keyword still falls through here, but
+      // the rule is still ill-formed under §33.4.1.4 either way.
+      bool is_use_expansion = !rule->use_cell.empty() ||
+                              !rule->use_lib.empty() || rule->use_config ||
+                              !rule->use_params.empty();
+      if (!is_use_expansion) {
+        diag_.Error(cfg->range.start,
+                    std::format("config '{}' cell clause '{}.{}' uses a "
+                                "liblist expansion; a library-qualified "
+                                "cell clause requires a use clause",
+                                cfg->name, rule->cell_lib, rule->cell_name));
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateAnonymousProgramNameSharing() {
   auto check_scope = [&](const std::vector<ModuleItem*>& items) {
     std::unordered_map<std::string_view, const ModuleItem*> seen;
@@ -762,6 +785,9 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateConfigDefaultClauses();
   // §33.4.1.3: instance paths must start at a top-level design cell.
   ValidateConfigInstanceClauses();
+  // §33.4.1.4: cell clauses with a library qualifier cannot use a
+  // liblist expansion.
+  ValidateConfigCellClauses();
   // §24.6: Anonymous program items share the surrounding scope's name space.
   ValidateAnonymousProgramNameSharing();
   // §26.2: Reject package items that are nets with implicit continuous

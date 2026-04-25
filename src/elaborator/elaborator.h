@@ -56,6 +56,10 @@ class Elaborator {
   /// at a cell named in the config's `design` statement.
   void ValidateConfigInstanceClauses();
 
+  /// §33.4.1.4: a `cell` clause that includes a library qualifier on
+  /// the cell name cannot use a `liblist` expansion clause.
+  void ValidateConfigCellClauses();
+
   /// §24.6: Anonymous program items share the surrounding package or
   /// compilation-unit name space; collisions with that surrounding scope
   /// are an error.
