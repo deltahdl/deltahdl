@@ -647,6 +647,10 @@ class Elaborator {
   // §33.6.1: library declaration order from the lib.map; consulted by
   // FindModule when several cells share a name across libraries.
   std::vector<std::string> library_order_;
+  // §33.6.2: when a config's `default liblist` is in effect the search
+  // order is exclusive — candidates whose library is not in
+  // library_order_ are filtered out rather than merely deprioritized.
+  bool library_order_strict_ = false;
   TypedefMap typedefs_;
   std::unordered_set<std::string_view> cu_scope_names_;  // §3.12.1
   ScopeMap cu_param_scope_;  // §3.12.1

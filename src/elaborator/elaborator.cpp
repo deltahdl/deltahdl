@@ -1114,6 +1114,21 @@ void Elaborator::SetLibraryDeclarationOrder(std::vector<std::string> order) {
 RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   RunPreElaborationValidations();
 
+  // §33.6.2: a `default liblist` clause in the config replaces the
+  // lib.map's declaration order with the listed libraries, and excludes
+  // every other library from binding.  Apply the override before any
+  // FindModule call so even the design-statement lookup sees it.
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kDefault) continue;
+    library_order_.clear();
+    library_order_.reserve(rule->liblist.size());
+    for (auto lib : rule->liblist) {
+      library_order_.emplace_back(lib);
+    }
+    library_order_strict_ = true;
+    break;
+  }
+
   // §33.5.4: the cells named in the config's design statement are the
   // top-level modules.  Resolve each cell to its module declaration and
   // hand them all to the shared elaboration core.
@@ -1253,6 +1268,24 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
     } else {
       candidates.push_back(mod);
     }
+  }
+  // §33.6.2: when a config's default liblist is active, drop any
+  // candidate whose library is not on the liblist — those cells "shall
+  // not be used" regardless of source order.
+  if (library_order_strict_ && !candidates.empty()) {
+    std::vector<ModuleDecl*> filtered;
+    filtered.reserve(candidates.size());
+    for (auto* c : candidates) {
+      bool listed = false;
+      for (const auto& lib : library_order_) {
+        if (lib == c->library) {
+          listed = true;
+          break;
+        }
+      }
+      if (listed) filtered.push_back(c);
+    }
+    candidates = std::move(filtered);
   }
   if (!candidates.empty()) {
     auto priority = [this](std::string_view lib) -> size_t {
