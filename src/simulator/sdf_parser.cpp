@@ -558,21 +558,25 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
     // delays. Decode them into typed SdfInterconnect entries — they belong
     // to backannotation, not the §32.3 unannotatable warning channel.
     if (kw.text == "INTERCONNECT") {
-      cell.interconnects.push_back(ParseInterconnectEntry(s));
+      auto ic = ParseInterconnectEntry(s);
+      ic.is_increment = increment;
+      cell.interconnects.push_back(std::move(ic));
       RecordDelayEntry(cell, SdfDelayEntryKind::kInterconnect,
                        cell.interconnects.size() - 1);
       continue;
     }
     if (kw.text == "PORT") {
-      cell.interconnects.push_back(
-          ParseLoadOnlyInterconnect(s, SdfInterconnectKind::kPort));
+      auto ic = ParseLoadOnlyInterconnect(s, SdfInterconnectKind::kPort);
+      ic.is_increment = increment;
+      cell.interconnects.push_back(std::move(ic));
       RecordDelayEntry(cell, SdfDelayEntryKind::kInterconnect,
                        cell.interconnects.size() - 1);
       continue;
     }
     if (kw.text == "NETDELAY") {
-      cell.interconnects.push_back(
-          ParseLoadOnlyInterconnect(s, SdfInterconnectKind::kNetdelay));
+      auto ic = ParseLoadOnlyInterconnect(s, SdfInterconnectKind::kNetdelay);
+      ic.is_increment = increment;
+      cell.interconnects.push_back(std::move(ic));
       RecordDelayEntry(cell, SdfDelayEntryKind::kInterconnect,
                        cell.interconnects.size() - 1);
       continue;
@@ -726,14 +730,13 @@ static void ParseLabelSection(std::string_view& s, SdfCell& cell,
     SdfSpecparam sp;
     sp.name = std::string(name_tok.text);
     sp.value = ParseLabelValue(s);
+    sp.is_increment = increment;
     Expect(s, SdfTokKind::kRParen);
-    if (increment) {
-      // INCREMENT semantics on specparams are outside §32.4.3's text;
-      // record so the warning channel surfaces the omission rather than
-      // dropping the value silently.
-      file.unannotatable.emplace_back("LABEL");
-      continue;
-    }
+    // §32.6 sentence 3: INCREMENT-mode specparams are not dropped — the
+    // mode bit travels onto the SdfSpecparam so the annotator can fold
+    // the new value into the running specparam total rather than
+    // overwriting the prior one. ABSOLUTE leaves `is_increment` false
+    // and the existing overwrite path applies.
     cell.specparams.push_back(std::move(sp));
   }
   Expect(s, SdfTokKind::kRParen);  // close ABSOLUTE/INCREMENT
@@ -1013,8 +1016,27 @@ static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
   return targets;
 }
 
+// §32.6 sentence 4: decide whether a cell sits at or hierarchically under
+// the named region. The scope is a hierarchical prefix; an empty scope
+// disables the filter so every cell qualifies. A non-empty scope matches
+// a cell whose instance equals the scope or whose first separator-
+// delimited segment is exactly the scope, so "u1" includes both "u1"
+// and "u1/sub/dut" but rejects sibling regions like "u10/dut" that
+// merely share a leading substring. Either '/' or '.' is accepted as
+// the hierarchy separator since SDF and SystemVerilog name them
+// differently and no LRM rule narrows the choice.
+static bool CellInScope(std::string_view instance, std::string_view scope) {
+  if (scope.empty()) return true;
+  if (instance.size() < scope.size()) return false;
+  if (instance.compare(0, scope.size(), scope) != 0) return false;
+  if (instance.size() == scope.size()) return true;
+  const char sep = instance[scope.size()];
+  return sep == '/' || sep == '.';
+}
+
 SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
-                                         SpecifyManager& mgr, SdfMtm mtm) {
+                                         SpecifyManager& mgr, SdfMtm mtm,
+                                         std::string_view scope) {
   SdfAnnotationResult result;
   // §32.3 sentence 1: surface one warning per piece of SDF data the
   // parser flagged as unannotatable. Constructs unrelated to
@@ -1041,6 +1063,12 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
   // synthesise a category-by-category fallback so legacy callers keep
   // observing their pre-§32.5 ordering.
   for (const auto& cell : file.cells) {
+    // §32.6 sentence 4: skip cells outside the caller-supplied region so
+    // that "different regions of a design can be annotated from
+    // different SDF files" via successive scoped calls. The empty-scope
+    // default leaves every cell eligible, preserving the §32.5
+    // single-call behaviour.
+    if (!CellInScope(cell.instance, scope)) continue;
     std::vector<SdfDelayEntryRef> derived;
     const std::vector<SdfDelayEntryRef>* order = &cell.delay_entry_order;
     if (order->empty() && (!cell.iopaths.empty() ||
@@ -1077,6 +1105,17 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
           pd.delays[1] = SelectMtm(io.fall, mtm);
           pd.delays[2] = SelectMtm(io.turnoff, mtm);
           if (!io.extended_form) {
+            // §32.6 sentence 3: an INCREMENT-mode IOPATH modifies the
+            // matched path's existing delays additively rather than
+            // overwriting them. Pulse limits stay where the prior
+            // ABSOLUTE / PATHPULSE annotation left them, since the
+            // INCREMENT description is restricted to the propagation
+            // delays. Skip the default-reset of pulse limits in this
+            // branch for the same reason.
+            if (io.is_increment) {
+              mgr.IncrementPathDelay(pd);
+              break;
+            }
             // §32.5 example 1: an ABSOLUTE IOPATH annotation overwrites
             // the path's pulse-filter limits. Default-reset reject and
             // error to mirror the new propagation delays so a prior
@@ -1172,6 +1211,15 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
             delay.reject_limit[i] = scratch.delays[i];
             delay.error_limit[i] = scratch.delays[i];
           }
+          // §32.6 sentence 3: INCREMENT-mode interconnect entries add
+          // onto whatever the prior ABSOLUTE annotation installed for
+          // the same (src, dst) pair. The PORT/NETDELAY load-only wipe
+          // rule is intentionally not run for INCREMENT — modify
+          // accumulates rather than wiping siblings.
+          if (ic.is_increment) {
+            mgr.IncrementInterconnectDelay(delay);
+            break;
+          }
           mgr.AddInterconnectDelay(std::move(delay));
           break;
         }
@@ -1181,7 +1229,15 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
       SpecparamValue value;
       value.name = sp.name;
       value.value = SelectMtm(sp.value, mtm);
-      mgr.SetSpecparamValue(std::move(value));
+      // §32.6 sentence 3 on the specparam category: an INCREMENT-mode
+      // entry must add onto the matched specparam's running value rather
+      // than overwriting it, paralleling the IOPATH/INTERCONNECT
+      // INCREMENT routing above.
+      if (sp.is_increment) {
+        mgr.IncrementSpecparamValue(std::move(value));
+      } else {
+        mgr.SetSpecparamValue(std::move(value));
+      }
     }
     for (const auto& tc : cell.timing_checks) {
       // §32.4.2: route through Table 32-2 — one SDF construct may produce

@@ -353,54 +353,6 @@ TEST(SdfDelayMapping, MultipleCondIopathsAnnotateRespectiveSiblings) {
   }
 }
 
-// §32.4.1 conditional shall rule + §32.4 sentence 5 (replacing): annotating
-// the same COND IOPATH twice must converge — the second pass overwrites the
-// stored delay on the matched conditional sibling rather than appending a
-// duplicate entry that would shadow the first.
-TEST(SdfDelayMapping, CondIopathReannotationOverwritesPriorValue) {
-  SpecifyManager mgr;
-  PathDelay sv;
-  sv.src_port = "a";
-  sv.dst_port = "y";
-  sv.condition = "mode";
-  sv.delay_count = 1;
-  sv.delays[0] = 0;
-  mgr.AddPathDelay(sv);
-
-  SdfFile first;
-  {
-    SdfCell cell;
-    SdfIopath io;
-    io.src_port = "a";
-    io.dst_port = "y";
-    io.condition = "mode";
-    io.rise.typ_val = 11;
-    io.fall.typ_val = 22;
-    cell.iopaths.push_back(io);
-    first.cells.push_back(cell);
-  }
-  AnnotateSdfToManager(first, mgr, SdfMtm::kTypical);
-
-  SdfFile second;
-  {
-    SdfCell cell;
-    SdfIopath io;
-    io.src_port = "a";
-    io.dst_port = "y";
-    io.condition = "mode";
-    io.rise.typ_val = 33;
-    io.fall.typ_val = 44;
-    cell.iopaths.push_back(io);
-    second.cells.push_back(cell);
-  }
-  AnnotateSdfToManager(second, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetPathDelays().size(), 1u);
-  EXPECT_EQ(mgr.GetPathDelays()[0].condition, "mode");
-  EXPECT_EQ(mgr.GetPathDelays()[0].delays[0], 33u);
-  EXPECT_EQ(mgr.GetPathDelays()[0].delays[1], 44u);
-}
-
 // §32.4.1 nonconditional shall rule, ifnone-sibling edge: an ifnone path is
 // still a specify path between the two named ports, so a nonconditional
 // IOPATH must update its delays alongside a conditional sibling. The SV

@@ -104,9 +104,15 @@ struct SdfTimingCheck {
 // supplies for a SystemVerilog specparam. The detailed mapping from SDF's
 // LABEL section to this struct is §32.4's responsibility; the §32.2
 // contract is just that backannotation can carry such a value through.
+//
+// §32.6 sentence 3: a specparam parsed inside (LABEL (INCREMENT ...))
+// carries the modify-vs-overwrite bit forward so the annotator can
+// route the entry through the additive specparam path instead of the
+// overwriting one when accumulating across SDF files.
 struct SdfSpecparam {
   std::string name;
   SdfDelayValue value;
+  bool is_increment = false;
 };
 
 // §32.4.4 Table 32-3: which of the three SDF construct shapes produced
@@ -130,12 +136,18 @@ enum class SdfInterconnectKind : uint8_t {
 // "delay from all sources" semantics are encoded by the absence of a
 // named source rather than a synthetic placeholder. The `kind` field
 // distinguishes them from INTERCONNECT for downstream rules.
+//
+// §32.6 sentence 3: an interconnect entry parsed inside (DELAY (INCREMENT
+// ...)) carries the INCREMENT-vs-ABSOLUTE bit forward so the annotator
+// can route the entry through the modify (additive) path instead of the
+// overwrite path when accumulating across SDF files.
 struct SdfInterconnect {
   std::string src_port;
   std::string dst_port;
   SdfDelayValue rise;
   SdfDelayValue fall;
   SdfInterconnectKind kind = SdfInterconnectKind::kInterconnect;
+  bool is_increment = false;
 };
 
 // §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT rows: an SDF entry that
@@ -246,7 +258,17 @@ struct SdfAnnotationResult {
 };
 
 // Apply parsed SDF data to a SpecifyManager.
+//
+// §32.6 sentence 4: when `scope` is non-empty the annotator filters by
+// the SDF cell INSTANCE so that only cells sitting at or hierarchically
+// under the named region land on the manager. The match accepts an
+// instance equal to the scope or one whose first separator-delimited
+// segment is exactly the scope, so "u1" annotates "u1" and "u1/sub/dut"
+// without spilling onto siblings like "u10/dut" that share a leading
+// substring. An empty scope (the default) disables the filter so every
+// cell is annotated, preserving the §32.5 single-call behaviour.
 SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
-                                         SpecifyManager& mgr, SdfMtm mtm);
+                                         SpecifyManager& mgr, SdfMtm mtm,
+                                         std::string_view scope = {});
 
 }  // namespace delta

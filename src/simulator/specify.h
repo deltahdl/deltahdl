@@ -552,6 +552,18 @@ class SpecifyManager {
   // overwrite. Defaulted to false so the simple-form IOPATH path and
   // every existing call site keep their default-reset semantics.
   void AddPathDelay(PathDelay delay, bool preserve_pulse_limits = false);
+  // §32.6 sentence 3: apply a modify (INCREMENT) annotation to existing
+  // path delays. The delta uses the same identity-tuple matching as
+  // AddPathDelay — a nonconditional delta fans out across every entry
+  // sharing (src_port, dst_port); a conditional or ifnone delta selects
+  // only the entry with the matching tuple — but the delays array is
+  // added slot-by-slot to each matched entry's existing `delays[]`
+  // rather than overwriting them. Pulse limits and the matched entry's
+  // own condition / ifnone identity are preserved, since INCREMENT
+  // describes a delta on the propagation delays only. When no matched
+  // entry exists, the delta is appended verbatim — the LRM admits a
+  // first-time INCREMENT whose "earlier" baseline is implicitly zero.
+  void IncrementPathDelay(const PathDelay& delta);
   void AddTimingCheck(TimingCheckEntry check);
 
   // §32.4.2: install one Table 32-2 expansion target onto every matching
@@ -572,7 +584,25 @@ class SpecifyManager {
 
   void AnnotateSdf(SdfAnnotation annotation);
   void SetSpecparamValue(SpecparamValue spec);
+  // §32.6 sentence 3: modify (INCREMENT) entry point for specparam values.
+  // The delta is keyed by name — the same identity SetSpecparamValue uses —
+  // and its `value` is added onto the matched entry's existing value
+  // rather than overwriting it. When no matched entry exists, the delta
+  // is appended verbatim, treating the implicit baseline as zero. The
+  // §32.4.3 specparam-reevaluation callbacks fire with the post-add
+  // total so any consumer expression sees the freshly accumulated value.
+  void IncrementSpecparamValue(SpecparamValue delta);
   void AddInterconnectDelay(InterconnectDelay delay);
+  // §32.6 sentence 3: modify (INCREMENT) entry point for interconnect
+  // delays. The delta is identified by (src_port, dst_port) — the same
+  // identity tuple AddInterconnectDelay uses — and its `rise`/`fall`
+  // values are added onto the matched entry's existing rise/fall and
+  // each of the twelve transition slots. When no matched entry exists,
+  // the delta is appended verbatim, treating the implicit baseline as
+  // zero. The PORT/NETDELAY load-only wipe rule of AddInterconnectDelay
+  // is intentionally not duplicated here: INCREMENT modifies whatever
+  // is already installed rather than wiping siblings.
+  void IncrementInterconnectDelay(const InterconnectDelay& delta);
 
   // §32.4.3 sentence 2: any expression containing one or more specparams
   // is reevaluated when annotated to from an SDF file. Consumers that hold

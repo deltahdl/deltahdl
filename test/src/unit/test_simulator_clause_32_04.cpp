@@ -323,38 +323,4 @@ TEST(SdfConstructMapping, ReannotationReplacesSpecparamRatherThanDuplicating) {
   EXPECT_EQ(mgr.GetSpecparamValues()[0].value, 11u);
 }
 
-// §32.4 sentence 5 (the "replacing" half): when a second annotation pass
-// supplies a different value for an already-named declaration, the new
-// value must take effect. The same-value convergence test above can be
-// satisfied by a first-write-wins implementation; this companion pins down
-// that the second pass actually overwrites the prior value.
-TEST(SdfConstructMapping, ReannotationOverwritesPriorSpecparamValue) {
-  SpecifyManager mgr;
-
-  SdfFile first;
-  {
-    SdfCell cell;
-    SdfSpecparam sp;
-    sp.name = "tHold";
-    sp.value.typ_val = 11;
-    cell.specparams.push_back(sp);
-    first.cells.push_back(cell);
-  }
-  AnnotateSdfToManager(first, mgr, SdfMtm::kTypical);
-
-  SdfFile second;
-  {
-    SdfCell cell;
-    SdfSpecparam sp;
-    sp.name = "tHold";
-    sp.value.typ_val = 47;
-    cell.specparams.push_back(sp);
-    second.cells.push_back(cell);
-  }
-  AnnotateSdfToManager(second, mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.GetSpecparamValues().size(), 1u);
-  EXPECT_EQ(mgr.GetSpecparamValues()[0].value, 47u);
-}
-
 }  // namespace

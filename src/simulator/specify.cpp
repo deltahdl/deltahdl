@@ -247,6 +247,61 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
   path_delays_.push_back(std::move(delay));
 }
 
+void SpecifyManager::IncrementPathDelay(const PathDelay& delta) {
+  // §32.6 sentence 3: route by the same conditional shape as AddPathDelay
+  // so that INCREMENT and ABSOLUTE annotations agree on which existing
+  // entries they target. A nonconditional delta fans across every
+  // (src, dst) sibling; a conditional or ifnone delta touches only the
+  // entry with the matching identity tuple. The per-slot add preserves
+  // pulse limits and the matched entry's condition / ifnone — INCREMENT
+  // describes a delta on the propagation delays only, so unrelated state
+  // must survive.
+  const bool sdf_is_nonconditional =
+      delta.condition.empty() && !delta.is_ifnone;
+  bool matched = false;
+  if (sdf_is_nonconditional) {
+    for (auto& existing : path_delays_) {
+      if (existing.src_port == delta.src_port &&
+          existing.dst_port == delta.dst_port) {
+        for (int i = 0; i < 12; ++i) existing.delays[i] += delta.delays[i];
+        matched = true;
+      }
+    }
+  } else {
+    for (auto& existing : path_delays_) {
+      if (existing.src_port == delta.src_port &&
+          existing.dst_port == delta.dst_port &&
+          existing.condition == delta.condition &&
+          existing.is_ifnone == delta.is_ifnone) {
+        for (int i = 0; i < 12; ++i) existing.delays[i] += delta.delays[i];
+        matched = true;
+        break;
+      }
+    }
+  }
+  if (!matched) path_delays_.push_back(delta);
+}
+
+void SpecifyManager::IncrementInterconnectDelay(const InterconnectDelay& delta) {
+  // §32.6 sentence 3 on the interconnect category. The (src_port, dst_port)
+  // tuple selects the entry to modify; rise/fall and each of the twelve
+  // transition slots are added rather than overwritten. A first-time
+  // INCREMENT whose key has no prior entry installs the delta verbatim,
+  // matching the path-delay branch's implicit-zero baseline.
+  for (auto& existing : interconnect_delays_) {
+    if (existing.src_port == delta.src_port &&
+        existing.dst_port == delta.dst_port) {
+      existing.rise += delta.rise;
+      existing.fall += delta.fall;
+      for (int i = 0; i < 12; ++i) {
+        existing.delays[i] += delta.delays[i];
+      }
+      return;
+    }
+  }
+  interconnect_delays_.push_back(delta);
+}
+
 void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
   // §32.4 + §32.4.1: replace any prior entry whose identifying tuple
   // matches the incoming check, so that successive backannotation passes
@@ -342,6 +397,34 @@ void SpecifyManager::SetSpecparamValue(SpecparamValue spec) {
   // annotation, not just the first.
   for (const auto& reev : specparam_reevaluators_) {
     if (reev.first == name) reev.second(value);
+  }
+}
+
+void SpecifyManager::IncrementSpecparamValue(SpecparamValue delta) {
+  // §32.6 sentence 3 on the specparam category: a same-name delta adds
+  // onto the matched entry's running value rather than replacing it.
+  // The reevaluation fan-out fires with the post-add total so consumers
+  // observe the freshly accumulated value, matching the contract
+  // SetSpecparamValue establishes for ABSOLUTE annotations. A delta
+  // whose name has no prior entry is treated as the LRM's "values from
+  // earlier SDF files" simply being absent, so the delta installs
+  // verbatim — equivalent to an implicit zero baseline.
+  std::string name = delta.name;
+  uint64_t added = delta.value;
+  uint64_t new_value = added;
+  auto it = specparam_index_.find(name);
+  if (it != specparam_index_.end()) {
+    new_value = specparam_values_[it->second].value + added;
+    specparam_values_[it->second].value = new_value;
+  } else {
+    specparam_index_[name] = specparam_values_.size();
+    SpecparamValue stored;
+    stored.name = name;
+    stored.value = added;
+    specparam_values_.push_back(std::move(stored));
+  }
+  for (const auto& reev : specparam_reevaluators_) {
+    if (reev.first == name) reev.second(new_value);
   }
 }
 
