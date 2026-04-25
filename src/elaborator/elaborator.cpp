@@ -254,6 +254,171 @@ void Elaborator::ValidateConfigHierarchicalRules() {
   }
 }
 
+namespace {
+
+bool IsLiteralKind(ExprKind k) {
+  switch (k) {
+    case ExprKind::kIntegerLiteral:
+    case ExprKind::kRealLiteral:
+    case ExprKind::kStringLiteral:
+    case ExprKind::kUnbasedUnsizedLiteral:
+    case ExprKind::kTimeLiteral:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Walk `expr`'s children with a visitor that returns true to short-circuit.
+template <typename Visitor>
+bool WalkExprAny(const Expr* expr, Visitor&& v) {
+  if (!expr) return false;
+  if (v(expr)) return true;
+  if (WalkExprAny(expr->lhs, v)) return true;
+  if (WalkExprAny(expr->rhs, v)) return true;
+  if (WalkExprAny(expr->condition, v)) return true;
+  if (WalkExprAny(expr->true_expr, v)) return true;
+  if (WalkExprAny(expr->false_expr, v)) return true;
+  if (WalkExprAny(expr->base, v)) return true;
+  if (WalkExprAny(expr->index, v)) return true;
+  if (WalkExprAny(expr->index_end, v)) return true;
+  if (WalkExprAny(expr->repeat_count, v)) return true;
+  if (WalkExprAny(expr->with_expr, v)) return true;
+  for (auto* a : expr->args) {
+    if (WalkExprAny(a, v)) return true;
+  }
+  for (auto* e : expr->elements) {
+    if (WalkExprAny(e, v)) return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+void Elaborator::ValidateConfigLocalparams() {
+  for (auto* cfg : unit_->configs) {
+    for (const auto& [name, expr] : cfg->local_params) {
+      if (!expr) continue;
+      if (!IsLiteralKind(expr->kind)) {
+        diag_.Error(
+            cfg->range.start,
+            std::format("config '{}' localparam '{}' is not assigned a "
+                        "literal value",
+                        cfg->name, name));
+      }
+    }
+  }
+}
+
+void Elaborator::ValidateConfigParamOverrides() {
+  for (auto* cfg : unit_->configs) {
+    // Names that are legal as identifiers inside an index expression
+    // of a hierarchical reference (item 2).
+    std::unordered_set<std::string_view> lp_names;
+    for (const auto& [name, _] : cfg->local_params) lp_names.insert(name);
+
+    // True iff `e`'s root walks down through nothing but identifier,
+    // member-access, and select nodes — the form item 3 calls "the
+    // hier identifier as the only term in the expression".  Indexes
+    // inside a select are not part of the term tree; they are vetted
+    // separately by item 2.
+    auto is_pure_term_tree = [](const Expr* e) {
+      while (e) {
+        switch (e->kind) {
+          case ExprKind::kIdentifier:
+            return true;
+          case ExprKind::kMemberAccess:
+            e = e->lhs;
+            break;
+          case ExprKind::kSelect:
+            e = e->base;
+            break;
+          default:
+            return false;
+        }
+      }
+      return false;
+    };
+
+    for (auto* rule : cfg->rules) {
+      for (const auto& [pname, expr] : rule->use_params) {
+        if (!expr) continue;
+
+        bool has_hier = WalkExprAny(expr, [](const Expr* e) {
+          return e->kind == ExprKind::kMemberAccess;
+        });
+
+        // Item 3: a hierarchical identifier may not appear as a sub-
+        // term of an arithmetic/logical expression (e.g. `top.W + 7`).
+        if (has_hier && !is_pure_term_tree(expr)) {
+          diag_.Error(
+              cfg->range.start,
+              std::format("config '{}' override of parameter '{}' embeds a "
+                          "hierarchical identifier inside a larger "
+                          "expression",
+                          cfg->name, pname));
+        }
+
+        // Item 5: a select that feeds into a member-access on its
+        // result is a mid-chain scope traversal (`top.arr[0].W`) and
+        // is forbidden.  A select whose result is the whole expression
+        // (`top.PARAM[2]`) is left to item 2.
+        bool has_mid_chain_select = WalkExprAny(expr, [](const Expr* e) {
+          return e->kind == ExprKind::kMemberAccess && e->lhs &&
+                 e->lhs->kind == ExprKind::kSelect;
+        });
+        if (has_mid_chain_select) {
+          diag_.Error(
+              cfg->range.start,
+              std::format("config '{}' override of parameter '{}' uses a "
+                          "hierarchical reference that traverses an array of "
+                          "instances",
+                          cfg->name, pname));
+        }
+
+        // Item 2: each identifier appearing inside a select index must
+        // name a localparam declared in the same configuration; bare
+        // literals carry no identifier and are accepted.
+        auto check_index = [&](const Expr* idx) {
+          WalkExprAny(idx, [&](const Expr* sub) {
+            if (sub->kind == ExprKind::kIdentifier &&
+                lp_names.count(sub->text) == 0) {
+              diag_.Error(
+                  cfg->range.start,
+                  std::format("config '{}' override of parameter '{}' uses "
+                              "index identifier '{}' that is neither a "
+                              "literal nor a localparam of the config",
+                              cfg->name, pname, sub->text));
+            }
+            return false;
+          });
+        };
+        WalkExprAny(expr, [&](const Expr* e) {
+          if (e->kind == ExprKind::kSelect) {
+            if (e->index) check_index(e->index);
+            if (e->index_end) check_index(e->index_end);
+          }
+          return false;
+        });
+
+        // Item 6: only built-in (system) constant functions are
+        // permitted; user-defined function calls are rejected.
+        bool has_user_call = WalkExprAny(expr, [](const Expr* e) {
+          return e->kind == ExprKind::kCall;
+        });
+        if (has_user_call) {
+          diag_.Error(
+              cfg->range.start,
+              std::format("config '{}' override of parameter '{}' calls a "
+                          "user-defined function; only built-in constant "
+                          "functions are permitted",
+                          cfg->name, pname));
+        }
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateAnonymousProgramNameSharing() {
   auto check_scope = [&](const std::vector<ModuleItem*>& items) {
     std::unordered_map<std::string_view, const ModuleItem*> seen;
@@ -825,6 +990,11 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // §33.4.2: an instance clause may not name a path inside a
   // subhierarchy delegated to another config.
   ValidateConfigHierarchicalRules();
+  // §33.4.3 item 1: localparams in a config must be literal-valued.
+  ValidateConfigLocalparams();
+  // §33.4.3 items 3, 5, 6: validate parameter override value expressions
+  // attached to a use clause.
+  ValidateConfigParamOverrides();
   // §24.6: Anonymous program items share the surrounding scope's name space.
   ValidateAnonymousProgramNameSharing();
   // §26.2: Reject package items that are nets with implicit continuous

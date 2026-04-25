@@ -65,6 +65,18 @@ class Elaborator {
   /// `instance ... use ...:config`.
   void ValidateConfigHierarchicalRules();
 
+  /// §33.4.3 item 1: each `localparam` declared in a configuration
+  /// must be assigned a literal value (no expressions, no identifier
+  /// references).
+  void ValidateConfigLocalparams();
+
+  /// §33.4.3 items 3, 5, 6: validate value expressions that override
+  /// parameters via a `use #(.NAME(value))` clause.  A hierarchical
+  /// identifier must be the entire expression; the path may not pass
+  /// through array-of-instances scopes; and only built-in (system)
+  /// constant functions may appear.
+  void ValidateConfigParamOverrides();
+
   /// §24.6: Anonymous program items share the surrounding package or
   /// compilation-unit name space; collisions with that surrounding scope
   /// are an error.
