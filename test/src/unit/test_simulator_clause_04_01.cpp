@@ -61,23 +61,6 @@ TEST(SchedulerOverviewSim, ConcurrentWriteSameTimeSlotLastWriteWins) {
   EXPECT_TRUE(val == 1u || val == 2u);
 }
 
-TEST(SchedulerOverviewSim, PLIRegionsExistInEnum) {
-  EXPECT_LT(static_cast<int>(Region::kPreActive),
-            static_cast<int>(Region::kActive));
-  EXPECT_LT(static_cast<int>(Region::kPreNBA), static_cast<int>(Region::kNBA));
-  EXPECT_GT(static_cast<int>(Region::kPostNBA), static_cast<int>(Region::kNBA));
-  EXPECT_LT(static_cast<int>(Region::kPreObserved),
-            static_cast<int>(Region::kObserved));
-  EXPECT_GT(static_cast<int>(Region::kPostObserved),
-            static_cast<int>(Region::kObserved));
-  EXPECT_LT(static_cast<int>(Region::kPreReNBA),
-            static_cast<int>(Region::kReNBA));
-  EXPECT_GT(static_cast<int>(Region::kPostReNBA),
-            static_cast<int>(Region::kReNBA));
-  EXPECT_LT(static_cast<int>(Region::kPrePostponed),
-            static_cast<int>(Region::kPostponed));
-}
-
 TEST(SchedulerOverviewSim, PLIPreActiveBeforeSimulationActive) {
   VerifyTwoRegionOrder({Region::kPreActive, "pre_active"},
                        {Region::kActive, "active"});
