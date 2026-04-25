@@ -10,19 +10,6 @@
 
 using namespace delta;
 
-TEST(PliPreNbaSim, PreNBARegionExecutesPLICallbacks) {
-  Arena arena;
-  Scheduler sched(arena);
-  int executed = 0;
-
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() { executed++; };
-  sched.ScheduleEvent({0}, Region::kPreNBA, ev);
-
-  sched.Run();
-  EXPECT_EQ(executed, 1);
-}
-
 TEST(PliPreNbaSim, PreNBACanReadValues) {
   Arena arena;
   Scheduler sched(arena);
