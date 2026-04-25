@@ -10,19 +10,6 @@
 
 using namespace delta;
 
-TEST(ReInactiveRegionSim, ReInactiveRegionExecutesEvents) {
-  Arena arena;
-  Scheduler sched(arena);
-  int executed = 0;
-
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() { executed++; };
-  sched.ScheduleEvent({0}, Region::kReInactive, ev);
-
-  sched.Run();
-  EXPECT_EQ(executed, 1);
-}
-
 TEST(ReInactiveRegionSim, ReInactiveExecutesAfterReactive) {
   VerifyTwoRegionOrder({Region::kReactive, "reactive"},
                        {Region::kReInactive, "reinactive"});
