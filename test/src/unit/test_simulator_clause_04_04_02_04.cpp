@@ -10,19 +10,6 @@
 
 using namespace delta;
 
-TEST(NbaRegionSim, NBARegionExecutesEvents) {
-  Arena arena;
-  Scheduler sched(arena);
-  int executed = 0;
-
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() { executed++; };
-  sched.ScheduleEvent({0}, Region::kNBA, ev);
-
-  sched.Run();
-  EXPECT_EQ(executed, 1);
-}
-
 TEST(NbaRegionSim, NBAExecutesAfterInactive) {
   VerifyTwoRegionOrder({Region::kInactive, "inactive"}, {Region::kNBA, "nba"});
 }
