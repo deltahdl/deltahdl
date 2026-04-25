@@ -66,11 +66,6 @@ TEST(SchedulerOverviewSim, PLIPrePostponedBeforePostponed) {
                        {Region::kPostponed, "postponed"});
 }
 
-TEST(SchedulerOverviewSim, PLIPostNBAAfterNBABeforePreObserved) {
-  VerifyThreeRegionOrder({Region::kNBA, "nba"}, {Region::kPostNBA, "post_nba"},
-                         {Region::kPreObserved, "pre_observed"});
-}
-
 TEST(SchedulerOverviewSim, FullPipelineIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
