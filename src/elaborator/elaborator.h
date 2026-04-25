@@ -651,6 +651,13 @@ class Elaborator {
   // order is exclusive — candidates whose library is not in
   // library_order_ are filtered out rather than merely deprioritized.
   bool library_order_strict_ = false;
+  // §33.6.3: cell-clause overrides keyed by the LHS cell name.  Each
+  // entry maps the matched cell name to the (use_lib, use_cell) the
+  // config's `cell <name> use <lib>.<cell>;` rule explicitly binds it
+  // to.  The override fires inside FindModule and bypasses both the
+  // library-order priority and the strict-liblist exclusion.
+  std::unordered_map<std::string, std::pair<std::string, std::string>>
+      cell_clause_use_overrides_;
   TypedefMap typedefs_;
   std::unordered_set<std::string_view> cu_scope_names_;  // §3.12.1
   ScopeMap cu_param_scope_;  // §3.12.1

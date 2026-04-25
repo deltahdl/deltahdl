@@ -1129,6 +1129,21 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
     break;
   }
 
+  // §33.6.3: a `cell <name> use <lib>.<cell>;` rule selects every
+  // instance whose cell name is <name> and explicitly binds it to
+  // <lib>.<cell>.  The binding is unconditional — it fires even when
+  // the default liblist excludes <lib>, because §33.6.3 calls it an
+  // "explicit" bind.  Record the mapping here so FindModule can apply
+  // it transitively at every instance lookup, including the design
+  // statement's own cells.
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kCell) continue;
+    if (!rule->cell_lib.empty()) continue;
+    if (rule->use_lib.empty() || rule->use_cell.empty()) continue;
+    cell_clause_use_overrides_[std::string(rule->cell_name)] = {
+        std::string(rule->use_lib), std::string(rule->use_cell)};
+  }
+
   // §33.5.4: the cells named in the config's design statement are the
   // top-level modules.  Resolve each cell to its module declaration and
   // hand them all to the shared elaboration core.
@@ -1254,6 +1269,24 @@ void Elaborator::ResolveExternModules() {
 }
 
 ModuleDecl* Elaborator::FindModule(std::string_view name) const {
+  // §33.6.3: "The cell clause selects all cells named m and explicitly
+  // binds them to the gate representation in gateLib."  When a config's
+  // cell clause names this lookup target, redirect to the named
+  // (lib, cell) pair directly — bypassing both the library-order
+  // priority of §33.6.1 and the strict-liblist exclusion of §33.6.2.
+  if (auto it = cell_clause_use_overrides_.find(std::string(name));
+      it != cell_clause_use_overrides_.end()) {
+    const auto& target_lib = it->second.first;
+    const auto& target_cell = it->second.second;
+    for (auto* mod : unit_->modules) {
+      if (mod->is_extern) continue;
+      if (mod->library == target_lib && mod->name == target_cell) {
+        return mod;
+      }
+    }
+    return nullptr;
+  }
+
   // §33.6.1: "all instances of module adder shall use aLib.adder
   // (because aLib is the first library specified that contains a cell
   // named adder)."  Collect every non-extern decl that matches `name`,
