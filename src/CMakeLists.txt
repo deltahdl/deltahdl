@@ -30,6 +30,7 @@ add_library(deltahdl_lib STATIC
     parser/parser_items.cpp
     parser/time_resolve.cpp
     parser/library_map.cpp
+    parser/precompiled_library.cpp
     elaborator/elaborator.cpp
     elaborator/elaborator_items.cpp
     elaborator/elaborator_defparam.cpp
