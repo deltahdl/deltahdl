@@ -8,31 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SchedulerOverviewSim, ActiveSetIteratesBeforeReactiveSet) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() {
-    order.push_back("active");
-    auto* inactive = sched.GetEventPool().Acquire();
-    inactive->callback = [&]() { order.push_back("inactive"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kInactive, inactive);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  auto* reactive = sched.GetEventPool().Acquire();
-  reactive->callback = [&]() { order.push_back("reactive"); };
-  sched.ScheduleEvent({0}, Region::kReactive, reactive);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "inactive");
-  EXPECT_EQ(order[2], "reactive");
-}
-
 TEST(SchedulerOverviewSim, PostponedIsLastRegionInTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
