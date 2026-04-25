@@ -114,6 +114,29 @@ CompilationUnit* Parser::Parse() {
   while (!AtEnd()) {
     ParseTopLevel(unit);
   }
+  // §33.5.1: a precompiling strategy in a single-pass tool maps every
+  // cell description from the input into the library, regardless of
+  // whether the cell is referenced.  Cells not bound to a specific
+  // library by a library-map driver fall back to the §33.3.1 "work"
+  // default so that the elaborator sees a fully library-tagged set.
+  for (auto* m : unit->modules) {
+    if (m->library.empty()) m->library = "work";
+  }
+  for (auto* i : unit->interfaces) {
+    if (i->library.empty()) i->library = "work";
+  }
+  for (auto* p : unit->programs) {
+    if (p->library.empty()) p->library = "work";
+  }
+  for (auto* u : unit->udps) {
+    if (u->library.empty()) u->library = "work";
+  }
+  for (auto* p : unit->packages) {
+    if (p->library.empty()) p->library = "work";
+  }
+  for (auto* c : unit->configs) {
+    if (c->library.empty()) c->library = "work";
+  }
   return unit;
 }
 
