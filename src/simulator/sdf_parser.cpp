@@ -236,7 +236,7 @@ static SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
 // Parse DELAY section
 // =============================================================================
 
-static void ParseDelaySection(std::string_view& s, SdfCell& cell,
+static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
                               bool increment) {
   // Inside (ABSOLUTE ...) or (INCREMENT ...)
   while (true) {
@@ -249,6 +249,10 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell,
       io.is_increment = increment;
       cell.iopaths.push_back(io);
     } else {
+      // §32.3: this construct sits inside DELAY — i.e. it is one of the
+      // §32.2 path-delay categories — but the parser cannot decode it.
+      // Record so the annotator can warn rather than dropping silently.
+      file.unannotatable.emplace_back(kw.text);
       SkipSdfParen(s);
     }
   }
@@ -276,7 +280,7 @@ static void ParseTimingCheckSection(std::string_view& s, SdfCell& cell) {
 // Parse a CELL
 // =============================================================================
 
-static SdfCell ParseCell(std::string_view& s) {
+static SdfCell ParseCell(std::string_view& s, SdfFile& file) {
   SdfCell cell;
   while (true) {
     SkipWhitespace(s);
@@ -295,7 +299,7 @@ static SdfCell ParseCell(std::string_view& s) {
       Expect(s, SdfTokKind::kLParen);
       auto mode = NextSdfToken(s);
       bool inc = (mode.text == "INCREMENT");
-      ParseDelaySection(s, cell, inc);
+      ParseDelaySection(s, cell, file, inc);
       Expect(s, SdfTokKind::kRParen);
     } else if (kw.text == "TIMINGCHECK") {
       ParseTimingCheckSection(s, cell);
@@ -330,8 +334,12 @@ bool ParseSdf(std::string_view input, SdfFile& out) {
       out.design = std::string(design.text);
       Expect(input, SdfTokKind::kRParen);
     } else if (kw.text == "CELL") {
-      out.cells.push_back(ParseCell(input));
+      out.cells.push_back(ParseCell(input, out));
     } else {
+      // §32.3: at the DELAYFILE level, anything besides CELL/SDFVERSION/
+      // DESIGN is either header metadata (DATE, VENDOR, PROGRAM, ...) or
+      // a TIMINGENV section — in either case "unrelated to SystemVerilog
+      // timing" per §32.3, so it is dropped silently with no warning.
       SkipSdfParen(input);
     }
   }
@@ -420,11 +428,23 @@ static TimingCheckKind MapSdfToTcKind(SdfCheckType ct) {
   return TimingCheckKind::kSetup;
 }
 
-void AnnotateSdfToManager(const SdfFile& file, SpecifyManager& mgr,
-                          SdfMtm mtm) {
+SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
+                                         SpecifyManager& mgr, SdfMtm mtm) {
+  SdfAnnotationResult result;
+  // §32.3 sentence 1: surface one warning per piece of SDF data the
+  // parser flagged as unannotatable. Constructs unrelated to
+  // SystemVerilog timing never reach this list (see SdfFile::unannotatable),
+  // so §32.3's silent-ignore rule for TIMINGENV and similar sections is
+  // preserved.
+  for (const auto& kw : file.unannotatable) {
+    result.warnings.push_back("SDF annotator: unable to annotate " + kw +
+                              " construct");
+  }
   // §32.2: backannotation iterates each of the four named categories. The
   // chosen MTM column is applied uniformly so a single invocation produces
-  // a self-consistent timing snapshot.
+  // a self-consistent timing snapshot. §32.3 sentence 4: only categories
+  // mentioned by the SDF file are written, so any pre-existing manager
+  // entry the file does not name is left at its prebackannotation value.
   for (const auto& cell : file.cells) {
     for (const auto& io : cell.iopaths) {
       PathDelay pd;
@@ -461,6 +481,7 @@ void AnnotateSdfToManager(const SdfFile& file, SpecifyManager& mgr,
       mgr.AddInterconnectDelay(std::move(delay));
     }
   }
+  return result;
 }
 
 }  // namespace delta

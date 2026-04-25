@@ -88,6 +88,14 @@ struct SdfFile {
   std::string version;
   std::string design;
   std::vector<SdfCell> cells;
+  // §32.3: SDF data the parser recognised as residing inside one of the
+  // four §32.2 backannotation categories (i.e. clearly related to
+  // SystemVerilog timing) but that it could not turn into one of the
+  // typed entries above. Each string is a short label naming the
+  // construct (e.g. "COND", "PATHPULSE"). The annotator surfaces one
+  // warning per entry. Constructs unrelated to SystemVerilog timing are
+  // not recorded here so they remain silent under §32.3's ignore rule.
+  std::vector<std::string> unannotatable;
 };
 
 // Min/typ/max selection mode (§32.9).
@@ -116,7 +124,18 @@ std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
 // SDF annotation
 // =============================================================================
 
+// §32.3: outcome of a single backannotation pass. `warnings` carries one
+// human-readable string per piece of SDF data the annotator was unable
+// to apply, satisfying the LRM rule that the annotator "shall issue a
+// warning for any data it is unable to annotate." Constructs the
+// annotator deliberately ignored under the same clause's
+// "unrelated to SystemVerilog timing" rule are not represented here.
+struct SdfAnnotationResult {
+  std::vector<std::string> warnings;
+};
+
 // Apply parsed SDF data to a SpecifyManager.
-void AnnotateSdfToManager(const SdfFile& file, SpecifyManager& mgr, SdfMtm mtm);
+SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
+                                         SpecifyManager& mgr, SdfMtm mtm);
 
 }  // namespace delta
