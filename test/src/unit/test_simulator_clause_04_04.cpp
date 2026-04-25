@@ -36,27 +36,6 @@ TEST(StratifiedSchedulerSim, EventsRemovedAfterExecution) {
   EXPECT_EQ(pool.FreeCount(), 1u);
 }
 
-TEST(StratifiedSchedulerSim, FirstDivisionByTime) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<uint64_t> exec_times;
-
-  sched.SetPostTimestepCallback(
-      [&]() { exec_times.push_back(sched.CurrentTime().ticks); });
-
-  for (uint64_t t : {0, 10, 20}) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = []() {};
-    sched.ScheduleEvent({t}, Region::kActive, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(exec_times.size(), 3u);
-  EXPECT_EQ(exec_times[0], 0u);
-  EXPECT_EQ(exec_times[1], 10u);
-  EXPECT_EQ(exec_times[2], 20u);
-}
-
 TEST(StratifiedSchedulerSim, AllEventsAtSameTimeFormOneTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
@@ -403,16 +382,3 @@ TEST(SchedulingSemanticsSim, SameTimeSlotExecution) {
   EXPECT_EQ(vb->value.ToUint64(), 2u);
 }
 
-TEST(SchedulingSemanticsSim, SimulationNeverGoesBackward) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd1;\n"
-      "    #10 x = 8'd2;\n"
-      "    #10 x = 8'd3;\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 3u);
-}

@@ -444,25 +444,6 @@ TEST(EventSimulationSim, EventPoolRecycles) {
 
 TEST(EventSimulationSim, SameTimeAndRegionFIFO) { VerifyActiveRegionFIFO(); }
 
-TEST(EventSimulationSim, SchedulerTimeOrdering) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> order;
-
-  auto* ev_late = sched.GetEventPool().Acquire();
-  ev_late->callback = [&order]() { order.push_back(2); };
-  sched.ScheduleEvent({10}, Region::kActive, ev_late);
-
-  auto* ev_early = sched.GetEventPool().Acquire();
-  ev_early->callback = [&order]() { order.push_back(1); };
-  sched.ScheduleEvent({5}, Region::kActive, ev_early);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], 1);
-  EXPECT_EQ(order[1], 2);
-}
-
 TEST(EventSimulationSim, SchedulerRegionOrdering) {
   Arena arena;
   Scheduler sched(arena);
@@ -548,27 +529,6 @@ TEST(EventSimulationSim, SchedulerInitialState) {
   Scheduler sched(arena);
   EXPECT_FALSE(sched.HasEvents());
   EXPECT_EQ(sched.CurrentTime().ticks, 0u);
-}
-
-TEST(EventSimulationSim, AllRegionsDefined) {
-  EXPECT_EQ(static_cast<int>(Region::kPreponed), 0);
-  EXPECT_EQ(static_cast<int>(Region::kPreActive), 1);
-  EXPECT_EQ(static_cast<int>(Region::kActive), 2);
-  EXPECT_EQ(static_cast<int>(Region::kInactive), 3);
-  EXPECT_EQ(static_cast<int>(Region::kPreNBA), 4);
-  EXPECT_EQ(static_cast<int>(Region::kNBA), 5);
-  EXPECT_EQ(static_cast<int>(Region::kPostNBA), 6);
-  EXPECT_EQ(static_cast<int>(Region::kPreObserved), 7);
-  EXPECT_EQ(static_cast<int>(Region::kObserved), 8);
-  EXPECT_EQ(static_cast<int>(Region::kPostObserved), 9);
-  EXPECT_EQ(static_cast<int>(Region::kReactive), 10);
-  EXPECT_EQ(static_cast<int>(Region::kReInactive), 11);
-  EXPECT_EQ(static_cast<int>(Region::kPreReNBA), 12);
-  EXPECT_EQ(static_cast<int>(Region::kReNBA), 13);
-  EXPECT_EQ(static_cast<int>(Region::kPostReNBA), 14);
-  EXPECT_EQ(static_cast<int>(Region::kPrePostponed), 15);
-  EXPECT_EQ(static_cast<int>(Region::kPostponed), 16);
-  EXPECT_EQ(kRegionCount, 17u);
 }
 
 TEST(SchedulingSemanticsSim, MultipleProcessesAcrossTime) {

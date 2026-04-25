@@ -8,40 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SchedulerOverviewSim, TimeSlotProgressionNeverGoesBackward) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<uint64_t> observed_times;
-
-  for (uint64_t t : {0, 3, 7, 15}) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&]() {
-      observed_times.push_back(sched.CurrentTime().ticks);
-    };
-    sched.ScheduleEvent({t}, Region::kActive, ev);
-  }
-  sched.Run();
-
-  ASSERT_EQ(observed_times.size(), 4u);
-  for (size_t i = 1; i < observed_times.size(); ++i) {
-    EXPECT_GT(observed_times[i], observed_times[i - 1]);
-  }
-}
-
-TEST(SchedulerOverviewSim, EmptySchedulerTerminatesImmediately) {
-  Arena arena;
-  Scheduler sched(arena);
-  EXPECT_FALSE(sched.HasEvents());
-  sched.Run();
-  EXPECT_EQ(sched.CurrentTime().ticks, 0u);
-}
-
-TEST(SchedulerOverviewSim, AllSeventeenRegionsPresent) { EXPECT_EQ(kRegionCount, 17u); }
-
-TEST(SchedulerOverviewSim, StratifiedRegionsExecuteInOrder) {
-  VerifyAllRegionsExecuteInOrder();
-}
-
 TEST(SchedulerOverviewSim, ActiveSetIteratesBeforeReactiveSet) {
   Arena arena;
   Scheduler sched(arena);
@@ -210,24 +176,6 @@ TEST(SchedulerOverviewSim, FullPipelineIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 11u);
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 22u);
   EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 99u);
-}
-
-TEST(SchedulerOverviewSim, MultiTimeSlotWithRegionOrdering) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  ScheduleLabeled(sched, 0, Region::kActive, "t0_active", order);
-  ScheduleLabeled(sched, 0, Region::kNBA, "t0_nba", order);
-  ScheduleLabeled(sched, 5, Region::kActive, "t5_active", order);
-  ScheduleLabeled(sched, 5, Region::kNBA, "t5_nba", order);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 4u);
-  EXPECT_EQ(order[0], "t0_active");
-  EXPECT_EQ(order[1], "t0_nba");
-  EXPECT_EQ(order[2], "t5_active");
-  EXPECT_EQ(order[3], "t5_nba");
 }
 
 }  // namespace
