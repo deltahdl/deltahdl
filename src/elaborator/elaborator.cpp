@@ -220,6 +220,40 @@ void Elaborator::ValidateConfigCellClauses() {
   }
 }
 
+void Elaborator::ValidateConfigHierarchicalRules() {
+  for (auto* cfg : unit_->configs) {
+    // Collect the inst paths that delegate a subhierarchy to another
+    // config (they carry the `:config` suffix).
+    std::vector<std::string_view> delegated;
+    for (auto* rule : cfg->rules) {
+      if (rule->kind == ConfigRuleKind::kInstance && rule->use_config) {
+        delegated.push_back(rule->inst_path);
+      }
+    }
+    // Each instance rule's path must not lie strictly within any
+    // delegated subhierarchy.  An exact match against the delegating
+    // path itself is fine; anything that goes one level deeper is the
+    // §33.4.2 error.
+    for (auto* rule : cfg->rules) {
+      if (rule->kind != ConfigRuleKind::kInstance) continue;
+      auto path = rule->inst_path;
+      for (auto root : delegated) {
+        if (path == root) continue;
+        if (path.size() > root.size() + 1 && path.starts_with(root) &&
+            path[root.size()] == '.') {
+          diag_.Error(
+              cfg->range.start,
+              std::format("instance '{}' in config '{}' lies within "
+                          "subhierarchy '{}' that is delegated to another "
+                          "config",
+                          path, cfg->name, root));
+          break;
+        }
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateAnonymousProgramNameSharing() {
   auto check_scope = [&](const std::vector<ModuleItem*>& items) {
     std::unordered_map<std::string_view, const ModuleItem*> seen;
@@ -788,6 +822,9 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // §33.4.1.4: cell clauses with a library qualifier cannot use a
   // liblist expansion.
   ValidateConfigCellClauses();
+  // §33.4.2: an instance clause may not name a path inside a
+  // subhierarchy delegated to another config.
+  ValidateConfigHierarchicalRules();
   // §24.6: Anonymous program items share the surrounding scope's name space.
   ValidateAnonymousProgramNameSharing();
   // §26.2: Reject package items that are nets with implicit continuous

@@ -60,6 +60,11 @@ class Elaborator {
   /// the cell name cannot use a `liblist` expansion clause.
   void ValidateConfigCellClauses();
 
+  /// §33.4.2: an instance clause cannot specify a hierarchical path
+  /// inside a subhierarchy already delegated to another config via
+  /// `instance ... use ...:config`.
+  void ValidateConfigHierarchicalRules();
+
   /// §24.6: Anonymous program items share the surrounding package or
   /// compilation-unit name space; collisions with that surrounding scope
   /// are an error.
