@@ -974,7 +974,7 @@ static void CollectAllModules(
   }
 }
 
-RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
+void Elaborator::RunPreElaborationValidations() {
   // §3.13: Validate definitions and package name spaces.
   ValidateNameSpaces();
   // §33.4.1.1: validate config design statements (cells must not name
@@ -1028,23 +1028,26 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateForwardClassTypedefs();
 
   ResolveExternModules();
+}
 
-  auto* mod_decl = FindModule(top_module_name);
-  if (!mod_decl) {
-    diag_.Error({}, std::format("top module '{}' not found", top_module_name));
-    return nullptr;
-  }
-
+RtlirDesign* Elaborator::ElaborateTops(
+    const std::vector<ModuleDecl*>& top_decls) {
   auto* design = arena_.Create<RtlirDesign>();
   ParamList empty_params;
   pending_generates_.clear();
   applied_defparams_.clear();
   early_defparam_resolutions_.clear();
-  auto* top = ElaborateModule(mod_decl, empty_params);
-  if (!top) return nullptr;
+
+  for (auto* mod_decl : top_decls) {
+    auto* top = ElaborateModule(mod_decl, empty_params);
+    if (!top) return nullptr;
+    design->top_modules.push_back(top);
+  }
 
   while (true) {
-    ApplyDefparamsRecursively(top);
+    for (auto* top : design->top_modules) {
+      ApplyDefparamsRecursively(top);
+    }
     if (pending_generates_.empty()) break;
     std::vector<PendingGenerate> batch;
     batch.swap(pending_generates_);
@@ -1053,17 +1056,18 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
     }
   }
   VerifyEarlyResolvedDefparams();
-  WarnUnresolvedDefparams(top);
 
-  // §23.11: Bind directives are applied after normal elaboration.
-  ApplyBindDirectives(top);
+  for (auto* top : design->top_modules) {
+    WarnUnresolvedDefparams(top);
+    // §23.11: Bind directives are applied after normal elaboration.
+    ApplyBindDirectives(top);
+    // §25.7.4: Detect duplicate modport exports across modules.
+    ValidateModportExportConflicts(top);
+    // §3.1: Register the full instantiation hierarchy in the design's
+    // module map.
+    CollectAllModules(top, design->all_modules);
+  }
 
-  // §25.7.4: Detect duplicate modport exports across modules.
-  ValidateModportExportConflicts(top);
-
-  design->top_modules.push_back(top);
-  // §3.1: Register the full instantiation hierarchy in the design's module map.
-  CollectAllModules(top, design->all_modules);
   // §3.12.1: CU-scope functions/tasks available to all modules.
   for (auto* item : unit_->cu_items) {
     if (item->kind == ModuleItemKind::kFunctionDecl ||
@@ -1083,6 +1087,37 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   design->cu_class_decls.insert(design->cu_class_decls.end(),
                                 unit_->classes.begin(), unit_->classes.end());
   return design;
+}
+
+RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
+  RunPreElaborationValidations();
+
+  auto* mod_decl = FindModule(top_module_name);
+  if (!mod_decl) {
+    diag_.Error({}, std::format("top module '{}' not found", top_module_name));
+    return nullptr;
+  }
+  return ElaborateTops({mod_decl});
+}
+
+RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
+  RunPreElaborationValidations();
+
+  // §33.5.4: the cells named in the config's design statement are the
+  // top-level modules.  Resolve each cell to its module declaration and
+  // hand them all to the shared elaboration core.
+  std::vector<ModuleDecl*> top_decls;
+  top_decls.reserve(cfg->design_cells.size());
+  for (const auto& [lib, cell] : cfg->design_cells) {
+    auto* md = FindModule(cell);
+    if (!md) {
+      diag_.Error({}, std::format("config '{}' design cell '{}' not found",
+                                  cfg->name, cell));
+      return nullptr;
+    }
+    top_decls.push_back(md);
+  }
+  return ElaborateTops(top_decls);
 }
 
 // §3.12.1: Register CU-scope typedefs, classes, and imports so they are

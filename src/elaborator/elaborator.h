@@ -39,7 +39,21 @@ class Elaborator {
   /// Returns nullptr on failure (diagnostics emitted via DiagEngine).
   RtlirDesign* Elaborate(std::string_view top_module_name);
 
+  /// §33.5.4: Elaborate the design driven by `cfg`'s `design` statement.
+  /// Each cell named in the design statement becomes a top-level module
+  /// of the resulting RtlirDesign, regardless of any uninstantiated
+  /// cells that happen to share the source files.
+  RtlirDesign* Elaborate(const ConfigDecl* cfg);
+
  private:
+  /// Run the one-shot validation passes that must precede any module
+  /// elaboration step, regardless of how the top modules were chosen.
+  void RunPreElaborationValidations();
+
+  /// Build an RtlirDesign rooted at the given top module declarations.
+  /// Shared by both public `Elaborate` overloads.
+  RtlirDesign* ElaborateTops(const std::vector<ModuleDecl*>& top_decls);
+
   /// §3.13: Check definitions and package name spaces for duplicates.
   void ValidateNameSpaces();
 
