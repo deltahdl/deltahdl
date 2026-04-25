@@ -52,6 +52,10 @@ enum class SdfCheckType : uint8_t {
   kWidth,
   kPeriod,
   kSkew,
+  // §32.4.2 Table 32-2 row "(BIDIRECTSKEW v1 v2... → $fullskew(v1,v2)":
+  // SDF's BIDIRECTSKEW has no direct same-named SystemVerilog timing
+  // check; it expands to $fullskew during annotation.
+  kBidirectskew,
   kNochange,
 };
 
@@ -61,8 +65,19 @@ struct SdfTimingCheck {
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
   std::string data_port;
   SpecifyEdge data_edge = SpecifyEdge::kNone;
+  // limit2 carries v2 for the §32.4.2 Table 32-2 two-value kinds:
+  // SETUPHOLD, RECREM, BIDIRECTSKEW, NOCHANGE. Defaulted otherwise.
   SdfDelayValue limit;
-  SdfDelayValue limit2;  // For setuphold/recrem
+  SdfDelayValue limit2;
+  // §32.4.2 paragraph 2: textual condition associated with the reference
+  // signal of the SDF timing check (the SDF analogue of SystemVerilog's
+  // `&&&` scalar timing check condition). Empty when the SDF check
+  // declares no condition; an empty value triggers the LRM's
+  // "shall match all corresponding SystemVerilog timing checks
+  // regardless of whether conditions are present" rule, while a
+  // non-empty value forces an exact match against the SystemVerilog
+  // timing check's stored `condition` text.
+  std::string condition;
 };
 
 // §32.2: SDF specparam value update. Carries the new value the SDF file

@@ -222,6 +222,9 @@ static SdfCheckType MapCheckType(std::string_view name) {
   if (name == "WIDTH") return SdfCheckType::kWidth;
   if (name == "PERIOD") return SdfCheckType::kPeriod;
   if (name == "SKEW") return SdfCheckType::kSkew;
+  // §32.4.2 Table 32-2: BIDIRECTSKEW exists only in SDF; the annotator
+  // routes it to $fullskew per the table.
+  if (name == "BIDIRECTSKEW") return SdfCheckType::kBidirectskew;
   if (name == "NOCHANGE") return SdfCheckType::kNochange;
   return SdfCheckType::kSetup;
 }
@@ -233,17 +236,44 @@ static SdfCheckType MapCheckType(std::string_view name) {
 struct SdfSignalRef {
   std::string port;
   SpecifyEdge edge = SpecifyEdge::kNone;
+  // §32.4.2 paragraph 3: when an SDF timing check signal is wrapped in
+  // a (COND <expr> <port>) form, the wrapped expression text travels
+  // here so the annotator can compare it against the SystemVerilog
+  // timing check's `&&&` condition. Empty when no COND wrapper is
+  // present, leaving the signal unrestricted on condition.
+  std::string condition;
 };
 
 static SdfSignalRef ParseSdfSignal(std::string_view& s) {
   SdfSignalRef ref;
   SkipWhitespace(s);
   if (!s.empty() && s[0] == '(') {
-    // (edge port)
     Expect(s, SdfTokKind::kLParen);
-    auto edge_tok = NextSdfToken(s);
-    if (edge_tok.text == "posedge") ref.edge = SpecifyEdge::kPosedge;
-    if (edge_tok.text == "negedge") ref.edge = SpecifyEdge::kNegedge;
+    auto first_tok = NextSdfToken(s);
+    // §32.4.2 paragraph 3 example (page 928) uses
+    // `(COND !mode (posedge clk))` to attach a condition to a
+    // reference signal. Capture the condition text and then descend
+    // into the wrapped port_instance, which itself may carry an edge.
+    if (first_tok.text == "COND") {
+      ref.condition = ParseSdfConditionText(s);
+      SkipWhitespace(s);
+      if (!s.empty() && s[0] == '(') {
+        Expect(s, SdfTokKind::kLParen);
+        auto edge_tok = NextSdfToken(s);
+        if (edge_tok.text == "posedge") ref.edge = SpecifyEdge::kPosedge;
+        else if (edge_tok.text == "negedge") ref.edge = SpecifyEdge::kNegedge;
+        auto port_tok = NextSdfToken(s);
+        ref.port = std::string(port_tok.text);
+        Expect(s, SdfTokKind::kRParen);
+      } else {
+        auto port_tok = NextSdfToken(s);
+        ref.port = std::string(port_tok.text);
+      }
+      Expect(s, SdfTokKind::kRParen);
+      return ref;
+    }
+    if (first_tok.text == "posedge") ref.edge = SpecifyEdge::kPosedge;
+    if (first_tok.text == "negedge") ref.edge = SpecifyEdge::kNegedge;
     auto port_tok = NextSdfToken(s);
     ref.port = std::string(port_tok.text);
     Expect(s, SdfTokKind::kRParen);
@@ -261,13 +291,48 @@ static SdfSignalRef ParseSdfSignal(std::string_view& s) {
 static SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
   SdfTimingCheck tc;
   tc.check_type = type;
-  auto data = ParseSdfSignal(s);
-  tc.data_port = data.port;
-  tc.data_edge = data.edge;
-  auto ref = ParseSdfSignal(s);
-  tc.ref_port = ref.port;
-  tc.ref_edge = ref.edge;
+  // §32.4.2 Table 32-2 single-signal kinds — WIDTH and PERIOD reference
+  // one signal only and have no separate data port. Every other kind in
+  // the table parses both a data and a reference port.
+  const bool single_signal = (type == SdfCheckType::kWidth ||
+                              type == SdfCheckType::kPeriod);
+  auto first = ParseSdfSignal(s);
+  if (single_signal) {
+    tc.ref_port = first.port;
+    tc.ref_edge = first.edge;
+    // §32.4.2 paragraph 3: a COND wrapper around the single signal
+    // attaches a condition to the only signal the check has, which is
+    // by definition the reference signal (WIDTH and PERIOD have no
+    // separate data signal). Propagate so the matcher sees it.
+    tc.condition = std::move(first.condition);
+  } else {
+    tc.data_port = first.port;
+    tc.data_edge = first.edge;
+    auto ref = ParseSdfSignal(s);
+    tc.ref_port = ref.port;
+    tc.ref_edge = ref.edge;
+    // §32.4.2 paragraph 3: SystemVerilog timing checks attach the `&&&`
+    // condition to the reference event only, so an SDF condition that
+    // appears on the reference signal is the one the matcher consults.
+    // Conditions parsed off the data signal (rare in practice and not
+    // used by the LRM examples) would have nowhere to land in
+    // TimingCheckEntry, so they are dropped here.
+    tc.condition = std::move(ref.condition);
+  }
   tc.limit = ParseDelayVal(s);
+  // §32.4.2 Table 32-2 two-value kinds — SETUPHOLD, RECREM, BIDIRECTSKEW,
+  // NOCHANGE supply v2 in addition to v1. Defaulted to a zero-valued
+  // triplet for the other kinds where the table only references v1.
+  const bool two_value = (type == SdfCheckType::kSetuphold ||
+                          type == SdfCheckType::kRecrem ||
+                          type == SdfCheckType::kBidirectskew ||
+                          type == SdfCheckType::kNochange);
+  if (two_value) {
+    SkipWhitespace(s);
+    if (!s.empty() && s[0] == '(') {
+      tc.limit2 = ParseDelayVal(s);
+    }
+  }
   Expect(s, SdfTokKind::kRParen);
   return tc;
 }
@@ -538,30 +603,149 @@ std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
 // Annotation
 // =============================================================================
 
-static TimingCheckKind MapSdfToTcKind(SdfCheckType ct) {
-  switch (ct) {
-    case SdfCheckType::kSetup:
-      return TimingCheckKind::kSetup;
-    case SdfCheckType::kHold:
-      return TimingCheckKind::kHold;
-    case SdfCheckType::kSetuphold:
-      return TimingCheckKind::kSetuphold;
-    case SdfCheckType::kRecovery:
-      return TimingCheckKind::kRecovery;
-    case SdfCheckType::kRemoval:
-      return TimingCheckKind::kRemoval;
-    case SdfCheckType::kRecrem:
-      return TimingCheckKind::kRecrem;
-    case SdfCheckType::kWidth:
-      return TimingCheckKind::kWidth;
-    case SdfCheckType::kPeriod:
-      return TimingCheckKind::kPeriod;
-    case SdfCheckType::kSkew:
-      return TimingCheckKind::kSkew;
-    case SdfCheckType::kNochange:
-      return TimingCheckKind::kNochange;
+// §32.4.2 Table 32-2: expand one SDF timing check construct into the list
+// of SystemVerilog timing checks the row dictates. Each target carries
+// per-field `set_*` flags that distinguish a real value from the table's
+// "x" marker so the matched SystemVerilog entry's other fields keep
+// their prebackannotation values.
+static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
+    const SdfTimingCheck& tc, SdfMtm mtm) {
+  const uint64_t v1 = SelectMtm(tc.limit, mtm);
+  const uint64_t v2 = SelectMtm(tc.limit2, mtm);
+  std::vector<SdfTcAnnotation> targets;
+  auto push = [&](TimingCheckKind kind) -> SdfTcAnnotation& {
+    SdfTcAnnotation a;
+    a.kind = kind;
+    a.ref_signal = tc.ref_port;
+    a.ref_edge = tc.ref_edge;
+    a.data_signal = tc.data_port;
+    a.data_edge = tc.data_edge;
+    a.condition = tc.condition;
+    targets.push_back(std::move(a));
+    return targets.back();
+  };
+  switch (tc.check_type) {
+    case SdfCheckType::kSetup: {
+      // Table row "(SETUP v1...) → $setup(v1), $setuphold(v1,x)"
+      auto& s = push(TimingCheckKind::kSetup);
+      s.set_limit = true;
+      s.limit = v1;
+      auto& sh = push(TimingCheckKind::kSetuphold);
+      sh.set_limit = true;
+      sh.limit = v1;
+      break;
+    }
+    case SdfCheckType::kHold: {
+      // Table row "(HOLD v1...) → $hold(v1), $setuphold(x,v1)"
+      auto& h = push(TimingCheckKind::kHold);
+      h.set_limit = true;
+      h.limit = v1;
+      auto& sh = push(TimingCheckKind::kSetuphold);
+      sh.set_limit2 = true;
+      sh.limit2 = v1;
+      break;
+    }
+    case SdfCheckType::kSetuphold: {
+      // Table row "(SETUPHOLD v1 v2...) → $setup(v1), $hold(v2),
+      // $setuphold(v1,v2)"
+      auto& s = push(TimingCheckKind::kSetup);
+      s.set_limit = true;
+      s.limit = v1;
+      auto& h = push(TimingCheckKind::kHold);
+      h.set_limit = true;
+      h.limit = v2;
+      auto& sh = push(TimingCheckKind::kSetuphold);
+      sh.set_limit = true;
+      sh.limit = v1;
+      sh.set_limit2 = true;
+      sh.limit2 = v2;
+      break;
+    }
+    case SdfCheckType::kRecovery: {
+      // Table row "(RECOVERY v1...) → $recovery(v1), $recrem(v1,x)"
+      auto& r = push(TimingCheckKind::kRecovery);
+      r.set_limit = true;
+      r.limit = v1;
+      auto& rr = push(TimingCheckKind::kRecrem);
+      rr.set_limit = true;
+      rr.limit = v1;
+      break;
+    }
+    case SdfCheckType::kRemoval: {
+      // Table row "(REMOVAL v1...) → $removal(v1), $recrem(x,v1)"
+      auto& r = push(TimingCheckKind::kRemoval);
+      r.set_limit = true;
+      r.limit = v1;
+      auto& rr = push(TimingCheckKind::kRecrem);
+      rr.set_limit2 = true;
+      rr.limit2 = v1;
+      break;
+    }
+    case SdfCheckType::kRecrem: {
+      // Table row "(RECREM v1 v2...) → $recovery(v1), $removal(v2),
+      // $recrem(v1,v2)"
+      auto& r = push(TimingCheckKind::kRecovery);
+      r.set_limit = true;
+      r.limit = v1;
+      auto& rm = push(TimingCheckKind::kRemoval);
+      rm.set_limit = true;
+      rm.limit = v2;
+      auto& rr = push(TimingCheckKind::kRecrem);
+      rr.set_limit = true;
+      rr.limit = v1;
+      rr.set_limit2 = true;
+      rr.limit2 = v2;
+      break;
+    }
+    case SdfCheckType::kSkew: {
+      // Table row "(SKEW v1...) → $skew(v1), $timeskew(v1)"
+      auto& s = push(TimingCheckKind::kSkew);
+      s.set_limit = true;
+      s.limit = v1;
+      auto& ts = push(TimingCheckKind::kTimeskew);
+      ts.set_limit = true;
+      ts.limit = v1;
+      break;
+    }
+    case SdfCheckType::kBidirectskew: {
+      // Table row "(BIDIRECTSKEW v1 v2...) → $fullskew(v1,v2)"
+      auto& fs = push(TimingCheckKind::kFullskew);
+      fs.set_limit = true;
+      fs.limit = v1;
+      fs.set_limit2 = true;
+      fs.limit2 = v2;
+      break;
+    }
+    case SdfCheckType::kWidth: {
+      // Table row "(WIDTH v1...) → $width(v1,x)" — the x is $width's
+      // glitch threshold, which §31.4.4 stores on a separate field; we
+      // only ever write `limit` so the threshold survives the pass.
+      auto& w = push(TimingCheckKind::kWidth);
+      w.set_limit = true;
+      w.limit = v1;
+      break;
+    }
+    case SdfCheckType::kPeriod: {
+      // Table row "(PERIOD v1...) → $period(v1)"
+      auto& p = push(TimingCheckKind::kPeriod);
+      p.set_limit = true;
+      p.limit = v1;
+      break;
+    }
+    case SdfCheckType::kNochange: {
+      // Table row "(NOCHANGE v1 v2...) → $nochange(v1,v2)" — §31.4.6
+      // names $nochange's two arguments start_edge_offset and
+      // end_edge_offset, which TimingCheckEntry stores on dedicated
+      // signed fields rather than `limit` / `limit2`.
+      auto& nc = push(TimingCheckKind::kNochange);
+      nc.set_start_edge_offset = true;
+      nc.start_edge_offset = static_cast<int64_t>(v1);
+      nc.set_end_edge_offset = true;
+      nc.end_edge_offset = static_cast<int64_t>(v2);
+      break;
+    }
   }
-  return TimingCheckKind::kSetup;
+  return targets;
 }
 
 SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
@@ -605,14 +789,14 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
       mgr.SetSpecparamValue(std::move(value));
     }
     for (const auto& tc : cell.timing_checks) {
-      TimingCheckEntry entry;
-      entry.kind = MapSdfToTcKind(tc.check_type);
-      entry.ref_signal = tc.ref_port;
-      entry.ref_edge = tc.ref_edge;
-      entry.data_signal = tc.data_port;
-      entry.data_edge = tc.data_edge;
-      entry.limit = SelectMtm(tc.limit, mtm);
-      mgr.AddTimingCheck(entry);
+      // §32.4.2: route through Table 32-2 — one SDF construct may produce
+      // several SystemVerilog timing-check annotations, each with its own
+      // per-field "x" mask. Per-target installation goes through
+      // AnnotateSdfTimingCheck so paragraph 2's match-by-property rule
+      // applies uniformly.
+      for (const auto& target : ExpandSdfTimingCheckTargets(tc, mtm)) {
+        mgr.AnnotateSdfTimingCheck(target);
+      }
     }
     for (const auto& ic : cell.interconnects) {
       InterconnectDelay delay;

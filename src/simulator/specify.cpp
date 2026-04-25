@@ -234,6 +234,53 @@ void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
   timing_checks_.push_back(std::move(check));
 }
 
+void SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a) {
+  // §32.4.2 paragraph 2: walk every stored TimingCheckEntry and apply
+  // the per-property matching rule. The kind and the two signal names
+  // are always required to agree — the table itself routes the
+  // annotation by SystemVerilog kind, and a check's signals are part of
+  // its identity. Each of `ref_edge`, `data_edge`, and `condition`
+  // restricts the match only when the SDF check supplied a value;
+  // `kNone` / empty leaves that property unrestricted, satisfying the
+  // sentence-1 "regardless of whether conditions are present" rule.
+  bool matched = false;
+  for (auto& existing : timing_checks_) {
+    if (existing.kind != a.kind) continue;
+    if (existing.ref_signal != a.ref_signal) continue;
+    if (existing.data_signal != a.data_signal) continue;
+    if (a.ref_edge != SpecifyEdge::kNone &&
+        existing.ref_edge != a.ref_edge) continue;
+    if (a.data_edge != SpecifyEdge::kNone &&
+        existing.data_edge != a.data_edge) continue;
+    if (!a.condition.empty() && existing.condition != a.condition) continue;
+    // Per-field write — Table 32-2's "x" cells leave their flag false so
+    // the SystemVerilog entry's existing value survives the pass.
+    if (a.set_limit) existing.limit = a.limit;
+    if (a.set_limit2) existing.limit2 = a.limit2;
+    if (a.set_start_edge_offset)
+      existing.start_edge_offset = a.start_edge_offset;
+    if (a.set_end_edge_offset) existing.end_edge_offset = a.end_edge_offset;
+    matched = true;
+  }
+  if (matched) return;
+  // No SystemVerilog match: append a fresh entry that mirrors the SDF's
+  // identifying tuple so the annotation is still observable. Only the
+  // fields the target asked to set are populated; the rest are left at
+  // their zero-initialised defaults.
+  TimingCheckEntry e;
+  e.kind = a.kind;
+  e.ref_signal = a.ref_signal;
+  e.ref_edge = a.ref_edge;
+  e.data_signal = a.data_signal;
+  e.data_edge = a.data_edge;
+  e.condition = a.condition;
+  if (a.set_limit) e.limit = a.limit;
+  if (a.set_limit2) e.limit2 = a.limit2;
+  if (a.set_start_edge_offset) e.start_edge_offset = a.start_edge_offset;
+  if (a.set_end_edge_offset) e.end_edge_offset = a.end_edge_offset;
+  timing_checks_.push_back(std::move(e));
+}
+
 void SpecifyManager::AnnotateSdf(SdfAnnotation annotation) {
   sdf_annotations_.push_back(std::move(annotation));
 }

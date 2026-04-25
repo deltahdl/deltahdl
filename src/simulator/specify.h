@@ -466,6 +466,33 @@ struct InterconnectDelay {
   uint64_t fall = 0;
 };
 
+// §32.4.2 Table 32-2 expansion target: a single SystemVerilog timing check
+// the annotator should install for one row of an SDF construct's
+// expansion. The identity fields (`kind`, signals, edges, `condition`)
+// describe the matching tuple for the LRM's per-property rule, while the
+// per-field `set_*` flags model the table's "x indicates no value is
+// annotated" marker — when a flag is false the matched SystemVerilog
+// timing check's existing field is left at its prebackannotation value.
+// `start_edge_offset` and `end_edge_offset` carry NOCHANGE's two values
+// because §31.4.6 lands them on dedicated fields rather than `limit` /
+// `limit2`.
+struct SdfTcAnnotation {
+  TimingCheckKind kind = TimingCheckKind::kSetup;
+  std::string ref_signal;
+  SpecifyEdge ref_edge = SpecifyEdge::kNone;
+  std::string data_signal;
+  SpecifyEdge data_edge = SpecifyEdge::kNone;
+  std::string condition;
+  uint64_t limit = 0;
+  uint64_t limit2 = 0;
+  int64_t start_edge_offset = 0;
+  int64_t end_edge_offset = 0;
+  bool set_limit = false;
+  bool set_limit2 = false;
+  bool set_start_edge_offset = false;
+  bool set_end_edge_offset = false;
+};
+
 // =============================================================================
 // SpecifyManager: manages path delays, timing checks, and SDF (§30-32)
 // =============================================================================
@@ -485,6 +512,14 @@ class SpecifyManager {
   // `&&&` condition text so two declarations on the same signals but
   // different conditions remain distinct backannotation targets.
   //
+  // §32.4.2: SDF timing-check annotation is routed through the
+  // AnnotateSdfTimingCheck entry point below rather than AddTimingCheck.
+  // The clause's Table 32-2 expansion and per-property matching rule
+  // make full-tuple identity matching the wrong shape for the SDF flow,
+  // so AddTimingCheck retains its strict-tuple semantics for the
+  // SystemVerilog registration path while the new method implements the
+  // §32.4.2 rules.
+  //
   // §32.4.1 specialises the path-delay branch around the SDF condition.
   // When the incoming entry is nonconditional (empty `condition`,
   // `is_ifnone` false), the LRM requires it to "annotate to all
@@ -498,6 +533,23 @@ class SpecifyManager {
   // either case, when no existing entry matches, the new one is appended.
   void AddPathDelay(PathDelay delay);
   void AddTimingCheck(TimingCheckEntry check);
+
+  // §32.4.2: install one Table 32-2 expansion target onto every matching
+  // SystemVerilog timing check. Matching follows the LRM's per-property
+  // rule: signals must agree, while each of edge/condition acts as a
+  // restriction only when the SDF check specified a value — an SDF
+  // ref_edge / data_edge of `kNone` and an empty `condition` matches any
+  // SystemVerilog value (paragraph 2 sentence 1, "shall match all
+  // corresponding SystemVerilog timing checks regardless of whether
+  // conditions are present"). When matched, only the fields whose
+  // `set_*` flag is true on the target are written, preserving the
+  // table's "x indicates no value is annotated" semantics — the
+  // SystemVerilog entry's other fields keep their prebackannotation
+  // values. When no SystemVerilog entry matches, a fresh
+  // TimingCheckEntry carrying the SDF identity and the requested values
+  // is appended so the annotation is still observable.
+  void AnnotateSdfTimingCheck(const SdfTcAnnotation& annotation);
+
   void AnnotateSdf(SdfAnnotation annotation);
   void SetSpecparamValue(SpecparamValue spec);
   void AddInterconnectDelay(InterconnectDelay delay);
