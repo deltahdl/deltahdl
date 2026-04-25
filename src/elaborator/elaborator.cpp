@@ -1166,6 +1166,73 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
                                              std::move(libs));
   }
 
+  // §33.6.5: an `instance <path> use <lib>.<cfg>:config;` rule
+  // delegates the bindings of <path> and its descendants to a named
+  // inner config.  The inner config's design statement supplies the
+  // exact binding for the named instance; the inner config's other
+  // rules supply bindings for descendants, with instance-clause
+  // paths interpreted relative to the inner config's own top-level
+  // module.  Translate each delegation into entries the existing
+  // FindModule path-matching loops can resolve:
+  //   - the inner design cell becomes a path-scoped use override for
+  //     the outer instance itself (instance_use_overrides_)
+  //   - the inner default liblist becomes an outer-instance liblist
+  //     rule keyed at the delegated path
+  //   - each inner instance liblist rule has its inner-relative path
+  //     rewritten to start at the outer delegated path
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kInstance) continue;
+    if (!rule->use_config) continue;
+    const ConfigDecl* inner = nullptr;
+    for (auto* other : unit_->configs) {
+      if (other != cfg && other->name == rule->use_cell) {
+        inner = other;
+        break;
+      }
+    }
+    if (!inner) {
+      diag_.Error(cfg->range.start,
+                  std::format("config '{}' delegates instance '{}' to unknown "
+                              "config '{}'",
+                              cfg->name, rule->inst_path, rule->use_cell));
+      continue;
+    }
+    if (inner->design_cells.empty()) continue;
+    std::string outer_path(rule->inst_path);
+    const auto& [inner_lib, inner_cell] = inner->design_cells.front();
+    instance_use_overrides_.emplace_back(outer_path, std::string(inner_lib),
+                                         std::string(inner_cell));
+    // Rewrite inner-relative paths to the outer namespace; the inner
+    // top-level module name stands in for the delegated path's root.
+    std::string_view inner_top = inner_cell;
+    for (auto* irule : inner->rules) {
+      if (irule->kind == ConfigRuleKind::kDefault) {
+        if (irule->liblist.empty()) continue;
+        std::vector<std::string> libs;
+        libs.reserve(irule->liblist.size());
+        for (auto lib : irule->liblist) libs.emplace_back(lib);
+        instance_liblist_overrides_.emplace_back(outer_path, std::move(libs));
+      } else if (irule->kind == ConfigRuleKind::kInstance) {
+        if (irule->liblist.empty()) continue;
+        std::string_view ipath = irule->inst_path;
+        bool path_matches =
+            ipath == inner_top ||
+            (ipath.size() > inner_top.size() && ipath.starts_with(inner_top) &&
+             ipath[inner_top.size()] == '.');
+        if (!path_matches) continue;
+        std::string translated = outer_path;
+        if (ipath.size() > inner_top.size()) {
+          translated.append(ipath.substr(inner_top.size()));
+        }
+        std::vector<std::string> libs;
+        libs.reserve(irule->liblist.size());
+        for (auto lib : irule->liblist) libs.emplace_back(lib);
+        instance_liblist_overrides_.emplace_back(std::move(translated),
+                                                 std::move(libs));
+      }
+    }
+  }
+
   // §33.5.4: the cells named in the config's design statement are the
   // top-level modules.  Resolve each cell to its module declaration and
   // hand them all to the shared elaboration core.
@@ -1291,6 +1358,24 @@ void Elaborator::ResolveExternModules() {
 }
 
 ModuleDecl* Elaborator::FindModule(std::string_view name) const {
+  // §33.6.5: when the current instance path exactly matches a path
+  // delegated to an inner config, the inner config's design statement
+  // dictates the binding for the named instance itself.  Resolve to
+  // the recorded (lib, cell) directly and bypass library-order and
+  // liblist filters; the binding is explicit per §33.6.5's "design
+  // statement … defines the exact binding".
+  if (!current_inst_path_.empty()) {
+    for (const auto& [path, ulib, ucell] : instance_use_overrides_) {
+      if (path != current_inst_path_) continue;
+      if (name != ucell) continue;
+      for (auto* mod : unit_->modules) {
+        if (mod->is_extern) continue;
+        if (mod->library == ulib && mod->name == ucell) return mod;
+      }
+      return nullptr;
+    }
+  }
+
   // §33.6.3: "The cell clause selects all cells named m and explicitly
   // binds them to the gate representation in gateLib."  When a config's
   // cell clause names this lookup target, redirect to the named

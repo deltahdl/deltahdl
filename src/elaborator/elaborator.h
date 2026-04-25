@@ -667,6 +667,16 @@ class Elaborator {
   // deeper rule on a sub-path can still rebind the subhierarchy.
   std::vector<std::pair<std::string, std::vector<std::string>>>
       instance_liblist_overrides_;
+  // §33.6.5: when an outer config delegates a subhierarchy to another
+  // config via `instance <path> use <lib>.<cfg>:config;`, the inner
+  // config's design statement is what defines the binding for the
+  // named instance itself.  Each entry stores (outer_path, lib, cell)
+  // where (lib, cell) is the inner config's design cell.  FindModule
+  // matches an entry when current_inst_path_ exactly equals
+  // outer_path and the cell-name being looked up equals cell, and
+  // returns the (lib, cell) module directly.
+  std::vector<std::tuple<std::string, std::string, std::string>>
+      instance_use_overrides_;
   // §33.6.4: hier_path of the instance currently being bound.
   // ElaborateTops seeds it with the top module's name; ElaborateModuleInst
   // pushes/pops the child path around each descent so that FindModule
