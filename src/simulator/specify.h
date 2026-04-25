@@ -20,6 +20,16 @@ struct PathDelay {
   std::string dst_port;
   SpecifyPathKind path_kind = SpecifyPathKind::kParallel;
   SpecifyEdge edge = SpecifyEdge::kNone;
+  // §32.4.1: text of the SystemVerilog `if (cond)` guard on this specify
+  // path declaration, captured verbatim so it can be compared character-
+  // wise against the SDF COND expression. Empty when the declaration is
+  // unconditional or when it is the `ifnone` else-branch (which is
+  // identified by `is_ifnone` instead).
+  std::string condition;
+  // §32.4.1: true when this declaration is the `ifnone` specify path —
+  // the SV else-branch that backannotation reaches via a CONDELSE-
+  // wrapped IOPATH. Mutually exclusive with a non-empty `condition`.
+  bool is_ifnone = false;
   uint8_t delay_count = 1;   // 1, 2, 3, 6, or 12
   uint64_t delays[12] = {};  // A.7.4 transition delays:
   // [0]=rise/t01, [1]=fall/t10, [2]=z/t0z,
@@ -159,6 +169,13 @@ struct TimingCheckEntry {
   int64_t start_edge_offset = 0;
   int64_t end_edge_offset = 0;
   std::string notifier;
+  // §32.4.1: text of the SystemVerilog `&&&` scalar timing-check condition
+  // attached to this entry. Captured verbatim so AddTimingCheck can use it
+  // as part of the identity tuple when routing an SDF backannotation —
+  // §32.4.1 says the annotator looks for timing checks of the same type
+  // where the names and conditions match, and "conditions" means this
+  // expression. Empty when the declaration is unconditional.
+  std::string condition;
 };
 
 // §31.4.2: classify whether a single $timeskew observation interval
@@ -459,15 +476,47 @@ class SpecifyManager {
   // the corresponding SystemVerilog declaration by the entry's identifying
   // fields and replaces the existing value when matched, so that two
   // backannotation passes over the same SDF data converge instead of
-  // accumulating shadows. AddPathDelay matches on (src_port, dst_port);
-  // AddTimingCheck matches on (kind, ref_signal, ref_edge, data_signal,
-  // data_edge); AddInterconnectDelay matches on (src_port, dst_port);
-  // SetSpecparamValue matches on name. Non-matching entries are appended.
+  // accumulating shadows. AddTimingCheck matches on (kind, ref_signal,
+  // ref_edge, data_signal, data_edge, condition); AddInterconnectDelay
+  // matches on (src_port, dst_port); SetSpecparamValue matches on name.
+  // Non-matching entries are appended.
+  //
+  // §32.4.1 sentence 2: the timing-check identity tuple includes the
+  // `&&&` condition text so two declarations on the same signals but
+  // different conditions remain distinct backannotation targets.
+  //
+  // §32.4.1 specialises the path-delay branch around the SDF condition.
+  // When the incoming entry is nonconditional (empty `condition`,
+  // `is_ifnone` false), the LRM requires it to "annotate to all
+  // SystemVerilog specify paths between those same two ports" — so the
+  // delay payload is written into every existing `(src_port, dst_port)`
+  // entry without disturbing each one's own `condition` / `is_ifnone`.
+  // When the incoming entry is conditional (non-empty `condition`) or
+  // ifnone (`is_ifnone` true), only the entry sharing the same identifying
+  // tuple `(src_port, dst_port, condition, is_ifnone)` is replaced — the
+  // LRM's "shall annotate only to ... with the same condition" rule. In
+  // either case, when no existing entry matches, the new one is appended.
   void AddPathDelay(PathDelay delay);
   void AddTimingCheck(TimingCheckEntry check);
   void AnnotateSdf(SdfAnnotation annotation);
   void SetSpecparamValue(SpecparamValue spec);
   void AddInterconnectDelay(InterconnectDelay delay);
+
+  // §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT: install pulse-filter
+  // limits onto every PathDelay between the named ports. The table maps
+  // both rows to "conditional and nonconditional specify path pulse
+  // limits", so this helper walks all stored PathDelays sharing the
+  // (src_port, dst_port) pair regardless of their condition / ifnone
+  // identity. When `is_percent` is true, `reject` and `error` are
+  // percentages in [0, 100] applied as scalings of each matched path's
+  // own `delays[i]`; otherwise they are absolute time values written
+  // straight onto `reject_limit[i]` / `error_limit[i]`. `has_error`
+  // mirrors the §30.7.3 single-vs-paired-value rule: an entry that
+  // supplied only the reject value collapses the X band to zero by
+  // forcing the error limit to equal the reject limit.
+  void AddSdfPulseLimit(std::string_view src, std::string_view dst,
+                        uint64_t reject, bool has_error, uint64_t error,
+                        bool is_percent);
 
   const std::vector<SpecparamValue>& GetSpecparamValues() const {
     return specparam_values_;
@@ -610,17 +659,13 @@ class SpecifyManager {
   }
 
  private:
-  using PathKey = std::pair<std::string, std::string>;
-  struct PairHash {
-    size_t operator()(const PathKey& p) const {
-      auto h1 = std::hash<std::string>{}(p.first);
-      auto h2 = std::hash<std::string>{}(p.second);
-      return h1 ^ (h2 << 1);
-    }
-  };
-
+  // §32.4.1 lets two specify paths share the same source/destination port
+  // pair when their conditions differ, so a (src, dst) → index map cannot
+  // address PathDelays uniquely. The vector is the authoritative store and
+  // every lookup is a linear scan — N is per-cell and small in practice,
+  // and the simpler representation lets AddPathDelay enforce the LRM's
+  // conditional vs nonconditional matching rules in one place.
   std::vector<PathDelay> path_delays_;
-  std::unordered_map<PathKey, size_t, PairHash> path_index_;
   std::vector<TimingCheckEntry> timing_checks_;
   std::vector<SdfAnnotation> sdf_annotations_;
   // §32.2 storage for the two non-path, non-timingcheck backannotation

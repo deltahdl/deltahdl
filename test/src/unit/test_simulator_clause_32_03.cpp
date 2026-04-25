@@ -10,10 +10,11 @@ using namespace delta;
 namespace {
 
 // §32.3 sentence 1: "It shall issue a warning for any data it is unable
-// to annotate." A COND-qualified IOPATH lives inside the DELAY section of
-// a CELL — clearly timing data — but the parser does not yet decode it,
-// so the annotator must surface a warning rather than dropping it on the
-// floor.
+// to annotate." A PATHPULSE construct lives inside the DELAY section of
+// a CELL — clearly timing data, since §32.4.1 Table 32-1 maps it to
+// SystemVerilog specify path pulse limits — but the parser does not yet
+// decode it, so the annotator must surface a warning rather than
+// dropping it on the floor.
 TEST(SdfAnnotator, WarnsForDataItIsUnableToAnnotate) {
   SdfFile file;
   std::string sdf = R"(
@@ -23,7 +24,7 @@ TEST(SdfAnnotator, WarnsForDataItIsUnableToAnnotate) {
         (INSTANCE u1)
         (DELAY
           (ABSOLUTE
-            (COND mode (IOPATH a y (10) (20)))
+            (PATHPULSE a y (3) (5))
           )
         )
       )
@@ -118,7 +119,8 @@ TEST(SdfAnnotator, UnspecifiedPathDelayIsPreserved) {
 
 // §32.3 sentence 1 (quantifier edge case): "any data" — when several
 // distinct unannotatable constructs share a single DELAY section, each
-// must produce its own warning rather than collapsing to one.
+// must produce its own warning rather than collapsing to one. PATHPULSE
+// and DEVICE are both Table 32-1 rows the parser does not yet decode.
 TEST(SdfAnnotator, EachUnannotatableConstructProducesItsOwnWarning) {
   SdfFile file;
   std::string sdf = R"(
@@ -128,8 +130,8 @@ TEST(SdfAnnotator, EachUnannotatableConstructProducesItsOwnWarning) {
         (INSTANCE u1)
         (DELAY
           (ABSOLUTE
-            (COND mode (IOPATH a y (10) (20)))
             (PATHPULSE a y (3) (5))
+            (DEVICE u1 (10) (20))
           )
         )
       )
@@ -194,7 +196,9 @@ TEST(SdfAnnotator, EmptySdfPreservesPopulatedManager) {
 // (sentence 2), an unannotatable construct (sentence 1), an annotated
 // IOPATH (the happy path), while the manager already holds a
 // prebackannotation path delay the file does not name (sentence 4). All
-// three rules must hold simultaneously and independently.
+// three rules must hold simultaneously and independently. PATHPULSE
+// stands in for the unannotatable construct because §32.4.1 has since
+// taken ownership of COND/CONDELSE-wrapped IOPATHs.
 TEST(SdfAnnotator, SilentIgnoredWarnedAndAnnotatedAllCoexist) {
   SpecifyManager mgr;
   PathDelay pre;
@@ -215,7 +219,7 @@ TEST(SdfAnnotator, SilentIgnoredWarnedAndAnnotatedAllCoexist) {
         (INSTANCE u1)
         (DELAY
           (ABSOLUTE
-            (COND mode (IOPATH a y (10) (20)))
+            (PATHPULSE a y (3) (5))
             (IOPATH b z (1) (2))
           )
         )

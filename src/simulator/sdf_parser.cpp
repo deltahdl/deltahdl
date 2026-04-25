@@ -146,6 +146,29 @@ static void SkipSdfParen(std::string_view& s) {
   }
 }
 
+// §32.4.1: capture the SDF condition expression that follows COND. The LRM
+// describes it as a Verilog-style boolean expression, but the only thing
+// the annotator needs is the textual form: it is compared character-wise
+// against the matching SystemVerilog `if (cond)` text on PathDelay. So the
+// parser collects every token up to the next opening parenthesis (which
+// starts the wrapped IOPATH) and joins them with single spaces — preserving
+// inter-token boundaries while throwing away whatever whitespace the SDF
+// source happened to use.
+static std::string ParseSdfConditionText(std::string_view& s) {
+  std::string out;
+  while (true) {
+    SkipWhitespace(s);
+    if (s.empty()) break;
+    if (s[0] == '(') break;
+    auto tok = NextSdfToken(s);
+    if (tok.kind == SdfTokKind::kEof) break;
+    if (tok.kind == SdfTokKind::kRParen) break;
+    if (!out.empty()) out.push_back(' ');
+    out.append(tok.text);
+  }
+  return out;
+}
+
 // =============================================================================
 // Parse IOPATH
 // =============================================================================
@@ -154,6 +177,23 @@ static SdfIopath ParseIopath(std::string_view& s) {
   SdfIopath io;
   io.src_port = ParseSdfPort(s);
   io.dst_port = ParseSdfPort(s);
+  // §32.4.1 Table 32-1 RETAIN rows: a (RETAIN ...) directive may appear
+  // between the destination port and the rise/fall/turnoff delay triplets.
+  // The table allows the simulator to ignore RETAIN entirely. Detect the
+  // construct by peeking for a `(RETAIN` opener and skip the parenthesised
+  // block so the following ParseDelayVal calls land on the actual delay
+  // values rather than mis-tokenising the RETAIN body as a delay number.
+  SkipWhitespace(s);
+  if (s.size() >= 7 && s[0] == '(') {
+    auto save = s;
+    Expect(s, SdfTokKind::kLParen);
+    auto peek = NextSdfToken(s);
+    if (peek.text == "RETAIN") {
+      SkipSdfParen(s);
+    } else {
+      s = save;
+    }
+  }
   io.rise = ParseDelayVal(s);
   SkipWhitespace(s);
   if (!s.empty() && s[0] == '(') {
@@ -236,6 +276,26 @@ static SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
 // Parse DELAY section
 // =============================================================================
 
+// §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT: parse the body of a
+// (PATHPULSE src dst (reject) [(error)]) or PATHPULSEPERCENT block. The
+// caller has already consumed the leading `(` and the keyword token, so
+// this helper expects to see the source/destination ports followed by
+// one or two delay-value triplets, then close the construct's `)`. The
+// returned entry's `is_percent` flag is set by the caller.
+static SdfPulseLimit ParsePulseLimit(std::string_view& s) {
+  SdfPulseLimit pl;
+  pl.src_port = ParseSdfPort(s);
+  pl.dst_port = ParseSdfPort(s);
+  pl.reject = ParseDelayVal(s);
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    pl.error = ParseDelayVal(s);
+    pl.has_error = true;
+  }
+  Expect(s, SdfTokKind::kRParen);
+  return pl;
+}
+
 static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
                               bool increment) {
   // Inside (ABSOLUTE ...) or (INCREMENT ...)
@@ -244,10 +304,68 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
     if (s.empty() || s[0] == ')') break;
     Expect(s, SdfTokKind::kLParen);
     auto kw = NextSdfToken(s);
+    if (kw.text == "PATHPULSE" || kw.text == "PATHPULSEPERCENT") {
+      auto pl = ParsePulseLimit(s);
+      pl.is_percent = (kw.text == "PATHPULSEPERCENT");
+      cell.pulse_limits.push_back(pl);
+      continue;
+    }
     if (kw.text == "IOPATH") {
       auto io = ParseIopath(s);
       io.is_increment = increment;
       cell.iopaths.push_back(io);
+    } else if (kw.text == "COND") {
+      // §32.4.1 Table 32-1 row "(COND (IOPATH...)": the wrapper carries a
+      // condition expression followed by an IOPATH. Capture the condition
+      // text, then descend into the IOPATH and stamp the iopath with it.
+      // A malformed COND that contains no nested IOPATH is treated as an
+      // unannotatable construct so the §32.3 warning channel remains the
+      // single home for things the parser sees but cannot map.
+      std::string cond = ParseSdfConditionText(s);
+      SkipWhitespace(s);
+      if (!s.empty() && s[0] == '(') {
+        Expect(s, SdfTokKind::kLParen);
+        auto inner = NextSdfToken(s);
+        if (inner.text == "IOPATH") {
+          auto io = ParseIopath(s);
+          io.is_increment = increment;
+          io.condition = std::move(cond);
+          cell.iopaths.push_back(io);
+          Expect(s, SdfTokKind::kRParen);  // close COND
+          continue;
+        }
+        // Unknown nested construct under COND — fall through to the
+        // generic skip path so the warning channel still surfaces it.
+        SkipSdfParen(s);
+      }
+      file.unannotatable.emplace_back("COND");
+      // Close the outer COND parens that the surrounding loop expected to
+      // be balanced when it took the leading '('. We may already be on
+      // ')' if the inner branch consumed only the inner pair, so probe
+      // gently rather than insisting on a paren here.
+      SkipWhitespace(s);
+      if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
+    } else if (kw.text == "CONDELSE") {
+      // §32.4.1 Table 32-1 row "(CONDELSE (IOPATH...) → ifnone": no
+      // condition expression — CONDELSE always means "the SV ifnone
+      // specify path between these two ports".
+      SkipWhitespace(s);
+      if (!s.empty() && s[0] == '(') {
+        Expect(s, SdfTokKind::kLParen);
+        auto inner = NextSdfToken(s);
+        if (inner.text == "IOPATH") {
+          auto io = ParseIopath(s);
+          io.is_increment = increment;
+          io.is_ifnone = true;
+          cell.iopaths.push_back(io);
+          Expect(s, SdfTokKind::kRParen);  // close CONDELSE
+          continue;
+        }
+        SkipSdfParen(s);
+      }
+      file.unannotatable.emplace_back("CONDELSE");
+      SkipWhitespace(s);
+      if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
     } else {
       // §32.3: this construct sits inside DELAY — i.e. it is one of the
       // §32.2 path-delay categories — but the parser cannot decode it.
@@ -468,6 +586,12 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
       PathDelay pd;
       pd.src_port = io.src_port;
       pd.dst_port = io.dst_port;
+      // §32.4.1: forward the SDF condition / ifnone flag so AddPathDelay
+      // can route the entry under the LRM's conditional vs nonconditional
+      // matching rules. A bare IOPATH leaves both fields at their defaults
+      // (empty string, false) and dispatches as nonconditional.
+      pd.condition = io.condition;
+      pd.is_ifnone = io.is_ifnone;
       pd.delay_count = 3;
       pd.delays[0] = SelectMtm(io.rise, mtm);
       pd.delays[1] = SelectMtm(io.fall, mtm);
@@ -497,6 +621,16 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
       delay.rise = SelectMtm(ic.rise, mtm);
       delay.fall = SelectMtm(ic.fall, mtm);
       mgr.AddInterconnectDelay(std::move(delay));
+    }
+    for (const auto& pl : cell.pulse_limits) {
+      // §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT: route the parsed
+      // entry through the manager helper that fans the limits across all
+      // matching specify paths, regardless of their condition. The
+      // percent/absolute distinction is preserved on the SdfPulseLimit
+      // and dispatched inside the manager.
+      mgr.AddSdfPulseLimit(pl.src_port, pl.dst_port, SelectMtm(pl.reject, mtm),
+                           pl.has_error, SelectMtm(pl.error, mtm),
+                           pl.is_percent);
     }
   }
   return result;

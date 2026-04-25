@@ -28,6 +28,18 @@ struct SdfIopath {
   SdfDelayValue fall;
   SdfDelayValue turnoff;
   bool is_increment = false;
+  // §32.4.1 Table 32-1 row "(COND (IOPATH...)": text of the SDF condition
+  // expression (e.g. "mode" for `(COND mode (IOPATH ...))`). Empty means
+  // the iopath is nonconditional, which §32.4.1 routes differently from a
+  // conditional one. The annotator compares this against the SystemVerilog
+  // condition text on PathDelay to find a same-condition match.
+  std::string condition;
+  // §32.4.1 Table 32-1 row "(CONDELSE (IOPATH...) → ifnone": the CONDELSE
+  // wrapper carries no expression — its semantics are exclusively to land
+  // on the `ifnone` specify path between the two named ports. Set true by
+  // the parser when it sees CONDELSE; mutually exclusive with `condition`
+  // being non-empty.
+  bool is_ifnone = false;
 };
 
 enum class SdfCheckType : uint8_t {
@@ -72,6 +84,21 @@ struct SdfInterconnect {
   SdfDelayValue fall;
 };
 
+// §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT rows: an SDF entry that
+// updates the per-path pulse-filter limits between two ports. The
+// `is_percent` flag distinguishes the two table rows — absolute reject /
+// error values when false, percentages of the matched PathDelay when
+// true. `has_error` carries the LRM rule that a single-value entry
+// collapses the X band to zero by mirroring reject into error.
+struct SdfPulseLimit {
+  std::string src_port;
+  std::string dst_port;
+  SdfDelayValue reject;
+  SdfDelayValue error;
+  bool has_error = false;
+  bool is_percent = false;
+};
+
 struct SdfCell {
   std::string cell_type;
   std::string instance;
@@ -82,6 +109,9 @@ struct SdfCell {
   // and zero interconnects.
   std::vector<SdfSpecparam> specparams;
   std::vector<SdfInterconnect> interconnects;
+  // §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT entries collected from
+  // the cell's DELAY section.
+  std::vector<SdfPulseLimit> pulse_limits;
 };
 
 struct SdfFile {

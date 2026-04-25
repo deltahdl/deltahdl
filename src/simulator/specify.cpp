@@ -168,35 +168,65 @@ void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
 // =============================================================================
 
 void SpecifyManager::AddPathDelay(PathDelay delay) {
-  // §32.4: backannotation matches each SDF construct to its corresponding
-  // SystemVerilog declaration and replaces the existing value. A path delay
-  // declaration is identified by its source/destination port pair, so a
-  // second write under the same key overwrites the prior entry in place
-  // rather than shadowing it through the index and leaving a stale slot
-  // behind in the vector.
-  PathKey key{delay.src_port, delay.dst_port};
-  auto it = path_index_.find(key);
-  if (it != path_index_.end()) {
-    path_delays_[it->second] = std::move(delay);
+  // §32.4.1: route by the SDF entry's conditional shape. A nonconditional
+  // entry (empty condition and not ifnone) annotates "to all SystemVerilog
+  // specify paths between those same two ports" — every existing PathDelay
+  // sharing the source/destination pair receives the new delay payload
+  // while keeping its own condition / ifnone identity, because the SV
+  // declaration's conditional shape is independent of the SDF entry that
+  // updated it. A conditional or ifnone SDF entry "shall annotate only to
+  // SystemVerilog specify paths between those same two ports with the
+  // same condition" — only the existing entry whose full identifying
+  // tuple matches is replaced. In either case, when nothing matches the
+  // new entry is appended so a fresh declaration can still take effect.
+  const bool sdf_is_nonconditional =
+      delay.condition.empty() && !delay.is_ifnone;
+  if (sdf_is_nonconditional) {
+    bool matched = false;
+    for (auto& existing : path_delays_) {
+      if (existing.src_port == delay.src_port &&
+          existing.dst_port == delay.dst_port) {
+        // Preserve the SV declaration's own conditional identity — the
+        // §32.4.1 rule updates payload, not the matched declaration's
+        // condition.
+        std::string saved_cond = existing.condition;
+        bool saved_ifnone = existing.is_ifnone;
+        existing = delay;
+        existing.condition = std::move(saved_cond);
+        existing.is_ifnone = saved_ifnone;
+        matched = true;
+      }
+    }
+    if (!matched) path_delays_.push_back(std::move(delay));
     return;
   }
-  path_index_[key] = path_delays_.size();
+  for (auto& existing : path_delays_) {
+    if (existing.src_port == delay.src_port &&
+        existing.dst_port == delay.dst_port &&
+        existing.condition == delay.condition &&
+        existing.is_ifnone == delay.is_ifnone) {
+      existing = std::move(delay);
+      return;
+    }
+  }
   path_delays_.push_back(std::move(delay));
 }
 
 void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
-  // §32.4: replace any prior entry whose identifying fields (kind, both
-  // signals, and their edges) match the incoming check, so that successive
-  // backannotation passes converge instead of accumulating duplicates.
-  // Limits, threshold, offsets, and notifier are payload — the fields
-  // checked here are the ones that uniquely name a SystemVerilog timing-
-  // check declaration.
+  // §32.4 + §32.4.1: replace any prior entry whose identifying tuple
+  // matches the incoming check, so that successive backannotation passes
+  // converge instead of accumulating duplicates. The tuple is (kind, both
+  // signals, both edges, condition) — §32.4.1 names "the same type where
+  // the names and conditions match" as the matcher, and the condition
+  // text distinguishes two declarations that share kind+signals+edges but
+  // differ only on the SystemVerilog `&&&` guard.
   for (auto& existing : timing_checks_) {
     if (existing.kind == check.kind &&
         existing.ref_signal == check.ref_signal &&
         existing.ref_edge == check.ref_edge &&
         existing.data_signal == check.data_signal &&
-        existing.data_edge == check.data_edge) {
+        existing.data_edge == check.data_edge &&
+        existing.condition == check.condition) {
       existing = std::move(check);
       return;
     }
@@ -218,6 +248,36 @@ void SpecifyManager::SetSpecparamValue(SpecparamValue spec) {
   specparam_values_.push_back(std::move(spec));
 }
 
+void SpecifyManager::AddSdfPulseLimit(std::string_view src,
+                                       std::string_view dst, uint64_t reject,
+                                       bool has_error, uint64_t error,
+                                       bool is_percent) {
+  // §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT: walk every PathDelay
+  // sharing the source/destination port pair. The table maps both rows to
+  // pulse limits across all conditional and nonconditional siblings, so a
+  // single SDF entry fans out across every such PathDelay regardless of
+  // its condition / ifnone identity.
+  for (auto& pd : path_delays_) {
+    if (pd.src_port != src || pd.dst_port != dst) continue;
+    if (is_percent) {
+      // The percent form scales each transition slot by reject/error
+      // percentages, in the same shape as the §30.7.2 global option.
+      // Silently raise an under-specified error percentage so the X band
+      // is well-formed; a single-value SDF entry collapses the X band by
+      // mirroring reject into error.
+      uint64_t reject_pct = reject;
+      uint64_t error_pct = has_error ? error : reject;
+      if (error_pct < reject_pct) error_pct = reject_pct;
+      for (int i = 0; i < 12; ++i) {
+        pd.reject_limit[i] = pd.delays[i] * reject_pct / 100;
+        pd.error_limit[i] = pd.delays[i] * error_pct / 100;
+      }
+    } else {
+      ApplySdfPulseLimits(pd, reject, has_error, error);
+    }
+  }
+}
+
 void SpecifyManager::AddInterconnectDelay(InterconnectDelay delay) {
   // §32.4: an interconnect-delay entity is identified by its source/
   // destination port pair, so a re-annotation under the same pair replaces
@@ -234,14 +294,25 @@ void SpecifyManager::AddInterconnectDelay(InterconnectDelay delay) {
 
 uint64_t SpecifyManager::GetPathDelay(std::string_view src,
                                       std::string_view dst) const {
-  auto it = path_index_.find({std::string(src), std::string(dst)});
-  if (it == path_index_.end()) return 0;
-  return path_delays_[it->second].delays[0];
+  // Return the first matching declaration's primary slot. With §32.4.1
+  // allowing multiple PathDelays per (src, dst) port pair (one per
+  // condition variant), callers that need a specific conditional sibling
+  // must iterate `GetPathDelays()` themselves; this helper preserves the
+  // simple-case ergonomics that pre-§32.4.1 callers relied on.
+  for (const auto& pd : path_delays_) {
+    if (pd.src_port == src && pd.dst_port == dst) {
+      return pd.delays[0];
+    }
+  }
+  return 0;
 }
 
 bool SpecifyManager::HasPathDelay(std::string_view src,
                                   std::string_view dst) const {
-  return path_index_.count({std::string(src), std::string(dst)}) > 0;
+  for (const auto& pd : path_delays_) {
+    if (pd.src_port == src && pd.dst_port == dst) return true;
+  }
+  return false;
 }
 
 bool SpecifyManager::CheckSetupViolation(std::string_view ref,
