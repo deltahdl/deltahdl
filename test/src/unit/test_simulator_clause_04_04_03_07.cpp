@@ -10,19 +10,6 @@
 
 using namespace delta;
 
-TEST(PliPreReNbaSim, PreReNBARegionExecutesPLICallbacks) {
-  Arena arena;
-  Scheduler sched(arena);
-  int executed = 0;
-
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() { executed++; };
-  sched.ScheduleEvent({0}, Region::kPreReNBA, ev);
-
-  sched.Run();
-  EXPECT_EQ(executed, 1);
-}
-
 TEST(PliPreReNbaSim, PreReNBACanReadValues) {
   Arena arena;
   Scheduler sched(arena);
@@ -78,25 +65,6 @@ TEST(PliPreReNbaSim, PreReNBACanCreateEvents) {
   ASSERT_EQ(order.size(), 2u);
   EXPECT_EQ(order[0], "pre_re_nba");
   EXPECT_EQ(order[1], "created_re_nba");
-}
-
-TEST(PliPreReNbaSim, PreReNBAExecutesBeforeReNBA) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* re_nba = sched.GetEventPool().Acquire();
-  re_nba->callback = [&]() { order.push_back("re_nba"); };
-  sched.ScheduleEvent({0}, Region::kReNBA, re_nba);
-
-  auto* pre_re_nba = sched.GetEventPool().Acquire();
-  pre_re_nba->callback = [&]() { order.push_back("pre_re_nba"); };
-  sched.ScheduleEvent({0}, Region::kPreReNBA, pre_re_nba);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "pre_re_nba");
-  EXPECT_EQ(order[1], "re_nba");
 }
 
 TEST(PliPreReNbaSim, PreReNBAExecutesAfterReInactiveBeforeReNBA) {
