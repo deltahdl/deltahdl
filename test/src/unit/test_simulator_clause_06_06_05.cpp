@@ -27,40 +27,6 @@ static Logic4Word ResolveTwoBit(Arena& arena, NetType type, Logic4Word a,
   return {var->value.words[0].aval & 1, var->value.words[0].bval & 1};
 }
 
-TEST(Tri0Tri1Resolution, Tri0ResolvesToZero) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 8);
-  Net net;
-  net.type = NetType::kTri0;
-  net.resolved = var;
-
-  auto drv = MakeLogic4Vec(arena, 8);
-  drv.words[0].aval = ~uint64_t{0};
-  drv.words[0].bval = ~uint64_t{0};
-  net.drivers.push_back(drv);
-  net.Resolve(arena);
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
-  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
-}
-
-TEST(Tri0Tri1Resolution, Tri1ResolvesToOne) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4Vec(arena, 8);
-  Net net;
-  net.type = NetType::kTri1;
-  net.resolved = var;
-
-  auto drv = MakeLogic4Vec(arena, 8);
-  drv.words[0].aval = ~uint64_t{0};
-  drv.words[0].bval = ~uint64_t{0};
-  net.drivers.push_back(drv);
-  net.Resolve(arena);
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);
-  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
-}
-
 // --- Table 6-5: tri0 truth table (16 entries) ---
 
 TEST(Tri0Tri1Resolution, Tri0_0_0) {

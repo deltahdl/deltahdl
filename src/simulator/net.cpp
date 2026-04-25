@@ -398,8 +398,34 @@ static void ScheduleDecay(Net& net, Scheduler* sched) {
   sched->ScheduleEvent(time, Region::kActive, event);
 }
 
-// §6.6.6/§6.6.4: Handle supply nets and trireg charge retention.
-// Returns true if the net type was handled (caller should return early).
+// §28.15.1: With no overriding source, a tri0 net pulls to 0 at pull strength
+// and a tri1 net pulls to 1 at pull strength. "No overriding source" covers
+// both an empty driver list and drivers contributing only z.
+static bool ResolveTriPullDefault(Net& net, Arena& arena) {
+  if (net.type != NetType::kTri0 && net.type != NetType::kTri1) return false;
+  if (!net.drivers.empty() && !AllDriversZ(net.drivers)) return false;
+
+  auto result = MakeLogic4Vec(arena, net.resolved->value.width);
+  uint64_t fill = (net.type == NetType::kTri1) ? ~uint64_t{0} : 0;
+  for (uint32_t w = 0; w < result.nwords; ++w) {
+    result.words[w] = {fill, 0};
+  }
+  net.resolved->value = result;
+  net.resolved_strength = NetStrength{};
+  if (net.type == NetType::kTri0) {
+    net.resolved_strength.s0_hi = Strength::kPull;
+    net.resolved_strength.s0_lo = Strength::kPull;
+  } else {
+    net.resolved_strength.s1_hi = Strength::kPull;
+    net.resolved_strength.s1_lo = Strength::kPull;
+  }
+  net.resolved->NotifyWatchers();
+  return true;
+}
+
+// §6.6.6/§6.6.4/§28.15.1: Handle supply nets, trireg charge retention, and
+// tri0/tri1 pull defaults. Returns true if the net type was handled
+// (caller should return early).
 static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
   if (net.type == NetType::kSupply0) {
     net.resolved->value = MakeLogic4VecVal(arena, net.resolved->value.width, 0);
@@ -422,6 +448,7 @@ static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
     net.resolved->NotifyWatchers();
     return true;
   }
+  if (ResolveTriPullDefault(net, arena)) return true;
   return false;
 }
 
@@ -433,8 +460,11 @@ bool Net::InCapacitiveState() const {
 
 void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (!resolved) return;
-  // §6.7.3: User-defined nettypes must resolve even with no drivers.
-  if (drivers.empty() && !is_user_nettype) return;
+  // §6.7.3 / §28.15.1: User-defined nettypes and tri0/tri1 must resolve
+  // even with no drivers — the latter pull to their default value/strength.
+  bool needs_resolution_when_undriven =
+      is_user_nettype || type == NetType::kTri0 || type == NetType::kTri1;
+  if (drivers.empty() && !needs_resolution_when_undriven) return;
 
   // Cancel pending decay when trireg exits capacitive state.
   if (type == NetType::kTrireg && !AllDriversZ(drivers)) {
