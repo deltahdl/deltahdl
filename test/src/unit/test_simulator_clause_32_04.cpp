@@ -250,4 +250,138 @@ TEST(SdfParser, ParseMinTypMaxDelay_FallValues) {
   EXPECT_EQ(io.fall.max_val, 6u);
 }
 
+// =============================================================================
+// §32.4 (parent text only) — Mapping of SDF constructs to SystemVerilog
+// =============================================================================
+
+// §32.4 sentence 1: "SDF timing values appear within a CELL declaration,
+// which can contain one or more of DELAY, TIMINGCHECK, and LABEL sections."
+// All three sections must coexist in a single CELL without the parser
+// rejecting the file or losing the surrounding metadata.
+TEST(SdfConstructMapping, CellWithAllThreeSectionsParses) {
+  SdfFile file;
+  std::string sdf = R"(
+    (DELAYFILE
+      (CELL
+        (CELLTYPE "dff")
+        (INSTANCE u1)
+        (DELAY (ABSOLUTE (IOPATH a y (10) (20))))
+        (TIMINGCHECK (SETUP d (posedge clk) (5)))
+        (LABEL (ABSOLUTE (dhigh 60) (dlow 40)))
+      )
+    )
+  )";
+  ASSERT_TRUE(ParseSdf(sdf, file));
+  ASSERT_EQ(file.cells.size(), 1u);
+  EXPECT_EQ(file.cells[0].cell_type, "dff");
+  EXPECT_EQ(file.cells[0].instance, "u1");
+  ASSERT_EQ(file.cells[0].iopaths.size(), 1u);
+  ASSERT_EQ(file.cells[0].timing_checks.size(), 1u);
+}
+
+// §32.4 sentence 1 ("one or more of"): a CELL with only LABEL — no DELAY
+// or TIMINGCHECK — must parse. The LRM does not require any particular
+// section to be present, only that one of the three is.
+TEST(SdfConstructMapping, CellWithOnlyLabelSectionParses) {
+  SdfFile file;
+  std::string sdf = R"(
+    (DELAYFILE
+      (CELL
+        (CELLTYPE "clk_gen")
+        (INSTANCE u2)
+        (LABEL (ABSOLUTE (dhigh 60)))
+      )
+    )
+  )";
+  ASSERT_TRUE(ParseSdf(sdf, file));
+  ASSERT_EQ(file.cells.size(), 1u);
+  EXPECT_EQ(file.cells[0].cell_type, "clk_gen");
+  EXPECT_EQ(file.cells[0].instance, "u2");
+}
+
+// §32.4 sentence 4: "The LABEL section contains new values for specparams."
+// LABEL is therefore SystemVerilog-timing-related data, distinct from the
+// "unrelated" header/TIMINGENV sections that §32.3 silently drops. When the
+// parser cannot yet decode the LABEL contents (the detailed name-value
+// mapping is §32.4.3's responsibility), the annotator must surface the
+// section through §32.3 sentence 1's "unable to annotate" warning channel,
+// not lose it silently.
+TEST(SdfConstructMapping, LabelSectionProducesUnannotatableWarning) {
+  SdfFile file;
+  std::string sdf = R"(
+    (DELAYFILE
+      (CELL
+        (CELLTYPE "clk_gen")
+        (INSTANCE u3)
+        (LABEL (ABSOLUTE (dhigh 60)))
+      )
+    )
+  )";
+  ASSERT_TRUE(ParseSdf(sdf, file));
+
+  SpecifyManager mgr;
+  SdfAnnotationResult result =
+      AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+
+  EXPECT_FALSE(result.warnings.empty());
+}
+
+// §32.4 sentence 5: "Backannotation into SystemVerilog is done by matching
+// SDF constructs to the corresponding SystemVerilog declarations and then
+// replacing the existing SystemVerilog timing values with those from the
+// SDF file." Annotating the same SDF file twice must converge — the second
+// pass replaces the first pass's specparam value rather than producing a
+// second entry for the same name.
+TEST(SdfConstructMapping, ReannotationReplacesSpecparamRatherThanDuplicating) {
+  SdfFile file;
+  SdfCell cell;
+  SdfSpecparam sp;
+  sp.name = "tHold";
+  sp.value.typ_val = 11;
+  cell.specparams.push_back(sp);
+  file.cells.push_back(cell);
+
+  SpecifyManager mgr;
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+  AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+
+  ASSERT_EQ(mgr.GetSpecparamValues().size(), 1u);
+  EXPECT_EQ(mgr.GetSpecparamValues()[0].name, "tHold");
+  EXPECT_EQ(mgr.GetSpecparamValues()[0].value, 11u);
+}
+
+// §32.4 sentence 5 (the "replacing" half): when a second annotation pass
+// supplies a different value for an already-named declaration, the new
+// value must take effect. The same-value convergence test above can be
+// satisfied by a first-write-wins implementation; this companion pins down
+// that the second pass actually overwrites the prior value.
+TEST(SdfConstructMapping, ReannotationOverwritesPriorSpecparamValue) {
+  SpecifyManager mgr;
+
+  SdfFile first;
+  {
+    SdfCell cell;
+    SdfSpecparam sp;
+    sp.name = "tHold";
+    sp.value.typ_val = 11;
+    cell.specparams.push_back(sp);
+    first.cells.push_back(cell);
+  }
+  AnnotateSdfToManager(first, mgr, SdfMtm::kTypical);
+
+  SdfFile second;
+  {
+    SdfCell cell;
+    SdfSpecparam sp;
+    sp.name = "tHold";
+    sp.value.typ_val = 47;
+    cell.specparams.push_back(sp);
+    second.cells.push_back(cell);
+  }
+  AnnotateSdfToManager(second, mgr, SdfMtm::kTypical);
+
+  ASSERT_EQ(mgr.GetSpecparamValues().size(), 1u);
+  EXPECT_EQ(mgr.GetSpecparamValues()[0].value, 47u);
+}
+
 }  // namespace

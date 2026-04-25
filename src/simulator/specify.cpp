@@ -168,12 +168,39 @@ void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
 // =============================================================================
 
 void SpecifyManager::AddPathDelay(PathDelay delay) {
+  // §32.4: backannotation matches each SDF construct to its corresponding
+  // SystemVerilog declaration and replaces the existing value. A path delay
+  // declaration is identified by its source/destination port pair, so a
+  // second write under the same key overwrites the prior entry in place
+  // rather than shadowing it through the index and leaving a stale slot
+  // behind in the vector.
   PathKey key{delay.src_port, delay.dst_port};
+  auto it = path_index_.find(key);
+  if (it != path_index_.end()) {
+    path_delays_[it->second] = std::move(delay);
+    return;
+  }
   path_index_[key] = path_delays_.size();
   path_delays_.push_back(std::move(delay));
 }
 
 void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
+  // §32.4: replace any prior entry whose identifying fields (kind, both
+  // signals, and their edges) match the incoming check, so that successive
+  // backannotation passes converge instead of accumulating duplicates.
+  // Limits, threshold, offsets, and notifier are payload — the fields
+  // checked here are the ones that uniquely name a SystemVerilog timing-
+  // check declaration.
+  for (auto& existing : timing_checks_) {
+    if (existing.kind == check.kind &&
+        existing.ref_signal == check.ref_signal &&
+        existing.ref_edge == check.ref_edge &&
+        existing.data_signal == check.data_signal &&
+        existing.data_edge == check.data_edge) {
+      existing = std::move(check);
+      return;
+    }
+  }
   timing_checks_.push_back(std::move(check));
 }
 
@@ -192,6 +219,16 @@ void SpecifyManager::SetSpecparamValue(SpecparamValue spec) {
 }
 
 void SpecifyManager::AddInterconnectDelay(InterconnectDelay delay) {
+  // §32.4: an interconnect-delay entity is identified by its source/
+  // destination port pair, so a re-annotation under the same pair replaces
+  // the prior rise/fall payload rather than appending a parallel entry.
+  for (auto& existing : interconnect_delays_) {
+    if (existing.src_port == delay.src_port &&
+        existing.dst_port == delay.dst_port) {
+      existing = std::move(delay);
+      return;
+    }
+  }
   interconnect_delays_.push_back(std::move(delay));
 }
 

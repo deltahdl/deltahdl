@@ -277,6 +277,22 @@ static void ParseTimingCheckSection(std::string_view& s, SdfCell& cell) {
 }
 
 // =============================================================================
+// Parse LABEL section
+// =============================================================================
+
+// §32.4: LABEL is one of the three CELL sections SDF timing values appear
+// within (alongside DELAY and TIMINGCHECK), and §32.4 sentence 4 assigns its
+// contents to the specparam-value backannotation category. The detailed
+// mapping from LABEL name-value entries to specparams belongs to §32.4.3;
+// recognising LABEL here lets §32.3 sentence 1 surface a warning for the
+// section's contents instead of silently dropping it the way the parser
+// drops constructs unrelated to SystemVerilog timing.
+static void ParseLabelSection(std::string_view& s, SdfFile& file) {
+  file.unannotatable.emplace_back("LABEL");
+  SkipSdfParen(s);
+}
+
+// =============================================================================
 // Parse a CELL
 // =============================================================================
 
@@ -303,6 +319,8 @@ static SdfCell ParseCell(std::string_view& s, SdfFile& file) {
       Expect(s, SdfTokKind::kRParen);
     } else if (kw.text == "TIMINGCHECK") {
       ParseTimingCheckSection(s, cell);
+    } else if (kw.text == "LABEL") {
+      ParseLabelSection(s, file);
     } else {
       SkipSdfParen(s);
     }

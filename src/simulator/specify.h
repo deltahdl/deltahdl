@@ -455,13 +455,17 @@ struct InterconnectDelay {
 
 class SpecifyManager {
  public:
+  // §32.4: every backannotation entry point matches the incoming entry to
+  // the corresponding SystemVerilog declaration by the entry's identifying
+  // fields and replaces the existing value when matched, so that two
+  // backannotation passes over the same SDF data converge instead of
+  // accumulating shadows. AddPathDelay matches on (src_port, dst_port);
+  // AddTimingCheck matches on (kind, ref_signal, ref_edge, data_signal,
+  // data_edge); AddInterconnectDelay matches on (src_port, dst_port);
+  // SetSpecparamValue matches on name. Non-matching entries are appended.
   void AddPathDelay(PathDelay delay);
   void AddTimingCheck(TimingCheckEntry check);
   void AnnotateSdf(SdfAnnotation annotation);
-  // §32.2: backannotation entry points for the two categories beyond
-  // specify path delays and timing check constraints. The setter for
-  // specparams replaces a prior value with the same name so repeated
-  // backannotations of the same SDF file converge.
   void SetSpecparamValue(SpecparamValue spec);
   void AddInterconnectDelay(InterconnectDelay delay);
 
