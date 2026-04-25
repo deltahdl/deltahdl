@@ -172,6 +172,31 @@ void Elaborator::ValidateConfigDefaultClauses() {
   }
 }
 
+void Elaborator::ValidateConfigInstanceClauses() {
+  for (auto* cfg : unit_->configs) {
+    if (cfg->design_cells.empty()) continue;
+    std::unordered_set<std::string_view> design_cells;
+    for (const auto& [lib, cell] : cfg->design_cells) {
+      design_cells.insert(cell);
+    }
+    for (auto* rule : cfg->rules) {
+      if (rule->kind != ConfigRuleKind::kInstance) continue;
+      std::string_view path = rule->inst_path;
+      size_t dot = path.find('.');
+      std::string_view first =
+          (dot == std::string_view::npos) ? path : path.substr(0, dot);
+      if (!design_cells.contains(first)) {
+        diag_.Error(
+            cfg->range.start,
+            std::format("instance path '{}' in config '{}' does not start "
+                        "at a top-level cell of the config's design "
+                        "statement",
+                        rule->inst_path, cfg->name));
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateAnonymousProgramNameSharing() {
   auto check_scope = [&](const std::vector<ModuleItem*>& items) {
     std::unordered_map<std::string_view, const ModuleItem*> seen;
@@ -735,6 +760,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   ValidateConfigDesignStatements();
   // §33.4.1.2: at most one default clause per config.
   ValidateConfigDefaultClauses();
+  // §33.4.1.3: instance paths must start at a top-level design cell.
+  ValidateConfigInstanceClauses();
   // §24.6: Anonymous program items share the surrounding scope's name space.
   ValidateAnonymousProgramNameSharing();
   // §26.2: Reject package items that are nets with implicit continuous
