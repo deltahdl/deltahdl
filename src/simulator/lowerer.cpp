@@ -138,6 +138,10 @@ struct ContAssignParams {
   // the output's per-side strength is derived per-evaluation from data_input's
   // resolved net strength rather than the static `ds` above.
   bool nonresistive_switch = false;
+  // §28.14: when set, the cont-assign represents an rnmos/rpmos/rcmos switch
+  // and the output's per-side strength is derived per-evaluation from
+  // data_input's resolved net strength reduced one tier per Table 28-8.
+  bool resistive_switch = false;
   const Expr* data_input = nullptr;
 };
 
@@ -245,20 +249,25 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
       }
     }
 
-    // §28.13: an nmos/pmos/cmos output reproduces the data input's per-side
-    // resolved strength, with kSupply collapsed to kStrong. When the data
+    // §28.13/§28.14: an nmos/pmos/cmos or rnmos/rpmos/rcmos output reproduces
+    // the data input's per-side resolved strength, with the appropriate
+    // reduction applied — supply→strong for nonresistive switches, the full
+    // Table 28-8 single-tier drop for resistive switches. When the data
     // terminal is an identifier bound to a net, propagate that net's resolved
     // strength; otherwise (constant operand, variable terminal, no net) keep
     // the cont-assign's static drive strength as a fallback so the switch
     // still drives a meaningful level.
     DriverStrength effective_ds = params.ds;
-    if (params.nonresistive_switch && params.data_input &&
+    if ((params.nonresistive_switch || params.resistive_switch) &&
+        params.data_input &&
         params.data_input->kind == ExprKind::kIdentifier) {
       auto* data_net = ctx.FindNet(params.data_input->text);
       if (data_net) {
         const NetStrength& ns = data_net->resolved_strength;
-        effective_ds.s0 = ReduceNonresistive(ns.s0_hi);
-        effective_ds.s1 = ReduceNonresistive(ns.s1_hi);
+        auto reduce = params.resistive_switch ? &ReduceResistive
+                                              : &ReduceNonresistive;
+        effective_ds.s0 = reduce(ns.s0_hi);
+        effective_ds.s1 = reduce(ns.s1_hi);
       }
     }
 
@@ -957,6 +966,7 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   cap.ds = {ParserStrToStrength(ca.drive_strength0),
             ParserStrToStrength(ca.drive_strength1)};
   cap.nonresistive_switch = ca.from_nonresistive_switch;
+  cap.resistive_switch = ca.from_resistive_switch;
   cap.data_input = ca.data_input;
   cap.delays = {ca.delay, ca.delay_fall, ca.delay_decay};
   cap.width = ca.width;

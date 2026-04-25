@@ -129,9 +129,14 @@ struct RtlirContAssign {
   // §28.13: set when the assignment was synthesized from an nmos/pmos/cmos
   // switch, so the simulator caps the propagated strength at strong.
   bool from_nonresistive_switch = false;
-  // §28.13: the data-input subexpression of the original switch (terminal #1).
-  // The cont-assign coroutine consults this signal's resolved strength at
-  // runtime so the output reproduces it under the supply→strong cap.
+  // §28.14: set when the assignment was synthesized from an rnmos/rpmos/rcmos
+  // switch, so the simulator reduces the propagated strength one tier per
+  // Table 28-8.
+  bool from_resistive_switch = false;
+  // §28.13/§28.14: the data-input subexpression of the original switch
+  // (terminal #1). The cont-assign coroutine consults this signal's resolved
+  // strength at runtime so the output reproduces it under the appropriate
+  // reduction rule.
   Expr* data_input = nullptr;
   std::vector<ResolvedAttribute> attrs;
 };

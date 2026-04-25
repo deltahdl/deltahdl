@@ -1,39 +1,50 @@
+// §28.14
+
 #include <gtest/gtest.h>
 
-#include "model_strength.h"
+#include "common/types.h"
+
+using namespace delta;
 
 namespace {
 
-TEST(StrengthReduction, ResistiveSupplyToPull) {
-  EXPECT_EQ(ReduceResistive(StrengthLevel::kSupply), StrengthLevel::kPull);
+// §28.14 routes every signal that crosses a resistive switch
+// (rnmos/rpmos/rcmos and rtran/rtranif*) through Table 28-8, which collapses
+// the two top driving levels onto pull, drops pull onto weak, folds the two
+// "weak" tiers onto medium, the two "medium" tiers onto small, floors small,
+// and preserves highz. The lowerer applies ReduceResistive per-side at every
+// re-evaluation, so the eight rows below pin the rule the production reducer
+// must encode.
+TEST(StrengthReductionResistive, SupplyReducesToPull) {
+  EXPECT_EQ(ReduceResistive(Strength::kSupply), Strength::kPull);
 }
 
-TEST(StrengthReduction, ResistiveStrongToPull) {
-  EXPECT_EQ(ReduceResistive(StrengthLevel::kStrong), StrengthLevel::kPull);
+TEST(StrengthReductionResistive, StrongReducesToPull) {
+  EXPECT_EQ(ReduceResistive(Strength::kStrong), Strength::kPull);
 }
 
-TEST(StrengthReduction, ResistivePullToWeak) {
-  EXPECT_EQ(ReduceResistive(StrengthLevel::kPull), StrengthLevel::kWeak);
+TEST(StrengthReductionResistive, PullReducesToWeak) {
+  EXPECT_EQ(ReduceResistive(Strength::kPull), Strength::kWeak);
 }
 
-TEST(StrengthReduction, ResistiveLargeToMedium) {
-  EXPECT_EQ(ReduceResistive(StrengthLevel::kLarge), StrengthLevel::kMedium);
+TEST(StrengthReductionResistive, LargeReducesToMedium) {
+  EXPECT_EQ(ReduceResistive(Strength::kLarge), Strength::kMedium);
 }
 
-TEST(StrengthReduction, ResistiveWeakToMedium) {
-  EXPECT_EQ(ReduceResistive(StrengthLevel::kWeak), StrengthLevel::kMedium);
+TEST(StrengthReductionResistive, WeakReducesToMedium) {
+  EXPECT_EQ(ReduceResistive(Strength::kWeak), Strength::kMedium);
 }
 
-TEST(StrengthReduction, ResistiveMediumToSmall) {
-  EXPECT_EQ(ReduceResistive(StrengthLevel::kMedium), StrengthLevel::kSmall);
+TEST(StrengthReductionResistive, MediumReducesToSmall) {
+  EXPECT_EQ(ReduceResistive(Strength::kMedium), Strength::kSmall);
 }
 
-TEST(StrengthReduction, ResistiveSmallToSmall) {
-  EXPECT_EQ(ReduceResistive(StrengthLevel::kSmall), StrengthLevel::kSmall);
+TEST(StrengthReductionResistive, SmallStaysSmall) {
+  EXPECT_EQ(ReduceResistive(Strength::kSmall), Strength::kSmall);
 }
 
-TEST(StrengthReduction, ResistiveHighzToHighz) {
-  EXPECT_EQ(ReduceResistive(StrengthLevel::kHighz), StrengthLevel::kHighz);
+TEST(StrengthReductionResistive, HighzStaysHighz) {
+  EXPECT_EQ(ReduceResistive(Strength::kHighz), Strength::kHighz);
 }
 
 }  // namespace

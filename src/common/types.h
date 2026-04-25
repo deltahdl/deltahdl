@@ -80,6 +80,12 @@ struct StrengthVal {
 /// returned unchanged.
 Strength ReduceNonresistive(Strength input);
 
+/// §28.14: a strength passing through any of the resistive switches —
+/// rnmos/rpmos/rcmos and rtran/rtranif0/rtranif1 — is reduced one tier per
+/// Table 28-8 (supply→pull, strong→pull, pull→weak, large→medium,
+/// weak→medium, medium→small, small→small, highz→highz).
+Strength ReduceResistive(Strength input);
+
 // --- Simulation time ---
 
 struct SimTime {

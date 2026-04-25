@@ -117,6 +117,32 @@ Strength ReduceNonresistive(Strength input) {
   return input == Strength::kSupply ? Strength::kStrong : input;
 }
 
+// --- Strength reduction (§28.14) ---
+
+Strength ReduceResistive(Strength input) {
+  // Table 28-8 collapses supply onto pull (alongside strong), folds the two
+  // weak-driving levels (pull→weak, weak→medium), and the two charge-storage
+  // levels above small (large→medium, medium→small). Small floors at small,
+  // and highz is preserved.
+  switch (input) {
+    case Strength::kSupply:
+    case Strength::kStrong:
+      return Strength::kPull;
+    case Strength::kPull:
+      return Strength::kWeak;
+    case Strength::kLarge:
+    case Strength::kWeak:
+      return Strength::kMedium;
+    case Strength::kMedium:
+      return Strength::kSmall;
+    case Strength::kSmall:
+      return Strength::kSmall;
+    case Strength::kHighz:
+      return Strength::kHighz;
+  }
+  return input;
+}
+
 // --- Timescale ---
 
 bool ParseTimeUnitStr(std::string_view str, TimeUnit& out) {
