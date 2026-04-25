@@ -321,6 +321,15 @@ static void ComputeSingleBitStrength(
     out.s0_hi = out.s0_lo = s;
   } else if (m.val == 1) {
     out.s1_hi = out.s1_lo = s;
+  } else if (m.val == 2 && (net_type == NetType::kWand ||
+                            net_type == NetType::kTriand ||
+                            net_type == NetType::kWor ||
+                            net_type == NetType::kTrior)) {
+    // §28.12.4: when wired AND/OR produces an x (e.g., wand of 1 and x), the
+    // result carries the strength of the combined signals. x lives on both
+    // sides of the strength scale, so record the same single level on each.
+    out.s0_hi = out.s0_lo = s;
+    out.s1_hi = out.s1_lo = s;
   }
 }
 

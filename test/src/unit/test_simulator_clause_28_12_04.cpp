@@ -329,6 +329,117 @@ TEST(StrengthResolution, WorZeroOrXResolvesToX) {
   EXPECT_EQ(var->value.words[0].bval, 1u);
 }
 
+// Strength-preservation rule for the defined-value outcome of wired AND.
+// After wand resolves a strong-1 vs strong-0 conflict to 0 via the AND of
+// values, the result must carry the combined signals' strength on the
+// value-0 side of the scale and leave the value-1 side empty. Pairs with
+// WandOneAndXRecordsCombinedStrength to cover both the defined-value and
+// the x-value outcomes of the same rule.
+TEST(StrengthResolution, WandConflictResultRecordsStrengthOnZeroSide) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWand;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
+}
+
+// Mirror for wor: a same-strength conflict resolved through the OR of values
+// produces 1 at the combined strength on the value-1 side; the value-0 side
+// stays empty.
+TEST(StrengthResolution, WorConflictResultRecordsStrengthOnOneSide) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWor;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kHighz);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
+}
+
+// §28.12.4 says "the strength of the result is the same as the strength of
+// the combined signals in both cases". When wand wired-AND of 1 and x
+// produces x, the resolved strength must still record the input strength on
+// both sides of the scale (x lives on both sides), not stay at HiZ.
+TEST(StrengthResolution, WandOneAndXRecordsCombinedStrength) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWand;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 1));
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+
+  auto x_val = MakeLogic4Vec(arena, 1);
+  x_val.words[0].aval = 0;
+  x_val.words[0].bval = 1;
+  net.drivers.push_back(x_val);
+  net.driver_strengths.push_back({Strength::kStrong, Strength::kStrong});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kStrong);
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
+}
+
+// Mirror for wor: 0 OR x at equal strength resolves to x; the resolved
+// strength must record the input strength on both sides.
+TEST(StrengthResolution, WorZeroOrXRecordsCombinedStrength) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 1);
+  Net net;
+  net.type = NetType::kWor;
+  net.resolved = var;
+
+  net.drivers.push_back(MakeLogic4VecVal(arena, 1, 0));
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+
+  auto x_val = MakeLogic4Vec(arena, 1);
+  x_val.words[0].aval = 0;
+  x_val.words[0].bval = 1;
+  net.drivers.push_back(x_val);
+  net.driver_strengths.push_back({Strength::kPull, Strength::kPull});
+  net.Resolve(arena);
+
+  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kPull);
+  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kPull);
+  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
+}
+
 // §28.12.4 names "multiple drivers" without bounding the count at two.
 // Three same-strength wand drivers (1, 1, 0) must fold as an and gate:
 // AND(1,1,0) = 0.
