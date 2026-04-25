@@ -544,7 +544,14 @@ class SpecifyManager {
   // tuple `(src_port, dst_port, condition, is_ifnone)` is replaced — the
   // LRM's "shall annotate only to ... with the same condition" rule. In
   // either case, when no existing entry matches, the new one is appended.
-  void AddPathDelay(PathDelay delay);
+  // §32.5 example 2: `preserve_pulse_limits` is true when the SDF source
+  // wrote the IOPATH in extended form with empty parens for every
+  // reject/error slot, signalling "hold the current values". The §32.4.1
+  // identity dispatch still selects which entries match, but each
+  // matched entry's existing reject_limit / error_limit survive the
+  // overwrite. Defaulted to false so the simple-form IOPATH path and
+  // every existing call site keep their default-reset semantics.
+  void AddPathDelay(PathDelay delay, bool preserve_pulse_limits = false);
   void AddTimingCheck(TimingCheckEntry check);
 
   // §32.4.2: install one Table 32-2 expansion target onto every matching

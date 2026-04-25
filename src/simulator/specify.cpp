@@ -167,7 +167,7 @@ void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
 // SpecifyManager
 // =============================================================================
 
-void SpecifyManager::AddPathDelay(PathDelay delay) {
+void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
   // §32.4.1: route by the SDF entry's conditional shape. A nonconditional
   // entry (empty condition and not ifnone) annotates "to all SystemVerilog
   // specify paths between those same two ports" — every existing PathDelay
@@ -179,6 +179,13 @@ void SpecifyManager::AddPathDelay(PathDelay delay) {
   // same condition" — only the existing entry whose full identifying
   // tuple matches is replaced. In either case, when nothing matches the
   // new entry is appended so a fresh declaration can still take effect.
+  //
+  // §32.5 example 2: when the caller asked to preserve pulse limits,
+  // each matched entry's existing reject_limit / error_limit are
+  // snapshotted before the overwrite and restored afterwards, so an
+  // extended-form IOPATH with empty pulse-limit parens can update the
+  // delays without disturbing whatever a prior PATHPULSE or
+  // PATHPULSEPERCENT installed.
   const bool sdf_is_nonconditional =
       delay.condition.empty() && !delay.is_ifnone;
   if (sdf_is_nonconditional) {
@@ -191,9 +198,23 @@ void SpecifyManager::AddPathDelay(PathDelay delay) {
         // condition.
         std::string saved_cond = existing.condition;
         bool saved_ifnone = existing.is_ifnone;
+        uint64_t saved_reject[12];
+        uint64_t saved_error[12];
+        if (preserve_pulse_limits) {
+          for (int i = 0; i < 12; ++i) {
+            saved_reject[i] = existing.reject_limit[i];
+            saved_error[i] = existing.error_limit[i];
+          }
+        }
         existing = delay;
         existing.condition = std::move(saved_cond);
         existing.is_ifnone = saved_ifnone;
+        if (preserve_pulse_limits) {
+          for (int i = 0; i < 12; ++i) {
+            existing.reject_limit[i] = saved_reject[i];
+            existing.error_limit[i] = saved_error[i];
+          }
+        }
         matched = true;
       }
     }
@@ -205,7 +226,21 @@ void SpecifyManager::AddPathDelay(PathDelay delay) {
         existing.dst_port == delay.dst_port &&
         existing.condition == delay.condition &&
         existing.is_ifnone == delay.is_ifnone) {
+      uint64_t saved_reject[12];
+      uint64_t saved_error[12];
+      if (preserve_pulse_limits) {
+        for (int i = 0; i < 12; ++i) {
+          saved_reject[i] = existing.reject_limit[i];
+          saved_error[i] = existing.error_limit[i];
+        }
+      }
       existing = std::move(delay);
+      if (preserve_pulse_limits) {
+        for (int i = 0; i < 12; ++i) {
+          existing.reject_limit[i] = saved_reject[i];
+          existing.error_limit[i] = saved_error[i];
+        }
+      }
       return;
     }
   }
@@ -348,9 +383,35 @@ void SpecifyManager::AddSdfPulseLimit(std::string_view src,
 }
 
 void SpecifyManager::AddInterconnectDelay(InterconnectDelay delay) {
-  // §32.4: an interconnect-delay entity is identified by its source/
-  // destination port pair, so a re-annotation under the same pair replaces
-  // the prior rise/fall payload rather than appending a parallel entry.
+  // §32.5 example 5: "An INTERCONNECT annotation followed by a PORT
+  // annotation shall cause the INTERCONNECT annotation to be
+  // overwritten." A PORT (or NETDELAY) entry carries no source port —
+  // its semantics are "the delay from all sources on the net to that
+  // load" — so installing one must wipe every prior interconnect delay
+  // landing on the same load, regardless of whether each prior was a
+  // PORT baseline or a source-specific INTERCONNECT override. The §32.5
+  // load-isolation companion still holds: only entries whose dst_port
+  // matches the incoming load are removed, leaving unrelated loads
+  // intact.
+  if (delay.src_port.empty()) {
+    interconnect_delays_.erase(
+        std::remove_if(interconnect_delays_.begin(),
+                       interconnect_delays_.end(),
+                       [&](const InterconnectDelay& existing) {
+                         return existing.dst_port == delay.dst_port;
+                       }),
+        interconnect_delays_.end());
+    interconnect_delays_.push_back(std::move(delay));
+    return;
+  }
+  // §32.4: an INTERCONNECT-shaped entry is identified by its source/
+  // destination port pair, so a re-annotation under the same pair
+  // replaces the prior rise/fall payload rather than appending a
+  // parallel entry. §32.5 example 4 ("PORT followed by INTERCONNECT")
+  // is satisfied here because a prior PORT baseline carries an empty
+  // source and therefore does not collide with this branch's
+  // (src, dst) tuple — the PORT entry is left in place beside the new
+  // source-specific override.
   for (auto& existing : interconnect_delays_) {
     if (existing.src_port == delay.src_port &&
         existing.dst_port == delay.dst_port) {

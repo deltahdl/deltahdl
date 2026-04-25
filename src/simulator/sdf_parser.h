@@ -40,6 +40,26 @@ struct SdfIopath {
   // the parser when it sees CONDELSE; mutually exclusive with `condition`
   // being non-empty.
   bool is_ifnone = false;
+  // §32.5 examples 2 and 3: the SDF grammar admits an extended IOPATH
+  // shape `((delay) (reject) (error))` per direction, where any of the
+  // three inner groups may be empty parens to "hold the current values
+  // of the pulse limits". The simple form `(delay) (delay)` leaves
+  // `extended_form` false; the parser flips it true when it sees the
+  // nested triplet, and the *_present flags below distinguish supplied
+  // values from the LRM's empty-parens "preserve" marker. The annotator
+  // routes the extended form through a preservation-aware code path so
+  // a prior PATHPULSE survives an IOPATH with empty pulse-limit slots.
+  bool extended_form = false;
+  bool rise_delay_present = true;
+  bool fall_delay_present = true;
+  SdfDelayValue rise_reject;
+  bool rise_reject_present = false;
+  SdfDelayValue rise_error;
+  bool rise_error_present = false;
+  SdfDelayValue fall_reject;
+  bool fall_reject_present = false;
+  SdfDelayValue fall_error;
+  bool fall_error_present = false;
 };
 
 enum class SdfCheckType : uint8_t {
@@ -133,6 +153,27 @@ struct SdfPulseLimit {
   bool is_percent = false;
 };
 
+// §32.5 sentence 1: "SDF annotation is an ordered process. The constructs
+// from the SDF file are annotated in their order of occurrence." Within a
+// DELAY section the parser may interleave IOPATH, PATHPULSE, INTERCONNECT,
+// PORT, and NETDELAY entries, and the LRM examples on page 929-930 hinge
+// on those entries being applied in the order they appear (a PATHPULSE
+// followed by an IOPATH overwrites the former, an INTERCONNECT followed
+// by a PORT is overwritten by the latter, and so on). The category
+// vectors below preserve the parsed entries by kind so existing readers
+// can still inspect them; this companion vector records the source order
+// the annotator must walk to satisfy §32.5.
+enum class SdfDelayEntryKind : uint8_t {
+  kIopath,
+  kPulseLimit,
+  kInterconnect,
+};
+
+struct SdfDelayEntryRef {
+  SdfDelayEntryKind kind = SdfDelayEntryKind::kIopath;
+  uint32_t index = 0;  // index into the matching cell vector
+};
+
 struct SdfCell {
   std::string cell_type;
   std::string instance;
@@ -146,6 +187,12 @@ struct SdfCell {
   // §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT entries collected from
   // the cell's DELAY section.
   std::vector<SdfPulseLimit> pulse_limits;
+  // §32.5 source-order trail through the DELAY section. Each ref points
+  // back into one of `iopaths`, `pulse_limits`, or `interconnects`, in
+  // the order the parser saw them. Empty for cells built programmatically
+  // by tests; AnnotateSdfToManager falls back to a category-by-category
+  // derived order in that case.
+  std::vector<SdfDelayEntryRef> delay_entry_order;
 };
 
 struct SdfFile {

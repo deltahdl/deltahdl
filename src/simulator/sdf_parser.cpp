@@ -173,6 +173,88 @@ static std::string ParseSdfConditionText(std::string_view& s) {
 // Parse IOPATH
 // =============================================================================
 
+// §32.5 examples 2 and 3: an extended-form IOPATH direction is
+// `((delay) (reject) (error))` where any of the three inner groups may
+// be empty parens. ParseDelayValOrEmpty consumes one such inner group:
+// it always reads the surrounding `(` and `)`, and reports through
+// `*present` whether a number was actually inside. An empty group leaves
+// the returned SdfDelayValue at its zero-initialised default; the
+// annotator consults the matching `*_present` flag rather than the
+// numeric value to honour the LRM's "hold the current values" rule.
+static SdfDelayValue ParseDelayValOrEmpty(std::string_view& s, bool* present) {
+  SdfDelayValue dv;
+  *present = false;
+  if (!Expect(s, SdfTokKind::kLParen)) return dv;
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == ')') {
+    Expect(s, SdfTokKind::kRParen);
+    return dv;
+  }
+  auto first = NextSdfToken(s);
+  if (first.kind == SdfTokKind::kNumber) {
+    dv.min_val = first.num_val;
+    dv.typ_val = first.num_val;
+    dv.max_val = first.num_val;
+    *present = true;
+    SkipWhitespace(s);
+    if (!s.empty() && s[0] == ':') {
+      Expect(s, SdfTokKind::kColon);
+      auto typ = NextSdfToken(s);
+      if (typ.kind == SdfTokKind::kNumber) dv.typ_val = typ.num_val;
+      Expect(s, SdfTokKind::kColon);
+      auto max_tok = NextSdfToken(s);
+      if (max_tok.kind == SdfTokKind::kNumber) dv.max_val = max_tok.num_val;
+    }
+  }
+  Expect(s, SdfTokKind::kRParen);
+  return dv;
+}
+
+// §32.5 examples 2 and 3: an extended-form direction triplet
+// `((delay) (reject) (error))`. The outer parens wrap up to three inner
+// groups in order; missing trailing groups are treated as absent.
+struct ExtendedIopathDir {
+  SdfDelayValue delay;
+  bool delay_present = false;
+  SdfDelayValue reject;
+  bool reject_present = false;
+  SdfDelayValue error;
+  bool error_present = false;
+};
+
+static ExtendedIopathDir ParseExtendedDirection(std::string_view& s) {
+  ExtendedIopathDir d;
+  if (!Expect(s, SdfTokKind::kLParen)) return d;
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    d.delay = ParseDelayValOrEmpty(s, &d.delay_present);
+  }
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    d.reject = ParseDelayValOrEmpty(s, &d.reject_present);
+  }
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    d.error = ParseDelayValOrEmpty(s, &d.error_present);
+  }
+  Expect(s, SdfTokKind::kRParen);
+  return d;
+}
+
+// §32.5 examples 2 and 3: the SDF source is in extended IOPATH form when
+// the first character inside the leading direction paren is itself a `(`,
+// signalling the nested `((delay) (reject) (error))` shape. The simple
+// form has a digit (or `:`) there. Peek without consuming so the caller
+// can dispatch to the right per-direction parser.
+static bool LooksLikeExtendedIopathDirection(std::string_view s) {
+  if (s.empty() || s[0] != '(') return false;
+  size_t i = 1;
+  while (i < s.size() && (std::isspace(static_cast<unsigned char>(s[i])) != 0)) {
+    ++i;
+  }
+  return i < s.size() && s[i] == '(';
+}
+
 static SdfIopath ParseIopath(std::string_view& s) {
   SdfIopath io;
   io.src_port = ParseSdfPort(s);
@@ -194,15 +276,53 @@ static SdfIopath ParseIopath(std::string_view& s) {
       s = save;
     }
   }
-  io.rise = ParseDelayVal(s);
+
   SkipWhitespace(s);
-  if (!s.empty() && s[0] == '(') {
-    io.fall = ParseDelayVal(s);
-  }
-  // Skip to closing paren of IOPATH
-  SkipWhitespace(s);
-  if (!s.empty() && s[0] == '(') {
-    io.turnoff = ParseDelayVal(s);
+  io.extended_form = LooksLikeExtendedIopathDirection(s);
+  if (io.extended_form) {
+    // §32.5 example 3 lays out the extended form per direction:
+    // `((delay) (reject) (error))`. Read up to three directions
+    // (rise, fall, turnoff) and copy their components onto the
+    // SdfIopath; absent groups stay at the zero-initialised default
+    // and the matching `*_present` flag tells the annotator which
+    // slots received a value.
+    auto rise_dir = ParseExtendedDirection(s);
+    if (rise_dir.delay_present) io.rise = rise_dir.delay;
+    io.rise_delay_present = rise_dir.delay_present;
+    io.rise_reject = rise_dir.reject;
+    io.rise_reject_present = rise_dir.reject_present;
+    io.rise_error = rise_dir.error;
+    io.rise_error_present = rise_dir.error_present;
+    SkipWhitespace(s);
+    if (!s.empty() && s[0] == '(') {
+      auto fall_dir = ParseExtendedDirection(s);
+      if (fall_dir.delay_present) io.fall = fall_dir.delay;
+      io.fall_delay_present = fall_dir.delay_present;
+      io.fall_reject = fall_dir.reject;
+      io.fall_reject_present = fall_dir.reject_present;
+      io.fall_error = fall_dir.error;
+      io.fall_error_present = fall_dir.error_present;
+    }
+    SkipWhitespace(s);
+    if (!s.empty() && s[0] == '(') {
+      auto turnoff_dir = ParseExtendedDirection(s);
+      // The §32.5 examples don't exercise turnoff pulse-limit
+      // components; only the delay value is forwarded so the existing
+      // simple-form turnoff handling continues to work, while any
+      // turnoff reject/error slot the source supplied is silently
+      // accepted but not propagated onto the path.
+      if (turnoff_dir.delay_present) io.turnoff = turnoff_dir.delay;
+    }
+  } else {
+    io.rise = ParseDelayVal(s);
+    SkipWhitespace(s);
+    if (!s.empty() && s[0] == '(') {
+      io.fall = ParseDelayVal(s);
+    }
+    SkipWhitespace(s);
+    if (!s.empty() && s[0] == '(') {
+      io.turnoff = ParseDelayVal(s);
+    }
   }
   Expect(s, SdfTokKind::kRParen);
   return io;
@@ -406,6 +526,18 @@ static SdfPulseLimit ParsePulseLimit(std::string_view& s) {
   return pl;
 }
 
+// §32.5: append the just-parsed entry to the cell's source-order trail
+// so the annotator can replay the DELAY section in the order the parser
+// saw the constructs. Centralised so each push_back into a typed vector
+// stays paired with the corresponding order record.
+static void RecordDelayEntry(SdfCell& cell, SdfDelayEntryKind kind,
+                             size_t index) {
+  SdfDelayEntryRef ref;
+  ref.kind = kind;
+  ref.index = static_cast<uint32_t>(index);
+  cell.delay_entry_order.push_back(ref);
+}
+
 static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
                               bool increment) {
   // Inside (ABSOLUTE ...) or (INCREMENT ...)
@@ -418,6 +550,8 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
       auto pl = ParsePulseLimit(s);
       pl.is_percent = (kw.text == "PATHPULSEPERCENT");
       cell.pulse_limits.push_back(pl);
+      RecordDelayEntry(cell, SdfDelayEntryKind::kPulseLimit,
+                       cell.pulse_limits.size() - 1);
       continue;
     }
     // §32.4.4 Table 32-3: INTERCONNECT/PORT/NETDELAY all map to interconnect
@@ -425,22 +559,30 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
     // to backannotation, not the §32.3 unannotatable warning channel.
     if (kw.text == "INTERCONNECT") {
       cell.interconnects.push_back(ParseInterconnectEntry(s));
+      RecordDelayEntry(cell, SdfDelayEntryKind::kInterconnect,
+                       cell.interconnects.size() - 1);
       continue;
     }
     if (kw.text == "PORT") {
       cell.interconnects.push_back(
           ParseLoadOnlyInterconnect(s, SdfInterconnectKind::kPort));
+      RecordDelayEntry(cell, SdfDelayEntryKind::kInterconnect,
+                       cell.interconnects.size() - 1);
       continue;
     }
     if (kw.text == "NETDELAY") {
       cell.interconnects.push_back(
           ParseLoadOnlyInterconnect(s, SdfInterconnectKind::kNetdelay));
+      RecordDelayEntry(cell, SdfDelayEntryKind::kInterconnect,
+                       cell.interconnects.size() - 1);
       continue;
     }
     if (kw.text == "IOPATH") {
       auto io = ParseIopath(s);
       io.is_increment = increment;
       cell.iopaths.push_back(io);
+      RecordDelayEntry(cell, SdfDelayEntryKind::kIopath,
+                       cell.iopaths.size() - 1);
     } else if (kw.text == "COND") {
       // §32.4.1 Table 32-1 row "(COND (IOPATH...)": the wrapper carries a
       // condition expression followed by an IOPATH. Capture the condition
@@ -458,6 +600,8 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
           io.is_increment = increment;
           io.condition = std::move(cond);
           cell.iopaths.push_back(io);
+          RecordDelayEntry(cell, SdfDelayEntryKind::kIopath,
+                           cell.iopaths.size() - 1);
           Expect(s, SdfTokKind::kRParen);  // close COND
           continue;
         }
@@ -485,6 +629,8 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
           io.is_increment = increment;
           io.is_ifnone = true;
           cell.iopaths.push_back(io);
+          RecordDelayEntry(cell, SdfDelayEntryKind::kIopath,
+                           cell.iopaths.size() - 1);
           Expect(s, SdfTokKind::kRParen);  // close CONDELSE
           continue;
         }
@@ -884,22 +1030,152 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
   // a self-consistent timing snapshot. §32.3 sentence 4: only categories
   // mentioned by the SDF file are written, so any pre-existing manager
   // entry the file does not name is left at its prebackannotation value.
+  //
+  // §32.5: within each cell's DELAY section, IOPATH / PATHPULSE /
+  // INTERCONNECT / PORT / NETDELAY entries must be applied in the order
+  // the SDF source spelled them out — a per-category iteration would
+  // collapse the LRM's "ordered process" guarantee. Walk
+  // `delay_entry_order` instead, dispatching on each ref's kind. For
+  // SdfCell instances built programmatically (older tests still wire
+  // category vectors directly) the order vector is empty; in that case
+  // synthesise a category-by-category fallback so legacy callers keep
+  // observing their pre-§32.5 ordering.
   for (const auto& cell : file.cells) {
-    for (const auto& io : cell.iopaths) {
-      PathDelay pd;
-      pd.src_port = io.src_port;
-      pd.dst_port = io.dst_port;
-      // §32.4.1: forward the SDF condition / ifnone flag so AddPathDelay
-      // can route the entry under the LRM's conditional vs nonconditional
-      // matching rules. A bare IOPATH leaves both fields at their defaults
-      // (empty string, false) and dispatches as nonconditional.
-      pd.condition = io.condition;
-      pd.is_ifnone = io.is_ifnone;
-      pd.delay_count = 3;
-      pd.delays[0] = SelectMtm(io.rise, mtm);
-      pd.delays[1] = SelectMtm(io.fall, mtm);
-      pd.delays[2] = SelectMtm(io.turnoff, mtm);
-      mgr.AddPathDelay(pd);
+    std::vector<SdfDelayEntryRef> derived;
+    const std::vector<SdfDelayEntryRef>* order = &cell.delay_entry_order;
+    if (order->empty() && (!cell.iopaths.empty() ||
+                            !cell.pulse_limits.empty() ||
+                            !cell.interconnects.empty())) {
+      derived.reserve(cell.iopaths.size() + cell.pulse_limits.size() +
+                       cell.interconnects.size());
+      for (uint32_t i = 0; i < cell.iopaths.size(); ++i) {
+        derived.push_back({SdfDelayEntryKind::kIopath, i});
+      }
+      for (uint32_t i = 0; i < cell.pulse_limits.size(); ++i) {
+        derived.push_back({SdfDelayEntryKind::kPulseLimit, i});
+      }
+      for (uint32_t i = 0; i < cell.interconnects.size(); ++i) {
+        derived.push_back({SdfDelayEntryKind::kInterconnect, i});
+      }
+      order = &derived;
+    }
+    for (const auto& entry : *order) {
+      switch (entry.kind) {
+        case SdfDelayEntryKind::kIopath: {
+          const auto& io = cell.iopaths[entry.index];
+          PathDelay pd;
+          pd.src_port = io.src_port;
+          pd.dst_port = io.dst_port;
+          // §32.4.1: forward the SDF condition / ifnone flag so AddPathDelay
+          // can route the entry under the LRM's conditional vs nonconditional
+          // matching rules. A bare IOPATH leaves both fields at their defaults
+          // (empty string, false) and dispatches as nonconditional.
+          pd.condition = io.condition;
+          pd.is_ifnone = io.is_ifnone;
+          pd.delay_count = 3;
+          pd.delays[0] = SelectMtm(io.rise, mtm);
+          pd.delays[1] = SelectMtm(io.fall, mtm);
+          pd.delays[2] = SelectMtm(io.turnoff, mtm);
+          if (!io.extended_form) {
+            // §32.5 example 1: an ABSOLUTE IOPATH annotation overwrites
+            // the path's pulse-filter limits. Default-reset reject and
+            // error to mirror the new propagation delays so a prior
+            // PATHPULSE / PATHPULSEPERCENT annotation cannot survive
+            // the IOPATH overwrite. Without this, the IOPATH's payload
+            // would carry zero-initialised reject/error fields and
+            // AddPathDelay's wholesale replacement would silently zero
+            // the matched SystemVerilog declaration's prior limits.
+            InitDefaultPulseLimits(pd);
+            mgr.AddPathDelay(pd);
+            break;
+          }
+          // §32.5 examples 2 and 3: the extended IOPATH form carries
+          // per-direction reject and error slots that may be empty.
+          // When every pulse-limit slot was empty the path's prior
+          // reject and error survive the overwrite (example 2);
+          // otherwise the supplied values install onto every transition
+          // slot, with the simple-form default-reset filling in any
+          // unsupplied slots (example 3, plus mixed-supply edge cases).
+          const bool any_pulse_supplied =
+              io.rise_reject_present || io.rise_error_present ||
+              io.fall_reject_present || io.fall_error_present;
+          if (!any_pulse_supplied) {
+            mgr.AddPathDelay(pd, /*preserve_pulse_limits=*/true);
+            break;
+          }
+          InitDefaultPulseLimits(pd);
+          if (io.rise_reject_present || io.fall_reject_present) {
+            const SdfDelayValue& src_dv = io.rise_reject_present
+                                              ? io.rise_reject
+                                              : io.fall_reject;
+            const uint64_t reject = SelectMtm(src_dv, mtm);
+            for (int i = 0; i < 12; ++i) pd.reject_limit[i] = reject;
+          }
+          if (io.rise_error_present || io.fall_error_present) {
+            const SdfDelayValue& src_dv = io.rise_error_present
+                                              ? io.rise_error
+                                              : io.fall_error;
+            const uint64_t err = SelectMtm(src_dv, mtm);
+            for (int i = 0; i < 12; ++i) pd.error_limit[i] = err;
+          }
+          mgr.AddPathDelay(pd);
+          break;
+        }
+        case SdfDelayEntryKind::kPulseLimit: {
+          const auto& pl = cell.pulse_limits[entry.index];
+          // §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT: route the parsed
+          // entry through the manager helper that fans the limits across
+          // all matching specify paths, regardless of their condition. The
+          // percent/absolute distinction is preserved on the SdfPulseLimit
+          // and dispatched inside the manager.
+          mgr.AddSdfPulseLimit(pl.src_port, pl.dst_port,
+                                SelectMtm(pl.reject, mtm), pl.has_error,
+                                SelectMtm(pl.error, mtm), pl.is_percent);
+          break;
+        }
+        case SdfDelayEntryKind::kInterconnect: {
+          const auto& ic = cell.interconnects[entry.index];
+          InterconnectDelay delay;
+          delay.src_port = ic.src_port;
+          delay.dst_port = ic.dst_port;
+          delay.rise = SelectMtm(ic.rise, mtm);
+          delay.fall = SelectMtm(ic.fall, mtm);
+          // §32.4.4: interconnect delays follow the same fill-in rules as
+          // specify path delays. Borrow the §30.5.1 / Table 30-2 expansion
+          // helper by staging the rise and fall values inside a PathDelay,
+          // letting ExpandTransitionDelays produce the twelve-slot
+          // result, then copy the slots out. A purely-zero fall (the
+          // LRM's single-value SDF input) keeps `delay_count` at 1 so
+          // the expansion broadcasts the rise value across every slot;
+          // a supplied fall switches to the two-value column in which
+          // rise covers the 0->z/z->1 transitions and fall covers
+          // 1->z/z->0.
+          PathDelay scratch;
+          scratch.delays[0] = delay.rise;
+          const bool fall_supplied = ic.fall.min_val != 0 ||
+                                       ic.fall.typ_val != 0 ||
+                                       ic.fall.max_val != 0;
+          if (fall_supplied) {
+            scratch.delays[1] = delay.fall;
+            scratch.delay_count = 2;
+          } else {
+            scratch.delay_count = 1;
+          }
+          ExpandTransitionDelays(scratch);
+          for (int i = 0; i < 12; ++i) {
+            delay.delays[i] = scratch.delays[i];
+            // §32.4.4: each of the twelve transition delays carries its
+            // own reject and error pulse limit. Initialise both to the
+            // matching delay so the default inertial-delay behaviour
+            // applies — a pulse narrower than the propagation delay is
+            // rejected — until a later mechanism revises the limits.
+            delay.reject_limit[i] = scratch.delays[i];
+            delay.error_limit[i] = scratch.delays[i];
+          }
+          mgr.AddInterconnectDelay(std::move(delay));
+          break;
+        }
+      }
     }
     for (const auto& sp : cell.specparams) {
       SpecparamValue value;
@@ -916,54 +1192,6 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
       for (const auto& target : ExpandSdfTimingCheckTargets(tc, mtm)) {
         mgr.AnnotateSdfTimingCheck(target);
       }
-    }
-    for (const auto& ic : cell.interconnects) {
-      InterconnectDelay delay;
-      delay.src_port = ic.src_port;
-      delay.dst_port = ic.dst_port;
-      delay.rise = SelectMtm(ic.rise, mtm);
-      delay.fall = SelectMtm(ic.fall, mtm);
-      // §32.4.4: interconnect delays follow the same fill-in rules as
-      // specify path delays. Borrow the §30.5.1 / Table 30-2 expansion
-      // helper by staging the rise and fall values inside a PathDelay,
-      // letting ExpandTransitionDelays produce the twelve-slot result,
-      // then copy the slots out. A purely-zero fall (the LRM's
-      // single-value SDF input) keeps `delay_count` at 1 so the
-      // expansion broadcasts the rise value across every slot; a
-      // supplied fall switches to the two-value column in which rise
-      // covers the 0->z/z->1 transitions and fall covers 1->z/z->0.
-      PathDelay scratch;
-      scratch.delays[0] = delay.rise;
-      const bool fall_supplied = ic.fall.min_val != 0 || ic.fall.typ_val != 0 ||
-                                 ic.fall.max_val != 0;
-      if (fall_supplied) {
-        scratch.delays[1] = delay.fall;
-        scratch.delay_count = 2;
-      } else {
-        scratch.delay_count = 1;
-      }
-      ExpandTransitionDelays(scratch);
-      for (int i = 0; i < 12; ++i) {
-        delay.delays[i] = scratch.delays[i];
-        // §32.4.4: each of the twelve transition delays carries its own
-        // reject and error pulse limit. Initialise both to the matching
-        // delay so the default inertial-delay behaviour applies — a
-        // pulse narrower than the propagation delay is rejected — until
-        // a later mechanism revises the limits.
-        delay.reject_limit[i] = scratch.delays[i];
-        delay.error_limit[i] = scratch.delays[i];
-      }
-      mgr.AddInterconnectDelay(std::move(delay));
-    }
-    for (const auto& pl : cell.pulse_limits) {
-      // §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT: route the parsed
-      // entry through the manager helper that fans the limits across all
-      // matching specify paths, regardless of their condition. The
-      // percent/absolute distinction is preserved on the SdfPulseLimit
-      // and dispatched inside the manager.
-      mgr.AddSdfPulseLimit(pl.src_port, pl.dst_port, SelectMtm(pl.reject, mtm),
-                           pl.has_error, SelectMtm(pl.error, mtm),
-                           pl.is_percent);
     }
   }
   return result;
