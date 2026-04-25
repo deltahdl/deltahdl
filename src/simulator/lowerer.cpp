@@ -134,6 +134,11 @@ struct ContAssignParams {
   DriverStrength ds;
   ContAssignDelayExprs delays;
   uint32_t width = 0;
+  // §28.13: when set, the cont-assign represents an nmos/pmos/cmos switch and
+  // the output's per-side strength is derived per-evaluation from data_input's
+  // resolved net strength rather than the static `ds` above.
+  bool nonresistive_switch = false;
+  const Expr* data_input = nullptr;
 };
 
 // §10.3.3: Select the appropriate delay for a continuous assignment based on
@@ -240,14 +245,31 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
       }
     }
 
+    // §28.13: an nmos/pmos/cmos output reproduces the data input's per-side
+    // resolved strength, with kSupply collapsed to kStrong. When the data
+    // terminal is an identifier bound to a net, propagate that net's resolved
+    // strength; otherwise (constant operand, variable terminal, no net) keep
+    // the cont-assign's static drive strength as a fallback so the switch
+    // still drives a meaningful level.
+    DriverStrength effective_ds = params.ds;
+    if (params.nonresistive_switch && params.data_input &&
+        params.data_input->kind == ExprKind::kIdentifier) {
+      auto* data_net = ctx.FindNet(params.data_input->text);
+      if (data_net) {
+        const NetStrength& ns = data_net->resolved_strength;
+        effective_ds.s0 = ReduceNonresistive(ns.s0_hi);
+        effective_ds.s1 = ReduceNonresistive(ns.s1_hi);
+      }
+    }
+
     // §10.3.4: If target is a net, add/update as a strength-aware driver.
     if (net) {
       if (first) {
         net->drivers.push_back(val);
-        net->driver_strengths.push_back(params.ds);
+        net->driver_strengths.push_back(effective_ds);
       } else {
         net->drivers[driver_idx] = val;
-        net->driver_strengths[driver_idx] = params.ds;
+        net->driver_strengths[driver_idx] = effective_ds;
       }
       net->Resolve(arena);
     } else {
@@ -934,6 +956,8 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   cap.rhs = ca.rhs;
   cap.ds = {ParserStrToStrength(ca.drive_strength0),
             ParserStrToStrength(ca.drive_strength1)};
+  cap.nonresistive_switch = ca.from_nonresistive_switch;
+  cap.data_input = ca.data_input;
   cap.delays = {ca.delay, ca.delay_fall, ca.delay_decay};
   cap.width = ca.width;
   p->coro = MakeContAssignCoroutine(cap, ctx_, arena_).Release();

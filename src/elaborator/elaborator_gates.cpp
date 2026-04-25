@@ -328,6 +328,12 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     ca.lhs = terms[0];
     ca.rhs = rhs;
     ca.width = LookupLhsWidth(ca.lhs, mod);
+    // §28.13 covers nmos and pmos only; rnmos/rpmos are resistive (§28.14).
+    ca.from_nonresistive_switch =
+        (kind == GateKind::kNmos || kind == GateKind::kPmos);
+    if (ca.from_nonresistive_switch) {
+      ca.data_input = data;
+    }
     ApplyGateDelays(ca, item);
     mod->assigns.push_back(ca);
     return;
@@ -373,6 +379,11 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
     ca.lhs = terms[0];
     ca.rhs = rhs;
     ca.width = LookupLhsWidth(ca.lhs, mod);
+    // §28.13: cmos is nonresistive; rcmos is resistive (§28.14).
+    ca.from_nonresistive_switch = (kind == GateKind::kCmos);
+    if (ca.from_nonresistive_switch) {
+      ca.data_input = data;
+    }
     ApplyGateDelays(ca, item);
     mod->assigns.push_back(ca);
     return;

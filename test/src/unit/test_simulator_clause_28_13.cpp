@@ -1,42 +1,50 @@
+// §28.13
+
 #include <gtest/gtest.h>
 
-#include "model_strength.h"
+#include "common/types.h"
+
+using namespace delta;
 
 namespace {
 
-TEST(StrengthReduction, NonresistivePassesStrong) {
-  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kStrong), StrengthLevel::kStrong);
+// §28.13's only transformation: a supply strength flowing through any of the
+// nonresistive switches (nmos/pmos/cmos and tran/tranif*) emerges reduced to
+// strong. The production reducer is the single place that encodes that rule;
+// verify the reduction happens.
+TEST(StrengthReductionNonresistive, SupplyReducesToStrong) {
+  EXPECT_EQ(ReduceNonresistive(Strength::kSupply), Strength::kStrong);
 }
 
-TEST(StrengthReduction, NonresistivePassesPull) {
-  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kPull), StrengthLevel::kPull);
+// §28.13 names supply as the sole exception. The remaining seven driving and
+// charge-storage levels of Table 28-7 must traverse a nonresistive switch
+// unchanged. Each level below pins one row of that table against the reducer.
+TEST(StrengthReductionNonresistive, StrongPassesThrough) {
+  EXPECT_EQ(ReduceNonresistive(Strength::kStrong), Strength::kStrong);
 }
 
-TEST(StrengthReduction, NonresistivePassesWeak) {
-  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kWeak), StrengthLevel::kWeak);
+TEST(StrengthReductionNonresistive, PullPassesThrough) {
+  EXPECT_EQ(ReduceNonresistive(Strength::kPull), Strength::kPull);
 }
 
-TEST(StrengthReduction, NonresistiveReducesSupplyToStrong) {
-  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kSupply), StrengthLevel::kStrong);
+TEST(StrengthReductionNonresistive, LargePassesThrough) {
+  EXPECT_EQ(ReduceNonresistive(Strength::kLarge), Strength::kLarge);
 }
 
-TEST(StrengthReduction, NonresistivePassesHighz) {
-  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kHighz), StrengthLevel::kHighz);
+TEST(StrengthReductionNonresistive, WeakPassesThrough) {
+  EXPECT_EQ(ReduceNonresistive(Strength::kWeak), Strength::kWeak);
 }
 
-// §28.13 names supply as the sole exception; every other strength — including
-// the three charge-storage levels — must pass through unchanged. The three
-// tests below close the coverage for the "all others unchanged" clause.
-TEST(StrengthReduction, NonresistivePassesLarge) {
-  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kLarge), StrengthLevel::kLarge);
+TEST(StrengthReductionNonresistive, MediumPassesThrough) {
+  EXPECT_EQ(ReduceNonresistive(Strength::kMedium), Strength::kMedium);
 }
 
-TEST(StrengthReduction, NonresistivePassesMedium) {
-  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kMedium), StrengthLevel::kMedium);
+TEST(StrengthReductionNonresistive, SmallPassesThrough) {
+  EXPECT_EQ(ReduceNonresistive(Strength::kSmall), Strength::kSmall);
 }
 
-TEST(StrengthReduction, NonresistivePassesSmall) {
-  EXPECT_EQ(ReduceNonresistive(StrengthLevel::kSmall), StrengthLevel::kSmall);
+TEST(StrengthReductionNonresistive, HighzPassesThrough) {
+  EXPECT_EQ(ReduceNonresistive(Strength::kHighz), Strength::kHighz);
 }
 
 }  // namespace

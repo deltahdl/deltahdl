@@ -126,6 +126,13 @@ struct RtlirContAssign {
   Expr* delay = nullptr;        // §10.3.3: rise delay (or single delay)
   Expr* delay_fall = nullptr;   // §10.3.3: fall delay
   Expr* delay_decay = nullptr;  // §10.3.3: turn-off delay
+  // §28.13: set when the assignment was synthesized from an nmos/pmos/cmos
+  // switch, so the simulator caps the propagated strength at strong.
+  bool from_nonresistive_switch = false;
+  // §28.13: the data-input subexpression of the original switch (terminal #1).
+  // The cont-assign coroutine consults this signal's resolved strength at
+  // runtime so the output reproduces it under the supply→strong cap.
+  Expr* data_input = nullptr;
   std::vector<ResolvedAttribute> attrs;
 };
 

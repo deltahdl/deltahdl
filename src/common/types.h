@@ -74,6 +74,12 @@ struct StrengthVal {
   uint8_t val : 2;
 };
 
+/// §28.13: a strength entering an nmos/pmos/cmos switch on its data input or
+/// crossing a tran/tranif0/tranif1 bidirectional pair is reproduced on the
+/// far side, except that supply collapses to strong. All other levels are
+/// returned unchanged.
+Strength ReduceNonresistive(Strength input);
+
 // --- Simulation time ---
 
 struct SimTime {

@@ -111,6 +111,12 @@ uint64_t Logic2Vec::ToUint64() const {
   return words[0];
 }
 
+// --- Strength reduction (§28.13) ---
+
+Strength ReduceNonresistive(Strength input) {
+  return input == Strength::kSupply ? Strength::kStrong : input;
+}
+
 // --- Timescale ---
 
 bool ParseTimeUnitStr(std::string_view str, TimeUnit& out) {
