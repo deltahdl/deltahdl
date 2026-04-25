@@ -181,6 +181,20 @@ void SpecifyManager::AnnotateSdf(SdfAnnotation annotation) {
   sdf_annotations_.push_back(std::move(annotation));
 }
 
+void SpecifyManager::SetSpecparamValue(SpecparamValue spec) {
+  auto it = specparam_index_.find(spec.name);
+  if (it != specparam_index_.end()) {
+    specparam_values_[it->second] = std::move(spec);
+    return;
+  }
+  specparam_index_[spec.name] = specparam_values_.size();
+  specparam_values_.push_back(std::move(spec));
+}
+
+void SpecifyManager::AddInterconnectDelay(InterconnectDelay delay) {
+  interconnect_delays_.push_back(std::move(delay));
+}
+
 uint64_t SpecifyManager::GetPathDelay(std::string_view src,
                                       std::string_view dst) const {
   auto it = path_index_.find({std::string(src), std::string(dst)});

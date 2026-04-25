@@ -431,6 +431,24 @@ struct SdfAnnotation {
   std::string scope;  // Module instance scope
 };
 
+// §32.2: a specparam value that backannotation has installed onto the
+// design. The name keys the specparam being updated; the value is the
+// MTM-selected scalar the SDF file supplied.
+struct SpecparamValue {
+  std::string name;
+  uint64_t value = 0;
+};
+
+// §32.2: an interconnect delay that backannotation has installed onto the
+// design. Keyed by the source/destination port pair; rise and fall are
+// the MTM-selected scalars the SDF file supplied.
+struct InterconnectDelay {
+  std::string src_port;
+  std::string dst_port;
+  uint64_t rise = 0;
+  uint64_t fall = 0;
+};
+
 // =============================================================================
 // SpecifyManager: manages path delays, timing checks, and SDF (§30-32)
 // =============================================================================
@@ -440,6 +458,19 @@ class SpecifyManager {
   void AddPathDelay(PathDelay delay);
   void AddTimingCheck(TimingCheckEntry check);
   void AnnotateSdf(SdfAnnotation annotation);
+  // §32.2: backannotation entry points for the two categories beyond
+  // specify path delays and timing check constraints. The setter for
+  // specparams replaces a prior value with the same name so repeated
+  // backannotations of the same SDF file converge.
+  void SetSpecparamValue(SpecparamValue spec);
+  void AddInterconnectDelay(InterconnectDelay delay);
+
+  const std::vector<SpecparamValue>& GetSpecparamValues() const {
+    return specparam_values_;
+  }
+  const std::vector<InterconnectDelay>& GetInterconnectDelays() const {
+    return interconnect_delays_;
+  }
 
   uint64_t GetPathDelay(std::string_view src, std::string_view dst) const;
   const std::vector<PathDelay>& GetPathDelays() const { return path_delays_; }
@@ -588,6 +619,12 @@ class SpecifyManager {
   std::unordered_map<PathKey, size_t, PairHash> path_index_;
   std::vector<TimingCheckEntry> timing_checks_;
   std::vector<SdfAnnotation> sdf_annotations_;
+  // §32.2 storage for the two non-path, non-timingcheck backannotation
+  // categories. Specparams are name-keyed so a later SDF write overwrites
+  // an earlier value; interconnects are appended in order.
+  std::vector<SpecparamValue> specparam_values_;
+  std::unordered_map<std::string, size_t> specparam_index_;
+  std::vector<InterconnectDelay> interconnect_delays_;
 };
 
 }  // namespace delta

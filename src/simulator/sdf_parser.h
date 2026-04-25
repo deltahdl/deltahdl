@@ -53,11 +53,35 @@ struct SdfTimingCheck {
   SdfDelayValue limit2;  // For setuphold/recrem
 };
 
+// §32.2: SDF specparam value update. Carries the new value the SDF file
+// supplies for a SystemVerilog specparam. The detailed mapping from SDF's
+// LABEL section to this struct is §32.4's responsibility; the §32.2
+// contract is just that backannotation can carry such a value through.
+struct SdfSpecparam {
+  std::string name;
+  SdfDelayValue value;
+};
+
+// §32.2: SDF interconnect delay between two ports. Same split: §32.4 owns
+// the INTERCONNECT/PORT parsing, §32.2 owns the fact that backannotation
+// names interconnect delays as one of its four update categories.
+struct SdfInterconnect {
+  std::string src_port;
+  std::string dst_port;
+  SdfDelayValue rise;
+  SdfDelayValue fall;
+};
+
 struct SdfCell {
   std::string cell_type;
   std::string instance;
   std::vector<SdfIopath> iopaths;
   std::vector<SdfTimingCheck> timing_checks;
+  // §32.2's two remaining backannotation categories. Empty by default so
+  // existing IOPATH/TIMINGCHECK-only flows keep observing zero specparams
+  // and zero interconnects.
+  std::vector<SdfSpecparam> specparams;
+  std::vector<SdfInterconnect> interconnects;
 };
 
 struct SdfFile {

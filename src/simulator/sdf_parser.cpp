@@ -422,6 +422,9 @@ static TimingCheckKind MapSdfToTcKind(SdfCheckType ct) {
 
 void AnnotateSdfToManager(const SdfFile& file, SpecifyManager& mgr,
                           SdfMtm mtm) {
+  // §32.2: backannotation iterates each of the four named categories. The
+  // chosen MTM column is applied uniformly so a single invocation produces
+  // a self-consistent timing snapshot.
   for (const auto& cell : file.cells) {
     for (const auto& io : cell.iopaths) {
       PathDelay pd;
@@ -433,6 +436,12 @@ void AnnotateSdfToManager(const SdfFile& file, SpecifyManager& mgr,
       pd.delays[2] = SelectMtm(io.turnoff, mtm);
       mgr.AddPathDelay(pd);
     }
+    for (const auto& sp : cell.specparams) {
+      SpecparamValue value;
+      value.name = sp.name;
+      value.value = SelectMtm(sp.value, mtm);
+      mgr.SetSpecparamValue(std::move(value));
+    }
     for (const auto& tc : cell.timing_checks) {
       TimingCheckEntry entry;
       entry.kind = MapSdfToTcKind(tc.check_type);
@@ -442,6 +451,14 @@ void AnnotateSdfToManager(const SdfFile& file, SpecifyManager& mgr,
       entry.data_edge = tc.data_edge;
       entry.limit = SelectMtm(tc.limit, mtm);
       mgr.AddTimingCheck(entry);
+    }
+    for (const auto& ic : cell.interconnects) {
+      InterconnectDelay delay;
+      delay.src_port = ic.src_port;
+      delay.dst_port = ic.dst_port;
+      delay.rise = SelectMtm(ic.rise, mtm);
+      delay.fall = SelectMtm(ic.fall, mtm);
+      mgr.AddInterconnectDelay(std::move(delay));
     }
   }
 }
