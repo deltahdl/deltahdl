@@ -134,6 +134,29 @@ void Elaborator::ValidateNameSpaces() {
   }
 }
 
+void Elaborator::ValidateConfigDesignStatements() {
+  std::unordered_set<std::string_view> config_names;
+  for (auto* cfg : unit_->configs) config_names.insert(cfg->name);
+
+  for (auto* cfg : unit_->configs) {
+    for (auto& [lib, cell] : cfg->design_cells) {
+      // §33.4.1.1: a design cell cannot be a configuration.
+      if (config_names.contains(cell)) {
+        diag_.Error(
+            cfg->range.start,
+            std::format("config '{}' design statement names configuration "
+                        "'{}'; design cells must not be configs",
+                        cfg->name, cell));
+      }
+      // §33.4.1.1: an omitted library identifier resolves to the
+      // library that contains this config (set by §33.3.3 tagging).
+      if (lib.empty()) {
+        lib = cfg->library;
+      }
+    }
+  }
+}
+
 void Elaborator::ValidateAnonymousProgramNameSharing() {
   auto check_scope = [&](const std::vector<ModuleItem*>& items) {
     std::unordered_map<std::string_view, const ModuleItem*> seen;
@@ -692,6 +715,9 @@ static void CollectAllModules(
 RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // §3.13: Validate definitions and package name spaces.
   ValidateNameSpaces();
+  // §33.4.1.1: validate config design statements (cells must not name
+  // configurations) and resolve omitted library identifiers.
+  ValidateConfigDesignStatements();
   // §24.6: Anonymous program items share the surrounding scope's name space.
   ValidateAnonymousProgramNameSharing();
   // §26.2: Reject package items that are nets with implicit continuous

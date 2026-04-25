@@ -43,6 +43,12 @@ class Elaborator {
   /// §3.13: Check definitions and package name spaces for duplicates.
   void ValidateNameSpaces();
 
+  /// §33.4.1.1: validate every config's design statement: cells named
+  /// in `design` cannot be configurations themselves, and an omitted
+  /// library identifier defaults to the library that contains the
+  /// config.
+  void ValidateConfigDesignStatements();
+
   /// §24.6: Anonymous program items share the surrounding package or
   /// compilation-unit name space; collisions with that surrounding scope
   /// are an error.

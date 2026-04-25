@@ -1,5 +1,7 @@
 #include "parser/parser.h"
 
+#include <format>
+
 namespace delta {
 
 // Parse: design { [lib.] cell } ;
@@ -115,16 +117,38 @@ ConfigDecl* Parser::ParseConfigDecl() {
     Expect(TokenKind::kSemicolon);
   }
 
-  // Design statement (required).
+  // §33.4.1.1: a config has one and only one design statement, and it
+  // shall appear before any config rule statements.
+  bool has_design = false;
   if (Check(TokenKind::kKwDesign)) {
     ParseDesignStatement(decl);
+    has_design = true;
   } else if (!Check(TokenKind::kKwEndconfig) && !AtEnd()) {
     diag_.Error(CurrentLoc(), "expected 'design' statement in config");
   }
 
   // Config rule statements.
   while (!Check(TokenKind::kKwEndconfig) && !AtEnd()) {
+    if (Check(TokenKind::kKwDesign)) {
+      diag_.Error(CurrentLoc(),
+                  std::format("duplicate 'design' statement in config '{}'",
+                              decl->name));
+      // Skip past the offending design statement so parsing can recover.
+      Consume();
+      while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndconfig)
+             && !AtEnd()) {
+        Consume();
+      }
+      if (Check(TokenKind::kSemicolon)) Consume();
+      continue;
+    }
     decl->rules.push_back(ParseConfigRule());
+  }
+
+  if (!has_design) {
+    diag_.Error(decl->range.start,
+                std::format("config '{}' is missing a 'design' statement",
+                            decl->name));
   }
 
   Expect(TokenKind::kKwEndconfig);
