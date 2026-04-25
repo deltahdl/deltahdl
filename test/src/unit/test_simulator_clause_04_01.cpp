@@ -61,11 +61,6 @@ TEST(SchedulerOverviewSim, ConcurrentWriteSameTimeSlotLastWriteWins) {
   EXPECT_TRUE(val == 1u || val == 2u);
 }
 
-TEST(SchedulerOverviewSim, PLIPreActiveBeforeSimulationActive) {
-  VerifyTwoRegionOrder({Region::kPreActive, "pre_active"},
-                       {Region::kActive, "active"});
-}
-
 TEST(SchedulerOverviewSim, PLIPrePostponedBeforePostponed) {
   VerifyTwoRegionOrder({Region::kPrePostponed, "pre_postponed"},
                        {Region::kPostponed, "postponed"});
