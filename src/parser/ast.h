@@ -729,6 +729,10 @@ struct ModuleDecl {
 
   bool is_cell = false;  // §22.10: tagged by `celldefine
 
+  // §33.3.3: library this cell is mapped into; assigned by
+  // LibraryMap::TagCompilationUnit once the source file path is known.
+  std::string_view library;
+
   // Timeunit/timeprecision (§3.14)
   TimeUnit time_unit = TimeUnit::kNs;
   TimeUnit time_prec = TimeUnit::kNs;
@@ -740,6 +744,7 @@ struct PackageDecl {
   std::string_view name;
   SourceRange range;
   std::vector<ModuleItem*> items;
+  std::string_view library;  // §33.3.3
 };
 
 // --- Class declarations ---
@@ -1012,6 +1017,7 @@ struct UdpDecl {
   bool has_initial = false;  // §29.7: initial <output> = <value>;
   char initial_value = 'x';  // '0', '1', or 'x'
   std::vector<UdpTableRow> table;
+  std::string_view library;  // §33.3.3
 };
 
 // --- Library source text (A.1.1) ---
@@ -1065,6 +1071,7 @@ struct ConfigDecl {
   std::vector<std::pair<std::string_view, std::string_view>> design_cells;
   std::vector<ConfigRule*> rules;
   std::vector<std::pair<std::string_view, Expr*>> local_params;
+  std::string_view library;  // §33.3.3
 };
 
 struct CompilationUnit {

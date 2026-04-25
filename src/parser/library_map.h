@@ -7,6 +7,7 @@
 
 namespace delta {
 
+struct CompilationUnit;
 struct LibraryDecl;
 
 // Maps source files to libraries per IEEE 1800-2023 §33.3.1.
@@ -43,6 +44,14 @@ class LibraryMap {
   // and reported instead of looping.
   bool LoadMapFile(const std::filesystem::path& map_file,
                    std::vector<std::string>* errors = nullptr);
+
+  // §33.3.3: stamp every cell-kind design element in `cu` (modules,
+  // interfaces, programs, primitives, packages, configs) with the
+  // library that owns `source_path` according to LibraryForFile.  The
+  // returned view's storage is owned by this LibraryMap, so the CU must
+  // not outlive it.
+  void TagCompilationUnit(CompilationUnit& cu,
+                          std::string_view source_path) const;
 
  private:
   struct Entry {

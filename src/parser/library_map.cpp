@@ -194,6 +194,17 @@ std::string_view LibraryMap::LibraryForFile(std::string_view path) const {
   return chosen;
 }
 
+void LibraryMap::TagCompilationUnit(CompilationUnit& cu,
+                                    std::string_view source_path) const {
+  std::string_view lib = LibraryForFile(source_path);
+  for (auto* m : cu.modules) m->library = lib;
+  for (auto* i : cu.interfaces) i->library = lib;
+  for (auto* p : cu.programs) p->library = lib;
+  for (auto* u : cu.udps) u->library = lib;
+  for (auto* p : cu.packages) p->library = lib;
+  for (auto* c : cu.configs) c->library = lib;
+}
+
 bool LibraryMap::LoadMapFile(const std::filesystem::path& map_file,
                              std::vector<std::string>* errors) {
   std::vector<std::filesystem::path> stack;
