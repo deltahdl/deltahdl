@@ -49,6 +49,9 @@ class Elaborator {
   /// config.
   void ValidateConfigDesignStatements();
 
+  /// §33.4.1.2: each config may contain at most one default clause.
+  void ValidateConfigDefaultClauses();
+
   /// §24.6: Anonymous program items share the surrounding package or
   /// compilation-unit name space; collisions with that surrounding scope
   /// are an error.

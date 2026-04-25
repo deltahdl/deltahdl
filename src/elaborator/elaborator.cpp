@@ -157,6 +157,21 @@ void Elaborator::ValidateConfigDesignStatements() {
   }
 }
 
+void Elaborator::ValidateConfigDefaultClauses() {
+  for (auto* cfg : unit_->configs) {
+    int default_count = 0;
+    for (auto* rule : cfg->rules) {
+      if (rule->kind == ConfigRuleKind::kDefault) ++default_count;
+    }
+    if (default_count > 1) {
+      diag_.Error(cfg->range.start,
+                  std::format("config '{}' has {} default clauses; "
+                              "at most one is allowed",
+                              cfg->name, default_count));
+    }
+  }
+}
+
 void Elaborator::ValidateAnonymousProgramNameSharing() {
   auto check_scope = [&](const std::vector<ModuleItem*>& items) {
     std::unordered_map<std::string_view, const ModuleItem*> seen;
@@ -718,6 +733,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // §33.4.1.1: validate config design statements (cells must not name
   // configurations) and resolve omitted library identifiers.
   ValidateConfigDesignStatements();
+  // §33.4.1.2: at most one default clause per config.
+  ValidateConfigDefaultClauses();
   // §24.6: Anonymous program items share the surrounding scope's name space.
   ValidateAnonymousProgramNameSharing();
   // §26.2: Reject package items that are nets with implicit continuous
