@@ -92,12 +92,6 @@ TEST(PliRegionSim, PreObservedExecutesBetweenPostNBAAndObserved) {
                          {Region::kObserved, "observed"});
 }
 
-TEST(PliRegionSim, PostReNBAExecutesBetweenReNBAAndPrePostponed) {
-  VerifyThreeRegionOrder({Region::kReNBA, "renba"},
-                         {Region::kPostReNBA, "post_renba"},
-                         {Region::kPrePostponed, "pre_postponed"});
-}
-
 TEST(PliRegionSim, PrePostponedExecutesBeforePostponed) {
   Arena arena;
   Scheduler sched(arena);
