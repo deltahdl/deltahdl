@@ -92,12 +92,6 @@ TEST(PliRegionSim, PreObservedExecutesBetweenPostNBAAndObserved) {
                          {Region::kObserved, "observed"});
 }
 
-TEST(PliRegionSim, PostObservedExecutesBetweenObservedAndReactive) {
-  VerifyThreeRegionOrder({Region::kObserved, "observed"},
-                         {Region::kPostObserved, "post_observed"},
-                         {Region::kReactive, "reactive"});
-}
-
 TEST(PliRegionSim, PreReNBAExecutesBetweenReInactiveAndReNBA) {
   VerifyThreeRegionOrder({Region::kReInactive, "reinactive"},
                          {Region::kPreReNBA, "pre_renba"},

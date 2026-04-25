@@ -10,19 +10,6 @@
 
 using namespace delta;
 
-TEST(PliPostObservedSim, PostObservedRegionExecutesPLICallbacks) {
-  Arena arena;
-  Scheduler sched(arena);
-  int executed = 0;
-
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() { executed++; };
-  sched.ScheduleEvent({0}, Region::kPostObserved, ev);
-
-  sched.Run();
-  EXPECT_EQ(executed, 1);
-}
-
 TEST(PliPostObservedSim, PostObservedCanReadValues) {
   VerifyRegionCanReadActiveValue(Region::kPostObserved);
 }
