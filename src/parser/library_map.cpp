@@ -206,6 +206,18 @@ std::vector<std::string_view> LibraryMap::LibraryDeclarationOrder() const {
   return order;
 }
 
+std::vector<std::string> LibraryMap::ResolveSearchOrder(
+    const std::vector<std::string>& cli_override) const {
+  // §33.8.1: a non-empty CLI list overrides the lib.map's declaration
+  // order outright — it does not merge or splice with the map.  The
+  // override is names only, so any module's library label must already
+  // have been assigned from the lib.map for the override to bind it.
+  if (!cli_override.empty()) return cli_override;
+  std::vector<std::string> order;
+  for (auto name : LibraryDeclarationOrder()) order.emplace_back(name);
+  return order;
+}
+
 void LibraryMap::TagCompilationUnit(CompilationUnit& cu,
                                     std::string_view source_path) const {
   std::string_view lib = LibraryForFile(source_path);

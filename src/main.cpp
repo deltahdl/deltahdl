@@ -13,6 +13,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "lexer/lexer.h"
+#include "parser/library_map.h"
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 #include "simulator/lowerer.h"
@@ -37,6 +38,9 @@ struct CliOptions {
   std::vector<std::string> include_dirs;
   std::vector<std::string> lib_dirs;
   std::vector<std::string> lib_files;
+  // §33.8.1: command-line library search order; overrides the lib.map
+  // declaration order when non-empty.
+  std::vector<std::string> lib_search_order;
   std::vector<std::pair<std::string, std::string>> defines;
   uint64_t max_time = 0;
   uint32_t seed = 0;
@@ -70,6 +74,7 @@ void PrintHelp() {
             << "  -f <file>            Read options from file\n"
             << "  -v <file>            Verilog library file\n"
             << "  -y <dir>             Verilog library directory\n"
+            << "  -L <name>            Library search order (repeatable)\n"
             << "  +define+<n>=<v>      Define macro\n"
             << "  +incdir+<path>       Include directory\n"
             << "  -Wall -Werror        Warning controls\n"
@@ -229,6 +234,12 @@ bool TryParseLibArg(std::string_view arg, int& i, int argc,
   }
   if (arg == "-y" && i + 1 < argc) {
     opts.lib_dirs.emplace_back(argv[++i]);
+    return true;
+  }
+  // §33.8.1: -L names a library and pushes it onto the search-order
+  // override.  Order matters — the first -L is searched first.
+  if (arg == "-L" && i + 1 < argc) {
+    opts.lib_search_order.emplace_back(argv[++i]);
     return true;
   }
   return false;
@@ -435,6 +446,14 @@ const delta::RtlirDesign* ElaborateDesign(const CliOptions& opts,
                                           delta::DiagEngine& diag,
                                           delta::Arena& arena) {
   delta::Elaborator elaborator(arena, diag, cu);
+  // §33.8.1: in the absence of a configuration, the -L list (if any)
+  // overrides the lib.map's declaration order.  An empty override
+  // leaves the lib.map's order in effect.
+  delta::LibraryMap lib_map;
+  auto effective_order = lib_map.ResolveSearchOrder(opts.lib_search_order);
+  if (!effective_order.empty()) {
+    elaborator.SetLibraryDeclarationOrder(std::move(effective_order));
+  }
   auto top = ResolveTopModule(opts, cu);
   const auto* design = elaborator.Elaborate(top);
   if (diag.HasErrors() || design == nullptr) return nullptr;

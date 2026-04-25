@@ -59,6 +59,16 @@ class LibraryMap {
   // returned views are owned by this LibraryMap.
   std::vector<std::string_view> LibraryDeclarationOrder() const;
 
+  // §33.8.1: resolve the effective library search order for default
+  // binding when no configuration is in use.  When `cli_override` is
+  // non-empty, it overrides the lib.map's declaration order verbatim;
+  // the override carries library names only, so the definitions still
+  // come from the entries this LibraryMap was loaded with.  When the
+  // override is empty, the lib.map's declaration order is returned
+  // unchanged.
+  std::vector<std::string> ResolveSearchOrder(
+      const std::vector<std::string>& cli_override) const;
+
  private:
   struct Entry {
     std::string library;
