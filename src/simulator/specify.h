@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
@@ -554,6 +556,19 @@ class SpecifyManager {
   void SetSpecparamValue(SpecparamValue spec);
   void AddInterconnectDelay(InterconnectDelay delay);
 
+  // §32.4.3 sentence 2: any expression containing one or more specparams
+  // is reevaluated when annotated to from an SDF file. Consumers that hold
+  // such an expression — a specify path-delay expression, a procedural
+  // delay, or any other site that read the specparam at elaboration time
+  // — register a callback keyed by the specparam name; SetSpecparamValue
+  // invokes every registered callback for that name with the freshly
+  // installed value. Multiple consumers may register against the same
+  // specparam (the LRM page-928 example references `cap` from both a
+  // procedural delay and a specify path expression), so this is a
+  // multimap-shaped store rather than a single-slot lookup.
+  void RegisterSpecparamReevaluation(std::string name,
+                                     std::function<void(uint64_t)> reevaluate);
+
   // §32.4.1 Table 32-1 PATHPULSE / PATHPULSEPERCENT: install pulse-filter
   // limits onto every PathDelay between the named ports. The table maps
   // both rows to "conditional and nonconditional specify path pulse
@@ -726,6 +741,13 @@ class SpecifyManager {
   std::vector<SpecparamValue> specparam_values_;
   std::unordered_map<std::string, size_t> specparam_index_;
   std::vector<InterconnectDelay> interconnect_delays_;
+  // §32.4.3 sentence 2: name-keyed callbacks fired by SetSpecparamValue
+  // when the matching specparam is updated. A vector of (name, callback)
+  // pairs lets two registrations against the same name coexist, which
+  // models the LRM example where a specparam is referenced from more
+  // than one expression.
+  std::vector<std::pair<std::string, std::function<void(uint64_t)>>>
+      specparam_reevaluators_;
 };
 
 }  // namespace delta

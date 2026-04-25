@@ -463,16 +463,73 @@ static void ParseTimingCheckSection(std::string_view& s, SdfCell& cell) {
 // Parse LABEL section
 // =============================================================================
 
-// §32.4: LABEL is one of the three CELL sections SDF timing values appear
-// within (alongside DELAY and TIMINGCHECK), and §32.4 sentence 4 assigns its
-// contents to the specparam-value backannotation category. The detailed
-// mapping from LABEL name-value entries to specparams belongs to §32.4.3;
-// recognising LABEL here lets §32.3 sentence 1 surface a warning for the
-// section's contents instead of silently dropping it the way the parser
-// drops constructs unrelated to SystemVerilog timing.
-static void ParseLabelSection(std::string_view& s, SdfFile& file) {
-  file.unannotatable.emplace_back("LABEL");
-  SkipSdfParen(s);
+// §32.4.3: a LABEL specparam value follows the SDF rvalue grammar, which
+// admits both a wrapped triplet `(N:N:N)` / single `(N)` and a bare
+// `signed_real_number` form. The page-927 LRM example writes `(dhigh 60)`
+// — bare-number form — so the parser must accept either shape rather than
+// always demanding the parenthesised triplet `ParseDelayVal` consumes.
+static SdfDelayValue ParseLabelValue(std::string_view& s) {
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') return ParseDelayVal(s);
+  SdfDelayValue dv;
+  auto num = NextSdfToken(s);
+  if (num.kind == SdfTokKind::kNumber) {
+    dv.min_val = num.num_val;
+    dv.typ_val = num.num_val;
+    dv.max_val = num.num_val;
+  }
+  return dv;
+}
+
+// §32.4.3 sentence 1: the LABEL section's `(identifier delval)` entries
+// each name a SystemVerilog specparam to update. Decode every such pair
+// into an SdfSpecparam on the cell so the downstream annotator can route
+// the new value through SetSpecparamValue. The caller has consumed the
+// outer `(LABEL` parens and a leading `(`, leaving the ABSOLUTE/INCREMENT
+// keyword to be read here, after which we walk the body until its closing
+// `)` and then consume LABEL's own closing `)`.
+static void ParseLabelSection(std::string_view& s, SdfCell& cell,
+                              SdfFile& file) {
+  SkipWhitespace(s);
+  if (s.empty() || s[0] != '(') {
+    // Empty LABEL body — nothing to decode and nothing to warn about.
+    Expect(s, SdfTokKind::kRParen);
+    return;
+  }
+  Expect(s, SdfTokKind::kLParen);
+  auto mode = NextSdfToken(s);
+  // The ABSOLUTE/INCREMENT distinction is part of the SDF grammar but the
+  // §32.4.3 text only describes the ABSOLUTE form; INCREMENT entries are
+  // surfaced through the §32.3 warning channel rather than silently
+  // mis-applied as ABSOLUTE values.
+  if (mode.text != "ABSOLUTE" && mode.text != "INCREMENT") {
+    file.unannotatable.emplace_back("LABEL");
+    SkipSdfParen(s);
+    SkipWhitespace(s);
+    if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
+    return;
+  }
+  const bool increment = (mode.text == "INCREMENT");
+  while (true) {
+    SkipWhitespace(s);
+    if (s.empty() || s[0] == ')') break;
+    Expect(s, SdfTokKind::kLParen);
+    auto name_tok = NextSdfToken(s);
+    SdfSpecparam sp;
+    sp.name = std::string(name_tok.text);
+    sp.value = ParseLabelValue(s);
+    Expect(s, SdfTokKind::kRParen);
+    if (increment) {
+      // INCREMENT semantics on specparams are outside §32.4.3's text;
+      // record so the warning channel surfaces the omission rather than
+      // dropping the value silently.
+      file.unannotatable.emplace_back("LABEL");
+      continue;
+    }
+    cell.specparams.push_back(std::move(sp));
+  }
+  Expect(s, SdfTokKind::kRParen);  // close ABSOLUTE/INCREMENT
+  Expect(s, SdfTokKind::kRParen);  // close LABEL
 }
 
 // =============================================================================
@@ -503,7 +560,7 @@ static SdfCell ParseCell(std::string_view& s, SdfFile& file) {
     } else if (kw.text == "TIMINGCHECK") {
       ParseTimingCheckSection(s, cell);
     } else if (kw.text == "LABEL") {
-      ParseLabelSection(s, file);
+      ParseLabelSection(s, cell, file);
     } else {
       SkipSdfParen(s);
     }

@@ -299,33 +299,6 @@ TEST(SdfConstructMapping, CellWithOnlyLabelSectionParses) {
   EXPECT_EQ(file.cells[0].instance, "u2");
 }
 
-// §32.4 sentence 4: "The LABEL section contains new values for specparams."
-// LABEL is therefore SystemVerilog-timing-related data, distinct from the
-// "unrelated" header/TIMINGENV sections that §32.3 silently drops. When the
-// parser cannot yet decode the LABEL contents (the detailed name-value
-// mapping is §32.4.3's responsibility), the annotator must surface the
-// section through §32.3 sentence 1's "unable to annotate" warning channel,
-// not lose it silently.
-TEST(SdfConstructMapping, LabelSectionProducesUnannotatableWarning) {
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "clk_gen")
-        (INSTANCE u3)
-        (LABEL (ABSOLUTE (dhigh 60)))
-      )
-    )
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-
-  SpecifyManager mgr;
-  SdfAnnotationResult result =
-      AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
-
-  EXPECT_FALSE(result.warnings.empty());
-}
-
 // §32.4 sentence 5: "Backannotation into SystemVerilog is done by matching
 // SDF constructs to the corresponding SystemVerilog declarations and then
 // replacing the existing SystemVerilog timing values with those from the

@@ -286,13 +286,35 @@ void SpecifyManager::AnnotateSdf(SdfAnnotation annotation) {
 }
 
 void SpecifyManager::SetSpecparamValue(SpecparamValue spec) {
+  // §32.4.3 sentence 2: capture the name and freshly installed value
+  // before storing — `spec` is moved into the value table — so the
+  // reevaluation fan-out below can refer to both. The store-then-fire
+  // ordering is deliberate: callbacks may consult GetSpecparamValues()
+  // for cross-references and must observe the new value already
+  // committed.
+  std::string name = spec.name;
+  uint64_t value = spec.value;
   auto it = specparam_index_.find(spec.name);
   if (it != specparam_index_.end()) {
     specparam_values_[it->second] = std::move(spec);
-    return;
+  } else {
+    specparam_index_[spec.name] = specparam_values_.size();
+    specparam_values_.push_back(std::move(spec));
   }
-  specparam_index_[spec.name] = specparam_values_.size();
-  specparam_values_.push_back(std::move(spec));
+  // §32.4.3 sentence 2: invoke every registered consumer of this
+  // specparam name. The LRM names "any expression containing one or
+  // more specparams" so all matching callbacks fire on every
+  // annotation, not just the first.
+  for (const auto& reev : specparam_reevaluators_) {
+    if (reev.first == name) reev.second(value);
+  }
+}
+
+void SpecifyManager::RegisterSpecparamReevaluation(
+    std::string name, std::function<void(uint64_t)> reevaluate) {
+  // Append rather than replace so two expressions referencing the same
+  // specparam each receive their own reevaluation cue.
+  specparam_reevaluators_.emplace_back(std::move(name), std::move(reevaluate));
 }
 
 void SpecifyManager::AddSdfPulseLimit(std::string_view src,
