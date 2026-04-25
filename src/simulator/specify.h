@@ -633,6 +633,42 @@ class SpecifyManager {
                         uint64_t reject, bool has_error, uint64_t error,
                         bool is_percent);
 
+  // §32.7 paragraph 4: an INCREMENT-mode SDF pulse-limit annotation adds
+  // signed deltas onto the running reject/error limits of every PathDelay
+  // sharing the (src, dst) port pair, clamping any component that would
+  // become negative back to zero. `has_error` mirrors the §30.7.3 single-
+  // vs-paired-value rule: when false, the reject delta is mirrored into
+  // the error slot before the per-slot addition so a one-value entry
+  // collapses the X band to a single value as in the ABSOLUTE path. The
+  // mirror happens before the clamp so a negative reject-only delta
+  // drives both limits to zero, matching the LRM rule that "annotations
+  // in INCREMENT mode can result in pulse limits less than 0, in which
+  // case they shall be adjusted to 0". The propagation delays in
+  // `delays[i]` are not touched.
+  void IncrementSdfPulseLimit(std::string_view src, std::string_view dst,
+                              int64_t reject_delta, bool has_error,
+                              int64_t error_delta);
+
+  // §32.7 sentence 1: configure the two pulse-limit invocation
+  // percentages used by SDF delay annotation when computing default
+  // reject and error limits. Both percentages are integers in [0, 100];
+  // the LRM defaults to 100/100, so a SpecifyManager constructed without
+  // a SetGlobalPulseLimitPercents call observes the inertial-delay
+  // baseline. Once set, every subsequent SDF IOPATH default-reset uses
+  // the new percentages; PATHPULSE / PATHPULSEPERCENT and SDF-supplied
+  // pulse-limit slots continue to override the percentage-derived
+  // defaults per §30.7.3's precedence rule.
+  void SetGlobalPulseLimitPercents(uint8_t reject_pct, uint8_t error_pct);
+
+  // §32.7 sentence 2: getters for the two pulse-limit invocation
+  // percentages. Default to 100 each on a freshly constructed manager,
+  // matching the LRM's "by default, these limits are 100%" wording.
+  // The annotator reads these during SDF delay annotation; tests inspect
+  // them to confirm SetGlobalPulseLimitPercents installed the requested
+  // values.
+  uint8_t RejectPulseLimitPercent() const { return reject_pulse_pct_; }
+  uint8_t ErrorPulseLimitPercent() const { return error_pulse_pct_; }
+
   const std::vector<SpecparamValue>& GetSpecparamValues() const {
     return specparam_values_;
   }
@@ -796,6 +832,13 @@ class SpecifyManager {
   // than one expression.
   std::vector<std::pair<std::string, std::function<void(uint64_t)>>>
       specparam_reevaluators_;
+  // §32.7 sentences 1-2: the two pulse-limit invocation percentages that
+  // govern default reject / error limits during SDF IOPATH annotation.
+  // Default-initialised to 100 so a manager that never had
+  // SetGlobalPulseLimitPercents called still applies the inertial-delay
+  // baseline.
+  uint8_t reject_pulse_pct_ = 100;
+  uint8_t error_pulse_pct_ = 100;
 };
 
 }  // namespace delta

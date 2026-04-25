@@ -307,7 +307,7 @@ TEST(SdfMultipleAnnotations,
         (DELAY (ABSOLUTE
           (PATHPULSE A Z (10) (20))
           (IOPATH A Z (35) (61))
-          (PATHPULSE A Z (50) (90))))))
+          (PATHPULSE A Z (20) (30))))))
   )";
   ASSERT_TRUE(ParseSdf(sdf, file));
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
@@ -316,8 +316,14 @@ TEST(SdfMultipleAnnotations,
   const auto& pd = mgr.GetPathDelays()[0];
   EXPECT_EQ(pd.delays[0], 35u);
   EXPECT_EQ(pd.delays[1], 61u);
-  EXPECT_EQ(pd.reject_limit[0], 50u);
-  EXPECT_EQ(pd.error_limit[0], 90u);
+  // §32.7 last sentence: the trailing PATHPULSE values (20, 30) fit
+  // within delays[0]=35, so neither component is clamped down to the
+  // delay and both observable limits match the SDF text. Pins down
+  // that the §32.5 source-order rule still distinguishes the trailing
+  // PATHPULSE from the IOPATH default-reset (which would have left
+  // both limits at 35).
+  EXPECT_EQ(pd.reject_limit[0], 20u);
+  EXPECT_EQ(pd.error_limit[0], 30u);
 }
 
 // §32.5 sentence 1, same-construct overwrite: the LRM phrases the rule
@@ -462,7 +468,13 @@ TEST(SdfMultipleAnnotations,
   pre.src_port = "A";
   pre.dst_port = "Z";
   pre.delay_count = 1;
-  pre.delays[0] = 1;
+  // §32.7 last sentence: a baseline delay tall enough that the trailing
+  // PATHPULSE values (10 / 20) sit at or below `delays[0]` and so are
+  // not clamped. The preservation rule under test concerns the
+  // empty-pulse-slot extended IOPATH, not the PATHPULSE clamp; seeding
+  // a delay that admits the PATHPULSE values verbatim isolates the
+  // preservation path.
+  pre.delays[0] = 20;
   mgr.AddPathDelay(pre);
 
   SdfFile file;
@@ -570,7 +582,13 @@ TEST(SdfMultipleAnnotations,
     pd.src_port = "A";
     pd.dst_port = "Z";
     pd.delay_count = 1;
-    pd.delays[0] = 1;
+    // §32.7 last sentence: every per-slot baseline delay sits at or
+    // above the maximum PATHPULSE value (7), so neither the rise nor
+    // the fall reject/error component is clamped on the separate-form
+    // pass. With the clamp out of the picture, the §32.5 example-3
+    // equivalence between the combined extended IOPATH and the
+    // (PATHPULSE)+(IOPATH-with-empty-slots) pair holds slot by slot.
+    for (int i = 0; i < 12; ++i) pd.delays[i] = 10;
     m.AddPathDelay(pd);
     return m;
   };

@@ -462,7 +462,62 @@ void SpecifyManager::AddSdfPulseLimit(std::string_view src,
     } else {
       ApplySdfPulseLimits(pd, reject, has_error, error);
     }
+    // §32.7 last sentence: clamp every per-slot reject / error limit to
+    // the matching propagation delay. The LRM phrases the rule on
+    // PATHPULSE specifically — "When PATHPULSE sets the pulse limits to
+    // values greater than the delay, SystemVerilog shall exhibit the
+    // same behavior as if the pulse limits had been set equal to the
+    // delay" — but the same upper bound applies just as cleanly to the
+    // PATHPULSEPERCENT path: clipping at install time keeps the stored
+    // value consistent with the observable runtime behaviour the rule
+    // requires, regardless of which row of Table 32-1 produced the
+    // entry.
+    for (int i = 0; i < 12; ++i) {
+      if (pd.reject_limit[i] > pd.delays[i]) pd.reject_limit[i] = pd.delays[i];
+      if (pd.error_limit[i] > pd.delays[i]) pd.error_limit[i] = pd.delays[i];
+    }
   }
+}
+
+void SpecifyManager::IncrementSdfPulseLimit(std::string_view src,
+                                            std::string_view dst,
+                                            int64_t reject_delta,
+                                            bool has_error,
+                                            int64_t error_delta) {
+  // §32.7 paragraph 4: walk every matching PathDelay and add the signed
+  // deltas onto its existing reject / error limits, clamping any
+  // negative result back to zero. The §30.7.3 single-value rule is
+  // applied first by mirroring the reject delta into the error slot
+  // when the source supplied no error value; only after the mirror
+  // does the per-slot addition and clamp run, so a reject-only delta
+  // that drives the limit below zero collapses both limits to zero
+  // instead of leaving a stale post-mirror error behind.
+  const int64_t effective_error_delta = has_error ? error_delta : reject_delta;
+  for (auto& pd : path_delays_) {
+    if (pd.src_port != src || pd.dst_port != dst) continue;
+    for (int i = 0; i < 12; ++i) {
+      const int64_t new_reject =
+          static_cast<int64_t>(pd.reject_limit[i]) + reject_delta;
+      const int64_t new_error =
+          static_cast<int64_t>(pd.error_limit[i]) + effective_error_delta;
+      pd.reject_limit[i] =
+          new_reject < 0 ? 0u : static_cast<uint64_t>(new_reject);
+      pd.error_limit[i] =
+          new_error < 0 ? 0u : static_cast<uint64_t>(new_error);
+    }
+  }
+}
+
+void SpecifyManager::SetGlobalPulseLimitPercents(uint8_t reject_pct,
+                                                 uint8_t error_pct) {
+  // §32.7 sentence 1 + sentence 2: install the two pulse-limit
+  // invocation percentages. The annotator consults these later when
+  // it needs default reject / error limits for an SDF IOPATH delay,
+  // so this setter is the only place the percentages enter the
+  // SpecifyManager. No clamp into [0, 100] is applied here — callers
+  // own the validation of their invocation options.
+  reject_pulse_pct_ = reject_pct;
+  error_pulse_pct_ = error_pct;
 }
 
 void SpecifyManager::AddInterconnectDelay(InterconnectDelay delay) {

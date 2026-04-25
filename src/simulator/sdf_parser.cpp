@@ -1116,15 +1116,18 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
               mgr.IncrementPathDelay(pd);
               break;
             }
-            // §32.5 example 1: an ABSOLUTE IOPATH annotation overwrites
-            // the path's pulse-filter limits. Default-reset reject and
-            // error to mirror the new propagation delays so a prior
-            // PATHPULSE / PATHPULSEPERCENT annotation cannot survive
-            // the IOPATH overwrite. Without this, the IOPATH's payload
-            // would carry zero-initialised reject/error fields and
-            // AddPathDelay's wholesale replacement would silently zero
-            // the matched SystemVerilog declaration's prior limits.
-            InitDefaultPulseLimits(pd);
+            // §32.5 example 1 + §32.7 sentence 1: an ABSOLUTE IOPATH
+            // annotation overwrites the path's pulse-filter limits.
+            // Default reject and error are derived from the
+            // SpecifyManager's pulse-limit invocation percentages
+            // (defaulted to 100/100, which collapses to the inertial-
+            // delay baseline). Computing the defaults from the
+            // percentage settings is what §32.7 specifies for "the
+            // default values annotated for pulse limits"; without it,
+            // a model that opted into custom percentages would still
+            // see 100%-of-delay limits on every SDF IOPATH installation.
+            ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
+                                    mgr.ErrorPulseLimitPercent());
             mgr.AddPathDelay(pd);
             break;
           }
@@ -1142,7 +1145,15 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
             mgr.AddPathDelay(pd, /*preserve_pulse_limits=*/true);
             break;
           }
-          InitDefaultPulseLimits(pd);
+          // §32.7 sentence 1: even when the extended IOPATH supplies
+          // some pulse-limit slots, any unsupplied slots fall back to
+          // the percentage-derived default rather than mirroring the
+          // raw delay. This keeps the partial-supply path consistent
+          // with the simple-form ABSOLUTE branch above so callers that
+          // opted into custom percentages observe them everywhere SDF
+          // delay annotation produces a default.
+          ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
+                                  mgr.ErrorPulseLimitPercent());
           if (io.rise_reject_present || io.fall_reject_present) {
             const SdfDelayValue& src_dv = io.rise_reject_present
                                               ? io.rise_reject
