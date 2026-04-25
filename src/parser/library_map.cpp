@@ -1,6 +1,15 @@
 #include "parser/library_map.h"
 
+#include <fstream>
+#include <sstream>
+#include <system_error>
+
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "lexer/lexer.h"
 #include "parser/ast.h"
+#include "parser/parser.h"
 
 namespace delta {
 
@@ -183,6 +192,86 @@ std::string_view LibraryMap::LibraryForFile(std::string_view path) const {
   if (!found_any) return "work";
   if (ambiguous) return std::string_view{};
   return chosen;
+}
+
+bool LibraryMap::LoadMapFile(const std::filesystem::path& map_file,
+                             std::vector<std::string>* errors) {
+  std::vector<std::filesystem::path> stack;
+  return LoadMapFileImpl(map_file, stack, errors);
+}
+
+bool LibraryMap::LoadMapFileImpl(const std::filesystem::path& map_file,
+                                 std::vector<std::filesystem::path>& stack,
+                                 std::vector<std::string>* errors) {
+  namespace fs = std::filesystem;
+  std::error_code ec;
+  fs::path canon = fs::weakly_canonical(map_file, ec);
+  if (ec) canon = map_file;
+
+  // §33.3.2 says the include behaves "as though the contents appear in
+  // place"; with cycles that would never terminate, so detect and abort.
+  for (const auto& p : stack) {
+    if (p == canon) {
+      if (errors) {
+        errors->push_back("library map cycle including " + canon.string());
+      }
+      return false;
+    }
+  }
+
+  std::ifstream ifs(canon);
+  if (!ifs.good()) {
+    if (errors) {
+      errors->push_back("cannot open library map file " + canon.string());
+    }
+    return false;
+  }
+  std::ostringstream buf;
+  buf << ifs.rdbuf();
+  std::string content = buf.str();
+
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  uint32_t fid = mgr.AddFile(canon.string(), std::move(content));
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  auto* cu = parser.ParseLibraryText();
+
+  if (diag.HasErrors() || cu == nullptr) {
+    if (errors) {
+      errors->push_back("parse errors in library map file " + canon.string());
+    }
+    return false;
+  }
+
+  // §33.3.2: relative paths in library statements anchor to the
+  // containing file's directory; AddDeclaration takes that directory as
+  // base_dir, so the existing §33.3.1 evaluator handles the resolution.
+  std::string base_dir = canon.parent_path().string();
+  for (auto* lib_decl : cu->libraries) {
+    AddDeclaration(*lib_decl, base_dir);
+  }
+
+  // §33.3.2: relative include paths anchor to the containing file's
+  // directory; recurse with the resolved absolute path so subsequent
+  // levels see their own parent dir as base.
+  stack.push_back(canon);
+  bool ok = true;
+  for (auto* inc : cu->lib_includes) {
+    if (inc->file_path.empty()) {
+      ok = false;
+      continue;
+    }
+    fs::path inc_path(std::string{inc->file_path});
+    if (inc_path.is_relative()) {
+      inc_path = canon.parent_path() / inc_path;
+    }
+    if (!LoadMapFileImpl(inc_path, stack, errors)) ok = false;
+  }
+  stack.pop_back();
+
+  return ok;
 }
 
 }  // namespace delta

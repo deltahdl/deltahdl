@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -33,6 +34,16 @@ class LibraryMap {
   static std::string ResolveSpec(std::string_view spec,
                                  std::string_view base_dir);
 
+  // Read a lib.map file from disk, register its library declarations,
+  // and recursively expand any include statements per §33.3.2.  Relative
+  // paths in both library and include statements anchor to the directory
+  // of the file that contains them.  Returns true on success; on
+  // failure, diagnostic messages are appended to `errors` (if non-null)
+  // and the call returns false.  Cycles between map files are detected
+  // and reported instead of looping.
+  bool LoadMapFile(const std::filesystem::path& map_file,
+                   std::vector<std::string>* errors = nullptr);
+
  private:
   struct Entry {
     std::string library;
@@ -40,6 +51,10 @@ class LibraryMap {
     std::string spec;
   };
   std::vector<Entry> entries_;
+
+  bool LoadMapFileImpl(const std::filesystem::path& map_file,
+                       std::vector<std::filesystem::path>& stack,
+                       std::vector<std::string>* errors);
 };
 
 }  // namespace delta
