@@ -75,6 +75,29 @@ bool GlobOne(std::string_view pat, std::string_view name) {
   return pi == pat.size();
 }
 
+// §33.3.1.1 spec-type priority: smaller value wins.
+enum class SpecKind : int {
+  kExplicitFilename = 0,
+  kWildcardFilename = 1,
+  kDirectory = 2,
+};
+
+// Classify a file_path_spec by its trailing form.  The hierarchical
+// wildcard `...` denotes directories, so a spec ending with `...` is
+// also classified as a directory match.
+SpecKind ClassifySpec(std::string_view spec) {
+  if (spec.empty()) return SpecKind::kExplicitFilename;
+  if (spec.back() == '/') return SpecKind::kDirectory;
+  size_t last_slash = spec.rfind('/');
+  std::string_view tail = (last_slash == std::string_view::npos)
+                              ? spec
+                              : spec.substr(last_slash + 1);
+  if (tail == "...") return SpecKind::kDirectory;
+  bool has_wild = tail.find_first_of("*?") != std::string_view::npos ||
+                  tail.find("...") != std::string_view::npos;
+  return has_wild ? SpecKind::kWildcardFilename : SpecKind::kExplicitFilename;
+}
+
 bool GlobMatchSegments(const std::vector<std::string_view>& pat_segs,
                        size_t pi,
                        const std::vector<std::string_view>& path_segs,
@@ -135,11 +158,31 @@ void LibraryMap::AddDeclaration(const LibraryDecl& decl,
 }
 
 std::string_view LibraryMap::LibraryForFile(std::string_view path) const {
+  // §33.3.1.1 file-path resolution: collect every entry that matches, keep
+  // only the highest-priority spec-type tier, and surface cross-library
+  // ambiguity within that tier as an empty return.  §33.3.1's "work"
+  // fallback applies only when nothing matches at all.
+  bool found_any = false;
+  SpecKind best = SpecKind::kDirectory;
+  std::string_view chosen;
+  bool ambiguous = false;
+
   for (const auto& e : entries_) {
-    if (PathMatches(e.spec, e.base_dir, path)) return e.library;
+    if (!PathMatches(e.spec, e.base_dir, path)) continue;
+    SpecKind kind = ClassifySpec(e.spec);
+    if (!found_any || static_cast<int>(kind) < static_cast<int>(best)) {
+      found_any = true;
+      best = kind;
+      chosen = e.library;
+      ambiguous = false;
+    } else if (kind == best && e.library != chosen) {
+      ambiguous = true;
+    }
   }
-  // §33.3.1: any file unmatched by a declared library belongs to "work".
-  return "work";
+
+  if (!found_any) return "work";
+  if (ambiguous) return std::string_view{};
+  return chosen;
 }
 
 }  // namespace delta

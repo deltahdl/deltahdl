@@ -118,13 +118,6 @@ TEST(LibraryMapRelativePath, DotDotResolvesToParent) {
 // Order-of-declaration determines first-match win, satisfying §33.3.1's
 // "multiple map files shall be read in the order in which they are
 // specified" — within one map and across maps, the table reflects order.
-TEST(LibraryMapDeclarationOrder, FirstDeclarationWins) {
-  LibraryMap m;
-  m.AddDeclaration(MakeDecl("first", {"*.v"}), "/proj");
-  m.AddDeclaration(MakeDecl("second", {"*.v"}), "/proj");
-  EXPECT_EQ(m.LibraryForFile("/proj/file.v"), "first");
-}
-
 TEST(LibraryMapDeclarationOrder, MultipleMapFilesProcessedInOrder) {
   // Simulating two .map files: first contributes one declaration, then
   // the second contributes another.  The earlier file's spec wins for
