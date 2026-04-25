@@ -10,19 +10,6 @@
 
 using namespace delta;
 
-TEST(ReactiveRegionSim, ReactiveRegionExecutesEvents) {
-  Arena arena;
-  Scheduler sched(arena);
-  int executed = 0;
-
-  auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&]() { executed++; };
-  sched.ScheduleEvent({0}, Region::kReactive, ev);
-
-  sched.Run();
-  EXPECT_EQ(executed, 1);
-}
-
 TEST(ReactiveRegionSim, ReactiveRegionHoldsMultipleEvents) {
   Arena arena;
   Scheduler sched(arena);
