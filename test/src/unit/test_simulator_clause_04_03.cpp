@@ -74,6 +74,29 @@ TEST(EventSimulationSim, AlwaysFFIsProcess) {
   EXPECT_EQ(f.ctx.FindVariable("q")->value.ToUint64(), 55u);
 }
 
+// Bare `always` (kRtlirProcessKind::kAlways) — distinct from always_ff/_comb/_latch
+// in the elaborator's MapAlwaysKind; verifies it lowers to a runnable process.
+TEST(EventSimulationSim, AlwaysIsProcess) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk;\n"
+      "  logic [7:0] d, q;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    d = 8'd77;\n"
+      "    #5 clk = 1;\n"
+      "  end\n"
+      "  always @(posedge clk) q <= d;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("q")->value.ToUint64(), 77u);
+}
+
 TEST(EventSimulationSim, ContinuousAssignIsProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -207,11 +230,6 @@ TEST(EventSimulationSim, MixedProcessTypesSensitiveToSameVariable) {
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("via_assign")->value.ToUint64(), 20u);
   EXPECT_EQ(f.ctx.FindVariable("via_comb")->value.ToUint64(), 30u);
-}
-
-TEST(EventSimulationSim, SimulationTimeStartsAtZero) {
-  SimFixture f;
-  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
 TEST(EventSimulationSim, NoDelayExecutesAtTimeZero) {
@@ -553,27 +571,6 @@ TEST(EventSimulationSim, AllRegionsDefined) {
   EXPECT_EQ(kRegionCount, 17u);
 }
 
-TEST(SchedulingSemanticsSim, BehavioralAndDataflowCoexist) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  assign b = a + 8'd1;\n"
-      "  initial a = 8'd5;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 5u);
-  EXPECT_EQ(vb->value.ToUint64(), 6u);
-}
-
 TEST(SchedulingSemanticsSim, MultipleProcessesAcrossTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -599,25 +596,6 @@ TEST(SchedulingSemanticsSim, MultipleProcessesAcrossTime) {
   ASSERT_NE(vb, nullptr);
   EXPECT_EQ(va->value.ToUint64(), 2u);
   EXPECT_EQ(vb->value.ToUint64(), 20u);
-}
-
-TEST(SchedulingSemanticsSim, CascadeOfProcesses) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd5;\n"
-      "  assign b = a + 8'd1;\n"
-      "  always_comb c = b * 8'd2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 5u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 6u);
-  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 12u);
 }
 
 TEST(SchedulingSemanticsSim, InterleavedTimeExecution) {

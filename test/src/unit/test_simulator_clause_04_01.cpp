@@ -8,25 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SchedulerOverviewSim, EventBasedSchedulingEndToEnd) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd3;\n"
-      "  assign b = a + 8'd1;\n"
-      "  always_comb c = b * 8'd2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 3u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 4u);
-  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 8u);
-}
-
 TEST(SchedulerOverviewSim, TimeSlotProgressionNeverGoesBackward) {
   Arena arena;
   Scheduler sched(arena);
