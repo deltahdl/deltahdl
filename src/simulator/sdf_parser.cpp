@@ -3,7 +3,10 @@
 #include "simulator/sdf_parser.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <cstddef>
+#include <initializer_list>
 
 #include "simulator/specify.h"
 
@@ -832,7 +835,7 @@ static uint64_t SelectMtm(const SdfDelayValue& dv, SdfMtm mtm) {
 }
 
 // =============================================================================
-// Delay expansion (Table 32-4)
+// Delay expansion (§32.8 Table 32-4)
 // =============================================================================
 
 std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
@@ -840,30 +843,96 @@ std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
   std::vector<uint64_t> out(12, 0);
   if (vals.empty()) return out;
 
-  if (vals.size() == 1) {
-    uint64_t v = SelectMtm(vals[0], mtm);
-    std::fill(out.begin(), out.end(), v);
+  const std::size_t n = vals.size();
+  const uint64_t v1 = SelectMtm(vals[0], mtm);
+
+  // Table 32-4 enumerates exactly five input counts. Counts outside that
+  // set have no LRM-defined mapping; broadcast v1 across every slot so a
+  // misuse still leaves the path table populated rather than half-zero.
+  if (n != 1 && n != 2 && n != 3 && n != 6 && n != 12) {
+    std::fill(out.begin(), out.end(), v1);
     return out;
   }
 
-  uint64_t rise = SelectMtm(vals[0], mtm);
-  uint64_t fall = SelectMtm(vals[1], mtm);
-  uint64_t turnoff = (vals.size() >= 3) ? SelectMtm(vals[2], mtm) : 0;
+  if (n == 1) {
+    std::fill(out.begin(), out.end(), v1);
+    return out;
+  }
 
-  // Table 32-4: 3-value mapping
-  out[0] = rise;                     // 0->1
-  out[1] = fall;                     // 1->0
-  out[2] = turnoff;                  // 0->z
-  out[3] = rise;                     // z->1
-  out[4] = turnoff;                  // 1->z
-  out[5] = fall;                     // z->0
-  out[6] = std::min(rise, turnoff);  // 0->x
-  out[7] = std::max(rise, turnoff);  // x->1
-  out[8] = std::min(fall, turnoff);  // 1->x
-  out[9] = std::max(fall, turnoff);  // x->0
-  out[10] = std::min(rise, fall);    // x->z
-  out[11] = std::max(rise, fall);    // z->x
+  const uint64_t v2 = SelectMtm(vals[1], mtm);
+  if (n == 2) {
+    out[0] = v1;                    // 0->1
+    out[1] = v2;                    // 1->0
+    out[2] = v1;                    // 0->z
+    out[3] = v1;                    // z->1
+    out[4] = v2;                    // 1->z
+    out[5] = v2;                    // z->0
+    out[6] = v1;                    // 0->x
+    out[7] = v1;                    // x->1
+    out[8] = v2;                    // 1->x
+    out[9] = v2;                    // x->0
+    out[10] = std::max(v1, v2);     // x->z
+    out[11] = std::min(v1, v2);     // z->x
+    return out;
+  }
 
+  const uint64_t v3 = SelectMtm(vals[2], mtm);
+  if (n == 3) {
+    out[0] = v1;                    // 0->1
+    out[1] = v2;                    // 1->0
+    out[2] = v3;                    // 0->z
+    out[3] = v1;                    // z->1
+    out[4] = v3;                    // 1->z
+    out[5] = v2;                    // z->0
+    out[6] = std::min(v1, v3);      // 0->x
+    out[7] = std::max(v1, v3);      // x->1
+    out[8] = std::min(v2, v3);      // 1->x
+    out[9] = v2;                    // x->0
+    out[10] = v3;                   // x->z
+    out[11] = std::min(v1, v2);     // z->x
+    return out;
+  }
+
+  const uint64_t v4 = SelectMtm(vals[3], mtm);
+  const uint64_t v5 = SelectMtm(vals[4], mtm);
+  const uint64_t v6 = SelectMtm(vals[5], mtm);
+  if (n == 6) {
+    out[0] = v1;                    // 0->1
+    out[1] = v2;                    // 1->0
+    out[2] = v3;                    // 0->z
+    out[3] = v4;                    // z->1
+    out[4] = v5;                    // 1->z
+    out[5] = v6;                    // z->0
+    out[6] = std::min(v1, v3);      // 0->x
+    out[7] = std::max(v1, v4);      // x->1
+    out[8] = std::min(v2, v5);      // 1->x
+    out[9] = std::max(v2, v6);      // x->0
+    out[10] = std::max(v3, v5);     // x->z
+    out[11] = std::min(v4, v6);     // z->x
+    return out;
+  }
+
+  // n == 12: every transition slot maps directly to the matching SDF value.
+  for (std::size_t i = 0; i < 12; ++i) {
+    out[i] = SelectMtm(vals[i], mtm);
+  }
+  return out;
+}
+
+std::array<uint64_t, 4> ReduceSdfDelaysToThree(
+    const std::vector<SdfDelayValue>& vals, SdfMtm mtm) {
+  std::array<uint64_t, 4> out{0, 0, 0, 0};
+  if (vals.empty()) return out;
+  // §32.8 sentence 5: take only the first three SDF entries, ignoring v4
+  // onward. The slot fill-in for inputs of size 1 or 2 is §28.16 /
+  // Table 28-9 territory; broadcast the first value as a defensive
+  // populate so the X-state minimum still draws from three real values.
+  out[0] = SelectMtm(vals[0], mtm);
+  out[1] = vals.size() >= 2 ? SelectMtm(vals[1], mtm) : out[0];
+  out[2] = vals.size() >= 3 ? SelectMtm(vals[2], mtm) : out[0];
+  // §32.8 sentence 6: the X-state delay equals the minimum of the other
+  // three delays.
+  out[3] = std::min({out[0], out[1], out[2]});
   return out;
 }
 
@@ -1100,10 +1169,20 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
           // (empty string, false) and dispatches as nonconditional.
           pd.condition = io.condition;
           pd.is_ifnone = io.is_ifnone;
-          pd.delay_count = 3;
-          pd.delays[0] = SelectMtm(io.rise, mtm);
-          pd.delays[1] = SelectMtm(io.fall, mtm);
-          pd.delays[2] = SelectMtm(io.turnoff, mtm);
+          // §32.8 Table 32-4: extend the SDF rise/fall/turnoff triplet
+          // into all twelve SystemVerilog transition slots before the
+          // PathDelay lands on the manager. SdfIopath models exactly
+          // three SDF delays per IOPATH so we always select the
+          // three-value column. Slots [3..11] used to be left at zero,
+          // which silently dropped to-z and X-state transition delays;
+          // routing through ExpandSdfDelays applies the §32.8 rule and
+          // populates them.
+          {
+            const auto expanded =
+                ExpandSdfDelays({io.rise, io.fall, io.turnoff}, mtm);
+            pd.delay_count = 12;
+            for (int i = 0; i < 12; ++i) pd.delays[i] = expanded[i];
+          }
           if (!io.extended_form) {
             // §32.6 sentence 3: an INCREMENT-mode IOPATH modifies the
             // matched path's existing delays additively rather than
@@ -1190,37 +1269,31 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
           delay.dst_port = ic.dst_port;
           delay.rise = SelectMtm(ic.rise, mtm);
           delay.fall = SelectMtm(ic.fall, mtm);
-          // §32.4.4: interconnect delays follow the same fill-in rules as
-          // specify path delays. Borrow the §30.5.1 / Table 30-2 expansion
-          // helper by staging the rise and fall values inside a PathDelay,
-          // letting ExpandTransitionDelays produce the twelve-slot
-          // result, then copy the slots out. A purely-zero fall (the
-          // LRM's single-value SDF input) keeps `delay_count` at 1 so
-          // the expansion broadcasts the rise value across every slot;
-          // a supplied fall switches to the two-value column in which
-          // rise covers the 0->z/z->1 transitions and fall covers
-          // 1->z/z->0.
-          PathDelay scratch;
-          scratch.delays[0] = delay.rise;
+          // §32.4.4 + §32.8 Table 32-4: extend the SDF rise/(fall)
+          // interconnect delays into all twelve SystemVerilog transition
+          // slots. A purely-zero fall across min/typ/max is the SDF
+          // single-value-input convention and selects Table 32-4's
+          // one-value column; a supplied fall selects the two-value
+          // column. Routing through the §32.8 helper replaces the
+          // §30.5.1-based expansion the prior implementation used and
+          // matches the IOPATH branch above on the same SDF value
+          // mapping table.
           const bool fall_supplied = ic.fall.min_val != 0 ||
                                        ic.fall.typ_val != 0 ||
                                        ic.fall.max_val != 0;
-          if (fall_supplied) {
-            scratch.delays[1] = delay.fall;
-            scratch.delay_count = 2;
-          } else {
-            scratch.delay_count = 1;
-          }
-          ExpandTransitionDelays(scratch);
+          std::vector<SdfDelayValue> ic_vals;
+          ic_vals.push_back(ic.rise);
+          if (fall_supplied) ic_vals.push_back(ic.fall);
+          const auto expanded = ExpandSdfDelays(ic_vals, mtm);
           for (int i = 0; i < 12; ++i) {
-            delay.delays[i] = scratch.delays[i];
+            delay.delays[i] = expanded[i];
             // §32.4.4: each of the twelve transition delays carries its
             // own reject and error pulse limit. Initialise both to the
             // matching delay so the default inertial-delay behaviour
             // applies — a pulse narrower than the propagation delay is
             // rejected — until a later mechanism revises the limits.
-            delay.reject_limit[i] = scratch.delays[i];
-            delay.error_limit[i] = scratch.delays[i];
+            delay.reject_limit[i] = expanded[i];
+            delay.error_limit[i] = expanded[i];
           }
           // §32.6 sentence 3: INCREMENT-mode interconnect entries add
           // onto whatever the prior ABSOLUTE annotation installed for

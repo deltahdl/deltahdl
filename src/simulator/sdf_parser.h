@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -236,12 +237,29 @@ enum class SdfMtm : uint8_t {
 bool ParseSdf(std::string_view input, SdfFile& out);
 
 // =============================================================================
-// Delay expansion (Table 32-4)
+// Delay expansion (§32.8 Table 32-4)
 // =============================================================================
 
-// Expand 1/2/3/6/12 delay values into 12 transition delays.
+// §32.8 Table 32-4: extend 1/2/3/6/12 SDF delay values into the 12
+// SystemVerilog transition delays of a specify path or interconnect. The
+// table differs from the §30.5.1 / Table 30-3 pessimistic min/max
+// derivation in several X-state slots — for example three-value SDF input
+// resolves x->0 to v2 (not max(v2,v3)), x->z to v3 (not max(v1,v2)), and
+// six-value input resolves x->1 to max(v1,v4) — so the SDF flow must
+// route through this helper rather than the §30.5.1 expansion.
 std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
                                       SdfMtm mtm);
+
+// §32.8 sentences 5-7: reduce more-than-three SDF delays to the three
+// SystemVerilog delays of a gate primitive or continuous assignment by
+// keeping the first three and ignoring the rest, with the X-state delay
+// derived as the minimum of those three. Returns
+// {rise, fall, turnoff, x_state}; for inputs of three or fewer the
+// per-slot expansion is delegated to §28.16 / Table 28-9 (this helper
+// just broadcasts the supplied values into the unfilled slots), but the
+// §32.8 X-state-equals-min rule still drives the fourth slot.
+std::array<uint64_t, 4> ReduceSdfDelaysToThree(
+    const std::vector<SdfDelayValue>& vals, SdfMtm mtm);
 
 // =============================================================================
 // SDF annotation
