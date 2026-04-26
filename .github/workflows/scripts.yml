@@ -644,6 +644,41 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+  test-satisfy-unsatisfied-subclause-set-with-satisfied-dependencies:
+    needs: [test-is-subclause-satisfied]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-script-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-script-
+      - name: Install tools
+        run: pip install pypdf pytest pytest-cov
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/satisfy_unsatisfied_subclause_set_with_satisfied_dependencies/unit/
+          -v
+          --cov=satisfy_unsatisfied_subclause_set_with_satisfied_dependencies
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+      - name: Run integration tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/satisfy_unsatisfied_subclause_set_with_satisfied_dependencies/integration/
+          -v
+      - name: Run e2e tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/satisfy_unsatisfied_subclause_set_with_satisfied_dependencies/e2e/
+          -v
   test-satisfy-unsatisfied-subclause-with-satisfied-dependencies:
     needs: [test-is-subclause-satisfied]
     runs-on: ubuntu-24.04

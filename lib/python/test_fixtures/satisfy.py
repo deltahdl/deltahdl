@@ -12,9 +12,9 @@ def make_lrm(tmp_path):
     return lrm
 
 
-def write_diagnostic(tmp_path, payload):
+def write_diagnostic(tmp_path, payload, *, name: str = "diag.json"):
     """Write a diagnostic JSON file under *tmp_path* and return its path."""
-    path = tmp_path / "diag.json"
+    path = tmp_path / name
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
 
