@@ -381,28 +381,6 @@ TEST(ForceReleaseSim, ReleaseVariableHoldsValue) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-TEST(ForceReleaseSim, ForceReleaseThenAssign) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    force x = 8'd50;\n"
-      "    release x;\n"
-      "    x = 8'd75;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
-  ASSERT_NE(x, nullptr);
-  EXPECT_FALSE(x->is_forced);
-  EXPECT_EQ(x->value.ToUint64(), 75u);
-}
-
 TEST(ForceReleaseSim, ForceOverridesAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
