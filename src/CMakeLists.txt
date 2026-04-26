@@ -44,6 +44,7 @@ add_library(deltahdl_lib STATIC
     elaborator/sensitivity.cpp
     simulator/driver_update.cpp
     simulator/net.cpp
+    simulator/switch_network.cpp
     simulator/scheduler.cpp
     simulator/process.cpp
     simulator/variable.cpp

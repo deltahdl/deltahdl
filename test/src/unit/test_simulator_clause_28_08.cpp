@@ -123,57 +123,6 @@ TEST(SwitchProcessing, Tranif0BlocksWhenControlHigh) {
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
 
-TEST(SwitchProcessing, UserDefinedNetZControlTreatedAsOff) {
-  auto np = MakeNetPair(1);
-  std::vector<SwitchInst> sw;
-  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 1}, true});
-  ResolveSwitchNetwork(sw, np.arena);
-  EXPECT_EQ(ValOf(*np.vb), kValZ);
-}
-
-TEST(SwitchProcessing, UserDefinedNetXControlTreatedAsOff) {
-  auto np = MakeNetPair(1);
-  std::vector<SwitchInst> sw;
-  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 1}, true});
-  ResolveSwitchNetwork(sw, np.arena);
-  EXPECT_EQ(ValOf(*np.vb), kValZ);
-}
-
-TEST(SwitchProcessing, UserDefinedNetControlOneConducts) {
-  auto np = MakeNetPair(1);
-  std::vector<SwitchInst> sw;
-  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 0}, true});
-  ResolveSwitchNetwork(sw, np.arena);
-  EXPECT_EQ(ValOf(*np.vb), kVal1);
-}
-
-TEST(SwitchProcessing, UserDefinedNetControlZeroBlocks) {
-  auto np = MakeNetPair(1);
-  std::vector<SwitchInst> sw;
-  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 0}, true});
-  ResolveSwitchNetwork(sw, np.arena);
-  EXPECT_EQ(ValOf(*np.vb), kValZ);
-}
-
-// Built-in nets do not take the UDNT off-for-x/z shortcut: an unknown control
-// value leaves the undriven side at x rather than z, making the result
-// distinguishable from a switch that simply blocked.
-TEST(SwitchProcessing, BuiltinXControlResolvesToUnknownNotOff) {
-  auto np = MakeNetPair(1);
-  std::vector<SwitchInst> sw;
-  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 1}, false});
-  ResolveSwitchNetwork(sw, np.arena);
-  EXPECT_EQ(ValOf(*np.vb), kValX);
-}
-
-TEST(SwitchProcessing, BuiltinZControlResolvesToUnknownNotOff) {
-  auto np = MakeNetPair(1);
-  std::vector<SwitchInst> sw;
-  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 1}, false});
-  ResolveSwitchNetwork(sw, np.arena);
-  EXPECT_EQ(ValOf(*np.vb), kValX);
-}
-
 // Resistive variants differ only in strength (not modeled here); conductivity
 // behavior must match their full-strength counterparts.
 TEST(SwitchProcessing, RtranBidirectionalPropagation) {

@@ -1,293 +1,23 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <string>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
 #include "helpers_switch_network.h"
-#include "simulator/scheduler.h"
+#include "simulator/net.h"
+#include "simulator/switch_network.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(SwitchProcessingSchedulingSim, UnidirectionalEventProcessing) {
-  Arena arena;
-  Scheduler sched(arena);
-  int input = 5;
-  int output = 0;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    int result = input * 2;
-    auto* update = sched.GetEventPool().Acquire();
-    update->kind = EventKind::kUpdate;
-    update->callback = [&, result]() { output = result; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(output, 10);
-}
-
-TEST(SwitchProcessingSchedulingSim, BidirectionalSignalFlow) {
-  Arena arena;
-  Scheduler sched(arena);
-  int net_a = 0;
-  int net_b = 0;
-  bool switch_on = true;
-
-  auto* drive_a = sched.GetEventPool().Acquire();
-  drive_a->kind = EventKind::kEvaluation;
-  drive_a->callback = [&]() {
-    net_a = 1;
-    if (switch_on) {
-      auto* update = sched.GetEventPool().Acquire();
-      update->kind = EventKind::kUpdate;
-      update->callback = [&]() { net_b = net_a; };
-      sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-    }
-  };
-  sched.ScheduleEvent({0}, Region::kActive, drive_a);
-
-  auto* drive_b = sched.GetEventPool().Acquire();
-  drive_b->kind = EventKind::kEvaluation;
-  drive_b->callback = [&]() {
-    net_b = 0;
-    if (switch_on) {
-      auto* update = sched.GetEventPool().Acquire();
-      update->kind = EventKind::kUpdate;
-      update->callback = [&]() { net_a = net_b; };
-      sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-    }
-  };
-  sched.ScheduleEvent({5}, Region::kActive, drive_b);
-
-  sched.Run();
-
-  EXPECT_EQ(net_a, 0);
-  EXPECT_EQ(net_b, 0);
-}
-
-TEST(SwitchProcessingSchedulingSim, CoordinatedProcessingOfConnectedNodes) {
-  Arena arena;
-  Scheduler sched(arena);
-
-  int n0 = 1;
-  int n1 = 0;
-  int n2 = 0;
-  bool sw0_on = true;
-  bool sw1_on = true;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    if (sw0_on && sw1_on) {
-      auto* update = sched.GetEventPool().Acquire();
-      update->kind = EventKind::kUpdate;
-      update->callback = [&]() {
-        n1 = n0;
-        n2 = n0;
-      };
-      sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-    }
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(n0, 1);
-  EXPECT_EQ(n1, 1);
-  EXPECT_EQ(n2, 1);
-}
-
-TEST(SwitchProcessingSchedulingSim, InputsAndOutputsInteract) {
-  Arena arena;
-  Scheduler sched(arena);
-  int node_a = 0;
-  int node_b = 0;
-  int driver_a_val = 1;
-  int driver_b_val = 1;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    auto* update = sched.GetEventPool().Acquire();
-    update->kind = EventKind::kUpdate;
-    update->callback = [&]() {
-      node_a = driver_a_val;
-      node_b = driver_b_val;
-    };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(node_a, 1);
-  EXPECT_EQ(node_b, 1);
-}
-
-TEST(SwitchProcessingSchedulingSim, RelaxationTechnique) {
-  Arena arena;
-  Scheduler sched(arena);
-
-  int n0 = 1;
-  int n1 = -1;
-  int n2 = -1;
-  int iterations = 0;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    int prev_n1 = 0;
-    int prev_n2 = 0;
-    do {
-      prev_n1 = n1;
-      prev_n2 = n2;
-      n1 = n0;
-      n2 = n1;
-      ++iterations;
-    } while (n1 != prev_n1 || n2 != prev_n2);
-    auto* update = sched.GetEventPool().Acquire();
-    update->kind = EventKind::kUpdate;
-    update->callback = []() {};
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(n0, 1);
-  EXPECT_EQ(n1, 1);
-  EXPECT_EQ(n2, 1);
-
-  EXPECT_EQ(iterations, 2);
-}
-
-TEST(SwitchProcessingSchedulingSim, IntermingledWithOtherActiveEvents) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* switch_proc = sched.GetEventPool().Acquire();
-  switch_proc->kind = EventKind::kEvaluation;
-  switch_proc->callback = [&]() { order.push_back("switch_process"); };
-  sched.ScheduleEvent({0}, Region::kActive, switch_proc);
-
-  auto* gate_eval = sched.GetEventPool().Acquire();
-  gate_eval->kind = EventKind::kEvaluation;
-  gate_eval->callback = [&]() { order.push_back("gate_eval"); };
-  sched.ScheduleEvent({0}, Region::kActive, gate_eval);
-
-  auto* proc_stmt = sched.GetEventPool().Acquire();
-  proc_stmt->kind = EventKind::kEvaluation;
-  proc_stmt->callback = [&]() { order.push_back("proc_stmt"); };
-  sched.ScheduleEvent({0}, Region::kActive, proc_stmt);
-
-  sched.Run();
-
-  ASSERT_EQ(order.size(), 3u);
-  bool has_switch = false;
-  bool has_gate = false;
-  bool has_proc = false;
-  for (const auto& s : order) {
-    if (s == "switch_process") has_switch = true;
-    if (s == "gate_eval") has_gate = true;
-    if (s == "proc_stmt") has_proc = true;
-  }
-  EXPECT_TRUE(has_switch);
-  EXPECT_TRUE(has_gate);
-  EXPECT_TRUE(has_proc);
-}
-
-TEST(SwitchProcessingSchedulingSim, SteadyStateUniqueLevel) {
-  Arena arena;
-  Scheduler sched(arena);
-
-  int node_a_result = 0;
-  int gate_val = -1;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    int result_gate_on = 1;
-    int result_gate_off = 1;
-
-    if (result_gate_on == result_gate_off) {
-      node_a_result = result_gate_on;
-    } else {
-      node_a_result = gate_val;
-    }
-    auto* update = sched.GetEventPool().Acquire();
-    update->kind = EventKind::kUpdate;
-    update->callback = []() {};
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(node_a_result, 1);
-}
-
-TEST(SwitchProcessingSchedulingSim, SteadyStateAmbiguousX) {
-  Arena arena;
-  Scheduler sched(arena);
-
-  int node_b_result = 0;
-  int x_val = -1;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    int result_gate_on = 1;
-    int result_gate_off = 0;
-    if (result_gate_on == result_gate_off) {
-      node_b_result = result_gate_on;
-    } else {
-      node_b_result = x_val;
-    }
-    auto* update = sched.GetEventPool().Acquire();
-    update->kind = EventKind::kUpdate;
-    update->callback = []() {};
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(node_b_result, x_val);
-}
-
-TEST(SwitchProcessingSchedulingSim, UserDefinedNetTypeSwitchOffForXZ) {
-  Arena arena;
-  Scheduler sched(arena);
-  int udn_a = 5;
-  int udn_b = 10;
-  int control = -1;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    bool switch_off = (control == -1 || control == -2);
-    auto* update = sched.GetEventPool().Acquire();
-    update->kind = EventKind::kUpdate;
-    if (switch_off) {
-      update->callback = []() {};
-    } else {
-      update->callback = [&]() { udn_b = udn_a; };
-    }
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-
-  EXPECT_EQ(udn_a, 5);
-  EXPECT_EQ(udn_b, 10);
-}
-
-TEST(SwitchProcessing, NetworkResolvesAllDevicesTogether) {
+// §4.9.5: Switch processing shall consider all the devices in a bidirectional
+// switch-connected net before determining the appropriate value for any node.
+TEST(BidirectionalSwitchNetwork,
+     NetworkResolutionPropagatesAcrossCascadedSwitches) {
   Arena arena;
   auto* va = arena.Create<Variable>();
   va->value = MakeLogic4Vec(arena, 1);
@@ -300,30 +30,168 @@ TEST(SwitchProcessing, NetworkResolvesAllDevicesTogether) {
   Net b = MakeUndrivenNet(arena, vb);
   Net c = MakeUndrivenNet(arena, vc);
 
-  std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, SwitchKind::kTran, {}, false});
-  sw.push_back({&b, &c, SwitchKind::kTran, {}, false});
-  ResolveSwitchNetwork(sw, arena);
+  std::vector<BidirSwitchInst> sw;
+  sw.push_back({&a, &b, BidirSwitchKind::kTran, {0, 0}, false});
+  sw.push_back({&b, &c, BidirSwitchKind::kTran, {0, 0}, false});
+  ResolveBidirSwitchNetwork(sw, arena);
+
   EXPECT_EQ(ValOf(*vb), kVal1);
   EXPECT_EQ(ValOf(*vc), kVal1);
 }
 
-TEST(SwitchProcessing, BuiltinNetXControlNonUniqueProducesX) {
-  auto np = MakeNetPair(1);
+// §4.9.5: The "consider all the devices in a bidirectional switch-connected
+// net" rule has to take non-conducting devices into account too — they
+// partition the net so a value cannot reach nodes on the far side of an open
+// switch even if every other device in the chain conducts.
+TEST(BidirectionalSwitchNetwork,
+     NonConductingSwitchBlocksDownstreamPropagation) {
+  Arena arena;
+  auto* va = arena.Create<Variable>();
+  va->value = MakeLogic4Vec(arena, 1);
+  auto* vb = arena.Create<Variable>();
+  vb->value = MakeLogic4Vec(arena, 1);
+  auto* vc = arena.Create<Variable>();
+  vc->value = MakeLogic4Vec(arena, 1);
 
-  std::vector<SwitchInst> sw;
-  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {0, 1}, false});
-  ResolveSwitchNetwork(sw, np.arena);
+  Net a = MakeNet1(arena, va, 1);
+  Net b = MakeUndrivenNet(arena, vb);
+  Net c = MakeUndrivenNet(arena, vc);
+
+  std::vector<BidirSwitchInst> sw;
+  sw.push_back({&a, &b, BidirSwitchKind::kTran, {0, 0}, false});
+  sw.push_back({&b, &c, BidirSwitchKind::kTranif1, {0, 0}, false});
+  ResolveBidirSwitchNetwork(sw, arena);
+
+  EXPECT_EQ(ValOf(*vb), kVal1);
+  EXPECT_EQ(ValOf(*vc), kValZ);
+}
+
+TEST(BidirectionalSwitchNetwork, AllSixSourceElementsAreBidirectional) {
+  for (auto kind :
+       {BidirSwitchKind::kTran, BidirSwitchKind::kRtran,
+        BidirSwitchKind::kTranif0, BidirSwitchKind::kTranif1,
+        BidirSwitchKind::kRtranif0, BidirSwitchKind::kRtranif1}) {
+    auto np = MakeNetPair(1);
+    Logic4Word ctrl =
+        (kind == BidirSwitchKind::kTranif0 ||
+         kind == BidirSwitchKind::kRtranif0)
+            ? Logic4Word{0, 0}
+            : Logic4Word{1, 0};
+    std::vector<BidirSwitchInst> sw;
+    sw.push_back({&np.a, &np.b, kind, ctrl, false});
+    ResolveBidirSwitchNetwork(sw, np.arena);
+    EXPECT_EQ(ValOf(*np.vb), kVal1);
+  }
+}
+
+// §4.9.5: For built-in net types, when the control input is x, any node with
+// the same logic level under all conducting/nonconducting combinations gets
+// that level; nodes whose value depends on the choice get x.
+TEST(BidirectionalSwitchNetwork, BuiltinNetXControlAmbiguousGivesX) {
+  auto np = MakeNetPair(1);
+  std::vector<BidirSwitchInst> sw;
+  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {0, 1}, false});
+  ResolveBidirSwitchNetwork(sw, np.arena);
   EXPECT_EQ(ValOf(*np.vb), kValX);
 }
 
-TEST(SwitchProcessing, BuiltinNetZControlNonUniqueProducesX) {
+// §4.9.5: A z control input on a built-in-net switch is unknown for the same
+// reason as x and produces x at every node whose value is not unique across
+// the conducting/nonconducting combinations.
+TEST(BidirectionalSwitchNetwork, BuiltinNetZControlAmbiguousGivesX) {
   auto np = MakeNetPair(0);
-
-  std::vector<SwitchInst> sw;
-  sw.push_back({&np.a, &np.b, SwitchKind::kTranif1, {1, 1}, false});
-  ResolveSwitchNetwork(sw, np.arena);
+  std::vector<BidirSwitchInst> sw;
+  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {1, 1}, false});
+  ResolveBidirSwitchNetwork(sw, np.arena);
   EXPECT_EQ(ValOf(*np.vb), kValX);
+}
+
+// §4.9.5: The other half of the built-in-net x-control rule: when both the
+// fully-conducting and fully-nonconducting solutions agree on a node, that
+// shared level is the steady-state value rather than x. Both terminals are
+// driven to the same value here, so neither solution can disagree.
+TEST(BidirectionalSwitchNetwork,
+     BuiltinNetUnknownControlUniqueLogicLevelIsPreserved) {
+  Arena arena;
+  auto* va = arena.Create<Variable>();
+  va->value = MakeLogic4Vec(arena, 1);
+  auto* vb = arena.Create<Variable>();
+  vb->value = MakeLogic4Vec(arena, 1);
+
+  Net a = MakeNet1(arena, va, 1);
+  Net b = MakeNet1(arena, vb, 1);
+
+  std::vector<BidirSwitchInst> sw;
+  sw.push_back({&a, &b, BidirSwitchKind::kTranif1, {0, 1}, false});
+  ResolveBidirSwitchNetwork(sw, arena);
+
+  EXPECT_EQ(ValOf(*va), kVal1);
+  EXPECT_EQ(ValOf(*vb), kVal1);
+}
+
+// §4.9.5: For user-defined net types, when the control input is on, the two
+// terminal nets are resolved as if a single net.
+TEST(BidirectionalSwitchNetwork,
+     UserDefinedNetKnownControlOnResolvesAsSingleNet) {
+  auto np = MakeNetPair(1);
+  std::vector<BidirSwitchInst> sw;
+  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {1, 0}, true});
+  ResolveBidirSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kVal1);
+}
+
+// §4.9.5: For user-defined net types, when the control input is off, each
+// terminal net is resolved separately, so an undriven net stays at z.
+TEST(BidirectionalSwitchNetwork,
+     UserDefinedNetKnownControlOffResolvesSeparately) {
+  auto np = MakeNetPair(1);
+  std::vector<BidirSwitchInst> sw;
+  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {0, 0}, true});
+  ResolveBidirSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
+}
+
+// §4.9.5: The bidirectional switch shall be treated as off for an x control
+// input value when the connected nets are user-defined. The undriven side
+// therefore retains its prior z value rather than picking up x.
+TEST(BidirectionalSwitchNetwork, UserDefinedNetXControlIsOff) {
+  auto np = MakeNetPair(1);
+  std::vector<BidirSwitchInst> sw;
+  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {0, 1}, true});
+  ResolveBidirSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
+}
+
+// §4.9.5: A z control input on a user-defined-net switch likewise turns the
+// switch off; this is the contrast with the built-in-net rule.
+TEST(BidirectionalSwitchNetwork, UserDefinedNetZControlIsOff) {
+  auto np = MakeNetPair(1);
+  std::vector<BidirSwitchInst> sw;
+  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {1, 1}, true});
+  ResolveBidirSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(ValOf(*np.vb), kValZ);
+}
+
+TEST(BidirectionalSwitchNetwork,
+     ConductsAlwaysForTranAndRtranIgnoringControl) {
+  EXPECT_TRUE(BidirSwitchConducts(BidirSwitchKind::kTran, {0, 0}));
+  EXPECT_TRUE(BidirSwitchConducts(BidirSwitchKind::kTran, {1, 0}));
+  EXPECT_TRUE(BidirSwitchConducts(BidirSwitchKind::kTran, {0, 1}));
+  EXPECT_TRUE(BidirSwitchConducts(BidirSwitchKind::kTran, {1, 1}));
+  EXPECT_TRUE(BidirSwitchConducts(BidirSwitchKind::kRtran, {0, 1}));
+  EXPECT_TRUE(BidirSwitchConducts(BidirSwitchKind::kRtran, {1, 1}));
+}
+
+TEST(BidirectionalSwitchNetwork,
+     ControlIsUnknownDistinguishesIfVariantsFromTran) {
+  EXPECT_FALSE(BidirSwitchControlIsUnknown(BidirSwitchKind::kTran, {0, 1}));
+  EXPECT_FALSE(BidirSwitchControlIsUnknown(BidirSwitchKind::kRtran, {1, 1}));
+  EXPECT_FALSE(BidirSwitchControlIsUnknown(BidirSwitchKind::kTranif1, {0, 0}));
+  EXPECT_FALSE(BidirSwitchControlIsUnknown(BidirSwitchKind::kTranif1, {1, 0}));
+  EXPECT_TRUE(BidirSwitchControlIsUnknown(BidirSwitchKind::kTranif1, {0, 1}));
+  EXPECT_TRUE(BidirSwitchControlIsUnknown(BidirSwitchKind::kTranif1, {1, 1}));
+  EXPECT_TRUE(BidirSwitchControlIsUnknown(BidirSwitchKind::kTranif0, {0, 1}));
+  EXPECT_TRUE(BidirSwitchControlIsUnknown(BidirSwitchKind::kRtranif1, {1, 1}));
 }
 
 }  // namespace
