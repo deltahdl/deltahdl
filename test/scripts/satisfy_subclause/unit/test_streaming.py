@@ -132,12 +132,12 @@ def test_print_event_assistant_thinking_block(
 def test_print_event_assistant_unknown_block_type(
     streaming, capsys,
 ) -> None:
-    """Unknown assistant block types render as a [type] marker."""
+    """Unknown assistant block types are silently consumed."""
     streaming.print_event({
         "type": "assistant",
         "message": {"content": [{"type": "weird"}]},
     })
-    assert "[weird]" in capsys.readouterr().out
+    assert capsys.readouterr().out == ""
 
 
 def test_print_event_assistant_null_content(streaming, capsys) -> None:
@@ -155,16 +155,10 @@ def test_print_event_assistant_null_message(streaming, capsys) -> None:
     assert capsys.readouterr().out == ""
 
 
-def test_print_event_system_init_prints_marker(streaming, capsys) -> None:
-    """System events print a one-line marker including the subtype."""
+def test_print_event_system_is_silent(streaming, capsys) -> None:
+    """System events are consumed silently."""
     streaming.print_event({"type": "system", "subtype": "init"})
-    assert "system" in capsys.readouterr().out
-
-
-def test_print_event_system_init_includes_subtype(streaming, capsys) -> None:
-    """The system marker mentions the event subtype."""
-    streaming.print_event({"type": "system", "subtype": "init"})
-    assert "init" in capsys.readouterr().out
+    assert capsys.readouterr().out == ""
 
 
 def test_print_event_user_tool_result_string(streaming, capsys) -> None:
@@ -251,16 +245,16 @@ def test_print_event_user_skips_non_tool_result_block(
     assert capsys.readouterr().out == ""
 
 
-def test_print_event_result_prints_marker(streaming, capsys) -> None:
-    """Result events print a terminal marker."""
+def test_print_event_result_is_silent(streaming, capsys) -> None:
+    """Result events are consumed silently."""
     streaming.print_event({"type": "result", "result": "DONE"})
-    assert "result" in capsys.readouterr().out
+    assert capsys.readouterr().out == ""
 
 
-def test_print_event_unknown_type_prints_raw(streaming, capsys) -> None:
-    """Unknown event types fall back to printing the raw type."""
+def test_print_event_unknown_type_is_silent(streaming, capsys) -> None:
+    """Unknown event types are consumed silently."""
     streaming.print_event({"type": "weird"})
-    assert "weird" in capsys.readouterr().out
+    assert capsys.readouterr().out == ""
 
 
 def test_print_event_assistant_text_missing_text(streaming, capsys) -> None:
@@ -389,14 +383,6 @@ _OK_STREAM = [
 def test_run_claude_streaming_returns_result(streaming) -> None:
     """The terminal result event's .result is returned."""
     assert _run(streaming, _OK_STREAM)[0] == "final"
-
-
-def test_run_claude_streaming_prints_startup_marker(
-    streaming, capsys,
-) -> None:
-    """A '[claude starting]' marker prints to stderr immediately on launch."""
-    _run(streaming, _OK_STREAM)
-    assert "claude starting" in capsys.readouterr().err
 
 
 def test_run_claude_streaming_writes_prompt(streaming) -> None:

@@ -1,15 +1,13 @@
 """Live streaming runner for Claude CLI invocations.
 
 Wraps the Claude CLI in ``--output-format stream-json`` mode, decodes
-each event as it arrives, and prints a human-readable summary of every
-event type (system init, assistant text/tool_use/thinking, user
-tool_result, result, unknown) to the terminal. Returns the final
-``.result`` text from the terminal ``result`` event so callers can
-parse structured output after the stream ends.
+each event as it arrives, and prints assistant text/tool_use/thinking
+blocks and user tool_result blocks to the terminal as Claude produces
+them. Returns the final ``.result`` text from the terminal ``result``
+event so callers can parse structured output after the stream ends.
 
-The runner is deliberately loud: there should never be a silent gap
-unless we are blocked on the child process, so callers can tell the
-pipeline is alive at every step.
+System, result, and unknown events are consumed silently — only the
+substantive content blocks reach the terminal.
 """
 
 import json
@@ -77,8 +75,6 @@ def print_assistant_blocks(message) -> None:
             print(format_tool_call(block), flush=True)
         elif btype == "thinking":
             print("  ◊ thinking...", flush=True)
-        else:
-            print(f"  · [{btype}]", flush=True)
 
 
 def print_user_blocks(message) -> None:
@@ -89,19 +85,12 @@ def print_user_blocks(message) -> None:
 
 
 def print_event(event) -> None:
-    """Print a one-line summary of every stream-json event type."""
+    """Print substantive blocks from assistant/user events; ignore the rest."""
     etype = event.get("type")
-    if etype == "system":
-        subtype = event.get("subtype", "?")
-        print(f"[system: {subtype}]", flush=True)
-    elif etype == "assistant":
+    if etype == "assistant":
         print_assistant_blocks(event.get("message") or {})
     elif etype == "user":
         print_user_blocks(event.get("message") or {})
-    elif etype == "result":
-        print("[result]", flush=True)
-    else:
-        print(f"[{etype}]", flush=True)
 
 
 def extract_result(event) -> str | None:
@@ -163,7 +152,6 @@ def run_claude_streaming(cmd, prompt, *, env) -> str:
         assert proc.stderr is not None
         proc.stdin.write(prompt)
         proc.stdin.close()
-        print("[claude starting]", file=sys.stderr, flush=True)
 
         result_text: str | None = None
         for raw in proc.stdout:
