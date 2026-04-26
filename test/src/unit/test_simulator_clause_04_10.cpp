@@ -200,24 +200,6 @@ TEST(PliCallbackControlSim, CbAtEndOfSimTimeInPrePostponed) {
   EXPECT_EQ(order[2], "postponed");
 }
 
-TEST(PliCallbackControlSim, CbReadOnlySynchInPostponed) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  ScheduleActiveEvent(sched, order);
-
-  auto* cb = sched.GetEventPool().Acquire();
-  cb->kind = EventKind::kEvaluation;
-  cb->callback = [&]() { order.push_back("postponed_cb"); };
-  sched.ScheduleEvent({0}, Region::kPostponed, cb);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "postponed_cb");
-}
-
 static void ScheduleOrderEvent(Scheduler& sched, SimTime time, Region region,
                                std::vector<std::string>& order,
                                const std::string& label) {

@@ -45,6 +45,7 @@ constexpr int kCbReadWriteSynch = 2;
 constexpr int kCbEndOfSimulation = 3;
 constexpr int kCbStmt = 4;
 constexpr int kCbAtStartOfSimTime = 5;
+constexpr int kCbReadOnlySynch = 6;
 
 // --- VPI property constants (IEEE 1800-2023 Section 36.13) ---
 
@@ -311,6 +312,7 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 #define cbEndOfSimulation 3
 #define cbStmt 4
 #define cbAtStartOfSimTime 5
+#define cbReadOnlySynch 6
 
 #define vpiType 1
 #define vpiName 2
