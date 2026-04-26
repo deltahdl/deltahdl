@@ -46,13 +46,135 @@ TEST(DesignElements, AllSevenDesignElementsCoexist) {
       "config cfg; design m; endconfig\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "m");
+  EXPECT_EQ(r.cu->modules[0]->decl_kind, ModuleDeclKind::kModule);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->name, "p");
+  EXPECT_EQ(r.cu->programs[0]->decl_kind, ModuleDeclKind::kProgram);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
+  EXPECT_EQ(r.cu->interfaces[0]->decl_kind, ModuleDeclKind::kInterface);
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->checkers[0]->name, "chk");
+  EXPECT_EQ(r.cu->checkers[0]->decl_kind, ModuleDeclKind::kChecker);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  EXPECT_EQ(r.cu->udps[0]->name, "udp_id");
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->configs[0]->name, "cfg");
+}
+
+// §3.2 states that design elements are containers for declarations and
+// procedural code. Verify the parser populates a non-empty body for each of
+// the seven kinds when given a representative declaration inside.
+TEST(DesignElements, DesignElementsContainDeclarations) {
+  auto r = Parse(
+      "module m; wire w; endmodule\n"
+      "program p; int x; endprogram\n"
+      "interface ifc; logic s; endinterface\n"
+      "checker chk; logic flag; endchecker\n"
+      "package pkg; parameter int K = 1; endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_FALSE(r.cu->modules[0]->items.empty());
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_FALSE(r.cu->programs[0]->items.empty());
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_FALSE(r.cu->interfaces[0]->items.empty());
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_FALSE(r.cu->checkers[0]->items.empty());
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_FALSE(r.cu->packages[0]->items.empty());
+}
+
+// Primitives carry a UDP table rather than a generic items list (§28); the
+// non-empty table is the §3.2 "container for procedural code" observation.
+TEST(DesignElements, PrimitiveContainsTableRows) {
+  auto r = Parse(
+      "primitive udp_id (output out, input in);\n"
+      "  table 0 : 0; 1 : 1; endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps.size(), 1u);
+  EXPECT_FALSE(r.cu->udps[0]->table.empty());
+}
+
+// Configurations carry design_cells and rules rather than a generic items
+// list (§33); a non-empty design_cells observes the container property.
+TEST(DesignElements, ConfigurationContainsDesignCell) {
+  auto r = Parse(
+      "module top; endmodule\n"
+      "config cfg; design top; endconfig\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_FALSE(r.cu->configs[0]->design_cells.empty());
+}
+
+// §3.2's container claim names "declarations and procedural code" together;
+// the declaration half is covered above. Verify the parser also accepts
+// procedural code (an initial block) inside each design-element kind that
+// permits it. Packages, primitives, and configs do not host procedural
+// blocks per their own clauses; their container property is verified by
+// the dedicated tests above.
+TEST(DesignElements, DesignElementsContainProceduralCode) {
+  auto r = Parse(
+      "module m; initial begin end endmodule\n"
+      "program p; initial begin end endprogram\n"
+      "interface ifc; initial begin end endinterface\n"
+      "checker chk; initial begin end endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_FALSE(r.cu->modules[0]->items.empty());
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_FALSE(r.cu->programs[0]->items.empty());
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_FALSE(r.cu->interfaces[0]->items.empty());
+  ASSERT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_FALSE(r.cu->checkers[0]->items.empty());
+}
+
+// §3.2's enumeration of seven design-element kinds is exhaustive. A
+// top-level subroutine declaration is a CU-scope item (§3.12.1) and must
+// not be classified as a design element of any kind.
+TEST(DesignElements, TopLevelFunctionIsNotDesignElement) {
+  auto r = Parse(
+      "function int helper(int x); return x; endfunction\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_FALSE(r.cu->cu_items.empty());
+  EXPECT_TRUE(r.cu->programs.empty());
+  EXPECT_TRUE(r.cu->interfaces.empty());
+  EXPECT_TRUE(r.cu->checkers.empty());
+  EXPECT_TRUE(r.cu->packages.empty());
+  EXPECT_TRUE(r.cu->udps.empty());
+  EXPECT_TRUE(r.cu->configs.empty());
+}
+
+// A bind directive may appear at the top level (§23.11) but is not one of
+// the seven design-element kinds enumerated by §3.2.
+TEST(DesignElements, TopLevelBindIsNotDesignElement) {
+  auto r = Parse(
+      "checker chk; endchecker\n"
+      "module m; endmodule\n"
+      "bind m chk c1();\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->udps.size(), 1u);
-  EXPECT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_FALSE(r.cu->bind_directives.empty());
+  EXPECT_TRUE(r.cu->programs.empty());
+  EXPECT_TRUE(r.cu->interfaces.empty());
+  EXPECT_TRUE(r.cu->packages.empty());
+  EXPECT_TRUE(r.cu->udps.empty());
+  EXPECT_TRUE(r.cu->configs.empty());
 }
 
 }  // namespace

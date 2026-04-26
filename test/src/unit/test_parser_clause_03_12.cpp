@@ -17,20 +17,6 @@ TEST(DesignBuildingBlockParsing, CompilationProducesAST) {
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-TEST(DesignBuildingBlockParsing, AllDesignElementTypesCompile) {
-  auto r = Parse(
-      "module m; endmodule\n"
-      "program p; endprogram\n"
-      "interface ifc; endinterface\n"
-      "checker chk; endchecker\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->checkers.size(), 1u);
-}
-
 TEST(DesignBuildingBlockParsing, ParameterOverrideCompiles) {
   auto r = Parse(
       "module sub #(parameter W = 8);\n"
@@ -81,29 +67,6 @@ TEST(DesignBuildingBlockParsing, PrimitiveDesignElementCompiles) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->udps.size(), 1u);
   EXPECT_EQ(r.cu->udps[0]->name, "udp_or");
-}
-
-TEST(DesignBuildingBlockParsing, AllDesignElementTypesIncludingPackageAndPrimitive) {
-  auto r = Parse(
-      "package pkg; endpackage\n"
-      "module m; endmodule\n"
-      "program p; endprogram\n"
-      "interface ifc; endinterface\n"
-      "checker chk; endchecker\n"
-      "primitive udp_inv(output y, input a);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->packages.size(), 1u);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_EQ(r.cu->udps.size(), 1u);
 }
 
 TEST(DesignBuildingBlockParsing, InstantiationWithParameterOverrideParsed) {
