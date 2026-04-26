@@ -396,6 +396,33 @@ VpiHandle VpiContext::CreateNetObj(std::string_view name, Net* net_ptr,
   return obj;
 }
 
+// --- §4.10 PLI callback control points ---
+
+Region RegionForPliCallback(int reason) {
+  switch (reason) {
+    case kCbAfterDelay:
+    case kCbNextSimTime:
+    case kCbAtStartOfSimTime:
+      return Region::kPreActive;
+    // Table 4-1 lists "Pre-NBA or Post-NBA" for cbReadWriteSynch — the
+    // standard permits either; we pick Pre-NBA so the callback observes the
+    // latest active-region assignments before the NBA region drains.
+    case kCbReadWriteSynch:
+    case kCbNBASynch:
+      return Region::kPreNBA;
+    case kCbAtEndOfSimTime:
+      return Region::kPrePostponed;
+    case kCbReadOnlySynch:
+      return Region::kPostponed;
+    default:
+      return Region::kCOUNT;
+  }
+}
+
+bool IsOneShotPliCallback(int reason) {
+  return RegionForPliCallback(reason) != Region::kCOUNT;
+}
+
 // --- Global context singleton ---
 
 static VpiContext* g_vpi_context = nullptr;

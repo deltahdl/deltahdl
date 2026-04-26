@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/types.h"
+
 namespace delta {
 
 class SimContext;
@@ -46,6 +48,12 @@ constexpr int kCbEndOfSimulation = 3;
 constexpr int kCbStmt = 4;
 constexpr int kCbAtStartOfSimTime = 5;
 constexpr int kCbReadOnlySynch = 6;
+// §4.10 Table 4-1: the remaining one-shot evaluation callbacks. Numeric
+// values follow the order in which they appear in this header.
+constexpr int kCbAfterDelay = 7;
+constexpr int kCbNextSimTime = 8;
+constexpr int kCbNBASynch = 9;
+constexpr int kCbAtEndOfSimTime = 10;
 
 // --- VPI property constants (IEEE 1800-2023 Section 36.13) ---
 
@@ -258,6 +266,20 @@ class VpiContext {
   std::vector<std::string> str_pool_;
 };
 
+// --- §4.10: PLI callback control points ---
+
+/// §4.10 Table 4-1: returns the event region a one-shot PLI callback is
+/// scheduled into based on its registration reason. Reasons not listed in
+/// Table 4-1 (including immediately-fired callbacks like cbValueChange)
+/// return Region::kCOUNT to signal "no assigned region".
+Region RegionForPliCallback(int reason);
+
+/// §4.10 first paragraph: returns true iff the callback reason names one of
+/// the seven Table 4-1 callbacks, which are the kind "explicitly registered
+/// as a one-shot evaluation event". Returns false for the immediate-fire
+/// kind (e.g. cbValueChange).
+bool IsOneShotPliCallback(int reason);
+
 // --- Global VPI context access ---
 
 VpiContext& GetGlobalVpiContext();
@@ -313,6 +335,10 @@ using SVpiVlogInfo = delta::VpiVlogInfo;
 #define cbStmt 4
 #define cbAtStartOfSimTime 5
 #define cbReadOnlySynch 6
+#define cbAfterDelay 7
+#define cbNextSimTime 8
+#define cbNBASynch 9
+#define cbAtEndOfSimTime 10
 
 #define vpiType 1
 #define vpiName 2
