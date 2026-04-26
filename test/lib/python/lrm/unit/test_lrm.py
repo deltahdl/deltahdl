@@ -89,3 +89,20 @@ def test_lrm_read_falls_back_when_outline_empty(blank_pdf) -> None:
     fallback = build_lrm_read_instruction("9.2.1", "/nope.pdf")
     real = build_lrm_read_instruction("9.2.1", blank_pdf)
     assert real.replace(blank_pdf, "/nope.pdf") == fallback
+
+
+def test_lrm_read_names_read_tool() -> None:
+    """Page hint names the Read tool as the only allowed PDF reader."""
+    assert "Read tool" in build_lrm_read_instruction("4.1", "/lrm.pdf")
+
+
+def test_lrm_read_caps_at_one_page_per_call() -> None:
+    """Page hint caps each Read call at a single page."""
+    assert "one page per call" in build_lrm_read_instruction(
+        "4.1", "/lrm.pdf",
+    )
+
+
+def test_lrm_read_uses_positive_phrasing() -> None:
+    """Page hint avoids the word 'never' (positive scope only)."""
+    assert "never" not in build_lrm_read_instruction("4.1", "/lrm.pdf")

@@ -69,6 +69,31 @@ def test_disallowed_tools_blocks_cmake() -> None:
     assert "Bash(cmake *)" in MUTATOR_DISALLOWED_TOOLS
 
 
+def test_disallowed_tools_blocks_pdftotext() -> None:
+    """The mutator disallowed-tools list blocks Bash(pdftotext *)."""
+    assert "pdftotext" in MUTATOR_DISALLOWED_TOOLS
+
+
+def test_disallowed_tools_blocks_pdfgrep() -> None:
+    """The mutator disallowed-tools list blocks Bash(pdfgrep *)."""
+    assert "pdfgrep" in MUTATOR_DISALLOWED_TOOLS
+
+
+def test_disallowed_tools_blocks_pdftohtml() -> None:
+    """The mutator disallowed-tools list blocks Bash(pdftohtml *)."""
+    assert "pdftohtml" in MUTATOR_DISALLOWED_TOOLS
+
+
+def test_disallowed_tools_blocks_pdftoppm() -> None:
+    """The mutator disallowed-tools list blocks Bash(pdftoppm *)."""
+    assert "pdftoppm" in MUTATOR_DISALLOWED_TOOLS
+
+
+def test_disallowed_tools_blocks_mutool() -> None:
+    """The mutator disallowed-tools list blocks Bash(mutool *)."""
+    assert "mutool" in MUTATOR_DISALLOWED_TOOLS
+
+
 # --- format_diagnostic_summary ----------------------------------------------
 
 

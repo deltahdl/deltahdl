@@ -93,9 +93,8 @@ def build_lrm_read_instruction(subclause: str, lrm: str) -> str:
     h = build_hierarchy(subclause)
     toc = load_toc(lrm)
     page_hint = (
-        " When reading the PDF, read one page at a time"
-        " (never request more than 2 pages per Read call)"
-        " to avoid content filtering errors."
+        " Read the PDF with the Read tool, one page per call —"
+        " that keeps each call inside the content-filter budget."
     )
     target = _format_clause(subclause, toc)
     if h["ancestors"]:

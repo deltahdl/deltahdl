@@ -75,6 +75,8 @@ DISALLOWED_TOOLS = (
     " Bash(git commit *) Bash(git push *)"
     " Bash(git rm *) Bash(git mv *)"
     " Bash(rm *) Bash(mv *) Bash(cp *) Bash(touch *) Bash(mkdir *)"
+    " Bash(pdftotext *) Bash(pdfgrep *) Bash(pdftohtml *)"
+    " Bash(pdftoppm *) Bash(mutool *)"
 )
 
 

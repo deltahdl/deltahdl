@@ -37,6 +37,8 @@ MUTATOR_DISALLOWED_TOOLS = (
     " Bash(rm *) Bash(mv *) Bash(cp *)"
     " Bash(cmake *) Bash(make *) Bash(ninja *)"
     " Bash(ctest *) Bash(pytest *)"
+    " Bash(pdftotext *) Bash(pdfgrep *) Bash(pdftohtml *)"
+    " Bash(pdftoppm *) Bash(mutool *)"
 )
 
 

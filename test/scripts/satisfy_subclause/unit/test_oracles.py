@@ -124,6 +124,31 @@ def test_disallowed_tools_blocks_rm() -> None:
     assert "rm *" in DISALLOWED_TOOLS
 
 
+def test_disallowed_tools_blocks_pdftotext() -> None:
+    """The disallowed-tools list blocks Bash(pdftotext *)."""
+    assert "pdftotext" in DISALLOWED_TOOLS
+
+
+def test_disallowed_tools_blocks_pdfgrep() -> None:
+    """The disallowed-tools list blocks Bash(pdfgrep *)."""
+    assert "pdfgrep" in DISALLOWED_TOOLS
+
+
+def test_disallowed_tools_blocks_pdftohtml() -> None:
+    """The disallowed-tools list blocks Bash(pdftohtml *)."""
+    assert "pdftohtml" in DISALLOWED_TOOLS
+
+
+def test_disallowed_tools_blocks_pdftoppm() -> None:
+    """The disallowed-tools list blocks Bash(pdftoppm *)."""
+    assert "pdftoppm" in DISALLOWED_TOOLS
+
+
+def test_disallowed_tools_blocks_mutool() -> None:
+    """The disallowed-tools list blocks Bash(mutool *)."""
+    assert "mutool" in DISALLOWED_TOOLS
+
+
 # --- build_env --------------------------------------------------------------
 
 
