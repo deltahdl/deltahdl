@@ -1,10 +1,15 @@
-"""Live streaming runner for Claude CLI mutator invocations.
+"""Live streaming runner for Claude CLI invocations.
 
 Wraps the Claude CLI in ``--output-format stream-json`` mode, decodes
-each event as it arrives, prints a human-readable summary to the
-terminal, and returns the final ``.result`` text. Mutators use this so
-the user sees Claude's text and tool calls land live; oracles continue
-to use the buffered JSON path because they need the structured result.
+each event as it arrives, and prints a human-readable summary of every
+event type (system init, assistant text/tool_use/thinking, user
+tool_result, result, unknown) to the terminal. Returns the final
+``.result`` text from the terminal ``result`` event so callers can
+parse structured output after the stream ends.
+
+The runner is deliberately loud: there should never be a silent gap
+unless we are blocked on the child process, so callers can tell the
+pipeline is alive at every step.
 """
 
 import json
@@ -17,6 +22,17 @@ _TOOL_ARG_KEYS = (
     "file_path", "path", "command", "pattern", "url", "query",
 )
 _MAX_ARG_LEN = 80
+
+
+def _truncate(text: str) -> str:
+    """Return *text*'s first non-empty line, capped at ``_MAX_ARG_LEN``."""
+    stripped = text.strip()
+    if not stripped:
+        return ""
+    first = stripped.splitlines()[0]
+    if len(first) > _MAX_ARG_LEN:
+        return first[: _MAX_ARG_LEN - 3] + "..."
+    return first
 
 
 def format_tool_call(block) -> str:
@@ -32,8 +48,25 @@ def format_tool_call(block) -> str:
     return f"  · {name}()"
 
 
+def format_tool_result(block) -> str:
+    """Return a one-line summary of a user ``tool_result`` block."""
+    content = block.get("content")
+    if isinstance(content, str):
+        text = content
+    elif isinstance(content, list):
+        parts = [
+            c.get("text", "") for c in content
+            if isinstance(c, dict) and c.get("type") == "text"
+        ]
+        text = "".join(parts)
+    else:
+        text = ""
+    summary = _truncate(text)
+    return f"  ↳ {summary}" if summary else "  ↳ (empty)"
+
+
 def print_assistant_blocks(message) -> None:
-    """Print text and tool_use blocks from an ``assistant`` message."""
+    """Print every block in an ``assistant`` message."""
     for block in message.get("content") or []:
         btype = block.get("type")
         if btype == "text":
@@ -42,12 +75,33 @@ def print_assistant_blocks(message) -> None:
                 print(text, flush=True)
         elif btype == "tool_use":
             print(format_tool_call(block), flush=True)
+        elif btype == "thinking":
+            print("  ◊ thinking...", flush=True)
+        else:
+            print(f"  · [{btype}]", flush=True)
+
+
+def print_user_blocks(message) -> None:
+    """Print ``tool_result`` blocks from a ``user`` message."""
+    for block in message.get("content") or []:
+        if block.get("type") == "tool_result":
+            print(format_tool_result(block), flush=True)
 
 
 def print_event(event) -> None:
-    """Pretty-print one stream-json event to stdout."""
-    if event.get("type") == "assistant":
+    """Print a one-line summary of every stream-json event type."""
+    etype = event.get("type")
+    if etype == "system":
+        subtype = event.get("subtype", "?")
+        print(f"[system: {subtype}]", flush=True)
+    elif etype == "assistant":
         print_assistant_blocks(event.get("message") or {})
+    elif etype == "user":
+        print_user_blocks(event.get("message") or {})
+    elif etype == "result":
+        print("[result]", flush=True)
+    else:
+        print(f"[{etype}]", flush=True)
 
 
 def extract_result(event) -> str | None:
@@ -109,6 +163,7 @@ def run_claude_streaming(cmd, prompt, *, env) -> str:
         assert proc.stderr is not None
         proc.stdin.write(prompt)
         proc.stdin.close()
+        print("[claude starting]", file=sys.stderr, flush=True)
 
         result_text: str | None = None
         for raw in proc.stdout:

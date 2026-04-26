@@ -118,15 +118,26 @@ def test_print_event_assistant_skips_whitespace_text(
     assert capsys.readouterr().out == ""
 
 
-def test_print_event_assistant_skips_unknown_block(
+def test_print_event_assistant_thinking_block(
     streaming, capsys,
 ) -> None:
-    """Unknown block types in an assistant message are silently skipped."""
+    """Thinking blocks render as a visible one-line marker."""
     streaming.print_event({
         "type": "assistant",
-        "message": {"content": [{"type": "thinking", "text": "ignored"}]},
+        "message": {"content": [{"type": "thinking", "text": "..."}]},
     })
-    assert capsys.readouterr().out == ""
+    assert "thinking" in capsys.readouterr().out
+
+
+def test_print_event_assistant_unknown_block_type(
+    streaming, capsys,
+) -> None:
+    """Unknown assistant block types render as a [type] marker."""
+    streaming.print_event({
+        "type": "assistant",
+        "message": {"content": [{"type": "weird"}]},
+    })
+    assert "[weird]" in capsys.readouterr().out
 
 
 def test_print_event_assistant_null_content(streaming, capsys) -> None:
@@ -144,10 +155,112 @@ def test_print_event_assistant_null_message(streaming, capsys) -> None:
     assert capsys.readouterr().out == ""
 
 
-def test_print_event_non_assistant(streaming, capsys) -> None:
-    """Non-assistant events are silently ignored."""
+def test_print_event_system_init_prints_marker(streaming, capsys) -> None:
+    """System events print a one-line marker including the subtype."""
     streaming.print_event({"type": "system", "subtype": "init"})
+    assert "system" in capsys.readouterr().out
+
+
+def test_print_event_system_init_includes_subtype(streaming, capsys) -> None:
+    """The system marker mentions the event subtype."""
+    streaming.print_event({"type": "system", "subtype": "init"})
+    assert "init" in capsys.readouterr().out
+
+
+def test_print_event_user_tool_result_string(streaming, capsys) -> None:
+    """User tool_result blocks with a string body render as a one-liner."""
+    streaming.print_event({
+        "type": "user",
+        "message": {"content": [
+            {"type": "tool_result", "content": "ok"},
+        ]},
+    })
+    assert "ok" in capsys.readouterr().out
+
+
+def test_print_event_user_tool_result_text_blocks(
+    streaming, capsys,
+) -> None:
+    """User tool_result blocks with nested text blocks render their text."""
+    streaming.print_event({
+        "type": "user",
+        "message": {"content": [
+            {"type": "tool_result", "content": [
+                {"type": "text", "text": "fileA\nfileB"},
+            ]},
+        ]},
+    })
+    assert "fileA" in capsys.readouterr().out
+
+
+def test_print_event_user_tool_result_truncates(streaming, capsys) -> None:
+    """Long tool_result text is truncated with an ellipsis."""
+    streaming.print_event({
+        "type": "user",
+        "message": {"content": [
+            {"type": "tool_result", "content": "x" * 500},
+        ]},
+    })
+    assert "..." in capsys.readouterr().out
+
+
+def test_print_event_user_tool_result_empty(streaming, capsys) -> None:
+    """An empty tool_result body still renders a marker."""
+    streaming.print_event({
+        "type": "user",
+        "message": {"content": [
+            {"type": "tool_result", "content": ""},
+        ]},
+    })
+    assert "(empty)" in capsys.readouterr().out
+
+
+def test_print_event_user_tool_result_unknown_content_type(
+    streaming, capsys,
+) -> None:
+    """A tool_result with non-string, non-list content renders empty."""
+    streaming.print_event({
+        "type": "user",
+        "message": {"content": [
+            {"type": "tool_result", "content": None},
+        ]},
+    })
+    assert "(empty)" in capsys.readouterr().out
+
+
+def test_print_event_user_null_content(streaming, capsys) -> None:
+    """A user event with null content prints nothing."""
+    streaming.print_event({"type": "user", "message": {"content": None}})
     assert capsys.readouterr().out == ""
+
+
+def test_print_event_user_null_message(streaming, capsys) -> None:
+    """A user event with null message prints nothing."""
+    streaming.print_event({"type": "user", "message": None})
+    assert capsys.readouterr().out == ""
+
+
+def test_print_event_user_skips_non_tool_result_block(
+    streaming, capsys,
+) -> None:
+    """User blocks that are not tool_result are ignored."""
+    streaming.print_event({
+        "type": "user",
+        "message": {"content": [{"type": "text", "text": "noop"}]},
+    })
+    assert capsys.readouterr().out == ""
+
+
+def test_print_event_result_prints_marker(streaming, capsys) -> None:
+    """Result events print a terminal marker."""
+    streaming.print_event({"type": "result", "result": "DONE"})
+    assert "result" in capsys.readouterr().out
+
+
+def test_print_event_unknown_type_prints_raw(streaming, capsys) -> None:
+    """Unknown event types fall back to printing the raw type."""
+    streaming.print_event({"type": "weird"})
+    assert "weird" in capsys.readouterr().out
 
 
 def test_print_event_assistant_text_missing_text(streaming, capsys) -> None:
@@ -276,6 +389,14 @@ _OK_STREAM = [
 def test_run_claude_streaming_returns_result(streaming) -> None:
     """The terminal result event's .result is returned."""
     assert _run(streaming, _OK_STREAM)[0] == "final"
+
+
+def test_run_claude_streaming_prints_startup_marker(
+    streaming, capsys,
+) -> None:
+    """A '[claude starting]' marker prints to stderr immediately on launch."""
+    _run(streaming, _OK_STREAM)
+    assert "claude starting" in capsys.readouterr().err
 
 
 def test_run_claude_streaming_writes_prompt(streaming) -> None:
