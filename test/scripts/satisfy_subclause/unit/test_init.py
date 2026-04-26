@@ -506,13 +506,16 @@ def test_main_exits_nonzero_when_stuck(ssc, tmp_path):
         [failing, failing, failing],
         pass_results=[{"status": "satisfied"}, {"status": "satisfied"}],
     )
+    captured_code = None
     with oracle:
         with issue:
             with pipeline:
                 with label:
-                    with pytest.raises(SystemExit) as exc:
+                    try:
                         ssc.main(_args(tmp_path))
-    assert exc.value.code != 0
+                    except SystemExit as exc:
+                        captured_code = exc.code
+    assert captured_code != 0
 
 
 def test_main_logs_subclause_to_stderr(ssc, tmp_path, capsys):

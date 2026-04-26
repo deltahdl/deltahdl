@@ -103,8 +103,9 @@ def test_main_requires_diagnostic_file(swd, tmp_path):
 
 def test_main_accepts_empty_dependencies(swd, tmp_path):
     """main() accepts an empty --satisfied-dependencies value."""
-    with _patched_runner():
+    with _patched_runner() as runner:
         swd.main(_args(tmp_path, _failing_payload(), deps=""))
+    assert runner.called
 
 
 def test_main_rejects_bad_clause(swd, tmp_path):
