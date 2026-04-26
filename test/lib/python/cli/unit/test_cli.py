@@ -21,6 +21,7 @@ from lib.python.cli import (
     invoke_implement_subclause,
     invoke_implement_subclauses,
     parse_and_validate,
+    parse_and_validate_subclause,
     parse_clause_issues,
     parse_labels,
     run_claude_cli,
@@ -157,6 +158,50 @@ def test_validate_subclause_rejects_garbage() -> None:
     args = argparse.Namespace(subclause="not-a-clause")
     with pytest.raises(SystemExit):
         validate_subclause(parser, args)
+
+
+# ---- parse_and_validate_subclause -------------------------------------------
+
+
+def _subclause_parser():
+    """Build a minimal parser wired up for parse_and_validate_subclause."""
+    parser = argparse.ArgumentParser()
+    add_lrm_arg(parser)
+    add_subclause_arg(parser)
+    return parser
+
+
+def test_parse_and_validate_subclause_returns_namespace(tmp_path) -> None:
+    """Returns the parsed namespace when --lrm and --subclause are valid."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.touch()
+    parser = _subclause_parser()
+    args = parse_and_validate_subclause(
+        parser, ["--lrm", str(lrm), "--subclause", "33.4.1.5"],
+    )
+    assert args.subclause == "33.4.1.5"
+
+
+def test_parse_and_validate_subclause_rejects_missing_lrm(tmp_path) -> None:
+    """Errors out when --lrm points at a non-existent file."""
+    parser = _subclause_parser()
+    with pytest.raises(SystemExit):
+        parse_and_validate_subclause(
+            parser,
+            ["--lrm", str(tmp_path / "no.pdf"), "--subclause", "4.1"],
+        )
+
+
+def test_parse_and_validate_subclause_rejects_bad_subclause(tmp_path) -> None:
+    """Errors out when --subclause is not a valid clause string."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.touch()
+    parser = _subclause_parser()
+    with pytest.raises(SystemExit):
+        parse_and_validate_subclause(
+            parser,
+            ["--lrm", str(lrm), "--subclause", "garbage"],
+        )
 
 
 # ---- add_github_args --------------------------------------------------------

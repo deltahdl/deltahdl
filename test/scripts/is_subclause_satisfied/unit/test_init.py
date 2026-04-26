@@ -2,7 +2,7 @@
 
 import json
 import runpy
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -36,89 +36,27 @@ def _all_satisfied_payload():
     return {condition: SATISFIED for condition in SATISFACTION_CONDITIONS}
 
 
-def _claude_response(payload):
-    """Return a stubbed Claude --output-format json stdout for *payload*."""
-    return json.dumps({"result": json.dumps(payload)})
+# ---- main argument plumbing ------------------------------------------------
 
 
-def _claude_completed(stdout, *, returncode=0, stderr=""):
-    """Return a stubbed CompletedProcess for subprocess.run."""
-    completed = MagicMock()
-    completed.returncode = returncode
-    completed.stdout = stdout
-    completed.stderr = stderr
-    return completed
-
-
-# ---- parse_args -------------------------------------------------------------
-
-
-def test_parse_args_requires_subclause(iss, tmp_path):
-    """--subclause is required; omitting it exits."""
+def test_main_requires_subclause(iss, tmp_path):
+    """main() exits when --subclause is missing."""
     with pytest.raises(SystemExit):
-        iss.parse_args(["--lrm", str(_make_lrm(tmp_path))])
+        iss.main(["--lrm", str(_make_lrm(tmp_path))])
 
 
-def test_parse_args_requires_lrm(iss):
-    """--lrm is required; omitting it exits."""
+def test_main_requires_lrm(iss):
+    """main() exits when --lrm is missing."""
     with pytest.raises(SystemExit):
-        iss.parse_args(["--subclause", "4.1"])
+        iss.main(["--subclause", "4.1"])
 
 
-def test_parse_args_rejects_missing_lrm(iss, tmp_path):
-    """Non-existent LRM file exits."""
+def test_main_rejects_bad_clause(iss, tmp_path):
+    """main() exits when --subclause is not a valid clause string."""
     with pytest.raises(SystemExit):
-        iss.parse_args([
-            "--lrm", str(tmp_path / "no.txt"), "--subclause", "4.1",
+        iss.main([
+            "--lrm", str(_make_lrm(tmp_path)), "--subclause", "bad",
         ])
-
-
-def test_parse_args_rejects_bad_clause(iss, tmp_path):
-    """Invalid clause format exits."""
-    with pytest.raises(SystemExit):
-        iss.parse_args(_args_with_lrm(tmp_path)[:2] + [
-            "--subclause", "bad",
-        ])
-
-
-def test_parse_args_accepts_numeric(iss, tmp_path):
-    """Numeric clause is accepted and stored on the namespace."""
-    args = iss.parse_args(_args_with_lrm(tmp_path))
-    assert args.subclause == "4.1"
-
-
-def test_parse_args_accepts_annex(iss, tmp_path):
-    """Single-letter annex clause is accepted."""
-    args = iss.parse_args([
-        "--lrm", str(_make_lrm(tmp_path)), "--subclause", "B",
-    ])
-    assert args.subclause == "B"
-
-
-def test_parse_args_accepts_deep_clause(iss, tmp_path):
-    """Five-component clause is accepted."""
-    args = iss.parse_args([
-        "--lrm", str(_make_lrm(tmp_path)), "--subclause", "33.4.1.5.2",
-    ])
-    assert args.subclause == "33.4.1.5.2"
-
-
-def test_parse_args_default_model(iss, tmp_path):
-    """--model defaults to 'opus'."""
-    args = iss.parse_args(_args_with_lrm(tmp_path))
-    assert args.model == "opus"
-
-
-def test_parse_args_model_override(iss, tmp_path):
-    """--model accepts an override value."""
-    args = iss.parse_args(_args_with_lrm(tmp_path, "--model", "sonnet"))
-    assert args.model == "sonnet"
-
-
-def test_parse_args_lrm_value(iss, tmp_path):
-    """--lrm value is stored on the namespace."""
-    args = iss.parse_args(_args_with_lrm(tmp_path))
-    assert str(args.lrm) == str(_make_lrm(tmp_path))
 
 
 # ---- build_prompt ----------------------------------------------------------
@@ -170,37 +108,6 @@ def test_build_prompt_forbids_self_recursion(iss):
 def test_build_prompt_includes_pascalcase_naming(iss):
     """Prompt mentions the PascalCase naming convention."""
     assert "PascalCase" in iss.build_prompt("6.3", "~/LRM.pdf")
-
-
-# ---- extract_json_object ----------------------------------------------------
-
-
-def test_extract_json_object_bare(iss):
-    """A bare JSON object is returned verbatim."""
-    assert iss.extract_json_object('{"a": 1}') == '{"a": 1}'
-
-
-def test_extract_json_object_with_surrounding_text(iss):
-    """A JSON object surrounded by text is extracted."""
-    assert iss.extract_json_object('preamble {"a": 1} trailer') == '{"a": 1}'
-
-
-def test_extract_json_object_fenced(iss):
-    """A JSON object inside a ```json``` fence is extracted."""
-    text = '```json\n{"a": 1}\n```'
-    assert iss.extract_json_object(text) == '{"a": 1}'
-
-
-def test_extract_json_object_fenced_no_lang(iss):
-    """A JSON object inside an unmarked code fence is extracted."""
-    text = '```\n{"a": 1}\n```'
-    assert iss.extract_json_object(text) == '{"a": 1}'
-
-
-def test_extract_json_object_raises_when_missing(iss):
-    """Text without any JSON object raises ValueError."""
-    with pytest.raises(ValueError):
-        iss.extract_json_object("no json here")
 
 
 # ---- parse_diagnostic -------------------------------------------------------
@@ -299,168 +206,15 @@ def test_diagnostic_to_payload_preserves_satisfied(iss):
     assert payload["test_coverage"] == SATISFIED
 
 
-# ---- run_oracle -------------------------------------------------------------
-
-
-def _patched_run(stdout, *, returncode=0, stderr=""):
-    """Patch subprocess.run with a stubbed CompletedProcess."""
-    completed = _claude_completed(stdout, returncode=returncode, stderr=stderr)
-    return patch(
-        "is_subclause_satisfied.subprocess.run",
-        return_value=completed,
-    )
-
-
-def test_run_oracle_returns_result_text(iss):
-    """run_oracle returns the .result string from the Claude CLI payload."""
-    stdout = _claude_response(_all_satisfied_payload())
-    with _patched_run(stdout):
-        text = iss.run_oracle("prompt", model="opus")
-    assert text == json.dumps(_all_satisfied_payload())
-
-
-def test_run_oracle_passes_model_to_cli(iss):
-    """run_oracle passes the model argument to the Claude CLI."""
-    stdout = _claude_response(_all_satisfied_payload())
-    with _patched_run(stdout) as mock_run:
-        iss.run_oracle("prompt", model="haiku")
-    cmd = mock_run.call_args[0][0]
-    assert cmd[cmd.index("--model") + 1] == "haiku"
-
-
-def test_run_oracle_passes_disallowed_tools(iss):
-    """run_oracle passes --disallowedTools to the Claude CLI."""
-    stdout = _claude_response(_all_satisfied_payload())
-    with _patched_run(stdout) as mock_run:
-        iss.run_oracle("prompt", model="opus")
-    assert "--disallowedTools" in mock_run.call_args[0][0]
-
-
-def test_run_oracle_disallowed_tools_blocks_write(iss):
-    """run_oracle's disallowedTools value blocks the Write tool."""
-    stdout = _claude_response(_all_satisfied_payload())
-    with _patched_run(stdout) as mock_run:
-        iss.run_oracle("prompt", model="opus")
-    cmd = mock_run.call_args[0][0]
-    assert "Write" in cmd[cmd.index("--disallowedTools") + 1]
-
-
-def test_run_oracle_disallowed_tools_blocks_edit(iss):
-    """run_oracle's disallowedTools value blocks the Edit tool."""
-    stdout = _claude_response(_all_satisfied_payload())
-    with _patched_run(stdout) as mock_run:
-        iss.run_oracle("prompt", model="opus")
-    cmd = mock_run.call_args[0][0]
-    assert "Edit" in cmd[cmd.index("--disallowedTools") + 1]
-
-
-def test_run_oracle_uses_dangerously_skip_permissions(iss):
-    """run_oracle invokes the Claude CLI with --dangerously-skip-permissions."""
-    stdout = _claude_response(_all_satisfied_payload())
-    with _patched_run(stdout) as mock_run:
-        iss.run_oracle("prompt", model="opus")
-    assert "--dangerously-skip-permissions" in mock_run.call_args[0][0]
-
-
-def test_run_oracle_writes_prompt_to_stdin(iss):
-    """run_oracle passes the prompt to subprocess.run as input."""
-    stdout = _claude_response(_all_satisfied_payload())
-    with _patched_run(stdout) as mock_run:
-        iss.run_oracle("hello prompt", model="opus")
-    assert mock_run.call_args[1]["input"] == "hello prompt"
-
-
-def test_run_oracle_uses_json_output_format(iss):
-    """run_oracle requests --output-format json from the Claude CLI."""
-    stdout = _claude_response(_all_satisfied_payload())
-    with _patched_run(stdout) as mock_run:
-        iss.run_oracle("prompt", model="opus")
-    cmd = mock_run.call_args[0][0]
-    assert cmd[cmd.index("--output-format") + 1] == "json"
-
-
-def test_run_oracle_env_drops_claudecode(iss):
-    """run_oracle's env passed to subprocess.run has no CLAUDECODE."""
-    stdout = _claude_response(_all_satisfied_payload())
-    with patch.dict("os.environ", {"CLAUDECODE": "1"}, clear=False):
-        with _patched_run(stdout) as mock_run:
-            iss.run_oracle("prompt", model="opus")
-    assert "CLAUDECODE" not in mock_run.call_args[1]["env"]
-
-
-def test_run_oracle_env_preserves_other_vars(iss):
-    """run_oracle's env passed to subprocess.run preserves other vars."""
-    stdout = _claude_response(_all_satisfied_payload())
-    with patch.dict("os.environ", {"SOME_VAR": "value"}, clear=False):
-        with _patched_run(stdout) as mock_run:
-            iss.run_oracle("prompt", model="opus")
-    assert mock_run.call_args[1]["env"].get("SOME_VAR") == "value"
-
-
-def test_run_oracle_exits_on_nonzero(iss):
-    """A non-zero exit code is loud-fatal."""
-    with _patched_run("", returncode=1, stderr="boom"):
-        with pytest.raises(SystemExit):
-            iss.run_oracle("prompt", model="opus")
-
-
-def test_run_oracle_dumps_stderr_on_nonzero(iss, capsys):
-    """Non-zero exit dumps stderr to the terminal."""
-    with _patched_run("", returncode=1, stderr="UNIQUE_STDERR"):
-        try:
-            iss.run_oracle("prompt", model="opus")
-        except SystemExit:
-            pass
-    assert "UNIQUE_STDERR" in capsys.readouterr().err
-
-
-def test_run_oracle_exits_on_non_json_stdout(iss):
-    """Non-JSON stdout from the Claude CLI is loud-fatal."""
-    with _patched_run("not json"):
-        with pytest.raises(SystemExit):
-            iss.run_oracle("prompt", model="opus")
-
-
-def test_run_oracle_dumps_non_json_stdout(iss, capsys):
-    """Non-JSON stdout is echoed to stderr."""
-    with _patched_run("WEIRD_BAD_JSON"):
-        try:
-            iss.run_oracle("prompt", model="opus")
-        except SystemExit:
-            pass
-    assert "WEIRD_BAD_JSON" in capsys.readouterr().err
-
-
-def test_run_oracle_exits_when_result_missing(iss):
-    """Claude payload without a .result field is loud-fatal."""
-    with _patched_run(json.dumps({"other": "value"})):
-        with pytest.raises(SystemExit):
-            iss.run_oracle("prompt", model="opus")
-
-
-def test_run_oracle_exits_when_result_empty(iss):
-    """Claude payload with empty .result is loud-fatal."""
-    with _patched_run(json.dumps({"result": ""})):
-        with pytest.raises(SystemExit):
-            iss.run_oracle("prompt", model="opus")
-
-
-def test_run_oracle_exits_when_result_non_string(iss):
-    """Claude payload with non-string .result is loud-fatal."""
-    with _patched_run(json.dumps({"result": 42})):
-        with pytest.raises(SystemExit):
-            iss.run_oracle("prompt", model="opus")
-
-
 # ---- main -------------------------------------------------------------------
 
 
 def _run_main(iss, tmp_path, *, payload=None, extra=None):
-    """Run main() with run_oracle stubbed; return captured stdout."""
+    """Run main() with run_oracle_call stubbed; return captured mock."""
     payload = payload or _all_satisfied_payload()
     args = _args_with_lrm(tmp_path, *(extra or []))
     with patch(
-        "is_subclause_satisfied.run_oracle",
+        "is_subclause_satisfied.run_oracle_call",
         return_value=json.dumps(payload),
     ) as mock_run:
         iss.main(args)
@@ -468,13 +222,13 @@ def _run_main(iss, tmp_path, *, payload=None, extra=None):
 
 
 def test_main_invokes_run_oracle(iss, tmp_path):
-    """main() invokes run_oracle exactly once."""
+    """main() invokes the oracle Claude call exactly once."""
     mock_run = _run_main(iss, tmp_path)
     assert mock_run.call_count == 1
 
 
 def test_main_passes_model_to_run_oracle(iss, tmp_path):
-    """main() forwards --model to run_oracle."""
+    """main() forwards --model to the oracle Claude call."""
     mock_run = _run_main(iss, tmp_path, extra=["--model", "haiku"])
     assert mock_run.call_args[1]["model"] == "haiku"
 
@@ -504,9 +258,15 @@ def test_main_prints_failure_verdict_no(iss, tmp_path, capsys):
 
 
 def test_main_logs_subclause_to_stderr(iss, tmp_path, capsys):
-    """main() prints a one-line oracle banner to stderr."""
+    """main() prints a one-line satisfaction-oracle banner to stderr."""
     _run_main(iss, tmp_path)
     assert "§4.1" in capsys.readouterr().err
+
+
+def test_main_banner_identifies_satisfaction_oracle(iss, tmp_path, capsys):
+    """main() banner identifies the satisfaction oracle (not dependency)."""
+    _run_main(iss, tmp_path)
+    assert "Satisfaction" in capsys.readouterr().err
 
 
 # ---- __main__ guard --------------------------------------------------------

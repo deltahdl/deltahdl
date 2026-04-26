@@ -7,21 +7,10 @@ surveys both the source tree and the test tree, and returns a structured
 renames, edits, or deletes anything.
 """
 
-import argparse
 import json
-import os
-import re
-import subprocess
 import sys
 from dataclasses import asdict
 
-from lib.python.cli import (
-    add_lrm_arg,
-    add_model_arg,
-    add_subclause_arg,
-    validate_lrm,
-    validate_subclause,
-)
 from lib.python.clause import STAGE_TO_PREFIX, clause_to_filename
 from lib.python.lrm import build_lrm_read_instruction
 from lib.python.satisfy import (
@@ -30,13 +19,10 @@ from lib.python.satisfy import (
     ConditionStatus,
     SubclauseDiagnostic,
 )
-
-
-_DISALLOWED_TOOLS = (
-    "Write Edit MultiEdit NotebookEdit"
-    " Bash(git commit *) Bash(git push *)"
-    " Bash(git rm *) Bash(git mv *)"
-    " Bash(rm *) Bash(mv *) Bash(cp *) Bash(touch *) Bash(mkdir *)"
+from lib.python.satisfy.oracle import (
+    build_oracle_args,
+    extract_json_literal,
+    run_oracle_call,
 )
 
 
@@ -98,23 +84,6 @@ def build_prompt(subclause: str, lrm: str) -> str:
 # Response parsing
 # ---------------------------------------------------------------------------
 
-def extract_json_object(text: str) -> str:
-    """Extract a JSON object substring from ``text``.
-
-    Handles bare objects and ```json``` fenced blocks. Raises
-    ``ValueError`` if no ``{...}`` substring is present.
-    """
-    fenced = re.search(
-        r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL,
-    )
-    if fenced:
-        return fenced.group(1)
-    obj = re.search(r"\{.*\}", text, re.DOTALL)
-    if obj:
-        return obj.group(0)
-    raise ValueError("No JSON object found in oracle output")
-
-
 def _parse_condition(condition: str, value: object) -> ConditionStatus:
     """Validate one condition value; return it normalised."""
     if value == SATISFIED:
@@ -133,7 +102,7 @@ def _parse_condition(condition: str, value: object) -> ConditionStatus:
 
 def parse_diagnostic(text: str) -> SubclauseDiagnostic:
     """Parse the oracle's response text into a ``SubclauseDiagnostic``."""
-    body = extract_json_object(text)
+    body = extract_json_literal(text)
     payload = json.loads(body)
     fields: dict[str, ConditionStatus] = {}
     for condition in SATISFACTION_CONDITIONS:
@@ -151,85 +120,24 @@ def diagnostic_to_payload(diag: SubclauseDiagnostic) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Claude CLI invocation
-# ---------------------------------------------------------------------------
-
-def _build_env() -> dict:
-    """Return a clean environment for Claude CLI subprocesses."""
-    env = os.environ.copy()
-    env.pop("CLAUDECODE", None)
-    return env
-
-
-def run_oracle(prompt: str, *, model: str = "opus") -> str:
-    """Invoke Claude in JSON mode; return the ``.result`` text.
-
-    Loud-fatal on non-zero exit, non-JSON stdout, or missing result.
-    """
-    cmd = [
-        "claude", "-p",
-        "--model", model,
-        "--output-format", "json",
-        "--dangerously-skip-permissions",
-        "--disallowedTools", _DISALLOWED_TOOLS,
-    ]
-    env = _build_env()
-    completed = subprocess.run(
-        cmd,
-        input=prompt,
-        capture_output=True,
-        text=True,
-        env=env,
-        check=False,
-    )
-    if completed.returncode != 0:
-        print(completed.stderr, file=sys.stderr)
-        sys.exit(completed.returncode)
-    try:
-        payload = json.loads(completed.stdout)
-    except json.JSONDecodeError:
-        print(
-            f"Claude CLI did not return JSON:\n{completed.stdout}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    text = payload.get("result")
-    if not isinstance(text, str) or not text:
-        print("Claude CLI did not return a result string", file=sys.stderr)
-        sys.exit(1)
-    return text
-
-
-# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
-def parse_args(argv=None) -> argparse.Namespace:
-    """Parse and validate CLI arguments."""
-    parser = argparse.ArgumentParser(
-        description=(
-            "Read-only satisfaction oracle for an LRM subclause."
-            " Prints a SubclauseDiagnostic JSON object to stdout."
-        ),
-    )
-    add_lrm_arg(parser)
-    add_subclause_arg(parser)
-    add_model_arg(parser)
-    args = parser.parse_args(argv)
-    validate_lrm(parser, args)
-    validate_subclause(parser, args)
-    return args
+_DESCRIPTION = (
+    "Read-only satisfaction oracle for an LRM subclause."
+    " Prints a SubclauseDiagnostic JSON object to stdout."
+)
 
 
 def main(argv=None) -> None:
     """Run the oracle and print the diagnostic JSON to stdout."""
-    args = parse_args(argv)
+    args = build_oracle_args(_DESCRIPTION, argv)
     print(
-        f"Oracle: §{args.subclause}, model {args.model}",
+        f"Satisfaction oracle: §{args.subclause}, model {args.model}",
         file=sys.stderr,
     )
     prompt = build_prompt(args.subclause, str(args.lrm))
-    text = run_oracle(prompt, model=args.model)
+    text = run_oracle_call(prompt, model=args.model)
     diag = parse_diagnostic(text)
     payload = diagnostic_to_payload(diag)
     print(json.dumps(payload, indent=2))

@@ -15,8 +15,7 @@ from lib.python.cli import (
     add_lrm_arg,
     add_model_arg,
     add_subclause_arg,
-    validate_lrm,
-    validate_subclause,
+    parse_and_validate_subclause,
 )
 from lib.python.git import (
     commit_and_push,
@@ -363,10 +362,7 @@ def parse_args(argv=None):
     )
     add_model_arg(parser)
     add_continue_arg(parser)
-    args = parser.parse_args(argv)
-    validate_lrm(parser, args)
-    validate_subclause(parser, args)
-    return args
+    return parse_and_validate_subclause(parser, argv)
 
 
 def clause_depth(clause: str) -> int:

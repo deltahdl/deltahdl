@@ -44,6 +44,17 @@ def validate_subclause(
         )
 
 
+def parse_and_validate_subclause(
+    parser: argparse.ArgumentParser,
+    argv: list[str] | None = None,
+) -> argparse.Namespace:
+    """Parse *argv* and validate both ``--lrm`` and ``--subclause``."""
+    args = parser.parse_args(argv)
+    validate_lrm(parser, args)
+    validate_subclause(parser, args)
+    return args
+
+
 def add_model_arg(parser: argparse.ArgumentParser) -> None:
     """Add the ``--model`` argument to *parser*."""
     parser.add_argument(
