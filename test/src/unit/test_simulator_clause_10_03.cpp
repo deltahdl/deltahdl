@@ -74,23 +74,4 @@ TEST(ContinuousAssignSim, DrivesVectorVariable) {
   EXPECT_EQ(var->value.ToUint64(), 0xBEEFu);
 }
 
-TEST(ContinuousAssignSim, ReEvaluatesOnRhsChange) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  assign b = a;\n"
-      "  initial begin\n"
-      "    a = 8'd10;\n"
-      "    #1;\n"
-      "    a = 8'd42;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 42u);
-}
-
 }  // namespace

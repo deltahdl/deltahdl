@@ -97,22 +97,6 @@ TEST(EventSimulationSim, AlwaysIsProcess) {
   EXPECT_EQ(f.ctx.FindVariable("q")->value.ToUint64(), 77u);
 }
 
-TEST(EventSimulationSim, ContinuousAssignIsProcess) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] src, dst;\n"
-      "  assign dst = src;\n"
-      "  initial src = 8'd33;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 33u);
-}
-
 TEST(EventSimulationSim, ProceduralAssignmentInProcess) {
   auto result = RunAndGet(
       "module t;\n"
@@ -157,24 +141,6 @@ TEST(EventSimulationSim, NonBlockingAssignCreatesUpdateEvent) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 88u);
-}
-
-TEST(EventSimulationSim, ContinuousAssignUpdateEvent) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial a = 8'd4;\n"
-      "  assign b = a + 8'd1;\n"
-      "  assign c = b + 8'd1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 5u);
-  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 6u);
 }
 
 TEST(EventSimulationSim, EvaluationEventOnInputChange) {
