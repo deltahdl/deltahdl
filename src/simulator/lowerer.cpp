@@ -960,6 +960,10 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   p->id = next_id_++;
   p->home_region = from_program ? Region::kReactive : Region::kActive;
   p->is_reactive = from_program;
+  // Inherit the lowerer's current instance prefix so that bare identifiers
+  // in the cont-assign expressions resolve to the enclosing scope's items
+  // through the FindVariable prefix lookup.
+  p->inst_prefix = inst_prefix_;
   ContAssignParams cap;
   cap.lhs = ca.lhs;
   cap.rhs = ca.rhs;
@@ -1093,6 +1097,66 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
   }
 }
 
+// --- §4.9.6: Port-connection lowering for module instances ---
+
+void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
+                                bool from_program) {
+  for (const auto& binding : inst.port_bindings) {
+    if (!binding.connection) continue;
+    if (binding.width == 0) continue;
+    if (binding.direction != Direction::kInput &&
+        binding.direction != Direction::kOutput &&
+        binding.direction != Direction::kInout) {
+      continue;
+    }
+
+    // Bare port-name identifier for the local (child) side. The cont-assign
+    // coroutine inherits inst_prefix_ via Process::inst_prefix, so a bare
+    // port name resolves to the prefixed local port through FindVariable.
+    auto* name_str = arena_.Create<std::string>(std::string(binding.port_name));
+    auto* local_id = arena_.Create<Expr>();
+    local_id->kind = ExprKind::kIdentifier;
+    local_id->text = *name_str;
+
+    // §4.9.6: An inout port is a non-strength-reducing transistor connecting
+    // the local net to the outside net — both sides observe a single shared
+    // storage location. Implement this by aliasing the local port's
+    // variable entry to the outside identifier's variable so a write on
+    // either side is the same write. Aliasing only applies when the outside
+    // is a plain identifier; expression connections fall through and the
+    // inout effectively becomes unconnected at the binding boundary.
+    if (binding.direction == Direction::kInout) {
+      if (binding.connection->kind != ExprKind::kIdentifier) continue;
+      std::string local_qualified = inst_prefix_ + std::string(binding.port_name);
+      ctx_.AliasVariable(local_qualified, binding.connection->text);
+      continue;
+    }
+
+    // §4.9.6: An input port is a continuous assignment from the outside
+    // expression to the local input net or variable.
+    if (binding.direction == Direction::kInput) {
+      RtlirContAssign ca;
+      ca.lhs = local_id;
+      ca.rhs = binding.connection;
+      ca.width = binding.width;
+      LowerContAssign(ca, from_program);
+      continue;
+    }
+
+    // §4.9.6: An output port is a continuous assignment from the local
+    // output expression to the outside net or variable. Only identifier
+    // outside expressions are valid lvalues here; complex selects or
+    // concatenations on the outside are not sinks the cont-assign coroutine
+    // can write into and are skipped.
+    if (binding.connection->kind != ExprKind::kIdentifier) continue;
+    RtlirContAssign ca;
+    ca.lhs = binding.connection;
+    ca.rhs = local_id;
+    ca.width = binding.width;
+    LowerContAssign(ca, from_program);
+  }
+}
+
 // --- §23.6: Recursive child module lowering for hierarchical access ---
 
 void Lowerer::LowerChildModules(const RtlirModule* mod) {
@@ -1132,6 +1196,11 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
         if (port.is_signed) v->is_signed = true;
       }
     }
+
+    // §4.9.6: Bridge each child port to the outside world via implicit
+    // assignments. Done before lowering the child's own processes so that
+    // input drivers are present in time for the first scheduled evaluation.
+    LowerPortBindings(child, child.resolved->is_program);
 
     // Lower child processes (inst_prefix_ is set on each Process).
     uint32_t child_block_id =

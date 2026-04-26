@@ -20,6 +20,7 @@ struct RtlirProcess;
 struct AssocArrayObject;
 struct ClassDecl;
 struct Expr;
+struct RtlirModuleInst;
 struct RtlirVariable;
 struct Variable;
 
@@ -58,6 +59,11 @@ class Lowerer {
   void RegisterEnumForCast(const RtlirVariable& var);
   void RegisterEnumTypes(const RtlirModule* mod);
   void LowerChildModules(const RtlirModule* mod);
+  // §4.9.6: Materialize a child instance's port_bindings — input/output
+  // ports become implicit continuous assignments, inout ports alias the
+  // local port variable onto the outside identifier so the two sides
+  // share storage like a non-strength-reducing transistor.
+  void LowerPortBindings(const RtlirModuleInst& inst, bool from_program);
 
   SimContext& ctx_;
   Arena& arena_;

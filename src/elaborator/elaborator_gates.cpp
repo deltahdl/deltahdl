@@ -142,6 +142,57 @@ void ValidateBidirectionalSwitchConnections(const ModuleItem* item,
   }
 }
 
+// §4.9.6: Per-gate-kind index list of terminals that act as outputs or
+// inout (bidirectional) connections. These are the terminals the spec
+// constrains to 1-bit nets.
+static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
+                                                        size_t nterms) {
+  switch (kind) {
+    case GateKind::kBuf:
+    case GateKind::kNot: {
+      // Last terminal is the input; every preceding terminal is an output.
+      std::vector<size_t> outs;
+      for (size_t i = 0; i + 1 < nterms; ++i) outs.push_back(i);
+      return outs;
+    }
+    case GateKind::kTran:
+    case GateKind::kRtran:
+    case GateKind::kTranif0:
+    case GateKind::kTranif1:
+    case GateKind::kRtranif0:
+    case GateKind::kRtranif1:
+      // Bidirectional pass switches: terminals 0 and 1 are the two inout
+      // terminals; the optional terminal 2 (control) is an input.
+      return (nterms >= 2) ? std::vector<size_t>{0, 1} : std::vector<size_t>{};
+    default:
+      // Single-output gates (and/nand/or/nor/xor/xnor, bufif*, notif*,
+      // nmos/pmos/rnmos/rpmos, cmos/rcmos, pullup/pulldown): terminal 0 is
+      // the output, every later terminal is an input.
+      return (nterms >= 1) ? std::vector<size_t>{0} : std::vector<size_t>{};
+  }
+}
+
+void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
+                                           const RtlirModule* mod,
+                                           DiagEngine& diag) {
+  if (!item || item->kind != ModuleItemKind::kGateInst) return;
+  // Array-of-instances forms have a separate width rule (1 or array length)
+  // already enforced where the array is unrolled; do not double-diagnose.
+  if (item->inst_range_left || item->inst_range_right) return;
+
+  const auto& terms = item->gate_terminals;
+  for (size_t i : OutputOrInoutTerminalIndices(item->gate_kind, terms.size())) {
+    auto* t = terms[i];
+    if (!t || t->kind != ExprKind::kIdentifier) continue;
+    uint32_t w = LookupLhsWidth(t, mod);
+    if (w == 0 || w == 1) continue;
+    diag.Error(item->loc,
+               std::format("primitive output or inout terminal '{}' must be "
+                           "a 1-bit net (got width {})",
+                           t->text, w));
+  }
+}
+
 /// Build a binary expression tree from left-folding the given operand over
 /// all inputs with the given operator.
 static Expr* BuildBinaryChain(Arena& arena, TokenKind op,

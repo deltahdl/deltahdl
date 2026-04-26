@@ -817,6 +817,15 @@ void ValidateBidirectionalSwitchConnections(const ModuleItem* item,
                                             const RtlirModule* mod,
                                             DiagEngine& diag);
 
+// §4.9.6: Diagnose a primitive output or inout terminal that is not a 1-bit
+// net. Inputs are not constrained here — multi-bit input expressions fall
+// under the implicit-cont-assign rule and are handled by gate elaboration.
+// Skipped for array-of-instances forms, which have their own per-instance vs.
+// array-length width allowance.
+void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
+                                           const RtlirModule* mod,
+                                           DiagEngine& diag);
+
 // §23.10: capture declared type/range info on a value-parameter decl.
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype);
 

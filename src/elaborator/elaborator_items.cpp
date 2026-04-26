@@ -706,6 +706,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
         }
       }
       ValidateBidirectionalSwitchConnections(item, mod, diag_);
+      ValidatePrimitiveOutputTerminalWidths(item, mod, diag_);
       ElaborateGateInst(item, mod, arena_);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       break;
