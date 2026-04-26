@@ -210,80 +210,6 @@ jobs:
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/classify_tests/e2e/ -v
-  test-compute-subclause-dependencies:
-    needs:
-      - test-lib-clause
-      - test-lib-cli
-      - test-lib-git
-      - test-lib-lrm
-      - test-lib-satisfy
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-scripts-test-script-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-script-
-      - name: Install tools
-        run: pip install pypdf pytest pytest-cov
-      - name: Run unit tests with 100% coverage gate
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/compute_subclause_dependencies/unit/ -v
-          --cov=compute_subclause_dependencies
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-      - name: Run integration tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/compute_subclause_dependencies/integration/ -v
-      - name: Run e2e tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/compute_subclause_dependencies/e2e/ -v
-  test-is-subclause-satisfied:
-    needs:
-      - test-lib-clause
-      - test-lib-cli
-      - test-lib-git
-      - test-lib-lrm
-      - test-lib-satisfy
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-scripts-test-script-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-script-
-      - name: Install tools
-        run: pip install pypdf pytest pytest-cov
-      - name: Run unit tests with 100% coverage gate
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/is_subclause_satisfied/unit/ -v
-          --cov=is_subclause_satisfied
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-      - name: Run integration tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/is_subclause_satisfied/integration/ -v
-      - name: Run e2e tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/is_subclause_satisfied/e2e/ -v
   test-lib-classify:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -445,29 +371,6 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
-  test-lib-satisfy:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/satisfy/unit/ -v
-          --cov=lib.python.satisfy
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
   test-run-sim-tests:
     needs: test-lib-run-tests-common
     runs-on: ubuntu-24.04
@@ -518,8 +421,11 @@ jobs:
           --cov-fail-under=100
   test-satisfy-subclause:
     needs:
-      - test-is-subclause-satisfied
-      - test-satisfy-unsatisfied-subclause
+      - test-lib-clause
+      - test-lib-cli
+      - test-lib-git
+      - test-lib-github
+      - test-lib-lrm
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -550,141 +456,6 @@ jobs:
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/satisfy_subclause/e2e/ -v
-  test-satisfy-unsatisfied-subclause:
-    needs:
-      - test-compute-subclause-dependencies
-      - test-satisfy-unsatisfied-subclause-set-with-satisfied-dependencies
-      - test-satisfy-unsatisfied-subclause-with-satisfied-dependencies
-      - test-satisfy-unsatisfied-subclause-without-dependencies
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-scripts-test-script-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-script-
-      - name: Install tools
-        run: pip install pypdf pytest pytest-cov
-      - name: Run unit tests with 100% coverage gate
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/satisfy_unsatisfied_subclause/unit/ -v
-          --cov=satisfy_unsatisfied_subclause
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-      - name: Run integration tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/satisfy_unsatisfied_subclause/integration/ -v
-      - name: Run e2e tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/satisfy_unsatisfied_subclause/e2e/ -v
-  test-satisfy-unsatisfied-subclause-set-with-satisfied-dependencies:
-    needs: [test-is-subclause-satisfied]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-scripts-test-script-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-script-
-      - name: Install tools
-        run: pip install pypdf pytest pytest-cov
-      - name: Run unit tests with 100% coverage gate
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/satisfy_unsatisfied_subclause_set_with_satisfied_dependencies/unit/
-          -v
-          --cov=satisfy_unsatisfied_subclause_set_with_satisfied_dependencies
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-      - name: Run integration tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/satisfy_unsatisfied_subclause_set_with_satisfied_dependencies/integration/
-          -v
-      - name: Run e2e tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/satisfy_unsatisfied_subclause_set_with_satisfied_dependencies/e2e/
-          -v
-  test-satisfy-unsatisfied-subclause-with-satisfied-dependencies:
-    needs: [test-is-subclause-satisfied]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-scripts-test-script-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-script-
-      - name: Install tools
-        run: pip install pypdf pytest pytest-cov
-      - name: Run unit tests with 100% coverage gate
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/satisfy_unsatisfied_subclause_with_satisfied_dependencies/unit/ -v
-          --cov=satisfy_unsatisfied_subclause_with_satisfied_dependencies
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-      - name: Run integration tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/satisfy_unsatisfied_subclause_with_satisfied_dependencies/integration/ -v
-      - name: Run e2e tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/satisfy_unsatisfied_subclause_with_satisfied_dependencies/e2e/ -v
-  test-satisfy-unsatisfied-subclause-without-dependencies:
-    needs: [test-is-subclause-satisfied]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-scripts-test-script-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-script-
-      - name: Install tools
-        run: pip install pypdf pytest pytest-cov
-      - name: Run unit tests with 100% coverage gate
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/satisfy_unsatisfied_subclause_without_dependencies/unit/ -v
-          --cov=satisfy_unsatisfied_subclause_without_dependencies
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
-      - name: Run integration tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/satisfy_unsatisfied_subclause_without_dependencies/integration/ -v
-      - name: Run e2e tests
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/satisfy_unsatisfied_subclause_without_dependencies/e2e/ -v
 name: scripts
 on:
   pull_request:
