@@ -193,6 +193,49 @@ def test_extract_result_missing(streaming) -> None:
     assert streaming.extract_result({"type": "result"}) is None
 
 
+# --- build_streaming_cmd ----------------------------------------------------
+
+
+def test_build_streaming_cmd_starts_with_claude(streaming) -> None:
+    """The argv begins with 'claude' followed by '-p'."""
+    cmd = streaming.build_streaming_cmd(model="opus", disallowed_tools="X")
+    assert cmd[:2] == ["claude", "-p"]
+
+
+def test_build_streaming_cmd_carries_model(streaming) -> None:
+    """The model argument is forwarded to --model."""
+    cmd = streaming.build_streaming_cmd(model="haiku", disallowed_tools="X")
+    assert cmd[cmd.index("--model") + 1] == "haiku"
+
+
+def test_build_streaming_cmd_uses_stream_json(streaming) -> None:
+    """--output-format stream-json is set so events stream live."""
+    cmd = streaming.build_streaming_cmd(model="opus", disallowed_tools="X")
+    assert cmd[cmd.index("--output-format") + 1] == "stream-json"
+
+
+def test_build_streaming_cmd_uses_verbose(streaming) -> None:
+    """--verbose is required for stream-json output."""
+    cmd = streaming.build_streaming_cmd(model="opus", disallowed_tools="X")
+    assert "--verbose" in cmd
+
+
+def test_build_streaming_cmd_uses_dangerously_skip_permissions(
+    streaming,
+) -> None:
+    """--dangerously-skip-permissions is set."""
+    cmd = streaming.build_streaming_cmd(model="opus", disallowed_tools="X")
+    assert "--dangerously-skip-permissions" in cmd
+
+
+def test_build_streaming_cmd_carries_disallowed_tools(streaming) -> None:
+    """The disallowed-tools string is forwarded to --disallowedTools."""
+    cmd = streaming.build_streaming_cmd(
+        model="opus", disallowed_tools="Bash(git *)",
+    )
+    assert cmd[cmd.index("--disallowedTools") + 1] == "Bash(git *)"
+
+
 # --- run_claude_streaming ---------------------------------------------------
 
 

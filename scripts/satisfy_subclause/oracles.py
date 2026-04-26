@@ -14,13 +14,14 @@ mutating tool and ``run_oracle_call`` exits non-zero on any failure.
 import json
 import os
 import re
-import subprocess
 import sys
 from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
 from lib.python.clause import STAGE_TO_PREFIX, clause_to_filename
 from lib.python.lrm import build_lrm_read_instruction
+
+from .streaming import build_streaming_cmd, run_claude_streaming
 
 
 SATISFACTION_CONDITIONS: tuple[str, ...] = (
@@ -108,43 +109,18 @@ def extract_json_literal(text: str) -> str:
 
 
 def run_oracle_call(prompt: str, *, model: str) -> str:
-    """Invoke Claude in JSON mode; return the oracle's ``.result`` text.
+    """Invoke Claude with read-only tools; return the oracle's ``.result``.
 
-    Loud-fatal on non-zero exit, non-JSON stdout, or missing/empty
-    result. The command line forces ``--output-format json`` and
-    blocks every mutating tool via ``--disallowedTools``.
+    Runs the CLI in stream-json mode so the streaming runner can decode
+    events and print Claude's text/tool_use blocks live — oracle passes
+    can take many minutes and the user needs to see progress. The
+    streaming runner extracts the terminal ``.result`` text and is
+    loud-fatal on a non-zero exit code or a missing result event.
     """
-    cmd = [
-        "claude", "-p",
-        "--model", model,
-        "--output-format", "json",
-        "--dangerously-skip-permissions",
-        "--disallowedTools", DISALLOWED_TOOLS,
-    ]
-    completed = subprocess.run(
-        cmd,
-        input=prompt,
-        capture_output=True,
-        text=True,
-        env=build_env(),
-        check=False,
+    cmd = build_streaming_cmd(
+        model=model, disallowed_tools=DISALLOWED_TOOLS,
     )
-    if completed.returncode != 0:
-        print(completed.stderr, file=sys.stderr)
-        sys.exit(completed.returncode)
-    try:
-        payload = json.loads(completed.stdout)
-    except json.JSONDecodeError:
-        print(
-            f"Claude CLI did not return JSON:\n{completed.stdout}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    text = payload.get("result")
-    if not isinstance(text, str) or not text:
-        print("Claude CLI did not return a result string", file=sys.stderr)
-        sys.exit(1)
-    return text
+    return run_claude_streaming(cmd, prompt, env=build_env())
 
 
 # ---------------------------------------------------------------------------

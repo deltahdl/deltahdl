@@ -26,7 +26,7 @@ from .oracles import (
     SubclauseDiagnostic,
     build_env,
 )
-from .streaming import run_claude_streaming
+from .streaming import build_streaming_cmd, run_claude_streaming
 
 
 # Mutators may edit source and test files but must never run git, gh,
@@ -69,14 +69,9 @@ def run_mutator_call(prompt: str, *, model: str) -> None:
     mutator passes can take many minutes and the user needs to see
     progress. Loud-fatal on a non-zero exit code.
     """
-    cmd = [
-        "claude", "-p",
-        "--model", model,
-        "--verbose",
-        "--output-format", "stream-json",
-        "--dangerously-skip-permissions",
-        "--disallowedTools", MUTATOR_DISALLOWED_TOOLS,
-    ]
+    cmd = build_streaming_cmd(
+        model=model, disallowed_tools=MUTATOR_DISALLOWED_TOOLS,
+    )
     run_claude_streaming(cmd, prompt, env=build_env())
 
 

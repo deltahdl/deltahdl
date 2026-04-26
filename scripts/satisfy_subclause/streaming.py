@@ -69,6 +69,24 @@ def exit_with_error(message, stderr) -> NoReturn:
     sys.exit(1)
 
 
+def build_streaming_cmd(*, model: str, disallowed_tools: str) -> list[str]:
+    """Return a Claude CLI argv for stream-json mode.
+
+    Both oracles and mutators invoke Claude with the same flag shape
+    (only ``--disallowedTools`` differs). Centralise the argv here so
+    pylint's duplicate-code rule does not complain about parallel
+    blocks in the two caller modules.
+    """
+    return [
+        "claude", "-p",
+        "--model", model,
+        "--verbose",
+        "--output-format", "stream-json",
+        "--dangerously-skip-permissions",
+        "--disallowedTools", disallowed_tools,
+    ]
+
+
 def run_claude_streaming(cmd, prompt, *, env) -> str:
     """Run Claude CLI in stream-json mode, printing events live.
 

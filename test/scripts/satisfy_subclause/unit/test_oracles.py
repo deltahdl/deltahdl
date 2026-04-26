@@ -210,135 +210,70 @@ def test_extract_json_literal_raises_when_missing() -> None:
 # --- run_oracle_call --------------------------------------------------------
 
 
-def _patched_run(stub_completed, stdout, *, returncode=0, stderr=""):
-    """Patch subprocess.run with a stubbed CompletedProcess."""
+def _patched_streaming(result_text="DONE"):
+    """Patch run_claude_streaming with a fixed return string."""
     return patch(
-        "satisfy_subclause.oracles.subprocess.run",
-        return_value=stub_completed(
-            stdout=stdout, returncode=returncode, stderr=stderr,
-        ),
+        "satisfy_subclause.oracles.run_claude_streaming",
+        return_value=result_text,
     )
 
 
-def _ok_stdout(result_text="DONE"):
-    """Build a successful Claude --output-format json stdout payload."""
-    return json.dumps({"result": result_text})
+def test_run_oracle_call_returns_result_text() -> None:
+    """Returns the .result string forwarded by the streaming runner."""
+    with _patched_streaming("DONE"):
+        assert run_oracle_call("prompt", model="opus") == "DONE"
 
 
-def test_run_oracle_call_returns_result_text(stub_completed) -> None:
-    """Returns the .result string from the Claude CLI payload."""
-    with _patched_run(stub_completed, _ok_stdout("DONE")):
-        text = run_oracle_call("prompt", model="opus")
-    assert text == "DONE"
-
-
-def test_run_oracle_call_passes_prompt_to_stdin(stub_completed) -> None:
-    """Passes the prompt to subprocess.run as stdin."""
-    with _patched_run(stub_completed, _ok_stdout()) as mock_run:
+def test_run_oracle_call_passes_prompt() -> None:
+    """Forwards the prompt to run_claude_streaming."""
+    with _patched_streaming() as mock_stream:
         run_oracle_call("hello prompt", model="opus")
-    assert mock_run.call_args[1]["input"] == "hello prompt"
+    assert mock_stream.call_args[0][1] == "hello prompt"
 
 
-def test_run_oracle_call_passes_model_to_cli(stub_completed) -> None:
+def test_run_oracle_call_passes_model_to_cli() -> None:
     """Passes the model argument to the Claude CLI."""
-    with _patched_run(stub_completed, _ok_stdout()) as mock_run:
+    with _patched_streaming() as mock_stream:
         run_oracle_call("prompt", model="haiku")
-    cmd = mock_run.call_args[0][0]
+    cmd = mock_stream.call_args[0][0]
     assert cmd[cmd.index("--model") + 1] == "haiku"
 
 
-def test_run_oracle_call_uses_json_output_format(stub_completed) -> None:
-    """Requests --output-format json from the Claude CLI."""
-    with _patched_run(stub_completed, _ok_stdout()) as mock_run:
+def test_run_oracle_call_uses_stream_json() -> None:
+    """Requests --output-format stream-json so events stream live."""
+    with _patched_streaming() as mock_stream:
         run_oracle_call("prompt", model="opus")
-    cmd = mock_run.call_args[0][0]
-    assert cmd[cmd.index("--output-format") + 1] == "json"
+    cmd = mock_stream.call_args[0][0]
+    assert cmd[cmd.index("--output-format") + 1] == "stream-json"
 
 
-def test_run_oracle_call_passes_disallowed_tools(stub_completed) -> None:
+def test_run_oracle_call_uses_verbose() -> None:
+    """Invokes the Claude CLI with --verbose (required for stream-json)."""
+    with _patched_streaming() as mock_stream:
+        run_oracle_call("prompt", model="opus")
+    assert "--verbose" in mock_stream.call_args[0][0]
+
+
+def test_run_oracle_call_passes_disallowed_tools() -> None:
     """Passes --disallowedTools to the Claude CLI."""
-    with _patched_run(stub_completed, _ok_stdout()) as mock_run:
+    with _patched_streaming() as mock_stream:
         run_oracle_call("prompt", model="opus")
-    assert "--disallowedTools" in mock_run.call_args[0][0]
+    assert "--disallowedTools" in mock_stream.call_args[0][0]
 
 
-def test_run_oracle_call_uses_dangerously_skip_permissions(
-    stub_completed,
-) -> None:
+def test_run_oracle_call_uses_dangerously_skip_permissions() -> None:
     """Invokes the Claude CLI with --dangerously-skip-permissions."""
-    with _patched_run(stub_completed, _ok_stdout()) as mock_run:
+    with _patched_streaming() as mock_stream:
         run_oracle_call("prompt", model="opus")
-    assert "--dangerously-skip-permissions" in mock_run.call_args[0][0]
+    assert "--dangerously-skip-permissions" in mock_stream.call_args[0][0]
 
 
-def test_run_oracle_call_passes_clean_env(stub_completed) -> None:
-    """Passes a CLAUDECODE-scrubbed env to subprocess.run."""
+def test_run_oracle_call_passes_clean_env() -> None:
+    """Passes a CLAUDECODE-scrubbed env to the streaming runner."""
     with patch.dict("os.environ", {"CLAUDECODE": "1"}, clear=False):
-        with _patched_run(stub_completed, _ok_stdout()) as mock_run:
+        with _patched_streaming() as mock_stream:
             run_oracle_call("prompt", model="opus")
-    assert "CLAUDECODE" not in mock_run.call_args[1]["env"]
-
-
-def test_run_oracle_call_exits_on_nonzero(stub_completed) -> None:
-    """A non-zero exit code is loud-fatal."""
-    with _patched_run(stub_completed, "", returncode=1, stderr="boom"):
-        with pytest.raises(SystemExit):
-            run_oracle_call("prompt", model="opus")
-
-
-def test_run_oracle_call_dumps_stderr_on_nonzero(
-    stub_completed, capsys,
-) -> None:
-    """Non-zero exit dumps stderr to the terminal."""
-    patched = _patched_run(
-        stub_completed, "", returncode=1, stderr="UNIQUE_ORACLE_STDERR",
-    )
-    with patched:
-        try:
-            run_oracle_call("prompt", model="opus")
-        except SystemExit:
-            pass
-    assert "UNIQUE_ORACLE_STDERR" in capsys.readouterr().err
-
-
-def test_run_oracle_call_exits_on_non_json_stdout(stub_completed) -> None:
-    """Non-JSON stdout from the Claude CLI is loud-fatal."""
-    with _patched_run(stub_completed, "not json"):
-        with pytest.raises(SystemExit):
-            run_oracle_call("prompt", model="opus")
-
-
-def test_run_oracle_call_dumps_non_json_stdout(
-    stub_completed, capsys,
-) -> None:
-    """Non-JSON stdout is echoed to stderr."""
-    with _patched_run(stub_completed, "ORACLE_BAD_JSON"):
-        try:
-            run_oracle_call("prompt", model="opus")
-        except SystemExit:
-            pass
-    assert "ORACLE_BAD_JSON" in capsys.readouterr().err
-
-
-def test_run_oracle_call_exits_when_result_missing(stub_completed) -> None:
-    """Claude payload without a .result field is loud-fatal."""
-    with _patched_run(stub_completed, json.dumps({"other": "value"})):
-        with pytest.raises(SystemExit):
-            run_oracle_call("prompt", model="opus")
-
-
-def test_run_oracle_call_exits_when_result_empty(stub_completed) -> None:
-    """Claude payload with empty .result is loud-fatal."""
-    with _patched_run(stub_completed, json.dumps({"result": ""})):
-        with pytest.raises(SystemExit):
-            run_oracle_call("prompt", model="opus")
-
-
-def test_run_oracle_call_exits_when_result_non_string(stub_completed) -> None:
-    """Claude payload with non-string .result is loud-fatal."""
-    with _patched_run(stub_completed, json.dumps({"result": 42})):
-        with pytest.raises(SystemExit):
-            run_oracle_call("prompt", model="opus")
+    assert "CLAUDECODE" not in mock_stream.call_args[1]["env"]
 
 
 # --- build_satisfaction_prompt ---------------------------------------------
