@@ -5,18 +5,12 @@ from unittest.mock import patch
 
 import pytest
 
+from satisfy_subclause import oracles
 from satisfy_subclause.mutators import CycleMember
-from satisfy_subclause.oracles import (
-    SATISFACTION_CONDITIONS,
-    SATISFIED,
-    ConditionStatus,
-    SubclauseDiagnostic,
-)
 from satisfy_subclause.pipeline import (
     dispatch_cycle,
     find_or_create_issue,
     issue_title_for,
-    label_issue_pipeline_stuck,
     legacy_issue_title_for,
     parse_issue_number_from_create_output,
     satisfy_subclause,
@@ -40,22 +34,9 @@ def _legacy_payload(state: str, *, number: int = 88) -> str:
 # --- helpers ----------------------------------------------------------------
 
 
-def _diag(failing: bool = False) -> SubclauseDiagnostic:
-    """Return a satisfied or one-failure diagnostic."""
-    fields: dict[str, ConditionStatus] = {
-        c: SATISFIED for c in SATISFACTION_CONDITIONS
-    }
-    if failing:
-        fields["rule_coverage"] = ["rule 7 has no production code"]
-    return SubclauseDiagnostic(**fields)
-
-
-def _target(subclause: str, *, issue: int = 42,
-            failing: bool = True) -> CycleMember:
+def _target(subclause: str = "33.4.1.5", issue: int = 42) -> CycleMember:
     """Build a CycleMember target for inner-orchestrator tests."""
-    return CycleMember(
-        subclause=subclause, diagnostic=_diag(failing=failing), issue=issue,
-    )
+    return CycleMember(subclause=subclause, issue=issue)
 
 
 # --- issue helpers ----------------------------------------------------------
@@ -220,42 +201,12 @@ def test_find_or_create_issue_reopens_legacy_closed(stub_completed) -> None:
     assert reopen_cmd[:3] == ["gh", "issue", "reopen"]
 
 
-# --- label_issue_pipeline_stuck --------------------------------------------
-
-
-def test_label_issue_adds_label(stub_completed) -> None:
-    """label_issue_pipeline_stuck adds the pipeline-stuck label."""
-    with patch(
-        "satisfy_subclause.pipeline.subprocess.run",
-        return_value=stub_completed(),
-    ) as mock_run:
-        label_issue_pipeline_stuck(42, _diag(failing=True))
-    label_cmd = mock_run.call_args_list[0][0][0]
-    assert "pipeline-stuck" in label_cmd
-
-
-def test_label_issue_posts_comment(stub_completed) -> None:
-    """label_issue_pipeline_stuck posts a diagnostic comment."""
-    with patch(
-        "satisfy_subclause.pipeline.subprocess.run",
-        return_value=stub_completed(),
-    ) as mock_run:
-        label_issue_pipeline_stuck(42, _diag(failing=True))
-    comment_cmd = mock_run.call_args_list[1][0][0]
-    assert "comment" in comment_cmd
-
-
 # --- dispatch_cycle ---------------------------------------------------------
 
 
-def _patched_for_cycle(diagnostic_factory=None, issues=(100, 101)):
-    """Patch is_subclause_satisfied, find_or_create_issue, and the cycle mutator."""
-    diag_factory = diagnostic_factory or (lambda: _diag(failing=True))
+def _patched_for_cycle(issues=(100, 101)):
+    """Patch find_or_create_issue and the cycle mutator."""
     return (
-        patch(
-            "satisfy_subclause.pipeline.is_subclause_satisfied",
-            side_effect=lambda *_a, **_k: diag_factory(),
-        ),
         patch(
             "satisfy_subclause.pipeline.find_or_create_issue",
             side_effect=list(issues),
@@ -269,46 +220,41 @@ def _patched_for_cycle(diagnostic_factory=None, issues=(100, 101)):
 
 def test_dispatch_cycle_invokes_set_mutator() -> None:
     """dispatch_cycle invokes the cycle-set mutator with one CycleMember per."""
-    mock_oracle, mock_issue, mock_mut = _patched_for_cycle()
-    with mock_oracle:
-        with mock_issue:
-            with mock_mut as mut:
-                dispatch_cycle(["33.4.1.5", "33.6"], "~/LRM.pdf", model="opus")
+    mock_issue, mock_mut = _patched_for_cycle()
+    with mock_issue:
+        with mock_mut as mut:
+            dispatch_cycle(["33.4.1.5", "33.6"], "~/LRM.pdf", model="opus")
     members_arg = mut.call_args[0][0]
     assert len(members_arg) == 2
 
 
 def test_dispatch_cycle_passes_issues() -> None:
     """dispatch_cycle gathers the per-member issue numbers."""
-    mock_oracle, mock_issue, mock_mut = _patched_for_cycle(issues=(200, 201))
-    with mock_oracle:
-        with mock_issue:
-            with mock_mut as mut:
-                dispatch_cycle(["33.4.1.5", "33.6"], "~/LRM.pdf", model="opus")
+    mock_issue, mock_mut = _patched_for_cycle(issues=(200, 201))
+    with mock_issue:
+        with mock_mut as mut:
+            dispatch_cycle(["33.4.1.5", "33.6"], "~/LRM.pdf", model="opus")
     issues_seen = [m.issue for m in mut.call_args[0][0]]
     assert issues_seen == [200, 201]
 
 
 def test_dispatch_cycle_passes_subclauses() -> None:
     """dispatch_cycle preserves the cycle-member identifiers."""
-    mock_oracle, mock_issue, mock_mut = _patched_for_cycle()
-    with mock_oracle:
-        with mock_issue:
-            with mock_mut as mut:
-                dispatch_cycle(["33.4.1.5", "33.6"], "~/LRM.pdf", model="opus")
+    mock_issue, mock_mut = _patched_for_cycle()
+    with mock_issue:
+        with mock_mut as mut:
+            dispatch_cycle(["33.4.1.5", "33.6"], "~/LRM.pdf", model="opus")
     subs_seen = [m.subclause for m in mut.call_args[0][0]]
     assert subs_seen == ["33.4.1.5", "33.6"]
 
 
-def test_dispatch_cycle_passes_diagnostics() -> None:
-    """dispatch_cycle attaches a diagnostic per member."""
-    mock_oracle, mock_issue, mock_mut = _patched_for_cycle()
-    with mock_oracle:
-        with mock_issue:
-            with mock_mut as mut:
-                dispatch_cycle(["33.4.1.5", "33.6"], "~/LRM.pdf", model="opus")
-    diagnostics_seen = [m.diagnostic for m in mut.call_args[0][0]]
-    assert all(isinstance(d, SubclauseDiagnostic) for d in diagnostics_seen)
+def test_dispatch_cycle_does_not_call_oracle() -> None:
+    """dispatch_cycle no longer invokes the satisfaction oracle."""
+    mock_issue, mock_mut = _patched_for_cycle()
+    with mock_issue:
+        with mock_mut:
+            dispatch_cycle(["33.4.1.5", "33.6"], "~/LRM.pdf", model="opus")
+    assert not hasattr(oracles, "is_subclause_satisfied")
 
 
 # --- satisfy_unsatisfied_subclause -----------------------------------------
@@ -446,198 +392,99 @@ def test_inner_logs_subclause_to_stderr(capsys) -> None:
 # --- satisfy_subclause -----------------------------------------------------
 
 
-def _patched_pipeline(diagnostics, *, inner_results=None):
-    """Patch the pipeline integration points."""
+def _patched_pipeline(*, inner_results=None):
+    """Patch the pipeline integration points (no oracle, no retry loop)."""
     return (
-        patch(
-            "satisfy_subclause.pipeline.is_subclause_satisfied",
-            side_effect=diagnostics,
-        ),
         patch(
             "satisfy_subclause.pipeline.find_or_create_issue",
             return_value=42,
         ),
         patch(
             "satisfy_subclause.pipeline.satisfy_unsatisfied_subclause",
-            side_effect=inner_results or [],
+            side_effect=inner_results or [{"status": "satisfied"}],
         ),
-        patch("satisfy_subclause.pipeline.label_issue_pipeline_stuck"),
         patch("satisfy_subclause.pipeline.dispatch_cycle"),
     )
 
 
-def _patched_stuck_pipeline():
-    """Build a pipeline patch set that exhausts the retry budget."""
-    failing = _diag(failing=True)
-    return _patched_pipeline(
-        [failing, failing, failing],
-        inner_results=[{"status": "satisfied"}, {"status": "satisfied"}],
-    )
-
-
-def test_satisfy_skips_when_already_satisfied() -> None:
-    """satisfy_subclause does not run the pipeline when the oracle says yes."""
-    oracle, issue, inner, label, cycle = _patched_pipeline([_diag()])
-    with oracle:
-        with issue:
-            with inner as mock_inner:
-                with label:
-                    with cycle:
-                        satisfy_subclause(
-                            "33.4.1.5", "~/LRM.pdf", model="opus",
-                        )
-    assert not mock_inner.called
-
-
-def test_satisfy_returns_satisfied_when_already_satisfied() -> None:
-    """satisfy_subclause returns the satisfied marker on early-yes."""
-    oracle, issue, inner, label, cycle = _patched_pipeline([_diag()])
-    with oracle:
-        with issue:
-            with inner:
-                with label:
-                    with cycle:
-                        result = satisfy_subclause(
-                            "33.4.1.5", "~/LRM.pdf", model="opus",
-                        )
-    assert result == {"status": "satisfied"}
-
-
-def test_satisfy_runs_pipeline_when_unsatisfied() -> None:
-    """satisfy_subclause runs the inner pipeline when the oracle returns no."""
-    oracle, issue, inner, label, cycle = _patched_pipeline(
-        [_diag(failing=True), _diag()],
-        inner_results=[{"status": "satisfied"}],
-    )
-    with oracle:
-        with issue:
-            with inner as mock_inner:
-                with label:
-                    with cycle:
-                        satisfy_subclause(
-                            "33.4.1.5", "~/LRM.pdf", model="opus",
-                        )
+def test_satisfy_runs_inner_pipeline_unconditionally() -> None:
+    """satisfy_subclause always runs the inner pipeline (no entry-time skip)."""
+    issue, inner, cycle = _patched_pipeline()
+    with issue:
+        with inner as mock_inner:
+            with cycle:
+                satisfy_subclause(
+                    "33.4.1.5", "~/LRM.pdf", model="opus",
+                )
     assert mock_inner.called
 
 
-def test_satisfy_returns_satisfied_after_convergence() -> None:
-    """satisfy_subclause returns satisfied after the inner pipeline converges."""
-    oracle, issue, inner, label, cycle = _patched_pipeline(
-        [_diag(failing=True), _diag()],
-        inner_results=[{"status": "satisfied"}],
-    )
-    with oracle:
-        with issue:
-            with inner:
-                with label:
-                    with cycle:
-                        result = satisfy_subclause(
-                            "33.4.1.5", "~/LRM.pdf", model="opus",
-                        )
+def test_satisfy_returns_satisfied_after_inner_pipeline() -> None:
+    """satisfy_subclause returns satisfied after the inner pipeline returns."""
+    issue, inner, cycle = _patched_pipeline()
+    with issue:
+        with inner:
+            with cycle:
+                result = satisfy_subclause(
+                    "33.4.1.5", "~/LRM.pdf", model="opus",
+                )
     assert result == {"status": "satisfied"}
+
+
+def test_satisfy_runs_pipeline_only_once() -> None:
+    """One pass: there is no retry loop and no post-mutator re-check."""
+    issue, inner, cycle = _patched_pipeline()
+    with issue:
+        with inner as mock_inner:
+            with cycle:
+                satisfy_subclause(
+                    "33.4.1.5", "~/LRM.pdf", model="opus",
+                )
+    assert mock_inner.call_count == 1
 
 
 def test_satisfy_propagates_cycle_when_nested() -> None:
     """satisfy_subclause propagates a cycle when nested under another frame."""
     cycle_payload = {"status": "cycle", "members": ["33.4", "33.4.1.5"]}
-    oracle, issue, inner, label, cycle = _patched_pipeline(
-        [_diag(failing=True)],
-        inner_results=[cycle_payload],
-    )
-    with oracle:
-        with issue:
-            with inner:
-                with label:
-                    with cycle as mock_dispatch:
-                        result = satisfy_subclause(
-                            "33.4.1.5", "~/LRM.pdf", model="opus",
-                            in_progress=frozenset({"33.4"}),
-                        )
+    issue, inner, cycle = _patched_pipeline(inner_results=[cycle_payload])
+    with issue:
+        with inner:
+            with cycle as mock_dispatch:
+                result = satisfy_subclause(
+                    "33.4.1.5", "~/LRM.pdf", model="opus",
+                    in_progress=frozenset({"33.4"}),
+                )
     assert result["status"] == "cycle" and not mock_dispatch.called
 
 
 def test_satisfy_dispatches_cycle_at_outermost_frame() -> None:
     """satisfy_subclause dispatches when the cycle frame is outermost."""
     cycle_payload = {"status": "cycle", "members": ["33.4.1.5", "33.6"]}
-    oracle, issue, inner, label, cycle = _patched_pipeline(
-        [_diag(failing=True), _diag()],
-        inner_results=[cycle_payload],
-    )
-    with oracle:
-        with issue:
-            with inner:
-                with label:
-                    with cycle as mock_dispatch:
-                        satisfy_subclause(
-                            "33.4.1.5", "~/LRM.pdf", model="opus",
-                        )
+    issue, inner, cycle = _patched_pipeline(inner_results=[cycle_payload])
+    with issue:
+        with inner:
+            with cycle as mock_dispatch:
+                satisfy_subclause(
+                    "33.4.1.5", "~/LRM.pdf", model="opus",
+                )
     assert mock_dispatch.called
-
-
-def test_satisfy_retries_once_then_labels_stuck() -> None:
-    """satisfy_subclause retries once then labels the issue pipeline-stuck."""
-    oracle, issue, inner, label, cycle = _patched_stuck_pipeline()
-    with oracle:
-        with issue:
-            with inner:
-                with label as mock_label:
-                    with cycle:
-                        try:
-                            satisfy_subclause(
-                                "33.4.1.5", "~/LRM.pdf", model="opus",
-                            )
-                        except SystemExit:
-                            pass
-    assert mock_label.called
-
-
-def test_satisfy_exits_nonzero_when_stuck() -> None:
-    """satisfy_subclause exits non-zero when the pipeline gets stuck."""
-    oracle, issue, inner, label, cycle = _patched_stuck_pipeline()
-    captured_code = None
-    with oracle:
-        with issue:
-            with inner:
-                with label:
-                    with cycle:
-                        try:
-                            satisfy_subclause(
-                                "33.4.1.5", "~/LRM.pdf", model="opus",
-                            )
-                        except SystemExit as exc:
-                            captured_code = exc.code
-    assert captured_code != 0
 
 
 def test_satisfy_logs_subclause_to_stderr(capsys) -> None:
     """satisfy_subclause prints a one-line outer-orchestrator banner."""
-    oracle, issue, inner, label, cycle = _patched_pipeline([_diag()])
-    with oracle:
-        with issue:
-            with inner:
-                with label:
-                    with cycle:
-                        satisfy_subclause(
-                            "33.4.1.5", "~/LRM.pdf", model="opus",
-                        )
+    issue, inner, cycle = _patched_pipeline()
+    with issue:
+        with inner:
+            with cycle:
+                satisfy_subclause(
+                    "33.4.1.5", "~/LRM.pdf", model="opus",
+                )
     assert "§33.4.1.5" in capsys.readouterr().err
 
 
-def test_satisfy_logs_retry_to_stderr(capsys) -> None:
-    """satisfy_subclause logs the retry message between passes."""
-    oracle, issue, inner, label, cycle = _patched_stuck_pipeline()
-    with oracle:
-        with issue:
-            with inner:
-                with label:
-                    with cycle:
-                        try:
-                            satisfy_subclause(
-                                "33.4.1.5", "~/LRM.pdf", model="opus",
-                            )
-                        except SystemExit:
-                            pass
-    assert "retrying" in capsys.readouterr().err
+def test_satisfy_does_not_call_satisfaction_oracle() -> None:
+    """satisfy_subclause never invokes is_subclause_satisfied (it's removed)."""
+    assert not hasattr(oracles, "is_subclause_satisfied")
 
 
 # --- CycleMember dataclass --------------------------------------------------
@@ -645,7 +492,5 @@ def test_satisfy_logs_retry_to_stderr(capsys) -> None:
 
 def test_cycle_member_holds_subclause() -> None:
     """CycleMember stores the subclause identifier."""
-    member = CycleMember(
-        subclause="33.4.1.5", diagnostic=_diag(), issue=42,
-    )
+    member = CycleMember(subclause="33.4.1.5", issue=42)
     assert member.subclause == "33.4.1.5"

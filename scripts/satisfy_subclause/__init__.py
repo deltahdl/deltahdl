@@ -1,10 +1,11 @@
 """User-facing entry point for the satisfaction pipeline.
 
-``satisfy_subclause --subclause X --lrm path`` is idempotent: if §X is
-already satisfied (per the satisfaction oracle), it does nothing.
-Otherwise it runs the recursive pipeline defined in :mod:`pipeline`,
-labels the issue ``pipeline-stuck`` if the retry budget is exhausted,
-and exits non-zero on failure.
+``satisfy_subclause --subclause X --lrm path`` finds-or-creates a
+GitHub issue for §X, recursively satisfies its dependencies, then
+runs the eight-step audit-then-act mutator once. Convergence emerges
+from the working tree: any edits the mutator produced are committed
+with a ``Closes #N`` trailer; an empty diff means §X is already
+satisfied.
 """
 
 import argparse
@@ -20,10 +21,10 @@ from .pipeline import satisfy_subclause
 
 
 _DESCRIPTION = (
-    "Idempotently satisfy an LRM subclause. Runs the satisfaction"
-    " oracle, recursively satisfies dependencies, dispatches the"
-    " appropriate mutator, and labels the issue pipeline-stuck if"
-    " the retry budget is exhausted."
+    "Idempotently satisfy an LRM subclause. Finds-or-creates an issue,"
+    " recursively satisfies dependencies, and runs the eight-step"
+    " audit-then-act mutator. The mutator's commit step is the"
+    " convergence signal."
 )
 
 

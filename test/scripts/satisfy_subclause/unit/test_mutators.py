@@ -8,42 +8,16 @@ from satisfy_subclause.mutators import (
     MUTATOR_DISALLOWED_TOOLS,
     CycleMember,
     build_commit_message,
-    build_cycle_prompt,
-    build_failure_resolution_block,
-    build_no_deps_prompt,
-    build_no_external_state_block,
-    build_with_deps_prompt,
+    build_steps,
     commit_mutator_result,
     filter_changes,
-    format_diagnostic_summary,
     is_valid_path,
-    run_mutator_call,
+    run_step,
+    run_steps,
     satisfy_unsatisfied_subclause_set_with_satisfied_dependencies,
     satisfy_unsatisfied_subclause_with_satisfied_dependencies,
     satisfy_unsatisfied_subclause_without_dependencies,
-    short_circuit_if_satisfied,
 )
-from satisfy_subclause.oracles import (
-    SATISFACTION_CONDITIONS,
-    SATISFIED,
-    SubclauseDiagnostic,
-)
-
-
-# --- helpers ---------------------------------------------------------------
-
-
-def _all_satisfied():
-    """Return a fully satisfied diagnostic."""
-    fields = {c: SATISFIED for c in SATISFACTION_CONDITIONS}
-    return SubclauseDiagnostic(**fields)
-
-
-def _failing_diagnostic():
-    """Return a diagnostic with one rule_coverage failure."""
-    fields = {c: SATISFIED for c in SATISFACTION_CONDITIONS}
-    fields["rule_coverage"] = ["rule 7 has no production code"]
-    return SubclauseDiagnostic(**fields)
 
 
 # --- MUTATOR_DISALLOWED_TOOLS -----------------------------------------------
@@ -94,28 +68,7 @@ def test_disallowed_tools_blocks_mutool() -> None:
     assert "mutool" in MUTATOR_DISALLOWED_TOOLS
 
 
-# --- format_diagnostic_summary ----------------------------------------------
-
-
-def test_format_diagnostic_summary_all_satisfied() -> None:
-    """A fully-satisfied diagnostic formats with five 'satisfied' lines."""
-    text = format_diagnostic_summary(_all_satisfied())
-    assert text.count("satisfied") == 5
-
-
-def test_format_diagnostic_summary_lists_failures() -> None:
-    """A failure list appears as bullet points under its condition."""
-    text = format_diagnostic_summary(_failing_diagnostic())
-    assert "rule 7 has no production code" in text
-
-
-def test_format_diagnostic_summary_names_failing_condition() -> None:
-    """The failing condition name appears in the formatted summary."""
-    text = format_diagnostic_summary(_failing_diagnostic())
-    assert "rule_coverage" in text
-
-
-# --- run_mutator_call -------------------------------------------------------
+# --- run_step ---------------------------------------------------------------
 
 
 def _patched_streaming():
@@ -126,55 +79,131 @@ def _patched_streaming():
     )
 
 
-def test_run_mutator_call_passes_prompt() -> None:
-    """run_mutator_call forwards the prompt to the streaming runner."""
+def test_run_step_passes_prompt() -> None:
+    """run_step forwards the prompt to the streaming runner."""
     with _patched_streaming() as mock_stream:
-        run_mutator_call("hello prompt", model="opus")
+        run_step("hello prompt", model="opus", continue_session=False)
     assert mock_stream.call_args[0][1] == "hello prompt"
 
 
-def test_run_mutator_call_passes_model() -> None:
-    """run_mutator_call passes --model to the Claude CLI."""
+def test_run_step_passes_model() -> None:
+    """run_step passes --model to the Claude CLI."""
     with _patched_streaming() as mock_stream:
-        run_mutator_call("prompt", model="haiku")
+        run_step("prompt", model="haiku", continue_session=False)
     cmd = mock_stream.call_args[0][0]
     assert cmd[cmd.index("--model") + 1] == "haiku"
 
 
-def test_run_mutator_call_passes_disallowed_tools() -> None:
-    """run_mutator_call passes --disallowedTools."""
+def test_run_step_passes_disallowed_tools() -> None:
+    """run_step passes --disallowedTools."""
     with _patched_streaming() as mock_stream:
-        run_mutator_call("prompt", model="opus")
+        run_step("prompt", model="opus", continue_session=False)
     assert "--disallowedTools" in mock_stream.call_args[0][0]
 
 
-def test_run_mutator_call_uses_dangerously_skip_permissions() -> None:
-    """run_mutator_call passes --dangerously-skip-permissions."""
+def test_run_step_uses_dangerously_skip_permissions() -> None:
+    """run_step passes --dangerously-skip-permissions."""
     with _patched_streaming() as mock_stream:
-        run_mutator_call("prompt", model="opus")
+        run_step("prompt", model="opus", continue_session=False)
     assert "--dangerously-skip-permissions" in mock_stream.call_args[0][0]
 
 
-def test_run_mutator_call_uses_stream_json() -> None:
-    """run_mutator_call requests stream-json output for live streaming."""
+def test_run_step_uses_stream_json() -> None:
+    """run_step requests stream-json output for live streaming."""
     with _patched_streaming() as mock_stream:
-        run_mutator_call("prompt", model="opus")
+        run_step("prompt", model="opus", continue_session=False)
     cmd = mock_stream.call_args[0][0]
     assert cmd[cmd.index("--output-format") + 1] == "stream-json"
 
 
-def test_run_mutator_call_uses_verbose() -> None:
-    """run_mutator_call passes --verbose (required by stream-json)."""
+def test_run_step_uses_verbose() -> None:
+    """run_step passes --verbose (required by stream-json)."""
     with _patched_streaming() as mock_stream:
-        run_mutator_call("prompt", model="opus")
+        run_step("prompt", model="opus", continue_session=False)
     assert "--verbose" in mock_stream.call_args[0][0]
 
 
-def test_run_mutator_call_passes_env() -> None:
-    """run_mutator_call passes a Claude-safe env to the streaming runner."""
+def test_run_step_first_step_does_not_continue() -> None:
+    """The first step opens a fresh Claude session (no --continue)."""
     with _patched_streaming() as mock_stream:
-        run_mutator_call("prompt", model="opus")
+        run_step("prompt", model="opus", continue_session=False)
+    assert "--continue" not in mock_stream.call_args[0][0]
+
+
+def test_run_step_later_step_continues_session() -> None:
+    """Later steps resume the session via --continue."""
+    with _patched_streaming() as mock_stream:
+        run_step("prompt", model="opus", continue_session=True)
+    assert "--continue" in mock_stream.call_args[0][0]
+
+
+def test_run_step_passes_env() -> None:
+    """run_step passes a Claude-safe env to the streaming runner."""
+    with _patched_streaming() as mock_stream:
+        run_step("prompt", model="opus", continue_session=False)
     assert "env" in mock_stream.call_args[1]
+
+
+# --- run_steps --------------------------------------------------------------
+
+
+def test_run_steps_invokes_each_step() -> None:
+    """run_steps calls run_step once per step."""
+    steps = [("desc1", "p1"), ("desc2", "p2"), ("desc3", "p3")]
+    with patch("satisfy_subclause.mutators.run_step") as mock_step:
+        run_steps(steps, model="opus")
+    assert mock_step.call_count == 3
+
+
+def test_run_steps_first_step_opens_fresh_session() -> None:
+    """The first run_step call has continue_session=False."""
+    steps = [("desc1", "p1"), ("desc2", "p2")]
+    with patch("satisfy_subclause.mutators.run_step") as mock_step:
+        run_steps(steps, model="opus")
+    assert mock_step.call_args_list[0][1]["continue_session"] is False
+
+
+def test_run_steps_later_steps_continue_session() -> None:
+    """Every step after the first has continue_session=True."""
+    steps = [("desc1", "p1"), ("desc2", "p2"), ("desc3", "p3")]
+    with patch("satisfy_subclause.mutators.run_step") as mock_step:
+        run_steps(steps, model="opus")
+    assert all(
+        call[1]["continue_session"] is True
+        for call in mock_step.call_args_list[1:]
+    )
+
+
+def test_run_steps_passes_model() -> None:
+    """run_steps forwards the model argument to each run_step call."""
+    steps = [("desc", "p")]
+    with patch("satisfy_subclause.mutators.run_step") as mock_step:
+        run_steps(steps, model="haiku")
+    assert mock_step.call_args[1]["model"] == "haiku"
+
+
+def test_run_steps_passes_prompt() -> None:
+    """run_steps forwards each step's prompt to run_step."""
+    steps = [("only", "a-prompt")]
+    with patch("satisfy_subclause.mutators.run_step") as mock_step:
+        run_steps(steps, model="opus")
+    assert mock_step.call_args[0][0] == "a-prompt"
+
+
+def test_run_steps_logs_first_step_banner(capsys) -> None:
+    """run_steps prints a 'Step 1/total: description' banner for step 1."""
+    steps = [("Auditing src", "p1"), ("Auditing tests", "p2")]
+    with patch("satisfy_subclause.mutators.run_step"):
+        run_steps(steps, model="opus")
+    assert "Step 1/2: Auditing src" in capsys.readouterr().out
+
+
+def test_run_steps_logs_later_step_banner(capsys) -> None:
+    """run_steps prints a 'Step 2/total: description' banner for step 2."""
+    steps = [("Auditing src", "p1"), ("Auditing tests", "p2")]
+    with patch("satisfy_subclause.mutators.run_step"):
+        run_steps(steps, model="opus")
+    assert "Step 2/2: Auditing tests" in capsys.readouterr().out
 
 
 # --- is_valid_path ----------------------------------------------------------
@@ -340,103 +369,224 @@ def test_commit_mutator_result_returns_false_when_only_garbage() -> None:
     assert (result, mock_c.called) == (False, False)
 
 
-# --- shared prompt blocks ----------------------------------------------------
+def test_commit_mutator_result_only_deletions_commits() -> None:
+    """A commit composed solely of deletions still commits."""
+    with _patched_porcelain(([], [], ["foo.cpp"])), \
+            _patched_commit() as mock_c:
+        result = commit_mutator_result(["6.3"], [42])
+    assert (result, mock_c.called) == (True, True)
 
 
-def test_failure_resolution_block_lists_each_condition() -> None:
-    """The shared resolution block names every satisfaction condition."""
-    text = build_failure_resolution_block()
-    missing = [c for c in SATISFACTION_CONDITIONS if c not in text]
-    assert missing == []
+def test_commit_mutator_result_summary_lists_added() -> None:
+    """The commit summary lists added files."""
+    with _patched_porcelain((["foo.cpp"], [], [])), \
+            _patched_commit() as mock_c:
+        commit_mutator_result(["6.3"], [42])
+    message = mock_c.call_args[0][2]
+    assert "Added foo.cpp" in message
 
 
-def test_failure_resolution_block_says_smallest_set() -> None:
-    """The shared resolution block requires minimal edits."""
-    assert "smallest set of edits" in build_failure_resolution_block()
+def test_commit_mutator_result_summary_lists_modified() -> None:
+    """The commit summary lists modified files."""
+    with _patched_porcelain(([], ["bar.h"], [])), \
+            _patched_commit() as mock_c:
+        commit_mutator_result(["6.3"], [42])
+    message = mock_c.call_args[0][2]
+    assert "Modified bar.h" in message
 
 
-def test_no_external_state_block_blocks_git() -> None:
-    """The no-external-state block forbids git from inside the prompt."""
-    assert "git" in build_no_external_state_block()
+def test_commit_mutator_result_summary_lists_deleted() -> None:
+    """The commit summary lists deleted files."""
+    with _patched_porcelain(([], [], ["baz.py"])), \
+            _patched_commit() as mock_c:
+        commit_mutator_result(["6.3"], [42])
+    message = mock_c.call_args[0][2]
+    assert "Deleted baz.py" in message
 
 
-def test_no_external_state_block_blocks_commit() -> None:
-    """The no-external-state block forbids commit/push from inside the prompt."""
-    assert "commit or push" in build_no_external_state_block()
+# --- build_steps ------------------------------------------------------------
 
 
-# --- short_circuit_if_satisfied --------------------------------------------
+def _step_descriptions(steps) -> list[str]:
+    """Return just the description strings from a list of step pairs."""
+    return [d for d, _p in steps]
 
 
-def test_short_circuit_returns_true_when_satisfied() -> None:
-    """short_circuit_if_satisfied returns True for a satisfied diagnostic."""
-    assert short_circuit_if_satisfied("6.3", _all_satisfied()) is True
+_EIGHT_STEP_DESCRIPTIONS = [
+    "Auditing src",
+    "Auditing tests",
+    "Deleting duplicate tests",
+    "Moving misplaced tests",
+    "Renaming test suites",
+    "Renaming test names",
+    "Writing missing tests",
+    "Writing missing functionality",
+]
 
 
-def test_short_circuit_returns_false_when_failing() -> None:
-    """short_circuit_if_satisfied returns False for a failing diagnostic."""
-    assert short_circuit_if_satisfied("6.3", _failing_diagnostic()) is False
+def test_build_steps_returns_eight() -> None:
+    """build_steps for a single subclause returns eight step pairs."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert len(steps) == 8
 
 
-def test_short_circuit_prints_when_satisfied(capsys) -> None:
-    """short_circuit_if_satisfied prints a notice when verdict is yes."""
-    short_circuit_if_satisfied("6.3", _all_satisfied())
-    assert "nothing to do" in capsys.readouterr().err
+def test_build_steps_descriptions_match_pipeline() -> None:
+    """The eight descriptions are the audit-then-act pipeline names."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert _step_descriptions(steps) == _EIGHT_STEP_DESCRIPTIONS
 
 
-def test_short_circuit_silent_when_failing(capsys) -> None:
-    """short_circuit_if_satisfied prints nothing when verdict is no."""
-    short_circuit_if_satisfied("6.3", _failing_diagnostic())
-    assert capsys.readouterr().err == ""
+def test_build_steps_first_step_reads_lrm() -> None:
+    """Step 1 includes the LRM read instruction for the subclause."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "~/LRM.pdf" in steps[0][1]
 
 
-# --- build_no_deps_prompt ---------------------------------------------------
+def test_build_steps_first_step_audits_src() -> None:
+    """Step 1 instructs Claude to audit src/."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "search src/" in steps[0][1]
 
 
-def test_no_deps_prompt_mentions_subclause() -> None:
-    """No-deps prompt mentions the target subclause."""
-    prompt = build_no_deps_prompt("33.4.1.5", "~/LRM.pdf", _failing_diagnostic())
-    assert "§33.4.1.5" in prompt
+def test_build_steps_second_step_audits_tests() -> None:
+    """Step 2 instructs Claude to audit test/src/unit/."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "test/src/unit/" in steps[1][1]
 
 
-def test_no_deps_prompt_includes_diagnostic_failures() -> None:
-    """No-deps prompt embeds the diagnostic failure descriptions."""
-    prompt = build_no_deps_prompt("33.4.1.5", "~/LRM.pdf", _failing_diagnostic())
-    assert "rule 7 has no production code" in prompt
+def test_build_steps_no_deps_states_no_dependencies() -> None:
+    """Step 1 with no deps says no external deps were needed."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "No external dependencies" in steps[0][1]
 
 
-def test_no_deps_prompt_says_no_dependencies() -> None:
-    """No-deps prompt asserts the subclause has no remaining dependencies."""
-    prompt = build_no_deps_prompt("33.4.1.5", "~/LRM.pdf", _failing_diagnostic())
-    assert "no remaining dependencies" in prompt
+def test_build_steps_with_deps_lists_dependencies() -> None:
+    """Step 1 with satisfied deps names them in the deps block."""
+    steps = build_steps(
+        ["33.4.1.5"], "~/LRM.pdf",
+        satisfied_dependencies=["33.6.1", "33.4.1.4"],
+    )
+    assert "§33.6.1" in steps[0][1] and "§33.4.1.4" in steps[0][1]
 
 
-def test_no_deps_prompt_forbids_git() -> None:
-    """No-deps prompt explicitly forbids running git."""
-    prompt = build_no_deps_prompt("33.4.1.5", "~/LRM.pdf", _failing_diagnostic())
-    assert "git" in prompt
+def test_build_steps_with_deps_says_reference_them() -> None:
+    """Step 1 with deps tells Claude they may be referenced."""
+    steps = build_steps(
+        ["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=["33.6.1"],
+    )
+    assert "reference their machinery" in steps[0][1]
 
 
-def test_no_deps_prompt_describes_each_failure_kind() -> None:
-    """No-deps prompt names instructions for each failure kind."""
-    prompt = build_no_deps_prompt("33.4.1.5", "~/LRM.pdf", _failing_diagnostic())
-    missing = [c for c in SATISFACTION_CONDITIONS if c not in prompt]
-    assert missing == []
+def test_build_steps_no_json_contract() -> None:
+    """No step asks for a JSON object diagnostic."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    for _description, prompt in steps:
+        assert "JSON object" not in prompt
 
 
-def test_no_deps_prompt_mentions_lrm() -> None:
-    """No-deps prompt embeds the LRM path."""
-    prompt = build_no_deps_prompt("33.4.1.5", "~/LRM.pdf", _failing_diagnostic())
-    assert "~/LRM.pdf" in prompt
+def test_build_steps_no_rule_coverage_token() -> None:
+    """No step references the rule_coverage JSON-key from the dropped oracle."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert all("rule_coverage" not in prompt for _d, prompt in steps)
 
 
-# --- satisfy_unsatisfied_subclause_without_dependencies ---------------------
+def test_build_steps_no_satisfaction_predicate() -> None:
+    """No step references the (a)-(e) satisfaction-predicate framing."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert all(
+        "satisfaction predicate" not in prompt for _d, prompt in steps
+    )
 
 
-def _patched_call_and_commit(committed=True):
-    """Patch run_mutator_call and commit_mutator_result."""
+def test_build_steps_canonical_files_listed_in_step_4() -> None:
+    """Step 4 (moving misplaced tests) names the canonical test files."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "test_parser_clause_33_04_01_05.cpp" in steps[3][1]
+
+
+def test_build_steps_canonical_files_listed_in_step_7() -> None:
+    """Step 7 (writing missing tests) names the canonical test files."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "test_parser_clause_33_04_01_05.cpp" in steps[6][1]
+
+
+def test_build_steps_constraints_present_in_action_steps() -> None:
+    """Every action step (3-8) includes the per-step constraints block."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    for _description, prompt in steps[2:]:
+        assert "Only act on requirements" in prompt
+
+
+def test_build_steps_no_excludes_machinery() -> None:
+    """No step uses the implement_subclause --exclude framing."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    for _description, prompt in steps:
+        assert "OFF-LIMITS" not in prompt
+
+
+def test_build_steps_cycle_lists_each_member() -> None:
+    """Cycle steps name every cycle member in step 1."""
+    steps = build_steps(
+        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
+    )
+    assert "§33.4.1.5" in steps[0][1] and "§33.4.1.6" in steps[0][1]
+
+
+def test_build_steps_cycle_describes_co_implementation() -> None:
+    """Step 1 of a cycle run explains the co-implementation contract."""
+    steps = build_steps(
+        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
+    )
+    assert "co-implementing" in steps[0][1]
+
+
+def test_build_steps_cycle_lists_first_member_canonical_files() -> None:
+    """Cycle steps list canonical test files for the first cycle member."""
+    steps = build_steps(
+        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
+    )
+    assert "test_parser_clause_33_04_01_05.cpp" in steps[1][1]
+
+
+def test_build_steps_cycle_lists_second_member_canonical_files() -> None:
+    """Cycle steps list canonical test files for the second cycle member."""
+    steps = build_steps(
+        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
+    )
+    assert "test_parser_clause_33_04_01_06.cpp" in steps[1][1]
+
+
+def test_build_steps_cycle_no_per_member_diagnostic() -> None:
+    """Cycle steps no longer carry the per-member DIAGNOSTIC blocks."""
+    steps = build_steps(
+        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
+    )
+    for _description, prompt in steps:
+        assert "DIAGNOSTIC for" not in prompt
+
+
+def test_build_steps_cycle_external_deps_listed() -> None:
+    """Cycle step 1 lists external dependencies if any."""
+    steps = build_steps(
+        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf",
+        satisfied_dependencies=["33.6.1"],
+    )
+    assert "§33.6.1" in steps[0][1]
+
+
+def test_build_steps_single_member_has_no_cycle_intro() -> None:
+    """A single-subclause run does not include the cycle intro block."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "co-implementing" not in steps[0][1]
+
+
+# --- mutator dispatch shells ------------------------------------------------
+
+
+def _patched_run_steps_and_commit(committed=True):
+    """Patch run_steps and commit_mutator_result."""
     return (
-        patch("satisfy_subclause.mutators.run_mutator_call"),
+        patch("satisfy_subclause.mutators.run_steps"),
         patch(
             "satisfy_subclause.mutators.commit_mutator_result",
             return_value=committed,
@@ -444,52 +594,51 @@ def _patched_call_and_commit(committed=True):
     )
 
 
-def _target(failing: bool = True, subclause: str = "33.4.1.5",
-            issue: int = 42) -> CycleMember:
-    """Build a CycleMember target with a satisfied or failing diagnostic."""
-    diagnostic = _failing_diagnostic() if failing else _all_satisfied()
-    return CycleMember(
-        subclause=subclause, diagnostic=diagnostic, issue=issue,
-    )
+def _target(subclause: str = "33.4.1.5", issue: int = 42) -> CycleMember:
+    """Build a CycleMember target for mutator-shell tests."""
+    return CycleMember(subclause=subclause, issue=issue)
 
 
-def test_no_deps_skips_when_satisfied() -> None:
-    """No-deps mutator is a no-op when the diagnostic is already satisfied."""
-    mock_call, mock_commit = _patched_call_and_commit()
-    with mock_call as call:
-        with mock_commit:
-            satisfy_unsatisfied_subclause_without_dependencies(
-                _target(failing=False), "~/LRM.pdf", model="opus",
-            )
-    assert not call.called
+# --- satisfy_unsatisfied_subclause_without_dependencies ---------------------
 
 
-def test_no_deps_invokes_mutator_when_failing() -> None:
-    """No-deps mutator invokes run_mutator_call when the diagnostic fails."""
-    mock_call, mock_commit = _patched_call_and_commit()
-    with mock_call as call:
+def test_no_deps_invokes_run_steps() -> None:
+    """No-deps mutator runs the eight-step pipeline."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_without_dependencies(
                 _target(), "~/LRM.pdf", model="opus",
             )
-    assert call.called
+    assert run.called
 
 
-def test_no_deps_passes_model_to_mutator() -> None:
-    """No-deps mutator forwards the model arg to run_mutator_call."""
-    mock_call, mock_commit = _patched_call_and_commit()
-    with mock_call as call:
+def test_no_deps_passes_eight_steps() -> None:
+    """No-deps mutator hands eight step pairs to run_steps."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
+        with mock_commit:
+            satisfy_unsatisfied_subclause_without_dependencies(
+                _target(), "~/LRM.pdf", model="opus",
+            )
+    assert len(run.call_args[0][0]) == 8
+
+
+def test_no_deps_passes_model() -> None:
+    """No-deps mutator forwards the model arg to run_steps."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_without_dependencies(
                 _target(), "~/LRM.pdf", model="haiku",
             )
-    assert call.call_args[1]["model"] == "haiku"
+    assert run.call_args[1]["model"] == "haiku"
 
 
 def test_no_deps_commits_with_subclause_and_issue() -> None:
     """No-deps mutator commits with the right subclause/issue pair."""
-    mock_call, mock_commit = _patched_call_and_commit()
-    with mock_call:
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run:
         with mock_commit as commit:
             satisfy_unsatisfied_subclause_without_dependencies(
                 _target(), "~/LRM.pdf", model="opus",
@@ -499,8 +648,8 @@ def test_no_deps_commits_with_subclause_and_issue() -> None:
 
 def test_no_deps_warns_when_no_changes(capsys) -> None:
     """No-deps mutator warns when no source-tree changes were made."""
-    mock_call, mock_commit = _patched_call_and_commit(committed=False)
-    with mock_call:
+    mock_run, mock_commit = _patched_run_steps_and_commit(committed=False)
+    with mock_run:
         with mock_commit:
             satisfy_unsatisfied_subclause_without_dependencies(
                 _target(), "~/LRM.pdf", model="opus",
@@ -510,8 +659,8 @@ def test_no_deps_warns_when_no_changes(capsys) -> None:
 
 def test_no_deps_logs_subclause_to_stderr(capsys) -> None:
     """No-deps mutator prints a one-line banner to stderr."""
-    mock_call, mock_commit = _patched_call_and_commit()
-    with mock_call:
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run:
         with mock_commit:
             satisfy_unsatisfied_subclause_without_dependencies(
                 _target(), "~/LRM.pdf", model="opus",
@@ -519,194 +668,91 @@ def test_no_deps_logs_subclause_to_stderr(capsys) -> None:
     assert "§33.4.1.5" in capsys.readouterr().err
 
 
-# --- build_with_deps_prompt -------------------------------------------------
-
-
-def test_with_deps_prompt_mentions_subclause() -> None:
-    """With-deps prompt mentions the target subclause."""
-    prompt = build_with_deps_prompt(
-        "33.4", "~/LRM.pdf", _failing_diagnostic(), [],
-    )
-    assert "§33.4" in prompt
-
-
-def test_with_deps_prompt_includes_diagnostic_failures() -> None:
-    """With-deps prompt embeds the diagnostic failure descriptions."""
-    prompt = build_with_deps_prompt(
-        "33.4", "~/LRM.pdf", _failing_diagnostic(), [],
-    )
-    assert "rule 7 has no production code" in prompt
-
-
-def test_with_deps_prompt_lists_satisfied_deps() -> None:
-    """With-deps prompt lists the dependencies that are already satisfied."""
-    prompt = build_with_deps_prompt(
-        "33.4", "~/LRM.pdf", _failing_diagnostic(),
-        ["33.6.1", "33.4.1.5"],
-    )
-    assert "§33.6.1" in prompt and "§33.4.1.5" in prompt
-
-
-def test_with_deps_prompt_describes_dep_reuse() -> None:
-    """With-deps prompt explains that satisfied deps may be referenced."""
-    prompt = build_with_deps_prompt(
-        "33.4", "~/LRM.pdf", _failing_diagnostic(), ["33.6.1"],
-    )
-    assert "reference their machinery" in prompt
-
-
-def test_with_deps_prompt_handles_empty_deps() -> None:
-    """With-deps prompt handles the empty dependency list with a no-deps note."""
-    prompt = build_with_deps_prompt(
-        "33.4", "~/LRM.pdf", _failing_diagnostic(), [],
-    )
-    assert "No external dependencies" in prompt
-
-
-def test_with_deps_prompt_forbids_git() -> None:
-    """With-deps prompt explicitly forbids running git."""
-    prompt = build_with_deps_prompt(
-        "33.4", "~/LRM.pdf", _failing_diagnostic(), [],
-    )
-    assert "git" in prompt
-
-
 # --- satisfy_unsatisfied_subclause_with_satisfied_dependencies --------------
 
 
-def test_with_deps_skips_when_satisfied() -> None:
-    """With-deps mutator is a no-op when the diagnostic is already satisfied."""
-    mock_call, mock_commit = _patched_call_and_commit()
-    with mock_call as call:
+def test_with_deps_invokes_run_steps() -> None:
+    """With-deps mutator runs the eight-step pipeline."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_with_satisfied_dependencies(
-                _target(failing=False, subclause="33.4"),
-                "~/LRM.pdf", ["33.6.1"], model="opus",
+                _target(subclause="33.4"), "~/LRM.pdf",
+                ["33.6.1"], model="opus",
             )
-    assert not call.called
+    assert run.called
 
 
-def test_with_deps_invokes_mutator_when_failing() -> None:
-    """With-deps mutator invokes run_mutator_call when failing."""
-    mock_call, mock_commit = _patched_call_and_commit()
-    with mock_call as call:
+def test_with_deps_passes_eight_steps() -> None:
+    """With-deps mutator hands eight step pairs to run_steps."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_with_satisfied_dependencies(
-                _target(subclause="33.4"),
-                "~/LRM.pdf", ["33.6.1"], model="opus",
+                _target(subclause="33.4"), "~/LRM.pdf",
+                ["33.6.1"], model="opus",
             )
-    assert call.called
+    assert len(run.call_args[0][0]) == 8
 
 
-def test_with_deps_passes_deps_into_prompt() -> None:
-    """With-deps mutator forwards the deps list into the Claude prompt."""
-    mock_call, mock_commit = _patched_call_and_commit()
-    with mock_call as call:
+def test_with_deps_passes_deps_into_first_step_prompt() -> None:
+    """With-deps mutator embeds the deps list in step 1's prompt."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_with_satisfied_dependencies(
-                _target(subclause="33.4"),
-                "~/LRM.pdf", ["33.6.1"], model="opus",
+                _target(subclause="33.4"), "~/LRM.pdf",
+                ["33.6.1"], model="opus",
             )
-    assert "§33.6.1" in call.call_args[0][0]
+    first_step_prompt = run.call_args[0][0][0][1]
+    assert "§33.6.1" in first_step_prompt
 
 
 def test_with_deps_commits_with_subclause_and_issue() -> None:
     """With-deps mutator commits with the right subclause/issue pair."""
-    mock_call, mock_commit = _patched_call_and_commit()
-    with mock_call:
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run:
         with mock_commit as commit:
             satisfy_unsatisfied_subclause_with_satisfied_dependencies(
-                _target(subclause="33.4"),
-                "~/LRM.pdf", ["33.6.1"], model="opus",
+                _target(subclause="33.4"), "~/LRM.pdf",
+                ["33.6.1"], model="opus",
             )
     assert commit.call_args[0] == (["33.4"], [42])
 
 
-def test_with_deps_logs_subclause_to_stderr(capsys) -> None:
-    """With-deps mutator prints a one-line banner to stderr."""
-    mock_call, mock_commit = _patched_call_and_commit()
-    with mock_call:
+def test_with_deps_warns_when_no_changes(capsys) -> None:
+    """With-deps mutator warns when no source-tree changes were made."""
+    mock_run, mock_commit = _patched_run_steps_and_commit(committed=False)
+    with mock_run:
         with mock_commit:
             satisfy_unsatisfied_subclause_with_satisfied_dependencies(
-                _target(subclause="33.4"),
-                "~/LRM.pdf", ["33.6.1"], model="opus",
+                _target(subclause="33.4"), "~/LRM.pdf",
+                ["33.6.1"], model="opus",
+            )
+    assert "no source-tree changes" in capsys.readouterr().err
+
+
+def test_with_deps_logs_subclause_to_stderr(capsys) -> None:
+    """With-deps mutator prints a one-line banner to stderr."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run:
+        with mock_commit:
+            satisfy_unsatisfied_subclause_with_satisfied_dependencies(
+                _target(subclause="33.4"), "~/LRM.pdf",
+                ["33.6.1"], model="opus",
             )
     assert "§33.4" in capsys.readouterr().err
-
-
-# --- build_cycle_prompt -----------------------------------------------------
-
-
-def _two_member_cycle():
-    """Return a two-member CycleMember list with failing diagnostics."""
-    return [
-        CycleMember(
-            subclause="33.4.1.5",
-            diagnostic=_failing_diagnostic(),
-            issue=10,
-        ),
-        CycleMember(
-            subclause="33.4.1.6",
-            diagnostic=_failing_diagnostic(),
-            issue=11,
-        ),
-    ]
-
-
-def test_cycle_prompt_lists_each_member() -> None:
-    """Cycle prompt names each cycle member with the section sign."""
-    prompt = build_cycle_prompt(_two_member_cycle(), "~/LRM.pdf", [])
-    assert "§33.4.1.5" in prompt and "§33.4.1.6" in prompt
-
-
-def test_cycle_prompt_describes_cycle_relationship() -> None:
-    """Cycle prompt explains that cycle members must be implemented together."""
-    prompt = build_cycle_prompt(_two_member_cycle(), "~/LRM.pdf", [])
-    assert "implemented together" in prompt
-
-
-def test_cycle_prompt_lists_each_diagnostic() -> None:
-    """Cycle prompt embeds a DIAGNOSTIC section per cycle member."""
-    prompt = build_cycle_prompt(_two_member_cycle(), "~/LRM.pdf", [])
-    assert prompt.count("DIAGNOSTIC for") == 2
-
-
-def test_cycle_prompt_includes_failure() -> None:
-    """Cycle prompt includes each member's failure descriptions."""
-    prompt = build_cycle_prompt(_two_member_cycle(), "~/LRM.pdf", [])
-    assert "rule 7 has no production code" in prompt
-
-
-def test_cycle_prompt_lists_external_deps() -> None:
-    """Cycle prompt lists the external dependencies that are already satisfied."""
-    prompt = build_cycle_prompt(_two_member_cycle(), "~/LRM.pdf", ["33.6.1"])
-    assert "§33.6.1" in prompt
-
-
-def test_cycle_prompt_handles_no_external_deps() -> None:
-    """Cycle prompt handles the no-external-deps case with a notice."""
-    prompt = build_cycle_prompt(_two_member_cycle(), "~/LRM.pdf", [])
-    assert "No external dependencies" in prompt
-
-
-def test_cycle_prompt_forbids_git() -> None:
-    """Cycle prompt explicitly forbids running git."""
-    prompt = build_cycle_prompt(_two_member_cycle(), "~/LRM.pdf", [])
-    assert "git" in prompt
 
 
 # --- satisfy_unsatisfied_subclause_set_with_satisfied_dependencies ---------
 
 
-def _patched_cycle_runners(committed=True):
-    """Patch run_mutator_call and commit_mutator_result for cycle tests."""
-    return (
-        patch("satisfy_subclause.mutators.run_mutator_call"),
-        patch(
-            "satisfy_subclause.mutators.commit_mutator_result",
-            return_value=committed,
-        ),
-    )
+def _two_member_cycle() -> list[CycleMember]:
+    """Return a two-member CycleMember list."""
+    return [
+        CycleMember(subclause="33.4.1.5", issue=10),
+        CycleMember(subclause="33.4.1.6", issue=11),
+    ]
 
 
 def test_cycle_rejects_single_member() -> None:
@@ -727,54 +773,89 @@ def test_cycle_rejects_four_members() -> None:
         )
 
 
-def _mixed_cycle(member_a_diag, member_b_diag) -> list:
-    """Build a two-member cycle whose diagnostics may differ."""
-    return [
-        CycleMember(subclause="33.4.1.5", diagnostic=member_a_diag, issue=10),
-        CycleMember(subclause="33.4.1.6", diagnostic=member_b_diag, issue=11),
-    ]
-
-
-def test_cycle_skips_when_all_members_satisfied() -> None:
-    """Cycle mutator is a no-op when every member is already satisfied."""
-    members = _mixed_cycle(_all_satisfied(), _all_satisfied())
-    mock_call, mock_commit = _patched_cycle_runners()
-    with mock_call as call:
+def test_cycle_accepts_three_members() -> None:
+    """A three-member cycle is accepted."""
+    three = _two_member_cycle() + [CycleMember(subclause="33.5", issue=12)]
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
-                members, "~/LRM.pdf", [], model="opus",
+                three, "~/LRM.pdf", [], model="opus",
             )
-    assert not call.called
+    assert run.called
 
 
-def test_cycle_invokes_mutator_when_any_member_fails() -> None:
-    """Cycle mutator invokes the Claude mutator when any member is failing."""
-    members = _mixed_cycle(_failing_diagnostic(), _all_satisfied())
-    mock_call, mock_commit = _patched_cycle_runners()
-    with mock_call as call:
+def test_cycle_invokes_run_steps() -> None:
+    """Cycle mutator runs the eight-step pipeline."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
-                members, "~/LRM.pdf", [], model="opus",
+                _two_member_cycle(), "~/LRM.pdf", [], model="opus",
             )
-    assert call.called
+    assert run.called
+
+
+def test_cycle_passes_eight_steps() -> None:
+    """Cycle mutator hands eight step pairs to run_steps."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
+        with mock_commit:
+            satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
+                _two_member_cycle(), "~/LRM.pdf", [], model="opus",
+            )
+    assert len(run.call_args[0][0]) == 8
+
+
+def test_cycle_first_step_lists_first_member() -> None:
+    """Cycle mutator's first-step prompt names the first cycle member."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
+        with mock_commit:
+            satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
+                _two_member_cycle(), "~/LRM.pdf", [], model="opus",
+            )
+    assert "§33.4.1.5" in run.call_args[0][0][0][1]
+
+
+def test_cycle_first_step_lists_second_member() -> None:
+    """Cycle mutator's first-step prompt names the second cycle member."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
+        with mock_commit:
+            satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
+                _two_member_cycle(), "~/LRM.pdf", [], model="opus",
+            )
+    assert "§33.4.1.6" in run.call_args[0][0][0][1]
+
+
+def test_cycle_first_step_lists_external_deps() -> None:
+    """Cycle mutator's first-step prompt lists external satisfied deps."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
+        with mock_commit:
+            satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
+                _two_member_cycle(), "~/LRM.pdf", ["33.6.1"], model="opus",
+            )
+    first_step_prompt = run.call_args[0][0][0][1]
+    assert "§33.6.1" in first_step_prompt
 
 
 def test_cycle_commits_with_all_issues() -> None:
     """Cycle mutator commits with one Closes trailer per cycle member."""
-    members = _two_member_cycle()
-    mock_call, mock_commit = _patched_cycle_runners()
-    with mock_call:
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run:
         with mock_commit as commit:
             satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
-                members, "~/LRM.pdf", [], model="opus",
+                _two_member_cycle(), "~/LRM.pdf", [], model="opus",
             )
     assert commit.call_args[0] == (["33.4.1.5", "33.4.1.6"], [10, 11])
 
 
 def test_cycle_warns_when_no_changes(capsys) -> None:
     """Cycle mutator warns when no source-tree changes were made."""
-    mock_call, mock_commit = _patched_cycle_runners(committed=False)
-    with mock_call:
+    mock_run, mock_commit = _patched_run_steps_and_commit(committed=False)
+    with mock_run:
         with mock_commit:
             satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
                 _two_member_cycle(), "~/LRM.pdf", [], model="opus",
@@ -784,11 +865,26 @@ def test_cycle_warns_when_no_changes(capsys) -> None:
 
 def test_cycle_logs_subclauses_to_stderr(capsys) -> None:
     """Cycle mutator prints a one-line banner to stderr."""
-    mock_call, mock_commit = _patched_cycle_runners()
-    with mock_call:
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run:
         with mock_commit:
             satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
                 _two_member_cycle(), "~/LRM.pdf", [], model="opus",
             )
     err = capsys.readouterr().err
     assert "33.4.1.5" in err and "33.4.1.6" in err
+
+
+# --- CycleMember dataclass --------------------------------------------------
+
+
+def test_cycle_member_holds_subclause() -> None:
+    """CycleMember stores the subclause identifier."""
+    member = CycleMember(subclause="33.4.1.5", issue=42)
+    assert member.subclause == "33.4.1.5"
+
+
+def test_cycle_member_holds_issue() -> None:
+    """CycleMember stores the issue number."""
+    member = CycleMember(subclause="33.4.1.5", issue=42)
+    assert member.issue == 42

@@ -1,12 +1,12 @@
 """Recursive driver for the satisfaction pipeline.
 
-``satisfy_subclause`` is the entry point: it runs the satisfaction
-oracle, returns early on verdict yes, finds-or-creates a GitHub issue,
-and recursively dispatches to ``satisfy_unsatisfied_subclause`` until
-either the oracle flips to yes, the recursion bubbles up a cycle that
-this frame is the outermost member of (and so dispatches the cycle-set
-mutator), or the retry budget is exhausted (and the issue is labelled
-``pipeline-stuck``).
+``satisfy_subclause`` is the entry point: it finds-or-creates a
+GitHub issue for the requested subclause, computes its dependencies,
+recursively satisfies each dependency, and dispatches the appropriate
+mutator. The mutator runs the eight-step audit-then-act pipeline once;
+convergence is detected by the working tree (the mutator commits any
+edits with a ``Closes #N`` trailer; an empty diff means the codebase
+already satisfied §X — or now does — and nothing is committed).
 
 Cycle detection is honest: ``in_progress`` threads through the
 recursion as a frozen set of subclause identifiers. When the inner
@@ -15,12 +15,16 @@ returns a cycle marker rather than recursing into it. The marker
 bubbles up through every cycle member's frame; the outermost frame
 (whose ``in_progress`` does not yet contain it) dispatches the
 cycle-set mutator.
+
+There is no satisfaction oracle and no verdict. The audit lives in
+steps 1-2 of the mutator pipeline, where Claude produces it free-form
+and consumes it in steps 3-8 of the same session — never through a
+Python-shaped contract.
 """
 
 import json
 import subprocess
 import sys
-from dataclasses import asdict
 
 from .mutators import (
     CycleMember,
@@ -28,14 +32,7 @@ from .mutators import (
     satisfy_unsatisfied_subclause_with_satisfied_dependencies,
     satisfy_unsatisfied_subclause_without_dependencies,
 )
-from .oracles import (
-    SubclauseDiagnostic,
-    compute_subclause_dependencies,
-    is_subclause_satisfied,
-)
-
-
-_MAX_RETRIES = 1
+from .oracles import compute_subclause_dependencies
 
 
 # ---------------------------------------------------------------------------
@@ -112,44 +109,21 @@ def find_or_create_issue(subclause: str) -> int:
     return parse_issue_number_from_create_output(completed.stdout)
 
 
-def label_issue_pipeline_stuck(
-    issue: int, diagnostic: SubclauseDiagnostic,
-) -> None:
-    """Add the pipeline-stuck label and post the final diagnostic comment."""
-    subprocess.run(
-        ["gh", "issue", "edit", str(issue),
-         "--add-label", "pipeline-stuck"],
-        check=False,
-    )
-    body = "Pipeline stuck after retry. Final diagnostic:\n```json\n" \
-        + json.dumps(asdict(diagnostic), indent=2) + "\n```\n"
-    subprocess.run(
-        ["gh", "issue", "comment", str(issue), "--body", body],
-        check=False,
-    )
-
-
 # ---------------------------------------------------------------------------
 # Cycle dispatch
 # ---------------------------------------------------------------------------
 
-def _build_cycle_members(
-    members: list[str], lrm: str, *, model: str,
-) -> list[CycleMember]:
-    """Run the oracle and find/create issues for each cycle member."""
+def _build_cycle_members(members: list[str]) -> list[CycleMember]:
+    """Find or create issues for each cycle member."""
     return [
-        CycleMember(
-            subclause=member,
-            diagnostic=is_subclause_satisfied(member, lrm, model=model),
-            issue=find_or_create_issue(member),
-        )
+        CycleMember(subclause=member, issue=find_or_create_issue(member))
         for member in members
     ]
 
 
 def dispatch_cycle(members: list[str], lrm: str, *, model: str) -> None:
     """Run the cycle-set mutator for *members*."""
-    cycle = _build_cycle_members(members, lrm, model=model)
+    cycle = _build_cycle_members(members)
     satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
         cycle, lrm, satisfied_dependencies=[], model=model,
     )
@@ -217,12 +191,14 @@ def satisfy_subclause(
 ) -> dict:
     """Idempotently satisfy ``subclause``.
 
-    Returns ``{"status": "satisfied"}`` if the subclause is satisfied
-    on entry or after the pipeline runs. Returns
+    Runs one pass of the eight-step mutator pipeline. Returns
+    ``{"status": "satisfied"}`` after the pass completes, or
     ``{"status": "cycle", "members": [...]}`` when a cycle bubbles up
     through this frame and an outer caller is responsible for
-    dispatching the cycle-set mutator. Exits non-zero (after labelling
-    the issue ``pipeline-stuck``) when the retry budget is exhausted.
+    dispatching the cycle-set mutator. The mutator's commit step is
+    the convergence signal: empty diff means §X already satisfied (or
+    now does), non-empty diff is committed with a ``Closes #N``
+    trailer.
     """
     print(
         f"Outer orchestrator: §{subclause}, model {model},"
@@ -230,36 +206,16 @@ def satisfy_subclause(
         file=sys.stderr,
     )
 
-    diagnostic = is_subclause_satisfied(subclause, lrm, model=model)
-    if diagnostic.verdict == "yes":
-        print(f"§{subclause} already satisfied; nothing to do.",
-              file=sys.stderr)
-        return {"status": "satisfied"}
-
     issue = find_or_create_issue(subclause)
     new_in_progress = in_progress | {subclause}
 
-    for attempt in range(_MAX_RETRIES + 1):
-        target = CycleMember(
-            subclause=subclause, diagnostic=diagnostic, issue=issue,
-        )
-        result = satisfy_unsatisfied_subclause(
-            target, lrm, model=model, in_progress=new_in_progress,
-        )
-        if result.get("status") == "cycle":
-            members = result.get("members", [])
-            if subclause in members and in_progress:
-                return result
-            dispatch_cycle(members, lrm, model=model)
-        diagnostic = is_subclause_satisfied(subclause, lrm, model=model)
-        if diagnostic.verdict == "yes":
-            return {"status": "satisfied"}
-        if attempt < _MAX_RETRIES:
-            print(
-                f"Pass {attempt + 1} did not converge for §{subclause};"
-                " retrying once with the fresh diagnostic.",
-                file=sys.stderr,
-            )
-
-    label_issue_pipeline_stuck(issue, diagnostic)
-    sys.exit(1)
+    target = CycleMember(subclause=subclause, issue=issue)
+    result = satisfy_unsatisfied_subclause(
+        target, lrm, model=model, in_progress=new_in_progress,
+    )
+    if result.get("status") == "cycle":
+        members = result.get("members", [])
+        if subclause in members and in_progress:
+            return result
+        dispatch_cycle(members, lrm, model=model)
+    return {"status": "satisfied"}
