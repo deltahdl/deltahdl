@@ -25,6 +25,11 @@ import sys
 
 from lib.python.cli import parse_and_validate_subclause
 from lib.python.satisfy.mutator import build_mutator_parser
+from lib.python.satisfy.orchestrator import (
+    add_in_progress_arg,
+    parse_in_progress,
+    run_capture,
+)
 
 
 _DESCRIPTION = (
@@ -37,29 +42,11 @@ _DESCRIPTION = (
 # CLI
 # ---------------------------------------------------------------------------
 
-def add_in_progress_arg(parser: argparse.ArgumentParser) -> None:
-    """Add the ``--in-progress`` argument used for cycle detection."""
-    parser.add_argument(
-        "--in-progress",
-        type=str,
-        default="",
-        help=(
-            "Comma-separated subclauses currently in progress in the"
-            " caller stack. Used for cycle detection."
-        ),
-    )
-
-
 def parse_args(argv=None) -> argparse.Namespace:
     """Parse and validate CLI arguments."""
     parser = build_mutator_parser(_DESCRIPTION)
     add_in_progress_arg(parser)
     return parse_and_validate_subclause(parser, argv)
-
-
-def parse_in_progress(raw: str) -> list[str]:
-    """Split a comma-separated --in-progress value into a list."""
-    return [item.strip() for item in raw.split(",") if item.strip()]
 
 
 # ---------------------------------------------------------------------------
@@ -70,19 +57,13 @@ def invoke_compute_dependencies(
     subclause: str, lrm: str, *, model: str,
 ) -> list[str]:
     """Subprocess ``python -m compute_subclause_dependencies``."""
-    cmd = [
+    stdout = run_capture([
         sys.executable, "-m", "compute_subclause_dependencies",
         "--lrm", lrm,
         "--subclause", subclause,
         "--model", model,
-    ]
-    completed = subprocess.run(
-        cmd, capture_output=True, text=True, check=False,
-    )
-    if completed.returncode != 0:
-        print(completed.stderr, file=sys.stderr)
-        sys.exit(completed.returncode)
-    deps = json.loads(completed.stdout)
+    ])
+    deps = json.loads(stdout)
     if not isinstance(deps, list):
         print(
             f"compute_subclause_dependencies returned non-list: {deps}",
@@ -99,20 +80,14 @@ def invoke_satisfy_subclause(
 
     Returns the parsed status JSON the outer orchestrator emits.
     """
-    cmd = [
+    stdout = run_capture([
         sys.executable, "-m", "satisfy_subclause",
         "--lrm", lrm,
         "--subclause", subclause,
         "--model", model,
         "--in-progress", ",".join(in_progress),
-    ]
-    completed = subprocess.run(
-        cmd, capture_output=True, text=True, check=False,
-    )
-    if completed.returncode != 0:
-        print(completed.stderr, file=sys.stderr)
-        sys.exit(completed.returncode)
-    payload = json.loads(completed.stdout) if completed.stdout.strip() else {}
+    ])
+    payload = json.loads(stdout) if stdout.strip() else {}
     return payload if isinstance(payload, dict) else {}
 
 

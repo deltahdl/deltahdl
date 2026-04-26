@@ -1,8 +1,18 @@
 """Shared test fixtures and helpers for satisfaction-pipeline scripts."""
 
 import json
+from unittest.mock import MagicMock
 
 from lib.python.satisfy import SATISFACTION_CONDITIONS, SATISFIED
+
+
+def stub_completed(stdout: str = "", returncode: int = 0, stderr: str = ""):
+    """Build a stubbed ``CompletedProcess`` for ``subprocess.run``."""
+    completed = MagicMock()
+    completed.returncode = returncode
+    completed.stdout = stdout
+    completed.stderr = stderr
+    return completed
 
 
 def make_lrm(tmp_path):

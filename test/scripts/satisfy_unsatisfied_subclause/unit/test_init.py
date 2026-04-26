@@ -2,13 +2,14 @@
 
 import json
 import runpy
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from lib.python.test_fixtures.satisfy import (
     failing_payload,
     make_lrm,
+    stub_completed,
     write_diagnostic,
 )
 
@@ -37,12 +38,8 @@ def _args(tmp_path, **overrides):
 
 
 def _completed(stdout="", returncode=0):
-    """Build a stubbed CompletedProcess."""
-    completed = MagicMock()
-    completed.returncode = returncode
-    completed.stdout = stdout
-    completed.stderr = ""
-    return completed
+    """Build a stubbed CompletedProcess via the shared helper."""
+    return stub_completed(stdout=stdout, returncode=returncode)
 
 
 # ---- parse_args -----------------------------------------------------------

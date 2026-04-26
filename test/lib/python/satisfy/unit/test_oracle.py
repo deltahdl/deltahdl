@@ -1,7 +1,7 @@
 """Tests for lib.python.satisfy.oracle (shared Claude-CLI plumbing)."""
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -12,6 +12,7 @@ from lib.python.satisfy.oracle import (
     extract_json_literal,
     run_oracle_call,
 )
+from lib.python.test_fixtures.satisfy import stub_completed
 
 
 # --- DISALLOWED_TOOLS --------------------------------------------------------
@@ -189,20 +190,13 @@ def test_build_oracle_args_rejects_missing_lrm(tmp_path) -> None:
 # --- run_oracle_call --------------------------------------------------------
 
 
-def _completed(stdout, *, returncode=0, stderr=""):
-    """Build a stubbed CompletedProcess for subprocess.run."""
-    completed = MagicMock()
-    completed.returncode = returncode
-    completed.stdout = stdout
-    completed.stderr = stderr
-    return completed
-
-
 def _patched(stdout, *, returncode=0, stderr=""):
     """Patch subprocess.run with a stubbed CompletedProcess."""
     return patch(
         "lib.python.satisfy.oracle.subprocess.run",
-        return_value=_completed(stdout, returncode=returncode, stderr=stderr),
+        return_value=stub_completed(
+            stdout=stdout, returncode=returncode, stderr=stderr,
+        ),
     )
 
 
