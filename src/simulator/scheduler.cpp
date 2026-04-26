@@ -115,14 +115,13 @@ void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
   if (post_timestep_cb_) post_timestep_cb_();
 }
 
-// --- Scheduler: Active region set iteration ---
-// Regions: Active, Inactive, PreNBA, NBA, PostNBA
+// Inner active-set loop: iterates over Active..Post-Observed per §4.5.
 
 bool Scheduler::IterateActiveSet(TimeSlot& slot) {
-  if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostNBA)) {
+  if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
     return false;
   }
-  while (slot.AnyNonemptyIn(Region::kActive, Region::kPostNBA)) {
+  while (slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
     ExecuteActiveRegions(slot);
   }
   return true;
@@ -138,27 +137,24 @@ void Scheduler::ExecuteActiveRegions(TimeSlot& slot) {
   exec(Region::kPreNBA);
   exec(Region::kNBA);
   exec(Region::kPostNBA);
+  exec(Region::kPreObserved);
+  exec(Region::kObserved);
+  exec(Region::kPostObserved);
 }
 
-// --- Scheduler: Reactive region set iteration ---
-// Regions: PreObserved, Observed, PostObserved, Reactive,
-//          ReInactive, PreReNBA, ReNBA, PostReNBA, PrePostponed
+// Inner reactive-set loop: iterates over Reactive..Post-Re-NBA per §4.5.
+// The outer loop in ExecuteTimeSlot re-enters the active-set loop once this
+// returns, so events scheduled into the active set during reactive drain are
+// processed only after the five reactive regions are fully drained.
 
 bool Scheduler::IterateReactiveSet(TimeSlot& slot) {
-  if (!slot.AnyNonemptyIn(Region::kPreObserved, Region::kPostReNBA)) {
+  if (!slot.AnyNonemptyIn(Region::kReactive, Region::kPostReNBA)) {
     return false;
   }
-  while (slot.AnyNonemptyIn(Region::kPreObserved, Region::kPostReNBA)) {
+  while (slot.AnyNonemptyIn(Region::kReactive, Region::kPostReNBA)) {
     ExecuteReactiveRegions(slot);
-    RestartActiveSet(slot);
   }
   return true;
-}
-
-void Scheduler::RestartActiveSet(TimeSlot& slot) {
-  if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostNBA)) return;
-  while (IterateActiveSet(slot)) {
-  }
 }
 
 void Scheduler::ExecuteReactiveRegions(TimeSlot& slot) {
@@ -166,9 +162,6 @@ void Scheduler::ExecuteReactiveRegions(TimeSlot& slot) {
     ExecuteRegion(slot.regions[static_cast<size_t>(r)]);
   };
 
-  exec(Region::kPreObserved);
-  exec(Region::kObserved);
-  exec(Region::kPostObserved);
   exec(Region::kReactive);
   exec(Region::kReInactive);
   exec(Region::kPreReNBA);

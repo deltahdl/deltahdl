@@ -94,7 +94,6 @@ class Scheduler {
 
   bool IterateActiveSet(TimeSlot& slot);
   bool IterateReactiveSet(TimeSlot& slot);
-  void RestartActiveSet(TimeSlot& slot);
 
   EventPool pool_;
   std::map<SimTime, TimeSlot> event_calendar_;

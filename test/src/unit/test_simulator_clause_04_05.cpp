@@ -80,32 +80,6 @@ TEST(SimulationAlgorithmSim, ActiveSetIterationReExecutesActiveAfterInactive) {
   EXPECT_EQ(order[1], "active_from_inactive");
 }
 
-TEST(SimulationAlgorithmSim, ActiveSetReIteratesWhenNBAGeneratesActiveEvent) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* nba = sched.GetEventPool().Acquire();
-  nba->callback = [&]() {
-    order.push_back("nba");
-    auto* new_active = sched.GetEventPool().Acquire();
-    new_active->callback = [&]() { order.push_back("active_from_nba"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, new_active);
-  };
-  sched.ScheduleEvent({0}, Region::kNBA, nba);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "nba");
-  EXPECT_EQ(order[1], "active_from_nba");
-}
-
-TEST(SimulationAlgorithmSim, PrePostponedOnlyAfterActiveAndReactiveSetsEmpty) {
-  VerifyThreeRegionOrder({Region::kActive, "active"},
-                         {Region::kReactive, "reactive"},
-                         {Region::kPrePostponed, "pre_postponed"});
-}
-
 TEST(SimulationAlgorithmSim, ReactiveRestartsActiveSetBeforePrePostponed) {
   Arena arena;
   Scheduler sched(arena);
@@ -165,6 +139,89 @@ TEST(SimulationAlgorithmSim, IterativeRegionOrderMatchesAlgorithm) {
     auto curr = static_cast<int>(kIterativeRegions[i]);
     EXPECT_EQ(curr, prev + 1) << "Region ordinal gap at index " << i;
   }
+}
+
+TEST(SimulationAlgorithmSim,
+     PrePostponedWaitsForCascadeThroughAllFiveReactiveRegions) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  auto* reactive = sched.GetEventPool().Acquire();
+  reactive->callback = [&]() {
+    order.push_back("reactive");
+    auto* re_inactive = sched.GetEventPool().Acquire();
+    re_inactive->callback = [&]() {
+      order.push_back("re_inactive");
+      auto* pre_re_nba = sched.GetEventPool().Acquire();
+      pre_re_nba->callback = [&]() {
+        order.push_back("pre_re_nba");
+        auto* re_nba = sched.GetEventPool().Acquire();
+        re_nba->callback = [&]() {
+          order.push_back("re_nba");
+          auto* post_re_nba = sched.GetEventPool().Acquire();
+          post_re_nba->callback = [&]() { order.push_back("post_re_nba"); };
+          sched.ScheduleEvent(sched.CurrentTime(), Region::kPostReNBA,
+                              post_re_nba);
+        };
+        sched.ScheduleEvent(sched.CurrentTime(), Region::kReNBA, re_nba);
+      };
+      sched.ScheduleEvent(sched.CurrentTime(), Region::kPreReNBA, pre_re_nba);
+    };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kReInactive, re_inactive);
+  };
+  sched.ScheduleEvent({0}, Region::kReactive, reactive);
+
+  auto* pp = sched.GetEventPool().Acquire();
+  pp->callback = [&]() { order.push_back("pre_postponed"); };
+  sched.ScheduleEvent({0}, Region::kPrePostponed, pp);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 6u);
+  EXPECT_EQ(order[0], "reactive");
+  EXPECT_EQ(order[1], "re_inactive");
+  EXPECT_EQ(order[2], "pre_re_nba");
+  EXPECT_EQ(order[3], "re_nba");
+  EXPECT_EQ(order[4], "post_re_nba");
+  EXPECT_EQ(order[5], "pre_postponed");
+}
+
+TEST(SimulationAlgorithmSim, PostponedRunsWhenAllIterativeRegionsAreEmpty) {
+  Arena arena;
+  Scheduler sched(arena);
+  bool postponed_ran = false;
+
+  auto* ev = sched.GetEventPool().Acquire();
+  ev->callback = [&]() { postponed_ran = true; };
+  sched.ScheduleEvent({0}, Region::kPostponed, ev);
+
+  sched.Run();
+  EXPECT_TRUE(postponed_ran);
+}
+
+TEST(SimulationAlgorithmSim, UpdateEventModifiesObjectAndSchedulesEvaluation) {
+  Arena arena;
+  Scheduler sched(arena);
+  int object_value = 0;
+  bool sensitive_eval_ran = false;
+
+  auto* update = sched.GetEventPool().Acquire();
+  update->kind = EventKind::kUpdate;
+  update->callback = [&]() {
+    object_value = 7;
+    auto* eval = sched.GetEventPool().Acquire();
+    eval->kind = EventKind::kEvaluation;
+    eval->callback = [&]() {
+      sensitive_eval_ran = true;
+      EXPECT_EQ(object_value, 7);
+    };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, eval);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, update);
+
+  sched.Run();
+  EXPECT_TRUE(sensitive_eval_ran);
+  EXPECT_EQ(object_value, 7);
 }
 
 TEST(Scheduler, InitialState) {

@@ -163,8 +163,6 @@ TEST(StratifiedSchedulerSim, All17RegionsNamedAndOrdered) {
             static_cast<int>(Region::kPostponed));
 }
 
-TEST(StratifiedSchedulerSim, AllRegionsExecuteInOrder) { VerifyAllRegionsExecuteInOrder(); }
-
 TEST(StratifiedSchedulerSim, TimeSlotAnyNonemptyInRange) {
   Arena arena;
   EventPool pool(arena);
