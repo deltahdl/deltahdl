@@ -1,10 +1,8 @@
 """Shared CLI argument helpers for implementation scripts."""
 
 import argparse
-import dataclasses
 import re
 import subprocess
-import sys
 import threading
 from pathlib import Path
 
@@ -91,29 +89,6 @@ def parse_and_validate(
     return args
 
 
-# ---------------------------------------------------------------------------
-# Dataclasses for subprocess invocation
-# ---------------------------------------------------------------------------
-
-@dataclasses.dataclass(frozen=True)
-class SubclauseParams:
-    """Batch-constant parameters for ``invoke_implement_subclause``."""
-
-    lrm: str
-    issue: int
-    model: str
-
-
-@dataclasses.dataclass(frozen=True)
-class ClauseParams:
-    """Batch-constant parameters for ``invoke_implement_clause``."""
-
-    lrm: str
-    organization: str
-    repo: str
-    labels: list[str]
-
-
 def parse_labels(raw: str) -> list[str]:
     """Split a comma-separated label string into a list."""
     return [s.strip() for s in raw.split(",")]
@@ -140,48 +115,6 @@ def add_github_args(parser: argparse.ArgumentParser) -> None:
         "--repo",
         required=True,
         help="GitHub repository.",
-    )
-
-
-def parse_clause_issues(raw: str) -> dict[str, int]:
-    """Parse comma-separated ``clause=issue`` pairs.
-
-    Returns a dict mapping clause strings to integer issue numbers.
-    """
-    pairs = [s.strip() for s in raw.split(",")]
-    result: dict[str, int] = {}
-    for pair in pairs:
-        if "=" not in pair:
-            raise argparse.ArgumentTypeError(
-                f"Invalid clause=issue pair: '{pair}'. Expected format: 15=17",
-            )
-        key, value = pair.split("=", 1)
-        key = key.strip()
-        value = value.strip()
-        if not CLAUSE_RE.match(key):
-            raise argparse.ArgumentTypeError(
-                f"Invalid clause format '{key}'. "
-                "Expected V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z "
-                "(V is a number or uppercase letter; "
-                "remaining parts are numbers).",
-            )
-        try:
-            result[key] = int(value)
-        except ValueError as exc:
-            raise argparse.ArgumentTypeError(
-                f"Invalid issue number '{value}' for clause '{key}'. "
-                "Expected an integer.",
-            ) from exc
-    return result
-
-
-def add_clauses_arg(parser: argparse.ArgumentParser) -> None:
-    """Add the ``--clauses`` argument to *parser*."""
-    parser.add_argument(
-        "--clauses",
-        type=parse_clause_issues,
-        required=True,
-        help="Comma-separated clause=issue pairs (e.g. 15=17,16=18).",
     )
 
 
@@ -224,72 +157,3 @@ def run_claude_cli(cmd, prompt, *, env, timeout=None):
     if timeout is not None:
         kwargs["timeout"] = timeout
     return subprocess.run(cmd, check=False, **kwargs)
-
-
-def invoke_implement_subclause(
-    lrm: str, subclause: str, issue: int, **kwargs,
-) -> None:
-    """Shell out to ``python -m implement_subclause``."""
-    print(f"Invoking implement_subclause for {subclause}...")
-    cmd = [
-        sys.executable, "-m", "implement_subclause",
-        "--lrm", lrm,
-        "--subclause", subclause,
-        "--issue", str(issue),
-        "--model", kwargs.get("model", "opus"),
-    ]
-    if kwargs.get("continue_session"):
-        cmd.append("--continue")
-    if kwargs.get("exclude"):
-        cmd.extend(["--exclude", kwargs["exclude"]])
-    result = subprocess.run(cmd, check=False)
-    if result.returncode != 0:
-        sys.exit(result.returncode)
-
-
-def invoke_implement_subclauses(
-    lrm: str,
-    issues: list[int],
-    *,
-    organization: str,
-    repo: str,
-    **kwargs,
-) -> None:
-    """Shell out to ``python -m implement_subclauses``."""
-    issues_str = ",".join(str(i) for i in issues)
-    print(f"Invoking implement_subclauses for issues {issues_str}...")
-    cmd = [
-        sys.executable, "-m", "implement_subclauses",
-        "--lrm", lrm,
-        "--issues", issues_str,
-        "--organization", organization,
-        "--repo", repo,
-        "--model", kwargs.get("model", "opus"),
-    ]
-    if kwargs.get("continue_session"):
-        cmd.append("--continue")
-    result = subprocess.run(cmd, check=False)
-    if result.returncode != 0:
-        sys.exit(result.returncode)
-
-
-def invoke_implement_clause(
-    params: ClauseParams, clause: str, sub_issue: int, *,
-    continue_session: bool = False,
-) -> None:
-    """Shell out to ``python -m implement_clause``."""
-    print(f"Invoking implement_clause for clause {clause} (issue #{sub_issue})...")
-    cmd = [
-        sys.executable, "-m", "implement_clause",
-        "--lrm", params.lrm,
-        "--clause", clause,
-        "--issue", str(sub_issue),
-        "--organization", params.organization,
-        "--repo", params.repo,
-        "--labels", ",".join(params.labels),
-    ]
-    if continue_session:
-        cmd.append("--continue")
-    result = subprocess.run(cmd, check=False)
-    if result.returncode != 0:
-        sys.exit(result.returncode)

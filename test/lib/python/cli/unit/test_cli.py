@@ -1,7 +1,6 @@
 """Tests for lib.python.cli."""
 
 import argparse
-import sys
 import time
 from pathlib import Path
 from unittest.mock import patch
@@ -9,20 +8,14 @@ from unittest.mock import patch
 import pytest
 
 from lib.python.cli import (
-    ClauseParams,
-    add_clauses_arg,
     add_continue_arg,
     add_github_args,
     add_labels_arg,
     add_lrm_arg,
     add_model_arg,
     add_subclause_arg,
-    invoke_implement_clause,
-    invoke_implement_subclause,
-    invoke_implement_subclauses,
     parse_and_validate,
     parse_and_validate_subclause,
-    parse_clause_issues,
     parse_labels,
     run_claude_cli,
     run_with_dots,
@@ -31,7 +24,6 @@ from lib.python.cli import (
 )
 from lib.python.test_fixtures.subprocess_stubs import (
     spy_subprocess_run,
-    stub_subprocess_failure,
     stub_subprocess_success,
 )
 
@@ -223,274 +215,6 @@ def test_add_github_args_repo() -> None:
     assert args.repo == "myrepo"
 
 
-# ---- invoke_implement_subclause ---------------------------------------------
-
-
-def _invoke_and_capture(monkeypatch, *, continue_session=False):
-    """Invoke with stubbed subprocess and return captured command."""
-    captured = stub_subprocess_success(monkeypatch)
-    invoke_implement_subclause(
-        "/tmp/lrm.pdf", "6.1", 42,
-        continue_session=continue_session,
-    )
-    return captured[0]
-
-
-def test_invoke_implement_subclause_calls_python(monkeypatch) -> None:
-    """Invokes the current Python interpreter."""
-    assert _invoke_and_capture(monkeypatch)[0] == sys.executable
-
-
-def test_invoke_implement_subclause_module(monkeypatch) -> None:
-    """Passes -m implement_subclause."""
-    assert _invoke_and_capture(monkeypatch)[1:3] == ["-m", "implement_subclause"]
-
-
-def test_invoke_implement_subclause_lrm(monkeypatch) -> None:
-    """Passes --lrm with correct value."""
-    cmd = _invoke_and_capture(monkeypatch)
-    assert cmd[cmd.index("--lrm") + 1] == "/tmp/lrm.pdf"
-
-
-def test_invoke_implement_subclause_subclause(monkeypatch) -> None:
-    """Passes --subclause with correct value."""
-    cmd = _invoke_and_capture(monkeypatch)
-    assert cmd[cmd.index("--subclause") + 1] == "6.1"
-
-
-def test_invoke_implement_subclause_issue(monkeypatch) -> None:
-    """Passes --issue as string."""
-    cmd = _invoke_and_capture(monkeypatch)
-    assert cmd[cmd.index("--issue") + 1] == "42"
-
-
-def test_invoke_implement_subclause_model(monkeypatch) -> None:
-    """Passes --model with correct value."""
-    cmd = _invoke_and_capture(monkeypatch)
-    assert cmd[cmd.index("--model") + 1] == "opus"
-
-
-def test_invoke_implement_subclause_no_continue(monkeypatch) -> None:
-    """Omits --continue when continue_session is False."""
-    assert "--continue" not in _invoke_and_capture(monkeypatch)
-
-
-def test_invoke_implement_subclause_with_continue(monkeypatch) -> None:
-    """Appends --continue when continue_session is True."""
-    assert "--continue" in _invoke_and_capture(monkeypatch, continue_session=True)
-
-
-def test_invoke_implement_subclause_no_exclude(monkeypatch) -> None:
-    """Omits --exclude when exclude is empty."""
-    assert "--exclude" not in _invoke_and_capture(monkeypatch)
-
-
-def test_invoke_implement_subclause_with_exclude(monkeypatch) -> None:
-    """Appends --exclude when exclude is non-empty."""
-    captured = stub_subprocess_success(monkeypatch)
-    invoke_implement_subclause("/tmp/lrm.pdf", "6.1", 42, exclude="6.1.1,6.1.2")
-    cmd = captured[0]
-    assert cmd[cmd.index("--exclude") + 1] == "6.1.1,6.1.2"
-
-
-def test_invoke_implement_subclause_failure(monkeypatch) -> None:
-    """Calls sys.exit on nonzero returncode."""
-    stub_subprocess_failure(monkeypatch)
-    with pytest.raises(SystemExit):
-        invoke_implement_subclause("/tmp/lrm.pdf", "6.1", 42)
-
-
-# ---- parse_clause_issues ----------------------------------------------------
-
-
-def test_parse_clause_issues_single() -> None:
-    """Single pair returns a one-element dict."""
-    assert parse_clause_issues("15=17") == {"15": 17}
-
-
-def test_parse_clause_issues_multiple() -> None:
-    """Comma-separated pairs are split correctly."""
-    assert parse_clause_issues("15=17,16=18") == {"15": 17, "16": 18}
-
-
-def test_parse_clause_issues_strips_whitespace() -> None:
-    """Whitespace around pairs is stripped."""
-    assert parse_clause_issues(" 15 = 17 , 16 = 18 ") == {"15": 17, "16": 18}
-
-
-def test_parse_clause_issues_rejects_no_equals() -> None:
-    """Missing = sign raises ArgumentTypeError."""
-    with pytest.raises(argparse.ArgumentTypeError):
-        parse_clause_issues("15")
-
-
-def test_parse_clause_issues_rejects_non_int_issue() -> None:
-    """Non-integer issue number raises ArgumentTypeError."""
-    with pytest.raises(argparse.ArgumentTypeError):
-        parse_clause_issues("15=abc")
-
-
-def test_parse_clause_issues_non_int_chains_cause() -> None:
-    """Non-integer issue number chains the original ValueError."""
-    cause = None
-    try:
-        parse_clause_issues("15=abc")
-    except argparse.ArgumentTypeError as exc:
-        cause = exc.__cause__
-    assert isinstance(cause, ValueError)
-
-
-def test_parse_clause_issues_rejects_invalid_clause() -> None:
-    """Invalid clause format raises ArgumentTypeError."""
-    with pytest.raises(argparse.ArgumentTypeError):
-        parse_clause_issues("bad=17")
-
-
-def test_add_clauses_arg() -> None:
-    """Adds --clauses as a required argument."""
-    parser = argparse.ArgumentParser()
-    add_clauses_arg(parser)
-    args = parser.parse_args(["--clauses", "15=17"])
-    assert args.clauses == {"15": 17}
-
-
-# ---- invoke_implement_clause ------------------------------------------------
-
-
-_CL_PARAMS = ClauseParams(
-    lrm="/tmp/lrm.pdf",
-    organization="deltahdl", repo="deltahdl",
-    labels=["IEEE 1800-2023"],
-)
-
-
-def _invoke_clause_and_capture(monkeypatch):
-    """Invoke with stubbed subprocess and return captured command."""
-    captured = stub_subprocess_success(monkeypatch)
-    invoke_implement_clause(_CL_PARAMS, "15", 17)
-    return captured[0]
-
-
-def test_invoke_implement_clause_module(monkeypatch) -> None:
-    """Passes -m implement_clause."""
-    assert _invoke_clause_and_capture(monkeypatch)[1:3] == ["-m", "implement_clause"]
-
-
-def test_invoke_implement_clause_clause(monkeypatch) -> None:
-    """Passes --clause with correct value."""
-    cmd = _invoke_clause_and_capture(monkeypatch)
-    assert cmd[cmd.index("--clause") + 1] == "15"
-
-
-def test_invoke_implement_clause_issue(monkeypatch) -> None:
-    """Passes --issue as string."""
-    cmd = _invoke_clause_and_capture(monkeypatch)
-    assert cmd[cmd.index("--issue") + 1] == "17"
-
-
-def test_invoke_implement_clause_organization(monkeypatch) -> None:
-    """Passes --organization with correct value."""
-    cmd = _invoke_clause_and_capture(monkeypatch)
-    assert cmd[cmd.index("--organization") + 1] == "deltahdl"
-
-
-def test_invoke_implement_clause_repo(monkeypatch) -> None:
-    """Passes --repo with correct value."""
-    cmd = _invoke_clause_and_capture(monkeypatch)
-    assert cmd[cmd.index("--repo") + 1] == "deltahdl"
-
-
-def test_invoke_implement_clause_failure(monkeypatch) -> None:
-    """Calls sys.exit on nonzero returncode."""
-    stub_subprocess_failure(monkeypatch)
-    with pytest.raises(SystemExit):
-        invoke_implement_clause(_CL_PARAMS, "15", 17)
-
-
-def test_invoke_implement_clause_continue(monkeypatch) -> None:
-    """Passes --continue when continue_session is True."""
-    captured = stub_subprocess_success(monkeypatch)
-    invoke_implement_clause(
-        _CL_PARAMS, "15", 17, continue_session=True,
-    )
-    assert "--continue" in captured[0]
-
-
-# ---- invoke_implement_subclauses -------------------------------------------
-
-
-def _invoke_subclauses_and_capture(monkeypatch):
-    """Invoke with stubbed subprocess and return captured command."""
-    captured = stub_subprocess_success(monkeypatch)
-    invoke_implement_subclauses(
-        "/tmp/lrm.pdf", [100, 101],
-        organization="deltahdl", repo="deltahdl",
-    )
-    return captured[0]
-
-
-def test_invoke_implement_subclauses_calls_python(monkeypatch) -> None:
-    """Invokes the current Python interpreter."""
-    assert _invoke_subclauses_and_capture(monkeypatch)[0] == sys.executable
-
-
-def test_invoke_implement_subclauses_module(monkeypatch) -> None:
-    """Passes -m implement_subclauses."""
-    cmd = _invoke_subclauses_and_capture(monkeypatch)
-    assert cmd[1:3] == ["-m", "implement_subclauses"]
-
-
-def test_invoke_implement_subclauses_lrm(monkeypatch) -> None:
-    """Passes --lrm with correct value."""
-    cmd = _invoke_subclauses_and_capture(monkeypatch)
-    assert cmd[cmd.index("--lrm") + 1] == "/tmp/lrm.pdf"
-
-
-def test_invoke_implement_subclauses_issues(monkeypatch) -> None:
-    """Passes --issues as comma-joined string."""
-    cmd = _invoke_subclauses_and_capture(monkeypatch)
-    assert cmd[cmd.index("--issues") + 1] == "100,101"
-
-
-def test_invoke_implement_subclauses_organization(monkeypatch) -> None:
-    """Passes --organization with correct value."""
-    cmd = _invoke_subclauses_and_capture(monkeypatch)
-    assert cmd[cmd.index("--organization") + 1] == "deltahdl"
-
-
-def test_invoke_implement_subclauses_repo(monkeypatch) -> None:
-    """Passes --repo with correct value."""
-    cmd = _invoke_subclauses_and_capture(monkeypatch)
-    assert cmd[cmd.index("--repo") + 1] == "deltahdl"
-
-
-def test_invoke_implement_subclauses_model(monkeypatch) -> None:
-    """Passes --model with default opus."""
-    cmd = _invoke_subclauses_and_capture(monkeypatch)
-    assert cmd[cmd.index("--model") + 1] == "opus"
-
-
-def test_invoke_implement_subclauses_continue(monkeypatch) -> None:
-    """Passes --continue when continue_session is True."""
-    captured = stub_subprocess_success(monkeypatch)
-    invoke_implement_subclauses(
-        "/tmp/lrm.pdf", [100],
-        organization="o", repo="r",
-        continue_session=True,
-    )
-    assert "--continue" in captured[0]
-
-
-def test_invoke_implement_subclauses_failure(monkeypatch) -> None:
-    """Calls sys.exit on nonzero returncode."""
-    stub_subprocess_failure(monkeypatch)
-    with pytest.raises(SystemExit):
-        invoke_implement_subclauses(
-            "/tmp/lrm.pdf", [100],
-            organization="o", repo="r",
-        )
-
-
 # ---- parse_and_validate ----------------------------------------------------
 
 
@@ -596,12 +320,3 @@ def test_add_labels_arg_required() -> None:
     add_labels_arg(parser)
     with pytest.raises(SystemExit):
         parser.parse_args([])
-
-
-# ---- invoke_implement_clause with labels -----------------------------------
-
-
-def test_invoke_implement_clause_labels(monkeypatch) -> None:
-    """Passes --labels with comma-joined value."""
-    cmd = _invoke_clause_and_capture(monkeypatch)
-    assert cmd[cmd.index("--labels") + 1] == "IEEE 1800-2023"
