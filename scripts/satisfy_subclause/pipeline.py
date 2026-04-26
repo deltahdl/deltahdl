@@ -47,6 +47,14 @@ def issue_title_for(subclause: str) -> str:
     return f"Satisfy §{subclause}"
 
 
+def legacy_issue_title_for(subclause: str) -> str:
+    """Return the historical pre-pipeline GitHub issue title for *subclause*."""
+    return (
+        f"Ensure IEEE 1800-2023 §{subclause} functionalities and tests are"
+        " implemented and properly named"
+    )
+
+
 def parse_issue_number_from_create_output(output: str) -> int:
     """Extract the issue number from a ``gh issue create`` URL."""
     url = output.strip().splitlines()[-1].strip()
@@ -54,13 +62,15 @@ def parse_issue_number_from_create_output(output: str) -> int:
 
 
 def find_or_create_issue(subclause: str) -> int:
-    """Return the issue number for *subclause* (creating or reopening)."""
+    """Return the issue number for *subclause* (creating, reopening, or
+    migrating a legacy-titled issue in place)."""
     title = issue_title_for(subclause)
+    legacy_title = legacy_issue_title_for(subclause)
     completed = subprocess.run(
         [
             "gh", "issue", "list",
             "--state", "all",
-            "--search", title,
+            "--search", f"§{subclause}",
             "--json", "number,title,state",
         ],
         capture_output=True, text=True, check=False,
@@ -70,14 +80,21 @@ def find_or_create_issue(subclause: str) -> int:
         sys.exit(completed.returncode)
     matches = json.loads(completed.stdout) if completed.stdout.strip() else []
     for entry in matches:
-        if entry.get("title") == title:
-            number = int(entry["number"])
-            if entry.get("state", "").lower() == "closed":
-                subprocess.run(
-                    ["gh", "issue", "reopen", str(number)],
-                    check=False,
-                )
-            return number
+        entry_title = entry.get("title")
+        if entry_title not in (title, legacy_title):
+            continue
+        number = int(entry["number"])
+        if entry_title == legacy_title:
+            subprocess.run(
+                ["gh", "issue", "edit", str(number), "--title", title],
+                check=False,
+            )
+        if entry.get("state", "").lower() == "closed":
+            subprocess.run(
+                ["gh", "issue", "reopen", str(number)],
+                check=False,
+            )
+        return number
     completed = subprocess.run(
         [
             "gh", "issue", "create",

@@ -17,10 +17,24 @@ from satisfy_subclause.pipeline import (
     find_or_create_issue,
     issue_title_for,
     label_issue_pipeline_stuck,
+    legacy_issue_title_for,
     parse_issue_number_from_create_output,
     satisfy_subclause,
     satisfy_unsatisfied_subclause,
 )
+
+
+_LEGACY_TITLE = (
+    "Ensure IEEE 1800-2023 §33.4.1.5 functionalities and tests are"
+    " implemented and properly named"
+)
+
+
+def _legacy_payload(state: str, *, number: int = 88) -> str:
+    """Return a gh-issue-list JSON payload with one legacy-titled entry."""
+    return json.dumps([
+        {"number": number, "title": _LEGACY_TITLE, "state": state},
+    ])
 
 
 # --- helpers ----------------------------------------------------------------
@@ -140,6 +154,70 @@ def test_find_or_create_issue_creates_when_no_title_matches(
         ],
     ):
         assert find_or_create_issue("33.4.1.5") == 333
+
+
+# --- legacy-title migration -------------------------------------------------
+
+
+def test_legacy_issue_title_for() -> None:
+    """legacy_issue_title_for produces the historical 'Ensure …' title."""
+    assert legacy_issue_title_for("33.4.1.5") == _LEGACY_TITLE
+
+
+def test_find_or_create_issue_returns_legacy_open_number(stub_completed) -> None:
+    """find_or_create_issue returns the legacy-titled open issue's number."""
+    body = _legacy_payload("OPEN")
+    with patch(
+        "satisfy_subclause.pipeline.subprocess.run",
+        side_effect=[stub_completed(stdout=body), stub_completed()],
+    ):
+        assert find_or_create_issue("33.4.1.5") == 88
+
+
+def test_find_or_create_issue_renames_legacy_open(stub_completed) -> None:
+    """find_or_create_issue renames a legacy-titled open issue in place."""
+    body = _legacy_payload("OPEN")
+    with patch(
+        "satisfy_subclause.pipeline.subprocess.run",
+        side_effect=[stub_completed(stdout=body), stub_completed()],
+    ) as mock_run:
+        find_or_create_issue("33.4.1.5")
+    edit_cmd = mock_run.call_args_list[1][0][0]
+    assert edit_cmd == [
+        "gh", "issue", "edit", "88", "--title", "Satisfy §33.4.1.5",
+    ]
+
+
+def test_find_or_create_issue_renames_legacy_closed(stub_completed) -> None:
+    """A legacy-titled closed issue is renamed before being reopened."""
+    body = _legacy_payload("CLOSED")
+    with patch(
+        "satisfy_subclause.pipeline.subprocess.run",
+        side_effect=[
+            stub_completed(stdout=body),
+            stub_completed(),
+            stub_completed(),
+        ],
+    ) as mock_run:
+        find_or_create_issue("33.4.1.5")
+    edit_cmd = mock_run.call_args_list[1][0][0]
+    assert edit_cmd[:3] == ["gh", "issue", "edit"]
+
+
+def test_find_or_create_issue_reopens_legacy_closed(stub_completed) -> None:
+    """A legacy-titled closed issue is reopened after the rename."""
+    body = _legacy_payload("CLOSED")
+    with patch(
+        "satisfy_subclause.pipeline.subprocess.run",
+        side_effect=[
+            stub_completed(stdout=body),
+            stub_completed(),
+            stub_completed(),
+        ],
+    ) as mock_run:
+        find_or_create_issue("33.4.1.5")
+    reopen_cmd = mock_run.call_args_list[2][0][0]
+    assert reopen_cmd[:3] == ["gh", "issue", "reopen"]
 
 
 # --- label_issue_pipeline_stuck --------------------------------------------
