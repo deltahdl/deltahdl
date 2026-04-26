@@ -5,7 +5,6 @@ Builds an optimized prompt and invokes Claude CLI.
 
 import argparse
 import os
-import re
 import subprocess
 import sys
 
@@ -15,7 +14,9 @@ from lib.python.cli import (
     add_continue_arg,
     add_lrm_arg,
     add_model_arg,
+    add_subclause_arg,
     validate_lrm,
+    validate_subclause,
 )
 from lib.python.git import (
     commit_and_push,
@@ -27,8 +28,6 @@ from .streaming import ContentFilterError, run_claude_streaming
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-
-CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
 
 _MAX_CONTENT_FILTER_RETRIES = 2
 
@@ -349,12 +348,7 @@ def parse_args(argv=None):
         description="Generate an implementation prompt for a given LRM clause.",
     )
     add_lrm_arg(parser)
-    parser.add_argument(
-        "--subclause",
-        type=str,
-        required=True,
-        help="LRM subclause number (V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z).",
-    )
+    add_subclause_arg(parser)
     parser.add_argument(
         "--issue",
         type=int,
@@ -370,16 +364,8 @@ def parse_args(argv=None):
     add_model_arg(parser)
     add_continue_arg(parser)
     args = parser.parse_args(argv)
-
     validate_lrm(parser, args)
-
-    if not CLAUSE_RE.match(args.subclause):
-        parser.error(
-            f"Invalid subclause format '{args.subclause}'. "
-            "Expected V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z "
-            "(V is a number or uppercase letter; remaining parts are numbers)."
-        )
-
+    validate_subclause(parser, args)
     return args
 
 

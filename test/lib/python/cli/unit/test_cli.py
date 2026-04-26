@@ -16,6 +16,7 @@ from lib.python.cli import (
     add_labels_arg,
     add_lrm_arg,
     add_model_arg,
+    add_subclause_arg,
     invoke_implement_clause,
     invoke_implement_subclause,
     invoke_implement_subclauses,
@@ -25,6 +26,7 @@ from lib.python.cli import (
     run_claude_cli,
     run_with_dots,
     validate_lrm,
+    validate_subclause,
 )
 from lib.python.test_fixtures.subprocess_stubs import (
     spy_subprocess_run,
@@ -101,6 +103,60 @@ def test_validate_lrm_file_missing() -> None:
     args = argparse.Namespace(lrm=Path("/nonexistent/lrm.pdf"))
     with pytest.raises(SystemExit):
         validate_lrm(parser, args)
+
+
+# ---- add_subclause_arg ------------------------------------------------------
+
+
+def test_add_subclause_arg_value() -> None:
+    """Adds --subclause as a required string argument."""
+    parser = argparse.ArgumentParser()
+    add_subclause_arg(parser)
+    args = parser.parse_args(["--subclause", "33.4.1.5"])
+    assert args.subclause == "33.4.1.5"
+
+
+def test_add_subclause_arg_required() -> None:
+    """--subclause is required."""
+    parser = argparse.ArgumentParser()
+    add_subclause_arg(parser)
+    with pytest.raises(SystemExit):
+        parser.parse_args([])
+
+
+# ---- validate_subclause -----------------------------------------------------
+
+
+def test_validate_subclause_accepts_numeric() -> None:
+    """Returns without error for a numeric clause string."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(subclause="6.24.1")
+    validate_subclause(parser, args)
+    assert args.subclause == "6.24.1"
+
+
+def test_validate_subclause_accepts_annex() -> None:
+    """Returns without error for a single-letter annex."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(subclause="B")
+    validate_subclause(parser, args)
+    assert args.subclause == "B"
+
+
+def test_validate_subclause_rejects_lowercase() -> None:
+    """Calls parser.error for a lowercase letter clause."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(subclause="b")
+    with pytest.raises(SystemExit):
+        validate_subclause(parser, args)
+
+
+def test_validate_subclause_rejects_garbage() -> None:
+    """Calls parser.error for a non-clause string."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(subclause="not-a-clause")
+    with pytest.raises(SystemExit):
+        validate_subclause(parser, args)
 
 
 # ---- add_github_args --------------------------------------------------------

@@ -21,6 +21,29 @@ def add_lrm_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_subclause_arg(parser: argparse.ArgumentParser) -> None:
+    """Add the ``--subclause`` argument to *parser*."""
+    parser.add_argument(
+        "--subclause",
+        type=str,
+        required=True,
+        help="LRM subclause number (V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z).",
+    )
+
+
+def validate_subclause(
+    parser: argparse.ArgumentParser, args: argparse.Namespace,
+) -> None:
+    """Error out if ``args.subclause`` is not a valid clause string."""
+    if not CLAUSE_RE.match(args.subclause):
+        parser.error(
+            f"Invalid subclause format '{args.subclause}'. "
+            "Expected V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z "
+            "(V is a number or uppercase letter; "
+            "remaining parts are numbers)."
+        )
+
+
 def add_model_arg(parser: argparse.ArgumentParser) -> None:
     """Add the ``--model`` argument to *parser*."""
     parser.add_argument(
