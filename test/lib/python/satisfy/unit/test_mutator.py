@@ -14,7 +14,9 @@ from lib.python.satisfy.mutator import (
     add_diagnostic_file_arg,
     add_issue_arg,
     build_commit_message,
+    build_failure_resolution_block,
     build_mutator_parser,
+    build_no_external_state_block,
     commit_mutator_result,
     filter_changes,
     format_diagnostic_summary,
@@ -22,7 +24,10 @@ from lib.python.satisfy.mutator import (
     load_diagnostic,
     parse_satisfied_dependencies,
     run_mutator_call,
+    run_single_subclause_mutator,
+    short_circuit_if_satisfied,
 )
+from lib.python.satisfy import SATISFACTION_CONDITIONS as _CONDITIONS
 
 
 # --- helpers ----------------------------------------------------------------
@@ -495,3 +500,119 @@ def test_build_mutator_parser_issue_required(tmp_path) -> None:
             "--subclause", "6.3",
             "--diagnostic-file", "/tmp/d.json",
         ])
+
+
+# --- shared prompt blocks ----------------------------------------------------
+
+
+def test_failure_resolution_block_lists_each_condition() -> None:
+    """The shared resolution block names every satisfaction condition."""
+    text = build_failure_resolution_block()
+    missing = [c for c in _CONDITIONS if c not in text]
+    assert missing == []
+
+
+def test_failure_resolution_block_says_smallest_set() -> None:
+    """The shared resolution block requires minimal edits."""
+    assert "smallest set of edits" in build_failure_resolution_block()
+
+
+def test_no_external_state_block_blocks_git() -> None:
+    """The no-external-state block forbids git from inside the prompt."""
+    assert "git" in build_no_external_state_block()
+
+
+def test_no_external_state_block_blocks_commit() -> None:
+    """The no-external-state block forbids commit/push from inside the prompt."""
+    assert "commit or push" in build_no_external_state_block()
+
+
+# --- run_single_subclause_mutator -------------------------------------------
+
+
+def _ns(subclause="6.3", issue=42, model="opus"):
+    """Build a minimal argparse Namespace for the runner."""
+    return argparse.Namespace(
+        subclause=subclause, issue=issue, model=model,
+    )
+
+
+def _patched_call_and_commit(committed=True):
+    """Patch run_mutator_call and commit_mutator_result."""
+    return (
+        patch("lib.python.satisfy.mutator.run_mutator_call"),
+        patch(
+            "lib.python.satisfy.mutator.commit_mutator_result",
+            return_value=committed,
+        ),
+    )
+
+
+def test_run_single_subclause_mutator_invokes_claude() -> None:
+    """run_single_subclause_mutator invokes the mutator Claude call."""
+    mock_call, mock_commit = _patched_call_and_commit()
+    with mock_call as call:
+        with mock_commit:
+            run_single_subclause_mutator(_ns(), "prompt body")
+    assert call.called
+
+
+def test_run_single_subclause_mutator_passes_prompt() -> None:
+    """run_single_subclause_mutator forwards the prompt to Claude."""
+    mock_call, mock_commit = _patched_call_and_commit()
+    with mock_call as call:
+        with mock_commit:
+            run_single_subclause_mutator(_ns(), "prompt body")
+    assert call.call_args[0][0] == "prompt body"
+
+
+def test_run_single_subclause_mutator_passes_model() -> None:
+    """run_single_subclause_mutator forwards args.model to Claude."""
+    mock_call, mock_commit = _patched_call_and_commit()
+    with mock_call as call:
+        with mock_commit:
+            run_single_subclause_mutator(_ns(model="haiku"), "prompt")
+    assert call.call_args[1]["model"] == "haiku"
+
+
+def test_run_single_subclause_mutator_calls_commit() -> None:
+    """run_single_subclause_mutator commits with the subclause and issue."""
+    mock_call, mock_commit = _patched_call_and_commit()
+    with mock_call:
+        with mock_commit as commit:
+            run_single_subclause_mutator(_ns(), "prompt")
+    assert commit.call_args[0] == (["6.3"], [42])
+
+
+def test_run_single_subclause_mutator_warns_when_no_changes(capsys) -> None:
+    """run_single_subclause_mutator warns when no source changes were made."""
+    mock_call, mock_commit = _patched_call_and_commit(committed=False)
+    with mock_call:
+        with mock_commit:
+            run_single_subclause_mutator(_ns(), "prompt")
+    assert "no source-tree changes" in capsys.readouterr().err
+
+
+# --- short_circuit_if_satisfied --------------------------------------------
+
+
+def test_short_circuit_returns_true_when_satisfied() -> None:
+    """short_circuit_if_satisfied returns True for a satisfied diagnostic."""
+    assert short_circuit_if_satisfied("6.3", _all_satisfied()) is True
+
+
+def test_short_circuit_returns_false_when_failing() -> None:
+    """short_circuit_if_satisfied returns False for a failing diagnostic."""
+    assert short_circuit_if_satisfied("6.3", _failing_diagnostic()) is False
+
+
+def test_short_circuit_prints_when_satisfied(capsys) -> None:
+    """short_circuit_if_satisfied prints a notice when verdict is yes."""
+    short_circuit_if_satisfied("6.3", _all_satisfied())
+    assert "nothing to do" in capsys.readouterr().err
+
+
+def test_short_circuit_silent_when_failing(capsys) -> None:
+    """short_circuit_if_satisfied prints nothing when verdict is no."""
+    short_circuit_if_satisfied("6.3", _failing_diagnostic())
+    assert capsys.readouterr().err == ""

@@ -1,53 +1,44 @@
 """Unit tests for satisfy_unsatisfied_subclause_without_dependencies."""
 
-import json
 import runpy
 from unittest.mock import patch
 
 import pytest
 
-from lib.python.satisfy import SATISFACTION_CONDITIONS, SATISFIED
+from lib.python.satisfy import SATISFACTION_CONDITIONS
 from lib.python.satisfy.mutator import load_diagnostic
+from lib.python.test_fixtures.satisfy import (
+    all_satisfied_payload,
+    failing_payload,
+    make_lrm,
+    write_diagnostic,
+)
 
 
 # ---- helpers ----------------------------------------------------------------
 
 
-def _make_lrm(tmp_path):
-    """Create an empty placeholder LRM file and return its path."""
-    lrm = tmp_path / "lrm.txt"
-    lrm.write_text("")
-    return lrm
-
-
-def _write_diag(tmp_path, payload):
-    """Write a diagnostic JSON file and return the path."""
-    path = tmp_path / "diag.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-    return path
-
-
-def _all_satisfied():
-    """Return a payload with all five conditions satisfied."""
-    return {c: SATISFIED for c in SATISFACTION_CONDITIONS}
-
-
-def _failing_payload():
-    """Return a payload with one rule_coverage failure."""
-    payload = _all_satisfied()
-    payload["rule_coverage"] = ["rule 7 has no production code"]
-    return payload
-
-
 def _args(tmp_path, payload, **overrides):
     """Build a CLI argv pointing --diagnostic-file at *payload*."""
     return [
-        "--lrm", overrides.get("lrm", str(_make_lrm(tmp_path))),
+        "--lrm", overrides.get("lrm", str(make_lrm(tmp_path))),
         "--subclause", overrides.get("subclause", "33.4.1.5"),
-        "--diagnostic-file", str(_write_diag(tmp_path, payload)),
+        "--diagnostic-file", str(write_diagnostic(tmp_path, payload)),
         "--issue", str(overrides.get("issue", 42)),
         "--model", overrides.get("model", "opus"),
     ]
+
+
+def _all_satisfied():
+    """Return a satisfied payload."""
+    return all_satisfied_payload()
+
+
+def _failing_payload():
+    """Return a payload with a single rule_coverage failure."""
+    return failing_payload(
+        "rule_coverage", failures=["rule 7 has no production code"],
+    )
 
 
 # ---- build_prompt ----------------------------------------------------------
@@ -55,7 +46,7 @@ def _args(tmp_path, payload, **overrides):
 
 def _build_prompt_with_failing(sus, tmp_path):
     """Build the prompt with a single rule_coverage failure."""
-    diag = load_diagnostic(_write_diag(tmp_path, _failing_payload()))
+    diag = load_diagnostic(write_diagnostic(tmp_path, _failing_payload()))
     return sus.build_prompt("33.4.1.5", "~/LRM.pdf", diag)
 
 
@@ -74,7 +65,10 @@ def test_build_prompt_includes_diagnostic_failures(sus, tmp_path):
 
 def test_build_prompt_says_no_dependencies(sus, tmp_path):
     """Prompt asserts the subclause has no remaining dependencies."""
-    assert "no dependencies" in _build_prompt_with_failing(sus, tmp_path)
+    assert (
+        "no remaining dependencies"
+        in _build_prompt_with_failing(sus, tmp_path)
+    )
 
 
 def test_build_prompt_forbids_git(sus, tmp_path):
@@ -101,8 +95,8 @@ def test_main_requires_subclause(sus, tmp_path):
     """main() exits when --subclause is missing."""
     with pytest.raises(SystemExit):
         sus.main([
-            "--lrm", str(_make_lrm(tmp_path)),
-            "--diagnostic-file", str(_write_diag(tmp_path, _all_satisfied())),
+            "--lrm", str(make_lrm(tmp_path)),
+            "--diagnostic-file", str(write_diagnostic(tmp_path, _all_satisfied())),
             "--issue", "1",
         ])
 
@@ -111,7 +105,7 @@ def test_main_requires_diagnostic_file(sus, tmp_path):
     """main() exits when --diagnostic-file is missing."""
     with pytest.raises(SystemExit):
         sus.main([
-            "--lrm", str(_make_lrm(tmp_path)),
+            "--lrm", str(make_lrm(tmp_path)),
             "--subclause", "4.1",
             "--issue", "1",
         ])
@@ -121,9 +115,9 @@ def test_main_requires_issue(sus, tmp_path):
     """main() exits when --issue is missing."""
     with pytest.raises(SystemExit):
         sus.main([
-            "--lrm", str(_make_lrm(tmp_path)),
+            "--lrm", str(make_lrm(tmp_path)),
             "--subclause", "4.1",
-            "--diagnostic-file", str(_write_diag(tmp_path, _all_satisfied())),
+            "--diagnostic-file", str(write_diagnostic(tmp_path, _all_satisfied())),
         ])
 
 
@@ -136,75 +130,48 @@ def test_main_rejects_bad_clause(sus, tmp_path):
 # ---- main: behaviour --------------------------------------------------------
 
 
-def _patched_pipeline(*, committed=True):
-    """Patch run_mutator_call and commit_mutator_result for main() runs."""
-    return (
-        patch(
-            "satisfy_unsatisfied_subclause_without_dependencies"
-            ".run_mutator_call",
-        ),
-        patch(
-            "satisfy_unsatisfied_subclause_without_dependencies"
-            ".commit_mutator_result",
-            return_value=committed,
-        ),
+def _patched_runner():
+    """Patch run_single_subclause_mutator for main() runs."""
+    return patch(
+        "satisfy_unsatisfied_subclause_without_dependencies"
+        ".run_single_subclause_mutator",
     )
 
 
 def test_main_skips_when_diagnostic_already_satisfied(sus, tmp_path, capsys):
     """main() prints a 'nothing to do' message when verdict is yes."""
-    mock_run, mock_commit = _patched_pipeline()
-    with mock_run as call:
-        with mock_commit as commit:
-            sus.main(_args(tmp_path, _all_satisfied()))
+    with _patched_runner() as runner:
+        sus.main(_args(tmp_path, _all_satisfied()))
     err = capsys.readouterr().err
-    assert ("nothing to do" in err
-            and not call.called
-            and not commit.called)
+    assert "nothing to do" in err and not runner.called
 
 
 def test_main_invokes_mutator_when_diagnostic_failing(sus, tmp_path):
-    """main() invokes the Claude mutator call when the diagnostic fails."""
-    mock_run, mock_commit = _patched_pipeline()
-    with mock_run as call:
-        with mock_commit:
-            sus.main(_args(tmp_path, _failing_payload()))
-    assert call.called
+    """main() invokes the shared mutator runner when the diagnostic fails."""
+    with _patched_runner() as runner:
+        sus.main(_args(tmp_path, _failing_payload()))
+    assert runner.called
 
 
-def test_main_passes_model_to_mutator(sus, tmp_path):
-    """main() forwards --model to the mutator Claude call."""
-    mock_run, mock_commit = _patched_pipeline()
-    with mock_run as call:
-        with mock_commit:
-            sus.main(_args(tmp_path, _failing_payload(), model="haiku"))
-    assert call.call_args[1]["model"] == "haiku"
+def test_main_passes_args_namespace_to_runner(sus, tmp_path):
+    """main() forwards the parsed argparse namespace to the runner."""
+    with _patched_runner() as runner:
+        sus.main(_args(tmp_path, _failing_payload(), model="haiku"))
+    assert runner.call_args[0][0].model == "haiku"
 
 
-def test_main_calls_commit_with_subclause(sus, tmp_path):
-    """main() commits with the target subclause and issue."""
-    mock_run, mock_commit = _patched_pipeline()
-    with mock_run:
-        with mock_commit as commit:
-            sus.main(_args(tmp_path, _failing_payload()))
-    assert commit.call_args[0] == (["33.4.1.5"], [42])
-
-
-def test_main_warns_when_no_changes(sus, tmp_path, capsys):
-    """main() warns to stderr when the mutator produced no source changes."""
-    mock_run, mock_commit = _patched_pipeline(committed=False)
-    with mock_run:
-        with mock_commit:
-            sus.main(_args(tmp_path, _failing_payload()))
-    assert "no source-tree changes" in capsys.readouterr().err
+def test_main_passes_prompt_to_runner(sus, tmp_path):
+    """main() supplies a prompt that names the target subclause."""
+    with _patched_runner() as runner:
+        sus.main(_args(tmp_path, _failing_payload()))
+    prompt = runner.call_args[0][1]
+    assert "§33.4.1.5" in prompt
 
 
 def test_main_logs_subclause_to_stderr(sus, tmp_path, capsys):
     """main() prints a one-line mutator banner to stderr."""
-    mock_run, mock_commit = _patched_pipeline()
-    with mock_run:
-        with mock_commit:
-            sus.main(_args(tmp_path, _failing_payload()))
+    with _patched_runner():
+        sus.main(_args(tmp_path, _failing_payload()))
     assert "§33.4.1.5" in capsys.readouterr().err
 
 

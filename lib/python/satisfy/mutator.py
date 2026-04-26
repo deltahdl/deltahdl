@@ -208,6 +208,39 @@ def commit_mutator_result(
 # Single-subclause mutator entry point
 # ---------------------------------------------------------------------------
 
+def build_failure_resolution_block() -> str:
+    """Return the per-condition resolution recipe shared by all mutators.
+
+    Every mutator prompt instructs Claude to take the smallest set of
+    edits that resolves each failing condition.  The recipe is shared
+    verbatim across the mutators so the model receives identical
+    guidance regardless of dependency context.
+    """
+    return (
+        "For every failing condition, take the smallest set of edits"
+        " that resolves it:\n"
+        "  - rule_coverage failures: write production code that applies"
+        " the named normative rule.\n"
+        "  - test_coverage failures: write a unit test for the named"
+        " normative rule, exercising the production code path.\n"
+        "  - test_placement failures: move tests into the canonical"
+        " files named by the diagnostic.\n"
+        "  - naming failures: rename suites/tests to PascalCase"
+        " descriptive names with no clause numbers.\n"
+        "  - deduplication failures: delete the redundant test, keeping"
+        " the canonical one."
+    )
+
+
+def build_no_external_state_block() -> str:
+    """Return the standard 'do not run git/gh/build' guard for mutators."""
+    return (
+        "Do not run git, gh, cmake, make, ctest, or pytest. Do not"
+        " commit or push — the orchestrator script will commit your"
+        " file edits after you finish."
+    )
+
+
 def build_mutator_parser(description: str) -> argparse.ArgumentParser:
     """Return a parser pre-wired with all single-subclause mutator args."""
     parser = argparse.ArgumentParser(description=description)
@@ -217,3 +250,42 @@ def build_mutator_parser(description: str) -> argparse.ArgumentParser:
     add_issue_arg(parser)
     add_model_arg(parser)
     return parser
+
+
+def short_circuit_if_satisfied(
+    subclause: str, diagnostic: SubclauseDiagnostic,
+) -> bool:
+    """Return True (and print a notice) when ``diagnostic`` already passes.
+
+    Mutators are no-ops on a verdict-yes diagnostic — the orchestrator
+    occasionally schedules them defensively, e.g. after a peer cycle
+    member's edits incidentally fixed the working tree.
+    """
+    if diagnostic.verdict == "yes":
+        print(
+            f"Diagnostic verdict for §{subclause} is already 'yes';"
+            " nothing to do.",
+            file=sys.stderr,
+        )
+        return True
+    return False
+
+
+def run_single_subclause_mutator(
+    args: argparse.Namespace, prompt: str,
+) -> None:
+    """Run the Claude mutator and commit the resulting changes.
+
+    Common tail-end shared by every single-subclause mutator: invoke
+    Claude with the supplied prompt, then commit the working-tree
+    changes (if any) with a single ``Closes #N`` trailer.  The caller
+    is responsible for short-circuiting on a verdict-yes diagnostic
+    before calling this function.
+    """
+    run_mutator_call(prompt, model=args.model)
+    if not commit_mutator_result([args.subclause], [args.issue]):
+        print(
+            f"Mutator for §{args.subclause} produced no source-tree"
+            " changes; nothing committed.",
+            file=sys.stderr,
+        )
