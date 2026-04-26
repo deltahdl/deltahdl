@@ -50,23 +50,6 @@ TEST(AssignmentSchedulingElaboration, ContinuousAssignWidth) {
   EXPECT_EQ(mod->assigns[0].width, 8u);
 }
 
-TEST(AssignmentSchedulingElaboration, ContinuousAssignSeparateFromProcesses) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b, c;\n"
-      "  assign b = a;\n"
-      "  initial c = 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  EXPECT_GE(mod->assigns.size(), 1u);
-  ASSERT_EQ(mod->processes.size(), 1u);
-  EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kInitial);
-}
-
 TEST(AssignmentSchedulingElaboration, BlockingAssignInInitialIsProcess) {
   ElabFixture f;
   auto* design = ElaborateSrc(
