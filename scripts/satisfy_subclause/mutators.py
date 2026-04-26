@@ -14,7 +14,6 @@ with one ``Closes #N`` trailer per subclause:
     A 2- or 3-member dependency cycle co-implemented in one pass.
 """
 
-import subprocess
 import sys
 from dataclasses import asdict, dataclass
 
@@ -27,6 +26,7 @@ from .oracles import (
     SubclauseDiagnostic,
     build_env,
 )
+from .streaming import run_claude_streaming
 
 
 # Mutators may edit source and test files but must never run git, gh,
@@ -64,26 +64,20 @@ class CycleMember:
 def run_mutator_call(prompt: str, *, model: str) -> None:
     """Invoke Claude with mutator tools enabled.
 
-    Streams Claude's stdout/stderr to the user's terminal directly
-    rather than capturing them — the user wants to see file edits as
-    they happen. Loud-fatal on a non-zero exit code.
+    Runs the CLI in stream-json mode so the streaming runner can
+    decode events and print Claude's text/tool_use blocks live —
+    mutator passes can take many minutes and the user needs to see
+    progress. Loud-fatal on a non-zero exit code.
     """
     cmd = [
         "claude", "-p",
         "--model", model,
+        "--verbose",
+        "--output-format", "stream-json",
         "--dangerously-skip-permissions",
         "--disallowedTools", MUTATOR_DISALLOWED_TOOLS,
     ]
-    completed = subprocess.run(
-        cmd, input=prompt, text=True,
-        env=build_env(), check=False,
-    )
-    if completed.returncode != 0:
-        print(
-            f"Mutator Claude call exited with code {completed.returncode}",
-            file=sys.stderr,
-        )
-        sys.exit(completed.returncode)
+    run_claude_streaming(cmd, prompt, env=build_env())
 
 
 # ---------------------------------------------------------------------------

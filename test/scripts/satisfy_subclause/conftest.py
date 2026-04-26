@@ -5,7 +5,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from satisfy_subclause import streaming as _streaming
 from satisfy_subclause.oracles import SATISFACTION_CONDITIONS, SATISFIED
+
+
+@pytest.fixture()
+def streaming():
+    """Return the satisfy_subclause.streaming module."""
+    return _streaming
 
 
 def _build_satisfied_payload() -> dict:

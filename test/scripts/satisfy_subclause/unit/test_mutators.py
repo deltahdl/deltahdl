@@ -1,6 +1,6 @@
 """Unit tests for satisfy_subclause.mutators."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -93,60 +93,63 @@ def test_format_diagnostic_summary_names_failing_condition() -> None:
 # --- run_mutator_call -------------------------------------------------------
 
 
-def _patched_run(returncode=0):
-    """Patch subprocess.run with a CompletedProcess at *returncode*."""
-    completed = MagicMock()
-    completed.returncode = returncode
+def _patched_streaming():
+    """Patch run_claude_streaming; the stub returns an empty result string."""
     return patch(
-        "satisfy_subclause.mutators.subprocess.run",
-        return_value=completed,
+        "satisfy_subclause.mutators.run_claude_streaming",
+        return_value="",
     )
 
 
 def test_run_mutator_call_passes_prompt() -> None:
-    """run_mutator_call passes the prompt as subprocess input."""
-    with _patched_run() as mock_run:
+    """run_mutator_call forwards the prompt to the streaming runner."""
+    with _patched_streaming() as mock_stream:
         run_mutator_call("hello prompt", model="opus")
-    assert mock_run.call_args[1]["input"] == "hello prompt"
+    assert mock_stream.call_args[0][1] == "hello prompt"
 
 
 def test_run_mutator_call_passes_model() -> None:
     """run_mutator_call passes --model to the Claude CLI."""
-    with _patched_run() as mock_run:
+    with _patched_streaming() as mock_stream:
         run_mutator_call("prompt", model="haiku")
-    cmd = mock_run.call_args[0][0]
+    cmd = mock_stream.call_args[0][0]
     assert cmd[cmd.index("--model") + 1] == "haiku"
 
 
 def test_run_mutator_call_passes_disallowed_tools() -> None:
     """run_mutator_call passes --disallowedTools."""
-    with _patched_run() as mock_run:
+    with _patched_streaming() as mock_stream:
         run_mutator_call("prompt", model="opus")
-    assert "--disallowedTools" in mock_run.call_args[0][0]
+    assert "--disallowedTools" in mock_stream.call_args[0][0]
 
 
 def test_run_mutator_call_uses_dangerously_skip_permissions() -> None:
     """run_mutator_call passes --dangerously-skip-permissions."""
-    with _patched_run() as mock_run:
+    with _patched_streaming() as mock_stream:
         run_mutator_call("prompt", model="opus")
-    assert "--dangerously-skip-permissions" in mock_run.call_args[0][0]
+    assert "--dangerously-skip-permissions" in mock_stream.call_args[0][0]
 
 
-def test_run_mutator_call_exits_on_nonzero() -> None:
-    """A non-zero exit code is loud-fatal."""
-    with _patched_run(returncode=2):
-        with pytest.raises(SystemExit):
-            run_mutator_call("prompt", model="opus")
+def test_run_mutator_call_uses_stream_json() -> None:
+    """run_mutator_call requests stream-json output for live streaming."""
+    with _patched_streaming() as mock_stream:
+        run_mutator_call("prompt", model="opus")
+    cmd = mock_stream.call_args[0][0]
+    assert cmd[cmd.index("--output-format") + 1] == "stream-json"
 
 
-def test_run_mutator_call_dumps_message_on_nonzero(capsys) -> None:
-    """A non-zero exit prints an error to stderr."""
-    with _patched_run(returncode=2):
-        try:
-            run_mutator_call("prompt", model="opus")
-        except SystemExit:
-            pass
-    assert "code 2" in capsys.readouterr().err
+def test_run_mutator_call_uses_verbose() -> None:
+    """run_mutator_call passes --verbose (required by stream-json)."""
+    with _patched_streaming() as mock_stream:
+        run_mutator_call("prompt", model="opus")
+    assert "--verbose" in mock_stream.call_args[0][0]
+
+
+def test_run_mutator_call_passes_env() -> None:
+    """run_mutator_call passes a Claude-safe env to the streaming runner."""
+    with _patched_streaming() as mock_stream:
+        run_mutator_call("prompt", model="opus")
+    assert "env" in mock_stream.call_args[1]
 
 
 # --- is_valid_path ----------------------------------------------------------
