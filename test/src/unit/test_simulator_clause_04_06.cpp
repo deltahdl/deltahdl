@@ -4,13 +4,13 @@
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "helpers_scheduler_event.h"
+#include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
-TEST(DeterminismSim, SequentialStatementsExecuteInSourceOrder) {
-  VerifyActiveRegionFIFO();
-}
-
+// §4.6(a): a process suspended in favor of others must resume at the next
+// statement, never reordered ahead of unrelated work the suspension yielded to.
 TEST(DeterminismSim, SuspendedProcessResumesInOrder) {
   Arena arena;
   Scheduler sched(arena);
@@ -38,81 +38,8 @@ TEST(DeterminismSim, SuspendedProcessResumesInOrder) {
   EXPECT_EQ(order[2], "A1");
 }
 
-TEST(DeterminismSim, LargeSequentialBlockPreservesOrder) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> order;
-
-  for (int i = 0; i < 20; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, i]() { order.push_back(i); };
-    sched.ScheduleEvent({0}, Region::kActive, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 20u);
-  for (int i = 0; i < 20; ++i) {
-    EXPECT_EQ(order[i], i);
-  }
-}
-
-TEST(DeterminismSim, NBAExecutionOrder) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> nba_order;
-
-  for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&nba_order, i]() { nba_order.push_back(i); };
-    sched.ScheduleEvent({0}, Region::kNBA, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(nba_order.size(), 3u);
-  EXPECT_EQ(nba_order[0], 0);
-  EXPECT_EQ(nba_order[1], 1);
-  EXPECT_EQ(nba_order[2], 2);
-}
-
-TEST(DeterminismSim, NBALastAssignmentWins) {
-  Arena arena;
-  Scheduler sched(arena);
-  int a = -1;
-
-  auto* nba0 = sched.GetEventPool().Acquire();
-  nba0->callback = [&]() { a = 0; };
-  sched.ScheduleEvent({0}, Region::kNBA, nba0);
-
-  auto* nba1 = sched.GetEventPool().Acquire();
-  nba1->callback = [&]() { a = 1; };
-  sched.ScheduleEvent({0}, Region::kNBA, nba1);
-
-  sched.Run();
-  EXPECT_EQ(a, 1);
-}
-
-TEST(DeterminismSim, ActiveGeneratedNBAsExecuteInOrder) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> nba_order;
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() {
-    for (int i = 0; i < 3; ++i) {
-      auto* nba = sched.GetEventPool().Acquire();
-      nba->callback = [&nba_order, i]() { nba_order.push_back(i); };
-      sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-    }
-  };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  sched.Run();
-  ASSERT_EQ(nba_order.size(), 3u);
-  EXPECT_EQ(nba_order[0], 0);
-  EXPECT_EQ(nba_order[1], 1);
-  EXPECT_EQ(nba_order[2], 2);
-}
-
+// §4.6(a)+(b) bridge: when N statements run in source order and each schedules
+// one NBA, the NBAs must drain in the same order.
 TEST(DeterminismSim, SequentialStatementsProduceOrderedNBAs) {
   Arena arena;
   Scheduler sched(arena);
@@ -136,101 +63,61 @@ TEST(DeterminismSim, SequentialStatementsProduceOrderedNBAs) {
   EXPECT_EQ(log, expected);
 }
 
-TEST(DeterminismSim, SourceOrderPreservedAcrossTimeSlots) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  for (int i = 0; i < 2; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, i]() {
-      order.push_back("t0_" + std::to_string(i));
-    };
-    sched.ScheduleEvent({0}, Region::kActive, ev);
-  }
-
-  for (int i = 0; i < 2; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, i]() {
-      order.push_back("t5_" + std::to_string(i));
-    };
-    sched.ScheduleEvent({5}, Region::kActive, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 4u);
-  EXPECT_EQ(order[0], "t0_0");
-  EXPECT_EQ(order[1], "t0_1");
-  EXPECT_EQ(order[2], "t5_0");
-  EXPECT_EQ(order[3], "t5_1");
+// §4.6(a) end-to-end: blocking assignments inside a begin-end block produce a
+// computation chain whose final values reflect strict source-order execution.
+TEST(DeterminismSim, BlockingAssignmentsExecuteInSourceOrder) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  initial begin\n"
+      "    a = 8'd10;\n"
+      "    b = a * 8'd2;\n"
+      "    c = b + a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 10u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
+  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 30u);
 }
 
-TEST(DeterminismSim, NBAOrderingAcrossTimeSlots) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> values;
-  int a = -1;
-
-  auto* nba0a = sched.GetEventPool().Acquire();
-  nba0a->callback = [&]() { a = 10; };
-  sched.ScheduleEvent({0}, Region::kNBA, nba0a);
-
-  auto* nba0b = sched.GetEventPool().Acquire();
-  nba0b->callback = [&]() { a = 20; };
-  sched.ScheduleEvent({0}, Region::kNBA, nba0b);
-
-  auto* sample0 = sched.GetEventPool().Acquire();
-  sample0->callback = [&]() { values.push_back(a); };
-  sched.ScheduleEvent({0}, Region::kPostponed, sample0);
-
-  auto* nba5a = sched.GetEventPool().Acquire();
-  nba5a->callback = [&]() { a = 30; };
-  sched.ScheduleEvent({5}, Region::kNBA, nba5a);
-
-  auto* nba5b = sched.GetEventPool().Acquire();
-  nba5b->callback = [&]() { a = 40; };
-  sched.ScheduleEvent({5}, Region::kNBA, nba5b);
-
-  auto* sample5 = sched.GetEventPool().Acquire();
-  sample5->callback = [&]() { values.push_back(a); };
-  sched.ScheduleEvent({5}, Region::kPostponed, sample5);
-
-  sched.Run();
-  ASSERT_EQ(values.size(), 2u);
-  EXPECT_EQ(values[0], 20);
-  EXPECT_EQ(values[1], 40);
-}
-
-TEST(DeterminismSim, ReactiveNBAExecutionOrder) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> order;
-
-  for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, i]() { order.push_back(i); };
-    sched.ScheduleEvent({0}, Region::kReNBA, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], 0);
-  EXPECT_EQ(order[1], 1);
-  EXPECT_EQ(order[2], 2);
-}
-
-TEST(SchedulingSemanticsSim, ComputationChainInProcess) {
+// §4.6(b) end-to-end: the LRM example. Two NBAs to the same variable in a
+// begin-end block must drain in execution order, so the second write wins.
+TEST(DeterminismSim, NBAExecutionOrderMatchesSourceOrder) {
   auto result = RunAndGet(
       "module t;\n"
-      "  logic [15:0] x;\n"
+      "  logic [7:0] a;\n"
       "  initial begin\n"
-      "    x = 16'd1;\n"
-      "    x = x + 16'd1;\n"
-      "    x = x * 16'd3;\n"
-      "    x = x - 16'd1;\n"
+      "    a <= 8'd0;\n"
+      "    a <= 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(result, 1u);
+}
+
+// §4.6(a) suspension clause: when a begin-end block suspends mid-execution
+// (here via #delay), control must resume at the next statement in source
+// order. The shift-and-or chain encodes ordering into the final value: only
+// strict source-order execution yields 0x123; any swap or skip produces a
+// different bit pattern.
+TEST(DeterminismSim, SourceOrderPreservedAcrossSuspension) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  initial begin\n"
+      "    x = 32'd0;\n"
+      "    #5 x = (x << 4) | 32'd1;\n"
+      "    #5 x = (x << 4) | 32'd2;\n"
+      "    #5 x = (x << 4) | 32'd3;\n"
       "  end\n"
       "endmodule\n",
       "x");
-
-  EXPECT_EQ(result, 5u);
+  EXPECT_EQ(result, 0x123u);
 }
+

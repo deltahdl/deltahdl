@@ -8,40 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SchedulerOverviewSim, NBAExecutionOrderMatchesSourceOrder) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  initial begin\n"
-      "    a <= 8'd0;\n"
-      "    a <= 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      "a");
-  EXPECT_EQ(result, 1u);
-}
-
-TEST(SchedulerOverviewSim, DeterministicSequentialWithinProcess) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c;\n"
-      "  initial begin\n"
-      "    a = 8'd10;\n"
-      "    b = a * 8'd2;\n"
-      "    c = b + a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 10u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
-  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 30u);
-}
-
 TEST(SchedulerOverviewSim, ConcurrentWriteSameTimeSlotLastWriteWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
