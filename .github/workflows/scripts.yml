@@ -499,6 +499,29 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+  test-lib-satisfy:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-lib-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/python/satisfy/unit/ -v
+          --cov=lib.python.satisfy
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   test-run-sim-tests:
     needs: test-lib-run-tests-common
     runs-on: ubuntu-24.04
