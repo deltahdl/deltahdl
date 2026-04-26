@@ -39,17 +39,50 @@ from .oracles import compute_subclause_dependencies
 # GitHub issue handling
 # ---------------------------------------------------------------------------
 
+_KIND_NEW_CANONICAL = "new_canonical"
+_KIND_LEGACY_SHORT = "legacy_short"
+_KIND_LEGACY_AUDIT = "legacy_audit"
+_KIND_MASTER_LIST = "master_list"
+
+
 def issue_title_for(subclause: str) -> str:
     """Return the canonical GitHub issue title for *subclause*."""
-    return f"Satisfy §{subclause}"
+    return f"Satisfy IEEE 1800-2023 §{subclause}"
+
+
+def _ensure_audit_title(subclause_marker: str) -> str:
+    """Return the ``Ensure IEEE 1800-2023 …`` audit title for the given marker."""
+    return (
+        f"Ensure IEEE 1800-2023 {subclause_marker} functionalities and tests"
+        " are implemented and properly named"
+    )
 
 
 def legacy_issue_title_for(subclause: str) -> str:
-    """Return the historical pre-pipeline GitHub issue title for *subclause*."""
-    return (
-        f"Ensure IEEE 1800-2023 §{subclause} functionalities and tests are"
-        " implemented and properly named"
-    )
+    """Return the legacy audit-style ``Ensure …`` title (numeric-form, with §)."""
+    return _ensure_audit_title(f"§{subclause}")
+
+
+def _legacy_audit_annex_title_for(subclause: str) -> str:
+    """Return the legacy audit-style ``Ensure …`` title (annex-form, no §)."""
+    return _ensure_audit_title(subclause)
+
+
+def _classify_title(title: str, subclause: str) -> str | None:
+    """Classify *title* as one of the recognised shapes for *subclause*."""
+    if title == issue_title_for(subclause):
+        return _KIND_NEW_CANONICAL
+    if title == f"Satisfy §{subclause}":
+        return _KIND_LEGACY_SHORT
+    if title in (
+        legacy_issue_title_for(subclause),
+        _legacy_audit_annex_title_for(subclause),
+    ):
+        return _KIND_LEGACY_AUDIT
+    prefix = f"Implement IEEE 1800-2023 §{subclause}"
+    if title == prefix or title.startswith(prefix + " "):
+        return _KIND_MASTER_LIST
+    return None
 
 
 def parse_issue_number_from_create_output(output: str) -> int:
@@ -58,11 +91,8 @@ def parse_issue_number_from_create_output(output: str) -> int:
     return int(url.rsplit("/", 1)[-1])
 
 
-def find_or_create_issue(subclause: str) -> int:
-    """Return the issue number for *subclause* (creating, reopening, or
-    migrating a legacy-titled issue in place)."""
-    title = issue_title_for(subclause)
-    legacy_title = legacy_issue_title_for(subclause)
+def _list_issues_for(subclause: str) -> list[dict]:
+    """Return the gh-issue-list payload for *subclause* (loud-fatal on error)."""
     completed = subprocess.run(
         [
             "gh", "issue", "list",
@@ -75,27 +105,15 @@ def find_or_create_issue(subclause: str) -> int:
     if completed.returncode != 0:
         print(completed.stderr, file=sys.stderr)
         sys.exit(completed.returncode)
-    matches = json.loads(completed.stdout) if completed.stdout.strip() else []
-    for entry in matches:
-        entry_title = entry.get("title")
-        if entry_title not in (title, legacy_title):
-            continue
-        number = int(entry["number"])
-        if entry_title == legacy_title:
-            subprocess.run(
-                ["gh", "issue", "edit", str(number), "--title", title],
-                check=False,
-            )
-        if entry.get("state", "").lower() == "closed":
-            subprocess.run(
-                ["gh", "issue", "reopen", str(number)],
-                check=False,
-            )
-        return number
+    return json.loads(completed.stdout) if completed.stdout.strip() else []
+
+
+def _create_new_issue(subclause: str) -> int:
+    """Create a fresh issue for *subclause* and return its number."""
     completed = subprocess.run(
         [
             "gh", "issue", "create",
-            "--title", title,
+            "--title", issue_title_for(subclause),
             "--body", (
                 f"Track satisfying §{subclause} via the satisfaction"
                 " pipeline (#1265)."
@@ -107,6 +125,55 @@ def find_or_create_issue(subclause: str) -> int:
         print(completed.stderr, file=sys.stderr)
         sys.exit(completed.returncode)
     return parse_issue_number_from_create_output(completed.stdout)
+
+
+def find_or_create_issue(subclause: str) -> int:
+    """Return the issue number for *subclause*.
+
+    Searches for any pre-existing issue whose title matches one of the
+    recognised shapes — current canonical (``Satisfy IEEE 1800-2023
+    §X``), deprecated short canonical (``Satisfy §X``), legacy audit
+    forms (``Ensure IEEE 1800-2023 [§]X functionalities …``), or
+    master-list form (``Implement IEEE 1800-2023 §X …``) — and reuses
+    it. When multiple matches exist (e.g. a master-list issue plus a
+    recently-created duplicate), the issue with the smallest number is
+    retained and the others are hard-deleted via ``gh issue delete
+    --yes``. Reused issues are renamed to the new canonical (except
+    master-list, which keeps its broader-scope title) and reopened if
+    closed. Creates a fresh issue when no match exists.
+    """
+    matches: list[tuple[dict, str]] = []
+    for entry in _list_issues_for(subclause):
+        kind = _classify_title(entry.get("title", "") or "", subclause)
+        if kind is not None:
+            matches.append((entry, kind))
+    if not matches:
+        return _create_new_issue(subclause)
+
+    matches.sort(key=lambda pair: int(pair[0]["number"]))
+    (oldest, oldest_kind), *duplicates = matches
+    for dup_entry, _kind in duplicates:
+        subprocess.run(
+            [
+                "gh", "issue", "delete",
+                str(int(dup_entry["number"])), "--yes",
+            ],
+            check=False,
+        )
+
+    number = int(oldest["number"])
+    canonical = issue_title_for(subclause)
+    if oldest_kind != _KIND_MASTER_LIST and oldest.get("title") != canonical:
+        subprocess.run(
+            ["gh", "issue", "edit", str(number), "--title", canonical],
+            check=False,
+        )
+    if oldest.get("state", "").lower() == "closed":
+        subprocess.run(
+            ["gh", "issue", "reopen", str(number)],
+            check=False,
+        )
+    return number
 
 
 # ---------------------------------------------------------------------------
