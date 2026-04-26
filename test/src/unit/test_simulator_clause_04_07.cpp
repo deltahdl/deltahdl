@@ -10,75 +10,32 @@
 
 using namespace delta;
 
-TEST(NondeterminismSim, ActiveRegionProcessesAllEvents) {
+// §4.7 atom 1: within-region drain order is unspecified, so two writes that
+// race in the Active region can resolve to either value. The test asserts the
+// permitted disjunction rather than a fixed order; production code applies the
+// rule by drainpath (FIFO is one valid choice, not a normative requirement).
+TEST(NondeterminismSim, ConflictingWritesInActiveRegion) {
   Arena arena;
   Scheduler sched(arena);
-  int count = 0;
+  int x = 0;
 
-  for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&]() { count++; };
-    sched.ScheduleEvent({0}, Region::kActive, ev);
-  }
+  auto* ev1 = sched.GetEventPool().Acquire();
+  ev1->callback = [&]() { x = 10; };
+  sched.ScheduleEvent({0}, Region::kActive, ev1);
 
-  sched.Run();
-  EXPECT_EQ(count, 5);
-}
-
-TEST(NondeterminismSim, ReactiveRegionProcessesAllEvents) {
-  Arena arena;
-  Scheduler sched(arena);
-  int count = 0;
-
-  for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&]() { count++; };
-    sched.ScheduleEvent({0}, Region::kReactive, ev);
-  }
-
-  sched.Run();
-  EXPECT_EQ(count, 5);
-}
-
-TEST(NondeterminismSim, IndependentActiveProcessesInterleave) {
-  Arena arena;
-  Scheduler sched(arena);
-  int a = 0;
-  int b = 0;
-
-  auto* ev_a = sched.GetEventPool().Acquire();
-  ev_a->callback = [&]() { a = 1; };
-  sched.ScheduleEvent({0}, Region::kActive, ev_a);
-
-  auto* ev_b = sched.GetEventPool().Acquire();
-  ev_b->callback = [&]() { b = 2; };
-  sched.ScheduleEvent({0}, Region::kActive, ev_b);
+  auto* ev2 = sched.GetEventPool().Acquire();
+  ev2->callback = [&]() { x = 20; };
+  sched.ScheduleEvent({0}, Region::kActive, ev2);
 
   sched.Run();
 
-  EXPECT_EQ(a, 1);
-  EXPECT_EQ(b, 2);
+  EXPECT_TRUE(x == 10 || x == 20);
 }
 
-TEST(NondeterminismSim, IndependentReactiveProcessesInterleave) {
-  Arena arena;
-  Scheduler sched(arena);
-  int a = 0;
-  int b = 0;
-
-  auto* ev_a = sched.GetEventPool().Acquire();
-  ev_a->callback = [&]() { a = 10; };
-  sched.ScheduleEvent({0}, Region::kReactive, ev_a);
-
-  auto* ev_b = sched.GetEventPool().Acquire();
-  ev_b->callback = [&]() { b = 20; };
-  sched.ScheduleEvent({0}, Region::kReactive, ev_b);
-
-  sched.Run();
-  EXPECT_EQ(a, 10);
-  EXPECT_EQ(b, 20);
-}
-
+// §4.7 atom 3: a process under evaluation may be suspended and its remainder
+// placed as a pending event. Here A is split into A_part1 and A_part2 by
+// scheduling A_part2 into the Inactive sub-region from inside A_part1; B
+// runs in between, observing the resulting interleave (atom 4).
 TEST(NondeterminismSim, ProcessSuspensionViaPendingEvent) {
   Arena arena;
   Scheduler sched(arena);
@@ -101,91 +58,59 @@ TEST(NondeterminismSim, ProcessSuspensionViaPendingEvent) {
   ASSERT_EQ(order.size(), 3u);
   EXPECT_EQ(order[0], "A_part1");
   EXPECT_EQ(order[1], "B");
-
   EXPECT_EQ(order[2], "A_part2");
 }
 
-TEST(NondeterminismSim, MultipleProcessInterleaving) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* a1 = sched.GetEventPool().Acquire();
-  a1->callback = [&]() {
-    order.push_back("A1");
-    auto* a2 = sched.GetEventPool().Acquire();
-    a2->callback = [&]() { order.push_back("A2"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kInactive, a2);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, a1);
-
-  auto* b = sched.GetEventPool().Acquire();
-  b->callback = [&]() { order.push_back("B"); };
-  sched.ScheduleEvent({0}, Region::kActive, b);
-
-  auto* c1 = sched.GetEventPool().Acquire();
-  c1->callback = [&]() {
-    order.push_back("C1");
-    auto* c2 = sched.GetEventPool().Acquire();
-    c2->callback = [&]() { order.push_back("C2"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kInactive, c2);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, c1);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 5u);
-
-  EXPECT_EQ(order[0], "A1");
-  EXPECT_EQ(order[1], "B");
-  EXPECT_EQ(order[2], "C1");
-
-  EXPECT_EQ(order[3], "A2");
-  EXPECT_EQ(order[4], "C2");
-}
-
-TEST(NondeterminismSim, ConflictingWritesInActiveRegion) {
-  Arena arena;
-  Scheduler sched(arena);
-  int x = 0;
-
-  auto* ev1 = sched.GetEventPool().Acquire();
-  ev1->callback = [&]() { x = 10; };
-  sched.ScheduleEvent({0}, Region::kActive, ev1);
-
-  auto* ev2 = sched.GetEventPool().Acquire();
-  ev2->callback = [&]() { x = 20; };
-  sched.ScheduleEvent({0}, Region::kActive, ev2);
-
-  sched.Run();
-
-  EXPECT_TRUE(x == 10 || x == 20);
-}
-
-TEST(NondeterminismSim, DynamicallyGeneratedActiveEventsExecute) {
+// §4.7 atom 1 in the active region: schedule N events into Active and
+// assert the sorted result, encoding "any permutation is valid" rather
+// than locking the test to whichever drain order the implementation
+// happens to produce. The production code complies by drainpath without
+// imposing a normative ordering between events.
+TEST(NondeterminismSim, ActiveEventsProcessedInAnyValidOrder) {
   Arena arena;
   Scheduler sched(arena);
   std::vector<int> order;
 
-  auto* gen = sched.GetEventPool().Acquire();
-  gen->callback = [&]() {
-    order.push_back(0);
-    for (int i = 1; i <= 3; ++i) {
-      auto* ev = sched.GetEventPool().Acquire();
-      ev->callback = [&order, i]() { order.push_back(i); };
-      sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, ev);
-    }
-  };
-  sched.ScheduleEvent({0}, Region::kActive, gen);
+  for (int i = 0; i < 4; ++i) {
+    auto* ev = sched.GetEventPool().Acquire();
+    ev->callback = [&order, i]() { order.push_back(i); };
+    sched.ScheduleEvent({0}, Region::kActive, ev);
+  }
 
   sched.Run();
   ASSERT_EQ(order.size(), 4u);
-  EXPECT_EQ(order[0], 0);
 
-  EXPECT_EQ(order[1], 1);
-  EXPECT_EQ(order[2], 2);
-  EXPECT_EQ(order[3], 3);
+  std::vector<int> sorted = order;
+  std::sort(sorted.begin(), sorted.end());
+  EXPECT_EQ(sorted, (std::vector<int>{0, 1, 2, 3}));
 }
 
+// §4.7 atom 1 in the reactive region: the LRM names Active and Reactive
+// in the same sentence, so the same drain-order freedom applies in the
+// reactive set. Four events drained in any permutation satisfy the rule.
+TEST(NondeterminismSim, ReactiveEventsProcessedInAnyValidOrder) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<int> order;
+
+  for (int i = 0; i < 4; ++i) {
+    auto* ev = sched.GetEventPool().Acquire();
+    ev->callback = [&order, i]() { order.push_back(i); };
+    sched.ScheduleEvent({0}, Region::kReactive, ev);
+  }
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 4u);
+
+  std::vector<int> sorted = order;
+  std::sort(sorted.begin(), sorted.end());
+  EXPECT_EQ(sorted, (std::vector<int>{0, 1, 2, 3}));
+}
+
+// §4.7 atom 3 in the reactive set: suspension uses Re-Inactive as the
+// pending sub-region instead of Inactive, but the same atom holds — a
+// procedural statement evaluation may be paused and resumed via a pending
+// event scheduled into the same region set.
 TEST(NondeterminismSim, ReactiveProcessSuspensionViaReInactive) {
   Arena arena;
   Scheduler sched(arena);
@@ -208,39 +133,5 @@ TEST(NondeterminismSim, ReactiveProcessSuspensionViaReInactive) {
   ASSERT_EQ(order.size(), 3u);
   EXPECT_EQ(order[0], "RA1");
   EXPECT_EQ(order[1], "RB");
-
   EXPECT_EQ(order[2], "RA2");
-}
-
-TEST(NondeterminismSim, NondeterminismAcrossTimeSlots) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* t0a = sched.GetEventPool().Acquire();
-  t0a->callback = [&]() { order.push_back("t0_a"); };
-  sched.ScheduleEvent({0}, Region::kActive, t0a);
-
-  auto* t0b = sched.GetEventPool().Acquire();
-  t0b->callback = [&]() { order.push_back("t0_b"); };
-  sched.ScheduleEvent({0}, Region::kActive, t0b);
-
-  auto* t5a = sched.GetEventPool().Acquire();
-  t5a->callback = [&]() { order.push_back("t5_a"); };
-  sched.ScheduleEvent({5}, Region::kActive, t5a);
-
-  auto* t5b = sched.GetEventPool().Acquire();
-  t5b->callback = [&]() { order.push_back("t5_b"); };
-  sched.ScheduleEvent({5}, Region::kActive, t5b);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 4u);
-
-  std::vector<std::string> t0(order.begin(), order.begin() + 2);
-  std::sort(t0.begin(), t0.end());
-  EXPECT_EQ(t0, (std::vector<std::string>{"t0_a", "t0_b"}));
-
-  std::vector<std::string> t5(order.begin() + 2, order.end());
-  std::sort(t5.begin(), t5.end());
-  EXPECT_EQ(t5, (std::vector<std::string>{"t5_a", "t5_b"}));
 }

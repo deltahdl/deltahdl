@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -38,25 +37,6 @@ TEST(ActiveRegionSim, ActiveRegionHoldsMultipleEvents) {
 
   sched.Run();
   EXPECT_EQ(count, 5);
-}
-
-TEST(ActiveRegionSim, ActiveEventsProcessedInAnyValidOrder) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> order;
-
-  for (int i = 0; i < 4; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, i]() { order.push_back(i); };
-    sched.ScheduleEvent({0}, Region::kActive, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 4u);
-
-  std::vector<int> sorted = order;
-  std::sort(sorted.begin(), sorted.end());
-  EXPECT_EQ(sorted, (std::vector<int>{0, 1, 2, 3}));
 }
 
 TEST(ActiveRegionSim, ActiveSelfLoopSchedulesMoreActiveEvents) {

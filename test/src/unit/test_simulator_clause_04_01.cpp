@@ -8,25 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(SchedulerOverviewSim, ConcurrentWriteSameTimeSlotLastWriteWins) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd1;\n"
-      "  initial x = 8'd2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  uint64_t val = var->value.ToUint64();
-  EXPECT_TRUE(val == 1u || val == 2u);
-}
-
 TEST(SchedulerOverviewSim, FullPipelineIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
