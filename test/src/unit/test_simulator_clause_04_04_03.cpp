@@ -92,20 +92,6 @@ TEST(PliRegionSim, PreObservedExecutesBetweenPostNBAAndObserved) {
                          {Region::kObserved, "observed"});
 }
 
-TEST(PliRegionSim, PrePostponedExecutesBeforePostponed) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  ScheduleLabeled(sched, Region::kPostponed, "postponed", order);
-  ScheduleLabeled(sched, Region::kPrePostponed, "pre_postponed", order);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "pre_postponed");
-  EXPECT_EQ(order[1], "postponed");
-}
-
 TEST(PliRegionSim, FullPLIRegionOrderingPerFigure41) { VerifyAllRegionOrder(); }
 
 TEST(PliRegionSim, PLIRegionsExecuteAcrossMultipleTimeSlots) {

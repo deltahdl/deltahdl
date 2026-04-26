@@ -80,37 +80,10 @@ TEST(PliPrePostponedSim, PrePostponedCanCreateEvents) {
   EXPECT_EQ(order[1], "created_postponed");
 }
 
-TEST(PliPrePostponedSim, PrePostponedExecutesAfterPostReNBA) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* pre_postponed = sched.GetEventPool().Acquire();
-  pre_postponed->callback = [&]() { order.push_back("pre_postponed"); };
-  sched.ScheduleEvent({0}, Region::kPrePostponed, pre_postponed);
-
-  auto* post_re_nba = sched.GetEventPool().Acquire();
-  post_re_nba->callback = [&]() { order.push_back("post_re_nba"); };
-  sched.ScheduleEvent({0}, Region::kPostReNBA, post_re_nba);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "post_re_nba");
-  EXPECT_EQ(order[1], "pre_postponed");
-}
-
 TEST(PliPrePostponedSim, PrePostponedExecutesAfterPostReNBABeforePostponed) {
   VerifyThreeRegionOrder({Region::kPostReNBA, "post_re_nba"},
                          {Region::kPrePostponed, "pre_postponed"},
                          {Region::kPostponed, "postponed"});
-}
-
-TEST(PliPrePostponedSim, PrePostponedIsWithinReactiveRegionSet) {
-  auto pre_postponed_ord = static_cast<int>(Region::kPrePostponed);
-  auto post_re_nba_ord = static_cast<int>(Region::kPostReNBA);
-  auto postponed_ord = static_cast<int>(Region::kPostponed);
-  EXPECT_GT(pre_postponed_ord, post_re_nba_ord);
-  EXPECT_LT(pre_postponed_ord, postponed_ord);
 }
 
 TEST(PliPrePostponedSim, PrePostponedRegionHoldsMultiplePLICallbacks) {
@@ -146,31 +119,4 @@ TEST(PliPrePostponedSim, PrePostponedEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[0], 0u);
   EXPECT_EQ(times[1], 1u);
   EXPECT_EQ(times[2], 2u);
-}
-
-TEST(PliPrePostponedSim, PrePostponedReadWriteInReactiveRegionSetContext) {
-  Arena arena;
-  Scheduler sched(arena);
-  int value = 0;
-  int post_re_nba_sample = -1;
-  int postponed_sample = -1;
-
-  auto* post_re_nba = sched.GetEventPool().Acquire();
-  post_re_nba->callback = [&]() { value = 10; };
-  sched.ScheduleEvent({0}, Region::kPostReNBA, post_re_nba);
-
-  auto* pre_postponed = sched.GetEventPool().Acquire();
-  pre_postponed->callback = [&]() {
-    post_re_nba_sample = value;
-    value = 55;
-  };
-  sched.ScheduleEvent({0}, Region::kPrePostponed, pre_postponed);
-
-  auto* postponed = sched.GetEventPool().Acquire();
-  postponed->callback = [&]() { postponed_sample = value; };
-  sched.ScheduleEvent({0}, Region::kPostponed, postponed);
-
-  sched.Run();
-  EXPECT_EQ(post_re_nba_sample, 10);
-  EXPECT_EQ(postponed_sample, 55);
 }
