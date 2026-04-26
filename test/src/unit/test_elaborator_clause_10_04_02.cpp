@@ -8,29 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(NonblockingAssignSim, NbaDefersUpdate) {
-  LowerFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  initial begin\n"
-      "    x <= 42;\n"
-      "    x = x;  // read x: should still be 0 (X→0), not 42\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
 TEST(NonblockingAssignSim, NbaAppliesToValue) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -66,35 +43,6 @@ TEST(NonblockingAssignSim, SingleAssignment) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(NonblockingAssignSim, NBADeferredUpdate) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a;\n"
-      "  logic [31:0] b;\n"
-      "  initial begin\n"
-      "    a = 10;\n"
-      "    a <= 20;\n"
-      "    b = a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* a = f.ctx.FindVariable("a");
-  auto* b = f.ctx.FindVariable("b");
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(b, nullptr);
-
-  EXPECT_EQ(b->value.ToUint64(), 10u);
-
-  EXPECT_EQ(a->value.ToUint64(), 20u);
-}
-
 TEST(NonblockingAssignSim, MultipleNBASameVarLastWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -116,35 +64,6 @@ TEST(NonblockingAssignSim, MultipleNBASameVarLastWins) {
   auto* var = f.ctx.FindVariable("a");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
-}
-
-TEST(NonblockingAssignSim, NBASwapPattern) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] a;\n"
-      "  logic [31:0] b;\n"
-      "  initial begin\n"
-      "    a = 10;\n"
-      "    b = 20;\n"
-      "    a <= b;\n"
-      "    b <= a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* a = f.ctx.FindVariable("a");
-  auto* b = f.ctx.FindVariable("b");
-  ASSERT_NE(a, nullptr);
-  ASSERT_NE(b, nullptr);
-
-  EXPECT_EQ(a->value.ToUint64(), 20u);
-  EXPECT_EQ(b->value.ToUint64(), 10u);
 }
 
 TEST(NonblockingAssignSim, NBAExpressionRHS) {
@@ -404,37 +323,6 @@ TEST(NonblockingAssignSim, NBAFunctionCallRHS) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
-TEST(NonblockingAssignSim, NBAPipelinePattern) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [31:0] in_val;\n"
-      "  logic [31:0] stage1;\n"
-      "  logic [31:0] stage2;\n"
-      "  initial begin\n"
-      "    in_val = 99;\n"
-      "    stage1 = 55;\n"
-      "    stage2 = 0;\n"
-      "    stage2 <= stage1;\n"
-      "    stage1 <= in_val;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* s1 = f.ctx.FindVariable("stage1");
-  auto* s2 = f.ctx.FindVariable("stage2");
-  ASSERT_NE(s1, nullptr);
-  ASSERT_NE(s2, nullptr);
-
-  EXPECT_EQ(s2->value.ToUint64(), 55u);
-  EXPECT_EQ(s1->value.ToUint64(), 99u);
 }
 
 TEST(NonblockingAssignSim, NBAArithmeticExpression) {

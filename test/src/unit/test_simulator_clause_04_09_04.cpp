@@ -1,279 +1,185 @@
 #include <gtest/gtest.h>
 
-#include <string>
-#include <vector>
-
-#include "common/arena.h"
-#include "common/types.h"
-#include "simulator/scheduler.h"
+#include "fixture_simulator.h"
+#include "simulator/lowerer.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
-static void ScheduleNbaAssign(Scheduler& sched, const int& src, int& dst) {
-  int rhs_val = src;
-  auto* nba = sched.GetEventPool().Acquire();
-  nba->kind = EventKind::kUpdate;
-  nba->callback = [&, rhs_val]() { dst = rhs_val; };
-  sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
+// §4.9.4 atom: the update is scheduled as an NBA update event — the callback
+// goes into `Region::kNBA`, which drains after the Active region.
+// `ScheduleNonblockingAssign` calls `ScheduleEvent(..., Region::kNBA, event)`
+// so the LHS write is not visible to subsequent Active-region statements.
+// Observed by `dst <= 8'd7; snap = dst;` inside the same initial — the
+// blocking `snap = dst;` runs in Active, before the NBA region, so it captures
+// the prior `dst` (0). A misroute of the update into the Active region (or
+// any region before NBA) would leave `snap == 7`.
+TEST(NonblockingAssignSchedulingSim, SchedulesUpdateInNbaRegion) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] dst, snap;\n"
+      "  initial begin\n"
+      "    dst = 8'd0;\n"
+      "    snap = 8'd0;\n"
+      "    dst <= 8'd7;\n"
+      "    snap = dst;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("snap")->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 7u);
 }
 
-TEST(NonblockingAssignSchedulingSim, AlwaysComputesUpdatedValue) {
-  Arena arena;
-  Scheduler sched(arena);
-  int src = 42;
-  int dst = 0;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() { ScheduleNbaAssign(sched, src, dst); };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(dst, 42);
+// §4.9.4 atoms: NBA always computes the updated value, and when the delay is
+// zero the event is placed in the current time step.
+// `ExecNonblockingAssignImpl` evaluates the RHS via `EvalRhsWithStructContext`
+// and `ScheduleNonblockingAssign` schedules at
+// `current_time + SimTime{delay_ticks}`, with `delay_ticks == 0` resolving to
+// the current time. Observed by a bare `dst <= 8'd5;` at t=0 with no other
+// events — after `Run`, `dst` is 5 (so the eager evaluate-and-schedule path
+// fired) and `CurrentTime` is still 0 (so the placement is in the current
+// step). A no-op NBA path would leave `dst == 0`; a future schedule would
+// advance the clock past 0.
+TEST(NonblockingAssignSchedulingSim, ZeroDelaySchedulesInCurrentTimestep) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] dst;\n"
+      "  initial begin\n"
+      "    dst = 8'd0;\n"
+      "    dst <= 8'd5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 5u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-TEST(NonblockingAssignSchedulingSim, SchedulesUpdateAsNbaEvent) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->kind = EventKind::kUpdate;
-    nba->callback = [&]() { order.push_back("nba_update"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-
-    auto* active = sched.GetEventPool().Acquire();
-    active->kind = EventKind::kUpdate;
-    active->callback = [&]() { order.push_back("active_update"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, active);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "active_update");
-  EXPECT_EQ(order[1], "nba_update");
+// §4.9.4 atom: when the delay is nonzero, the NBA event is scheduled as a
+// future event. `ExecNonblockingAssignImpl` reads `stmt->delay`, evaluates it,
+// and `ScheduleNonblockingAssign` adds it to the current time. Observed by
+// `dst <= #10 8'd99;` from t=0 with a parallel `#5 mid = dst;` — at t=5 the
+// NBA has not yet fired, so `mid` captures the pre-NBA `dst` (0); after the
+// scheduler advances to t=10 and drains its NBA region, `dst` commits to 99.
+// A current-step schedule would leave `mid == 99`.
+TEST(NonblockingAssignSchedulingSim, NonzeroDelaySchedulesAsFutureEvent) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] dst, mid;\n"
+      "  initial begin\n"
+      "    dst = 8'd0;\n"
+      "    mid = 8'd0;\n"
+      "    dst <= #10 8'd99;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #5 mid = dst;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("mid")->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 99u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 10u);
 }
 
-TEST(NonblockingAssignSchedulingSim, ZeroDelaySchedulesNbaInCurrentTimestep) {
-  Arena arena;
-  Scheduler sched(arena);
-  int dst = 0;
-  bool nba_executed_at_time_zero = false;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    int rhs_val = 5;
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->kind = EventKind::kUpdate;
-    nba->callback = [&, rhs_val]() {
-      dst = rhs_val;
-      nba_executed_at_time_zero = (sched.CurrentTime().ticks == 0);
-    };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(dst, 5);
-  EXPECT_TRUE(nba_executed_at_time_zero);
+// §4.9.4 atom: the values in effect when the update is placed in the event
+// region are used to compute the right-hand value — the RHS is evaluated at
+// statement-execution time, not at NBA-fire time. `ExecNonblockingAssignImpl`
+// calls `EvalRhsWithStructContext` and captures the result by value into the
+// NBA callback. Observed by `dst <= src;` followed immediately by `src = 99;`
+// inside the same initial — `src` is 5 when the NBA is scheduled, so `dst`
+// must commit to 5, not 99. A callback that re-read `src` at fire time would
+// yield 99.
+TEST(NonblockingAssignSchedulingSim, RhsUsesValuesAtScheduleTime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] src, dst;\n"
+      "  initial begin\n"
+      "    src = 8'd5;\n"
+      "    dst = 8'd0;\n"
+      "    dst <= src;\n"
+      "    src = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("src")->value.ToUint64(), 99u);
+  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 5u);
 }
 
-TEST(NonblockingAssignSchedulingSim, NonzeroDelaySchedulesNbaAsFutureEvent) {
-  Arena arena;
-  Scheduler sched(arena);
-  int dst = 0;
-  uint64_t nba_time = 0;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    int rhs_val = 99;
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->kind = EventKind::kUpdate;
-    nba->callback = [&, rhs_val]() {
-      dst = rhs_val;
-      nba_time = sched.CurrentTime().ticks;
-    };
-    sched.ScheduleEvent({10}, Region::kNBA, nba);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(dst, 99);
-  EXPECT_EQ(nba_time, 10u);
+// §4.9.4 atom: the values in effect when the update is placed in the event
+// region are used to compute the left-hand target — the LHS index is
+// resolved at schedule time, not at fire time. For `mem[idx] <= ...`,
+// `ScheduleNonblockingAssign` evaluates `lhs->index` via `EvalExpr` and
+// captures the resolved index into the NBA callback. Observed by
+// `mem[idx] <= 8'hCC;` followed by `idx = 1;` — the NBA must write to
+// `mem[0]` (the index in effect at schedule time), leaving `mem[1]`
+// untouched. A fire-time index lookup would write to `mem[1]`.
+TEST(NonblockingAssignSchedulingSim, LhsTargetUsesValuesAtScheduleTime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] mem [0:1];\n"
+      "  int idx;\n"
+      "  initial begin\n"
+      "    mem[0] = 8'd0;\n"
+      "    mem[1] = 8'd0;\n"
+      "    idx = 0;\n"
+      "    mem[idx] <= 8'hCC;\n"
+      "    idx = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("mem[0]")->value.ToUint64(), 0xCCu);
+  EXPECT_EQ(f.ctx.FindVariable("mem[1]")->value.ToUint64(), 0u);
 }
 
-TEST(NonblockingAssignSchedulingSim, RhsComputedAtScheduleTime) {
-  Arena arena;
-  Scheduler sched(arena);
-  int src = 10;
-  int dst = 0;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    ScheduleNbaAssign(sched, src, dst);
-
-    src = 99;
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-
-  EXPECT_EQ(dst, 10);
-}
-
-TEST(NonblockingAssignSchedulingSim, LhsTargetDeterminedAtScheduleTime) {
-  Arena arena;
-  Scheduler sched(arena);
-  int select = 0;
-  int dst_a = 0;
-  int dst_b = 0;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    int target_select = select;
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->kind = EventKind::kUpdate;
-    nba->callback = [&, target_select]() {
-      if (target_select == 0) {
-        dst_a = 1;
-      } else {
-        dst_b = 1;
-      }
-    };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-
-    select = 1;
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-
-  EXPECT_EQ(dst_a, 1);
-  EXPECT_EQ(dst_b, 0);
-}
-
-TEST(NonblockingAssignSchedulingSim, MultipleNbasAllScheduleInNbaRegion) {
-  Arena arena;
-  Scheduler sched(arena);
-  int a = 0;
-  int b = 0;
-  int c = 0;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    auto* nba1 = sched.GetEventPool().Acquire();
-    nba1->kind = EventKind::kUpdate;
-    nba1->callback = [&]() { a = 1; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba1);
-
-    auto* nba2 = sched.GetEventPool().Acquire();
-    nba2->kind = EventKind::kUpdate;
-    nba2->callback = [&]() { b = 2; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba2);
-
-    auto* nba3 = sched.GetEventPool().Acquire();
-    nba3->kind = EventKind::kUpdate;
-    nba3->callback = [&]() { c = 3; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba3);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(a, 1);
-  EXPECT_EQ(b, 2);
-  EXPECT_EQ(c, 3);
-}
-
-TEST(NonblockingAssignSchedulingSim, NbaDoesNotBlockProcess) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    order.push_back("before_nba");
-
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->kind = EventKind::kUpdate;
-    nba->callback = [&]() { order.push_back("nba_update"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-
-    order.push_back("after_nba_next_stmt");
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "before_nba");
-  EXPECT_EQ(order[1], "after_nba_next_stmt");
-  EXPECT_EQ(order[2], "nba_update");
-}
-
-TEST(NonblockingAssignSchedulingSim, NbaExecutesAfterActiveAndInactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    auto* inactive = sched.GetEventPool().Acquire();
-    inactive->kind = EventKind::kUpdate;
-    inactive->callback = [&]() { order.push_back("inactive"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kInactive, inactive);
-
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->kind = EventKind::kUpdate;
-    nba->callback = [&]() { order.push_back("nba"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-
-    order.push_back("active");
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "inactive");
-  EXPECT_EQ(order[2], "nba");
-}
-
-TEST(NonblockingAssignSchedulingSim, SwapPatternBothRhsComputedBeforeUpdate) {
-  Arena arena;
-  Scheduler sched(arena);
-  int x = 1;
-  int y = 2;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    int rhs_x = y;
-    int rhs_y = x;
-
-    auto* nba1 = sched.GetEventPool().Acquire();
-    nba1->kind = EventKind::kUpdate;
-    nba1->callback = [&, rhs_x]() { x = rhs_x; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba1);
-
-    auto* nba2 = sched.GetEventPool().Acquire();
-    nba2->kind = EventKind::kUpdate;
-    nba2->callback = [&, rhs_y]() { y = rhs_y; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba2);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-
-  EXPECT_EQ(x, 2);
-  EXPECT_EQ(y, 1);
+// §4.9.4 atom (edge case): for a packed-vector bit-select LHS, the schedule-
+// time evaluation rule still applies — `ScheduleNonblockingAssign` takes the
+// `is_select && !elem` branch (no per-element variable exists for a packed
+// vector), evaluates `lhs->index` via `EvalExpr` at schedule time, and
+// captures the resolved bit position into a bit-write callback. Observed by
+// `dst[idx] <= 1'b1;` followed by `idx = 7;` — the NBA must set bit 0 (the
+// index in effect at schedule time), not bit 7. A fire-time index lookup
+// would set bit 7 instead, leaving bit 0 clear.
+TEST(NonblockingAssignSchedulingSim, BitSelectLhsUsesValuesAtScheduleTime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] dst;\n"
+      "  int idx;\n"
+      "  initial begin\n"
+      "    dst = 8'd0;\n"
+      "    idx = 0;\n"
+      "    dst[idx] <= 1'b1;\n"
+      "    idx = 7;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 0x01u);
 }
