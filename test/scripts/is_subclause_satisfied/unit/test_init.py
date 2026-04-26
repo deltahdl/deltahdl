@@ -9,7 +9,6 @@ import pytest
 from lib.python.satisfy import (
     SATISFACTION_CONDITIONS,
     SATISFIED,
-    SubclauseDiagnostic,
 )
 
 
@@ -177,32 +176,28 @@ def test_parse_diagnostic_rejects_unknown_value(iss):
 # ---- diagnostic_to_payload --------------------------------------------------
 
 
-def _full_diagnostic():
-    """Return a SubclauseDiagnostic with one failure and four satisfied."""
-    return SubclauseDiagnostic(
-        rule_coverage=["rule 7 has no production code"],
-        test_coverage=SATISFIED,
-        test_placement=SATISFIED,
-        naming=SATISFIED,
-        deduplication=SATISFIED,
-    )
+def _full_diagnostic(iss):
+    """Return a parsed diagnostic with one failure and four satisfied."""
+    payload = _all_satisfied_payload()
+    payload["rule_coverage"] = ["rule 7 has no production code"]
+    return iss.parse_diagnostic(json.dumps(payload))
 
 
 def test_diagnostic_to_payload_includes_verdict(iss):
     """The serialised payload includes the rolled-up verdict field."""
-    payload = iss.diagnostic_to_payload(_full_diagnostic())
+    payload = iss.diagnostic_to_payload(_full_diagnostic(iss))
     assert payload["verdict"] == "no"
 
 
 def test_diagnostic_to_payload_preserves_failures(iss):
     """The serialised payload preserves failure lists verbatim."""
-    payload = iss.diagnostic_to_payload(_full_diagnostic())
+    payload = iss.diagnostic_to_payload(_full_diagnostic(iss))
     assert payload["rule_coverage"] == ["rule 7 has no production code"]
 
 
 def test_diagnostic_to_payload_preserves_satisfied(iss):
     """The serialised payload preserves satisfied conditions verbatim."""
-    payload = iss.diagnostic_to_payload(_full_diagnostic())
+    payload = iss.diagnostic_to_payload(_full_diagnostic(iss))
     assert payload["test_coverage"] == SATISFIED
 
 
