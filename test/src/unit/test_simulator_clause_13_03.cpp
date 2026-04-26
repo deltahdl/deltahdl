@@ -53,54 +53,6 @@ TEST(TaskCall, SetupReturnsNullForUnknown) {
   EXPECT_EQ(result, nullptr);
 }
 
-TEST(TaskSim, TaskInputArg) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  task set_val(input logic [31:0] v);\n"
-      "    x = v;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    x = 0;\n"
-      "    set_val(32'd99);\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(val, 99u);
-}
-
-TEST(TaskSim, TaskInoutArg) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  task double_it(inout logic [31:0] v);\n"
-      "    v = v * 2;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    x = 32'd7;\n"
-      "    double_it(x);\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(val, 14u);
-}
-
-TEST(TaskSim, TaskMultipleOutputArgs) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] a, b;\n"
-      "  task split(input logic [31:0] v, output logic [31:0] lo, hi);\n"
-      "    lo = v & 32'hFFFF;\n"
-      "    hi = (v >> 16) & 32'hFFFF;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    split(32'h0003_0007, a, b);\n"
-      "  end\n"
-      "endmodule\n",
-      "a");
-  EXPECT_EQ(val, 7u);
-}
-
 TEST(TaskSim, TaskCallsTask) {
   auto val = RunAndGet(
       "module t;\n"

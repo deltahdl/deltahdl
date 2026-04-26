@@ -1,237 +1,275 @@
 #include <gtest/gtest.h>
 
-#include <string>
-#include <vector>
-
-#include "common/arena.h"
-#include "common/types.h"
-#include "simulator/scheduler.h"
+#include "fixture_simulator.h"
+#include "simulator/lowerer.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
-TEST(SubroutineArgSchedulingSim, ArgumentPassedByValue) {
-  Arena arena;
-  Scheduler sched(arena);
-  int caller_var = 10;
-  int subroutine_local = 0;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    subroutine_local = caller_var;
-
-    subroutine_local = 99;
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(caller_var, 10);
-  EXPECT_EQ(subroutine_local, 99);
+// §4.9.7 atom: copy-in is timed to invocation. The argument value is
+// captured into the formal at the moment the call is made, before the body
+// runs — so a caller-side source mutation that happens later inside the
+// task body must not propagate to the formal. Production: `BindFunctionArgs`
+// (src/simulator/eval_function.cpp:418) calls `ResolveArgValue` and writes
+// the result into a freshly created local variable; that local is never
+// re-read from the caller's storage. Observed by `cap = read_then_clobber(src)`
+// where the body writes `src = 99` after capturing `v` into `seen`. If
+// copy-in were a reference (or deferred until a later body read), `seen`
+// would observe 99; the test asserts 5, so the snapshot was taken at
+// invocation.
+TEST(SubroutineArgSchedulingSim, CopyInCapturesValueAtInvocation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int src, seen;\n"
+      "  function int read_then_clobber(input int v);\n"
+      "    src = 99;\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    src = 5;\n"
+      "    seen = read_then_clobber(src);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("seen")->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("src")->value.ToUint64(), 99u);
 }
 
-TEST(SubroutineArgSchedulingSim, CopyInOnInvocation) {
-  Arena arena;
-  Scheduler sched(arena);
-  int src = 42;
-  int copied_in = 0;
-
-  auto* invoke = sched.GetEventPool().Acquire();
-  invoke->kind = EventKind::kEvaluation;
-  invoke->callback = [&]() { copied_in = src; };
-  sched.ScheduleEvent({0}, Region::kActive, invoke);
-
-  auto* change_src = sched.GetEventPool().Acquire();
-  change_src->kind = EventKind::kEvaluation;
-  change_src->callback = [&]() { src = 999; };
-  sched.ScheduleEvent({3}, Region::kActive, change_src);
-
-  sched.Run();
-
-  EXPECT_EQ(copied_in, 42);
-  EXPECT_EQ(src, 999);
+// §4.9.7 atom: copy-out is timed to return. The caller's storage is not
+// touched until the subroutine returns — a parallel observer reading the
+// caller variable while the task is suspended mid-body must see the
+// pre-call value, and only after the return statement does the writeback
+// land. Production: `WritebackOutputArgs` (src/simulator/eval_function.cpp:445)
+// runs from `TeardownTaskCall` (line 1474) at the end of the task body, not
+// at the assignment statement that wrote the formal. Observed with a #5
+// delay between `o = 8'd42;` and the implicit return: a parallel `initial`
+// reads `dst` at #2 (mid-call) and again at #10 (post-return).
+TEST(SubroutineArgSchedulingSim, CopyOutOccursOnReturn) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] dst, mid_call, after_return;\n"
+      "  task set_then_delay(output logic [7:0] o);\n"
+      "    o = 8'd42;\n"
+      "    #5;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    dst = 8'd0;\n"
+      "    mid_call = 8'd0;\n"
+      "    after_return = 8'd0;\n"
+      "    set_then_delay(dst);\n"
+      "    after_return = dst;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #2 mid_call = dst;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("mid_call")->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 42u);
+  EXPECT_EQ(f.ctx.FindVariable("after_return")->value.ToUint64(), 42u);
 }
 
-TEST(SubroutineArgSchedulingSim, CopyOutOnReturn) {
-  Arena arena;
-  Scheduler sched(arena);
-  int caller_dst = 0;
-  bool returned = false;
-
-  auto* invoke = sched.GetEventPool().Acquire();
-  invoke->kind = EventKind::kEvaluation;
-  invoke->callback = [&]() {
-    int output_arg = 77;
-
-    caller_dst = output_arg;
-    returned = true;
-  };
-  sched.ScheduleEvent({0}, Region::kActive, invoke);
-
-  sched.Run();
-  EXPECT_TRUE(returned);
-  EXPECT_EQ(caller_dst, 77);
+// §4.9.7 atom: the copy-out behaves the same as a blocking assignment.
+// Production: `WritebackOutputArgs` calls `PerformBlockingAssign` at
+// src/simulator/eval_function.cpp:457 — literally the same code path used
+// for `=` statements. The observable consequence is immediate visibility
+// to the next statement in the same process: the post-call read sees the
+// written-back value without waiting for any later region. If copy-out
+// were routed through NBA scheduling, `snap` would still be 0 because the
+// blocking read of `dst` would race ahead of the deferred update.
+TEST(SubroutineArgSchedulingSim, CopyOutImmediatelyVisibleToNextStatement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] dst, snap;\n"
+      "  task write_dst(output logic [7:0] o);\n"
+      "    o = 8'd5;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    dst = 8'd0;\n"
+      "    snap = 8'd0;\n"
+      "    write_dst(dst);\n"
+      "    snap = dst;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("snap")->value.ToUint64(), 5u);
 }
 
-TEST(SubroutineArgSchedulingSim, InoutArgCopiedInAndOut) {
-  Arena arena;
-  Scheduler sched(arena);
-  int caller_var = 5;
-
-  auto* invoke = sched.GetEventPool().Acquire();
-  invoke->kind = EventKind::kEvaluation;
-  invoke->callback = [&]() {
-    int arg = caller_var;
-
-    arg = arg + 10;
-
-    caller_var = arg;
-  };
-  sched.ScheduleEvent({0}, Region::kActive, invoke);
-
-  sched.Run();
-  EXPECT_EQ(caller_var, 15);
+// §4.9.7 atom 4 corollary: a blocking-style commit fires variable watchers
+// the same way a `=` statement does. Production: `PerformBlockingAssign`
+// updates the variable in place, which triggers `NotifyWatchers` on the
+// caller-side `Variable`. An `always @(dst)` block treats the copy-out as
+// an event source. Observed by `observed` flipping to 1 after the call
+// returns — if copy-out bypassed the watcher path (e.g., wrote storage
+// directly without notifying), `observed` would stay 0.
+TEST(SubroutineArgSchedulingSim, CopyOutTriggersWatchers) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] dst, observed;\n"
+      "  task bump(output logic [7:0] o);\n"
+      "    o = 8'd9;\n"
+      "  endtask\n"
+      "  always @(dst) observed = 8'd1;\n"
+      "  initial begin\n"
+      "    dst = 8'd0;\n"
+      "    observed = 8'd0;\n"
+      "    bump(dst);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 9u);
+  EXPECT_EQ(f.ctx.FindVariable("observed")->value.ToUint64(), 1u);
 }
 
-TEST(SubroutineArgSchedulingSim, MultipleCopyOutArgsOnReturn) {
-  Arena arena;
-  Scheduler sched(arena);
-  int dst_a = 0;
-  int dst_b = 0;
-  int dst_c = 0;
-
-  auto* invoke = sched.GetEventPool().Acquire();
-  invoke->kind = EventKind::kEvaluation;
-  invoke->callback = [&]() {
-    int out_a = 1;
-    int out_b = 2;
-    int out_c = 3;
-
-    dst_a = out_a;
-    dst_b = out_b;
-    dst_c = out_c;
-  };
-  sched.ScheduleEvent({0}, Region::kActive, invoke);
-
-  sched.Run();
-  EXPECT_EQ(dst_a, 1);
-  EXPECT_EQ(dst_b, 2);
-  EXPECT_EQ(dst_c, 3);
+// §4.9.7 inout atom: an inout argument exercises both copy-in (atom 2)
+// and copy-out (atom 3) on the same formal. Production: `BindFunctionArgs`
+// runs the same ResolveArgValue/CreateLocalVariable copy-in that input
+// args get; `WritebackOutputArgs` (line 449) also writes back when
+// `dir == Direction::kInout`. Observed by `inc(x)` where the body reads
+// the caller's value (10), increments locally to 11, and writes back —
+// this only succeeds end-to-end if copy-in and copy-out both fire.
+TEST(SubroutineArgSchedulingSim, InoutArgCopiesInThenOut) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  task inc(inout logic [7:0] v);\n"
+      "    v = v + 8'd1;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    x = 8'd10;\n"
+      "    inc(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 11u);
 }
 
-TEST(SubroutineArgSchedulingSim, CopyOutBehavesAsBlockingAssignment) {
-  Arena arena;
-  Scheduler sched(arena);
-  int result = 0;
-  int observed_after_call = -1;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    int out_arg = 42;
-    result = out_arg;
-
-    observed_after_call = result;
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  EXPECT_EQ(result, 42);
-  EXPECT_EQ(observed_after_call, 42);
+// §4.9.7 edge: "on return" includes early-return paths. The body assigns
+// `o = 8'd5` and then takes the `return;` branch before reaching the
+// later `o = 8'd99` assignment — copy-out must still fire, and the
+// caller variable must hold the value the formal had at the return
+// moment (5, not 99). Production: `TeardownTaskCall`
+// (src/simulator/eval_function.cpp:1474) calls `WritebackOutputArgs`
+// unconditionally after `ExecFunctionBody`; the body's `kReturn`
+// `StmtResult` short-circuits the inner statement loop without
+// suppressing the outer writeback. A bug that gated writeback on
+// "natural fall-through" (kNormal) would leave `dst == 0`; a bug that
+// kept executing past the return would leave `dst == 99`.
+TEST(SubroutineArgSchedulingSim, CopyOutFiresOnEarlyReturn) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] dst;\n"
+      "  task set_and_skip(output logic [7:0] o, input bit do_skip);\n"
+      "    o = 8'd5;\n"
+      "    if (do_skip) return;\n"
+      "    o = 8'd99;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    dst = 8'd0;\n"
+      "    set_and_skip(dst, 1'b1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 5u);
 }
 
-TEST(SubroutineArgSchedulingSim, CopyOutEnablesEventsOnUpdate) {
-  Arena arena;
-  Scheduler sched(arena);
-  int sig = 0;
-  bool sensitive_triggered = false;
-
-  auto* invoke = sched.GetEventPool().Acquire();
-  invoke->kind = EventKind::kEvaluation;
-  invoke->callback = [&]() {
-    int out_arg = 5;
-
-    sig = out_arg;
-
-    auto* sensitive = sched.GetEventPool().Acquire();
-    sensitive->kind = EventKind::kEvaluation;
-    sensitive->callback = [&]() { sensitive_triggered = true; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, sensitive);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, invoke);
-
-  sched.Run();
-  EXPECT_EQ(sig, 5);
-  EXPECT_TRUE(sensitive_triggered);
+// §4.9.7 atom 4 edge: "behaves the same as does any blocking assignment"
+// implies the writeback supports the same LHS forms a `=` statement
+// supports — bit-select, element-select, slice, concat. The output
+// actual here is `arr[2]`, an element-select on an unpacked array.
+// Production: `WritebackOutputArgs` calls `PerformBlockingAssign(arr[2],
+// formal_value, ...)`, which dispatches into the same select-LHS path
+// (src/simulator/statement_assign_core.cpp PerformBlockingAssign) used
+// by direct `arr[2] = ...;` statements. If copy-out had its own
+// simplified writeback that only handled bare-identifier LHS, `arr[2]`
+// would stay 0 and the test would fail; a sibling read of `arr[1]`
+// proves the writeback is targeted, not a wholesale array clobber.
+TEST(SubroutineArgSchedulingSim, CopyOutSupportsBlockingAssignLhsForms) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [0:3];\n"
+      "  logic [7:0] sibling;\n"
+      "  task write_one(output logic [7:0] o);\n"
+      "    o = 8'd42;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    arr[0] = 8'd0;\n"
+      "    arr[1] = 8'd7;\n"
+      "    arr[2] = 8'd0;\n"
+      "    arr[3] = 8'd0;\n"
+      "    write_one(arr[2]);\n"
+      "    sibling = arr[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 42u);
+  EXPECT_EQ(f.ctx.FindVariable("sibling")->value.ToUint64(), 7u);
 }
 
-TEST(SubroutineArgSchedulingSim, CopyOutDoesNotSuspendProcess) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    order.push_back("before_call");
-
-    int dst = 0;
-    dst = 1;
-    order.push_back("after_call");
-    (void)dst;
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "before_call");
-  EXPECT_EQ(order[1], "after_call");
-}
-
-TEST(SubroutineArgSchedulingSim, CopyOutOccursInActiveRegion) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    order.push_back("copyout_active");
-
-    auto* nba = sched.GetEventPool().Acquire();
-    nba->kind = EventKind::kUpdate;
-    nba->callback = [&]() { order.push_back("nba_event"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "copyout_active");
-  EXPECT_EQ(order[1], "nba_event");
-}
-
-TEST(SubroutineArgSchedulingSim, CopyInAndCopyOutAreIndependent) {
-  Arena arena;
-  Scheduler sched(arena);
-  int caller_x = 10;
-  int caller_y = 0;
-
-  auto* invoke = sched.GetEventPool().Acquire();
-  invoke->kind = EventKind::kEvaluation;
-  invoke->callback = [&]() {
-    int x_local = caller_x;
-
-    int y_local = x_local * 2;
-
-    caller_x = 999;
-
-    caller_y = y_local;
-  };
-  sched.ScheduleEvent({0}, Region::kActive, invoke);
-
-  sched.Run();
-
-  EXPECT_EQ(caller_y, 20);
-
-  EXPECT_EQ(caller_x, 999);
+// §4.9.7 atom 3 plural form: every output formal is written back on
+// return — `WritebackOutputArgs` iterates `func->func_args` and writes
+// each kOutput/kInout in order. The single-arg form would pass even if
+// the writeback loop terminated after the first arg; this case proves
+// that all three caller-side variables are committed.
+TEST(SubroutineArgSchedulingSim, MultipleOutputArgsAllWrittenOnReturn) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c;\n"
+      "  task triple(output logic [7:0] x, y, z);\n"
+      "    x = 8'd1;\n"
+      "    y = 8'd2;\n"
+      "    z = 8'd3;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    a = 8'd0;\n"
+      "    b = 8'd0;\n"
+      "    c = 8'd0;\n"
+      "    triple(a, b, c);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 3u);
 }

@@ -4,55 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(FunctionSim, FunctionWithOutputArg) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  function void set_val(output logic [31:0] v);\n"
-      "    v = 32'd55;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    x = 0;\n"
-      "    set_val(x);\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(val, 55u);
-}
-
-TEST(FunctionSim, FunctionWithInoutArg) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] x;\n"
-      "  function void double_it(inout logic [31:0] v);\n"
-      "    v = v * 2;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    x = 32'd8;\n"
-      "    double_it(x);\n"
-      "  end\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(val, 16u);
-}
-
-TEST(FunctionSim, FunctionWithMultipleOutputArgs) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] lo, hi;\n"
-      "  function void split(input logic [31:0] v,\n"
-      "                      output logic [31:0] a, b);\n"
-      "    a = v & 32'hFFFF;\n"
-      "    b = (v >> 16) & 32'hFFFF;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    split(32'h0005_0003, lo, hi);\n"
-      "  end\n"
-      "endmodule\n",
-      "lo");
-  EXPECT_EQ(val, 3u);
-}
-
 TEST(FunctionSim, FunctionWithLocalVars) {
   auto val = RunAndGet(
       "module t;\n"
