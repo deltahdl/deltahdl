@@ -16,7 +16,10 @@ from typing import TypeAlias
 
 from lib.python.lrm import build_lrm_read_instruction
 
-from .streaming import build_streaming_cmd, run_claude_streaming
+from .streaming import (
+    build_streaming_cmd,
+    run_claude_streaming_with_retry,
+)
 
 
 SubclauseDependencies: TypeAlias = list[str]
@@ -48,14 +51,23 @@ def run_oracle_call(prompt: str, *, model: str) -> str:
 
     Runs the CLI in stream-json mode so the streaming runner can decode
     events and print Claude's text/tool_use blocks live — oracle passes
-    can take many minutes and the user needs to see progress. The
-    streaming runner extracts the terminal ``.result`` text and is
-    loud-fatal on a non-zero exit code or a missing result event.
+    can take many minutes and the user needs to see progress. Wraps
+    each call in a content-filter retry loop (max two retries) using
+    the recovery prompt from ``streaming``; the retry call appends
+    ``--continue`` so it resumes the same Claude session. Loud-fatal
+    on a non-zero exit code, a missing result event, or after the
+    retry budget is exhausted.
     """
     cmd = build_streaming_cmd(
         model=model, disallowed_tools=DISALLOWED_TOOLS,
     )
-    return run_claude_streaming(cmd, prompt, env=build_env())
+    retry_cmd = build_streaming_cmd(
+        model=model, disallowed_tools=DISALLOWED_TOOLS,
+        continue_session=True,
+    )
+    return run_claude_streaming_with_retry(
+        cmd, prompt, env=build_env(), retry_cmd=retry_cmd, role="Oracle",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -94,13 +106,11 @@ def build_dependency_prompt(subclause: str, lrm: str) -> str:
         " children); OR\n"
         f"  - §{subclause}'s normative rules cannot be tested without"
         " syntax or semantics defined in §Y.\n\n"
-        "Do NOT include §{subclause} itself. Do NOT include subclauses"
-        " whose satisfaction is merely related, only those whose"
-        " satisfaction is REQUIRED first. Order the list dependencies-"
-        "first (children before parents, foundations before consumers)."
-        "\n\n"
-        "You are READ-ONLY. Do not move, rename, edit, create, or"
-        " delete anything. Judge and report.\n\n"
+        f"List only OTHER subclauses (exclude §{subclause} itself)."
+        " Include only subclauses whose satisfaction is REQUIRED first."
+        " Order the list dependencies-first (children before parents,"
+        " foundations before consumers).\n\n"
+        "Read-only role: judge and report.\n\n"
         "Output ONLY a single JSON array of subclause-identifier"
         " strings, no preamble or trailing text. Each identifier is the"
         " same shape as --subclause input (digit-or-letter heads,"

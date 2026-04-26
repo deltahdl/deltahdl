@@ -32,7 +32,11 @@ from lib.python.github import format_subclause_label
 from lib.python.lrm import build_lrm_read_instruction
 
 from .oracles import build_env
-from .streaming import build_streaming_cmd, run_claude_streaming
+from .streaming import (
+    COPYRIGHT_REASON,
+    build_streaming_cmd,
+    run_claude_streaming_with_retry,
+)
 
 
 # Mutators may edit source and test files but must never run git, gh,
@@ -78,15 +82,27 @@ def run_step(
     each step can take many minutes and the user needs to see
     progress. When ``continue_session`` is true the call resumes the
     most recent Claude session so the steps share an audit context;
-    when false the call opens a fresh session. Loud-fatal on a
-    non-zero exit code.
+    when false the call opens a fresh session.
+
+    Wraps each call in a content-filter retry loop (max two retries)
+    using the recovery prompt from ``streaming``; the retry call
+    appends ``--continue`` so it resumes the same Claude session.
+    Loud-fatal on a non-zero exit code or after the retry budget is
+    exhausted.
     """
     cmd = build_streaming_cmd(
         model=model,
         disallowed_tools=MUTATOR_DISALLOWED_TOOLS,
         continue_session=continue_session,
     )
-    run_claude_streaming(cmd, prompt, env=build_env())
+    retry_cmd = build_streaming_cmd(
+        model=model,
+        disallowed_tools=MUTATOR_DISALLOWED_TOOLS,
+        continue_session=True,
+    )
+    run_claude_streaming_with_retry(
+        cmd, prompt, env=build_env(), retry_cmd=retry_cmd, role="Step",
+    )
 
 
 def run_steps(
@@ -221,7 +237,7 @@ def _build_constraints(subclauses: list[str]) -> str:
         " code path to change, edit those shared files in this run."
         " Requirement ownership is scoped by subclause; file editing"
         f" is scoped by what {label}'s text requires."
-        " Write original comments; do not copy LRM prose into source files."
+        f" {COPYRIGHT_REASON}"
     )
 
 
@@ -301,35 +317,36 @@ def build_steps(
          f" The correct files for {label} tests are: {canonical_files}."
          + constraints),
         ("Deleting duplicate tests",
-         f"Delete any duplicate tests that belong to {label}."
-         " Do NOT delete tests that belong to other subclauses,"
-         " even if they look similar."
+         f"Delete only the duplicate tests that belong to {label}."
+         " Leave every other subclause's tests untouched, even if"
+         " they look similar."
          + constraints),
         ("Moving misplaced tests",
          f"Search ALL files in test/src/unit/ for tests that belong to"
          f" {label}. Move any that are in the wrong files"
          f" to the correct files: {canonical_files}."
-         " Do NOT put tests in a parent clause file."
+         f" Place tests in the canonical files for {label}, not in a"
+         " parent clause file."
          " If moving tests leaves a file empty, delete that file"
          " and remove its entry from test/CMakeLists.txt."
          + constraints),
         ("Renaming test suites",
-         f"Rename any test suites that test {label} requirements"
+         f"Rename only test suites that cover {label} requirements"
          " and have unintuitive names"
          " (e.g., containing clause numbers like Cl5_7_1_),"
          " regardless of which file they are in."
-         " Use PascalCase names that describe what is being tested."
-         " Do NOT include clause or annex numbers."
-         " Do NOT rename or modify tests that belong to other subclauses."
+         " Use PascalCase names that describe what is being tested"
+         " (no clause or annex numbers)."
+         " Leave every other subclause's test suites untouched."
          + constraints),
         ("Renaming test names",
-         f"Rename any test names that test {label} requirements"
+         f"Rename only test names that cover {label} requirements"
          " and have unintuitive names"
          " (e.g., containing clause numbers like Cl5_7_1_),"
          " regardless of which file they are in."
-         " Use PascalCase names that describe what is being tested."
-         " Do NOT include clause or annex numbers."
-         " Do NOT rename or modify tests that belong to other subclauses."
+         " Use PascalCase names that describe what is being tested"
+         " (no clause or annex numbers)."
+         " Leave every other subclause's tests untouched."
          + constraints),
         ("Writing missing tests",
          f"Write missing unit tests for {label} requirements."
@@ -341,9 +358,8 @@ def build_steps(
          " — a test is sufficient when running it would"
          " observe the rule being applied by production code, not by"
          " a reference model or helper."
-         f" If a member of {label} defines no testable requirements"
-         " of its own (only its descendants do), do NOT create test"
-         " files for it."
+         f" Skip test creation for any member of {label} that has no"
+         " testable rules of its own (only its descendants do)."
          + constraints),
         ("Writing missing functionality",
          f"First, list every normative statement in the LRM text of"

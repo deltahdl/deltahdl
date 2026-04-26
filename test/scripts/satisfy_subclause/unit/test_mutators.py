@@ -74,7 +74,7 @@ def test_disallowed_tools_blocks_mutool() -> None:
 def _patched_streaming():
     """Patch run_claude_streaming; the stub returns an empty result string."""
     return patch(
-        "satisfy_subclause.mutators.run_claude_streaming",
+        "satisfy_subclause.mutators.run_claude_streaming_with_retry",
         return_value="",
     )
 
@@ -888,3 +888,43 @@ def test_cycle_member_holds_issue() -> None:
     """CycleMember stores the issue number."""
     member = CycleMember(subclause="33.4.1.5", issue=42)
     assert member.issue == 42
+
+
+# --- run_step: retry-helper wiring ------------------------------------------
+
+
+def test_run_step_passes_role_to_retry_helper() -> None:
+    """The Step role is forwarded so retry warnings name it."""
+    with _patched_streaming() as mock_stream:
+        run_step("prompt", model="opus", continue_session=False)
+    assert mock_stream.call_args[1]["role"] == "Step"
+
+
+def test_run_step_retry_cmd_uses_continue() -> None:
+    """The retry_cmd handed to the helper appends --continue."""
+    with _patched_streaming() as mock_stream:
+        run_step("prompt", model="opus", continue_session=False)
+    assert "--continue" in mock_stream.call_args[1]["retry_cmd"]
+
+
+def test_run_step_retry_cmd_carries_disallowed_tools() -> None:
+    """The retry_cmd carries the mutator disallowed-tools string."""
+    with _patched_streaming() as mock_stream:
+        run_step("prompt", model="opus", continue_session=False)
+    assert "--disallowedTools" in mock_stream.call_args[1]["retry_cmd"]
+
+
+# --- build_steps: copyright wording + positive instructions -----------------
+
+
+def test_build_steps_constraints_mention_copyright() -> None:
+    """The standard constraints block names the LRM copyright reason."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert any("copyright" in p.lower() for _d, p in steps)
+
+
+def test_build_steps_no_negative_do_not_in_oracles() -> None:
+    """No step uses the 'Do NOT' negative phrasing."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    for _description, prompt in steps:
+        assert "Do NOT" not in prompt

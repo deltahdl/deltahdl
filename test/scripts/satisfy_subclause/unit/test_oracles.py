@@ -102,7 +102,7 @@ def test_build_env_preserves_other_vars() -> None:
 def _patched_streaming(result_text="DONE"):
     """Patch run_claude_streaming with a fixed return string."""
     return patch(
-        "satisfy_subclause.oracles.run_claude_streaming",
+        "satisfy_subclause.oracles.run_claude_streaming_with_retry",
         return_value=result_text,
     )
 
@@ -182,7 +182,7 @@ def test_build_dependency_prompt_mentions_subclause() -> None:
 
 def test_build_dependency_prompt_mentions_read_only() -> None:
     """Prompt explicitly states the oracle is read-only."""
-    assert "READ-ONLY" in build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "read-only" in build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
 
 
 def test_build_dependency_prompt_mentions_lrm() -> None:
@@ -321,3 +321,49 @@ def test_compute_subclause_dependencies_logs_subclause_to_stderr(
     with _patched_oracle("[]"):
         compute_subclause_dependencies("33.4", "lrm.pdf", model="opus")
     assert "§33.4" in capsys.readouterr().err
+
+
+# --- build_dependency_prompt (positive instructions / f-string fix) ---------
+
+
+def test_build_dependency_prompt_excludes_self_via_substituted_subclause() -> None:
+    """The 'exclude self' clause names the actual subclause, not a literal placeholder."""
+    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "{subclause}" not in prompt
+
+
+def test_build_dependency_prompt_avoids_uppercase_do_not() -> None:
+    """The dependency oracle prompt avoids the 'Do NOT' phrasing."""
+    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "Do NOT" not in prompt
+
+
+def test_build_dependency_prompt_avoids_lowercase_do_not() -> None:
+    """The dependency oracle prompt avoids the 'do not' phrasing."""
+    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "do not" not in prompt
+
+
+# --- run_oracle_call: retry-helper wiring -----------------------------------
+
+
+def test_run_oracle_call_passes_role_to_retry_helper() -> None:
+    """The Oracle role is forwarded so retry warnings name it."""
+    with _patched_streaming() as mock_stream:
+        run_oracle_call("prompt", model="opus")
+    assert mock_stream.call_args[1]["role"] == "Oracle"
+
+
+def test_run_oracle_call_retry_cmd_uses_continue() -> None:
+    """The retry_cmd handed to the helper appends --continue."""
+    with _patched_streaming() as mock_stream:
+        run_oracle_call("prompt", model="opus")
+    assert "--continue" in mock_stream.call_args[1]["retry_cmd"]
+
+
+def test_run_oracle_call_retry_cmd_carries_model() -> None:
+    """The retry_cmd uses the same model as the initial cmd."""
+    with _patched_streaming() as mock_stream:
+        run_oracle_call("prompt", model="haiku")
+    retry_cmd = mock_stream.call_args[1]["retry_cmd"]
+    assert retry_cmd[retry_cmd.index("--model") + 1] == "haiku"

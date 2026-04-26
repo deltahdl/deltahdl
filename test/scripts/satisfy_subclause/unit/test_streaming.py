@@ -469,3 +469,230 @@ def test_run_claude_streaming_dumps_stderr_when_no_result(
     except SystemExit:
         pass
     assert "UNIQUE_NORESULT_STDERR" in capsys.readouterr().err
+
+
+# --- ContentFilterError + extract_error_result ------------------------------
+
+
+def test_content_filter_error_is_exception(streaming) -> None:
+    """ContentFilterError is exposed as an Exception subclass."""
+    assert issubclass(streaming.ContentFilterError, Exception)
+
+
+def test_extract_error_result_returns_none_for_non_result(streaming) -> None:
+    """Non-result events return None."""
+    assert streaming.extract_error_result({"type": "assistant"}) is None
+
+
+def test_extract_error_result_returns_none_for_success_result(
+    streaming,
+) -> None:
+    """Success result events (no is_error) return None."""
+    assert streaming.extract_error_result(
+        {"type": "result", "result": "ok"},
+    ) is None
+
+
+def test_extract_error_result_describes_subtype(streaming) -> None:
+    """Error result events surface the subtype."""
+    text = streaming.extract_error_result({
+        "type": "result",
+        "subtype": "error_api",
+        "is_error": True,
+        "errors": ["upstream went sideways"],
+    })
+    assert "error_api" in text
+
+
+def test_extract_error_result_describes_errors(streaming) -> None:
+    """Error result events surface the errors list."""
+    text = streaming.extract_error_result({
+        "type": "result",
+        "subtype": "error_api",
+        "is_error": True,
+        "errors": ["upstream went sideways"],
+    })
+    assert "upstream went sideways" in text
+
+
+def test_extract_error_result_handles_missing_errors(streaming) -> None:
+    """Error result events with no errors list still produce a description."""
+    text = streaming.extract_error_result({
+        "type": "result",
+        "subtype": "error_api",
+        "is_error": True,
+    })
+    assert "error_api" in text
+
+
+def test_extract_error_result_handles_non_list_errors(streaming) -> None:
+    """Error result events whose errors field is a string survive."""
+    text = streaming.extract_error_result({
+        "type": "result",
+        "subtype": "error_api",
+        "is_error": True,
+        "errors": "scalar error body",
+    })
+    assert "scalar error body" in text
+
+
+# --- run_claude_streaming: error result events ------------------------------
+
+
+_ERROR_RESULT_LINE = (
+    '{"type":"result","subtype":"error_api","is_error":true,'
+    '"errors":["upstream blew up"]}\n'
+)
+
+
+def test_run_claude_streaming_exits_on_error_result(streaming) -> None:
+    """A non-content-filter is_error result event is loud-fatal."""
+    with pytest.raises(SystemExit):
+        _run(streaming, [_ERROR_RESULT_LINE])
+
+
+def test_run_claude_streaming_error_result_message_includes_subtype(
+    streaming, capsys,
+) -> None:
+    """The exit message names the result event's subtype."""
+    try:
+        _run(streaming, [_ERROR_RESULT_LINE])
+    except SystemExit:
+        pass
+    assert "error_api" in capsys.readouterr().err
+
+
+def test_run_claude_streaming_error_result_message_includes_errors(
+    streaming, capsys,
+) -> None:
+    """The exit message includes the result event's errors body."""
+    try:
+        _run(streaming, [_ERROR_RESULT_LINE])
+    except SystemExit:
+        pass
+    assert "upstream blew up" in capsys.readouterr().err
+
+
+# --- run_claude_streaming: content-filter detection -------------------------
+
+
+def test_run_claude_streaming_raises_on_raw_content_filter_marker(
+    streaming,
+) -> None:
+    """A raw stdout line containing the filter marker raises ContentFilterError."""
+    lines = [
+        "diagnostic: blocked by content filtering policy\n",
+    ]
+    with pytest.raises(streaming.ContentFilterError):
+        _run(streaming, lines)
+
+
+def test_run_claude_streaming_raises_on_content_filter_in_error_result(
+    streaming,
+) -> None:
+    """An is_error result event whose errors mention the filter raises."""
+    lines = [
+        '{"type":"result","subtype":"error_api","is_error":true,'
+        '"errors":["response was blocked by content filtering"]}\n',
+    ]
+    with pytest.raises(streaming.ContentFilterError):
+        _run(streaming, lines)
+
+
+def test_run_claude_streaming_raises_on_stderr_content_filter(
+    streaming,
+) -> None:
+    """A non-zero exit with stderr mentioning the filter raises."""
+    with pytest.raises(streaming.ContentFilterError):
+        _run(
+            streaming,
+            _OK_STREAM,
+            returncode=1,
+            stderr="message blocked by content filtering",
+        )
+
+
+# --- run_claude_streaming_with_retry ----------------------------------------
+
+
+def _run_retry(streaming, side_effects, *, role="Step", retry_cmd=None):
+    """Patch the inner call and invoke run_claude_streaming_with_retry."""
+    if retry_cmd is None:
+        retry_cmd = ["claude", "--continue"]
+    inner_patch = patch.object(
+        streaming, "run_claude_streaming", side_effect=side_effects,
+    )
+    with inner_patch as inner:
+        result = None
+        try:
+            result = streaming.run_claude_streaming_with_retry(
+                ["claude"], "orig", env={}, retry_cmd=retry_cmd, role=role,
+            )
+        except SystemExit as exc:
+            return inner, None, exc
+    return inner, result, None
+
+
+def test_retry_returns_first_attempt_when_no_filter(streaming) -> None:
+    """A clean first attempt returns its result without retrying."""
+    inner, result, _ = _run_retry(streaming, ["DONE"])
+    assert (result, inner.call_count) == ("DONE", 1)
+
+
+def test_retry_recovers_after_one_filter(streaming) -> None:
+    """One filter strike retries with the recovery prompt and succeeds."""
+    side = [streaming.ContentFilterError("blocked"), "DONE"]
+    inner, result, _ = _run_retry(streaming, side)
+    assert (result, inner.call_count) == ("DONE", 2)
+
+
+def test_retry_uses_retry_cmd_after_filter(streaming) -> None:
+    """The retry call uses the supplied retry_cmd, not the initial cmd."""
+    side = [streaming.ContentFilterError("blocked"), "DONE"]
+    retry_cmd = ["claude", "--continue", "--marker"]
+    inner, _, _ = _run_retry(streaming, side, retry_cmd=retry_cmd)
+    assert inner.call_args_list[1][0][0] == retry_cmd
+
+
+def test_retry_uses_recovery_prompt_after_filter(streaming) -> None:
+    """The retry call uses CONTENT_FILTER_RETRY_PROMPT, not the original."""
+    side = [streaming.ContentFilterError("blocked"), "DONE"]
+    inner, _, _ = _run_retry(streaming, side)
+    assert inner.call_args_list[1][0][1] == streaming.CONTENT_FILTER_RETRY_PROMPT
+
+
+def test_retry_recovery_prompt_mentions_copyright(streaming) -> None:
+    """The recovery prompt names the LRM copyright reason."""
+    assert "copyright" in streaming.CONTENT_FILTER_RETRY_PROMPT.lower()
+
+
+def test_retry_succeeds_after_two_strikes(streaming) -> None:
+    """Two filter strikes followed by success returns the final result."""
+    side = [
+        streaming.ContentFilterError("blocked"),
+        streaming.ContentFilterError("blocked"),
+        "DONE",
+    ]
+    inner, result, _ = _run_retry(streaming, side)
+    assert (result, inner.call_count) == ("DONE", 3)
+
+
+def test_retry_exits_after_max_retries(streaming) -> None:
+    """Three filter strikes (initial + two retries) exits non-zero."""
+    side = [streaming.ContentFilterError("blocked")] * 3
+    _, _, exc = _run_retry(streaming, side)
+    assert exc is not None
+
+
+def test_retry_exit_message_names_role(streaming, capsys) -> None:
+    """The terminal error names the caller's role."""
+    side = [streaming.ContentFilterError("blocked")] * 3
+    _run_retry(streaming, side, role="Oracle")
+    assert "Oracle" in capsys.readouterr().err
+
+
+def test_retry_warning_includes_attempt_number(streaming, capsys) -> None:
+    """Each retry prints a warning naming the attempt number."""
+    side = [streaming.ContentFilterError("blocked"), "DONE"]
+    _run_retry(streaming, side)
+    assert "attempt 1" in capsys.readouterr().err
