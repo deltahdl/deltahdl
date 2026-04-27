@@ -302,4 +302,30 @@ TEST(ScopeAndLifetimeElaboration, DynamicArrayElementNonblockingIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §6.21: Elements of a dynamically sized array may not be the target of a
+// procedural continuous assignment (force form).
+TEST(ScopeAndLifetimeElaboration, DynamicArrayElementForceIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int d[] = new[4];\n"
+      "  initial force d[0] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.21: Elements of a dynamically sized array may not be the target of a
+// procedural continuous assignment (procedural assign form).
+TEST(ScopeAndLifetimeElaboration, DynamicArrayElementProcAssignIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int d[] = new[4];\n"
+      "  initial assign d[0] = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace

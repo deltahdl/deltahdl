@@ -251,4 +251,30 @@ TEST(VarDecl, BitIsUnsigned) {
   EXPECT_FALSE(mod->variables[0].is_signed);
 }
 
+// §6.8 footnote 14: a data_declaration that is not within a procedural
+// context shall not use the automatic keyword. Package items are
+// non-procedural, so an automatic variable inside a package is illegal.
+TEST(VarDecl, AutomaticInPackageIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  automatic int x;\n"
+      "endpackage\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.8 footnote 14: a static variable inside a package is allowed —
+// the rule only forbids the automatic keyword in non-procedural contexts.
+TEST(VarDecl, StaticInPackageOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  static int x;\n"
+      "endpackage\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

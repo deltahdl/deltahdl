@@ -470,6 +470,14 @@ void Elaborator::ValidatePackageItems() {
           item->kind == ModuleItemKind::kAlwaysLatchBlock) {
         diag_.Error(item->loc, "process is not allowed in a package");
       }
+      // §6.8 footnote 14: a data_declaration that is not within a procedural
+      // context shall not use the automatic keyword. Package items live
+      // outside any procedural context, so an automatic var here is illegal.
+      if (item->kind == ModuleItemKind::kVarDecl && item->is_automatic) {
+        diag_.Error(item->loc,
+                    "automatic lifetime is not allowed on package-level "
+                    "variables");
+      }
     }
   }
 }

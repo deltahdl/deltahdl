@@ -206,19 +206,27 @@ static std::string_view LhsBaseName(const Expr* e) {
   return {};
 }
 
-// §10.4.2: It shall be illegal to make nonblocking assignments to elements of
-// dynamically sized array variables.
+// §6.21 / §10.4.2: Elements of dynamically sized array variables shall not
+// be written with nonblocking, continuous, or procedural-continuous
+// assignments. The procedural-continuous forms are `force` and the
+// procedural `assign` statement (§10.6).
 static void CheckNbaDynamicArrayTarget(
     const Stmt* s,
     const std::unordered_set<std::string_view>& dyn_names,
     DiagEngine& diag) {
   if (!s) return;
-  if (s->kind == StmtKind::kNonblockingAssign && s->lhs &&
-      s->lhs->kind == ExprKind::kSelect) {
+  if (s->lhs && s->lhs->kind == ExprKind::kSelect) {
     auto name = LhsBaseName(s->lhs);
     if (!name.empty() && dyn_names.count(name) != 0) {
-      diag.Error(s->range.start,
-                 "nonblocking assignment to element of dynamic array");
+      if (s->kind == StmtKind::kNonblockingAssign) {
+        diag.Error(s->range.start,
+                   "nonblocking assignment to element of dynamic array");
+      } else if (s->kind == StmtKind::kForce ||
+                 s->kind == StmtKind::kAssign) {
+        diag.Error(s->range.start,
+                   "procedural continuous assignment to element of "
+                   "dynamic array");
+      }
     }
   }
   for (auto* sub : s->stmts) CheckNbaDynamicArrayTarget(sub, dyn_names, diag);
