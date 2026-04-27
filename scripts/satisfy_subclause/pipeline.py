@@ -83,13 +83,21 @@ def parse_issue_number_from_create_output(output: str) -> int:
 
 
 def _list_issues_for(subclause: str) -> list[dict]:
-    """Return the gh-issue-list payload for *subclause* (loud-fatal on error)."""
+    """Return the gh-issue-list payload for *subclause* (loud-fatal on error).
+
+    ``gh issue list`` defaults to 30 results. A heavily-subdivided clause
+    (e.g. §23 with §23.x.y.z descendants) easily exceeds that, pushing
+    the master-list issue past the cutoff so the matcher can't see it
+    and silently opens a duplicate. Raise the limit well above any
+    realistic per-clause result count.
+    """
     completed = subprocess.run(
         [
             "gh", "issue", "list",
             "--state", "all",
             "--search", f"§{subclause}",
             "--json", "number,title,state",
+            "--limit", "1000",
         ],
         capture_output=True, text=True, check=False,
     )
