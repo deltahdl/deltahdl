@@ -664,13 +664,65 @@ def test_cycle_rejects_single_member() -> None:
         )
 
 
-def test_cycle_rejects_four_members() -> None:
-    """A four-member cycle exceeds the cap and is rejected."""
-    members = _two_member_cycle() + _two_member_cycle()
-    with pytest.raises(ValueError):
-        satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
-            members, "~/LRM.pdf", [], model="opus",
-        )
+def _four_member_cycle() -> list[CycleMember]:
+    """Return a four-member CycleMember list (exceeds the cap)."""
+    return [
+        CycleMember(subclause="33.4.1.5", issue=10),
+        CycleMember(subclause="33.4.1.6", issue=11),
+        CycleMember(subclause="33.4.1.7", issue=12),
+        CycleMember(subclause="33.4.1.8", issue=13),
+    ]
+
+
+def _invoke_oversize_cycle() -> None:
+    """Call the cycle mutator with a four-member cycle (>cap)."""
+    satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
+        _four_member_cycle(), "~/LRM.pdf", [], model="opus",
+    )
+
+
+def test_cycle_oversize_skips_run_steps() -> None:
+    """An oversize cycle does not invoke the eight-step Claude pipeline."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with patch("satisfy_subclause.mutators.subprocess.run"):
+        with mock_run as run:
+            with mock_commit:
+                _invoke_oversize_cycle()
+    assert not run.called
+
+
+def test_cycle_oversize_skips_commit() -> None:
+    """Oversize cycle skips commit_mutator_result so issues stay open."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with patch("satisfy_subclause.mutators.subprocess.run"):
+        with mock_run:
+            with mock_commit as commit:
+                _invoke_oversize_cycle()
+    assert not commit.called
+
+
+def test_cycle_oversize_labels_each_issue_with_pipeline_cycle() -> None:
+    """Oversize cycle adds the pipeline-cycle label to every member's issue."""
+    with patch("satisfy_subclause.mutators.subprocess.run") as proc:
+        _invoke_oversize_cycle()
+    labelled = [
+        call.args[0][3]
+        for call in proc.call_args_list
+        if call.args[0][:3] == ["gh", "issue", "edit"]
+        and "pipeline-cycle" in call.args[0]
+    ]
+    assert labelled == ["10", "11", "12", "13"]
+
+
+def test_cycle_oversize_warns_to_stderr_naming_each_member(capsys) -> None:
+    """Oversize cycle prints a stderr notice naming every member."""
+    with patch("satisfy_subclause.mutators.subprocess.run"):
+        _invoke_oversize_cycle()
+    err = capsys.readouterr().err
+    assert (
+        "33.4.1.5" in err and "33.4.1.6" in err
+        and "33.4.1.7" in err and "33.4.1.8" in err
+    )
 
 
 def test_cycle_accepts_three_members() -> None:

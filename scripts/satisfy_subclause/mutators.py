@@ -62,6 +62,7 @@ COMMIT_BODY_DISALLOWED_TOOLS = (
 
 
 _MAX_CYCLE_MEMBERS = 3
+_PIPELINE_CYCLE_LABEL = "pipeline-cycle"
 
 
 @dataclass(frozen=True)
@@ -562,17 +563,59 @@ def satisfy_unsatisfied_subclause_with_satisfied_dependencies(
 # Mutator: cycle set
 # ---------------------------------------------------------------------------
 
+def _label_oversize_cycle_member(issue: int) -> None:
+    """Add the pipeline-cycle label to *issue* (idempotent)."""
+    subprocess.run(
+        [
+            "gh", "issue", "edit", str(issue),
+            "--add-label", _PIPELINE_CYCLE_LABEL,
+        ],
+        check=False,
+    )
+
+
+def _surface_oversize_cycle(members: list[CycleMember]) -> None:
+    """Label each member's issue and print a stderr notice; do not invoke Claude.
+
+    Cycles with more than ``_MAX_CYCLE_MEMBERS`` members are too tangled
+    to co-implement in one Claude session, so the pipeline hands them
+    to a human: each member's GitHub issue gets the
+    ``pipeline-cycle`` label and a stderr notice names the members and
+    their issues. The orchestrator then continues with the next
+    descendant rather than aborting the whole satisfy_clause run.
+    """
+    subclauses = [m.subclause for m in members]
+    issues = [m.issue for m in members]
+    scope = _scope_label(subclauses)
+    issues_str = ", ".join(f"#{i}" for i in issues)
+    print(
+        f"Cycle-set mutator: cycle of {len(members)} members"
+        f" ({scope}) exceeds the {_MAX_CYCLE_MEMBERS}-member ceiling;"
+        f" labelling each issue ({issues_str}) with"
+        f" '{_PIPELINE_CYCLE_LABEL}' and skipping the eight-step"
+        " pipeline so a human can break the cycle by hand.",
+        file=sys.stderr,
+    )
+    for issue in issues:
+        _label_oversize_cycle_member(issue)
+
+
 def satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
     members: list[CycleMember], lrm: str,
     satisfied_dependencies: list[str], *, model: str,
 ) -> None:
-    """Run the eight-step pipeline for a 2- or 3-member dependency cycle."""
-    if not 2 <= len(members) <= _MAX_CYCLE_MEMBERS:
+    """Run the eight-step pipeline for a 2- or 3-member dependency cycle.
+
+    Cycles with more than ``_MAX_CYCLE_MEMBERS`` members are surfaced
+    via ``_surface_oversize_cycle`` instead — Claude never sees them.
+    """
+    if len(members) < 2:
         raise ValueError(
-            f"Cycle must have 2 or {_MAX_CYCLE_MEMBERS} members (got"
-            f" {len(members)}). Larger cycles are surfaced to humans"
-            " via the pipeline-cycle label.",
+            f"Cycle must have at least 2 members (got {len(members)}).",
         )
+    if len(members) > _MAX_CYCLE_MEMBERS:
+        _surface_oversize_cycle(members)
+        return
     subclauses = [m.subclause for m in members]
     issues = [m.issue for m in members]
     print(
