@@ -473,7 +473,7 @@ jobs:
           restore-keys: |
             pip-scripts-test-script-
       - name: Install tools
-        run: pip install pytest pytest-cov
+        run: pip install pypdf pytest pytest-cov
       - name: Run unit tests with 100% coverage gate
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
