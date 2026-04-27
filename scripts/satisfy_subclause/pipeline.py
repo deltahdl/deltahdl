@@ -12,9 +12,11 @@ Cycle detection is honest: ``in_progress`` threads through the
 recursion as a frozen set of subclause identifiers. When the inner
 function discovers a dependency that already appears in that set, it
 returns a cycle marker rather than recursing into it. The marker
-bubbles up through every cycle member's frame; the outermost frame
-(whose ``in_progress`` does not yet contain it) dispatches the
-cycle-set mutator.
+bubbles up through every cycle member's frame — only frames at or
+below the cycle entry (those whose ``in_progress`` overlaps the
+running members set) add themselves — and the cycle-entry frame
+(the topmost frame whose own subclause is on the cycle) dispatches
+the cycle-set mutator.
 
 There is no satisfaction oracle and no verdict. The audit lives in
 steps 1-2 of the mutator pipeline, where Claude produces it free-form
@@ -233,10 +235,22 @@ def dispatch_cycle(
 # Inner orchestration
 # ---------------------------------------------------------------------------
 
-def _cycle_marker(subclause: str, members) -> dict:
-    """Return a cycle status dict including ``subclause``."""
-    combined = sorted(set(members) | {subclause})
-    return {"status": "cycle", "members": combined}
+def _cycle_marker(
+    subclause: str, members, *, in_progress: frozenset,
+) -> dict:
+    """Return a cycle status dict for a frame relaying the marker upward.
+
+    Adds ``subclause`` to ``members`` only when this frame sits at or
+    below the cycle entry — detected by ``members`` overlapping
+    ``in_progress``, since the cycle entry is necessarily an ancestor
+    in the call stack and therefore in ``in_progress``. Frames above
+    the cycle entry are not on the cycle and must not pollute the
+    members set.
+    """
+    members_set = set(members)
+    if members_set & in_progress:
+        members_set.add(subclause)
+    return {"status": "cycle", "members": sorted(members_set)}
 
 
 def satisfy_unsatisfied_subclause(
@@ -259,7 +273,9 @@ def satisfy_unsatisfied_subclause(
     deps = compute_subclause_dependencies(target.subclause, lrm, model=model)
     cycle_members = [d for d in deps if d in in_progress]
     if cycle_members:
-        return _cycle_marker(target.subclause, cycle_members)
+        return _cycle_marker(
+            target.subclause, cycle_members, in_progress=in_progress,
+        )
 
     satisfied: list[str] = []
     for dep in deps:
@@ -267,7 +283,10 @@ def satisfy_unsatisfied_subclause(
             dep, lrm, model=model, labels=labels, in_progress=in_progress,
         )
         if result.get("status") == "cycle":
-            return _cycle_marker(target.subclause, result.get("members", []))
+            return _cycle_marker(
+                target.subclause, result.get("members", []),
+                in_progress=in_progress,
+            )
         satisfied.append(dep)
 
     if satisfied:
@@ -317,7 +336,8 @@ def satisfy_subclause(
     )
     if result.get("status") == "cycle":
         members = result.get("members", [])
-        if subclause in members and in_progress:
+        parents_in_members = bool(in_progress & set(members))
+        if subclause not in members or parents_in_members:
             return result
         dispatch_cycle(members, lrm, model=model, labels=labels)
     return {"status": "satisfied"}
