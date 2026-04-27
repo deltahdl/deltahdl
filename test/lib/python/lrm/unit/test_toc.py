@@ -33,6 +33,20 @@ def test_last_entry_ends_at_document_end(make_pdf, nested_outline):
     assert load_toc(path)["24"][1] == 200
 
 
+def test_short_subclause_clamps_end_to_start(make_pdf):
+    """A subclause whose next non-descendant shares its start page
+    yields ``(start, start)``, not an underflowed ``(start, start - 1)``.
+    """
+    outline = [
+        (1, "33 Configuration", 935),
+        (2, "33.1 Introduction", 935),
+        (2, "33.2 Configuration", 935),
+        (1, "34 Protected envelope", 950),
+    ]
+    path = make_pdf("a.pdf", 1000, outline)
+    assert load_toc(path)["33.1"] == (935, 935)
+
+
 def test_non_clause_titles_are_skipped(make_pdf):
     """Bookmark titles without a leading clause token are ignored."""
     outline = [

@@ -91,23 +91,44 @@ def test_lrm_read_falls_back_when_outline_empty(blank_pdf) -> None:
     assert real.replace(blank_pdf, "/nope.pdf") == fallback
 
 
-def test_lrm_read_names_read_tool() -> None:
-    """Page hint names the Read tool as the only allowed PDF reader."""
-    assert "Read tool" in build_lrm_read_instruction("4.1", "/lrm.pdf")
+def test_lrm_read_intro_pairs_read_tool_with_pages_param() -> None:
+    """One sentence introduces both the Read tool and the `pages:` parameter."""
+    result = build_lrm_read_instruction("4.1", "/lrm.pdf")
+    sentences = [s.strip() for s in result.split(". ") if s.strip()]
+    assert any("Read tool" in s and "pages:" in s for s in sentences)
 
 
-def test_lrm_read_caps_at_one_page_per_call() -> None:
-    """Page hint caps each Read call at a single page."""
-    assert "one page per call" in build_lrm_read_instruction(
-        "4.1", "/lrm.pdf",
+def test_lrm_read_cap_lives_in_separate_sentence() -> None:
+    """The `one page per call` cap is a separate sentence from the intro."""
+    result = build_lrm_read_instruction("4.1", "/lrm.pdf")
+    sentences = [s.strip() for s in result.split(". ") if s.strip()]
+    intro_idx = next(
+        i for i, s in enumerate(sentences)
+        if "Read tool" in s and "pages:" in s
     )
+    cap_idx = next(
+        i for i, s in enumerate(sentences)
+        if "one page per call" in s.lower()
+    )
+    assert intro_idx != cap_idx
+
+
+def test_lrm_read_cap_names_read_20_page_limit() -> None:
+    """The cap sentence names Read's hard 20-page-per-request cap."""
+    result = build_lrm_read_instruction("4.1", "/lrm.pdf")
+    sentences = [s.strip() for s in result.split(". ") if s.strip()]
+    cap = next(s for s in sentences if "one page per call" in s.lower())
+    assert "20 pages" in cap
+
+
+def test_lrm_read_cap_names_content_filter_budget() -> None:
+    """The cap sentence names the content-filter budget alongside the Read cap."""
+    result = build_lrm_read_instruction("4.1", "/lrm.pdf")
+    sentences = [s.strip() for s in result.split(". ") if s.strip()]
+    cap = next(s for s in sentences if "one page per call" in s.lower())
+    assert "content-filter" in cap
 
 
 def test_lrm_read_uses_positive_phrasing() -> None:
     """Page hint avoids the word 'never' (positive scope only)."""
     assert "never" not in build_lrm_read_instruction("4.1", "/lrm.pdf")
-
-
-def test_lrm_read_names_pages_parameter() -> None:
-    """Page hint names the concrete Read tool parameter (`pages:`)."""
-    assert "pages:" in build_lrm_read_instruction("4.1", "/lrm.pdf")

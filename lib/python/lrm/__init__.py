@@ -43,7 +43,7 @@ def _compute_ranges(entries, total_pages):
         prefix = clause + "."
         for next_clause, next_start in entries[i + 1:]:
             if not next_clause.startswith(prefix):
-                end = next_start - 1
+                end = max(start, next_start - 1)
                 break
         result[clause] = (start, end)
     return result
@@ -93,9 +93,10 @@ def build_lrm_read_instruction(subclause: str, lrm: str) -> str:
     h = build_hierarchy(subclause)
     toc = load_toc(lrm)
     page_hint = (
-        " The Read tool decodes PDFs natively: pass `pages: \"N\"` to"
-        " read page N as text and images. Read one page per call to stay"
-        " inside the content-filter budget."
+        " Use the Read tool with `pages: \"N\"`."
+        " One page per call: the Read tool caps at 20 pages per request,"
+        " and the content-filter budget is tighter still — single-page"
+        " calls stay inside both."
     )
     target = _format_clause(subclause, toc)
     if h["ancestors"]:
