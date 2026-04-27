@@ -675,51 +675,38 @@ def test_inner_includes_self_in_cycle_members() -> None:
     assert "33.4.1.5" in result["members"]
 
 
-def test_inner_propagates_cycle_from_dep() -> None:
-    """Inner orch propagates a cycle marker emitted by a recursive dep call."""
+def _run_inner_cycle_propagation(*, in_progress: frozenset) -> dict:
+    """Run the inner orch where its single dep returns a fixed cycle marker."""
     mock_deps, mock_satisfy = _patched_inner(
         ["33.6.1"],
         dep_results=[{"status": "cycle", "members": ["33.4", "33.6.1"]}],
     )
     with mock_deps:
         with mock_satisfy:
-            result = satisfy_unsatisfied_subclause(
+            return satisfy_unsatisfied_subclause(
                 _target("33.4.1.5"), "~/LRM.pdf",
                 model="opus", labels=_LABELS,
-                in_progress=frozenset({"33.4.1.5"}),
+                in_progress=in_progress,
             )
+
+
+def test_inner_propagates_cycle_from_dep() -> None:
+    """Inner orch propagates a cycle marker emitted by a recursive dep call."""
+    result = _run_inner_cycle_propagation(in_progress=frozenset({"33.4.1.5"}))
     assert result["status"] == "cycle"
 
 
 def test_inner_does_not_add_self_above_cycle_entry() -> None:
     """A frame above the cycle entry must not pollute the members set."""
-    mock_deps, mock_satisfy = _patched_inner(
-        ["33.6.1"],
-        dep_results=[{"status": "cycle", "members": ["33.4", "33.6.1"]}],
-    )
-    with mock_deps:
-        with mock_satisfy:
-            result = satisfy_unsatisfied_subclause(
-                _target("33.4.1.5"), "~/LRM.pdf",
-                model="opus", labels=_LABELS,
-                in_progress=frozenset({"33.4.1.5"}),
-            )
+    result = _run_inner_cycle_propagation(in_progress=frozenset({"33.4.1.5"}))
     assert "33.4.1.5" not in result["members"]
 
 
 def test_inner_adds_self_when_below_cycle_entry() -> None:
     """A frame between the cycle entry and the detection point includes itself."""
-    mock_deps, mock_satisfy = _patched_inner(
-        ["33.6.1"],
-        dep_results=[{"status": "cycle", "members": ["33.4", "33.6.1"]}],
+    result = _run_inner_cycle_propagation(
+        in_progress=frozenset({"33.4", "33.4.1.5"}),
     )
-    with mock_deps:
-        with mock_satisfy:
-            result = satisfy_unsatisfied_subclause(
-                _target("33.4.1.5"), "~/LRM.pdf",
-                model="opus", labels=_LABELS,
-                in_progress=frozenset({"33.4", "33.4.1.5"}),
-            )
     assert "33.4.1.5" in result["members"]
 
 
@@ -797,62 +784,53 @@ def test_satisfy_runs_pipeline_only_once() -> None:
     assert mock_inner.call_count == 1
 
 
-def test_satisfy_propagates_cycle_when_nested() -> None:
-    """satisfy_subclause propagates a cycle when nested under another frame."""
-    cycle_payload = {"status": "cycle", "members": ["33.4", "33.4.1.5"]}
+def _run_satisfy_with_cycle(
+    subclause: str, members: list[str],
+    *, in_progress: frozenset = frozenset(),
+):
+    """Run satisfy_subclause whose inner returns the given cycle marker."""
+    cycle_payload = {"status": "cycle", "members": members}
     issue, inner, cycle = _patched_pipeline(inner_results=[cycle_payload])
     with issue:
         with inner:
             with cycle as mock_dispatch:
                 result = satisfy_subclause(
-                    "33.4.1.5", "~/LRM.pdf",
+                    subclause, "~/LRM.pdf",
                     model="opus", labels=_LABELS,
-                    in_progress=frozenset({"33.4"}),
+                    in_progress=in_progress,
                 )
+    return result, mock_dispatch
+
+
+def test_satisfy_propagates_cycle_when_nested() -> None:
+    """satisfy_subclause propagates a cycle when nested under another frame."""
+    result, mock_dispatch = _run_satisfy_with_cycle(
+        "33.4.1.5", ["33.4", "33.4.1.5"], in_progress=frozenset({"33.4"}),
+    )
     assert result["status"] == "cycle" and not mock_dispatch.called
 
 
 def test_satisfy_dispatches_cycle_at_outermost_frame() -> None:
     """satisfy_subclause dispatches when the cycle frame is outermost."""
-    cycle_payload = {"status": "cycle", "members": ["33.4.1.5", "33.6"]}
-    issue, inner, cycle = _patched_pipeline(inner_results=[cycle_payload])
-    with issue:
-        with inner:
-            with cycle as mock_dispatch:
-                satisfy_subclause(
-                    "33.4.1.5", "~/LRM.pdf",
-                    model="opus", labels=_LABELS,
-                )
+    _, mock_dispatch = _run_satisfy_with_cycle(
+        "33.4.1.5", ["33.4.1.5", "33.6"],
+    )
     assert mock_dispatch.called
 
 
 def test_satisfy_dispatches_at_cycle_entry_under_ancestors() -> None:
     """The cycle-entry frame dispatches even when ancestors sit above it."""
-    cycle_payload = {"status": "cycle", "members": ["33.4", "33.6"]}
-    issue, inner, cycle = _patched_pipeline(inner_results=[cycle_payload])
-    with issue:
-        with inner:
-            with cycle as mock_dispatch:
-                satisfy_subclause(
-                    "33.4", "~/LRM.pdf",
-                    model="opus", labels=_LABELS,
-                    in_progress=frozenset({"7.2"}),
-                )
+    _, mock_dispatch = _run_satisfy_with_cycle(
+        "33.4", ["33.4", "33.6"], in_progress=frozenset({"7.2"}),
+    )
     assert mock_dispatch.called
 
 
 def test_satisfy_propagates_cycle_when_self_not_in_members() -> None:
     """A frame whose subclause is not on the cycle propagates without dispatching."""
-    cycle_payload = {"status": "cycle", "members": ["33.4", "33.6"]}
-    issue, inner, cycle = _patched_pipeline(inner_results=[cycle_payload])
-    with issue:
-        with inner:
-            with cycle as mock_dispatch:
-                result = satisfy_subclause(
-                    "7.2", "~/LRM.pdf",
-                    model="opus", labels=_LABELS,
-                    in_progress=frozenset({"R"}),
-                )
+    result, mock_dispatch = _run_satisfy_with_cycle(
+        "7.2", ["33.4", "33.6"], in_progress=frozenset({"R"}),
+    )
     assert result["status"] == "cycle" and not mock_dispatch.called
 
 
