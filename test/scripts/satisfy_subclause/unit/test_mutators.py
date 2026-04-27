@@ -1,5 +1,6 @@
 """Unit tests for satisfy_subclause.mutators."""
 
+from contextlib import suppress
 from unittest.mock import patch
 
 import pytest
@@ -681,13 +682,21 @@ def _invoke_oversize_cycle() -> None:
     )
 
 
+def test_cycle_oversize_raises_to_abort_the_run() -> None:
+    """Oversize cycle raises so the orchestrator crashes catastrophically."""
+    with patch("satisfy_subclause.mutators.subprocess.run"):
+        with pytest.raises(RuntimeError):
+            _invoke_oversize_cycle()
+
+
 def test_cycle_oversize_skips_run_steps() -> None:
     """An oversize cycle does not invoke the eight-step Claude pipeline."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with patch("satisfy_subclause.mutators.subprocess.run"):
         with mock_run as run:
             with mock_commit:
-                _invoke_oversize_cycle()
+                with suppress(RuntimeError):
+                    _invoke_oversize_cycle()
     assert not run.called
 
 
@@ -697,14 +706,16 @@ def test_cycle_oversize_skips_commit() -> None:
     with patch("satisfy_subclause.mutators.subprocess.run"):
         with mock_run:
             with mock_commit as commit:
-                _invoke_oversize_cycle()
+                with suppress(RuntimeError):
+                    _invoke_oversize_cycle()
     assert not commit.called
 
 
 def test_cycle_oversize_labels_each_issue_with_pipeline_cycle() -> None:
-    """Oversize cycle adds the pipeline-cycle label to every member's issue."""
+    """Oversize cycle tags every member's issue before raising."""
     with patch("satisfy_subclause.mutators.subprocess.run") as proc:
-        _invoke_oversize_cycle()
+        with suppress(RuntimeError):
+            _invoke_oversize_cycle()
     labelled = [
         call.args[0][3]
         for call in proc.call_args_list
@@ -717,7 +728,8 @@ def test_cycle_oversize_labels_each_issue_with_pipeline_cycle() -> None:
 def test_cycle_oversize_warns_to_stderr_naming_each_member(capsys) -> None:
     """Oversize cycle prints a stderr notice naming every member."""
     with patch("satisfy_subclause.mutators.subprocess.run"):
-        _invoke_oversize_cycle()
+        with suppress(RuntimeError):
+            _invoke_oversize_cycle()
     err = capsys.readouterr().err
     assert (
         "33.4.1.5" in err and "33.4.1.6" in err

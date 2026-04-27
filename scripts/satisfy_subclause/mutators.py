@@ -574,30 +574,35 @@ def _label_oversize_cycle_member(issue: int) -> None:
     )
 
 
-def _surface_oversize_cycle(members: list[CycleMember]) -> None:
-    """Label each member's issue and print a stderr notice; do not invoke Claude.
+def _label_and_abort_on_oversize_cycle(members: list[CycleMember]) -> None:
+    """Tag each member's issue with pipeline-cycle then raise to abort the run.
 
     Cycles with more than ``_MAX_CYCLE_MEMBERS`` members are too tangled
-    to co-implement in one Claude session, so the pipeline hands them
-    to a human: each member's GitHub issue gets the
-    ``pipeline-cycle`` label and a stderr notice names the members and
-    their issues. The orchestrator then continues with the next
-    descendant rather than aborting the whole satisfy_clause run.
+    to co-implement in one Claude session. Record human-actionable
+    state first — each member's GitHub issue gets the
+    ``pipeline-cycle`` label so a human triaging tomorrow can find
+    them — then raise so the orchestrator crashes loudly rather than
+    silently skipping the failing cycle and proceeding with unrelated
+    descendants.
     """
     subclauses = [m.subclause for m in members]
     issues = [m.issue for m in members]
     scope = _scope_label(subclauses)
     issues_str = ", ".join(f"#{i}" for i in issues)
+    for issue in issues:
+        _label_oversize_cycle_member(issue)
     print(
         f"Cycle-set mutator: cycle of {len(members)} members"
         f" ({scope}) exceeds the {_MAX_CYCLE_MEMBERS}-member ceiling;"
-        f" labelling each issue ({issues_str}) with"
-        f" '{_PIPELINE_CYCLE_LABEL}' and skipping the eight-step"
-        " pipeline so a human can break the cycle by hand.",
+        f" tagged each issue ({issues_str}) with"
+        f" '{_PIPELINE_CYCLE_LABEL}'. Aborting the run — break the"
+        " cycle by hand and rerun.",
         file=sys.stderr,
     )
-    for issue in issues:
-        _label_oversize_cycle_member(issue)
+    raise RuntimeError(
+        f"Oversize satisfaction-pipeline cycle ({scope}); each member's"
+        f" issue tagged with '{_PIPELINE_CYCLE_LABEL}'.",
+    )
 
 
 def satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
@@ -606,16 +611,17 @@ def satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
 ) -> None:
     """Run the eight-step pipeline for a 2- or 3-member dependency cycle.
 
-    Cycles with more than ``_MAX_CYCLE_MEMBERS`` members are surfaced
-    via ``_surface_oversize_cycle`` instead — Claude never sees them.
+    Cycles with more than ``_MAX_CYCLE_MEMBERS`` members tag each
+    member's issue with ``pipeline-cycle`` and raise — the run dies so
+    the user sees the failure immediately rather than the orchestrator
+    silently skipping the cycle.
     """
     if len(members) < 2:
         raise ValueError(
             f"Cycle must have at least 2 members (got {len(members)}).",
         )
     if len(members) > _MAX_CYCLE_MEMBERS:
-        _surface_oversize_cycle(members)
-        return
+        _label_and_abort_on_oversize_cycle(members)
     subclauses = [m.subclause for m in members]
     issues = [m.issue for m in members]
     print(
