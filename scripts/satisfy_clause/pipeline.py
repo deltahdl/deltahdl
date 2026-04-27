@@ -8,8 +8,9 @@ surface the mismatch.
 
 import sys
 
-from lib.python.lrm import load_toc
 from satisfy_subclauses.pipeline import satisfy_subclauses
+
+from lib.python.lrm import load_toc
 
 
 def descendants_of(
