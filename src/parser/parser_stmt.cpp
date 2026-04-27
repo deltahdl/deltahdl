@@ -254,6 +254,16 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
       Check(TokenKind::kLBracket)) {
     ParsePackedDims(dtype);
   }
+  // §6.8 footnote 14: a data_declaration may only omit its data_type when
+  // the var keyword is present. Reaching ParseBlockDataDecl with no explicit
+  // data type and no `var` means the user wrote something like
+  // `automatic x = 0;` or `static x = 0;` in a procedural block, which has
+  // no SystemVerilog meaning.
+  if (!saw_var && dtype.kind == DataTypeKind::kImplicit) {
+    diag_.Error(CurrentLoc(),
+                "data_declaration without an explicit data type requires "
+                "the 'var' keyword");
+  }
   do {
     auto* s = arena_.Create<Stmt>();
     s->kind = StmtKind::kVarDecl;

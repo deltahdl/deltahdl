@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
@@ -135,6 +136,74 @@ TEST(VariableDeclaration, ShortrealDefaultIsZero) {
   EXPECT_EQ(var->value.words[0].aval, 0u);
 }
 
+
+// §6.8: A static variable's declaration-time initializer must be applied
+// before any initial or always procedure starts, so a procedure that reads
+// the variable at time zero observes the initial value rather than the
+// type's default.
+TEST(VariableDeclaration, StaticInitializerAppliesBeforeInitialBlock) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int x = 42;\n"
+      "  int observed;\n"
+      "  initial observed = x;\n"
+      "endmodule\n",
+      "observed");
+  EXPECT_EQ(val, 42u);
+}
+
+// §6.8: Same rule for vector types — a logic vector with a declaration-time
+// initializer is observed by an initial block at time zero.
+TEST(VariableDeclaration, StaticVectorInitializerAppliesBeforeInitialBlock) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] data = 8'hA5;\n"
+      "  logic [7:0] sampled;\n"
+      "  initial sampled = data;\n"
+      "endmodule\n",
+      "sampled");
+  EXPECT_EQ(val, 0xA5u);
+}
+
+// §6.8 Table 6-7: a chandle variable with no initializer takes the null
+// value (zero), not x.
+TEST(VariableDeclaration, ChandleDefaultIsNull) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  chandle h;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  auto* var = f.ctx.FindVariable("h");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].aval, 0u);
+  EXPECT_EQ(var->value.words[0].bval, 0u);
+}
+
+// §6.8 Table 6-7: a string variable with no initializer is registered as
+// a string-valued variable so the runtime treats its default as the empty
+// string rather than a logic vector full of x.
+TEST(VariableDeclaration, StringDefaultIsRegisteredAsString) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  string s;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  auto* var = f.ctx.FindVariable("s");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(f.ctx.IsStringVariable("s"));
+}
 
 // Table 6-7: event variable is marked as event.
 TEST(VariableDeclaration, EventDefaultIsNewEvent) {

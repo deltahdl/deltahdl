@@ -28,33 +28,8 @@ TEST(FunctionDeclElaboration, FunctionDeclVoidReturn) {
       "endmodule\n"));
 }
 
-TEST(FunctionDeclElaboration, FunctionDeclLifetimeAutomatic) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  function automatic int f(); return 0; endfunction\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->function_decls.size(), 1u);
-  EXPECT_TRUE(mod->function_decls[0]->is_automatic);
-}
-
-TEST(FunctionDeclElaboration, FunctionDeclLifetimeStatic) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  function static int f(); return 0; endfunction\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->function_decls.size(), 1u);
-  EXPECT_TRUE(mod->function_decls[0]->is_static);
-}
+// Lifetime-keyword acceptance on function declarations is a §6.21 rule;
+// the corresponding elaborator tests live in test_elaborator_clause_06_21.cpp.
 
 // --- function_body_declaration: implicit return type ---
 

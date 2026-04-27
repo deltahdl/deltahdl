@@ -121,37 +121,9 @@ TEST(BlockItemDeclParsing, BlockItemImportDecl) {
   EXPECT_EQ(stmt->decl_item->kind, ModuleItemKind::kImportDecl);
 }
 
-TEST(BlockItemDeclParsing, BlockItemAutomaticLifetime) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int x = 0;\n"
-      "    x = x + 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->var_is_automatic);
-}
-
-TEST(BlockItemDeclParsing, BlockItemStaticLifetime) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    static int count = 0;\n"
-      "    count = count + 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->var_is_static);
-}
+// Lifetime-keyword tests on block-scoped variable declarations are §6.21
+// rules; the corresponding parser tests live in test_parser_clause_06_21.cpp
+// (e.g. AutomaticVarDeclInBlock, StaticVarInBeginEnd).
 
 TEST(BlockItemDeclParsing, TaskBodyBlockItem) {
   auto r = Parse(

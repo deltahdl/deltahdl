@@ -1867,6 +1867,58 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   }
 }
 
+// §6.21: Walk a statement subtree and flag writes to any name in `auto_vars`
+// using nonblocking, force, or procedural-continuous assignments. The same
+// restriction applies regardless of whether the surrounding scope is a task,
+// initial block, always block, or final block — automatic storage cannot be
+// driven by these assignment forms.
+static void CheckAutoVarWritesInProc(
+    const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
+    DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kNonblockingAssign && s->lhs &&
+      s->lhs->kind == ExprKind::kIdentifier &&
+      auto_vars.count(s->lhs->text) != 0) {
+    diag.Error(s->range.start,
+               "automatic variable in nonblocking assignment");
+  }
+  if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
+    auto name = ExprIdent(s->lhs);
+    if (!name.empty() && auto_vars.count(name) != 0) {
+      diag.Error(s->range.start,
+                 "automatic variable in procedural continuous assignment");
+    }
+  }
+  for (auto* sub : s->stmts) CheckAutoVarWritesInProc(sub, auto_vars, diag);
+  for (auto* sub : s->fork_stmts)
+    CheckAutoVarWritesInProc(sub, auto_vars, diag);
+  CheckAutoVarWritesInProc(s->then_branch, auto_vars, diag);
+  CheckAutoVarWritesInProc(s->else_branch, auto_vars, diag);
+  CheckAutoVarWritesInProc(s->body, auto_vars, diag);
+  CheckAutoVarWritesInProc(s->for_body, auto_vars, diag);
+  for (auto& ci : s->case_items)
+    CheckAutoVarWritesInProc(ci.body, auto_vars, diag);
+}
+
+// §6.21: Apply the automatic-variable write restriction to every
+// procedural block in the module — initial, always (and its variants), and
+// final. Tasks are handled by ValidateFunctionBody via CheckTaskBodyStmt.
+void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    bool is_proc = item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kFinalBlock ||
+                   item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock;
+    if (!is_proc || !item->body) continue;
+    std::unordered_set<std::string_view> auto_vars;
+    CollectAutoVarNames(item->body, /*task_is_auto=*/false, auto_vars);
+    if (auto_vars.empty()) continue;
+    CheckAutoVarWritesInProc(item->body, auto_vars, diag_);
+  }
+}
+
 // §13.4.3: Check if a function body contains fork constructs.
 static bool BodyContainsFork(const Stmt* s) {
   if (!s) return false;

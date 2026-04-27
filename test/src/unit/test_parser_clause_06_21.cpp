@@ -6,28 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ScopeAndLifetimeParsing, LifetimeStaticInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    static int x;\n"
-      "  end\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ScopeAndLifetimeParsing, LifetimeAutomaticInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int y;\n"
-      "  end\n"
-      "endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ScopeAndLifetimeParsing, DataDeclAutomaticInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -41,38 +19,6 @@ TEST(ScopeAndLifetimeParsing, DataDeclAutomaticInBlock) {
   ASSERT_NE(body, nullptr);
   ASSERT_GE(body->stmts.size(), 1u);
   EXPECT_EQ(body->stmts[0]->var_is_automatic, true);
-}
-
-TEST(ScopeAndLifetimeParsing, DataDeclStaticInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    static int x = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->var_is_static, true);
-}
-
-TEST(ScopeAndLifetimeParsing, SeqBlockWithAutomaticVar) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int k = 10;\n"
-      "    a = k;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = InitialBody(r);
-  ASSERT_NE(body, nullptr);
-  EXPECT_GE(body->stmts.size(), 2u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(body->stmts[0]->var_is_automatic);
 }
 
 TEST(ScopeAndLifetimeParsing, AutomaticVarWithExpressionInit) {
@@ -205,38 +151,6 @@ TEST(ScopeAndLifetimeParsing, AutomaticVarDeclInBlock) {
   EXPECT_NE(body->stmts[0]->var_init, nullptr);
 }
 
-TEST(ScopeAndLifetimeParsing, AutomaticVarInitPerEntry) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int count = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->var_is_automatic);
-  EXPECT_NE(stmt->var_init, nullptr);
-}
-TEST(ScopeAndLifetimeParsing, AutomaticVarDeclInBlockWithDisplay) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int k = 5;\n"
-      "    $display(\"%0d\", k);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(body->stmts[0]->var_is_automatic);
-}
-
 TEST(ScopeAndLifetimeParsing, StaticVarInBeginEnd) {
   auto r = Parse(
       "module m;\n"
@@ -255,82 +169,11 @@ TEST(ScopeAndLifetimeParsing, StaticVarInBeginEnd) {
   EXPECT_EQ(stmt->var_name, "counter");
 }
 
-TEST(ScopeAndLifetimeParsing, AutoVarInBeginEnd) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int temp = 42;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmtT(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->var_is_automatic);
-  EXPECT_FALSE(stmt->var_is_static);
-  EXPECT_EQ(stmt->var_name, "temp");
-  EXPECT_NE(stmt->var_init, nullptr);
-}
-
 TEST_F(ProgramParseTest, ProgramWithAutomaticLifetime) {
   auto* unit = Parse("program automatic p; endprogram");
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-}
-
-TEST(ScopeAndLifetimeParsing, StaticVarInAutomaticFunctionSucceeds) {
-  auto r = Parse(
-      "module t;\n"
-      "  function automatic int count();\n"
-      "    static int counter = 0;\n"
-      "    counter = counter + 1;\n"
-      "    return counter;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ScopeAndLifetimeParsing, AutomaticVarInStaticFunctionSucceeds) {
-  auto r = Parse(
-      "module t;\n"
-      "  function static int get_temp();\n"
-      "    automatic int temp = 42;\n"
-      "    return temp;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ScopeAndLifetimeParsing, AutomaticBlockVarSetsFlag) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    automatic int auto1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->var_is_automatic);
-}
-
-TEST(ScopeAndLifetimeParsing, AutomaticBlockVarNotStatic) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    automatic int auto1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_FALSE(stmt->var_is_static);
-  EXPECT_EQ(stmt->var_name, "auto1");
 }
 
 TEST(ScopeAndLifetimeParsing, StaticBlockVarSetsFlag) {
@@ -347,35 +190,6 @@ TEST(ScopeAndLifetimeParsing, StaticBlockVarSetsFlag) {
   EXPECT_TRUE(stmt->var_is_static);
 }
 
-TEST(ScopeAndLifetimeParsing, StaticBlockVarNotAutomatic) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    static int st2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_FALSE(stmt->var_is_automatic);
-  EXPECT_EQ(stmt->var_name, "st2");
-}
-
-TEST(ScopeAndLifetimeParsing, AutomaticBlockVarWithInitializer) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    automatic int loop3 = 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->var_is_automatic);
-  ASSERT_NE(stmt->var_init, nullptr);
-}
-
 TEST(ScopeAndLifetimeParsing, StaticVarKeywordInBlock) {
   EXPECT_TRUE(
       ParseOk6("module t;\n"
@@ -383,20 +197,6 @@ TEST(ScopeAndLifetimeParsing, StaticVarKeywordInBlock) {
                "    static var logic x;\n"
                "  end\n"
                "endmodule\n"));
-}
-
-TEST(ScopeAndLifetimeParsing, FunctionWithAutomaticLifetime) {
-  auto r = Parse(
-      "module t;\n"
-      "  function automatic int get_val();\n"
-      "    return 42;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_TRUE(item->is_automatic);
 }
 
 TEST(ScopeAndLifetimeParsing, StaticVarInInitialBlock) {
@@ -680,21 +480,6 @@ TEST(ScopeAndLifetimeParsing, CuScopeFuncStaticDefault) {
   EXPECT_FALSE(r.cu->cu_items[0]->is_automatic);
 }
 
-TEST(ScopeAndLifetimeParsing, TaskAutomaticLifetime) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic my_task(input int x);\n"
-      "    $display(\"%0d\", x);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_automatic);
-  EXPECT_FALSE(item->is_static);
-}
-
 TEST(ScopeAndLifetimeParsing, LifetimeStaticOnModuleItem) {
   auto r = Parse("module m; static int x = 0; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -705,6 +490,64 @@ TEST(ScopeAndLifetimeParsing, LifetimeAutomaticOnModuleItem) {
   auto r = Parse("module m; automatic int y = 0; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+// §6.21: A function may carry an automatic lifetime keyword, which the
+// parser records on the declaration.
+TEST(ScopeAndLifetimeParsing, FunctionDeclLifetimeAutomatic) {
+  auto r = Parse(
+      "module m;\n"
+      "  function automatic int f(); return 0; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstFunctionDecl(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_automatic);
+  EXPECT_FALSE(item->is_static);
+}
+
+// §6.21: A function may also carry an explicit static lifetime keyword.
+TEST(ScopeAndLifetimeParsing, FunctionDeclLifetimeStatic) {
+  auto r = Parse(
+      "module m;\n"
+      "  function static int f(); return 0; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstFunctionDecl(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_FALSE(item->is_automatic);
+  EXPECT_TRUE(item->is_static);
+}
+
+// §6.21: A task may carry an automatic lifetime keyword.
+TEST(ScopeAndLifetimeParsing, TaskDeclLifetimeAutomatic) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic my_task;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_TRUE(item->is_automatic);
+  EXPECT_FALSE(item->is_static);
+}
+
+// §6.21: A task may also carry an explicit static lifetime keyword.
+TEST(ScopeAndLifetimeParsing, TaskDeclLifetimeStatic) {
+  auto r = Parse(
+      "module m;\n"
+      "  task static my_task;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_TRUE(item->is_static);
+  EXPECT_FALSE(item->is_automatic);
 }
 
 }  // namespace

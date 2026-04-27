@@ -45,4 +45,21 @@ TEST(ScopeAndLifetimeSimulation, ExplicitAutoInStaticFuncBlockFresh) {
   EXPECT_EQ(val, 11u);
 }
 
+// §6.21: A declared for-loop variable is automatic by default and lives in a
+// scope local to the loop. Assigning to a same-named variable inside the loop
+// shall not perturb a homonymous variable in the enclosing scope.
+TEST(ScopeAndLifetimeSimulation, ForLoopVarHasLocalScope) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x = 100;\n"
+      "    for (int x = 0; x < 5; x = x + 1) begin\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 100u);
+}
+
 }  // namespace

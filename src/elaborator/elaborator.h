@@ -445,6 +445,9 @@ class Elaborator {
 
   /// §13.2/§13.4.1/§13.4.4: Validate function/task body constraints.
   void ValidateFunctionBody(const ModuleItem* item);
+  /// §6.21: Reject NBA / force / procedural-continuous writes to automatic
+  /// variables declared inside procedural (initial / always / final) blocks.
+  void ValidateAutomaticVarProcWrites(const ModuleDecl* decl);
   /// §13.4.3: Validate constant function calls in parameter expressions.
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
   /// §13.5: Validate subroutine call arguments.

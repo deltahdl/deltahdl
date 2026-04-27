@@ -111,26 +111,9 @@ TEST(BlockItemDeclElaboration, MixedAlternativesElaborate) {
       "endmodule\n"));
 }
 
-// --- lifetime qualifiers ---
-
-TEST(BlockItemDeclElaboration, AutomaticDataDeclElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int x = 0;\n"
-      "    x = x + 1;\n"
-      "  end\n"
-      "endmodule\n"));
-}
-
-TEST(BlockItemDeclElaboration, StaticDataDeclElaborates) {
-  EXPECT_TRUE(ElabOk(
-      "module m;\n"
-      "  initial begin\n"
-      "    static int count = 0;\n"
-      "    count = count + 1;\n"
-      "  end\n"
-      "endmodule\n"));
-}
+// Lifetime-qualifier elaboration on block-scoped variable declarations is a
+// §6.21 rule; the corresponding elaborator tests live in
+// test_elaborator_clause_06_21.cpp (e.g. AutomaticVarInInitialBlock,
+// StaticVarInInitialBlock).
 
 }  // namespace

@@ -163,4 +163,143 @@ TEST(ScopeAndLifetimeElaboration, StaticVarForceInTaskSucceeds) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.21: Automatic variables shall not be written by nonblocking
+// assignments, even when the auto var lives inside an initial block.
+TEST(ScopeAndLifetimeElaboration, AutoVarNonblockingInInitialIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int x;\n"
+      "    x <= 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.21: Force on an automatic var inside an initial block is illegal.
+TEST(ScopeAndLifetimeElaboration, AutoVarForceInInitialIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int x;\n"
+      "    force x = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.21: Procedural-continuous assign on an automatic var inside an
+// always block is illegal.
+TEST(ScopeAndLifetimeElaboration, AutoVarProcAssignInAlwaysIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  always @(posedge clk) begin\n"
+      "    automatic int x;\n"
+      "    assign x = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.21: A static var inside an initial block may participate in
+// nonblocking assignments — only automatic variables are restricted.
+TEST(ScopeAndLifetimeElaboration, StaticVarNonblockingInInitialOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    static int x;\n"
+      "    x <= 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.21: A function may be declared automatic; the elaborator must
+// preserve the lifetime flag on the elaborated function declaration.
+TEST(ScopeAndLifetimeElaboration, FunctionDeclLifetimeAutomatic) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  function automatic int f(); return 0; endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->function_decls.size(), 1u);
+  EXPECT_TRUE(mod->function_decls[0]->is_automatic);
+}
+
+// §6.21: A function may also be declared with an explicit static lifetime.
+TEST(ScopeAndLifetimeElaboration, FunctionDeclLifetimeStatic) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  function static int f(); return 0; endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->function_decls.size(), 1u);
+  EXPECT_TRUE(mod->function_decls[0]->is_static);
+}
+
+// §6.21: A task may be declared automatic; the lifetime flag survives
+// elaboration on the task declaration.
+TEST(ScopeAndLifetimeElaboration, TaskDeclLifetimeAutomatic) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  task automatic my_task;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->function_decls.size(), 1u);
+  EXPECT_TRUE(mod->function_decls[0]->is_automatic);
+}
+
+// §6.21: A task may also be declared with an explicit static lifetime.
+TEST(ScopeAndLifetimeElaboration, TaskDeclLifetimeStatic) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  task static my_task;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->function_decls.size(), 1u);
+  EXPECT_TRUE(mod->function_decls[0]->is_static);
+}
+
+// §6.21: Elements of a dynamically sized array may not be the target of a
+// nonblocking assignment; the elaborator should reject this even when the
+// array name is a module-level static variable.
+TEST(ScopeAndLifetimeElaboration, DynamicArrayElementNonblockingIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int d[] = new[4];\n"
+      "  initial d[0] <= 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace

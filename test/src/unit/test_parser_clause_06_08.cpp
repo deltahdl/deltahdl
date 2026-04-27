@@ -41,13 +41,6 @@ TEST(VariableDeclaration, DataDeclLifetimeStatic) {
   EXPECT_TRUE(item->is_static);
 }
 
-TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsSingle) {
-  auto r = Parse("module m; int x; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kVarDecl);
-}
-
 TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsMultiple) {
   auto r = Parse("module m; int a = 1, b = 2, c = 3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -92,17 +85,6 @@ TEST(VariableDeclaration, VarDeclWithInit) {
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kVarDecl);
   EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
-}
-
-TEST(VariableDeclaration, DataDeclMultipleAssign) {
-  auto r = Parse("module m; int a = 1, b = 2; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kVarDecl) count++;
-  }
-  EXPECT_GE(count, 2);
 }
 
 TEST(VariableDeclaration, DataTypeScopedType) {
@@ -468,6 +450,46 @@ TEST(VariableDeclarations, VarBareNoTypeIsValid) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "v");
+}
+
+// §6.8 footnote 14: a data_declaration that omits the explicit data_type
+// requires the `var` keyword. A procedural decl that begins with a lifetime
+// keyword (here `automatic`) followed directly by an identifier and an
+// initializer must be diagnosed.
+TEST(VariableDeclarations, AutomaticWithoutDataTypeOrVarIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic x = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §6.8 footnote 14: same rule for explicit static lifetime — without a data
+// type, the `var` keyword is required.
+TEST(VariableDeclarations, StaticWithoutDataTypeOrVarIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    static y = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §6.8 footnote 14: when `var` is present the data type may be omitted —
+// the implicit data type defaults to logic. Verify the same surface form
+// that triggered the error above is accepted once `var` is added.
+TEST(VariableDeclarations, AutomaticVarWithoutDataTypeOk) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic var x = 1'b0;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 // §6.8: Variable with unpacked array dimension.

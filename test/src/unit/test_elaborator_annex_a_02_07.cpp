@@ -22,35 +22,8 @@ TEST(TaskDeclElaboration, TaskDeclAddedToModule) {
   EXPECT_EQ(mod->function_decls[0]->kind, ModuleItemKind::kTaskDecl);
 }
 
-TEST(TaskDeclElaboration, TaskDeclLifetimeAutomatic) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  task automatic my_task;\n"
-      "  endtask\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->function_decls.size(), 1u);
-  EXPECT_TRUE(mod->function_decls[0]->is_automatic);
-}
-
-TEST(TaskDeclElaboration, TaskDeclLifetimeStatic) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  task static my_task;\n"
-      "  endtask\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->function_decls.size(), 1u);
-  EXPECT_TRUE(mod->function_decls[0]->is_static);
-}
+// Lifetime-keyword acceptance on task declarations is a §6.21 rule;
+// the corresponding elaborator tests live in test_elaborator_clause_06_21.cpp.
 
 // --- task_body_declaration ---
 

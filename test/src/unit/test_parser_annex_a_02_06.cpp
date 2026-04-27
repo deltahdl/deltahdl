@@ -21,31 +21,8 @@ TEST(FunctionDeclParsing, FunctionDeclBasic) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
-TEST(FunctionDeclParsing, FunctionDeclLifetimeAutomatic) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int f(); return 0; endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstFunctionDecl(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_automatic);
-  EXPECT_FALSE(item->is_static);
-}
-
-TEST(FunctionDeclParsing, FunctionDeclLifetimeStatic) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int f(); return 0; endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstFunctionDecl(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_FALSE(item->is_automatic);
-  EXPECT_TRUE(item->is_static);
-}
+// Lifetime-keyword acceptance on function declarations is a §6.21 rule;
+// the corresponding parser tests live in test_parser_clause_06_21.cpp.
 
 TEST(FunctionDeclParsing, FunctionDeclVoidReturn) {
   auto r = Parse(
