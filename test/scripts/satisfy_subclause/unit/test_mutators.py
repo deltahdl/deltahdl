@@ -7,7 +7,6 @@ import pytest
 from satisfy_subclause.mutators import (
     MUTATOR_DISALLOWED_TOOLS,
     CycleMember,
-    _close_satisfied_issue,
     build_commit_message,
     build_steps,
     commit_mutator_result,
@@ -444,33 +443,6 @@ def test_commit_mutator_result_summary_lists_deleted() -> None:
         commit_mutator_result(["6.3"], [42])
     message = mock_c.call_args[0][2]
     assert "Deleted baz.py" in message
-
-
-# --- _close_satisfied_issue -------------------------------------------------
-
-
-def _patched_subprocess_run():
-    """Patch subprocess.run inside satisfy_subclause.mutators."""
-    return patch("satisfy_subclause.mutators.subprocess.run")
-
-
-def test_close_satisfied_issue_invokes_gh() -> None:
-    """_close_satisfied_issue runs ``gh issue close`` for the given issue."""
-    with _patched_subprocess_run() as run:
-        _close_satisfied_issue("6.3", 42)
-    assert run.call_args[0][0][:4] == ["gh", "issue", "close", "42"]
-
-
-def test_close_satisfied_issue_attaches_subclause_comment() -> None:
-    """The close call attaches an explanatory comment naming the subclause."""
-    with _patched_subprocess_run() as run:
-        _close_satisfied_issue("6.3", 42)
-        _close_satisfied_issue("A.7.1", 99)
-    comments = [
-        c[0][0][c[0][0].index("--comment") + 1]
-        for c in run.call_args_list
-    ]
-    assert ("§6.3" in comments[0]) and ("A.7.1" in comments[1])
 
 
 # --- build_steps ------------------------------------------------------------
