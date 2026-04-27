@@ -29,6 +29,7 @@ _LEGACY_AUDIT_ANNEX = (
     " implemented and properly named"
 )
 _MASTER_LIST = "Implement IEEE 1800-2023 §33 Configuring the contents of a design"
+_LABEL = "IEEE 1800-2023"
 
 
 def _payload(*entries) -> str:
@@ -158,14 +159,18 @@ def test_find_or_create_issue_returns_new_canonical_open(
 def test_find_or_create_issue_does_not_rename_new_canonical(
     stub_completed,
 ) -> None:
-    """A new-canonical-titled match does not trigger gh issue edit."""
+    """A new-canonical-titled match does not trigger a title-rename edit."""
     body = _payload((99, _NEW_CANONICAL, "OPEN"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
         return_value=stub_completed(stdout=body),
     ) as mock_run:
         find_or_create_issue("33.4.1.5")
-    assert mock_run.call_count == 1
+    rename_calls = [
+        call for call in mock_run.call_args_list
+        if call[0][0][:3] == ["gh", "issue", "edit"] and "--title" in call[0][0]
+    ]
+    assert rename_calls == []
 
 
 def test_find_or_create_issue_reopens_new_canonical_closed(
@@ -175,7 +180,7 @@ def test_find_or_create_issue_reopens_new_canonical_closed(
     body = _payload((55, _NEW_CANONICAL, "CLOSED"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body), stub_completed()],
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ) as mock_run:
         find_or_create_issue("33.4.1.5")
     reopen_cmd = mock_run.call_args_list[1][0][0]
@@ -190,7 +195,7 @@ def _run_rename_open_legacy(stub_completed, title: str, number: int):
     body = _payload((number, title, "OPEN"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body), stub_completed()],
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ) as mock_run:
         find_or_create_issue("33.4.1.5")
     return mock_run
@@ -201,7 +206,7 @@ def _run_reopen_closed_legacy(stub_completed, title: str, number: int):
     body = _payload((number, title, "CLOSED"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 3,
     ) as mock_run:
         find_or_create_issue("33.4.1.5")
     return mock_run
@@ -215,8 +220,7 @@ def test_find_or_create_issue_returns_legacy_short_number(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[
             stub_completed(stdout=_payload((99, _LEGACY_SHORT, "OPEN"))),
-            stub_completed(),
-        ],
+        ] + [stub_completed()] * 2,
     ):
         assert find_or_create_issue("33.4.1.5") == 99
 
@@ -255,8 +259,7 @@ def test_find_or_create_issue_returns_legacy_audit_numeric_open_number(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[
             stub_completed(stdout=_payload((88, _LEGACY_AUDIT_NUMERIC, "OPEN"))),
-            stub_completed(),
-        ],
+        ] + [stub_completed()] * 2,
     ):
         assert find_or_create_issue("33.4.1.5") == 88
 
@@ -291,9 +294,7 @@ def test_find_or_create_issue_returns_legacy_audit_annex_number(
     body = _payload((609, _LEGACY_AUDIT_ANNEX, "CLOSED"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[
-            stub_completed(stdout=body), stub_completed(), stub_completed(),
-        ],
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 3,
     ):
         assert find_or_create_issue("A.9.3") == 609
 
@@ -305,7 +306,7 @@ def test_find_or_create_issue_renames_legacy_audit_annex(
     body = _payload((609, _LEGACY_AUDIT_ANNEX, "OPEN"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body), stub_completed()],
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ) as mock_run:
         find_or_create_issue("A.9.3")
     edit_cmd = mock_run.call_args_list[1][0][0]
@@ -325,7 +326,7 @@ def test_find_or_create_issue_returns_master_list_number(
     body = _payload((35, _MASTER_LIST, "OPEN"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body), stub_completed()],
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ):
         assert find_or_create_issue("33") == 35
 
@@ -337,7 +338,7 @@ def test_find_or_create_issue_renames_master_list_to_new_canonical(
     body = _payload((35, _MASTER_LIST, "OPEN"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body), stub_completed()],
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ) as mock_run:
         find_or_create_issue("33")
     edit_cmd = mock_run.call_args_list[1][0][0]
@@ -354,7 +355,7 @@ def test_find_or_create_issue_reopens_master_list_closed(
     body = _payload((35, _MASTER_LIST, "CLOSED"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 3,
     ) as mock_run:
         find_or_create_issue("33")
     reopen_cmd = mock_run.call_args_list[2][0][0]
@@ -368,7 +369,7 @@ def test_find_or_create_issue_master_list_exact_prefix_match(
     body = _payload((35, "Implement IEEE 1800-2023 §33", "OPEN"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body), stub_completed()],
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ):
         assert find_or_create_issue("33") == 35
 
@@ -405,7 +406,7 @@ def test_find_or_create_issue_deletes_newer_duplicate(stub_completed) -> None:
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[
             stub_completed(stdout=_master_list_with_duplicate_payload()),
-        ] + [stub_completed()] * 2,
+        ] + [stub_completed()] * 3,
     ) as mock_run:
         find_or_create_issue("33")
     delete_cmd = mock_run.call_args_list[1][0][0]
@@ -420,7 +421,7 @@ def test_find_or_create_issue_keeps_older_when_duplicates(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[
             stub_completed(stdout=_master_list_with_duplicate_payload()),
-        ] + [stub_completed()] * 2,
+        ] + [stub_completed()] * 3,
     ):
         assert find_or_create_issue("33") == 35
 
@@ -433,7 +434,7 @@ def test_find_or_create_issue_renames_older_master_list_with_duplicates(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[
             stub_completed(stdout=_master_list_with_duplicate_payload()),
-        ] + [stub_completed()] * 2,
+        ] + [stub_completed()] * 3,
     ) as mock_run:
         find_or_create_issue("33")
     edit_cmd = mock_run.call_args_list[2][0][0]
@@ -462,7 +463,7 @@ def test_find_or_create_issue_renames_older_legacy_with_duplicates(
     body = _older_legacy_with_duplicate_payload()
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 3,
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 4,
     ) as mock_run:
         find_or_create_issue("A.2.1.3")
     edit_cmd = mock_run.call_args_list[2][0][0]
@@ -479,7 +480,7 @@ def test_find_or_create_issue_reopens_older_legacy_closed_with_duplicates(
     body = _older_legacy_with_duplicate_payload()
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 3,
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 4,
     ) as mock_run:
         find_or_create_issue("A.2.1.3")
     reopen_cmd = mock_run.call_args_list[3][0][0]
@@ -497,7 +498,7 @@ def test_find_or_create_issue_deletes_all_newer_duplicates(
     )
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 3,
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 4,
     ) as mock_run:
         find_or_create_issue("33")
     delete_targets = [
@@ -505,6 +506,92 @@ def test_find_or_create_issue_deletes_all_newer_duplicates(
         if call[0][0][:3] == ["gh", "issue", "delete"]
     ]
     assert delete_targets == ["1276", "2000"]
+
+
+# --- find_or_create_issue: IEEE 1800-2023 label application ----------------
+
+
+def _label_add_calls(mock_run) -> list[list[str]]:
+    """Return the gh-issue-edit --add-label calls captured by *mock_run*."""
+    return [
+        call[0][0] for call in mock_run.call_args_list
+        if call[0][0][:3] == ["gh", "issue", "edit"]
+        and "--add-label" in call[0][0]
+    ]
+
+
+def test_find_or_create_issue_create_passes_label(stub_completed) -> None:
+    """gh issue create receives the IEEE 1800-2023 label for new issues."""
+    url = "https://github.com/o/r/issues/777"
+    with patch(
+        "satisfy_subclause.pipeline.subprocess.run",
+        side_effect=[stub_completed(stdout="[]"), stub_completed(stdout=url)],
+    ) as mock_run:
+        find_or_create_issue("33.4.1.5")
+    create_cmd = mock_run.call_args_list[1][0][0]
+    assert create_cmd[create_cmd.index("--label") + 1] == _LABEL
+
+
+def test_find_or_create_issue_applies_label_to_canonical_match(
+    stub_completed,
+) -> None:
+    """A canonical-titled match gets the IEEE 1800-2023 label applied."""
+    body = _payload((99, _NEW_CANONICAL, "OPEN"))
+    with patch(
+        "satisfy_subclause.pipeline.subprocess.run",
+        return_value=stub_completed(stdout=body),
+    ) as mock_run:
+        find_or_create_issue("33.4.1.5")
+    assert _label_add_calls(mock_run) == [
+        ["gh", "issue", "edit", "99", "--add-label", _LABEL],
+    ]
+
+
+def test_find_or_create_issue_applies_label_to_renamed_legacy(
+    stub_completed,
+) -> None:
+    """A legacy-titled match gets the label applied after rename."""
+    mock_run = _run_rename_open_legacy(stub_completed, _LEGACY_SHORT, 99)
+    assert _label_add_calls(mock_run) == [
+        ["gh", "issue", "edit", "99", "--add-label", _LABEL],
+    ]
+
+
+def test_find_or_create_issue_applies_label_to_master_list_match(
+    stub_completed,
+) -> None:
+    """A master-list-titled match gets the label applied."""
+    body = _payload((35, _MASTER_LIST, "OPEN"))
+    with patch(
+        "satisfy_subclause.pipeline.subprocess.run",
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
+    ) as mock_run:
+        find_or_create_issue("33")
+    assert _label_add_calls(mock_run) == [
+        ["gh", "issue", "edit", "35", "--add-label", _LABEL],
+    ]
+
+
+def test_find_or_create_issue_applies_label_after_reopen(
+    stub_completed,
+) -> None:
+    """A closed match is reopened and then labelled (not labelled while closed)."""
+    body = _payload((55, _NEW_CANONICAL, "CLOSED"))
+    with patch(
+        "satisfy_subclause.pipeline.subprocess.run",
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
+    ) as mock_run:
+        find_or_create_issue("33.4.1.5")
+    reopen_index = next(
+        i for i, call in enumerate(mock_run.call_args_list)
+        if call[0][0][:3] == ["gh", "issue", "reopen"]
+    )
+    label_index = next(
+        i for i, call in enumerate(mock_run.call_args_list)
+        if call[0][0][:3] == ["gh", "issue", "edit"]
+        and "--add-label" in call[0][0]
+    )
+    assert reopen_index < label_index
 
 
 # --- dispatch_cycle ---------------------------------------------------------

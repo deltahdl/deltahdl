@@ -34,6 +34,8 @@ from .mutators import (
 )
 from .oracles import compute_subclause_dependencies
 
+LABEL = "IEEE 1800-2023"
+
 
 # ---------------------------------------------------------------------------
 # GitHub issue handling
@@ -113,6 +115,7 @@ def _create_new_issue(subclause: str) -> int:
         [
             "gh", "issue", "create",
             "--title", issue_title_for(subclause),
+            "--label", LABEL,
             "--body", (
                 f"Track satisfying §{subclause} via the satisfaction"
                 " pipeline (#1265)."
@@ -124,6 +127,18 @@ def _create_new_issue(subclause: str) -> int:
         print(completed.stderr, file=sys.stderr)
         sys.exit(completed.returncode)
     return parse_issue_number_from_create_output(completed.stdout)
+
+
+def _apply_label(number: int) -> None:
+    """Add the ``IEEE 1800-2023`` label to issue *number*.
+
+    ``gh issue edit --add-label`` is idempotent, so this is safe to call
+    on issues that already carry the label.
+    """
+    subprocess.run(
+        ["gh", "issue", "edit", str(number), "--add-label", LABEL],
+        check=False,
+    )
 
 
 def find_or_create_issue(subclause: str) -> int:
@@ -139,7 +154,8 @@ def find_or_create_issue(subclause: str) -> int:
     retained and the others are hard-deleted via ``gh issue delete
     --yes``. The retained issue is renamed to the new canonical (and
     any descriptive trailing text from the master-list form is
-    dropped) and reopened if closed. Creates a fresh issue when no
+    dropped), reopened if closed, and tagged with the ``IEEE 1800-2023``
+    label. Creates a fresh issue (carrying the same label) when no
     match exists.
     """
     matches = [
@@ -172,6 +188,7 @@ def find_or_create_issue(subclause: str) -> int:
             ["gh", "issue", "reopen", str(number)],
             check=False,
         )
+    _apply_label(number)
     return number
 
 
