@@ -135,6 +135,18 @@ def parse_labels(raw: str) -> list[str]:
     return [s.strip() for s in raw.split(",")]
 
 
+def parse_subclauses(raw: str) -> list[str]:
+    """Split a comma-separated subclause list and validate each entry."""
+    parts = [s.strip() for s in raw.split(",")]
+    for part in parts:
+        if not SUBCLAUSE_RE.match(part):
+            raise argparse.ArgumentTypeError(
+                f"Invalid subclause format '{part}'. "
+                "Expected V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z."
+            )
+    return parts
+
+
 def add_labels_arg(parser: argparse.ArgumentParser) -> None:
     """Add the ``--labels`` argument to *parser*."""
     parser.add_argument(
@@ -142,6 +154,16 @@ def add_labels_arg(parser: argparse.ArgumentParser) -> None:
         type=parse_labels,
         required=True,
         help="Comma-separated GitHub labels (e.g. 'IEEE 1800-2023,bug').",
+    )
+
+
+def add_subclauses_arg(parser: argparse.ArgumentParser) -> None:
+    """Add the ``--subclauses`` argument to *parser*."""
+    parser.add_argument(
+        "--subclauses",
+        type=parse_subclauses,
+        required=True,
+        help="Comma-separated subclauses (e.g. '33.1,33.4,A.5').",
     )
 
 

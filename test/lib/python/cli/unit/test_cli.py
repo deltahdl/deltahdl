@@ -15,10 +15,12 @@ from lib.python.cli import (
     add_lrm_arg,
     add_model_arg,
     add_subclause_arg,
+    add_subclauses_arg,
     parse_and_validate,
     parse_and_validate_clause,
     parse_and_validate_subclause,
     parse_labels,
+    parse_subclauses,
     run_claude_cli,
     run_with_dots,
     validate_clause,
@@ -465,5 +467,54 @@ def test_add_labels_arg_required() -> None:
     """--labels is required."""
     parser = argparse.ArgumentParser()
     add_labels_arg(parser)
+    with pytest.raises(SystemExit):
+        parser.parse_args([])
+
+
+# ---- parse_subclauses ------------------------------------------------------
+
+
+def test_parse_subclauses_single() -> None:
+    """Single entry returns a one-element list."""
+    assert parse_subclauses("33.1") == ["33.1"]
+
+
+def test_parse_subclauses_multiple() -> None:
+    """Comma-separated entries are split into a list."""
+    assert parse_subclauses("33.1,33.4,A.5") == ["33.1", "33.4", "A.5"]
+
+
+def test_parse_subclauses_strips_whitespace() -> None:
+    """Whitespace around commas is stripped."""
+    assert parse_subclauses(" 33.1 , 33.4 ") == ["33.1", "33.4"]
+
+
+def test_parse_subclauses_rejects_top_level_entry() -> None:
+    """A depth-0 entry raises ArgumentTypeError."""
+    with pytest.raises(argparse.ArgumentTypeError):
+        parse_subclauses("33.1,33")
+
+
+def test_parse_subclauses_rejects_garbage_entry() -> None:
+    """A malformed entry raises ArgumentTypeError."""
+    with pytest.raises(argparse.ArgumentTypeError):
+        parse_subclauses("garbage")
+
+
+# ---- add_subclauses_arg ----------------------------------------------------
+
+
+def test_add_subclauses_arg() -> None:
+    """Adds --subclauses parsed into a validated list."""
+    parser = argparse.ArgumentParser()
+    add_subclauses_arg(parser)
+    args = parser.parse_args(["--subclauses", "33.1,33.4"])
+    assert args.subclauses == ["33.1", "33.4"]
+
+
+def test_add_subclauses_arg_required() -> None:
+    """--subclauses is required."""
+    parser = argparse.ArgumentParser()
+    add_subclauses_arg(parser)
     with pytest.raises(SystemExit):
         parser.parse_args([])
