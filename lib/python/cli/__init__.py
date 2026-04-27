@@ -7,6 +7,7 @@ import threading
 from pathlib import Path
 
 SUBCLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){1,4}$")
+CLAUSE_ONLY_RE = re.compile(r"^(\d+|[A-Z])$")
 
 
 def add_lrm_arg(parser: argparse.ArgumentParser) -> None:
@@ -51,6 +52,45 @@ def parse_and_validate_subclause(
     args = parser.parse_args(argv)
     validate_lrm(parser, args)
     validate_subclause(parser, args)
+    return args
+
+
+def add_clause_arg(parser: argparse.ArgumentParser) -> None:
+    """Add the ``--clause`` argument to *parser*."""
+    parser.add_argument(
+        "--clause",
+        type=str,
+        required=True,
+        help="LRM clause number (V) — a number or single annex letter.",
+    )
+
+
+def validate_clause(
+    parser: argparse.ArgumentParser, args: argparse.Namespace,
+) -> None:
+    """Error out if ``args.clause`` is not a valid top-level clause string."""
+    if CLAUSE_ONLY_RE.match(args.clause):
+        return
+    if SUBCLAUSE_RE.match(args.clause):
+        parser.error(
+            f"--clause '{args.clause}' is a subclause; "
+            "use satisfy_subclause --subclause instead."
+        )
+    parser.error(
+        f"Invalid clause format '{args.clause}'. "
+        "Expected a single number (e.g. 33) or "
+        "uppercase annex letter (e.g. A)."
+    )
+
+
+def parse_and_validate_clause(
+    parser: argparse.ArgumentParser,
+    argv: list[str] | None = None,
+) -> argparse.Namespace:
+    """Parse *argv* and validate both ``--lrm`` and ``--clause``."""
+    args = parser.parse_args(argv)
+    validate_lrm(parser, args)
+    validate_clause(parser, args)
     return args
 
 

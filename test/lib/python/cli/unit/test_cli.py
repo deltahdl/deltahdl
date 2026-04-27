@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from lib.python.cli import (
+    add_clause_arg,
     add_continue_arg,
     add_github_args,
     add_labels_arg,
@@ -15,10 +16,12 @@ from lib.python.cli import (
     add_model_arg,
     add_subclause_arg,
     parse_and_validate,
+    parse_and_validate_clause,
     parse_and_validate_subclause,
     parse_labels,
     run_claude_cli,
     run_with_dots,
+    validate_clause,
     validate_lrm,
     validate_subclause,
 )
@@ -220,6 +223,123 @@ def test_parse_and_validate_subclause_rejects_bad_subclause(tmp_path) -> None:
         parse_and_validate_subclause(
             parser,
             ["--lrm", str(lrm), "--subclause", "garbage"],
+        )
+
+
+# ---- add_clause_arg ---------------------------------------------------------
+
+
+def test_add_clause_arg_value() -> None:
+    """Adds --clause as a required string argument."""
+    parser = argparse.ArgumentParser()
+    add_clause_arg(parser)
+    args = parser.parse_args(["--clause", "33"])
+    assert args.clause == "33"
+
+
+def test_add_clause_arg_required() -> None:
+    """--clause is required."""
+    parser = argparse.ArgumentParser()
+    add_clause_arg(parser)
+    with pytest.raises(SystemExit):
+        parser.parse_args([])
+
+
+# ---- validate_clause --------------------------------------------------------
+
+
+def test_validate_clause_accepts_numeric() -> None:
+    """Returns without error for a depth-0 numeric clause."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(clause="33")
+    validate_clause(parser, args)
+    assert args.clause == "33"
+
+
+def test_validate_clause_accepts_annex() -> None:
+    """Returns without error for a single annex letter."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(clause="A")
+    validate_clause(parser, args)
+    assert args.clause == "A"
+
+
+def test_validate_clause_rejects_subclause() -> None:
+    """Calls parser.error for a depth-≥1 subclause id."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(clause="33.1")
+    with pytest.raises(SystemExit):
+        validate_clause(parser, args)
+
+
+def test_validate_clause_rejects_lowercase() -> None:
+    """Calls parser.error for a lowercase letter."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(clause="a")
+    with pytest.raises(SystemExit):
+        validate_clause(parser, args)
+
+
+def test_validate_clause_rejects_garbage() -> None:
+    """Calls parser.error for a non-clause string."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(clause="not-a-clause")
+    with pytest.raises(SystemExit):
+        validate_clause(parser, args)
+
+
+def test_validate_clause_subclause_error_routes_to_satisfy_subclause(capsys) -> None:
+    """Subclause-shaped rejection message names ``satisfy_subclause``."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(clause="33.1")
+    try:
+        validate_clause(parser, args)
+    except SystemExit:
+        pass
+    assert "satisfy_subclause" in capsys.readouterr().err
+
+
+# ---- parse_and_validate_clause ----------------------------------------------
+
+
+def _clause_parser():
+    """Build a minimal parser wired up for parse_and_validate_clause."""
+    parser = argparse.ArgumentParser()
+    add_lrm_arg(parser)
+    add_clause_arg(parser)
+    return parser
+
+
+def test_parse_and_validate_clause_returns_namespace(tmp_path) -> None:
+    """Returns the parsed namespace when --lrm and --clause are valid."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.touch()
+    parser = _clause_parser()
+    args = parse_and_validate_clause(
+        parser, ["--lrm", str(lrm), "--clause", "33"],
+    )
+    assert args.clause == "33"
+
+
+def test_parse_and_validate_clause_rejects_missing_lrm(tmp_path) -> None:
+    """Errors out when --lrm points at a non-existent file."""
+    parser = _clause_parser()
+    with pytest.raises(SystemExit):
+        parse_and_validate_clause(
+            parser,
+            ["--lrm", str(tmp_path / "no.pdf"), "--clause", "33"],
+        )
+
+
+def test_parse_and_validate_clause_rejects_bad_clause(tmp_path) -> None:
+    """Errors out when --clause is not a valid depth-0 string."""
+    lrm = tmp_path / "lrm.pdf"
+    lrm.touch()
+    parser = _clause_parser()
+    with pytest.raises(SystemExit):
+        parse_and_validate_clause(
+            parser,
+            ["--lrm", str(lrm), "--clause", "33.1"],
         )
 
 
