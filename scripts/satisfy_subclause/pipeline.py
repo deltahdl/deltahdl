@@ -34,8 +34,6 @@ from .mutators import (
 )
 from .oracles import compute_subclause_dependencies
 
-LABEL = "IEEE 1800-2023"
-
 
 # ---------------------------------------------------------------------------
 # GitHub issue handling
@@ -109,13 +107,21 @@ def _list_issues_for(subclause: str) -> list[dict]:
     return json.loads(completed.stdout) if completed.stdout.strip() else []
 
 
-def _create_new_issue(subclause: str) -> int:
+def _label_create_args(labels: list[str]) -> list[str]:
+    """Return ``["--label", L1, "--label", L2, …]`` for ``gh issue create``."""
+    args: list[str] = []
+    for label in labels:
+        args.extend(["--label", label])
+    return args
+
+
+def _create_new_issue(subclause: str, labels: list[str]) -> int:
     """Create a fresh issue for *subclause* and return its number."""
     completed = subprocess.run(
         [
             "gh", "issue", "create",
             "--title", issue_title_for(subclause),
-            "--label", LABEL,
+            *_label_create_args(labels),
             "--body", (
                 f"Track satisfying §{subclause} via the satisfaction"
                 " pipeline (#1265)."
@@ -129,19 +135,23 @@ def _create_new_issue(subclause: str) -> int:
     return parse_issue_number_from_create_output(completed.stdout)
 
 
-def _apply_label(number: int) -> None:
-    """Add the ``IEEE 1800-2023`` label to issue *number*.
+def _apply_labels(number: int, labels: list[str]) -> None:
+    """Add *labels* to issue *number*.
 
-    ``gh issue edit --add-label`` is idempotent, so this is safe to call
-    on issues that already carry the label.
+    ``gh issue edit --add-label`` accepts a comma-separated list and is
+    idempotent, so this is safe to call on issues that already carry
+    any of the labels.
     """
     subprocess.run(
-        ["gh", "issue", "edit", str(number), "--add-label", LABEL],
+        [
+            "gh", "issue", "edit", str(number),
+            "--add-label", ",".join(labels),
+        ],
         check=False,
     )
 
 
-def find_or_create_issue(subclause: str) -> int:
+def find_or_create_issue(subclause: str, *, labels: list[str]) -> int:
     """Return the issue number for *subclause*.
 
     Searches for any pre-existing issue whose title matches one of the
@@ -154,8 +164,8 @@ def find_or_create_issue(subclause: str) -> int:
     retained and the others are hard-deleted via ``gh issue delete
     --yes``. The retained issue is renamed to the new canonical (and
     any descriptive trailing text from the master-list form is
-    dropped), reopened if closed, and tagged with the ``IEEE 1800-2023``
-    label. Creates a fresh issue (carrying the same label) when no
+    dropped), reopened if closed, and tagged with every label in
+    *labels*. Creates a fresh issue (carrying the same labels) when no
     match exists.
     """
     matches = [
@@ -163,7 +173,7 @@ def find_or_create_issue(subclause: str) -> int:
         if _title_matches(entry.get("title", "") or "", subclause)
     ]
     if not matches:
-        return _create_new_issue(subclause)
+        return _create_new_issue(subclause, labels)
 
     matches.sort(key=lambda entry: int(entry["number"]))
     oldest, *duplicates = matches
@@ -188,7 +198,7 @@ def find_or_create_issue(subclause: str) -> int:
             ["gh", "issue", "reopen", str(number)],
             check=False,
         )
-    _apply_label(number)
+    _apply_labels(number, labels)
     return number
 
 
@@ -196,17 +206,24 @@ def find_or_create_issue(subclause: str) -> int:
 # Cycle dispatch
 # ---------------------------------------------------------------------------
 
-def _build_cycle_members(members: list[str]) -> list[CycleMember]:
+def _build_cycle_members(
+    members: list[str], *, labels: list[str],
+) -> list[CycleMember]:
     """Find or create issues for each cycle member."""
     return [
-        CycleMember(subclause=member, issue=find_or_create_issue(member))
+        CycleMember(
+            subclause=member,
+            issue=find_or_create_issue(member, labels=labels),
+        )
         for member in members
     ]
 
 
-def dispatch_cycle(members: list[str], lrm: str, *, model: str) -> None:
+def dispatch_cycle(
+    members: list[str], lrm: str, *, model: str, labels: list[str],
+) -> None:
     """Run the cycle-set mutator for *members*."""
-    cycle = _build_cycle_members(members)
+    cycle = _build_cycle_members(members, labels=labels)
     satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
         cycle, lrm, satisfied_dependencies=[], model=model,
     )
@@ -224,7 +241,7 @@ def _cycle_marker(subclause: str, members) -> dict:
 
 def satisfy_unsatisfied_subclause(
     target: CycleMember, lrm: str, *,
-    model: str, in_progress: frozenset,
+    model: str, labels: list[str], in_progress: frozenset,
 ) -> dict:
     """Compute deps, recurse, then dispatch the right mutator.
 
@@ -247,7 +264,7 @@ def satisfy_unsatisfied_subclause(
     satisfied: list[str] = []
     for dep in deps:
         result = satisfy_subclause(
-            dep, lrm, model=model, in_progress=in_progress,
+            dep, lrm, model=model, labels=labels, in_progress=in_progress,
         )
         if result.get("status") == "cycle":
             return _cycle_marker(target.subclause, result.get("members", []))
@@ -270,7 +287,8 @@ def satisfy_unsatisfied_subclause(
 
 def satisfy_subclause(
     subclause: str, lrm: str, *,
-    model: str, in_progress: frozenset = frozenset(),
+    model: str, labels: list[str],
+    in_progress: frozenset = frozenset(),
 ) -> dict:
     """Idempotently satisfy ``subclause``.
 
@@ -289,16 +307,17 @@ def satisfy_subclause(
         file=sys.stderr,
     )
 
-    issue = find_or_create_issue(subclause)
+    issue = find_or_create_issue(subclause, labels=labels)
     new_in_progress = in_progress | {subclause}
 
     target = CycleMember(subclause=subclause, issue=issue)
     result = satisfy_unsatisfied_subclause(
-        target, lrm, model=model, in_progress=new_in_progress,
+        target, lrm, model=model, labels=labels,
+        in_progress=new_in_progress,
     )
     if result.get("status") == "cycle":
         members = result.get("members", [])
         if subclause in members and in_progress:
             return result
-        dispatch_cycle(members, lrm, model=model)
+        dispatch_cycle(members, lrm, model=model, labels=labels)
     return {"status": "satisfied"}

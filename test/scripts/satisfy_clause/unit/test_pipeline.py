@@ -55,7 +55,7 @@ def test_descendants_of_no_match_returns_empty() -> None:
 
 
 def test_satisfy_clause_dispatches_to_satisfy_subclauses(monkeypatch) -> None:
-    """Hands the descendant list to satisfy_subclauses with lrm and model."""
+    """Hands the descendant list to satisfy_subclauses with lrm, model, labels."""
     captured = []
     monkeypatch.setattr(
         "satisfy_clause.pipeline.load_toc",
@@ -63,10 +63,32 @@ def test_satisfy_clause_dispatches_to_satisfy_subclauses(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "satisfy_clause.pipeline.satisfy_subclauses",
-        lambda subs, lrm, *, model: captured.append((subs, lrm, model)),
+        lambda subs, lrm, *, model, labels:
+            captured.append((subs, lrm, model, labels)),
     )
-    satisfy_clause("33", "lrm.pdf", model="opus")
-    assert captured == [(["33.1", "33.2"], "lrm.pdf", "opus")]
+    satisfy_clause(
+        "33", "lrm.pdf", model="opus", labels=["IEEE 1800-2023"],
+    )
+    assert captured == [
+        (["33.1", "33.2"], "lrm.pdf", "opus", ["IEEE 1800-2023"]),
+    ]
+
+
+def test_satisfy_clause_passes_labels_through(monkeypatch) -> None:
+    """The labels list is forwarded verbatim to satisfy_subclauses."""
+    captured = []
+    monkeypatch.setattr(
+        "satisfy_clause.pipeline.load_toc",
+        lambda _lrm: {"33.1": (1, 1)},
+    )
+    monkeypatch.setattr(
+        "satisfy_clause.pipeline.satisfy_subclauses",
+        lambda subs, lrm, *, model, labels: captured.append(labels),
+    )
+    satisfy_clause(
+        "33", "lrm.pdf", model="opus", labels=["IEEE 1800-2023", "bug"],
+    )
+    assert captured == [["IEEE 1800-2023", "bug"]]
 
 
 def test_satisfy_clause_empty_descendants_exits(monkeypatch) -> None:
@@ -79,7 +101,9 @@ def test_satisfy_clause_empty_descendants_exits(monkeypatch) -> None:
         lambda *_args, **_kwargs: None,
     )
     with pytest.raises(SystemExit):
-        satisfy_clause("33", "lrm.pdf", model="opus")
+        satisfy_clause(
+            "33", "lrm.pdf", model="opus", labels=["IEEE 1800-2023"],
+        )
 
 
 def test_satisfy_clause_empty_descendants_message_names_clause(
@@ -90,7 +114,9 @@ def test_satisfy_clause_empty_descendants_message_names_clause(
         "satisfy_clause.pipeline.load_toc", lambda _lrm: {},
     )
     with pytest.raises(SystemExit, match="§33"):
-        satisfy_clause("33", "lrm.pdf", model="opus")
+        satisfy_clause(
+            "33", "lrm.pdf", model="opus", labels=["IEEE 1800-2023"],
+        )
 
 
 def test_satisfy_clause_empty_descendants_message_names_lrm(
@@ -101,4 +127,6 @@ def test_satisfy_clause_empty_descendants_message_names_lrm(
         "satisfy_clause.pipeline.load_toc", lambda _lrm: {},
     )
     with pytest.raises(SystemExit, match="missing.pdf"):
-        satisfy_clause("33", "missing.pdf", model="opus")
+        satisfy_clause(
+            "33", "missing.pdf", model="opus", labels=["IEEE 1800-2023"],
+        )

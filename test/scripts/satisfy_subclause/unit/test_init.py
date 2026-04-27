@@ -16,6 +16,7 @@ def test_parse_args_default_model(make_lrm) -> None:
     args = satisfy_subclause.parse_args([
         "--lrm", str(make_lrm),
         "--subclause", "33.4.1.5",
+        "--labels", "IEEE 1800-2023",
     ])
     assert args.model == "opus"
 
@@ -26,6 +27,7 @@ def test_parse_args_explicit_model(make_lrm) -> None:
         "--lrm", str(make_lrm),
         "--subclause", "33.4.1.5",
         "--model", "haiku",
+        "--labels", "IEEE 1800-2023",
     ])
     assert args.model == "haiku"
 
@@ -35,27 +37,65 @@ def test_parse_args_subclause_value(make_lrm) -> None:
     args = satisfy_subclause.parse_args([
         "--lrm", str(make_lrm),
         "--subclause", "33.4.1.5",
+        "--labels", "IEEE 1800-2023",
     ])
     assert args.subclause == "33.4.1.5"
+
+
+def test_parse_args_labels_single_value(make_lrm) -> None:
+    """--labels accepts a single label and parses it into a one-element list."""
+    args = satisfy_subclause.parse_args([
+        "--lrm", str(make_lrm),
+        "--subclause", "33.4.1.5",
+        "--labels", "IEEE 1800-2023",
+    ])
+    assert args.labels == ["IEEE 1800-2023"]
+
+
+def test_parse_args_labels_comma_separated(make_lrm) -> None:
+    """--labels splits on commas into an ordered list."""
+    args = satisfy_subclause.parse_args([
+        "--lrm", str(make_lrm),
+        "--subclause", "33.4.1.5",
+        "--labels", "IEEE 1800-2023,bug",
+    ])
+    assert args.labels == ["IEEE 1800-2023", "bug"]
+
+
+def test_parse_args_requires_labels(make_lrm) -> None:
+    """--labels is required."""
+    with pytest.raises(SystemExit):
+        satisfy_subclause.parse_args([
+            "--lrm", str(make_lrm),
+            "--subclause", "33.4.1.5",
+        ])
 
 
 def test_parse_args_requires_subclause(make_lrm) -> None:
     """--subclause is required."""
     with pytest.raises(SystemExit):
-        satisfy_subclause.parse_args(["--lrm", str(make_lrm)])
+        satisfy_subclause.parse_args([
+            "--lrm", str(make_lrm),
+            "--labels", "IEEE 1800-2023",
+        ])
 
 
 def test_parse_args_requires_lrm() -> None:
     """--lrm is required."""
     with pytest.raises(SystemExit):
-        satisfy_subclause.parse_args(["--subclause", "4.1"])
+        satisfy_subclause.parse_args([
+            "--subclause", "4.1",
+            "--labels", "IEEE 1800-2023",
+        ])
 
 
 def test_parse_args_rejects_bad_subclause(make_lrm) -> None:
     """An invalid clause string is rejected."""
     with pytest.raises(SystemExit):
         satisfy_subclause.parse_args([
-            "--lrm", str(make_lrm), "--subclause", "bad",
+            "--lrm", str(make_lrm),
+            "--subclause", "bad",
+            "--labels", "IEEE 1800-2023",
         ])
 
 
@@ -63,7 +103,9 @@ def test_parse_args_usage_names_package(make_lrm, capsys) -> None:
     """Error usage line names the package, not __main__.py."""
     try:
         satisfy_subclause.parse_args([
-            "--lrm", str(make_lrm), "--subclause", "bad",
+            "--lrm", str(make_lrm),
+            "--subclause", "bad",
+            "--labels", "IEEE 1800-2023",
         ])
     except SystemExit:
         pass
@@ -79,6 +121,7 @@ def test_main_calls_satisfy_subclause(make_lrm) -> None:
         satisfy_subclause.main([
             "--lrm", str(make_lrm),
             "--subclause", "33.4.1.5",
+            "--labels", "IEEE 1800-2023",
         ])
     assert mock_pipeline.called
 
@@ -89,6 +132,7 @@ def test_main_passes_subclause_to_pipeline(make_lrm) -> None:
         satisfy_subclause.main([
             "--lrm", str(make_lrm),
             "--subclause", "33.4.1.5",
+            "--labels", "IEEE 1800-2023",
         ])
     assert mock_pipeline.call_args[0][0] == "33.4.1.5"
 
@@ -100,8 +144,20 @@ def test_main_passes_model_to_pipeline(make_lrm) -> None:
             "--lrm", str(make_lrm),
             "--subclause", "33.4.1.5",
             "--model", "haiku",
+            "--labels", "IEEE 1800-2023",
         ])
     assert mock_pipeline.call_args[1]["model"] == "haiku"
+
+
+def test_main_passes_labels_to_pipeline(make_lrm) -> None:
+    """main() forwards the parsed labels list to the pipeline."""
+    with patch("satisfy_subclause.satisfy_subclause") as mock_pipeline:
+        satisfy_subclause.main([
+            "--lrm", str(make_lrm),
+            "--subclause", "33.4.1.5",
+            "--labels", "IEEE 1800-2023,bug",
+        ])
+    assert mock_pipeline.call_args[1]["labels"] == ["IEEE 1800-2023", "bug"]
 
 
 # --- __main__ guard --------------------------------------------------------

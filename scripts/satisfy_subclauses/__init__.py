@@ -9,6 +9,7 @@ beyond list parsing and ordering.
 import argparse
 
 from lib.python.cli import (
+    add_labels_arg,
     add_lrm_arg,
     add_model_arg,
     add_subclauses_arg,
@@ -30,10 +31,14 @@ def parse_args(argv=None) -> argparse.Namespace:
     add_lrm_arg(parser)
     add_subclauses_arg(parser)
     add_model_arg(parser)
+    add_labels_arg(parser)
     return parse_and_validate(parser, argv)
 
 
 def main(argv=None) -> None:
     """Run satisfy_subclause for each requested subclause."""
     args = parse_args(argv)
-    satisfy_subclauses(args.subclauses, str(args.lrm), model=args.model)
+    satisfy_subclauses(
+        args.subclauses, str(args.lrm),
+        model=args.model, labels=args.labels,
+    )

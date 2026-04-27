@@ -29,7 +29,7 @@ _LEGACY_AUDIT_ANNEX = (
     " implemented and properly named"
 )
 _MASTER_LIST = "Implement IEEE 1800-2023 §33 Configuring the contents of a design"
-_LABEL = "IEEE 1800-2023"
+_LABELS = ["IEEE 1800-2023"]
 
 
 def _payload(*entries) -> str:
@@ -79,7 +79,7 @@ def test_find_or_create_issue_creates_new(stub_completed) -> None:
     """find_or_create_issue creates a new issue when none exists."""
     url = "https://github.com/o/r/issues/777"
     with _patched_gh(stub_completed, create_url=url):
-        assert find_or_create_issue("33.4.1.5") == 777
+        assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 777
 
 
 def test_find_or_create_issue_creates_with_new_canonical_title(
@@ -91,7 +91,7 @@ def test_find_or_create_issue_creates_with_new_canonical_title(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout="[]"), stub_completed(stdout=url)],
     ) as mock_run:
-        find_or_create_issue("33.4.1.5")
+        find_or_create_issue("33.4.1.5", labels=_LABELS)
     cmd = mock_run.call_args_list[1][0][0]
     assert cmd[cmd.index("--title") + 1] == _NEW_CANONICAL
 
@@ -103,7 +103,7 @@ def test_find_or_create_issue_handles_empty_list_stdout(stub_completed) -> None:
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=""), stub_completed(stdout=url)],
     ):
-        assert find_or_create_issue("33.4.1.5") == 333
+        assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 333
 
 
 def test_find_or_create_issue_exits_on_list_failure(stub_completed) -> None:
@@ -113,7 +113,7 @@ def test_find_or_create_issue_exits_on_list_failure(stub_completed) -> None:
         return_value=stub_completed(returncode=1),
     ):
         with pytest.raises(SystemExit):
-            find_or_create_issue("33.4.1.5")
+            find_or_create_issue("33.4.1.5", labels=_LABELS)
 
 
 def test_find_or_create_issue_exits_on_create_failure(stub_completed) -> None:
@@ -123,7 +123,7 @@ def test_find_or_create_issue_exits_on_create_failure(stub_completed) -> None:
         side_effect=[stub_completed(stdout="[]"), stub_completed(returncode=1)],
     ):
         with pytest.raises(SystemExit):
-            find_or_create_issue("33.4.1.5")
+            find_or_create_issue("33.4.1.5", labels=_LABELS)
 
 
 def test_find_or_create_issue_creates_when_no_title_matches(
@@ -138,7 +138,7 @@ def test_find_or_create_issue_creates_when_no_title_matches(
             stub_completed(stdout=body), stub_completed(stdout=create_url),
         ],
     ):
-        assert find_or_create_issue("33.4.1.5") == 333
+        assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 333
 
 
 # --- find_or_create_issue: new-canonical match ------------------------------
@@ -153,7 +153,7 @@ def test_find_or_create_issue_returns_new_canonical_open(
         "satisfy_subclause.pipeline.subprocess.run",
         return_value=stub_completed(stdout=body),
     ):
-        assert find_or_create_issue("33.4.1.5") == 99
+        assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 99
 
 
 def test_find_or_create_issue_does_not_rename_new_canonical(
@@ -165,7 +165,7 @@ def test_find_or_create_issue_does_not_rename_new_canonical(
         "satisfy_subclause.pipeline.subprocess.run",
         return_value=stub_completed(stdout=body),
     ) as mock_run:
-        find_or_create_issue("33.4.1.5")
+        find_or_create_issue("33.4.1.5", labels=_LABELS)
     rename_calls = [
         call for call in mock_run.call_args_list
         if call[0][0][:3] == ["gh", "issue", "edit"] and "--title" in call[0][0]
@@ -182,7 +182,7 @@ def test_find_or_create_issue_reopens_new_canonical_closed(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ) as mock_run:
-        find_or_create_issue("33.4.1.5")
+        find_or_create_issue("33.4.1.5", labels=_LABELS)
     reopen_cmd = mock_run.call_args_list[1][0][0]
     assert reopen_cmd[:3] == ["gh", "issue", "reopen"]
 
@@ -197,7 +197,7 @@ def _run_rename_open_legacy(stub_completed, title: str, number: int):
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ) as mock_run:
-        find_or_create_issue("33.4.1.5")
+        find_or_create_issue("33.4.1.5", labels=_LABELS)
     return mock_run
 
 
@@ -208,7 +208,7 @@ def _run_reopen_closed_legacy(stub_completed, title: str, number: int):
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 3,
     ) as mock_run:
-        find_or_create_issue("33.4.1.5")
+        find_or_create_issue("33.4.1.5", labels=_LABELS)
     return mock_run
 
 
@@ -222,7 +222,7 @@ def test_find_or_create_issue_returns_legacy_short_number(
             stub_completed(stdout=_payload((99, _LEGACY_SHORT, "OPEN"))),
         ] + [stub_completed()] * 2,
     ):
-        assert find_or_create_issue("33.4.1.5") == 99
+        assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 99
 
 
 def test_find_or_create_issue_renames_legacy_short_to_new_canonical(
@@ -261,7 +261,7 @@ def test_find_or_create_issue_returns_legacy_audit_numeric_open_number(
             stub_completed(stdout=_payload((88, _LEGACY_AUDIT_NUMERIC, "OPEN"))),
         ] + [stub_completed()] * 2,
     ):
-        assert find_or_create_issue("33.4.1.5") == 88
+        assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 88
 
 
 def test_find_or_create_issue_renames_legacy_audit_numeric_open(
@@ -296,7 +296,7 @@ def test_find_or_create_issue_returns_legacy_audit_annex_number(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 3,
     ):
-        assert find_or_create_issue("A.9.3") == 609
+        assert find_or_create_issue("A.9.3", labels=_LABELS) == 609
 
 
 def test_find_or_create_issue_renames_legacy_audit_annex(
@@ -308,7 +308,7 @@ def test_find_or_create_issue_renames_legacy_audit_annex(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ) as mock_run:
-        find_or_create_issue("A.9.3")
+        find_or_create_issue("A.9.3", labels=_LABELS)
     edit_cmd = mock_run.call_args_list[1][0][0]
     assert edit_cmd == [
         "gh", "issue", "edit", "609", "--title",
@@ -328,7 +328,7 @@ def test_find_or_create_issue_returns_master_list_number(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ):
-        assert find_or_create_issue("33") == 35
+        assert find_or_create_issue("33", labels=_LABELS) == 35
 
 
 def test_find_or_create_issue_renames_master_list_to_new_canonical(
@@ -340,7 +340,7 @@ def test_find_or_create_issue_renames_master_list_to_new_canonical(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ) as mock_run:
-        find_or_create_issue("33")
+        find_or_create_issue("33", labels=_LABELS)
     edit_cmd = mock_run.call_args_list[1][0][0]
     assert edit_cmd == [
         "gh", "issue", "edit", "35", "--title",
@@ -357,7 +357,7 @@ def test_find_or_create_issue_reopens_master_list_closed(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 3,
     ) as mock_run:
-        find_or_create_issue("33")
+        find_or_create_issue("33", labels=_LABELS)
     reopen_cmd = mock_run.call_args_list[2][0][0]
     assert reopen_cmd[:3] == ["gh", "issue", "reopen"]
 
@@ -371,7 +371,7 @@ def test_find_or_create_issue_master_list_exact_prefix_match(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
     ):
-        assert find_or_create_issue("33") == 35
+        assert find_or_create_issue("33", labels=_LABELS) == 35
 
 
 def test_find_or_create_issue_master_list_does_not_match_subclause_subprefix(
@@ -386,7 +386,7 @@ def test_find_or_create_issue_master_list_does_not_match_subclause_subprefix(
             stub_completed(stdout=body), stub_completed(stdout=create_url),
         ],
     ):
-        assert find_or_create_issue("33.4") == 700
+        assert find_or_create_issue("33.4", labels=_LABELS) == 700
 
 
 # --- find_or_create_issue: duplicate-deletion path --------------------------
@@ -408,7 +408,7 @@ def test_find_or_create_issue_deletes_newer_duplicate(stub_completed) -> None:
             stub_completed(stdout=_master_list_with_duplicate_payload()),
         ] + [stub_completed()] * 3,
     ) as mock_run:
-        find_or_create_issue("33")
+        find_or_create_issue("33", labels=_LABELS)
     delete_cmd = mock_run.call_args_list[1][0][0]
     assert delete_cmd == ["gh", "issue", "delete", "1276", "--yes"]
 
@@ -423,7 +423,7 @@ def test_find_or_create_issue_keeps_older_when_duplicates(
             stub_completed(stdout=_master_list_with_duplicate_payload()),
         ] + [stub_completed()] * 3,
     ):
-        assert find_or_create_issue("33") == 35
+        assert find_or_create_issue("33", labels=_LABELS) == 35
 
 
 def test_find_or_create_issue_renames_older_master_list_with_duplicates(
@@ -436,7 +436,7 @@ def test_find_or_create_issue_renames_older_master_list_with_duplicates(
             stub_completed(stdout=_master_list_with_duplicate_payload()),
         ] + [stub_completed()] * 3,
     ) as mock_run:
-        find_or_create_issue("33")
+        find_or_create_issue("33", labels=_LABELS)
     edit_cmd = mock_run.call_args_list[2][0][0]
     assert edit_cmd == [
         "gh", "issue", "edit", "35", "--title",
@@ -465,7 +465,7 @@ def test_find_or_create_issue_renames_older_legacy_with_duplicates(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 4,
     ) as mock_run:
-        find_or_create_issue("A.2.1.3")
+        find_or_create_issue("A.2.1.3", labels=_LABELS)
     edit_cmd = mock_run.call_args_list[2][0][0]
     assert edit_cmd == [
         "gh", "issue", "edit", "542", "--title",
@@ -482,7 +482,7 @@ def test_find_or_create_issue_reopens_older_legacy_closed_with_duplicates(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 4,
     ) as mock_run:
-        find_or_create_issue("A.2.1.3")
+        find_or_create_issue("A.2.1.3", labels=_LABELS)
     reopen_cmd = mock_run.call_args_list[3][0][0]
     assert reopen_cmd[:3] == ["gh", "issue", "reopen"]
 
@@ -500,98 +500,12 @@ def test_find_or_create_issue_deletes_all_newer_duplicates(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 4,
     ) as mock_run:
-        find_or_create_issue("33")
+        find_or_create_issue("33", labels=_LABELS)
     delete_targets = [
         call[0][0][3] for call in mock_run.call_args_list[1:3]
         if call[0][0][:3] == ["gh", "issue", "delete"]
     ]
     assert delete_targets == ["1276", "2000"]
-
-
-# --- find_or_create_issue: IEEE 1800-2023 label application ----------------
-
-
-def _label_add_calls(mock_run) -> list[list[str]]:
-    """Return the gh-issue-edit --add-label calls captured by *mock_run*."""
-    return [
-        call[0][0] for call in mock_run.call_args_list
-        if call[0][0][:3] == ["gh", "issue", "edit"]
-        and "--add-label" in call[0][0]
-    ]
-
-
-def test_find_or_create_issue_create_passes_label(stub_completed) -> None:
-    """gh issue create receives the IEEE 1800-2023 label for new issues."""
-    url = "https://github.com/o/r/issues/777"
-    with patch(
-        "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout="[]"), stub_completed(stdout=url)],
-    ) as mock_run:
-        find_or_create_issue("33.4.1.5")
-    create_cmd = mock_run.call_args_list[1][0][0]
-    assert create_cmd[create_cmd.index("--label") + 1] == _LABEL
-
-
-def test_find_or_create_issue_applies_label_to_canonical_match(
-    stub_completed,
-) -> None:
-    """A canonical-titled match gets the IEEE 1800-2023 label applied."""
-    body = _payload((99, _NEW_CANONICAL, "OPEN"))
-    with patch(
-        "satisfy_subclause.pipeline.subprocess.run",
-        return_value=stub_completed(stdout=body),
-    ) as mock_run:
-        find_or_create_issue("33.4.1.5")
-    assert _label_add_calls(mock_run) == [
-        ["gh", "issue", "edit", "99", "--add-label", _LABEL],
-    ]
-
-
-def test_find_or_create_issue_applies_label_to_renamed_legacy(
-    stub_completed,
-) -> None:
-    """A legacy-titled match gets the label applied after rename."""
-    mock_run = _run_rename_open_legacy(stub_completed, _LEGACY_SHORT, 99)
-    assert _label_add_calls(mock_run) == [
-        ["gh", "issue", "edit", "99", "--add-label", _LABEL],
-    ]
-
-
-def test_find_or_create_issue_applies_label_to_master_list_match(
-    stub_completed,
-) -> None:
-    """A master-list-titled match gets the label applied."""
-    body = _payload((35, _MASTER_LIST, "OPEN"))
-    with patch(
-        "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
-    ) as mock_run:
-        find_or_create_issue("33")
-    assert _label_add_calls(mock_run) == [
-        ["gh", "issue", "edit", "35", "--add-label", _LABEL],
-    ]
-
-
-def test_find_or_create_issue_applies_label_after_reopen(
-    stub_completed,
-) -> None:
-    """A closed match is reopened and then labelled (not labelled while closed)."""
-    body = _payload((55, _NEW_CANONICAL, "CLOSED"))
-    with patch(
-        "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
-    ) as mock_run:
-        find_or_create_issue("33.4.1.5")
-    reopen_index = next(
-        i for i, call in enumerate(mock_run.call_args_list)
-        if call[0][0][:3] == ["gh", "issue", "reopen"]
-    )
-    label_index = next(
-        i for i, call in enumerate(mock_run.call_args_list)
-        if call[0][0][:3] == ["gh", "issue", "edit"]
-        and "--add-label" in call[0][0]
-    )
-    assert reopen_index < label_index
 
 
 # --- dispatch_cycle ---------------------------------------------------------
@@ -616,7 +530,10 @@ def test_dispatch_cycle_invokes_set_mutator() -> None:
     mock_issue, mock_mut = _patched_for_cycle()
     with mock_issue:
         with mock_mut as mut:
-            dispatch_cycle(["33.4.1.5", "33.6"], "~/LRM.pdf", model="opus")
+            dispatch_cycle(
+                ["33.4.1.5", "33.6"], "~/LRM.pdf",
+                model="opus", labels=_LABELS,
+            )
     members_arg = mut.call_args[0][0]
     assert len(members_arg) == 2
 
@@ -626,7 +543,10 @@ def test_dispatch_cycle_passes_issues() -> None:
     mock_issue, mock_mut = _patched_for_cycle(issues=(200, 201))
     with mock_issue:
         with mock_mut as mut:
-            dispatch_cycle(["33.4.1.5", "33.6"], "~/LRM.pdf", model="opus")
+            dispatch_cycle(
+                ["33.4.1.5", "33.6"], "~/LRM.pdf",
+                model="opus", labels=_LABELS,
+            )
     issues_seen = [m.issue for m in mut.call_args[0][0]]
     assert issues_seen == [200, 201]
 
@@ -636,7 +556,10 @@ def test_dispatch_cycle_passes_subclauses() -> None:
     mock_issue, mock_mut = _patched_for_cycle()
     with mock_issue:
         with mock_mut as mut:
-            dispatch_cycle(["33.4.1.5", "33.6"], "~/LRM.pdf", model="opus")
+            dispatch_cycle(
+                ["33.4.1.5", "33.6"], "~/LRM.pdf",
+                model="opus", labels=_LABELS,
+            )
     subs_seen = [m.subclause for m in mut.call_args[0][0]]
     assert subs_seen == ["33.4.1.5", "33.6"]
 
@@ -646,7 +569,10 @@ def test_dispatch_cycle_does_not_call_oracle() -> None:
     mock_issue, mock_mut = _patched_for_cycle()
     with mock_issue:
         with mock_mut:
-            dispatch_cycle(["33.4.1.5", "33.6"], "~/LRM.pdf", model="opus")
+            dispatch_cycle(
+                ["33.4.1.5", "33.6"], "~/LRM.pdf",
+                model="opus", labels=_LABELS,
+            )
     assert not hasattr(oracles, "is_subclause_satisfied")
 
 
@@ -681,34 +607,29 @@ def _patched_dispatch():
     )
 
 
+def _run_inner_for_deps(deps: list[str]) -> tuple[bool, bool]:
+    """Run the inner orchestrator and report (no_deps_called, with_deps_called)."""
+    mock_deps, mock_satisfy = _patched_inner(deps)
+    no_p, with_p = _patched_dispatch()
+    with mock_deps, mock_satisfy, no_p as mock_no, with_p as mock_with:
+        satisfy_unsatisfied_subclause(
+            _target("33.4.1.5"), "~/LRM.pdf",
+            model="opus", labels=_LABELS,
+            in_progress=frozenset({"33.4.1.5"}),
+        )
+    return mock_no.called, mock_with.called
+
+
 def test_inner_no_deps_invokes_no_deps_mutator() -> None:
     """Inner orch with no deps dispatches to the no-deps mutator."""
-    mock_deps, mock_satisfy = _patched_inner([])
-    no_p, with_p = _patched_dispatch()
-    with mock_deps:
-        with mock_satisfy:
-            with no_p as mock_no:
-                with with_p as mock_with:
-                    satisfy_unsatisfied_subclause(
-                        _target("33.4.1.5"), "~/LRM.pdf",
-                        model="opus", in_progress=frozenset({"33.4.1.5"}),
-                    )
-    assert mock_no.called and not mock_with.called
+    no_called, with_called = _run_inner_for_deps([])
+    assert no_called and not with_called
 
 
 def test_inner_with_deps_invokes_with_deps_mutator() -> None:
     """Inner orch with deps dispatches to the with-deps mutator."""
-    mock_deps, mock_satisfy = _patched_inner(["33.6.1"])
-    no_p, with_p = _patched_dispatch()
-    with mock_deps:
-        with mock_satisfy:
-            with no_p as mock_no:
-                with with_p as mock_with:
-                    satisfy_unsatisfied_subclause(
-                        _target("33.4.1.5"), "~/LRM.pdf",
-                        model="opus", in_progress=frozenset({"33.4.1.5"}),
-                    )
-    assert mock_with.called and not mock_no.called
+    no_called, with_called = _run_inner_for_deps(["33.6.1"])
+    assert with_called and not no_called
 
 
 def test_inner_returns_satisfied_after_dispatch() -> None:
@@ -722,7 +643,8 @@ def test_inner_returns_satisfied_after_dispatch() -> None:
             ):
                 result = satisfy_unsatisfied_subclause(
                     _target("33.4.1.5"), "~/LRM.pdf",
-                    model="opus", in_progress=frozenset({"33.4.1.5"}),
+                    model="opus", labels=_LABELS,
+                    in_progress=frozenset({"33.4.1.5"}),
                 )
     assert result == {"status": "satisfied"}
 
@@ -734,7 +656,8 @@ def test_inner_detects_cycle_in_own_deps() -> None:
         with mock_satisfy:
             result = satisfy_unsatisfied_subclause(
                 _target("33.4.1.5"), "~/LRM.pdf",
-                model="opus", in_progress=frozenset({"33.4.1.5", "33.4"}),
+                model="opus", labels=_LABELS,
+                in_progress=frozenset({"33.4.1.5", "33.4"}),
             )
     assert result["status"] == "cycle" and "33.4" in result["members"]
 
@@ -746,7 +669,8 @@ def test_inner_includes_self_in_cycle_members() -> None:
         with mock_satisfy:
             result = satisfy_unsatisfied_subclause(
                 _target("33.4.1.5"), "~/LRM.pdf",
-                model="opus", in_progress=frozenset({"33.4.1.5", "33.4"}),
+                model="opus", labels=_LABELS,
+                in_progress=frozenset({"33.4.1.5", "33.4"}),
             )
     assert "33.4.1.5" in result["members"]
 
@@ -761,7 +685,8 @@ def test_inner_propagates_cycle_from_dep() -> None:
         with mock_satisfy:
             result = satisfy_unsatisfied_subclause(
                 _target("33.4.1.5"), "~/LRM.pdf",
-                model="opus", in_progress=frozenset({"33.4.1.5"}),
+                model="opus", labels=_LABELS,
+                in_progress=frozenset({"33.4.1.5"}),
             )
     assert result["status"] == "cycle"
 
@@ -777,7 +702,8 @@ def test_inner_logs_subclause_to_stderr(capsys) -> None:
             ):
                 satisfy_unsatisfied_subclause(
                     _target("33.4.1.5"), "~/LRM.pdf",
-                    model="opus", in_progress=frozenset({"33.4.1.5"}),
+                    model="opus", labels=_LABELS,
+                    in_progress=frozenset({"33.4.1.5"}),
                 )
     assert "§33.4.1.5" in capsys.readouterr().err
 
@@ -807,7 +733,8 @@ def test_satisfy_runs_inner_pipeline_unconditionally() -> None:
         with inner as mock_inner:
             with cycle:
                 satisfy_subclause(
-                    "33.4.1.5", "~/LRM.pdf", model="opus",
+                    "33.4.1.5", "~/LRM.pdf",
+                    model="opus", labels=_LABELS,
                 )
     assert mock_inner.called
 
@@ -819,7 +746,8 @@ def test_satisfy_returns_satisfied_after_inner_pipeline() -> None:
         with inner:
             with cycle:
                 result = satisfy_subclause(
-                    "33.4.1.5", "~/LRM.pdf", model="opus",
+                    "33.4.1.5", "~/LRM.pdf",
+                    model="opus", labels=_LABELS,
                 )
     assert result == {"status": "satisfied"}
 
@@ -831,7 +759,8 @@ def test_satisfy_runs_pipeline_only_once() -> None:
         with inner as mock_inner:
             with cycle:
                 satisfy_subclause(
-                    "33.4.1.5", "~/LRM.pdf", model="opus",
+                    "33.4.1.5", "~/LRM.pdf",
+                    model="opus", labels=_LABELS,
                 )
     assert mock_inner.call_count == 1
 
@@ -844,7 +773,8 @@ def test_satisfy_propagates_cycle_when_nested() -> None:
         with inner:
             with cycle as mock_dispatch:
                 result = satisfy_subclause(
-                    "33.4.1.5", "~/LRM.pdf", model="opus",
+                    "33.4.1.5", "~/LRM.pdf",
+                    model="opus", labels=_LABELS,
                     in_progress=frozenset({"33.4"}),
                 )
     assert result["status"] == "cycle" and not mock_dispatch.called
@@ -858,7 +788,8 @@ def test_satisfy_dispatches_cycle_at_outermost_frame() -> None:
         with inner:
             with cycle as mock_dispatch:
                 satisfy_subclause(
-                    "33.4.1.5", "~/LRM.pdf", model="opus",
+                    "33.4.1.5", "~/LRM.pdf",
+                    model="opus", labels=_LABELS,
                 )
     assert mock_dispatch.called
 
@@ -870,7 +801,8 @@ def test_satisfy_logs_subclause_to_stderr(capsys) -> None:
         with inner:
             with cycle:
                 satisfy_subclause(
-                    "33.4.1.5", "~/LRM.pdf", model="opus",
+                    "33.4.1.5", "~/LRM.pdf",
+                    model="opus", labels=_LABELS,
                 )
     assert "§33.4.1.5" in capsys.readouterr().err
 

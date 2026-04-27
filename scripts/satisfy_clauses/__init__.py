@@ -11,6 +11,7 @@ import argparse
 
 from lib.python.cli import (
     add_clauses_arg,
+    add_labels_arg,
     add_lrm_arg,
     add_model_arg,
     parse_and_validate,
@@ -31,10 +32,14 @@ def parse_args(argv=None) -> argparse.Namespace:
     add_lrm_arg(parser)
     add_clauses_arg(parser)
     add_model_arg(parser)
+    add_labels_arg(parser)
     return parse_and_validate(parser, argv)
 
 
 def main(argv=None) -> None:
     """Run satisfy_clause for each requested clause."""
     args = parse_args(argv)
-    satisfy_clauses(args.clauses, str(args.lrm), model=args.model)
+    satisfy_clauses(
+        args.clauses, str(args.lrm),
+        model=args.model, labels=args.labels,
+    )

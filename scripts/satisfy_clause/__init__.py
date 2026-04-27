@@ -13,6 +13,7 @@ import argparse
 
 from lib.python.cli import (
     add_clause_arg,
+    add_labels_arg,
     add_lrm_arg,
     add_model_arg,
     parse_and_validate_clause,
@@ -34,10 +35,14 @@ def parse_args(argv=None) -> argparse.Namespace:
     add_lrm_arg(parser)
     add_clause_arg(parser)
     add_model_arg(parser)
+    add_labels_arg(parser)
     return parse_and_validate_clause(parser, argv)
 
 
 def main(argv=None) -> None:
     """Run satisfy_subclauses across §clause's descendants."""
     args = parse_args(argv)
-    satisfy_clause(args.clause, str(args.lrm), model=args.model)
+    satisfy_clause(
+        args.clause, str(args.lrm),
+        model=args.model, labels=args.labels,
+    )

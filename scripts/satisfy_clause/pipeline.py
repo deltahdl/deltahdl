@@ -28,7 +28,9 @@ def descendants_of(
     )
 
 
-def satisfy_clause(clause: str, lrm: str, *, model: str) -> None:
+def satisfy_clause(
+    clause: str, lrm: str, *, model: str, labels: list[str],
+) -> None:
     """Enumerate §``clause``'s descendants and delegate to satisfy_subclauses."""
     toc = load_toc(lrm)
     descendants = descendants_of(clause, toc)
@@ -37,4 +39,4 @@ def satisfy_clause(clause: str, lrm: str, *, model: str) -> None:
             f"satisfy_clause: §{clause} has no descendants in the TOC"
             f" loaded from {lrm}. Check that --lrm names the correct PDF."
         )
-    satisfy_subclauses(descendants, lrm, model=model)
+    satisfy_subclauses(descendants, lrm, model=model, labels=labels)
