@@ -419,6 +419,41 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+  test-satisfy-clause:
+    needs:
+      - test-lib-cli
+      - test-lib-lrm
+      - test-satisfy-subclauses
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-script-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-script-
+      - name: Install tools
+        run: pip install pypdf pytest pytest-cov
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/satisfy_clause/unit/ -v
+          --cov=satisfy_clause
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+      - name: Run integration tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/satisfy_clause/integration/ -v
+      - name: Run e2e tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/satisfy_clause/e2e/ -v
   test-satisfy-subclause:
     needs:
       - test-lib-clause
