@@ -30,7 +30,7 @@ _DESCRIPTION = (
 
 def parse_args(argv=None) -> argparse.Namespace:
     """Parse and validate CLI arguments."""
-    parser = argparse.ArgumentParser(description=_DESCRIPTION)
+    parser = argparse.ArgumentParser(prog=__package__, description=_DESCRIPTION)
     add_lrm_arg(parser)
     add_subclause_arg(parser)
     add_model_arg(parser)

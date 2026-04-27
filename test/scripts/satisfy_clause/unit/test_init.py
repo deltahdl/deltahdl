@@ -59,6 +59,17 @@ def test_parse_args_rejects_subclause(make_lrm) -> None:
         ])
 
 
+def test_parse_args_usage_names_package(make_lrm, capsys) -> None:
+    """Error usage line names the package, not __main__.py."""
+    try:
+        satisfy_clause.parse_args([
+            "--lrm", str(make_lrm), "--clause", "33.1",
+        ])
+    except SystemExit:
+        pass
+    assert capsys.readouterr().err.startswith("usage: satisfy_clause")
+
+
 # --- main ------------------------------------------------------------------
 
 
