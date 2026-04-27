@@ -23,6 +23,7 @@ working tree changed — empty diff means §X already satisfied (or now
 does); non-empty diff is committed with a ``Closes #N`` trailer.
 """
 
+import subprocess
 import sys
 from dataclasses import dataclass
 
@@ -161,17 +162,42 @@ def build_commit_message(
     return f"{title}\n\n{summary}\n\n{closes}\n"
 
 
+def _close_satisfied_issue(subclause: str, issue: int) -> None:
+    """Close the GitHub issue tracking *subclause*.
+
+    Used when the mutator produced no commit-worthy edits, which means
+    §X is already satisfied (or has no normative statements of its own
+    to satisfy). Without this, an empty diff would never push a
+    ``Closes #N`` trailer and the issue would stay open forever.
+    """
+    label = format_subclause_label(subclause)
+    comment = (
+        f"Mutator for {label} produced no source-tree changes."
+        f" {label} is already satisfied, or has no normative"
+        " statements of its own to implement."
+    )
+    subprocess.run(
+        ["gh", "issue", "close", str(issue), "--comment", comment],
+        check=False,
+    )
+
+
 def commit_mutator_result(
     subclauses: list[str], issues: list[int],
 ) -> bool:
     """Commit + push porcelain changes with a Closes trailer.
 
     Returns ``True`` if anything was committed, ``False`` if the working
-    tree had no source-tree changes after the mutator run.
+    tree had no source-tree changes after the mutator run. In the
+    no-changes case, closes each tracking issue directly via ``gh issue
+    close`` so the satisfaction state is recorded on GitHub even when
+    no commit lands.
     """
     added, modified, deleted = filter_changes(get_porcelain_changes())
     changed = added + modified
     if not changed and not deleted:
+        for subclause, issue in zip(subclauses, issues, strict=True):
+            _close_satisfied_issue(subclause, issue)
         return False
     summary_lines = [f"- Added {p}" for p in sorted(added)] + \
                     [f"- Modified {p}" for p in sorted(modified)] + \
