@@ -15,17 +15,6 @@ TEST_F(CheckerParseTest, EmptyChecker) {
   EXPECT_TRUE(unit->checkers[0]->items.empty());
 }
 
-TEST_F(CheckerParseTest, CheckerCoexistsWithModuleAndProgram) {
-  auto* unit = Parse(R"(
-    module m; endmodule
-    program p; endprogram
-    checker c; endchecker
-  )");
-  EXPECT_EQ(unit->modules.size(), 1u);
-  EXPECT_EQ(unit->programs.size(), 1u);
-  EXPECT_EQ(unit->checkers.size(), 1u);
-}
-
 TEST(FormalSyntaxParsing, CheckerDecl) {
   auto r = Parse("checker chk; endchecker\n");
   ASSERT_NE(r.cu, nullptr);

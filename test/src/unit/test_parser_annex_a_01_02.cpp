@@ -53,50 +53,6 @@ TEST(SourceText, CompilationUnitMultipleItems) {
   EXPECT_EQ(r.cu->interfaces.size(), 1u);
 }
 
-TEST(UdpDeclGrammar, UdpWithModule) {
-  auto r = Parse(
-      "primitive inv(output out, input in);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module top;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->udps.size(), 1u);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(UserDefinedPrimitiveParsing, UdpCoexistsWithModule) {
-  auto r = Parse(
-      "primitive inv(output out, input in);\n"
-      "  table\n"
-      "    0 : 1;\n"
-      "    1 : 0;\n"
-      "  endtable\n"
-      "endprimitive\n"
-      "module top;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->udps.size(), 1);
-  ASSERT_EQ(r.cu->modules.size(), 1);
-}
-
-TEST_F(ConfigParseTest, ConfigCoexistsWithModule) {
-  auto* unit = Parse(R"(
-    module m;
-    endmodule
-    config cfg;
-      design lib.top;
-    endconfig
-  )");
-  EXPECT_EQ(unit->modules.size(), 1u);
-  EXPECT_EQ(unit->configs.size(), 1u);
-  EXPECT_EQ(unit->configs[0]->name, "cfg");
-}
-
 TEST_F(ConfigParseTest, MultipleConfigs) {
   auto* unit = Parse(R"(
     config cfg1;

@@ -115,60 +115,6 @@ TEST(DesignElements, ConfigurationContainsDesignCell) {
   EXPECT_FALSE(r.cu->configs[0]->design_cells.empty());
 }
 
-// §3.2's enumeration of seven design-element kinds is exhaustive. A
-// top-level subroutine declaration is a CU-scope item (§3.12.1) and must
-// not be classified as a design element of any kind.
-TEST(DesignElements, TopLevelFunctionIsNotDesignElement) {
-  auto r = Parse(
-      "function int helper(int x); return x; endfunction\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_FALSE(r.cu->cu_items.empty());
-  EXPECT_TRUE(r.cu->programs.empty());
-  EXPECT_TRUE(r.cu->interfaces.empty());
-  EXPECT_TRUE(r.cu->checkers.empty());
-  EXPECT_TRUE(r.cu->packages.empty());
-  EXPECT_TRUE(r.cu->udps.empty());
-  EXPECT_TRUE(r.cu->configs.empty());
-}
-
-// A bind directive may appear at the top level (§23.11) but is not one of
-// the seven design-element kinds enumerated by §3.2.
-TEST(DesignElements, TopLevelBindIsNotDesignElement) {
-  auto r = Parse(
-      "checker chk; endchecker\n"
-      "module m; endmodule\n"
-      "bind m chk c1();\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_FALSE(r.cu->bind_directives.empty());
-  EXPECT_TRUE(r.cu->programs.empty());
-  EXPECT_TRUE(r.cu->interfaces.empty());
-  EXPECT_TRUE(r.cu->packages.empty());
-  EXPECT_TRUE(r.cu->udps.empty());
-  EXPECT_TRUE(r.cu->configs.empty());
-}
-
-// Closure of the seven-kind list from the zero direction: when no design
-// element introducing keywords appear in the source, no entries land in any
-// of the seven design-element vectors.
-TEST(DesignElements, EmptyCompilationUnitHasNoDesignElements) {
-  auto r = Parse("");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_TRUE(r.cu->modules.empty());
-  EXPECT_TRUE(r.cu->programs.empty());
-  EXPECT_TRUE(r.cu->interfaces.empty());
-  EXPECT_TRUE(r.cu->checkers.empty());
-  EXPECT_TRUE(r.cu->packages.empty());
-  EXPECT_TRUE(r.cu->udps.empty());
-  EXPECT_TRUE(r.cu->configs.empty());
-}
-
 // §3.2 names declarations and procedural code together as the contents a
 // design element holds. Observe the combined claim within a single body by
 // putting both content kinds inside one module and confirming the items

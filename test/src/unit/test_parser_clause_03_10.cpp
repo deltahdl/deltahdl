@@ -16,17 +16,6 @@ TEST(DesignBuildingBlockParsing, ConfigEnclosedByKeywords) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-TEST(DesignBuildingBlockParsing, ConfigWithDesignCell) {
-  auto r = Parse(
-      "module top; endmodule\n"
-      "config cfg;\n"
-      "  design top;\n"
-      "endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_FALSE(r.cu->configs[0]->design_cells.empty());
-}
-
 TEST(DesignBuildingBlockParsing, ConfigWithDefaultRule) {
   EXPECT_TRUE(
       ParseOk("module m; endmodule\n"
@@ -34,19 +23,6 @@ TEST(DesignBuildingBlockParsing, ConfigWithDefaultRule) {
               "  design m;\n"
               "  default liblist work;\n"
               "endconfig\n"));
-}
-
-TEST(DesignBuildingBlockParsing, ConfigAndModuleCoexist) {
-  auto r = Parse(
-      "module a; endmodule\n"
-      "module b; endmodule\n"
-      "config cfg;\n"
-      "  design a;\n"
-      "endconfig\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->modules.size(), 2u);
-  EXPECT_EQ(r.cu->configs.size(), 1u);
 }
 
 }  // namespace

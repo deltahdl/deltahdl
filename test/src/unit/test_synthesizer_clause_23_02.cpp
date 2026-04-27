@@ -5,7 +5,8 @@
 
 namespace {
 
-// §3.2 Design elements — synthesis of design element building blocks.
+// §23.2 Module definitions — a minimal empty module reaches the synthesizer
+// and lowers to an AIG without diagnostics.
 TEST(ModuleDefinitions, MinimalEmpty) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f, "module m; endmodule");

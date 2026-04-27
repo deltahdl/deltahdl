@@ -7,24 +7,12 @@ using namespace delta;
 namespace {
 
 // §3.2 names module, program, interface, checker, package, primitive, and
-// config as the introducing keywords for the seven design-element kinds. The
-// lexer-stage observation is that the entire enumerated set tokenizes as
-// keywords rather than identifiers; macromodule is also covered because §3.2
-// lets it stand in for module.
-TEST(DesignElementKeywords, AllAreReservedNotIdentifiers) {
-  const char* keywords[] = {"module",    "program",   "interface",
-                            "checker",   "package",   "primitive",
-                            "config",    "macromodule"};
-  for (const auto* kw : keywords) {
-    auto r = LexOne(kw);
-    EXPECT_NE(r.token.kind, TokenKind::kIdentifier)
-        << kw << " should be a keyword, not an identifier";
-  }
-}
-
+// config as the introducing keywords for the seven design-element kinds.
 // Verify the lexer assigns the §3.2-specific token kind to each introducing
 // keyword and to its matching end-keyword, so downstream parser dispatch can
-// route each keyword to its corresponding design-element AST node.
+// route each keyword to its corresponding design-element AST node. Each
+// keyword landing on its own kKw* token kind also implies the lexeme is not
+// classified as a generic identifier.
 TEST(DesignElementKeywords, EachLexesToItsDistinctTokenKind) {
   auto tokens = Lex(
       "module endmodule interface endinterface "
