@@ -277,4 +277,43 @@ TEST(VarDecl, StaticInPackageOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.8 footnote 17: applying a packed dimension to a struct type is
+// only legal when the struct is also marked packed; the elaborator
+// must reject the unpacked-struct + packed-dim combination.
+TEST(VarDecl, StructPackedDimWithoutPackedKeywordIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  struct { int x; } [3:0] s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.8 footnote 17: same rule for union — a packed dimension on an
+// unpacked union is illegal.
+TEST(VarDecl, UnionPackedDimWithoutPackedKeywordIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  union { int x; logic [31:0] y; } [3:0] u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §6.8 footnote 17: a packed struct accepts a packed dimension; this
+// is the legal counterpart to the negative test above and confirms the
+// rule fires only when the packed keyword is missing.
+TEST(VarDecl, PackedStructWithPackedDimOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  struct packed { logic [7:0] a; logic [7:0] b; } [3:0] s;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

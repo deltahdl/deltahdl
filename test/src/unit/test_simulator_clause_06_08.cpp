@@ -224,4 +224,34 @@ TEST(VariableDeclaration, EventDefaultIsNewEvent) {
   EXPECT_FALSE(var->is_null_event);
 }
 
+// §6.8: A declaration-time initializer is not restricted to a literal —
+// any expression that evaluates at the start of simulation is valid.
+// Verify a compound arithmetic expression is folded and its result is
+// observable from a procedural read at time zero.
+TEST(VariableDeclaration, StaticInitializerWithBinaryExpression) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int x = 10 * 4 + 2;\n"
+      "  int observed;\n"
+      "  initial observed = x;\n"
+      "endmodule\n",
+      "observed");
+  EXPECT_EQ(val, 42u);
+}
+
+// §6.8: An initializer expression may reference an earlier static
+// variable; the dependency is resolved before any initial procedure
+// starts so the observed value reflects the chained initialization.
+TEST(VariableDeclaration, StaticInitializerReferencesEarlierStatic) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int base = 7;\n"
+      "  int derived = base * 6;\n"
+      "  int observed;\n"
+      "  initial observed = derived;\n"
+      "endmodule\n",
+      "observed");
+  EXPECT_EQ(val, 42u);
+}
+
 }  // namespace
