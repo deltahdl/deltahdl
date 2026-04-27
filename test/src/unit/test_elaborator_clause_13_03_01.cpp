@@ -4,32 +4,9 @@ using namespace delta;
 
 namespace {
 
-TEST(TaskLifetimeElaboration, AutomaticTaskElaborates) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  task automatic my_task(input int n);\n"
-      "    #10;\n"
-      "  endtask\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(TaskDeclElaboration, StaticTaskElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  task static counter();\n"
-      "    int cnt;\n"
-      "    cnt = cnt + 1;\n"
-      "  endtask\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
+// Lifetime-keyword acceptance on task declarations is a §6.21 rule;
+// the corresponding elaborator tests (TaskDeclLifetimeAutomatic and
+// TaskDeclLifetimeStatic) live in test_elaborator_clause_06_21.cpp.
 
 TEST(TaskDeclElaboration, StaticVarInAutoTaskElaborates) {
   ElabFixture f;

@@ -88,43 +88,11 @@ TEST(FunctionLifetimeSim, DefaultFunctionIsStatic) {
   EXPECT_EQ(val, 2u);
 }
 
-TEST(FunctionLifetimeSim, StaticVarInAutomaticFunctionPersists) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  function automatic int get_id();\n"
-      "    static int next_id = 0;\n"
-      "    next_id = next_id + 1;\n"
-      "    return next_id;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    result = get_id();\n"
-      "    result = get_id();\n"
-      "    result = get_id();\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(val, 3u);
-}
-
-TEST(FunctionLifetimeSim, AutomaticVarInStaticFunctionFresh) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  function static int compute();\n"
-      "    automatic int tmp = 10;\n"
-      "    tmp = tmp + 1;\n"
-      "    return tmp;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    result = compute();\n"
-      "    result = compute();\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-
-  EXPECT_EQ(val, 11u);
-}
+// Static-var-in-auto-func persistence and auto-var-in-static-func
+// freshness are §6.21 lifetime semantics; the corresponding simulator
+// tests (ExplicitStaticInAutoFuncBlockPersists,
+// ExplicitAutoInStaticFuncBlockFresh) live in
+// test_simulator_clause_06_21.cpp.
 
 TEST(FunctionLifetimeSim, RecursiveAutomaticFunction) {
   auto val = RunAndGet(

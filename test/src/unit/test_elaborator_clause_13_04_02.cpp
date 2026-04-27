@@ -6,63 +6,11 @@ using namespace delta;
 
 namespace {
 
-TEST(FunctionLifetimeElaboration, AutomaticFunctionElaborates) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  function automatic int fact(input int n);\n"
-      "    if (n <= 1) return 1;\n"
-      "    return n;\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(FunctionLifetimeElaboration, StaticFunctionElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  function static int counter();\n"
-      "    int cnt;\n"
-      "    cnt = cnt + 1;\n"
-      "    return cnt;\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(FunctionLifetimeElaboration, StaticVarInAutomaticFunctionElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  function automatic int get_id();\n"
-      "    static int next_id = 0;\n"
-      "    next_id = next_id + 1;\n"
-      "    return next_id;\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(FunctionLifetimeElaboration, AutomaticVarInStaticFunctionElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  function static int compute(int x);\n"
-      "    automatic int tmp = x * 2;\n"
-      "    return tmp;\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
+// Lifetime-keyword acceptance on function declarations, plus the
+// auto-var-in-static-func and static-var-in-auto-func cases, are §6.21
+// rules; the corresponding elaborator tests (FunctionDeclLifetime*,
+// StaticVarInAutoFunc, AutoVarInStaticFunc) live in
+// test_elaborator_clause_06_21.cpp.
 
 TEST(FunctionLifetimeElaboration, DefaultLifetimeFunctionElaborates) {
   ElabFixture f;
@@ -77,18 +25,8 @@ TEST(FunctionLifetimeElaboration, DefaultLifetimeFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(FunctionLifetimeElaboration, FunctionInAutomaticModuleElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module automatic m;\n"
-      "  function int add(int a, int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
+// The module-level `automatic` lifetime qualifier is a §6.21 rule;
+// see ModuleAutomaticLifetime in test_elaborator_clause_06_21.cpp.
 
 TEST(FunctionLifetimeElaboration, RecursiveAutomaticFunctionElaborates) {
   ElabFixture f;
