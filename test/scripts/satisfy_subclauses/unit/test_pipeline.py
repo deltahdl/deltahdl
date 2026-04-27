@@ -25,4 +25,4 @@ def test_satisfy_subclauses_empty_list_no_dispatch(monkeypatch) -> None:
         lambda s, lrm, *, model: calls.append((s, lrm, model)),
     )
     satisfy_subclauses([], "lrm.pdf", model="opus")
-    assert calls == []
+    assert not calls
