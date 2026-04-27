@@ -147,6 +147,25 @@ def parse_subclauses(raw: str) -> list[str]:
     return parts
 
 
+def parse_clauses(raw: str) -> list[str]:
+    """Split a comma-separated clause list and validate each entry."""
+    parts = [s.strip() for s in raw.split(",")]
+    for part in parts:
+        if CLAUSE_ONLY_RE.match(part):
+            continue
+        if SUBCLAUSE_RE.match(part):
+            raise argparse.ArgumentTypeError(
+                f"--clauses entry '{part}' is a subclause; "
+                "use satisfy_subclauses --subclauses instead."
+            )
+        raise argparse.ArgumentTypeError(
+            f"Invalid clause format '{part}'. "
+            "Expected a single number (e.g. 33) or "
+            "uppercase annex letter (e.g. A)."
+        )
+    return parts
+
+
 def add_labels_arg(parser: argparse.ArgumentParser) -> None:
     """Add the ``--labels`` argument to *parser*."""
     parser.add_argument(
@@ -164,6 +183,16 @@ def add_subclauses_arg(parser: argparse.ArgumentParser) -> None:
         type=parse_subclauses,
         required=True,
         help="Comma-separated subclauses (e.g. '33.1,33.4,A.5').",
+    )
+
+
+def add_clauses_arg(parser: argparse.ArgumentParser) -> None:
+    """Add the ``--clauses`` argument to *parser*."""
+    parser.add_argument(
+        "--clauses",
+        type=parse_clauses,
+        required=True,
+        help="Comma-separated clauses (e.g. '32,33,A').",
     )
 
 

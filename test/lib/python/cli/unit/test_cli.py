@@ -9,6 +9,7 @@ import pytest
 
 from lib.python.cli import (
     add_clause_arg,
+    add_clauses_arg,
     add_continue_arg,
     add_github_args,
     add_labels_arg,
@@ -19,6 +20,7 @@ from lib.python.cli import (
     parse_and_validate,
     parse_and_validate_clause,
     parse_and_validate_subclause,
+    parse_clauses,
     parse_labels,
     parse_subclauses,
     run_claude_cli,
@@ -516,5 +518,60 @@ def test_add_subclauses_arg_required() -> None:
     """--subclauses is required."""
     parser = argparse.ArgumentParser()
     add_subclauses_arg(parser)
+    with pytest.raises(SystemExit):
+        parser.parse_args([])
+
+
+# ---- parse_clauses ---------------------------------------------------------
+
+
+def test_parse_clauses_single() -> None:
+    """Single entry returns a one-element list."""
+    assert parse_clauses("33") == ["33"]
+
+
+def test_parse_clauses_multiple() -> None:
+    """Comma-separated entries are split into a list."""
+    assert parse_clauses("32,33,A") == ["32", "33", "A"]
+
+
+def test_parse_clauses_strips_whitespace() -> None:
+    """Whitespace around commas is stripped."""
+    assert parse_clauses(" 32 , A ") == ["32", "A"]
+
+
+def test_parse_clauses_rejects_subclause_entry() -> None:
+    """A depth-≥1 entry raises ArgumentTypeError."""
+    with pytest.raises(argparse.ArgumentTypeError):
+        parse_clauses("32,33.1")
+
+
+def test_parse_clauses_subclause_error_routes_to_satisfy_subclauses() -> None:
+    """Subclause-shaped entry's error names ``satisfy_subclauses``."""
+    with pytest.raises(argparse.ArgumentTypeError, match="satisfy_subclauses"):
+        parse_clauses("33.1")
+
+
+def test_parse_clauses_rejects_garbage_entry() -> None:
+    """A malformed entry raises ArgumentTypeError."""
+    with pytest.raises(argparse.ArgumentTypeError):
+        parse_clauses("garbage")
+
+
+# ---- add_clauses_arg -------------------------------------------------------
+
+
+def test_add_clauses_arg() -> None:
+    """Adds --clauses parsed into a validated list."""
+    parser = argparse.ArgumentParser()
+    add_clauses_arg(parser)
+    args = parser.parse_args(["--clauses", "32,33,A"])
+    assert args.clauses == ["32", "33", "A"]
+
+
+def test_add_clauses_arg_required() -> None:
+    """--clauses is required."""
+    parser = argparse.ArgumentParser()
+    add_clauses_arg(parser)
     with pytest.raises(SystemExit):
         parser.parse_args([])
