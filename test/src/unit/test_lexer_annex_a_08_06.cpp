@@ -284,4 +284,110 @@ TEST(OperatorLexing, MinusMinusNotTwoMinus) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
 }
 
+// §A.8.6: multi-char operator tokens are atomic. Whitespace separating their
+// constituent characters must yield two distinct single-char tokens, not the
+// merged operator.
+
+TEST(OperatorLexing, WhitespaceBreaksLtEq) {
+  auto tokens = Lex("a < = b");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kLt);
+  EXPECT_NE(tokens[2].kind, TokenKind::kLtEq);
+}
+
+TEST(OperatorLexing, WhitespaceBreaksGtEq) {
+  auto tokens = Lex("a > = b");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kGt);
+  EXPECT_NE(tokens[2].kind, TokenKind::kGtEq);
+}
+
+TEST(OperatorLexing, WhitespaceBreaksTildeAmp) {
+  auto tokens = Lex("a ~ & b");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kTilde);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kAmp);
+}
+
+TEST(OperatorLexing, WhitespaceBreaksTildeCaret) {
+  auto tokens = Lex("a ~ ^ b");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kTilde);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kCaret);
+}
+
+TEST(OperatorLexing, WhitespaceBreaksCaretTilde) {
+  auto tokens = Lex("a ^ ~ b");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kCaret);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kTilde);
+}
+
+TEST(OperatorLexing, WhitespaceBreaksPlusPlus) {
+  auto tokens = Lex("a + + b");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kPlus);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kPlus);
+}
+
+TEST(OperatorLexing, WhitespaceBreaksMinusMinus) {
+  auto tokens = Lex("a - - b");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kMinus);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kMinus);
+}
+
+TEST(OperatorLexing, WhitespaceBreaksArrow) {
+  auto tokens = Lex("a - > b");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kMinus);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kGt);
+}
+
+TEST(OperatorLexing, WhitespaceBreaksLtDashGt) {
+  auto tokens = Lex("a < - > b");
+  ASSERT_GE(tokens.size(), 5u);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kLt);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kMinus);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kGt);
+}
+
+// §A.8.6: token-set closure — character pairs not listed as operators must not
+// collapse into single tokens.
+
+TEST(OperatorLexing, AdjacentTildesAreSeparate) {
+  auto tokens = Lex("~~a");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kTilde);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kTilde);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
+}
+
+TEST(OperatorLexing, AdjacentBangsAreSeparate) {
+  auto tokens = Lex("!!a");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kBang);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kBang);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
+}
+
+// §A.8.6: greedy maximal-munch keeps the longest §A.8.6 token and leaves the
+// remainder for the next token.
+
+TEST(OperatorLexing, GreedyTriplePlusKeepsIncrementThenPlus) {
+  auto tokens = Lex("+++a");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kPlusPlus);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kPlus);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
+}
+
+TEST(OperatorLexing, GreedyTripleMinusKeepsDecrementThenMinus) {
+  auto tokens = Lex("---a");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kMinusMinus);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kMinus);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
+}
+
 }  // namespace

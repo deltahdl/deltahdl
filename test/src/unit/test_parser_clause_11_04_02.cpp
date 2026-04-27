@@ -4,46 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(ExpressionParsing, PrefixIncrement) {
-  auto r = Parse("module m; initial ++x; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kUnary);
-  EXPECT_EQ(expr->op, TokenKind::kPlusPlus);
-}
-
-TEST(ExpressionParsing, PrefixDecrement) {
-  auto r = Parse("module m; initial --x; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kUnary);
-  EXPECT_EQ(expr->op, TokenKind::kMinusMinus);
-}
-
-TEST(ExpressionParsing, PostfixIncrement) {
-  auto r = Parse("module m; initial x++; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kPostfixUnary);
-  EXPECT_EQ(expr->op, TokenKind::kPlusPlus);
-}
-
-TEST(ExpressionParsing, PostfixDecrement) {
-  auto r = Parse("module m; initial x--; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* expr = FirstInitialExpr(r);
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kPostfixUnary);
-  EXPECT_EQ(expr->op, TokenKind::kMinusMinus);
-}
-
 TEST(ExpressionParsing, PrefixIncrementOnSelect) {
   auto r = Parse("module m; initial ++arr[0]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

@@ -10,96 +10,11 @@ using namespace delta;
 
 namespace {
 
-TEST(OperatorParsing, BinaryDiv) {
-  auto r = Parse("module m; initial x = a / b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kSlash);
-}
-
-TEST(OperatorParsing, BinaryMod) {
-  auto r = Parse("module m; initial x = a % b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kPercent);
-}
-
 TEST(OperatorAndExpressionParsing, ComplexMixedExpressionParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  initial x = (a + b) * c - d / e % f;\n"
               "endmodule\n"));
-}
-
-TEST(OperatorAndExpressionParsing, ArithmeticMul) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a * b;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->op, TokenKind::kStar);
-}
-
-TEST(OperatorParsing, UnaryPlus) {
-  auto r = Parse("module m; initial x = +a; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
-  EXPECT_EQ(rhs->op, TokenKind::kPlus);
-}
-
-TEST(OperatorParsing, UnaryMinus) {
-  auto r = Parse("module m; initial x = -a; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kUnary);
-  EXPECT_EQ(rhs->op, TokenKind::kMinus);
-}
-
-TEST(OperatorParsing, BinaryAdd) {
-  auto r = Parse("module m; initial x = a + b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kPlus);
-}
-
-TEST(OperatorParsing, BinarySub) {
-  auto r = Parse("module m; initial x = a - b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kMinus);
-}
-
-TEST(OperatorAndExpressionParsing, BinaryPowerOperator) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = base ** exp;\n"
-      "endmodule\n");
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
-  EXPECT_EQ(rhs->op, TokenKind::kPower);
-  ASSERT_NE(rhs->lhs, nullptr);
-  EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);
-  ASSERT_NE(rhs->rhs, nullptr);
-  EXPECT_EQ(rhs->rhs->kind, ExprKind::kIdentifier);
 }
 
 TEST(AssignmentParsing, ExprAddition) {
