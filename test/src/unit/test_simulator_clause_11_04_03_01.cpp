@@ -353,6 +353,20 @@ TEST(SignedUnsignedArithmetic, UnsignedVarIdentifierPreservesUnsigned) {
   EXPECT_EQ(result.ToUint64() & 0xFF, 0xFFu);
 }
 
+TEST(SignedUnsignedArithmetic, SignedNetPropagatesSignednessToSimVariable) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire signed [7:0] w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->is_signed);
+}
+
 TEST(SignedUnsignedArithmetic,
      SameBitPatternDifferentInterpretationSignedVsUnsigned) {
   SimFixture f;

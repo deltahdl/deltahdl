@@ -117,6 +117,31 @@ TEST(EvalOpXZ, UnaryPlusWithXPropagatesX) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
+TEST(EvalOpXZ, AddWithZPropagatesX) {
+  SimFixture f;
+
+  // Z bit at position 2: aval=1, bval=1 in that position.
+  MakeVar4(f, "az", 4, 0b0100, 0b0100);
+  auto* b = f.ctx.CreateVariable("z1", 4);
+  b->value = MakeLogic4VecVal(f.arena, 4, 1);
+  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "az"),
+                          MakeId(f.arena, "z1"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);
+}
+
+TEST(EvalOpXZ, MultiplyWithZBitPropagatesX) {
+  SimFixture f;
+
+  MakeVar4(f, "mz", 4, 0b0010, 0b0010);
+  auto* b = f.ctx.CreateVariable("z3", 4);
+  b->value = MakeLogic4VecVal(f.arena, 4, 3);
+  auto* expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "mz"),
+                          MakeId(f.arena, "z3"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_NE(result.words[0].bval, 0u);
+}
+
 TEST(OperatorSim, UnaryPlus) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -361,6 +386,34 @@ TEST(EvalOp, ZeroBasePositiveExponent) {
                           MakeInt(f.arena, 5));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+TEST(EvalOp, RealOperandPowerYieldsRealResult) {
+  SimFixture f;
+  MakeRealVar(f, "a", 9.0);
+  MakeRealVar(f, "b", 0.5);
+  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kPower,
+                                    MakeId(f.arena, "a"), MakeId(f.arena, "b")),
+                         f.ctx, f.arena);
+  EXPECT_TRUE(result.is_real);
+  EXPECT_DOUBLE_EQ(ToDouble(result), 3.0);
+}
+
+TEST(EvalOp, NegativeBaseZeroExponentReturnsOne) {
+  SimFixture f;
+  // Table 11-4: op1 < -1 paired with op2 == 0 yields 1.
+  auto* nb = f.ctx.CreateVariable("nb", 8);
+  nb->value = MakeLogic4VecVal(f.arena, 8, 0xFD);  // -3 as signed 8-bit
+  nb->value.is_signed = true;
+  nb->is_signed = true;
+  auto* ze = f.ctx.CreateVariable("ze", 8);
+  ze->value = MakeLogic4VecVal(f.arena, 8, 0);
+  ze->value.is_signed = true;
+  ze->is_signed = true;
+  auto* expr = MakeBinary(f.arena, TokenKind::kPower, MakeId(f.arena, "nb"),
+                          MakeId(f.arena, "ze"));
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(result.ToUint64() & 0xFF, 1u);
 }
 
 }  // namespace

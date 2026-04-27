@@ -21,6 +21,66 @@ TEST(SignedUnsignedArithmetic, IntVariableElaboratesAsSigned) {
   EXPECT_TRUE(mod->variables[0].is_signed);
 }
 
+TEST(SignedUnsignedArithmetic, ByteVariableElaboratesAsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte a;\n"
+      "  initial a = 0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_TRUE(mod->variables[0].is_signed);
+}
+
+TEST(SignedUnsignedArithmetic, ShortintVariableElaboratesAsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  shortint a;\n"
+      "  initial a = 0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_TRUE(mod->variables[0].is_signed);
+}
+
+TEST(SignedUnsignedArithmetic, IntegerVariableElaboratesAsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  integer a;\n"
+      "  initial a = 0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_TRUE(mod->variables[0].is_signed);
+}
+
+TEST(SignedUnsignedArithmetic, LongintVariableElaboratesAsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  longint a;\n"
+      "  initial a = 0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_TRUE(mod->variables[0].is_signed);
+}
+
 TEST(SignedUnsignedArithmetic, LogicVariableElaboratesAsUnsigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -98,6 +158,34 @@ TEST(SignedUnsignedArithmetic, ExplicitUnsignedOnSignedTypeElaboratesAsUnsigned)
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->variables.size(), 1u);
   EXPECT_FALSE(mod->variables[0].is_signed);
+}
+
+TEST(SignedUnsignedArithmetic, ExplicitSignedNetElaboratesAsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire signed [7:0] w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->nets.size(), 1u);
+  EXPECT_TRUE(mod->nets[0].is_signed);
+}
+
+TEST(SignedUnsignedArithmetic, DefaultNetElaboratesAsUnsigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [7:0] w;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->nets.size(), 1u);
+  EXPECT_FALSE(mod->nets[0].is_signed);
 }
 
 }  // namespace

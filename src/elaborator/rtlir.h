@@ -67,6 +67,8 @@ struct RtlirNet {
   std::string_view name;
   NetType net_type = NetType::kWire;
   uint32_t width = 1;
+  // §11.4.3.1: nets can be explicitly declared signed/unsigned.
+  bool is_signed = false;
   std::vector<uint32_t> driver_indices;
   // §6.6.4: Trireg charge strength and decay time.
   Strength charge_strength = Strength::kMedium;

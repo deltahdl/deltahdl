@@ -157,6 +157,19 @@ TEST(OperatorParsing, UnaryMinusPrecedenceOverMul) {
   EXPECT_EQ(rhs->lhs->op, TokenKind::kMinus);
 }
 
+TEST(OperatorParsing, UnaryPlusPrecedenceOverAdd) {
+  auto r = Parse("module m; initial x = +a + b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kPlus);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kUnary);
+  EXPECT_EQ(rhs->lhs->op, TokenKind::kPlus);
+}
+
 TEST(ConstExpr, PowerOperatorInConstantExpr) {
   EvalFixture f;
   ScopeMap scope;

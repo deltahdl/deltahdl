@@ -32,6 +32,18 @@ TEST(ConstEval, ZeroPowerZero) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 ** 0", f)), 1);
 }
 
+TEST(ConstEval, NegativeIntegerDivisionTruncatesTowardZero) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("-7 / 2", f)), -3);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("7 / -2", f)), -3);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("-7 % 2", f)), -1);
+}
+
+TEST(ConstEval, ZeroPowerNegative) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 ** -1", f)), std::nullopt);
+}
+
 TEST(ExpressionElaboration, BinaryExprInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

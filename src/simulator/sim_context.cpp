@@ -95,8 +95,9 @@ Net* SimContext::FindNet(std::string_view name) {
 Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
                            Strength charge_strength, uint64_t decay_ticks,
                            bool is_user_nettype,
-                           std::string_view resolve_func) {
+                           std::string_view resolve_func, bool is_signed) {
   auto* var = CreateVariable(name, width);
+  if (is_signed) var->is_signed = true;
   if (is_user_nettype) {
     // §6.7.3: User-defined nettype defaults to data type default (x for logic).
     // CreateVariable already initializes to x, so nothing more needed.

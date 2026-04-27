@@ -188,17 +188,6 @@ TEST(ExprType, RealDivRealIsReal) {
   EXPECT_DOUBLE_EQ(ToDouble(result), 3.0);
 }
 
-TEST(ExprType, RealPowerIsReal) {
-  SimFixture f;
-  MakeRealVar(f, "a", 9.0);
-  MakeRealVar(f, "b", 0.5);
-  auto result = EvalExpr(MakeBinary(f.arena, TokenKind::kPower,
-                                    MakeId(f.arena, "a"), MakeId(f.arena, "b")),
-                         f.ctx, f.arena);
-  EXPECT_TRUE(result.is_real);
-  EXPECT_DOUBLE_EQ(ToDouble(result), 3.0);
-}
-
 TEST(ExprType, UnaryMinusOnRealIsReal) {
   SimFixture f;
   MakeRealVar(f, "a", 3.5);
