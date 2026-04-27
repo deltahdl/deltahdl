@@ -1009,6 +1009,42 @@ void Elaborator::ValidateClassMethodBodies(const ModuleDecl* decl) {
   }
 }
 
+// §6.21: Force the automatic lifetime onto every class method that does
+// not carry an explicit qualifier. The class-scope override outranks the
+// enclosing module/package/program default-static rule so that local
+// variables inside methods reinitialise on every call.
+static void ApplyAutoToClassMethods(const ClassDecl* cls) {
+  if (!cls) return;
+  for (auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod && m->method &&
+        !m->method->is_automatic && !m->method->is_static) {
+      m->method->is_automatic = true;
+    }
+    // Apply the same rule to any nested class declared inside this one.
+    if (m->kind == ClassMemberKind::kClassDecl && m->nested_class) {
+      ApplyAutoToClassMethods(m->nested_class);
+    }
+  }
+}
+
+void Elaborator::ApplyClassMethodAutomaticDefault() {
+  for (auto* cls : unit_->classes) ApplyAutoToClassMethods(cls);
+  for (auto* mod : unit_->modules) {
+    for (auto* item : mod->items) {
+      if (item->kind == ModuleItemKind::kClassDecl) {
+        ApplyAutoToClassMethods(item->class_decl);
+      }
+    }
+  }
+  for (auto* pkg : unit_->packages) {
+    for (auto* item : pkg->items) {
+      if (item->kind == ModuleItemKind::kClassDecl) {
+        ApplyAutoToClassMethods(item->class_decl);
+      }
+    }
+  }
+}
+
 // §8.15: Check if an expression references 'super'.
 static bool ExprRefsSuper(const Expr* e) {
   if (!e) return false;

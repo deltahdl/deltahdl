@@ -407,4 +407,47 @@ TEST(ScopeAndLifetimeElaboration, StaticVarInStaticTask) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.21: A class method without an explicit lifetime keyword shall be
+// treated as automatic regardless of the enclosing module's default
+// lifetime. The elaborator pre-pass sets the flag so downstream code
+// (function-body checks, simulator locals init) sees it.
+TEST(ScopeAndLifetimeElaboration, ClassMethodDefaultsAutomatic) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  function int f(); return 0; endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->cu_class_decls.empty());
+  auto* cls = design->cu_class_decls[0];
+  ASSERT_FALSE(cls->members.empty());
+  ASSERT_NE(cls->members[0]->method, nullptr);
+  EXPECT_TRUE(cls->members[0]->method->is_automatic);
+}
+
+// §6.21: A class declared inside a static module still has automatic
+// methods — the class-scope rule outranks the module's default-static.
+TEST(ScopeAndLifetimeElaboration,
+     ClassMethodDefaultsAutomaticInsideStaticModule) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class C;\n"
+      "    function int f(); return 0; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->class_decls.empty());
+  auto* cls = mod->class_decls[0];
+  ASSERT_FALSE(cls->members.empty());
+  ASSERT_NE(cls->members[0]->method, nullptr);
+  EXPECT_TRUE(cls->members[0]->method->is_automatic);
+}
+
 }  // namespace

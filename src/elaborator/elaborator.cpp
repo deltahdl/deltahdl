@@ -1025,6 +1025,9 @@ void Elaborator::RunPreElaborationValidations() {
   ValidateSpecifyBlocks();
   // §3.12.1: Register CU-scope typedefs and classes before module elaboration.
   RegisterCuScopeItems();
+  // §6.21: Class methods default to automatic; do this before any
+  // function-body validation reads the lifetime flag.
+  ApplyClassMethodAutomaticDefault();
   // §8.13: Check that no class extends a :final class.
   ValidateFinalClassExtension();
   // §8.17: Validate chaining constructor rules.

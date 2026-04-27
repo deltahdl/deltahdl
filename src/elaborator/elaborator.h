@@ -497,6 +497,13 @@ class Elaborator {
   /// §8.7: Validate class method function bodies (nonblocking, etc.).
   void ValidateClassMethodBodies(const ModuleDecl* decl);
 
+  /// §6.21: A class method's lifetime defaults to automatic regardless
+  /// of the lifetime qualifier on its enclosing scope. Apply that rule
+  /// to every method member so downstream stages (function-body
+  /// validation, simulator local-variable initialization) see the
+  /// correct flag.
+  void ApplyClassMethodAutomaticDefault();
+
   /// §8.17: Validate chaining constructor rules.
   void ValidateChainingConstructors();
   void ValidateOneClassChainingCtor(const ClassDecl* cls);
