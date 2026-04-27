@@ -6,7 +6,7 @@ import subprocess
 import threading
 from pathlib import Path
 
-CLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
+SUBCLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){1,4}$")
 
 
 def add_lrm_arg(parser: argparse.ArgumentParser) -> None:
@@ -32,13 +32,14 @@ def add_subclause_arg(parser: argparse.ArgumentParser) -> None:
 def validate_subclause(
     parser: argparse.ArgumentParser, args: argparse.Namespace,
 ) -> None:
-    """Error out if ``args.subclause`` is not a valid clause string."""
-    if not CLAUSE_RE.match(args.subclause):
+    """Error out if ``args.subclause`` is not a valid subclause string."""
+    if not SUBCLAUSE_RE.match(args.subclause):
         parser.error(
             f"Invalid subclause format '{args.subclause}'. "
-            "Expected V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z "
+            "Expected V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z "
             "(V is a number or uppercase letter; "
-            "remaining parts are numbers)."
+            "remaining parts are numbers). "
+            "For a top-level clause, use satisfy_clause --clause instead."
         )
 
 

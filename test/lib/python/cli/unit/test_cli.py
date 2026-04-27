@@ -128,12 +128,12 @@ def test_validate_subclause_accepts_numeric() -> None:
     assert args.subclause == "6.24.1"
 
 
-def test_validate_subclause_accepts_annex() -> None:
-    """Returns without error for a single-letter annex."""
+def test_validate_subclause_accepts_annex_subclause() -> None:
+    """Returns without error for an annex-letter subclause."""
     parser = argparse.ArgumentParser()
-    args = argparse.Namespace(subclause="B")
+    args = argparse.Namespace(subclause="B.1")
     validate_subclause(parser, args)
-    assert args.subclause == "B"
+    assert args.subclause == "B.1"
 
 
 def test_validate_subclause_rejects_lowercase() -> None:
@@ -150,6 +150,33 @@ def test_validate_subclause_rejects_garbage() -> None:
     args = argparse.Namespace(subclause="not-a-clause")
     with pytest.raises(SystemExit):
         validate_subclause(parser, args)
+
+
+def test_validate_subclause_rejects_top_level_numeric() -> None:
+    """Calls parser.error for a depth-0 numeric clause."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(subclause="33")
+    with pytest.raises(SystemExit):
+        validate_subclause(parser, args)
+
+
+def test_validate_subclause_rejects_top_level_annex() -> None:
+    """Calls parser.error for a depth-0 annex letter."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(subclause="A")
+    with pytest.raises(SystemExit):
+        validate_subclause(parser, args)
+
+
+def test_validate_subclause_error_routes_to_satisfy_clause(capsys) -> None:
+    """Depth-0 rejection message names ``satisfy_clause``."""
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(subclause="33")
+    try:
+        validate_subclause(parser, args)
+    except SystemExit:
+        pass
+    assert "satisfy_clause" in capsys.readouterr().err
 
 
 # ---- parse_and_validate_subclause -------------------------------------------
