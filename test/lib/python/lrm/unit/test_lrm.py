@@ -106,3 +106,8 @@ def test_lrm_read_caps_at_one_page_per_call() -> None:
 def test_lrm_read_uses_positive_phrasing() -> None:
     """Page hint avoids the word 'never' (positive scope only)."""
     assert "never" not in build_lrm_read_instruction("4.1", "/lrm.pdf")
+
+
+def test_lrm_read_names_pages_parameter() -> None:
+    """Page hint names the concrete Read tool parameter (`pages:`)."""
+    assert "pages:" in build_lrm_read_instruction("4.1", "/lrm.pdf")
