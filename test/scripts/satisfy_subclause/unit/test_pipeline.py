@@ -321,39 +321,43 @@ def test_find_or_create_issue_renames_legacy_audit_annex(
 def test_find_or_create_issue_returns_master_list_number(
     stub_completed,
 ) -> None:
-    """A master-list-titled issue is returned by number without rename."""
+    """A master-list-titled issue is returned by number."""
     body = _payload((35, _MASTER_LIST, "OPEN"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        return_value=stub_completed(stdout=body),
+        side_effect=[stub_completed(stdout=body), stub_completed()],
     ):
         assert find_or_create_issue("33") == 35
 
 
-def test_find_or_create_issue_does_not_rename_master_list(
+def test_find_or_create_issue_renames_master_list_to_new_canonical(
     stub_completed,
 ) -> None:
-    """A master-list-titled issue is left unrenamed (only the list call fires)."""
+    """A master-list-titled match is renamed to bare 'Satisfy IEEE 1800-2023 §X'."""
     body = _payload((35, _MASTER_LIST, "OPEN"))
-    with patch(
-        "satisfy_subclause.pipeline.subprocess.run",
-        return_value=stub_completed(stdout=body),
-    ) as mock_run:
-        find_or_create_issue("33")
-    assert mock_run.call_count == 1
-
-
-def test_find_or_create_issue_reopens_master_list_closed(
-    stub_completed,
-) -> None:
-    """A closed master-list issue is reopened (still no rename)."""
-    body = _payload((35, _MASTER_LIST, "CLOSED"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
         side_effect=[stub_completed(stdout=body), stub_completed()],
     ) as mock_run:
         find_or_create_issue("33")
-    reopen_cmd = mock_run.call_args_list[1][0][0]
+    edit_cmd = mock_run.call_args_list[1][0][0]
+    assert edit_cmd == [
+        "gh", "issue", "edit", "35", "--title",
+        "Satisfy IEEE 1800-2023 §33",
+    ]
+
+
+def test_find_or_create_issue_reopens_master_list_closed(
+    stub_completed,
+) -> None:
+    """A closed master-list issue is reopened after the rename."""
+    body = _payload((35, _MASTER_LIST, "CLOSED"))
+    with patch(
+        "satisfy_subclause.pipeline.subprocess.run",
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 2,
+    ) as mock_run:
+        find_or_create_issue("33")
+    reopen_cmd = mock_run.call_args_list[2][0][0]
     assert reopen_cmd[:3] == ["gh", "issue", "reopen"]
 
 
@@ -364,7 +368,7 @@ def test_find_or_create_issue_master_list_exact_prefix_match(
     body = _payload((35, "Implement IEEE 1800-2023 §33", "OPEN"))
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        return_value=stub_completed(stdout=body),
+        side_effect=[stub_completed(stdout=body), stub_completed()],
     ):
         assert find_or_create_issue("33") == 35
 
@@ -387,15 +391,21 @@ def test_find_or_create_issue_master_list_does_not_match_subclause_subprefix(
 # --- find_or_create_issue: duplicate-deletion path --------------------------
 
 
-def test_find_or_create_issue_deletes_newer_duplicate(stub_completed) -> None:
-    """When two matches exist, the newer is hard-deleted via gh issue delete."""
-    body = _payload(
+def _master_list_with_duplicate_payload() -> str:
+    """Build a body with master-list #35 + a 'Satisfy §33' duplicate #1276."""
+    return _payload(
         (35, _MASTER_LIST, "OPEN"),
         (1276, "Satisfy §33", "OPEN"),
     )
+
+
+def test_find_or_create_issue_deletes_newer_duplicate(stub_completed) -> None:
+    """When two matches exist, the newer is hard-deleted via gh issue delete."""
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body), stub_completed()],
+        side_effect=[
+            stub_completed(stdout=_master_list_with_duplicate_payload()),
+        ] + [stub_completed()] * 2,
     ) as mock_run:
         find_or_create_issue("33")
     delete_cmd = mock_run.call_args_list[1][0][0]
@@ -406,31 +416,31 @@ def test_find_or_create_issue_keeps_older_when_duplicates(
     stub_completed,
 ) -> None:
     """When two matches exist, the older issue's number is returned."""
-    body = _payload(
-        (35, _MASTER_LIST, "OPEN"),
-        (1276, "Satisfy §33", "OPEN"),
-    )
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body), stub_completed()],
+        side_effect=[
+            stub_completed(stdout=_master_list_with_duplicate_payload()),
+        ] + [stub_completed()] * 2,
     ):
         assert find_or_create_issue("33") == 35
 
 
-def test_find_or_create_issue_does_not_rename_older_master_list_with_duplicates(
+def test_find_or_create_issue_renames_older_master_list_with_duplicates(
     stub_completed,
 ) -> None:
-    """When the older match is master-list, it is not renamed (only delete fires)."""
-    body = _payload(
-        (35, _MASTER_LIST, "OPEN"),
-        (1276, "Satisfy §33", "OPEN"),
-    )
+    """When the older match is master-list, it is also renamed (no special case)."""
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[stub_completed(stdout=body), stub_completed()],
+        side_effect=[
+            stub_completed(stdout=_master_list_with_duplicate_payload()),
+        ] + [stub_completed()] * 2,
     ) as mock_run:
         find_or_create_issue("33")
-    assert mock_run.call_count == 2
+    edit_cmd = mock_run.call_args_list[2][0][0]
+    assert edit_cmd == [
+        "gh", "issue", "edit", "35", "--title",
+        "Satisfy IEEE 1800-2023 §33",
+    ]
 
 
 def _older_legacy_with_duplicate_payload() -> str:
@@ -487,11 +497,7 @@ def test_find_or_create_issue_deletes_all_newer_duplicates(
     )
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
-        side_effect=[
-            stub_completed(stdout=body),
-            stub_completed(),
-            stub_completed(),
-        ],
+        side_effect=[stub_completed(stdout=body)] + [stub_completed()] * 3,
     ) as mock_run:
         find_or_create_issue("33")
     delete_targets = [

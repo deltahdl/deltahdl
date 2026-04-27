@@ -39,12 +39,6 @@ from .oracles import compute_subclause_dependencies
 # GitHub issue handling
 # ---------------------------------------------------------------------------
 
-_KIND_NEW_CANONICAL = "new_canonical"
-_KIND_LEGACY_SHORT = "legacy_short"
-_KIND_LEGACY_AUDIT = "legacy_audit"
-_KIND_MASTER_LIST = "master_list"
-
-
 def issue_title_for(subclause: str) -> str:
     """Return the canonical GitHub issue title for *subclause*."""
     return f"Satisfy IEEE 1800-2023 §{subclause}"
@@ -68,21 +62,18 @@ def _legacy_audit_annex_title_for(subclause: str) -> str:
     return _ensure_audit_title(subclause)
 
 
-def _classify_title(title: str, subclause: str) -> str | None:
-    """Classify *title* as one of the recognised shapes for *subclause*."""
-    if title == issue_title_for(subclause):
-        return _KIND_NEW_CANONICAL
-    if title == f"Satisfy §{subclause}":
-        return _KIND_LEGACY_SHORT
-    if title in (
+def _title_matches(title: str, subclause: str) -> bool:
+    """Return True if *title* matches any recognised shape for *subclause*."""
+    master_prefix = f"Implement IEEE 1800-2023 §{subclause}"
+    if title in {
+        issue_title_for(subclause),
+        f"Satisfy §{subclause}",
         legacy_issue_title_for(subclause),
         _legacy_audit_annex_title_for(subclause),
-    ):
-        return _KIND_LEGACY_AUDIT
-    prefix = f"Implement IEEE 1800-2023 §{subclause}"
-    if title == prefix or title.startswith(prefix + " "):
-        return _KIND_MASTER_LIST
-    return None
+        master_prefix,
+    }:
+        return True
+    return title.startswith(master_prefix + " ")
 
 
 def parse_issue_number_from_create_output(output: str) -> int:
@@ -138,21 +129,21 @@ def find_or_create_issue(subclause: str) -> int:
     it. When multiple matches exist (e.g. a master-list issue plus a
     recently-created duplicate), the issue with the smallest number is
     retained and the others are hard-deleted via ``gh issue delete
-    --yes``. Reused issues are renamed to the new canonical (except
-    master-list, which keeps its broader-scope title) and reopened if
-    closed. Creates a fresh issue when no match exists.
+    --yes``. The retained issue is renamed to the new canonical (and
+    any descriptive trailing text from the master-list form is
+    dropped) and reopened if closed. Creates a fresh issue when no
+    match exists.
     """
-    matches: list[tuple[dict, str]] = []
-    for entry in _list_issues_for(subclause):
-        kind = _classify_title(entry.get("title", "") or "", subclause)
-        if kind is not None:
-            matches.append((entry, kind))
+    matches = [
+        entry for entry in _list_issues_for(subclause)
+        if _title_matches(entry.get("title", "") or "", subclause)
+    ]
     if not matches:
         return _create_new_issue(subclause)
 
-    matches.sort(key=lambda pair: int(pair[0]["number"]))
-    (oldest, oldest_kind), *duplicates = matches
-    for dup_entry, _kind in duplicates:
+    matches.sort(key=lambda entry: int(entry["number"]))
+    oldest, *duplicates = matches
+    for dup_entry in duplicates:
         subprocess.run(
             [
                 "gh", "issue", "delete",
@@ -163,7 +154,7 @@ def find_or_create_issue(subclause: str) -> int:
 
     number = int(oldest["number"])
     canonical = issue_title_for(subclause)
-    if oldest_kind != _KIND_MASTER_LIST and oldest.get("title") != canonical:
+    if oldest.get("title") != canonical:
         subprocess.run(
             ["gh", "issue", "edit", str(number), "--title", canonical],
             check=False,
