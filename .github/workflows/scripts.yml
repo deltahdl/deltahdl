@@ -82,157 +82,157 @@ jobs:
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console lib/python/ test/scripts/ test/lib/python/
-#   test-classify-file:
-#     needs: [test-classify-tests]
-#     runs-on: ubuntu-24.04
-#     steps:
-#       - uses: actions/checkout@v4
-#       - name: Restore pip cache
-#         uses: actions/cache@v4
-#         with:
-#           key: >-
-#             pip-scripts-test-script-${{
-#             hashFiles('.github/workflows/scripts.yml') }}
-#           path: ~/.cache/pip
-#           restore-keys: |
-#             pip-scripts-test-script-
-#       - name: Install tools
-#         run: pip install pytest pytest-cov
-#       - name: Run unit tests with 100% coverage gate
-#         run: >-
-#           PYTHONPATH=.:scripts python3 -m pytest
-#           test/scripts/classify_file/unit/ -v
-#           --cov=classify_file
-#           --cov-branch
-#           --cov-report=term-missing
-#           --cov-fail-under=100
-#       - name: Run integration tests
-#         run: >-
-#           PYTHONPATH=.:scripts python3 -m pytest
-#           test/scripts/classify_file/integration/ -v
-#       - name: Run e2e tests
-#         run: >-
-#           PYTHONPATH=.:scripts python3 -m pytest
-#           test/scripts/classify_file/e2e/ -v
-#   test-classify-files:
-#     needs: [test-classify-file]
-#     runs-on: ubuntu-24.04
-#     steps:
-#       - uses: actions/checkout@v4
-#       - name: Restore pip cache
-#         uses: actions/cache@v4
-#         with:
-#           key: >-
-#             pip-scripts-test-script-${{
-#             hashFiles('.github/workflows/scripts.yml') }}
-#           path: ~/.cache/pip
-#           restore-keys: |
-#             pip-scripts-test-script-
-#       - name: Install tools
-#         run: pip install pytest pytest-cov
-#       - name: Run unit tests with 100% coverage gate
-#         run: >-
-#           PYTHONPATH=.:scripts python3 -m pytest
-#           test/scripts/classify_files/unit/ -v
-#           --cov=classify_files
-#           --cov-branch
-#           --cov-report=term-missing
-#           --cov-fail-under=100
-#       - name: Run integration tests
-#         run: >-
-#           PYTHONPATH=.:scripts python3 -m pytest
-#           test/scripts/classify_files/integration/ -v
-#       - name: Run e2e tests
-#         run: >-
-#           PYTHONPATH=.:scripts python3 -m pytest
-#           test/scripts/classify_files/e2e/ -v
-#   test-classify-test:
-#     needs: [test-lib-classify, test-lib-clause, test-lib-git, test-lib-github]
-#     runs-on: ubuntu-24.04
-#     steps:
-#       - uses: actions/checkout@v4
-#       - name: Restore pip cache
-#         uses: actions/cache@v4
-#         with:
-#           key: >-
-#             pip-scripts-test-script-${{
-#             hashFiles('.github/workflows/scripts.yml') }}
-#           path: ~/.cache/pip
-#           restore-keys: |
-#             pip-scripts-test-script-
-#       - name: Install tools
-#         run: pip install pytest pytest-cov
-#       - name: Run unit tests with 100% coverage gate
-#         run: >-
-#           PYTHONPATH=.:scripts python3 -m pytest
-#           test/scripts/classify_test/unit/ -v
-#           --cov=classify_test
-#           --cov-branch
-#           --cov-report=term-missing
-#           --cov-fail-under=100
-#       - name: Run integration tests
-#         run: >-
-#           PYTHONPATH=.:scripts python3 -m pytest
-#           test/scripts/classify_test/integration/ -v
-#       - name: Run e2e tests
-#         run: >-
-#           PYTHONPATH=.:scripts python3 -m pytest
-#           test/scripts/classify_test/e2e/ -v
-#   test-classify-tests:
-#     needs: [test-classify-test]
-#     runs-on: ubuntu-24.04
-#     steps:
-#       - uses: actions/checkout@v4
-#       - name: Restore pip cache
-#         uses: actions/cache@v4
-#         with:
-#           key: >-
-#             pip-scripts-test-script-${{
-#             hashFiles('.github/workflows/scripts.yml') }}
-#           path: ~/.cache/pip
-#           restore-keys: |
-#             pip-scripts-test-script-
-#       - name: Install tools
-#         run: pip install pytest pytest-cov
-#       - name: Run unit tests with 100% coverage gate
-#         run: >-
-#           PYTHONPATH=.:scripts python3 -m pytest
-#           test/scripts/classify_tests/unit/ -v
-#           --cov=classify_tests
-#           --cov-branch
-#           --cov-report=term-missing
-#           --cov-fail-under=100
-#       - name: Run integration tests
-#         run: >-
-#           PYTHONPATH=.:scripts python3 -m pytest
-#           test/scripts/classify_tests/integration/ -v
-#       - name: Run e2e tests
-#         run: >-
-#           PYTHONPATH=.:scripts python3 -m pytest
-#           test/scripts/classify_tests/e2e/ -v
-#   test-lib-classify:
-#     needs: static-analysis
-#     runs-on: ubuntu-24.04
-#     steps:
-#       - uses: actions/checkout@v4
-#       - name: Restore pip cache
-#         uses: actions/cache@v4
-#         with:
-#           key: >-
-#             pip-scripts-test-lib-${{
-#             hashFiles('.github/workflows/scripts.yml') }}
-#           path: ~/.cache/pip
-#           restore-keys: |
-#             pip-scripts-test-lib-
-#       - name: Install tools
-#         run: pip install pytest pytest-cov
-#       - name: Run tests with 100% coverage gate
-#         run: >-
-#           python3 -m pytest test/lib/python/classify/unit/ -v
-#           --cov=lib.python.classify
-#           --cov-branch
-#           --cov-report=term-missing
-#           --cov-fail-under=100
+  test-classify-file:
+    needs: [test-classify-tests]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-script-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-script-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_file/unit/ -v
+          --cov=classify_file
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+      - name: Run integration tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_file/integration/ -v
+      - name: Run e2e tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_file/e2e/ -v
+  test-classify-files:
+    needs: [test-classify-file]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-script-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-script-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_files/unit/ -v
+          --cov=classify_files
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+      - name: Run integration tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_files/integration/ -v
+      - name: Run e2e tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_files/e2e/ -v
+  test-classify-test:
+    needs: [test-lib-classify, test-lib-clause, test-lib-git, test-lib-github]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-script-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-script-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_test/unit/ -v
+          --cov=classify_test
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+      - name: Run integration tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_test/integration/ -v
+      - name: Run e2e tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_test/e2e/ -v
+  test-classify-tests:
+    needs: [test-classify-test]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-script-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-script-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_tests/unit/ -v
+          --cov=classify_tests
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+      - name: Run integration tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_tests/integration/ -v
+      - name: Run e2e tests
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/classify_tests/e2e/ -v
+  test-lib-classify:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-lib-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/python/classify/unit/ -v
+          --cov=lib.python.classify
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   test-lib-clause:
     needs: static-analysis
     runs-on: ubuntu-24.04
