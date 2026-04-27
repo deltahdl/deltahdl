@@ -53,6 +53,14 @@ MUTATOR_DISALLOWED_TOOLS = (
 )
 
 
+# The commit-body generator must not write, edit, or run anything; it
+# just narrates what the eight-step session already did. Block every
+# editing tool on top of MUTATOR_DISALLOWED_TOOLS.
+COMMIT_BODY_DISALLOWED_TOOLS = (
+    "Write Edit MultiEdit NotebookEdit " + MUTATOR_DISALLOWED_TOOLS
+)
+
+
 _MAX_CYCLE_MEMBERS = 3
 
 
@@ -162,6 +170,87 @@ def build_commit_message(
     return f"{title}\n\n{summary}\n\n{closes}\n"
 
 
+def build_action_summary(
+    added: list[str], modified: list[str], deleted: list[str],
+) -> str:
+    """Return the porcelain-derived bullet list used as the body fallback."""
+    lines = (
+        [f"- Added {p}" for p in sorted(added)]
+        + [f"- Modified {p}" for p in sorted(modified)]
+        + [f"- Deleted {p}" for p in sorted(deleted)]
+    )
+    return "\n".join(lines)
+
+
+def build_commit_prompt(
+    subclauses: list[str],
+    added: list[str], modified: list[str], deleted: list[str],
+) -> str:
+    """Return the prompt asking Claude to explain each file change.
+
+    Mirrors the historical ``implement_subclause`` commit-body prompt:
+    every porcelain entry must produce one bullet of the form
+    ``- {Verb} `path` because reason.``. The prompt requests the bullet
+    list only — no preamble, no trailing text — so the result can be
+    dropped into the commit body verbatim.
+    """
+    label = _scope_label(subclauses)
+    lines = [
+        f"You just finished satisfying {label}.",
+        "Git reports these file changes:\n",
+    ]
+    for path in sorted(added):
+        lines.append(f"  Added: {path}")
+    for path in sorted(modified):
+        lines.append(f"  Modified: {path}")
+    for path in sorted(deleted):
+        lines.append(f"  Deleted: {path}")
+    lines.append(
+        "\nWrite a commit message body as a bullet list."
+        " For each change, write one bullet explaining WHY"
+        " you made that change. Use this exact format:\n"
+        "\n"
+        "- Modified `path` because reason.\n"
+        "- Added `path` because reason.\n"
+        "- Deleted `path` because reason.\n"
+        "\n"
+        "If an added file and a deleted file represent a move,"
+        " combine them into one bullet:\n"
+        "\n"
+        "- Moved `TestName` from `old_path` to `new_path`"
+        " because reason.\n"
+        "\n"
+        "Output ONLY the bullet list."
+        " No preamble, no summary, no trailing text.",
+    )
+    return "\n".join(lines)
+
+
+def generate_commit_body(
+    subclauses: list[str],
+    added: list[str], modified: list[str], deleted: list[str],
+    *, model: str,
+) -> str:
+    """Ask Claude (resuming the eight-step session) to explain each change.
+
+    Issues a ``--continue`` Claude call so the model that just produced
+    the source-tree edits writes the matching ``- {Verb} `path` because
+    reason.`` bullet for each one. Returns the raw ``.result`` text;
+    callers fall back to ``build_action_summary`` when the result is
+    blank.
+    """
+    prompt = build_commit_prompt(subclauses, added, modified, deleted)
+    cmd = build_streaming_cmd(
+        model=model,
+        disallowed_tools=COMMIT_BODY_DISALLOWED_TOOLS,
+        continue_session=True,
+    )
+    print("\nGenerating commit message", flush=True)
+    return run_claude_streaming_with_retry(
+        cmd, prompt, env=build_env(), retry_cmd=cmd, role="Commit body",
+    )
+
+
 def _close_satisfied_issue(subclause: str, issue: int) -> None:
     """Close the GitHub issue tracking *subclause*.
 
@@ -183,7 +272,7 @@ def _close_satisfied_issue(subclause: str, issue: int) -> None:
 
 
 def commit_mutator_result(
-    subclauses: list[str], issues: list[int],
+    subclauses: list[str], issues: list[int], *, model: str,
 ) -> bool:
     """Commit + push porcelain changes with a Closes trailer.
 
@@ -192,6 +281,12 @@ def commit_mutator_result(
     no-changes case, closes each tracking issue directly via ``gh issue
     close`` so the satisfaction state is recorded on GitHub even when
     no commit lands.
+
+    When source-tree changes exist, asks Claude (via ``--continue``) to
+    write a ``- {Verb} `path` because reason.`` bullet per change so the
+    commit body explains *why* each file moved — matching the historical
+    ``implement_subclause`` commit-message shape. Falls back to a plain
+    porcelain-derived bullet list when Claude's output is blank.
     """
     added, modified, deleted = filter_changes(get_porcelain_changes())
     changed = added + modified
@@ -199,10 +294,14 @@ def commit_mutator_result(
         for subclause, issue in zip(subclauses, issues, strict=True):
             _close_satisfied_issue(subclause, issue)
         return False
-    summary_lines = [f"- Added {p}" for p in sorted(added)] + \
-                    [f"- Modified {p}" for p in sorted(modified)] + \
-                    [f"- Deleted {p}" for p in sorted(deleted)]
-    summary = "\n".join(summary_lines) or "- (no human-readable summary)"
+    summary = generate_commit_body(
+        subclauses, added, modified, deleted, model=model,
+    ).strip()
+    if not summary:
+        summary = (
+            build_action_summary(added, modified, deleted)
+            or "- (no human-readable summary)"
+        )
     message = build_commit_message(subclauses, issues, summary)
     commit_and_push(changed, deleted, message)
     return True
@@ -419,7 +518,9 @@ def satisfy_unsatisfied_subclause_without_dependencies(
         [target.subclause], lrm, satisfied_dependencies=[],
     )
     run_steps(steps, model=model)
-    if not commit_mutator_result([target.subclause], [target.issue]):
+    if not commit_mutator_result(
+        [target.subclause], [target.issue], model=model,
+    ):
         print(
             f"Mutator for §{target.subclause} produced no source-tree"
             " changes; nothing committed.",
@@ -447,7 +548,9 @@ def satisfy_unsatisfied_subclause_with_satisfied_dependencies(
         satisfied_dependencies=satisfied_dependencies,
     )
     run_steps(steps, model=model)
-    if not commit_mutator_result([target.subclause], [target.issue]):
+    if not commit_mutator_result(
+        [target.subclause], [target.issue], model=model,
+    ):
         print(
             f"Mutator for §{target.subclause} produced no source-tree"
             " changes; nothing committed.",
@@ -483,7 +586,7 @@ def satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
         satisfied_dependencies=satisfied_dependencies,
     )
     run_steps(steps, model=model)
-    if not commit_mutator_result(subclauses, issues):
+    if not commit_mutator_result(subclauses, issues, model=model):
         print(
             f"Cycle-set mutator for {subclauses} produced no source-tree"
             " changes; nothing committed.",
