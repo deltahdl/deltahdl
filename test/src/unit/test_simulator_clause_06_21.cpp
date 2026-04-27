@@ -62,4 +62,88 @@ TEST(ScopeAndLifetimeSimulation, ForLoopVarHasLocalScope) {
   EXPECT_EQ(val, 100u);
 }
 
+// §6.21: Locals of a static function retain their value between calls
+// because static lifetime spans the whole simulation.
+TEST(ScopeAndLifetimeSimulation, StaticFunctionVarsPersist) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  function static int counter();\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 3u);
+}
+
+// §6.21: Locals of an automatic function are reinitialised on every
+// call, so no value carries over across invocations.
+TEST(ScopeAndLifetimeSimulation, AutomaticFunctionVarsFresh) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  function automatic int counter();\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 1u);
+}
+
+// §6.21: When no lifetime keyword is given on a function, the default
+// lifetime is static; this is observable as cross-call accumulation.
+TEST(ScopeAndLifetimeSimulation, DefaultFunctionIsStatic) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  function int counter();\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 2u);
+}
+
+// §6.21: A function inside a module declared automatic inherits that
+// default lifetime, so its locals reinitialise per call even without
+// an explicit automatic keyword on the function itself.
+TEST(ScopeAndLifetimeSimulation, DefaultLifetimeInAutoModuleIsAutomatic) {
+  auto val = RunAndGet(
+      "module automatic t;\n"
+      "  logic [31:0] result;\n"
+      "  function int counter();\n"
+      "    int cnt;\n"
+      "    cnt = cnt + 1;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "    result = counter();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(val, 1u);
+}
+
 }  // namespace

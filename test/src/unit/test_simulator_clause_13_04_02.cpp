@@ -32,67 +32,11 @@ TEST(FunctionLifetimeSim, StaticFunctionWithArgs) {
   EXPECT_EQ(EvalExpr(c3, f.ctx, f.arena).ToUint64(), 10u);
 }
 
-TEST(FunctionLifetimeSim, StaticFunctionVarsPersist) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  function static int counter();\n"
-      "    int cnt;\n"
-      "    cnt = cnt + 1;\n"
-      "    return cnt;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    result = counter();\n"
-      "    result = counter();\n"
-      "    result = counter();\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(val, 3u);
-}
-
-TEST(FunctionLifetimeSim, AutomaticFunctionVarsFresh) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  function automatic int counter();\n"
-      "    int cnt;\n"
-      "    cnt = cnt + 1;\n"
-      "    return cnt;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    result = counter();\n"
-      "    result = counter();\n"
-      "    result = counter();\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(val, 1u);
-}
-
-TEST(FunctionLifetimeSim, DefaultFunctionIsStatic) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [31:0] result;\n"
-      "  function int counter();\n"
-      "    int cnt;\n"
-      "    cnt = cnt + 1;\n"
-      "    return cnt;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    result = counter();\n"
-      "    result = counter();\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(val, 2u);
-}
-
-// Static-var-in-auto-func persistence and auto-var-in-static-func
-// freshness are §6.21 lifetime semantics; the corresponding simulator
-// tests (ExplicitStaticInAutoFuncBlockPersists,
-// ExplicitAutoInStaticFuncBlockFresh) live in
-// test_simulator_clause_06_21.cpp.
+// Static-function var persistence, automatic-function var freshness,
+// the default-lifetime rule, the static-var-in-auto-func and
+// auto-var-in-static-func cases, and the auto-module-inherits-auto rule
+// are §6.21 lifetime semantics. The corresponding simulator tests live
+// in test_simulator_clause_06_21.cpp.
 
 TEST(FunctionLifetimeSim, RecursiveAutomaticFunction) {
   auto val = RunAndGet(
@@ -110,25 +54,6 @@ TEST(FunctionLifetimeSim, RecursiveAutomaticFunction) {
       "endmodule\n",
       "result");
   EXPECT_EQ(val, 120u);
-}
-
-TEST(FunctionLifetimeSim, DefaultLifetimeInAutomaticModuleIsAutomatic) {
-  auto val = RunAndGet(
-      "module automatic t;\n"
-      "  logic [31:0] result;\n"
-      "  function int counter();\n"
-      "    int cnt;\n"
-      "    cnt = cnt + 1;\n"
-      "    return cnt;\n"
-      "  endfunction\n"
-      "  initial begin\n"
-      "    result = counter();\n"
-      "    result = counter();\n"
-      "    result = counter();\n"
-      "  end\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(val, 1u);
 }
 
 }  // namespace

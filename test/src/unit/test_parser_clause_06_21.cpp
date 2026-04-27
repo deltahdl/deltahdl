@@ -582,4 +582,86 @@ TEST(ScopeAndLifetimeParsing, TaskDeclLifetimeDefault) {
   EXPECT_FALSE(item->is_static);
 }
 
+// §6.21: An automatic task may carry an explicit-automatic local
+// variable; the parser preserves both flags.
+TEST(ScopeAndLifetimeParsing, AutoTaskExplicitAutoLocals) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic run(input int seed);\n"
+      "    automatic int local_seed = seed;\n"
+      "    $display(local_seed);\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* t = FirstFuncOrTask(r);
+  ASSERT_NE(t, nullptr);
+  EXPECT_TRUE(t->is_automatic);
+  ASSERT_GE(t->func_body_stmts.size(), 1u);
+  EXPECT_EQ(t->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(t->func_body_stmts[0]->var_is_automatic);
+  EXPECT_EQ(t->func_body_stmts[0]->var_name, "local_seed");
+  EXPECT_NE(t->func_body_stmts[0]->var_init, nullptr);
+}
+
+// §6.21: Inside an automatic task, a specific variable can be made
+// static with the explicit static keyword.
+TEST(ScopeAndLifetimeParsing, StaticVarInAutoTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task automatic count();\n"
+      "    static int call_count = 0;\n"
+      "    call_count = call_count + 1;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* t = FirstFuncOrTask(r);
+  ASSERT_NE(t, nullptr);
+  EXPECT_TRUE(t->is_automatic);
+  ASSERT_GE(t->func_body_stmts.size(), 1u);
+  EXPECT_EQ(t->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(t->func_body_stmts[0]->var_is_static);
+}
+
+// §6.21: Inside a static task, a specific variable can be made
+// automatic with the explicit automatic keyword.
+TEST(ScopeAndLifetimeParsing, AutoVarInStaticTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task static proc();\n"
+      "    automatic int temp = 0;\n"
+      "    temp = temp + 1;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* t = FirstFuncOrTask(r);
+  ASSERT_NE(t, nullptr);
+  EXPECT_TRUE(t->is_static);
+  ASSERT_GE(t->func_body_stmts.size(), 1u);
+  EXPECT_EQ(t->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(t->func_body_stmts[0]->var_is_automatic);
+}
+
+// §6.21: A static task may carry an explicit-static local variable;
+// the redundant keyword is accepted and the parser flag is preserved.
+TEST(ScopeAndLifetimeParsing, StaticVarInStaticTask) {
+  auto r = Parse(
+      "module m;\n"
+      "  task static count();\n"
+      "    static int call_count = 0;\n"
+      "    call_count = call_count + 1;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* t = FirstFuncOrTask(r);
+  ASSERT_NE(t, nullptr);
+  EXPECT_TRUE(t->is_static);
+  ASSERT_GE(t->func_body_stmts.size(), 1u);
+  EXPECT_EQ(t->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(t->func_body_stmts[0]->var_is_static);
+}
+
 }  // namespace

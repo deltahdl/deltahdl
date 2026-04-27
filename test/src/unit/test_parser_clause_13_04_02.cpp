@@ -126,46 +126,10 @@ TEST(FunctionLifetimeParsing, StaticFunctionWithLocalVar) {
   EXPECT_EQ(fn->name, "count");
 }
 
-TEST(FunctionLifetimeParsing, StaticVarInAutomaticFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  function automatic int call_count();\n"
-      "    static int cnt = 0;\n"
-      "    cnt = cnt + 1;\n"
-      "    return cnt;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_TRUE(fn->is_automatic);
-  ASSERT_GE(fn->func_body_stmts.size(), 1u);
-  EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(fn->func_body_stmts[0]->var_is_static);
-  EXPECT_FALSE(fn->func_body_stmts[0]->var_is_automatic);
-  EXPECT_EQ(fn->func_body_stmts[0]->var_name, "cnt");
-}
-
-TEST(FunctionLifetimeParsing, AutomaticVarInStaticFunction) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int compute(int x);\n"
-      "    automatic int tmp = x * 2;\n"
-      "    return tmp;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* fn = FirstFuncOrTask(r);
-  ASSERT_NE(fn, nullptr);
-  EXPECT_TRUE(fn->is_static);
-  ASSERT_GE(fn->func_body_stmts.size(), 1u);
-  EXPECT_EQ(fn->func_body_stmts[0]->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(fn->func_body_stmts[0]->var_is_automatic);
-  EXPECT_FALSE(fn->func_body_stmts[0]->var_is_static);
-  EXPECT_EQ(fn->func_body_stmts[0]->var_name, "tmp");
-}
+// The static-var-in-auto-func and auto-var-in-static-func cases are
+// §6.21 lifetime-semantics tests; the corresponding parser tests
+// (StaticVarInAutoFunc, AutoVarInStaticFunc) live in
+// test_parser_clause_06_21.cpp.
 
 TEST(FunctionLifetimeParsing, AutomaticFunctionWithLocalVars) {
   auto r = Parse(

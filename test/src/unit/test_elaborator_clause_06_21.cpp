@@ -328,4 +328,83 @@ TEST(ScopeAndLifetimeElaboration, DynamicArrayElementProcAssignIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §6.21: An automatic task may carry an explicit-static local variable;
+// this is the task-side mirror of StaticVarInAutoFunc.
+TEST(ScopeAndLifetimeElaboration, StaticVarInAutoTask) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task automatic work();\n"
+      "    static int count = 0;\n"
+      "    count = count + 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.21: A static task may carry an explicit-automatic local variable;
+// this is the task-side mirror of AutoVarInStaticFunc.
+TEST(ScopeAndLifetimeElaboration, AutoVarInStaticTask) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task static work();\n"
+      "    automatic int temp = 0;\n"
+      "    temp = temp + 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.21: A task with no explicit lifetime keyword elaborates and
+// inherits the default-static lifetime from its enclosing scope.
+TEST(ScopeAndLifetimeElaboration, DefaultLifetimeTask) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task my_task(input int n);\n"
+      "    $display(\"%0d\", n);\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.21: An automatic task may also carry an explicit-automatic local
+// variable; the redundant keyword is accepted by the elaborator.
+TEST(ScopeAndLifetimeElaboration, AutoVarInAutoTask) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task automatic work();\n"
+      "    automatic int temp = 0;\n"
+      "    temp = temp + 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.21: A static task with an explicit-static local variable
+// elaborates without error; the redundant keyword is accepted.
+TEST(ScopeAndLifetimeElaboration, StaticVarInStaticTask) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  task static work();\n"
+      "    static int count = 0;\n"
+      "    count = count + 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
