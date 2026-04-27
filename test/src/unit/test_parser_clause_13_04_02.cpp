@@ -5,38 +5,10 @@ using namespace delta;
 
 namespace {
 
-TEST(FunctionLifetimeParsing, AutomaticLifetimeQualifier) {
-  auto r = Parse(
-      "module m;\n  function automatic int foo();\n"
-      "    return 1;\n  endfunction\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_TRUE(item->is_automatic);
-  EXPECT_FALSE(item->is_static);
-}
-
-TEST(FunctionLifetimeParsing, StaticLifetimeQualifier) {
-  auto r = Parse(
-      "module m;\n  function static int foo();\n"
-      "    return 1;\n  endfunction\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_FALSE(item->is_automatic);
-  EXPECT_TRUE(item->is_static);
-}
-
-TEST(FunctionLifetimeParsing, NoLifetimeQualifier) {
-  auto r = Parse(
-      "module m;\n  function int foo();\n"
-      "    return 1;\n  endfunction\nendmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_FALSE(item->is_automatic);
-  EXPECT_FALSE(item->is_static);
-}
+// Lifetime-keyword acceptance on function declarations is a §6.21 rule;
+// the corresponding parser tests (FunctionDeclLifetimeAutomatic,
+// FunctionDeclLifetimeStatic, and the default-lifetime case) live in
+// test_parser_clause_06_21.cpp.
 
 TEST(FunctionLifetimeParsing, AutomaticVoidFunction) {
   auto r = Parse(

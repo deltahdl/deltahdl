@@ -19,45 +19,10 @@ TEST(TaskLifetimeParsing, AutomaticTaskWithInputPort) {
   EXPECT_EQ(item->name, "drive");
 }
 
-TEST(TaskDeclParsing, TaskLifetimeAutomatic) {
-  auto r = Parse(
-      "module m;\n"
-      "  task automatic my_task();\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_TRUE(item->is_automatic);
-  EXPECT_FALSE(item->is_static);
-}
-
-TEST(TaskDeclParsing, TaskLifetimeStatic) {
-  auto r = Parse(
-      "module m;\n"
-      "  task static my_task();\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_FALSE(item->is_automatic);
-  EXPECT_TRUE(item->is_static);
-}
-
-TEST(TaskDeclParsing, TaskLifetimeDefault) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task();\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_FALSE(item->is_automatic);
-  EXPECT_FALSE(item->is_static);
-}
+// Lifetime-keyword acceptance on task declarations is a §6.21 rule;
+// the corresponding parser tests (TaskDeclLifetimeAutomatic,
+// TaskDeclLifetimeStatic, and the default-lifetime case) live in
+// test_parser_clause_06_21.cpp.
 
 TEST(TaskDeclParsing, AutomaticTaskWithoutParens) {
   auto r = Parse(

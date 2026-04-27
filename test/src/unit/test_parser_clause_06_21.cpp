@@ -521,6 +521,22 @@ TEST(ScopeAndLifetimeParsing, FunctionDeclLifetimeStatic) {
   EXPECT_TRUE(item->is_static);
 }
 
+// §6.21: A function with no explicit lifetime keyword carries neither
+// flag at the parser stage; the default-static rule is applied later
+// by the elaborator when it inherits from the enclosing scope.
+TEST(ScopeAndLifetimeParsing, FunctionDeclLifetimeDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  function int f(); return 0; endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstFunctionDecl(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_FALSE(item->is_automatic);
+  EXPECT_FALSE(item->is_static);
+}
+
 // §6.21: A task may carry an automatic lifetime keyword.
 TEST(ScopeAndLifetimeParsing, TaskDeclLifetimeAutomatic) {
   auto r = Parse(
@@ -548,6 +564,22 @@ TEST(ScopeAndLifetimeParsing, TaskDeclLifetimeStatic) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_TRUE(item->is_static);
   EXPECT_FALSE(item->is_automatic);
+}
+
+// §6.21: A task with no explicit lifetime keyword carries neither flag at
+// the parser stage; the default-static rule is applied later by the
+// elaborator when it inherits from the enclosing scope.
+TEST(ScopeAndLifetimeParsing, TaskDeclLifetimeDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task();\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_FALSE(item->is_automatic);
+  EXPECT_FALSE(item->is_static);
 }
 
 }  // namespace
