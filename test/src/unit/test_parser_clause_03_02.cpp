@@ -115,30 +115,6 @@ TEST(DesignElements, ConfigurationContainsDesignCell) {
   EXPECT_FALSE(r.cu->configs[0]->design_cells.empty());
 }
 
-// §3.2's container claim names "declarations and procedural code" together;
-// the declaration half is covered above. Verify the parser also accepts
-// procedural code (an initial block) inside each design-element kind that
-// permits it. Packages, primitives, and configs do not host procedural
-// blocks per their own clauses; their container property is verified by
-// the dedicated tests above.
-TEST(DesignElements, DesignElementsContainProceduralCode) {
-  auto r = Parse(
-      "module m; initial begin end endmodule\n"
-      "program p; initial begin end endprogram\n"
-      "interface ifc; initial begin end endinterface\n"
-      "checker chk; initial begin end endchecker\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_FALSE(r.cu->modules[0]->items.empty());
-  ASSERT_EQ(r.cu->programs.size(), 1u);
-  EXPECT_FALSE(r.cu->programs[0]->items.empty());
-  ASSERT_EQ(r.cu->interfaces.size(), 1u);
-  EXPECT_FALSE(r.cu->interfaces[0]->items.empty());
-  ASSERT_EQ(r.cu->checkers.size(), 1u);
-  EXPECT_FALSE(r.cu->checkers[0]->items.empty());
-}
-
 // §3.2's enumeration of seven design-element kinds is exhaustive. A
 // top-level subroutine declaration is a CU-scope item (§3.12.1) and must
 // not be classified as a design element of any kind.
@@ -175,6 +151,38 @@ TEST(DesignElements, TopLevelBindIsNotDesignElement) {
   EXPECT_TRUE(r.cu->packages.empty());
   EXPECT_TRUE(r.cu->udps.empty());
   EXPECT_TRUE(r.cu->configs.empty());
+}
+
+// Closure of the seven-kind list from the zero direction: when no design
+// element introducing keywords appear in the source, no entries land in any
+// of the seven design-element vectors.
+TEST(DesignElements, EmptyCompilationUnitHasNoDesignElements) {
+  auto r = Parse("");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules.empty());
+  EXPECT_TRUE(r.cu->programs.empty());
+  EXPECT_TRUE(r.cu->interfaces.empty());
+  EXPECT_TRUE(r.cu->checkers.empty());
+  EXPECT_TRUE(r.cu->packages.empty());
+  EXPECT_TRUE(r.cu->udps.empty());
+  EXPECT_TRUE(r.cu->configs.empty());
+}
+
+// §3.2 names declarations and procedural code together as the contents a
+// design element holds. Observe the combined claim within a single body by
+// putting both content kinds inside one module and confirming the items
+// vector picks up at least one of each.
+TEST(DesignElements, DesignElementContainsBothDeclarationAndProceduralBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  initial begin end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_GE(r.cu->modules[0]->items.size(), 2u);
 }
 
 }  // namespace

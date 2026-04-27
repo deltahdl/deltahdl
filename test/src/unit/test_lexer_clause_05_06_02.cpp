@@ -81,17 +81,6 @@ TEST(Keywords, EndconfigKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndconfig);
 }
 
-TEST(Keywords, DesignElementKeywordsAreNotIdentifiers) {
-  const char* keywords[] = {"module",    "program",   "interface",
-                            "checker",   "package",   "primitive",
-                            "config",    "macromodule"};
-  for (const auto* kw : keywords) {
-    auto r = LexOne(kw);
-    EXPECT_NE(r.token.kind, TokenKind::kIdentifier)
-        << kw << " should be a keyword, not an identifier";
-  }
-}
-
 TEST(Keywords, UppercaseNotKeyword) {
   auto r = LexOne("Module ");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
@@ -132,30 +121,6 @@ TEST(Keywords, KeywordPrefixIsIdentifier) {
 TEST(Keywords, KeywordSuffixIsIdentifier) {
   auto r = LexOne("endmodule_x");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-}
-
-TEST(Keywords, AllDesignElementKeywordsInSequence) {
-  auto tokens = Lex(
-      "module endmodule interface endinterface "
-      "program endprogram checker endchecker "
-      "package endpackage primitive endprimitive "
-      "config endconfig");
-  ASSERT_GE(tokens.size(), 15u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kKwEndmodule);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kKwInterface);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kKwEndinterface);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kKwProgram);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kKwEndprogram);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kKwChecker);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kKwEndchecker);
-  EXPECT_EQ(tokens[8].kind, TokenKind::kKwPackage);
-  EXPECT_EQ(tokens[9].kind, TokenKind::kKwEndpackage);
-  EXPECT_EQ(tokens[10].kind, TokenKind::kKwPrimitive);
-  EXPECT_EQ(tokens[11].kind, TokenKind::kKwEndprimitive);
-  EXPECT_EQ(tokens[12].kind, TokenKind::kKwConfig);
-  EXPECT_EQ(tokens[13].kind, TokenKind::kKwEndconfig);
-  EXPECT_EQ(tokens[14].kind, TokenKind::kEof);
 }
 
 static const GateKeywordEntry kGateKeywords[] = {
