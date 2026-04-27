@@ -389,6 +389,16 @@ class Parser {
   // True while parsing items inside a generate...endgenerate region.
   // Used to enforce §27.3's rule that generate regions do not nest.
   bool in_generate_region_ = false;
+
+  // §6.20.1: param_assignments inside a class body, package body, or
+  // compilation-unit scope shall become localparam declarations.
+  int class_body_depth_ = 0;
+  int package_body_depth_ = 0;
+  bool in_cu_scope_param_ = false;
+  bool ForceLocalparam() const {
+    return InGenerateBlock() || class_body_depth_ > 0 ||
+           package_body_depth_ > 0 || in_cu_scope_param_;
+  }
 };
 
 inline bool IsPortDirection(TokenKind tk) {

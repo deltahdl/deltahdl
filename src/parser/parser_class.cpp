@@ -268,6 +268,8 @@ ClassDecl* Parser::ParseClassDecl() {
   if (Match(TokenKind::kKwImplements)) ParseClassExtendsClause(decl, true);
   Expect(TokenKind::kSemicolon);
 
+  // §6.20.1: param_assignments inside a class body shall become localparam.
+  ++class_body_depth_;
   while (!Check(TokenKind::kKwEndclass) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
     auto before = lexer_.SavePos().pos;
@@ -275,6 +277,7 @@ ClassDecl* Parser::ParseClassDecl() {
     // Safety: if no progress was made, skip a token to avoid infinite loops.
     if (lexer_.SavePos().pos == before) Consume();
   }
+  --class_body_depth_;
   Expect(TokenKind::kKwEndclass);
   MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();

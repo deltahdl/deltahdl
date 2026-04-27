@@ -1540,6 +1540,15 @@ static std::optional<int64_t> FindParamOverride(
   return std::nullopt;
 }
 
+bool Elaborator::HasParamPortWithoutDefault(const ModuleDecl* decl) {
+  for (const auto& [name, expr] : decl->params) {
+    if (decl->localparam_port_names.count(name)) continue;
+    if (decl->type_param_names.count(name)) continue;
+    if (expr == nullptr) return true;
+  }
+  return false;
+}
+
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype) {
   pd.has_decl_range = dtype.packed_dim_left != nullptr;
   pd.has_decl_type = dtype.kind != DataTypeKind::kImplicit || dtype.is_signed;
@@ -1667,6 +1676,20 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
     }
 
     mod->params.push_back(pd);
+  }
+
+  // §6.20.1: a value parameter with no default in the parameter port list
+  // must be supplied at every instantiation of the design element. Type
+  // parameters and localparam ports are validated elsewhere; the check here
+  // catches a missing override on plain value parameters.
+  for (const auto& pd : mod->params) {
+    if (pd.is_localparam || pd.is_type_param) continue;
+    if (pd.default_value != nullptr) continue;
+    if (pd.from_override) continue;
+    diag_.Error(decl->range.start,
+                std::format("parameter '{}' of '{}' has no default value and "
+                            "no override at instantiation",
+                            pd.name, decl->name));
   }
 
   ElaboratePorts(decl, mod);

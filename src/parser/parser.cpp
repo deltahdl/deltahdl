@@ -405,9 +405,13 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
 
 bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
   // §3.12.1: CU-scope localparam/parameter declarations.
+  // §6.20.1: param_assignments in compilation-unit scope shall become
+  // localparam declarations.
   if (Check(TokenKind::kKwParameter) || Check(TokenKind::kKwLocalparam)) {
     std::vector<ModuleItem*> items;
+    in_cu_scope_param_ = true;
     ParseParamDecl(items);
+    in_cu_scope_param_ = false;
     for (auto* item : items) unit->cu_items.push_back(item);
     return true;
   }
@@ -592,6 +596,8 @@ PackageDecl* Parser::ParsePackageDecl() {
 
   pkg->name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kSemicolon);
+  // §6.20.1: param_assignments inside a package shall become localparam.
+  ++package_body_depth_;
   while (!Check(TokenKind::kKwEndpackage) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;  // null item (A.1.11)
     // A specify block is only valid as a module item; reject it here before
@@ -606,6 +612,7 @@ PackageDecl* Parser::ParsePackageDecl() {
       ParseModuleItem(pkg->items);
     }
   }
+  --package_body_depth_;
   Expect(TokenKind::kKwEndpackage);
   MatchEndLabel(pkg->name);
   pkg->range.end = CurrentLoc();

@@ -1063,6 +1063,9 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   for (const auto& [name, nested_decl] : local_nested_modules) {
     if (!nested_decl->ports.empty()) continue;
     if (nested_decl->decl_kind == ModuleDeclKind::kInterface) continue;
+    // §6.20.1: a design element with any non-defaulted parameter port shall
+    // not be implicitly instantiated.
+    if (HasParamPortWithoutDefault(nested_decl)) continue;
     bool explicitly_instantiated = false;
     for (const auto& child : mod->children) {
       if (child.module_name == name) {

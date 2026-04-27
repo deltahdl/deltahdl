@@ -155,6 +155,10 @@ class Elaborator {
   /// Populate ports from module declaration port list.
   void ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod);
 
+  /// §6.20.1: true when any non-localparam, non-type parameter declared in
+  /// the design element's parameter port list has no default value.
+  static bool HasParamPortWithoutDefault(const ModuleDecl* decl);
+
   /// Elaborate a single module item into RTLIR.
   void ElaborateItem(ModuleItem* item, RtlirModule* mod);
   void ElaborateParamDecl(ModuleItem* item, RtlirModule* mod);

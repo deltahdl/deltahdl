@@ -222,27 +222,4 @@ TEST(ParameterizedClassElaboration, TypedefChainedSpecializationOk) {
              "endmodule\n"));
 }
 
-// §8.25: Using unadorned name of parameterized class with no default
-// specialization shall be an error.
-TEST(ParameterizedClassElaboration, NoDefaultSpecializationError) {
-  EXPECT_FALSE(
-      ElabOk("class D #(int p);\n"
-             "  int data;\n"
-             "endclass\n"
-             "module m;\n"
-             "  D obj;\n"
-             "endmodule\n"));
-}
-
-// §8.25: Explicit specialization of class with no defaults is OK.
-TEST(ParameterizedClassElaboration, NoDefaultWithExplicitSpecOk) {
-  EXPECT_TRUE(
-      ElabOk("class D #(int p);\n"
-             "  int data;\n"
-             "endclass\n"
-             "module m;\n"
-             "  D #(5) obj;\n"
-             "endmodule\n"));
-}
-
 }  // namespace

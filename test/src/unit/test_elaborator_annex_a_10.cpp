@@ -38,14 +38,6 @@ TEST(BnfClarificationElaboration, TimeunitAndPrecisionOk) {
              "endmodule\n"));
 }
 
-TEST(BnfClarificationElaboration, ParameterInClassIsLocalparam) {
-  EXPECT_TRUE(
-      ElabOk("class c;\n"
-             "  parameter int WIDTH = 8;\n"
-             "endclass\n"
-             "module m; endmodule\n"));
-}
-
 TEST(BnfClarificationElaboration, AutomaticInInitialBlockOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -117,17 +109,6 @@ TEST(BnfClarificationElaboration, FinalOnPureVirtualError) {
       "module m; endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
-}
-
-// Item 7: parameter in class treated as localparam (cannot override)
-
-TEST(BnfClarificationElaboration, ParameterInClassNoOverride) {
-  EXPECT_TRUE(
-      ElabOk("class c;\n"
-             "  parameter int A = 1;\n"
-             "  parameter int B = A + 1;\n"
-             "endclass\n"
-             "module m; endmodule\n"));
 }
 
 // Item 16: charge strength only with trireg

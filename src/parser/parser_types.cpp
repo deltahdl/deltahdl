@@ -1,3 +1,4 @@
+#include <format>
 #include <optional>
 
 #include "parser/parser.h"
@@ -485,14 +486,26 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items,
     item->loc = loc;
     item->data_type.kind = DataTypeKind::kVoid;  // Marker for type params.
     item->forward_type_kind = fwd;
-    item->name = Expect(TokenKind::kIdentifier).text;
+    auto name_tok = Expect(TokenKind::kIdentifier);
+    item->name = name_tok.text;
+    bool has_default = false;
     if (Match(TokenKind::kEq)) {
+      has_default = true;
       auto dtype = ParseDataType();
       if (dtype.kind != DataTypeKind::kImplicit) {
         item->typedef_type = dtype;
       } else {
         item->init_expr = ParseExpr();
       }
+    }
+    // §6.20.1 footnote 22: a type_assignment outside a parameter_port_list
+    // shall not omit its default data type. ParseTypeParamDecl is reached
+    // only from non-port-list contexts, so a missing default is illegal here.
+    if (!has_default) {
+      diag_.Error(name_tok.loc,
+                  std::format("type parameter '{}' outside a parameter port "
+                              "list must have a default type",
+                              name_tok.text));
     }
     known_types_.insert(item->name);
     items.push_back(item);
@@ -504,8 +517,9 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
   bool localparam = Check(TokenKind::kKwLocalparam);
   Consume();  // parameter or localparam
-  // §27.2 / §6.20.4: treat as localparam if declared inside a generate block.
-  if (InGenerateBlock()) localparam = true;
+  // §6.20.1: param_assignments in a generate block, package, class body, or
+  // compilation-unit scope shall become localparam declarations.
+  if (ForceLocalparam()) localparam = true;
   // type_parameter_declaration: type [forward_type] list_of_type_assignments
   if (Match(TokenKind::kKwType)) {
     ParseTypeParamDecl(items, loc, localparam);

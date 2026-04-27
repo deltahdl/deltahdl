@@ -1500,7 +1500,8 @@ static bool ExprContainsHierRef(const Expr* e) {
 
 void Elaborator::ValidateValueParams(const ModuleDecl* decl,
                                      const RtlirModule* mod) {
-  // §6.20.2: Body value parameters must have a default value.
+  // §6.20.1 footnote 22: outside a parameter_port_list, a param_assignment
+  // may not omit its default constant_param_expression.
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kParamDecl) continue;
     // Skip type parameters (§6.20.3).

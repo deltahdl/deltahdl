@@ -181,12 +181,22 @@ void Parser::ParseParamPortDecl(
   // Handle type parameter: #(type T = real)  (§6.20.3)
   if (Match(TokenKind::kKwType)) {
     auto name = Expect(TokenKind::kIdentifier);
+    bool has_default = false;
     if (Match(TokenKind::kEq)) {
+      has_default = true;
       if (Check(TokenKind::kKwType)) {
         ParseExpr();  // type() expression as default
       } else {
         ParseDataType();  // consume default type
       }
+    }
+    // §6.20.1 footnote 22: a localparam declaration in a parameter_port_list
+    // may not omit the data_type from a type_assignment.
+    if (is_localparam_group && !has_default) {
+      diag_.Error(name.loc,
+                  std::format("localparam type '{}' in parameter port list "
+                              "must have a default type",
+                              name.text));
     }
     params.push_back({name.text, nullptr});
     if (param_types) param_types->push_back(DataType{});
@@ -200,6 +210,14 @@ void Parser::ParseParamPortDecl(
   Expr* default_val = nullptr;
   if (Match(TokenKind::kEq)) {
     default_val = ParseExpr();
+  }
+  // §6.20.1 footnote 22: a localparam declaration in a parameter_port_list
+  // may not omit the constant_param_expression from a param_assignment.
+  if (is_localparam_group && default_val == nullptr) {
+    diag_.Error(name.loc,
+                std::format("localparam '{}' in parameter port list must "
+                            "have a default value",
+                            name.text));
   }
   params.push_back({name.text, default_val});
   if (param_types) param_types->push_back(dtype);

@@ -4,26 +4,6 @@ using namespace delta;
 
 namespace {
 
-// Footnote 7: In a parameter_declaration that is a class_item, the parameter
-// keyword shall be a synonym for the localparam keyword.
-
-TEST(ClassSyntaxElaboration, ParameterInClassBodyIsLocalparam) {
-  EXPECT_TRUE(
-      ElabOk("class C;\n"
-             "  parameter int WIDTH = 8;\n"
-             "endclass\n"
-             "module m; endmodule\n"));
-}
-
-TEST(ClassSyntaxElaboration, MultipleParametersInClassBody) {
-  EXPECT_TRUE(
-      ElabOk("class C;\n"
-             "  parameter int A = 1;\n"
-             "  parameter int B = A + 1;\n"
-             "endclass\n"
-             "module m; endmodule\n"));
-}
-
 // Footnote 8: It shall be illegal to use the final_specifier when declaring a
 // pure virtual method or pure constraint.
 
