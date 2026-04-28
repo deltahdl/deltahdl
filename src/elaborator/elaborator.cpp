@@ -118,8 +118,11 @@ void Elaborator::ValidateNameSpaces() {
   for (auto* m : unit_->modules) check_def(m->library, m->name, m->range);
   for (auto* p : unit_->programs) check_def(p->library, p->name, p->range);
   for (auto* i : unit_->interfaces) check_def(i->library, i->name, i->range);
-  for (auto* c : unit_->checkers) check_def(c->library, c->name, c->range);
   for (auto* u : unit_->udps) check_def(u->library, u->name, u->range);
+  // §3.13(a) lists "module, primitive, program, and interface" — the
+  // checker construct is explicitly enumerated in §3.13(c) instead, so a
+  // checker's identifier shares the compilation-unit scope name space with
+  // CU-scope items rather than the definitions name space.
   // §33.2: a config is a design element peer to modules, so its name shares
   // the same definitions space and must be unique against every other entry.
   for (auto* cfg : unit_->configs) check_def(cfg->library, cfg->name, cfg->range);
@@ -139,6 +142,36 @@ void Elaborator::ValidateNameSpaces() {
                   "be declared by the user");
     }
   }
+
+  // §3.13(c): Compilation-unit scope name space — unifies the definitions of
+  // functions, tasks, checkers, parameters, named events, net declarations,
+  // variable declarations, and user-defined types declared outside any
+  // module/interface/package/checker/program/primitive construct.  The
+  // closing rule of §3.13 — "Within a name space, it shall be illegal to
+  // redeclare a name already declared by a prior declaration" — applies
+  // here.  Cross-scope collisions involving anonymous-program items are
+  // already diagnosed by ValidateAnonymousProgramNameSharing, so skip them
+  // here to avoid double reports.
+  std::unordered_map<std::string_view, SourceLoc> cu_scope_names;
+  auto check_cu = [&](std::string_view name, SourceLoc loc) {
+    if (name.empty()) return;
+    auto [it, inserted] = cu_scope_names.try_emplace(name, loc);
+    if (!inserted) {
+      diag_.Error(
+          loc,
+          std::format("redeclaration of '{}' in compilation-unit scope", name));
+    }
+  };
+  for (auto* item : unit_->cu_items) {
+    // Imports/exports make package items accessible by reference but do
+    // not themselves introduce a CU-scope declaration.
+    if (item->kind == ModuleItemKind::kImportDecl ||
+        item->kind == ModuleItemKind::kExportDecl) continue;
+    if (item->from_anonymous_program) continue;
+    check_cu(item->name, item->loc);
+  }
+  for (auto* cls : unit_->classes) check_cu(cls->name, cls->range.start);
+  for (auto* chk : unit_->checkers) check_cu(chk->name, chk->range.start);
 }
 
 void Elaborator::ValidateConfigDesignStatements() {

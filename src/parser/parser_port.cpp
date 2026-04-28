@@ -25,6 +25,27 @@ ModuleItem* Parser::ParseImportItem() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kImportDecl;
   item->loc = CurrentLoc();
+  // §3.12.1: "Because it has no name, the compilation-unit scope cannot be
+  // used with an import declaration."  An attempted `$unit::` source on an
+  // import declaration is rejected with a §3.12.1-specific diagnostic so
+  // the rule is observable, rather than surfacing as a generic
+  // expected-identifier complaint from the kSystemIdentifier vs. kIdentifier
+  // mismatch.
+  if (CurrentToken().kind == TokenKind::kSystemIdentifier &&
+      CurrentToken().text == "$unit") {
+    diag_.Error(CurrentLoc(),
+                "the compilation-unit scope cannot be used with an "
+                "import declaration");
+    Consume();
+    if (Check(TokenKind::kColonColon)) Consume();
+    if (Check(TokenKind::kStar)) {
+      Consume();
+      item->import_item.is_wildcard = true;
+    } else if (Check(TokenKind::kIdentifier)) {
+      item->import_item.item_name = Consume().text;
+    }
+    return item;
+  }
   item->import_item.package_name = Expect(TokenKind::kIdentifier).text;
   Expect(TokenKind::kColonColon);
   if (Match(TokenKind::kStar)) {

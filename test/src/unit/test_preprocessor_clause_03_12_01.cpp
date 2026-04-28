@@ -1,10 +1,17 @@
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <string>
+
 #include "fixture_parser.h"
 
 using namespace delta;
 
 namespace {
+
+namespace fs = std::filesystem;
 
 TEST(DesignBuildingBlockParsing, CompilationUnitDefinition) {
   auto r = ParseWithPreprocessor(
@@ -291,6 +298,41 @@ TEST(DesignBuildingBlockParsing, DirectiveDefinedBetweenModules) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 2u);
+}
+
+// §3.12.1: "The contents of files included using one or more `include
+// directives become part of the compilation unit of the file within which
+// they are included."  This is a preprocessor-stage rule: the contents of
+// the included file must end up in the same compilation unit as the file
+// that included it.
+TEST(CompilationUnitPreprocessing, IncludeDirectiveContentBecomesPartOfCu) {
+  fs::path dir = fs::temp_directory_path() /
+                 ("delta_test_cu_include_" + std::to_string(getpid()));
+  fs::create_directories(dir);
+  std::ofstream(dir / "shared.svh")
+      << "function int helper(int x); return x; endfunction\n";
+
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile((dir / "top.sv").string(),
+                         "`include \"shared.svh\"\nmodule m; endmodule\n");
+  Preprocessor preproc(mgr, diag, {});
+  auto pp = preproc.Preprocess(fid);
+  auto pp_fid = mgr.AddFile("<preprocessed>", pp);
+  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
+  Parser parser(lexer, arena, diag);
+  auto* cu = parser.Parse();
+
+  ASSERT_NE(cu, nullptr);
+  EXPECT_FALSE(diag.HasErrors());
+  ASSERT_EQ(cu->modules.size(), 1u);
+  EXPECT_EQ(cu->modules[0]->name, "m");
+  ASSERT_EQ(cu->cu_items.size(), 1u);
+  EXPECT_EQ(cu->cu_items[0]->kind, ModuleItemKind::kFunctionDecl);
+  EXPECT_EQ(cu->cu_items[0]->name, "helper");
+
+  fs::remove_all(dir);
 }
 
 }  // namespace

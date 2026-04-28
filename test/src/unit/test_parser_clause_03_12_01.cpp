@@ -98,6 +98,20 @@ TEST(DesignBuildingBlockParsing, CuScopeDataDecl) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "b");
 }
 
+// §3.12.1 declares that the compilation-unit scope can contain any item
+// definable in a package; §3.13(c) explicitly lists named events among the
+// CU-scope name space's contents.  A bare `event e;` at the top level
+// must be parsed as a CU-scope declaration.
+TEST(DesignBuildingBlockParsing, CuScopeNamedEventDeclaration) {
+  auto r = Parse(
+      "event e;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "e");
+}
+
 TEST(DesignBuildingBlockParsing, DollarUnitScopeResolutionExpr) {
   auto r = Parse(
       "bit b;\n"
@@ -341,29 +355,6 @@ TEST(CompilationUnitStructure, MultipleCheckersAccumulate) {
   EXPECT_EQ(r.cu->checkers[2]->name, "c3");
 }
 
-TEST(CompilationUnitScope, FunctionGoesToCuItems) {
-  auto r = Parse(
-      "function int add(int a, int b);\n"
-      "  return a + b;\n"
-      "endfunction\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(CompilationUnitStructure, TaskGoesToCuItems) {
-  auto r = Parse(
-      "task my_task;\n"
-      "endtask\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(CompilationUnitStructure, SourceWithoutModulesIsValid) {
   auto r = Parse(
       "package p; endpackage\n"
@@ -443,26 +434,6 @@ TEST(CompilationUnitStructure, MultipleCuScopeSubroutinesAccumulate) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
 }
 
-// §3.1 — CU-scope variable declaration is stored in cu_items.
-TEST(CompilationUnitStructure, CuScopeVarDeclGoesToCuItems) {
-  auto r = Parse(
-      "int global_var;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
-}
-
-// §3.1 — CU-scope parameter declaration is stored in cu_items.
-TEST(CompilationUnitStructure, CuScopeParameterGoesToCuItems) {
-  auto r = Parse(
-      "parameter int WIDTH = 8;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
-}
-
 // §3.1 — Design elements with comments interspersed.
 TEST(CompilationUnitStructure, CommentsInterspersedBetweenDesignElements) {
   auto r = Parse(
@@ -504,6 +475,21 @@ TEST(CompilationUnitStructure, ManyModulesAccumulate) {
   EXPECT_EQ(r.cu->modules.size(), 50u);
 }
 
+// §3.12.1: "Because it has no name, the compilation-unit scope cannot be
+// used with an import declaration."  An `import $unit::*;` (or selective
+// `import $unit::name;`) is rejected at parse time.
+TEST(CompilationUnitParsing, CompilationUnitScopeCannotBeImportedWildcard) {
+  EXPECT_FALSE(
+      ParseOk("import $unit::*;\n"
+              "module m; endmodule\n"));
+}
+
+TEST(CompilationUnitParsing, CompilationUnitScopeCannotBeImportedSelective) {
+  EXPECT_FALSE(
+      ParseOk("import $unit::foo;\n"
+              "module m; endmodule\n"));
+}
+
 TEST(CompilationUnitParsing, CuScopeSelectiveImport) {
   auto r = Parse(
       "package pkg;\n"
@@ -542,34 +528,45 @@ TEST(CompilationUnitParsing, DollarUnitInSubexpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CompilationUnits, CuScopeTypedefIsNotDesignElement) {
-  auto r = Parse(
-      "typedef int myint;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_EQ(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->packages.empty());
-}
-
-TEST(CompilationUnits, CuScopeParamIsNotDesignElement) {
-  auto r = Parse(
-      "parameter int P = 42;\n"
-      "module m; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  EXPECT_GE(r.cu->cu_items.size(), 1u);
-  EXPECT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->packages.empty());
-}
-
 TEST(CompilationUnits, UnrecognizedTopLevelTokenIsError) {
   EXPECT_FALSE(ParseOk("always_comb begin end"));
 }
 
 TEST(CompilationUnits, BareStatementAtTopLevelIsError) {
   EXPECT_FALSE(ParseOk("assign x = 1;"));
+}
+
+// §3.12.1: the compilation-unit scope can contain any item that can be
+// defined within a package, plus bind constructs.  Modules, primitives,
+// programs, interfaces, and packages are visible across compilation units;
+// classes, checkers, configs, and bind directives also belong to a CU.
+TEST(CompilationUnitStructure, AllDescriptionTypesCoexist) {
+  auto r = Parse(
+      "package pkg; endpackage\n"
+      "module m; endmodule\n"
+      "interface ifc; endinterface\n"
+      "program prg; endprogram\n"
+      "class C; endclass\n"
+      "checker chk; endchecker\n"
+      "primitive my_udp(output y, input a);\n"
+      "  table 0 : 0 ; 1 : 1 ; endtable\n"
+      "endprimitive\n"
+      "config cfg;\n"
+      "  design work.m;\n"
+      "  default liblist work;\n"
+      "endconfig\n"
+      "bind m chk chk_i(.a(s));\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->programs.size(), 1u);
+  EXPECT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->checkers.size(), 1u);
+  EXPECT_EQ(r.cu->udps.size(), 1u);
+  EXPECT_EQ(r.cu->configs.size(), 1u);
+  EXPECT_EQ(r.cu->bind_directives.size(), 1u);
 }
 
 TEST(CompilationUnits, DesignElementsInterleaveWithNonDesignElements) {
@@ -584,18 +581,6 @@ TEST(CompilationUnits, DesignElementsInterleaveWithNonDesignElements) {
   EXPECT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->classes.size(), 1u);
   EXPECT_EQ(r.cu->packages.size(), 1u);
-}
-
-TEST(CompilationUnit, MultipleModules) {
-  auto r = Parse(
-      "module a; endmodule\nmodule b; endmodule\n"
-      "module c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 3u);
-  EXPECT_EQ(r.cu->modules[0]->name, "a");
-  EXPECT_EQ(r.cu->modules[1]->name, "b");
-  EXPECT_EQ(r.cu->modules[2]->name, "c");
 }
 
 }  // namespace

@@ -422,18 +422,6 @@ TEST(IdentifierSyntaxParsing, SystemCallClog2) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(IdentifierSyntaxParsing, UnitScopePackageAccess) {
-  ParseFixture f;
-  auto* cu = ParseSrc(
-      "module m;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = $unit::top_param;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(cu, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(IdentifierSyntaxParsing, SystemIdentNoArgsAsStatement) {
   ParseFixture f;
   auto* cu = ParseSrc(
