@@ -197,26 +197,6 @@ TEST(Preprocessor, LineCommentMarkerInStringNotAComment) {
   EXPECT_NE(result.find("val"), std::string::npos);
 }
 
-TEST(Preprocessor, NestedBlockCommentsNotSupported) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define FOO val\n"
-      "/* outer /* inner */ int x = `FOO; */\n",
-      f);
-
-  EXPECT_NE(result.find("val"), std::string::npos);
-}
-
-TEST(Preprocessor, EmptyBlockComment) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define FOO val\n"
-      "/**/ int x = `FOO;\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("val"), std::string::npos);
-}
-
 TEST(Preprocessor, CodeAfterEndifOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess(

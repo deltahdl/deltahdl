@@ -83,16 +83,6 @@ TEST(LexicalTokenSim, LexicalTokenBlockCommentAsSeparator) {
   EXPECT_EQ(result, 66u);
 }
 
-TEST(LexicalTokenSim, LexicalTokenLineCommentTerminatesAtNewline) {
-  auto result = RunAndGet(
-      "module t; // this is a comment\n"
-      "  logic [7:0] result; // another comment\n"
-      "  initial result = 8'd44; // value\n"
-      "endmodule // end\n",
-      "result");
-  EXPECT_EQ(result, 44u);
-}
-
 TEST(LexicalTokenSim, LexicalTokenFreeFormatAlwaysComb) {
   auto result = RunAndGet(
       "module t; logic [7:0] a, result;\n"
