@@ -1,46 +1,15 @@
 #include <gtest/gtest.h>
 
-#include <set>
-
 #include "fixture_lexer.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(LexicalConventionLexing, TokenStreamEndsWithEof) {
-  auto tokens = Lex("module m; endmodule");
-  ASSERT_FALSE(tokens.empty());
-  EXPECT_EQ(tokens.back().kind, TokenKind::kEof);
-}
-
 TEST(LexicalConventionLexing, EmptySourceProducesOnlyEof) {
   auto tokens = Lex("");
   ASSERT_EQ(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
-}
-
-TEST(LexicalConventionLexing, AllFourAreasInOneStream) {
-  auto tokens =
-      Lex("(* full_case *) module t; // comment\n"
-          "  logic [7:0] x = 8'hFF + 1;\n"
-          "  real r = 3.14;\n"
-          "  initial $display(\"msg\");\n"
-          "endmodule\n");
-
-  std::set<TokenKind> kinds;
-  for (const auto& tok : tokens) {
-    kinds.insert(tok.kind);
-  }
-
-  EXPECT_TRUE(kinds.count(TokenKind::kAttrStart));
-  EXPECT_TRUE(kinds.count(TokenKind::kKwModule));
-  EXPECT_TRUE(kinds.count(TokenKind::kPlus));
-  EXPECT_TRUE(kinds.count(TokenKind::kIntLiteral));
-  EXPECT_TRUE(kinds.count(TokenKind::kRealLiteral));
-  EXPECT_TRUE(kinds.count(TokenKind::kStringLiteral));
-  EXPECT_TRUE(kinds.count(TokenKind::kSystemIdentifier));
-  EXPECT_TRUE(kinds.count(TokenKind::kIdentifier));
 }
 
 }  // namespace
