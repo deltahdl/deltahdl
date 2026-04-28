@@ -35,6 +35,23 @@ TEST(OperatorSynthesis, DoubleCharOperatorSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
+// §5.5: "Operators are single-, double-, or triple-character sequences."
+// Synthesizer-stage observation that triple-char operators flow through the
+// AIG lowering path.
+TEST(OperatorSynthesis, TripleCharOperatorSynthesizes) {
+  SynthFixture f;
+  auto* mod = ElaborateSrc(
+      f,
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  assign a = b <<< 1;\n"
+      "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto* aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+}
+
 TEST(OperatorSynthesis, UnaryOperatorSynthesizes) {
   SynthFixture f;
   auto* mod = ElaborateSrc(

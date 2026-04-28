@@ -82,21 +82,6 @@ TEST(OperatorAndExpressionParsing, AllAssignmentOperatorsParse) {
               "endmodule\n"));
 }
 
-TEST(OperatorAndExpressionParsing, ConditionalExpressionParses) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a ? b : c;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->condition, nullptr);
-  ASSERT_NE(rhs->true_expr, nullptr);
-  ASSERT_NE(rhs->false_expr, nullptr);
-}
-
 TEST(OperatorAndExpressionParsing, IncDecOperatorsParse) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

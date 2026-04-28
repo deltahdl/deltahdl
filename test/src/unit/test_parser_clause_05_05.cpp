@@ -238,4 +238,54 @@ TEST(LexicalConventionParsing, OperatorInContinuousAssign) {
               "endmodule\n"));
 }
 
+// §5.5: "Binary operators shall appear between their operands." A binary
+// operator with no right operand violates the rule and the parser must reject.
+TEST(LexicalConventionParsing, BinaryOperatorMissingRightOperandFails) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = a +;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §5.5: "Unary operators shall appear to the left of their operand." A unary
+// operator with no operand to its right violates the rule.
+TEST(LexicalConventionParsing, UnaryOperatorMissingOperandFails) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = ~;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §5.5: "A conditional operator shall have two operator characters that
+// separate three operands." Missing the second operator character (`:`) and
+// the third operand violates the rule.
+TEST(LexicalConventionParsing, ConditionalMissingColonFails) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = a ? b;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §5.5: same rule — three operands required; missing the false-branch
+// operand violates the rule.
+TEST(LexicalConventionParsing, ConditionalMissingFalseOperandFails) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = a ? b :;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §5.5: same rule — missing the true-branch operand violates the rule.
+TEST(LexicalConventionParsing, ConditionalMissingTrueOperandFails) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = a ? : c;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

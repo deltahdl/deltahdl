@@ -73,6 +73,13 @@ TEST(LexicalConventionLexing, SingleCharGt) {
 TEST(LexicalConventionLexing, SingleCharQuestion) {
   auto r = LexOne("?");
   EXPECT_EQ(r.token.kind, TokenKind::kQuestion);
+  EXPECT_EQ(r.token.text.size(), 1u);
+}
+
+TEST(LexicalConventionLexing, SingleCharColon) {
+  auto r = LexOne(": ");
+  EXPECT_EQ(r.token.kind, TokenKind::kColon);
+  EXPECT_EQ(r.token.text.size(), 1u);
 }
 
 TEST(LexicalConventionLexing, SingleCharEq) {
@@ -353,16 +360,20 @@ TEST(LexicalConventionLexing, DoubleNotTriple) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kEqEq);
 }
 
-TEST(LexicalConventionLexing, OperatorTokensRecognized) {
-  auto tokens = Lex("+ - * / % ** && ||");
-  EXPECT_EQ(tokens[0].kind, TokenKind::kPlus);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kMinus);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kStar);
-  EXPECT_EQ(tokens[3].kind, TokenKind::kSlash);
-  EXPECT_EQ(tokens[4].kind, TokenKind::kPercent);
-  EXPECT_EQ(tokens[5].kind, TokenKind::kPower);
-  EXPECT_EQ(tokens[6].kind, TokenKind::kAmpAmp);
-  EXPECT_EQ(tokens[7].kind, TokenKind::kPipePipe);
+// §5.5: "A conditional operator shall have two operator characters that
+// separate three operands." Lexer-stage observation: both `?` and `:` are
+// produced as separate single-character operator tokens, and the three
+// operands sit between/around them.
+TEST(LexicalConventionLexing, ConditionalOperatorTwoOperatorChars) {
+  auto tokens = Lex("a ? b : c");
+  ASSERT_GE(tokens.size(), 5u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].kind, TokenKind::kQuestion);
+  EXPECT_EQ(tokens[1].text.size(), 1u);
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[3].kind, TokenKind::kColon);
+  EXPECT_EQ(tokens[3].text.size(), 1u);
+  EXPECT_EQ(tokens[4].kind, TokenKind::kIdentifier);
 }
 
 }  // namespace

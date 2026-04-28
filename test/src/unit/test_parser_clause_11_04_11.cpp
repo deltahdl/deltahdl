@@ -75,18 +75,6 @@ TEST(OperatorAndExpressionParsing, TernaryAsFunctionArgument) {
   EXPECT_EQ(rhs->args[0]->kind, ExprKind::kTernary);
 }
 
-TEST(ExpressionParsing, ConditionalExprSimple) {
-  auto r = Parse("module m; initial x = a ? b : c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  ASSERT_NE(rhs->condition, nullptr);
-  ASSERT_NE(rhs->true_expr, nullptr);
-  ASSERT_NE(rhs->false_expr, nullptr);
-}
-
 TEST(OperatorAndExpressionParsing, TernaryWithCast) {
   auto r = Parse(
       "module t;\n"
