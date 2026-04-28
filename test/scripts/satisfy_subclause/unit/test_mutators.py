@@ -68,6 +68,21 @@ def test_disallowed_tools_blocks_mutool() -> None:
     assert "mutool" in MUTATOR_DISALLOWED_TOOLS
 
 
+def test_disallowed_tools_allows_rm() -> None:
+    """Steps 4 and 6 require deleting files on disk; rm must not be blocked."""
+    assert "Bash(rm *)" not in MUTATOR_DISALLOWED_TOOLS
+
+
+def test_disallowed_tools_allows_mv() -> None:
+    """Step 4 (Moving misplaced tests) needs mv; it must not be blocked."""
+    assert "Bash(mv *)" not in MUTATOR_DISALLOWED_TOOLS
+
+
+def test_disallowed_tools_allows_cp() -> None:
+    """cp is not destructive and is dropped for symmetry with rm/mv."""
+    assert "Bash(cp *)" not in MUTATOR_DISALLOWED_TOOLS
+
+
 # --- run_step ---------------------------------------------------------------
 
 

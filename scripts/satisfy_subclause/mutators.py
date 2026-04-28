@@ -40,12 +40,14 @@ from .streaming import (
 )
 
 
-# Mutators may edit source and test files but must never run git, gh,
-# build tools, or destructive shell commands directly. The orchestrator
-# owns the commit and the CI-equivalent gates.
+# Mutators may edit, create, delete, and rename source and test files
+# but must never run git, gh, or build/test tools directly. The
+# orchestrator owns the commit and the CI-equivalent gates: it reads
+# git status --porcelain after the eight-step pass and translates the
+# deleted set into git rm at commit time, so on-disk rm/mv by the
+# mutator is the supported path for Steps 4 and 6.
 MUTATOR_DISALLOWED_TOOLS = (
     "Bash(git *) Bash(gh *)"
-    " Bash(rm *) Bash(mv *) Bash(cp *)"
     " Bash(cmake *) Bash(make *) Bash(ninja *)"
     " Bash(ctest *) Bash(pytest *)"
     " Bash(pdftotext *) Bash(pdfgrep *) Bash(pdftohtml *)"
