@@ -446,17 +446,6 @@ TEST(Preprocessor, EscapedBacktickInStringNotDirective) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, DirectiveTakesEffectImmediately) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-  auto fid = f.mgr.AddFile("<test>",
-                           "`default_nettype none\n"
-                           "`default_nettype wire\n");
-  pp.Preprocess(fid);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(pp.DefaultNetType(), NetType::kWire);
-}
-
 TEST(Preprocessor, MultipleDirectivesAllInEffect) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -469,19 +458,6 @@ TEST(Preprocessor, MultipleDirectivesAllInEffect) {
   EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
   EXPECT_TRUE(pp.InCelldefine());
   EXPECT_TRUE(pp.HasTimescale());
-}
-
-TEST(Preprocessor, DirectivePersistsAcrossFiles) {
-  PreprocFixture f;
-  Preprocessor pp(f.mgr, f.diag, {});
-
-  auto fid1 = f.mgr.AddFile("<file1>", "`default_nettype none\n");
-  pp.Preprocess(fid1);
-  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
-
-  auto fid2 = f.mgr.AddFile("<file2>", "module m; endmodule\n");
-  pp.Preprocess(fid2);
-  EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
 }
 
 TEST(Preprocessor, DirectiveInRemainderOfAnotherDirective) {

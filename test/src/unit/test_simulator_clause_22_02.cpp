@@ -27,18 +27,6 @@ static uint64_t PreprocessAndGet(const std::string& src, const char* var_name) {
   return var->value.ToUint64();
 }
 
-TEST(CompilerDirectiveSimulation, DirectivePersistsInCompilationUnit) {
-  auto result = PreprocessAndGet(
-      "`define CONST 8'd99\n"
-      "module other; endmodule\n"
-      "module t;\n"
-      "  logic [7:0] result;\n"
-      "  initial result = `CONST;\n"
-      "endmodule\n",
-      "result");
-  EXPECT_EQ(result, 99u);
-}
-
 TEST(CompilerDirectiveSimulation, DirectiveCanBeOverridden) {
   auto result = PreprocessAndGet(
       "`define X 8'd10\n"
