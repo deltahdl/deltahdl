@@ -199,3 +199,28 @@ def test_commit_body_disallowed_tools_blocks_edit() -> None:
 def test_commit_body_disallowed_tools_blocks_git() -> None:
     """Commit-body generation must not run git directly."""
     assert "Bash(git *)" in COMMIT_BODY_DISALLOWED_TOOLS
+
+
+def test_commit_body_disallowed_tools_blocks_rm() -> None:
+    """Commit-body must not delete files via rm even though mutator allows it."""
+    assert "Bash(rm *)" in COMMIT_BODY_DISALLOWED_TOOLS
+
+
+def test_commit_body_disallowed_tools_blocks_mv() -> None:
+    """Commit-body must not move files via mv even though mutator allows it."""
+    assert "Bash(mv *)" in COMMIT_BODY_DISALLOWED_TOOLS
+
+
+def test_commit_body_disallowed_tools_blocks_cp() -> None:
+    """Commit-body must not copy files via cp even though mutator allows it."""
+    assert "Bash(cp *)" in COMMIT_BODY_DISALLOWED_TOOLS
+
+
+def test_commit_body_disallowed_tools_blocks_touch() -> None:
+    """Commit-body must not create empty files via touch."""
+    assert "Bash(touch *)" in COMMIT_BODY_DISALLOWED_TOOLS
+
+
+def test_commit_body_disallowed_tools_blocks_mkdir() -> None:
+    """Commit-body must not create directories via mkdir."""
+    assert "Bash(mkdir *)" in COMMIT_BODY_DISALLOWED_TOOLS

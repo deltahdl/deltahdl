@@ -57,9 +57,13 @@ MUTATOR_DISALLOWED_TOOLS = (
 
 # The commit-body generator must not write, edit, or run anything; it
 # just narrates what the eight-step session already did. Block every
-# editing tool on top of MUTATOR_DISALLOWED_TOOLS.
+# editing tool, plus the on-disk shell mutators that the mutator list
+# intentionally permits — without these the editing-tool ban has a
+# Bash escape hatch (rm/mv/cp/touch/mkdir).
 COMMIT_BODY_DISALLOWED_TOOLS = (
-    "Write Edit MultiEdit NotebookEdit " + MUTATOR_DISALLOWED_TOOLS
+    "Write Edit MultiEdit NotebookEdit"
+    " Bash(rm *) Bash(mv *) Bash(cp *) Bash(touch *) Bash(mkdir *)"
+    " " + MUTATOR_DISALLOWED_TOOLS
 )
 
 
