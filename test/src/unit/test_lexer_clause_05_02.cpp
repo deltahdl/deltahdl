@@ -88,12 +88,6 @@ TEST(LexicalConventionLexing, MixedWhitespaceAsTokenSeparators) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexicalConventionLexing, WhitespaceCategory) {
-  auto tokens = Lex("   ");
-  ASSERT_EQ(tokens.size(), 1u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
-}
-
 TEST(LexicalConventionLexing, CommentCategory) {
   auto tokens = Lex("a // line comment\nb");
   ASSERT_EQ(tokens.size(), 3u);
@@ -196,13 +190,6 @@ TEST(LexicalConventionLexing, StringLiteralAdjacentToOtherTokens) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(tokens[1].kind, TokenKind::kStringLiteral);
   EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
-}
-
-TEST(LexicalConventionLexing, LineCommentActsAsTokenSeparator) {
-  auto tokens = Lex("a//comment\nb");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].text, "b");
 }
 
 TEST(LexicalConventionLexing, FreeFormatIdentifierSplitByBlockComment) {

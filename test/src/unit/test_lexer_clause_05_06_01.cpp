@@ -251,4 +251,18 @@ TEST(LexicalConventionLexing, EscapedIdentifierBodyAbsorbsStructuralDelimiters) 
   EXPECT_EQ(r.token.text, "foo\"bar/*baz//qux'end");
 }
 
+// §5.6.1: rule (1) "shall start with the backslash character (\) and end with
+// white space" combined with §5.3's inclusion of end-of-file in the white
+// space category implies that a bare backslash followed only by EOF is a
+// well-formed escaped identifier with an empty body. Production code must
+// not over-read past the source buffer.
+TEST(LexicalConventionLexing, EscapedIdentifierBareBackslashAtEof) {
+  auto [tokens, errors] = LexWithDiag("\\");
+  EXPECT_FALSE(errors);
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_TRUE(tokens[0].text.empty());
+  EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
+}
+
 }  // namespace

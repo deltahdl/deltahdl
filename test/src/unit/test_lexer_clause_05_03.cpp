@@ -179,4 +179,42 @@ TEST(LexicalConventionLexing, VerticalTabSeparatesKeywords) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
 }
 
+// §5.3: "White space shall contain the characters for spaces, tabs, newlines,
+// formfeeds, and end of file." Bare end-of-file (no preceding explicit
+// whitespace) must terminate the preceding token just as the other whitespace
+// characters do — that is the operational meaning of EOF being a member of
+// the white space category.
+TEST(LexicalConventionLexing, EndOfFileIsWhitespaceTerminator) {
+  auto tokens = Lex("abc");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "abc");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
+}
+
+// §5.3: end-of-file must terminate every lexical-token category, not just
+// simple identifiers — exercise representative members from §5.2's seven
+// categories sitting flush against EOF (no trailing whitespace).
+TEST(LexicalConventionLexing, EndOfFileTerminatesEachTokenCategory) {
+  auto kw = Lex("module");
+  ASSERT_EQ(kw.size(), 2u);
+  EXPECT_EQ(kw[0].kind, TokenKind::kKwModule);
+  EXPECT_EQ(kw[1].kind, TokenKind::kEof);
+
+  auto num = Lex("42");
+  ASSERT_EQ(num.size(), 2u);
+  EXPECT_EQ(num[0].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(num[1].kind, TokenKind::kEof);
+
+  auto op = Lex("+");
+  ASSERT_EQ(op.size(), 2u);
+  EXPECT_EQ(op[0].kind, TokenKind::kPlus);
+  EXPECT_EQ(op[1].kind, TokenKind::kEof);
+
+  auto str = Lex("\"hi\"");
+  ASSERT_EQ(str.size(), 2u);
+  EXPECT_EQ(str[0].kind, TokenKind::kStringLiteral);
+  EXPECT_EQ(str[1].kind, TokenKind::kEof);
+}
+
 }  // namespace

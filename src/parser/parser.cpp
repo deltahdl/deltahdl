@@ -17,7 +17,17 @@ Parser::Parser(Lexer& lexer, Arena& arena, DiagEngine& diag)
 }
 
 Token Parser::CurrentToken() { return lexer_.Peek(); }
-bool Parser::Check(TokenKind kind) { return CurrentToken().Is(kind); }
+bool Parser::Check(TokenKind kind) {
+  // §5.6.1: "an escaped identifier \cpu3 is treated the same as a nonescaped
+  // identifier cpu3." Wherever the parser expects a generic identifier, an
+  // escaped-identifier token must satisfy the check too.
+  auto cur = CurrentToken().kind;
+  if (kind == TokenKind::kIdentifier) {
+    return cur == TokenKind::kIdentifier ||
+           cur == TokenKind::kEscapedIdentifier;
+  }
+  return cur == kind;
+}
 bool Parser::AtEnd() { return Check(TokenKind::kEof); }
 SourceLoc Parser::CurrentLoc() { return CurrentToken().loc; }
 

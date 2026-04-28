@@ -234,7 +234,7 @@ bool Parser::IsBlockVarDeclStartCore() {
     lexer_.RestorePos(saved);
     return is_decl;
   }
-  return CurrentToken().Is(TokenKind::kIdentifier) &&
+  return Check(TokenKind::kIdentifier) &&
          known_types_.count(CurrentToken().text) != 0;
 }
 

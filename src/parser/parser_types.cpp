@@ -271,8 +271,8 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
     Consume();
     return false;
   }
-  // Named type (user-defined): wire addressT w1;
-  if (CurrentToken().Is(TokenKind::kIdentifier) &&
+  // Named type (user-defined): wire addressT w1; (or `wire \my-type w1;`)
+  if (Check(TokenKind::kIdentifier) &&
       known_types_.count(CurrentToken().text) != 0) {
     auto inner = ParseNamedType();
     ApplyNetInfo(inner, dtype);
@@ -317,7 +317,7 @@ DataType Parser::ParseDataType() {
     return ParseVirtualInterfaceType();
   }
 
-  bool is_named = CurrentToken().Is(TokenKind::kIdentifier) &&
+  bool is_named = Check(TokenKind::kIdentifier) &&
                   known_types_.count(CurrentToken().text) != 0;
   if (is_named) {
     auto named = ParseNamedType();
