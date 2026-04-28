@@ -209,4 +209,46 @@ TEST(LexicalConventionLexing, SimpleAndEscapedInStream) {
   EXPECT_EQ(tokens[2].text, "ghi");
 }
 
+// §5.6.1: a `+` sign embedded in the body is part of the escaped identifier;
+// inserting whitespace before the `+` terminates the escaped identifier and
+// the `+` becomes its own operator token.
+TEST(LexicalConventionLexing, EscapedIdentifierWhitespaceIsSignificant) {
+  auto without_ws = Lex("\\foo+bar ");
+  ASSERT_GE(without_ws.size(), 2u);
+  EXPECT_EQ(without_ws[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(without_ws[0].text, "foo+bar");
+
+  auto with_ws = Lex("\\foo +bar ");
+  ASSERT_GE(with_ws.size(), 4u);
+  EXPECT_EQ(with_ws[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(with_ws[0].text, "foo");
+  EXPECT_EQ(with_ws[1].kind, TokenKind::kPlus);
+  EXPECT_EQ(with_ws[2].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(with_ws[2].text, "bar");
+}
+
+// §5.6.1: a leading backslash starts an escaped identifier whose body may
+// include `$` (printable ASCII 0x24). The `\` dispatch precedes the
+// system-identifier dispatch, so `\$display` is an escaped identifier, not a
+// system identifier.
+TEST(LexicalConventionLexing, EscapedDollarIsNotSystemId) {
+  auto r = LexOne("\\$display ");
+  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
+  EXPECT_NE(r.token.kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(r.token.text, "$display");
+}
+
+// §5.6.1: rule (1) "end with white space" combined with rule (2) "any printable
+// ASCII except white space" implies the body absorbs every non-whitespace
+// printable byte — including the bytes that would normally begin a string
+// literal ("), a line comment (//), a block comment (/*), or a number-base
+// apostrophe ('). The lexer must not dispatch to string or comment handling
+// from inside an escaped identifier body; it must continue scanning until the
+// first whitespace.
+TEST(LexicalConventionLexing, EscapedIdentifierBodyAbsorbsStructuralDelimiters) {
+  auto r = LexOne("\\foo\"bar/*baz//qux'end ");
+  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(r.token.text, "foo\"bar/*baz//qux'end");
+}
+
 }  // namespace

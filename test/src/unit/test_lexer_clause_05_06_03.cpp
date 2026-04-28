@@ -59,12 +59,6 @@ TEST(SystemNameLexing, MaxLengthOk) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kSystemIdentifier);
 }
 
-TEST(SystemNameLexing, EscapedDollarIsNotSystemId) {
-  auto r = LexOne("\\$display ");
-  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
-  EXPECT_NE(r.token.kind, TokenKind::kSystemIdentifier);
-}
-
 TEST(SystemNameLexing, DigitAsFirstChar) {
   auto r = LexOne("$0 ");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);

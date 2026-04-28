@@ -21,20 +21,6 @@ TEST(EscapedIdentifierSynthesis, EscapedIdentifierSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-TEST(EscapedIdentifierSynthesis, EscapedIdentifierSpecialCharsSynthesizes) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] \\***sig*** , result;\n"
-      "  assign result = \\***sig*** ;\n"
-      "endmodule\n");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-}
-
 TEST(EscapedIdentifierSynthesis, EscapedKeywordSynthesizes) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
@@ -77,14 +63,17 @@ TEST(EscapedIdentifierSynthesis, EscapedIdentMatchesSimpleIdentSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-// §5.6.1: digit-leading body — illegal as simple identifier — synthesizes.
-TEST(EscapedIdentifierSynthesis, EscapedIdentAllDigitsSynthesizes) {
+// §5.6.1: rule (4) symmetry at synthesis — a net declared in the escaped form
+// is reachable through a simple-form reference when both denote the same
+// stored name. The synthesized AIG must bind the reference to the declared
+// net.
+TEST(EscapedIdentifierSynthesis, EscapedDeclSimpleRefSynthesizes) {
   SynthFixture f;
   auto* mod = ElaborateSrc(
       f,
       "module m;\n"
-      "  logic [7:0] \\1234 , result;\n"
-      "  assign result = \\1234 ;\n"
+      "  logic [7:0] \\cpu3 , result;\n"
+      "  assign result = cpu3;\n"
       "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);

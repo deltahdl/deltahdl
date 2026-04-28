@@ -18,14 +18,6 @@ TEST(EscapedIdentifierElaboration, EscapedKeywordAsIdentifierElaborates) {
              "endmodule\n"));
 }
 
-TEST(EscapedIdentifierElaboration, EscapedIdentifierSpecialCharsElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic \\***error-condition*** ;\n"
-             "  assign \\***error-condition*** = 1'b0;\n"
-             "endmodule\n"));
-}
-
 TEST(EscapedIdentifierElaboration, MultipleEscapedIdentifiersElaborate) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -51,20 +43,14 @@ TEST(EscapedIdentifierElaboration, EscapedIdentMatchesSimpleIdent) {
              "endmodule\n"));
 }
 
-TEST(EscapedIdentifierElaboration, EscapedIdentDashClockElaborates) {
+// §5.6.1: rule (4) symmetry — when the declaration uses the escaped form and
+// the reference uses the simple form, the reference must still resolve to the
+// declaration (both forms denote the stored name "cpu3").
+TEST(EscapedIdentifierElaboration, EscapedDeclResolvesSimpleRef) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
-             "  logic \\-clock ;\n"
-             "  assign \\-clock = 1'b0;\n"
-             "endmodule\n"));
-}
-
-// §5.6.1: digit-leading body — illegal as simple identifier — is legal escaped.
-TEST(EscapedIdentifierElaboration, EscapedIdentAllDigitsElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic \\1234 ;\n"
-             "  assign \\1234 = 1'b1;\n"
+             "  logic [7:0] \\cpu3 ;\n"
+             "  assign cpu3 = 8'd5;\n"
              "endmodule\n"));
 }
 

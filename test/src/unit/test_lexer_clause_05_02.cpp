@@ -221,19 +221,4 @@ TEST(LexicalConventionLexing, EmptyInputProducesEofOnly) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-TEST(LexicalConventionLexing, EscapedIdentifierWhitespaceIsSignificant) {
-  auto without_ws = Lex("\\foo+bar ");
-  ASSERT_GE(without_ws.size(), 2u);
-  EXPECT_EQ(without_ws[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(without_ws[0].text, "foo+bar");
-
-  auto with_ws = Lex("\\foo +bar ");
-  ASSERT_GE(with_ws.size(), 4u);
-  EXPECT_EQ(with_ws[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(with_ws[0].text, "foo");
-  EXPECT_EQ(with_ws[1].kind, TokenKind::kPlus);
-  EXPECT_EQ(with_ws[2].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(with_ws[2].text, "bar");
-}
-
 }  // namespace

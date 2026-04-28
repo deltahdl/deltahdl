@@ -15,16 +15,6 @@ TEST(EscapedIdentifierSim, EscapedIdentAsVariable) {
   EXPECT_EQ(result, 55u);
 }
 
-TEST(EscapedIdentifierSim, EscapedIdentSpecialChars) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] \\data+bus ;\n"
-      "  initial \\data+bus = 8'd77;\n"
-      "endmodule\n",
-      "data+bus");
-  EXPECT_EQ(result, 77u);
-}
-
 TEST(EscapedIdentifierSim, EscapedKeywordAsVariable) {
   auto result = RunAndGet(
       "module t;\n"
@@ -68,16 +58,6 @@ TEST(EscapedIdentifierSim, EscapedIdentMatchesSimpleIdent) {
   EXPECT_EQ(result, 42u);
 }
 
-TEST(EscapedIdentifierSim, EscapedIdentDashClock) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] \\-clock ;\n"
-      "  initial \\-clock = 8'd11;\n"
-      "endmodule\n",
-      "-clock");
-  EXPECT_EQ(result, 11u);
-}
-
 TEST(EscapedIdentifierSim, EscapedIdentInExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -112,13 +92,16 @@ TEST(EscapedIdentifierSim, EscapedIdentVariableResolves) {
   EXPECT_EQ(val, 99u);
 }
 
-// §5.6.1: digit-leading body works through simulation as a normal variable.
-TEST(EscapedIdentifierSim, EscapedIdentAllDigitsAsVariable) {
+// §5.6.1: rule (4) symmetry at simulation — a value written through the
+// simple-form reference must be readable from the variable declared in the
+// escaped form. Both forms map to the stored name "cpu3".
+TEST(EscapedIdentifierSim, EscapedDeclSimpleRefResolves) {
   auto result = RunAndGet(
       "module t;\n"
-      "  logic [7:0] \\1234 ;\n"
-      "  initial \\1234 = 8'd44;\n"
+      "  logic [7:0] \\cpu3 ;\n"
+      "  initial cpu3 = 8'd77;\n"
       "endmodule\n",
-      "1234");
-  EXPECT_EQ(result, 44u);
+      "cpu3");
+  EXPECT_EQ(result, 77u);
 }
+

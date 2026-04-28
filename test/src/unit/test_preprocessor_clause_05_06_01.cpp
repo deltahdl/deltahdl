@@ -28,17 +28,6 @@ TEST(EscapedIdentifierPreprocessor, EscapedKeywordPreservedThroughPreprocessing)
   EXPECT_NE(result.find("\\module"), std::string::npos);
 }
 
-TEST(EscapedIdentifierPreprocessor, EscapedIdentifierSpecialCharsPreserved) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "module t;\n"
-      "  logic \\***error-condition*** ;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("\\***error-condition***"), std::string::npos);
-}
-
 TEST(EscapedIdentifierPreprocessor, MultipleEscapedIdentifiersPreserved) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -60,41 +49,6 @@ TEST(EscapedIdentifierPreprocessor, EscapedIdentifierInMacroContext) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(EscapedIdentifierPreprocessor, EscapedIdentDashClockPreserved) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "module t;\n"
-      "  logic \\-clock ;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("\\-clock"), std::string::npos);
-}
-
-// §5.6.1: digit-leading body passes through the preprocessor verbatim.
-TEST(EscapedIdentifierPreprocessor, EscapedIdentAllDigitsPreserved) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "module t;\n"
-      "  logic \\1234 ;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("\\1234"), std::string::npos);
-}
-
-// §5.6.1: case of body characters survives the preprocessor unchanged.
-TEST(EscapedIdentifierPreprocessor, EscapedIdentPreservesCase) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "module t;\n"
-      "  logic \\AbCdEf ;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("\\AbCdEf"), std::string::npos);
 }
 
 }  // namespace

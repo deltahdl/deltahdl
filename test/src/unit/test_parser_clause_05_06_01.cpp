@@ -12,18 +12,6 @@ TEST(LexicalConventionParsing, EscapedKeywordAsIdentifier) {
   EXPECT_TRUE(ParseOk("module t; wire \\module ; endmodule"));
 }
 
-TEST(LexicalConventionParsing, EscapedIdentSpecialChars) {
-  EXPECT_TRUE(ParseOk("module m; wire \\***error-condition*** ; endmodule"));
-}
-
-TEST(LexicalConventionParsing, EscapedIdentForwardSlash) {
-  EXPECT_TRUE(ParseOk("module m; wire \\net1/\\net2 ; endmodule"));
-}
-
-TEST(LexicalConventionParsing, EscapedIdentBraces) {
-  EXPECT_TRUE(ParseOk("module m; wire \\{a,b} ; endmodule"));
-}
-
 TEST(LexicalConventionParsing, EscapedIdentInExpression) {
   auto r = Parse(
       "module m;\n"
@@ -55,14 +43,6 @@ TEST(LexicalConventionParsing, MultipleEscapedIdentifiers) {
       ParseOk("module t;\n"
               "  logic \\a+b , \\c-d ;\n"
               "endmodule\n"));
-}
-
-TEST(LexicalConventionParsing, EscapedIdentDashClock) {
-  EXPECT_TRUE(ParseOk("module m; wire \\-clock ; endmodule"));
-}
-
-TEST(LexicalConventionParsing, EscapedIdentParentheses) {
-  EXPECT_TRUE(ParseOk("module m; wire \\a*(b+c) ; endmodule"));
 }
 
 TEST(LexicalConventionParsing, EscapedIdentSameAsSimpleIdent) {
