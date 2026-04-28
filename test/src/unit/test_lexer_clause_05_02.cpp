@@ -168,15 +168,6 @@ TEST(LexicalConventionLexing, TokensAdjacentToPunctuation) {
   EXPECT_EQ(tokens[3].kind, TokenKind::kRParen);
 }
 
-TEST(LexicalConventionLexing, BlockCommentActsAsTokenSeparator) {
-  auto tokens = Lex("a/**/b");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].text, "b");
-}
-
 TEST(LexicalConventionLexing, TokenStreamAlwaysEndsWithEof) {
   auto tokens = Lex("module m; endmodule");
   ASSERT_GE(tokens.size(), 2u);

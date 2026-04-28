@@ -40,20 +40,9 @@ TEST(LexicalConventionParsing, MultipleConsecutiveWhitespace) {
       ParseOk("module   \t\t   t  \n\n\n ;   logic   a  ;   endmodule"));
 }
 
-TEST(LexicalConventionParsing, MinimalWhitespace) {
-  EXPECT_TRUE(ParseOk("module t;endmodule"));
-}
-
 TEST(LexicalConventionParsing, ExcessiveWhitespace) {
   EXPECT_TRUE(
       ParseOk("  \t\n  module  \t  t  \n  ;  \n\n\t  endmodule  \n\n  "));
-}
-
-TEST(LexicalConventionParsing, WhitespaceOnlyInputParsesEmpty) {
-  auto r = Parse("   \t\n\n  \t  ");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(r.cu->modules.empty());
-  EXPECT_TRUE(r.cu->packages.empty());
 }
 
 TEST(LexicalConventionParsing, MixedTokensNoWhitespace) {

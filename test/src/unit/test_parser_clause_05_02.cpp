@@ -41,14 +41,6 @@ TEST(LexicalConventionParsing, WhitespaceVariationsProduceSameAST) {
   EXPECT_EQ(compact.cu->modules[0]->name, spread.cu->modules[0]->name);
 }
 
-TEST(LexicalConventionParsing, SourceWithAllTokenCategoriesParses) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic [7:0] data = 8'hAB;\n"
-              "  initial $display(\"hello\");\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, AllTokenCategoriesParsed) {
   EXPECT_TRUE(
       ParseOk("module t; // line comment\n"
