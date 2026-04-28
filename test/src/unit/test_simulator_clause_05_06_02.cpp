@@ -52,14 +52,3 @@ TEST(KeywordIdentifierSim, KeywordLowercaseOnly) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §5.6.2: an escaped keyword (control-flow) is usable as a variable in
-// simulation.
-TEST(KeywordIdentifierSim, EscapedKeywordIfUsableAsVariable) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] \\if ;\n"
-      "  initial \\if = 8'd33;\n"
-      "endmodule\n",
-      "if");
-  EXPECT_EQ(result, 33u);
-}

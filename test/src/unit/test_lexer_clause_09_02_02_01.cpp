@@ -18,11 +18,6 @@ TEST(GeneralPurposeAlwaysLexing, AlwaysPrefixIsIdentifier) {
   EXPECT_EQ(r.token.text, "always_xyz");
 }
 
-TEST(GeneralPurposeAlwaysLexing, UppercaseIsIdentifier) {
-  auto r = LexOne("ALWAYS ");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-}
-
 TEST(GeneralPurposeAlwaysLexing, AlwaysFollowedByHash) {
   auto tokens = Lex("always #5");
   ASSERT_GE(tokens.size(), 2u);

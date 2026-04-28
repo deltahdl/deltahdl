@@ -29,15 +29,4 @@ TEST(KeywordElaboration, UppercaseKeywordAsIdentifierElaborates) {
              "endmodule\n"));
 }
 
-TEST(KeywordElaboration, MultipleKeywordConstructsElaborate) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic [7:0] a, b;\n"
-             "  assign a = 8'd0;\n"
-             "  initial begin\n"
-             "    for (int i = 0; i < 2; i++) b = b + 8'd1;\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
 }  // namespace

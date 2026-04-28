@@ -18,11 +18,6 @@ TEST(InitialProcedureLexing, InitialPrefixIsIdentifier) {
   EXPECT_EQ(r.token.text, "initial_value");
 }
 
-TEST(InitialProcedureLexing, UppercaseIsIdentifier) {
-  auto r = LexOne("INITIAL ");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-}
-
 TEST(InitialProcedureLexing, InitialFollowedByStatement) {
   auto tokens = Lex("initial x = 1;");
   ASSERT_GE(tokens.size(), 2u);

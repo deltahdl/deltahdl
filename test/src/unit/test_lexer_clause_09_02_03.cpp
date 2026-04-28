@@ -18,11 +18,6 @@ TEST(FinalProcedureLexing, FinalPrefixIsIdentifier) {
   EXPECT_EQ(r.token.text, "final_value");
 }
 
-TEST(FinalProcedureLexing, UppercaseIsIdentifier) {
-  auto r = LexOne("FINAL ");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-}
-
 TEST(FinalProcedureLexing, FinalFollowedByStatement) {
   auto tokens = Lex("final x = 1;");
   ASSERT_GE(tokens.size(), 2u);

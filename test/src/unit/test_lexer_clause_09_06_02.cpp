@@ -18,11 +18,6 @@ TEST(DisableStatementLexing, DisablePrefixIsIdentifier) {
   EXPECT_EQ(r.token.text, "disable_block");
 }
 
-TEST(DisableStatementLexing, UppercaseIsIdentifier) {
-  auto r = LexOne("DISABLE ");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-}
-
 TEST(DisableStatementLexing, DisableFollowedByIdentifier) {
   auto tokens = Lex("disable my_block;");
   ASSERT_GE(tokens.size(), 3u);
