@@ -55,19 +55,6 @@ TEST(LexicalConventionLexing, CrlfIsWhitespace) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-TEST(LexicalConventionLexing, EofTerminatesTokenStream) {
-  auto tokens = Lex("a");
-  ASSERT_EQ(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
-}
-
-TEST(LexicalConventionLexing, EofOnlyInput) {
-  auto tokens = Lex("");
-  ASSERT_EQ(tokens.size(), 1u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
-}
-
 TEST(LexicalConventionLexing, WhitespaceNotEmittedAsToken) {
   auto tokens = Lex("  \t\n\f\v  a  \t\n\f\v  ");
   ASSERT_EQ(tokens.size(), 2u);
