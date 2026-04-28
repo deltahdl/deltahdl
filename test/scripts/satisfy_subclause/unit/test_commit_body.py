@@ -111,6 +111,12 @@ def test_build_commit_prompt_demands_only_bullets() -> None:
     assert "Output ONLY the bullet list" in prompt
 
 
+def test_build_commit_prompt_mentions_copyright() -> None:
+    """The commit prompt names the LRM copyright reason for paraphrasing."""
+    prompt = build_commit_prompt(["6.3"], ["foo.cpp"], [], [])
+    assert "copyright" in prompt.lower()
+
+
 # --- generate_commit_body ---------------------------------------------------
 
 

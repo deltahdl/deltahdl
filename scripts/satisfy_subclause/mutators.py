@@ -194,6 +194,11 @@ def build_commit_prompt(
     ``- {Verb} `path` because reason.``. The prompt requests the bullet
     list only — no preamble, no trailing text — so the result can be
     dropped into the commit body verbatim.
+
+    The copyright reason rides on this prompt (and only this prompt)
+    because the commit body is the one Claude-authored artefact that
+    quotes risk reproducing LRM prose; the eight-step source-code
+    prompts deliberately omit it.
     """
     label = _scope_label(subclauses)
     lines = [
@@ -222,7 +227,8 @@ def build_commit_prompt(
         " because reason.\n"
         "\n"
         "Output ONLY the bullet list."
-        " No preamble, no summary, no trailing text.",
+        " No preamble, no summary, no trailing text."
+        f" {COPYRIGHT_REASON}",
     )
     return "\n".join(lines)
 
@@ -363,7 +369,6 @@ def _build_constraints(subclauses: list[str]) -> str:
         " code path to change, edit those shared files in this run."
         " Requirement ownership is scoped by subclause; file editing"
         f" is scoped by what {label}'s text requires."
-        f" {COPYRIGHT_REASON}"
     )
 
 

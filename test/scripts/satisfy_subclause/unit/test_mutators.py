@@ -881,10 +881,16 @@ def test_run_step_retry_cmd_carries_disallowed_tools() -> None:
 # --- build_steps: copyright wording + positive instructions -----------------
 
 
-def test_build_steps_constraints_mention_copyright() -> None:
-    """The standard constraints block names the LRM copyright reason."""
+def test_build_steps_constraints_omit_copyright() -> None:
+    """The eight-step prompts must not carry the LRM copyright reason."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert any("copyright" in p.lower() for _d, p in steps)
+    assert not any("copyright" in p.lower() for _d, p in steps)
+
+
+def test_build_steps_constraints_omit_paraphrase() -> None:
+    """The eight-step prompts must not tell Claude to paraphrase."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert not any("paraphrase" in p.lower() for _d, p in steps)
 
 
 def test_build_steps_no_negative_do_not_in_oracles() -> None:
