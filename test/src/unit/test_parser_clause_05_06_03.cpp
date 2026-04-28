@@ -147,4 +147,23 @@ TEST(SystemNameParsing, EmbeddedDollarSystemCallParses) {
   EXPECT_EQ(expr->callee, "$test$plusargs");
 }
 
+// §5.6.3 Syntax 5-1 form 3:
+//   system_tf_identifier ( expression { , [ expression ] } [ , [ clocking_event ] ] )
+// The trailing optional clocking_event distinguishes form 3 from forms 1/2.
+// The parser must accept a `@(event)` token where the BNF permits it; without
+// this, the syntax of the §5.6.3 production is incomplete.
+TEST(SystemNameParsing, SystemTfCallWithClockingEvent) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, sig;\n"
+      "  initial $past(sig, 1, , @(posedge clk));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(expr->callee, "$past");
+}
+
 }  // namespace

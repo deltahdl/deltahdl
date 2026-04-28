@@ -227,17 +227,6 @@ TEST(LexicalConventionLexing, EscapedIdentifierWhitespaceIsSignificant) {
   EXPECT_EQ(with_ws[2].text, "bar");
 }
 
-// §5.6.1: a leading backslash starts an escaped identifier whose body may
-// include `$` (printable ASCII 0x24). The `\` dispatch precedes the
-// system-identifier dispatch, so `\$display` is an escaped identifier, not a
-// system identifier.
-TEST(LexicalConventionLexing, EscapedDollarIsNotSystemId) {
-  auto r = LexOne("\\$display ");
-  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
-  EXPECT_NE(r.token.kind, TokenKind::kSystemIdentifier);
-  EXPECT_EQ(r.token.text, "$display");
-}
-
 // §5.6.1: rule (1) "end with white space" combined with rule (2) "any printable
 // ASCII except white space" implies the body absorbs every non-whitespace
 // printable byte — including the bytes that would normally begin a string

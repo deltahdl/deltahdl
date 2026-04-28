@@ -114,6 +114,24 @@ TEST(SystemNameLexing, DollarAtEofNotSystemId) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
 }
 
+// §5.6.3 footnote 55: "The $ character in a system_tf_identifier shall not be
+// followed by white_space." §5.3 lists the carriage return as white_space, so
+// `$\r` must terminate the leading `$` as a kDollar (queue-dimension/last-
+// index operator), not begin a system_tf_identifier.
+TEST(SystemNameLexing, DollarFollowedByCarriageReturnNotSystemId) {
+  auto tokens = Lex("$\r");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
+}
+
+// §5.6.3 footnote 55: same rule for the form-feed character, which §5.3
+// includes in white_space.
+TEST(SystemNameLexing, DollarFollowedByFormFeedNotSystemId) {
+  auto tokens = Lex("$\f");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kDollar);
+}
+
 TEST(SystemNameLexing, ExceedsMaxLength) {
   std::string id = "$" + std::string(1024, 'a');
   auto [tokens, errors] = LexWithDiag(id);
@@ -129,6 +147,18 @@ TEST(SystemNameLexing, MultipleInStream) {
   EXPECT_EQ(tokens[1].text, "$finish");
   EXPECT_EQ(tokens[2].kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(tokens[2].text, "$time");
+}
+
+// §5.6.3 (footnote 55): "A system_tf_identifier shall not be escaped." The
+// escaped form `\$display ` must therefore lex as an escaped (user-defined)
+// identifier per §5.6.1 — never as the system identifier `$display` — so a
+// name colliding with a simulator task cannot silently bind to the simulator's
+// implementation.
+TEST(SystemNameLexing, EscapedDollarIsNotSystemId) {
+  auto r = LexOne("\\$display ");
+  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
+  EXPECT_NE(r.token.kind, TokenKind::kSystemIdentifier);
+  EXPECT_EQ(r.token.text, "$display");
 }
 
 }  // namespace

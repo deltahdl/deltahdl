@@ -69,4 +69,16 @@ TEST(SystemNameElaboration, EmbeddedDollarSystemCallElaborates) {
              "endmodule\n"));
 }
 
+// §5.6.3: "these standard system tasks … can be used in the same places void
+// functions (see 13.4) can be used." A void-returning call as a procedural
+// statement inside an always block is one such place, so the elaborator must
+// accept a system-task statement appearing inside an always block.
+TEST(SystemNameElaboration, SystemTaskInAlwaysBlockElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic clk;\n"
+             "  always @(posedge clk) $display(\"tick\");\n"
+             "endmodule\n"));
+}
+
 }  // namespace
