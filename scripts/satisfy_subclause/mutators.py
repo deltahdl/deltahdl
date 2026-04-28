@@ -458,8 +458,21 @@ def build_steps(
          f" to the correct files: {canonical_files}."
          f" Place tests in the canonical files for {label}, not in a"
          " parent clause file."
-         " If moving tests leaves a file empty, delete that file"
-         " and remove its entry from test/CMakeLists.txt."
+         + constraints),
+        ("Deleting tests for non-normative subclauses",
+         f"Re-read the LRM text of {label}. If a subclause in"
+         f" {label} defines no normative rules of its own — its"
+         " requirements live entirely in descendants, as is the case"
+         " for introductions, overviews, roadmaps, and other"
+         " purely-descriptive subclauses — delete every test in that"
+         f" subclause's canonical test files. The canonical files for"
+         f" {label} are: {canonical_files}."
+         + constraints),
+        ("Deleting empty test files",
+         f"Inspect {label}'s canonical test files: {canonical_files}."
+         " For any file that has no TEST(...) blocks remaining after"
+         " the prior deletion and move steps, delete the file and"
+         " remove its add_unit_test(...) entry from test/CMakeLists.txt."
          + constraints),
         ("Renaming test suites",
          f"Rename only test suites that cover {label} requirements"

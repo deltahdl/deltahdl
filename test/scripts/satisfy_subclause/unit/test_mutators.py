@@ -313,11 +313,13 @@ def _step_descriptions(steps) -> list[str]:
     return [d for d, _p in steps]
 
 
-_EIGHT_STEP_DESCRIPTIONS = [
+_TEN_STEP_DESCRIPTIONS = [
     "Auditing src",
     "Auditing tests",
     "Deleting duplicate tests",
     "Moving misplaced tests",
+    "Deleting tests for non-normative subclauses",
+    "Deleting empty test files",
     "Renaming test suites",
     "Renaming test names",
     "Writing missing tests",
@@ -325,16 +327,16 @@ _EIGHT_STEP_DESCRIPTIONS = [
 ]
 
 
-def test_build_steps_returns_eight() -> None:
-    """build_steps for a single subclause returns eight step pairs."""
+def test_build_steps_returns_ten() -> None:
+    """build_steps for a single subclause returns ten step pairs."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert len(steps) == 8
+    assert len(steps) == 10
 
 
 def test_build_steps_descriptions_match_pipeline() -> None:
-    """The eight descriptions are the audit-then-act pipeline names."""
+    """The ten descriptions are the audit-then-act pipeline names."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert _step_descriptions(steps) == _EIGHT_STEP_DESCRIPTIONS
+    assert _step_descriptions(steps) == _TEN_STEP_DESCRIPTIONS
 
 
 def test_build_steps_first_step_reads_lrm() -> None:
@@ -405,10 +407,63 @@ def test_build_steps_canonical_files_listed_in_step_4() -> None:
     assert "test_parser_clause_33_04_01_05.cpp" in steps[3][1]
 
 
-def test_build_steps_canonical_files_listed_in_step_7() -> None:
-    """Step 7 (writing missing tests) names the canonical test files."""
+def test_build_steps_canonical_files_listed_in_writing_missing_tests() -> None:
+    """The 'writing missing tests' step names the canonical test files."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[6][1]
+    assert "test_parser_clause_33_04_01_05.cpp" in steps[8][1]
+
+
+def test_build_steps_step5_is_non_normative_deletion() -> None:
+    """Step 5's description targets non-normative-subclause test deletion."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert steps[4][0] == "Deleting tests for non-normative subclauses"
+
+
+def test_build_steps_step5_mentions_normative_rules() -> None:
+    """Step 5 frames the criterion as 'no normative rules of its own'."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "no normative rules of its own" in steps[4][1]
+
+
+def test_build_steps_step5_names_descriptive_examples() -> None:
+    """Step 5 names introductions/overviews/roadmaps as worked examples."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    prompt = steps[4][1]
+    assert (
+        "introductions" in prompt
+        and "overviews" in prompt
+        and "roadmaps" in prompt
+    )
+
+
+def test_build_steps_step5_lists_canonical_files() -> None:
+    """Step 5 lists the canonical test files for the subclause."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "test_parser_clause_33_04_01_05.cpp" in steps[4][1]
+
+
+def test_build_steps_step6_is_empty_file_cleanup() -> None:
+    """Step 6's description targets empty-test-file cleanup."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert steps[5][0] == "Deleting empty test files"
+
+
+def test_build_steps_step6_removes_cmakelists_entry() -> None:
+    """Step 6 instructs Claude to also remove the CMakeLists.txt entry."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "CMakeLists.txt" in steps[5][1]
+
+
+def test_build_steps_step6_lists_canonical_files() -> None:
+    """Step 6 names the canonical test files it inspects."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "test_parser_clause_33_04_01_05.cpp" in steps[5][1]
+
+
+def test_build_steps_step4_no_inline_empty_file_rule() -> None:
+    """Step 4 (Moving) no longer carries the inline empty-file rule."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "CMakeLists.txt" not in steps[3][1]
 
 
 def test_build_steps_constraints_present_in_action_steps() -> None:
@@ -514,15 +569,15 @@ def test_no_deps_invokes_run_steps() -> None:
     assert run.called
 
 
-def test_no_deps_passes_eight_steps() -> None:
-    """No-deps mutator hands eight step pairs to run_steps."""
+def test_no_deps_passes_ten_steps() -> None:
+    """No-deps mutator hands ten step pairs to run_steps."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_without_dependencies(
                 _target(), "~/LRM.pdf", model="opus",
             )
-    assert len(run.call_args[0][0]) == 8
+    assert len(run.call_args[0][0]) == 10
 
 
 def test_no_deps_passes_model() -> None:
@@ -584,8 +639,8 @@ def test_with_deps_invokes_run_steps() -> None:
     assert run.called
 
 
-def test_with_deps_passes_eight_steps() -> None:
-    """With-deps mutator hands eight step pairs to run_steps."""
+def test_with_deps_passes_ten_steps() -> None:
+    """With-deps mutator hands ten step pairs to run_steps."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
@@ -593,7 +648,7 @@ def test_with_deps_passes_eight_steps() -> None:
                 _target(subclause="33.4"), "~/LRM.pdf",
                 ["33.6.1"], model="opus",
             )
-    assert len(run.call_args[0][0]) == 8
+    assert len(run.call_args[0][0]) == 10
 
 
 def test_with_deps_passes_deps_into_first_step_prompt() -> None:
@@ -760,15 +815,15 @@ def test_cycle_invokes_run_steps() -> None:
     assert run.called
 
 
-def test_cycle_passes_eight_steps() -> None:
-    """Cycle mutator hands eight step pairs to run_steps."""
+def test_cycle_passes_ten_steps() -> None:
+    """Cycle mutator hands ten step pairs to run_steps."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
                 _two_member_cycle(), "~/LRM.pdf", [], model="opus",
             )
-    assert len(run.call_args[0][0]) == 8
+    assert len(run.call_args[0][0]) == 10
 
 
 def test_cycle_first_step_lists_first_member() -> None:
