@@ -117,3 +117,15 @@ TEST(LexicalTokenSim, LexicalTokenCrlfLineEndings) {
       "result");
   EXPECT_EQ(result, 55u);
 }
+
+// §5.2: string literal is one of the seven lexical token categories. Observed
+// at simulator stage by consuming a string literal in a value assignment.
+TEST(LexicalTokenSim, LexicalTokenStringLiteralCategoryInSimulation) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  byte result;\n"
+      "  initial result = \"Z\";\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 0x5Au);
+}

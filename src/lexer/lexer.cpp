@@ -509,7 +509,16 @@ Token Lexer::LexEscapedIdentifier() {
   auto loc = MakeLoc();
   Advance();  // skip backslash
   uint32_t start = pos_;
-  while (!AtEnd() && !std::isspace(static_cast<unsigned char>(Current()))) {
+  while (!AtEnd()) {
+    unsigned char c = static_cast<unsigned char>(Current());
+    if (std::isspace(c)) {
+      break;
+    }
+    // §5.6.1: body may contain only printable ASCII (decimal 33-126).
+    if (c < 33 || c > 126) {
+      diag_.Error(MakeLoc(),
+                  "escaped identifier contains non-printable character");
+    }
     Advance();
   }
   Token tok;

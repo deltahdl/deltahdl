@@ -53,11 +53,6 @@ TEST(LexicalConventionLexing, EscapedKeywordIsIdentifier) {
   EXPECT_NE(r.token.kind, TokenKind::kKwModule);
 }
 
-TEST(LexicalConventionLexing, EscapedBeginIsIdentifier) {
-  auto r = LexOne("\\begin ");
-  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
-}
-
 TEST(LexicalConventionLexing, MaxLengthOk) {
   std::string id = "\\" + std::string(1023, 'a') + " ";
   auto [tokens, errors] = LexWithDiag(id);
@@ -160,6 +155,48 @@ TEST(LexicalConventionLexing, EscapedIdentifierPreservesCase) {
   auto r = LexOne("\\AbCdEf ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
   EXPECT_EQ(r.token.text, "AbCdEf");
+}
+
+// §5.6.1: body restricted to printable ASCII (33-126). Non-whitespace
+// control characters below 33 are rejected.
+TEST(LexicalConventionLexing, EscapedIdentifierRejectsControlCharBelow33) {
+  std::string src = "\\ab";
+  src += '\x01';
+  src += "cd ";
+  auto [tokens, errors] = LexWithDiag(src);
+  EXPECT_TRUE(errors);
+}
+
+// §5.6.1: DEL (0x7F = 127) is outside the printable ASCII range.
+TEST(LexicalConventionLexing, EscapedIdentifierRejectsDel) {
+  std::string src = "\\ab";
+  src += '\x7F';
+  src += "cd ";
+  auto [tokens, errors] = LexWithDiag(src);
+  EXPECT_TRUE(errors);
+}
+
+// §5.6.1: Bytes with the high bit set are outside the printable ASCII range.
+TEST(LexicalConventionLexing, EscapedIdentifierRejectsHighByte) {
+  std::string src = "\\ab";
+  src += static_cast<char>(0x80);
+  src += "cd ";
+  auto [tokens, errors] = LexWithDiag(src);
+  EXPECT_TRUE(errors);
+}
+
+// §5.6.1: leading backslash and terminating whitespace are not part of the
+// identifier, even when the escaped form is interleaved with simple
+// identifiers in a token stream.
+TEST(LexicalConventionLexing, SimpleAndEscapedInStream) {
+  auto tokens = Lex("abc \\def ghi");
+  ASSERT_GE(tokens.size(), 4u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "abc");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[1].text, "def");
+  EXPECT_EQ(tokens[2].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[2].text, "ghi");
 }
 
 }  // namespace

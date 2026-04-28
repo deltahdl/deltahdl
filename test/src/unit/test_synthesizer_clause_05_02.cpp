@@ -73,4 +73,22 @@ TEST(LexicalConventionSynthesis, CommentsDoNotAffectSynthesis) {
   ASSERT_NE(aig, nullptr);
 }
 
+// §5.2: the synthesizable token categories (whitespace, comment, operator,
+// number, identifier, keyword) all reach the synth backend in one stream.
+// String literals are excluded because synthesis cannot represent them.
+TEST(LexicalConventionSynthesis, AllSynthesizableTokenCategoriesSynthesize) {
+  SynthFixture f;
+  auto* mod = ElaborateSrc(
+      f,
+      "module m; // line comment\n"
+      "  /* block comment */\n"
+      "  logic [7:0] data;\n"
+      "  assign data = 8'hAB + 8'd1;\n"
+      "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto* aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+}
+
 }  // namespace

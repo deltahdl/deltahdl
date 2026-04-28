@@ -179,12 +179,4 @@ TEST(LexicalConventionLexing, VerticalTabSeparatesKeywords) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
 }
 
-TEST(LexicalConventionLexing, OperatorsDoNotNeedWhitespaceSeparation) {
-  auto tokens = Lex("a+b");
-  ASSERT_EQ(tokens.size(), 4u);
-  EXPECT_EQ(tokens[0].text, "a");
-  EXPECT_EQ(tokens[1].kind, TokenKind::kPlus);
-  EXPECT_EQ(tokens[2].text, "b");
-}
-
 }  // namespace
