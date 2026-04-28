@@ -12,14 +12,6 @@ TEST(LexicalConventionParsing, EscapedKeywordAsIdentifier) {
   EXPECT_TRUE(ParseOk("module t; wire \\module ; endmodule"));
 }
 
-TEST(LexicalConventionParsing, EscapedIdentBasic) {
-  EXPECT_TRUE(ParseOk("module m; wire \\busa+index ; endmodule"));
-}
-
-TEST(LexicalConventionParsing, EscapedIdentKeyword) {
-  EXPECT_TRUE(ParseOk("module m; wire \\net ; endmodule"));
-}
-
 TEST(LexicalConventionParsing, EscapedIdentSpecialChars) {
   EXPECT_TRUE(ParseOk("module m; wire \\***error-condition*** ; endmodule"));
 }
@@ -47,23 +39,6 @@ TEST(LexicalConventionParsing, EscapedIdentInLetDecl) {
       ParseOk("module m;\n"
               "  let \\my+let = 1;\n"
               "endmodule\n"));
-}
-
-TEST(LexicalConventionParsing, EscapedIdentifierInExpression) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  logic \\bus+a ;\n"
-              "endmodule\n"));
-}
-
-TEST(LexicalConventionParsing, EscapedIdentifierPreservesWhitespaceRule) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic \\my+sig ;\n"
-      "  assign \\my+sig = 1'b0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(LexicalConventionParsing, EscapedIdentifierAtEndOfDeclaration) {
@@ -124,6 +99,30 @@ TEST(LexicalConventionParsing, EscapedIdentInPackageScope) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+// §5.6.1: escaped identifier accepted as task name (declaration position).
+TEST(LexicalConventionParsing, EscapedIdentAsTaskName) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  task \\my-task ;\n"
+              "  endtask\n"
+              "endmodule\n"));
+}
+
+// §5.6.1: escaped identifier accepted as function name.
+TEST(LexicalConventionParsing, EscapedIdentAsFunctionName) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  function int \\f+1 ();\n"
+              "    return 0;\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
+// §5.6.1: digit-leading body is legal as escaped identifier (illegal as simple).
+TEST(LexicalConventionParsing, EscapedIdentAllDigits) {
+  EXPECT_TRUE(ParseOk("module m; logic \\1234 ; endmodule"));
 }
 
 }  // namespace

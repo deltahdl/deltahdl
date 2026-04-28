@@ -32,16 +32,6 @@ TEST(KeywordIdentifierSim, EscapedKeywordCoexistsWithKeyword) {
   EXPECT_EQ(result, 42u);
 }
 
-TEST(KeywordIdentifierSim, AllUppercaseUsedAsVariable) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] MODULE;\n"
-      "  initial MODULE = 8'd88;\n"
-      "endmodule\n",
-      "MODULE");
-  EXPECT_EQ(result, 88u);
-}
-
 TEST(KeywordIdentifierSim, KeywordLowercaseOnly) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -60,4 +50,16 @@ TEST(KeywordIdentifierSim, KeywordLowercaseOnly) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
+// §5.6.2: an escaped keyword (control-flow) is usable as a variable in
+// simulation.
+TEST(KeywordIdentifierSim, EscapedKeywordIfUsableAsVariable) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] \\if ;\n"
+      "  initial \\if = 8'd33;\n"
+      "endmodule\n",
+      "if");
+  EXPECT_EQ(result, 33u);
 }

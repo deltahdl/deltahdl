@@ -49,32 +49,4 @@ TEST(KeywordSynthesis, UppercaseKeywordAsSignalSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-TEST(KeywordSynthesis, AllUppercaseKeywordAsSignalSynthesizes) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] MODULE, result;\n"
-      "  assign result = MODULE;\n"
-      "endmodule\n");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-}
-
-TEST(KeywordSynthesis, EscapedKeywordCoexistsWithKeywordSynthesizes) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] \\module , result;\n"
-      "  assign result = \\module ;\n"
-      "endmodule\n");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-}
-
 }  // namespace

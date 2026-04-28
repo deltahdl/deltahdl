@@ -33,8 +33,4 @@ TEST(LexicalConventionParsing, AllUppercaseUsedAsIdentifier) {
   EXPECT_TRUE(ParseOk("module m; logic MODULE; endmodule"));
 }
 
-TEST(LexicalConventionParsing, MixedCaseUsedAsIdentifier) {
-  EXPECT_TRUE(ParseOk("module m; logic Begin; endmodule"));
-}
-
 }  // namespace

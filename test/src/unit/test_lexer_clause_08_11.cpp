@@ -25,24 +25,6 @@ TEST(ThisLexer, ThisKeywordLookup) {
   EXPECT_EQ(kw, std::optional(TokenKind::kKwThis));
 }
 
-TEST(ThisLexer, ThisCaseSensitiveUppercase) {
-  auto tokens = Lex("This");
-  ASSERT_GE(tokens.size(), 1u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-}
-
-TEST(ThisLexer, ThisCaseSensitiveAllCaps) {
-  auto tokens = Lex("THIS");
-  ASSERT_GE(tokens.size(), 1u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-}
-
-TEST(ThisLexer, EscapedThisIsIdentifier) {
-  auto tokens = Lex("\\this ");
-  ASSERT_GE(tokens.size(), 1u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-}
-
 TEST(ThisLexer, ThisDotMemberLexesAsThreeTokens) {
   auto tokens = Lex("this.x");
   ASSERT_GE(tokens.size(), 3u);

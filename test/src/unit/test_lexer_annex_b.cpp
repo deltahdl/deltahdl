@@ -295,52 +295,6 @@ TEST(KeywordListLexing, LookupKeywordReturnsCorrectTokenKind) {
   }
 }
 
-TEST(KeywordListLexing, UppercaseIsNotKeyword) {
-  const char* const kSamples[] = {
-      "MODULE", "WIRE",    "REG",    "INPUT",   "OUTPUT", "ALWAYS", "IF",
-      "ELSE",   "BEGIN",   "END",    "CLASS",   "LOGIC",  "INT",    "FUNCTION",
-      "TASK",   "PACKAGE", "IMPORT", "TYPEDEF", "ENUM",   "STRUCT",
-  };
-  for (const char* upper : kSamples) {
-    auto tokens = Lex(upper);
-    ASSERT_GE(tokens.size(), 2u) << "upper: " << upper;
-    EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier)
-        << upper << " (uppercase) should be an identifier, not a keyword";
-  }
-}
-
-TEST(KeywordListLexing, MixedCaseIsNotKeyword) {
-  const char* const kSamples[] = {
-      "Module",  "Wire",     "Reg",    "Input",      "Output",
-      "Always",  "Begin",    "End",    "Class",      "Logic",
-      "Int",     "Function", "Task",   "Package",    "Import",
-      "Typedef", "Enum",     "Struct", "AlwaysComb", "AlwaysFF",
-  };
-  for (const char* mixed : kSamples) {
-    auto tokens = Lex(mixed);
-    ASSERT_GE(tokens.size(), 2u) << "mixed: " << mixed;
-    EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier)
-        << mixed << " (mixed case) should be an identifier, not a keyword";
-  }
-}
-
-TEST(KeywordListLexing, EscapedKeywordsAreIdentifiers) {
-  const char* const kSamples[] = {
-      "module",   "wire",     "reg",        "input",      "output",  "always",
-      "if",       "else",     "begin",      "end",        "class",   "logic",
-      "int",      "function", "task",       "package",    "import",  "typedef",
-      "enum",     "struct",   "interface",  "program",    "checker", "clocking",
-      "property", "sequence", "covergroup", "constraint", "assert",  "assume",
-  };
-  for (const char* kw : kSamples) {
-    std::string escaped = std::string("\\") + kw + " ";
-    auto tokens = Lex(escaped);
-    ASSERT_GE(tokens.size(), 2u) << "escaped: " << kw;
-    EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier)
-        << "\\" << kw << " should be an escaped identifier, not a keyword";
-  }
-}
-
 TEST(KeywordListLexing, NonKeywordsAreIdentifiers) {
   const char* const kNonKeywords[] = {
       "foo",   "bar",   "my_signal", "data_in", "clk",        "reset",

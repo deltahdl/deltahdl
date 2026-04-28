@@ -30,17 +30,6 @@ TEST(KeywordPreprocessor, UppercaseKeywordAsIdentifierPassesThrough) {
   EXPECT_NE(result.find("MODULE"), std::string::npos);
 }
 
-TEST(KeywordPreprocessor, MixedCaseKeywordAsIdentifierPassesThrough) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "module t;\n"
-      "  logic [7:0] Begin;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("Begin"), std::string::npos);
-}
-
 TEST(KeywordPreprocessor, KeywordInMacroExpansion) {
   PreprocFixture f;
   auto result = Preprocess(

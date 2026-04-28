@@ -23,27 +23,6 @@ TEST(LexicalConventionLexing, TerminatedBySpace) {
   EXPECT_EQ(tokens[1].text, "next");
 }
 
-TEST(LexicalConventionLexing, TerminatedByNewline) {
-  auto tokens = Lex("\\esc_id\n");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "esc_id");
-}
-
-TEST(LexicalConventionLexing, TerminatedByTab) {
-  auto tokens = Lex("\\esc_id\t");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "esc_id");
-}
-
-TEST(LexicalConventionLexing, TerminatedByEof) {
-  auto tokens = Lex("\\esc_id");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "esc_id");
-}
-
 TEST(LexicalConventionLexing, SpecialCharsInEscaped) {
   auto r = LexOne("\\***error-condition*** ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
@@ -137,11 +116,6 @@ TEST(LexicalConventionLexing, EscapedIdentifierTerminatedByTab) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
 }
 
-TEST(LexicalConventionLexing, EscapedIdentifierIncludesSpecialChars) {
-  auto r = LexOne("\\a+b*c ");
-  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
-}
-
 TEST(LexicalConventionLexing, EscapedIdentifierAtEof) {
   auto tokens = Lex("\\abc");
   ASSERT_GE(tokens.size(), 2u);
@@ -162,6 +136,30 @@ TEST(LexicalConventionLexing, EscapedAndSimpleIdentLexToSameText) {
   auto simple = LexOne("cpu3");
   EXPECT_EQ(escaped.token.text, simple.token.text);
   EXPECT_EQ(escaped.token.text, "cpu3");
+}
+
+// §5.6.1: white space terminator covers carriage return.
+TEST(LexicalConventionLexing, EscapedIdentifierTerminatedByCarriageReturn) {
+  auto tokens = Lex("\\abc\rdef");
+  ASSERT_GE(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(tokens[0].text, "abc");
+  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[1].text, "def");
+}
+
+// §5.6.1: escaped body may begin with a digit (simple identifiers cannot).
+TEST(LexicalConventionLexing, EscapedIdentifierStartingWithDigit) {
+  auto r = LexOne("\\1234 ");
+  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(r.token.text, "1234");
+}
+
+// §5.6.1: lexer preserves case of body characters verbatim.
+TEST(LexicalConventionLexing, EscapedIdentifierPreservesCase) {
+  auto r = LexOne("\\AbCdEf ");
+  EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
+  EXPECT_EQ(r.token.text, "AbCdEf");
 }
 
 }  // namespace

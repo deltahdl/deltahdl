@@ -1,5 +1,7 @@
 // §5.6.2
 
+#include <string>
+
 #include "fixture_lexer.h"
 
 using namespace delta;
@@ -81,18 +83,6 @@ TEST(Keywords, EndconfigKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndconfig);
 }
 
-TEST(Keywords, UppercaseNotKeyword) {
-  auto r = LexOne("Module ");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-  EXPECT_EQ(r.token.text, "Module");
-}
-
-TEST(Keywords, AllUppercaseNotKeyword) {
-  auto r = LexOne("MODULE ");
-  EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
-  EXPECT_EQ(r.token.text, "MODULE");
-}
-
 TEST(Keywords, MixedCaseVariantsNotKeywords) {
   const char* const mixed[] = {"Module", "BEGIN", "Logic", "WIRE", "AlwayS"};
   for (const char* m : mixed) {
@@ -123,34 +113,85 @@ TEST(Keywords, KeywordSuffixIsIdentifier) {
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
 }
 
-static const GateKeywordEntry kGateKeywords[] = {
-    {"and", TokenKind::kKwAnd},
-    {"nand", TokenKind::kKwNand},
-    {"or", TokenKind::kKwOr},
-    {"nor", TokenKind::kKwNor},
-    {"xor", TokenKind::kKwXor},
-    {"xnor", TokenKind::kKwXnor},
-    {"buf", TokenKind::kKwBuf},
-    {"not", TokenKind::kKwNot},
-    {"bufif0", TokenKind::kKwBufif0},
-    {"bufif1", TokenKind::kKwBufif1},
-    {"notif0", TokenKind::kKwNotif0},
-    {"notif1", TokenKind::kKwNotif1},
-    {"nmos", TokenKind::kKwNmos},
-    {"pmos", TokenKind::kKwPmos},
-    {"rnmos", TokenKind::kKwRnmos},
-    {"rpmos", TokenKind::kKwRpmos},
-    {"cmos", TokenKind::kKwCmos},
-    {"rcmos", TokenKind::kKwRcmos},
-    {"tran", TokenKind::kKwTran},
-    {"rtran", TokenKind::kKwRtran},
-    {"tranif0", TokenKind::kKwTranif0},
-    {"tranif1", TokenKind::kKwTranif1},
-    {"rtranif0", TokenKind::kKwRtranif0},
-    {"rtranif1", TokenKind::kKwRtranif1},
-    {"pullup", TokenKind::kKwPullup},
-    {"pulldown", TokenKind::kKwPulldown},
-};
+TEST(Keywords, SimpleIdentKeywordDisambiguation) {
+  auto tokens = Lex("module");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
+}
+
+TEST(Keywords, SimpleIdentNotKeyword) {
+  auto tokens = Lex("modules");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(tokens[0].text, "modules");
+}
+
+TEST(Keywords, ThisCaseSensitiveUppercase) {
+  auto tokens = Lex("This");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+}
+
+TEST(Keywords, ThisCaseSensitiveAllCaps) {
+  auto tokens = Lex("THIS");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
+}
+
+TEST(Keywords, EscapedThisIsIdentifier) {
+  auto tokens = Lex("\\this ");
+  ASSERT_GE(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+}
+
+// §5.6.2: "All keywords are defined in lowercase only."
+TEST(Keywords, UppercaseIsNotKeyword) {
+  const char* const kSamples[] = {
+      "MODULE", "WIRE",    "REG",    "INPUT",   "OUTPUT", "ALWAYS", "IF",
+      "ELSE",   "BEGIN",   "END",    "CLASS",   "LOGIC",  "INT",    "FUNCTION",
+      "TASK",   "PACKAGE", "IMPORT", "TYPEDEF", "ENUM",   "STRUCT",
+  };
+  for (const char* upper : kSamples) {
+    auto tokens = Lex(upper);
+    ASSERT_GE(tokens.size(), 2u) << "upper: " << upper;
+    EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier)
+        << upper << " (uppercase) should be an identifier, not a keyword";
+  }
+}
+
+TEST(Keywords, MixedCaseIsNotKeyword) {
+  const char* const kSamples[] = {
+      "Module",  "Wire",     "Reg",    "Input",      "Output",
+      "Always",  "Begin",    "End",    "Class",      "Logic",
+      "Int",     "Function", "Task",   "Package",    "Import",
+      "Typedef", "Enum",     "Struct", "AlwaysComb", "AlwaysFF",
+  };
+  for (const char* mixed : kSamples) {
+    auto tokens = Lex(mixed);
+    ASSERT_GE(tokens.size(), 2u) << "mixed: " << mixed;
+    EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier)
+        << mixed << " (mixed case) should be an identifier, not a keyword";
+  }
+}
+
+// §5.6.2: "A SystemVerilog keyword preceded by an escape (backslash)
+// character is not interpreted as a keyword."
+TEST(Keywords, EscapedKeywordsAreIdentifiers) {
+  const char* const kSamples[] = {
+      "module",   "wire",     "reg",        "input",      "output",  "always",
+      "if",       "else",     "begin",      "end",        "class",   "logic",
+      "int",      "function", "task",       "package",    "import",  "typedef",
+      "enum",     "struct",   "interface",  "program",    "checker", "clocking",
+      "property", "sequence", "covergroup", "constraint", "assert",  "assume",
+  };
+  for (const char* kw : kSamples) {
+    std::string escaped = std::string("\\") + kw + " ";
+    auto tokens = Lex(escaped);
+    ASSERT_GE(tokens.size(), 2u) << "escaped: " << kw;
+    EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier)
+        << "\\" << kw << " should be an escaped identifier, not a keyword";
+  }
+}
 
 TEST(GateKeywordLexing, KeywordSubstringIsIdentifier) {
   auto r = LexOne("ands");

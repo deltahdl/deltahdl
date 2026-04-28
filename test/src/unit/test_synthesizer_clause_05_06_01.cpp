@@ -77,4 +77,19 @@ TEST(EscapedIdentifierSynthesis, EscapedIdentMatchesSimpleIdentSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
+// §5.6.1: digit-leading body — illegal as simple identifier — synthesizes.
+TEST(EscapedIdentifierSynthesis, EscapedIdentAllDigitsSynthesizes) {
+  SynthFixture f;
+  auto* mod = ElaborateSrc(
+      f,
+      "module m;\n"
+      "  logic [7:0] \\1234 , result;\n"
+      "  assign result = \\1234 ;\n"
+      "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  auto* aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+}
+
 }  // namespace

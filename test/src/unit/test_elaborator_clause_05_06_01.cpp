@@ -10,18 +10,6 @@ TEST(EscapedIdentifierElaboration, EscapedIdentifierElaborates) {
              "endmodule\n"));
 }
 
-TEST(EscapedIdentifierElaboration, EscapedIdentifierElaboratesCorrectly) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic \\my+sig ;\n"
-      "  assign \\my+sig = 1'b1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(EscapedIdentifierElaboration, EscapedKeywordAsIdentifierElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -68,6 +56,15 @@ TEST(EscapedIdentifierElaboration, EscapedIdentDashClockElaborates) {
       ElabOk("module t;\n"
              "  logic \\-clock ;\n"
              "  assign \\-clock = 1'b0;\n"
+             "endmodule\n"));
+}
+
+// §5.6.1: digit-leading body — illegal as simple identifier — is legal escaped.
+TEST(EscapedIdentifierElaboration, EscapedIdentAllDigitsElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic \\1234 ;\n"
+             "  assign \\1234 = 1'b1;\n"
              "endmodule\n"));
 }
 

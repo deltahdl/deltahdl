@@ -78,19 +78,6 @@ TEST(IdentifierLexing, SimpleIdentCaseSensitive) {
   EXPECT_EQ(tokens[2].text, "Foo");
 }
 
-TEST(IdentifierLexing, SimpleIdentKeywordDisambiguation) {
-  auto tokens = Lex("module");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
-}
-
-TEST(IdentifierLexing, SimpleIdentNotKeyword) {
-  auto tokens = Lex("modules");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);
-  EXPECT_EQ(tokens[0].text, "modules");
-}
-
 TEST(IdentifierLexing, SimpleIdentSourceLocation) {
   auto [tokens, errors] = LexWithDiag("  foo");
   EXPECT_FALSE(errors);

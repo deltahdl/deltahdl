@@ -111,3 +111,14 @@ TEST(EscapedIdentifierSim, EscapedIdentVariableResolves) {
       "y");
   EXPECT_EQ(val, 99u);
 }
+
+// §5.6.1: digit-leading body works through simulation as a normal variable.
+TEST(EscapedIdentifierSim, EscapedIdentAllDigitsAsVariable) {
+  auto result = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] \\1234 ;\n"
+      "  initial \\1234 = 8'd44;\n"
+      "endmodule\n",
+      "1234");
+  EXPECT_EQ(result, 44u);
+}
