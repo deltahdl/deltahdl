@@ -185,6 +185,16 @@ TEST(LexicalConventionLexing, EscapedIdentifierRejectsHighByte) {
   EXPECT_TRUE(errors);
 }
 
+// §5.6.1: an escaped identifier whose terminator immediately follows the
+// leading backslash has an empty body (zero characters between \ and the
+// terminating whitespace).
+TEST(LexicalConventionLexing, EscapedIdentifierEmptyBodyAtSpace) {
+  auto [tokens, errors] = LexWithDiag("\\ foo");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
+  EXPECT_TRUE(tokens[0].text.empty());
+}
+
 // §5.6.1: leading backslash and terminating whitespace are not part of the
 // identifier, even when the escaped form is interleaved with simple
 // identifiers in a token stream.

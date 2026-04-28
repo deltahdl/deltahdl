@@ -74,6 +74,22 @@ TEST(LexicalConventionLexing, DigitStartIsNumber) {
   EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
 }
 
+// §5.6: "The first character of a simple identifier shall not be a digit
+// or $". A leading $ followed by identifier characters is not a simple
+// identifier (it is parsed elsewhere as a system name).
+TEST(LexicalConventionLexing, DollarStartIsNotIdentifier) {
+  auto r = LexOne("$abc ");
+  EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
+}
+
+// §5.6: "A keyword (see 5.6.2) may not be used as a user-defined
+// identifier." A bare keyword form must not be classified as an identifier
+// token by the lexer.
+TEST(LexicalConventionLexing, KeywordIsNotIdentifier) {
+  auto r = LexOne("module ");
+  EXPECT_NE(r.token.kind, TokenKind::kIdentifier);
+}
+
 
 TEST(LexicalConventionLexing, CaseSensitive) {
   auto tokens = Lex("ABC abc Abc");

@@ -24,22 +24,6 @@ TEST(IdentifierElaboration, SimpleIdentResolvesInModule) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(IdentifierElaboration, IdentCaseSensitiveElaboration) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  logic X;\n"
-      "  assign x = 0;\n"
-      "  assign X = 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->variables.size(), 2u);
-}
-
 TEST(IdentifierElaboration, PackageScopeParamResolution) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -148,3 +148,18 @@ TEST(IdentifierSim, IdentifierMixedCharClasses) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
+
+// §5.6: "If an identifier exceeds the implementation-specific length limit,
+// an error shall be reported." A 1025-character identifier reaching the
+// simulator-stage pipeline must cause an error on the diagnostic engine.
+TEST(IdentifierSim, IdentifierExceedingMaxLengthReportsError) {
+  SimFixture f;
+  std::string long_id(1025, 'a');
+  ElaborateSrc("module t;\n"
+               "  logic " +
+                   long_id +
+                   ";\n"
+                   "endmodule\n",
+               f);
+  EXPECT_TRUE(f.has_errors);
+}

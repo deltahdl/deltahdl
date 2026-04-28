@@ -31,22 +31,6 @@ TEST(IdentifierSimulation, PackageScopeParamResolves) {
   EXPECT_EQ(val, 16u);
 }
 
-TEST(IdentifierSimulation, CaseSensitiveIdentifiers) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  logic [7:0] X;\n"
-      "  logic [7:0] y;\n"
-      "  initial begin\n"
-      "    x = 10;\n"
-      "    X = 20;\n"
-      "    y = x + X;\n"
-      "  end\n"
-      "endmodule\n",
-      "y");
-  EXPECT_EQ(val, 30u);
-}
-
 TEST(IdentifierSimulation, SystemCallIdentExecutes) {
   SimFixture f;
   auto* design = ElaborateSrc(
