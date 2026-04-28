@@ -157,4 +157,11 @@ TEST(LexicalConventionLexing, EscapedIdentifierTerminatedByFormfeed) {
   EXPECT_EQ(tokens[1].text, "def");
 }
 
+TEST(LexicalConventionLexing, EscapedAndSimpleIdentLexToSameText) {
+  auto escaped = LexOne("\\cpu3 ");
+  auto simple = LexOne("cpu3");
+  EXPECT_EQ(escaped.token.text, simple.token.text);
+  EXPECT_EQ(escaped.token.text, "cpu3");
+}
+
 }  // namespace

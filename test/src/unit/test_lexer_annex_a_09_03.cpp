@@ -99,55 +99,6 @@ TEST(IdentifierLexing, SimpleIdentSourceLocation) {
   EXPECT_EQ(tokens[0].loc.column, 3u);
 }
 
-TEST(IdentifierLexing, EscapedIdentBasic) {
-  auto tokens = Lex("\\my_id ");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "my_id");
-}
-
-TEST(IdentifierLexing, EscapedIdentWithKeyword) {
-  auto tokens = Lex("\\module ");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "module");
-}
-
-TEST(IdentifierLexing, EscapedIdentWithSpecialChars) {
-  auto tokens = Lex("\\a+b*c/d ");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "a+b*c/d");
-}
-
-TEST(IdentifierLexing, EscapedIdentTerminatedByNewline) {
-  auto tokens = Lex("\\esc_id\n");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "esc_id");
-}
-
-TEST(IdentifierLexing, EscapedIdentTerminatedByTab) {
-  auto tokens = Lex("\\esc_id\t");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "esc_id");
-}
-
-TEST(IdentifierLexing, EscapedIdentWithBraces) {
-  auto tokens = Lex("\\{net} ");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "{net}");
-}
-
-TEST(IdentifierLexing, EscapedIdentWithBrackets) {
-  auto tokens = Lex("\\bus[0] ");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "bus[0]");
-}
-
 TEST(IdentifierLexing, EscapedIdentMaxLength) {
   std::string id = "\\" + std::string(1023, 'a') + " ";
   auto [tokens, errors] = LexWithDiag(id);
@@ -160,16 +111,6 @@ TEST(IdentifierLexing, EscapedIdentExceedsMaxLength) {
   std::string id = "\\" + std::string(1025, 'a') + " ";
   auto [tokens, errors] = LexWithDiag(id);
   EXPECT_TRUE(errors);
-}
-
-TEST(IdentifierLexing, EscapedIdentFollowedByToken) {
-  auto tokens = Lex("\\my_id ; \\next_id ;");
-  ASSERT_GE(tokens.size(), 5u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "my_id");
-  EXPECT_EQ(tokens[1].kind, TokenKind::kSemicolon);
-  EXPECT_EQ(tokens[2].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[2].text, "next_id");
 }
 
 TEST(IdentifierLexing, CIdentNoDollarChar) {
@@ -282,13 +223,6 @@ TEST(IdentifierLexing, EscapedIdentEmptyBodyAtSpace) {
   ASSERT_GE(tokens.size(), 2u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
   EXPECT_TRUE(tokens[0].text.empty());
-}
-
-TEST(IdentifierLexing, EscapedIdentAtEofNoWhitespace) {
-  auto tokens = Lex("\\myid");
-  ASSERT_GE(tokens.size(), 2u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
-  EXPECT_EQ(tokens[0].text, "myid");
 }
 
 // --- simple_identifier edge cases ---

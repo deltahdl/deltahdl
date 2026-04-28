@@ -100,4 +100,30 @@ TEST(LexicalConventionParsing, EscapedIdentSameAsSimpleIdent) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(LexicalConventionParsing, EscapedIdentInHierPath) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic x;\n"
+      "  assign x = \\inst .data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(LexicalConventionParsing, EscapedIdentAsModuleName) {
+  EXPECT_TRUE(ParseOk("module \\my-module ; endmodule\n"));
+}
+
+TEST(LexicalConventionParsing, EscapedIdentInPackageScope) {
+  auto r = Parse(
+      "package \\my-pkg ;\n"
+      "  parameter int W = 4;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  logic [\\my-pkg ::W-1:0] data;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

@@ -97,3 +97,17 @@ TEST(EscapedIdentifierSim, EscapedIdentInExpression) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
+
+TEST(EscapedIdentifierSim, EscapedIdentVariableResolves) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] \\my-var ;\n"
+      "  logic [7:0] y;\n"
+      "  initial begin\n"
+      "    \\my-var = 99;\n"
+      "    y = \\my-var ;\n"
+      "  end\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(val, 99u);
+}

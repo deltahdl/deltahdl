@@ -18,20 +18,6 @@ TEST(IdentifierSimulation, SimpleIdentVariableResolves) {
   EXPECT_EQ(val, 42u);
 }
 
-TEST(IdentifierSimulation, EscapedIdentVariableResolves) {
-  auto val = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] \\my-var ;\n"
-      "  logic [7:0] y;\n"
-      "  initial begin\n"
-      "    \\my-var = 99;\n"
-      "    y = \\my-var ;\n"
-      "  end\n"
-      "endmodule\n",
-      "y");
-  EXPECT_EQ(val, 99u);
-}
-
 TEST(IdentifierSimulation, PackageScopeParamResolves) {
   auto val = RunAndGet(
       "package pkg;\n"

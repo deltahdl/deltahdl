@@ -40,30 +40,6 @@ TEST(IdentifierElaboration, IdentCaseSensitiveElaboration) {
   ASSERT_GE(mod->variables.size(), 2u);
 }
 
-TEST(IdentifierElaboration, EscapedIdentEquivalence) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic data;\n"
-      "  assign \\data = 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(IdentifierElaboration, EscapedIdentWithKeywordName) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic \\module ;\n"
-      "  assign \\module = 1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(IdentifierElaboration, PackageScopeParamResolution) {
   ElabFixture f;
   auto* design = ElaborateSrc(

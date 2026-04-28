@@ -84,18 +84,6 @@ TEST(IdentifierSyntaxParsing, HierarchicalIdentWithMultipleBitSelects) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(IdentifierSyntaxParsing, EscapedIdentInHierPath) {
-  ParseFixture f;
-  auto* cu = ParseSrc(
-      "module m;\n"
-      "  logic x;\n"
-      "  assign x = \\inst .data;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(cu, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(IdentifierSyntaxParsing, PackageScopeAccess) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -411,13 +399,6 @@ TEST(IdentifierSyntaxParsing, ConfigIdentifier) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(IdentifierSyntaxParsing, EscapedIdentAsModuleName) {
-  ParseFixture f;
-  auto* cu = ParseSrc("module \\my-module ; endmodule\n", f);
-  ASSERT_NE(cu, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 TEST(IdentifierSyntaxParsing, SystemCallInExpr) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -479,19 +460,6 @@ TEST(IdentifierSyntaxParsing, SystemIdentMultipleInBlock) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(IdentifierSyntaxParsing, EscapedIdentInPackageScope) {
-  ParseFixture f;
-  auto* cu = ParseSrc(
-      "package \\my-pkg ;\n"
-      "  parameter int W = 4;\n"
-      "endpackage\n"
-      "module m;\n"
-      "  logic [\\my-pkg ::W-1:0] data;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(cu, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
 
 TEST(IdentifierSyntaxParsing, TypeIdentifier) {
   ParseFixture f;
