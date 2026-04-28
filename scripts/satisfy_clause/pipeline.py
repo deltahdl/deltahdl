@@ -8,6 +8,7 @@ surface the mismatch.
 
 import sys
 
+from satisfy_subclause.pipeline import find_or_create_issue
 from satisfy_subclauses.pipeline import satisfy_subclauses
 
 from lib.python.lrm import load_toc
@@ -31,7 +32,14 @@ def descendants_of(
 def satisfy_clause(
     clause: str, lrm: str, *, model: str, labels: list[str],
 ) -> None:
-    """Enumerate §``clause``'s descendants and delegate to satisfy_subclauses."""
+    """Enumerate §``clause``'s descendants and delegate to satisfy_subclauses.
+
+    The clause-level issue itself is also passed through
+    ``find_or_create_issue`` so a pre-existing issue gets reopened (if
+    closed) and renamed to the new canonical title (if matching a
+    legacy or master-list shape) — the descendant loop only handles
+    subclause-level issues.
+    """
     toc = load_toc(lrm)
     descendants = descendants_of(clause, toc)
     if not descendants:
@@ -39,4 +47,5 @@ def satisfy_clause(
             f"satisfy_clause: §{clause} has no descendants in the TOC"
             f" loaded from {lrm}. Check that --lrm names the correct PDF."
         )
+    find_or_create_issue(clause, labels=labels)
     satisfy_subclauses(descendants, lrm, model=model, labels=labels)

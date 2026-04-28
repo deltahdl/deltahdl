@@ -1,8 +1,22 @@
 """Unit tests for the satisfy_clause pipeline."""
 
+from typing import Callable
+
 import pytest
 
 from satisfy_clause.pipeline import descendants_of, satisfy_clause
+
+
+@pytest.fixture(autouse=True)
+def _stub_find_or_create_issue(monkeypatch):
+    """Default-stub find_or_create_issue so tests do not hit gh.
+
+    Tests that need to inspect the call replace this stub themselves.
+    """
+    monkeypatch.setattr(
+        "satisfy_clause.pipeline.find_or_create_issue",
+        lambda _clause, *, labels: 0,
+    )
 
 
 # --- descendants_of --------------------------------------------------------
@@ -129,4 +143,56 @@ def test_satisfy_clause_empty_descendants_message_names_lrm(
     with pytest.raises(SystemExit, match="missing.pdf"):
         satisfy_clause(
             "33", "missing.pdf", model="opus", labels=["IEEE 1800-2023"],
+        )
+
+
+# --- parent-clause issue handling ------------------------------------------
+
+
+def _record_finder(captured: list) -> Callable[..., int]:
+    """Return a find_or_create_issue stub that appends to *captured*."""
+    def _stub(clause: str, *, labels: list[str]) -> int:
+        captured.append((clause, labels))
+        return 999
+    return _stub
+
+
+def test_satisfy_clause_finds_or_creates_issue_for_parent_clause(
+    monkeypatch,
+) -> None:
+    """The clause itself goes through find_or_create_issue (reopen/rename)."""
+    captured: list = []
+    monkeypatch.setattr(
+        "satisfy_clause.pipeline.load_toc",
+        lambda _lrm: {"33": (1, 1), "33.1": (1, 1)},
+    )
+    monkeypatch.setattr(
+        "satisfy_clause.pipeline.satisfy_subclauses",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "satisfy_clause.pipeline.find_or_create_issue",
+        _record_finder(captured),
+    )
+    satisfy_clause(
+        "33", "lrm.pdf", model="opus", labels=["IEEE 1800-2023"],
+    )
+    assert captured == [("33", ["IEEE 1800-2023"])]
+
+
+def test_satisfy_clause_skips_parent_issue_when_no_descendants(
+    monkeypatch,
+) -> None:
+    """An empty-descendants exit must not touch GitHub."""
+    def _explode(*_args, **_kwargs):
+        raise AssertionError("find_or_create_issue must not be called")
+    monkeypatch.setattr(
+        "satisfy_clause.pipeline.load_toc", lambda _lrm: {"33": (1, 1)},
+    )
+    monkeypatch.setattr(
+        "satisfy_clause.pipeline.find_or_create_issue", _explode,
+    )
+    with pytest.raises(SystemExit):
+        satisfy_clause(
+            "33", "lrm.pdf", model="opus", labels=["IEEE 1800-2023"],
         )
