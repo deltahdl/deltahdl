@@ -5,7 +5,9 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "fixture_simulator.h"
 #include "helpers_scheduler_event.h"
+#include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 
 using namespace delta;
@@ -132,4 +134,51 @@ TEST(NbaRegionSim, NBARegionHoldsMultipleEvents) {
 
   sched.Run();
   EXPECT_EQ(count, 5);
+}
+
+// §4.4.2.4 ¶2: a nonblocking assignment from the active region set creates
+// an event in the NBA region. Lowering `a <= 8'd99` from an `initial` (Active)
+// process must defer the write until after every blocking assignment in the
+// same time slot — `b = a + 8'd2` reads the pre-NBA value (1, giving 3) and
+// `a = a + 8'd5` continues the active-set chain. Only after the active set
+// drains does the NBA event fire and overwrite `a` with 99.
+TEST(NbaRegionSim, NonblockingAssignFromActiveSetSchedulesNBA) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'd1;\n"
+      "    b = a + 8'd2;\n"
+      "    a <= 8'd99;\n"
+      "    a = a + 8'd5;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 99u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 3u);
+}
+
+// §4.4.2.4 ¶2: the NBA event may be scheduled for a later simulation time.
+// Lowering `b <= #5 8'd99` enqueues the NBA event at t=5; the scheduler
+// advances time before draining NBA, so on completion the simulator's current
+// time reflects the deferred slot.
+TEST(NbaRegionSim, NonblockingAssignWithDelaySchedulesNBALater) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] b;\n"
+      "  initial b <= #5 8'd99;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 99u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 5u);
 }
