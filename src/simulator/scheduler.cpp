@@ -72,6 +72,15 @@ bool TimeSlot::AnyNonemptyIn(Region first, Region last) const {
   return false;
 }
 
+bool TimeSlot::AnyIterativeNonempty() const {
+  for (size_t i = 0; i < kRegionCount; ++i) {
+    if (IsIterativeRegion(static_cast<Region>(i)) && !regions[i].empty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // --- Scheduler: public interface ---
 
 void Scheduler::ScheduleEvent(SimTime time, Region region, Event* event) {
@@ -126,10 +135,10 @@ void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
   ExecuteRegion(slot, Region::kPreActive);
 
   // §4.4.1 ¶2: loop while any iterative region in this slot still holds
-  // events. The 14 iterative regions are exactly Active..Pre-Postponed in
-  // enum order, which lets a contiguous range scan stand in for filtering
-  // through IsIterativeRegion.
-  while (slot.AnyNonemptyIn(Region::kActive, Region::kPrePostponed)) {
+  // events. AnyIterativeNonempty routes each region through IsIterativeRegion
+  // so the loop's gate is the §4.4.1 ¶2 classifier rather than a hard-coded
+  // enum range.
+  while (slot.AnyIterativeNonempty()) {
     while (IterateActiveSet(slot)) {
     }
     while (IterateReactiveSet(slot)) {

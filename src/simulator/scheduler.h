@@ -41,6 +41,12 @@ struct TimeSlot {
   std::array<EventQueue, kRegionCount> regions{};
 
   bool AnyNonemptyIn(Region first, Region last) const;
+
+  // §4.4.1 ¶2: true while any iterative region in this slot still holds
+  // events, decided by routing each region through IsIterativeRegion so the
+  // outer iterative loop applies the §4.4.1 ¶2 classification rather than a
+  // hard-coded enum range.
+  bool AnyIterativeNonempty() const;
 };
 
 // --- Forward declaration ---

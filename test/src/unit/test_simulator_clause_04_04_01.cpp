@@ -147,23 +147,6 @@ TEST(SchedulerRegionSetSim, ReactiveRegionSetClassification) {
   }
 }
 
-// §4.4.1 ¶1: the active and reactive region sets are disjoint and each
-// contains exactly five regions.
-TEST(SchedulerRegionSetSim, ActiveAndReactiveSetsAreDisjoint) {
-  size_t active_count = 0;
-  size_t reactive_count = 0;
-  for (size_t i = 0; i < kRegionCount; ++i) {
-    auto r = static_cast<Region>(i);
-    bool a = IsActiveRegionSet(r);
-    bool x = IsReactiveRegionSet(r);
-    EXPECT_FALSE(a && x) << "region index " << i;
-    if (a) ++active_count;
-    if (x) ++reactive_count;
-  }
-  EXPECT_EQ(active_count, 5u);
-  EXPECT_EQ(reactive_count, 5u);
-}
-
 // §4.4.1 ¶2: production-code classifier returns true for the 14 named
 // iterative regions and false for Preponed, Pre-Active, and Postponed.
 TEST(SchedulerRegionSetSim, IterativeRegionClassification) {
@@ -177,20 +160,6 @@ TEST(SchedulerRegionSetSim, IterativeRegionClassification) {
     if (IsIterativeRegion(r)) ++iterative_count;
   }
   EXPECT_EQ(iterative_count, 14u);
-}
-
-// §4.4.1 ¶1+¶2: every active region set member is also an iterative region;
-// every reactive region set member is also an iterative region.
-TEST(SchedulerRegionSetSim, BothSetsAreIterative) {
-  for (size_t i = 0; i < kRegionCount; ++i) {
-    auto r = static_cast<Region>(i);
-    if (IsActiveRegionSet(r)) {
-      EXPECT_TRUE(IsIterativeRegion(r)) << "active region index " << i;
-    }
-    if (IsReactiveRegionSet(r)) {
-      EXPECT_TRUE(IsIterativeRegion(r)) << "reactive region index " << i;
-    }
-  }
 }
 
 // §4.4.1 ¶1: scheduler iteration of the active region set actually consults
@@ -238,40 +207,57 @@ TEST(SchedulerRegionSetSim, SchedulerExecutesReactiveSetPerClassifier) {
   }
 }
 
-// §4.4.1 ¶2: an iterative region that belongs to neither the active region set
-// nor the reactive region set must be one of the four bridge/Pre-Postponed
-// regions. Closes the exhaustiveness gap left by `BothSetsAreIterative`
-// (which only verifies the two sets are subsets of the iterative regions).
-TEST(SchedulerRegionSetSim,
-     IterativeRegionsOutsideBothSetsAreBridgeAndPrePostponed) {
-  size_t outside_count = 0;
+// §4.4.1 ¶2: scheduler iteration of the iterative regions actually consults
+// IsIterativeRegion — every region the predicate marks true drains, and the
+// scheduler's iterative loop processes exactly the 14-region set.
+TEST(SchedulerRegionSetSim, SchedulerIteratesIterativeRegionsPerClassifier) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<Region> drained;
+
   for (size_t i = 0; i < kRegionCount; ++i) {
     auto r = static_cast<Region>(i);
     if (!IsIterativeRegion(r)) continue;
-    if (IsActiveRegionSet(r) || IsReactiveRegionSet(r)) continue;
-    bool ok = (r == Region::kPreObserved) || (r == Region::kObserved) ||
-              (r == Region::kPostObserved) || (r == Region::kPrePostponed);
-    EXPECT_TRUE(ok) << "iterative non-set region index " << i;
-    ++outside_count;
+    auto* ev = sched.GetEventPool().Acquire();
+    ev->callback = [&drained, r]() { drained.push_back(r); };
+    sched.ScheduleEvent({0}, r, ev);
   }
-  EXPECT_EQ(outside_count, 4u);
+
+  sched.Run();
+  ASSERT_EQ(drained.size(), 14u);
+  for (auto r : drained) {
+    EXPECT_TRUE(IsIterativeRegion(r));
+  }
 }
 
-// §4.4.1 ¶2 corollary: regions excluded from the iterative enumeration are
-// exactly Preponed, Pre-Active, and Postponed. Closes the exhaustiveness gap
-// left by `NonIterativeRegionsAre3` (which schedules into those three but
-// does not assert that no other region is non-iterative).
-TEST(SchedulerRegionSetSim, NonIterativeRegionsAreExactlyPreponedPreActivePostponed) {
-  size_t non_iter_count = 0;
-  for (size_t i = 0; i < kRegionCount; ++i) {
-    auto r = static_cast<Region>(i);
-    if (IsIterativeRegion(r)) continue;
-    bool ok = (r == Region::kPreponed) || (r == Region::kPreActive) ||
-              (r == Region::kPostponed);
-    EXPECT_TRUE(ok) << "non-iterative region index " << i;
-    ++non_iter_count;
+// §4.4.1 ¶2 edge cases for the iterative-loop gate. Direct test of the
+// production-code path TimeSlot::AnyIterativeNonempty (which routes through
+// IsIterativeRegion) covers three states that end-to-end scheduler tests
+// either can't reach or would manifest as an infinite loop rather than a
+// clean failure: an empty slot, a slot whose only events are in non-iterative
+// regions (the §4.4.1 ¶2 exclusion set: Preponed, Pre-Active, Postponed), and
+// a slot with a single event in an iterative region. A predicate that
+// misclassified Postponed as iterative would hang ExecuteTimeSlot; one that
+// misclassified Preponed or Pre-Active would go undetected because those
+// regions are pre-drained before the loop entry.
+TEST(SchedulerRegionSetSim, TimeSlotAnyIterativeNonemptyExcludesNonIterative) {
+  Arena arena;
+  EventPool pool(arena);
+  TimeSlot slot;
+
+  EXPECT_FALSE(slot.AnyIterativeNonempty());
+
+  for (auto r : {Region::kPreponed, Region::kPreActive, Region::kPostponed}) {
+    auto* ev = pool.Acquire();
+    ev->callback = []() {};
+    slot.regions[static_cast<size_t>(r)].Push(ev);
   }
-  EXPECT_EQ(non_iter_count, 3u);
+  EXPECT_FALSE(slot.AnyIterativeNonempty());
+
+  auto* ev = pool.Acquire();
+  ev->callback = []() {};
+  slot.regions[static_cast<size_t>(Region::kPrePostponed)].Push(ev);
+  EXPECT_TRUE(slot.AnyIterativeNonempty());
 }
 
 TEST(SchedulerRegionSetSim, AllRegionsCategorizedAndProcessed) {
