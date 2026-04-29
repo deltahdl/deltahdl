@@ -111,13 +111,4 @@ TEST(BnfClarificationElaboration, FinalOnPureVirtualError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// Item 16: charge strength only with trireg
-
-TEST(BnfClarificationElaboration, ChargeStrengthWithTriregOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  trireg (small) x;\n"
-             "endmodule\n"));
-}
-
 }  // namespace

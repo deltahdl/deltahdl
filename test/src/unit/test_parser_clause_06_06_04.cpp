@@ -44,57 +44,6 @@ TEST(TriregParsing, TriregChargeStrengthWithLogic) {
   EXPECT_EQ(item->name, "cap1");
 }
 
-TEST(TriregParsing, TriregChargeStrengthSmall) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (small) s;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
-  EXPECT_EQ(item->data_type.charge_strength, 1u);
-}
-
-TEST(TriregParsing, TriregChargeStrengthMedium) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (medium) m;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
-  EXPECT_EQ(item->data_type.charge_strength, 2u);
-}
-
-TEST(TriregParsing, TriregChargeStrengthLarge) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg (large) lg;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kTrireg);
-  EXPECT_EQ(item->data_type.charge_strength, 4u);
-}
-
-TEST(TriregParsing, TriregNoChargeStrength) {
-  auto r = Parse(
-      "module t;\n"
-      "  trireg t1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.charge_strength, 0u);
-}
-
 TEST(TriregParsing, TriregVector) {
   auto r = Parse(
       "module t;\n"

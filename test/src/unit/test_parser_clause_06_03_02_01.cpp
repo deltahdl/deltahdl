@@ -97,4 +97,28 @@ TEST(DataTypeParsing, TriregChargeStrengthSignedVector) {
   EXPECT_EQ(item->name, "cap2");
 }
 
+TEST(DataTypeParsing, ChargeStrengthKeywordOnWireFails) {
+  auto r = Parse(
+      "module t;\n"
+      "  wire (small) w;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(DataTypeParsing, ChargeStrengthKeywordOnWandFails) {
+  auto r = Parse(
+      "module t;\n"
+      "  wand (medium) w;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(DataTypeParsing, ChargeStrengthKeywordOnTriFails) {
+  auto r = Parse(
+      "module t;\n"
+      "  tri (large) w;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
