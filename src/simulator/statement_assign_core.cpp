@@ -840,6 +840,9 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   } else {
     // Queue target: schedule a single callback that replaces all elements.
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+    // §4.3 ¶3: replacing the queue's elements is a state change of the
+    // target variable, so the scheduled callback is an update event.
+    event->kind = EventKind::kUpdate;
     event->callback = [q, elems = std::move(elems)]() {
       q->elements = elems;
       q->element_ids.clear();
@@ -899,6 +902,8 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
 // §10.4.2: Create a whole-variable NBA callback.
 static void SetupWholeVarNbaCallback(Event* event, Variable* var,
                                      const Logic4Vec& rhs_val) {
+  // §4.3 ¶3: every change in state of a net or variable is an update event.
+  event->kind = EventKind::kUpdate;
   var->pending_nba = rhs_val;
   var->has_pending_nba = true;
   event->callback = [var]() {
@@ -924,6 +929,9 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const Logic4Vec& rhs_val,
   if (!var) return;
 
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  // §4.3 ¶3: every change in state of a net or variable is an update event;
+  // a bit/part-select NBA still mutates the target variable's state.
+  event->kind = EventKind::kUpdate;
   if (is_select && !elem) {
     // §10.4.2: Evaluate LHS index at schedule time, not at callback time.
     const Expr* lhs = stmt->lhs;

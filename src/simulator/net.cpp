@@ -401,6 +401,9 @@ static void DecayKnownBitsToX(Logic4Vec& val) {
 static void ScheduleDecay(Net& net, Scheduler* sched) {
   uint64_t gen = ++net.decay_generation;
   auto* event = sched->GetEventPool().Acquire();
+  // §4.3 ¶3: charge decay rewrites the net's resolved value, which is a
+  // change in state of the net, so the scheduled callback is an update event.
+  event->kind = EventKind::kUpdate;
   event->callback = [&net, gen]() {
     if (net.decay_generation != gen) return;
     DecayKnownBitsToX(net.resolved->value);

@@ -304,6 +304,9 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
 static void ScheduleProcess(Process* proc, SimContext& ctx) {
   auto& sched = ctx.GetScheduler();
   auto* event = sched.GetEventPool().Acquire();
+  // §4.3 ¶4: "The evaluation of a process is also an event, known as an
+  // evaluation event."
+  event->kind = EventKind::kEvaluation;
   event->callback = [proc, &ctx]() {
     ctx.SetCurrentProcess(proc);
     proc->Resume();
