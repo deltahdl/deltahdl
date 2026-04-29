@@ -60,26 +60,6 @@ TEST(SimulationAlgorithmSim, ExecuteSimulationStopsWhenAllTimeSlotsEmpty) {
 
 TEST(SimulationAlgorithmSim, ExecuteTimeSlotFullRegionOrdering) { VerifyAllRegionOrder(); }
 
-TEST(SimulationAlgorithmSim, ActiveSetIterationReExecutesActiveAfterInactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* inactive = sched.GetEventPool().Acquire();
-  inactive->callback = [&]() {
-    order.push_back("inactive");
-    auto* new_active = sched.GetEventPool().Acquire();
-    new_active->callback = [&]() { order.push_back("active_from_inactive"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, new_active);
-  };
-  sched.ScheduleEvent({0}, Region::kInactive, inactive);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "inactive");
-  EXPECT_EQ(order[1], "active_from_inactive");
-}
-
 TEST(SimulationAlgorithmSim, ReactiveRestartsActiveSetBeforePrePostponed) {
   Arena arena;
   Scheduler sched(arena);
@@ -120,24 +100,6 @@ TEST(SimulationAlgorithmSim, ExecuteRegionDrainsAllEventsInFIFOOrder) {
   ASSERT_EQ(order.size(), 5u);
   for (int i = 0; i < 5; ++i) {
     EXPECT_EQ(order[i], i);
-  }
-}
-
-TEST(SimulationAlgorithmSim, IterativeRegionOrderMatchesAlgorithm) {
-  constexpr Region kIterativeRegions[] = {
-      Region::kActive,     Region::kInactive,     Region::kPreNBA,
-      Region::kNBA,        Region::kPostNBA,      Region::kPreObserved,
-      Region::kObserved,   Region::kPostObserved, Region::kReactive,
-      Region::kReInactive, Region::kPreReNBA,     Region::kReNBA,
-      Region::kPostReNBA,  Region::kPrePostponed,
-  };
-  constexpr size_t kCount = sizeof(kIterativeRegions) / sizeof(Region);
-  EXPECT_EQ(kCount, 14u);
-
-  for (size_t i = 1; i < kCount; ++i) {
-    auto prev = static_cast<int>(kIterativeRegions[i - 1]);
-    auto curr = static_cast<int>(kIterativeRegions[i]);
-    EXPECT_EQ(curr, prev + 1) << "Region ordinal gap at index " << i;
   }
 }
 

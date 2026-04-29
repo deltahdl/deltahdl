@@ -4,6 +4,7 @@
 #include "fixture_simulator.h"
 #include "helpers_scheduler_event.h"
 #include "simulator/lowerer.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
@@ -33,27 +34,6 @@ TEST(InactiveRegionSim, AllActiveEventsCompleteBeforeInactive) {
   ASSERT_EQ(order.size(), 4u);
 
   EXPECT_EQ(order[3], "inactive");
-}
-
-TEST(InactiveRegionSim, ZeroDelaySchedulesIntoInactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() {
-    order.push_back("active");
-
-    auto* delayed = sched.GetEventPool().Acquire();
-    delayed->callback = [&order]() { order.push_back("after_zero_delay"); };
-    sched.ScheduleEvent({0}, Region::kInactive, delayed);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "after_zero_delay");
 }
 
 TEST(InactiveRegionSim, InactiveToActiveIteration) {
@@ -182,6 +162,36 @@ TEST(InactiveRegionSim, InactiveRegionHoldsMultipleEvents) {
 
   sched.Run();
   EXPECT_EQ(count, 5);
+}
+
+// §4.4.2.3 ¶2: production `#0` from the active region set suspends the
+// process, schedules the resume into Inactive, and resumes it on the next
+// Inactive→Active iteration. The NBA `b <= 9` is queued before `#0`; if the
+// resume were routed past NBA (or the process were not suspended at all) the
+// post-resume read of `b` would observe 9. Reading 0 confirms the resume
+// fires from Inactive — strictly between Active and NBA — and that control
+// re-enters Active before the post-`#0` statement runs.
+TEST(InactiveRegionSim, ZeroDelaySuspendsProcessAndResumesViaInactive) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] b, snap;\n"
+      "  initial begin\n"
+      "    b = 8'd0;\n"
+      "    snap = 8'd0;\n"
+      "    b <= 8'd9;\n"
+      "    #0;\n"
+      "    snap = b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("snap")->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 9u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
 

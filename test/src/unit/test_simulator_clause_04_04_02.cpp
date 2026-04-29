@@ -86,3 +86,24 @@ TEST(SimAndPliRegionSim, PreponedIsFirstPostponedIsLast) {
 TEST(SimAndPliRegionSim, MixedSimAndPLIRegionsExecuteInOrder) {
   VerifyAllRegionsExecuteInOrder();
 }
+
+// §4.4.2 ¶1 enumeration: production-code IsSimulationRegion classifies the
+// nine LRM-named regions (Preponed, Active, Inactive, NBA, Observed, Reactive,
+// Re-Inactive, Re-NBA, Postponed) as simulation regions and rejects every
+// other region. The §4.4.1 partition tests assert sum/disjointness/coverage
+// but do not pin classifier membership to the §4.4.2 enumeration.
+TEST(SimAndPliRegionSim, IsSimulationRegionMatchesEnumeration) {
+  for (auto r : kSimulationRegions) {
+    EXPECT_TRUE(IsSimulationRegion(r))
+        << "expected simulation region index " << static_cast<int>(r);
+  }
+  for (auto r : kPLIRegions) {
+    EXPECT_FALSE(IsSimulationRegion(r))
+        << "unexpected simulation region index " << static_cast<int>(r);
+  }
+  size_t sim_count = 0;
+  for (size_t i = 0; i < kRegionCount; ++i) {
+    if (IsSimulationRegion(static_cast<Region>(i))) ++sim_count;
+  }
+  EXPECT_EQ(sim_count, kSimulationRegionCount);
+}
