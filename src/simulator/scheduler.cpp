@@ -75,6 +75,12 @@ bool TimeSlot::AnyNonemptyIn(Region first, Region last) const {
 
 void Scheduler::ScheduleEvent(SimTime time, Region region, Event* event) {
   assert(!(time < current_time_));
+  // §4.4.3.1: Within the Preponed region, it is illegal to schedule an
+  // event in any other region within the current time slot.
+  if (current_region_ == Region::kPreponed && time == current_time_ &&
+      region != Region::kPreponed) {
+    ++illegal_preponed_schedule_count_;
+  }
   auto idx = static_cast<size_t>(region);
   event_calendar_[time].regions[idx].Push(event);
 }
@@ -92,10 +98,10 @@ void Scheduler::Run() {
 
 void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
   // Preponed region: read-only sampling (§4.4.2.1)
-  ExecuteRegion(slot.regions[static_cast<size_t>(Region::kPreponed)]);
+  ExecuteRegion(slot, Region::kPreponed);
 
   // Pre-Active region: PLI callback (§4.4.3.2)
-  ExecuteRegion(slot.regions[static_cast<size_t>(Region::kPreActive)]);
+  ExecuteRegion(slot, Region::kPreActive);
 
   // Iterative loop: [Active ... Pre-Postponed] (§4.5)
   while (slot.AnyNonemptyIn(Region::kActive, Region::kPrePostponed)) {
@@ -105,13 +111,14 @@ void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
     }
     // Pre-Postponed only when [Active...Post-Re-NBA] are all empty
     if (!slot.AnyNonemptyIn(Region::kActive, Region::kPostReNBA)) {
-      ExecuteRegion(slot.regions[static_cast<size_t>(Region::kPrePostponed)]);
+      ExecuteRegion(slot, Region::kPrePostponed);
     }
   }
 
   // Postponed region: read-only (§4.4.3.10)
-  ExecuteRegion(slot.regions[static_cast<size_t>(Region::kPostponed)]);
+  ExecuteRegion(slot, Region::kPostponed);
 
+  current_region_ = Region::kCOUNT;
   if (post_timestep_cb_) post_timestep_cb_();
 }
 
@@ -128,9 +135,7 @@ bool Scheduler::IterateActiveSet(TimeSlot& slot) {
 }
 
 void Scheduler::ExecuteActiveRegions(TimeSlot& slot) {
-  auto exec = [&](Region r) {
-    ExecuteRegion(slot.regions[static_cast<size_t>(r)]);
-  };
+  auto exec = [&](Region r) { ExecuteRegion(slot, r); };
 
   exec(Region::kActive);
   exec(Region::kInactive);
@@ -158,9 +163,7 @@ bool Scheduler::IterateReactiveSet(TimeSlot& slot) {
 }
 
 void Scheduler::ExecuteReactiveRegions(TimeSlot& slot) {
-  auto exec = [&](Region r) {
-    ExecuteRegion(slot.regions[static_cast<size_t>(r)]);
-  };
+  auto exec = [&](Region r) { ExecuteRegion(slot, r); };
 
   exec(Region::kReactive);
   exec(Region::kReInactive);
@@ -171,7 +174,12 @@ void Scheduler::ExecuteReactiveRegions(TimeSlot& slot) {
 
 // --- Scheduler: single region drain ---
 
-void Scheduler::ExecuteRegion(EventQueue& queue) {
+void Scheduler::ExecuteRegion(TimeSlot& slot, Region region) {
+  current_region_ = region;
+  DrainQueue(slot.regions[static_cast<size_t>(region)]);
+}
+
+void Scheduler::DrainQueue(EventQueue& queue) {
   while (!queue.empty()) {
     Event* event = queue.Pop();
     if (event->callback) {

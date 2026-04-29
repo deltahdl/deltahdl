@@ -27,29 +27,6 @@ TEST(PreponedRegionSim, PreponedExecutesBeforeAllOtherRegions) {
   EXPECT_EQ(order[0], "preponed");
 }
 
-TEST(PreponedRegionSim, PreponedSamplesBeforeActiveModifications) {
-  Arena arena;
-  Scheduler sched(arena);
-  int shared_value = 0;
-  int sampled_in_preponed = -1;
-  int sampled_in_active = -1;
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() {
-    shared_value = 42;
-    sampled_in_active = shared_value;
-  };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  auto* preponed = sched.GetEventPool().Acquire();
-  preponed->callback = [&]() { sampled_in_preponed = shared_value; };
-  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
-
-  sched.Run();
-  EXPECT_EQ(sampled_in_preponed, 0);
-  EXPECT_EQ(sampled_in_active, 42);
-}
-
 TEST(PreponedRegionSim, PreponedEquivalentToPreviousPostponed) {
   Arena arena;
   Scheduler sched(arena);
@@ -207,4 +184,29 @@ TEST(PreponedRegionSim, PreponedSeesCorrectStateAcrossMultipleTimeSlots) {
   ASSERT_EQ(preponed_samples.size(), 2u);
   EXPECT_EQ(preponed_samples[0], 10);
   EXPECT_EQ(preponed_samples[1], 20);
+}
+
+// §4.4.2.1: Preponed sampling is equivalent to sampling in the previous
+// Postponed region. Postponed runs after the NBA region, so a Preponed at
+// time t+1 must observe the post-NBA value written at time t.
+TEST(PreponedRegionSim, PreponedSeesPostNBAStateFromPreviousTimeSlot) {
+  Arena arena;
+  Scheduler sched(arena);
+  int value = 0;
+  int sampled_in_preponed = -1;
+
+  auto* active = sched.GetEventPool().Acquire();
+  active->callback = [&]() { value = 1; };
+  sched.ScheduleEvent({0}, Region::kActive, active);
+
+  auto* nba = sched.GetEventPool().Acquire();
+  nba->callback = [&]() { value = 2; };
+  sched.ScheduleEvent({0}, Region::kNBA, nba);
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() { sampled_in_preponed = value; };
+  sched.ScheduleEvent({1}, Region::kPreponed, preponed);
+
+  sched.Run();
+  EXPECT_EQ(sampled_in_preponed, 2);
 }

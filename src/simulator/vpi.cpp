@@ -9,6 +9,7 @@
 
 #include "common/types.h"
 #include "simulator/net.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
@@ -216,6 +217,10 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
 void VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* /*time*/,
                           int /*flags*/) {
   if (!obj || !value || !obj->var) return;
+  // §4.4.3.1: Within the Preponed region it is illegal to write values to
+  // any net or variable. Record the violation; the write still proceeds so
+  // non-conforming code stays observable.
+  if (scheduler_) scheduler_->NoteWriteAttempt();
   if (value->format == kVpiIntVal) {
     auto new_val = static_cast<uint64_t>(value->value.integer);
     obj->var->value.words[0].aval = new_val;

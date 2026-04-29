@@ -11,6 +11,7 @@
 namespace delta {
 
 class SimContext;
+class Scheduler;
 struct Net;
 struct Variable;
 
@@ -207,6 +208,10 @@ class VpiContext {
 
   void Attach(SimContext& sim_ctx);
 
+  // §4.4.3.1: Wire the scheduler so PutValue can detect writes that occur
+  // while the simulator is in the Preponed region.
+  void SetScheduler(Scheduler* sched) { scheduler_ = sched; }
+
   VpiHandle RegisterSystf(VpiSystfData* data);
   VpiHandle HandleByName(const char* name, VpiHandle scope);
   VpiHandle HandleByIndex(int index, VpiHandle parent);
@@ -257,6 +262,7 @@ class VpiContext {
   std::vector<VpiHandle> cb_handles_;
   std::unordered_map<std::string_view, VpiObject*> object_map_;
   std::vector<VpiObject*> all_objects_;
+  Scheduler* scheduler_ = nullptr;
   bool stop_requested_ = false;
   bool finish_requested_ = false;
   VpiErrorInfo last_error_ = {};

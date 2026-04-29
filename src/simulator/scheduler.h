@@ -75,6 +75,7 @@ class Scheduler {
   explicit Scheduler(Arena& arena) : pool_(arena) {}
 
   SimTime CurrentTime() const { return current_time_; }
+  Region CurrentRegion() const { return current_region_; }
   bool HasEvents() const { return !event_calendar_.empty(); }
 
   void ScheduleEvent(SimTime time, Region region, Event* event);
@@ -86,11 +87,37 @@ class Scheduler {
     post_timestep_cb_ = std::move(cb);
   }
 
+  // §4.4.3.1: Number of attempts to schedule an event in any other region of
+  // the current time slot from inside the Preponed region. Such schedules are
+  // declared illegal by the LRM; the scheduler still queues the event but
+  // records the violation here so callers can detect the rule break.
+  size_t IllegalPreponedScheduleCount() const {
+    return illegal_preponed_schedule_count_;
+  }
+
+  // §4.4.3.1: Number of attempts to write a net or variable while inside the
+  // Preponed region. Production write paths (e.g. VpiContext::PutValue) call
+  // NoteWriteAttempt() before mutating a net or variable; the scheduler
+  // increments this counter when the current region is Preponed, applying
+  // the LRM's "illegal to write values to any net or variable" restriction.
+  size_t IllegalPreponedWriteCount() const {
+    return illegal_preponed_write_count_;
+  }
+
+  // §4.4.3.1: Called by net/variable write paths before each write. When the
+  // current region is Preponed the write is recorded as a violation.
+  void NoteWriteAttempt() {
+    if (current_region_ == Region::kPreponed) {
+      ++illegal_preponed_write_count_;
+    }
+  }
+
  private:
   void ExecuteTimeSlot(TimeSlot& slot);
   void ExecuteActiveRegions(TimeSlot& slot);
   void ExecuteReactiveRegions(TimeSlot& slot);
-  void ExecuteRegion(EventQueue& queue);
+  void ExecuteRegion(TimeSlot& slot, Region region);
+  void DrainQueue(EventQueue& queue);
 
   bool IterateActiveSet(TimeSlot& slot);
   bool IterateReactiveSet(TimeSlot& slot);
@@ -99,6 +126,9 @@ class Scheduler {
   std::map<SimTime, TimeSlot> event_calendar_;
   std::function<void()> post_timestep_cb_;
   SimTime current_time_{0};
+  Region current_region_ = Region::kCOUNT;
+  size_t illegal_preponed_schedule_count_ = 0;
+  size_t illegal_preponed_write_count_ = 0;
   bool stop_requested_ = false;
 };
 

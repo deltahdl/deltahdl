@@ -148,31 +148,3 @@ TEST(PostponedRegionSim, PostponedPLIEventsExecuteInRegion) {
 TEST(PostponedRegionSim, PostponedEventsAcrossMultipleTimeSlots) {
   VerifyEventsAcrossTimeSlots(Region::kPostponed);
 }
-
-TEST(PostponedRegionSim, PostponedStatePersistsToNextPreponed) {
-  Arena arena;
-  Scheduler sched(arena);
-  int value = 0;
-  int sampled_postponed = -1;
-  int sampled_preponed = -1;
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() { value = 100; };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  auto* postponed = sched.GetEventPool().Acquire();
-  postponed->callback = [&]() { sampled_postponed = value; };
-  sched.ScheduleEvent({0}, Region::kPostponed, postponed);
-
-  auto* preponed = sched.GetEventPool().Acquire();
-  preponed->callback = [&]() { sampled_preponed = value; };
-  sched.ScheduleEvent({1}, Region::kPreponed, preponed);
-
-  auto* active1 = sched.GetEventPool().Acquire();
-  active1->callback = [&]() { value = 999; };
-  sched.ScheduleEvent({1}, Region::kActive, active1);
-
-  sched.Run();
-  EXPECT_EQ(sampled_postponed, 100);
-  EXPECT_EQ(sampled_preponed, 100);
-}

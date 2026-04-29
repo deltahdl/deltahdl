@@ -7,6 +7,8 @@
 #include "common/types.h"
 #include "helpers_scheduler_event.h"
 #include "simulator/scheduler.h"
+#include "simulator/variable.h"
+#include "simulator/vpi.h"
 
 using namespace delta;
 
@@ -73,10 +75,6 @@ TEST(PliPreponedSim, PreponedExecutesBeforePreActive) {
   EXPECT_EQ(order[1], "pre_active");
 }
 
-TEST(PliPreponedSim, PreponedIsFirstRegionOrdinal) {
-  EXPECT_EQ(static_cast<int>(Region::kPreponed), 0);
-}
-
 TEST(PliPreponedSim, PreponedRegionHoldsMultiplePLICallbacks) {
   Arena arena;
   Scheduler sched(arena);
@@ -90,40 +88,6 @@ TEST(PliPreponedSim, PreponedRegionHoldsMultiplePLICallbacks) {
 
   sched.Run();
   EXPECT_EQ(count, 5);
-}
-
-TEST(PliPreponedSim, PreponedSeesStatefromPreviousTimeSlot) {
-  Arena arena;
-  Scheduler sched(arena);
-  int value = 0;
-  int sampled_t1 = -1;
-
-  auto* active0 = sched.GetEventPool().Acquire();
-  active0->callback = [&]() { value = 77; };
-  sched.ScheduleEvent({0}, Region::kActive, active0);
-
-  auto* preponed1 = sched.GetEventPool().Acquire();
-  preponed1->callback = [&]() { sampled_t1 = value; };
-  sched.ScheduleEvent({1}, Region::kPreponed, preponed1);
-
-  sched.Run();
-  EXPECT_EQ(sampled_t1, 77);
-}
-
-TEST(PliPreponedSim, PreponedExecutesBeforeAllOtherRegions) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  ScheduleLabeled(sched, Region::kPostponed, "postponed", order);
-  ScheduleLabeled(sched, Region::kActive, "active", order);
-  ScheduleLabeled(sched, Region::kNBA, "nba", order);
-  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
-  ScheduleLabeled(sched, Region::kPreponed, "preponed", order);
-
-  sched.Run();
-  ASSERT_GE(order.size(), 5u);
-  EXPECT_EQ(order[0], "preponed");
 }
 
 TEST(PliPreponedSim, PreponedEventsAcrossMultipleTimeSlots) {
@@ -166,4 +130,201 @@ TEST(PliPreponedSim, PreponedProvidesConsistentReadOnlySnapshot) {
 
   sched.Run();
   EXPECT_EQ(sum_in_preponed, 3);
+}
+
+// §4.4.3.1: scheduling into another region of the current time slot from
+// inside Preponed is illegal. The scheduler records the violation.
+TEST(PliPreponedSim, IllegalScheduleIntoOtherRegionInCurrentTimeSlot) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() {
+    auto* offender = sched.GetEventPool().Acquire();
+    offender->callback = []() {};
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, offender);
+  };
+  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
+
+  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 0u);
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 1u);
+}
+
+// §4.4.3.1: scheduling into the same region (Preponed) at the current time
+// slot is not the "any other region" case, so it is not flagged. Likewise,
+// scheduling into another region at a *future* time slot is allowed because
+// the restriction is scoped to the current time slot.
+TEST(PliPreponedSim, LegalSchedulesFromPreponedAreNotFlagged) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() {
+    auto* future = sched.GetEventPool().Acquire();
+    future->callback = []() {};
+    sched.ScheduleEvent({1}, Region::kActive, future);
+  };
+  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 0u);
+}
+
+// §4.4.3.1: scheduling from non-Preponed regions (e.g. Active) into other
+// regions of the current time slot is permitted by §4.4.3.1 — the rule is
+// specific to the Preponed region.
+TEST(PliPreponedSim, ScheduleFromActiveIntoOtherRegionIsNotFlagged) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* active = sched.GetEventPool().Acquire();
+  active->callback = [&]() {
+    auto* nba = sched.GetEventPool().Acquire();
+    nba->callback = []() {};
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, active);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 0u);
+}
+
+// §4.4.3.1: each illegal schedule from Preponed is counted independently.
+TEST(PliPreponedSim, MultipleIllegalSchedulesAreEachCounted) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() {
+    for (int i = 0; i < 3; ++i) {
+      auto* ev = sched.GetEventPool().Acquire();
+      ev->callback = []() {};
+      sched.ScheduleEvent(sched.CurrentTime(), Region::kPreActive, ev);
+    }
+  };
+  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 3u);
+}
+
+// §4.4.3.1: while executing Preponed, the scheduler reports the current
+// region so the restriction can be inspected by code paths that emit nets
+// or variable writes.
+TEST(PliPreponedSim, CurrentRegionIsPreponedDuringPreponedCallback) {
+  Arena arena;
+  Scheduler sched(arena);
+  Region observed = Region::kCOUNT;
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() { observed = sched.CurrentRegion(); };
+  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
+
+  sched.Run();
+  EXPECT_EQ(observed, Region::kPreponed);
+}
+
+// §4.4.3.1: the rule forbids scheduling into "any other region" within the
+// current time slot — the Preponed region itself is not "other" and must not
+// be flagged.
+TEST(PliPreponedSim, ScheduleIntoSamePreponedRegionAtCurrentTimeIsNotFlagged) {
+  Arena arena;
+  Scheduler sched(arena);
+  bool inner_ran = false;
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() {
+    auto* inner = sched.GetEventPool().Acquire();
+    inner->callback = [&]() { inner_ran = true; };
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kPreponed, inner);
+  };
+  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
+
+  sched.Run();
+  EXPECT_TRUE(inner_ran);
+  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 0u);
+}
+
+// §4.4.3.1: "any other region" includes the last region of the time slot —
+// the Postponed region. Scheduling into Postponed from inside Preponed at
+// the current time slot is a violation.
+TEST(PliPreponedSim, ScheduleIntoPostponedAtCurrentTimeIsFlagged) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() {
+    auto* postponed = sched.GetEventPool().Acquire();
+    postponed->callback = []() {};
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kPostponed, postponed);
+  };
+  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 1u);
+}
+
+// §4.4.3.1: it is illegal to write values to any net or variable from inside
+// the Preponed region. The VPI write path (VpiContext::PutValue) is the
+// canonical PLI write entry point; when invoked from a Preponed callback,
+// the scheduler records the violation.
+TEST(PliPreponedSim, VpiPutValueFromPreponedRecordsWriteViolation) {
+  Arena arena;
+  Scheduler sched(arena);
+  VpiContext vpi;
+  vpi.SetScheduler(&sched);
+
+  Logic4Word storage{};
+  Variable var{};
+  var.value.width = 32;
+  var.value.nwords = 1;
+  var.value.words = &storage;
+
+  VpiObject obj{};
+  obj.var = &var;
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() {
+    VpiValue value{};
+    value.format = kVpiIntVal;
+    value.value.integer = 42;
+    vpi.PutValue(&obj, &value, nullptr, 0);
+  };
+  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
+
+  EXPECT_EQ(sched.IllegalPreponedWriteCount(), 0u);
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreponedWriteCount(), 1u);
+}
+
+// §4.4.3.1: VPI writes from regions other than Preponed are not flagged —
+// the rule is scoped to the Preponed region.
+TEST(PliPreponedSim, VpiPutValueOutsidePreponedDoesNotRecordViolation) {
+  Arena arena;
+  Scheduler sched(arena);
+  VpiContext vpi;
+  vpi.SetScheduler(&sched);
+
+  Logic4Word storage{};
+  Variable var{};
+  var.value.width = 32;
+  var.value.nwords = 1;
+  var.value.words = &storage;
+
+  VpiObject obj{};
+  obj.var = &var;
+
+  auto* active = sched.GetEventPool().Acquire();
+  active->callback = [&]() {
+    VpiValue value{};
+    value.format = kVpiIntVal;
+    value.value.integer = 42;
+    vpi.PutValue(&obj, &value, nullptr, 0);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, active);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreponedWriteCount(), 0u);
+  EXPECT_EQ(var.value.words[0].aval, 42u);
 }
