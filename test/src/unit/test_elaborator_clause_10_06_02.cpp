@@ -4,7 +4,6 @@
 
 #include "common/arena.h"
 #include "fixture_elaborator.h"
-#include "helpers_force_target.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
 
@@ -71,30 +70,87 @@ TEST(ForceReleaseElaboration, ForceConstPartSelectNetElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ForceRelease, LegalTargetNet) {
-  ForceInfo info{ForceTarget::kNet};
-  EXPECT_TRUE(ValidateForceTarget(info));
+// §10.6.2: force LHS shall not be a bit-select of a variable.
+TEST(ForceReleaseElaboration, ForceBitSelectVariableLhsIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  initial begin force data[3] = 1'b1; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ForceRelease, LegalTargetConcatenation) {
-  ForceInfo info{ForceTarget::kConcatenation};
-  EXPECT_TRUE(ValidateForceTarget(info));
+// §10.6.2: force LHS shall not be a part-select of a variable.
+TEST(ForceReleaseElaboration, ForcePartSelectVariableLhsIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  initial begin force data[3:0] = 4'hA; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ForceRelease, IllegalBitSelectVariable) {
-  ForceInfo info{ForceTarget::kBitSelectVariable};
-  EXPECT_FALSE(ValidateForceTarget(info));
+// §10.6.2: force LHS shall not be a bit-select of a net with a user-defined
+// nettype.
+TEST(ForceReleaseElaboration, ForceBitSelectUserNettypeNetIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  nettype logic [7:0] my_t;\n"
+      "  my_t bus;\n"
+      "  initial begin force bus[3] = 1'b1; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ForceRelease, IllegalPartSelectVariable) {
-  ForceInfo info{ForceTarget::kPartSelectVariable};
-  EXPECT_FALSE(ValidateForceTarget(info));
+// §10.6.2: force LHS shall not be a part-select of a net with a user-defined
+// nettype.
+TEST(ForceReleaseElaboration, ForcePartSelectUserNettypeNetIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  nettype logic [7:0] my_t;\n"
+      "  my_t bus;\n"
+      "  initial begin force bus[7:4] = 4'hF; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ForceRelease, IllegalMixedAssignmentTarget) {
-  ForceInfo info{ForceTarget::kSingularVariable};
-  info.has_mixed_assignments = true;
-  EXPECT_FALSE(ValidateForceTarget(info));
+// §10.6.2: a force statement shall not be applied to a variable that is
+// being assigned by a mixture of continuous and procedural assignments.
+TEST(ForceReleaseElaboration, ForceOnMixedAssignmentVariableIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic x;\n"
+      "  assign x = 1'b0;\n"
+      "  initial begin\n"
+      "    x = 1'b1;\n"
+      "    force x = 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §10.6.2: force in a concatenation, where one operand is a bit-select of
+// a variable, is illegal.
+TEST(ForceReleaseElaboration, ForceConcatWithBitSelectVariableIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] data;\n"
+      "  wire w;\n"
+      "  initial begin force {w, data[0]} = 2'b11; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace

@@ -298,6 +298,58 @@ static void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
   for (auto& ci : s->case_items) CheckProceduralAssignLhs(ci.body, diag);
 }
 
+// §10.6.2: validate one LHS operand of a force/release statement. The LHS
+// can be a singular variable reference, a net, a constant bit/part-select of
+// a vector net, or (recursively) a concatenation of these. It shall not be
+// a bit-select or part-select of a variable, nor a bit-select or part-select
+// of a net with a user-defined nettype.
+static void CheckForceLhsOperand(
+    const Expr* e,
+    const std::unordered_set<std::string_view>& net_names,
+    const std::unordered_set<std::string_view>& nettype_net_names,
+    SourceLoc loc, DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kConcatenation) {
+    for (auto* el : e->elements)
+      CheckForceLhsOperand(el, net_names, nettype_net_names, loc, diag);
+    return;
+  }
+  if (e->kind == ExprKind::kSelect) {
+    auto base_name = LhsBaseName(e);
+    if (base_name.empty()) return;
+    if (nettype_net_names.count(base_name) != 0) {
+      diag.Error(loc,
+                 "bit-select or part-select of a net with a user-defined "
+                 "nettype is not a legal force LHS");
+    } else if (net_names.count(base_name) == 0) {
+      diag.Error(loc, "bit-select or part-select of a variable is not a "
+                      "legal force LHS");
+    }
+  }
+}
+
+static void CheckForceLhs(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& net_names,
+    const std::unordered_set<std::string_view>& nettype_net_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kForce && s->lhs) {
+    CheckForceLhsOperand(s->lhs, net_names, nettype_net_names,
+                         s->range.start, diag);
+  }
+  for (auto* sub : s->stmts)
+    CheckForceLhs(sub, net_names, nettype_net_names, diag);
+  for (auto* sub : s->fork_stmts)
+    CheckForceLhs(sub, net_names, nettype_net_names, diag);
+  CheckForceLhs(s->then_branch, net_names, nettype_net_names, diag);
+  CheckForceLhs(s->else_branch, net_names, nettype_net_names, diag);
+  CheckForceLhs(s->body, net_names, nettype_net_names, diag);
+  CheckForceLhs(s->for_body, net_names, nettype_net_names, diag);
+  for (auto& ci : s->case_items)
+    CheckForceLhs(ci.body, net_names, nettype_net_names, diag);
+}
+
 // §6.6.8: check if an expression tree contains an interconnect identifier.
 static bool ExprUsesInterconnect(
     const Expr* e,
@@ -1301,6 +1353,9 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item) {
     // §6.6.8: interconnect cannot be target of force/release/assign/deassign.
     CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);
     CheckProceduralAssignLhs(item->body, diag_);
+    // §10.6.2: force LHS shall not be bit/part-select of a variable, nor of
+    // a net with a user-defined nettype.
+    CheckForceLhs(item->body, net_names_, nettype_net_names_, diag_);
     // §10.9: LHS assignment patterns must use positional notation.
     WalkStmtsForLhsPatternKeys(item->body, diag_);
   }

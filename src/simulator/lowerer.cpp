@@ -283,7 +283,9 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
       net->Resolve(arena);
     } else {
       auto* var = ctx.FindVariable(params.lhs->text);
-      if (var) {
+      if (var && !var->is_forced) {
+        // §10.6.2: A force on a variable overrides the continuous assignment
+        // until release; skip the cont-assign write while forced.
         var->value = ResizeToWidth(val, var->value.width, arena);
         var->NotifyWatchers();
       }

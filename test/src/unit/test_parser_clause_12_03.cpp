@@ -146,34 +146,6 @@ TEST(StatementSyntaxParsing, NonblockingAssignmentAsStatement) {
   EXPECT_EQ(stmt->kind, StmtKind::kNonblockingAssign);
 }
 
-TEST(StatementSyntaxParsing, ForceAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    force x = 1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kForce);
-}
-
-TEST(StatementSyntaxParsing, ReleaseAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    release x;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kRelease);
-}
-
 TEST(StatementSyntaxParsing, CaseAsStatement) {
   auto r = Parse(
       "module m;\n"

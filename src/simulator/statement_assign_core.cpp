@@ -1223,7 +1223,16 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
 
   if (stmt->kind == StmtKind::kDeassign) {
     var->assign_cont_rhs = nullptr;
-  } else if (var->assign_cont_rhs) {
+  } else if (stmt->lhs->kind == ExprKind::kIdentifier) {
+    // §10.6.2: When a release is executed on a net, the net shall immediately
+    // be assigned the value determined by its drivers. Re-resolving applies
+    // the current driver values now that is_forced has been cleared.
+    if (auto* net = ctx.FindNet(stmt->lhs->text)) {
+      net->Resolve(arena);
+    }
+  }
+
+  if (var->assign_cont_rhs && stmt->kind != StmtKind::kDeassign) {
     // Reestablish the active assign procedural continuous assignment.
     auto rhs_val = EvalExpr(var->assign_cont_rhs, ctx, arena);
     var->is_forced = true;

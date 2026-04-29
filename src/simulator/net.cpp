@@ -460,6 +460,10 @@ bool Net::InCapacitiveState() const {
 
 void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (!resolved) return;
+  // §10.6.2: A force procedural statement on a net shall override all drivers
+  // until a release procedural statement is executed; preserve the forced
+  // value while the net is forced.
+  if (resolved->is_forced) return;
   // §6.7.3 / §28.15.1: User-defined nettypes and tri0/tri1 must resolve
   // even with no drivers — the latter pull to their default value/strength.
   bool needs_resolution_when_undriven =

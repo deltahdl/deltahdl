@@ -1,6 +1,5 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
-#include "helpers_force_target.h"
 #include "helpers_stmt_exec.h"
 #include "helpers_switch_network.h"
 #include "simulator/lowerer.h"
@@ -27,59 +26,6 @@ TEST(ForceReleaseSim, VarLvalueForce) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(ForceRelease, LegalTargetSingularVariable) {
-  ForceInfo info{ForceTarget::kSingularVariable};
-  EXPECT_TRUE(ValidateForceTarget(info));
-}
-
-TEST(ForceRelease, LegalTargetConstBitSelectNet) {
-  ForceInfo info{ForceTarget::kConstBitSelectNet};
-  EXPECT_TRUE(ValidateForceTarget(info));
-}
-
-TEST(ForceRelease, LegalTargetConstPartSelectNet) {
-  ForceInfo info{ForceTarget::kConstPartSelectNet};
-  EXPECT_TRUE(ValidateForceTarget(info));
-}
-
-TEST(ForceRelease, IllegalUserDefinedNettypePartSelect) {
-  ForceInfo info{ForceTarget::kUserDefinedNettypePartSelect};
-  EXPECT_FALSE(ValidateForceTarget(info));
-}
-
-void ForceVariable(Variable& var, const Logic4Vec& value) { var.value = value; }
-
-TEST(ForceRelease, ForceVariableOverridesValue) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 1, 1);
-  EXPECT_EQ(ValOf(*var), kVal1);
-
-  ForceVariable(*var, MakeLogic4VecVal(arena, 1, 0));
-  EXPECT_EQ(ValOf(*var), kVal0);
-}
-
-void ReleaseVariable(Variable& var, bool has_continuous_driver,
-                     const Logic4Vec* continuous_value, Arena& arena) {
-  (void)arena;
-  if (has_continuous_driver && continuous_value) {
-    var.value = *continuous_value;
-  }
-}
-
-TEST(ForceRelease, ReleaseUndrivenVariableHoldsValue) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 1, 0);
-
-  ForceVariable(*var, MakeLogic4VecVal(arena, 1, 1));
-  EXPECT_EQ(ValOf(*var), kVal1);
-
-  ReleaseVariable(*var, false, nullptr, arena);
-
-  EXPECT_EQ(ValOf(*var), kVal1);
-}
-
 TEST(ForceRelease, ReleaseContinuouslyDrivenVariableReestablishes) {
   Arena arena;
   auto* var = arena.Create<Variable>();
@@ -87,10 +33,10 @@ TEST(ForceRelease, ReleaseContinuouslyDrivenVariableReestablishes) {
 
   Logic4Vec continuous_val = MakeLogic4VecVal(arena, 1, 0);
 
-  ForceVariable(*var, MakeLogic4VecVal(arena, 1, 1));
+  var->value = MakeLogic4VecVal(arena, 1, 1);
   EXPECT_EQ(ValOf(*var), kVal1);
 
-  ReleaseVariable(*var, true, &continuous_val, arena);
+  var->value = continuous_val;
 
   EXPECT_EQ(ValOf(*var), kVal0);
 }
@@ -463,6 +409,95 @@ TEST(ForceReleaseSim, ReleaseReestablishesAssign) {
   ASSERT_NE(x, nullptr);
   EXPECT_FALSE(x->is_forced);
   EXPECT_EQ(x->value.ToUint64(), 10u);
+}
+
+// §10.6.2: "Releasing a variable that is driven by a continuous assignment
+// ... shall reestablish that assignment and schedule a reevaluation in the
+// continuous assignment's scheduling region." Observed via a module-level
+// continuous assignment driving the variable: after release, a subsequent
+// change to the cont-assign source must propagate into the released variable.
+TEST(ForceReleaseSim, ReleaseReestablishesContinuousAssignment) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  logic [7:0] x;\n"
+      "  assign x = src;\n"
+      "  initial begin\n"
+      "    src = 8'd10;\n"
+      "    #1;\n"
+      "    force x = 8'd99;\n"
+      "    #1;\n"
+      "    release x;\n"
+      "    src = 8'd42;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_FALSE(x->is_forced);
+  EXPECT_EQ(x->value.ToUint64(), 42u);
+}
+
+// §10.6.2: "A force procedural statement on a net shall override all drivers
+// of the net—gate outputs, module outputs, and continuous assignments—until
+// a release procedural statement is executed on the net."
+TEST(ForceReleaseSim, ForceOnNetOverridesContinuousDriver) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  wire [7:0] w;\n"
+      "  assign w = 8'd10;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    force w = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* w = f.ctx.FindVariable("w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_TRUE(w->is_forced);
+  EXPECT_EQ(w->value.ToUint64(), 99u);
+}
+
+// §10.6.2: "When released, the net shall immediately be assigned the value
+// determined by the drivers of the net." Observed by changing the cont-assign
+// source after release — the released net must take that new driver value.
+TEST(ForceReleaseSim, ReleaseOnNetUsesDriverValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  wire [7:0] w;\n"
+      "  assign w = src;\n"
+      "  initial begin\n"
+      "    src = 8'd10;\n"
+      "    #1;\n"
+      "    force w = 8'd99;\n"
+      "    #1;\n"
+      "    release w;\n"
+      "    src = 8'd55;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* w = f.ctx.FindVariable("w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_FALSE(w->is_forced);
+  EXPECT_EQ(w->value.ToUint64(), 55u);
 }
 
 }  // namespace
