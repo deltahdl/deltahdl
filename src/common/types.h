@@ -155,6 +155,33 @@ enum class Region : uint8_t {
 
 static constexpr size_t kRegionCount = static_cast<size_t>(Region::kCOUNT);
 
+// --- Region categorization (IEEE 1800-2023 §4.4.1) ---
+
+/// §4.4.1 ¶1: events scheduled in the Active, Inactive, Pre-NBA, NBA, and
+/// Post-NBA regions are active region set events.
+bool IsActiveRegionSet(Region r);
+
+/// §4.4.1 ¶1: events scheduled in the Reactive, Re-Inactive, Pre-Re-NBA,
+/// Re-NBA, and Post-Re-NBA regions are reactive region set events.
+bool IsReactiveRegionSet(Region r);
+
+/// §4.4.1 ¶2: the iterative regions are the active region set, the Observed
+/// bridge (Pre-Observed, Observed, Post-Observed), the reactive region set,
+/// and Pre-Postponed — 14 regions in total.
+bool IsIterativeRegion(Region r);
+
+/// §4.4.1 ¶3: every region is categorized as a simulation region. Membership
+/// content is enumerated by §4.4.2 (Preponed, Active, Inactive, NBA, Observed,
+/// Reactive, Re-Inactive, Re-NBA, Postponed).
+bool IsSimulationRegion(Region r);
+
+/// §4.4.1 ¶3: every region is categorized as a PLI region. Membership content
+/// is enumerated by §4.4.3 (Pre-Active, Pre-NBA, Post-NBA, Pre-Observed,
+/// Post-Observed, Pre-Re-NBA, Post-Re-NBA, Pre-Postponed). The §4.4.1 ¶3
+/// partition makes IsSimulationRegion and IsPliRegion mutually exclusive and
+/// jointly exhaustive across the 17 regions.
+bool IsPliRegion(Region r);
+
 // --- Annex E: Delay mode directives ---
 
 enum class DelayModeDirective : uint8_t {

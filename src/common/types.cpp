@@ -143,6 +143,89 @@ Strength ReduceResistive(Strength input) {
   return input;
 }
 
+// --- Region categorization (§4.4.1) ---
+
+bool IsActiveRegionSet(Region r) {
+  switch (r) {
+    case Region::kActive:
+    case Region::kInactive:
+    case Region::kPreNBA:
+    case Region::kNBA:
+    case Region::kPostNBA:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool IsReactiveRegionSet(Region r) {
+  switch (r) {
+    case Region::kReactive:
+    case Region::kReInactive:
+    case Region::kPreReNBA:
+    case Region::kReNBA:
+    case Region::kPostReNBA:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool IsIterativeRegion(Region r) {
+  switch (r) {
+    case Region::kActive:
+    case Region::kInactive:
+    case Region::kPreNBA:
+    case Region::kNBA:
+    case Region::kPostNBA:
+    case Region::kPreObserved:
+    case Region::kObserved:
+    case Region::kPostObserved:
+    case Region::kReactive:
+    case Region::kReInactive:
+    case Region::kPreReNBA:
+    case Region::kReNBA:
+    case Region::kPostReNBA:
+    case Region::kPrePostponed:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool IsSimulationRegion(Region r) {
+  switch (r) {
+    case Region::kPreponed:
+    case Region::kActive:
+    case Region::kInactive:
+    case Region::kNBA:
+    case Region::kObserved:
+    case Region::kReactive:
+    case Region::kReInactive:
+    case Region::kReNBA:
+    case Region::kPostponed:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool IsPliRegion(Region r) {
+  switch (r) {
+    case Region::kPreActive:
+    case Region::kPreNBA:
+    case Region::kPostNBA:
+    case Region::kPreObserved:
+    case Region::kPostObserved:
+    case Region::kPreReNBA:
+    case Region::kPostReNBA:
+    case Region::kPrePostponed:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // --- Timescale ---
 
 bool ParseTimeUnitStr(std::string_view str, TimeUnit& out) {

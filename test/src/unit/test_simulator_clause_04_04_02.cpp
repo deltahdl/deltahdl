@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <set>
 #include <vector>
 
 #include "common/arena.h"
@@ -40,26 +39,9 @@ TEST(SimAndPliRegionSim, PLIRegionCountIs8) {
   EXPECT_EQ(sizeof(kPLIRegions) / sizeof(kPLIRegions[0]), 8u);
 }
 
-TEST(SimAndPliRegionSim, SimPlusPLIEqualsTotal) {
-  EXPECT_EQ(kSimulationRegionCount + kPLIRegionCount, kRegionCount);
-}
-
-TEST(SimAndPliRegionSim, SimAndPLIAreDisjoint) {
-  std::set<Region> sim_set(std::begin(kSimulationRegions),
-                           std::end(kSimulationRegions));
-  std::set<Region> pli_set(std::begin(kPLIRegions), std::end(kPLIRegions));
-
-  for (auto r : pli_set) {
-    EXPECT_EQ(sim_set.count(r), 0u);
-  }
-}
-
-TEST(SimAndPliRegionSim, SimAndPLICoverAllRegions) {
-  std::set<Region> all;
-  for (auto r : kSimulationRegions) all.insert(r);
-  for (auto r : kPLIRegions) all.insert(r);
-  EXPECT_EQ(all.size(), kRegionCount);
-}
+// §4.4.1 ¶3 partition assertions (sum, disjointness, coverage) live in
+// test_simulator_clause_04_04_01.cpp; this file scopes simulation/PLI
+// enumeration tests to §4.4.2.
 
 TEST(SimAndPliRegionSim, AllPLIRegionsExecute) {
   Arena arena;

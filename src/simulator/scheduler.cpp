@@ -103,7 +103,10 @@ void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
   // Pre-Active region: PLI callback (§4.4.3.2)
   ExecuteRegion(slot, Region::kPreActive);
 
-  // Iterative loop: [Active ... Pre-Postponed] (§4.5)
+  // §4.4.1 ¶2: loop while any iterative region in this slot still holds
+  // events. The 14 iterative regions are exactly Active..Pre-Postponed in
+  // enum order, which lets a contiguous range scan stand in for filtering
+  // through IsIterativeRegion.
   while (slot.AnyNonemptyIn(Region::kActive, Region::kPrePostponed)) {
     while (IterateActiveSet(slot)) {
     }
@@ -135,16 +138,15 @@ bool Scheduler::IterateActiveSet(TimeSlot& slot) {
 }
 
 void Scheduler::ExecuteActiveRegions(TimeSlot& slot) {
-  auto exec = [&](Region r) { ExecuteRegion(slot, r); };
-
-  exec(Region::kActive);
-  exec(Region::kInactive);
-  exec(Region::kPreNBA);
-  exec(Region::kNBA);
-  exec(Region::kPostNBA);
-  exec(Region::kPreObserved);
-  exec(Region::kObserved);
-  exec(Region::kPostObserved);
+  // §4.4.1 ¶1: drain every active region set member in enum order, then bridge
+  // through the Observed regions on the way to the reactive set (§4.5).
+  for (size_t i = 0; i < kRegionCount; ++i) {
+    auto r = static_cast<Region>(i);
+    if (IsActiveRegionSet(r) || r == Region::kPreObserved ||
+        r == Region::kObserved || r == Region::kPostObserved) {
+      ExecuteRegion(slot, r);
+    }
+  }
 }
 
 // Inner reactive-set loop: iterates over Reactive..Post-Re-NBA per §4.5.
@@ -163,13 +165,13 @@ bool Scheduler::IterateReactiveSet(TimeSlot& slot) {
 }
 
 void Scheduler::ExecuteReactiveRegions(TimeSlot& slot) {
-  auto exec = [&](Region r) { ExecuteRegion(slot, r); };
-
-  exec(Region::kReactive);
-  exec(Region::kReInactive);
-  exec(Region::kPreReNBA);
-  exec(Region::kReNBA);
-  exec(Region::kPostReNBA);
+  // §4.4.1 ¶1: drain every reactive region set member in enum order.
+  for (size_t i = 0; i < kRegionCount; ++i) {
+    auto r = static_cast<Region>(i);
+    if (IsReactiveRegionSet(r)) {
+      ExecuteRegion(slot, r);
+    }
+  }
 }
 
 // --- Scheduler: single region drain ---
