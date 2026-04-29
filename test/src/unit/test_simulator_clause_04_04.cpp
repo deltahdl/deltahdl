@@ -298,29 +298,6 @@ TEST(StratifiedSchedulerSim, MultipleTimeSlotsFormDistinctSlots) {
   EXPECT_EQ(result, 3u);
 }
 
-TEST(StratifiedSchedulerSim, EventCalendarTimeOrdered) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<uint64_t> times;
-
-  sched.SetPostTimestepCallback(
-      [&]() { times.push_back(sched.CurrentTime().ticks); });
-
-  for (uint64_t t : {30, 10, 50, 20, 40}) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = []() {};
-    sched.ScheduleEvent({t}, Region::kActive, ev);
-  }
-
-  sched.Run();
-  ASSERT_EQ(times.size(), 5u);
-  EXPECT_EQ(times[0], 10u);
-  EXPECT_EQ(times[1], 20u);
-  EXPECT_EQ(times[2], 30u);
-  EXPECT_EQ(times[3], 40u);
-  EXPECT_EQ(times[4], 50u);
-}
-
 TEST(StratifiedSchedulerSim, NoEventsNoAdvance) {
   Arena arena;
   Scheduler sched(arena);

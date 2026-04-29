@@ -104,6 +104,22 @@ class Scheduler {
     return illegal_preponed_write_count_;
   }
 
+  // §4.3 ¶3: every change in state of a net or variable is an *update event*.
+  // Counts events that production code labels EventKind::kUpdate at the
+  // moment they enter the calendar, so a test can observe that a state-change
+  // path applied the §4.3 ¶3 classification rather than reading state values.
+  size_t UpdateEventScheduledCount() const {
+    return update_events_scheduled_count_;
+  }
+
+  // §4.3 ¶4: the evaluation of a process is an *evaluation event*. Counts
+  // events that production code labels EventKind::kEvaluation when scheduled,
+  // letting a test observe that process-evaluation paths applied the §4.3 ¶4
+  // classification.
+  size_t EvaluationEventScheduledCount() const {
+    return evaluation_events_scheduled_count_;
+  }
+
   // §4.4.3.1: Called by net/variable write paths before each write. When the
   // current region is Preponed the write is recorded as a violation.
   void NoteWriteAttempt() {
@@ -129,6 +145,8 @@ class Scheduler {
   Region current_region_ = Region::kCOUNT;
   size_t illegal_preponed_schedule_count_ = 0;
   size_t illegal_preponed_write_count_ = 0;
+  size_t update_events_scheduled_count_ = 0;
+  size_t evaluation_events_scheduled_count_ = 0;
   bool stop_requested_ = false;
 };
 

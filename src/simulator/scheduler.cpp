@@ -1,6 +1,7 @@
 #include "simulator/scheduler.h"
 
-#include <cassert>
+#include <cstdio>
+#include <cstdlib>
 
 #include "common/arena.h"
 
@@ -74,12 +75,33 @@ bool TimeSlot::AnyNonemptyIn(Region first, Region last) const {
 // --- Scheduler: public interface ---
 
 void Scheduler::ScheduleEvent(SimTime time, Region region, Event* event) {
-  assert(!(time < current_time_));
+  // §4.4 ¶2: every event has one simulation time which "can be the current
+  // time or some future time", and "the simulator never goes backwards in
+  // time". Enforce in every build configuration so a release simulator
+  // cannot silently violate the rule on caller misuse.
+  if (time < current_time_) {
+    std::fprintf(
+        stderr,
+        "scheduler: refusing to schedule event at past time %llu "
+        "(current=%llu); §4.4 ¶2 forbids backwards-in-time scheduling\n",
+        static_cast<unsigned long long>(time.ticks),
+        static_cast<unsigned long long>(current_time_.ticks));
+    std::abort();
+  }
   // §4.4.3.1: Within the Preponed region, it is illegal to schedule an
   // event in any other region within the current time slot.
   if (current_region_ == Region::kPreponed && time == current_time_ &&
       region != Region::kPreponed) {
     ++illegal_preponed_schedule_count_;
+  }
+  // §4.3 ¶3/¶4: tally each event by its kind at schedule time so a test can
+  // observe that production code labelled the event as an update or
+  // evaluation event in the calendar entry, before Run() releases the Event
+  // back to the pool and clears its kind.
+  if (event->kind == EventKind::kUpdate) {
+    ++update_events_scheduled_count_;
+  } else {
+    ++evaluation_events_scheduled_count_;
   }
   auto idx = static_cast<size_t>(region);
   event_calendar_[time].regions[idx].Push(event);
