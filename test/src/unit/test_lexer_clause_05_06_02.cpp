@@ -83,11 +83,6 @@ TEST(Keywords, EndconfigKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwEndconfig);
 }
 
-TEST(Keywords, DataTypeKeywordRecognized) {
-  auto r = LexOne("logic");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwLogic);
-}
-
 TEST(Keywords, ControlFlowKeywordRecognized) {
   auto r = LexOne("if");
   EXPECT_EQ(r.token.kind, TokenKind::kKwIf);

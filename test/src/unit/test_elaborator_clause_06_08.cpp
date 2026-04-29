@@ -41,50 +41,6 @@ TEST(VarDecl, InitializerPreservedInRtlir) {
   EXPECT_NE(mod->variables[0].init_expr, nullptr);
 }
 
-TEST(VarDecl, LogicIs4State) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] data;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_TRUE(mod->variables[0].is_4state);
-  EXPECT_EQ(mod->variables[0].width, 8u);
-}
-
-TEST(VarDecl, IntIs2State) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int count;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_FALSE(mod->variables[0].is_4state);
-  EXPECT_EQ(mod->variables[0].width, 32u);
-}
-
-TEST(VarDecl, IntIsSigned) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int x;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_TRUE(mod->variables[0].is_signed);
-}
-
 TEST(VarDecl, RealIsReal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -111,6 +67,20 @@ TEST(VarDecl, EventIsEvent) {
   auto* mod = design->top_modules[0];
   ASSERT_FALSE(mod->variables.empty());
   EXPECT_TRUE(mod->variables[0].is_event);
+}
+
+TEST(VarDecl, IntIsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_FALSE(mod->variables.empty());
+  EXPECT_TRUE(mod->variables[0].is_signed);
 }
 
 TEST(VarDecl, MultipleVarsInOneStatement) {

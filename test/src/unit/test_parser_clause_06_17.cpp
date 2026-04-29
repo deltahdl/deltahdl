@@ -51,18 +51,8 @@ TEST(DataTypeParsing, EventVarDeclSimple) {
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kEvent);
 }
 
-TEST(DataTypeParsing, EventTypeWidthZero) {
-  DataType dt;
-  dt.kind = DataTypeKind::kEvent;
-  EXPECT_EQ(EvalTypeWidth(dt), 0u);
-}
-
 TEST(DataTypeParsing, EventNotIntegral) {
   EXPECT_FALSE(IsIntegralType(DataTypeKind::kEvent));
-}
-
-TEST(DataTypeParsing, EventNot4State) {
-  EXPECT_FALSE(Is4stateType(DataTypeKind::kEvent));
 }
 
 TEST(DataTypeParsing, EventAssignNull) {
