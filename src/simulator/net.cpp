@@ -384,13 +384,26 @@ static void SetAllX(Logic4Vec& val) {
   }
 }
 
+// §28.16.2.1: charge decay is "the cause of transition of a 1 or 0 that is
+// stored in a trireg net to an unknown value (x)". Bits already at x stay x;
+// bits at z (per §28.16.2 R8, only reachable via initial state or force) are
+// preserved — decay shall not manufacture x out of a z that the LRM allows
+// the trireg to hold.
+static void DecayKnownBitsToX(Logic4Vec& val) {
+  for (uint32_t w = 0; w < val.nwords; ++w) {
+    uint64_t known = ~val.words[w].bval;
+    val.words[w].aval &= ~known;
+    val.words[w].bval |= known;
+  }
+}
+
 // §6.6.4.2: Schedule charge decay event with generation counter.
 static void ScheduleDecay(Net& net, Scheduler* sched) {
   uint64_t gen = ++net.decay_generation;
   auto* event = sched->GetEventPool().Acquire();
   event->callback = [&net, gen]() {
     if (net.decay_generation != gen) return;
-    SetAllX(net.resolved->value);
+    DecayKnownBitsToX(net.resolved->value);
     net.resolved->NotifyWatchers();
   };
   auto time = sched->CurrentTime();

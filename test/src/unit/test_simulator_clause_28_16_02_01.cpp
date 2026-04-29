@@ -214,6 +214,34 @@ TEST(ChargeDecayProcess, WideVectorDecaysEveryWord) {
   EXPECT_TRUE(AllBitsX(var->value));
 }
 
+// §28.16.2.1: Decay is "the cause of transition of a 1 or 0 that is stored
+// in a trireg net to x". Bits that hold z (legal per §28.16.2 R8 from an
+// initial state or force) must not be turned into x by the decay process —
+// only the 1 and 0 bits decay; x stays x; z stays z.
+TEST(ChargeDecayProcess, OnlyKnownBitsTransitionToX) {
+  Arena arena;
+  Scheduler sched(arena);
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  // Per-bit setup: 0=1, 1=0, 2=z, 3=x, 4=1, 5=0, 6=z, 7=x.
+  var->value.words[0].aval = 0b01010101;
+  var->value.words[0].bval = 0b11001100;
+  Net net;
+  net.type = NetType::kTrireg;
+  net.resolved = var;
+  net.decay_ticks = 30;
+  net.drivers.push_back(MakeAllZ(arena, 8));
+  net.Resolve(arena, &sched);
+
+  ASSERT_TRUE(sched.HasEvents());
+  sched.Run();
+
+  // 1/0 bits → x (aval=0, bval=1); z bits (2,6) stay z (aval=1, bval=1);
+  // x bits (3,7) stay x (aval=0, bval=1).
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0b01000100u);
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
+}
+
 // §28.16.2.1: A second driver-off after a (b)-ended decay must restart the
 // process from scratch — pins req (2) applied more than once and guards
 // against stale-state bugs where a cancelled decay prevents a new one.

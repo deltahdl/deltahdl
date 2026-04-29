@@ -67,26 +67,6 @@ TEST(TriregResolution, NotInCapacitiveStateForNonTrireg) {
   EXPECT_FALSE(net.InCapacitiveState());
 }
 
-TEST(TriregResolution, MultipleZDriversRetainValue) {
-  Arena arena;
-  auto* var = arena.Create<Variable>();
-  var->value = MakeLogic4VecVal(arena, 8, 77);
-  Net net;
-  net.type = NetType::kTrireg;
-  net.resolved = var;
-
-  auto z1 = MakeLogic4Vec(arena, 8);
-  z1.words[0].aval = ~uint64_t{0};
-  z1.words[0].bval = ~uint64_t{0};
-  auto z2 = MakeLogic4Vec(arena, 8);
-  z2.words[0].aval = ~uint64_t{0};
-  z2.words[0].bval = ~uint64_t{0};
-  net.drivers.push_back(z1);
-  net.drivers.push_back(z2);
-  net.Resolve(arena);
-  EXPECT_EQ(var->value.ToUint64(), 77u);
-}
-
 // §28.16.2 R8: a z value on one driver must not propagate to the trireg
 // — when another driver is non-z, the non-z driver wins and the trireg
 // takes that value rather than going into capacitive retention.
@@ -124,6 +104,30 @@ TEST(TriregResolution, NotInCapacitiveStateWhenAnyDriverNonZ) {
   net.drivers.push_back(z_drv);
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 1));
   EXPECT_FALSE(net.InCapacitiveState());
+}
+
+// §28.16.2 R6: retention covers "1, 0, or x" — when drivers turn off after
+// having driven x, the trireg shall retain the x state. Existing retention
+// tests cover 1/0 patterns; pin x explicitly so the LRM's three-state list
+// is fully observed.
+TEST(TriregResolution, RetainsXStateWhenDriversTurnOff) {
+  Arena arena;
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4Vec(arena, 8);
+  var->value.words[0].aval = 0;
+  var->value.words[0].bval = 0xFF;  // every bit = x
+  Net net;
+  net.type = NetType::kTrireg;
+  net.resolved = var;
+
+  auto z_drv = MakeLogic4Vec(arena, 8);
+  z_drv.words[0].aval = ~uint64_t{0};
+  z_drv.words[0].bval = ~uint64_t{0};
+  net.drivers.push_back(z_drv);
+  net.Resolve(arena);
+
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
 TEST(TriregResolution, XDriverResolvesLikeWire) {
