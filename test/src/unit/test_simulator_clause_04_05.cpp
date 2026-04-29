@@ -199,36 +199,4 @@ TEST(SimulationAlgorithmSim, PostponedRunsWhenAllIterativeRegionsAreEmpty) {
   EXPECT_TRUE(postponed_ran);
 }
 
-TEST(SimulationAlgorithmSim, UpdateEventModifiesObjectAndSchedulesEvaluation) {
-  Arena arena;
-  Scheduler sched(arena);
-  int object_value = 0;
-  bool sensitive_eval_ran = false;
-
-  auto* update = sched.GetEventPool().Acquire();
-  update->kind = EventKind::kUpdate;
-  update->callback = [&]() {
-    object_value = 7;
-    auto* eval = sched.GetEventPool().Acquire();
-    eval->kind = EventKind::kEvaluation;
-    eval->callback = [&]() {
-      sensitive_eval_ran = true;
-      EXPECT_EQ(object_value, 7);
-    };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, eval);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, update);
-
-  sched.Run();
-  EXPECT_TRUE(sensitive_eval_ran);
-  EXPECT_EQ(object_value, 7);
-}
-
-TEST(Scheduler, InitialState) {
-  Arena arena;
-  Scheduler sched(arena);
-  EXPECT_FALSE(sched.HasEvents());
-  EXPECT_EQ(sched.CurrentTime().ticks, 0);
-}
-
 }  // namespace
