@@ -446,29 +446,35 @@ def test_run_claude_streaming_dumps_stderr_on_nonzero(
     assert "UNIQUE_STDERR" in capsys.readouterr().err
 
 
-def test_run_claude_streaming_exits_when_no_result(streaming) -> None:
-    """A stream without a terminal result event is loud-fatal."""
+def test_run_claude_streaming_raises_missing_result_event(streaming) -> None:
+    """A stream without a terminal result event raises MissingResultEventError."""
     lines = [
         '{"type":"assistant","message":{"content":'
         '[{"type":"text","text":"hi"}]}}\n',
     ]
-    with pytest.raises(SystemExit):
+    with pytest.raises(streaming.MissingResultEventError):
         _run(streaming, lines)
 
 
-def test_run_claude_streaming_dumps_stderr_when_no_result(
-    streaming, capsys,
-) -> None:
-    """Missing-result exit dumps stderr to the terminal."""
+def _run_capturing_missing_result(streaming, lines, *, stderr=""):
+    """Run with a stubbed Popen and return the MissingResultEventError raised."""
+    try:
+        _run(streaming, lines, stderr=stderr)
+    except streaming.MissingResultEventError as exc:
+        return exc
+    raise RuntimeError("expected MissingResultEventError, got success")
+
+
+def test_run_claude_streaming_missing_result_carries_stderr(streaming) -> None:
+    """MissingResultEventError carries stderr so the retry wrapper can surface it."""
     lines = [
         '{"type":"assistant","message":{"content":'
         '[{"type":"text","text":"hi"}]}}\n',
     ]
-    try:
-        _run(streaming, lines, stderr="UNIQUE_NORESULT_STDERR")
-    except SystemExit:
-        pass
-    assert "UNIQUE_NORESULT_STDERR" in capsys.readouterr().err
+    exc = _run_capturing_missing_result(
+        streaming, lines, stderr="UNIQUE_NORESULT_STDERR",
+    )
+    assert exc.stderr == "UNIQUE_NORESULT_STDERR"
 
 
 # --- ContentFilterError + extract_error_result ------------------------------
@@ -696,3 +702,237 @@ def test_retry_warning_includes_attempt_number(streaming, capsys) -> None:
     side = [streaming.ContentFilterError("blocked"), "DONE"]
     _run_retry(streaming, side)
     assert "attempt 1" in capsys.readouterr().err
+
+
+# --- MissingResultEventError + run_claude_streaming -------------------------
+
+
+def test_missing_result_event_error_is_exception(streaming) -> None:
+    """MissingResultEventError is exposed as an Exception subclass."""
+    assert issubclass(streaming.MissingResultEventError, Exception)
+
+
+def test_missing_result_session_id_captured_from_system_event(
+    streaming,
+) -> None:
+    """The session_id from the first system event is captured on the exception."""
+    lines = [
+        '{"type":"system","subtype":"init","session_id":"sid-abc-123"}\n',
+        '{"type":"assistant","message":{"content":'
+        '[{"type":"text","text":"hi"}]}}\n',
+    ]
+    exc = _run_capturing_missing_result(streaming, lines)
+    assert exc.session_id == "sid-abc-123"
+
+
+def test_missing_result_session_id_is_none_without_system_event(
+    streaming,
+) -> None:
+    """session_id is None when no system event arrived."""
+    lines = [
+        '{"type":"assistant","message":{"content":'
+        '[{"type":"text","text":"hi"}]}}\n',
+    ]
+    exc = _run_capturing_missing_result(streaming, lines)
+    assert exc.session_id is None
+
+
+def test_missing_result_session_id_ignores_non_string(streaming) -> None:
+    """A non-string session_id field on the system event is treated as missing."""
+    lines = [
+        '{"type":"system","session_id":42}\n',
+        '{"type":"assistant","message":{"content":'
+        '[{"type":"text","text":"hi"}]}}\n',
+    ]
+    exc = _run_capturing_missing_result(streaming, lines)
+    assert exc.session_id is None
+
+
+def test_missing_result_last_event_after_tool_result_names_tool(
+    streaming,
+) -> None:
+    """A stream ending after a tool_result identifies the tool by name."""
+    lines = [
+        '{"type":"assistant","message":{"content":'
+        '[{"type":"tool_use","name":"TodoWrite","input":{}}]}}\n',
+        '{"type":"user","message":{"content":'
+        '[{"type":"tool_result","content":"ok"}]}}\n',
+    ]
+    exc = _run_capturing_missing_result(streaming, lines)
+    assert "TodoWrite" in exc.last_event
+
+
+def test_missing_result_last_event_after_assistant_text(streaming) -> None:
+    """A stream ending after assistant text describes that as the last event."""
+    lines = [
+        '{"type":"assistant","message":{"content":'
+        '[{"type":"text","text":"hi"}]}}\n',
+    ]
+    exc = _run_capturing_missing_result(streaming, lines)
+    assert "text" in exc.last_event
+
+
+def test_missing_result_last_event_after_assistant_thinking(streaming) -> None:
+    """A stream ending after a thinking block describes that as the last event."""
+    lines = [
+        '{"type":"assistant","message":{"content":'
+        '[{"type":"thinking","text":"..."}]}}\n',
+    ]
+    exc = _run_capturing_missing_result(streaming, lines)
+    assert "thinking" in exc.last_event
+
+
+def test_missing_result_last_event_after_assistant_tool_use(streaming) -> None:
+    """A stream ending after a tool_use identifies the tool by name."""
+    lines = [
+        '{"type":"assistant","message":{"content":'
+        '[{"type":"tool_use","name":"Read","input":{"file_path":"/x"}}]}}\n',
+    ]
+    exc = _run_capturing_missing_result(streaming, lines)
+    assert "Read" in exc.last_event
+
+
+def test_missing_result_last_event_when_no_events_seen(streaming) -> None:
+    """An empty stream still yields a non-empty last_event description."""
+    exc = _run_capturing_missing_result(streaming, [])
+    assert exc.last_event
+
+
+def test_missing_result_str_includes_session_id(streaming) -> None:
+    """str(exception) includes the session id for log correlation."""
+    lines = [
+        '{"type":"system","subtype":"init","session_id":"sid-abc-123"}\n',
+    ]
+    exc = _run_capturing_missing_result(streaming, lines)
+    assert "sid-abc-123" in str(exc)
+
+
+def test_missing_result_str_includes_last_event(streaming) -> None:
+    """str(exception) includes the last_event description."""
+    lines = [
+        '{"type":"assistant","message":{"content":'
+        '[{"type":"tool_use","name":"TodoWrite","input":{}}]}}\n',
+    ]
+    exc = _run_capturing_missing_result(streaming, lines)
+    assert "TodoWrite" in str(exc)
+
+
+# --- run_claude_streaming_with_retry: missing-result retry ------------------
+
+
+def _missing_result(streaming, **kwargs):
+    """Construct a MissingResultEventError with sensible defaults."""
+    defaults = {"session_id": None, "last_event": "x", "stderr": ""}
+    defaults.update(kwargs)
+    return streaming.MissingResultEventError(**defaults)
+
+
+def test_missing_result_retry_recovers_after_one_strike(streaming) -> None:
+    """One missing-result strike retries with the recovery prompt and succeeds."""
+    side = [_missing_result(streaming), "DONE"]
+    inner, result, _ = _run_retry(streaming, side)
+    assert (result, inner.call_count) == ("DONE", 2)
+
+
+def test_missing_result_retry_uses_retry_cmd(streaming) -> None:
+    """The retry call uses the supplied retry_cmd, not the initial cmd."""
+    side = [_missing_result(streaming), "DONE"]
+    retry_cmd = ["claude", "--continue", "--marker"]
+    inner, _, _ = _run_retry(streaming, side, retry_cmd=retry_cmd)
+    assert inner.call_args_list[1][0][0] == retry_cmd
+
+
+def test_missing_result_retry_uses_recovery_prompt(streaming) -> None:
+    """The retry call uses MISSING_RESULT_RETRY_PROMPT, not the original."""
+    side = [_missing_result(streaming), "DONE"]
+    inner, _, _ = _run_retry(streaming, side)
+    assert (
+        inner.call_args_list[1][0][1]
+        == streaming.MISSING_RESULT_RETRY_PROMPT
+    )
+
+
+def test_missing_result_retry_recovery_prompt_mentions_continue(
+    streaming,
+) -> None:
+    """The recovery prompt explains the previous stream ended without a result."""
+    assert "result" in streaming.MISSING_RESULT_RETRY_PROMPT.lower()
+
+
+def test_missing_result_retry_exits_after_max_strikes(streaming) -> None:
+    """Two missing-result strikes (initial + one retry) exit non-zero."""
+    side = [_missing_result(streaming)] * 2
+    _, _, exc = _run_retry(streaming, side)
+    assert exc is not None
+
+
+def test_missing_result_retry_exit_message_names_role(
+    streaming, capsys,
+) -> None:
+    """The terminal error names the caller's role on missing-result exhaust."""
+    side = [_missing_result(streaming)] * 2
+    _run_retry(streaming, side, role="Oracle")
+    assert "Oracle" in capsys.readouterr().err
+
+
+def test_missing_result_retry_exit_message_includes_session_id(
+    streaming, capsys,
+) -> None:
+    """The terminal error includes session_id for log correlation."""
+    side = [_missing_result(streaming, session_id="sid-99")] * 2
+    _run_retry(streaming, side)
+    assert "sid-99" in capsys.readouterr().err
+
+
+def test_missing_result_retry_exit_message_includes_last_event(
+    streaming, capsys,
+) -> None:
+    """The terminal error includes last_event for diagnostic context."""
+    side = [
+        _missing_result(streaming, last_event="tool_result for TodoWrite"),
+    ] * 2
+    _run_retry(streaming, side)
+    assert "TodoWrite" in capsys.readouterr().err
+
+
+def test_missing_result_retry_exit_dumps_stderr(streaming, capsys) -> None:
+    """The terminal error dumps the captured stderr from the last attempt."""
+    side = [
+        _missing_result(streaming, stderr="UNIQUE_EXHAUST_STDERR"),
+    ] * 2
+    _run_retry(streaming, side)
+    assert "UNIQUE_EXHAUST_STDERR" in capsys.readouterr().err
+
+
+def test_missing_result_retry_warning_includes_session_id(
+    streaming, capsys,
+) -> None:
+    """The retry warning includes session_id for log correlation."""
+    side = [_missing_result(streaming, session_id="sid-77"), "DONE"]
+    _run_retry(streaming, side)
+    assert "sid-77" in capsys.readouterr().err
+
+
+def test_missing_result_retry_warning_includes_last_event(
+    streaming, capsys,
+) -> None:
+    """The retry warning includes last_event for diagnostic context."""
+    side = [
+        _missing_result(
+            streaming, last_event="tool_result for TodoWrite",
+        ),
+        "DONE",
+    ]
+    _run_retry(streaming, side)
+    assert "TodoWrite" in capsys.readouterr().err
+
+
+def test_filter_and_missing_result_have_independent_budgets(streaming) -> None:
+    """Each error type tracks its own attempt counter; mixed strikes recover."""
+    side = [
+        streaming.ContentFilterError("blocked"),
+        _missing_result(streaming),
+        "DONE",
+    ]
+    inner, result, _ = _run_retry(streaming, side)
+    assert (result, inner.call_count) == ("DONE", 3)
