@@ -103,6 +103,15 @@ void Scheduler::ScheduleEvent(SimTime time, Region region, Event* event) {
       region != Region::kPreponed) {
     ++illegal_preponed_schedule_count_;
   }
+  // §4.4.2.9: Within the Postponed region, it is illegal to schedule an
+  // event in any previous region within the current time slot. Postponed
+  // is the last region of the slot, so any current-time schedule into a
+  // non-Postponed region is a violation. §4.4.3.10 PLI events share this
+  // same Postponed region, so PLI callback schedules are caught here too.
+  if (current_region_ == Region::kPostponed && time == current_time_ &&
+      region != Region::kPostponed) {
+    ++illegal_postponed_schedule_count_;
+  }
   // §4.3 ¶3/¶4: tally each event by its kind at schedule time so a test can
   // observe that production code labelled the event as an update or
   // evaluation event in the calendar entry, before Run() releases the Event

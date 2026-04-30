@@ -217,9 +217,13 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
 void VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* /*time*/,
                           int /*flags*/) {
   if (!obj || !value || !obj->var) return;
-  // §4.4.3.1: Within the Preponed region it is illegal to write values to
-  // any net or variable. Record the violation; the write still proceeds so
-  // non-conforming code stays observable.
+  // §4.4.3.1 (Preponed) and §4.4.2.9 (Postponed) both forbid writing values
+  // to any net or variable while executing in their respective regions.
+  // §4.4.3.10 inherits the Postponed restriction because PLI callbacks
+  // landing in Postponed share the same region as the simulation events.
+  // NoteWriteAttempt routes the violation to the right counter based on the
+  // scheduler's current region. The write still proceeds so non-conforming
+  // code stays observable.
   if (scheduler_) scheduler_->NoteWriteAttempt();
   if (value->format == kVpiIntVal) {
     auto new_val = static_cast<uint64_t>(value->value.integer);

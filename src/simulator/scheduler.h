@@ -110,6 +110,25 @@ class Scheduler {
     return illegal_preponed_write_count_;
   }
 
+  // §4.4.2.9: Within the Postponed region it is illegal to schedule an event
+  // in any previous region within the current time slot. Postponed is the
+  // last region of the slot, so any current-time schedule into a non-Postponed
+  // region is a violation. The scheduler still queues the event so that
+  // non-conforming code stays observable.
+  size_t IllegalPostponedScheduleCount() const {
+    return illegal_postponed_schedule_count_;
+  }
+
+  // §4.4.2.9: Within the Postponed region it is illegal to write values to
+  // any net or variable. Production write paths (e.g. VpiContext::PutValue)
+  // call NoteWriteAttempt() before mutating a net or variable; the scheduler
+  // increments this counter when the current region is Postponed, applying
+  // the §4.4.2.9 "no new value changes" restriction. §4.4.3.10 PLI events
+  // share this same Postponed region, so PLI callback writes are caught here.
+  size_t IllegalPostponedWriteCount() const {
+    return illegal_postponed_write_count_;
+  }
+
   // §4.3 ¶3: every change in state of a net or variable is an *update event*.
   // Counts events that production code labels EventKind::kUpdate at the
   // moment they enter the calendar, so a test can observe that a state-change
@@ -126,11 +145,16 @@ class Scheduler {
     return evaluation_events_scheduled_count_;
   }
 
-  // §4.4.3.1: Called by net/variable write paths before each write. When the
-  // current region is Preponed the write is recorded as a violation.
+  // §4.4.3.1 and §4.4.2.9: Called by net/variable write paths before each
+  // write. The Preponed region forbids writes (§4.4.3.1) and the Postponed
+  // region forbids writes (§4.4.2.9, "no new value changes"). The scheduler
+  // records each violation in its own counter so callers can attribute the
+  // rule break to the right subclause.
   void NoteWriteAttempt() {
     if (current_region_ == Region::kPreponed) {
       ++illegal_preponed_write_count_;
+    } else if (current_region_ == Region::kPostponed) {
+      ++illegal_postponed_write_count_;
     }
   }
 
@@ -151,6 +175,8 @@ class Scheduler {
   Region current_region_ = Region::kCOUNT;
   size_t illegal_preponed_schedule_count_ = 0;
   size_t illegal_preponed_write_count_ = 0;
+  size_t illegal_postponed_schedule_count_ = 0;
+  size_t illegal_postponed_write_count_ = 0;
   size_t update_events_scheduled_count_ = 0;
   size_t evaluation_events_scheduled_count_ = 0;
   bool stop_requested_ = false;
