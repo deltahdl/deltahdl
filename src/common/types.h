@@ -170,16 +170,17 @@ bool IsReactiveRegionSet(Region r);
 /// and Pre-Postponed — 14 regions in total.
 bool IsIterativeRegion(Region r);
 
-/// §4.4.1 ¶3: every region is categorized as a simulation region. Membership
-/// content is enumerated by §4.4.2 (Preponed, Active, Inactive, NBA, Observed,
-/// Reactive, Re-Inactive, Re-NBA, Postponed).
+/// §4.4.2 ¶1: the simulation regions of a time slot are the Preponed, Active,
+/// Inactive, NBA, Observed, Reactive, Re-Inactive, Re-NBA, and Postponed
+/// regions. The §4.4.1 ¶3 partition pairs this predicate with IsPliRegion so
+/// every region is classified as exactly one of the two categories.
 bool IsSimulationRegion(Region r);
 
-/// §4.4.1 ¶3: every region is categorized as a PLI region. Membership content
-/// is enumerated by §4.4.3 (Pre-Active, Pre-NBA, Post-NBA, Pre-Observed,
-/// Post-Observed, Pre-Re-NBA, Post-Re-NBA, Pre-Postponed). The §4.4.1 ¶3
-/// partition makes IsSimulationRegion and IsPliRegion mutually exclusive and
-/// jointly exhaustive across the 17 regions.
+/// §4.4.3 ¶1: the PLI regions of a time slot are the Pre-Active, Pre-NBA,
+/// Post-NBA, Pre-Observed, Post-Observed, Pre-Re-NBA, Post-Re-NBA, and
+/// Pre-Postponed regions. The §4.4.1 ¶3 partition makes IsSimulationRegion
+/// and IsPliRegion mutually exclusive and jointly exhaustive across the 17
+/// regions.
 bool IsPliRegion(Region r);
 
 // --- Annex E: Delay mode directives ---

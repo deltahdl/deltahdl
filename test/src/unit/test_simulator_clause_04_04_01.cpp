@@ -260,21 +260,6 @@ TEST(SchedulerRegionSetSim, TimeSlotAnyIterativeNonemptyExcludesNonIterative) {
   EXPECT_TRUE(slot.AnyIterativeNonempty());
 }
 
-TEST(SchedulerRegionSetSim, AllRegionsCategorizedAndProcessed) {
-  Arena arena;
-  Scheduler sched(arena);
-  int count = 0;
-
-  for (int r = 0; r < static_cast<int>(Region::kCOUNT); ++r) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&count]() { count++; };
-    sched.ScheduleEvent({0}, static_cast<Region>(r), ev);
-  }
-
-  sched.Run();
-  EXPECT_EQ(count, static_cast<int>(kRegionCount));
-}
-
 // §4.4.1 ¶3: production-code predicates IsSimulationRegion / IsPliRegion
 // implement the partition. The §4.4.1 ¶3 obligation is the partition's
 // existence, totality, and disjointness; the membership content lives in

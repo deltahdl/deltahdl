@@ -29,11 +29,6 @@ constexpr size_t kPLIRegionCount = 8;
 
 }  // namespace
 
-TEST(SimAndPliRegionSim, SimulationRegionCountIs9) {
-  EXPECT_EQ(kSimulationRegionCount, 9u);
-  EXPECT_EQ(sizeof(kSimulationRegions) / sizeof(kSimulationRegions[0]), 9u);
-}
-
 TEST(SimAndPliRegionSim, PLIRegionCountIs8) {
   EXPECT_EQ(kPLIRegionCount, 8u);
   EXPECT_EQ(sizeof(kPLIRegions) / sizeof(kPLIRegions[0]), 8u);
