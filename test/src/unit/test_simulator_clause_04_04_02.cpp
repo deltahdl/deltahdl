@@ -102,3 +102,64 @@ TEST(SimAndPliRegionSim, IsSimulationRegionMatchesEnumeration) {
   }
   EXPECT_EQ(sim_count, kSimulationRegionCount);
 }
+
+// §4.4.2 ¶1 sentence 2: "The flow of execution of the event regions is
+// specified in Figure 4-1." Figure 4-1 is a per-time-slot flow; sequential
+// slots must each apply it independently. Run() drives Scheduler over the
+// event_calendar map; observing the cross-slot trace shows production code
+// re-entering the per-slot region order at every slot rather than collapsing
+// regions across slots. Two slots with sim-region events at each prove the
+// flow re-applies: time 0's Active must precede time 0's Postponed, time 1's
+// Active must precede time 1's Postponed, and time 0's Postponed must precede
+// time 1's Active (since slots advance in time order per §4.4 ¶2 and the slot
+// flow does not bleed across slots).
+TEST(SimAndPliRegionSim, SimulationRegionFlowAppliesPerTimeSlot) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  for (uint64_t t = 0; t < 2; ++t) {
+    auto* postponed = sched.GetEventPool().Acquire();
+    postponed->callback = [&order, t]() {
+      order.push_back("postponed@" + std::to_string(t));
+    };
+    sched.ScheduleEvent({t}, Region::kPostponed, postponed);
+
+    auto* active = sched.GetEventPool().Acquire();
+    active->callback = [&order, t]() {
+      order.push_back("active@" + std::to_string(t));
+    };
+    sched.ScheduleEvent({t}, Region::kActive, active);
+  }
+
+  sched.Run();
+  std::vector<std::string> expected = {"active@0", "postponed@0", "active@1",
+                                       "postponed@1"};
+  EXPECT_EQ(order, expected);
+}
+
+// §4.4.2 ¶1 sentence 2: Figure 4-1's flow must hold even when most regions in
+// a slot are empty. Production Scheduler::ExecuteTimeSlot walks the regions
+// in fixed enum order, draining each queue (which is a no-op when empty), so
+// the listed simulation regions still execute in their Figure 4-1 order
+// regardless of which neighbours have events. Edge case: only Preponed and
+// Postponed are populated — they are the slot's first and last simulation
+// regions, so the relative order is the strongest pin.
+TEST(SimAndPliRegionSim, SparselyPopulatedSimulationRegionsExecuteInOrder) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+
+  auto* postponed = sched.GetEventPool().Acquire();
+  postponed->callback = [&order]() { order.push_back("postponed"); };
+  sched.ScheduleEvent({0}, Region::kPostponed, postponed);
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&order]() { order.push_back("preponed"); };
+  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
+
+  sched.Run();
+  ASSERT_EQ(order.size(), 2u);
+  EXPECT_EQ(order[0], "preponed");
+  EXPECT_EQ(order[1], "postponed");
+}
