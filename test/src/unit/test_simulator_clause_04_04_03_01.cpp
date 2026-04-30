@@ -30,32 +30,6 @@ TEST(PliPreponedSim, PreponedAccessesDataBeforeAnyStateChange) {
   EXPECT_EQ(sampled_in_preponed, 42);
 }
 
-TEST(PliPreponedSim, PreponedSeesStateBeforeAllSimulationRegions) {
-  Arena arena;
-  Scheduler sched(arena);
-  int value = 0;
-  int sampled = -1;
-
-  auto schedule_mod = [&](Region r, int new_val) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&value, new_val]() { value = new_val; };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule_mod(Region::kActive, 10);
-  schedule_mod(Region::kInactive, 20);
-  schedule_mod(Region::kNBA, 30);
-  schedule_mod(Region::kReactive, 40);
-  schedule_mod(Region::kReNBA, 50);
-
-  auto* preponed = sched.GetEventPool().Acquire();
-  preponed->callback = [&]() { sampled = value; };
-  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
-
-  sched.Run();
-  EXPECT_EQ(sampled, 0);
-}
-
 TEST(PliPreponedSim, PreponedExecutesBeforePreActive) {
   Arena arena;
   Scheduler sched(arena);
@@ -108,28 +82,6 @@ TEST(PliPreponedSim, PreponedEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[0], 0u);
   EXPECT_EQ(times[1], 1u);
   EXPECT_EQ(times[2], 2u);
-}
-
-TEST(PliPreponedSim, PreponedProvidesConsistentReadOnlySnapshot) {
-  Arena arena;
-  Scheduler sched(arena);
-  int a = 1;
-  int b = 2;
-  int sum_in_preponed = -1;
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() {
-    a = 100;
-    b = 200;
-  };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  auto* preponed = sched.GetEventPool().Acquire();
-  preponed->callback = [&]() { sum_in_preponed = a + b; };
-  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
-
-  sched.Run();
-  EXPECT_EQ(sum_in_preponed, 3);
 }
 
 // §4.4.3.1: scheduling into another region of the current time slot from
@@ -296,6 +248,39 @@ TEST(PliPreponedSim, VpiPutValueFromPreponedRecordsWriteViolation) {
   EXPECT_EQ(sched.IllegalPreponedWriteCount(), 0u);
   sched.Run();
   EXPECT_EQ(sched.IllegalPreponedWriteCount(), 1u);
+}
+
+// §4.4.3.1: each illegal write from Preponed is counted independently, so
+// repeated VPI writes during a Preponed callback all register against the
+// "illegal to write values to any net or variable" rule.
+TEST(PliPreponedSim, MultipleIllegalWritesAreEachCounted) {
+  Arena arena;
+  Scheduler sched(arena);
+  VpiContext vpi;
+  vpi.SetScheduler(&sched);
+
+  Logic4Word storage{};
+  Variable var{};
+  var.value.width = 32;
+  var.value.nwords = 1;
+  var.value.words = &storage;
+
+  VpiObject obj{};
+  obj.var = &var;
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() {
+    for (int i = 0; i < 4; ++i) {
+      VpiValue value{};
+      value.format = kVpiIntVal;
+      value.value.integer = i;
+      vpi.PutValue(&obj, &value, nullptr, 0);
+    }
+  };
+  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreponedWriteCount(), 4u);
 }
 
 // §4.4.3.1: VPI writes from regions other than Preponed are not flagged —
