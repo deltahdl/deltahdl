@@ -84,6 +84,19 @@ TEST(ActiveRegionSim, ActiveRegionEmptyDoesNotBlockOtherRegions) {
   EXPECT_TRUE(postponed_fired);
 }
 
+// §4.4.2.2 cross-references §4.4.1: it says the Active region "holds the
+// current active region set events". The phrase "active region set events"
+// is defined by §4.4.1 ¶1 — events scheduled in Active, Inactive, Pre-NBA,
+// NBA, and Post-NBA. Production code IsActiveRegionSet(Region::kActive)
+// must therefore return true; otherwise §4.4.2.2's claim that the Active
+// region holds active-set events would be a free-floating cross-reference.
+// Routing through the §4.4.1 classifier here makes the §4.4.2.2 ↔ §4.4.1
+// cycle relationship observable at the §4.4.2.2 level, so a regression in
+// §4.4.1's classifier would surface as a §4.4.2.2 failure too.
+TEST(ActiveRegionSim, ActiveRegionIsActiveRegionSetMember) {
+  EXPECT_TRUE(IsActiveRegionSet(Region::kActive));
+}
+
 // §4.4.2.2: "...holds the current active region set events being evaluated".
 // "Being evaluated" includes events scheduled into Active by an in-flight
 // Active callback at the current time — they enter the same Active queue
