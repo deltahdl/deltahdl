@@ -17,6 +17,7 @@ from lib.python.cli import (
 )
 from lib.python.lrm import load_toc
 
+from .ordering import find_cycle_groups, order_groups
 from .walk import build_subclause_record
 
 
@@ -45,10 +46,11 @@ def main(argv: list[str] | None = None) -> None:
     """Run the dependency oracles for every subclause and write the graph."""
     args = parse_args(argv)
     toc = load_toc(str(args.lrm))
-    graph = {
+    records = {
         subclause: build_subclause_record(
             subclause, str(args.lrm), model=args.model,
         )
         for subclause in toc
     }
-    args.output.write_text(json.dumps(graph))
+    order = order_groups(find_cycle_groups(records), records)
+    args.output.write_text(json.dumps({"records": records, "order": order}))

@@ -71,14 +71,14 @@ def test_main_walks_every_toc_entry(run_main) -> None:
 
 
 def test_main_writes_record_per_subclause(run_main, make_output) -> None:
-    """Output file contains one entry per load_toc subclause, keyed by id."""
+    """records/ section contains one entry per load_toc subclause, keyed by id."""
     run_main(toc={"4.4": (10, 20), "5.6": (21, 30)})
     payload = json.loads(make_output.read_text())
-    assert set(payload) == {"4.4", "5.6"}
+    assert set(payload["records"]) == {"4.4", "5.6"}
 
 
 def test_main_record_payload(run_main, make_output) -> None:
-    """Each entry in the output file is the build_subclause_record payload."""
+    """Each entry under records/ is the build_subclause_record payload."""
     record = {
         "dependencies": ["3.14.3"],
         "proofs": {"3.14.3": "Sentence."},
@@ -86,7 +86,14 @@ def test_main_record_payload(run_main, make_output) -> None:
     }
     run_main(record=record)
     payload = json.loads(make_output.read_text())
-    assert payload["4.4"] == record
+    assert payload["records"]["4.4"] == record
+
+
+def test_main_writes_order_section(run_main, make_output) -> None:
+    """The output file carries an order section with one group per subclause."""
+    run_main(toc={"4.4": (10, 20), "5.6": (21, 30)})
+    payload = json.loads(make_output.read_text())
+    assert sorted(g[0] for g in payload["order"]) == ["4.4", "5.6"]
 
 
 def test_main_forwards_model_to_record_builder(run_main) -> None:
