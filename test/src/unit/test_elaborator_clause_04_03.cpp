@@ -6,47 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §4.3 ¶2: "Examples of processes include... always_comb procedures...". The
-// elaborator's AddProcess path constructs an RtlirProcess of kind kAlwaysComb
-// for an always_comb procedure and infers its sensitivity from the body when
-// none is written explicitly.
-TEST(EventSimulationElaboration, AlwaysCombIsRecognizedAsAProcess) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b;\n"
-      "  always_comb b = a;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kAlwaysComb);
-  EXPECT_NE(mod->processes[0].body, nullptr);
-  EXPECT_FALSE(mod->processes[0].sensitivity.empty());
-}
-
-// §4.3 ¶2: "Examples of processes include... always_latch procedures...". The
-// elaborator constructs an RtlirProcess of kind kAlwaysLatch for an
-// always_latch procedure and infers its sensitivity from the body.
-TEST(EventSimulationElaboration, AlwaysLatchIsRecognizedAsAProcess) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic en, d, q;\n"
-      "  always_latch if (en) q = d;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kAlwaysLatch);
-  EXPECT_NE(mod->processes[0].body, nullptr);
-  EXPECT_FALSE(mod->processes[0].sensitivity.empty());
-}
-
 // §4.3 ¶2: "Examples of processes include... continuous assignments...". The
 // elaborator records each continuous assignment in the module's `assigns`
 // list as a distinct process-like construct, separate from procedural

@@ -6,6 +6,7 @@
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
+#include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -90,6 +91,34 @@ TEST(EventSimulationSim, NbaAssignmentSchedulesAnUpdateEvent) {
   f.scheduler.Run();
   EXPECT_GE(f.scheduler.UpdateEventScheduledCount(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 9u);
+}
+
+// §4.3 ¶3, net case: "Every change in state of a net or variable in the
+// system description being simulated is considered an *update event*." The
+// NBA test above covers the `variable` half via `ScheduleNonblockingAssign`;
+// the `net` half is observed here through trireg charge decay, the only
+// scheduled net-state-change path. `ScheduleDecay` (net.cpp) acquires an
+// Event and labels it `EventKind::kUpdate` before placing it on the
+// scheduler — when all drivers go to Z on a trireg with `decay_ticks > 0`,
+// `Net::Resolve` triggers `ScheduleDecay`, and the kUpdate tally rises.
+TEST(EventSimulationSim, NetChargeDecaySchedulesAnUpdateEvent) {
+  Arena arena;
+  Scheduler sched(arena);
+  auto* var = arena.Create<Variable>();
+  var->value = MakeLogic4VecVal(arena, 8, 0xAB);
+  Net net;
+  net.type = NetType::kTrireg;
+  net.resolved = var;
+  net.decay_ticks = 50;
+  Logic4Vec all_z = MakeLogic4Vec(arena, 8);
+  for (uint32_t w = 0; w < all_z.nwords; ++w) {
+    all_z.words[w].aval = ~uint64_t{0};
+    all_z.words[w].bval = ~uint64_t{0};
+  }
+  net.drivers.push_back(all_z);
+  EXPECT_EQ(sched.UpdateEventScheduledCount(), 0u);
+  net.Resolve(arena, &sched);
+  EXPECT_GE(sched.UpdateEventScheduledCount(), 1u);
 }
 
 // §4.3 ¶3 corollary: a design that performs no state changes must produce no
