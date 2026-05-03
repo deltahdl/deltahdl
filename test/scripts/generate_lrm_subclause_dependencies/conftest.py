@@ -1,4 +1,4 @@
-"""Shared fixtures for document_dependency_graph tests."""
+"""Shared fixtures for generate_lrm_subclause_dependencies tests."""
 
 from pathlib import Path
 

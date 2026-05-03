@@ -1,4 +1,4 @@
-"""Unit tests for document_dependency_graph.commit (the --commit path)."""
+"""Unit tests for generate_lrm_subclause_dependencies.commit (the --commit path)."""
 
 from collections.abc import Callable
 from pathlib import Path
@@ -19,7 +19,7 @@ def test_commit_runs_git_commit(
     cmds, _, out = run_commit()
     assert any(
         "git commit" in c
-        and "document_dependency_graph" in c
+        and "generate_lrm_subclause_dependencies" in c
         and str(out) in c
         for c in cmds
     )

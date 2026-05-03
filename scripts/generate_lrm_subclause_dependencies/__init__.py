@@ -1,6 +1,6 @@
 """Generate the LRM dependency graph as a JSON file.
 
-``document_dependency_graph --lrm path --output graph.json`` walks the
+``generate_lrm_subclause_dependencies --lrm path --output graph.json`` walks the
 LRM table of contents, asks the read-only oracles once per subclause,
 and writes the resulting graph to disk so downstream tools can plan a
 satisfaction pass without re-querying Claude on every recursion.

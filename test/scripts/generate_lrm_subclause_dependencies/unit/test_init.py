@@ -1,4 +1,4 @@
-"""Unit tests for the document_dependency_graph argparse wrapper."""
+"""Unit tests for the generate_lrm_subclause_dependencies argparse wrapper."""
 
 import contextlib
 import json
@@ -10,13 +10,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import document_dependency_graph
+import generate_lrm_subclause_dependencies
 
 
 def test_parse_args_requires_lrm(make_output: Path) -> None:
     """--lrm is required."""
     with pytest.raises(SystemExit):
-        document_dependency_graph.parse_args([
+        generate_lrm_subclause_dependencies.parse_args([
             "--output", str(make_output),
         ])
 
@@ -27,7 +27,7 @@ def test_parse_args_validates_lrm_exists(
     """--lrm must point at an existing file."""
     missing = tmp_path / "missing.pdf"
     with pytest.raises(SystemExit):
-        document_dependency_graph.parse_args([
+        generate_lrm_subclause_dependencies.parse_args([
             "--lrm", str(missing),
             "--output", str(make_output),
         ])
@@ -35,7 +35,7 @@ def test_parse_args_validates_lrm_exists(
 
 def test_parse_args_default_model(make_lrm: Path, make_output: Path) -> None:
     """--model defaults to 'opus'."""
-    args = document_dependency_graph.parse_args([
+    args = generate_lrm_subclause_dependencies.parse_args([
         "--lrm", str(make_lrm),
         "--output", str(make_output),
     ])
@@ -44,7 +44,7 @@ def test_parse_args_default_model(make_lrm: Path, make_output: Path) -> None:
 
 def test_parse_args_explicit_model(make_lrm: Path, make_output: Path) -> None:
     """--model accepts an explicit value."""
-    args = document_dependency_graph.parse_args([
+    args = generate_lrm_subclause_dependencies.parse_args([
         "--lrm", str(make_lrm),
         "--output", str(make_output),
         "--model", "haiku",
@@ -55,14 +55,14 @@ def test_parse_args_explicit_model(make_lrm: Path, make_output: Path) -> None:
 def test_parse_args_requires_output(make_lrm: Path) -> None:
     """--output is required."""
     with pytest.raises(SystemExit):
-        document_dependency_graph.parse_args([
+        generate_lrm_subclause_dependencies.parse_args([
             "--lrm", str(make_lrm),
         ])
 
 
 def test_parse_args_output_value(make_lrm: Path, make_output: Path) -> None:
     """--output is parsed and forwarded as the file path."""
-    args = document_dependency_graph.parse_args([
+    args = generate_lrm_subclause_dependencies.parse_args([
         "--lrm", str(make_lrm),
         "--output", str(make_output),
     ])
@@ -73,7 +73,7 @@ def test_parse_args_commit_defaults_off(
     make_lrm: Path, make_output: Path,
 ) -> None:
     """--commit defaults to False so a plain run never touches git."""
-    args = document_dependency_graph.parse_args([
+    args = generate_lrm_subclause_dependencies.parse_args([
         "--lrm", str(make_lrm),
         "--output", str(make_output),
     ])
@@ -84,7 +84,7 @@ def test_parse_args_commit_explicit(
     make_lrm: Path, make_output: Path,
 ) -> None:
     """--commit sets args.commit to True."""
-    args = document_dependency_graph.parse_args([
+    args = generate_lrm_subclause_dependencies.parse_args([
         "--lrm", str(make_lrm),
         "--output", str(make_output),
         "--commit",
@@ -96,7 +96,7 @@ def test_parse_args_resume_defaults_off(
     make_lrm: Path, make_output: Path,
 ) -> None:
     """--resume defaults to False so a plain run never reads the prior --output."""
-    args = document_dependency_graph.parse_args([
+    args = generate_lrm_subclause_dependencies.parse_args([
         "--lrm", str(make_lrm),
         "--output", str(make_output),
     ])
@@ -107,7 +107,7 @@ def test_parse_args_resume_explicit(
     make_lrm: Path, make_output: Path,
 ) -> None:
     """--resume sets args.resume to True."""
-    args = document_dependency_graph.parse_args([
+    args = generate_lrm_subclause_dependencies.parse_args([
         "--lrm", str(make_lrm),
         "--output", str(make_output),
         "--resume",
@@ -214,7 +214,7 @@ def test_main_passes_output_path_to_commit(
 def test_main_guard_invokes_main() -> None:
     """Running as __main__ calls main()."""
     with pytest.raises(SystemExit):
-        runpy.run_module("document_dependency_graph", run_name="__main__")
+        runpy.run_module("generate_lrm_subclause_dependencies", run_name="__main__")
 
 
 # --- Checkpoint / resume ----------------------------------------------------
@@ -262,12 +262,12 @@ def _stub_walk(
         if side_effect is not None
         else {"return_value": return_value}
     )
-    toc_p = patch("document_dependency_graph.load_toc", return_value=toc)
+    toc_p = patch("generate_lrm_subclause_dependencies.load_toc", return_value=toc)
     rec_p = patch(
-        "document_dependency_graph.build_subclause_record",
+        "generate_lrm_subclause_dependencies.build_subclause_record",
         **record_kwargs,
     )
-    com_p = patch("document_dependency_graph.commit_output")
+    com_p = patch("generate_lrm_subclause_dependencies.commit_output")
     with toc_p, com_p, rec_p as mock_record:
         with contextlib.suppress(RuntimeError):
             yield mock_record
@@ -284,7 +284,7 @@ def _run_main(
     make_lrm: Path, make_output: Path, *, resume: bool = False,
 ) -> None:
     """Invoke main() with the canonical argv for checkpoint tests."""
-    document_dependency_graph.main(
+    generate_lrm_subclause_dependencies.main(
         _checkpoint_argv(make_lrm, make_output, resume=resume),
     )
 

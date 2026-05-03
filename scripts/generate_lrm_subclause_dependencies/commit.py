@@ -46,7 +46,7 @@ def _has_staged_changes() -> bool:
 def _commit(path: Path) -> None:
     """Create the dependency-graph commit naming this script and *path*."""
     message = (
-        f"document_dependency_graph: refresh {path}"
+        f"generate_lrm_subclause_dependencies: refresh {path}"
     )
     proc = _run(["git", "commit", "-m", message])
     if proc.returncode != 0:

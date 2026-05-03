@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from document_dependency_graph.ordering import find_cycle_groups, order_groups
+from generate_lrm_subclause_dependencies.ordering import find_cycle_groups, order_groups
 
 
 def _records(graph: dict[str, list[str]]) -> dict[str, dict[str, Any]]:

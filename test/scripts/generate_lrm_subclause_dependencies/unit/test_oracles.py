@@ -1,11 +1,11 @@
-"""Unit tests for document_dependency_graph.oracles."""
+"""Unit tests for generate_lrm_subclause_dependencies.oracles."""
 
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from document_dependency_graph.oracles import (
+from generate_lrm_subclause_dependencies.oracles import (
     build_prerequisites_prompt,
     build_proof_sentence_prompt,
     compute_prerequisites,
@@ -90,7 +90,7 @@ def test_parse_proof_sentence_rejects_non_string() -> None:
 def test_compute_proof_sentence_returns_parsed_text(make_lrm: Path) -> None:
     """compute_proof_sentence returns the oracle's quoted sentence."""
     with patch(
-        "document_dependency_graph.oracles.run_oracle_call",
+        "generate_lrm_subclause_dependencies.oracles.run_oracle_call",
         return_value='"Module instantiation requires elaboration."',
     ):
         result = compute_proof_sentence(
@@ -102,7 +102,7 @@ def test_compute_proof_sentence_returns_parsed_text(make_lrm: Path) -> None:
 def test_compute_proof_sentence_passes_prompt(make_lrm: Path) -> None:
     """compute_proof_sentence sends the proof-sentence prompt to the oracle."""
     with patch(
-        "document_dependency_graph.oracles.run_oracle_call",
+        "generate_lrm_subclause_dependencies.oracles.run_oracle_call",
         return_value='"x."',
     ) as mock_call:
         compute_proof_sentence(
@@ -114,7 +114,7 @@ def test_compute_proof_sentence_passes_prompt(make_lrm: Path) -> None:
 def test_compute_proof_sentence_passes_model(make_lrm: Path) -> None:
     """compute_proof_sentence forwards the model to the oracle."""
     with patch(
-        "document_dependency_graph.oracles.run_oracle_call",
+        "generate_lrm_subclause_dependencies.oracles.run_oracle_call",
         return_value='"x."',
     ) as mock_call:
         compute_proof_sentence(
@@ -171,7 +171,7 @@ def test_parse_prerequisites_rejects_empty_string() -> None:
 def test_compute_prerequisites_returns_parsed_text(make_lrm: Path) -> None:
     """compute_prerequisites returns the oracle's parsed string."""
     with patch(
-        "document_dependency_graph.oracles.run_oracle_call",
+        "generate_lrm_subclause_dependencies.oracles.run_oracle_call",
         return_value='"elaborated definitions"',
     ):
         result = compute_prerequisites(
@@ -183,7 +183,7 @@ def test_compute_prerequisites_returns_parsed_text(make_lrm: Path) -> None:
 def test_compute_prerequisites_passes_prereq_prompt(make_lrm: Path) -> None:
     """compute_prerequisites sends the prerequisites prompt to the oracle."""
     with patch(
-        "document_dependency_graph.oracles.run_oracle_call",
+        "generate_lrm_subclause_dependencies.oracles.run_oracle_call",
         return_value='"x"',
     ) as mock_call:
         compute_prerequisites(
@@ -195,7 +195,7 @@ def test_compute_prerequisites_passes_prereq_prompt(make_lrm: Path) -> None:
 def test_compute_prerequisites_passes_model(make_lrm: Path) -> None:
     """compute_prerequisites forwards the model to the oracle."""
     with patch(
-        "document_dependency_graph.oracles.run_oracle_call",
+        "generate_lrm_subclause_dependencies.oracles.run_oracle_call",
         return_value='"x"',
     ) as mock_call:
         compute_prerequisites(

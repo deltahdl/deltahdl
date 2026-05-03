@@ -210,7 +210,7 @@ jobs:
   #       run: >-
   #         PYTHONPATH=.:scripts python3 -m pytest
   #         test/scripts/classify_tests/e2e/ -v
-  test-document-dependency-graph:
+  test-generate-lrm-subclause-dependencies:
     needs:
       - test-lib-cli
       - test-lib-lrm
@@ -231,19 +231,19 @@ jobs:
       - name: Run unit tests with 100% coverage gate
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/document_dependency_graph/unit/ -v
-          --cov=document_dependency_graph
+          test/scripts/generate_lrm_subclause_dependencies/unit/ -v
+          --cov=generate_lrm_subclause_dependencies
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
       - name: Run integration tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/document_dependency_graph/integration/ -v
+          test/scripts/generate_lrm_subclause_dependencies/integration/ -v
       - name: Run e2e tests
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
-          test/scripts/document_dependency_graph/e2e/ -v
+          test/scripts/generate_lrm_subclause_dependencies/e2e/ -v
   # test-lib-classify:
   #   needs: static-analysis
   #   runs-on: ubuntu-24.04

@@ -1,10 +1,10 @@
-"""Unit tests for document_dependency_graph.walk."""
+"""Unit tests for generate_lrm_subclause_dependencies.walk."""
 
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from document_dependency_graph.walk import build_subclause_record
+from generate_lrm_subclause_dependencies.walk import build_subclause_record
 
 
 def _run_record(
@@ -17,15 +17,15 @@ def _run_record(
 ) -> tuple[dict[str, Any], MagicMock, MagicMock, MagicMock]:
     """Patch the three oracles, run build_subclause_record, return mocks+record."""
     deps_patch = patch(
-        "document_dependency_graph.walk.compute_subclause_dependencies",
+        "generate_lrm_subclause_dependencies.walk.compute_subclause_dependencies",
         return_value=deps,
     )
     proof_patch = patch(
-        "document_dependency_graph.walk.compute_proof_sentence",
+        "generate_lrm_subclause_dependencies.walk.compute_proof_sentence",
         return_value=proof,
     )
     prereq_patch = patch(
-        "document_dependency_graph.walk.compute_prerequisites",
+        "generate_lrm_subclause_dependencies.walk.compute_prerequisites",
         return_value=prereq,
     )
     with deps_patch as mock_deps, proof_patch as mock_proof, \

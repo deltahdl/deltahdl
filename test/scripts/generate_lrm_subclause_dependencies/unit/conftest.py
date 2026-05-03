@@ -1,4 +1,4 @@
-"""Shared fixtures for document_dependency_graph unit tests."""
+"""Shared fixtures for generate_lrm_subclause_dependencies unit tests."""
 
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import document_dependency_graph
-from document_dependency_graph.commit import commit_output
+import generate_lrm_subclause_dependencies
+from generate_lrm_subclause_dependencies.commit import commit_output
 
 
 _DEFAULT_TOC: dict[str, tuple[int, int]] = {"4.4": (10, 20)}
@@ -45,19 +45,19 @@ def run_main(
         if extra_argv:
             argv.extend(extra_argv)
         toc_patch = patch(
-            "document_dependency_graph.load_toc",
+            "generate_lrm_subclause_dependencies.load_toc",
             return_value=toc_payload,
         )
         record_patch = patch(
-            "document_dependency_graph.build_subclause_record",
+            "generate_lrm_subclause_dependencies.build_subclause_record",
             return_value=record_payload,
         )
         commit_patch = patch(
-            "document_dependency_graph.commit_output",
+            "generate_lrm_subclause_dependencies.commit_output",
         )
         with toc_patch as mock_toc, record_patch as mock_record, \
                 commit_patch as mock_commit:
-            document_dependency_graph.main(argv)
+            generate_lrm_subclause_dependencies.main(argv)
         return mock_toc, mock_record, mock_commit
 
     return _run
@@ -111,7 +111,7 @@ def run_commit(
 
         runner = MagicMock(side_effect=_run)
         raised: RuntimeError | None = None
-        with patch("document_dependency_graph.commit.subprocess.run", runner):
+        with patch("generate_lrm_subclause_dependencies.commit.subprocess.run", runner):
             try:
                 commit_output(out)
             except RuntimeError as exc:
