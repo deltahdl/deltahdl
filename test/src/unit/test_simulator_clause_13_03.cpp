@@ -139,4 +139,24 @@ TEST(TaskSim, AutomaticTaskInputFromCaller) {
   EXPECT_EQ(val, 42u);
 }
 
+// §13.3 example mytask3: a bare second formal `b` after `output logic [7:0] a`
+// inherits the [7:0] vector type. Writing through `b` from inside the task
+// observable in the caller must round-trip the full 8-bit value, which only
+// happens if `b`'s elaborated width matches `a`. With the §6.8 implicit-
+// data-type → 1-bit logic mapping the caller would receive only the LSB.
+TEST(TaskSim, FormalArgInheritedTypeRoundTripsFullWidth) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] result_a;\n"
+      "  logic [7:0] result_b;\n"
+      "  task fill(output logic [7:0] a, b);\n"
+      "    a = 8'hA5;\n"
+      "    b = 8'h5A;\n"
+      "  endtask\n"
+      "  initial fill(result_a, result_b);\n"
+      "endmodule\n",
+      "result_b");
+  EXPECT_EQ(val, 0x5Au);
+}
+
 }  // namespace

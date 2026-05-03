@@ -126,9 +126,10 @@ TEST(FunctionLifetimeParsing, StaticFunctionWithLocalVar) {
   EXPECT_EQ(fn->name, "count");
 }
 
-// The static-var-in-auto-func and auto-var-in-static-func cases are
-// §6.21 lifetime-semantics tests; the corresponding parser tests
-// (StaticVarInAutoFunc, AutoVarInStaticFunc) live in
+// Lifetime-related parser tests for functions — the static-var-in-auto-func,
+// auto-var-in-static-func, and static-var-in-static-func cases — are §6.21
+// lifetime-semantics tests; the corresponding parser tests
+// (StaticVarInAutoFunc, AutoVarInStaticFunc, StaticVarInStaticFunc) live in
 // test_parser_clause_06_21.cpp.
 
 TEST(FunctionLifetimeParsing, AutomaticFunctionWithLocalVars) {
@@ -151,33 +152,6 @@ TEST(FunctionLifetimeParsing, AutomaticFunctionWithLocalVars) {
   ASSERT_GE(item->func_body_stmts.size(), 2u);
   EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(item->func_body_stmts[1]->kind, StmtKind::kVarDecl);
-}
-
-static Stmt* FirstBodyStmt(ModuleItem* item) {
-  if (!item || item->func_body_stmts.empty()) return nullptr;
-  return item->func_body_stmts[0];
-}
-
-TEST(FunctionLifetimeParsing, StaticFunctionWithStaticLocalVar) {
-  auto r = Parse(
-      "module m;\n"
-      "  function static int call_count();\n"
-      "    static int cnt = 0;\n"
-      "    cnt = cnt + 1;\n"
-      "    return cnt;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->is_static);
-  auto* var_stmt = FirstBodyStmt(item);
-  ASSERT_NE(var_stmt, nullptr);
-  EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(var_stmt->var_is_static);
-  EXPECT_FALSE(var_stmt->var_is_automatic);
-  EXPECT_NE(var_stmt->var_init, nullptr);
 }
 
 TEST(FunctionLifetimeParsing, FunctionInAutomaticModule) {

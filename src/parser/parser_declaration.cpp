@@ -268,7 +268,12 @@ ModuleItem* Parser::ParseNettypeDecl() {
 }
 
 // A.2.7: Parse port direction and update sticky direction state.
-Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir) {
+// Returns the resulting sticky direction; sets `was_explicit` to true when a
+// direction keyword was actually consumed (per §13.3, the explicit-vs-sticky
+// distinction also drives data-type defaulting on the same argument).
+Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir,
+                                    bool* was_explicit) {
+  if (was_explicit) *was_explicit = true;
   if (Check(TokenKind::kKwInput)) {
     arg.direction = Direction::kInput;
     Consume();
@@ -291,10 +296,11 @@ Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir) {
     return Direction::kRef;
   }
   arg.direction = sticky_dir;
+  if (was_explicit) *was_explicit = false;
   return sticky_dir;
 }
 
-std::vector<FunctionArg> Parser::ParseFunctionArgs() {
+std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
   std::vector<FunctionArg> args;
   Expect(TokenKind::kLParen);
   if (Check(TokenKind::kRParen)) {
@@ -303,6 +309,8 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs() {
   }
   Direction sticky_dir = Direction::kInput;
   bool seen_default = false;
+  DataType prev_data_type;  // §13.3 sticky data-type for inheritance.
+  bool first_arg = true;
   do {
     FunctionArg arg;
     // §8.3: class_constructor_arg ::= tf_port_item | default
@@ -321,16 +329,54 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs() {
     if (Match(TokenKind::kKwConst)) {
       arg.is_const = true;
     }
-    sticky_dir = ParseArgDirection(arg, sticky_dir);
+    bool dir_explicit = false;
+    sticky_dir = ParseArgDirection(arg, sticky_dir, &dir_explicit);
+    // §13.3: "The const and static qualifiers on the ref direction are
+    // included in this default." When direction is inherited from the
+    // previous formal (sticky) and that formal carried the ref-side
+    // qualifiers, propagate them to the current formal.
+    if (!dir_explicit && arg.direction == Direction::kRef && !args.empty()) {
+      const auto& prev = args.back();
+      if (prev.direction == Direction::kRef) {
+        arg.is_const = arg.is_const || prev.is_const;
+        arg.is_ref_static = arg.is_ref_static || prev.is_ref_static;
+      }
+    }
     Match(TokenKind::kKwVar);  // A.2.7 tf_port_item: [var]
     arg.data_type = ParseDataType();
+    // §13.3: "Each formal argument has a data type that can be explicitly
+    // declared or inherited from the previous argument. If the data type is
+    // not explicitly declared, then the default data type is logic if it is
+    // the first argument or if the argument direction is explicitly
+    // specified. Otherwise, the data type is inherited from the previous
+    // argument." kImplicit here means no data_type token was consumed; treat
+    // as "not explicitly declared" for the §13.3 rule. §6.8 gives the
+    // canonical implicit-data-type → logic mapping that we apply at first
+    // position or after an explicit direction keyword.
+    if (arg.data_type.kind == DataTypeKind::kImplicit &&
+        arg.data_type.packed_dim_left == nullptr && !arg.data_type.is_signed) {
+      if (first_arg || dir_explicit) {
+        arg.data_type.kind = DataTypeKind::kLogic;
+      } else {
+        arg.data_type = prev_data_type;
+      }
+    }
     if (CheckIdentifier()) {
       arg.name = Consume().text;
+    } else if (require_identifiers) {
+      // §13.3 footnote 28: "In a tf_port_item, it shall be illegal to omit
+      // the explicit port_identifier except within a function_prototype or
+      // task_prototype."
+      diag_.Error(CurrentLoc(),
+                  "tf_port_item shall include a port_identifier outside of a "
+                  "function_prototype or task_prototype");
     }
     ParseUnpackedDims(arg.unpacked_dims);
     if (Match(TokenKind::kEq)) {
       arg.default_value = ParseExpr();
     }
+    prev_data_type = arg.data_type;
+    first_arg = false;
     args.push_back(arg);
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kRParen);
@@ -452,7 +498,7 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
   ParseFuncName(item);
 
   if (Check(TokenKind::kLParen)) {
-    item->func_args = ParseFunctionArgs();
+    item->func_args = ParseFunctionArgs(/*require_identifiers=*/!prototype_only);
     item->is_ansi_ports = true;
   }
   Expect(TokenKind::kSemicolon);
@@ -488,7 +534,7 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   }
 
   if (Check(TokenKind::kLParen)) {
-    item->func_args = ParseFunctionArgs();
+    item->func_args = ParseFunctionArgs(/*require_identifiers=*/!prototype_only);
     item->is_ansi_ports = true;
   }
   Expect(TokenKind::kSemicolon);
@@ -580,6 +626,15 @@ void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
     bool is_ref_static = (dir == Direction::kRef) && Match(TokenKind::kKwStatic);
     Match(TokenKind::kKwVar);  // A.2.7 tf_port_declaration: [var]
     DataType dt = ParseDataType();
+    // §13.3: every old-style tf_port_declaration carries an explicit direction
+    // keyword, so the §13.3 rule "default data type is logic if ... the
+    // argument direction is explicitly specified" applies whenever the type
+    // was omitted. The §6.8 implicit-data-type → logic mapping is the same
+    // resolution used for ANSI tf_port_items in ParseFunctionArgs above.
+    if (dt.kind == DataTypeKind::kImplicit && dt.packed_dim_left == nullptr &&
+        !dt.is_signed) {
+      dt.kind = DataTypeKind::kLogic;
+    }
     // list_of_tf_variable_identifiers: comma-separated port names
     do {
       FunctionArg arg;

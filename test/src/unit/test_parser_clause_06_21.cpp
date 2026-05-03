@@ -6,21 +6,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ScopeAndLifetimeParsing, DataDeclAutomaticInBlock) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    automatic int x;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* body = r.cu->modules[0]->items[0]->body;
-  ASSERT_NE(body, nullptr);
-  ASSERT_GE(body->stmts.size(), 1u);
-  EXPECT_EQ(body->stmts[0]->var_is_automatic, true);
-}
-
 TEST(ScopeAndLifetimeParsing, AutomaticVarWithExpressionInit) {
   auto r = Parse(
       "module m;\n"
@@ -174,20 +159,6 @@ TEST_F(ProgramParseTest, ProgramWithAutomaticLifetime) {
   ASSERT_EQ(unit->programs.size(), 1u);
   EXPECT_EQ(unit->programs[0]->name, "p");
   EXPECT_EQ(unit->programs[0]->decl_kind, ModuleDeclKind::kProgram);
-}
-
-TEST(ScopeAndLifetimeParsing, StaticBlockVarSetsFlag) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial begin\n"
-      "    static int st2;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kVarDecl);
-  EXPECT_TRUE(stmt->var_is_static);
 }
 
 TEST(ScopeAndLifetimeParsing, StaticVarKeywordInBlock) {
@@ -431,6 +402,31 @@ TEST(ScopeAndLifetimeParsing, AutoVarInStaticFunc) {
   EXPECT_FALSE(var_stmt->var_is_static);
 }
 
+// §6.21: A static function may also carry an explicit-static local
+// variable. This is the static+static counterpart to AutoVarInStaticFunc
+// and StaticVarInAutoFunc.
+TEST(ScopeAndLifetimeParsing, StaticVarInStaticFunc) {
+  auto r = Parse(
+      "module m;\n"
+      "  function static int call_count();\n"
+      "    static int cnt = 0;\n"
+      "    cnt = cnt + 1;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_TRUE(item->is_static);
+  auto* var_stmt = FirstBodyStmt(item);
+  ASSERT_NE(var_stmt, nullptr);
+  EXPECT_EQ(var_stmt->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(var_stmt->var_is_static);
+  EXPECT_FALSE(var_stmt->var_is_automatic);
+  EXPECT_NE(var_stmt->var_init, nullptr);
+}
+
 TEST(ScopeAndLifetimeParsing, StaticVarInAutoFunc) {
   auto r = Parse(
       "module m;\n"
@@ -480,16 +476,26 @@ TEST(ScopeAndLifetimeParsing, CuScopeFuncStaticDefault) {
   EXPECT_FALSE(r.cu->cu_items[0]->is_automatic);
 }
 
+// §6.21: A module-level variable may carry an explicit static lifetime
+// keyword; the parser records the flag on the resulting var_decl.
 TEST(ScopeAndLifetimeParsing, LifetimeStaticOnModuleItem) {
   auto r = Parse("module m; static int x = 0; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_TRUE(item->is_static);
 }
 
+// §6.21: The same module-level form is accepted with the automatic
+// lifetime keyword (the elaborator separately enforces footnote 14a).
 TEST(ScopeAndLifetimeParsing, LifetimeAutomaticOnModuleItem) {
   auto r = Parse("module m; automatic int y = 0; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_TRUE(item->is_automatic);
 }
 
 // §6.21: A function may carry an automatic lifetime keyword, which the

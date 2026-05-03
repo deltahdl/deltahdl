@@ -152,9 +152,10 @@ ModuleItem* Parser::ParseDpiImport() {
   }
   item->name = Expect(TokenKind::kIdentifier).text;
 
-  // Optional argument list
+  // Optional argument list — DPI import is a prototype-only context, so
+  // port identifiers may be omitted per §13.3 footnote 28.
   if (Check(TokenKind::kLParen)) {
-    item->func_args = ParseFunctionArgs();
+    item->func_args = ParseFunctionArgs(/*require_identifiers=*/false);
   }
   Expect(TokenKind::kSemicolon);
   return item;

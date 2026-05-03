@@ -147,21 +147,10 @@ TEST(TaskDeclParsing, TfPortListMultiplePorts) {
   EXPECT_EQ(item->func_args[2].name, "c");
 }
 
-TEST(TaskDeclParsing, TfPortListStickyDirection) {
-  auto r = Parse(
-      "module m;\n"
-      "  task my_task(input int a, int b, output int c, int d);\n"
-      "  endtask\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->func_args.size(), 4u);
-  EXPECT_EQ(item->func_args[0].direction, Direction::kInput);
-  EXPECT_EQ(item->func_args[1].direction, Direction::kInput);
-  EXPECT_EQ(item->func_args[2].direction, Direction::kOutput);
-  EXPECT_EQ(item->func_args[3].direction, Direction::kOutput);
-}
+// The sticky-direction rule ("Once a direction is given, subsequent formals
+// default to the same direction") is §13.3 base-text; the corresponding
+// parser test (FormalArgDirectionStickyAcrossSwitch) lives in
+// test_parser_clause_13_03.cpp.
 
 // --- tf_port_item ---
 

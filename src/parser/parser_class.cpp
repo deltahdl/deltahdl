@@ -51,7 +51,10 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
     item->loc = CurrentLoc();
     Consume();
     item->name = Expect(TokenKind::kIdentifier).text;
-    if (Check(TokenKind::kLParen)) item->func_args = ParseFunctionArgs();
+    if (Check(TokenKind::kLParen))
+      // §A.2.9 modport_tf_port = method_prototype, so port identifiers
+      // may be omitted per §13.3 footnote 28.
+      item->func_args = ParseFunctionArgs(/*require_identifiers=*/false);
     port.prototype = item;
     port.name = item->name;
   } else if (Check(TokenKind::kKwFunction)) {
@@ -61,7 +64,10 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
     Consume();
     item->data_type = ParseFunctionReturnType();
     item->name = Expect(TokenKind::kIdentifier).text;
-    if (Check(TokenKind::kLParen)) item->func_args = ParseFunctionArgs();
+    if (Check(TokenKind::kLParen))
+      // §A.2.9 modport_tf_port = method_prototype, so port identifiers
+      // may be omitted per §13.3 footnote 28.
+      item->func_args = ParseFunctionArgs(/*require_identifiers=*/false);
     port.prototype = item;
     port.name = item->name;
   } else {

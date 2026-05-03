@@ -143,36 +143,12 @@ TEST(DeclarationListParsing, ListOfParamAssignmentsSingle) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsMultiple) {
-  auto r = Parse("module m; logic a, b, c; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  int count = 0;
-  for (auto* item : r.cu->modules[0]->items) {
-    if (item->kind == ModuleItemKind::kVarDecl) count++;
-  }
-  EXPECT_EQ(count, 3);
-}
-
-TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsWithInit) {
-  auto r = Parse("module m; int x = 0, y = 1; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* x = r.cu->modules[0]->items[0];
-  auto* y = r.cu->modules[0]->items[1];
-  EXPECT_NE(x->init_expr, nullptr);
-  EXPECT_NE(y->init_expr, nullptr);
-}
-
-TEST(DeclarationListParsing, ListOfVariableIdentifiersWithDims) {
-  auto r = Parse("module m; logic [7:0] a [3:0], b [1:0]; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* a = r.cu->modules[0]->items[0];
-  auto* b = r.cu->modules[0]->items[1];
-  EXPECT_FALSE(a->unpacked_dims.empty());
-  EXPECT_FALSE(b->unpacked_dims.empty());
-}
+// The §6.8 "set of variables sharing the same characteristics, declared in
+// the same declaration statement" rule and the "variable can be declared
+// with an initializer" rule are tested in test_parser_clause_06_08.cpp
+// (ListOfVariableDeclAssignmentsMultiple, ListOfVariableDeclAssignmentsWithDims,
+// MultipleLogicDecls). The corresponding tests previously duplicated in this
+// file have been removed.
 
 TEST(DeclarationListParsing, ListOfPortIdentifiersMultiple) {
   auto r = Parse("module m(input logic a, input logic b); endmodule\n");

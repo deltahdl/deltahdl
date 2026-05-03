@@ -23,24 +23,6 @@ TEST(VariableDeclaration, DataDeclVarPrefix) {
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
 }
 
-TEST(VariableDeclaration, DataDeclLifetimeAutomatic) {
-  auto r = Parse("module m; automatic int counter; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_TRUE(item->is_automatic);
-}
-
-TEST(VariableDeclaration, DataDeclLifetimeStatic) {
-  auto r = Parse("module m; static int counter; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
-  EXPECT_TRUE(item->is_static);
-}
-
 TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsMultiple) {
   auto r = Parse("module m; int a = 1, b = 2, c = 3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

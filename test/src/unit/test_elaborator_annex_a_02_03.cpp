@@ -4,20 +4,10 @@ using namespace delta;
 
 namespace {
 
-// --- list_of_variable_decl_assignments elaboration ---
-
-TEST(DeclarationListElaboration, MultipleVariablesElaborate) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  logic a, b, c;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  EXPECT_EQ(mod->variables.size(), 3u);
-}
+// The §6.8 "set of variables sharing the same characteristics, declared in
+// the same declaration statement" rule is tested at the elaborator stage in
+// test_elaborator_clause_06_08.cpp (MultipleVarsInOneStatement). The
+// corresponding test previously duplicated in this file has been removed.
 
 TEST(DeclarationListElaboration, MultipleNetsElaborate) {
   ElabFixture f;

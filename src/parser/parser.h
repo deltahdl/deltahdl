@@ -204,12 +204,13 @@ class Parser {
   DataType ParseFunctionReturnType();
   void ParseDynamicOverrideSpecifiers(ModuleItem* item);
   void ParseOneOverrideSpecifier(ModuleItem* item);
-  Direction ParseArgDirection(FunctionArg& arg, Direction sticky_dir);
+  Direction ParseArgDirection(FunctionArg& arg, Direction sticky_dir,
+                              bool* was_explicit = nullptr);
   void ParseFuncName(ModuleItem* item);
   void ParseFuncBody(ModuleItem* item);
   ModuleItem* ParseFunctionDecl(bool prototype_only = false);
   ModuleItem* ParseTaskDecl(bool prototype_only = false);
-  std::vector<FunctionArg> ParseFunctionArgs();
+  std::vector<FunctionArg> ParseFunctionArgs(bool require_identifiers = true);
   void ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw);
 
   // Declarations
