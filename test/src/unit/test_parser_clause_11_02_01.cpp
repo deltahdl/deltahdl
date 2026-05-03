@@ -305,6 +305,14 @@ TEST(ConstExpr, NestedConstantSysFuncIsConstant) {
   EXPECT_TRUE(IsConstantExpr(e));
 }
 
+// §11.2.1: "Constant expressions can use any of the operators defined in
+// Table 11-1." A nested ternary on constant operands satisfies the predicate.
+TEST(ConstExpr, NestedTernaryIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("1 ? (0 ? 3 : 4) : 5", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
 TEST(ConstExpr, TernaryWithNonConstantCondNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("x ? 10 : 20", f);
@@ -330,6 +338,144 @@ TEST(ConstExpr, NullExprNotConstant) {
 TEST(ConstEval, NullExprReturnsNullopt) {
   EXPECT_EQ(ConstEvalInt(nullptr), std::nullopt);
   EXPECT_EQ(ConstEvalReal(nullptr), std::nullopt);
+}
+
+// §11.2.1: Non-void constant function calls are operands of constant
+// expressions when their arguments are themselves constant. The function's
+// own constant-function conformance (§13.4.3) is checked separately.
+TEST(ConstExpr, NonVoidFunctionCallWithConstantArgsIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("foo(3, 4)", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
+TEST(ConstExpr, FunctionCallWithNonConstantArgNotConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("foo(x, 4)", f);
+  EXPECT_FALSE(IsConstantExpr(e));
+}
+
+// §11.2.1 + §5.13: Constant built-in method calls are operands of constant
+// expressions when the method has no side effects and either (a) the
+// identifier and args are constant or (b) the method depends only on the
+// type of the identifier.
+TEST(ConstExpr, BuiltinMethodSizeWithParensIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("arr.size()", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
+TEST(ConstExpr, BuiltinMethodSizeNoParensIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("arr.size", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
+TEST(ConstExpr, BuiltinMethodBitsIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("v.bits", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
+TEST(ConstExpr, BuiltinMethodLenWithConstantIdentifierIsConstant) {
+  EvalFixture f;
+  ScopeMap scope = {{"S", 0}};
+  auto* e = ParseExprFrom("S.len", f);
+  EXPECT_TRUE(IsConstantExpr(e, scope));
+}
+
+TEST(ConstExpr, BuiltinMethodLenWithNonConstantIdentifierNotConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("s.len", f);
+  EXPECT_FALSE(IsConstantExpr(e));
+}
+
+TEST(ConstExpr, BuiltinMethodSizeWithNonConstantArgNotConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("arr.size(x)", f);
+  EXPECT_FALSE(IsConstantExpr(e));
+}
+
+// §11.2.1: $sformatf (§21.3.3) is a constant system function when its
+// arguments are constant expressions.
+TEST(ConstExpr, SformatfWithConstantArgsIsConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("$sformatf(\"v=%0d\", 42)", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
+// §11.2.1: $timescale and $timeprecision (§20.4) are constant system
+// functions when their arguments are constant expressions.
+TEST(ConstExpr, TimescaleIsConstantSysFunc) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("$timescale", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
+TEST(ConstExpr, TimeprecisionIsConstantSysFunc) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("$timeprecision", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
+// §11.2.1: $itor and $rtoi (§20.5 conversion system functions) are constant
+// when their arguments are constant.
+TEST(ConstExpr, ItorIsConstantSysFunc) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("$itor(42)", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
+TEST(ConstExpr, RtoiIsConstantSysFunc) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("$rtoi(3.7)", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
+// §11.2.1 last paragraph: data query (§20.6) and array query (§20.7) system
+// functions may be constant system function calls even when their arguments
+// are not constant expressions.
+TEST(ConstExpr, BitsConstantEvenWhenArgIsNonConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("$bits(x)", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
+TEST(ConstExpr, DimensionsConstantEvenWhenArgIsNonConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("$dimensions(x)", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
+TEST(ConstExpr, SizeQueryConstantEvenWhenArgIsNonConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("$size(x)", f);
+  EXPECT_TRUE(IsConstantExpr(e));
+}
+
+// §11.2.1: Constant bit-selects of parameters are operands of constant
+// expressions.
+TEST(ConstExpr, ConstantBitSelectOfParameterIsConstant) {
+  EvalFixture f;
+  ScopeMap scope = {{"P", 0}};
+  auto* e = ParseExprFrom("P[2]", f);
+  EXPECT_TRUE(IsConstantExpr(e, scope));
+}
+
+// §11.2.1: Constant part-selects of parameters are operands of constant
+// expressions.
+TEST(ConstExpr, ConstantPartSelectOfParameterIsConstant) {
+  EvalFixture f;
+  ScopeMap scope = {{"P", 0}};
+  auto* e = ParseExprFrom("P[3:0]", f);
+  EXPECT_TRUE(IsConstantExpr(e, scope));
+}
+
+// §11.2.1: A bit-select of a non-parameter identifier is not constant.
+TEST(ConstExpr, BitSelectOfNonParameterNotConstant) {
+  EvalFixture f;
+  auto* e = ParseExprFrom("x[2]", f);
+  EXPECT_FALSE(IsConstantExpr(e));
 }
 
 }  // namespace

@@ -1525,6 +1525,7 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     case StmtKind::kAssertImmediate:
     case StmtKind::kAssumeImmediate:
     case StmtKind::kCoverImmediate:
+    case StmtKind::kExpect:
       return ExecImmediateAssert(stmt, ctx, arena);
     case StmtKind::kForce:
     case StmtKind::kAssign:

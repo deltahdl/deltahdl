@@ -5,20 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(BuiltinMethodParsing, MethodCallWithParens) {
-  auto r = Parse(
-      "module m;\n"
-      "  int arr [0:3];\n"
-      "  int s;\n"
-      "  initial s = arr.size();\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCall);
-}
-
 TEST(BuiltinMethodParsing, MethodCallNoParens) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

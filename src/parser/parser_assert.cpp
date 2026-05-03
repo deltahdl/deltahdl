@@ -328,7 +328,10 @@ ModuleItem* Parser::ParseSequenceDecl() {
 
 Stmt* Parser::ParseExpectStmt() {
   auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kAssertImmediate;  // reuse for stub
+  // §13.4: expect is one of the time-controlling statements forbidden
+  // inside a function body, so it carries its own kind distinct from the
+  // immediate-assert family.
+  stmt->kind = StmtKind::kExpect;
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwExpect);
   Expect(TokenKind::kLParen);

@@ -563,6 +563,59 @@ static bool IsConstantSysCallExpr(const Expr* expr, const ScopeMap& scope) {
   return AllElementsConstant(expr->args, scope);
 }
 
+// §11.2.1 + §5.13: Built-in methods whose value depends only on the type of
+// the identifier (not its current value). Constant built-in method calls of
+// these methods are constant expressions whenever their input arguments are
+// constant, even when the identifier is not constant. The set covers fixed
+// array properties — size and num for fixed-size unpacked arrays and the
+// §20.7 array query family that returns dimensional metadata.
+static bool IsTypeOnlyBuiltinMethod(std::string_view method) {
+  static const std::unordered_set<std::string_view> kMethods = {
+      "size",  "num",   "bits",      "dimensions",
+      "unpacked_dimensions", "left",  "right",     "low",
+      "high",  "increment",
+  };
+  return kMethods.count(method) > 0;
+}
+
+// §11.2.1 + §5.13: Built-in method calls whose value depends on the current
+// value of the identifier (e.g., string.len). These require the identifier
+// itself to be a constant expression.
+static bool IsValueDependentBuiltinMethod(std::string_view method) {
+  static const std::unordered_set<std::string_view> kMethods = {
+      "len",
+  };
+  return kMethods.count(method) > 0;
+}
+
+// §11.2.1: A constant built-in method call is a method call (kCall on a
+// member access, or a paren-less kMemberAccess) where:
+//  - the method has no side effects, and
+//  - the input arguments are constant, and
+//  - either the method depends only on the type of the identifier, or
+//    the identifier itself is a constant expression.
+static bool IsConstantBuiltinMethodCall(const Expr* expr,
+                                        const ScopeMap& scope) {
+  if (!expr) return false;
+  const Expr* member = nullptr;
+  if (expr->kind == ExprKind::kCall && expr->lhs &&
+      expr->lhs->kind == ExprKind::kMemberAccess) {
+    if (!AllElementsConstant(expr->args, scope)) return false;
+    member = expr->lhs;
+  } else if (expr->kind == ExprKind::kMemberAccess) {
+    member = expr;
+  } else {
+    return false;
+  }
+  if (!member->rhs || member->rhs->kind != ExprKind::kIdentifier) return false;
+  std::string_view method = member->rhs->text;
+  if (IsTypeOnlyBuiltinMethod(method)) return true;
+  if (IsValueDependentBuiltinMethod(method)) {
+    return IsConstantExpr(member->lhs, scope);
+  }
+  return false;
+}
+
 bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return false;
 
@@ -601,7 +654,19 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
       return IsConstantExpr(expr->lhs, scope);
     case ExprKind::kAssignmentPattern:
       return AllElementsConstant(expr->elements, scope);
+    case ExprKind::kCall: {
+      // §11.2.1: Constant built-in method call (object.method(args)).
+      if (IsConstantBuiltinMethodCall(expr, scope)) return true;
+      // §11.2.1: Non-void constant function call (see §13.4.3). The function
+      // declaration is checked separately for §13.4.3 conformance — here we
+      // only require that the arguments are themselves constant expressions.
+      return AllElementsConstant(expr->args, scope);
+    }
     case ExprKind::kMemberAccess: {
+      // §11.2.1 + §5.13: Constant built-in method call without parentheses
+      // (object.method per §13.5.5: empty parens are optional). The check is
+      // shared with the kCall case via IsConstantBuiltinMethodCall.
+      if (IsConstantBuiltinMethodCall(expr, scope)) return true;
       if (expr->lhs && expr->rhs &&
           expr->lhs->kind == ExprKind::kIdentifier &&
           expr->rhs->kind == ExprKind::kIdentifier) {

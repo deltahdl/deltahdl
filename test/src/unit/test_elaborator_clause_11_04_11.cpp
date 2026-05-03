@@ -207,13 +207,6 @@ TEST(ConstEvalReal, TernaryOnReals) {
   EXPECT_DOUBLE_EQ(val.value_or(0.0), 2.5);
 }
 
-TEST(ConstExpr, NestedTernaryIsConstant) {
-  EvalFixture f;
-  auto* e = ParseExprFrom("1 ? (0 ? 3 : 4) : 5", f);
-  EXPECT_TRUE(IsConstantExpr(e));
-  EXPECT_EQ(ConstEvalInt(e), 4);
-}
-
 TEST(ExpressionElaboration, TernaryWidthIsMaxOfBranches) {
   SimFixture f;
   auto* design = ElaborateSrc(

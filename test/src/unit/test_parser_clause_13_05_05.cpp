@@ -64,4 +64,30 @@ TEST(SubroutineCallSyntaxParsing, VoidFunctionAllDefaultsWithoutParens) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kIdentifier);
 }
 
+// §13.5.5: A class function method without arguments may be called without
+// the empty parentheses; the bare member access shall parse cleanly.
+TEST(SubroutineCallSyntaxParsing, ClassMethodNoArgsWithoutParens) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  function void touch; endfunction\n"
+              "endclass\n"
+              "module m;\n"
+              "  C c;\n"
+              "  initial c.touch;\n"
+              "endmodule\n"));
+}
+
+// §13.5.5: A class method whose arguments all have defaults may be called
+// without the empty parentheses.
+TEST(SubroutineCallSyntaxParsing, ClassMethodAllDefaultsWithoutParens) {
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  function void take(int v = 1); endfunction\n"
+              "endclass\n"
+              "module m;\n"
+              "  C c;\n"
+              "  initial c.take;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

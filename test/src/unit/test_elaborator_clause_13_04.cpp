@@ -202,4 +202,137 @@ TEST(FunctionElaboration, FunctionWithNestedTaskEnableError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §13.4: It shall be illegal to call a function with output, inout, or ref
+// arguments in an expression that is not within a procedural statement
+// (e.g., a continuous assignment).
+TEST(FunctionElaboration, OutputArgCallInContAssignError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int f(output int b); b = 7; return 0; endfunction\n"
+      "  int v;\n"
+      "  wire [31:0] w;\n"
+      "  assign w = f(v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, InoutArgCallInContAssignError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int f(inout int b); return b; endfunction\n"
+      "  int v;\n"
+      "  wire [31:0] w;\n"
+      "  assign w = f(v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(FunctionElaboration, RefArgCallInContAssignError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function automatic int f(ref int b); return b; endfunction\n"
+      "  int v;\n"
+      "  wire [31:0] w;\n"
+      "  assign w = f(v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §13.4: A const ref function argument shall be legal in this context.
+TEST(FunctionElaboration, ConstRefArgCallInContAssignOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int f(const ref int b); return b; endfunction\n"
+      "  int v;\n"
+      "  wire [31:0] w;\n"
+      "  assign w = f(v);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §13.4: It shall be illegal to call a function with output / inout / ref
+// arguments inside an event expression.
+TEST(FunctionElaboration, OutputArgCallInEventExpressionError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int f(output int b); b = 0; return 0; endfunction\n"
+      "  int v;\n"
+      "  logic clk;\n"
+      "  always @(posedge clk iff f(v) != 0) v = v + 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §13.4: It shall be illegal to call a function with output / inout / ref
+// arguments inside a procedural continuous assignment (assign / force).
+TEST(FunctionElaboration, OutputArgCallInProceduralContAssignError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int f(output int b); b = 0; return 0; endfunction\n"
+      "  int v;\n"
+      "  logic [31:0] w;\n"
+      "  initial begin\n"
+      "    assign w = f(v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §13.4(a): The expect statement is one of the time-controlling statements
+// listed in §13.4 and shall not appear inside a function body.
+TEST(FunctionElaboration, FunctionWithExpectError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic ready;\n"
+      "  function void f();\n"
+      "    expect(ready);\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §13.4(a): The cycle-delay statement (##N) is a time-controlling statement
+// and shall not appear inside a function body.
+TEST(FunctionElaboration, FunctionWithCycleDelayError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    ##5;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §13.4: A function call with only input args is legal in any expression
+// context.
+TEST(FunctionElaboration, InputOnlyArgCallInContAssignOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function int f(input int a); return a + 1; endfunction\n"
+      "  wire [31:0] w;\n"
+      "  assign w = f(32'd5);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

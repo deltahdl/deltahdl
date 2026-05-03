@@ -1748,11 +1748,14 @@ static void CheckFuncBodyStmt(
     diag.Error(s->range.start,
                "only fork/join_none is permitted inside a function");
   }
-  // §13.2: Function shall not contain time-controlling statements.
+  // §13.4(a): A function shall not contain any time-controlling statements,
+  // i.e., any statements containing #, ##, @, fork-join, fork-join_any,
+  // wait, wait fork, wait_order, or expect.
   if (s->kind == StmtKind::kDelay || s->kind == StmtKind::kCycleDelay ||
       s->kind == StmtKind::kEventControl ||
       s->kind == StmtKind::kTimingControl || s->kind == StmtKind::kWait ||
-      s->kind == StmtKind::kWaitFork || s->kind == StmtKind::kWaitOrder) {
+      s->kind == StmtKind::kWaitFork || s->kind == StmtKind::kWaitOrder ||
+      s->kind == StmtKind::kExpect) {
     diag.Error(s->range.start,
                "time-controlling statement is not allowed inside a function");
   }
@@ -2246,6 +2249,58 @@ static void CheckVoidCallInExpr(
   for (auto* e : expr->elements) CheckVoidCallInExpr(e, func_decls, diag);
 }
 
+// §13.4: A function shall not be called with output, inout, or ref (non-const)
+// arguments inside an event expression, an expression within a procedural
+// continuous assignment, or any expression that is not within a procedural
+// statement. Returns the offending argument's direction name when illegal,
+// or empty when the call is acceptable in such a context.
+static std::string_view ForbiddenFuncArgInNonProc(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
+  if (!expr || expr->kind != ExprKind::kCall || expr->callee.empty())
+    return {};
+  auto it = func_decls.find(expr->callee);
+  if (it == func_decls.end()) return {};
+  const auto* func = it->second;
+  if (func->kind != ModuleItemKind::kFunctionDecl) return {};
+  for (const auto& arg : func->func_args) {
+    if (arg.direction == Direction::kOutput) return "output";
+    if (arg.direction == Direction::kInout) return "inout";
+    // §13.5.2 + §13.4: const ref function argument is legal in this context.
+    if (arg.direction == Direction::kRef && !arg.is_const) return "ref";
+  }
+  return {};
+}
+
+// §13.4: Walk an expression and flag any function call that uses
+// output / inout / non-const ref arguments. Used in non-procedural and
+// event-expression contexts.
+static void CheckCallNoOutInoutRefInExpr(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag, std::string_view context) {
+  if (!expr) return;
+  auto bad = ForbiddenFuncArgInNonProc(expr, func_decls);
+  if (!bad.empty()) {
+    diag.Error(expr->range.start,
+               std::format("function '{}' has {} argument; cannot be called "
+                           "in {}",
+                           expr->callee, bad, context));
+  }
+  CheckCallNoOutInoutRefInExpr(expr->lhs, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->rhs, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->condition, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->true_expr, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->false_expr, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->base, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->index, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->index_end, func_decls, diag, context);
+  for (auto* a : expr->args)
+    CheckCallNoOutInoutRefInExpr(a, func_decls, diag, context);
+  for (auto* e : expr->elements)
+    CheckCallNoOutInoutRefInExpr(e, func_decls, diag, context);
+}
+
 // §13.5: Walk expression tree for call validation.
 static void WalkExprForCallArgs(
     const Expr* expr,
@@ -2295,6 +2350,21 @@ static void WalkStmtForCallArgs(
   CheckVoidCallInExpr(s->rhs, func_decls, diag);
   CheckVoidCallInExpr(s->condition, func_decls, diag);
   CheckVoidCallInExpr(s->for_cond, func_decls, diag);
+  // §13.4: Function calls with output / inout / non-const ref args are
+  // illegal in procedural continuous assignments (assign / force) and inside
+  // event expressions (event control or wait_order arguments).
+  if (s->kind == StmtKind::kAssign || s->kind == StmtKind::kForce) {
+    CheckCallNoOutInoutRefInExpr(s->rhs, func_decls, diag,
+                                 "a procedural continuous assignment");
+  }
+  if (s->kind == StmtKind::kEventControl) {
+    for (const auto& ev : s->events) {
+      CheckCallNoOutInoutRefInExpr(ev.signal, func_decls, diag,
+                                   "an event expression");
+      CheckCallNoOutInoutRefInExpr(ev.iff_condition, func_decls, diag,
+                                   "an event expression");
+    }
+  }
   WalkExprForCallArgs(s->expr, func_decls, diag);
   WalkExprForCallArgs(s->lhs, func_decls, diag);
   WalkExprForCallArgs(s->rhs, func_decls, diag);
@@ -2318,10 +2388,23 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
   }
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kInitialBlock ||
-        item->kind == ModuleItemKind::kAlwaysBlock ||
-        item->kind == ModuleItemKind::kFinalBlock) {
+    bool is_proc_block = item->kind == ModuleItemKind::kInitialBlock ||
+                         item->kind == ModuleItemKind::kAlwaysBlock ||
+                         item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                         item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                         item->kind == ModuleItemKind::kFinalBlock;
+    if (is_proc_block) {
       WalkStmtForCallArgs(item->body, all_decls, diag_);
+      // §13.4: Sensitivity-list event expressions are not within a procedural
+      // statement; function calls with output / inout / non-const ref args
+      // are illegal here.
+      for (const auto& ev : item->sensitivity) {
+        CheckCallNoOutInoutRefInExpr(ev.signal, all_decls, diag_,
+                                     "an event expression");
+        CheckCallNoOutInoutRefInExpr(ev.iff_condition, all_decls, diag_,
+                                     "an event expression");
+      }
     }
     // Also check function/task bodies.
     if (item->kind == ModuleItemKind::kFunctionDecl ||
@@ -2332,6 +2415,11 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
     }
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckVoidCallInExpr(item->assign_rhs, all_decls, diag_);
+      // §13.4: A continuous assignment is not within a procedural statement;
+      // function calls with output / inout / non-const ref args are illegal.
+      CheckCallNoOutInoutRefInExpr(
+          item->assign_rhs, all_decls, diag_,
+          "a continuous assignment");
     }
   }
 }

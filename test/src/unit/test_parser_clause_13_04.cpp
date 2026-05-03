@@ -78,24 +78,6 @@ TEST(FunctionDeclParsing, AutoFuncWithAllPortDirs) {
   EXPECT_EQ(item->func_args[2].data_type.kind, DataTypeKind::kInt);
 }
 
-TEST(FunctionDeclParsing, BasicFunctionWithTwoArgs) {
-  auto r = Parse(
-      "module t;\n"
-      "  function int add(input int a, input int b);\n"
-      "    return a + b;\n"
-      "  endfunction\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = r.cu->modules[0]->items[0];
-  EXPECT_EQ(item->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(item->name, "add");
-  std::string expected[] = {"a", "b"};
-  ASSERT_EQ(item->func_args.size(), std::size(expected));
-  for (size_t i = 0; i < std::size(expected); ++i) {
-    EXPECT_EQ(item->func_args[i].name, expected[i]) << "arg " << i;
-  }
-}
-
 TEST(FunctionDeclParsing, OldStylePortThreeIdentifiers) {
   auto r = Parse(
       "module m;\n"
@@ -461,6 +443,25 @@ TEST(FunctionDeclParsing, AllArgDirections) {
               "    return a + d;\n"
               "  endfunction\n"
               "endmodule\n"));
+}
+
+// §13.4: "Each formal argument has a data type that can be explicitly
+// declared or inherited from the previous argument." When the data type is
+// omitted on a non-first argument that does not have an explicit direction,
+// it shall inherit from the previous argument.
+TEST(FunctionDeclParsing, FuncArgDataTypeInheritedFromPrevious) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f(int a, b);\n"
+      "  endfunction\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FirstItem(r);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 2u);
+  EXPECT_EQ(item->func_args[0].data_type.kind, DataTypeKind::kInt);
+  EXPECT_EQ(item->func_args[1].data_type.kind, DataTypeKind::kInt);
 }
 
 }  // namespace

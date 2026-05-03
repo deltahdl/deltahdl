@@ -235,6 +235,10 @@ enum class StmtKind : uint8_t {
   kVarDecl,          // Block-level variable declaration (§9.3.1)
   kBlockItemDecl,    // Block-level typedef/import/let (§A.2.8)
   kCycleDelay,       // ##N cycle delay statement (§14.11)
+  kExpect,           // expect(property) statement (§16.17). §13.4 lists
+                     // expect among the time-controlling statements that
+                     // are illegal inside a function body, so it must be
+                     // distinguishable from immediate assert/assume/cover.
 };
 
 enum class Edge : uint8_t {
