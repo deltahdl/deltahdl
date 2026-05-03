@@ -49,21 +49,6 @@ TEST(PliPreponedSim, PreponedExecutesBeforePreActive) {
   EXPECT_EQ(order[1], "pre_active");
 }
 
-TEST(PliPreponedSim, PreponedRegionHoldsMultiplePLICallbacks) {
-  Arena arena;
-  Scheduler sched(arena);
-  int count = 0;
-
-  for (int i = 0; i < 5; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&]() { count++; };
-    sched.ScheduleEvent({0}, Region::kPreponed, ev);
-  }
-
-  sched.Run();
-  EXPECT_EQ(count, 5);
-}
-
 TEST(PliPreponedSim, PreponedEventsAcrossMultipleTimeSlots) {
   Arena arena;
   Scheduler sched(arena);

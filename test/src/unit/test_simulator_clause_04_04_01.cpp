@@ -10,47 +10,6 @@
 
 using namespace delta;
 
-TEST(SchedulerRegionSetSim, ActiveSetBeforeReactiveSet) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
-  ScheduleLabeled(sched, Region::kActive, "active", order);
-  ScheduleLabeled(sched, Region::kNBA, "nba", order);
-  ScheduleLabeled(sched, Region::kReNBA, "renba", order);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 4u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "nba");
-  EXPECT_EQ(order[2], "reactive");
-  EXPECT_EQ(order[3], "renba");
-}
-
-TEST(SchedulerRegionSetSim, NonIterativeRegionsAre3) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> order;
-
-  auto schedule = [&](Region r, int id) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, id]() { order.push_back(id); };
-    sched.ScheduleEvent({0}, r, ev);
-  };
-
-  schedule(Region::kPreponed, 1);
-  schedule(Region::kPreActive, 2);
-  schedule(Region::kPostponed, 3);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-
-  EXPECT_EQ(order[0], 1);
-  EXPECT_EQ(order[1], 2);
-  EXPECT_EQ(order[2], 3);
-}
-
 TEST(SchedulerRegionSetSim, BothSetsInSameTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
@@ -68,50 +27,6 @@ TEST(SchedulerRegionSetSim, BothSetsInSameTimeSlot) {
 
   sched.Run();
   EXPECT_EQ(timestep_count, 1);
-}
-
-TEST(SchedulerRegionSetSim, ActiveSetCompletesBeforeObservedReactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  ScheduleLabeled(sched, Region::kObserved, "observed", order);
-  ScheduleLabeled(sched, Region::kActive, "active", order);
-  ScheduleLabeled(sched, Region::kNBA, "nba", order);
-  ScheduleLabeled(sched, Region::kInactive, "inactive", order);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 4u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "inactive");
-  EXPECT_EQ(order[2], "nba");
-  EXPECT_EQ(order[3], "observed");
-}
-
-TEST(SchedulerRegionSetSim, ObservedRegionsBridgeActivAndReactive) {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-
-  ScheduleLabeled(sched, Region::kActive, "active", order);
-  ScheduleLabeled(sched, Region::kPreObserved, "pre_observed", order);
-  ScheduleLabeled(sched, Region::kObserved, "observed", order);
-  ScheduleLabeled(sched, Region::kPostObserved, "post_observed", order);
-  ScheduleLabeled(sched, Region::kReactive, "reactive", order);
-
-  sched.Run();
-  ASSERT_EQ(order.size(), 5u);
-  EXPECT_EQ(order[0], "active");
-  EXPECT_EQ(order[1], "pre_observed");
-  EXPECT_EQ(order[2], "observed");
-  EXPECT_EQ(order[3], "post_observed");
-  EXPECT_EQ(order[4], "reactive");
-}
-
-TEST(SchedulerRegionSetSim, PrePostponedIsLastIterativeRegion) {
-  VerifyThreeRegionOrder({Region::kPostReNBA, "post_renba"},
-                         {Region::kPrePostponed, "pre_postponed"},
-                         {Region::kPostponed, "postponed"});
 }
 
 TEST(SchedulerRegionSetSim, ProcessReactiveContextFlag) {

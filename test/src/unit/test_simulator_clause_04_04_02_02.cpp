@@ -9,17 +9,6 @@
 
 using namespace delta;
 
-// §4.4.2.2: "The Active region holds the current active region set events
-// being evaluated...". The Active region is itself a member of the active
-// region set (§4.4.1 ¶1); IsActiveRegionSet is the production classifier
-// used by Scheduler::ExecuteActiveRegions to decide which regions to drain
-// inside the active-set iteration. Pinning the classifier here keeps the
-// "Active is in the active region set" invariant testable from §4.4.2.2 in
-// addition to §4.4.1's partition test.
-TEST(ActiveRegionSim, ActiveIsActiveRegionSetMember) {
-  EXPECT_TRUE(IsActiveRegionSet(Region::kActive));
-}
-
 // §4.4.2.2: the Active region "holds the current active region set events
 // being evaluated...and can be processed in any order." The LRM grants the
 // implementation freedom over the intra-Active ordering; the testable rule
