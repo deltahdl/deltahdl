@@ -84,6 +84,25 @@ def test_parse_args_commit_explicit(make_lrm, make_output) -> None:
     assert args.commit is True
 
 
+def test_parse_args_resume_defaults_off(make_lrm, make_output) -> None:
+    """--resume defaults to False so a plain run never reads the prior --output."""
+    args = document_dependency_graph.parse_args([
+        "--lrm", str(make_lrm),
+        "--output", str(make_output),
+    ])
+    assert args.resume is False
+
+
+def test_parse_args_resume_explicit(make_lrm, make_output) -> None:
+    """--resume sets args.resume to True."""
+    args = document_dependency_graph.parse_args([
+        "--lrm", str(make_lrm),
+        "--output", str(make_output),
+        "--resume",
+    ])
+    assert args.resume is True
+
+
 def test_main_walks_every_toc_entry(run_main) -> None:
     """main() invokes build_subclause_record once per load_toc entry."""
     _, mock_record, _ = run_main(
@@ -175,9 +194,12 @@ _FRESH_RECORD: dict[str, Any] = {
 }
 
 
-def _checkpoint_argv(make_lrm, make_output) -> list[str]:
+def _checkpoint_argv(make_lrm, make_output, *, resume: bool = False) -> list[str]:
     """Build the canonical argv for checkpoint tests."""
-    return ["--lrm", str(make_lrm), "--output", str(make_output)]
+    argv = ["--lrm", str(make_lrm), "--output", str(make_output)]
+    if resume:
+        argv.append("--resume")
+    return argv
 
 
 @contextlib.contextmanager
@@ -211,9 +233,11 @@ def _seed_checkpoint(make_output, records: dict[str, dict[str, Any]]) -> None:
     make_output.write_text(json.dumps({"records": records}))
 
 
-def _run_main(make_lrm, make_output) -> None:
+def _run_main(make_lrm, make_output, *, resume: bool = False) -> None:
     """Invoke main() with the canonical argv for checkpoint tests."""
-    document_dependency_graph.main(_checkpoint_argv(make_lrm, make_output))
+    document_dependency_graph.main(
+        _checkpoint_argv(make_lrm, make_output, resume=resume),
+    )
 
 
 _TWO_TOC = {"4.4": (10, 20), "5.6": (21, 30)}
@@ -224,7 +248,7 @@ def test_main_resume_reuses_cached_record(make_lrm, make_output) -> None:
     """A pre-existing records section is reused verbatim for the cached subclause."""
     _seed_checkpoint(make_output, {"4.4": _CACHED_RECORD})
     with _stub_walk(_TWO_TOC, return_value=_FRESH_RECORD):
-        _run_main(make_lrm, make_output)
+        _run_main(make_lrm, make_output, resume=True)
     payload = json.loads(make_output.read_text())
     assert payload["records"]["4.4"] == _CACHED_RECORD
 
@@ -233,7 +257,7 @@ def test_main_resume_skips_oracle_for_cached_subclause(make_lrm, make_output) ->
     """build_subclause_record is not called for a cached subclause."""
     _seed_checkpoint(make_output, {"4.4": _CACHED_RECORD})
     with _stub_walk(_TWO_TOC, return_value=_FRESH_RECORD) as mock_record:
-        _run_main(make_lrm, make_output)
+        _run_main(make_lrm, make_output, resume=True)
     assert [c.args[0] for c in mock_record.call_args_list] == ["5.6"]
 
 
@@ -257,7 +281,7 @@ def test_main_drops_cached_records_not_in_toc(make_lrm, make_output) -> None:
     """Cached records for subclauses no longer in TOC are dropped from output."""
     _seed_checkpoint(make_output, {"old.1": _CACHED_RECORD})
     with _stub_walk({"4.4": (10, 20)}, return_value=_FRESH_RECORD):
-        _run_main(make_lrm, make_output)
+        _run_main(make_lrm, make_output, resume=True)
     payload = json.loads(make_output.read_text())
     assert "old.1" not in payload["records"]
 
@@ -266,4 +290,19 @@ def test_main_no_checkpoint_runs_every_subclause(make_lrm, make_output) -> None:
     """Without a checkpoint file, build_subclause_record runs for every TOC entry."""
     with _stub_walk(_TWO_TOC, return_value=_FRESH_RECORD) as mock_record:
         _run_main(make_lrm, make_output)
+    assert mock_record.call_count == 2
+
+
+def test_main_without_resume_ignores_existing_output(make_lrm, make_output) -> None:
+    """Without --resume, a pre-existing --output is ignored — every subclause re-walks."""
+    _seed_checkpoint(make_output, {"4.4": _CACHED_RECORD})
+    with _stub_walk(_TWO_TOC, return_value=_FRESH_RECORD) as mock_record:
+        _run_main(make_lrm, make_output)
+    assert mock_record.call_count == 2
+
+
+def test_main_resume_with_no_existing_output_runs_fresh(make_lrm, make_output) -> None:
+    """--resume against a missing --output starts fresh and walks every subclause."""
+    with _stub_walk(_TWO_TOC, return_value=_FRESH_RECORD) as mock_record:
+        _run_main(make_lrm, make_output, resume=True)
     assert mock_record.call_count == 2

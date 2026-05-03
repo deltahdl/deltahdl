@@ -49,6 +49,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             " to main. Off by default."
         ),
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        default=False,
+        help=(
+            "Read --output as a checkpoint and skip subclauses already"
+            " recorded there. Off by default — a fresh run ignores any"
+            " pre-existing --output and overwrites it on the first"
+            " per-subclause checkpoint write."
+        ),
+    )
     return parse_and_validate(parser, argv)
 
 
@@ -69,7 +80,7 @@ def main(argv: list[str] | None = None) -> None:
     """Run the dependency oracles for every subclause and write the graph."""
     args = parse_args(argv)
     toc = load_toc(str(args.lrm))
-    cached = _load_checkpoint(args.output)
+    cached = _load_checkpoint(args.output) if args.resume else {}
     records: dict = {}
     for subclause in toc:
         if subclause in cached:
