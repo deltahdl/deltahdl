@@ -310,6 +310,25 @@ def test_parse_dependencies_rejects_text_without_array() -> None:
         parse_dependencies("no array here")
 
 
+def test_parse_dependencies_picks_last_array_when_prose_has_brackets() -> None:
+    """Prose containing a bracketed example doesn't swallow the real array."""
+    text = (
+        "Reasoning: §3.9 says [example with typedef struct, function].\n\n"
+        "It defers all syntax to Clause 26.\n\n"
+        "[]"
+    )
+    assert not parse_dependencies(text)
+
+
+def test_parse_dependencies_picks_last_nonempty_array_when_prose_has_brackets() -> None:
+    """A non-empty final array is picked over earlier bracketed prose."""
+    text = (
+        "Earlier prose [unrelated bracketed text] more prose.\n\n"
+        '["33.6.1", "33.4.1.5"]'
+    )
+    assert parse_dependencies(text) == ["33.6.1", "33.4.1.5"]
+
+
 # --- compute_subclause_dependencies -----------------------------------------
 
 

@@ -76,7 +76,7 @@ def run_oracle_call(prompt: str, *, model: str) -> str:
 
 _DEP_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
 _FENCED_ARR_RE = re.compile(r"```(?:json)?\s*(\[.*?\])\s*```", re.DOTALL)
-_BARE_ARR_RE = re.compile(r"\[.*\]", re.DOTALL)
+_BARE_ARR_RE = re.compile(r"\[[^\[\]]*\]", re.DOTALL)
 
 
 def _extract_dependency_array(text: str) -> str:
@@ -84,9 +84,13 @@ def _extract_dependency_array(text: str) -> str:
     match = _FENCED_ARR_RE.search(text)
     if match:
         return match.group(1)
-    match = _BARE_ARR_RE.search(text)
-    if match:
-        return match.group(0)
+    # Pick the LAST bare-array group: the oracle's reasoning prose can
+    # contain bracketed examples (e.g. "[example with typedef struct,
+    # function]") earlier in the response, so a greedy match would span
+    # from the first prose bracket to the actual final answer.
+    matches = _BARE_ARR_RE.findall(text)
+    if matches:
+        return matches[-1]
     raise ValueError("No JSON array found in oracle output")
 
 
