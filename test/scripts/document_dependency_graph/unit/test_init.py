@@ -2,6 +2,8 @@
 
 import json
 import runpy
+from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -155,3 +157,119 @@ def test_main_guard_invokes_main() -> None:
     """Running as __main__ calls main()."""
     with pytest.raises(SystemExit):
         runpy.run_module("document_dependency_graph", run_name="__main__")
+
+
+# --- Checkpoint / resume ----------------------------------------------------
+
+
+_CACHED_RECORD: dict[str, Any] = {
+    "dependencies": ["3.14.3"],
+    "proofs": {"3.14.3": "Cached sentence."},
+    "prerequisites": {"3.14.3": "cached prereq"},
+}
+_FRESH_RECORD: dict[str, Any] = {
+    "dependencies": [],
+    "proofs": {},
+    "prerequisites": {},
+}
+
+
+def _checkpoint_argv(make_lrm, make_output) -> list[str]:
+    """Build the canonical argv for checkpoint tests."""
+    return ["--lrm", str(make_lrm), "--output", str(make_output)]
+
+
+def _patch_walk(toc, *, return_value=None, side_effect=None):
+    """Stack patches on load_toc/build_subclause_record/commit_output."""
+    record_kwargs = (
+        {"side_effect": side_effect}
+        if side_effect is not None
+        else {"return_value": return_value}
+    )
+    return (
+        patch("document_dependency_graph.load_toc", return_value=toc),
+        patch(
+            "document_dependency_graph.build_subclause_record",
+            **record_kwargs,
+        ),
+        patch("document_dependency_graph.commit_output"),
+    )
+
+
+def test_main_resume_reuses_cached_record(make_lrm, make_output) -> None:
+    """A pre-existing records section is reused verbatim for the cached subclause."""
+    make_output.write_text(json.dumps({"records": {"4.4": _CACHED_RECORD}}))
+    toc_p, rec_p, com_p = _patch_walk(
+        {"4.4": (10, 20), "5.6": (21, 30)}, return_value=_FRESH_RECORD,
+    )
+    with toc_p, rec_p, com_p:
+        document_dependency_graph.main(_checkpoint_argv(make_lrm, make_output))
+    payload = json.loads(make_output.read_text())
+    assert payload["records"]["4.4"] == _CACHED_RECORD
+
+
+def test_main_resume_skips_oracle_for_cached_subclause(make_lrm, make_output) -> None:
+    """build_subclause_record is not called for a cached subclause."""
+    make_output.write_text(json.dumps({"records": {"4.4": _CACHED_RECORD}}))
+    toc_p, rec_p, com_p = _patch_walk(
+        {"4.4": (10, 20), "5.6": (21, 30)}, return_value=_FRESH_RECORD,
+    )
+    with toc_p, com_p, rec_p as mock_record:
+        document_dependency_graph.main(_checkpoint_argv(make_lrm, make_output))
+    assert [c.args[0] for c in mock_record.call_args_list] == ["5.6"]
+
+
+def _run_main_capturing_crash(make_lrm, make_output, toc_p, rec_p, com_p) -> None:
+    """Run main() and swallow the seeded crash so the file state can be inspected."""
+    with toc_p, rec_p, com_p:
+        try:
+            document_dependency_graph.main(
+                _checkpoint_argv(make_lrm, make_output),
+            )
+        except RuntimeError:
+            pass
+
+
+def test_main_crash_persists_completed_records(make_lrm, make_output) -> None:
+    """A crash mid-walk leaves prior subclauses persisted in --output."""
+    side = [_FRESH_RECORD, RuntimeError("oracle exploded")]
+    toc_p, rec_p, com_p = _patch_walk(
+        {"4.4": (10, 20), "5.6": (21, 30)}, side_effect=side,
+    )
+    _run_main_capturing_crash(make_lrm, make_output, toc_p, rec_p, com_p)
+    payload = json.loads(make_output.read_text())
+    assert payload["records"] == {"4.4": _FRESH_RECORD}
+
+
+def test_main_partial_checkpoint_omits_order_section(make_lrm, make_output) -> None:
+    """A crash mid-walk leaves no order section since the walk did not finish."""
+    side = [_FRESH_RECORD, RuntimeError("oracle exploded")]
+    toc_p, rec_p, com_p = _patch_walk(
+        {"4.4": (10, 20), "5.6": (21, 30)}, side_effect=side,
+    )
+    _run_main_capturing_crash(make_lrm, make_output, toc_p, rec_p, com_p)
+    payload = json.loads(make_output.read_text())
+    assert "order" not in payload
+
+
+def test_main_drops_cached_records_not_in_toc(make_lrm, make_output) -> None:
+    """Cached records for subclauses no longer in TOC are dropped from output."""
+    stale = {"old.1": _CACHED_RECORD}
+    make_output.write_text(json.dumps({"records": stale}))
+    toc_p, rec_p, com_p = _patch_walk(
+        {"4.4": (10, 20)}, return_value=_FRESH_RECORD,
+    )
+    with toc_p, rec_p, com_p:
+        document_dependency_graph.main(_checkpoint_argv(make_lrm, make_output))
+    payload = json.loads(make_output.read_text())
+    assert "old.1" not in payload["records"]
+
+
+def test_main_no_checkpoint_runs_every_subclause(make_lrm, make_output) -> None:
+    """Without a checkpoint file, build_subclause_record runs for every TOC entry."""
+    toc_p, rec_p, com_p = _patch_walk(
+        {"4.4": (10, 20), "5.6": (21, 30)}, return_value=_FRESH_RECORD,
+    )
+    with toc_p, com_p, rec_p as mock_record:
+        document_dependency_graph.main(_checkpoint_argv(make_lrm, make_output))
+    assert mock_record.call_count == 2

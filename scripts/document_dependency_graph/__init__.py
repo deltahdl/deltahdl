@@ -52,16 +52,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parse_and_validate(parser, argv)
 
 
+def _load_checkpoint(output: Path) -> dict:
+    """Return the cached records dict from ``output``, or empty if absent.
+
+    A pre-existing --output file lets a resumed run skip oracle calls
+    for subclauses that already have a record. Malformed JSON raises
+    so a corrupt checkpoint becomes a loud failure rather than a silent
+    rerun-from-scratch.
+    """
+    if not output.exists():
+        return {}
+    return json.loads(output.read_text()).get("records", {})
+
+
 def main(argv: list[str] | None = None) -> None:
     """Run the dependency oracles for every subclause and write the graph."""
     args = parse_args(argv)
     toc = load_toc(str(args.lrm))
-    records = {
-        subclause: build_subclause_record(
+    cached = _load_checkpoint(args.output)
+    records: dict = {}
+    for subclause in toc:
+        if subclause in cached:
+            records[subclause] = cached[subclause]
+            continue
+        records[subclause] = build_subclause_record(
             subclause, str(args.lrm), model=args.model,
         )
-        for subclause in toc
-    }
+        args.output.write_text(json.dumps({"records": records}))
     order = order_groups(find_cycle_groups(records), records)
     args.output.write_text(json.dumps({"records": records, "order": order}))
     if args.commit:
