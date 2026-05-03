@@ -14,11 +14,25 @@ from lib.python.lrm import build_lrm_read_instruction
 
 
 _FENCED_STR_RE = re.compile(r"```(?:json)?\s*(.+?)\s*```", re.DOTALL)
+_QUOTED_STR_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
 
 
-def _strip_fences(text: str) -> str:
-    match = _FENCED_STR_RE.search(text)
-    return match.group(1) if match else text.strip()
+def _extract_json_body(text: str) -> str:
+    """Return the JSON body from oracle output.
+
+    Prefers a fenced ```json``` block, otherwise the LAST bare quoted
+    ``"..."`` substring: the oracle's reasoning prose can contain its
+    own quoted LRM phrases earlier in the response, so a strip-only
+    fallback would feed prose into ``json.loads`` and crash with the
+    confusing "Expecting value: line 1 column 1" error.
+    """
+    fenced = _FENCED_STR_RE.search(text)
+    if fenced:
+        return fenced.group(1)
+    quoted = _QUOTED_STR_RE.findall(text)
+    if quoted:
+        return quoted[-1]
+    return text.strip()
 
 
 def build_proof_sentence_prompt(
@@ -52,7 +66,7 @@ def parse_proof_sentence(text: str) -> str:
     empty strings and non-string JSON values so a malformed response
     becomes a loud failure rather than a silent empty record.
     """
-    body = _strip_fences(text)
+    body = _extract_json_body(text)
     payload = json.loads(body)
     if not isinstance(payload, str):
         raise ValueError(

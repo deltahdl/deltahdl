@@ -64,6 +64,19 @@ def test_parse_proof_sentence_rejects_empty_string() -> None:
         parse_proof_sentence('""')
 
 
+def test_parse_proof_sentence_picks_last_string_after_prose() -> None:
+    """parse_proof_sentence picks the trailing JSON string past reasoning prose."""
+    raw = (
+        "Based on §3, the only material reference is in"
+        " §3.13(h): \"enclosed by the (* and *) constructs (see"
+        " 5.12).\"\n\n"
+        '"the attribute_instance syntax and its dedicated name space"'
+    )
+    assert parse_proof_sentence(raw) == (
+        "the attribute_instance syntax and its dedicated name space"
+    )
+
+
 def test_parse_proof_sentence_rejects_non_string() -> None:
     """parse_proof_sentence rejects a non-string JSON value."""
     with pytest.raises(ValueError):
