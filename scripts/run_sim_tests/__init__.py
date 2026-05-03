@@ -2,15 +2,16 @@
 
 import subprocess
 import sys
+from pathlib import Path
 
 from lib.python.run_tests_common import BINARY, REPO_ROOT, check_binary, print_result
 
 TEST_DIR = REPO_ROOT / "test" / "src" / "e2e"
 
 
-def collect_tests():
+def collect_tests() -> list[tuple[Path, Path]]:
     """Collect all .sv files that have a matching .expected file."""
-    tests = []
+    tests: list[tuple[Path, Path]] = []
     for sv in sorted(TEST_DIR.glob("*.sv")):
         expected = sv.with_suffix(".expected")
         if expected.exists():
@@ -18,7 +19,7 @@ def collect_tests():
     return tests
 
 
-def run_test(sv_path, expected_path):
+def run_test(sv_path: Path, expected_path: Path) -> tuple[bool, str]:
     """Run deltahdl on a .sv file and compare output to .expected."""
     expected_text = expected_path.read_text()
     try:
@@ -38,7 +39,7 @@ def run_test(sv_path, expected_path):
     return False, f"expected:\n{expected_text}got:\n{actual}"
 
 
-def main():
+def main() -> None:
     """Run all simulation e2e tests and print a summary."""
     check_binary()
 

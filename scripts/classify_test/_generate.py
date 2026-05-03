@@ -1,11 +1,12 @@
 """File-generation helpers for classify_test."""
 
 import re
+from typing import Any
 
 from ._split import _render_tests, strip_lrm_quotes
 
 
-def _preamble_name(item):
+def _preamble_name(item: Any) -> str | None:
     """Extract the identifier (struct/class/enum/function name) from a item."""
     for line in item.lines:
         stripped = line.strip()
@@ -25,9 +26,9 @@ def _preamble_name(item):
     return None
 
 
-def _filter_preamble(items, tests):
+def _filter_preamble(items: list[Any], tests: list[Any]) -> list[Any]:
     """Return only preamble items referenced (directly or transitively)."""
-    names = {}
+    names: dict[str, Any] = {}
     for item in items:
         name = _preamble_name(item)
         if name:
@@ -59,9 +60,11 @@ def _filter_preamble(items, tests):
     ]
 
 
-def generate_file(clause, title, parsed, tests):
+def generate_file(
+    clause: str, title: str, parsed: Any, tests: list[Any],
+) -> str:
     """Generate the content of a split test file."""
-    out = []
+    out: list[str] = []
     if clause == "non-lrm":
         out.append("// Non-LRM tests")
     elif re.match(r"^[A-Z]\.", clause):

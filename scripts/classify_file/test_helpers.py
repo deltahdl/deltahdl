@@ -48,7 +48,7 @@ def stub_create_issue(
     """Stub subprocess.run for create_issue; return captured calls."""
     captured: list[dict[str, object]] = []
 
-    def capture_run(cmd, **kwargs):
+    def capture_run(cmd: list[str], **kwargs: object) -> MagicMock:
         captured.append(
             {"cmd": list(cmd), "input": kwargs.get("input", "")},
         )

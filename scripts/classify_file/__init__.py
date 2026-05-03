@@ -162,7 +162,7 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _maybe_close(args, reason):
+def _maybe_close(args: argparse.Namespace, reason: str) -> None:
     """Close the issue if one is attached and not creating a new one."""
     if not args.create_issue and args.issue is not None:
         close_issue(
@@ -184,7 +184,9 @@ def _run(args: argparse.Namespace) -> None:
         filepath.unlink()
         print(f"Deleted {filepath.name}")
         if not args.dry_run and not args.no_commit:
-            commit_and_push([], [filepath], f"Delete empty {filepath.name}\n")
+            commit_and_push(
+                [], [str(filepath)], f"Delete empty {filepath.name}\n",
+            )
         _maybe_close(args, "the file has no tests")
         return
     if args.create_issue:
@@ -212,7 +214,7 @@ def _run(args: argparse.Namespace) -> None:
         )
 
 
-def main():
+def main() -> None:
     """Entry point for classify_file."""
     cast(io.TextIOWrapper, sys.stdout).reconfigure(line_buffering=True)
     cast(io.TextIOWrapper, sys.stderr).reconfigure(line_buffering=True)

@@ -237,7 +237,10 @@ def dispatch_cycle(
 # ---------------------------------------------------------------------------
 
 def _cycle_marker(
-    subclause: str, members, *, in_progress: frozenset[str],
+    subclause: str,
+    members: list[str],
+    *,
+    in_progress: frozenset[str],
 ) -> dict[str, Any]:
     """Return a cycle status dict for a frame relaying the marker upward.
 

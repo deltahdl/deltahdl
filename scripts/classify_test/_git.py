@@ -1,5 +1,7 @@
 """Git commit and push integration for classify_test."""
 
+from typing import Any
+
 from classify_test._output import _format_clause
 from lib.python.git import commit_and_push, run_git
 
@@ -7,7 +9,9 @@ from lib.python.git import commit_and_push, run_git
 _run_git = run_git
 
 
-def build_commit_message(test_name, clause, rationale, action=""):
+def build_commit_message(
+    test_name: str, clause: str, rationale: str, action: str = "",
+) -> str:
     """Build a classify_test commit message.
 
     Format:
@@ -27,7 +31,7 @@ def build_commit_message(test_name, clause, rationale, action=""):
     return f"{title}\n\n{body}\n\n{trailer}\n"
 
 
-def commit_classification(ctx):
+def commit_classification(ctx: dict[str, Any]) -> str | None:
     """Build file lists and commit+push the classification result.
 
     *ctx* is a dict with keys: filepath, target, to_merge, new_names,
@@ -37,7 +41,7 @@ def commit_classification(ctx):
     changed = [ctx["test_dir"] / f"{n}.cpp" for n in ctx["new_names"]]
     changed.extend(mp for mp, _ in ctx["to_merge"])
     changed.append(ctx["cmake_path"])
-    deleted = []
+    deleted: list[Any] = []
     if filepath.exists():
         changed.append(filepath)
     else:

@@ -21,7 +21,7 @@ non-content-filter error result events) are loud-fatal via
 import json
 import subprocess
 import sys
-from typing import NoReturn
+from typing import Any, NoReturn
 
 
 _TOOL_ARG_KEYS = (
@@ -73,7 +73,9 @@ class MissingResultEventError(Exception):
     body, captured for the eventual loud-fatal message.
     """
 
-    def __init__(self, *, session_id, last_event, stderr) -> None:
+    def __init__(
+        self, *, session_id: str | None, last_event: str, stderr: str,
+    ) -> None:
         self.session_id = session_id
         self.last_event = last_event
         self.stderr = stderr
@@ -94,7 +96,7 @@ def _truncate(text: str) -> str:
     return first
 
 
-def format_tool_call(block) -> str:
+def format_tool_call(block: dict[str, Any]) -> str:
     """Return a one-line summary of an assistant ``tool_use`` block."""
     name = block.get("name", "?")
     inp = block.get("input") or {}
@@ -107,7 +109,7 @@ def format_tool_call(block) -> str:
     return f"  · {name}()"
 
 
-def format_tool_result(block) -> str:
+def format_tool_result(block: dict[str, Any]) -> str:
     """Return a one-line summary of a user ``tool_result`` block."""
     content = block.get("content")
     if isinstance(content, str):
@@ -124,7 +126,7 @@ def format_tool_result(block) -> str:
     return f"  ↳ {summary}" if summary else "  ↳ (empty)"
 
 
-def extract_session_id(event):
+def extract_session_id(event: dict[str, Any]) -> str | None:
     """Return the session_id from a system event, else None.
 
     The first event in a stream-json run is normally
@@ -138,7 +140,7 @@ def extract_session_id(event):
     return sid if isinstance(sid, str) else None
 
 
-def extract_tool_name(event):
+def extract_tool_name(event: dict[str, Any]) -> str | None:
     """Return the most recent tool_use's name in *event*, or None.
 
     A subsequent ``tool_result`` event does not carry the tool name,
@@ -151,11 +153,12 @@ def extract_tool_name(event):
     blocks = (event.get("message") or {}).get("content") or []
     for block in reversed(blocks):
         if block.get("type") == "tool_use":
-            return block.get("name")
+            name = block.get("name")
+            return name if isinstance(name, str) else None
     return None
 
 
-def describe_assistant_blocks(event) -> str:
+def describe_assistant_blocks(event: dict[str, Any]) -> str:
     """Return a short description of the last meaningful assistant block."""
     blocks = (event.get("message") or {}).get("content") or []
     for block in reversed(blocks):
@@ -169,7 +172,9 @@ def describe_assistant_blocks(event) -> str:
     return "(empty)"
 
 
-def describe_user_blocks(event, last_tool_name) -> str:
+def describe_user_blocks(
+    event: dict[str, Any], last_tool_name: str | None,
+) -> str:
     """Return a short description of the user (tool_result) event."""
     blocks = (event.get("message") or {}).get("content") or []
     for block in blocks:
@@ -180,7 +185,7 @@ def describe_user_blocks(event, last_tool_name) -> str:
     return "user (other)"
 
 
-def describe_result_event(event) -> str:
+def describe_result_event(event: dict[str, Any]) -> str:
     """Return a short description of a result event."""
     if event.get("is_error"):
         return f"result(is_error):{event.get('subtype') or '?'}"
@@ -201,7 +206,7 @@ class _StreamDiagnostic:
         self.last_event: str = "(no events)"
         self.last_tool_name: str | None = None
 
-    def observe_event(self, event) -> None:
+    def observe_event(self, event: dict[str, Any]) -> None:
         """Update the diagnostic state from a decoded event."""
         if self.session_id is None:
             self.session_id = extract_session_id(event)
@@ -210,7 +215,7 @@ class _StreamDiagnostic:
         )
         self.last_event = describe_event(event, self.last_tool_name)
 
-    def to_missing_result_error(self, stderr) -> "MissingResultEventError":
+    def to_missing_result_error(self, stderr: str) -> "MissingResultEventError":
         """Build a MissingResultEventError carrying the captured state."""
         return MissingResultEventError(
             session_id=self.session_id,
@@ -219,7 +224,9 @@ class _StreamDiagnostic:
         )
 
 
-def describe_event(event, last_tool_name) -> str:
+def describe_event(
+    event: dict[str, Any], last_tool_name: str | None,
+) -> str:
     """Return a one-line description of *event* for diagnostics."""
     etype = event.get("type") or "unknown"
     if etype == "assistant":
@@ -233,7 +240,7 @@ def describe_event(event, last_tool_name) -> str:
     return etype
 
 
-def print_assistant_blocks(message) -> None:
+def print_assistant_blocks(message: dict[str, Any]) -> None:
     """Print every block in an ``assistant`` message."""
     for block in message.get("content") or []:
         btype = block.get("type")
@@ -247,14 +254,14 @@ def print_assistant_blocks(message) -> None:
             print("  ◊ thinking...", flush=True)
 
 
-def print_user_blocks(message) -> None:
+def print_user_blocks(message: dict[str, Any]) -> None:
     """Print ``tool_result`` blocks from a ``user`` message."""
     for block in message.get("content") or []:
         if block.get("type") == "tool_result":
             print(format_tool_result(block), flush=True)
 
 
-def print_event(event) -> None:
+def print_event(event: dict[str, Any]) -> None:
     """Print substantive blocks from assistant/user events; ignore the rest."""
     etype = event.get("type")
     if etype == "assistant":
@@ -263,7 +270,7 @@ def print_event(event) -> None:
         print_user_blocks(event.get("message") or {})
 
 
-def extract_result(event) -> str | None:
+def extract_result(event: dict[str, Any]) -> str | None:
     """Return the ``.result`` text from a ``result`` event, else ``None``."""
     if event.get("type") != "result":
         return None
@@ -273,7 +280,7 @@ def extract_result(event) -> str | None:
     return None
 
 
-def extract_error_result(event) -> str | None:
+def extract_error_result(event: dict[str, Any]) -> str | None:
     """Return a description for an ``is_error`` result event, else ``None``.
 
     The Claude CLI emits a valid result event with ``is_error: true`` and
@@ -299,7 +306,7 @@ def extract_error_result(event) -> str | None:
     return f"subtype={subtype}"
 
 
-def exit_with_error(message, stderr) -> NoReturn:
+def exit_with_error(message: str, stderr: str) -> NoReturn:
     """Print *message* and *stderr* to stderr and exit with code 1."""
     print(
         f"\nERROR: {message}\n--- stderr ---\n{stderr}",
@@ -334,7 +341,9 @@ def build_streaming_cmd(
     return cmd
 
 
-def run_claude_streaming(cmd, prompt, *, env) -> str:
+def run_claude_streaming(
+    cmd: list[str], prompt: str, *, env: dict[str, str],
+) -> str:
     """Run Claude CLI in stream-json mode, printing events live.
 
     *cmd* must already include ``--output-format stream-json`` and
@@ -419,7 +428,12 @@ def run_claude_streaming(cmd, prompt, *, env) -> str:
 
 
 def run_claude_streaming_with_retry(
-    cmd, prompt, *, env, retry_cmd, role: str,
+    cmd: list[str],
+    prompt: str,
+    *,
+    env: dict[str, str],
+    retry_cmd: list[str],
+    role: str,
 ) -> str:
     """Wrap ``run_claude_streaming`` in a recoverable-error retry loop.
 

@@ -1,6 +1,7 @@
 """Prompts and schemas for test classification."""
 
 import json
+from typing import Any
 
 CLAUSE_PROMPT_TEMPLATE = """What IEEE 1800-2023 clause does this test exercise?
 
@@ -114,7 +115,7 @@ PREFIX_SCHEMA = json.dumps({
 })
 
 
-def build_clause_prompt(test, lrm_path, against=""):
+def build_clause_prompt(test: Any, lrm_path: str, against: str = "") -> str:
     """Build the clause-only classification prompt."""
     body = "\n".join(test.preceding_comments + test.lines)
     template = (
@@ -130,7 +131,7 @@ def build_clause_prompt(test, lrm_path, against=""):
     )
 
 
-def build_topic_prompt(test, topics_hint):
+def build_topic_prompt(test: Any, topics_hint: str) -> str:
     """Build the topic classification prompt for non-LRM tests."""
     body = "\n".join(test.preceding_comments + test.lines)
     return TOPIC_PROMPT_TEMPLATE.format(

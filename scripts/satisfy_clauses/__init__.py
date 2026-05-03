@@ -26,7 +26,7 @@ _DESCRIPTION = (
 )
 
 
-def parse_args(argv=None) -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse and validate CLI arguments."""
     parser = argparse.ArgumentParser(prog=__package__, description=_DESCRIPTION)
     add_lrm_arg(parser)
@@ -36,7 +36,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     return parse_and_validate(parser, argv)
 
 
-def main(argv=None) -> None:
+def main(argv: list[str] | None = None) -> None:
     """Run satisfy_clause for each requested clause."""
     args = parse_args(argv)
     satisfy_clauses(

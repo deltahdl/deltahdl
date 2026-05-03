@@ -1,12 +1,14 @@
 """GitHub issue integration for classify_test."""
 
+import argparse
 import re
 import sys
+from typing import Any
 
 from lib.python.github import fetch_issue_body, update_issue_body
 
 
-def _validate_issue_args(args):
+def _validate_issue_args(args: argparse.Namespace) -> None:
     """Validate that --organization and --repo are present when --issue is."""
     if args.issue and not args.organization:
         print("ERROR: --organization is required when"
@@ -18,7 +20,9 @@ def _validate_issue_args(args):
         sys.exit(1)
 
 
-def update_test_status(body, test_name, status, *, remark=""):
+def update_test_status(
+    body: str, test_name: str, status: str, *, remark: str = "",
+) -> str:
     """Update the Status column for test_name in the issue table."""
     row_re = re.compile(
         r"^(\|[^|]*)\| " + re.escape(test_name) + r" \|[^|]*\|[^|]*\|$",
@@ -33,8 +37,13 @@ def update_test_status(body, test_name, status, *, remark=""):
     return body[:match.start()] + new_row + body[match.end():]
 
 
-def build_action_remark(test, *, source_is_target, target_filename=None,
-                        commit_url=""):
+def build_action_remark(
+    test: Any,
+    *,
+    source_is_target: bool,
+    target_filename: str | None = None,
+    commit_url: str = "",
+) -> str:
     """Build a human-readable action remark for a classified test."""
     orig_test = getattr(test, "original_test_name", None)
     test_renamed = orig_test is not None and orig_test != test.test_name
@@ -71,9 +80,13 @@ def build_action_remark(test, *, source_is_target, target_filename=None,
 
 
 def maybe_update_issue_status(
-    args, tests, *, source_is_target, target_filenames=None,
-    commit_url="",
-):
+    args: argparse.Namespace,
+    tests: list[Any],
+    *,
+    source_is_target: bool,
+    target_filenames: dict[str, str] | None = None,
+    commit_url: str = "",
+) -> None:
     """Update status for classified tests in a GitHub issue."""
     if args.issue is None:
         return
@@ -101,7 +114,7 @@ def maybe_update_issue_status(
     )
 
 
-def build_commit_url(args, sha):
+def build_commit_url(args: argparse.Namespace, sha: str | None) -> str:
     """Build a GitHub commit URL from org/repo and SHA."""
     if not sha:
         return ""
@@ -109,8 +122,13 @@ def build_commit_url(args, sha):
             f"/{args.repo}/commit/{sha}")
 
 
-def update_issue_after_commit(args, target, source_is_target,
-                              target_filenames, commit_url=""):
+def update_issue_after_commit(
+    args: argparse.Namespace,
+    target: list[Any],
+    source_is_target: bool,
+    target_filenames: dict[str, str] | None,
+    commit_url: str = "",
+) -> None:
     """Update the GitHub issue with the action and commit link."""
     if args.issue is None:
         return

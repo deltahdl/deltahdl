@@ -148,7 +148,7 @@ def _run(args: argparse.Namespace) -> None:
     print("Done")
 
 
-def main():
+def main() -> None:
     """Entry point for classify_files."""
     cast(io.TextIOWrapper, sys.stdout).reconfigure(line_buffering=True)
     cast(io.TextIOWrapper, sys.stderr).reconfigure(line_buffering=True)

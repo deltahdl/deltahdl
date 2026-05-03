@@ -1,9 +1,10 @@
 """Output and summary formatting for classify_test."""
 
 import textwrap
+from typing import Any
 
 
-def _format_clause(clause):
+def _format_clause(clause: str | None) -> str:
     """Format a clause for display."""
     if clause is None:
         return "(parse error)"
@@ -13,7 +14,7 @@ def _format_clause(clause):
     return f"\u00a7{clause}"
 
 
-def _wrap(label, value):
+def _wrap(label: str, value: str) -> str:
     """Wrap a labeled line to 80 chars with 2-space continuation indent."""
     return textwrap.fill(
         value, width=80,
@@ -32,7 +33,7 @@ _PREFIX_TO_STAGE = {
 }
 
 
-def print_classification_table(tests):
+def print_classification_table(tests: list[Any]) -> None:
     """Print the classification results as sub-reports."""
     for i, t in enumerate(tests):
         print(_wrap("Test", f"{t.test_name}()"))

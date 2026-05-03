@@ -20,7 +20,9 @@ def stub_remove_file_checkbox(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     """Stub remove_file_checkbox; return list of filenames removed."""
     removed: list[str] = []
 
-    def fake_remove(_org, _repo, _issue, filename):
+    def fake_remove(
+        _org: str, _repo: str, _issue: int, filename: str,
+    ) -> None:
         removed.append(filename)
 
     monkeypatch.setattr(
@@ -30,9 +32,9 @@ def stub_remove_file_checkbox(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 
 
 def stub_fetch_issue_title(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     titles: dict[int, str],
-):
+) -> None:
     """Stub fetch_issue_title; return title from *titles* dict."""
     monkeypatch.setattr(
         classify_files, "fetch_issue_title",

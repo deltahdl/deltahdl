@@ -15,7 +15,12 @@ from lib.python.classify import (
 from lib.python.cli import add_continue_arg
 
 
-def _build_command(args, test_entry, *, continue_session=False):
+def _build_command(
+    args: argparse.Namespace,
+    test_entry: str,
+    *,
+    continue_session: bool = False,
+) -> list[str]:
     """Build the subprocess command list for classify_test."""
     suite, test = test_entry.split(".", 1)
     cmd = [
@@ -32,8 +37,14 @@ def _build_command(args, test_entry, *, continue_session=False):
     return cmd
 
 
-def run_classify_test(args, test_name, index, total, *,
-                      continue_session=False):
+def run_classify_test(
+    args: argparse.Namespace,
+    test_name: str,
+    index: int,
+    total: int,
+    *,
+    continue_session: bool = False,
+) -> bool:
     """Invoke classify_test for a single test. Returns True on success."""
     print(f"Processing test {index}/{total}: {test_name}")
     cmd = _build_command(
@@ -43,7 +54,7 @@ def run_classify_test(args, test_name, index, total, *,
     return result.returncode == 0
 
 
-def _parse_args():
+def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         prog="classify_tests",
@@ -68,7 +79,7 @@ def _parse_args():
     return parser.parse_args()
 
 
-def _run(args):
+def _run(args: argparse.Namespace) -> None:
     """Execute the batch classification."""
     names = [n.strip() for n in args.tests.split(",")]
     total = len(names)
@@ -79,7 +90,7 @@ def _run(args):
             sys.exit(1)
 
 
-def main():
+def main() -> None:
     """Entry point for classify_tests."""
     cast(io.TextIOWrapper, sys.stdout).reconfigure(line_buffering=True)
     cast(io.TextIOWrapper, sys.stderr).reconfigure(line_buffering=True)

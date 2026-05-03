@@ -1,5 +1,9 @@
 """Shared test helpers for classify_test unit tests."""
 
+from typing import Any
+
+import pytest
+
 import classify_test
 from lib.python.test_fixtures.subprocess_stubs import (
     stub_subprocess_failure,
@@ -18,9 +22,13 @@ __all__ = [
 
 
 def make_test_block(
-    name, prefix=None, clause=None, *,
-    comments=None, body=None,
-):
+    name: str,
+    prefix: str | None = None,
+    clause: str | None = None,
+    *,
+    comments: list[str] | None = None,
+    body: list[str] | None = None,
+) -> Any:
     """Shorthand factory for TestBlock."""
     if body is None:
         lines = [f"TEST(S, {name}) {{", "}"]
@@ -38,9 +46,12 @@ def make_test_block(
 
 
 def make_parsed_file(
-    includes=None, using=None, ns=False,
-    preamble=None, tests=None,
-):
+    includes: list[str] | None = None,
+    using: str | None = None,
+    ns: bool = False,
+    preamble: list[Any] | None = None,
+    tests: list[Any] | None = None,
+) -> Any:
     """Shorthand factory for ParsedFile."""
     return classify_test.ParsedFile(
         includes=includes or ["#include <gtest/gtest.h>"],
@@ -52,7 +63,7 @@ def make_parsed_file(
     )
 
 
-def stub_side_effects(monkeypatch):
+def stub_side_effects(monkeypatch: pytest.MonkeyPatch) -> None:
     """Stub maybe_update_issue_status and commit_classification."""
     monkeypatch.setattr(
         classify_test, "maybe_update_issue_status",
@@ -64,10 +75,16 @@ def stub_side_effects(monkeypatch):
     )
 
 
-def stub_classifier(monkeypatch, response, stage="parser"):
+def stub_classifier(
+    monkeypatch: pytest.MonkeyPatch,
+    response: Any,
+    stage: str = "parser",
+) -> None:
     """Stub _call_claude and side-effect functions for _run tests."""
 
-    def _fake_claude(_prompt, schema=None, **_kw):
+    def _fake_claude(
+        _prompt: str, schema: str | None = None, **_kw: Any,
+    ) -> Any:
         if schema and "pipeline_stage" in schema:
             return {"pipeline_stage": stage, "rationale": "r"}
         return response

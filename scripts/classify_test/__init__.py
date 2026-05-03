@@ -19,7 +19,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from lib.python.classify import (
     add_github_args,
@@ -75,6 +75,9 @@ class TestBlock:
     prefix: str | None = None
     clause: str | None = None
     rationale: str | None = None
+    prefix_rationale: str | None = None
+    original_suite_name: str | None = None
+    original_test_name: str | None = None
 
 
 @dataclass
@@ -137,7 +140,12 @@ CMAKE_PATH = REPO_ROOT / "test" / "CMakeLists.txt"
 # Stage 1: Parse — brace extraction
 # ---------------------------------------------------------------------------
 
-def _update_brace_depth(line, depth, in_string, in_block_comment):
+def _update_brace_depth(
+    line: str,
+    depth: int,
+    in_string: bool,
+    in_block_comment: bool,
+) -> tuple[int, bool, bool, bool]:
     """Scan one line, updating brace depth and lexer state.
 
     Returns (depth, in_string, in_block_comment, found_close).
@@ -171,10 +179,12 @@ def _update_brace_depth(line, depth, in_string, in_block_comment):
     return depth, in_string, in_block_comment, False
 
 
-def extract_brace_block(lines, start_idx):
+def extract_brace_block(
+    lines: list[str], start_idx: int,
+) -> tuple[list[str], int]:
     """Extract a brace-delimited block starting from start_idx."""
     depth, in_string, in_block_comment = 0, False, False
-    block = []
+    block: list[str] = []
     for i in range(start_idx, len(lines)):
         block.append(lines[i])
         depth, in_string, in_block_comment, found = _update_brace_depth(
@@ -191,7 +201,7 @@ def extract_brace_block(lines, start_idx):
 # Stage 1: Parse — helpers
 # ---------------------------------------------------------------------------
 
-def is_section_header(line):
+def is_section_header(line: str) -> bool:
     """Check if a line is a section separator (=== or --- banners)."""
     stripped = line.strip()
     if stripped.startswith("//"):
@@ -204,13 +214,15 @@ def is_section_header(line):
     return False
 
 
-def _parse_header(lines):
+def _parse_header(
+    lines: list[str],
+) -> tuple[list[str], str | None, bool, int]:
     """Parse file header: includes, using-line, namespace wrapper.
 
     Returns (includes, using_line, has_namespace, body_start_idx).
     """
-    includes = []
-    using_line = None
+    includes: list[str] = []
+    using_line: str | None = None
     has_ns = False
     i = 0
 
@@ -247,7 +259,12 @@ def _parse_header(lines):
     return includes, using_line, has_ns, i
 
 
-def _try_parse_preamble(lines, i, stripped, comments):
+def _try_parse_preamble(
+    lines: list[str],
+    i: int,
+    stripped: str,
+    comments: list[str],
+) -> tuple[PreambleItem | None, int]:
     """Try to parse a preamble item (brace block or declaration).
 
     Mutates *comments* in place (clears on consumption).
@@ -271,7 +288,9 @@ def _try_parse_preamble(lines, i, stripped, comments):
     return None, i + 1
 
 
-def _parse_body(lines, start_idx):
+def _parse_body(
+    lines: list[str], start_idx: int,
+) -> tuple[list[PreambleItem], list[PreambleItem], list[TestBlock], bool]:
     """Parse body: extract TEST blocks and preamble items.
 
     Returns (global_preamble, all_tests, found_namespace).
@@ -326,7 +345,7 @@ def _parse_body(lines, start_idx):
     return g_pre, s_pre, all_tests, has_ns
 
 
-def parse_file(filepath):
+def parse_file(filepath: Path) -> ParsedFile:
     """Parse a standalone test file into structured components."""
     text = filepath.read_text(encoding="utf-8")
     lines = text.splitlines(keepends=True)
@@ -352,7 +371,7 @@ _PREFIX_PROMPT_TEMPLATE = PREFIX_PROMPT_TEMPLATE
 _PREFIX_SCHEMA = PREFIX_SCHEMA
 
 
-def _detect_prefix(test, clause, lrm_path):
+def _detect_prefix(test: TestBlock, clause: str, lrm_path: str) -> str:
     """Detect pipeline stage prefix from test body."""
     if clause.replace("_", "-").startswith("non-lrm"):
         test.prefix_rationale = "clause is non-LRM"
@@ -379,9 +398,9 @@ def _detect_prefix(test, clause, lrm_path):
     sys.exit(1)
 
 
-def existing_non_lrm_topics(test_dir):
+def existing_non_lrm_topics(test_dir: Path) -> list[str]:
     """Scan output dir for existing test_non_lrm_*.cpp topic names."""
-    topics = set()
+    topics: set[str] = set()
     pattern = str(test_dir / "test_non_lrm_*.cpp")
     for fpath in sorted(glob.glob(pattern)):
         stem = Path(fpath).stem
@@ -397,7 +416,7 @@ _CLAUSE_SCHEMA = CLAUSE_SCHEMA
 _TOPIC_SCHEMA = TOPIC_SCHEMA
 
 
-def _build_topic_hint(test_dir):
+def _build_topic_hint(test_dir: Path) -> str:
     """Build existing topics hint for non-LRM classification."""
     topics = existing_non_lrm_topics(test_dir)
     if not topics:
@@ -410,7 +429,7 @@ def _build_topic_hint(test_dir):
     )
 
 
-def _extract_json(text):
+def _extract_json(text: str) -> Any:
     """Extract a JSON object from Claude's response text."""
     try:
         return json.loads(text)
@@ -427,7 +446,11 @@ def _extract_json(text):
     sys.exit(1)
 
 
-def _call_claude(prompt, schema=None, continue_session=False):
+def _call_claude(
+    prompt: str,
+    schema: str | None = None,
+    continue_session: bool = False,
+) -> Any:
     """Call Claude CLI and return parsed JSON response."""
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
@@ -482,7 +505,9 @@ def _call_claude(prompt, schema=None, continue_session=False):
     return _extract_json(raw)
 
 
-def _validate_clause_response(response, test_name):
+def _validate_clause_response(
+    response: dict[str, Any], test_name: str,
+) -> None:
     """Validate Claude's clause response or exit with error."""
     if "clause" not in response:
         print(f"ERROR: Classification for test {test_name} is missing"
@@ -497,7 +522,9 @@ def _validate_clause_response(response, test_name):
         sys.exit(1)
 
 
-def _validate_topic_response(response, test_name):
+def _validate_topic_response(
+    response: dict[str, Any], test_name: str,
+) -> None:
     """Validate Claude's topic response or exit with error."""
     if not response.get("non_lrm_topic"):
         print(f"ERROR: Topic for test {test_name} is missing"
@@ -505,11 +532,13 @@ def _validate_topic_response(response, test_name):
         sys.exit(1)
 
 
-def _rename_test_macro(test, new_suite, new_name):
+def _rename_test_macro(
+    test: TestBlock, new_suite: str, new_name: str,
+) -> None:
     """Rename both args in a test block's TEST()/TEST_F()/TEST_P() line."""
-    if not hasattr(test, "original_suite_name"):
+    if test.original_suite_name is None:
         test.original_suite_name = test.suite_name
-    if not hasattr(test, "original_test_name"):
+    if test.original_test_name is None:
         test.original_test_name = test.test_name
     test.lines[0] = re.sub(
         r'^(TEST(?:_[FP])?)\(' + re.escape(test.suite_name)
@@ -521,8 +550,13 @@ def _rename_test_macro(test, new_suite, new_name):
     test.test_name = new_name
 
 
-def _apply_classification(test, clause_resp, topic_resp=None,
-                          *, lrm_path):
+def _apply_classification(
+    test: TestBlock,
+    clause_resp: dict[str, Any],
+    topic_resp: dict[str, Any] | None = None,
+    *,
+    lrm_path: str,
+) -> None:
     """Apply clause and optional topic responses to a test block."""
     _validate_clause_response(clause_resp, test.test_name)
     clause = clause_resp["clause"]
@@ -540,8 +574,14 @@ def _apply_classification(test, clause_resp, topic_resp=None,
     _rename_test_macro(test, suite, name)
 
 
-def classify_test_block(test, test_dir, lrm_path, *,
-                        continue_session=False, against=""):
+def classify_test_block(
+    test: TestBlock,
+    test_dir: Path,
+    lrm_path: str,
+    *,
+    continue_session: bool = False,
+    against: str = "",
+) -> TestBlock | None:
     """Use Claude to classify a single test's prefix and clause."""
     print(f"Calling Claude to classify clause for {test.test_name}...",
           end="", flush=True)
@@ -576,15 +616,17 @@ def classify_test_block(test, test_dir, lrm_path, *,
 # Stage 3: Deduplicate
 # ---------------------------------------------------------------------------
 
-def normalize_test_body(test):
+def normalize_test_body(test: TestBlock) -> str:
     """Return a normalized string of the test body (excluding the TEST line)."""
     body_lines = test.lines[1:]
     return "\n".join(line.strip() for line in body_lines)
 
 
-def find_existing_tests(target_base, test_dir, exclude_path=None):
+def find_existing_tests(
+    target_base: str, test_dir: Path, exclude_path: Path | None = None,
+) -> set[str]:
     """Find normalized test bodies in existing clause files."""
-    existing_bodies = set()
+    existing_bodies: set[str] = set()
     patterns = [
         str(test_dir / f"{target_base}.cpp"),
         str(test_dir / f"{target_base}_[a-z].cpp"),
@@ -614,7 +656,9 @@ def find_existing_tests(target_base, test_dir, exclude_path=None):
 # Stage 4: Resolve filenames
 # ---------------------------------------------------------------------------
 
-def find_merge_target(target_base, test_dir, exclude_path=None):
+def find_merge_target(
+    target_base: str, test_dir: Path, exclude_path: Path | None = None,
+) -> Path | None:
     """Find an existing file to merge tests into."""
     exact = test_dir / f"{target_base}.cpp"
     if exact.exists():
@@ -641,12 +685,14 @@ def find_merge_target(target_base, test_dir, exclude_path=None):
 # Stage 6: Update CMakeLists.txt
 # ---------------------------------------------------------------------------
 
-def update_cmake(old_name, new_names, *, keep_old=False):
+def update_cmake(
+    old_name: str, new_names: list[str], *, keep_old: bool = False,
+) -> None:
     """Update CMakeLists.txt: remove old entry, add new entries sorted."""
     text = CMAKE_PATH.read_text(encoding="utf-8")
     lines = text.splitlines()
-    header_lines = []
-    test_names = []
+    header_lines: list[str] = []
+    test_names: list[str] = []
     for line in lines:
         m = re.match(r"add_unit_test\((\w+)\)", line.strip())
         if m:
@@ -667,7 +713,7 @@ def update_cmake(old_name, new_names, *, keep_old=False):
 # Main
 # ---------------------------------------------------------------------------
 
-def _parse_args():
+def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Split standalone test files into per-clause files.",
@@ -696,7 +742,9 @@ def _parse_args():
     return parser.parse_args()
 
 
-def _group_tests(tests):
+def _group_tests(
+    tests: list[TestBlock],
+) -> dict[tuple[str, str], list[TestBlock]]:
     """Group tests by (prefix, clause)."""
     groups: dict[tuple[str, str], list[TestBlock]] = {}
     for t in tests:
@@ -706,7 +754,12 @@ def _group_tests(tests):
     return groups
 
 
-def _report_removals(tests, existing_bodies, target, dry_run):
+def _report_removals(
+    tests: list[TestBlock],
+    existing_bodies: set[str],
+    target: str,
+    dry_run: bool,
+) -> int:
     """Print removal messages for duplicate tests and return count."""
     verb = "Would have removed" if dry_run else "Removed"
     count = 0
@@ -720,11 +773,18 @@ def _report_removals(tests, existing_bodies, target, dry_run):
 
 
 def _resolve_destinations(
-    groups, test_dir, exclude_path=None, dry_run=False,
-):
+    groups: dict[tuple[str, str], list[TestBlock]],
+    test_dir: Path,
+    exclude_path: Path | None = None,
+    dry_run: bool = False,
+) -> tuple[
+    list[tuple[str, str, list[TestBlock]]],
+    list[tuple[Path, list[TestBlock]]],
+    int,
+]:
     """Deduplicate tests and resolve create/merge destinations."""
-    to_create = []
-    to_merge = []
+    to_create: list[tuple[str, str, list[TestBlock]]] = []
+    to_merge: list[tuple[Path, list[TestBlock]]] = []
     n_removed = 0
     for (prefix, clause), tests in sorted(groups.items()):
         target = clause_to_filename(prefix, clause)
@@ -745,7 +805,13 @@ def _resolve_destinations(
     return to_create, to_merge, n_removed
 
 
-def _write_creates(to_create, parsed, test_dir, lrm_titles, max_lines):
+def _write_creates(
+    to_create: list[tuple[str, str, list[TestBlock]]],
+    parsed: ParsedFile,
+    test_dir: Path,
+    lrm_titles: dict[str, str],
+    max_lines: int | None,
+) -> list[str]:
     """Write newly created clause files and return their names."""
     names: list[str] = []
     for filename, clause, tests in to_create:
@@ -768,7 +834,12 @@ def _write_creates(to_create, parsed, test_dir, lrm_titles, max_lines):
     return names
 
 
-def _write_files(to_create, to_merge, parsed, ctx):
+def _write_files(
+    to_create: list[tuple[str, str, list[TestBlock]]],
+    to_merge: list[tuple[Path, list[TestBlock]]],
+    parsed: ParsedFile,
+    ctx: dict[str, Any],
+) -> list[str]:
     """Write new files and merge into existing files."""
     new_names = _write_creates(
         to_create, parsed, ctx["test_dir"],
@@ -786,7 +857,13 @@ def _write_files(to_create, to_merge, parsed, ctx):
     return new_names
 
 
-def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
+def _rewrite_source(
+    filepath: Path,
+    groups: dict[tuple[str, str], list[TestBlock]],
+    parsed: ParsedFile,
+    lrm_titles: dict[str, str],
+    test_name: str,
+) -> int:
     """Rewrite the source file keeping only tests that belong there."""
     staying = [t for (p, c), ts in groups.items()
                if clause_to_filename(p, c) == test_name
@@ -799,7 +876,9 @@ def _rewrite_source(filepath, groups, parsed, lrm_titles, test_name):
     return len(staying)
 
 
-def _validate_input(filepath, suite_name, test_name):
+def _validate_input(
+    filepath: Path, suite_name: str, test_name: str,
+) -> tuple[ParsedFile, TestBlock]:
     """Parse and validate the input file, returning (parsed, target)."""
     if not filepath.exists():
         print(f"ERROR: {filepath} not found")
@@ -817,7 +896,9 @@ def _validate_input(filepath, suite_name, test_name):
     return parsed, matches[0]
 
 
-def _update_source(filepath, parsed, ctx):
+def _update_source(
+    filepath: Path, parsed: ParsedFile, ctx: dict[str, Any],
+) -> int:
     """Rewrite or remove the source file after moving a test."""
     others = [t for t in parsed.all_tests
               if not (getattr(t, "original_suite_name", t.suite_name)
@@ -843,8 +924,13 @@ def _update_source(filepath, parsed, ctx):
     return 0
 
 
-def _apply_rename_in_place(args, filepath, parsed, target,
-                           action=""):
+def _apply_rename_in_place(
+    args: argparse.Namespace,
+    filepath: Path,
+    parsed: ParsedFile,
+    target: list[TestBlock],
+    action: str = "",
+) -> str | None:
     """Rewrite the source file when a test is renamed but stays in place.
 
     Returns the commit SHA if a rename was applied, ``None`` if no
@@ -860,7 +946,7 @@ def _apply_rename_in_place(args, filepath, parsed, target,
     if not has_renames:
         return None
     content = generate_file(
-        target[0].clause, "", parsed, parsed.all_tests,
+        target[0].clause or "non-lrm", "", parsed, parsed.all_tests,
     )
     filepath.write_text(content, encoding="utf-8")
     if not getattr(args, "no_commit", False):
@@ -874,10 +960,14 @@ def _apply_rename_in_place(args, filepath, parsed, target,
     return None
 
 
-def _build_action(target, source_is_target):
+def _build_action(
+    target: list[TestBlock], source_is_target: bool,
+) -> tuple[str, dict[str, str]]:
     """Build the action string and target filenames map."""
     target_filenames = {
-        t.test_name: clause_to_filename(t.prefix, t.clause) + ".cpp"
+        t.test_name: clause_to_filename(
+            t.prefix or "test_non_lrm_", t.clause or "non-lrm",
+        ) + ".cpp"
         for t in target
     }
     action = build_action_remark(
@@ -889,7 +979,11 @@ def _build_action(target, source_is_target):
     return action, target_filenames
 
 
-def _print_destinations(to_create, to_merge, max_lines):
+def _print_destinations(
+    to_create: list[tuple[str, str, list[TestBlock]]],
+    to_merge: list[tuple[Path, list[TestBlock]]],
+    max_lines: int | None,
+) -> None:
     """Print target and merge info for resolved destinations."""
     for dest, _, _ in to_create:
         print(f"  Target: {dest}.cpp")
@@ -901,7 +995,7 @@ def _print_destinations(to_create, to_merge, max_lines):
                   f" number of lines to more than {max_lines} lines")
 
 
-def _run(args):
+def _run(args: argparse.Namespace) -> None:
     """Execute the split operation."""
     _validate_issue_args(args)
     filepath = Path(args.file).resolve()
@@ -909,7 +1003,7 @@ def _run(args):
     out_dir = Path(args.output_dir).resolve()
     if classify_test_block(
         target, out_dir,
-        Path(args.lrm).resolve(),
+        str(Path(args.lrm).resolve()),
         continue_session=args.continue_session,
         against=args.against,
     ) is None:
@@ -971,7 +1065,7 @@ def _run(args):
                               build_commit_url(args, sha))
 
 
-def main():
+def main() -> None:
     """Entry point."""
     cast(io.TextIOWrapper, sys.stdout).reconfigure(line_buffering=True)
     cast(io.TextIOWrapper, sys.stderr).reconfigure(line_buffering=True)

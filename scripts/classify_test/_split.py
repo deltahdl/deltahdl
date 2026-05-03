@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 
-def strip_lrm_quotes(line):
+def strip_lrm_quotes(line: str) -> str:
     """Remove LRM prose quotes from comments."""
     if re.search(r'//.*"[A-Z].*"', line):
         m = re.match(r'(//\s*§[\d.]+:?\s*)(".*")', line)
@@ -16,14 +16,14 @@ def strip_lrm_quotes(line):
     return line
 
 
-def _count_file_lines(path):
+def _count_file_lines(path: Path) -> int:
     """Return the number of lines in a file, or 0 if it does not exist."""
     if not path.exists():
         return 0
     return len(path.read_text(encoding="utf-8").splitlines())
 
 
-def _next_suffix_file(target_base, test_dir):
+def _next_suffix_file(target_base: str, test_dir: Path) -> str:
     """Return the next available single-letter suffix (a, b, c, ...)."""
     variants = sorted(
         glob.glob(str(test_dir / f"{target_base}_[a-z].cpp")),
@@ -34,7 +34,7 @@ def _next_suffix_file(target_base, test_dir):
     return chr(ord(last) + 1)
 
 
-def _rename_base_to_suffix(target_base, test_dir):
+def _rename_base_to_suffix(target_base: str, test_dir: Path) -> Path:
     """Rename base file to next available suffix; return new path."""
     suffix = _next_suffix_file(target_base, test_dir)
     base = test_dir / f"{target_base}.cpp"
@@ -43,7 +43,7 @@ def _rename_base_to_suffix(target_base, test_dir):
     return dest
 
 
-def _test_line_count(test):
+def _test_line_count(test: Any) -> int:
     """Return the number of lines a test block will occupy."""
     count = len(test.lines) + 1  # +1 for trailing blank line
     for line in test.preceding_comments:
@@ -52,9 +52,9 @@ def _test_line_count(test):
     return count
 
 
-def _render_tests(tests):
+def _render_tests(tests: list[Any]) -> list[str]:
     """Render test blocks to a flat list of lines."""
-    out = []
+    out: list[str] = []
     for t in tests:
         for line in t.preceding_comments:
             cleaned = strip_lrm_quotes(line)
@@ -66,9 +66,12 @@ def _render_tests(tests):
     return out
 
 
-def _split_tests(tests, file_len, max_lines):
+def _split_tests(
+    tests: list[Any], file_len: int, max_lines: int | None,
+) -> tuple[list[Any], list[Any]]:
     """Partition tests into (fit, overflow) given current file length."""
-    fit, overflow = [], []
+    fit: list[Any] = []
+    overflow: list[Any] = []
     current = file_len
     for t in tests:
         n = _test_line_count(t)
@@ -80,7 +83,13 @@ def _split_tests(tests, file_len, max_lines):
     return fit, overflow
 
 
-def _flush_overflow(overflow, base, test_dir, source_path, max_lines):
+def _flush_overflow(
+    overflow: list[Any],
+    base: str,
+    test_dir: Path,
+    source_path: Path,
+    max_lines: int | None,
+) -> list[str]:
     """Write overflow tests to new suffix file(s); return new names."""
     new_names: list[str] = []
     batch: list[Any] = []
@@ -103,9 +112,9 @@ def _flush_overflow(overflow, base, test_dir, source_path, max_lines):
     return new_names
 
 
-def _dedup_preamble(global_preamble, text):
+def _dedup_preamble(global_preamble: list[Any], text: str) -> list[str]:
     """Return preamble lines not already present in text."""
-    out = []
+    out: list[str] = []
     for item in global_preamble:
         first_code = next(
             (ln for ln in item.lines if not ln.strip().startswith("//")),
@@ -117,7 +126,7 @@ def _dedup_preamble(global_preamble, text):
     return out
 
 
-def _find_namespace_close(lines):
+def _find_namespace_close(lines: list[str]) -> int:
     """Return index of }  // namespace line, or len(lines)."""
     for i in range(len(lines) - 1, -1, -1):
         if lines[i].strip() in ("}  // namespace", "} // namespace"):
@@ -125,8 +134,13 @@ def _find_namespace_close(lines):
     return len(lines)
 
 
-def append_tests_to_file(filepath, global_preamble, tests,
-                         max_lines=None, section_preamble=None):
+def append_tests_to_file(
+    filepath: Path,
+    global_preamble: list[Any],
+    tests: list[Any],
+    max_lines: int | None = None,
+    section_preamble: list[Any] | None = None,
+) -> list[str]:
     """Append tests to an existing file before closing }  // namespace.
 
     Returns a list of new filenames created by splitting (empty if no
@@ -148,7 +162,7 @@ def append_tests_to_file(filepath, global_preamble, tests,
     if not max_lines or not overflow:
         return []
 
-    new_names = []
+    new_names: list[str] = []
     base = re.sub(r"_[a-z]$", "", filepath.stem)
     if filepath.stem == base:
         renamed = _rename_base_to_suffix(base, filepath.parent)
@@ -160,12 +174,14 @@ def append_tests_to_file(filepath, global_preamble, tests,
     return new_names
 
 
-def _write_overflow_file(outpath, source_path, tests):
+def _write_overflow_file(
+    outpath: Path, source_path: Path, tests: list[Any],
+) -> None:
     """Write overflow tests to a new file, copying the header from source."""
     source_text = source_path.read_text(encoding="utf-8")
     source_lines = source_text.splitlines()
     # Copy everything up to and including "namespace {" + blank line.
-    header = []
+    header: list[str] = []
     for line in source_lines:
         header.append(line)
         if line.strip() == "namespace {":
@@ -184,7 +200,9 @@ def _write_overflow_file(outpath, source_path, tests):
     outpath.write_text("\n".join(header), encoding="utf-8")
 
 
-def _batch_tests(tests, header_lines, max_lines):
+def _batch_tests(
+    tests: list[Any], header_lines: int, max_lines: int,
+) -> list[list[Any]]:
     """Split tests into batches that each fit within max_lines."""
     batches: list[list[Any]] = []
     current_batch: list[Any] = []
@@ -202,7 +220,12 @@ def _batch_tests(tests, header_lines, max_lines):
     return batches
 
 
-def _write_one_file(filename, content, test_dir, new_names):
+def _write_one_file(
+    filename: str,
+    content: str,
+    test_dir: Path,
+    new_names: list[str],
+) -> None:
     """Write content to a single .cpp file and record its name."""
     outpath = test_dir / f"{filename}.cpp"
     outpath.write_text(content, encoding="utf-8")

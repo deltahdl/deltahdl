@@ -22,7 +22,7 @@ from lib.python.run_tests_common import (
 TEST_DIR = REPO_ROOT / "third_party" / "sv-tests" / "tests"
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Run CHIPS Alliance sv-tests against deltahdl."
@@ -40,12 +40,12 @@ def parse_args():
     return parser.parse_args()
 
 
-def _natural_sort_key(text):
+def _natural_sort_key(text: str) -> list[Any]:
     """Split text into (str, int, str, int, ...) for natural ordering."""
     return [int(tok) if tok.isdigit() else tok for tok in re.split(r"(\d+)", text)]
 
 
-def collect_tests(chapter=None):
+def collect_tests(chapter: str | None = None) -> list[str]:
     """Collect .sv files under the chapter directories.
 
     If *chapter* is given (e.g. "5"), only that chapter's tests are collected.
@@ -55,13 +55,13 @@ def collect_tests(chapter=None):
     return sorted(glob.glob(pattern, recursive=True), key=_natural_sort_key)
 
 
-def parse_metadata(path):
+def parse_metadata(path: str) -> dict[str, str]:
     """Parse sv-tests metadata from a .sv file header comment."""
     text = Path(path).read_text(encoding="utf-8")
     match = re.search(r"/\*(.*?)\*/", text, re.DOTALL)
     if not match:
         return {}
-    metadata = {}
+    metadata: dict[str, str] = {}
     for line in match.group(1).splitlines():
         m = re.match(r"\s*:(\w+):\s*(.*)", line)
         if m:
@@ -88,7 +88,7 @@ _COMPARE_OPS: dict[type[ast.cmpop], Callable[[Any, Any], bool]] = {
 }
 
 
-def eval_node(node):
+def eval_node(node: ast.AST) -> Any:
     """Evaluate an AST node containing only constants and comparisons."""
     if isinstance(node, ast.Constant):
         return node.value
@@ -110,7 +110,7 @@ def eval_node(node):
     raise ValueError(f"Unsupported node: {type(node).__name__}")
 
 
-def try_string_equality(expr):
+def try_string_equality(expr: str) -> bool | None:
     """Fallback: regex-based string equality for SV-style quoting."""
     m = re.match(r"\(\s*'(.*)'\s*==\s*'(.*)'\s*\)$", expr)
     if m:
@@ -118,7 +118,7 @@ def try_string_equality(expr):
     return None
 
 
-def check_assertions(stdout):
+def check_assertions(stdout: str) -> tuple[bool, str]:
     """Evaluate :assert: patterns in simulation output."""
     for line in stdout.splitlines():
         match = re.search(r":assert:\s*(.*)", line)
@@ -138,7 +138,11 @@ def check_assertions(stdout):
     return True, ""
 
 
-def run_test(path, simulate=False, defines=()):
+def run_test(
+    path: str,
+    simulate: bool = False,
+    defines: tuple[str, ...] | list[str] = (),
+) -> tuple[bool, str]:
     """Run deltahdl on a single .sv file.
 
     Returns (passed, stderr_or_detail) tuple.
@@ -161,7 +165,7 @@ def run_test(path, simulate=False, defines=()):
     return check_assertions(result.stdout)
 
 
-def chapter_from_path(path):
+def chapter_from_path(path: str) -> str:
     """Extract the chapter directory name (e.g. 'chapter-5') from a path."""
     for part in Path(path).parts:
         if part.startswith("chapter-"):
@@ -169,7 +173,9 @@ def chapter_from_path(path):
     return Path(path).parent.name
 
 
-def _aggregate_chapters(results):
+def _aggregate_chapters(
+    results: list[dict[str, Any]],
+) -> list[tuple[str, str, str, str]]:
     """Aggregate results into sorted (name, passed, total, pct) row tuples."""
     chapters: defaultdict[str, dict[str, int]] = defaultdict(
         lambda: {"passed": 0, "failed": 0},
@@ -180,7 +186,7 @@ def _aggregate_chapters(results):
             bucket["passed"] += 1
         else:
             bucket["failed"] += 1
-    rows = []
+    rows: list[tuple[str, str, str, str]] = []
     for name in sorted(chapters, key=_natural_sort_key):
         c = chapters[name]
         total = c["passed"] + c["failed"]
@@ -190,7 +196,7 @@ def _aggregate_chapters(results):
     return rows
 
 
-def print_chapter_breakdown(results):
+def print_chapter_breakdown(results: list[dict[str, Any]]) -> None:
     """Print per-chapter pass/fail summary as a box-drawing table."""
     rows = _aggregate_chapters(results)
     headers = ("Chapter", "Passed", "Sub-Total", "Percentage")
@@ -199,10 +205,14 @@ def print_chapter_breakdown(results):
         for i, h in enumerate(headers)
     ]
 
-    def _border(left, mid, right):
+    def _border(left: str, mid: str, right: str) -> str:
         return left + mid.join("─" * (w + 2) for w in widths) + right
 
-    def _row(vals, aligns, color=""):
+    def _row(
+        vals: tuple[str, ...] | list[str],
+        aligns: list[str],
+        color: str = "",
+    ) -> str:
         cells = [f" {v:{a}{widths[i]}} " for i, (v, a) in enumerate(zip(vals, aligns))]
         inner = "│".join(cells)
         return f"│{color}{inner}{RESET}│" if color else "│" + inner + "│"
@@ -217,7 +227,9 @@ def print_chapter_breakdown(results):
     print(_border("└", "┴", "┘"))
 
 
-def write_junit_xml(results, elapsed, filepath):
+def write_junit_xml(
+    results: list[dict[str, Any]], elapsed: float, filepath: str,
+) -> None:
     """Write JUnit XML report to the given filepath."""
     total = len(results)
     failures = sum(1 for r in results if r["status"] == "fail")
@@ -258,7 +270,7 @@ def write_junit_xml(results, elapsed, filepath):
     tree.write(filepath, xml_declaration=True, encoding="unicode")
 
 
-def build_result(path):
+def build_result(path: str) -> tuple[dict[str, Any], int]:
     """Run one sv-test and return (result_dict, ok_int). Does not print."""
     chapter = chapter_from_path(path)
     try:
@@ -311,7 +323,7 @@ def build_result(path):
     }, ok_int
 
 
-def print_status(result, ok_int):
+def print_status(result: dict[str, Any], ok_int: int) -> None:
     """Print PASS/FAIL/TIMEOUT for a single test result."""
     if result["status"] == "timeout":
         print(f"  {RED}TIMEOUT{RESET}: {result['name']}", flush=True)
@@ -319,14 +331,14 @@ def print_status(result, ok_int):
         print_result(bool(ok_int), result["name"])
 
 
-def execute_single_test(path):
+def execute_single_test(path: str) -> tuple[dict[str, Any], int]:
     """Run one sv-test, print result, and return (result_dict, ok_int)."""
     result, ok_int = build_result(path)
     print_status(result, ok_int)
     return result, ok_int
 
 
-def main():
+def main() -> None:
     """Run all sv-tests and print a summary."""
     args = parse_args()
 
@@ -337,8 +349,8 @@ def main():
         print(f"error: no .sv files found in {TEST_DIR}", file=sys.stderr)
         sys.exit(1)
 
-    results = []
-    ok_flags = []
+    results: list[dict[str, Any]] = []
+    ok_flags: list[int] = []
     suite_start = time.monotonic()
 
     try:
