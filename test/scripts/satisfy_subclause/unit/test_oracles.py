@@ -190,10 +190,28 @@ def test_build_dependency_prompt_mentions_lrm() -> None:
     assert "~/LRM.pdf" in build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
 
 
-def test_build_dependency_prompt_names_terms_functions_constructs() -> None:
-    """Prompt names the concrete things to look for in §X's text."""
+def test_build_dependency_prompt_grounds_in_normative_rule() -> None:
+    """Prompt anchors a dependency on a normative rule §X states."""
     prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
-    assert "term, function, or syntactic construct" in prompt
+    assert "normative rule" in prompt
+
+
+def test_build_dependency_prompt_anchors_dep_on_machinery_prereq() -> None:
+    """Prompt anchors a dependency on §Y's machinery being a prerequisite."""
+    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "machinery" in prompt
+
+
+def test_build_dependency_prompt_invites_quotable_evidence() -> None:
+    """Prompt asks for a quotable §X sentence as the dep's grounding."""
+    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "quote" in prompt
+
+
+def test_build_dependency_prompt_drops_term_use_criterion() -> None:
+    """Prompt no longer treats vocabulary mentions as a dep criterion."""
+    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "term, function, or syntactic construct" not in prompt
 
 
 def test_build_dependency_prompt_orders_foundations_first() -> None:

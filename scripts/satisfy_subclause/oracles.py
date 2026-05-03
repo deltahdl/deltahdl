@@ -96,12 +96,13 @@ def build_dependency_prompt(subclause: str, lrm: str) -> str:
     return (
         f"You are the read-only dependency oracle for §{subclause}.\n\n"
         f"{read_ctx}\n\n"
-        f"List the subclauses whose code §{subclause}'s code builds on."
-        f" A subclause §Y belongs on the list when §{subclause}'s text"
-        " uses a term, function, or syntactic construct that §Y"
-        " defines. For each subclause you list, you can point to the"
-        f" sentence in §{subclause} where the term, function, or"
-        " construct appears.\n\n"
+        f"List the subclauses §{subclause}'s implementation builds on"
+        f" top of. A subclause §Y belongs on the list when"
+        f" §{subclause} states a normative rule whose implementation"
+        " needs §Y's machinery to already be in place. For each"
+        " subclause you list, you can quote the sentence in"
+        f" §{subclause} that states the rule and name the §Y"
+        " machinery the rule needs.\n\n"
         "Order the list foundations-first: subclauses that define the"
         " most general machinery come before subclauses that build on"
         " those.\n\n"
@@ -109,8 +110,8 @@ def build_dependency_prompt(subclause: str, lrm: str) -> str:
         "Output a single JSON array of subclause-identifier strings"
         " in the same shape as --subclause input (digit-or-letter"
         ' heads, dotted decimal parts), e.g. ["33.6.1", "33.4.1.5"].'
-        f" An empty array [] means §{subclause}'s code stands on its"
-        " own."
+        f" An empty array [] means §{subclause}'s normative rules"
+        " implement on top of code already in the tree."
     )
 
 
