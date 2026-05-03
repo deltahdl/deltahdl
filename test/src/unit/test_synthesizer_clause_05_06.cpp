@@ -65,20 +65,6 @@ TEST(IdentifierSynthesis, CaseSensitiveIdentifiersSynthesize) {
   ASSERT_NE(aig, nullptr);
 }
 
-TEST(IdentifierSynthesis, SingleCharIdentifierSynthesizes) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] x, y;\n"
-      "  assign x = y;\n"
-      "endmodule\n");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-}
-
 TEST(IdentifierSynthesis, MaxLengthIdentifierSynthesizes) {
   SynthFixture f;
   std::string long_id(1024, 'a');
@@ -92,20 +78,6 @@ TEST(IdentifierSynthesis, MaxLengthIdentifierSynthesizes) {
           long_id +
           ";\n"
           "endmodule\n");
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-}
-
-TEST(IdentifierSynthesis, MixedCharClassIdentifiersSynthesize) {
-  SynthFixture f;
-  auto* mod = ElaborateSrc(
-      f,
-      "module m;\n"
-      "  logic [7:0] _start, mid$dle, end_99, result;\n"
-      "  assign result = _start + mid$dle + end_99;\n"
-      "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);

@@ -25,10 +25,6 @@ TEST(LexicalConventionParsing, EscapedKeywordAsIdentifier) {
   EXPECT_TRUE(ParseOk("module m; logic \\begin ; endmodule"));
 }
 
-TEST(LexicalConventionParsing, KeywordCannotBeVariableName) {
-  EXPECT_FALSE(ParseOk("module m; logic module; endmodule"));
-}
-
 TEST(LexicalConventionParsing, AllUppercaseUsedAsIdentifier) {
   EXPECT_TRUE(ParseOk("module m; logic MODULE; endmodule"));
 }

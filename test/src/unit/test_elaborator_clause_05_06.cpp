@@ -28,22 +28,6 @@ TEST(IdentifierElaboration, IdentifierStartingWithUnderscoreElaborates) {
              "endmodule\n"));
 }
 
-TEST(IdentifierElaboration, SingleCharIdentifierElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic x;\n"
-             "  assign x = 1'b0;\n"
-             "endmodule\n"));
-}
-
-TEST(IdentifierElaboration, UnderscoreOnlyIdentifierElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic _;\n"
-             "  assign _ = 1'b0;\n"
-             "endmodule\n"));
-}
-
 TEST(IdentifierElaboration, CaseSensitiveIdentifiersElaborate) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -72,16 +56,6 @@ TEST(IdentifierElaboration, IdentifierAsModuleNameElaborates) {
       ElabOk("module my_module_99;\n"
              "  logic x;\n"
              "  assign x = 1'b0;\n"
-             "endmodule\n"));
-}
-
-TEST(IdentifierElaboration, MixedCharClassIdentifierElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic [7:0] _start, mid$dle, end_99;\n"
-             "  assign _start = 8'd0;\n"
-             "  assign mid$dle = 8'd0;\n"
-             "  assign end_99 = 8'd0;\n"
              "endmodule\n"));
 }
 

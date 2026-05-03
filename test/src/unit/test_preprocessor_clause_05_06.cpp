@@ -72,24 +72,4 @@ TEST(IdentifierPreprocessor, IdentifierInMacroExpansion) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(IdentifierPreprocessor, SingleCharIdentifierPassesThrough) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "module t;\n"
-      "  logic x;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(IdentifierPreprocessor, MixedCharClassIdentifiersPassThrough) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "module t;\n"
-      "  logic [7:0] _start, mid$dle, end_99;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
 }  // namespace

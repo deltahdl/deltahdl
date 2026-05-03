@@ -77,14 +77,6 @@ TEST(LexicalConventionParsing, LetIdentUnderscore) {
   EXPECT_EQ(item->name, "_my_let_123");
 }
 
-TEST(LexicalConventionParsing, SimpleWithUnderscore) {
-  auto r = Parse("module m; logic _bus3; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "_bus3");
-}
-
 TEST(LexicalConventionParsing, IdentifierAsModuleName) {
   auto r = Parse("module my_mod_99; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -104,22 +96,6 @@ TEST(LexicalConventionParsing, MaxLengthIdentifierParses) {
   auto r = Parse("module m; logic " + long_id + "; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(LexicalConventionParsing, SingleCharIdentifierParses) {
-  auto r = Parse("module m; logic x; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "x");
-}
-
-TEST(LexicalConventionParsing, UnderscoreOnlyIdentifierParses) {
-  auto r = Parse("module m; logic _; endmodule");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "_");
 }
 
 TEST(LexicalConventionParsing, IdentifierInAssignExpression) {

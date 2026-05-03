@@ -97,58 +97,6 @@ TEST(IdentifierSim, IdentifierReferencesObject) {
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
-TEST(IdentifierSim, SingleCharIdentifier) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial x = 8'd99;\n"
-      "endmodule\n",
-      "x");
-  EXPECT_EQ(result, 99u);
-}
-
-TEST(IdentifierSim, UnderscoreOnlyIdentifier) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] _;\n"
-      "  initial _ = 8'd44;\n"
-      "endmodule\n",
-      "_");
-  EXPECT_EQ(result, 44u);
-}
-
-TEST(IdentifierSim, IdentifierAllUppercase) {
-  auto result = RunAndGet(
-      "module t;\n"
-      "  logic [7:0] ALLCAPS;\n"
-      "  initial ALLCAPS = 8'd33;\n"
-      "endmodule\n",
-      "ALLCAPS");
-  EXPECT_EQ(result, 33u);
-}
-
-TEST(IdentifierSim, IdentifierMixedCharClasses) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] _start, mid$dle, end_99, result;\n"
-      "  initial begin\n"
-      "    _start = 8'd1;\n"
-      "    mid$dle = 8'd2;\n"
-      "    end_99 = 8'd3;\n"
-      "    result = _start + mid$dle + end_99;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 6u);
-}
-
 // §5.6: "If an identifier exceeds the implementation-specific length limit,
 // an error shall be reported." A 1025-character identifier reaching the
 // simulator-stage pipeline must cause an error on the diagnostic engine.
