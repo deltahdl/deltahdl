@@ -1,68 +1,73 @@
 """Unit tests for git integration functions in classify_test."""
 
-from types import SimpleNamespace
+from collections.abc import Iterable
+from pathlib import Path
+from types import ModuleType, SimpleNamespace
+from typing import Any
+
+import pytest
 
 
 # ---- build_commit_message --------------------------------------------------
 
 
-def test_build_commit_message_title_has_test_name(ct_git):
+def test_build_commit_message_title_has_test_name(ct_git: ModuleType) -> None:
     """Title line contains the test name."""
     build_commit_message = ct_git.build_commit_message
     msg = build_commit_message("FooBar", "6.1", "rationale text")
     assert "Classify FooBar" in msg.splitlines()[0]
 
 
-def test_build_commit_message_title_has_clause(ct_git):
+def test_build_commit_message_title_has_clause(ct_git: ModuleType) -> None:
     """Title line contains the formatted clause with section sign."""
     build_commit_message = ct_git.build_commit_message
     msg = build_commit_message("T", "6.1", "r")
     assert "§6.1" in msg.splitlines()[0]
 
 
-def test_build_commit_message_title_has_skip_ci(ct_git):
+def test_build_commit_message_title_has_skip_ci(ct_git: ModuleType) -> None:
     """Title line contains [skip ci]."""
     build_commit_message = ct_git.build_commit_message
     msg = build_commit_message("T", "6.1", "r")
     assert "[skip ci]" in msg.splitlines()[0]
 
 
-def test_build_commit_message_title_has_arrow(ct_git):
+def test_build_commit_message_title_has_arrow(ct_git: ModuleType) -> None:
     """Title line uses arrow separator."""
     build_commit_message = ct_git.build_commit_message
     msg = build_commit_message("T", "6.1", "r")
     assert "→" in msg.splitlines()[0]
 
 
-def test_build_commit_message_title_format(ct_git):
+def test_build_commit_message_title_format(ct_git: ModuleType) -> None:
     """Title line matches exact format."""
     build_commit_message = ct_git.build_commit_message
     msg = build_commit_message("MyTest", "9.2.1", "r")
     assert msg.splitlines()[0] == "Classify MyTest → §9.2.1 [skip ci]"
 
 
-def test_build_commit_message_non_lrm_clause(ct_git):
+def test_build_commit_message_non_lrm_clause(ct_git: ModuleType) -> None:
     """Non-LRM clause formats as 'Non-LRM TOPIC'."""
     build_commit_message = ct_git.build_commit_message
     msg = build_commit_message("T", "non-lrm:aig", "r")
     assert "Non-LRM AIG" in msg.splitlines()[0]
 
 
-def test_build_commit_message_non_lrm_underscore(ct_git):
+def test_build_commit_message_non_lrm_underscore(ct_git: ModuleType) -> None:
     """Non-LRM clause with underscore converts to space."""
     build_commit_message = ct_git.build_commit_message
     msg = build_commit_message("T", "non-lrm:aig_opt", "r")
     assert "Non-LRM AIG OPT" in msg.splitlines()[0]
 
 
-def test_build_commit_message_has_co_authored_by(ct_git):
+def test_build_commit_message_has_co_authored_by(ct_git: ModuleType) -> None:
     """Message contains Co-Authored-By trailer."""
     build_commit_message = ct_git.build_commit_message
     msg = build_commit_message("T", "6.1", "r")
     assert "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>" in msg
 
 
-def test_build_commit_message_rationale_in_body(ct_git):
+def test_build_commit_message_rationale_in_body(ct_git: ModuleType) -> None:
     """Rationale text appears in message body."""
     build_commit_message = ct_git.build_commit_message
     rationale = "This test exercises the UDP initial statement construct."
@@ -70,7 +75,7 @@ def test_build_commit_message_rationale_in_body(ct_git):
     assert rationale in msg
 
 
-def test_build_commit_message_exhaustive_rationale(ct_git):
+def test_build_commit_message_exhaustive_rationale(ct_git: ModuleType) -> None:
     """Full multi-sentence rationale is preserved, not truncated."""
     build_commit_message = ct_git.build_commit_message
     rationale = (
@@ -83,7 +88,7 @@ def test_build_commit_message_exhaustive_rationale(ct_git):
     assert rationale in msg
 
 
-def test_build_commit_message_blank_line_after_title(ct_git):
+def test_build_commit_message_blank_line_after_title(ct_git: ModuleType) -> None:
     """Blank line separates title from body."""
     build_commit_message = ct_git.build_commit_message
     msg = build_commit_message("T", "6.1", "rationale")
@@ -91,7 +96,7 @@ def test_build_commit_message_blank_line_after_title(ct_git):
     assert lines[1] == ""
 
 
-def test_build_commit_message_blank_line_before_trailer(ct_git):
+def test_build_commit_message_blank_line_before_trailer(ct_git: ModuleType) -> None:
     """Blank line separates body from Co-Authored-By trailer."""
     build_commit_message = ct_git.build_commit_message
     msg = build_commit_message("T", "6.1", "rationale")
@@ -102,7 +107,7 @@ def test_build_commit_message_blank_line_before_trailer(ct_git):
     assert lines[trailer_idx - 1] == ""
 
 
-def test_build_commit_message_annex_clause(ct_git):
+def test_build_commit_message_annex_clause(ct_git: ModuleType) -> None:
     """Annex clause formats with section sign."""
     build_commit_message = ct_git.build_commit_message
     msg = build_commit_message("T", "A.6.3", "r")
@@ -112,11 +117,15 @@ def test_build_commit_message_annex_clause(ct_git):
 # ---- commit_classification ---------------------------------------------------
 
 
-def _stub_commit_push(monkeypatch, ct_git):
+def _stub_commit_push(
+    monkeypatch: pytest.MonkeyPatch, ct_git: ModuleType,
+) -> dict[str, Any]:
     """Stub commit_and_push to capture arguments."""
-    captured = {}
+    captured: dict[str, Any] = {}
 
-    def fake(changed, deleted, message):
+    def fake(
+        changed: Iterable[Path], deleted: Iterable[Path], message: str,
+    ) -> str:
         captured["changed"] = list(changed)
         captured["deleted"] = list(deleted)
         captured["message"] = message
@@ -126,9 +135,9 @@ def _stub_commit_push(monkeypatch, ct_git):
     return captured
 
 
-def _make_ctx(tmp_path, **overrides):
+def _make_ctx(tmp_path: Path, **overrides: Any) -> dict[str, Any]:
     """Build a commit_classification context dict."""
-    defaults = {
+    defaults: dict[str, Any] = {
         "filepath": tmp_path / "test_input.cpp",
         "target": [SimpleNamespace(
             test_name="T",
@@ -143,7 +152,9 @@ def _make_ctx(tmp_path, **overrides):
     return defaults
 
 
-def test_commit_classification_includes_new_files(monkeypatch, tmp_path, ct_git):
+def test_commit_classification_includes_new_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ct_git: ModuleType,
+) -> None:
     """Changed files include newly created output files."""
     commit_classification = ct_git.commit_classification
     captured = _stub_commit_push(monkeypatch, ct_git)
@@ -152,7 +163,9 @@ def test_commit_classification_includes_new_files(monkeypatch, tmp_path, ct_git)
     assert tmp_path / "test_parser_clause_06_01.cpp" in captured["changed"]
 
 
-def test_commit_classification_includes_merged(monkeypatch, tmp_path, ct_git):
+def test_commit_classification_includes_merged(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ct_git: ModuleType,
+) -> None:
     """Changed files include merge targets."""
     commit_classification = ct_git.commit_classification
     merge_path = tmp_path / "test_parser_clause_06_01.cpp"
@@ -162,7 +175,9 @@ def test_commit_classification_includes_merged(monkeypatch, tmp_path, ct_git):
     assert merge_path in captured["changed"]
 
 
-def test_commit_classification_includes_cmake(monkeypatch, tmp_path, ct_git):
+def test_commit_classification_includes_cmake(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ct_git: ModuleType,
+) -> None:
     """Changed files include CMakeLists.txt."""
     commit_classification = ct_git.commit_classification
     cmake = tmp_path / "CMakeLists.txt"
@@ -173,8 +188,8 @@ def test_commit_classification_includes_cmake(monkeypatch, tmp_path, ct_git):
 
 
 def test_commit_classification_existing_source_in_changed(
-    monkeypatch, tmp_path, ct_git,
-):
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ct_git: ModuleType,
+) -> None:
     """Source file that still exists goes into changed list."""
     commit_classification = ct_git.commit_classification
     src = tmp_path / "test_input.cpp"
@@ -186,8 +201,8 @@ def test_commit_classification_existing_source_in_changed(
 
 
 def test_commit_classification_deleted_source_in_deleted(
-    monkeypatch, tmp_path, ct_git,
-):
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ct_git: ModuleType,
+) -> None:
     """Source file that was removed goes into deleted list."""
     commit_classification = ct_git.commit_classification
     src = tmp_path / "test_input.cpp"
@@ -197,7 +212,9 @@ def test_commit_classification_deleted_source_in_deleted(
     assert src in captured["deleted"]
 
 
-def test_commit_classification_message_has_test_name(monkeypatch, tmp_path, ct_git):
+def test_commit_classification_message_has_test_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ct_git: ModuleType,
+) -> None:
     """Commit message includes the test name."""
     commit_classification = ct_git.commit_classification
     captured = _stub_commit_push(monkeypatch, ct_git)
@@ -212,7 +229,7 @@ def test_commit_classification_message_has_test_name(monkeypatch, tmp_path, ct_g
 # ---- build_commit_message with action --------------------------------------
 
 
-def test_build_commit_message_with_action(ct_git):
+def test_build_commit_message_with_action(ct_git: ModuleType) -> None:
     """Action text appears in message body."""
     msg = ct_git.build_commit_message(
         "T", "6.1", "rationale", action="Kept in the same file",
@@ -220,7 +237,7 @@ def test_build_commit_message_with_action(ct_git):
     assert "Action: Kept in the same file" in msg
 
 
-def test_build_commit_message_without_action(ct_git):
+def test_build_commit_message_without_action(ct_git: ModuleType) -> None:
     """No 'Action:' line when action is empty."""
     msg = ct_git.build_commit_message("T", "6.1", "rationale")
     assert "Action:" not in msg
@@ -229,7 +246,9 @@ def test_build_commit_message_without_action(ct_git):
 # ---- commit_classification with action -------------------------------------
 
 
-def test_commit_classification_passes_action(monkeypatch, tmp_path, ct_git):
+def test_commit_classification_passes_action(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ct_git: ModuleType,
+) -> None:
     """Action from ctx appears in commit message."""
     commit_classification = ct_git.commit_classification
     captured = _stub_commit_push(monkeypatch, ct_git)
@@ -243,7 +262,9 @@ def test_commit_classification_passes_action(monkeypatch, tmp_path, ct_git):
 # ---- commit_classification returns SHA -------------------------------------
 
 
-def test_commit_classification_returns_sha(monkeypatch, tmp_path, ct_git):
+def test_commit_classification_returns_sha(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ct_git: ModuleType,
+) -> None:
     """commit_classification returns the SHA from commit_and_push."""
     _stub_commit_push(monkeypatch, ct_git)
     ctx = _make_ctx(tmp_path)

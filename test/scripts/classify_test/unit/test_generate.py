@@ -1,17 +1,23 @@
 """Unit tests for file generation functions in classify_test."""
 
+from pathlib import Path
+from types import ModuleType
+from typing import Any
+
+import pytest
+
 
 # ---- find_existing_tests ---------------------------------------------------
 
 
-def test_find_existing_tests_empty(ct, tmp_path):
+def test_find_existing_tests_empty(ct: ModuleType, tmp_path: Path) -> None:
     """Returns empty set when no matching files exist."""
     assert ct.find_existing_tests(
         "test_parser_clause_06", tmp_path,
     ) == set()
 
 
-def test_find_existing_tests_exact(ct, tmp_path):
+def test_find_existing_tests_exact(ct: ModuleType, tmp_path: Path) -> None:
     """Finds test bodies in exact match file."""
     f = tmp_path / "test_parser_clause_06.cpp"
     f.write_text("TEST(S, Existing) {\n  int x = 1;\n}\n")
@@ -21,7 +27,7 @@ def test_find_existing_tests_exact(ct, tmp_path):
     assert result  # returns non-empty set of body hashes
 
 
-def test_find_existing_tests_variant(ct, tmp_path):
+def test_find_existing_tests_variant(ct: ModuleType, tmp_path: Path) -> None:
     """Finds test bodies in variant files (e.g., _a.cpp)."""
     f = tmp_path / "test_parser_clause_06_a.cpp"
     f.write_text("TEST_F(S, Found) {\n  int x = 1;\n}\n")
@@ -31,7 +37,7 @@ def test_find_existing_tests_variant(ct, tmp_path):
     assert result  # returns non-empty set of body hashes
 
 
-def test_find_existing_tests_excludes_source(ct, tmp_path):
+def test_find_existing_tests_excludes_source(ct: ModuleType, tmp_path: Path) -> None:
     """Skips the source file when exclude_path is given."""
     f = tmp_path / "test_non_lrm_aig.cpp"
     f.write_text("TEST(S, Self) {\n  int x = 1;\n}\n")
@@ -41,7 +47,7 @@ def test_find_existing_tests_excludes_source(ct, tmp_path):
     assert not result  # excluded file's bodies not included
 
 
-def test_find_existing_tests_dedup_by_body(ct, tmp_path):
+def test_find_existing_tests_dedup_by_body(ct: ModuleType, tmp_path: Path) -> None:
     """Same body with different name is detected as existing."""
     f = tmp_path / "test_parser_clause_06.cpp"
     f.write_text("TEST(S, OldName) {\n  int x = 1;\n}\n")
@@ -58,7 +64,7 @@ def test_find_existing_tests_dedup_by_body(ct, tmp_path):
     assert body in existing
 
 
-def test_find_existing_tests_different_body(ct, tmp_path):
+def test_find_existing_tests_different_body(ct: ModuleType, tmp_path: Path) -> None:
     """Different body with same name is NOT detected as existing."""
     f = tmp_path / "test_parser_clause_06.cpp"
     f.write_text("TEST(S, SameName) {\n  int x = 1;\n}\n")
@@ -78,42 +84,42 @@ def test_find_existing_tests_different_body(ct, tmp_path):
 # ---- clause_to_filename ----------------------------------------------------
 
 
-def test_clause_to_filename_non_lrm_with_topic(ct):
+def test_clause_to_filename_non_lrm_with_topic(ct: ModuleType) -> None:
     """non-lrm:topic produces test_non_lrm_topic."""
     assert ct.clause_to_filename(
         "test_non_lrm_", "non-lrm:aig",
     ) == "test_non_lrm_aig"
 
 
-def test_clause_to_filename_non_lrm_no_topic(ct):
+def test_clause_to_filename_non_lrm_no_topic(ct: ModuleType) -> None:
     """Plain non-lrm produces test_non_lrm_misc."""
     assert ct.clause_to_filename(
         "test_non_lrm_", "non-lrm",
     ) == "test_non_lrm_misc"
 
 
-def test_clause_to_filename_annex(ct):
+def test_clause_to_filename_annex(ct: ModuleType) -> None:
     """Annex clause produces annex filename."""
     assert ct.clause_to_filename(
         "test_parser_", "A.6.3",
     ) == "test_parser_annex_a_06_03"
 
 
-def test_clause_to_filename_bare_annex(ct):
+def test_clause_to_filename_bare_annex(ct: ModuleType) -> None:
     """Bare annex letter produces annex filename."""
     assert ct.clause_to_filename(
         "test_lexer_", "B",
     ) == "test_lexer_annex_b"
 
 
-def test_clause_to_filename_regular(ct):
+def test_clause_to_filename_regular(ct: ModuleType) -> None:
     """Regular clause produces clause filename."""
     assert ct.clause_to_filename(
         "test_parser_", "6.3.1",
     ) == "test_parser_clause_06_03_01"
 
 
-def test_clause_to_filename_trailing_underscore(ct):
+def test_clause_to_filename_trailing_underscore(ct: ModuleType) -> None:
     """Prefix trailing underscore is stripped."""
     result = ct.clause_to_filename("test_parser_", "6.1")
     assert result == "test_parser_clause_06_01"
@@ -122,7 +128,7 @@ def test_clause_to_filename_trailing_underscore(ct):
 # ---- _count_file_lines -----------------------------------------------------
 
 
-def test_count_file_lines(ct, tmp_path):
+def test_count_file_lines(ct: ModuleType, tmp_path: Path) -> None:
     """Returns line count of an existing file."""
     _count_file_lines = getattr(ct, "_count_file_lines")
     f = tmp_path / "test.cpp"
@@ -130,7 +136,7 @@ def test_count_file_lines(ct, tmp_path):
     assert _count_file_lines(f) == 3
 
 
-def test_count_file_lines_missing(ct, tmp_path):
+def test_count_file_lines_missing(ct: ModuleType, tmp_path: Path) -> None:
     """Returns 0 for nonexistent file."""
     _count_file_lines = getattr(ct, "_count_file_lines")
     assert _count_file_lines(tmp_path / "missing.cpp") == 0
@@ -139,20 +145,20 @@ def test_count_file_lines_missing(ct, tmp_path):
 # ---- _next_suffix_file -----------------------------------------------------
 
 
-def test_next_suffix_file_no_existing(ct, tmp_path):
+def test_next_suffix_file_no_existing(ct: ModuleType, tmp_path: Path) -> None:
     """Returns '_a' when no suffix files exist."""
     _next_suffix_file = getattr(ct, "_next_suffix_file")
     assert _next_suffix_file("test_parser_clause_06", tmp_path) == "a"
 
 
-def test_next_suffix_file_a_exists(ct, tmp_path):
+def test_next_suffix_file_a_exists(ct: ModuleType, tmp_path: Path) -> None:
     """Returns '_b' when _a exists."""
     _next_suffix_file = getattr(ct, "_next_suffix_file")
     (tmp_path / "test_parser_clause_06_a.cpp").write_text("")
     assert _next_suffix_file("test_parser_clause_06", tmp_path) == "b"
 
 
-def test_next_suffix_file_multiple(ct, tmp_path):
+def test_next_suffix_file_multiple(ct: ModuleType, tmp_path: Path) -> None:
     """Returns '_c' when _a and _b exist."""
     _next_suffix_file = getattr(ct, "_next_suffix_file")
     (tmp_path / "test_parser_clause_06_a.cpp").write_text("")
@@ -163,7 +169,7 @@ def test_next_suffix_file_multiple(ct, tmp_path):
 # ---- _rename_base_to_suffix ------------------------------------------------
 
 
-def test_rename_base_to_suffix_returns_a(ct, tmp_path):
+def test_rename_base_to_suffix_returns_a(ct: ModuleType, tmp_path: Path) -> None:
     """Returned path has _a suffix when no suffixes exist."""
     _rename_base_to_suffix = getattr(ct, "_rename_base_to_suffix")
     f = tmp_path / "foo.cpp"
@@ -172,7 +178,7 @@ def test_rename_base_to_suffix_returns_a(ct, tmp_path):
     assert result.name == "foo_a.cpp"
 
 
-def test_rename_base_to_suffix_removes_base(ct, tmp_path):
+def test_rename_base_to_suffix_removes_base(ct: ModuleType, tmp_path: Path) -> None:
     """Base file no longer exists after rename."""
     _rename_base_to_suffix = getattr(ct, "_rename_base_to_suffix")
     f = tmp_path / "foo.cpp"
@@ -181,7 +187,7 @@ def test_rename_base_to_suffix_removes_base(ct, tmp_path):
     assert not f.exists()
 
 
-def test_rename_base_to_suffix_creates_target(ct, tmp_path):
+def test_rename_base_to_suffix_creates_target(ct: ModuleType, tmp_path: Path) -> None:
     """Target _a file exists after rename."""
     _rename_base_to_suffix = getattr(ct, "_rename_base_to_suffix")
     f = tmp_path / "foo.cpp"
@@ -190,7 +196,7 @@ def test_rename_base_to_suffix_creates_target(ct, tmp_path):
     assert (tmp_path / "foo_a.cpp").exists()
 
 
-def test_rename_base_to_suffix_skips_existing_variant(ct, tmp_path):
+def test_rename_base_to_suffix_skips_existing_variant(ct: ModuleType, tmp_path: Path) -> None:
     """Renames base to _b when _a already exists."""
     _rename_base_to_suffix = getattr(ct, "_rename_base_to_suffix")
     (tmp_path / "foo.cpp").write_text("base")
@@ -199,7 +205,7 @@ def test_rename_base_to_suffix_skips_existing_variant(ct, tmp_path):
     assert result.name == "foo_b.cpp"
 
 
-def test_rename_base_to_suffix_preserves_content(ct, tmp_path):
+def test_rename_base_to_suffix_preserves_content(ct: ModuleType, tmp_path: Path) -> None:
     """Renamed file preserves original content."""
     _rename_base_to_suffix = getattr(ct, "_rename_base_to_suffix")
     (tmp_path / "foo.cpp").write_text("base")
@@ -211,7 +217,7 @@ def test_rename_base_to_suffix_preserves_content(ct, tmp_path):
 # ---- find_merge_target -----------------------------------------------------
 
 
-def test_find_merge_target_exact(ct, tmp_path):
+def test_find_merge_target_exact(ct: ModuleType, tmp_path: Path) -> None:
     """Returns exact file when it exists."""
     f = tmp_path / "test_parser_clause_06.cpp"
     f.write_text("")
@@ -220,7 +226,7 @@ def test_find_merge_target_exact(ct, tmp_path):
     ) == f
 
 
-def test_find_merge_target_variant(ct, tmp_path):
+def test_find_merge_target_variant(ct: ModuleType, tmp_path: Path) -> None:
     """Returns last variant file when exact does not exist."""
     (tmp_path / "test_parser_clause_06_a.cpp").write_text("")
     (tmp_path / "test_parser_clause_06_b.cpp").write_text("")
@@ -230,14 +236,14 @@ def test_find_merge_target_variant(ct, tmp_path):
     assert result.name == "test_parser_clause_06_b.cpp"
 
 
-def test_find_merge_target_none(ct, tmp_path):
+def test_find_merge_target_none(ct: ModuleType, tmp_path: Path) -> None:
     """Returns None when no matching files exist."""
     assert ct.find_merge_target(
         "test_parser_clause_06", tmp_path,
     ) is None
 
 
-def test_find_merge_target_excludes_source(ct, tmp_path):
+def test_find_merge_target_excludes_source(ct: ModuleType, tmp_path: Path) -> None:
     """Returns None when only match is the excluded source file."""
     f = tmp_path / "test_non_lrm_aig.cpp"
     f.write_text("TEST(S, Self) {\n}\n")
@@ -249,12 +255,12 @@ def test_find_merge_target_excludes_source(ct, tmp_path):
 # ---- strip_lrm_quotes ------------------------------------------------------
 
 
-def test_strip_lrm_quotes_no_quote(ct):
+def test_strip_lrm_quotes_no_quote(ct: ModuleType) -> None:
     """Returns line unchanged when no quote present."""
     assert ct.strip_lrm_quotes("int x = 0;") == "int x = 0;"
 
 
-def test_strip_lrm_quotes_section_ref(ct):
+def test_strip_lrm_quotes_section_ref(ct: ModuleType) -> None:
     """Strips quote but keeps section reference."""
     result = ct.strip_lrm_quotes(
         '// \u00a76.3: "A type is defined..."',
@@ -262,7 +268,7 @@ def test_strip_lrm_quotes_section_ref(ct):
     assert result == "// \u00a76.3:"
 
 
-def test_strip_lrm_quotes_no_section_ref(ct):
+def test_strip_lrm_quotes_no_section_ref(ct: ModuleType) -> None:
     """Returns empty string when quote has no section reference."""
     result = ct.strip_lrm_quotes(
         '// "All types must be..."',
@@ -273,7 +279,7 @@ def test_strip_lrm_quotes_no_section_ref(ct):
 # ---- generate_file ---------------------------------------------------------
 
 
-def test_generate_file_non_lrm(ct, ct_helpers):
+def test_generate_file_non_lrm(ct: ModuleType, ct_helpers: ModuleType) -> None:
     """Generates non-LRM file header."""
     _parsed = ct_helpers.make_parsed_file
     _tb = ct_helpers.make_test_block
@@ -283,7 +289,7 @@ def test_generate_file_non_lrm(ct, ct_helpers):
     assert content.startswith("// Non-LRM tests")
 
 
-def test_generate_file_annex_with_title(ct, ct_helpers):
+def test_generate_file_annex_with_title(ct: ModuleType, ct_helpers: ModuleType) -> None:
     """Generates annex header with title."""
     _parsed = ct_helpers.make_parsed_file
     _tb = ct_helpers.make_test_block
@@ -293,7 +299,7 @@ def test_generate_file_annex_with_title(ct, ct_helpers):
     assert "// Annex A.6: Grammar" in content
 
 
-def test_generate_file_annex_no_title(ct, ct_helpers):
+def test_generate_file_annex_no_title(ct: ModuleType, ct_helpers: ModuleType) -> None:
     """Generates annex header without title."""
     _parsed = ct_helpers.make_parsed_file
     _tb = ct_helpers.make_test_block
@@ -303,7 +309,7 @@ def test_generate_file_annex_no_title(ct, ct_helpers):
     assert "// Annex A.6" in content
 
 
-def test_generate_file_regular_with_title(ct, ct_helpers):
+def test_generate_file_regular_with_title(ct: ModuleType, ct_helpers: ModuleType) -> None:
     """Generates regular clause header with title."""
     _parsed = ct_helpers.make_parsed_file
     _tb = ct_helpers.make_test_block
@@ -313,7 +319,7 @@ def test_generate_file_regular_with_title(ct, ct_helpers):
     assert "// \u00a76.3: Data types" in content
 
 
-def test_generate_file_regular_no_title(ct, ct_helpers):
+def test_generate_file_regular_no_title(ct: ModuleType, ct_helpers: ModuleType) -> None:
     """Generates regular clause header without title."""
     _parsed = ct_helpers.make_parsed_file
     _tb = ct_helpers.make_test_block
@@ -323,7 +329,7 @@ def test_generate_file_regular_no_title(ct, ct_helpers):
     assert "// \u00a76.3" in content
 
 
-def test_generate_file_with_using(ct, ct_helpers):
+def test_generate_file_with_using(ct: ModuleType, ct_helpers: ModuleType) -> None:
     """Includes using-line when present."""
     _parsed = ct_helpers.make_parsed_file
     _tb = ct_helpers.make_test_block
@@ -333,7 +339,7 @@ def test_generate_file_with_using(ct, ct_helpers):
     assert "using namespace delta;" in content
 
 
-def test_generate_file_with_preamble(ct, ct_helpers):
+def test_generate_file_with_preamble(ct: ModuleType, ct_helpers: ModuleType) -> None:
     """Includes global preamble items referenced by tests."""
     _parsed = ct_helpers.make_parsed_file
     pre = ct.PreambleItem(lines=["struct Foo {", "};"])
@@ -347,7 +353,7 @@ def test_generate_file_with_preamble(ct, ct_helpers):
     assert "struct Foo {" in content
 
 
-def test_generate_file_preceding_comments(ct, ct_helpers):
+def test_generate_file_preceding_comments(ct: ModuleType, ct_helpers: ModuleType) -> None:
     """Includes preceding comments for tests."""
     _parsed = ct_helpers.make_parsed_file
     _tb = ct_helpers.make_test_block
@@ -357,7 +363,7 @@ def test_generate_file_preceding_comments(ct, ct_helpers):
     assert "// a test comment" in content
 
 
-def test_generate_file_preceding_comment_stripped(ct, ct_helpers):
+def test_generate_file_preceding_comment_stripped(ct: ModuleType, ct_helpers: ModuleType) -> None:
     """Strips LRM quotes from preceding comments."""
     _parsed = ct_helpers.make_parsed_file
     _tb = ct_helpers.make_test_block
@@ -367,7 +373,7 @@ def test_generate_file_preceding_comment_stripped(ct, ct_helpers):
     assert '"All modules' not in content
 
 
-def test_generate_file_namespace_wrapper(ct, ct_helpers):
+def test_generate_file_namespace_wrapper(ct: ModuleType, ct_helpers: ModuleType) -> None:
     """Output includes namespace { ... } // namespace."""
     _parsed = ct_helpers.make_parsed_file
     _tb = ct_helpers.make_test_block
@@ -377,7 +383,7 @@ def test_generate_file_namespace_wrapper(ct, ct_helpers):
     assert "namespace {" in content and "}  // namespace" in content
 
 
-def test_generate_file_with_section_preamble(ct, ct_helpers):
+def test_generate_file_with_section_preamble(ct: ModuleType, ct_helpers: ModuleType) -> None:
     """Includes section preamble items referenced by tests."""
     _parsed = ct_helpers.make_parsed_file
     sec = ct.PreambleItem(
@@ -394,7 +400,7 @@ def test_generate_file_with_section_preamble(ct, ct_helpers):
     assert "static int Helper() {" in content
 
 
-def test_generate_file_preamble_stripped_empty(ct, ct_helpers):
+def test_generate_file_preamble_stripped_empty(ct: ModuleType, ct_helpers: ModuleType) -> None:
     """Exercise generate_file preamble with strip_lrm_quotes returning empty."""
     _parsed = ct_helpers.make_parsed_file
     _tb = ct_helpers.make_test_block
@@ -410,7 +416,7 @@ def test_generate_file_preamble_stripped_empty(ct, ct_helpers):
 # ---- append_tests_to_file --------------------------------------------------
 
 
-def test_append_tests_to_file_basic(ct, ct_helpers, tmp_path):
+def test_append_tests_to_file_basic(ct: ModuleType, ct_helpers: ModuleType, tmp_path: Path) -> None:
     """Appends tests before } // namespace."""
     _tb = ct_helpers.make_test_block
     f = tmp_path / "existing.cpp"
@@ -431,7 +437,12 @@ def test_append_tests_to_file_basic(ct, ct_helpers, tmp_path):
     assert "TEST(S, New)" in text
 
 
-def _append_with_preamble(ct, ct_helpers, tmp_path, existing_content):
+def _append_with_preamble(
+    ct: ModuleType,
+    ct_helpers: ModuleType,
+    tmp_path: Path,
+    existing_content: str,
+) -> str:
     """Write existing_content, append a preamble + test, return file text."""
     _tb = ct_helpers.make_test_block
     f = tmp_path / "existing.cpp"
@@ -442,7 +453,11 @@ def _append_with_preamble(ct, ct_helpers, tmp_path, existing_content):
     return f.read_text(encoding="utf-8")
 
 
-def test_append_tests_to_file_new_preamble(ct, ct_helpers, tmp_path):
+def test_append_tests_to_file_new_preamble(
+    ct: ModuleType,
+    ct_helpers: ModuleType,
+    tmp_path: Path,
+) -> None:
     """Appends preamble items that are not already present."""
     text = _append_with_preamble(
         ct, ct_helpers, tmp_path, "namespace {\n}  // namespace\n"
@@ -450,7 +465,8 @@ def test_append_tests_to_file_new_preamble(ct, ct_helpers, tmp_path):
     assert "struct Bar {" in text
 
 
-def test_append_tests_to_file_duplicate_preamble(ct, ct_helpers, tmp_path):
+def test_append_tests_to_file_duplicate_preamble(ct: ModuleType, ct_helpers: ModuleType,
+                                                 tmp_path: Path) -> None:
     """Skips preamble items already present in the file."""
     text = _append_with_preamble(
         ct, ct_helpers, tmp_path,
@@ -459,7 +475,8 @@ def test_append_tests_to_file_duplicate_preamble(ct, ct_helpers, tmp_path):
     assert text.count("struct Bar {") == 1
 
 
-def test_append_tests_to_file_no_namespace_close(ct, ct_helpers, tmp_path):
+def test_append_tests_to_file_no_namespace_close(ct: ModuleType, ct_helpers: ModuleType,
+                                                 tmp_path: Path) -> None:
     """Appends at end of file when no } // namespace found."""
     _tb = ct_helpers.make_test_block
     f = tmp_path / "existing.cpp"
@@ -470,7 +487,11 @@ def test_append_tests_to_file_no_namespace_close(ct, ct_helpers, tmp_path):
     assert "TEST(S, T)" in text
 
 
-def test_append_tests_to_file_comment_strip(ct, ct_helpers, tmp_path):
+def test_append_tests_to_file_comment_strip(
+    ct: ModuleType,
+    ct_helpers: ModuleType,
+    tmp_path: Path,
+) -> None:
     """Strips LRM quotes from appended preceding comments."""
     _tb = ct_helpers.make_test_block
     f = tmp_path / "existing.cpp"
@@ -484,7 +505,8 @@ def test_append_tests_to_file_comment_strip(ct, ct_helpers, tmp_path):
     assert '"All modules' not in text
 
 
-def test_append_tests_to_file_comment_only_preamble(ct, ct_helpers, tmp_path):
+def test_append_tests_to_file_comment_only_preamble(ct: ModuleType, ct_helpers: ModuleType,
+                                                    tmp_path: Path) -> None:
     """Preamble with only comment lines uses first line for dedup check."""
     _tb = ct_helpers.make_test_block
     f = tmp_path / "existing.cpp"
@@ -499,7 +521,8 @@ def test_append_tests_to_file_comment_only_preamble(ct, ct_helpers, tmp_path):
     assert "// A helper comment" in text
 
 
-def test_append_tests_to_file_single_space_close(ct, ct_helpers, tmp_path):
+def test_append_tests_to_file_single_space_close(ct: ModuleType, ct_helpers: ModuleType,
+                                                 tmp_path: Path) -> None:
     """Finds '} // namespace' (single space variant)."""
     _tb = ct_helpers.make_test_block
     f = tmp_path / "existing.cpp"
@@ -515,7 +538,8 @@ def test_append_tests_to_file_single_space_close(ct, ct_helpers, tmp_path):
     assert "TEST(S, New)" in text
 
 
-def test_append_tests_to_file_empty_stripped_comment(ct, ct_helpers, tmp_path):
+def test_append_tests_to_file_empty_stripped_comment(ct: ModuleType, ct_helpers: ModuleType,
+                                                     tmp_path: Path) -> None:
     """Empty stripped preceding comment is not appended."""
     _tb = ct_helpers.make_test_block
     f = tmp_path / "existing.cpp"
@@ -529,7 +553,11 @@ def test_append_tests_to_file_empty_stripped_comment(ct, ct_helpers, tmp_path):
     assert "Some LRM quote" not in text
 
 
-def test_append_tests_to_file_normal_comment(ct, ct_helpers, tmp_path):
+def test_append_tests_to_file_normal_comment(
+    ct: ModuleType,
+    ct_helpers: ModuleType,
+    tmp_path: Path,
+) -> None:
     """Non-LRM preceding comment is appended by append_tests_to_file."""
     _tb = ct_helpers.make_test_block
     f = tmp_path / "existing.cpp"
@@ -546,7 +574,7 @@ def test_append_tests_to_file_normal_comment(ct, ct_helpers, tmp_path):
 # ---- _write_files splitting -------------------------------------------------
 
 
-def _make_large_test(ct, name, n_lines):
+def _make_large_test(ct: ModuleType, name: str, n_lines: int) -> Any:
     """Create a test block with n_lines of body."""
     body = [f"TEST(S, {name}) {{"]
     for i in range(n_lines - 2):
@@ -560,44 +588,62 @@ def _make_large_test(ct, name, n_lines):
     )
 
 
-def _do_split_write(ct, ct_helpers, tmp_path, max_lines=50):
+def _do_split_write(
+    ct: ModuleType,
+    ct_helpers: ModuleType,
+    tmp_path: Path,
+    max_lines: int | None = 50,
+) -> Any:
     """Helper: write two large tests, optionally capped at max_lines."""
     _write_files = getattr(ct, "_write_files")
     parsed = ct_helpers.make_parsed_file()
     t1 = _make_large_test(ct, "Big1", 40)
     t2 = _make_large_test(ct, "Big2", 40)
     to_create = [("test_parser_clause_06_01", "6.1", [t1, t2])]
-    opts = {"test_dir": tmp_path, "lrm_titles": {}}
+    opts: dict[str, Any] = {"test_dir": tmp_path, "lrm_titles": {}}
     if max_lines is not None:
         opts["max_lines"] = max_lines
     return _write_files(to_create, [], parsed, opts)
 
 
-def test_write_files_split_creates_a(ct, ct_helpers, tmp_path):
+def test_write_files_split_creates_a(
+    ct: ModuleType,
+    ct_helpers: ModuleType,
+    tmp_path: Path,
+) -> None:
     """Splitting creates _a suffix file."""
     _do_split_write(ct, ct_helpers, tmp_path)
     assert (tmp_path / "test_parser_clause_06_01_a.cpp").exists()
 
 
-def test_write_files_split_creates_b(ct, ct_helpers, tmp_path):
+def test_write_files_split_creates_b(
+    ct: ModuleType,
+    ct_helpers: ModuleType,
+    tmp_path: Path,
+) -> None:
     """Splitting creates _b suffix file."""
     _do_split_write(ct, ct_helpers, tmp_path)
     assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
 
 
-def test_write_files_split_no_base(ct, ct_helpers, tmp_path):
+def test_write_files_split_no_base(ct: ModuleType, ct_helpers: ModuleType, tmp_path: Path) -> None:
     """Splitting does not create unsuffixed base file."""
     _do_split_write(ct, ct_helpers, tmp_path)
     assert not (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
 
-def test_write_files_split_returns_names(ct, ct_helpers, tmp_path):
+def test_write_files_split_returns_names(
+    ct: ModuleType,
+    ct_helpers: ModuleType,
+    tmp_path: Path,
+) -> None:
     """Splitting returns both suffix names."""
     names = _do_split_write(ct, ct_helpers, tmp_path)
     assert "test_parser_clause_06_01_a" in names
 
 
-def test_write_files_no_split_under_max_lines(ct, ct_helpers, tmp_path):
+def test_write_files_no_split_under_max_lines(ct: ModuleType, ct_helpers: ModuleType,
+                                              tmp_path: Path) -> None:
     """Content under limit stays in one file."""
     _parsed = ct_helpers.make_parsed_file
     _tb = ct_helpers.make_test_block
@@ -612,7 +658,11 @@ def test_write_files_no_split_under_max_lines(ct, ct_helpers, tmp_path):
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
 
-def test_write_files_no_split_returns_name(ct, ct_helpers, tmp_path):
+def test_write_files_no_split_returns_name(
+    ct: ModuleType,
+    ct_helpers: ModuleType,
+    tmp_path: Path,
+) -> None:
     """No-split returns the base name."""
     _parsed = ct_helpers.make_parsed_file
     _tb = ct_helpers.make_test_block
@@ -627,7 +677,8 @@ def test_write_files_no_split_returns_name(ct, ct_helpers, tmp_path):
     assert "test_parser_clause_06_01" in names
 
 
-def test_write_files_no_split_when_no_max_lines(ct, ct_helpers, tmp_path):
+def test_write_files_no_split_when_no_max_lines(ct: ModuleType, ct_helpers: ModuleType,
+                                                tmp_path: Path) -> None:
     """max_lines=None never splits."""
     _do_split_write(ct, ct_helpers, tmp_path, max_lines=None)
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
@@ -636,7 +687,7 @@ def test_write_files_no_split_when_no_max_lines(ct, ct_helpers, tmp_path):
 # ---- append_tests_to_file splitting ----------------------------------------
 
 
-def _near_limit_file(tmp_path, name):
+def _near_limit_file(tmp_path: Path, name: str) -> Path:
     """Create a file near the 50-line limit and return its path."""
     f = tmp_path / name
     lines = ["#include <gtest/gtest.h>", "", "namespace {", ""]
@@ -647,7 +698,7 @@ def _near_limit_file(tmp_path, name):
     return f
 
 
-def test_append_splits_creates_overflow_file(ct, tmp_path):
+def test_append_splits_creates_overflow_file(ct: ModuleType, tmp_path: Path) -> None:
     """Overflow tests go to next suffix file."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
     t = _make_large_test(ct, "Overflow", 20)
@@ -657,7 +708,7 @@ def test_append_splits_creates_overflow_file(ct, tmp_path):
     assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
 
 
-def test_append_splits_returns_new_name(ct, tmp_path):
+def test_append_splits_returns_new_name(ct: ModuleType, tmp_path: Path) -> None:
     """Overflow append returns the new suffix filename."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
     t = _make_large_test(ct, "Overflow", 20)
@@ -667,7 +718,11 @@ def test_append_splits_returns_new_name(ct, tmp_path):
     assert "test_parser_clause_06_01_b" in new_names
 
 
-def test_append_no_split_keeps_in_file(ct, ct_helpers, tmp_path):
+def test_append_no_split_keeps_in_file(
+    ct: ModuleType,
+    ct_helpers: ModuleType,
+    tmp_path: Path,
+) -> None:
     """Append stays in same file when under limit."""
     _tb = ct_helpers.make_test_block
     f = tmp_path / "existing.cpp"
@@ -682,7 +737,11 @@ def test_append_no_split_keeps_in_file(ct, ct_helpers, tmp_path):
     assert "TEST(S, New)" in f.read_text(encoding="utf-8")
 
 
-def test_append_no_split_returns_empty(ct, ct_helpers, tmp_path):
+def test_append_no_split_returns_empty(
+    ct: ModuleType,
+    ct_helpers: ModuleType,
+    tmp_path: Path,
+) -> None:
     """No-split append returns empty list."""
     _tb = ct_helpers.make_test_block
     f = tmp_path / "existing.cpp"
@@ -697,7 +756,7 @@ def test_append_no_split_returns_empty(ct, ct_helpers, tmp_path):
     assert not new_names
 
 
-def test_append_renames_base_to_a(ct, tmp_path):
+def test_append_renames_base_to_a(ct: ModuleType, tmp_path: Path) -> None:
     """Base file renamed to _a when splitting."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01.cpp")
     t = _make_large_test(ct, "Overflow", 20)
@@ -707,7 +766,7 @@ def test_append_renames_base_to_a(ct, tmp_path):
     assert (tmp_path / "test_parser_clause_06_01_a.cpp").exists()
 
 
-def test_append_renames_base_creates_overflow(ct, tmp_path):
+def test_append_renames_base_creates_overflow(ct: ModuleType, tmp_path: Path) -> None:
     """Overflow goes to _b when base renamed to _a."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01.cpp")
     t = _make_large_test(ct, "Overflow", 20)
@@ -717,7 +776,7 @@ def test_append_renames_base_creates_overflow(ct, tmp_path):
     assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
 
 
-def test_append_renames_base_removes_original(ct, tmp_path):
+def test_append_renames_base_removes_original(ct: ModuleType, tmp_path: Path) -> None:
     """Original base file no longer exists after rename."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01.cpp")
     t = _make_large_test(ct, "Overflow", 20)
@@ -727,7 +786,7 @@ def test_append_renames_base_removes_original(ct, tmp_path):
     assert not (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
 
-def test_append_renames_base_returns_both_names(ct, tmp_path):
+def test_append_renames_base_returns_both_names(ct: ModuleType, tmp_path: Path) -> None:
     """Returns both _a and _b names when base is renamed."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01.cpp")
     t = _make_large_test(ct, "Overflow", 20)
@@ -737,7 +796,7 @@ def test_append_renames_base_returns_both_names(ct, tmp_path):
     assert "test_parser_clause_06_01_a" in new_names
 
 
-def _do_multi_batch_overflow(ct, tmp_path):
+def _do_multi_batch_overflow(ct: ModuleType, tmp_path: Path) -> None:
     """Set up multi-batch overflow: 3 tests into near-limit file."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
     tests = [_make_large_test(ct, f"Ov{i}", 20) for i in range(3)]
@@ -746,19 +805,19 @@ def _do_multi_batch_overflow(ct, tmp_path):
     )
 
 
-def test_append_overflow_multi_batch_creates_b(ct, tmp_path):
+def test_append_overflow_multi_batch_creates_b(ct: ModuleType, tmp_path: Path) -> None:
     """Multi-batch overflow creates _b suffix file."""
     _do_multi_batch_overflow(ct, tmp_path)
     assert (tmp_path / "test_parser_clause_06_01_b.cpp").exists()
 
 
-def test_append_overflow_multi_batch_creates_c(ct, tmp_path):
+def test_append_overflow_multi_batch_creates_c(ct: ModuleType, tmp_path: Path) -> None:
     """Third overflow batch creates _c suffix file."""
     _do_multi_batch_overflow(ct, tmp_path)
     assert (tmp_path / "test_parser_clause_06_01_c.cpp").exists()
 
 
-def test_append_overflow_includes_preceding_comments(ct, tmp_path):
+def test_append_overflow_includes_preceding_comments(ct: ModuleType, tmp_path: Path) -> None:
     """Overflow file includes preceding comments from tests."""
     f = _near_limit_file(tmp_path, "test_parser_clause_06_01_a.cpp")
     t = ct.TestBlock(
@@ -778,7 +837,7 @@ def test_append_overflow_includes_preceding_comments(ct, tmp_path):
 # ---- _write_overflow_file edge cases ----------------------------------------
 
 
-def test_write_overflow_file_strips_empty_comment(ct, tmp_path):
+def test_write_overflow_file_strips_empty_comment(ct: ModuleType, tmp_path: Path) -> None:
     """Stripped LRM-quote comment is omitted from overflow file."""
     _write_overflow_file = getattr(ct, "_write_overflow_file")
     source = tmp_path / "source.cpp"
@@ -796,7 +855,11 @@ def test_write_overflow_file_strips_empty_comment(ct, tmp_path):
     assert "All modules" not in out.read_text(encoding="utf-8")
 
 
-def test_write_overflow_file_no_namespace(ct, ct_helpers, tmp_path):
+def test_write_overflow_file_no_namespace(
+    ct: ModuleType,
+    ct_helpers: ModuleType,
+    tmp_path: Path,
+) -> None:
     """Copies entire source when no 'namespace {' found."""
     _write_overflow_file = getattr(ct, "_write_overflow_file")
     _tb = ct_helpers.make_test_block
@@ -813,7 +876,7 @@ def test_write_overflow_file_no_namespace(ct, ct_helpers, tmp_path):
 # ---- _batch_tests edge cases ------------------------------------------------
 
 
-def test_batch_tests_empty(ct):
+def test_batch_tests_empty(ct: ModuleType) -> None:
     """Empty tests list produces empty batches."""
     _batch_tests = getattr(ct, "_batch_tests")
     assert not _batch_tests([], 10, 50)
@@ -822,7 +885,7 @@ def test_batch_tests_empty(ct):
 # ---- _flush_overflow edge cases ---------------------------------------------
 
 
-def test_flush_overflow_empty(ct, tmp_path):
+def test_flush_overflow_empty(ct: ModuleType, tmp_path: Path) -> None:
     """Empty overflow list returns empty names."""
     _flush_overflow = getattr(ct, "_flush_overflow")
     source = tmp_path / "source.cpp"
@@ -833,7 +896,8 @@ def test_flush_overflow_empty(ct, tmp_path):
 # ---- update_cmake ----------------------------------------------------------
 
 
-def test_update_cmake_removes_and_adds(ct, monkeypatch, tmp_path):
+def test_update_cmake_removes_and_adds(ct: ModuleType, monkeypatch: pytest.MonkeyPatch,
+                                       tmp_path: Path) -> None:
     """Removes old test name and adds new ones."""
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(
@@ -847,7 +911,11 @@ def test_update_cmake_removes_and_adds(ct, monkeypatch, tmp_path):
     assert "old_test" not in text and "new_a" in text
 
 
-def test_update_cmake_sorted(ct, monkeypatch, tmp_path):
+def test_update_cmake_sorted(
+    ct: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     """New entries are sorted and deduplicated."""
     cmake = tmp_path / "CMakeLists.txt"
     cmake.write_text(

@@ -1,9 +1,11 @@
 """Unit tests for cycle finding and dependency-respecting group ordering."""
 
+from typing import Any
+
 from document_dependency_graph.ordering import find_cycle_groups, order_groups
 
 
-def _records(graph):
+def _records(graph: dict[str, list[str]]) -> dict[str, dict[str, Any]]:
     """Wrap a {sub: [deps]} dict into the per-subclause record shape."""
     return {
         sub: {"dependencies": deps, "proofs": {}, "prerequisites": {}}

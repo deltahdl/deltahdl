@@ -1,11 +1,13 @@
 """Unit tests for satisfy_subclause.mutators._close_satisfied_issue."""
 
+from typing import Any
 from unittest.mock import patch
+
 
 from satisfy_subclause.mutators import _close_satisfied_issue
 
 
-def _patched_subprocess_run():
+def _patched_subprocess_run() -> Any:
     """Patch subprocess.run inside satisfy_subclause.mutators."""
     return patch("satisfy_subclause.mutators.subprocess.run")
 

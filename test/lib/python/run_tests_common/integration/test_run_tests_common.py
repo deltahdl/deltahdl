@@ -1,12 +1,15 @@
 """Integration tests for run_tests_common module."""
 
 from pathlib import Path
+from types import ModuleType
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from lib.python import run_tests_common
 
 
-def test_startup_then_print(capsys):
+def test_startup_then_print(capsys: pytest.CaptureFixture[str]) -> None:
     """Simulates a runner: check binary exists, then print results."""
     mock_binary = MagicMock(spec=Path)
     mock_binary.exists.return_value = True
@@ -20,17 +23,21 @@ def test_startup_then_print(capsys):
 class TestColorConsistency:
     """All three color constants must be unanimously empty or non-empty."""
 
-    def test_colors_all_empty_when_no_color(self, reload_no_color):
+    def test_colors_all_empty_when_no_color(
+        self, reload_no_color: ModuleType,
+    ) -> None:
         """With NO_COLOR=1, GREEN, RED, RESET must all be empty."""
         mod = reload_no_color
         assert all(v == "" for v in (mod.GREEN, mod.RED, mod.RESET))
 
-    def test_colors_all_nonempty_when_tty(self, reload_with_colors):
+    def test_colors_all_nonempty_when_tty(
+        self, reload_with_colors: ModuleType,
+    ) -> None:
         """With a tty and no NO_COLOR, all color constants are non-empty."""
         mod = reload_with_colors
         assert all(v != "" for v in (mod.GREEN, mod.RED, mod.RESET))
 
 
-def test_binary_is_under_repo_root():
+def test_binary_is_under_repo_root() -> None:
     """BINARY path should start with REPO_ROOT."""
     assert str(run_tests_common.BINARY).startswith(str(run_tests_common.REPO_ROOT))

@@ -1,6 +1,10 @@
 """Tests for lib.lrm."""
 
+from collections.abc import Callable, Sequence
+
 from lib.python.lrm import build_lrm_read_instruction
+
+PdfBuilder = Callable[[str, int, Sequence[tuple[int, str, int]]], str]
 
 
 def test_lrm_read_general_subclause() -> None:
@@ -33,7 +37,9 @@ def test_lrm_read_includes_subclause() -> None:
     assert "§9.2.1" in result
 
 
-def test_lrm_read_includes_target_page_range(make_pdf, nested_outline) -> None:
+def test_lrm_read_includes_target_page_range(
+    make_pdf: PdfBuilder, nested_outline: list[tuple[int, str, int]],
+) -> None:
     """Target subclause page range appears when outline is available."""
     path = make_pdf("a.pdf", 200, nested_outline)
     result = build_lrm_read_instruction("23.2.2", path)
@@ -41,7 +47,7 @@ def test_lrm_read_includes_target_page_range(make_pdf, nested_outline) -> None:
 
 
 def test_lrm_read_includes_ancestor_page_range(
-    make_pdf, nested_outline,
+    make_pdf: PdfBuilder, nested_outline: list[tuple[int, str, int]],
 ) -> None:
     """Ancestor page range appears, de-overlapped against the target."""
     path = make_pdf("a.pdf", 200, nested_outline)
@@ -49,7 +55,7 @@ def test_lrm_read_includes_ancestor_page_range(
     assert "pages 110-111" in result
 
 
-def test_lrm_read_omits_missing_clause_pages(make_pdf) -> None:
+def test_lrm_read_omits_missing_clause_pages(make_pdf: PdfBuilder) -> None:
     """A clause missing from the outline gets no page range."""
     outline = [
         (1, "23 Tasks and functions", 100),
@@ -60,7 +66,9 @@ def test_lrm_read_omits_missing_clause_pages(make_pdf) -> None:
     assert "(pages" not in result
 
 
-def test_lrm_read_omits_ancestor_pages_when_overlap_total(make_pdf) -> None:
+def test_lrm_read_omits_ancestor_pages_when_overlap_total(
+    make_pdf: PdfBuilder,
+) -> None:
     """Ancestor that shares its start page with the target gets no range."""
     outline = [
         (1, "23 Tasks", 100),
@@ -73,7 +81,7 @@ def test_lrm_read_omits_ancestor_pages_when_overlap_total(make_pdf) -> None:
     assert "§23.2)" in result
 
 
-def test_lrm_read_formats_single_page_clause(make_pdf) -> None:
+def test_lrm_read_formats_single_page_clause(make_pdf: PdfBuilder) -> None:
     """A clause spanning exactly one page renders as 'page N' (singular)."""
     outline = [
         (1, "1 Overview", 5),
@@ -84,7 +92,7 @@ def test_lrm_read_formats_single_page_clause(make_pdf) -> None:
     assert "page 5)" in result
 
 
-def test_lrm_read_falls_back_when_outline_empty(blank_pdf) -> None:
+def test_lrm_read_falls_back_when_outline_empty(blank_pdf: str) -> None:
     """Empty outline → instruction matches the no-PDF fallback."""
     fallback = build_lrm_read_instruction("9.2.1", "/nope.pdf")
     real = build_lrm_read_instruction("9.2.1", blank_pdf)

@@ -12,7 +12,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 
-def _make_stub_binary(tmp_path, exit_code=0, stderr=""):
+def _make_stub_binary(
+    tmp_path: Path, exit_code: int = 0, stderr: str = "",
+) -> Path:
     """Create a stub deltahdl binary that exits with the given code."""
     binary = tmp_path / "deltahdl"
     lines = ["#!/usr/bin/env bash"]
@@ -25,7 +27,7 @@ def _make_stub_binary(tmp_path, exit_code=0, stderr=""):
     return binary
 
 
-def _make_sv_tree(tmp_path):
+def _make_sv_tree(tmp_path: Path) -> Path:
     """Create a minimal sv-test tree with chapter dirs and .sv files."""
     test_dir = tmp_path / "sv-tests"
     ch5 = test_dir / "chapter-5"
@@ -35,7 +37,11 @@ def _make_sv_tree(tmp_path):
     return test_dir
 
 
-def _run_sv_tests(tmp_path, exit_code=0, extra_args=None):
+def _run_sv_tests(
+    tmp_path: Path,
+    exit_code: int = 0,
+    extra_args: list[str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run run_sv_tests.py in a subprocess with patched BINARY and TEST_DIR.
 
     Returns the CompletedProcess.
@@ -75,7 +81,7 @@ def _run_sv_tests(tmp_path, exit_code=0, extra_args=None):
     )
 
 
-def test_all_pass_exit_zero_and_pass_in_output(tmp_path):
+def test_all_pass_exit_zero_and_pass_in_output(tmp_path: Path) -> None:
     """With exit-0 stub, script exits 0 and stdout contains PASS."""
     result = _run_sv_tests(tmp_path, exit_code=0)
     assert (
@@ -85,13 +91,13 @@ def test_all_pass_exit_zero_and_pass_in_output(tmp_path):
     )
 
 
-def test_all_fail_exit_one_and_fail_in_output(tmp_path):
+def test_all_fail_exit_one_and_fail_in_output(tmp_path: Path) -> None:
     """With exit-1 stub, script exits 1 and stdout contains FAIL."""
     result = _run_sv_tests(tmp_path, exit_code=1)
     assert result.returncode == 1 and "FAIL" in result.stdout
 
 
-def test_junit_xml_exit_code(tmp_path):
+def test_junit_xml_exit_code(tmp_path: Path) -> None:
     """With --junit-xml, the script exits 0 when all tests pass."""
     xml_path = str(tmp_path / "report.xml")
     result = _run_sv_tests(
@@ -100,7 +106,7 @@ def test_junit_xml_exit_code(tmp_path):
     assert result.returncode == 0 and Path(xml_path).exists()
 
 
-def test_junit_xml_structure(tmp_path):
+def test_junit_xml_structure(tmp_path: Path) -> None:
     """With --junit-xml, the script writes a parseable XML file."""
     xml_path = str(tmp_path / "report.xml")
     _run_sv_tests(

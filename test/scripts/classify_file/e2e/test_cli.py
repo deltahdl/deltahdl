@@ -1,5 +1,6 @@
 """End-to-end tests for the classify_file CLI."""
 
+import subprocess
 from pathlib import Path
 
 from lib.python.test_utils import (
@@ -18,7 +19,7 @@ _SCRIPTS_DIR = str(
 # ---- Helpers ---------------------------------------------------------------
 
 
-def _install_fake_classify_test(tmp_path, exit_code=0):
+def _install_fake_classify_test(tmp_path: Path, exit_code: int = 0) -> str:
     """Install a fake classify_test package that exits with *exit_code*.
 
     Returns the directory to prepend to PYTHONPATH so the fake
@@ -67,7 +68,9 @@ def _install_fake_classify_test(tmp_path, exit_code=0):
     return fake_scripts
 
 
-def _base_env(tmp_path, fake_scripts_dir, issue_body=""):
+def _base_env(
+        tmp_path: Path, fake_scripts_dir: str,
+        issue_body: str = "") -> dict[str, str]:
     """Build subprocess env with fake classify_test before real scripts."""
     fake_bin = install_fake_gh(
         tmp_path, issue_body=issue_body, handle_post=True,
@@ -75,19 +78,22 @@ def _base_env(tmp_path, fake_scripts_dir, issue_body=""):
     return build_base_env(tmp_path, fake_scripts_dir, fake_bin)
 
 
-def _invoke(*args, cwd=None, env=None):
+def _invoke(
+        *args: str, cwd: str | None = None,
+        env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run classify_file in a child process."""
     return invoke_module("classify_file", *args, cwd=cwd, env=env)
 
 
-def _write_test_file(tmp_path, body):
+def _write_test_file(tmp_path: Path, body: str) -> Path:
     """Write test_input.cpp and return its path."""
     f = tmp_path / "test_input.cpp"
     f.write_text(body, encoding="utf-8")
     return f
 
 
-def _all_flags(tmp_path):
+def _all_flags(tmp_path: Path) -> list[str]:
     """Return the full set of required CLI flags."""
     return [
         "--file", str(tmp_path / "test_input.cpp"),
@@ -96,7 +102,7 @@ def _all_flags(tmp_path):
     ]
 
 
-def _all_flags_create(tmp_path):
+def _all_flags_create(tmp_path: Path) -> list[str]:
     """Return CLI flags with --create-issue instead of --issue."""
     return [
         "--file", str(tmp_path / "test_input.cpp"),
@@ -105,7 +111,7 @@ def _all_flags_create(tmp_path):
     ]
 
 
-def _common_flags(tmp_path):
+def _common_flags(tmp_path: Path) -> list[str]:
     """Return flags shared by issue-mutex validation tests."""
     return [
         "--file", str(tmp_path / "f.cpp"),
@@ -116,7 +122,9 @@ def _common_flags(tmp_path):
     ]
 
 
-def _run_batch(tmp_path, body, exit_code=0):
+def _run_batch(
+        tmp_path: Path, body: str,
+        exit_code: int = 0) -> subprocess.CompletedProcess[str]:
     """Write *body*, install fake classify_test, and invoke classify_file."""
     fake = _install_fake_classify_test(tmp_path, exit_code=exit_code)
     env = _base_env(tmp_path, fake)
@@ -130,14 +138,14 @@ def _run_batch(tmp_path, body, exit_code=0):
 # ---- CLI argument errors ---------------------------------------------------
 
 
-def test_no_args_prints_usage(tmp_path):
+def test_no_args_prints_usage(tmp_path: Path) -> None:
     """Running with no arguments prints usage to stderr."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
     assert "usage:" in _invoke(cwd=str(tmp_path), env=env).stderr
 
 
-def test_usage_shows_classify_file(tmp_path):
+def test_usage_shows_classify_file(tmp_path: Path) -> None:
     """Usage line shows 'classify_file' as program name."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
@@ -146,7 +154,7 @@ def test_usage_shows_classify_file(tmp_path):
     ).stderr
 
 
-def test_missing_file_flag_reported(tmp_path):
+def test_missing_file_flag_reported(tmp_path: Path) -> None:
     """Omitting --file reports the missing argument."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
@@ -160,7 +168,8 @@ def test_missing_file_flag_reported(tmp_path):
 # ---- Input validation errors -----------------------------------------------
 
 
-def _invoke_missing_file_create(tmp_path):
+def _invoke_missing_file_create(
+        tmp_path: Path) -> subprocess.CompletedProcess[str]:
     """Invoke classify_file with --create-issue pointing at a missing file."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
@@ -169,17 +178,17 @@ def _invoke_missing_file_create(tmp_path):
     return _invoke(*flags, cwd=str(tmp_path), env=env)
 
 
-def test_nonexistent_file_exits_zero(tmp_path):
+def test_nonexistent_file_exits_zero(tmp_path: Path) -> None:
     """Missing file with --create-issue exits 0."""
     assert _invoke_missing_file_create(tmp_path).returncode == 0
 
 
-def test_nonexistent_file_prints_not_found(tmp_path):
+def test_nonexistent_file_prints_not_found(tmp_path: Path) -> None:
     """Missing file with --create-issue prints 'not found'."""
     assert "not found" in _invoke_missing_file_create(tmp_path).stdout
 
 
-def test_missing_file_with_issue_exits_zero(tmp_path):
+def test_missing_file_with_issue_exits_zero(tmp_path: Path) -> None:
     """Missing file with --issue closes issue and exits 0."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
@@ -189,7 +198,7 @@ def test_missing_file_with_issue_exits_zero(tmp_path):
     assert result.returncode == 0
 
 
-def test_file_without_tests_exits_zero(tmp_path):
+def test_file_without_tests_exits_zero(tmp_path: Path) -> None:
     """A file with no TEST blocks exits 0 when --issue is given."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
@@ -201,7 +210,7 @@ def test_file_without_tests_exits_zero(tmp_path):
     assert result.returncode == 0
 
 
-def test_file_without_tests_deletes_file(tmp_path):
+def test_file_without_tests_deletes_file(tmp_path: Path) -> None:
     """A file with no TEST blocks is deleted."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
@@ -216,7 +225,7 @@ def test_file_without_tests_deletes_file(tmp_path):
 # ---- Successful batch run --------------------------------------------------
 
 
-def test_batch_all_pass_exits_zero(tmp_path):
+def test_batch_all_pass_exits_zero(tmp_path: Path) -> None:
     """Exits 0 when all classify_test calls succeed."""
     result = _run_batch(
         tmp_path, "TEST(S, A) {\n}\nTEST(S, B) {\n}\n",
@@ -227,7 +236,7 @@ def test_batch_all_pass_exits_zero(tmp_path):
 # ---- Failure batch run -----------------------------------------------------
 
 
-def test_batch_failure_exits_one(tmp_path):
+def test_batch_failure_exits_one(tmp_path: Path) -> None:
     """Exits 1 when classify_test fails."""
     result = _run_batch(
         tmp_path, "TEST(S, A) {\n}\n", exit_code=1,
@@ -235,7 +244,7 @@ def test_batch_failure_exits_one(tmp_path):
     assert result.returncode == 1
 
 
-def test_batch_progress_output(tmp_path):
+def test_batch_progress_output(tmp_path: Path) -> None:
     """Progress lines show test index and name."""
     result = _run_batch(
         tmp_path,
@@ -247,7 +256,7 @@ def test_batch_progress_output(tmp_path):
 # ---- --create-issue --------------------------------------------------------
 
 
-def test_create_issue_batch_exits_zero(tmp_path):
+def test_create_issue_batch_exits_zero(tmp_path: Path) -> None:
     """Exits 0 when --create-issue is used and all tests pass."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
@@ -259,7 +268,7 @@ def test_create_issue_batch_exits_zero(tmp_path):
     assert result.returncode == 0
 
 
-def test_create_issue_prints_created(tmp_path):
+def test_create_issue_prints_created(tmp_path: Path) -> None:
     """Stdout contains the created issue number."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
@@ -271,7 +280,7 @@ def test_create_issue_prints_created(tmp_path):
     assert "Created issue #999" in result.stdout
 
 
-def test_both_issue_flags_rejects(tmp_path):
+def test_both_issue_flags_rejects(tmp_path: Path) -> None:
     """Both --issue and --create-issue are rejected."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
@@ -283,7 +292,7 @@ def test_both_issue_flags_rejects(tmp_path):
     assert result.returncode != 0
 
 
-def test_neither_issue_flag_rejects(tmp_path):
+def test_neither_issue_flag_rejects(tmp_path: Path) -> None:
     """Neither --issue nor --create-issue is rejected."""
     fake = _install_fake_classify_test(tmp_path)
     env = _base_env(tmp_path, fake)
@@ -297,7 +306,7 @@ def test_neither_issue_flag_rejects(tmp_path):
 # ---- sync_issue_rows e2e ---------------------------------------------------
 
 
-def _run_with_reviewed(tmp_path):
+def _run_with_reviewed(tmp_path: Path) -> subprocess.CompletedProcess[str]:
     """Run classify_file with one reviewed and one unreviewed test."""
     fake = _install_fake_classify_test(tmp_path)
     issue_body = (
@@ -314,11 +323,11 @@ def _run_with_reviewed(tmp_path):
     )
 
 
-def test_issue_skips_reviewed_exits_zero(tmp_path):
+def test_issue_skips_reviewed_exits_zero(tmp_path: Path) -> None:
     """Exits 0 when some tests are already reviewed."""
     assert _run_with_reviewed(tmp_path).returncode == 0
 
 
-def test_issue_skips_reviewed_prints_message(tmp_path):
+def test_issue_skips_reviewed_prints_message(tmp_path: Path) -> None:
     """Prints skip message for reviewed tests."""
     assert "Skipping 1 already-reviewed" in _run_with_reviewed(tmp_path).stdout

@@ -8,6 +8,7 @@ list), ``build_commit_prompt`` (the Claude prompt that asks for ``-
 ``commit_mutator_result`` lives in ``test_mutators.py``.
 """
 
+from typing import Any
 from unittest.mock import patch
 
 from satisfy_subclause.mutators import (
@@ -120,7 +121,7 @@ def test_build_commit_prompt_mentions_copyright() -> None:
 # --- generate_commit_body ---------------------------------------------------
 
 
-def _patched_streaming_body():
+def _patched_streaming_body() -> Any:
     """Patch run_claude_streaming_with_retry; the stub returns a fixed body."""
     return patch(
         "satisfy_subclause.mutators.run_claude_streaming_with_retry",

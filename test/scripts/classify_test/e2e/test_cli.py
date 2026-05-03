@@ -3,7 +3,9 @@
 import json
 import os
 import stat
+import subprocess
 from pathlib import Path
+from typing import Any
 
 from lib.python.test_utils import invoke_module
 
@@ -18,7 +20,11 @@ _ISSUE_FLAGS = ("--issue", "1", "--organization", "o", "--repo", "r",
                 "--max-lines", "1000")
 
 
-def _invoke(*args, cwd=None, env=None):
+def _invoke(
+    *args: str,
+    cwd: str | None = None,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run classify_test in a child process."""
     if env is None:
         env = os.environ.copy()
@@ -30,7 +36,7 @@ def _invoke(*args, cwd=None, env=None):
     return invoke_module("classify_test", *args, cwd=cwd, env=env)
 
 
-def _bootstrap_repo(tmp_path, cmake_body="# header\n"):
+def _bootstrap_repo(tmp_path: Path, cmake_body: str = "# header\n") -> None:
     """Create minimal repo layout so find_repo_root succeeds."""
     (tmp_path / "test").mkdir()
     (tmp_path / "test" / "CMakeLists.txt").write_text(
@@ -38,21 +44,21 @@ def _bootstrap_repo(tmp_path, cmake_body="# header\n"):
     )
 
 
-def _create_ref_files(tmp_path):
+def _create_ref_files(tmp_path: Path) -> str:
     """Create minimal LRM file for --lrm flag."""
     lrm = tmp_path / "LRM.txt"
     lrm.write_text("1 Overview\n", encoding="utf-8")
     return str(lrm)
 
 
-def _base_env(tmp_path):
+def _base_env(tmp_path: Path) -> dict[str, str]:
     """Build subprocess env with HOME pointing to *tmp_path*."""
     env = os.environ.copy()
     env["HOME"] = str(tmp_path)
     return env
 
 
-def _install_fake(tmp_path, name, body):
+def _install_fake(tmp_path: Path, name: str, body: str) -> Path:
     """Install a fake executable in tmp_path/bin; return bin dir."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
@@ -62,8 +68,12 @@ def _install_fake(tmp_path, name, body):
     return bin_dir
 
 
-def _env_with_fakes(tmp_path, claude_response, test_names=None,
-                    prefix_stage="parser"):
+def _env_with_fakes(
+    tmp_path: Path,
+    claude_response: dict[str, Any],
+    test_names: list[str] | None = None,
+    prefix_stage: str = "parser",
+) -> dict[str, str]:
     """Build env with fake claude, git, and gh binaries on PATH."""
     clause_payload = json.dumps(claude_response)
     prefix_payload = json.dumps(
@@ -95,7 +105,7 @@ def _env_with_fakes(tmp_path, claude_response, test_names=None,
     return env
 
 
-def _write_test_file(tmp_path, body):
+def _write_test_file(tmp_path: Path, body: str) -> Path:
     """Write test_input.cpp wrapping *body* in gtest boilerplate."""
     parts = [
         "#include <gtest/gtest.h>", "",
@@ -108,7 +118,7 @@ def _write_test_file(tmp_path, body):
     return f
 
 
-def _run_dry(tmp_path):
+def _run_dry(tmp_path: Path) -> subprocess.CompletedProcess[str]:
     """Bootstrap and execute a dry-run pipeline."""
     _bootstrap_repo(tmp_path)
     _write_test_file(tmp_path, "TEST(S, DryT) {\n  auto r = Parse(src);\n}")
@@ -126,7 +136,7 @@ def _run_dry(tmp_path):
     )
 
 
-def _setup_pipeline(tmp_path):
+def _setup_pipeline(tmp_path: Path) -> tuple[dict[str, str], str]:
     """Prepare repo, input, cmake, and fakes."""
     _bootstrap_repo(
         tmp_path, "# header\nadd_unit_test(test_input)\n",
@@ -141,7 +151,7 @@ def _setup_pipeline(tmp_path):
     return _env_with_fakes(tmp_path, resp), lrm
 
 
-def _run_pipeline(tmp_path):
+def _run_pipeline(tmp_path: Path) -> subprocess.CompletedProcess[str]:
     """Run the full live pipeline and return CompletedProcess."""
     env, lrm = _setup_pipeline(tmp_path)
     return _invoke(
@@ -157,13 +167,13 @@ def _run_pipeline(tmp_path):
 # ---- CLI argument errors ---------------------------------------------------
 
 
-def test_no_args_prints_usage(tmp_path):
+def test_no_args_prints_usage(tmp_path: Path) -> None:
     """Running with no arguments prints usage to stderr."""
     _bootstrap_repo(tmp_path)
     assert "usage:" in _invoke(cwd=str(tmp_path)).stderr
 
 
-def test_missing_file_flag_reported(tmp_path):
+def test_missing_file_flag_reported(tmp_path: Path) -> None:
     """Omitting --file reports the missing argument."""
     _bootstrap_repo(tmp_path)
     assert "--file" in _invoke(
@@ -171,7 +181,7 @@ def test_missing_file_flag_reported(tmp_path):
     ).stderr
 
 
-def test_missing_output_dir_flag_reported(tmp_path):
+def test_missing_output_dir_flag_reported(tmp_path: Path) -> None:
     """Omitting --output-dir reports the missing argument."""
     _bootstrap_repo(tmp_path)
     assert "--output-dir" in _invoke(
@@ -182,7 +192,7 @@ def test_missing_output_dir_flag_reported(tmp_path):
 # ---- Input validation errors -----------------------------------------------
 
 
-def test_nonexistent_file_reports_error(tmp_path):
+def test_nonexistent_file_reports_error(tmp_path: Path) -> None:
     """Pointing --file at a missing path prints ERROR."""
     _bootstrap_repo(tmp_path)
     lrm = _create_ref_files(tmp_path)
@@ -196,7 +206,7 @@ def test_nonexistent_file_reports_error(tmp_path):
     ).stdout
 
 
-def test_file_without_tests_reports_error(tmp_path):
+def test_file_without_tests_reports_error(tmp_path: Path) -> None:
     """A file with no TEST blocks prints an error about missing tests."""
     _bootstrap_repo(tmp_path)
     lrm = _create_ref_files(tmp_path)
@@ -214,7 +224,7 @@ def test_file_without_tests_reports_error(tmp_path):
     ).stdout
 
 
-def test_test_not_found_reports_error(tmp_path):
+def test_test_not_found_reports_error(tmp_path: Path) -> None:
     """Passing --test with unknown name prints ERROR."""
     _bootstrap_repo(tmp_path)
     _write_test_file(tmp_path, "TEST(S, Alpha) {\n}")
@@ -233,12 +243,12 @@ def test_test_not_found_reports_error(tmp_path):
 
 
 
-def test_dry_run_lists_target_filename(tmp_path):
+def test_dry_run_lists_target_filename(tmp_path: Path) -> None:
     """Dry run output lists the target filename."""
     assert "test_parser_clause_06_01.cpp" in _run_dry(tmp_path).stdout
 
 
-def test_dry_run_does_not_create_output(tmp_path):
+def test_dry_run_does_not_create_output(tmp_path: Path) -> None:
     """Dry run does not create any clause output files."""
     _run_dry(tmp_path)
     assert not (tmp_path / "test_parser_clause_06_01.cpp").exists()
@@ -247,18 +257,18 @@ def test_dry_run_does_not_create_output(tmp_path):
 # ---- Full pipeline ---------------------------------------------------------
 
 
-def test_pipeline_reports_done(tmp_path):
+def test_pipeline_reports_done(tmp_path: Path) -> None:
     """Full pipeline prints CMakeLists.txt update message."""
     assert "Updated `CMakeLists.txt`" in _run_pipeline(tmp_path).stdout
 
 
-def test_pipeline_creates_clause_file(tmp_path):
+def test_pipeline_creates_clause_file(tmp_path: Path) -> None:
     """Pipeline creates the expected clause output file."""
     _run_pipeline(tmp_path)
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
 
-def test_pipeline_output_contains_test(tmp_path):
+def test_pipeline_output_contains_test(tmp_path: Path) -> None:
     """Generated clause file contains the classified test."""
     _run_pipeline(tmp_path)
     assert "TEST(S, Alpha)" in (
@@ -266,13 +276,13 @@ def test_pipeline_output_contains_test(tmp_path):
     ).read_text()
 
 
-def test_pipeline_deletes_input(tmp_path):
+def test_pipeline_deletes_input(tmp_path: Path) -> None:
     """Pipeline removes the original input file."""
     _run_pipeline(tmp_path)
     assert not (tmp_path / "test_input.cpp").exists()
 
 
-def test_pipeline_adds_cmake_entry(tmp_path):
+def test_pipeline_adds_cmake_entry(tmp_path: Path) -> None:
     """CMakeLists.txt contains the new clause entry."""
     _run_pipeline(tmp_path)
     assert "test_parser_clause_06_01" in (
@@ -280,7 +290,7 @@ def test_pipeline_adds_cmake_entry(tmp_path):
     ).read_text()
 
 
-def test_pipeline_drops_old_cmake_entry(tmp_path):
+def test_pipeline_drops_old_cmake_entry(tmp_path: Path) -> None:
     """CMakeLists.txt no longer contains the old test_input entry."""
     _run_pipeline(tmp_path)
     assert "test_input" not in (
@@ -291,7 +301,9 @@ def test_pipeline_drops_old_cmake_entry(tmp_path):
 # ---- Named namespace wrapper -----------------------------------------------
 
 
-def _setup_named_ns_pipeline(tmp_path):
+def _setup_named_ns_pipeline(
+    tmp_path: Path,
+) -> tuple[dict[str, str], str]:
     """Prepare repo with a test file using namespace delta { ... }."""
     _bootstrap_repo(
         tmp_path, "# header\nadd_unit_test(test_input)\n",
@@ -317,7 +329,7 @@ def _setup_named_ns_pipeline(tmp_path):
     return _env_with_fakes(tmp_path, resp), lrm
 
 
-def test_named_ns_pipeline_reports_done(tmp_path):
+def test_named_ns_pipeline_reports_done(tmp_path: Path) -> None:
     """Pipeline succeeds on a file with named namespace wrapper."""
     env, lrm = _setup_named_ns_pipeline(tmp_path)
     r = _invoke(
@@ -331,7 +343,9 @@ def test_named_ns_pipeline_reports_done(tmp_path):
     assert "Updated `CMakeLists.txt`" in r.stdout
 
 
-def _run_named_ns_pipeline(tmp_path):
+def _run_named_ns_pipeline(
+    tmp_path: Path,
+) -> subprocess.CompletedProcess[str]:
     """Setup and run the named-namespace pipeline."""
     env, lrm = _setup_named_ns_pipeline(tmp_path)
     return _invoke(
@@ -344,13 +358,13 @@ def _run_named_ns_pipeline(tmp_path):
     )
 
 
-def test_named_ns_pipeline_creates_clause_file(tmp_path):
+def test_named_ns_pipeline_creates_clause_file(tmp_path: Path) -> None:
     """Pipeline creates clause file from named-namespace input."""
     _run_named_ns_pipeline(tmp_path)
     assert (tmp_path / "test_parser_clause_06_01.cpp").exists()
 
 
-def test_named_ns_pipeline_output_contains_test(tmp_path):
+def test_named_ns_pipeline_output_contains_test(tmp_path: Path) -> None:
     """Clause file from named-namespace input contains the test."""
     _run_named_ns_pipeline(tmp_path)
     assert "TEST(S, Alpha)" in (
@@ -361,11 +375,11 @@ def test_named_ns_pipeline_output_contains_test(tmp_path):
 # ---- Exit codes ------------------------------------------------------------
 
 
-def test_dry_run_exits_zero(tmp_path):
+def test_dry_run_exits_zero(tmp_path: Path) -> None:
     """Successful dry run exits with code 0."""
     assert _run_dry(tmp_path).returncode == 0
 
 
-def test_pipeline_exits_zero(tmp_path):
+def test_pipeline_exits_zero(tmp_path: Path) -> None:
     """Successful full pipeline exits with code 0."""
     assert _run_pipeline(tmp_path).returncode == 0

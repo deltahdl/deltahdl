@@ -1,23 +1,22 @@
 """Fixtures specific to run_sv_tests tests."""
 
+from collections.abc import Callable
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
-SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent.parent / "scripts"
+_PKG = Path(__file__).resolve().parents[3] / "scripts" / "run_sv_tests"
 
 
 @pytest.fixture()
-def rst(module_loader):
+def rst(module_loader: Callable[[str, Path], ModuleType]) -> ModuleType:
     """Load the run_sv_tests module."""
-    return module_loader(
-        "run_sv_tests",
-        SCRIPTS_DIR / "run_sv_tests" / "__init__.py",
-    )
+    return module_loader("run_sv_tests", _PKG / "__init__.py")
 
 
 @pytest.fixture()
-def sv_test_tree(tmp_path):
+def sv_test_tree(tmp_path: Path) -> Path:
     """Create a fake sv-tests directory tree with chapter dirs and .sv files.
 
     Returns the tmp_path containing:

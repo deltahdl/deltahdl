@@ -1,6 +1,9 @@
 """Unit tests for the classify_files module."""
 
+import argparse
 import sys
+from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -46,58 +49,58 @@ _SUB_ISSUES_ARGV = [
 ]
 
 
-def _make_args(**overrides):
+def _make_args(**overrides: Any) -> argparse.Namespace:
     """Build args with classify_files-specific defaults."""
-    defaults = {
+    defaults: dict[str, Any] = {
         "files": "a.cpp,b.cpp",
         "sub_issues": None,
         "issue": 61,
     }
     defaults.update(overrides)
-    return make_classify_args(**defaults)
+    return cast(argparse.Namespace, make_classify_args(**defaults))
 
 
 # ---- _parse_args -----------------------------------------------------------
 
 
-def test_parse_args_files(monkeypatch):
+def test_parse_args_files(monkeypatch: pytest.MonkeyPatch) -> None:
     """Parses --files flag."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     assert _parse_args().files == "a.cpp,b.cpp"
 
 
-def test_parse_args_issue(monkeypatch):
+def test_parse_args_issue(monkeypatch: pytest.MonkeyPatch) -> None:
     """Parses --issue flag."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     assert _parse_args().issue == 61
 
 
-def test_parse_args_issue_optional(monkeypatch):
+def test_parse_args_issue_optional(monkeypatch: pytest.MonkeyPatch) -> None:
     """--issue defaults to None when omitted."""
     argv = [a for a in _BASE_ARGV if a not in ("--issue", "61")]
     monkeypatch.setattr(sys, "argv", argv)
     assert _parse_args().issue is None
 
 
-def test_parse_args_lrm(monkeypatch):
+def test_parse_args_lrm(monkeypatch: pytest.MonkeyPatch) -> None:
     """Parses --lrm flag."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     assert _parse_args().lrm == "/lrm.txt"
 
 
-def test_parse_args_output_dir(monkeypatch):
+def test_parse_args_output_dir(monkeypatch: pytest.MonkeyPatch) -> None:
     """Parses --output-dir flag."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     assert _parse_args().output_dir == "/out"
 
 
-def test_parse_args_organization(monkeypatch):
+def test_parse_args_organization(monkeypatch: pytest.MonkeyPatch) -> None:
     """Parses --organization flag."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     assert _parse_args().organization == "testorg"
 
 
-def test_parse_args_organization_required(monkeypatch):
+def test_parse_args_organization_required(monkeypatch: pytest.MonkeyPatch) -> None:
     """Rejects missing --organization."""
     argv = [a for a in _BASE_ARGV
             if a not in ("--organization", "testorg")]
@@ -106,13 +109,13 @@ def test_parse_args_organization_required(monkeypatch):
         _parse_args()
 
 
-def test_parse_args_repo(monkeypatch):
+def test_parse_args_repo(monkeypatch: pytest.MonkeyPatch) -> None:
     """Parses --repo flag."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     assert _parse_args().repo == "testrepo"
 
 
-def test_parse_args_repo_required(monkeypatch):
+def test_parse_args_repo_required(monkeypatch: pytest.MonkeyPatch) -> None:
     """Rejects missing --repo."""
     argv = [a for a in _BASE_ARGV
             if a not in ("--repo", "testrepo")]
@@ -121,13 +124,13 @@ def test_parse_args_repo_required(monkeypatch):
         _parse_args()
 
 
-def test_parse_args_max_lines(monkeypatch):
+def test_parse_args_max_lines(monkeypatch: pytest.MonkeyPatch) -> None:
     """Parses --max-lines flag."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     assert _parse_args().max_lines == 1000
 
 
-def test_parse_args_max_lines_required(monkeypatch):
+def test_parse_args_max_lines_required(monkeypatch: pytest.MonkeyPatch) -> None:
     """Rejects missing --max-lines."""
     argv = [a for a in _BASE_ARGV
             if a not in ("--max-lines", "1000")]
@@ -136,31 +139,33 @@ def test_parse_args_max_lines_required(monkeypatch):
         _parse_args()
 
 
-def test_parse_args_dry_run(monkeypatch):
+def test_parse_args_dry_run(monkeypatch: pytest.MonkeyPatch) -> None:
     """Parses --dry-run flag."""
     monkeypatch.setattr(sys, "argv", [*_BASE_ARGV, "--dry-run"])
     assert _parse_args().dry_run is True
 
 
-def test_parse_args_dry_run_default(monkeypatch):
+def test_parse_args_dry_run_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """Default dry_run is False."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     assert _parse_args().dry_run is False
 
 
-def test_parse_args_no_commit(monkeypatch):
+def test_parse_args_no_commit(monkeypatch: pytest.MonkeyPatch) -> None:
     """Parses --no-commit flag."""
     monkeypatch.setattr(sys, "argv", [*_BASE_ARGV, "--no-commit"])
     assert _parse_args().no_commit is True
 
 
-def test_parse_args_no_commit_default(monkeypatch):
+def test_parse_args_no_commit_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """Default no_commit is False."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     assert _parse_args().no_commit is False
 
 
-def test_parse_args_prog_name(monkeypatch, capsys):
+def test_parse_args_prog_name(
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str]) -> None:
     """Usage line shows classify_files as program name."""
     assert "classify_files" in capture_help_output(
         _parse_args, monkeypatch, capsys,
@@ -170,55 +175,55 @@ def test_parse_args_prog_name(monkeypatch, capsys):
 # ---- _build_command --------------------------------------------------------
 
 
-def test_build_command_invokes_classify_file():
+def test_build_command_invokes_classify_file() -> None:
     """Command starts with python -m classify_file."""
     cmd = _build_command(_make_args(), "/path/a.cpp")
     assert cmd[:3] == [sys.executable, "-m", "classify_file"]
 
 
-def test_build_command_file_flag():
+def test_build_command_file_flag() -> None:
     """Command contains --file with the given path."""
     cmd = _build_command(_make_args(), "/path/a.cpp")
     assert cmd[cmd.index("--file") + 1] == "/path/a.cpp"
 
 
-def test_build_command_create_issue_flag():
+def test_build_command_create_issue_flag() -> None:
     """Command contains --create-issue."""
     cmd = _build_command(_make_args(), "/path/a.cpp")
     assert "--create-issue" in cmd
 
 
-def test_build_command_no_issue_number():
+def test_build_command_no_issue_number() -> None:
     """Command does not contain --issue."""
     cmd = _build_command(_make_args(), "/path/a.cpp")
     assert "--issue" not in cmd
 
 
-def test_build_command_output_dir_flag():
+def test_build_command_output_dir_flag() -> None:
     """Command contains correct --output-dir value."""
     cmd = _build_command(_make_args(), "/path/a.cpp")
     assert cmd[cmd.index("--output-dir") + 1] == "/out"
 
 
-def test_build_command_lrm_flag():
+def test_build_command_lrm_flag() -> None:
     """Command contains correct --lrm value."""
     cmd = _build_command(_make_args(), "/path/a.cpp")
     assert cmd[cmd.index("--lrm") + 1] == "/lrm.txt"
 
 
-def test_build_command_organization_flag():
+def test_build_command_organization_flag() -> None:
     """Command contains correct --organization value."""
     cmd = _build_command(_make_args(), "/path/a.cpp")
     assert cmd[cmd.index("--organization") + 1] == "testorg"
 
 
-def test_build_command_repo_flag():
+def test_build_command_repo_flag() -> None:
     """Command contains correct --repo value."""
     cmd = _build_command(_make_args(), "/path/a.cpp")
     assert cmd[cmd.index("--repo") + 1] == "testrepo"
 
 
-def test_build_command_max_lines_flag():
+def test_build_command_max_lines_flag() -> None:
     """Command contains correct --max-lines value."""
     cmd = _build_command(_make_args(), "/path/a.cpp")
     assert cmd[cmd.index("--max-lines") + 1] == "1000"
@@ -227,14 +232,16 @@ def test_build_command_max_lines_flag():
 # ---- run_classify_file -----------------------------------------------------
 
 
-def test_run_classify_file_succeeds_silently(monkeypatch):
+def test_run_classify_file_succeeds_silently(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """No SystemExit when subprocess succeeds."""
     captured = stub_subprocess_success(monkeypatch)
     classify_files.run_classify_file(_make_args(), "/p/a.cpp", 1, 1)
     assert len(captured) == 1
 
 
-def test_run_classify_file_exits_on_failure(monkeypatch):
+def test_run_classify_file_exits_on_failure(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """SystemExit when subprocess fails."""
     stub_subprocess_failure(monkeypatch)
     with pytest.raises(SystemExit):
@@ -244,8 +251,8 @@ def test_run_classify_file_exits_on_failure(monkeypatch):
 
 
 def test_run_classify_file_prints_progress(
-    monkeypatch, capsys,
-):
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str]) -> None:
     """Prints progress line with file index and name."""
     stub_subprocess_success(monkeypatch)
     classify_files.run_classify_file(
@@ -254,7 +261,8 @@ def test_run_classify_file_prints_progress(
     assert "Processing file 2/5: b.cpp" in capsys.readouterr().out
 
 
-def test_run_classify_file_passes_file_path(monkeypatch):
+def test_run_classify_file_passes_file_path(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """Subprocess command contains the correct --file value."""
     captured = stub_subprocess_success(monkeypatch)
     classify_files.run_classify_file(
@@ -263,7 +271,8 @@ def test_run_classify_file_passes_file_path(monkeypatch):
     assert captured[0][captured[0].index("--file") + 1] == "/p/a.cpp"
 
 
-def test_run_classify_file_does_not_capture_output(monkeypatch):
+def test_run_classify_file_does_not_capture_output(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """Subprocess inherits stdout/stderr (no capture_output)."""
     kwargs_log = spy_subprocess_run(monkeypatch)
     classify_files.run_classify_file(
@@ -356,18 +365,21 @@ def _stub_not_found(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     return updated
 
 
-def _raise_value_error(_body, _name):
+def _raise_value_error(_body: str, _name: str) -> str:
     raise ValueError("not found")
 
 
-def test_remove_file_checkbox_not_found_skips_update(monkeypatch):
+def test_remove_file_checkbox_not_found_skips_update(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """Does not call update_issue_body when filename is missing."""
     updated = _stub_not_found(monkeypatch)
     classify_files.remove_file_checkbox("o", "r", 61, "missing.cpp")
     assert not updated
 
 
-def test_remove_file_checkbox_not_found_prints_message(monkeypatch, capsys):
+def test_remove_file_checkbox_not_found_prints_message(
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str]) -> None:
     """Prints friendly skip message when filename is missing."""
     _stub_not_found(monkeypatch)
     classify_files.remove_file_checkbox("o", "r", 61, "missing.cpp")
@@ -377,7 +389,7 @@ def test_remove_file_checkbox_not_found_prints_message(monkeypatch, capsys):
 # ---- _run ------------------------------------------------------------------
 
 
-def test_run_processes_all_files(monkeypatch):
+def test_run_processes_all_files(monkeypatch: pytest.MonkeyPatch) -> None:
     """Subprocess invoked once per file."""
     captured = stub_subprocess_success(monkeypatch)
     stub_remove_file_checkbox(monkeypatch)
@@ -385,7 +397,8 @@ def test_run_processes_all_files(monkeypatch):
     assert len(captured) == 2
 
 
-def test_run_removes_checkbox_after_each_file(monkeypatch):
+def test_run_removes_checkbox_after_each_file(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """Removes file checkbox after each successful file."""
     stub_subprocess_success(monkeypatch)
     removed = stub_remove_file_checkbox(monkeypatch)
@@ -393,7 +406,8 @@ def test_run_removes_checkbox_after_each_file(monkeypatch):
     assert removed == ["a.cpp", "b.cpp"]
 
 
-def test_run_skips_checkbox_when_file_exists(monkeypatch, tmp_path):
+def test_run_skips_checkbox_when_file_exists(
+        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Does not remove checkbox when the file still exists."""
     f = tmp_path / "a.cpp"
     f.write_text("", encoding="utf-8")
@@ -403,7 +417,8 @@ def test_run_skips_checkbox_when_file_exists(monkeypatch, tmp_path):
     assert not removed
 
 
-def test_run_splits_comma_separated_files(monkeypatch):
+def test_run_splits_comma_separated_files(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """Comma-separated files result in distinct subprocess calls."""
     captured = stub_subprocess_success(monkeypatch)
     stub_remove_file_checkbox(monkeypatch)
@@ -412,7 +427,8 @@ def test_run_splits_comma_separated_files(monkeypatch):
     assert files == ["x.cpp", "y.cpp"]
 
 
-def test_run_skips_checkbox_when_no_issue(monkeypatch):
+def test_run_skips_checkbox_when_no_issue(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """Does not remove checkbox when --issue is omitted."""
     stub_subprocess_success(monkeypatch)
     removed = stub_remove_file_checkbox(monkeypatch)
@@ -420,7 +436,9 @@ def test_run_skips_checkbox_when_no_issue(monkeypatch):
     assert not removed
 
 
-def test_run_prints_done(monkeypatch, capsys):
+def test_run_prints_done(
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str]) -> None:
     """Prints Done after all files processed."""
     stub_subprocess_success(monkeypatch)
     stub_remove_file_checkbox(monkeypatch)
@@ -431,13 +449,14 @@ def test_run_prints_done(monkeypatch, capsys):
 # ---- --sub-issues argument parsing -----------------------------------------
 
 
-def test_parse_args_sub_issues(monkeypatch):
+def test_parse_args_sub_issues(monkeypatch: pytest.MonkeyPatch) -> None:
     """Parses --sub-issues flag."""
     monkeypatch.setattr(sys, "argv", _SUB_ISSUES_ARGV)
     assert _parse_args().sub_issues == "76,77"
 
 
-def test_parse_args_files_and_sub_issues_rejects(monkeypatch):
+def test_parse_args_files_and_sub_issues_rejects(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """Both --files and --sub-issues are rejected."""
     monkeypatch.setattr(sys, "argv", [
         "prog",
@@ -450,7 +469,8 @@ def test_parse_args_files_and_sub_issues_rejects(monkeypatch):
         _parse_args()
 
 
-def test_parse_args_neither_rejects(monkeypatch):
+def test_parse_args_neither_rejects(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """Neither --files nor --sub-issues is rejected."""
     monkeypatch.setattr(sys, "argv", [
         "prog",
@@ -464,14 +484,14 @@ def test_parse_args_neither_rejects(monkeypatch):
 # ---- extract_filename_from_title ------------------------------------------
 
 
-def test_extract_filename_from_title_valid():
+def test_extract_filename_from_title_valid() -> None:
     """Extracts filename from valid title."""
     assert extract_filename_from_title(
         "Classify tests in foo.cpp",
     ) == "foo.cpp"
 
 
-def test_extract_filename_from_title_invalid():
+def test_extract_filename_from_title_invalid() -> None:
     """sys.exit(1) on non-matching title."""
     with pytest.raises(SystemExit):
         extract_filename_from_title("Unrelated title")
@@ -480,7 +500,8 @@ def test_extract_filename_from_title_invalid():
 # ---- resolve_sub_issues ---------------------------------------------------
 
 
-def test_resolve_sub_issues_returns_entries(monkeypatch):
+def test_resolve_sub_issues_returns_entries(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """Maps issue numbers to (path, issue) pairs."""
     stub_fetch_issue_title(monkeypatch, {
         76: "Classify tests in a.cpp",
@@ -494,43 +515,43 @@ def test_resolve_sub_issues_returns_entries(monkeypatch):
 # ---- _build_command with sub_issue ----------------------------------------
 
 
-def test_build_command_dry_run():
+def test_build_command_dry_run() -> None:
     """--dry-run appears in subprocess command."""
     cmd = _build_command(_make_args(dry_run=True), "/p/a.cpp")
     assert "--dry-run" in cmd
 
 
-def test_build_command_no_dry_run():
+def test_build_command_no_dry_run() -> None:
     """--dry-run absent when flag is False."""
     cmd = _build_command(_make_args(), "/p/a.cpp")
     assert "--dry-run" not in cmd
 
 
-def test_build_command_no_commit():
+def test_build_command_no_commit() -> None:
     """--no-commit appears in subprocess command."""
     cmd = _build_command(_make_args(no_commit=True), "/p/a.cpp")
     assert "--no-commit" in cmd
 
 
-def test_build_command_no_no_commit():
+def test_build_command_no_no_commit() -> None:
     """--no-commit absent when flag is False."""
     cmd = _build_command(_make_args(), "/p/a.cpp")
     assert "--no-commit" not in cmd
 
 
-def test_build_command_with_sub_issue():
+def test_build_command_with_sub_issue() -> None:
     """sub_issue=76 produces --issue 76."""
     cmd = _build_command(_make_args(), "/p/a.cpp", sub_issue=76)
     assert cmd[cmd.index("--issue") + 1] == "76"
 
 
-def test_build_command_with_sub_issue_no_create():
+def test_build_command_with_sub_issue_no_create() -> None:
     """sub_issue=76 excludes --create-issue."""
     cmd = _build_command(_make_args(), "/p/a.cpp", sub_issue=76)
     assert "--create-issue" not in cmd
 
 
-def test_build_command_without_sub_issue():
+def test_build_command_without_sub_issue() -> None:
     """sub_issue=None keeps --create-issue (backward compat)."""
     cmd = _build_command(_make_args(), "/p/a.cpp")
     assert "--create-issue" in cmd
@@ -539,7 +560,8 @@ def test_build_command_without_sub_issue():
 # ---- _run with --sub-issues -----------------------------------------------
 
 
-def test_run_sub_issues_passes_issue_flag(monkeypatch):
+def test_run_sub_issues_passes_issue_flag(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """_run with sub_issues passes --issue to each subprocess."""
     stub_fetch_issue_title(monkeypatch, {
         76: "Classify tests in a.cpp",
@@ -552,7 +574,8 @@ def test_run_sub_issues_passes_issue_flag(monkeypatch):
     assert issues == ["76", "77"]
 
 
-def test_run_sub_issues_removes_master_checkbox(monkeypatch):
+def test_run_sub_issues_removes_master_checkbox(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """Master issue checkbox removed after each file."""
     stub_fetch_issue_title(monkeypatch, {
         76: "Classify tests in a.cpp",
@@ -567,7 +590,9 @@ def test_run_sub_issues_removes_master_checkbox(monkeypatch):
 # ---- main ------------------------------------------------------------------
 
 
-def test_main_calls_run(monkeypatch, capsys):
+def test_main_calls_run(
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str]) -> None:
     """main() calls _run with parsed args."""
     monkeypatch.setattr(sys, "argv", _BASE_ARGV)
     stub_subprocess_success(monkeypatch)

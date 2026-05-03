@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -39,7 +40,9 @@ def test_fetch_issue_body_success() -> None:
         assert fetch_issue_body("org", "repo", 1) == "hello\n"
 
 
-def test_fetch_issue_body_prints_action(capsys) -> None:
+def test_fetch_issue_body_prints_action(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Prints that it is fetching the issue."""
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="body\n")
     with patch("lib.python.github.subprocess.run", return_value=cp):
@@ -67,7 +70,9 @@ def test_fetch_issue_title_success() -> None:
         assert fetch_issue_title("org", "repo", 1) == "Title"
 
 
-def test_fetch_issue_title_prints_action(capsys) -> None:
+def test_fetch_issue_title_prints_action(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Prints that it is fetching the issue title."""
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="T\n")
     with patch("lib.python.github.subprocess.run", return_value=cp):
@@ -118,7 +123,9 @@ def test_update_issue_body_success() -> None:
     )
 
 
-def test_update_issue_body_prints_action(capsys) -> None:
+def test_update_issue_body_prints_action(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Prints that it is updating the issue."""
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
     with patch("lib.python.github.subprocess.run", return_value=cp):
@@ -155,7 +162,9 @@ def test_close_issue_sets_state_closed() -> None:
     assert "state=closed" in mock_run.call_args[0][0]
 
 
-def test_close_issue_prints_reason(capsys) -> None:
+def test_close_issue_prints_reason(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Prints the reason for closing."""
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
     with patch("lib.python.github.subprocess.run", return_value=cp):
@@ -163,7 +172,9 @@ def test_close_issue_prints_reason(capsys) -> None:
     assert "all done" in capsys.readouterr().out
 
 
-def test_close_issue_prints_confirmation(capsys) -> None:
+def test_close_issue_prints_confirmation(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Prints confirmation after closing."""
     cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
     with patch("lib.python.github.subprocess.run", return_value=cp):
@@ -575,7 +586,9 @@ def test_find_issue_by_title_partial_match() -> None:
         assert find_issue_by_title("org", "repo", "My Issue") is None
 
 
-def test_create_issue_returns_number(monkeypatch) -> None:
+def test_create_issue_returns_number(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """create_issue returns the issue number from the API response."""
     mock_result = subprocess.CompletedProcess(
         args=[], returncode=0,
@@ -585,7 +598,9 @@ def test_create_issue_returns_number(monkeypatch) -> None:
     assert create_issue("org", "repo", "title", "body") == 42
 
 
-def test_create_issue_exits_on_failure(monkeypatch) -> None:
+def test_create_issue_exits_on_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """create_issue exits when the API call fails."""
     mock_result = subprocess.CompletedProcess(
         args=[], returncode=1, stdout="", stderr="err",
@@ -595,28 +610,37 @@ def test_create_issue_exits_on_failure(monkeypatch) -> None:
         create_issue("org", "repo", "title", "body")
 
 
-def _create_issue_payload(monkeypatch, **kwargs):
+def _create_issue_payload(
+    monkeypatch: pytest.MonkeyPatch, **kwargs: Any,
+) -> dict[str, Any]:
     """Call create_issue with stubbed subprocess and return the parsed payload."""
     cp = subprocess.CompletedProcess(
         args=[], returncode=0, stdout='{"number": 7}', stderr="",
     )
-    captured = []
-    monkeypatch.setattr(
-        subprocess, "run",
-        lambda *_a, **kw: (captured.append(kw.get("input", "")), cp)[1],
-    )
+    captured: list[str] = []
+
+    def stub_run(*_a: Any, **kw: Any) -> subprocess.CompletedProcess[str]:
+        captured.append(kw.get("input", ""))
+        return cp
+
+    monkeypatch.setattr(subprocess, "run", stub_run)
     create_issue("org", "repo", "title", "body", **kwargs)
-    return json.loads(captured[0])
+    parsed: dict[str, Any] = json.loads(captured[0])
+    return parsed
 
 
-def test_create_issue_includes_labels(monkeypatch) -> None:
+def test_create_issue_includes_labels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """create_issue includes labels in the payload when provided."""
     assert _create_issue_payload(
         monkeypatch, labels=["IEEE 1800-2023"],
     )["labels"] == ["IEEE 1800-2023"]
 
 
-def test_create_issue_omits_labels_when_none(monkeypatch) -> None:
+def test_create_issue_omits_labels_when_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """create_issue omits labels key from payload when None."""
     assert "labels" not in _create_issue_payload(monkeypatch)
 

@@ -1,12 +1,17 @@
 """Integration tests for the classify_test pipeline."""
 
-from types import SimpleNamespace
+from collections.abc import Callable
+from pathlib import Path
+from types import ModuleType, SimpleNamespace
+from typing import Any
+
+import pytest
 
 
 # ---- Helpers ---------------------------------------------------------------
 
 
-def _write_input(tmp_path, body):
+def _write_input(tmp_path: Path, body: str) -> Path:
     """Write test_input.cpp with standard boilerplate wrapping *body*."""
     f = tmp_path / "test_input.cpp"
     f.write_text(
@@ -17,17 +22,21 @@ def _write_input(tmp_path, body):
     return f
 
 
-def _make_classifier(*triples):
+def _make_classifier(
+    *triples: tuple[str, str] | tuple[str, str, str],
+) -> Callable[..., dict[str, str]]:
     """Build per-test classifier from (name, clause[, stage]) triples."""
-    clause_lookup = {}
-    stage_lookup = {}
+    clause_lookup: dict[str, str] = {}
+    stage_lookup: dict[str, str] = {}
     for triple in triples:
         name, clause = triple[0], triple[1]
         stage = triple[2] if len(triple) > 2 else "parser"
         clause_lookup[name] = clause
         stage_lookup[name] = stage
 
-    def classifier(prompt, _schema=None, **_kw):
+    def classifier(
+        prompt: str, _schema: str | None = None, **_kw: Any,
+    ) -> dict[str, str]:
         if _schema and "pipeline_stage" in _schema:
             for name, stage in stage_lookup.items():
                 if name in prompt:
@@ -43,9 +52,13 @@ def _make_classifier(*triples):
     return classifier
 
 
-def _make_classifier_with_topic(_name, clause, topic):
+def _make_classifier_with_topic(
+    _name: str, clause: str, topic: str,
+) -> Callable[..., dict[str, str]]:
     """Build per-test classifier that returns clause then topic."""
-    def classifier(_prompt, schema=None, **_kw):
+    def classifier(
+        _prompt: str, schema: str | None = None, **_kw: Any,
+    ) -> dict[str, str]:
         if schema and "pipeline_stage" in schema:
             return {"pipeline_stage": "parser", "rationale": "r"}
         if schema and "non_lrm_topic" in schema:
@@ -57,11 +70,16 @@ def _make_classifier_with_topic(_name, clause, topic):
     return classifier
 
 
-def _noop(*_a, **_kw):
+def _noop(*_a: Any, **_kw: Any) -> None:
     """No-op stub for side-effect functions."""
 
 
-def _stub_externals(ct, monkeypatch, tmp_path, classifier):
+def _stub_externals(
+    ct: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    classifier: Callable[..., dict[str, str]],
+) -> None:
     """Stub Claude CLI, CMake path, and side-effect functions."""
     monkeypatch.setattr(ct, "_call_claude", classifier)
     cmake = tmp_path / "CMakeLists.txt"
@@ -75,7 +93,13 @@ def _stub_externals(ct, monkeypatch, tmp_path, classifier):
         ct, "commit_classification", _noop)
 
 
-def _run_pipeline(ct, tmp_path, test, suite="S", dry_run=False):
+def _run_pipeline(
+    ct: ModuleType,
+    tmp_path: Path,
+    test: str,
+    suite: str = "S",
+    dry_run: bool = False,
+) -> None:
     """Execute _run on test_input.cpp in *tmp_path*."""
     _run = getattr(ct, "_run")
     _run(SimpleNamespace(
@@ -95,7 +119,9 @@ def _run_pipeline(ct, tmp_path, test, suite="S", dry_run=False):
     ))
 
 
-def _do_multi_clause(ct, tmp_path, monkeypatch):
+def _do_multi_clause(
+    ct: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> Path:
     """Write two tests, classify to different clauses, and run pipeline."""
     _write_input(
         tmp_path,
@@ -111,7 +137,9 @@ def _do_multi_clause(ct, tmp_path, monkeypatch):
     return tmp_path
 
 
-def _do_merge(ct, tmp_path, monkeypatch):
+def _do_merge(
+    ct: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> Path:
     """Merge a new test into an existing clause file, return its path."""
     existing = tmp_path / "test_parser_clause_06_01.cpp"
     existing.write_text(
@@ -127,7 +155,9 @@ def _do_merge(ct, tmp_path, monkeypatch):
     return existing
 
 
-def _do_dry_run(ct, tmp_path, monkeypatch):
+def _do_dry_run(
+    ct: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> Path:
     """Run pipeline in dry-run mode, return tmp_path."""
     _write_input(tmp_path, "TEST(S, DryT) {\n  auto r = Parse(src);\n}\n\n")
     _stub_externals(ct, monkeypatch, tmp_path, _make_classifier(
@@ -140,19 +170,31 @@ def _do_dry_run(ct, tmp_path, monkeypatch):
 # ---- Multi-clause split ----------------------------------------------------
 
 
-def test_multi_clause_creates_parser_file(ct, tmp_path, monkeypatch):
+def test_multi_clause_creates_parser_file(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Parser clause file is created for the parser-classified test."""
     assert (_do_multi_clause(ct, tmp_path, monkeypatch)
             / "test_parser_clause_06_01.cpp").exists()
 
 
-def test_multi_clause_creates_lexer_file(ct, tmp_path, monkeypatch):
+def test_multi_clause_creates_lexer_file(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Lexer clause file is created for the lexer-classified test."""
     assert (_do_multi_clause(ct, tmp_path, monkeypatch)
             / "test_lexer_clause_05_03.cpp").exists()
 
 
-def test_multi_clause_parser_contains_alpha(ct, tmp_path, monkeypatch):
+def test_multi_clause_parser_contains_alpha(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Parser file contains the Alpha test."""
     assert "TEST(S, Alpha)" in (
         _do_multi_clause(ct, tmp_path, monkeypatch)
@@ -160,7 +202,11 @@ def test_multi_clause_parser_contains_alpha(ct, tmp_path, monkeypatch):
     ).read_text()
 
 
-def test_multi_clause_lexer_contains_beta(ct, tmp_path, monkeypatch):
+def test_multi_clause_lexer_contains_beta(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Lexer file contains the Beta test."""
     assert "TEST(S, Beta)" in (
         _do_multi_clause(ct, tmp_path, monkeypatch)
@@ -168,20 +214,32 @@ def test_multi_clause_lexer_contains_beta(ct, tmp_path, monkeypatch):
     ).read_text()
 
 
-def test_multi_clause_deletes_input(ct, tmp_path, monkeypatch):
+def test_multi_clause_deletes_input(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Input file is removed after splitting."""
     assert not (_do_multi_clause(ct, tmp_path, monkeypatch)
                 / "test_input.cpp").exists()
 
 
-def test_multi_clause_cmake_has_new_entry(ct, tmp_path, monkeypatch):
+def test_multi_clause_cmake_has_new_entry(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """CMakeLists.txt contains the new parser clause entry."""
     assert "test_parser_clause_06_01" in (
         _do_multi_clause(ct, tmp_path, monkeypatch) / "CMakeLists.txt"
     ).read_text()
 
 
-def test_multi_clause_cmake_drops_old_entry(ct, tmp_path, monkeypatch):
+def test_multi_clause_cmake_drops_old_entry(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """CMakeLists.txt no longer contains the old test_input entry."""
     assert "test_input" not in (
         _do_multi_clause(ct, tmp_path, monkeypatch) / "CMakeLists.txt"
@@ -191,12 +249,20 @@ def test_multi_clause_cmake_drops_old_entry(ct, tmp_path, monkeypatch):
 # ---- Merge into existing file ----------------------------------------------
 
 
-def test_merge_adds_new_test(ct, tmp_path, monkeypatch):
+def test_merge_adds_new_test(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Merged file contains the new test."""
     assert "TEST(S, Fresh)" in _do_merge(ct, tmp_path, monkeypatch).read_text()
 
 
-def test_merge_preserves_old_test(ct, tmp_path, monkeypatch):
+def test_merge_preserves_old_test(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Merged file still contains the pre-existing test."""
     assert "TEST(S, Old)" in _do_merge(ct, tmp_path, monkeypatch).read_text()
 
@@ -204,7 +270,12 @@ def test_merge_preserves_old_test(ct, tmp_path, monkeypatch):
 # ---- Deduplication ---------------------------------------------------------
 
 
-def test_dedup_reports_duplicate(ct, tmp_path, monkeypatch, capsys):
+def test_dedup_reports_duplicate(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Tests already in the target file are reported as removed."""
     (tmp_path / "test_parser_clause_06_01.cpp").write_text(
         "TEST(S, Dup) {\n  auto r = Parse(src);\n}\n", encoding="utf-8",
@@ -220,7 +291,11 @@ def test_dedup_reports_duplicate(ct, tmp_path, monkeypatch, capsys):
 # ---- Non-LRM topic routing ------------------------------------------------
 
 
-def test_non_lrm_topic_creates_named_file(ct, tmp_path, monkeypatch):
+def test_non_lrm_topic_creates_named_file(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Non-LRM test with topic creates test_non_lrm_<topic>.cpp."""
     _write_input(tmp_path, "TEST(S, InternalHelper) {\n  auto r = Parse(src);\n}\n\n")
     _stub_externals(ct, monkeypatch, tmp_path, _make_classifier_with_topic(
@@ -233,7 +308,11 @@ def test_non_lrm_topic_creates_named_file(ct, tmp_path, monkeypatch):
 # ---- Self-named source (dedup regression) ---------------------------------
 
 
-def test_self_named_source_not_treated_as_duplicate(ct, tmp_path, monkeypatch):
+def test_self_named_source_not_treated_as_duplicate(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Source file whose name matches target is not flagged as duplicate."""
     _run = getattr(ct, "_run")
     src = tmp_path / "test_non_lrm_aig.cpp"
@@ -258,7 +337,11 @@ def test_self_named_source_not_treated_as_duplicate(ct, tmp_path, monkeypatch):
 # ---- Annex routing ---------------------------------------------------------
 
 
-def test_annex_creates_annex_file(ct, tmp_path, monkeypatch):
+def test_annex_creates_annex_file(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Annex-clause test creates test_<prefix>_annex_<letter>_<padded>.cpp."""
     _write_input(tmp_path, "TEST(S, GrammarRule) {\n  auto r = Parse(src);\n}\n\n")
     _stub_externals(ct, monkeypatch, tmp_path, _make_classifier(
@@ -271,13 +354,21 @@ def test_annex_creates_annex_file(ct, tmp_path, monkeypatch):
 # ---- Dry run ---------------------------------------------------------------
 
 
-def test_dry_run_no_output_files(ct, tmp_path, monkeypatch):
+def test_dry_run_no_output_files(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Dry run does not create any output files."""
     assert not (_do_dry_run(ct, tmp_path, monkeypatch)
                 / "test_parser_clause_06_01.cpp").exists()
 
 
-def test_dry_run_preserves_input(ct, tmp_path, monkeypatch):
+def test_dry_run_preserves_input(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Dry run does not delete the input file."""
     assert (_do_dry_run(ct, tmp_path, monkeypatch)
             / "test_input.cpp").exists()
@@ -286,7 +377,11 @@ def test_dry_run_preserves_input(ct, tmp_path, monkeypatch):
 # ---- Preamble propagation --------------------------------------------------
 
 
-def test_preamble_propagated_to_output(ct, tmp_path, monkeypatch):
+def test_preamble_propagated_to_output(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Global preamble from input appears in generated output files."""
     f = tmp_path / "test_input.cpp"
     f.write_text(
@@ -308,7 +403,11 @@ def test_preamble_propagated_to_output(ct, tmp_path, monkeypatch):
 # ---- LRM quote stripping ---------------------------------------------------
 
 
-def test_lrm_quotes_stripped_in_output(ct, tmp_path, monkeypatch):
+def test_lrm_quotes_stripped_in_output(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """LRM prose quotes in comments are stripped from generated output."""
     f = tmp_path / "test_input.cpp"
     f.write_text(
@@ -330,7 +429,11 @@ def test_lrm_quotes_stripped_in_output(ct, tmp_path, monkeypatch):
 # ---- Roundtrip parse -------------------------------------------------------
 
 
-def test_output_reparseable(ct, tmp_path, monkeypatch):
+def test_output_reparseable(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Generated output can be re-parsed by parse_file without errors."""
     _write_input(tmp_path, "TEST(S, Round) {\n  auto r = Parse(src);\n}\n\n")
     _stub_externals(ct, monkeypatch, tmp_path, _make_classifier(
@@ -345,7 +448,9 @@ def test_output_reparseable(ct, tmp_path, monkeypatch):
 # ---- Named namespace wrapper -----------------------------------------------
 
 
-def _do_named_ns(ct, tmp_path, monkeypatch):
+def _do_named_ns(
+    ct: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> Path:
     """Write input with namespace delta { ... } and run pipeline."""
     f = tmp_path / "test_input.cpp"
     f.write_text(
@@ -367,13 +472,21 @@ def _do_named_ns(ct, tmp_path, monkeypatch):
     return tmp_path
 
 
-def test_named_ns_creates_output(ct, tmp_path, monkeypatch):
+def test_named_ns_creates_output(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Pipeline creates output file from named-namespace input."""
     d = _do_named_ns(ct, tmp_path, monkeypatch)
     assert (d / "test_non_lrm_vpi.cpp").exists()
 
 
-def test_named_ns_output_contains_test(ct, tmp_path, monkeypatch):
+def test_named_ns_output_contains_test(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Output file contains the test from inside the named namespace."""
     d = _do_named_ns(ct, tmp_path, monkeypatch)
     assert "TEST(S, DefaultCtx)" in (
@@ -384,9 +497,13 @@ def test_named_ns_output_contains_test(ct, tmp_path, monkeypatch):
 # ---- Prefix fallback via Claude -------------------------------------------
 
 
-def _make_classifier_with_prefix(name, clause, stage):
+def _make_classifier_with_prefix(
+    name: str, clause: str, stage: str,
+) -> Callable[..., dict[str, str]]:
     """Build classifier that returns clause, then pipeline stage on fallback."""
-    def classifier(prompt, _schema=None, **_kw):
+    def classifier(
+        prompt: str, _schema: str | None = None, **_kw: Any,
+    ) -> dict[str, str]:
         if _schema and "pipeline_stage" in _schema:
             return {"pipeline_stage": stage, "rationale": "r"}
         if name in prompt:
@@ -398,7 +515,11 @@ def _make_classifier_with_prefix(name, clause, stage):
     return classifier
 
 
-def test_prefix_fallback_creates_correct_file(ct, tmp_path, monkeypatch):
+def test_prefix_fallback_creates_correct_file(
+    ct: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Non-obvious helper falls back to Claude for prefix detection."""
     _write_input(
         tmp_path,

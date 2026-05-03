@@ -87,7 +87,7 @@ def test_add_continue_arg_set() -> None:
 # ---- validate_lrm -----------------------------------------------------------
 
 
-def test_validate_lrm_file_exists(tmp_path) -> None:
+def test_validate_lrm_file_exists(tmp_path: Path) -> None:
     """Returns without error when file exists."""
     lrm = tmp_path / "lrm.pdf"
     lrm.touch()
@@ -175,7 +175,9 @@ def test_validate_subclause_rejects_top_level_annex() -> None:
         validate_subclause(parser, args)
 
 
-def test_validate_subclause_error_routes_to_satisfy_clause(capsys) -> None:
+def test_validate_subclause_error_routes_to_satisfy_clause(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Depth-0 rejection message names ``satisfy_clause``."""
     parser = argparse.ArgumentParser()
     args = argparse.Namespace(subclause="33")
@@ -189,7 +191,7 @@ def test_validate_subclause_error_routes_to_satisfy_clause(capsys) -> None:
 # ---- parse_and_validate_subclause -------------------------------------------
 
 
-def _subclause_parser():
+def _subclause_parser() -> argparse.ArgumentParser:
     """Build a minimal parser wired up for parse_and_validate_subclause."""
     parser = argparse.ArgumentParser()
     add_lrm_arg(parser)
@@ -197,7 +199,7 @@ def _subclause_parser():
     return parser
 
 
-def test_parse_and_validate_subclause_returns_namespace(tmp_path) -> None:
+def test_parse_and_validate_subclause_returns_namespace(tmp_path: Path) -> None:
     """Returns the parsed namespace when --lrm and --subclause are valid."""
     lrm = tmp_path / "lrm.pdf"
     lrm.touch()
@@ -208,7 +210,9 @@ def test_parse_and_validate_subclause_returns_namespace(tmp_path) -> None:
     assert args.subclause == "33.4.1.5"
 
 
-def test_parse_and_validate_subclause_rejects_missing_lrm(tmp_path) -> None:
+def test_parse_and_validate_subclause_rejects_missing_lrm(
+    tmp_path: Path,
+) -> None:
     """Errors out when --lrm points at a non-existent file."""
     parser = _subclause_parser()
     with pytest.raises(SystemExit):
@@ -218,7 +222,9 @@ def test_parse_and_validate_subclause_rejects_missing_lrm(tmp_path) -> None:
         )
 
 
-def test_parse_and_validate_subclause_rejects_bad_subclause(tmp_path) -> None:
+def test_parse_and_validate_subclause_rejects_bad_subclause(
+    tmp_path: Path,
+) -> None:
     """Errors out when --subclause is not a valid clause string."""
     lrm = tmp_path / "lrm.pdf"
     lrm.touch()
@@ -292,7 +298,9 @@ def test_validate_clause_rejects_garbage() -> None:
         validate_clause(parser, args)
 
 
-def test_validate_clause_subclause_error_routes_to_satisfy_subclause(capsys) -> None:
+def test_validate_clause_subclause_error_routes_to_satisfy_subclause(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Subclause-shaped rejection message names ``satisfy_subclause``."""
     parser = argparse.ArgumentParser()
     args = argparse.Namespace(clause="33.1")
@@ -306,7 +314,7 @@ def test_validate_clause_subclause_error_routes_to_satisfy_subclause(capsys) -> 
 # ---- parse_and_validate_clause ----------------------------------------------
 
 
-def _clause_parser():
+def _clause_parser() -> argparse.ArgumentParser:
     """Build a minimal parser wired up for parse_and_validate_clause."""
     parser = argparse.ArgumentParser()
     add_lrm_arg(parser)
@@ -314,7 +322,7 @@ def _clause_parser():
     return parser
 
 
-def test_parse_and_validate_clause_returns_namespace(tmp_path) -> None:
+def test_parse_and_validate_clause_returns_namespace(tmp_path: Path) -> None:
     """Returns the parsed namespace when --lrm and --clause are valid."""
     lrm = tmp_path / "lrm.pdf"
     lrm.touch()
@@ -325,7 +333,9 @@ def test_parse_and_validate_clause_returns_namespace(tmp_path) -> None:
     assert args.clause == "33"
 
 
-def test_parse_and_validate_clause_rejects_missing_lrm(tmp_path) -> None:
+def test_parse_and_validate_clause_rejects_missing_lrm(
+    tmp_path: Path,
+) -> None:
     """Errors out when --lrm points at a non-existent file."""
     parser = _clause_parser()
     with pytest.raises(SystemExit):
@@ -335,7 +345,9 @@ def test_parse_and_validate_clause_rejects_missing_lrm(tmp_path) -> None:
         )
 
 
-def test_parse_and_validate_clause_rejects_bad_clause(tmp_path) -> None:
+def test_parse_and_validate_clause_rejects_bad_clause(
+    tmp_path: Path,
+) -> None:
     """Errors out when --clause is not a valid depth-0 string."""
     lrm = tmp_path / "lrm.pdf"
     lrm.touch()
@@ -369,7 +381,7 @@ def test_add_github_args_repo() -> None:
 # ---- parse_and_validate ----------------------------------------------------
 
 
-def test_parse_and_validate_returns_namespace(tmp_path) -> None:
+def test_parse_and_validate_returns_namespace(tmp_path: Path) -> None:
     """Returns a Namespace with parsed and validated args."""
     lrm = tmp_path / "lrm.pdf"
     lrm.touch()
@@ -378,7 +390,7 @@ def test_parse_and_validate_returns_namespace(tmp_path) -> None:
     assert parse_and_validate(parser, ["--lrm", str(lrm)]).lrm == lrm
 
 
-def test_parse_and_validate_rejects_missing_lrm(tmp_path) -> None:
+def test_parse_and_validate_rejects_missing_lrm(tmp_path: Path) -> None:
     """Calls parser.error when LRM file does not exist."""
     parser = argparse.ArgumentParser()
     add_lrm_arg(parser)
@@ -389,21 +401,27 @@ def test_parse_and_validate_rejects_missing_lrm(tmp_path) -> None:
 # ---- run_claude_cli -------------------------------------------------------
 
 
-def test_run_claude_cli_calls_subprocess_run(monkeypatch):
+def test_run_claude_cli_calls_subprocess_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """run_claude_cli delegates to subprocess.run."""
     captured = stub_subprocess_success(monkeypatch)
     run_claude_cli(["claude", "-p"], "hello", env={"K": "V"})
     assert captured[0] == ["claude", "-p"]
 
 
-def test_run_claude_cli_passes_timeout(monkeypatch):
+def test_run_claude_cli_passes_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """run_claude_cli forwards the timeout parameter."""
     kwargs_log = spy_subprocess_run(monkeypatch)
     run_claude_cli(["true"], "", env={}, timeout=600)
     assert kwargs_log[0]["timeout"] == 600
 
 
-def test_run_claude_cli_returns_completed_process(monkeypatch):
+def test_run_claude_cli_returns_completed_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """run_claude_cli returns the subprocess.CompletedProcess object."""
     stub_subprocess_success(monkeypatch)
     result = run_claude_cli(["true"], "", env={})
@@ -413,19 +431,19 @@ def test_run_claude_cli_returns_completed_process(monkeypatch):
 # ---- run_with_dots --------------------------------------------------------
 
 
-def test_run_with_dots_returns_result():
+def test_run_with_dots_returns_result() -> None:
     """run_with_dots returns the function result."""
     assert run_with_dots(lambda: 42) == 42
 
 
-def test_run_with_dots_calls_function():
+def test_run_with_dots_calls_function() -> None:
     """run_with_dots calls the provided function."""
-    calls = []
+    calls: list[int] = []
     run_with_dots(lambda: calls.append(1))
     assert len(calls) == 1
 
 
-def test_run_with_dots_prints_dots(capsys):
+def test_run_with_dots_prints_dots(capsys: pytest.CaptureFixture[str]) -> None:
     """run_with_dots prints dots while the function runs."""
     with patch("lib.python.cli._DOT_INTERVAL_SECONDS", 0.05):
         run_with_dots(lambda: time.sleep(0.15))

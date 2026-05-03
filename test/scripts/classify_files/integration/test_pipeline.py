@@ -1,7 +1,10 @@
 """Integration tests for the classify_files pipeline."""
 
+import argparse
 import subprocess
+from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -24,9 +27,9 @@ _ARGS_DEFAULTS = {
 }
 
 
-def _pipeline_args(**overrides):
+def _pipeline_args(**overrides: Any) -> argparse.Namespace:
     """Build args for _run."""
-    result = {
+    result: dict[str, Any] = {
         "files": "a.cpp,b.cpp",
         "sub_issues": None,
         "output_dir": "/out",
@@ -35,7 +38,7 @@ def _pipeline_args(**overrides):
         "no_commit": False,
         **_ARGS_DEFAULTS, **overrides,
     }
-    return SimpleNamespace(**result)
+    return cast(argparse.Namespace, SimpleNamespace(**result))
 
 
 def _mock_run_fail_first(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -65,7 +68,7 @@ def _stub_remove(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 # ---- Pipeline tests --------------------------------------------------------
 
 
-def test_processes_two_files(monkeypatch):
+def test_processes_two_files(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pipeline invokes classify_file for each of two files."""
     log = stub_subprocess_success(monkeypatch)
     _stub_remove(monkeypatch)
@@ -73,7 +76,7 @@ def test_processes_two_files(monkeypatch):
     assert len(log) == 2
 
 
-def test_each_call_targets_distinct_file(monkeypatch):
+def test_each_call_targets_distinct_file(monkeypatch: pytest.MonkeyPatch) -> None:
     """Each subprocess call targets a different file."""
     log = stub_subprocess_success(monkeypatch)
     _stub_remove(monkeypatch)
@@ -82,7 +85,7 @@ def test_each_call_targets_distinct_file(monkeypatch):
     assert files == ["a.cpp", "b.cpp"]
 
 
-def test_halts_on_first_failure(monkeypatch):
+def test_halts_on_first_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pipeline halts immediately when first file fails."""
     _mock_run_fail_first(monkeypatch)
     _stub_remove(monkeypatch)
@@ -90,7 +93,8 @@ def test_halts_on_first_failure(monkeypatch):
         _run(_pipeline_args())
 
 
-def test_removes_checkbox_after_each_file(monkeypatch):
+def test_removes_checkbox_after_each_file(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """Removes file checkbox after each successful file."""
     stub_subprocess_success(monkeypatch)
     removed = _stub_remove(monkeypatch)
@@ -98,7 +102,8 @@ def test_removes_checkbox_after_each_file(monkeypatch):
     assert removed == ["a.cpp", "b.cpp"]
 
 
-def test_skips_checkbox_when_file_exists(monkeypatch, tmp_path):
+def test_skips_checkbox_when_file_exists(
+        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Does not remove checkbox when the file still exists."""
     f = tmp_path / "a.cpp"
     f.write_text("", encoding="utf-8")
@@ -111,7 +116,9 @@ def test_skips_checkbox_when_file_exists(monkeypatch, tmp_path):
 # ---- --sub-issues pipeline ------------------------------------------------
 
 
-def _stub_resolve(monkeypatch, entries):
+def _stub_resolve(
+        monkeypatch: pytest.MonkeyPatch,
+        entries: list[tuple[str, int]]) -> None:
     """Stub resolve_sub_issues to return *entries*."""
     monkeypatch.setattr(
         classify_files, "resolve_sub_issues",
@@ -119,7 +126,7 @@ def _stub_resolve(monkeypatch, entries):
     )
 
 
-def test_sub_issues_uses_issue_flag(monkeypatch):
+def test_sub_issues_uses_issue_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     """Each subprocess command has --issue, not --create-issue."""
     _stub_resolve(monkeypatch, [("a.cpp", 76), ("b.cpp", 77)])
     log = stub_subprocess_success(monkeypatch)
@@ -128,7 +135,8 @@ def test_sub_issues_uses_issue_flag(monkeypatch):
     assert all("--create-issue" not in c for c in log)
 
 
-def test_sub_issues_removes_master_checkbox(monkeypatch):
+def test_sub_issues_removes_master_checkbox(
+        monkeypatch: pytest.MonkeyPatch) -> None:
     """Master checkbox removed with correct filenames."""
     _stub_resolve(monkeypatch, [("a.cpp", 76), ("b.cpp", 77)])
     stub_subprocess_success(monkeypatch)

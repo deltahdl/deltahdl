@@ -2,7 +2,8 @@
 
 import subprocess
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -25,7 +26,7 @@ _ARGS_DEFAULTS = {
 
 def _pipeline_args(tmp_path: Path, **overrides: object) -> SimpleNamespace:
     """Build args pointing at test_input.cpp inside *tmp_path*."""
-    result = {
+    result: dict[str, Any] = {
         "file": str(tmp_path / "test_input.cpp"),
         "output_dir": str(tmp_path),
         "lrm": str(tmp_path / "lrm.txt"),
@@ -34,7 +35,8 @@ def _pipeline_args(tmp_path: Path, **overrides: object) -> SimpleNamespace:
     return SimpleNamespace(**result)
 
 
-def _write_and_args(tmp_path: Path, body: str, **overrides: object) -> SimpleNamespace:
+def _write_and_args(
+        tmp_path: Path, body: str, **overrides: object) -> SimpleNamespace:
     """Write test_input.cpp and return args for _run."""
     (tmp_path / "test_input.cpp").write_text(
         body, encoding="utf-8",
@@ -42,7 +44,7 @@ def _write_and_args(tmp_path: Path, body: str, **overrides: object) -> SimpleNam
     return _pipeline_args(tmp_path, **overrides)
 
 
-def _stub_close(monkeypatch: pytest.MonkeyPatch, cf) -> list[bool]:
+def _stub_close(monkeypatch: pytest.MonkeyPatch, cf: ModuleType) -> list[bool]:
     """Stub close_issue; return True-appending call log."""
     called: list[bool] = []
     monkeypatch.setattr(
@@ -52,7 +54,9 @@ def _stub_close(monkeypatch: pytest.MonkeyPatch, cf) -> list[bool]:
     return called
 
 
-def _stub_create(monkeypatch: pytest.MonkeyPatch, cf, number: int = 42) -> list[int]:
+def _stub_create(
+        monkeypatch: pytest.MonkeyPatch, cf: ModuleType,
+        number: int = 42) -> list[int]:
     """Stub create_issue; return number-appending call log."""
     called: list[int] = []
 
@@ -64,7 +68,7 @@ def _stub_create(monkeypatch: pytest.MonkeyPatch, cf, number: int = 42) -> list[
     return called
 
 
-def _stub_ensure(monkeypatch: pytest.MonkeyPatch, cf) -> list[bool]:
+def _stub_ensure(monkeypatch: pytest.MonkeyPatch, cf: ModuleType) -> list[bool]:
     """Stub sync_issue_rows; return call log."""
     called: list[bool] = []
 
@@ -79,7 +83,9 @@ def _stub_ensure(monkeypatch: pytest.MonkeyPatch, cf) -> list[bool]:
 # ---- Batch processing via classify_tests ----------------------------------
 
 
-def test_invokes_classify_tests_once(tmp_path, monkeypatch, cf):
+def test_invokes_classify_tests_once(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        cf: ModuleType) -> None:
     """Pipeline invokes classify_tests exactly once for all tests."""
     body = (
         "TEST(S, Alpha) {\n}\n"
@@ -93,7 +99,9 @@ def test_invokes_classify_tests_once(tmp_path, monkeypatch, cf):
     assert len(log) == 1
 
 
-def test_tests_flag_contains_all_names(tmp_path, monkeypatch, cf):
+def test_tests_flag_contains_all_names(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        cf: ModuleType) -> None:
     """The --tests flag includes all test names comma-separated."""
     body = (
         "TEST(S, Alpha) {\n}\n"
@@ -106,7 +114,9 @@ def test_tests_flag_contains_all_names(tmp_path, monkeypatch, cf):
     assert log[0][log[0].index("--tests") + 1] == "S.Alpha,S.Beta"
 
 
-def test_flags_propagated_to_subprocess(tmp_path, monkeypatch, cf):
+def test_flags_propagated_to_subprocess(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        cf: ModuleType) -> None:
     """Optional flags are forwarded to classify_tests call."""
     _stub_ensure(monkeypatch, cf)
     log = stub_subprocess_success(monkeypatch)
@@ -116,7 +126,9 @@ def test_flags_propagated_to_subprocess(tmp_path, monkeypatch, cf):
     assert "--dry-run" in log[0]
 
 
-def test_exits_on_classify_tests_failure(tmp_path, monkeypatch, cf):
+def test_exits_on_classify_tests_failure(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        cf: ModuleType) -> None:
     """Pipeline exits when classify_tests returns non-zero."""
     _stub_ensure(monkeypatch, cf)
     stub_subprocess_failure(monkeypatch)
@@ -126,7 +138,9 @@ def test_exits_on_classify_tests_failure(tmp_path, monkeypatch, cf):
         )
 
 
-def test_single_test_file(tmp_path, monkeypatch, cf):
+def test_single_test_file(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        cf: ModuleType) -> None:
     """Single-test file succeeds without error."""
     _stub_ensure(monkeypatch, cf)
     log = stub_subprocess_success(monkeypatch)
@@ -137,7 +151,9 @@ def test_single_test_file(tmp_path, monkeypatch, cf):
     assert len(log) == 1
 
 
-def test_closes_issue_after_all_pass(tmp_path, monkeypatch, cf):
+def test_closes_issue_after_all_pass(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        cf: ModuleType) -> None:
     """Pipeline closes the issue after classify_tests succeeds."""
     _stub_ensure(monkeypatch, cf)
     stub_subprocess_success(monkeypatch)
@@ -150,7 +166,9 @@ def test_closes_issue_after_all_pass(tmp_path, monkeypatch, cf):
     assert len(log) == 1
 
 
-def test_create_issue_then_process(tmp_path, monkeypatch, cf):
+def test_create_issue_then_process(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        cf: ModuleType) -> None:
     """Pipeline creates issue then invokes classify_tests once."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
     log = stub_subprocess_success(monkeypatch)
@@ -166,7 +184,7 @@ def test_create_issue_then_process(tmp_path, monkeypatch, cf):
 
 
 def _sync_order_log(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cf,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cf: ModuleType,
 ) -> list[str]:
     """Run pipeline recording sync vs subprocess call order."""
     body = "TEST(S, A) {\n}\nTEST(S, B) {\n}\n"
@@ -177,7 +195,7 @@ def _sync_order_log(
 
     monkeypatch.setattr(cf, "sync_issue_rows", fake_sync)
 
-    def log_run(_cmd, **_kw):
+    def log_run(_cmd: Any, **_kw: Any) -> MagicMock:
         order.append("subprocess")
         m = MagicMock()
         m.returncode, m.stdout, m.stderr = 0, "", ""
@@ -190,16 +208,16 @@ def _sync_order_log(
 
 
 def test_sync_issue_rows_runs_first(
-    tmp_path, monkeypatch, cf,
-):
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        cf: ModuleType) -> None:
     """Pipeline calls sync_issue_rows before subprocess calls."""
     order = _sync_order_log(tmp_path, monkeypatch, cf)
     assert order[0] == "sync"
 
 
 def test_subprocess_runs_after_sync(
-    tmp_path, monkeypatch, cf,
-):
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        cf: ModuleType) -> None:
     """All calls after sync_issue_rows are subprocess calls."""
     order = _sync_order_log(tmp_path, monkeypatch, cf)
     assert all(e == "subprocess" for e in order[1:])

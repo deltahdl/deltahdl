@@ -1,5 +1,6 @@
 """Unit tests for satisfy_subclause.oracles."""
 
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -99,7 +100,7 @@ def test_build_env_preserves_other_vars() -> None:
 # --- run_oracle_call --------------------------------------------------------
 
 
-def _patched_streaming(result_text="DONE"):
+def _patched_streaming(result_text: str = "DONE") -> Any:
     """Patch run_claude_streaming with a fixed return string."""
     return patch(
         "satisfy_subclause.oracles.run_claude_streaming_with_retry",
@@ -332,7 +333,7 @@ def test_parse_dependencies_picks_last_nonempty_array_when_prose_has_brackets() 
 # --- compute_subclause_dependencies -----------------------------------------
 
 
-def _patched_oracle(result_text):
+def _patched_oracle(result_text: str) -> Any:
     """Patch run_oracle_call with a fixed return string."""
     return patch(
         "satisfy_subclause.oracles.run_oracle_call",
@@ -358,7 +359,9 @@ def test_compute_subclause_dependencies_passes_model() -> None:
     assert mock_run.call_args[1]["model"] == "haiku"
 
 
-def test_compute_subclause_dependencies_logs_banner_to_stderr(capsys) -> None:
+def test_compute_subclause_dependencies_logs_banner_to_stderr(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """compute_subclause_dependencies prints a dependency-oracle banner."""
     with _patched_oracle("[]"):
         compute_subclause_dependencies("33.4", "lrm.pdf", model="opus")
@@ -366,7 +369,7 @@ def test_compute_subclause_dependencies_logs_banner_to_stderr(capsys) -> None:
 
 
 def test_compute_subclause_dependencies_logs_subclause_to_stderr(
-    capsys,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """compute_subclause_dependencies includes the subclause in its banner."""
     with _patched_oracle("[]"):

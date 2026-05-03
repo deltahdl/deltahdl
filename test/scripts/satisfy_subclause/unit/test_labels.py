@@ -9,7 +9,9 @@ Covers:
 """
 
 import json
-from unittest.mock import patch
+from collections.abc import Callable
+from typing import Any, cast
+from unittest.mock import MagicMock, patch
 
 from satisfy_subclause.mutators import CycleMember
 from satisfy_subclause.pipeline import (
@@ -24,7 +26,9 @@ _NEW_CANONICAL = "Satisfy IEEE 1800-2023 §33.4.1.5"
 _LABELS_THREE = ["IEEE 1800-2023", "bug", "needs-triage"]
 
 
-def _patched_run_create(stub_completed):
+def _patched_run_create(
+    stub_completed: Callable[..., MagicMock],
+) -> Any:
     """Patch subprocess.run with a (no-match list, create-success) sequence."""
     list_done = stub_completed(stdout="[]")
     create_done = stub_completed(stdout="https://github.com/o/r/issues/501")
@@ -34,7 +38,9 @@ def _patched_run_create(stub_completed):
     )
 
 
-def _patched_run_with_match(stub_completed, *, number: int, title: str):
+def _patched_run_with_match(
+    stub_completed: Callable[..., MagicMock], *, number: int, title: str,
+) -> Any:
     """Patch subprocess.run with a one-entry OPEN list match (no extra calls)."""
     body = json.dumps([
         {"number": number, "title": title, "state": "OPEN"},
@@ -53,19 +59,21 @@ def _label_create_values(create_cmd: list[str]) -> list[str]:
     ]
 
 
-def _add_label_value(mock_run) -> str:
+def _add_label_value(mock_run: MagicMock) -> str:
     """Return the single ``--add-label`` value captured by *mock_run*."""
     for call in mock_run.call_args_list:
         cmd = call[0][0]
         if cmd[:3] == ["gh", "issue", "edit"] and "--add-label" in cmd:
-            return cmd[cmd.index("--add-label") + 1]
+            return cast(str, cmd[cmd.index("--add-label") + 1])
     raise AssertionError("no --add-label call recorded")
 
 
 # --- find_or_create_issue: gh issue create label arguments -----------------
 
 
-def test_create_passes_every_label_in_order(stub_completed) -> None:
+def test_create_passes_every_label_in_order(
+    stub_completed: Callable[..., MagicMock],
+) -> None:
     """gh issue create includes every --labels-supplied label in order."""
     with _patched_run_create(stub_completed) as mock_run:
         find_or_create_issue("33.4.1.5", labels=_LABELS_THREE)
@@ -76,7 +84,9 @@ def test_create_passes_every_label_in_order(stub_completed) -> None:
 # --- find_or_create_issue: --add-label on existing matches -----------------
 
 
-def test_add_label_joins_labels_with_commas(stub_completed) -> None:
+def test_add_label_joins_labels_with_commas(
+    stub_completed: Callable[..., MagicMock],
+) -> None:
     """Multiple labels collapse into a single comma-separated --add-label arg."""
     with _patched_run_with_match(
         stub_completed, number=99, title=_NEW_CANONICAL,

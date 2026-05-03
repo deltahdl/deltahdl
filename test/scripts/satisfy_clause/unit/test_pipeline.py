@@ -1,6 +1,7 @@
 """Unit tests for the satisfy_clause pipeline."""
 
-from typing import Callable
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 
@@ -8,7 +9,7 @@ from satisfy_clause.pipeline import descendants_of, satisfy_clause
 
 
 @pytest.fixture(autouse=True)
-def _stub_find_or_create_issue(monkeypatch):
+def _stub_find_or_create_issue(monkeypatch: pytest.MonkeyPatch) -> None:
     """Default-stub find_or_create_issue so tests do not hit gh.
 
     Tests that need to inspect the call replace this stub themselves.
@@ -68,9 +69,11 @@ def test_descendants_of_no_match_returns_empty() -> None:
 # --- satisfy_clause --------------------------------------------------------
 
 
-def test_satisfy_clause_dispatches_to_satisfy_subclauses(monkeypatch) -> None:
+def test_satisfy_clause_dispatches_to_satisfy_subclauses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Hands the descendant list to satisfy_subclauses with lrm, model, labels."""
-    captured = []
+    captured: list[tuple[list[str], str, str, list[str]]] = []
     monkeypatch.setattr(
         "satisfy_clause.pipeline.load_toc",
         lambda _lrm: {"33": (1, 1), "33.1": (1, 1), "33.2": (1, 1)},
@@ -88,9 +91,11 @@ def test_satisfy_clause_dispatches_to_satisfy_subclauses(monkeypatch) -> None:
     ]
 
 
-def test_satisfy_clause_passes_labels_through(monkeypatch) -> None:
+def test_satisfy_clause_passes_labels_through(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The labels list is forwarded verbatim to satisfy_subclauses."""
-    captured = []
+    captured: list[list[str]] = []
     monkeypatch.setattr(
         "satisfy_clause.pipeline.load_toc",
         lambda _lrm: {"33.1": (1, 1)},
@@ -105,7 +110,9 @@ def test_satisfy_clause_passes_labels_through(monkeypatch) -> None:
     assert captured == [["IEEE 1800-2023", "bug"]]
 
 
-def test_satisfy_clause_empty_descendants_exits(monkeypatch) -> None:
+def test_satisfy_clause_empty_descendants_exits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A clause with no descendants in the TOC exits non-zero."""
     monkeypatch.setattr(
         "satisfy_clause.pipeline.load_toc", lambda _lrm: {"33": (1, 1)},
@@ -121,7 +128,7 @@ def test_satisfy_clause_empty_descendants_exits(monkeypatch) -> None:
 
 
 def test_satisfy_clause_empty_descendants_message_names_clause(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The exit message names the requested clause."""
     monkeypatch.setattr(
@@ -134,7 +141,7 @@ def test_satisfy_clause_empty_descendants_message_names_clause(
 
 
 def test_satisfy_clause_empty_descendants_message_names_lrm(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The exit message names the LRM path so the caller can fix --lrm."""
     monkeypatch.setattr(
@@ -149,7 +156,9 @@ def test_satisfy_clause_empty_descendants_message_names_lrm(
 # --- parent-clause issue handling ------------------------------------------
 
 
-def _record_finder(captured: list) -> Callable[..., int]:
+def _record_finder(
+    captured: list[tuple[str, list[str]]],
+) -> Callable[..., int]:
     """Return a find_or_create_issue stub that appends to *captured*."""
     def _stub(clause: str, *, labels: list[str]) -> int:
         captured.append((clause, labels))
@@ -158,10 +167,10 @@ def _record_finder(captured: list) -> Callable[..., int]:
 
 
 def test_satisfy_clause_finds_or_creates_issue_for_parent_clause(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The clause itself goes through find_or_create_issue (reopen/rename)."""
-    captured: list = []
+    captured: list[tuple[str, list[str]]] = []
     monkeypatch.setattr(
         "satisfy_clause.pipeline.load_toc",
         lambda _lrm: {"33": (1, 1), "33.1": (1, 1)},
@@ -181,10 +190,10 @@ def test_satisfy_clause_finds_or_creates_issue_for_parent_clause(
 
 
 def test_satisfy_clause_skips_parent_issue_when_no_descendants(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An empty-descendants exit must not touch GitHub."""
-    def _explode(*_args, **_kwargs):
+    def _explode(*_args: Any, **_kwargs: Any) -> int:
         raise AssertionError("find_or_create_issue must not be called")
     monkeypatch.setattr(
         "satisfy_clause.pipeline.load_toc", lambda _lrm: {"33": (1, 1)},

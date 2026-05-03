@@ -1,6 +1,9 @@
 """Top-level conftest for classify_tests tests."""
 
+from collections.abc import Callable
 from pathlib import Path
+from types import ModuleType
+from typing import cast
 
 import pytest
 
@@ -8,7 +11,9 @@ SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent.parent / "scripts"
 
 
 @pytest.fixture()
-def cts(module_loader):
+def cts(
+    module_loader: Callable[[str, Path], ModuleType],
+) -> ModuleType:
     """Load the classify_tests module."""
     return module_loader(
         "classify_tests",
@@ -17,6 +22,6 @@ def cts(module_loader):
 
 
 @pytest.fixture()
-def _cts(request):
+def _cts(request: pytest.FixtureRequest) -> ModuleType:
     """Order-only dependency so submodule fixtures load after classify_tests."""
-    return request.getfixturevalue("cts")
+    return cast(ModuleType, request.getfixturevalue("cts"))

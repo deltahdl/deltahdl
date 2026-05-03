@@ -1,10 +1,12 @@
 """Shared fixtures for document_dependency_graph tests."""
 
+from pathlib import Path
+
 import pytest
 
 
 @pytest.fixture()
-def make_lrm(tmp_path):
+def make_lrm(tmp_path: Path) -> Path:
     """Create an empty placeholder LRM file and return its path."""
     lrm = tmp_path / "lrm.txt"
     lrm.write_text("")
@@ -12,6 +14,6 @@ def make_lrm(tmp_path):
 
 
 @pytest.fixture()
-def make_output(tmp_path):
+def make_output(tmp_path: Path) -> Path:
     """Return a fresh output path inside ``tmp_path``."""
     return tmp_path / "graph.json"

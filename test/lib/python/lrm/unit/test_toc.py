@@ -1,39 +1,54 @@
 """Tests for lib.lrm.load_toc."""
 
+from collections.abc import Callable, Sequence
+from pathlib import Path
+
 from lib.python.lrm import load_toc
 
+PdfBuilder = Callable[[str, int, Sequence[tuple[int, str, int]]], str]
 
-def test_leaf_clause_maps_to_start_page(make_pdf, nested_outline):
+
+def test_leaf_clause_maps_to_start_page(
+    make_pdf: PdfBuilder, nested_outline: list[tuple[int, str, int]],
+) -> None:
     """A leaf bookmark resolves to its 1-indexed start page."""
     path = make_pdf("a.pdf", 200, nested_outline)
     assert load_toc(path)["23.2.2"][0] == 112
 
 
-def test_sibling_boundary_sets_end_page(make_pdf, nested_outline):
+def test_sibling_boundary_sets_end_page(
+    make_pdf: PdfBuilder, nested_outline: list[tuple[int, str, int]],
+) -> None:
     """End page = next-sibling-start − 1 for a sibling boundary."""
     path = make_pdf("a.pdf", 200, nested_outline)
     assert load_toc(path)["23.2.1"][1] == 111
 
 
-def test_ancestor_boundary_sets_end_page(make_pdf, nested_outline):
+def test_ancestor_boundary_sets_end_page(
+    make_pdf: PdfBuilder, nested_outline: list[tuple[int, str, int]],
+) -> None:
     """End page crosses subtree boundary to next non-descendant."""
     path = make_pdf("a.pdf", 200, nested_outline)
     assert load_toc(path)["23.2.2"][1] == 129
 
 
-def test_parent_clause_spans_subtree(make_pdf, nested_outline):
+def test_parent_clause_spans_subtree(
+    make_pdf: PdfBuilder, nested_outline: list[tuple[int, str, int]],
+) -> None:
     """A parent clause's end page reaches the start of the next sibling."""
     path = make_pdf("a.pdf", 200, nested_outline)
     assert load_toc(path)["23"][1] == 129
 
 
-def test_last_entry_ends_at_document_end(make_pdf, nested_outline):
+def test_last_entry_ends_at_document_end(
+    make_pdf: PdfBuilder, nested_outline: list[tuple[int, str, int]],
+) -> None:
     """The final outline entry ends at the last PDF page."""
     path = make_pdf("a.pdf", 200, nested_outline)
     assert load_toc(path)["24"][1] == 200
 
 
-def test_short_subclause_clamps_end_to_start(make_pdf):
+def test_short_subclause_clamps_end_to_start(make_pdf: PdfBuilder) -> None:
     """A subclause whose next non-descendant shares its start page
     yields ``(start, start)``, not an underflowed ``(start, start - 1)``.
     """
@@ -47,7 +62,7 @@ def test_short_subclause_clamps_end_to_start(make_pdf):
     assert load_toc(path)["33.1"] == (935, 935)
 
 
-def test_non_clause_titles_are_skipped(make_pdf):
+def test_non_clause_titles_are_skipped(make_pdf: PdfBuilder) -> None:
     """Bookmark titles without a leading clause token are ignored."""
     outline = [
         (1, "Front matter", 1),
@@ -57,24 +72,26 @@ def test_non_clause_titles_are_skipped(make_pdf):
     assert "Front matter" not in load_toc(path)
 
 
-def test_empty_outline_returns_empty_dict(blank_pdf):
+def test_empty_outline_returns_empty_dict(blank_pdf: str) -> None:
     """A PDF with no outline yields an empty mapping."""
     assert load_toc(blank_pdf) == {}
 
 
-def test_missing_path_returns_empty_dict(tmp_path):
+def test_missing_path_returns_empty_dict(tmp_path: Path) -> None:
     """A nonexistent file path yields an empty mapping."""
     assert load_toc(str(tmp_path / "does-not-exist.pdf")) == {}
 
 
-def test_corrupt_pdf_returns_empty_dict(tmp_path):
+def test_corrupt_pdf_returns_empty_dict(tmp_path: Path) -> None:
     """A non-PDF file yields an empty mapping rather than raising."""
     path = tmp_path / "corrupt.pdf"
     path.write_bytes(b"not a pdf")
     assert load_toc(str(path)) == {}
 
 
-def test_repeat_call_returns_same_object(make_pdf, nested_outline):
+def test_repeat_call_returns_same_object(
+    make_pdf: PdfBuilder, nested_outline: list[tuple[int, str, int]],
+) -> None:
     """Memoization: a second call returns the identical dict object."""
     path = make_pdf("a.pdf", 200, nested_outline)
     assert load_toc(path) is load_toc(path)

@@ -1,6 +1,7 @@
 """Unit tests for parsing functions in classify_test."""
 
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -8,14 +9,18 @@ import pytest
 # ---- find_repo_root --------------------------------------------------------
 
 
-def test_find_repo_root_exits_when_no_repo_root(tmp_path, monkeypatch, ct):
+def test_find_repo_root_exits_when_no_repo_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ct: ModuleType,
+) -> None:
     """find_repo_root exits when no test/CMakeLists.txt exists."""
     monkeypatch.setattr(Path, "cwd", staticmethod(lambda: tmp_path))
     with pytest.raises(SystemExit):
         ct.find_repo_root()
 
 
-def test_find_repo_root_returns_repo_root(tmp_path, monkeypatch, ct):
+def test_find_repo_root_returns_repo_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ct: ModuleType,
+) -> None:
     """find_repo_root returns the directory containing test/CMakeLists.txt."""
     (tmp_path / "test").mkdir()
     (tmp_path / "test" / "CMakeLists.txt").write_text("")
@@ -28,28 +33,32 @@ def test_find_repo_root_returns_repo_root(tmp_path, monkeypatch, ct):
 # ---- _update_brace_depth ---------------------------------------------------
 
 
-def test_update_brace_depth_open_brace_increments(ct):
+def test_update_brace_depth_open_brace_increments(ct: ModuleType) -> None:
     """Opening brace increments depth."""
     _update_brace_depth = getattr(ct, "_update_brace_depth")
     d, _, _, found = _update_brace_depth("{", 0, False, False)
     assert d == 1 and not found
 
 
-def test_update_brace_depth_close_brace_at_one_returns_found(ct):
+def test_update_brace_depth_close_brace_at_one_returns_found(
+    ct: ModuleType,
+) -> None:
     """Closing brace at depth 1 returns found=True."""
     _update_brace_depth = getattr(ct, "_update_brace_depth")
     d, _, _, found = _update_brace_depth("}", 1, False, False)
     assert d == 0 and found
 
 
-def test_update_brace_depth_close_brace_non_zero_no_found(ct):
+def test_update_brace_depth_close_brace_non_zero_no_found(
+    ct: ModuleType,
+) -> None:
     """Closing brace when depth > 1 does not signal found."""
     _update_brace_depth = getattr(ct, "_update_brace_depth")
     d, _, _, found = _update_brace_depth("}", 2, False, False)
     assert d == 1 and not found
 
 
-def test_update_brace_depth_ignores_braces_in_string(ct):
+def test_update_brace_depth_ignores_braces_in_string(ct: ModuleType) -> None:
     """Braces inside a string literal are ignored."""
     _update_brace_depth = getattr(ct, "_update_brace_depth")
     d, ins, _, _ = _update_brace_depth(
@@ -58,7 +67,7 @@ def test_update_brace_depth_ignores_braces_in_string(ct):
     assert d == 0 and not ins
 
 
-def test_update_brace_depth_escape_in_string(ct):
+def test_update_brace_depth_escape_in_string(ct: ModuleType) -> None:
     """Backslash inside a string skips the next character."""
     _update_brace_depth = getattr(ct, "_update_brace_depth")
     d, ins, _, _ = _update_brace_depth(
@@ -67,7 +76,7 @@ def test_update_brace_depth_escape_in_string(ct):
     assert d == 0 and not ins
 
 
-def test_update_brace_depth_line_comment(ct):
+def test_update_brace_depth_line_comment(ct: ModuleType) -> None:
     """// comment causes remainder of line to be skipped."""
     _update_brace_depth = getattr(ct, "_update_brace_depth")
     d, _, _, _ = _update_brace_depth(
@@ -76,7 +85,7 @@ def test_update_brace_depth_line_comment(ct):
     assert d == 0
 
 
-def test_update_brace_depth_block_comment_start(ct):
+def test_update_brace_depth_block_comment_start(ct: ModuleType) -> None:
     """/* starts a block comment."""
     _update_brace_depth = getattr(ct, "_update_brace_depth")
     _, _, bc, _ = _update_brace_depth(
@@ -85,7 +94,7 @@ def test_update_brace_depth_block_comment_start(ct):
     assert bc is True
 
 
-def test_update_brace_depth_block_comment_end(ct):
+def test_update_brace_depth_block_comment_end(ct: ModuleType) -> None:
     """*/ ends a block comment."""
     _update_brace_depth = getattr(ct, "_update_brace_depth")
     _, _, bc, _ = _update_brace_depth(
@@ -94,7 +103,7 @@ def test_update_brace_depth_block_comment_end(ct):
     assert bc is False
 
 
-def test_update_brace_depth_stays_in_block_comment(ct):
+def test_update_brace_depth_stays_in_block_comment(ct: ModuleType) -> None:
     """Non-closing chars inside block comment stay in comment."""
     _update_brace_depth = getattr(ct, "_update_brace_depth")
     _, _, bc, _ = _update_brace_depth(
@@ -103,7 +112,7 @@ def test_update_brace_depth_stays_in_block_comment(ct):
     assert bc is True
 
 
-def test_update_brace_depth_star_no_slash(ct):
+def test_update_brace_depth_star_no_slash(ct: ModuleType) -> None:
     """A * not followed by / does not end a block comment."""
     _update_brace_depth = getattr(ct, "_update_brace_depth")
     _, _, bc, _ = _update_brace_depth(
@@ -112,7 +121,7 @@ def test_update_brace_depth_star_no_slash(ct):
     assert bc is True
 
 
-def test_update_brace_depth_empty_line(ct):
+def test_update_brace_depth_empty_line(ct: ModuleType) -> None:
     """An empty line leaves state unchanged."""
     _update_brace_depth = getattr(ct, "_update_brace_depth")
     assert _update_brace_depth("", 0, False, False) == (
@@ -123,20 +132,20 @@ def test_update_brace_depth_empty_line(ct):
 # ---- extract_brace_block ---------------------------------------------------
 
 
-def test_extract_brace_block_single_line(ct):
+def test_extract_brace_block_single_line(ct: ModuleType) -> None:
     """Extracts a simple single-line brace block."""
     _, end = ct.extract_brace_block(["{}\n"], 0)
     assert end == 0
 
 
-def test_extract_brace_block_multi_line(ct):
+def test_extract_brace_block_multi_line(ct: ModuleType) -> None:
     """Extracts a multi-line brace block."""
     lines = ["{\n", "  x;\n", "}\n"]
     block, end = ct.extract_brace_block(lines, 0)
     assert end == 2 and len(block) == 3
 
 
-def test_extract_brace_block_unmatched(ct):
+def test_extract_brace_block_unmatched(ct: ModuleType) -> None:
     """Raises ValueError for unmatched braces."""
     with pytest.raises(ValueError, match="Unmatched brace"):
         ct.extract_brace_block(["{\n"], 0)
@@ -145,27 +154,27 @@ def test_extract_brace_block_unmatched(ct):
 # ---- is_section_header -----------------------------------------------------
 
 
-def test_is_section_header_equals_banner(ct):
+def test_is_section_header_equals_banner(ct: ModuleType) -> None:
     """Lines with 10+ '=' are section headers."""
     assert ct.is_section_header("// ==========") is True
 
 
-def test_is_section_header_dash_banner(ct):
+def test_is_section_header_dash_banner(ct: ModuleType) -> None:
     """Lines with 10+ '-' are section headers."""
     assert ct.is_section_header("// ----------") is True
 
 
-def test_is_section_header_too_short(ct):
+def test_is_section_header_too_short(ct: ModuleType) -> None:
     """Fewer than 10 repeated chars is not a header."""
     assert ct.is_section_header("// ===") is False
 
 
-def test_is_section_header_no_comment(ct):
+def test_is_section_header_no_comment(ct: ModuleType) -> None:
     """A line not starting with // is not a header."""
     assert ct.is_section_header("==========") is False
 
 
-def test_is_section_header_mixed(ct):
+def test_is_section_header_mixed(ct: ModuleType) -> None:
     """A mixed =- line is not a header."""
     assert ct.is_section_header("// ====------") is False
 
@@ -173,7 +182,7 @@ def test_is_section_header_mixed(ct):
 # ---- _parse_header ---------------------------------------------------------
 
 
-def test_parse_header_full(ct):
+def test_parse_header_full(ct: ModuleType) -> None:
     """Parses includes, using-line, and namespace."""
     _parse_header = getattr(ct, "_parse_header")
     lines = [
@@ -189,7 +198,7 @@ def test_parse_header_full(ct):
     assert has_ns is True
 
 
-def test_parse_header_no_using(ct):
+def test_parse_header_no_using(ct: ModuleType) -> None:
     """Parses header without a using-line."""
     _parse_header = getattr(ct, "_parse_header")
     lines = [
@@ -201,7 +210,7 @@ def test_parse_header_no_using(ct):
     assert using is None
 
 
-def test_parse_header_no_namespace(ct):
+def test_parse_header_no_namespace(ct: ModuleType) -> None:
     """Parses header without namespace wrapper."""
     _parse_header = getattr(ct, "_parse_header")
     lines = [
@@ -213,14 +222,14 @@ def test_parse_header_no_namespace(ct):
     assert has_ns is False
 
 
-def test_parse_header_no_includes(ct):
+def test_parse_header_no_includes(ct: ModuleType) -> None:
     """Parses header with no #include lines at all."""
     _parse_header = getattr(ct, "_parse_header")
     inc, _, _, _ = _parse_header([])
     assert not inc
 
 
-def test_parse_header_non_using_stops_scan(ct):
+def test_parse_header_non_using_stops_scan(ct: ModuleType) -> None:
     """Non-empty, non-using line stops the using-line scan."""
     _parse_header = getattr(ct, "_parse_header")
     lines = [
@@ -232,7 +241,7 @@ def test_parse_header_non_using_stops_scan(ct):
     assert using is None
 
 
-def test_parse_header_blank_lines_before_using(ct):
+def test_parse_header_blank_lines_before_using(ct: ModuleType) -> None:
     """Blank lines between includes and using-line are consumed."""
     _parse_header = getattr(ct, "_parse_header")
     lines = [
@@ -248,18 +257,18 @@ def test_parse_header_blank_lines_before_using(ct):
 # ---- _try_parse_preamble ---------------------------------------------------
 
 
-def test_try_parse_preamble_brace_block(ct):
+def test_try_parse_preamble_brace_block(ct: ModuleType) -> None:
     """Parses a brace-delimited preamble item."""
     _try_parse_preamble = getattr(ct, "_try_parse_preamble")
     lines = ["struct Foo {\n", "};\n"]
-    comments = []
+    comments: list[str] = []
     item, new_i = _try_parse_preamble(
         lines, 0, "struct Foo {", comments,
     )
     assert item is not None and new_i == 2
 
 
-def test_try_parse_preamble_brace_block_with_comments(ct):
+def test_try_parse_preamble_brace_block_with_comments(ct: ModuleType) -> None:
     """Preceding comments are prepended to brace-block items."""
     _try_parse_preamble = getattr(ct, "_try_parse_preamble")
     lines = ["struct Foo {\n", "};\n"]
@@ -270,18 +279,18 @@ def test_try_parse_preamble_brace_block_with_comments(ct):
     assert item.lines[0] == "// A comment"
 
 
-def test_try_parse_preamble_semicolon(ct):
+def test_try_parse_preamble_semicolon(ct: ModuleType) -> None:
     """Parses a semicolon-terminated declaration."""
     _try_parse_preamble = getattr(ct, "_try_parse_preamble")
     lines = ["using T = int;\n"]
-    comments = []
+    comments: list[str] = []
     item, new_i = _try_parse_preamble(
         lines, 0, "using T = int;", comments,
     )
     assert item is not None and new_i == 1
 
 
-def test_try_parse_preamble_semicolon_with_comments(ct):
+def test_try_parse_preamble_semicolon_with_comments(ct: ModuleType) -> None:
     """Preceding comments are prepended to semicolon declarations."""
     _try_parse_preamble = getattr(ct, "_try_parse_preamble")
     lines = ["using T = int;\n"]
@@ -292,22 +301,24 @@ def test_try_parse_preamble_semicolon_with_comments(ct):
     assert item.lines[0] == "// type alias"
 
 
-def test_try_parse_preamble_comment_accumulation(ct):
+def test_try_parse_preamble_comment_accumulation(ct: ModuleType) -> None:
     """A line that is neither brace-block nor semicolon is a comment."""
     _try_parse_preamble = getattr(ct, "_try_parse_preamble")
     lines = ["something\n"]
-    comments = []
+    comments: list[str] = []
     item, _ = _try_parse_preamble(
         lines, 0, "something", comments,
     )
     assert item is None and len(comments) == 1
 
 
-def test_try_parse_preamble_unmatched_brace_falls_through(ct):
+def test_try_parse_preamble_unmatched_brace_falls_through(
+    ct: ModuleType,
+) -> None:
     """Unmatched brace falls through to semicolon / comment path."""
     _try_parse_preamble = getattr(ct, "_try_parse_preamble")
     lines = ["weird {\n"]
-    comments = []
+    comments: list[str] = []
     item, _ = _try_parse_preamble(
         lines, 0, "weird {", comments,
     )
@@ -317,7 +328,7 @@ def test_try_parse_preamble_unmatched_brace_falls_through(ct):
 # ---- _parse_body -----------------------------------------------------------
 
 
-def test_parse_body_extracts_test(ct):
+def test_parse_body_extracts_test(ct: ModuleType) -> None:
     """Extracts TEST blocks from the body."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -328,7 +339,7 @@ def test_parse_body_extracts_test(ct):
     assert len(tests) == 1
 
 
-def test_parse_body_extracts_test_f(ct):
+def test_parse_body_extracts_test_f(ct: ModuleType) -> None:
     """Extracts TEST_F blocks."""
     _parse_body = getattr(ct, "_parse_body")
     lines = ["TEST_F(Suite, MyTest) {\n", "}\n"]
@@ -336,7 +347,7 @@ def test_parse_body_extracts_test_f(ct):
     assert tests[0].suite_name == "Suite"
 
 
-def test_parse_body_detects_namespace(ct):
+def test_parse_body_detects_namespace(ct: ModuleType) -> None:
     """Detects namespace { in body."""
     _parse_body = getattr(ct, "_parse_body")
     lines = ["namespace {\n", "TEST(S, T) {\n", "}\n"]
@@ -344,7 +355,7 @@ def test_parse_body_detects_namespace(ct):
     assert has_ns is True
 
 
-def test_parse_body_skips_blank_and_closing(ct):
+def test_parse_body_skips_blank_and_closing(ct: ModuleType) -> None:
     """Blank lines and } // namespace are skipped."""
     _parse_body = getattr(ct, "_parse_body")
     lines = ["\n", "}  // namespace\n", "} // namespace\n"]
@@ -352,7 +363,7 @@ def test_parse_body_skips_blank_and_closing(ct):
     assert not tests and not g
 
 
-def test_parse_body_comments_attached(ct):
+def test_parse_body_comments_attached(ct: ModuleType) -> None:
     """Comments before a TEST are attached as preceding_comments."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -364,7 +375,7 @@ def test_parse_body_comments_attached(ct):
     assert len(tests[0].preceding_comments) == 1
 
 
-def test_parse_body_global_preamble(ct):
+def test_parse_body_global_preamble(ct: ModuleType) -> None:
     """Preamble before first TEST goes to global_preamble."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -376,7 +387,7 @@ def test_parse_body_global_preamble(ct):
     assert len(g_pre) == 1
 
 
-def test_parse_body_section_preamble(ct):
+def test_parse_body_section_preamble(ct: ModuleType) -> None:
     """Preamble after first TEST goes to section preamble."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -390,7 +401,7 @@ def test_parse_body_section_preamble(ct):
     assert not g_pre and len(tests) == 2
 
 
-def test_parse_body_returns_section_preamble_count(ct):
+def test_parse_body_returns_section_preamble_count(ct: ModuleType) -> None:
     """Section preamble (helpers between tests) has one item."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -404,7 +415,7 @@ def test_parse_body_returns_section_preamble_count(ct):
     assert len(s_pre) == 1
 
 
-def test_parse_body_returns_section_preamble_content(ct):
+def test_parse_body_returns_section_preamble_content(ct: ModuleType) -> None:
     """Section preamble item contains the using declaration."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -418,7 +429,9 @@ def test_parse_body_returns_section_preamble_content(ct):
     assert "using U = float;" in s_pre[0].lines[0]
 
 
-def test_parse_body_section_preamble_brace_block_count(ct):
+def test_parse_body_section_preamble_brace_block_count(
+    ct: ModuleType,
+) -> None:
     """A brace-delimited helper between tests yields one preamble item."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -434,7 +447,9 @@ def test_parse_body_section_preamble_brace_block_count(ct):
     assert len(s_pre) == 1
 
 
-def test_parse_body_section_preamble_brace_block_content(ct):
+def test_parse_body_section_preamble_brace_block_content(
+    ct: ModuleType,
+) -> None:
     """A brace-delimited helper preamble item contains the function signature."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -450,7 +465,7 @@ def test_parse_body_section_preamble_brace_block_content(ct):
     assert "static int Helper() {" in s_pre[0].lines[0]
 
 
-def test_parse_body_non_test_non_semicolon(ct):
+def test_parse_body_non_test_non_semicolon(ct: ModuleType) -> None:
     """_parse_body handles lines returning None from _try_parse_preamble."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -462,7 +477,7 @@ def test_parse_body_non_test_non_semicolon(ct):
     assert len(tests) == 1
 
 
-def test_parse_body_skips_named_namespace_opener(ct):
+def test_parse_body_skips_named_namespace_opener(ct: ModuleType) -> None:
     """Named namespace opener is skipped, TEST inside is found."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -474,7 +489,9 @@ def test_parse_body_skips_named_namespace_opener(ct):
     assert len(tests) == 1
 
 
-def test_parse_body_named_namespace_opener_sets_has_ns(ct):
+def test_parse_body_named_namespace_opener_sets_has_ns(
+    ct: ModuleType,
+) -> None:
     """Named namespace opener sets has_ns flag."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -486,7 +503,7 @@ def test_parse_body_named_namespace_opener_sets_has_ns(ct):
     assert has_ns is True
 
 
-def test_parse_body_skips_named_namespace_closer(ct):
+def test_parse_body_skips_named_namespace_closer(ct: ModuleType) -> None:
     """Named namespace closer is skipped without error."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -498,7 +515,9 @@ def test_parse_body_skips_named_namespace_closer(ct):
     assert len(tests) == 1
 
 
-def test_parse_body_extracts_test_inside_named_namespace(ct):
+def test_parse_body_extracts_test_inside_named_namespace(
+    ct: ModuleType,
+) -> None:
     """TEST inside named + anonymous namespace wrappers is found."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -516,7 +535,9 @@ def test_parse_body_extracts_test_inside_named_namespace(ct):
     assert len(tests) == 1
 
 
-def test_parse_body_named_namespace_captures_test_name(ct):
+def test_parse_body_named_namespace_captures_test_name(
+    ct: ModuleType,
+) -> None:
     """TEST name is correctly captured inside named namespace."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -534,7 +555,7 @@ def test_parse_body_named_namespace_captures_test_name(ct):
     assert tests[0].test_name == "DefaultContextIsAvailable"
 
 
-def test_parse_body_named_namespace_sets_has_ns(ct):
+def test_parse_body_named_namespace_sets_has_ns(ct: ModuleType) -> None:
     """Named + anonymous namespace wrappers set has_ns."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -552,7 +573,9 @@ def test_parse_body_named_namespace_sets_has_ns(ct):
     assert has_ns is True
 
 
-def test_parse_body_named_namespace_no_space_before_brace(ct):
+def test_parse_body_named_namespace_no_space_before_brace(
+    ct: ModuleType,
+) -> None:
     """Named namespace with no space before brace is handled."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -564,7 +587,9 @@ def test_parse_body_named_namespace_no_space_before_brace(ct):
     assert len(tests) == 1
 
 
-def test_parse_body_named_namespace_no_space_sets_has_ns(ct):
+def test_parse_body_named_namespace_no_space_sets_has_ns(
+    ct: ModuleType,
+) -> None:
     """Named namespace without space before brace sets has_ns."""
     _parse_body = getattr(ct, "_parse_body")
     lines = [
@@ -579,7 +604,7 @@ def test_parse_body_named_namespace_no_space_sets_has_ns(ct):
 # ---- parse_file ------------------------------------------------------------
 
 
-def test_parse_file_full(tmp_path, ct):
+def test_parse_file_full(tmp_path: Path, ct: ModuleType) -> None:
     """parse_file returns a ParsedFile with all components."""
     src = tmp_path / "test.cpp"
     src.write_text(
@@ -597,7 +622,7 @@ def test_parse_file_full(tmp_path, ct):
     assert len(pf.all_tests) == 1
 
 
-def test_parse_file_body_namespace(tmp_path, ct):
+def test_parse_file_body_namespace(tmp_path: Path, ct: ModuleType) -> None:
     """parse_file detects namespace from body when not in header."""
     src = tmp_path / "test.cpp"
     src.write_text(
@@ -630,7 +655,9 @@ _NAMED_NS_FILE = (
 )
 
 
-def test_parse_file_named_namespace_finds_test(tmp_path, ct):
+def test_parse_file_named_namespace_finds_test(
+    tmp_path: Path, ct: ModuleType,
+) -> None:
     """parse_file extracts the test from a named namespace file."""
     src = tmp_path / "test.cpp"
     src.write_text(_NAMED_NS_FILE, encoding="utf-8")
@@ -638,7 +665,9 @@ def test_parse_file_named_namespace_finds_test(tmp_path, ct):
     assert len(pf.all_tests) == 1
 
 
-def test_parse_file_named_namespace_test_name(tmp_path, ct):
+def test_parse_file_named_namespace_test_name(
+    tmp_path: Path, ct: ModuleType,
+) -> None:
     """parse_file captures correct test name from named namespace file."""
     src = tmp_path / "test.cpp"
     src.write_text(_NAMED_NS_FILE, encoding="utf-8")
@@ -646,7 +675,9 @@ def test_parse_file_named_namespace_test_name(tmp_path, ct):
     assert pf.all_tests[0].test_name == "DefaultContextIsAvailable"
 
 
-def test_parse_file_named_namespace_has_ns(tmp_path, ct):
+def test_parse_file_named_namespace_has_ns(
+    tmp_path: Path, ct: ModuleType,
+) -> None:
     """parse_file detects namespace wrapper in named namespace file."""
     src = tmp_path / "test.cpp"
     src.write_text(_NAMED_NS_FILE, encoding="utf-8")
@@ -657,7 +688,7 @@ def test_parse_file_named_namespace_has_ns(tmp_path, ct):
 # ---- multi-line TEST macro -------------------------------------------------
 
 
-def test_parse_body_multiline_test_macro(ct):
+def test_parse_body_multiline_test_macro(ct: ModuleType) -> None:
     """_parse_body finds TEST macros split across two lines."""
     lines = [
         "TEST(MySuite,\n",
@@ -670,7 +701,7 @@ def test_parse_body_multiline_test_macro(ct):
     assert len(tests) == 1
 
 
-def test_parse_body_multiline_test_name(ct):
+def test_parse_body_multiline_test_name(ct: ModuleType) -> None:
     """_parse_body extracts the correct test name from multi-line macro."""
     lines = [
         "TEST(MySuite,\n",
@@ -683,7 +714,7 @@ def test_parse_body_multiline_test_name(ct):
     assert tests[0].test_name == "MyTest"
 
 
-def test_parse_body_multiline_test_suite(ct):
+def test_parse_body_multiline_test_suite(ct: ModuleType) -> None:
     """_parse_body extracts the correct suite name from multi-line macro."""
     lines = [
         "TEST(MySuite,\n",

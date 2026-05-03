@@ -1,6 +1,7 @@
 """Unit tests for the satisfy_clauses argparse wrapper."""
 
 import runpy
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -11,7 +12,7 @@ import satisfy_clauses
 # --- parse_args ------------------------------------------------------------
 
 
-def test_parse_args_default_model(make_lrm) -> None:
+def test_parse_args_default_model(make_lrm: Path) -> None:
     """--model defaults to 'opus'."""
     args = satisfy_clauses.parse_args([
         "--lrm", str(make_lrm),
@@ -21,7 +22,7 @@ def test_parse_args_default_model(make_lrm) -> None:
     assert args.model == "opus"
 
 
-def test_parse_args_explicit_model(make_lrm) -> None:
+def test_parse_args_explicit_model(make_lrm: Path) -> None:
     """--model accepts an explicit value."""
     args = satisfy_clauses.parse_args([
         "--lrm", str(make_lrm),
@@ -32,7 +33,7 @@ def test_parse_args_explicit_model(make_lrm) -> None:
     assert args.model == "haiku"
 
 
-def test_parse_args_clauses_value(make_lrm) -> None:
+def test_parse_args_clauses_value(make_lrm: Path) -> None:
     """--clauses is parsed into a list preserving input order."""
     args = satisfy_clauses.parse_args([
         "--lrm", str(make_lrm),
@@ -42,7 +43,7 @@ def test_parse_args_clauses_value(make_lrm) -> None:
     assert args.clauses == ["32", "33", "A"]
 
 
-def test_parse_args_labels_comma_separated(make_lrm) -> None:
+def test_parse_args_labels_comma_separated(make_lrm: Path) -> None:
     """--labels splits on commas into an ordered list."""
     args = satisfy_clauses.parse_args([
         "--lrm", str(make_lrm),
@@ -52,7 +53,7 @@ def test_parse_args_labels_comma_separated(make_lrm) -> None:
     assert args.labels == ["IEEE 1800-2023", "bug"]
 
 
-def test_parse_args_requires_labels(make_lrm) -> None:
+def test_parse_args_requires_labels(make_lrm: Path) -> None:
     """--labels is required."""
     with pytest.raises(SystemExit):
         satisfy_clauses.parse_args([
@@ -61,7 +62,7 @@ def test_parse_args_requires_labels(make_lrm) -> None:
         ])
 
 
-def test_parse_args_requires_clauses(make_lrm) -> None:
+def test_parse_args_requires_clauses(make_lrm: Path) -> None:
     """--clauses is required."""
     with pytest.raises(SystemExit):
         satisfy_clauses.parse_args([
@@ -79,7 +80,7 @@ def test_parse_args_requires_lrm() -> None:
         ])
 
 
-def test_parse_args_rejects_subclause_in_list(make_lrm) -> None:
+def test_parse_args_rejects_subclause_in_list(make_lrm: Path) -> None:
     """A depth-≥1 entry within --clauses is rejected at parse time."""
     with pytest.raises(SystemExit):
         satisfy_clauses.parse_args([
@@ -89,7 +90,9 @@ def test_parse_args_rejects_subclause_in_list(make_lrm) -> None:
         ])
 
 
-def test_parse_args_usage_names_package(make_lrm, capsys) -> None:
+def test_parse_args_usage_names_package(
+    make_lrm: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
     """Error usage line names the package, not __main__.py."""
     try:
         satisfy_clauses.parse_args([
@@ -105,7 +108,7 @@ def test_parse_args_usage_names_package(make_lrm, capsys) -> None:
 # --- main ------------------------------------------------------------------
 
 
-def test_main_dispatches_each_entry(make_lrm) -> None:
+def test_main_dispatches_each_entry(make_lrm: Path) -> None:
     """main() forwards the parsed list into the pipeline in input order."""
     with patch("satisfy_clauses.satisfy_clauses") as mock_pipeline:
         satisfy_clauses.main([
@@ -116,7 +119,7 @@ def test_main_dispatches_each_entry(make_lrm) -> None:
     assert mock_pipeline.call_args[0][0] == ["32", "33"]
 
 
-def test_main_passes_model_to_pipeline(make_lrm) -> None:
+def test_main_passes_model_to_pipeline(make_lrm: Path) -> None:
     """main() forwards the model arg."""
     with patch("satisfy_clauses.satisfy_clauses") as mock_pipeline:
         satisfy_clauses.main([
@@ -128,7 +131,7 @@ def test_main_passes_model_to_pipeline(make_lrm) -> None:
     assert mock_pipeline.call_args[1]["model"] == "haiku"
 
 
-def test_main_passes_labels_to_pipeline(make_lrm) -> None:
+def test_main_passes_labels_to_pipeline(make_lrm: Path) -> None:
     """main() forwards the parsed labels list to the pipeline."""
     with patch("satisfy_clauses.satisfy_clauses") as mock_pipeline:
         satisfy_clauses.main([

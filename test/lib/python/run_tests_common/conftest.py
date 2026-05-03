@@ -2,6 +2,8 @@
 
 import importlib
 import os
+from collections.abc import Iterator
+from types import ModuleType
 from unittest.mock import patch
 
 import pytest
@@ -10,7 +12,7 @@ from lib.python import run_tests_common
 
 
 @pytest.fixture()
-def reload_no_color():
+def reload_no_color() -> Iterator[ModuleType]:
     """Reload run_tests_common with NO_COLOR=1 and return the reloaded module."""
     env = os.environ.copy()
     env["NO_COLOR"] = "1"
@@ -20,7 +22,7 @@ def reload_no_color():
 
 
 @pytest.fixture()
-def reload_with_colors():
+def reload_with_colors() -> Iterator[ModuleType]:
     """Reload run_tests_common with CI=true on a tty and return the module."""
     env = os.environ.copy()
     env.pop("NO_COLOR", None)

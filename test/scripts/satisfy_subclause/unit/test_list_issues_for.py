@@ -9,28 +9,32 @@ matcher silently opens a duplicate (#1290 vs #25 — see issue #1278).
 These tests guard the limit by inspecting the gh argv.
 """
 
-from unittest.mock import patch
+from collections.abc import Callable
+from typing import cast
+from unittest.mock import MagicMock, patch
 
 from satisfy_subclause.pipeline import _list_issues_for
 
 
-def _gh_argv_for(stub_completed) -> list[str]:
+def _gh_argv_for(stub_completed: Callable[..., MagicMock]) -> list[str]:
     """Run _list_issues_for with a stubbed gh and return its argv."""
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
         return_value=stub_completed(stdout="[]"),
     ) as mock_run:
         _list_issues_for("23")
-    return mock_run.call_args_list[0][0][0]
+    return cast(list[str], mock_run.call_args_list[0][0][0])
 
 
-def test_list_issues_for_passes_limit_flag(stub_completed) -> None:
+def test_list_issues_for_passes_limit_flag(
+    stub_completed: Callable[..., MagicMock],
+) -> None:
     """_list_issues_for invokes gh with an explicit --limit flag."""
     assert "--limit" in _gh_argv_for(stub_completed)
 
 
 def test_list_issues_for_limit_value_clears_real_clause_count(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """The --limit value comfortably exceeds the worst-case §X result count.
 

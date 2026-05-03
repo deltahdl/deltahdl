@@ -1,5 +1,7 @@
 """Shared fixtures for document_dependency_graph unit tests."""
 
+from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -18,7 +20,9 @@ _DEFAULT_RECORD: dict[str, Any] = {
 
 
 @pytest.fixture()
-def run_main(make_lrm, make_output):
+def run_main(
+    make_lrm: Path, make_output: Path,
+) -> Callable[..., tuple[MagicMock, MagicMock, MagicMock]]:
     """Patch the walk hooks, run main(), and return the mock pair.
 
     The mocks (load_toc, build_subclause_record) are returned so each
@@ -26,7 +30,12 @@ def run_main(make_lrm, make_output):
     plate of patching, building argv, and invoking main().
     """
 
-    def _run(*, toc=None, record=None, extra_argv=None):
+    def _run(
+        *,
+        toc: dict[str, tuple[int, int]] | None = None,
+        record: dict[str, Any] | None = None,
+        extra_argv: Sequence[str] | None = None,
+    ) -> tuple[MagicMock, MagicMock, MagicMock]:
         toc_payload = _DEFAULT_TOC if toc is None else toc
         record_payload = _DEFAULT_RECORD if record is None else record
         argv = [
@@ -54,7 +63,7 @@ def run_main(make_lrm, make_output):
     return _run
 
 
-def _completed(returncode=0, stdout=""):
+def _completed(returncode: int = 0, stdout: str = "") -> MagicMock:
     """Build a stubbed CompletedProcess for subprocess.run."""
     proc = MagicMock()
     proc.returncode = returncode
@@ -64,7 +73,9 @@ def _completed(returncode=0, stdout=""):
 
 
 @pytest.fixture()
-def run_commit(tmp_path):
+def run_commit(
+    tmp_path: Path,
+) -> Callable[..., tuple[list[str], RuntimeError | None, Path]]:
     """Run commit_output(out) with a stubbed git; return (cmds, raised).
 
     ``cmds`` is the list of joined git commands the stub observed;
@@ -74,13 +85,17 @@ def run_commit(tmp_path):
     """
 
     def _make(
-        *, dirty=False, staged_diff=True,
-        git_add_rc=0, git_commit_rc=0, git_push_rc=0,
-    ):
+        *,
+        dirty: bool = False,
+        staged_diff: bool = True,
+        git_add_rc: int = 0,
+        git_commit_rc: int = 0,
+        git_push_rc: int = 0,
+    ) -> tuple[list[str], RuntimeError | None, Path]:
         out = tmp_path / "graph.json"
         out.write_text("{}")
 
-        def _run(cmd, **_kwargs):
+        def _run(cmd: list[str], **_kwargs: Any) -> MagicMock:
             joined = " ".join(cmd)
             if "git status --porcelain --untracked-files=no" in joined:
                 return _completed(stdout="?? a\n" if dirty else "")

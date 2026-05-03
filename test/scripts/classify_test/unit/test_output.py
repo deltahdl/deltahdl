@@ -1,22 +1,26 @@
 """Unit tests for output formatting in classify_test."""
 
+from types import ModuleType
+
+import pytest
+
 
 # ---- _format_clause --------------------------------------------------------
 
 
-def test_format_clause_non_lrm(ct_output):
+def test_format_clause_non_lrm(ct_output: ModuleType) -> None:
     """Non-LRM clause formats as 'Non-LRM TAG'."""
     _format_clause = getattr(ct_output, "_format_clause")
     assert _format_clause("non-lrm:aig") == "Non-LRM AIG"
 
 
-def test_format_clause_non_lrm_underscore(ct_output):
+def test_format_clause_non_lrm_underscore(ct_output: ModuleType) -> None:
     """Non-LRM clause with underscore converts to space."""
     _format_clause = getattr(ct_output, "_format_clause")
     assert _format_clause("non-lrm:aig_opt") == "Non-LRM AIG OPT"
 
 
-def test_format_clause_regular(ct_output):
+def test_format_clause_regular(ct_output: ModuleType) -> None:
     """Regular clause formats with section sign."""
     _format_clause = getattr(ct_output, "_format_clause")
     assert _format_clause("6.1") == "\u00a76.1"
@@ -25,7 +29,11 @@ def test_format_clause_regular(ct_output):
 # ---- _print_classification_table -------------------------------------------
 
 
-def test_print_classification_test_line(capsys, ct_output, ct_helpers):
+def test_print_classification_test_line(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """Prints 'Test: Name()' for each test."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
@@ -34,7 +42,11 @@ def test_print_classification_test_line(capsys, ct_output, ct_helpers):
     assert "Test: Foo()" in capsys.readouterr().out
 
 
-def test_print_classification_clause_line(capsys, ct_output, ct_helpers):
+def test_print_classification_clause_line(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """Prints 'Clause:' with formatted clause."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
@@ -43,7 +55,11 @@ def test_print_classification_clause_line(capsys, ct_output, ct_helpers):
     assert "Clause: \u00a76.1" in capsys.readouterr().out
 
 
-def test_print_classification_rationale_line(capsys, ct_output, ct_helpers):
+def test_print_classification_rationale_line(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """Prints 'Rationale:' with rationale text."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
@@ -53,7 +69,11 @@ def test_print_classification_rationale_line(capsys, ct_output, ct_helpers):
     assert "Rationale: AIG stuff" in capsys.readouterr().out
 
 
-def test_print_classification_non_lrm_clause(capsys, ct_output, ct_helpers):
+def test_print_classification_non_lrm_clause(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """Non-LRM clause displays as 'Non-LRM AIG'."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
@@ -62,7 +82,11 @@ def test_print_classification_non_lrm_clause(capsys, ct_output, ct_helpers):
     assert "Clause: Non-LRM AIG" in capsys.readouterr().out
 
 
-def test_print_classification_none_clause(capsys, ct_output, ct_helpers):
+def test_print_classification_none_clause(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """None clause displays as '(parse error)'."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
@@ -71,7 +95,11 @@ def test_print_classification_none_clause(capsys, ct_output, ct_helpers):
     assert "Clause: (parse error)" in capsys.readouterr().out
 
 
-def test_print_classification_separator_between(capsys, ct_output, ct_helpers):
+def test_print_classification_separator_between(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """Multi-test output has ---- separator between sub-reports."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
@@ -81,7 +109,11 @@ def test_print_classification_separator_between(capsys, ct_output, ct_helpers):
     assert "----" in capsys.readouterr().out
 
 
-def test_print_classification_no_trailing_separator(capsys, ct_output, ct_helpers):
+def test_print_classification_no_trailing_separator(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """No ---- after the last sub-report."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
@@ -92,7 +124,11 @@ def test_print_classification_no_trailing_separator(capsys, ct_output, ct_helper
     assert out.count("----") == 1
 
 
-def test_print_classification_single_no_separator(capsys, ct_output, ct_helpers):
+def test_print_classification_single_no_separator(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """Single test has no ---- separator."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
@@ -101,7 +137,11 @@ def test_print_classification_single_no_separator(capsys, ct_output, ct_helpers)
     assert "----" not in capsys.readouterr().out
 
 
-def test_print_classification_no_line_over_80(capsys, ct_output, ct_helpers):
+def test_print_classification_no_line_over_80(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """No output line exceeds 80 characters."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
@@ -113,7 +153,11 @@ def test_print_classification_no_line_over_80(capsys, ct_output, ct_helpers):
     assert all(len(line) <= 80 for line in out.splitlines())
 
 
-def test_print_classification_wrap_aligns(capsys, ct_output, ct_helpers):
+def test_print_classification_wrap_aligns(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """Wrapped continuation lines align with 2-space indent."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
@@ -130,7 +174,11 @@ def test_print_classification_wrap_aligns(capsys, ct_output, ct_helpers):
     assert cont.startswith("  ") and not cont.startswith("  ----")
 
 
-def test_print_classification_prefix_rationale(capsys, ct_output, ct_helpers):
+def test_print_classification_prefix_rationale(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """Prints prefix rationale when set on test block."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
@@ -140,7 +188,11 @@ def test_print_classification_prefix_rationale(capsys, ct_output, ct_helpers):
     assert "Stage: simulator" in capsys.readouterr().out
 
 
-def test_print_classification_prefix_rationale_reason(capsys, ct_output, ct_helpers):
+def test_print_classification_prefix_rationale_reason(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """Prints the stage rationale text."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
@@ -150,7 +202,11 @@ def test_print_classification_prefix_rationale_reason(capsys, ct_output, ct_help
     assert "attributes affect elaboration" in capsys.readouterr().out
 
 
-def test_print_classification_pattern_match_stage(capsys, ct_output, ct_helpers):
+def test_print_classification_pattern_match_stage(
+    capsys: pytest.CaptureFixture[str],
+    ct_output: ModuleType,
+    ct_helpers: ModuleType,
+) -> None:
     """Prints stage line for pattern-matched prefix."""
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table

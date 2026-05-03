@@ -1,7 +1,9 @@
 """Unit tests for satisfy_subclause.pipeline."""
 
 import json
-from unittest.mock import patch
+from collections.abc import Callable
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -32,7 +34,7 @@ _MASTER_LIST = "Implement IEEE 1800-2023 §33 Configuring the contents of a desi
 _LABELS = ["IEEE 1800-2023"]
 
 
-def _payload(*entries) -> str:
+def _payload(*entries: tuple[int, str, str]) -> str:
     """Return a gh-issue-list JSON payload for the given (number, title, state) tuples."""
     return json.dumps([
         {"number": n, "title": t, "state": s} for n, t, s in entries
@@ -64,8 +66,11 @@ def test_parse_issue_number_from_create_output() -> None:
 # --- find_or_create_issue: create / search-failure paths --------------------
 
 
-def _patched_gh(stub_completed, list_payload="[]", list_rc=0,
-                create_url="", create_rc=0):
+def _patched_gh(
+    stub_completed: Callable[..., MagicMock],
+    list_payload: str = "[]", list_rc: int = 0,
+    create_url: str = "", create_rc: int = 0,
+) -> Any:
     """Patch subprocess.run with a sequence of gh responses (list, create)."""
     list_completed = stub_completed(stdout=list_payload, returncode=list_rc)
     create_completed = stub_completed(stdout=create_url, returncode=create_rc)
@@ -75,7 +80,7 @@ def _patched_gh(stub_completed, list_payload="[]", list_rc=0,
     )
 
 
-def test_find_or_create_issue_creates_new(stub_completed) -> None:
+def test_find_or_create_issue_creates_new(stub_completed: Callable[..., MagicMock]) -> None:
     """find_or_create_issue creates a new issue when none exists."""
     url = "https://github.com/o/r/issues/777"
     with _patched_gh(stub_completed, create_url=url):
@@ -83,7 +88,7 @@ def test_find_or_create_issue_creates_new(stub_completed) -> None:
 
 
 def test_find_or_create_issue_creates_with_new_canonical_title(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """gh issue create receives the new canonical title."""
     url = "https://github.com/o/r/issues/777"
@@ -96,7 +101,9 @@ def test_find_or_create_issue_creates_with_new_canonical_title(
     assert cmd[cmd.index("--title") + 1] == _NEW_CANONICAL
 
 
-def test_find_or_create_issue_handles_empty_list_stdout(stub_completed) -> None:
+def test_find_or_create_issue_handles_empty_list_stdout(
+    stub_completed: Callable[..., MagicMock],
+) -> None:
     """find_or_create_issue treats an empty list stdout as no matches."""
     url = "https://github.com/o/r/issues/333"
     with patch(
@@ -106,7 +113,9 @@ def test_find_or_create_issue_handles_empty_list_stdout(stub_completed) -> None:
         assert find_or_create_issue("33.4.1.5", labels=_LABELS) == 333
 
 
-def test_find_or_create_issue_exits_on_list_failure(stub_completed) -> None:
+def test_find_or_create_issue_exits_on_list_failure(
+    stub_completed: Callable[..., MagicMock],
+) -> None:
     """A non-zero gh issue list exit is loud-fatal."""
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
@@ -116,7 +125,9 @@ def test_find_or_create_issue_exits_on_list_failure(stub_completed) -> None:
             find_or_create_issue("33.4.1.5", labels=_LABELS)
 
 
-def test_find_or_create_issue_exits_on_create_failure(stub_completed) -> None:
+def test_find_or_create_issue_exits_on_create_failure(
+    stub_completed: Callable[..., MagicMock],
+) -> None:
     """A non-zero gh issue create exit is loud-fatal."""
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
@@ -127,7 +138,7 @@ def test_find_or_create_issue_exits_on_create_failure(stub_completed) -> None:
 
 
 def test_find_or_create_issue_creates_when_no_title_matches(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A list with mismatched-title entries falls through to create."""
     body = _payload((1, "Different title", "OPEN"))
@@ -145,7 +156,7 @@ def test_find_or_create_issue_creates_when_no_title_matches(
 
 
 def test_find_or_create_issue_returns_new_canonical_open(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A new-canonical-titled open issue is returned without rename or reopen."""
     body = _payload((99, _NEW_CANONICAL, "OPEN"))
@@ -157,7 +168,7 @@ def test_find_or_create_issue_returns_new_canonical_open(
 
 
 def test_find_or_create_issue_does_not_rename_new_canonical(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A new-canonical-titled match does not trigger a title-rename edit."""
     body = _payload((99, _NEW_CANONICAL, "OPEN"))
@@ -174,7 +185,7 @@ def test_find_or_create_issue_does_not_rename_new_canonical(
 
 
 def test_find_or_create_issue_reopens_new_canonical_closed(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A new-canonical-titled closed match is reopened."""
     body = _payload((55, _NEW_CANONICAL, "CLOSED"))
@@ -190,7 +201,9 @@ def test_find_or_create_issue_reopens_new_canonical_closed(
 # --- find_or_create_issue: legacy-short ('Satisfy §X') ----------------------
 
 
-def _run_rename_open_legacy(stub_completed, title: str, number: int):
+def _run_rename_open_legacy(
+    stub_completed: Callable[..., MagicMock], title: str, number: int,
+) -> MagicMock:
     """Run find_or_create_issue against a single open legacy-titled match."""
     body = _payload((number, title, "OPEN"))
     with patch(
@@ -201,7 +214,9 @@ def _run_rename_open_legacy(stub_completed, title: str, number: int):
     return mock_run
 
 
-def _run_reopen_closed_legacy(stub_completed, title: str, number: int):
+def _run_reopen_closed_legacy(
+    stub_completed: Callable[..., MagicMock], title: str, number: int,
+) -> MagicMock:
     """Run find_or_create_issue against a single closed legacy-titled match."""
     body = _payload((number, title, "CLOSED"))
     with patch(
@@ -213,7 +228,7 @@ def _run_reopen_closed_legacy(stub_completed, title: str, number: int):
 
 
 def test_find_or_create_issue_returns_legacy_short_number(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A 'Satisfy §X' open issue is recognised as legacy and returns its number."""
     with patch(
@@ -226,7 +241,7 @@ def test_find_or_create_issue_returns_legacy_short_number(
 
 
 def test_find_or_create_issue_renames_legacy_short_to_new_canonical(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A 'Satisfy §X' match is renamed to the new canonical title."""
     mock_run = _run_rename_open_legacy(stub_completed, _LEGACY_SHORT, 99)
@@ -235,7 +250,7 @@ def test_find_or_create_issue_renames_legacy_short_to_new_canonical(
 
 
 def test_find_or_create_issue_reopens_legacy_short_closed(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A closed 'Satisfy §X' match is reopened after the rename."""
     mock_run = _run_reopen_closed_legacy(stub_completed, _LEGACY_SHORT, 55)
@@ -252,7 +267,7 @@ def test_legacy_issue_title_for() -> None:
 
 
 def test_find_or_create_issue_returns_legacy_audit_numeric_open_number(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A legacy-audit-numeric titled open issue's number is returned."""
     with patch(
@@ -265,7 +280,7 @@ def test_find_or_create_issue_returns_legacy_audit_numeric_open_number(
 
 
 def test_find_or_create_issue_renames_legacy_audit_numeric_open(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A legacy-audit-numeric titled open issue is renamed to the new canonical."""
     mock_run = _run_rename_open_legacy(stub_completed, _LEGACY_AUDIT_NUMERIC, 88)
@@ -274,7 +289,7 @@ def test_find_or_create_issue_renames_legacy_audit_numeric_open(
 
 
 def test_find_or_create_issue_reopens_legacy_audit_numeric_closed(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A legacy-audit-numeric titled closed issue is reopened after the rename."""
     mock_run = _run_reopen_closed_legacy(
@@ -288,7 +303,7 @@ def test_find_or_create_issue_reopens_legacy_audit_numeric_closed(
 
 
 def test_find_or_create_issue_returns_legacy_audit_annex_number(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A legacy-audit-annex titled (no §) closed issue is recognised and returned."""
     body = _payload((609, _LEGACY_AUDIT_ANNEX, "CLOSED"))
@@ -300,7 +315,7 @@ def test_find_or_create_issue_returns_legacy_audit_annex_number(
 
 
 def test_find_or_create_issue_renames_legacy_audit_annex(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A legacy-audit-annex titled issue is renamed to 'Satisfy IEEE 1800-2023 §A.9.3'."""
     body = _payload((609, _LEGACY_AUDIT_ANNEX, "OPEN"))
@@ -320,7 +335,7 @@ def test_find_or_create_issue_renames_legacy_audit_annex(
 
 
 def test_find_or_create_issue_returns_master_list_number(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A master-list-titled issue is returned by number."""
     body = _payload((35, _MASTER_LIST, "OPEN"))
@@ -332,7 +347,7 @@ def test_find_or_create_issue_returns_master_list_number(
 
 
 def test_find_or_create_issue_renames_master_list_to_new_canonical(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A master-list-titled match is renamed to bare 'Satisfy IEEE 1800-2023 §X'."""
     body = _payload((35, _MASTER_LIST, "OPEN"))
@@ -349,7 +364,7 @@ def test_find_or_create_issue_renames_master_list_to_new_canonical(
 
 
 def test_find_or_create_issue_reopens_master_list_closed(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A closed master-list issue is reopened after the rename."""
     body = _payload((35, _MASTER_LIST, "CLOSED"))
@@ -363,7 +378,7 @@ def test_find_or_create_issue_reopens_master_list_closed(
 
 
 def test_find_or_create_issue_master_list_exact_prefix_match(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A master-list title equal to the bare prefix (no descriptive text) matches."""
     body = _payload((35, "Implement IEEE 1800-2023 §33", "OPEN"))
@@ -375,7 +390,7 @@ def test_find_or_create_issue_master_list_exact_prefix_match(
 
 
 def test_find_or_create_issue_master_list_does_not_match_subclause_subprefix(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """An §33 master-list title must not match a §33.4 lookup."""
     body = _payload((35, _MASTER_LIST, "OPEN"))
@@ -400,7 +415,9 @@ def _master_list_with_duplicate_payload() -> str:
     )
 
 
-def test_find_or_create_issue_deletes_newer_duplicate(stub_completed) -> None:
+def test_find_or_create_issue_deletes_newer_duplicate(
+    stub_completed: Callable[..., MagicMock],
+) -> None:
     """When two matches exist, the newer is hard-deleted via gh issue delete."""
     with patch(
         "satisfy_subclause.pipeline.subprocess.run",
@@ -414,7 +431,7 @@ def test_find_or_create_issue_deletes_newer_duplicate(stub_completed) -> None:
 
 
 def test_find_or_create_issue_keeps_older_when_duplicates(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """When two matches exist, the older issue's number is returned."""
     with patch(
@@ -427,7 +444,7 @@ def test_find_or_create_issue_keeps_older_when_duplicates(
 
 
 def test_find_or_create_issue_renames_older_master_list_with_duplicates(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """When the older match is master-list, it is also renamed (no special case)."""
     with patch(
@@ -457,7 +474,7 @@ def _older_legacy_with_duplicate_payload() -> str:
 
 
 def test_find_or_create_issue_renames_older_legacy_with_duplicates(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """When the older match is non-master-list legacy, it is renamed."""
     body = _older_legacy_with_duplicate_payload()
@@ -474,7 +491,7 @@ def test_find_or_create_issue_renames_older_legacy_with_duplicates(
 
 
 def test_find_or_create_issue_reopens_older_legacy_closed_with_duplicates(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """A closed older legacy match is reopened after delete + rename."""
     body = _older_legacy_with_duplicate_payload()
@@ -488,7 +505,7 @@ def test_find_or_create_issue_reopens_older_legacy_closed_with_duplicates(
 
 
 def test_find_or_create_issue_deletes_all_newer_duplicates(
-    stub_completed,
+    stub_completed: Callable[..., MagicMock],
 ) -> None:
     """Every newer match is deleted, not just the most-recent one."""
     body = _payload(
@@ -511,7 +528,9 @@ def test_find_or_create_issue_deletes_all_newer_duplicates(
 # --- dispatch_cycle ---------------------------------------------------------
 
 
-def _patched_for_cycle(issues=(100, 101)):
+def _patched_for_cycle(
+    issues: tuple[int, ...] = (100, 101),
+) -> tuple[Any, Any]:
     """Patch find_or_create_issue and the cycle mutator."""
     return (
         patch(
@@ -579,7 +598,9 @@ def test_dispatch_cycle_does_not_call_oracle() -> None:
 # --- satisfy_unsatisfied_subclause -----------------------------------------
 
 
-def _patched_inner(deps, *, dep_results=None):
+def _patched_inner(
+    deps: list[str], *, dep_results: list[dict[str, Any]] | None = None,
+) -> tuple[Any, Any]:
     """Patch compute_subclause_dependencies and satisfy_subclause."""
     return (
         patch(
@@ -593,7 +614,7 @@ def _patched_inner(deps, *, dep_results=None):
     )
 
 
-def _patched_dispatch():
+def _patched_dispatch() -> tuple[Any, Any]:
     """Patch the no-deps and with-deps mutator entry points."""
     return (
         patch(
@@ -675,7 +696,9 @@ def test_inner_includes_self_in_cycle_members() -> None:
     assert "33.4.1.5" in result["members"]
 
 
-def _run_inner_cycle_propagation(*, in_progress: frozenset) -> dict:
+def _run_inner_cycle_propagation(
+    *, in_progress: frozenset[str],
+) -> dict[str, Any]:
     """Run the inner orch where its single dep returns a fixed cycle marker."""
     mock_deps, mock_satisfy = _patched_inner(
         ["33.6.1"],
@@ -710,7 +733,7 @@ def test_inner_adds_self_when_below_cycle_entry() -> None:
     assert "33.4.1.5" in result["members"]
 
 
-def test_inner_logs_subclause_to_stderr(capsys) -> None:
+def test_inner_logs_subclause_to_stderr(capsys: pytest.CaptureFixture[str]) -> None:
     """Inner orch prints a one-line banner to stderr."""
     mock_deps, mock_satisfy = _patched_inner([])
     with mock_deps:
@@ -730,7 +753,9 @@ def test_inner_logs_subclause_to_stderr(capsys) -> None:
 # --- satisfy_subclause -----------------------------------------------------
 
 
-def _patched_pipeline(*, inner_results=None):
+def _patched_pipeline(
+    *, inner_results: list[dict[str, Any]] | None = None,
+) -> tuple[Any, Any, Any]:
     """Patch the pipeline integration points (no oracle, no retry loop)."""
     return (
         patch(
@@ -786,8 +811,8 @@ def test_satisfy_runs_pipeline_only_once() -> None:
 
 def _run_satisfy_with_cycle(
     subclause: str, members: list[str],
-    *, in_progress: frozenset = frozenset(),
-):
+    *, in_progress: frozenset[str] = frozenset(),
+) -> tuple[dict[str, Any], MagicMock]:
     """Run satisfy_subclause whose inner returns the given cycle marker."""
     cycle_payload = {"status": "cycle", "members": members}
     issue, inner, cycle = _patched_pipeline(inner_results=[cycle_payload])
@@ -834,7 +859,7 @@ def test_satisfy_propagates_cycle_when_self_not_in_members() -> None:
     assert result["status"] == "cycle" and not mock_dispatch.called
 
 
-def test_satisfy_logs_subclause_to_stderr(capsys) -> None:
+def test_satisfy_logs_subclause_to_stderr(capsys: pytest.CaptureFixture[str]) -> None:
     """satisfy_subclause prints a one-line outer-orchestrator banner."""
     issue, inner, cycle = _patched_pipeline()
     with issue:

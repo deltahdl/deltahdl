@@ -3,6 +3,8 @@
 import subprocess
 import sys
 import textwrap
+from collections.abc import Callable
+from pathlib import Path
 
 from lib.python import run_tests_common
 
@@ -10,7 +12,9 @@ REPO_ROOT = run_tests_common.REPO_ROOT
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 
-def _run_sim_script(test_dir, binary_path):
+def _run_sim_script(
+    test_dir: Path, binary_path: Path,
+) -> subprocess.CompletedProcess[str]:
     """Run run_sim_tests.main() in a subprocess with patched paths.
 
     Args:
@@ -41,7 +45,9 @@ def _run_sim_script(test_dir, binary_path):
     )
 
 
-def test_exit_zero_when_all_pass(tmp_path, stub_binary):
+def test_exit_zero_when_all_pass(
+    tmp_path: Path, stub_binary: Callable[..., Path],
+) -> None:
     """Script should exit 0 when stub binary echoes expected output."""
     test_dir = tmp_path / "tests"
     test_dir.mkdir()
@@ -54,7 +60,9 @@ def test_exit_zero_when_all_pass(tmp_path, stub_binary):
     assert result.returncode == 0
 
 
-def test_exit_one_with_diff_on_mismatch(tmp_path, stub_binary):
+def test_exit_one_with_diff_on_mismatch(
+    tmp_path: Path, stub_binary: Callable[..., Path],
+) -> None:
     """Script should exit 1 and show diff when output mismatches."""
     test_dir = tmp_path / "tests"
     test_dir.mkdir()
@@ -67,7 +75,9 @@ def test_exit_one_with_diff_on_mismatch(tmp_path, stub_binary):
     assert result.returncode == 1 and "expected" in result.stdout
 
 
-def test_exit_one_with_error_when_no_pairs(tmp_path, stub_binary):
+def test_exit_one_with_error_when_no_pairs(
+    tmp_path: Path, stub_binary: Callable[..., Path],
+) -> None:
     """Script should exit 1 and print error when no test pairs exist."""
     test_dir = tmp_path / "tests"
     test_dir.mkdir()

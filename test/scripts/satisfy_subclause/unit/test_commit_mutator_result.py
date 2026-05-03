@@ -6,14 +6,17 @@ generate_commit_body invocation, and the porcelain-derived bullet-list
 fallback when Claude returns a blank body.
 """
 
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 
 from satisfy_subclause.mutators import commit_mutator_result
 
+_Porcelain = tuple[list[str], list[str], list[str]]
 
-def _patched_porcelain(changes):
+
+def _patched_porcelain(changes: _Porcelain) -> Any:
     """Patch get_porcelain_changes with a fixed return value."""
     return patch(
         "satisfy_subclause.mutators.get_porcelain_changes",
@@ -21,7 +24,7 @@ def _patched_porcelain(changes):
     )
 
 
-def _patched_commit():
+def _patched_commit() -> Any:
     """Patch commit_and_push with a no-op MagicMock."""
     return patch(
         "satisfy_subclause.mutators.commit_and_push",
@@ -29,12 +32,12 @@ def _patched_commit():
     )
 
 
-def _patched_close():
+def _patched_close() -> Any:
     """Patch the gh-issue-close subprocess shim."""
     return patch("satisfy_subclause.mutators._close_satisfied_issue")
 
 
-def _patched_body(value: str = ""):
+def _patched_body(value: str = "") -> Any:
     """Patch generate_commit_body to return *value* (default: empty fallback)."""
     return patch(
         "satisfy_subclause.mutators.generate_commit_body",
@@ -47,7 +50,7 @@ def _patched_body(value: str = ""):
     ids=["clean", "only-garbage"],
 )
 def test_commit_mutator_result_returns_false_when_no_committable(
-    porcelain,
+    porcelain: _Porcelain,
 ) -> None:
     """A clean tree (or one filtered down to empty) returns False."""
     with _patched_porcelain(porcelain), _patched_commit() as mock_c, \
@@ -93,7 +96,7 @@ def test_commit_mutator_result_filters_garbage_deleted() -> None:
     ids=["clean", "only-garbage"],
 )
 def test_commit_mutator_result_closes_issue_when_no_committable(
-    porcelain,
+    porcelain: _Porcelain,
 ) -> None:
     """A clean (or filter-empty) tree means §X is satisfied → issue is closed."""
     with _patched_porcelain(porcelain), _patched_commit(), \

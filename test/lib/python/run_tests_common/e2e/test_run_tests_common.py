@@ -8,7 +8,7 @@ from lib.python import run_tests_common
 REPO_ROOT = run_tests_common.REPO_ROOT
 
 
-def test_import_succeeds_in_subprocess():
+def test_import_succeeds_in_subprocess() -> None:
     """Importing run_tests_common in a fresh Python process should succeed."""
     repo_root = str(REPO_ROOT)
     result = subprocess.run(
@@ -26,7 +26,7 @@ def test_import_succeeds_in_subprocess():
     assert result.returncode == 0, f"Import failed: {result.stderr}"
 
 
-def test_public_names_are_accessible():
+def test_public_names_are_accessible() -> None:
     """REPO_ROOT, BINARY, GREEN, RED, RESET, check_binary, and
     print_result should all be importable attributes."""
     expected = [

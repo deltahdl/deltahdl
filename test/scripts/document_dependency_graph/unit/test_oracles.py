@@ -1,5 +1,6 @@
 """Unit tests for document_dependency_graph.oracles."""
 
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -17,25 +18,25 @@ from document_dependency_graph.oracles import (
 # --- build_proof_sentence_prompt -------------------------------------------
 
 
-def test_proof_prompt_names_subclause(make_lrm) -> None:
+def test_proof_prompt_names_subclause(make_lrm: Path) -> None:
     """The proof-sentence prompt names the asking subclause §X."""
     prompt = build_proof_sentence_prompt("4.4", "3.14.3", str(make_lrm))
     assert "§4.4" in prompt
 
 
-def test_proof_prompt_names_dependency(make_lrm) -> None:
+def test_proof_prompt_names_dependency(make_lrm: Path) -> None:
     """The proof-sentence prompt names the dependency §Y."""
     prompt = build_proof_sentence_prompt("4.4", "3.14.3", str(make_lrm))
     assert "§3.14.3" in prompt
 
 
-def test_proof_prompt_includes_lrm_read_instruction(make_lrm) -> None:
+def test_proof_prompt_includes_lrm_read_instruction(make_lrm: Path) -> None:
     """The proof-sentence prompt tells Claude to read the LRM at the path."""
     prompt = build_proof_sentence_prompt("4.4", "3.14.3", str(make_lrm))
     assert str(make_lrm) in prompt
 
 
-def test_proof_prompt_requests_quoted_sentence(make_lrm) -> None:
+def test_proof_prompt_requests_quoted_sentence(make_lrm: Path) -> None:
     """The proof-sentence prompt asks for a single quoted sentence."""
     prompt = build_proof_sentence_prompt("4.4", "3.14.3", str(make_lrm))
     assert "sentence" in prompt
@@ -86,7 +87,7 @@ def test_parse_proof_sentence_rejects_non_string() -> None:
 # --- compute_proof_sentence ------------------------------------------------
 
 
-def test_compute_proof_sentence_returns_parsed_text(make_lrm) -> None:
+def test_compute_proof_sentence_returns_parsed_text(make_lrm: Path) -> None:
     """compute_proof_sentence returns the oracle's quoted sentence."""
     with patch(
         "document_dependency_graph.oracles.run_oracle_call",
@@ -98,7 +99,7 @@ def test_compute_proof_sentence_returns_parsed_text(make_lrm) -> None:
     assert result == "Module instantiation requires elaboration."
 
 
-def test_compute_proof_sentence_passes_prompt(make_lrm) -> None:
+def test_compute_proof_sentence_passes_prompt(make_lrm: Path) -> None:
     """compute_proof_sentence sends the proof-sentence prompt to the oracle."""
     with patch(
         "document_dependency_graph.oracles.run_oracle_call",
@@ -110,7 +111,7 @@ def test_compute_proof_sentence_passes_prompt(make_lrm) -> None:
     assert "§3.14.3" in mock_call.call_args[0][0]
 
 
-def test_compute_proof_sentence_passes_model(make_lrm) -> None:
+def test_compute_proof_sentence_passes_model(make_lrm: Path) -> None:
     """compute_proof_sentence forwards the model to the oracle."""
     with patch(
         "document_dependency_graph.oracles.run_oracle_call",
@@ -125,19 +126,19 @@ def test_compute_proof_sentence_passes_model(make_lrm) -> None:
 # --- build_prerequisites_prompt --------------------------------------------
 
 
-def test_prereq_prompt_names_subclause(make_lrm) -> None:
+def test_prereq_prompt_names_subclause(make_lrm: Path) -> None:
     """The prerequisites prompt names §X."""
     prompt = build_prerequisites_prompt("4.4", "3.14.3", str(make_lrm))
     assert "§4.4" in prompt
 
 
-def test_prereq_prompt_names_dependency(make_lrm) -> None:
+def test_prereq_prompt_names_dependency(make_lrm: Path) -> None:
     """The prerequisites prompt names §Y."""
     prompt = build_prerequisites_prompt("4.4", "3.14.3", str(make_lrm))
     assert "§3.14.3" in prompt
 
 
-def test_prereq_prompt_asks_what_must_exist(make_lrm) -> None:
+def test_prereq_prompt_asks_what_must_exist(make_lrm: Path) -> None:
     """The prerequisites prompt asks what §Y must already provide."""
     prompt = build_prerequisites_prompt("4.4", "3.14.3", str(make_lrm))
     assert "already" in prompt
@@ -167,7 +168,7 @@ def test_parse_prerequisites_rejects_empty_string() -> None:
 # --- compute_prerequisites -------------------------------------------------
 
 
-def test_compute_prerequisites_returns_parsed_text(make_lrm) -> None:
+def test_compute_prerequisites_returns_parsed_text(make_lrm: Path) -> None:
     """compute_prerequisites returns the oracle's parsed string."""
     with patch(
         "document_dependency_graph.oracles.run_oracle_call",
@@ -179,7 +180,7 @@ def test_compute_prerequisites_returns_parsed_text(make_lrm) -> None:
     assert result == "elaborated definitions"
 
 
-def test_compute_prerequisites_passes_prereq_prompt(make_lrm) -> None:
+def test_compute_prerequisites_passes_prereq_prompt(make_lrm: Path) -> None:
     """compute_prerequisites sends the prerequisites prompt to the oracle."""
     with patch(
         "document_dependency_graph.oracles.run_oracle_call",
@@ -191,7 +192,7 @@ def test_compute_prerequisites_passes_prereq_prompt(make_lrm) -> None:
     assert "prerequisites oracle" in mock_call.call_args[0][0]
 
 
-def test_compute_prerequisites_passes_model(make_lrm) -> None:
+def test_compute_prerequisites_passes_model(make_lrm: Path) -> None:
     """compute_prerequisites forwards the model to the oracle."""
     with patch(
         "document_dependency_graph.oracles.run_oracle_call",

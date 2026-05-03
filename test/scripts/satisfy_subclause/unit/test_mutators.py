@@ -1,5 +1,6 @@
 """Unit tests for satisfy_subclause.mutators."""
 
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -85,7 +86,7 @@ def test_disallowed_tools_allows_cp() -> None:
 # --- run_step ---------------------------------------------------------------
 
 
-def _patched_streaming():
+def _patched_streaming() -> Any:
     """Patch run_claude_streaming; the stub returns an empty result string."""
     return patch(
         "satisfy_subclause.mutators.run_claude_streaming_with_retry",
@@ -204,7 +205,9 @@ def test_run_steps_passes_prompt() -> None:
     assert mock_step.call_args[0][0] == "a-prompt"
 
 
-def test_run_steps_logs_first_step_banner(capsys) -> None:
+def test_run_steps_logs_first_step_banner(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """run_steps prints a 'Step 1/total: description' banner for step 1."""
     steps = [("Auditing src", "p1"), ("Auditing tests", "p2")]
     with patch("satisfy_subclause.mutators.run_step"):
@@ -212,7 +215,9 @@ def test_run_steps_logs_first_step_banner(capsys) -> None:
     assert "Step 1/2: Auditing src" in capsys.readouterr().out
 
 
-def test_run_steps_logs_later_step_banner(capsys) -> None:
+def test_run_steps_logs_later_step_banner(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """run_steps prints a 'Step 2/total: description' banner for step 2."""
     steps = [("Auditing src", "p1"), ("Auditing tests", "p2")]
     with patch("satisfy_subclause.mutators.run_step"):
@@ -328,7 +333,7 @@ def test_build_commit_message_uses_annex_label() -> None:
 # --- build_steps ------------------------------------------------------------
 
 
-def _step_descriptions(steps) -> list[str]:
+def _step_descriptions(steps: list[tuple[str, str]]) -> list[str]:
     """Return just the description strings from a list of step pairs."""
     return [d for d, _p in steps]
 
@@ -575,7 +580,7 @@ def test_build_steps_single_member_has_no_cycle_intro() -> None:
 # --- mutator dispatch shells ------------------------------------------------
 
 
-def _patched_run_steps_and_commit(committed=True):
+def _patched_run_steps_and_commit(committed: bool = True) -> tuple[Any, Any]:
     """Patch run_steps and commit_mutator_result."""
     return (
         patch("satisfy_subclause.mutators.run_steps"),
@@ -638,7 +643,9 @@ def test_no_deps_commits_with_subclause_and_issue() -> None:
     assert commit.call_args[0] == (["33.4.1.5"], [42])
 
 
-def test_no_deps_warns_when_no_changes(capsys) -> None:
+def test_no_deps_warns_when_no_changes(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """No-deps mutator warns when no source-tree changes were made."""
     mock_run, mock_commit = _patched_run_steps_and_commit(committed=False)
     with mock_run:
@@ -649,7 +656,9 @@ def test_no_deps_warns_when_no_changes(capsys) -> None:
     assert "no source-tree changes" in capsys.readouterr().err
 
 
-def test_no_deps_logs_subclause_to_stderr(capsys) -> None:
+def test_no_deps_logs_subclause_to_stderr(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """No-deps mutator prints a one-line banner to stderr."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run:
@@ -712,7 +721,9 @@ def test_with_deps_commits_with_subclause_and_issue() -> None:
     assert commit.call_args[0] == (["33.4"], [42])
 
 
-def test_with_deps_warns_when_no_changes(capsys) -> None:
+def test_with_deps_warns_when_no_changes(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """With-deps mutator warns when no source-tree changes were made."""
     mock_run, mock_commit = _patched_run_steps_and_commit(committed=False)
     with mock_run:
@@ -724,7 +735,9 @@ def test_with_deps_warns_when_no_changes(capsys) -> None:
     assert "no source-tree changes" in capsys.readouterr().err
 
 
-def test_with_deps_logs_subclause_to_stderr(capsys) -> None:
+def test_with_deps_logs_subclause_to_stderr(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """With-deps mutator prints a one-line banner to stderr."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run:
@@ -884,7 +897,9 @@ def test_cycle_commits_with_all_issues() -> None:
     assert commit.call_args[0] == (["33.4.1.5", "33.4.1.6"], [10, 11])
 
 
-def test_cycle_warns_when_no_changes(capsys) -> None:
+def test_cycle_warns_when_no_changes(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Cycle mutator warns when no source-tree changes were made."""
     mock_run, mock_commit = _patched_run_steps_and_commit(committed=False)
     with mock_run:
@@ -895,7 +910,9 @@ def test_cycle_warns_when_no_changes(capsys) -> None:
     assert "produced no source" in capsys.readouterr().err
 
 
-def test_cycle_logs_subclauses_to_stderr(capsys) -> None:
+def test_cycle_logs_subclauses_to_stderr(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Cycle mutator prints a one-line banner to stderr."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run:
