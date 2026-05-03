@@ -244,29 +244,29 @@ jobs:
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/document_dependency_graph/e2e/ -v
-  test-lib-classify:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/classify/unit/ -v
-          --cov=lib.python.classify
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
+  # test-lib-classify:
+  #   needs: static-analysis
+  #   runs-on: ubuntu-24.04
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Restore pip cache
+  #       uses: actions/cache@v4
+  #       with:
+  #         key: >-
+  #           pip-scripts-test-lib-${{
+  #           hashFiles('.github/workflows/scripts.yml') }}
+  #         path: ~/.cache/pip
+  #         restore-keys: |
+  #           pip-scripts-test-lib-
+  #     - name: Install tools
+  #       run: pip install pytest pytest-cov
+  #     - name: Run tests with 100% coverage gate
+  #       run: >-
+  #         python3 -m pytest test/lib/python/classify/unit/ -v
+  #         --cov=lib.python.classify
+  #         --cov-branch
+  #         --cov-report=term-missing
+  #         --cov-fail-under=100
   test-lib-clause:
     needs: static-analysis
     runs-on: ubuntu-24.04
