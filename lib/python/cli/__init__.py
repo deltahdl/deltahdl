@@ -5,6 +5,9 @@ import re
 import subprocess
 import threading
 from pathlib import Path
+from typing import Any, Callable, TypeVar
+
+_T = TypeVar("_T")
 
 SUBCLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){1,4}$")
 CLAUSE_ONLY_RE = re.compile(r"^(\d+|[A-Z])$")
@@ -213,14 +216,16 @@ def add_github_args(parser: argparse.ArgumentParser) -> None:
 _DOT_INTERVAL_SECONDS = 5
 
 
-def run_with_dots(func, *args, **kwargs):
+def run_with_dots(
+    func: Callable[..., _T], *args: Any, **kwargs: Any,
+) -> _T:
     """Run *func* while printing dots every few seconds.
 
     Returns whatever *func* returns.
     """
     stop = threading.Event()
 
-    def _print_dots():
+    def _print_dots() -> None:
         while not stop.wait(_DOT_INTERVAL_SECONDS):
             print(".", end="", flush=True)
 
@@ -234,13 +239,19 @@ def run_with_dots(func, *args, **kwargs):
         print()
 
 
-def run_claude_cli(cmd, prompt, *, env, timeout=None):
+def run_claude_cli(
+    cmd: list[str],
+    prompt: str,
+    *,
+    env: dict[str, str],
+    timeout: float | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run the Claude CLI and return the completed process.
 
     Centralises the ``subprocess.run`` call so that callers do not
     duplicate the same keyword arguments.
     """
-    kwargs = {
+    kwargs: dict[str, Any] = {
         "input": prompt,
         "capture_output": True,
         "text": True,

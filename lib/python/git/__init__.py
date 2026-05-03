@@ -4,9 +4,10 @@ import os.path
 import re
 import subprocess
 import sys
+from typing import Any
 
 
-def run_git(cmd, **kwargs):
+def run_git(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
     """Run a git command and exit on failure."""
     result = subprocess.run(
         cmd,
@@ -23,7 +24,11 @@ def run_git(cmd, **kwargs):
     return result
 
 
-def commit_and_push(changed_files, deleted_files, message):
+def commit_and_push(
+    changed_files: list[str],
+    deleted_files: list[str],
+    message: str,
+) -> str | None:
     """Stage changed/deleted files, commit with message, and push.
 
     Returns the commit SHA on success, or ``None`` when there is nothing
@@ -63,10 +68,12 @@ def get_remote_repo(remote: str = "origin") -> tuple[str, str]:
     return m.group(1), m.group(2)
 
 
-def get_porcelain_changes():
+def get_porcelain_changes() -> tuple[list[str], list[str], list[str]]:
     """Return (added, modified, deleted) from ``git status --porcelain``."""
     result = run_git(["git", "status", "--porcelain"])
-    added, modified, deleted = [], [], []
+    added: list[str] = []
+    modified: list[str] = []
+    deleted: list[str] = []
     for line in result.stdout.splitlines():
         if not line:
             continue
@@ -81,14 +88,16 @@ def get_porcelain_changes():
     return added, modified, deleted
 
 
-def build_file_change_summary(added, modified, deleted):
+def build_file_change_summary(
+    added: list[str], modified: list[str], deleted: list[str],
+) -> str:
     """Build a human-readable summary of file changes.
 
     Returns a string like ``"Added foo.cpp, bar.cpp; modified baz.cpp;
     deleted old.cpp"`` using basenames sorted alphabetically.  Returns
     ``""`` when all lists are empty.
     """
-    parts = []
+    parts: list[str] = []
     for label, files in [("Added", added), ("modified", modified),
                          ("deleted", deleted)]:
         if files:

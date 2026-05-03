@@ -23,7 +23,9 @@ def load_module_from_path(module_name: str, path: Path) -> ModuleType:
     return module
 
 
-def build_base_env(tmp_path, fake_scripts_dir, fake_bin):
+def build_base_env(
+    tmp_path: Path, fake_scripts_dir: str, fake_bin: str,
+) -> dict[str, str]:
     """Build a subprocess env with *fake_scripts_dir* before real scripts."""
     env = os.environ.copy()
     env["HOME"] = str(tmp_path)
@@ -36,7 +38,7 @@ def build_base_env(tmp_path, fake_scripts_dir, fake_bin):
     return env
 
 
-def install_fake_script(tmp_path, name, content):
+def install_fake_script(tmp_path: Path, name: str, content: str) -> str:
     """Write an executable shell script into ``tmp_path/fake_bin/``.
 
     Returns the ``fake_bin`` directory path as a string (suitable for
@@ -51,8 +53,11 @@ def install_fake_script(tmp_path, name, content):
 
 
 def install_fake_gh(
-    tmp_path, issue_body="", issue_title="", handle_post=False,
-):
+    tmp_path: Path,
+    issue_body: str = "",
+    issue_title: str = "",
+    handle_post: bool = False,
+) -> str:
     """Install a fake ``gh`` CLI that handles common API patterns.
 
     Handles ``--jq .body`` (returns *issue_body*),
@@ -88,7 +93,9 @@ def install_fake_gh(
     return install_fake_script(tmp_path, "gh", "".join(lines))
 
 
-def install_fake_package(tmp_path, name, exit_code=0):
+def install_fake_package(
+    tmp_path: Path, name: str, exit_code: int = 0,
+) -> str:
     """Install a fake Python package that exits with *exit_code*.
 
     Returns the directory to prepend to PYTHONPATH so the fake
@@ -105,7 +112,7 @@ def install_fake_package(tmp_path, name, exit_code=0):
     return str(fake_scripts)
 
 
-def e2e_base_flags(tmp_path):
+def e2e_base_flags(tmp_path: Path) -> list[str]:
     """Return the shared CLI flags common to all classify e2e tests."""
     return [
         "--output-dir", str(tmp_path),
@@ -116,7 +123,12 @@ def e2e_base_flags(tmp_path):
     ]
 
 
-def invoke_module(module_name, *args, cwd=None, env=None):
+def invoke_module(
+    module_name: str,
+    *args: str,
+    cwd: str | Path | None = None,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run *module_name* in a child process via ``python -m``."""
     run_env = (env or os.environ).copy()
     if "PYTHONPATH" not in run_env:

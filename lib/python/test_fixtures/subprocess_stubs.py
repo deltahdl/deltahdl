@@ -15,7 +15,7 @@ def stub_subprocess_success(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
     mock_result.stdout = ""
     mock_result.stderr = ""
 
-    def capture_run(cmd, **_kwargs):
+    def capture_run(cmd: Any, **_kwargs: Any) -> MagicMock:
         captured.append(list(cmd))
         return mock_result
 
@@ -42,7 +42,7 @@ def spy_subprocess_run(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     """
     kwargs_log: list[dict[str, Any]] = []
 
-    def spy_run(_cmd, **kwargs):
+    def spy_run(_cmd: Any, **kwargs: Any) -> MagicMock:
         kwargs_log.append(kwargs)
         result = MagicMock()
         result.returncode = 0

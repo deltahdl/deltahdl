@@ -2,22 +2,28 @@
 
 import io
 import sys
-from types import SimpleNamespace
-from typing import cast
+from types import ModuleType, SimpleNamespace
+from typing import Any, Callable, cast
+
+import pytest
 
 
-def argv_without_flag(base, flag):
+def argv_without_flag(base: list[str], flag: str) -> list[str]:
     """Return *base* with *flag* and its value removed."""
     return [v for i, v in enumerate(base)
             if flag not in (base[max(0, i - 1)], v)]
 
 
-def main_enables_line_buffering(monkeypatch, module, make_args_fn):
+def main_enables_line_buffering(
+    monkeypatch: pytest.MonkeyPatch,
+    module: ModuleType,
+    make_args_fn: Callable[..., Any],
+) -> bool:
     """Return whether *module*.main() reconfigures stdout for line buffering."""
-    configured = []
+    configured: list[dict[str, Any]] = []
     original = cast(io.TextIOWrapper, sys.stdout).reconfigure
 
-    def mock_reconfigure(**kwargs):
+    def mock_reconfigure(**kwargs: Any) -> None:
         configured.append(kwargs)
         return original(**kwargs)
 
@@ -28,7 +34,11 @@ def main_enables_line_buffering(monkeypatch, module, make_args_fn):
     return any(k.get("line_buffering") for k in configured)
 
 
-def capture_help_output(parse_func, monkeypatch, capsys):
+def capture_help_output(
+    parse_func: Callable[[], Any],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> str:
     """Call *parse_func* with ``--help`` and return captured stdout."""
     monkeypatch.setattr(sys, "argv", ["prog", "--help"])
     try:
@@ -47,9 +57,9 @@ CLASSIFY_BASE_ARGV = [
 ]
 
 
-def make_classify_args(**overrides):
+def make_classify_args(**overrides: Any) -> SimpleNamespace:
     """Build a SimpleNamespace with classify-script base args."""
-    defaults = {
+    defaults: dict[str, Any] = {
         "file": "/path/to/test.cpp",
         "output_dir": "/out",
         "lrm": "/lrm.txt",
