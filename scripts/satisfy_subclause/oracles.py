@@ -36,6 +36,7 @@ DISALLOWED_TOOLS = (
     " Bash(rm *) Bash(mv *) Bash(cp *) Bash(touch *) Bash(mkdir *)"
     " Bash(pdftotext *) Bash(pdfgrep *) Bash(pdftohtml *)"
     " Bash(pdftoppm *) Bash(mutool *)"
+    " Bash(python3 *) Bash(python *)"
 )
 
 

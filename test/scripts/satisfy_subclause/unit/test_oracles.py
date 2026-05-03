@@ -73,6 +73,24 @@ def test_disallowed_tools_blocks_mutool() -> None:
     assert "mutool" in DISALLOWED_TOOLS
 
 
+def test_disallowed_tools_blocks_python3() -> None:
+    """The disallowed-tools list blocks Bash(python3 *).
+
+    Closes the wrapper-evasion hole where sub-Claude routed a banned
+    pdftotext invocation through ``python3 -c "subprocess.run(...)"``.
+    """
+    assert "python3 *" in DISALLOWED_TOOLS
+
+
+def test_disallowed_tools_blocks_python() -> None:
+    """The disallowed-tools list blocks Bash(python *).
+
+    Same wrapper hole as ``python3``, via the unsuffixed ``python``
+    binary that some environments expose.
+    """
+    assert "python *" in DISALLOWED_TOOLS
+
+
 # --- build_env --------------------------------------------------------------
 
 
