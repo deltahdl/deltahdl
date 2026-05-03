@@ -216,15 +216,19 @@ void VpiContext::GetValue(VpiHandle obj, VpiValue* value) {
 
 void VpiContext::PutValue(VpiHandle obj, VpiValue* value, VpiTime* /*time*/,
                           int /*flags*/) {
-  if (!obj || !value || !obj->var) return;
+  if (!obj || !value) return;
+  if (!obj->var && !obj->net) return;
   // §4.4.3.1 (Preponed) and §4.4.2.9 (Postponed) both forbid writing values
   // to any net or variable while executing in their respective regions.
   // §4.4.3.10 inherits the Postponed restriction because PLI callbacks
   // landing in Postponed share the same region as the simulation events.
   // NoteWriteAttempt routes the violation to the right counter based on the
-  // scheduler's current region. The write still proceeds so non-conforming
-  // code stays observable.
+  // scheduler's current region. §4.4.3.1's "any net or variable" reaches
+  // every PLI write target, so the attempt is flagged even when obj names a
+  // net rather than a variable; the actual variable-store dispatch below
+  // still short-circuits for net-only targets.
   if (scheduler_) scheduler_->NoteWriteAttempt();
+  if (!obj->var) return;
   if (value->format == kVpiIntVal) {
     auto new_val = static_cast<uint64_t>(value->value.integer);
     obj->var->value.words[0].aval = new_val;

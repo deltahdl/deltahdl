@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "helpers_scheduler_event.h"
+#include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
 #include "simulator/vpi.h"
@@ -297,4 +298,96 @@ TEST(PliPreponedSim, VpiPutValueOutsidePreponedDoesNotRecordViolation) {
   sched.Run();
   EXPECT_EQ(sched.IllegalPreponedWriteCount(), 0u);
   EXPECT_EQ(var.value.words[0].aval, 42u);
+}
+
+// §4.4.3.1: "any other region within the current time slot" is universal —
+// every region except Preponed is forbidden as a current-time schedule
+// target from inside a Preponed callback. Iterate over every non-Preponed
+// region so the universal quantifier is observed end-to-end rather than via
+// a representative-region sample.
+TEST(PliPreponedSim,
+     IllegalScheduleIntoEveryNonPreponedRegionAtCurrentTimeIsFlagged) {
+  Arena arena;
+  Scheduler sched(arena);
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() {
+    for (size_t i = 0; i < kRegionCount; ++i) {
+      auto r = static_cast<Region>(i);
+      if (r == Region::kPreponed) continue;
+      auto* ev = sched.GetEventPool().Acquire();
+      ev->callback = []() {};
+      sched.ScheduleEvent(sched.CurrentTime(), r, ev);
+    }
+  };
+  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), kRegionCount - 1);
+}
+
+// §4.4.3.1: the illegal-write rule and the illegal-schedule rule are stated
+// as two distinct prohibitions. A Preponed callback that violates both in a
+// single execution must bump both counters — neither rule's counter may
+// absorb the other's tally.
+TEST(PliPreponedSim,
+     WriteAndScheduleViolationsFromPreponedAreCountedIndependently) {
+  Arena arena;
+  Scheduler sched(arena);
+  VpiContext vpi;
+  vpi.SetScheduler(&sched);
+
+  Logic4Word storage{};
+  Variable var{};
+  var.value.width = 32;
+  var.value.nwords = 1;
+  var.value.words = &storage;
+
+  VpiObject obj{};
+  obj.var = &var;
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() {
+    auto* offender = sched.GetEventPool().Acquire();
+    offender->callback = []() {};
+    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, offender);
+
+    VpiValue value{};
+    value.format = kVpiIntVal;
+    value.value.integer = 7;
+    vpi.PutValue(&obj, &value, nullptr, 0);
+  };
+  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
+
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 1u);
+  EXPECT_EQ(sched.IllegalPreponedWriteCount(), 1u);
+}
+
+// §4.4.3.1: the rule prohibits writing values to "any net or variable" — net
+// targets count, not just variables. When a PLI write attempt names a net
+// rather than a variable, VpiContext::PutValue still notes the attempt so
+// the §4.4.3.1 violation is observable.
+TEST(PliPreponedSim, VpiPutValueOnNetFromPreponedRecordsWriteViolation) {
+  Arena arena;
+  Scheduler sched(arena);
+  VpiContext vpi;
+  vpi.SetScheduler(&sched);
+
+  Net net{};
+  VpiObject obj{};
+  obj.net = &net;
+
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() {
+    VpiValue value{};
+    value.format = kVpiIntVal;
+    value.value.integer = 1;
+    vpi.PutValue(&obj, &value, nullptr, 0);
+  };
+  sched.ScheduleEvent({0}, Region::kPreponed, preponed);
+
+  EXPECT_EQ(sched.IllegalPreponedWriteCount(), 0u);
+  sched.Run();
+  EXPECT_EQ(sched.IllegalPreponedWriteCount(), 1u);
 }
