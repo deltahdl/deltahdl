@@ -23,11 +23,6 @@ TEST(TwoStateAndFourState, TwoStateTypes) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kLongint));
 }
 
-TEST(TwoStateAndFourState, LogicAndRegBoth4State) {
-  EXPECT_EQ(Is4stateType(DataTypeKind::kLogic),
-            Is4stateType(DataTypeKind::kReg));
-}
-
 TEST(TwoStateAndFourState, TwoStateIntStoresFullWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -48,6 +43,16 @@ TEST(TwoStateAndFourState, TwoStateIntStoresFullWidth) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
+}
+
+TEST(TwoStateAndFourState, LogicAndRegMatchAsSameType) {
+  DataType logic_t;
+  logic_t.kind = DataTypeKind::kLogic;
+  DataType reg_t;
+  reg_t.kind = DataTypeKind::kReg;
+  EXPECT_TRUE(TypesMatch(logic_t, reg_t));
+  EXPECT_TRUE(TypesMatch(reg_t, logic_t));
+  EXPECT_TRUE(TypesEquivalent(logic_t, reg_t));
 }
 
 TEST(TwoStateAndFourState, LogicAndRegElaborateIdentically) {

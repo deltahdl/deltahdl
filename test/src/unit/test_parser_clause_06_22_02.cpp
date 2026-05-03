@@ -82,15 +82,6 @@ TEST(EquivalentTypesParsing, TypesEquivalentSameSignedInt) {
   EXPECT_TRUE(TypesEquivalent(a, b));
 }
 
-TEST(EquivalentTypesParsing, LogicAndRegEquivalent) {
-  DataType a;
-  a.kind = DataTypeKind::kLogic;
-  DataType b;
-  b.kind = DataTypeKind::kReg;
-  EXPECT_FALSE(TypesMatch(a, b));
-  EXPECT_TRUE(TypesEquivalent(a, b));
-}
-
 TEST(EquivalentTypesParsing, IntNotEquivalentToInteger) {
   DataType a;
   a.kind = DataTypeKind::kInt;

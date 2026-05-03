@@ -249,7 +249,9 @@ Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
   bool has_xz = false;
   for (uint32_t i = 0; i < val.nwords && !has_xz; ++i)
     has_xz = val.words[i].bval != 0;
-  if (!has_xz) {
+  // Single-word fast path. ToUint64() only returns word[0], so >64-bit values
+  // must fall through to the multi-word path below to preserve upper words.
+  if (!has_xz && val.width <= 64 && target_width <= 64) {
     uint64_t v = val.ToUint64();
     if (val.is_signed && target_width > val.width && val.width > 0 &&
         val.width < 64) {

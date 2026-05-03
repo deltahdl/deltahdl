@@ -274,10 +274,16 @@ static bool IsSimpleBitVector(DataTypeKind kind) {
          kind == DataTypeKind::kReg;
 }
 
+// §6.11.2: logic and reg denote the same type, so collapse reg onto logic
+// for kind comparisons.
+static DataTypeKind CanonKind(DataTypeKind k) {
+  return k == DataTypeKind::kReg ? DataTypeKind::kLogic : k;
+}
+
 bool TypesMatch(const DataType& a, const DataType& b) {
   if (a.is_signed != b.is_signed) return false;
 
-  if (a.kind == b.kind) {
+  if (CanonKind(a.kind) == CanonKind(b.kind)) {
     if (a.kind == DataTypeKind::kNamed) return a.type_name == b.type_name;
     return true;
   }
