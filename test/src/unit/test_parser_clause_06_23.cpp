@@ -6,10 +6,13 @@ using namespace delta;
 namespace {
 
 TEST(TypeOperatorParsing, TypeOperatorInVarDecl) {
+  // §6.8 footnote 18 requires the var keyword when type_reference is used
+  // as the data type of a variable declaration; the §6.23 type-operator
+  // form here threads through that gate.
   auto r = Parse(
       "module m;\n"
       "  int a;\n"
-      "  type(a) b;\n"
+      "  var type(a) b;\n"
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

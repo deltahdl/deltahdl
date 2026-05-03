@@ -58,22 +58,6 @@ TEST(BnfClarificationElaboration, StructPackedWithDimOk) {
              "endmodule\n"));
 }
 
-TEST(BnfClarificationElaboration, TypeRefWithWireOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  wire x;\n"
-             "  wire type(x) y;\n"
-             "endmodule\n"));
-}
-
-TEST(BnfClarificationElaboration, TypeRefWithVarOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  int x;\n"
-             "  var type(x) y;\n"
-             "endmodule\n"));
-}
-
 TEST(BnfClarificationElaboration, ReplicationWithConstantOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

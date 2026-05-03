@@ -247,6 +247,18 @@ TEST(VarDecl, StaticInPackageOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.8 footnote 14: positive counterpart — the automatic keyword is permitted
+// when the data_declaration sits inside a procedural context. An initial
+// block is procedural, so the elaborator must accept the form unchanged.
+TEST(VarDecl, AutomaticInProceduralBlockOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  initial begin\n"
+             "    automatic int x = 5;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 // §6.8 footnote 17: applying a packed dimension to a struct type is
 // only legal when the struct is also marked packed; the elaborator
 // must reject the unpacked-struct + packed-dim combination.
@@ -284,6 +296,83 @@ TEST(VarDecl, PackedStructWithPackedDimOk) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §6.8 footnote 17: same legal counterpart for union — once the packed
+// keyword is present, applying a packed dimension is allowed.
+TEST(VarDecl, PackedUnionWithPackedDimOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  union packed { logic [7:0] a; logic [7:0] b; } [3:0] u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.8 footnote 18: when a type_reference is used in a net declaration it
+// must be preceded by a net type keyword. Confirm at the elaborator stage
+// that the legal form `wire type(x) y;` survives elaboration.
+TEST(VarDecl, TypeRefInNetDeclWithWireOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  wire x;\n"
+             "  wire type(x) y;\n"
+             "endmodule\n"));
+}
+
+// §6.8 footnote 18: the variable-declaration counterpart — `var type(x) y;`
+// elaborates cleanly because the var keyword satisfies the rule.
+TEST(VarDecl, TypeRefInVarDeclWithVarOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int x;\n"
+             "  var type(x) y;\n"
+             "endmodule\n"));
+}
+
+// §6.8 example: `var byte my_byte;` is "equivalent to" the bare form
+// `byte my_byte;`. Elaborating both side-by-side must produce variables
+// with matching width, signedness, and 4-state classification — the var
+// prefix may not change any observable property when the data_type is
+// already explicit.
+TEST(VarDecl, VarBytePrefixEquivalentToBareByte) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  var byte a;\n"
+      "  byte b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 2u);
+  EXPECT_EQ(mod->variables[0].width, mod->variables[1].width);
+  EXPECT_EQ(mod->variables[0].is_signed, mod->variables[1].is_signed);
+  EXPECT_EQ(mod->variables[0].is_4state, mod->variables[1].is_4state);
+}
+
+// §6.8 example: `var [15:0] vw;` is "equivalent to" `var logic [15:0] vw;`.
+// With only a range supplied, the implicit data type is logic, so both
+// forms must produce identical 16-bit 4-state variables.
+TEST(VarDecl, VarRangeOnlyEquivalentToVarLogic) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  var [15:0] a;\n"
+      "  var logic [15:0] b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 2u);
+  EXPECT_EQ(mod->variables[0].width, 16u);
+  EXPECT_EQ(mod->variables[0].width, mod->variables[1].width);
+  EXPECT_EQ(mod->variables[0].is_4state, mod->variables[1].is_4state);
+  EXPECT_EQ(mod->variables[0].is_signed, mod->variables[1].is_signed);
 }
 
 }  // namespace

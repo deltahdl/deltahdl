@@ -88,17 +88,6 @@ TEST(UnionDeclarationValidation, RandcInUnion_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// Footnote 17: packed dim on union requires soft/packed keyword.
-TEST(UnionDeclarationValidation, PackedDimOnUnpackedUnion_Rejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union { int a; int b; } [3:0] arr;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 // §7.3: String (dynamic type) in untagged union shall be rejected.
 TEST(UnionDeclarationValidation, StringInUntaggedUnion_Rejected) {
   ElabFixture f;
@@ -121,23 +110,13 @@ TEST(UnionDeclarationValidation, RandInTaggedUnion_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// Footnote 17: packed dim on union with soft keyword is allowed.
+// §7.3.1: a soft union accepts a packed dimension; this is the soft-union
+// relaxation of the §6.8 footnote-17 packed-keyword requirement.
 TEST(UnionDeclarationValidation, PackedDimOnSoftUnion_Allowed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
       "  union soft { int a; logic [31:0] b; } [3:0] arr;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-// Footnote 17: packed dim on packed union is allowed.
-TEST(UnionDeclarationValidation, PackedDimOnPackedUnion_Allowed) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  union packed { logic [7:0] a; logic [7:0] b; } [3:0] arr;\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());

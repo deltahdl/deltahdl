@@ -37,22 +37,6 @@ TEST(IntegralType, ImplicitTypeIsIntegral) {
   EXPECT_TRUE(IsIntegralType(DataTypeKind::kImplicit));
 }
 
-TEST(IntegralType, IntegerTypeWidths) {
-  DataType dt;
-  dt.kind = DataTypeKind::kByte;
-  EXPECT_EQ(EvalTypeWidth(dt), 8u);
-  dt.kind = DataTypeKind::kShortint;
-  EXPECT_EQ(EvalTypeWidth(dt), 16u);
-  dt.kind = DataTypeKind::kInt;
-  EXPECT_EQ(EvalTypeWidth(dt), 32u);
-  dt.kind = DataTypeKind::kLongint;
-  EXPECT_EQ(EvalTypeWidth(dt), 64u);
-  dt.kind = DataTypeKind::kInteger;
-  EXPECT_EQ(EvalTypeWidth(dt), 32u);
-  dt.kind = DataTypeKind::kTime;
-  EXPECT_EQ(EvalTypeWidth(dt), 64u);
-}
-
 TEST(IntegralType, SimpleBitVectorDefaultWidthIsOne) {
   DataType dt;
   dt.kind = DataTypeKind::kBit;

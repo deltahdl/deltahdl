@@ -64,14 +64,4 @@ TEST(StructDeclarationValidation, RandcInUnpackedStruct_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(StructDeclarationValidation, PackedDimOnUnpackedStruct_Rejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  struct { logic [7:0] a; logic [7:0] b; } [3:0] arr;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
 }  // namespace

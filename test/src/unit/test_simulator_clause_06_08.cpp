@@ -254,4 +254,28 @@ TEST(VariableDeclaration, StaticInitializerReferencesEarlierStatic) {
   EXPECT_EQ(val, 42u);
 }
 
+// §6.8: "Initial values are not constrained to simple constants; they can
+// include run-time expressions, including dynamic memory allocation. For
+// example, a static class handle ... can be created and initialized by
+// calling its new method." Verify that a static class handle initialized
+// via new() in its declaration is alive at time zero with the value the
+// constructor stored — this exercises the dynamic-allocation form of the
+// initializer rule end-to-end through the simulator.
+TEST(VariableDeclaration, StaticInitializerWithClassNew) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  int v;\n"
+      "  function new(int initial_v);\n"
+      "    v = initial_v;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C handle = new(42);\n"
+      "  int observed;\n"
+      "  initial observed = handle.v;\n"
+      "endmodule\n",
+      "observed");
+  EXPECT_EQ(val, 42u);
+}
+
 }  // namespace

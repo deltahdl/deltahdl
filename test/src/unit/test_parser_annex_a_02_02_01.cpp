@@ -235,19 +235,23 @@ TEST(NetAndVariableTypeParsing, ClassTypeParameterized) {
 // --- data_type: type_reference ---
 
 TEST(NetAndVariableTypeParsing, TypeReferenceExpression) {
+  // §6.8 footnote 18 requires the var keyword when type_reference is the
+  // data type of a variable declaration.
   auto r = Parse(
       "module m;\n"
       "  int x;\n"
-      "  type(x) y;\n"
+      "  var type(x) y;\n"
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
 TEST(NetAndVariableTypeParsing, TypeReferenceDataType) {
+  // §6.8 footnote 18 requires the var keyword when type_reference is the
+  // data type of a variable declaration.
   auto r = Parse(
       "module m;\n"
-      "  type(int) y;\n"
+      "  var type(int) y;\n"
       "endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

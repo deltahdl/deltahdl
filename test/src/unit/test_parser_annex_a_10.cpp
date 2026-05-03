@@ -73,22 +73,6 @@ TEST(BnfClarificationParsing, StructPackedOk) {
               "endmodule\n"));
 }
 
-TEST(BnfClarificationParsing, TypeRefInNetDecl) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  wire x;\n"
-              "  wire type(x) y;\n"
-              "endmodule\n"));
-}
-
-TEST(BnfClarificationParsing, TypeRefInVarDeclWithVar) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  int x;\n"
-              "  var type(x) y;\n"
-              "endmodule\n"));
-}
-
 // Item 10: rand/randc mutual exclusion
 
 TEST(BnfClarificationParsing, ErrorRandAndRandc) {

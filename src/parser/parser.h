@@ -226,7 +226,8 @@ class Parser {
   ModuleItem* ParseInitialBlock();
   ModuleItem* ParseFinalBlock();
   void ParseVarPrefixed(std::vector<ModuleItem*>& items);
-  void ParseTypedItemOrInst(std::vector<ModuleItem*>& items);
+  void ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
+                            bool had_lifetime = false);
   void ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items);
   ModuleItem* ParseModuleInst(const Token& module_tok);
   ModuleItem* ParseModuleInstList(const Token& module_tok,

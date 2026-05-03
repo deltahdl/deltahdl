@@ -20,22 +20,6 @@ TEST(NetAndVariableTypeElaboration, LogicVariableWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// --- integer_atom_type elaboration ---
-
-TEST(NetAndVariableTypeElaboration, IntAtomTypeWidth) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  int x;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_EQ(mod->variables[0].width, 32u);
-}
-
 // --- non_integer_type elaboration ---
 
 TEST(NetAndVariableTypeElaboration, RealVariableElaborates) {
@@ -154,79 +138,6 @@ TEST(NetAndVariableTypeElaboration, SignedVariableElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-}
-
-// --- integer_atom_type widths ---
-
-TEST(NetAndVariableTypeElaboration, ByteAtomTypeWidth) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  byte b;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_EQ(mod->variables[0].width, 8u);
-}
-
-TEST(NetAndVariableTypeElaboration, ShortintAtomTypeWidth) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  shortint s;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_EQ(mod->variables[0].width, 16u);
-}
-
-TEST(NetAndVariableTypeElaboration, LongintAtomTypeWidth) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  longint l;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_EQ(mod->variables[0].width, 64u);
-}
-
-TEST(NetAndVariableTypeElaboration, IntegerAtomTypeWidth) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  integer i;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_EQ(mod->variables[0].width, 32u);
-  EXPECT_TRUE(mod->variables[0].is_4state);
-}
-
-TEST(NetAndVariableTypeElaboration, TimeAtomTypeWidth) {
-  ElabFixture f;
-  auto* design = Elaborate(
-      "module m;\n"
-      "  time t;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_FALSE(mod->variables.empty());
-  EXPECT_EQ(mod->variables[0].width, 64u);
 }
 
 // --- non_integer_type elaboration ---

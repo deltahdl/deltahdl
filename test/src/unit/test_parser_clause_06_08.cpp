@@ -478,6 +478,30 @@ TEST(VariableDeclarations, StaticWithoutDataTypeOrVarIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §6.8 footnote 14b: the rule applies to every data_declaration, not only
+// procedural-block ones. At module-item scope a lifetime keyword forces a
+// data_declaration interpretation, so omitting both the data_type and `var`
+// must still be rejected.
+TEST(VariableDeclarations, StaticAtModuleScopeWithoutDataTypeOrVarIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  static x = 0;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §6.8 footnote 14b: same rule for the automatic lifetime at module-item
+// scope. Footnote 14a separately forbids automatic outside procedural
+// contexts; this test pins the parser-stage requirement that the surface
+// form is rejected before the elaborator gets a chance to apply 14a.
+TEST(VariableDeclarations, AutomaticAtModuleScopeWithoutDataTypeOrVarIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  automatic x = 0;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 // §6.8 footnote 14: when `var` is present the data type may be omitted —
 // the implicit data type defaults to logic. Verify the same surface form
 // that triggered the error above is accepted once `var` is added.
@@ -504,6 +528,48 @@ TEST(VariableDeclarations, VarWithUnpackedArrayDim) {
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(item->name, "mem");
   EXPECT_FALSE(item->unpacked_dims.empty());
+}
+
+// §6.8 footnote 18: when a type_reference is used in a variable declaration,
+// it shall be preceded by the var keyword. The bare form `type(x) y;` at
+// module-item position is therefore illegal.
+TEST(VariableDeclarations, TypeRefInVarDeclWithoutVarIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a;\n"
+      "  type(a) b;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §6.8 footnote 18: the same surface form parses cleanly once the required
+// `var` prefix is present, confirming the rule fires only on the missing
+// keyword and not on the type_reference itself.
+TEST(VariableDeclarations, TypeRefInVarDeclWithVarOk) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a;\n"
+      "  var type(a) b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->modules[0]->items.size(), 2u);
+  auto* item = r.cu->modules[0]->items[1];
+  EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
+  EXPECT_NE(item->data_type.type_ref_expr, nullptr);
+  EXPECT_EQ(item->name, "b");
+}
+
+// §6.8 footnote 18: the net-side counterpart — when type_reference is used
+// in a net declaration it shall be preceded by a net type keyword. Verify
+// that `wire type(x) y;` is accepted, completing parser-level coverage of
+// both halves of the footnote.
+TEST(VariableDeclarations, TypeRefInNetDeclWithWireOk) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  wire x;\n"
+              "  wire type(x) y;\n"
+              "endmodule\n"));
 }
 
 }  // namespace
