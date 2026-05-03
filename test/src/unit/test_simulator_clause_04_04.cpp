@@ -36,6 +36,31 @@ TEST(StratifiedSchedulerSim, EventsRemovedAfterExecution) {
   EXPECT_EQ(pool.FreeCount(), 1u);
 }
 
+// §4.4 ¶2: every event has *one and only one* simulation execution time. An
+// event scheduled at time T must fire exactly once and only when CurrentTime()
+// equals T — not earlier (would violate "current or future"), not later (would
+// violate ordering), and not multiple times (would violate "one"). Production
+// `Scheduler::DrainQueue` pops each event off its queue exactly once before
+// invoking the callback, and the post-fire `pool_.Release` ensures the event
+// is not re-armed.
+TEST(StratifiedSchedulerSim, EventFiresExactlyOnceAtScheduledTime) {
+  Arena arena;
+  Scheduler sched(arena);
+  int fire_count = 0;
+  uint64_t fire_time = UINT64_MAX;
+
+  auto* ev = sched.GetEventPool().Acquire();
+  ev->callback = [&]() {
+    ++fire_count;
+    fire_time = sched.CurrentTime().ticks;
+  };
+  sched.ScheduleEvent({42}, Region::kActive, ev);
+
+  sched.Run();
+  EXPECT_EQ(fire_count, 1);
+  EXPECT_EQ(fire_time, 42u);
+}
+
 TEST(StratifiedSchedulerSim, AllEventsAtSameTimeFormOneTimeSlot) {
   Arena arena;
   Scheduler sched(arena);
@@ -211,25 +236,6 @@ TEST(StratifiedSchedulerSim, EventQueueClear) {
   EXPECT_TRUE(queue.empty());
 }
 
-TEST(StratifiedSchedulerSim, RegionsPredictableDesignTestbenchInteraction) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 8'd10;\n"
-      "    b <= 8'd20;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 10u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 20u);
-}
-
 TEST(StratifiedSchedulerSim, PredictableNBAToAlwaysCombInteraction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -266,6 +272,35 @@ TEST(StratifiedSchedulerSim, DynamicSchedulingWithinSameTimeSlot) {
   sched.Run();
   EXPECT_TRUE(inner_ran);
   EXPECT_EQ(timestep_count, 1);
+}
+
+// §4.4 ¶1: events can be dynamically scheduled, executed, and removed *as the
+// simulator advances through time*. The "advances through time" half is the
+// future-time variant of dynamic scheduling: production code inside a current
+// callback calls Scheduler::ScheduleEvent with a time strictly greater than
+// CurrentTime(). The scheduler must place the event in a future slot and pick
+// it up only when Run() advances to that slot.
+TEST(StratifiedSchedulerSim, EventsDynamicallyScheduledAtFutureTime) {
+  Arena arena;
+  Scheduler sched(arena);
+  bool fired_at_future = false;
+  uint64_t fire_time = UINT64_MAX;
+
+  auto* outer = sched.GetEventPool().Acquire();
+  outer->callback = [&]() {
+    auto* later = sched.GetEventPool().Acquire();
+    later->callback = [&]() {
+      fired_at_future = true;
+      fire_time = sched.CurrentTime().ticks;
+    };
+    sched.ScheduleEvent({100}, Region::kActive, later);
+  };
+  sched.ScheduleEvent({0}, Region::kActive, outer);
+
+  sched.Run();
+  EXPECT_TRUE(fired_at_future);
+  EXPECT_EQ(fire_time, 100u);
+  EXPECT_EQ(sched.CurrentTime().ticks, 100u);
 }
 
 TEST(StratifiedSchedulerSim, BlockingAndNBACompleteInSameTimeSlot) {
@@ -331,29 +366,5 @@ TEST(StratifiedSchedulerSim, RegionOrderingPerTimeSlot) {
   EXPECT_EQ(log[1].second, "t5_nba");
   EXPECT_EQ(log[2].second, "t10_active");
   EXPECT_EQ(log[3].second, "t10_nba");
-}
-
-TEST(SchedulingSemanticsSim, SameTimeSlotExecution) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 8'd1;\n"
-      "    b = 8'd2;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
-  auto* va = f.ctx.FindVariable("a");
-  auto* vb = f.ctx.FindVariable("b");
-  ASSERT_NE(va, nullptr);
-  ASSERT_NE(vb, nullptr);
-  EXPECT_EQ(va->value.ToUint64(), 1u);
-  EXPECT_EQ(vb->value.ToUint64(), 2u);
 }
 

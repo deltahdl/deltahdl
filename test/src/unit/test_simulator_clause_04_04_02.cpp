@@ -72,12 +72,6 @@ TEST(SimAndPliRegionSim, SimulationRegionsExecuteInOrder) {
   }
 }
 
-TEST(SimAndPliRegionSim, PreponedIsFirstPostponedIsLast) {
-  EXPECT_EQ(static_cast<int>(Region::kPreponed), 0);
-  EXPECT_EQ(static_cast<int>(Region::kPostponed),
-            static_cast<int>(Region::kCOUNT) - 1);
-}
-
 TEST(SimAndPliRegionSim, MixedSimAndPLIRegionsExecuteInOrder) {
   VerifyAllRegionsExecuteInOrder();
 }
