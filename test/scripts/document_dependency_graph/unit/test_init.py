@@ -62,9 +62,28 @@ def test_parse_args_output_value(make_lrm, make_output) -> None:
     assert str(args.output) == str(make_output)
 
 
+def test_parse_args_commit_defaults_off(make_lrm, make_output) -> None:
+    """--commit defaults to False so a plain run never touches git."""
+    args = document_dependency_graph.parse_args([
+        "--lrm", str(make_lrm),
+        "--output", str(make_output),
+    ])
+    assert args.commit is False
+
+
+def test_parse_args_commit_explicit(make_lrm, make_output) -> None:
+    """--commit sets args.commit to True."""
+    args = document_dependency_graph.parse_args([
+        "--lrm", str(make_lrm),
+        "--output", str(make_output),
+        "--commit",
+    ])
+    assert args.commit is True
+
+
 def test_main_walks_every_toc_entry(run_main) -> None:
     """main() invokes build_subclause_record once per load_toc entry."""
-    _, mock_record = run_main(
+    _, mock_record, _ = run_main(
         toc={"4.4": (10, 20), "5.6": (21, 30), "13.4": (31, 50)},
     )
     assert mock_record.call_count == 3
@@ -98,20 +117,38 @@ def test_main_writes_order_section(run_main, make_output) -> None:
 
 def test_main_forwards_model_to_record_builder(run_main) -> None:
     """main() forwards the parsed --model to build_subclause_record."""
-    _, mock_record = run_main(extra_argv=["--model", "haiku"])
+    _, mock_record, _ = run_main(extra_argv=["--model", "haiku"])
     assert mock_record.call_args[1]["model"] == "haiku"
 
 
 def test_main_forwards_lrm_to_record_builder(run_main, make_lrm) -> None:
     """main() forwards the parsed --lrm to build_subclause_record."""
-    _, mock_record = run_main()
+    _, mock_record, _ = run_main()
     assert mock_record.call_args[0][1] == str(make_lrm)
 
 
 def test_main_passes_lrm_to_load_toc(run_main, make_lrm) -> None:
     """main() reads the table of contents from the --lrm path."""
-    mock_toc, _ = run_main(toc={})
+    mock_toc, _, _ = run_main(toc={})
     assert mock_toc.call_args[0][0] == str(make_lrm)
+
+
+def test_main_skips_commit_when_flag_unset(run_main) -> None:
+    """Without --commit, main() does not call commit_output."""
+    _, _, mock_commit = run_main()
+    assert mock_commit.call_count == 0
+
+
+def test_main_calls_commit_output_when_commit_flag(run_main) -> None:
+    """With --commit, main() calls commit_output exactly once."""
+    _, _, mock_commit = run_main(extra_argv=["--commit"])
+    assert mock_commit.call_count == 1
+
+
+def test_main_passes_output_path_to_commit(run_main, make_output) -> None:
+    """commit_output is called with the parsed --output path."""
+    _, _, mock_commit = run_main(extra_argv=["--commit"])
+    assert mock_commit.call_args[0][0] == make_output
 
 
 def test_main_guard_invokes_main() -> None:

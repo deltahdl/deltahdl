@@ -17,6 +17,7 @@ from lib.python.cli import (
 )
 from lib.python.lrm import load_toc
 
+from .commit import commit_output
 from .ordering import find_cycle_groups, order_groups
 from .walk import build_subclause_record
 
@@ -39,6 +40,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         required=True,
         help="Path the dependency graph JSON file is written to.",
     )
+    parser.add_argument(
+        "--commit",
+        action="store_true",
+        default=False,
+        help=(
+            "After writing the output file, stage, commit, and push it"
+            " to main. Off by default."
+        ),
+    )
     return parse_and_validate(parser, argv)
 
 
@@ -54,3 +64,5 @@ def main(argv: list[str] | None = None) -> None:
     }
     order = order_groups(find_cycle_groups(records), records)
     args.output.write_text(json.dumps({"records": records, "order": order}))
+    if args.commit:
+        commit_output(args.output)
