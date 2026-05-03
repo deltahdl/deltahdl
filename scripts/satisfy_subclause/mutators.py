@@ -12,7 +12,7 @@ landed on disk with one ``Closes #N`` trailer per subclause:
     has dependencies that are now satisfied; step 1 tells Claude they
     are in place and may be referenced rather than re-implemented.
   - ``satisfy_unsatisfied_subclause_set_with_satisfied_dependencies``:
-    A 2- or 3-member dependency cycle co-implemented in one pass; the
+    A multi-member dependency cycle satisfied in one pass; the
     eight steps run once over the cycle set, with each step naming
     every member.
 
@@ -65,10 +65,6 @@ COMMIT_BODY_DISALLOWED_TOOLS = (
     " Bash(rm *) Bash(mv *) Bash(cp *) Bash(touch *) Bash(mkdir *)"
     " " + MUTATOR_DISALLOWED_TOOLS
 )
-
-
-_MAX_CYCLE_MEMBERS = 3
-_PIPELINE_CYCLE_LABEL = "pipeline-cycle"
 
 
 @dataclass(frozen=True)
@@ -172,7 +168,7 @@ def build_commit_message(
         title = f"Satisfy {format_subclause_label(subclauses[0])}"
     else:
         labels = " + ".join(format_subclause_label(s) for s in subclauses)
-        title = f"Satisfy {labels} (cycle co-implementation)"
+        title = f"Satisfy {labels} (multi-subclause pass)"
     closes = "\n".join(f"Closes #{i}" for i in issues)
     return f"{title}\n\n{summary}\n\n{closes}\n"
 
@@ -402,16 +398,18 @@ def _build_dependencies_block(satisfied_dependencies: list[str]) -> str:
 
 
 def _build_cycle_intro_block(subclauses: list[str]) -> str:
-    """Return the cycle-relationship preface for step 1 of a cycle run."""
+    """Return the multi-subclause preface for step 1 of a multi-member run."""
     if len(subclauses) == 1:
         return ""
     label = _scope_label(subclauses)
     return (
-        f"You are co-implementing the dependency cycle {label}: each"
-        " of these subclauses requires machinery from the others, so"
-        " they must be implemented together in a single pass. When"
-        " fixing one member, you may freely reference syntax and"
-        " machinery defined by another cycle member.\n\n"
+        f"You are satisfying {label} in one pass. As you read each"
+        " subclause's LRM text, look for terms, functions, or"
+        " syntactic constructs that one of these subclauses uses from"
+        " another. Where you find such links, weave the implementations"
+        " together so a term defined in one subclause is shared with"
+        " the others that use it. Where you find none, satisfy each"
+        " subclause's requirements on its own.\n\n"
     )
 
 
@@ -424,7 +422,7 @@ def build_steps(
     """Return the eight ``(description, prompt)`` step pairs.
 
     A list of one subclause produces the single-subclause pipeline; a
-    list of 2-3 subclauses produces the cycle co-implementation
+    list of two or more subclauses produces the multi-subclause
     pipeline (every step names every member). The
     ``satisfied_dependencies`` list seeds step 1 so Claude knows which
     machinery it may reference rather than re-implement.
@@ -587,65 +585,22 @@ def satisfy_unsatisfied_subclause_with_satisfied_dependencies(
 # Mutator: cycle set
 # ---------------------------------------------------------------------------
 
-def _label_oversize_cycle_member(issue: int) -> None:
-    """Add the pipeline-cycle label to *issue* (idempotent)."""
-    subprocess.run(
-        [
-            "gh", "issue", "edit", str(issue),
-            "--add-label", _PIPELINE_CYCLE_LABEL,
-        ],
-        check=False,
-    )
-
-
-def _label_and_abort_on_oversize_cycle(members: list[CycleMember]) -> None:
-    """Tag each member's issue with pipeline-cycle then raise to abort the run.
-
-    Cycles with more than ``_MAX_CYCLE_MEMBERS`` members are too tangled
-    to co-implement in one Claude session. Record human-actionable
-    state first — each member's GitHub issue gets the
-    ``pipeline-cycle`` label so a human triaging tomorrow can find
-    them — then raise so the orchestrator crashes loudly rather than
-    silently skipping the failing cycle and proceeding with unrelated
-    descendants.
-    """
-    subclauses = [m.subclause for m in members]
-    issues = [m.issue for m in members]
-    scope = _scope_label(subclauses)
-    issues_str = ", ".join(f"#{i}" for i in issues)
-    for issue in issues:
-        _label_oversize_cycle_member(issue)
-    print(
-        f"Cycle-set mutator: cycle of {len(members)} members"
-        f" ({scope}) exceeds the {_MAX_CYCLE_MEMBERS}-member ceiling;"
-        f" tagged each issue ({issues_str}) with"
-        f" '{_PIPELINE_CYCLE_LABEL}'. Aborting the run — break the"
-        " cycle by hand and rerun.",
-        file=sys.stderr,
-    )
-    raise RuntimeError(
-        f"Oversize satisfaction-pipeline cycle ({scope}); each member's"
-        f" issue tagged with '{_PIPELINE_CYCLE_LABEL}'.",
-    )
-
-
 def satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
     members: list[CycleMember], lrm: str,
     satisfied_dependencies: list[str], *, model: str,
 ) -> None:
-    """Run the eight-step pipeline for a 2- or 3-member dependency cycle.
+    """Run the eight-step pipeline for a multi-member dependency cycle.
 
-    Cycles with more than ``_MAX_CYCLE_MEMBERS`` members tag each
-    member's issue with ``pipeline-cycle`` and raise — the run dies so
-    the user sees the failure immediately rather than the orchestrator
-    silently skipping the cycle.
+    The eight steps run once over every member in ``members``; the
+    cycle-intro preface tells Claude to weave members that share terms
+    and to satisfy independent members on their own. Any cycle of two
+    or more members is accepted; the model is responsible for fitting
+    the bundled LRM text and code surface in its context window.
     """
     if len(members) < 2:
         raise ValueError(
             f"Cycle must have at least 2 members (got {len(members)}).",
         )
-    if len(members) > _MAX_CYCLE_MEMBERS:
-        _label_and_abort_on_oversize_cycle(members)
     subclauses = [m.subclause for m in members]
     issues = [m.issue for m in members]
     print(

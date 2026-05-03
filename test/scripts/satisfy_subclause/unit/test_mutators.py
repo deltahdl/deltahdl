@@ -1,6 +1,5 @@
 """Unit tests for satisfy_subclause.mutators."""
 
-from contextlib import suppress
 from unittest.mock import patch
 
 import pytest
@@ -291,9 +290,15 @@ def test_build_commit_message_single_subclause_title() -> None:
 
 
 def test_build_commit_message_set_title() -> None:
-    """A multi-subclause commit title names cycle co-implementation."""
+    """A multi-subclause commit title is labelled neutrally."""
     msg = build_commit_message(["33.4.1.5", "33.4.1.6"], [10, 11], "")
-    assert "cycle co-implementation" in msg
+    assert "multi-subclause pass" in msg
+
+
+def test_build_commit_message_set_title_avoids_cycle_assertion() -> None:
+    """A multi-subclause commit title does not assert co-implementation."""
+    msg = build_commit_message(["33.4.1.5", "33.4.1.6"], [10, 11], "")
+    assert "cycle co-implementation" not in msg
 
 
 def test_build_commit_message_includes_summary() -> None:
@@ -503,12 +508,28 @@ def test_build_steps_cycle_lists_each_member() -> None:
     assert "§33.4.1.5" in steps[0][1] and "§33.4.1.6" in steps[0][1]
 
 
-def test_build_steps_cycle_describes_co_implementation() -> None:
-    """Step 1 of a cycle run explains the co-implementation contract."""
+def test_build_steps_cycle_describes_one_pass() -> None:
+    """Step 1 of a multi-subclause run says it satisfies them in one pass."""
     steps = build_steps(
         ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
     )
-    assert "co-implementing" in steps[0][1]
+    assert "in one pass" in steps[0][1]
+
+
+def test_build_steps_cycle_invites_weaving_or_independent_satisfaction() -> None:
+    """Step 1 frames weaving and independent satisfaction as equal options."""
+    steps = build_steps(
+        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
+    )
+    assert "weave" in steps[0][1]
+
+
+def test_build_steps_cycle_does_not_assert_mutual_dependency() -> None:
+    """Step 1 does not claim each member requires machinery from the others."""
+    steps = build_steps(
+        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
+    )
+    assert "requires machinery from the others" not in steps[0][1]
 
 
 def test_build_steps_cycle_lists_first_member_canonical_files() -> None:
@@ -546,9 +567,9 @@ def test_build_steps_cycle_external_deps_listed() -> None:
 
 
 def test_build_steps_single_member_has_no_cycle_intro() -> None:
-    """A single-subclause run does not include the cycle intro block."""
+    """A single-subclause run skips the multi-subclause weaving preface."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "co-implementing" not in steps[0][1]
+    assert "weave" not in steps[0][1]
 
 
 # --- mutator dispatch shells ------------------------------------------------
@@ -735,80 +756,8 @@ def test_cycle_rejects_single_member() -> None:
         )
 
 
-def _four_member_cycle() -> list[CycleMember]:
-    """Return a four-member CycleMember list (exceeds the cap)."""
-    return [
-        CycleMember(subclause="33.4.1.5", issue=10),
-        CycleMember(subclause="33.4.1.6", issue=11),
-        CycleMember(subclause="33.4.1.7", issue=12),
-        CycleMember(subclause="33.4.1.8", issue=13),
-    ]
-
-
-def _invoke_oversize_cycle() -> None:
-    """Call the cycle mutator with a four-member cycle (>cap)."""
-    satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
-        _four_member_cycle(), "~/LRM.pdf", [], model="opus",
-    )
-
-
-def test_cycle_oversize_raises_to_abort_the_run() -> None:
-    """Oversize cycle raises so the orchestrator crashes catastrophically."""
-    with patch("satisfy_subclause.mutators.subprocess.run"):
-        with pytest.raises(RuntimeError):
-            _invoke_oversize_cycle()
-
-
-def test_cycle_oversize_skips_run_steps() -> None:
-    """An oversize cycle does not invoke the eight-step Claude pipeline."""
-    mock_run, mock_commit = _patched_run_steps_and_commit()
-    with patch("satisfy_subclause.mutators.subprocess.run"):
-        with mock_run as run:
-            with mock_commit:
-                with suppress(RuntimeError):
-                    _invoke_oversize_cycle()
-    assert not run.called
-
-
-def test_cycle_oversize_skips_commit() -> None:
-    """Oversize cycle skips commit_mutator_result so issues stay open."""
-    mock_run, mock_commit = _patched_run_steps_and_commit()
-    with patch("satisfy_subclause.mutators.subprocess.run"):
-        with mock_run:
-            with mock_commit as commit:
-                with suppress(RuntimeError):
-                    _invoke_oversize_cycle()
-    assert not commit.called
-
-
-def test_cycle_oversize_labels_each_issue_with_pipeline_cycle() -> None:
-    """Oversize cycle tags every member's issue before raising."""
-    with patch("satisfy_subclause.mutators.subprocess.run") as proc:
-        with suppress(RuntimeError):
-            _invoke_oversize_cycle()
-    labelled = [
-        call.args[0][3]
-        for call in proc.call_args_list
-        if call.args[0][:3] == ["gh", "issue", "edit"]
-        and "pipeline-cycle" in call.args[0]
-    ]
-    assert labelled == ["10", "11", "12", "13"]
-
-
-def test_cycle_oversize_warns_to_stderr_naming_each_member(capsys) -> None:
-    """Oversize cycle prints a stderr notice naming every member."""
-    with patch("satisfy_subclause.mutators.subprocess.run"):
-        with suppress(RuntimeError):
-            _invoke_oversize_cycle()
-    err = capsys.readouterr().err
-    assert (
-        "33.4.1.5" in err and "33.4.1.6" in err
-        and "33.4.1.7" in err and "33.4.1.8" in err
-    )
-
-
 def test_cycle_accepts_three_members() -> None:
-    """A three-member cycle is accepted."""
+    """A three-member cycle runs the eight-step pipeline."""
     three = _two_member_cycle() + [CycleMember(subclause="33.5", issue=12)]
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
@@ -817,6 +766,55 @@ def test_cycle_accepts_three_members() -> None:
                 three, "~/LRM.pdf", [], model="opus",
             )
     assert run.called
+
+
+def _four_member_cycle() -> list[CycleMember]:
+    """Return a four-member CycleMember list."""
+    return [
+        CycleMember(subclause="33.4.1.5", issue=10),
+        CycleMember(subclause="33.4.1.6", issue=11),
+        CycleMember(subclause="33.4.1.7", issue=12),
+        CycleMember(subclause="33.4.1.8", issue=13),
+    ]
+
+
+def test_cycle_accepts_four_members() -> None:
+    """A four-member cycle runs the eight-step pipeline."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
+        with mock_commit:
+            satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
+                _four_member_cycle(), "~/LRM.pdf", [], model="opus",
+            )
+    assert run.called
+
+
+def test_cycle_accepts_five_members() -> None:
+    """A five-member cycle runs the eight-step pipeline."""
+    five = _four_member_cycle() + [CycleMember(subclause="33.5", issue=14)]
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with mock_run as run:
+        with mock_commit:
+            satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
+                five, "~/LRM.pdf", [], model="opus",
+            )
+    assert run.called
+
+
+def test_cycle_four_members_skips_pipeline_cycle_label() -> None:
+    """A four-member cycle no longer tags issues with the pipeline-cycle label."""
+    mock_run, mock_commit = _patched_run_steps_and_commit()
+    with patch("satisfy_subclause.mutators.subprocess.run") as proc:
+        with mock_run:
+            with mock_commit:
+                satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
+                    _four_member_cycle(), "~/LRM.pdf", [], model="opus",
+                )
+    labelled_with_pipeline_cycle = [
+        call for call in proc.call_args_list
+        if call.args and "pipeline-cycle" in str(call.args[0])
+    ]
+    assert labelled_with_pipeline_cycle == []
 
 
 def test_cycle_invokes_run_steps() -> None:

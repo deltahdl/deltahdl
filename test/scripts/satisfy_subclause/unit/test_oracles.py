@@ -190,14 +190,28 @@ def test_build_dependency_prompt_mentions_lrm() -> None:
     assert "~/LRM.pdf" in build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
 
 
-def test_build_dependency_prompt_describes_required_relation() -> None:
-    """Prompt explains the dependency relation as REQUIRED-before."""
-    assert "REQUIRED" in build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+def test_build_dependency_prompt_names_terms_functions_constructs() -> None:
+    """Prompt names the concrete things to look for in §X's text."""
+    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "term, function, or syntactic construct" in prompt
 
 
-def test_build_dependency_prompt_describes_parent_rollup() -> None:
-    """Prompt explains the parent-rolls-up-over-children rule."""
-    assert "child" in build_dependency_prompt("33.4", "~/LRM.pdf")
+def test_build_dependency_prompt_orders_foundations_first() -> None:
+    """Prompt instructs ordering by foundation-then-builds-on."""
+    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "foundations-first" in prompt
+
+
+def test_build_dependency_prompt_avoids_required_emphasis() -> None:
+    """Prompt no longer leans on the 'REQUIRED' framing."""
+    prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
+    assert "REQUIRED" not in prompt
+
+
+def test_build_dependency_prompt_drops_parent_rollup_rule() -> None:
+    """Prompt no longer reframes parent satisfaction as a child dependency."""
+    prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
+    assert "rolls up" not in prompt
 
 
 def test_build_dependency_prompt_requests_json_array() -> None:
