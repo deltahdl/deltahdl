@@ -67,12 +67,12 @@ jobs:
           --fail-on=C,R,W --fail-under=10.0
       - name: Run mypy on source
         run: >-
-          PYTHONPATH=.:scripts python3 -m mypy
+          PYTHONPATH=.:scripts python3 -m mypy --strict
           lib/python/ scripts/
       - name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts
-          python3 -m mypy --explicit-package-bases
+          python3 -m mypy --strict --explicit-package-bases
           lib/python/ test/scripts/ test/lib/python/
       - name: Detect copy-paste in source
         run: >-
