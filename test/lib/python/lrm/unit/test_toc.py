@@ -2,6 +2,10 @@
 
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
+
+import pytest
+from pypdf import PdfReader
 
 from lib.python.lrm import load_toc
 
@@ -95,3 +99,36 @@ def test_repeat_call_returns_same_object(
     """Memoization: a second call returns the identical dict object."""
     path = make_pdf("a.pdf", 200, nested_outline)
     assert load_toc(path) is load_toc(path)
+
+
+def test_unresolvable_destination_is_skipped(
+    make_pdf: PdfBuilder,
+    nested_outline: list[tuple[int, str, int]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bookmarks whose destination page can't be resolved are skipped."""
+    path = make_pdf("unresolvable_all.pdf", 200, nested_outline)
+    monkeypatch.setattr(
+        PdfReader, "get_destination_page_number",
+        lambda *_a, **_kw: None,
+    )
+    assert load_toc(path) == {}
+
+
+def test_unresolvable_destination_skips_only_that_entry(
+    make_pdf: PdfBuilder,
+    nested_outline: list[tuple[int, str, int]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Other bookmarks still resolve when one destination is None."""
+    path = make_pdf("unresolvable_one.pdf", 200, nested_outline)
+    real = PdfReader.get_destination_page_number
+
+    def stub(self: Any, item: Any) -> int | None:
+        if str(item.title or "").startswith("23.2.1"):
+            return None
+        return real(self, item)
+    monkeypatch.setattr(
+        PdfReader, "get_destination_page_number", stub,
+    )
+    assert "23.2.1" not in load_toc(path)
