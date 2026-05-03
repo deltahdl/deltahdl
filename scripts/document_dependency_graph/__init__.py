@@ -1,31 +1,30 @@
 """Generate the LRM dependency graph as a JSON file.
 
-``document_dependency_graph --lrm path --output graph.json`` calls the
-read-only dependency oracle and writes the resulting graph to disk so
-downstream tools can plan a satisfaction pass without re-querying
-Claude on every recursion.
+``document_dependency_graph --lrm path --output graph.json`` walks the
+LRM table of contents, asks the read-only oracles once per subclause,
+and writes the resulting graph to disk so downstream tools can plan a
+satisfaction pass without re-querying Claude on every recursion.
 """
 
 import argparse
 import json
 from pathlib import Path
 
-from satisfy_subclause.oracles import compute_subclause_dependencies
-
 from lib.python.cli import (
     add_lrm_arg,
     add_model_arg,
     parse_and_validate,
 )
+from lib.python.lrm import load_toc
+
+from .walk import build_subclause_record
 
 
 _DESCRIPTION = (
-    "Walk the LRM, ask the dependency oracle once per subclause, and"
+    "Walk the LRM, ask the dependency oracles once per subclause, and"
     " write the resulting graph to a JSON file so downstream tools"
     " can plan a satisfaction pass without re-querying."
 )
-
-_PLACEHOLDER_SUBCLAUSE = "4.4"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -43,9 +42,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Run the dependency oracle and write the graph file."""
+    """Run the dependency oracles for every subclause and write the graph."""
     args = parse_args(argv)
-    deps = compute_subclause_dependencies(
-        _PLACEHOLDER_SUBCLAUSE, str(args.lrm), model=args.model,
-    )
-    args.output.write_text(json.dumps({_PLACEHOLDER_SUBCLAUSE: deps}))
+    toc = load_toc(str(args.lrm))
+    graph = {
+        subclause: build_subclause_record(
+            subclause, str(args.lrm), model=args.model,
+        )
+        for subclause in toc
+    }
+    args.output.write_text(json.dumps(graph))

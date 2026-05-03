@@ -2,7 +2,6 @@
 
 import json
 import runpy
-from unittest.mock import patch
 
 import pytest
 
@@ -63,72 +62,49 @@ def test_parse_args_output_value(make_lrm, make_output) -> None:
     assert str(args.output) == str(make_output)
 
 
-def test_main_invokes_oracle_for_placeholder(make_lrm, make_output) -> None:
-    """main() calls the dependency oracle once for the placeholder subclause."""
-    with patch(
-        "document_dependency_graph.compute_subclause_dependencies",
-        return_value=[],
-    ) as mock_oracle:
-        document_dependency_graph.main([
-            "--lrm", str(make_lrm),
-            "--output", str(make_output),
-        ])
-    assert mock_oracle.call_count == 1
+def test_main_walks_every_toc_entry(run_main) -> None:
+    """main() invokes build_subclause_record once per load_toc entry."""
+    _, mock_record = run_main(
+        toc={"4.4": (10, 20), "5.6": (21, 30), "13.4": (31, 50)},
+    )
+    assert mock_record.call_count == 3
 
 
-def test_main_passes_lrm_to_oracle(make_lrm, make_output) -> None:
-    """main() forwards the parsed --lrm path to the oracle."""
-    with patch(
-        "document_dependency_graph.compute_subclause_dependencies",
-        return_value=[],
-    ) as mock_oracle:
-        document_dependency_graph.main([
-            "--lrm", str(make_lrm),
-            "--output", str(make_output),
-        ])
-    assert mock_oracle.call_args[0][1] == str(make_lrm)
-
-
-def test_main_passes_model_to_oracle(make_lrm, make_output) -> None:
-    """main() forwards the parsed --model to the oracle."""
-    with patch(
-        "document_dependency_graph.compute_subclause_dependencies",
-        return_value=[],
-    ) as mock_oracle:
-        document_dependency_graph.main([
-            "--lrm", str(make_lrm),
-            "--output", str(make_output),
-            "--model", "haiku",
-        ])
-    assert mock_oracle.call_args[1]["model"] == "haiku"
-
-
-def test_main_writes_oracle_result_to_output(make_lrm, make_output) -> None:
-    """main() writes a JSON file mapping the placeholder subclause to deps."""
-    with patch(
-        "document_dependency_graph.compute_subclause_dependencies",
-        return_value=["4.4.1", "4.4.2"],
-    ):
-        document_dependency_graph.main([
-            "--lrm", str(make_lrm),
-            "--output", str(make_output),
-        ])
+def test_main_writes_record_per_subclause(run_main, make_output) -> None:
+    """Output file contains one entry per load_toc subclause, keyed by id."""
+    run_main(toc={"4.4": (10, 20), "5.6": (21, 30)})
     payload = json.loads(make_output.read_text())
-    assert payload == {"4.4": ["4.4.1", "4.4.2"]}
+    assert set(payload) == {"4.4", "5.6"}
 
 
-def test_main_writes_single_entry_file(make_lrm, make_output) -> None:
-    """The graph file contains exactly one entry (the placeholder)."""
-    with patch(
-        "document_dependency_graph.compute_subclause_dependencies",
-        return_value=[],
-    ):
-        document_dependency_graph.main([
-            "--lrm", str(make_lrm),
-            "--output", str(make_output),
-        ])
+def test_main_record_payload(run_main, make_output) -> None:
+    """Each entry in the output file is the build_subclause_record payload."""
+    record = {
+        "dependencies": ["3.14.3"],
+        "proofs": {"3.14.3": "Sentence."},
+        "prerequisites": {"3.14.3": "elaboration"},
+    }
+    run_main(record=record)
     payload = json.loads(make_output.read_text())
-    assert len(payload) == 1
+    assert payload["4.4"] == record
+
+
+def test_main_forwards_model_to_record_builder(run_main) -> None:
+    """main() forwards the parsed --model to build_subclause_record."""
+    _, mock_record = run_main(extra_argv=["--model", "haiku"])
+    assert mock_record.call_args[1]["model"] == "haiku"
+
+
+def test_main_forwards_lrm_to_record_builder(run_main, make_lrm) -> None:
+    """main() forwards the parsed --lrm to build_subclause_record."""
+    _, mock_record = run_main()
+    assert mock_record.call_args[0][1] == str(make_lrm)
+
+
+def test_main_passes_lrm_to_load_toc(run_main, make_lrm) -> None:
+    """main() reads the table of contents from the --lrm path."""
+    mock_toc, _ = run_main(toc={})
+    assert mock_toc.call_args[0][0] == str(make_lrm)
 
 
 def test_main_guard_invokes_main() -> None:
