@@ -2,6 +2,7 @@
 
 import os
 import re
+from typing import Any, Iterator
 
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
@@ -13,7 +14,7 @@ _CLAUSE_RE = re.compile(r"^([A-Z]|\d+)(\.\d+){0,4}\b")
 _TOC_CACHE: dict[str, dict[str, tuple[int, int]]] = {}
 
 
-def _walk_outline(items):
+def _walk_outline(items: Any) -> Iterator[Any]:
     """Yield outline items in document order from a pypdf outline tree."""
     for item in items:
         if isinstance(item, list):
@@ -22,7 +23,7 @@ def _walk_outline(items):
             yield item
 
 
-def _extract_entries(reader):
+def _extract_entries(reader: PdfReader) -> list[tuple[str, int]]:
     """Return ``[(clause, start_page)]`` from a PDF reader, in doc order."""
     entries: list[tuple[str, int]] = []
     for item in _walk_outline(reader.outline):
@@ -30,12 +31,16 @@ def _extract_entries(reader):
         match = _CLAUSE_RE.match(title)
         if match is None:
             continue
-        start = reader.get_destination_page_number(item) + 1
-        entries.append((match.group(0), start))
+        page = reader.get_destination_page_number(item)
+        if page is None:
+            continue
+        entries.append((match.group(0), page + 1))
     return entries
 
 
-def _compute_ranges(entries, total_pages):
+def _compute_ranges(
+    entries: list[tuple[str, int]], total_pages: int,
+) -> dict[str, tuple[int, int]]:
     """Compute ``{clause: (start, end)}`` from ordered ``entries``."""
     result: dict[str, tuple[int, int]] = {}
     for i, (clause, start) in enumerate(entries):
@@ -68,7 +73,12 @@ def load_toc(lrm_path: str) -> dict[str, tuple[int, int]]:
     return toc
 
 
-def _format_clause(clause, toc, *, truncate_at=None):
+def _format_clause(
+    clause: str,
+    toc: dict[str, tuple[int, int]],
+    *,
+    truncate_at: str | None = None,
+) -> str:
     """Return ``§clause`` with an optional ``(pages A-B)`` suffix.
 
     When ``truncate_at`` names another clause present in ``toc``, the

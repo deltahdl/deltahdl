@@ -1,8 +1,10 @@
 """Batch-classify selected tests in a file by invoking classify_test per test."""
 
 import argparse
+import io
 import subprocess
 import sys
+from typing import cast
 
 from lib.python.classify import (
     add_github_args,
@@ -79,6 +81,6 @@ def _run(args):
 
 def main():
     """Entry point for classify_tests."""
-    sys.stdout.reconfigure(line_buffering=True)
-    sys.stderr.reconfigure(line_buffering=True)
+    cast(io.TextIOWrapper, sys.stdout).reconfigure(line_buffering=True)
+    cast(io.TextIOWrapper, sys.stderr).reconfigure(line_buffering=True)
     _run(_parse_args())

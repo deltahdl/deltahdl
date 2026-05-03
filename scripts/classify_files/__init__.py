@@ -1,10 +1,12 @@
 """Batch-classify multiple files by invoking classify_file per file."""
 
 import argparse
+import io
 import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 from lib.python.github import (
     fetch_issue_body,
@@ -148,6 +150,6 @@ def _run(args: argparse.Namespace) -> None:
 
 def main():
     """Entry point for classify_files."""
-    sys.stdout.reconfigure(line_buffering=True)
-    sys.stderr.reconfigure(line_buffering=True)
+    cast(io.TextIOWrapper, sys.stdout).reconfigure(line_buffering=True)
+    cast(io.TextIOWrapper, sys.stderr).reconfigure(line_buffering=True)
     _run(_parse_args())

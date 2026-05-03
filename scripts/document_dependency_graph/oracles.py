@@ -29,7 +29,7 @@ def _extract_json_body(text: str) -> str:
     fenced = _FENCED_STR_RE.search(text)
     if fenced:
         return fenced.group(1)
-    quoted = _QUOTED_STR_RE.findall(text)
+    quoted: list[str] = _QUOTED_STR_RE.findall(text)
     if quoted:
         return quoted[-1]
     return text.strip()

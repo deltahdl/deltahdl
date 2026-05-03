@@ -3,6 +3,7 @@
 import glob
 import re
 from pathlib import Path
+from typing import Any
 
 
 def strip_lrm_quotes(line):
@@ -81,8 +82,9 @@ def _split_tests(tests, file_len, max_lines):
 
 def _flush_overflow(overflow, base, test_dir, source_path, max_lines):
     """Write overflow tests to new suffix file(s); return new names."""
-    new_names = []
-    batch, batch_lines = [], 0
+    new_names: list[str] = []
+    batch: list[Any] = []
+    batch_lines = 0
     for t in overflow:
         n = _test_line_count(t)
         if batch and max_lines and batch_lines + n > max_lines:
@@ -184,8 +186,8 @@ def _write_overflow_file(outpath, source_path, tests):
 
 def _batch_tests(tests, header_lines, max_lines):
     """Split tests into batches that each fit within max_lines."""
-    batches = []
-    current_batch = []
+    batches: list[list[Any]] = []
+    current_batch: list[Any] = []
     current_len = header_lines
     for t in tests:
         n = _test_line_count(t)

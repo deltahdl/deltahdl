@@ -12,6 +12,7 @@ import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any, Callable
 from xml.etree import ElementTree as ET
 
 from lib.python.run_tests_common import (
@@ -68,14 +69,14 @@ def parse_metadata(path):
     return metadata
 
 
-_UNARY_OPS = {
+_UNARY_OPS: dict[type[ast.unaryop], Callable[[Any], Any]] = {
     ast.Not: operator.not_,
     ast.USub: operator.neg,
     ast.UAdd: operator.pos,
     ast.Invert: operator.invert,
 }
 
-_COMPARE_OPS = {
+_COMPARE_OPS: dict[type[ast.cmpop], Callable[[Any, Any], bool]] = {
     ast.Eq: operator.eq,
     ast.NotEq: operator.ne,
     ast.Lt: operator.lt,
@@ -170,7 +171,9 @@ def chapter_from_path(path):
 
 def _aggregate_chapters(results):
     """Aggregate results into sorted (name, passed, total, pct) row tuples."""
-    chapters = defaultdict(lambda: {"passed": 0, "failed": 0})
+    chapters: defaultdict[str, dict[str, int]] = defaultdict(
+        lambda: {"passed": 0, "failed": 0},
+    )
     for r in results:
         bucket = chapters[r["chapter"]]
         if r["status"] == "pass":

@@ -1,10 +1,12 @@
 """Batch-classify all tests in a file by invoking classify_test per test."""
 
 import argparse
+import io
 import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 from lib.python.github import (
     create_issue as _create_gh_issue,
@@ -212,6 +214,6 @@ def _run(args: argparse.Namespace) -> None:
 
 def main():
     """Entry point for classify_file."""
-    sys.stdout.reconfigure(line_buffering=True)
-    sys.stderr.reconfigure(line_buffering=True)
+    cast(io.TextIOWrapper, sys.stdout).reconfigure(line_buffering=True)
+    cast(io.TextIOWrapper, sys.stderr).reconfigure(line_buffering=True)
     _run(_parse_args())

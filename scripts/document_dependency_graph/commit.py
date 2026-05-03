@@ -13,7 +13,7 @@ import subprocess
 from pathlib import Path
 
 
-def _run(cmd: list[str]) -> subprocess.CompletedProcess:
+def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
     """Run *cmd* and return the completed process (no exceptions raised)."""
     return subprocess.run(cmd, check=False, capture_output=True, text=True)
 

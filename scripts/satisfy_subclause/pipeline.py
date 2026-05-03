@@ -27,6 +27,7 @@ Python-shaped contract.
 import json
 import subprocess
 import sys
+from typing import Any
 
 from .mutators import (
     CycleMember,
@@ -84,7 +85,7 @@ def parse_issue_number_from_create_output(output: str) -> int:
     return int(url.rsplit("/", 1)[-1])
 
 
-def _list_issues_for(subclause: str) -> list[dict]:
+def _list_issues_for(subclause: str) -> list[dict[str, Any]]:
     """Return the gh-issue-list payload for *subclause* (loud-fatal on error).
 
     ``gh issue list`` defaults to 30 results. A heavily-subdivided clause
@@ -236,8 +237,8 @@ def dispatch_cycle(
 # ---------------------------------------------------------------------------
 
 def _cycle_marker(
-    subclause: str, members, *, in_progress: frozenset,
-) -> dict:
+    subclause: str, members, *, in_progress: frozenset[str],
+) -> dict[str, Any]:
     """Return a cycle status dict for a frame relaying the marker upward.
 
     Adds ``subclause`` to ``members`` only when this frame sits at or
@@ -255,8 +256,8 @@ def _cycle_marker(
 
 def satisfy_unsatisfied_subclause(
     target: CycleMember, lrm: str, *,
-    model: str, labels: list[str], in_progress: frozenset,
-) -> dict:
+    model: str, labels: list[str], in_progress: frozenset[str],
+) -> dict[str, Any]:
     """Compute deps, recurse, then dispatch the right mutator.
 
     Returns ``{"status": "satisfied"}`` on success or
@@ -307,8 +308,8 @@ def satisfy_unsatisfied_subclause(
 def satisfy_subclause(
     subclause: str, lrm: str, *,
     model: str, labels: list[str],
-    in_progress: frozenset = frozenset(),
-) -> dict:
+    in_progress: frozenset[str] = frozenset(),
+) -> dict[str, Any]:
     """Idempotently satisfy ``subclause``.
 
     Runs one pass of the eight-step mutator pipeline. Returns

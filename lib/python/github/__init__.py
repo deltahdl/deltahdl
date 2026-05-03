@@ -170,7 +170,8 @@ def find_issue_by_title(
         return None
     for issue in json.loads(result.stdout):
         if issue["title"] == title:
-            return issue["number"]
+            number: int = issue["number"]
+            return number
     return None
 
 
@@ -196,7 +197,7 @@ def create_issue(
         print(f"ERROR: Failed to create issue:"
               f"\n{result.stderr}", file=sys.stderr)
         sys.exit(1)
-    issue_number = json.loads(result.stdout)["number"]
+    issue_number: int = json.loads(result.stdout)["number"]
     print(f"Created issue #{issue_number}")
     return issue_number
 

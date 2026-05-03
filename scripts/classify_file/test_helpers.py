@@ -44,9 +44,9 @@ def stub_close_issue(
 
 def stub_create_issue(
     monkeypatch: pytest.MonkeyPatch, issue_number: int = 42,
-) -> list[dict[str, str]]:
+) -> list[dict[str, object]]:
     """Stub subprocess.run for create_issue; return captured calls."""
-    captured: list[dict[str, str]] = []
+    captured: list[dict[str, object]] = []
 
     def capture_run(cmd, **kwargs):
         captured.append(

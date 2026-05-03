@@ -9,6 +9,7 @@ satisfaction pass without re-querying Claude on every recursion.
 import argparse
 import json
 from pathlib import Path
+from typing import Any
 
 from lib.python.cli import (
     add_lrm_arg,
@@ -63,7 +64,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parse_and_validate(parser, argv)
 
 
-def _load_checkpoint(output: Path) -> dict:
+def _load_checkpoint(output: Path) -> dict[str, Any]:
     """Return the cached records dict from ``output``, or empty if absent.
 
     A pre-existing --output file lets a resumed run skip oracle calls
@@ -73,7 +74,10 @@ def _load_checkpoint(output: Path) -> dict:
     """
     if not output.exists():
         return {}
-    return json.loads(output.read_text()).get("records", {})
+    records: dict[str, Any] = json.loads(output.read_text()).get(
+        "records", {},
+    )
+    return records
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -81,7 +85,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     toc = load_toc(str(args.lrm))
     cached = _load_checkpoint(args.output) if args.resume else {}
-    records: dict = {}
+    records: dict[str, Any] = {}
     for subclause in toc:
         if subclause in cached:
             records[subclause] = cached[subclause]

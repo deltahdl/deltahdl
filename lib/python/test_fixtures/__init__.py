@@ -1,7 +1,9 @@
 """Shared test fixtures."""
 
+import io
 import sys
 from types import SimpleNamespace
+from typing import cast
 
 
 def argv_without_flag(base, flag):
@@ -13,7 +15,7 @@ def argv_without_flag(base, flag):
 def main_enables_line_buffering(monkeypatch, module, make_args_fn):
     """Return whether *module*.main() reconfigures stdout for line buffering."""
     configured = []
-    original = sys.stdout.reconfigure
+    original = cast(io.TextIOWrapper, sys.stdout).reconfigure
 
     def mock_reconfigure(**kwargs):
         configured.append(kwargs)

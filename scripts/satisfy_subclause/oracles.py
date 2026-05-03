@@ -39,7 +39,7 @@ DISALLOWED_TOOLS = (
 )
 
 
-def build_env() -> dict:
+def build_env() -> dict[str, str]:
     """Return a Claude-safe copy of the current environment."""
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
@@ -88,7 +88,7 @@ def _extract_dependency_array(text: str) -> str:
     # contain bracketed examples (e.g. "[example with typedef struct,
     # function]") earlier in the response, so a greedy match would span
     # from the first prose bracket to the actual final answer.
-    matches = _BARE_ARR_RE.findall(text)
+    matches: list[str] = _BARE_ARR_RE.findall(text)
     if matches:
         return matches[-1]
     raise ValueError("No JSON array found in oracle output")

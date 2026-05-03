@@ -6,6 +6,8 @@ oracle call per dependency. Splitting the questions keeps every Claude
 invocation single-purpose.
 """
 
+from typing import Any
+
 from satisfy_subclause.oracles import compute_subclause_dependencies
 
 from .oracles import compute_prerequisites, compute_proof_sentence
@@ -13,7 +15,7 @@ from .oracles import compute_prerequisites, compute_proof_sentence
 
 def build_subclause_record(
     subclause: str, lrm: str, *, model: str,
-) -> dict:
+) -> dict[str, Any]:
     """Return the rich dependency record for one subclause.
 
     The record carries the dependency identifiers in oracle order

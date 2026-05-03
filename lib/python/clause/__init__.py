@@ -1,6 +1,7 @@
 """Utilities for parsing and formatting LRM clause numbers."""
 
 import re
+from typing import Any
 
 
 STAGE_TO_PREFIX: dict[str, str] = {
@@ -32,7 +33,7 @@ def clause_to_filename(prefix: str, clause: str) -> str:
     return f"{prefix}_clause_{padded}"
 
 
-def build_hierarchy(clause: str) -> dict:
+def build_hierarchy(clause: str) -> dict[str, Any]:
     """Derive template variables from a clause string.
 
     Returns a dict with keys:
@@ -44,7 +45,7 @@ def build_hierarchy(clause: str) -> dict:
     is_annex = parts[0][0].isalpha() and parts[0][0].isupper()
     depth = len(parts)
 
-    result: dict = {"is_annex": is_annex, "subclause": clause}
+    result: dict[str, Any] = {"is_annex": is_annex, "subclause": clause}
 
     if is_annex:
         letter = parts[0]

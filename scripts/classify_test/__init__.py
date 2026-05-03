@@ -10,6 +10,7 @@ Usage:
 
 import argparse
 import glob
+import io
 import json
 import os
 import re
@@ -18,6 +19,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from lib.python.classify import (
     add_github_args,
@@ -30,10 +32,8 @@ from ._github import (
     _validate_issue_args,
     build_action_remark,
     build_commit_url,
-    fetch_issue_body,
     maybe_update_issue_status,
     update_issue_after_commit,
-    update_issue_body,
 )
 from ._generate import _filter_preamble, _preamble_name, generate_file
 from ._git import commit_classification
@@ -276,12 +276,12 @@ def _parse_body(lines, start_idx):
 
     Returns (global_preamble, all_tests, found_namespace).
     """
-    g_pre = []
-    all_tests = []
+    g_pre: list[PreambleItem] = []
+    all_tests: list[TestBlock] = []
     has_ns = False
-    comments = []
+    comments: list[str] = []
     in_global = True
-    s_pre = []
+    s_pre: list[PreambleItem] = []
     i = start_idx
 
     while i < len(lines):
@@ -698,7 +698,7 @@ def _parse_args():
 
 def _group_tests(tests):
     """Group tests by (prefix, clause)."""
-    groups = {}
+    groups: dict[tuple[str, str], list[TestBlock]] = {}
     for t in tests:
         prefix = t.prefix or "test_non_lrm"
         clause = t.clause or "non-lrm"
@@ -747,7 +747,7 @@ def _resolve_destinations(
 
 def _write_creates(to_create, parsed, test_dir, lrm_titles, max_lines):
     """Write newly created clause files and return their names."""
-    names = []
+    names: list[str] = []
     for filename, clause, tests in to_create:
         title = lrm_titles.get(clause, "")
         batches = (_batch_tests(
@@ -973,8 +973,8 @@ def _run(args):
 
 def main():
     """Entry point."""
-    sys.stdout.reconfigure(line_buffering=True)
-    sys.stderr.reconfigure(line_buffering=True)
+    cast(io.TextIOWrapper, sys.stdout).reconfigure(line_buffering=True)
+    cast(io.TextIOWrapper, sys.stderr).reconfigure(line_buffering=True)
     _run(_parse_args())
 
 
