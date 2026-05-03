@@ -17,7 +17,6 @@ import re
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
@@ -34,6 +33,16 @@ from ._github import (
     build_commit_url,
     maybe_update_issue_status,
     update_issue_after_commit,
+)
+from ._models import Classification, ParsedFile, PreambleItem, TestBlock
+from ._parse import (
+    _parse_body,
+    _parse_header,
+    _try_parse_preamble,
+    _update_brace_depth,
+    extract_brace_block,
+    is_section_header,
+    parse_file,
 )
 from ._generate import _filter_preamble, _preamble_name, generate_file
 from ._git import commit_classification
@@ -59,45 +68,6 @@ from ._split import (
     append_tests_to_file,
     strip_lrm_quotes,
 )
-
-
-# ---------------------------------------------------------------------------
-# Data structures
-# ---------------------------------------------------------------------------
-@dataclass
-class TestBlock:
-    """A single TEST/TEST_F/TEST_P block with classification metadata."""
-
-    suite_name: str
-    test_name: str
-    lines: list[str]
-    preceding_comments: list[str]
-    prefix: str | None = None
-    clause: str | None = None
-    rationale: str | None = None
-    prefix_rationale: str | None = None
-    original_suite_name: str | None = None
-    original_test_name: str | None = None
-
-
-@dataclass
-class PreambleItem:
-    """A preamble declaration (struct, enum, helper function, etc.)."""
-
-    lines: list[str]
-
-
-@dataclass
-class ParsedFile:
-    """Result of parsing a standalone test file."""
-
-    includes: list[str]
-    using_line: str | None
-    has_namespace_wrapper: bool
-    global_preamble: list[PreambleItem]
-    section_preamble: list[PreambleItem]
-    all_tests: list[TestBlock]
-    source_filename: str | None = None
 
 
 _VALID_PREFIXES = frozenset({
@@ -137,232 +107,6 @@ CMAKE_PATH = REPO_ROOT / "test" / "CMakeLists.txt"
 
 
 # ---------------------------------------------------------------------------
-# Stage 1: Parse — brace extraction
-# ---------------------------------------------------------------------------
-
-def _update_brace_depth(
-    line: str,
-    depth: int,
-    in_string: bool,
-    in_block_comment: bool,
-) -> tuple[int, bool, bool, bool]:
-    """Scan one line, updating brace depth and lexer state.
-
-    Returns (depth, in_string, in_block_comment, found_close).
-    """
-    j = 0
-    while j < len(line):
-        ch = line[j]
-        if in_block_comment:
-            if ch == "*" and j + 1 < len(line) and line[j + 1] == "/":
-                in_block_comment = False
-                j += 1
-        elif in_string:
-            if ch == "\\":
-                j += 1
-            elif ch == '"':
-                in_string = False
-        elif ch == "/" and j + 1 < len(line) and line[j + 1] in "/*":
-            if line[j + 1] == "/":
-                break
-            in_block_comment = True
-            j += 1
-        elif ch == '"':
-            in_string = True
-        elif ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return depth, in_string, in_block_comment, True
-        j += 1
-    return depth, in_string, in_block_comment, False
-
-
-def extract_brace_block(
-    lines: list[str], start_idx: int,
-) -> tuple[list[str], int]:
-    """Extract a brace-delimited block starting from start_idx."""
-    depth, in_string, in_block_comment = 0, False, False
-    block: list[str] = []
-    for i in range(start_idx, len(lines)):
-        block.append(lines[i])
-        depth, in_string, in_block_comment, found = _update_brace_depth(
-            lines[i], depth, in_string, in_block_comment,
-        )
-        if found:
-            return block, i
-    raise ValueError(
-        f"Unmatched brace starting at line {start_idx + 1}",
-    )
-
-
-# ---------------------------------------------------------------------------
-# Stage 1: Parse — helpers
-# ---------------------------------------------------------------------------
-
-def is_section_header(line: str) -> bool:
-    """Check if a line is a section separator (=== or --- banners)."""
-    stripped = line.strip()
-    if stripped.startswith("//"):
-        content = stripped[2:].strip()
-        if len(content) >= 10 and (
-            all(c == "=" for c in content)
-            or all(c == "-" for c in content)
-        ):
-            return True
-    return False
-
-
-def _parse_header(
-    lines: list[str],
-) -> tuple[list[str], str | None, bool, int]:
-    """Parse file header: includes, using-line, namespace wrapper.
-
-    Returns (includes, using_line, has_namespace, body_start_idx).
-    """
-    includes: list[str] = []
-    using_line: str | None = None
-    has_ns = False
-    i = 0
-
-    while i < len(lines) and not lines[i].strip().startswith("#include"):
-        i += 1
-
-    while i < len(lines):
-        stripped = lines[i].strip()
-        if stripped.startswith("#include"):
-            includes.append(lines[i].rstrip("\n"))
-            i += 1
-            continue
-        if stripped != "":
-            break
-        i += 1
-
-    while i < len(lines):
-        stripped = lines[i].strip()
-        if stripped.startswith("using namespace"):
-            using_line = lines[i].rstrip("\n")
-            i += 1
-            break
-        if stripped != "":
-            break
-        i += 1  # pragma: no cover — unreachable (second loop consumes blanks)
-
-    while i < len(lines) and lines[i].strip() == "":
-        i += 1
-
-    if i < len(lines) and lines[i].strip() == "namespace {":
-        has_ns = True
-        i += 1
-
-    return includes, using_line, has_ns, i
-
-
-def _try_parse_preamble(
-    lines: list[str],
-    i: int,
-    stripped: str,
-    comments: list[str],
-) -> tuple[PreambleItem | None, int]:
-    """Try to parse a preamble item (brace block or declaration).
-
-    Mutates *comments* in place (clears on consumption).
-    Returns (PreambleItem | None, new_i).
-    """
-    if "{" in stripped:
-        try:
-            blk, end = extract_brace_block(lines, i)
-            item_lines = [ln.rstrip("\n") for ln in blk]
-            if comments:
-                item_lines = list(comments) + item_lines
-                comments.clear()
-            return PreambleItem(lines=item_lines), end + 1
-        except ValueError:
-            pass
-    if stripped.endswith(";"):
-        decl = list(comments) + [lines[i].rstrip("\n")]
-        comments.clear()
-        return PreambleItem(lines=decl), i + 1
-    comments.append(lines[i].rstrip("\n"))
-    return None, i + 1
-
-
-def _parse_body(
-    lines: list[str], start_idx: int,
-) -> tuple[list[PreambleItem], list[PreambleItem], list[TestBlock], bool]:
-    """Parse body: extract TEST blocks and preamble items.
-
-    Returns (global_preamble, all_tests, found_namespace).
-    """
-    g_pre: list[PreambleItem] = []
-    all_tests: list[TestBlock] = []
-    has_ns = False
-    comments: list[str] = []
-    in_global = True
-    s_pre: list[PreambleItem] = []
-    i = start_idx
-
-    while i < len(lines):
-        stripped = lines[i].strip()
-        if stripped == "" or re.match(
-            r'^\}\s*//\s*namespace(\s+\w+)?$', stripped,
-        ):
-            i += 1
-            continue
-        if stripped.startswith("//"):
-            comments.append(lines[i].rstrip("\n"))
-            i += 1
-            continue
-        if re.match(r'^namespace(\s+\w+)?\s*\{$', stripped):
-            has_ns = True
-            i += 1
-            continue
-        m = re.match(r"^TEST(?:_[FP])?\((\w+),\s*(\w+)\)", stripped)
-        if not m and i + 1 < len(lines):
-            m = re.match(
-                r"^TEST(?:_[FP])?\((\w+),\s*(\w+)\)",
-                stripped.rstrip() + " " + lines[i + 1].strip(),
-            )
-        if m:
-            in_global = False
-            blk, end = extract_brace_block(lines, i)
-            all_tests.append(TestBlock(
-                suite_name=m.group(1),
-                test_name=m.group(2),
-                lines=[ln.rstrip("\n") for ln in blk],
-                preceding_comments=list(comments),
-            ))
-            comments.clear()
-            i = end + 1
-            continue
-        item, i = _try_parse_preamble(
-            lines, i, stripped, comments,
-        )
-        if item:
-            target = g_pre if in_global else s_pre
-            target.append(item)
-    return g_pre, s_pre, all_tests, has_ns
-
-
-def parse_file(filepath: Path) -> ParsedFile:
-    """Parse a standalone test file into structured components."""
-    text = filepath.read_text(encoding="utf-8")
-    lines = text.splitlines(keepends=True)
-    includes, using_line, hdr_ns, body_start = _parse_header(lines)
-    g_pre, s_pre, all_tests, body_ns = _parse_body(lines, body_start)
-    return ParsedFile(
-        includes=includes,
-        using_line=using_line,
-        has_namespace_wrapper=hdr_ns or body_ns,
-        global_preamble=g_pre,
-        section_preamble=s_pre,
-        all_tests=all_tests,
-        source_filename=filepath.name,
-    )
-
-
-# ---------------------------------------------------------------------------
 # Stage 2: Classify via Claude
 # ---------------------------------------------------------------------------
 
@@ -374,7 +118,7 @@ _PREFIX_SCHEMA = PREFIX_SCHEMA
 def _detect_prefix(test: TestBlock, clause: str, lrm_path: str) -> str:
     """Detect pipeline stage prefix from test body."""
     if clause.replace("_", "-").startswith("non-lrm"):
-        test.prefix_rationale = "clause is non-LRM"
+        test.classification.prefix_rationale = "clause is non-LRM"
         return "test_non_lrm_"
     body = "\n".join(test.lines)
     print(f"Calling Claude to detect pipeline stage for"
@@ -391,7 +135,7 @@ def _detect_prefix(test: TestBlock, clause: str, lrm_path: str) -> str:
     stage = resp.get("pipeline_stage", "")
     prefix = _STAGE_TO_PREFIX.get(stage)
     if prefix:
-        test.prefix_rationale = resp.get("rationale", "")
+        test.classification.prefix_rationale = resp.get("rationale", "")
         return prefix
     print(f"ERROR: Cannot detect pipeline stage for test"
           f" {test.test_name}. Claude returned: {resp}")
@@ -536,10 +280,10 @@ def _rename_test_macro(
     test: TestBlock, new_suite: str, new_name: str,
 ) -> None:
     """Rename both args in a test block's TEST()/TEST_F()/TEST_P() line."""
-    if test.original_suite_name is None:
-        test.original_suite_name = test.suite_name
-    if test.original_test_name is None:
-        test.original_test_name = test.test_name
+    if test.classification.original_suite_name is None:
+        test.classification.original_suite_name = test.suite_name
+    if test.classification.original_test_name is None:
+        test.classification.original_test_name = test.test_name
     test.lines[0] = re.sub(
         r'^(TEST(?:_[FP])?)\(' + re.escape(test.suite_name)
         + r',\s*' + re.escape(test.test_name) + r'\)',
@@ -565,9 +309,9 @@ def _apply_classification(
     if clause == "non-lrm" and topic_resp:
         _validate_topic_response(topic_resp, test.test_name)
         clause = f"non-lrm:{topic_resp['non_lrm_topic']}"
-    test.prefix = _detect_prefix(test, clause, lrm_path)
-    test.clause = clause
-    test.rationale = clause_resp.get("rationale", "")
+    test.classification.prefix = _detect_prefix(test, clause, lrm_path)
+    test.classification.clause = clause
+    test.classification.rationale = clause_resp.get("rationale", "")
     resp = topic_resp or clause_resp
     suite = resp["suite_name"]
     name = resp["test_name"]
@@ -748,8 +492,8 @@ def _group_tests(
     """Group tests by (prefix, clause)."""
     groups: dict[tuple[str, str], list[TestBlock]] = {}
     for t in tests:
-        prefix = t.prefix or "test_non_lrm"
-        clause = t.clause or "non-lrm"
+        prefix = t.classification.prefix or "test_non_lrm"
+        clause = t.classification.clause or "non-lrm"
         groups.setdefault((prefix, clause), []).append(t)
     return groups
 
@@ -901,10 +645,10 @@ def _update_source(
 ) -> int:
     """Rewrite or remove the source file after moving a test."""
     others = [t for t in parsed.all_tests
-              if not (getattr(t, "original_suite_name", t.suite_name)
-                      == ctx["suite"]
-                      and getattr(t, "original_test_name", t.test_name)
-                      == ctx["test"])]
+              if not ((t.classification.original_suite_name
+                       or t.suite_name) == ctx["suite"]
+                      and (t.classification.original_test_name
+                           or t.test_name) == ctx["test"])]
     source_is_target = ctx["source_is_target"]
     if source_is_target and others:
         content = generate_file("non-lrm", "", parsed, others)
@@ -937,16 +681,17 @@ def _apply_rename_in_place(
     renames were needed, or ``False`` when ``no_commit`` is set.
     """
     has_renames = any(
-        (getattr(t, "original_test_name", None) is not None
-         and t.original_test_name != t.test_name)
-        or (getattr(t, "original_suite_name", None) is not None
-            and t.original_suite_name != t.suite_name)
+        (t.classification.original_test_name is not None
+         and t.classification.original_test_name != t.test_name)
+        or (t.classification.original_suite_name is not None
+            and t.classification.original_suite_name != t.suite_name)
         for t in target
     )
     if not has_renames:
         return None
     content = generate_file(
-        target[0].clause or "non-lrm", "", parsed, parsed.all_tests,
+        target[0].classification.clause or "non-lrm",
+        "", parsed, parsed.all_tests,
     )
     filepath.write_text(content, encoding="utf-8")
     if not getattr(args, "no_commit", False):
@@ -966,7 +711,8 @@ def _build_action(
     """Build the action string and target filenames map."""
     target_filenames = {
         t.test_name: clause_to_filename(
-            t.prefix or "test_non_lrm_", t.clause or "non-lrm",
+            t.classification.prefix or "test_non_lrm_",
+            t.classification.clause or "non-lrm",
         ) + ".cpp"
         for t in target
     }
@@ -1044,10 +790,10 @@ def _run(args: argparse.Namespace) -> None:
     update_cmake(
         filepath.stem, new_names,
         keep_old=source_is_target or any(
-            not (getattr(t, "original_suite_name", t.suite_name)
-                 == args.suite
-                 and getattr(t, "original_test_name", t.test_name)
-                 == args.test)
+            not ((t.classification.original_suite_name
+                  or t.suite_name) == args.suite
+                 and (t.classification.original_test_name
+                      or t.test_name) == args.test)
             for t in parsed.all_tests
         ),
     )

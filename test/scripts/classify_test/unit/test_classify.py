@@ -93,7 +93,7 @@ def test_detect_prefix_stores_rationale(ct, ct_helpers, monkeypatch):
     )
     t = ct_helpers.make_test_block("T", body=["  x();"])
     getattr(ct, "_detect_prefix")(t, "6.1", "/lrm")
-    assert t.prefix_rationale == "timing checks"
+    assert t.classification.prefix_rationale == "timing checks"
 
 
 def test_detect_prefix_calls_claude(ct, ct_helpers, monkeypatch):
@@ -436,7 +436,7 @@ def test_apply_classification_found(ct, ct_helpers, monkeypatch):
         "suite_name": "Parsing", "test_name": "MyTest",
     }
     _apply_classification(t, clause_resp, lrm_path="/tmp/lrm.txt")
-    assert t.prefix == "test_parser_" and t.clause == "6.1"
+    assert t.classification.prefix == "test_parser_" and t.classification.clause == "6.1"
 
 
 def test_apply_classification_non_lrm_underscore(ct, ct_helpers):
@@ -449,7 +449,7 @@ def test_apply_classification_non_lrm_underscore(ct, ct_helpers):
     topic_resp = {"non_lrm_topic": "aig", "rationale": "r",
                   "suite_name": "AigGraph", "test_name": "BasicOp"}
     _apply_classification(t, clause_resp, topic_resp, lrm_path="/tmp/lrm.txt")
-    assert t.clause == "non-lrm:aig"
+    assert t.classification.clause == "non-lrm:aig"
 
 
 def _apply_non_lrm_aig(ct, ct_helpers):
@@ -467,7 +467,7 @@ def _apply_non_lrm_aig(ct, ct_helpers):
 def test_apply_classification_non_lrm_with_topic(ct, ct_helpers):
     """Appends topic to non-lrm clause."""
     t = _apply_non_lrm_aig(ct, ct_helpers)
-    assert t.clause == "non-lrm:aig"
+    assert t.classification.clause == "non-lrm:aig"
 
 
 def test_apply_classification_no_rationale(ct, ct_helpers, monkeypatch):
@@ -478,7 +478,7 @@ def test_apply_classification_no_rationale(ct, ct_helpers, monkeypatch):
     t = _tb("T", body=["  auto r = Parse(src);"])
     clause_resp = {"clause": "6.1", "suite_name": "S", "test_name": "T"}
     _apply_classification(t, clause_resp, lrm_path="/tmp/lrm.txt")
-    assert t.rationale == ""
+    assert t.classification.rationale == ""
 
 
 def test_apply_classification_non_lrm_empty_topic(ct, ct_helpers):
@@ -505,13 +505,13 @@ def test_apply_classification_detects_prefix(ct, ct_helpers, monkeypatch):
     clause_resp = {"clause": "6.1", "rationale": "r",
                    "suite_name": "Elaboration", "test_name": "T"}
     _apply_classification(t, clause_resp, lrm_path="/tmp/lrm.txt")
-    assert t.prefix == "test_elaborator_"
+    assert t.classification.prefix == "test_elaborator_"
 
 
 def test_apply_classification_non_lrm_prefix_override(ct, ct_helpers):
     """Non-LRM clause overrides prefix to test_non_lrm_."""
     t = _apply_non_lrm_aig(ct, ct_helpers)
-    assert t.prefix == "test_non_lrm_"
+    assert t.classification.prefix == "test_non_lrm_"
 
 
 # ---- classify_test_block ----------------------------------------------------
@@ -577,7 +577,7 @@ def test_classify_tests_matching(ct, ct_helpers, monkeypatch, tmp_path):
     ct.classify_test_block(
         t, tmp_path, tmp_path / "lrm.txt",
     )
-    assert t.prefix == "test_parser_"
+    assert t.classification.prefix == "test_parser_"
 
 
 def _do_non_lrm_two_calls(ct, ct_helpers, monkeypatch, tmp_path):
@@ -612,13 +612,13 @@ def test_classify_tests_non_lrm_call_count(ct, ct_helpers, monkeypatch, tmp_path
 def test_classify_tests_non_lrm_clause(ct, ct_helpers, monkeypatch, tmp_path):
     """classify_tests sets clause to non-lrm:aig for non-LRM tests."""
     _, t = _do_non_lrm_two_calls(ct, ct_helpers, monkeypatch, tmp_path)
-    assert t.clause == "non-lrm:aig"
+    assert t.classification.clause == "non-lrm:aig"
 
 
 def test_classify_tests_non_lrm_prefix(ct, ct_helpers, monkeypatch, tmp_path):
     """classify_tests sets prefix to test_non_lrm_ for non-LRM tests."""
     _, t = _do_non_lrm_two_calls(ct, ct_helpers, monkeypatch, tmp_path)
-    assert t.prefix == "test_non_lrm_"
+    assert t.classification.prefix == "test_non_lrm_"
 
 
 # ---- _validate_clause_response helpers -------------------------------------
@@ -889,4 +889,4 @@ def test_rename_preserves_original_test_name(ct):
     )
     _rename(t, "A", "Second")
     _rename(t, "B", "Third")
-    assert t.original_test_name == "First"
+    assert t.classification.original_test_name == "First"

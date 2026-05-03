@@ -131,7 +131,8 @@ def _make_ctx(tmp_path, **overrides):
     defaults = {
         "filepath": tmp_path / "test_input.cpp",
         "target": [SimpleNamespace(
-            test_name="T", clause="6.1", rationale="r",
+            test_name="T",
+            classification=SimpleNamespace(clause="6.1", rationale="r"),
         )],
         "new_names": [],
         "to_merge": [],
@@ -201,7 +202,8 @@ def test_commit_classification_message_has_test_name(monkeypatch, tmp_path, ct_g
     commit_classification = ct_git.commit_classification
     captured = _stub_commit_push(monkeypatch, ct_git)
     ctx = _make_ctx(tmp_path, target=[SimpleNamespace(
-        test_name="FooBar", clause="6.1", rationale="r",
+        test_name="FooBar",
+        classification=SimpleNamespace(clause="6.1", rationale="r"),
     )])
     commit_classification(ctx)
     assert "FooBar" in captured["message"]

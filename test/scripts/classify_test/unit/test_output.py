@@ -48,7 +48,7 @@ def test_print_classification_rationale_line(capsys, ct_output, ct_helpers):
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
     t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = "AIG stuff"
+    t.classification.rationale = "AIG stuff"
     _print_classification_table([t])
     assert "Rationale: AIG stuff" in capsys.readouterr().out
 
@@ -107,7 +107,7 @@ def test_print_classification_no_line_over_80(capsys, ct_output, ct_helpers):
     _print_classification_table = ct_output.print_classification_table
     long_rationale = "word " * 20  # 100 chars, will need wrapping
     t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = long_rationale.strip()
+    t.classification.rationale = long_rationale.strip()
     _print_classification_table([t])
     out = capsys.readouterr().out
     assert all(len(line) <= 80 for line in out.splitlines())
@@ -119,7 +119,7 @@ def test_print_classification_wrap_aligns(capsys, ct_output, ct_helpers):
     _print_classification_table = ct_output.print_classification_table
     long_rationale = "word " * 20
     t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = long_rationale.strip()
+    t.classification.rationale = long_rationale.strip()
     _print_classification_table([t])
     lines = capsys.readouterr().out.splitlines()
     # Find continuation lines (after Rationale: line, before next label/sep)
@@ -135,7 +135,7 @@ def test_print_classification_prefix_rationale(capsys, ct_output, ct_helpers):
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
     t = _tb("T", prefix="test_simulator_", clause="5.12")
-    t.prefix_rationale = "attributes affect elaboration"
+    t.classification.prefix_rationale = "attributes affect elaboration"
     _print_classification_table([t])
     assert "Stage: simulator" in capsys.readouterr().out
 
@@ -145,7 +145,7 @@ def test_print_classification_prefix_rationale_reason(capsys, ct_output, ct_help
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
     t = _tb("T", prefix="test_simulator_", clause="5.12")
-    t.prefix_rationale = "attributes affect elaboration"
+    t.classification.prefix_rationale = "attributes affect elaboration"
     _print_classification_table([t])
     assert "attributes affect elaboration" in capsys.readouterr().out
 
@@ -155,6 +155,6 @@ def test_print_classification_pattern_match_stage(capsys, ct_output, ct_helpers)
     _tb = ct_helpers.make_test_block
     _print_classification_table = ct_output.print_classification_table
     t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.prefix_rationale = "body contains 'Parse'"
+    t.classification.prefix_rationale = "body contains 'Parse'"
     _print_classification_table([t])
     assert "Stage: parser" in capsys.readouterr().out

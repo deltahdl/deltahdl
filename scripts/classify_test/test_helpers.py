@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 import classify_test
+from classify_test._models import Classification, ParsedFile, TestBlock
 from lib.python.test_fixtures.subprocess_stubs import (
     stub_subprocess_failure,
     stub_subprocess_success,
@@ -34,14 +35,12 @@ def make_test_block(
         lines = [f"TEST(S, {name}) {{", "}"]
     else:
         lines = [f"TEST(S, {name}) {{"] + body + ["}"]
-    return classify_test.TestBlock(
+    return TestBlock(
         suite_name="S",
         test_name=name,
         lines=lines,
         preceding_comments=comments or [],
-        prefix=prefix,
-        clause=clause,
-        rationale=None,
+        classification=Classification(prefix=prefix, clause=clause),
     )
 
 
@@ -53,7 +52,7 @@ def make_parsed_file(
     tests: list[Any] | None = None,
 ) -> Any:
     """Shorthand factory for ParsedFile."""
-    return classify_test.ParsedFile(
+    return ParsedFile(
         includes=includes or ["#include <gtest/gtest.h>"],
         using_line=using,
         has_namespace_wrapper=ns,

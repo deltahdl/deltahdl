@@ -10,7 +10,10 @@ _run_git = run_git
 
 
 def build_commit_message(
-    test_name: str, clause: str, rationale: str, action: str = "",
+    test_name: str,
+    clause: str | None,
+    rationale: str | None,
+    action: str = "",
 ) -> str:
     """Build a classify_test commit message.
 
@@ -25,9 +28,9 @@ def build_commit_message(
     """
     title = f"Classify {test_name} → {_format_clause(clause)} [skip ci]"
     trailer = "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
-    body = rationale
+    body = rationale or ""
     if action:
-        body = f"{rationale}\n\nAction: {action}"
+        body = f"{body}\n\nAction: {action}"
     return f"{title}\n\n{body}\n\n{trailer}\n"
 
 
@@ -48,5 +51,8 @@ def commit_classification(ctx: dict[str, Any]) -> str | None:
         deleted.append(filepath)
     t = ctx["target"][0]
     action = ctx.get("action", "")
-    msg = build_commit_message(t.test_name, t.clause, t.rationale, action)
+    msg = build_commit_message(
+        t.test_name, t.classification.clause, t.classification.rationale,
+        action,
+    )
     return commit_and_push(changed, deleted, msg)

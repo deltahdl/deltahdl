@@ -264,7 +264,7 @@ def _setup_maybe_update(
         lambda org, repo, issue, body: updated.append(body),
     )
     t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = "r"
+    t.classification.rationale = "r"
     args = _issue_args(issue=42, organization="org", repo="repo")
     ct_github.maybe_update_issue_status(
         args, [t],
@@ -340,7 +340,7 @@ def test_maybe_update_passes_correct_org(monkeypatch, ct_github, ct_helpers):
         lambda org, repo, issue, body: orgs.append(org),
     )
     t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = "r"
+    t.classification.rationale = "r"
     args = _issue_args(issue=42, organization="myorg", repo="repo")
     ct_github.maybe_update_issue_status(args, [t], source_is_target=True)
     assert all(o == "myorg" for o in orgs)
@@ -359,7 +359,7 @@ def test_maybe_update_passes_correct_issue(monkeypatch, ct_github, ct_helpers):
         lambda org, repo, issue, body: issues.append(issue),
     )
     t = _tb("T", prefix="test_parser_", clause="6.1")
-    t.rationale = "r"
+    t.classification.rationale = "r"
     args = _issue_args(issue=99, organization="org", repo="repo")
     ct_github.maybe_update_issue_status(args, [t], source_is_target=True)
     assert all(i == 99 for i in issues)
@@ -384,8 +384,8 @@ def _setup_renamed_update(
         lambda org, repo, issue, body: updated.append(body),
     )
     t = _tb("NewName", prefix="test_parser_", clause="6.1")
-    t.rationale = "r"
-    t.original_test_name = "OldName"
+    t.classification.rationale = "r"
+    t.classification.original_test_name = "OldName"
     args = _issue_args(issue=42, organization="org", repo="repo")
     ct_github.maybe_update_issue_status(
         args, [t],
@@ -464,7 +464,7 @@ def test_build_action_remark_kept_and_renamed(ct_github, ct_helpers):
     t = ct_helpers.make_test_block(
         "NewName", prefix="test_parser_", clause="6.1",
     )
-    t.original_test_name = "OldName"
+    t.classification.original_test_name = "OldName"
     result = ct_github.build_action_remark(
         t, source_is_target=True,
     )
@@ -476,7 +476,7 @@ def test_build_action_remark_moved_and_renamed(ct_github, ct_helpers):
     t = ct_helpers.make_test_block(
         "NewName", prefix="test_parser_", clause="6.1",
     )
-    t.original_test_name = "OldName"
+    t.classification.original_test_name = "OldName"
     result = ct_github.build_action_remark(
         t, source_is_target=False, target_filename="foo.cpp",
     )
@@ -497,7 +497,7 @@ def test_build_action_remark_renamed_only(ct_github, ct_helpers):
     t = ct_helpers.make_test_block(
         "NewName", prefix="test_parser_", clause="6.1",
     )
-    t.original_test_name = "OldName"
+    t.classification.original_test_name = "OldName"
     result = ct_github.build_action_remark(
         t, source_is_target=False,
     )
@@ -507,7 +507,7 @@ def test_build_action_remark_renamed_only(ct_github, ct_helpers):
 def test_build_action_remark_kept_suite_renamed(ct_github, ct_helpers):
     """Returns 'Kept ... but suite renamed ...' when suite changed."""
     t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
-    t.original_suite_name = "OldSuite"
+    t.classification.original_suite_name = "OldSuite"
     t.suite_name = "NewSuite"
     result = ct_github.build_action_remark(
         t, source_is_target=True,
@@ -520,8 +520,8 @@ def test_build_action_remark_kept_both_renamed(ct_github, ct_helpers):
     t = ct_helpers.make_test_block(
         "NewName", prefix="test_parser_", clause="6.1",
     )
-    t.original_test_name = "OldName"
-    t.original_suite_name = "OldSuite"
+    t.classification.original_test_name = "OldName"
+    t.classification.original_suite_name = "OldSuite"
     t.suite_name = "NewSuite"
     result = ct_github.build_action_remark(
         t, source_is_target=True,
@@ -535,7 +535,7 @@ def test_build_action_remark_kept_both_renamed(ct_github, ct_helpers):
 def test_build_action_remark_moved_suite_renamed(ct_github, ct_helpers):
     """Returns 'Moved ... and suite renamed ...' when moved + suite change."""
     t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
-    t.original_suite_name = "OldSuite"
+    t.classification.original_suite_name = "OldSuite"
     t.suite_name = "NewSuite"
     result = ct_github.build_action_remark(
         t, source_is_target=False, target_filename="foo.cpp",
@@ -548,8 +548,8 @@ def test_build_action_remark_moved_both_renamed(ct_github, ct_helpers):
     t = ct_helpers.make_test_block(
         "NewName", prefix="test_parser_", clause="6.1",
     )
-    t.original_test_name = "OldName"
-    t.original_suite_name = "OldSuite"
+    t.classification.original_test_name = "OldName"
+    t.classification.original_suite_name = "OldSuite"
     t.suite_name = "NewSuite"
     result = ct_github.build_action_remark(
         t, source_is_target=False, target_filename="foo.cpp",
@@ -563,7 +563,7 @@ def test_build_action_remark_moved_both_renamed(ct_github, ct_helpers):
 def test_build_action_remark_suite_renamed_only(ct_github, ct_helpers):
     """Returns 'suite renamed ...' when only suite changed, no location."""
     t = ct_helpers.make_test_block("T", prefix="test_parser_", clause="6.1")
-    t.original_suite_name = "OldSuite"
+    t.classification.original_suite_name = "OldSuite"
     t.suite_name = "NewSuite"
     result = ct_github.build_action_remark(
         t, source_is_target=False,

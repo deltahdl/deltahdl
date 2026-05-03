@@ -45,9 +45,9 @@ def build_action_remark(
     commit_url: str = "",
 ) -> str:
     """Build a human-readable action remark for a classified test."""
-    orig_test = getattr(test, "original_test_name", None)
+    orig_test = test.classification.original_test_name
     test_renamed = orig_test is not None and orig_test != test.test_name
-    orig_suite = getattr(test, "original_suite_name", None)
+    orig_suite = test.classification.original_suite_name
     suite_renamed = (
         orig_suite is not None and orig_suite != test.suite_name
     )
@@ -96,8 +96,7 @@ def maybe_update_issue_status(
         args.organization, args.repo, args.issue,
     )
     for t in tests:
-        orig = getattr(t, "original_test_name", None)
-        lookup_name = orig or t.test_name
+        lookup_name = t.classification.original_test_name or t.test_name
         fname = (target_filenames or {}).get(t.test_name, "")
         remark = build_action_remark(
             t,
