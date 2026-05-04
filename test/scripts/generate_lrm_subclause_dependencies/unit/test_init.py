@@ -140,11 +140,7 @@ def test_main_record_payload(
     make_output: Path,
 ) -> None:
     """Each entry under records/ is the build_subclause_record payload."""
-    record = {
-        "dependencies": ["3.14.3"],
-        "proofs": {"3.14.3": "Sentence."},
-        "prerequisites": {"3.14.3": "elaboration"},
-    }
+    record = {"dependencies": ["3.14.3"]}
     run_main(record=record)
     payload = json.loads(make_output.read_text())
     assert payload["records"]["4.4"] == record
@@ -220,16 +216,8 @@ def test_main_guard_invokes_main() -> None:
 # --- Checkpoint / resume ----------------------------------------------------
 
 
-_CACHED_RECORD: dict[str, Any] = {
-    "dependencies": ["3.14.3"],
-    "proofs": {"3.14.3": "Cached sentence."},
-    "prerequisites": {"3.14.3": "cached prereq"},
-}
-_FRESH_RECORD: dict[str, Any] = {
-    "dependencies": [],
-    "proofs": {},
-    "prerequisites": {},
-}
+_CACHED_RECORD: dict[str, Any] = {"dependencies": ["3.14.3"]}
+_FRESH_RECORD: dict[str, Any] = {"dependencies": []}
 
 
 def _checkpoint_argv(

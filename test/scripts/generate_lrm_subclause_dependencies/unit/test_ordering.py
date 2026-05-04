@@ -7,10 +7,7 @@ from generate_lrm_subclause_dependencies.ordering import find_cycle_groups, orde
 
 def _records(graph: dict[str, list[str]]) -> dict[str, dict[str, Any]]:
     """Wrap a {sub: [deps]} dict into the per-subclause record shape."""
-    return {
-        sub: {"dependencies": deps, "proofs": {}, "prerequisites": {}}
-        for sub, deps in graph.items()
-    }
+    return {sub: {"dependencies": deps} for sub, deps in graph.items()}
 
 
 def test_single_subclause_no_deps_is_one_group() -> None:

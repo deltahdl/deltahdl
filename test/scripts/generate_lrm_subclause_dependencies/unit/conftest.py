@@ -12,11 +12,7 @@ from generate_lrm_subclause_dependencies.commit import commit_output
 
 
 _DEFAULT_TOC: dict[str, tuple[int, int]] = {"4.4": (10, 20)}
-_DEFAULT_RECORD: dict[str, Any] = {
-    "dependencies": [],
-    "proofs": {},
-    "prerequisites": {},
-}
+_DEFAULT_RECORD: dict[str, Any] = {"dependencies": []}
 
 
 @pytest.fixture()
