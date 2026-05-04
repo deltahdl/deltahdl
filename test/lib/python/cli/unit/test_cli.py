@@ -11,6 +11,7 @@ from lib.python.cli import (
     add_clause_arg,
     add_clauses_arg,
     add_continue_arg,
+    add_effort_arg,
     add_github_args,
     add_labels_arg,
     add_lrm_arg,
@@ -63,6 +64,41 @@ def test_add_model_arg_custom() -> None:
     add_model_arg(parser)
     args = parser.parse_args(["--model", "sonnet"])
     assert args.model == "sonnet"
+
+
+def test_add_model_arg_with_default_override() -> None:
+    """Caller-supplied default replaces the built-in opus default."""
+    parser = argparse.ArgumentParser()
+    add_model_arg(parser, default="sonnet")
+    args = parser.parse_args([])
+    assert args.model == "sonnet"
+
+
+# ---- add_effort_arg ---------------------------------------------------------
+
+
+def test_add_effort_arg_default() -> None:
+    """Defaults --effort to medium."""
+    parser = argparse.ArgumentParser()
+    add_effort_arg(parser)
+    args = parser.parse_args([])
+    assert args.effort == "medium"
+
+
+def test_add_effort_arg_custom() -> None:
+    """Accepts a custom --effort value from the allowed set."""
+    parser = argparse.ArgumentParser()
+    add_effort_arg(parser)
+    args = parser.parse_args(["--effort", "high"])
+    assert args.effort == "high"
+
+
+def test_add_effort_arg_rejects_invalid_choice() -> None:
+    """Calls parser.error for an --effort value outside the allowed set."""
+    parser = argparse.ArgumentParser()
+    add_effort_arg(parser)
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--effort", "extreme"])
 
 
 # ---- add_continue_arg -------------------------------------------------------

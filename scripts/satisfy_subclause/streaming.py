@@ -316,7 +316,11 @@ def exit_with_error(message: str, stderr: str) -> NoReturn:
 
 
 def build_streaming_cmd(
-    *, model: str, disallowed_tools: str, continue_session: bool = False,
+    *,
+    model: str,
+    disallowed_tools: str,
+    continue_session: bool = False,
+    effort: str | None = None,
 ) -> list[str]:
     """Return a Claude CLI argv for stream-json mode.
 
@@ -327,6 +331,9 @@ def build_streaming_cmd(
     true, ``--continue`` is appended so the call resumes the most
     recent Claude session rather than starting a fresh one — used by
     the eight-step mutator pipeline to keep all steps in one session.
+    When *effort* is set, ``--effort {effort}`` is appended so the
+    Claude CLI applies the named thinking-budget tier; left as ``None``
+    for callers that have not opted into the flag.
     """
     cmd = [
         "claude", "-p",
@@ -336,6 +343,8 @@ def build_streaming_cmd(
         "--dangerously-skip-permissions",
         "--disallowedTools", disallowed_tools,
     ]
+    if effort is not None:
+        cmd.extend(["--effort", effort])
     if continue_session:
         cmd.append("--continue")
     return cmd

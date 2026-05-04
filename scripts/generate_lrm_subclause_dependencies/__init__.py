@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from lib.python.cli import (
+    add_effort_arg,
     add_lrm_arg,
     add_model_arg,
     parse_and_validate,
@@ -34,7 +35,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse and validate CLI arguments."""
     parser = argparse.ArgumentParser(prog=__package__, description=_DESCRIPTION)
     add_lrm_arg(parser)
-    add_model_arg(parser)
+    add_model_arg(parser, default="sonnet")
+    add_effort_arg(parser)
     parser.add_argument(
         "--output",
         type=Path,
@@ -91,7 +93,7 @@ def main(argv: list[str] | None = None) -> None:
             records[subclause] = cached[subclause]
             continue
         records[subclause] = build_subclause_record(
-            subclause, str(args.lrm), model=args.model,
+            subclause, str(args.lrm), model=args.model, effort=args.effort,
         )
         args.output.write_text(json.dumps({"records": records}))
     order = order_groups(find_cycle_groups(records), records)

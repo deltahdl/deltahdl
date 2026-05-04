@@ -12,6 +12,7 @@ def _run_record(
     *,
     deps: list[str],
     model: str = "opus",
+    effort: str = "medium",
 ) -> tuple[dict[str, Any], MagicMock]:
     """Patch the dependency oracle, run build_subclause_record, return mock+record."""
     deps_patch = patch(
@@ -20,7 +21,7 @@ def _run_record(
     )
     with deps_patch as mock_deps:
         record = build_subclause_record(
-            "4.4", str(make_lrm), model=model,
+            "4.4", str(make_lrm), model=model, effort=effort,
         )
     return record, mock_deps
 
@@ -41,3 +42,9 @@ def test_record_forwards_model_to_dependency_oracle(make_lrm: Path) -> None:
     """The model argument flows to compute_subclause_dependencies."""
     _, mock_deps = _run_record(make_lrm, deps=[], model="haiku")
     assert mock_deps.call_args[1]["model"] == "haiku"
+
+
+def test_record_forwards_effort_to_dependency_oracle(make_lrm: Path) -> None:
+    """The effort argument flows to compute_subclause_dependencies."""
+    _, mock_deps = _run_record(make_lrm, deps=[], effort="high")
+    assert mock_deps.call_args[1]["effort"] == "high"

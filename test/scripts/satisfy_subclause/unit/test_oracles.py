@@ -147,6 +147,29 @@ def test_run_oracle_call_passes_model_to_cli() -> None:
     assert cmd[cmd.index("--model") + 1] == "haiku"
 
 
+def test_run_oracle_call_passes_effort_to_cli() -> None:
+    """An explicit effort flows to --effort on the Claude CLI argv."""
+    with _patched_streaming() as mock_stream:
+        run_oracle_call("prompt", model="opus", effort="medium")
+    cmd = mock_stream.call_args[0][0]
+    assert cmd[cmd.index("--effort") + 1] == "medium"
+
+
+def test_run_oracle_call_omits_effort_by_default() -> None:
+    """Without an effort kwarg, --effort is absent from the Claude CLI argv."""
+    with _patched_streaming() as mock_stream:
+        run_oracle_call("prompt", model="opus")
+    assert "--effort" not in mock_stream.call_args[0][0]
+
+
+def test_run_oracle_call_retry_cmd_carries_effort() -> None:
+    """The retry_cmd uses the same effort as the initial cmd."""
+    with _patched_streaming() as mock_stream:
+        run_oracle_call("prompt", model="opus", effort="medium")
+    retry_cmd = mock_stream.call_args[1]["retry_cmd"]
+    assert retry_cmd[retry_cmd.index("--effort") + 1] == "medium"
+
+
 def test_run_oracle_call_uses_stream_json() -> None:
     """Requests --output-format stream-json so events stream live."""
     with _patched_streaming() as mock_stream:
@@ -375,6 +398,15 @@ def test_compute_subclause_dependencies_passes_model() -> None:
             "33.4", "lrm.pdf", model="haiku",
         )
     assert mock_run.call_args[1]["model"] == "haiku"
+
+
+def test_compute_subclause_dependencies_passes_effort() -> None:
+    """compute_subclause_dependencies forwards the effort arg."""
+    with _patched_oracle("[]") as mock_run:
+        compute_subclause_dependencies(
+            "33.4", "lrm.pdf", model="opus", effort="medium",
+        )
+    assert mock_run.call_args[1]["effort"] == "medium"
 
 
 def test_compute_subclause_dependencies_logs_banner_to_stderr(

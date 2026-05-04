@@ -34,12 +34,12 @@ def test_parse_args_validates_lrm_exists(
 
 
 def test_parse_args_default_model(make_lrm: Path, make_output: Path) -> None:
-    """--model defaults to 'opus'."""
+    """--model defaults to 'sonnet' for the dependency-graph walk."""
     args = generate_lrm_subclause_dependencies.parse_args([
         "--lrm", str(make_lrm),
         "--output", str(make_output),
     ])
-    assert args.model == "opus"
+    assert args.model == "sonnet"
 
 
 def test_parse_args_explicit_model(make_lrm: Path, make_output: Path) -> None:
@@ -50,6 +50,25 @@ def test_parse_args_explicit_model(make_lrm: Path, make_output: Path) -> None:
         "--model", "haiku",
     ])
     assert args.model == "haiku"
+
+
+def test_parse_args_default_effort(make_lrm: Path, make_output: Path) -> None:
+    """--effort defaults to 'medium'."""
+    args = generate_lrm_subclause_dependencies.parse_args([
+        "--lrm", str(make_lrm),
+        "--output", str(make_output),
+    ])
+    assert args.effort == "medium"
+
+
+def test_parse_args_explicit_effort(make_lrm: Path, make_output: Path) -> None:
+    """--effort accepts an explicit value from the allowed set."""
+    args = generate_lrm_subclause_dependencies.parse_args([
+        "--lrm", str(make_lrm),
+        "--output", str(make_output),
+        "--effort", "high",
+    ])
+    assert args.effort == "high"
 
 
 def test_parse_args_requires_output(make_lrm: Path) -> None:
@@ -162,6 +181,14 @@ def test_main_forwards_model_to_record_builder(
     """main() forwards the parsed --model to build_subclause_record."""
     _, mock_record, _ = run_main(extra_argv=["--model", "haiku"])
     assert mock_record.call_args[1]["model"] == "haiku"
+
+
+def test_main_forwards_effort_to_record_builder(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+) -> None:
+    """main() forwards the parsed --effort to build_subclause_record."""
+    _, mock_record, _ = run_main(extra_argv=["--effort", "high"])
+    assert mock_record.call_args[1]["effort"] == "high"
 
 
 def test_main_forwards_lrm_to_record_builder(

@@ -371,6 +371,20 @@ def test_build_streaming_cmd_carries_disallowed_tools(streaming: ModuleType) -> 
     assert cmd[cmd.index("--disallowedTools") + 1] == "Bash(git *)"
 
 
+def test_build_streaming_cmd_carries_effort(streaming: ModuleType) -> None:
+    """An effort kwarg is forwarded to --effort."""
+    cmd = streaming.build_streaming_cmd(
+        model="opus", disallowed_tools="X", effort="medium",
+    )
+    assert cmd[cmd.index("--effort") + 1] == "medium"
+
+
+def test_build_streaming_cmd_omits_effort_by_default(streaming: ModuleType) -> None:
+    """Without an effort kwarg, --effort is not present in the argv."""
+    cmd = streaming.build_streaming_cmd(model="opus", disallowed_tools="X")
+    assert "--effort" not in cmd
+
+
 # --- run_claude_streaming ---------------------------------------------------
 
 

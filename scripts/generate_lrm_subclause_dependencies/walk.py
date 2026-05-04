@@ -12,8 +12,10 @@ from satisfy_subclause.oracles import compute_subclause_dependencies
 
 
 def build_subclause_record(
-    subclause: str, lrm: str, *, model: str,
+    subclause: str, lrm: str, *, model: str, effort: str,
 ) -> dict[str, Any]:
     """Return the dependency record for one subclause."""
-    deps = compute_subclause_dependencies(subclause, lrm, model=model)
+    deps = compute_subclause_dependencies(
+        subclause, lrm, model=model, effort=effort,
+    )
     return {"dependencies": deps}

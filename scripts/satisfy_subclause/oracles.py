@@ -47,7 +47,9 @@ def build_env() -> dict[str, str]:
     return env
 
 
-def run_oracle_call(prompt: str, *, model: str) -> str:
+def run_oracle_call(
+    prompt: str, *, model: str, effort: str | None = None,
+) -> str:
     """Invoke Claude with read-only tools; return the oracle's ``.result``.
 
     Runs the CLI in stream-json mode so the streaming runner can decode
@@ -57,14 +59,16 @@ def run_oracle_call(prompt: str, *, model: str) -> str:
     the recovery prompt from ``streaming``; the retry call appends
     ``--continue`` so it resumes the same Claude session. Loud-fatal
     on a non-zero exit code, a missing result event, or after the
-    retry budget is exhausted.
+    retry budget is exhausted. When *effort* is set, the Claude CLI
+    runs at that thinking-budget tier; the retry cmd carries the same
+    effort so the recovery call matches the original session's shape.
     """
     cmd = build_streaming_cmd(
-        model=model, disallowed_tools=DISALLOWED_TOOLS,
+        model=model, disallowed_tools=DISALLOWED_TOOLS, effort=effort,
     )
     retry_cmd = build_streaming_cmd(
         model=model, disallowed_tools=DISALLOWED_TOOLS,
-        continue_session=True,
+        continue_session=True, effort=effort,
     )
     return run_claude_streaming_with_retry(
         cmd, prompt, env=build_env(), retry_cmd=retry_cmd, role="Oracle",
@@ -140,7 +144,7 @@ def parse_dependencies(text: str) -> SubclauseDependencies:
 
 
 def compute_subclause_dependencies(
-    subclause: str, lrm: str, *, model: str,
+    subclause: str, lrm: str, *, model: str, effort: str | None = None,
 ) -> SubclauseDependencies:
     """Run the dependency oracle for ``subclause``."""
     print(
@@ -148,5 +152,5 @@ def compute_subclause_dependencies(
         file=sys.stderr,
     )
     prompt = build_dependency_prompt(subclause, lrm)
-    text = run_oracle_call(prompt, model=model)
+    text = run_oracle_call(prompt, model=model, effort=effort)
     return parse_dependencies(text)
