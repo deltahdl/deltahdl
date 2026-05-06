@@ -104,12 +104,12 @@ def main(argv: list[str] | None = None) -> None:
     cached = _load_checkpoint(args.output) if args.resume else {}
     if args.commit:
         assert_clean_tree()
-    records: dict[str, Any] = {}
+    records: dict[str, Any] = {
+        sub: cached[sub] for sub in toc if sub in cached
+    }
     total = len(toc)
     for index, subclause in enumerate(toc, start=1):
-        if subclause in cached:
-            records[subclause] = cached[subclause]
-        else:
+        if subclause not in records:
             records[subclause] = build_subclause_record(
                 subclause, str(args.lrm), model=args.model, effort=args.effort,
             )

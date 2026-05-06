@@ -456,10 +456,15 @@ def test_main_empty_toc_writes_empty_payload(
     assert payload == {"records": {}, "order": []}
 
 
-def test_main_each_checkpoint_includes_order(
-    make_lrm: Path, make_output: Path,
-) -> None:
-    """Every per-subclause commit_output call sees an order section on disk."""
+def _capture_snapshots(
+    make_lrm: Path, make_output: Path, *, resume: bool = False,
+) -> list[dict[str, Any]]:
+    """Run main() with --commit and return the per-iteration JSON snapshots.
+
+    Each stubbed commit_output call records the on-disk graph JSON, so
+    tests can inspect what every checkpoint write looked like rather
+    than only the final --output content.
+    """
     snapshots: list[dict[str, Any]] = []
 
     def _snapshot(path: Path, **_kwargs: Any) -> None:
@@ -478,7 +483,33 @@ def test_main_each_checkpoint_includes_order(
         side_effect=_snapshot,
     )
     cln_p = patch("generate_lrm_subclause_dependencies.assert_clean_tree")
-    argv = _checkpoint_argv(make_lrm, make_output) + ["--commit"]
+    argv = _checkpoint_argv(make_lrm, make_output, resume=resume) + ["--commit"]
     with toc_p, rec_p, com_p, cln_p:
         generate_lrm_subclause_dependencies.main(argv)
+    return snapshots
+
+
+def test_main_each_checkpoint_includes_order(
+    make_lrm: Path, make_output: Path,
+) -> None:
+    """Every per-subclause commit_output call sees an order section on disk."""
+    snapshots = _capture_snapshots(make_lrm, make_output)
     assert all("order" in snap for snap in snapshots)
+
+
+def test_main_resume_first_checkpoint_has_full_cached_records(
+    make_lrm: Path, make_output: Path,
+) -> None:
+    """Iteration 1 with --resume already carries every cached record.
+
+    Without this guarantee, --resume against a complete cache shrinks
+    the on-disk file to one entry on iteration 1 (then re-grows it),
+    making each per-subclause commit a destructive overwrite of the
+    cached state and a real network push.
+    """
+    _seed_checkpoint(
+        make_output,
+        {"4.4": _CACHED_RECORD, "5.6": _CACHED_RECORD},
+    )
+    snapshots = _capture_snapshots(make_lrm, make_output, resume=True)
+    assert set(snapshots[0]["records"]) == {"4.4", "5.6"}
