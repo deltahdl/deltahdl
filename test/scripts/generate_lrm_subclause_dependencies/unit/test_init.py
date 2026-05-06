@@ -217,12 +217,15 @@ def test_main_skips_commit_when_flag_unset(
     assert mock_commit.call_count == 0
 
 
-def test_main_calls_commit_output_when_commit_flag(
+def test_main_commit_output_called_per_subclause(
     run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
 ) -> None:
-    """With --commit, main() calls commit_output exactly once."""
-    _, _, mock_commit = run_main(extra_argv=["--commit"])
-    assert mock_commit.call_count == 1
+    """With --commit, commit_output is called once per TOC entry."""
+    _, _, mock_commit = run_main(
+        toc={"4.4": (10, 20), "5.6": (21, 30), "13.4": (31, 50)},
+        extra_argv=["--commit"],
+    )
+    assert mock_commit.call_count == 3
 
 
 def test_main_passes_output_path_to_commit(
@@ -232,6 +235,21 @@ def test_main_passes_output_path_to_commit(
     """commit_output is called with the parsed --output path."""
     _, _, mock_commit = run_main(extra_argv=["--commit"])
     assert mock_commit.call_args[0][0] == make_output
+
+
+def test_main_commit_message_includes_progress(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+) -> None:
+    """Each commit_output message names the subclause with i/n progress."""
+    _, _, mock_commit = run_main(
+        toc={"4.4": (10, 20), "5.6": (21, 30)},
+        extra_argv=["--commit"],
+    )
+    messages = [c.kwargs["message"] for c in mock_commit.call_args_list]
+    assert messages == [
+        "generate_lrm_subclause_dependencies: checkpoint 4.4 (1/2)",
+        "generate_lrm_subclause_dependencies: checkpoint 5.6 (2/2)",
+    ]
 
 
 def test_main_guard_invokes_main() -> None:
@@ -283,7 +301,8 @@ def _stub_walk(
         **record_kwargs,
     )
     com_p = patch("generate_lrm_subclause_dependencies.commit_output")
-    with toc_p, com_p, rec_p as mock_record:
+    cln_p = patch("generate_lrm_subclause_dependencies.assert_clean_tree")
+    with toc_p, com_p, cln_p, rec_p as mock_record:
         with contextlib.suppress(RuntimeError):
             yield mock_record
 
@@ -339,14 +358,14 @@ def test_main_crash_persists_completed_records(
     assert payload["records"] == {"4.4": _FRESH_RECORD}
 
 
-def test_main_partial_checkpoint_omits_order_section(
+def test_main_partial_checkpoint_includes_order_section(
     make_lrm: Path, make_output: Path,
 ) -> None:
-    """A crash mid-walk leaves no order section since the walk did not finish."""
+    """A crash mid-walk leaves an order section over the walked records."""
     with _stub_walk(_TWO_TOC, side_effect=_CRASH_SIDE_EFFECT):
         _run_main(make_lrm, make_output)
     payload = json.loads(make_output.read_text())
-    assert "order" not in payload
+    assert payload["order"] == [["4.4"]]
 
 
 def test_main_drops_cached_records_not_in_toc(
@@ -386,3 +405,80 @@ def test_main_resume_with_no_existing_output_runs_fresh(
     with _stub_walk(_TWO_TOC, return_value=_FRESH_RECORD) as mock_record:
         _run_main(make_lrm, make_output, resume=True)
     assert mock_record.call_count == 2
+
+
+# --- assert_clean_tree at startup ------------------------------------------
+
+
+@contextlib.contextmanager
+def _stub_run_with_clean(
+    toc: dict[str, tuple[int, int]],
+) -> Iterator[MagicMock]:
+    """Stub the walk and yield the assert_clean_tree mock for inspection."""
+    toc_p = patch("generate_lrm_subclause_dependencies.load_toc", return_value=toc)
+    rec_p = patch(
+        "generate_lrm_subclause_dependencies.build_subclause_record",
+        return_value=_FRESH_RECORD,
+    )
+    com_p = patch("generate_lrm_subclause_dependencies.commit_output")
+    cln_p = patch("generate_lrm_subclause_dependencies.assert_clean_tree")
+    with toc_p, rec_p, com_p, cln_p as mock_clean:
+        yield mock_clean
+
+
+def test_main_asserts_clean_tree_when_commit(
+    make_lrm: Path, make_output: Path,
+) -> None:
+    """With --commit, main() invokes assert_clean_tree once before the walk."""
+    argv = _checkpoint_argv(make_lrm, make_output) + ["--commit"]
+    with _stub_run_with_clean(_TWO_TOC) as mock_clean:
+        generate_lrm_subclause_dependencies.main(argv)
+    assert mock_clean.call_count == 1
+
+
+def test_main_skips_assert_clean_tree_without_commit(
+    make_lrm: Path, make_output: Path,
+) -> None:
+    """Without --commit, main() never invokes assert_clean_tree."""
+    argv = _checkpoint_argv(make_lrm, make_output)
+    with _stub_run_with_clean(_TWO_TOC) as mock_clean:
+        generate_lrm_subclause_dependencies.main(argv)
+    assert mock_clean.call_count == 0
+
+
+def test_main_empty_toc_writes_empty_payload(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+    make_output: Path,
+) -> None:
+    """An empty TOC writes an empty records/order payload to --output."""
+    run_main(toc={})
+    payload = json.loads(make_output.read_text())
+    assert payload == {"records": {}, "order": []}
+
+
+def test_main_each_checkpoint_includes_order(
+    make_lrm: Path, make_output: Path,
+) -> None:
+    """Every per-subclause commit_output call sees an order section on disk."""
+    snapshots: list[dict[str, Any]] = []
+
+    def _snapshot(path: Path, **_kwargs: Any) -> None:
+        snapshots.append(json.loads(path.read_text()))
+
+    toc_p = patch(
+        "generate_lrm_subclause_dependencies.load_toc",
+        return_value=_TWO_TOC,
+    )
+    rec_p = patch(
+        "generate_lrm_subclause_dependencies.build_subclause_record",
+        return_value=_FRESH_RECORD,
+    )
+    com_p = patch(
+        "generate_lrm_subclause_dependencies.commit_output",
+        side_effect=_snapshot,
+    )
+    cln_p = patch("generate_lrm_subclause_dependencies.assert_clean_tree")
+    argv = _checkpoint_argv(make_lrm, make_output) + ["--commit"]
+    with toc_p, rec_p, com_p, cln_p:
+        generate_lrm_subclause_dependencies.main(argv)
+    assert all("order" in snap for snap in snapshots)

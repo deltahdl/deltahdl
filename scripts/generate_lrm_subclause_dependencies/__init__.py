@@ -19,7 +19,7 @@ from lib.python.cli import (
 )
 from lib.python.lrm import load_toc
 
-from .commit import commit_output
+from .commit import assert_clean_tree, commit_output
 from .ordering import find_cycle_groups, order_groups
 from .walk import build_subclause_record
 
@@ -48,8 +48,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         default=False,
         help=(
-            "After writing the output file, stage, commit, and push it"
-            " to main. Off by default."
+            "After writing each per-subclause checkpoint, stage,"
+            " commit, and push it to main so progress is durable"
+            " across crashes. Off by default."
         ),
     )
     parser.add_argument(
@@ -82,21 +83,41 @@ def _load_checkpoint(output: Path) -> dict[str, Any]:
     return records
 
 
+def _write_checkpoint(output: Path, records: dict[str, Any]) -> None:
+    """Write *records* and the derived dependency order to *output*."""
+    order = order_groups(find_cycle_groups(records), records)
+    output.write_text(json.dumps({"records": records, "order": order}))
+
+
+def _checkpoint_message(subclause: str, index: int, total: int) -> str:
+    """Return the per-subclause checkpoint commit message."""
+    return (
+        f"generate_lrm_subclause_dependencies: "
+        f"checkpoint {subclause} ({index}/{total})"
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     """Run the dependency oracles for every subclause and write the graph."""
     args = parse_args(argv)
     toc = load_toc(str(args.lrm))
     cached = _load_checkpoint(args.output) if args.resume else {}
+    if args.commit:
+        assert_clean_tree()
     records: dict[str, Any] = {}
-    for subclause in toc:
+    total = len(toc)
+    for index, subclause in enumerate(toc, start=1):
         if subclause in cached:
             records[subclause] = cached[subclause]
-            continue
-        records[subclause] = build_subclause_record(
-            subclause, str(args.lrm), model=args.model, effort=args.effort,
-        )
-        args.output.write_text(json.dumps({"records": records}))
-    order = order_groups(find_cycle_groups(records), records)
-    args.output.write_text(json.dumps({"records": records, "order": order}))
-    if args.commit:
-        commit_output(args.output)
+        else:
+            records[subclause] = build_subclause_record(
+                subclause, str(args.lrm), model=args.model, effort=args.effort,
+            )
+        _write_checkpoint(args.output, records)
+        if args.commit:
+            commit_output(
+                args.output,
+                message=_checkpoint_message(subclause, index, total),
+            )
+    if not records:
+        _write_checkpoint(args.output, records)

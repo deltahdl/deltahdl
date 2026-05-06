@@ -1,9 +1,9 @@
-"""Stage, commit, and push the dependency-graph output file.
+"""Stage, commit, and push checkpoint writes of the dependency graph.
 
 A long oracle walk takes hours; the ``--commit`` flag exists so that
-the result is already saved to the remote when the walk finishes,
-removing the risk of losing all that Claude work to a local disk
-failure before a human gets back to commit by hand.
+each completed subclause is already saved to the remote when the walk
+is interrupted, removing the risk of losing oracle work to a local
+disk failure or a crash before a human gets back to commit by hand.
 
 Failures are catastrophic by design: any unexpected git exit raises
 ``RuntimeError`` rather than being logged and ignored.
@@ -18,8 +18,13 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(cmd, check=False, capture_output=True, text=True)
 
 
-def _ensure_clean_tree() -> None:
-    """Raise if the working tree carries unstaged or untracked tracked changes."""
+def assert_clean_tree() -> None:
+    """Raise if the working tree carries unstaged or untracked tracked changes.
+
+    Called once at startup before the walk begins so an unrelated dirty
+    file does not race per-subclause checkpoint commits, and so the
+    user sees the failure before any oracle calls happen.
+    """
     proc = _run(["git", "status", "--porcelain", "--untracked-files=no"])
     if proc.stdout.strip():
         raise RuntimeError(
@@ -43,11 +48,8 @@ def _has_staged_changes() -> bool:
     return proc.returncode != 0
 
 
-def _commit(path: Path) -> None:
-    """Create the dependency-graph commit naming this script and *path*."""
-    message = (
-        f"generate_lrm_subclause_dependencies: refresh {path}"
-    )
+def _commit(message: str) -> None:
+    """Create the dependency-graph commit with *message*."""
     proc = _run(["git", "commit", "-m", message])
     if proc.returncode != 0:
         raise RuntimeError(
@@ -64,17 +66,15 @@ def _push() -> None:
         )
 
 
-def commit_output(path: Path) -> None:
-    """Stage, commit, and push *path* as the only file in a new commit.
+def commit_output(path: Path, *, message: str) -> None:
+    """Stage *path*, commit it with *message*, and push to origin/main.
 
-    Raises ``RuntimeError`` if the working tree is dirty before
-    staging, or if any git step exits non-zero. Returns cleanly
-    without committing when the staged diff is empty (the file
-    already matches the last committed version).
+    Returns cleanly without committing when the staged diff is empty
+    (the file already matches the last committed version). Any
+    non-zero git exit raises ``RuntimeError``.
     """
-    _ensure_clean_tree()
     _stage(path)
     if not _has_staged_changes():
         return
-    _commit(path)
+    _commit(message)
     _push()
