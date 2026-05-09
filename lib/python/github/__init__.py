@@ -90,21 +90,33 @@ def update_subclause_status(body: str, label: str, status: str, *,
     return body[:match.start()] + new_row + body[match.end():]
 
 
-def fetch_issue_body(organization: str, repo: str, issue: int) -> str:
-    """Fetch the body of a GitHub issue using ``gh api``."""
-    print(f"Fetching issue #{issue} from {organization}/{repo}...")
+def _gh_api_jq(
+    organization: str, repo: str, issue: int, *, jq: str, label: str,
+) -> str:
+    """Run ``gh api repos/.../issues/{issue} --jq <expr>`` and return stdout.
+
+    Exits with a templated error message on non-zero gh exit. Returns
+    the raw stdout — callers strip if their field is a single-line
+    scalar.
+    """
     result = subprocess.run(
         ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
-         "--jq", ".body"],
+         "--jq", jq],
         capture_output=True,
         text=True,
         check=False,
     )
     if result.returncode != 0:
-        print(f"ERROR: Failed to fetch issue #{issue}:"
+        print(f"ERROR: Failed to fetch {label} for issue #{issue}:"
               f"\n{result.stderr}", file=sys.stderr)
         sys.exit(1)
     return result.stdout
+
+
+def fetch_issue_body(organization: str, repo: str, issue: int) -> str:
+    """Fetch the body of a GitHub issue using ``gh api``."""
+    print(f"Fetching issue #{issue} from {organization}/{repo}...")
+    return _gh_api_jq(organization, repo, issue, jq=".body", label="body")
 
 
 _SUBCLAUSE_RE = re.compile(r"§(\d+(?:\.\d+)*)|(\b[A-Z](?:\.\d+)+)")
@@ -124,34 +136,16 @@ def extract_subclause_from_title(title: str) -> str:
 def fetch_issue_title(organization: str, repo: str, issue: int) -> str:
     """Fetch the title of a GitHub issue using ``gh api``."""
     print(f"Fetching title for issue #{issue} from {organization}/{repo}...")
-    result = subprocess.run(
-        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
-         "--jq", ".title"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to fetch issue #{issue}:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    return result.stdout.strip()
+    return _gh_api_jq(
+        organization, repo, issue, jq=".title", label="title",
+    ).strip()
 
 
 def fetch_issue_state(organization: str, repo: str, issue: int) -> str:
     """Fetch the state of a GitHub issue using ``gh api``."""
-    result = subprocess.run(
-        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
-         "--jq", ".state"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to fetch state for issue #{issue}:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    return result.stdout.strip()
+    return _gh_api_jq(
+        organization, repo, issue, jq=".state", label="state",
+    ).strip()
 
 
 def find_issue_by_title(

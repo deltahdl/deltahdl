@@ -525,6 +525,36 @@ def build_steps(
 
 
 # ---------------------------------------------------------------------------
+# Mutator pipeline tail
+# ---------------------------------------------------------------------------
+
+def _run_pipeline_and_commit(
+    members: list[CycleMember], lrm: str,
+    satisfied_dependencies: list[str], *,
+    model: str, no_change_label: str,
+) -> None:
+    """Run the eight-step pipeline over ``members`` and commit.
+
+    Warns to stderr when the pipeline produced no source-tree changes
+    so a downstream operator can tell convergence apart from a silent
+    no-op. ``no_change_label`` is the leading phrase of that warning
+    (e.g. ``Mutator for §X.Y`` or ``Cycle-set mutator for [...]``).
+    """
+    subclauses = [m.subclause for m in members]
+    issues = [m.issue for m in members]
+    steps = build_steps(
+        subclauses, lrm, satisfied_dependencies=satisfied_dependencies,
+    )
+    run_steps(steps, model=model)
+    if not commit_mutator_result(subclauses, issues, model=model):
+        print(
+            f"{no_change_label} produced no source-tree changes;"
+            " nothing committed.",
+            file=sys.stderr,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Mutator: no dependencies
 # ---------------------------------------------------------------------------
 
@@ -537,18 +567,11 @@ def satisfy_unsatisfied_subclause_without_dependencies(
         f" model {model}",
         file=sys.stderr,
     )
-    steps = build_steps(
-        [target.subclause], lrm, satisfied_dependencies=[],
+    _run_pipeline_and_commit(
+        [target], lrm, [],
+        model=model,
+        no_change_label=f"Mutator for §{target.subclause}",
     )
-    run_steps(steps, model=model)
-    if not commit_mutator_result(
-        [target.subclause], [target.issue], model=model,
-    ):
-        print(
-            f"Mutator for §{target.subclause} produced no source-tree"
-            " changes; nothing committed.",
-            file=sys.stderr,
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -566,19 +589,11 @@ def satisfy_unsatisfied_subclause_with_satisfied_dependencies(
         f" issue #{target.issue}, model {model}",
         file=sys.stderr,
     )
-    steps = build_steps(
-        [target.subclause], lrm,
-        satisfied_dependencies=satisfied_dependencies,
+    _run_pipeline_and_commit(
+        [target], lrm, satisfied_dependencies,
+        model=model,
+        no_change_label=f"Mutator for §{target.subclause}",
     )
-    run_steps(steps, model=model)
-    if not commit_mutator_result(
-        [target.subclause], [target.issue], model=model,
-    ):
-        print(
-            f"Mutator for §{target.subclause} produced no source-tree"
-            " changes; nothing committed.",
-            file=sys.stderr,
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -609,14 +624,8 @@ def satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
         f" model {model}",
         file=sys.stderr,
     )
-    steps = build_steps(
-        subclauses, lrm,
-        satisfied_dependencies=satisfied_dependencies,
+    _run_pipeline_and_commit(
+        members, lrm, satisfied_dependencies,
+        model=model,
+        no_change_label=f"Cycle-set mutator for {subclauses}",
     )
-    run_steps(steps, model=model)
-    if not commit_mutator_result(subclauses, issues, model=model):
-        print(
-            f"Cycle-set mutator for {subclauses} produced no source-tree"
-            " changes; nothing committed.",
-            file=sys.stderr,
-        )
