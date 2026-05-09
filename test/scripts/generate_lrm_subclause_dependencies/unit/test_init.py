@@ -154,6 +154,15 @@ def test_main_writes_record_per_subclause(
     assert set(payload["records"]) == {"4.4", "5.6"}
 
 
+def test_main_writes_pretty_printed_json(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+    make_output: Path,
+) -> None:
+    """The output JSON is pretty-printed with two-space indentation."""
+    run_main(toc={"4.4": (10, 20)})
+    assert "\n  " in make_output.read_text()
+
+
 def test_main_record_payload(
     run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
     make_output: Path,

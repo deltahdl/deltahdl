@@ -86,7 +86,7 @@ def _load_checkpoint(output: Path) -> dict[str, Any]:
 def _write_checkpoint(output: Path, records: dict[str, Any]) -> None:
     """Write *records* and the derived dependency order to *output*."""
     order = order_groups(find_cycle_groups(records), records)
-    output.write_text(json.dumps({"records": records, "order": order}))
+    output.write_text(json.dumps({"records": records, "order": order}, indent=2))
 
 
 def _checkpoint_message(subclause: str, index: int, total: int) -> str:
