@@ -522,3 +522,100 @@ def test_main_resume_first_checkpoint_has_full_cached_records(
     )
     snapshots = _capture_snapshots(make_lrm, make_output, resume=True)
     assert set(snapshots[0]["records"]) == {"4.4", "5.6"}
+
+
+# --- aggregate-skip walker filter -------------------------------------------
+
+
+_AGGREGATE_TOC: dict[str, tuple[int, int]] = {
+    "23": (100, 129),
+    "23.1": (100, 109),
+}
+_SINGLETON_TOC: dict[str, tuple[int, int]] = {"2": (10, 12)}
+_ANNEX_AGGREGATE_TOC: dict[str, tuple[int, int]] = {
+    "A": (900, 939),
+    "A.1": (900, 919),
+}
+_ANNEX_SINGLETON_TOC: dict[str, tuple[int, int]] = {"B": (940, 949)}
+
+
+def test_main_skips_aggregate_chapter(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+) -> None:
+    """A chapter with at least one numbered subclause is not walked."""
+    _, mock_record, _ = run_main(toc=_AGGREGATE_TOC)
+    walked = [c.args[0] for c in mock_record.call_args_list]
+    assert "23" not in walked
+
+
+def test_main_walks_subclauses_under_aggregate(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+) -> None:
+    """The numbered subclauses under an aggregate chapter are still walked."""
+    _, mock_record, _ = run_main(toc=_AGGREGATE_TOC)
+    walked = [c.args[0] for c in mock_record.call_args_list]
+    assert walked == ["23.1"]
+
+
+def test_main_walks_singleton_chapter(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+) -> None:
+    """A top-level chapter with no numbered subclauses is walked."""
+    _, mock_record, _ = run_main(toc=_SINGLETON_TOC)
+    walked = [c.args[0] for c in mock_record.call_args_list]
+    assert walked == ["2"]
+
+
+def test_main_skips_aggregate_annex(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+) -> None:
+    """An annex with at least one numbered subclause is not walked."""
+    _, mock_record, _ = run_main(toc=_ANNEX_AGGREGATE_TOC)
+    walked = [c.args[0] for c in mock_record.call_args_list]
+    assert "A" not in walked
+
+
+def test_main_walks_singleton_annex(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+) -> None:
+    """An annex with no numbered subclauses is walked."""
+    _, mock_record, _ = run_main(toc=_ANNEX_SINGLETON_TOC)
+    walked = [c.args[0] for c in mock_record.call_args_list]
+    assert walked == ["B"]
+
+
+def test_main_drops_aggregate_records_from_output(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+    make_output: Path,
+) -> None:
+    """Aggregates are absent from the records section the walker writes."""
+    run_main(toc=_AGGREGATE_TOC)
+    payload = json.loads(make_output.read_text())
+    assert "23" not in payload["records"]
+
+
+def test_main_progress_total_excludes_aggregates(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+) -> None:
+    """The i/n progress reports total walked entries, not raw TOC size."""
+    _, _, mock_commit = run_main(
+        toc=_AGGREGATE_TOC, extra_argv=["--commit"],
+    )
+    messages = [c.kwargs["message"] for c in mock_commit.call_args_list]
+    assert messages == [
+        "generate_lrm_subclause_dependencies: checkpoint 23.1 (1/1)",
+    ]
+
+
+def test_main_resume_drops_cached_aggregate_record(
+    make_lrm: Path, make_output: Path,
+) -> None:
+    """A cached aggregate record is dropped on resume so it is not reused."""
+    _seed_checkpoint(
+        make_output,
+        {"23": _CACHED_RECORD, "23.1": _CACHED_RECORD},
+    )
+    with _stub_walk(_AGGREGATE_TOC, return_value=_FRESH_RECORD):
+        _run_main(make_lrm, make_output, resume=True)
+    payload = json.loads(make_output.read_text())
+    assert "23" not in payload["records"]

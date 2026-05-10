@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from pypdf import PdfReader
 
-from lib.python.lrm import load_toc
+from lib.python.lrm import is_top_level_aggregate, load_toc
 
 PdfBuilder = Callable[[str, int, Sequence[tuple[int, str, int]]], str]
 
@@ -216,3 +216,48 @@ def test_annex_singleton_at_document_end_uses_total_pages(
     """A childless annex at end-of-document ends at the last PDF page."""
     path = make_pdf("annex.pdf", 1000, annex_outline)
     assert load_toc(path)["Q"][1] == 1000
+
+
+# --- is_top_level_aggregate -------------------------------------------------
+
+
+def test_is_top_level_aggregate_chapter_with_subclauses_true() -> None:
+    """A chapter with at least one numbered subclause is an aggregate."""
+    toc = {"23": (100, 129), "23.1": (100, 109)}
+    assert is_top_level_aggregate("23", toc) is True
+
+
+def test_is_top_level_aggregate_singleton_chapter_false() -> None:
+    """A top-level chapter with no numbered subclauses is not an aggregate."""
+    toc = {"2": (10, 12), "3": (15, 20)}
+    assert is_top_level_aggregate("2", toc) is False
+
+
+def test_is_top_level_aggregate_annex_with_subclauses_true() -> None:
+    """An annex with numbered subclauses is an aggregate."""
+    toc = {"A": (900, 939), "A.1": (900, 919)}
+    assert is_top_level_aggregate("A", toc) is True
+
+
+def test_is_top_level_aggregate_singleton_annex_false() -> None:
+    """A childless annex (Annex B / P / Q) is not an aggregate."""
+    toc = {"B": (940, 949), "P": (950, 959)}
+    assert is_top_level_aggregate("B", toc) is False
+
+
+def test_is_top_level_aggregate_subclause_false() -> None:
+    """A sub-level entry is never an aggregate, even with descendants."""
+    toc = {"23": (100, 129), "23.2": (110, 129), "23.2.1": (110, 111)}
+    assert is_top_level_aggregate("23.2", toc) is False
+
+
+def test_is_top_level_aggregate_missing_clause_false() -> None:
+    """A clause not present in the TOC is not an aggregate."""
+    toc = {"23": (100, 129)}
+    assert is_top_level_aggregate("99", toc) is False
+
+
+def test_is_top_level_aggregate_does_not_match_prefix_substring() -> None:
+    """``2`` is not an aggregate when only ``20.1`` is present (not ``2.x``)."""
+    toc = {"2": (10, 12), "20": (100, 130), "20.1": (100, 105)}
+    assert is_top_level_aggregate("2", toc) is False

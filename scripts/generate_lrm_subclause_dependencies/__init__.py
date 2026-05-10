@@ -17,7 +17,7 @@ from lib.python.cli import (
     add_model_arg,
     parse_and_validate,
 )
-from lib.python.lrm import load_toc
+from lib.python.lrm import is_top_level_aggregate, load_toc
 
 from .commit import assert_clean_tree, commit_output
 from .ordering import find_cycle_groups, order_groups
@@ -104,11 +104,12 @@ def main(argv: list[str] | None = None) -> None:
     cached = _load_checkpoint(args.output) if args.resume else {}
     if args.commit:
         assert_clean_tree()
+    walked = [sub for sub in toc if not is_top_level_aggregate(sub, toc)]
     records: dict[str, Any] = {
-        sub: cached[sub] for sub in toc if sub in cached
+        sub: cached[sub] for sub in walked if sub in cached
     }
-    total = len(toc)
-    for index, subclause in enumerate(toc, start=1):
+    total = len(walked)
+    for index, subclause in enumerate(walked, start=1):
         if subclause not in records:
             records[subclause] = build_subclause_record(
                 subclause, str(args.lrm), model=args.model, effort=args.effort,

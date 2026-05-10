@@ -73,6 +73,27 @@ def _compute_ranges(
     return result
 
 
+def is_top_level_aggregate(
+    clause: str, toc: dict[str, tuple[int, int]],
+) -> bool:
+    """Return True iff ``clause`` is a top-level entry that has at least
+    one numbered subclause in ``toc``.
+
+    The dependency graph treats such clauses as aggregates: the
+    enumeration root for a list of numbered subclauses, with no
+    individual satisfaction work of its own. They are skipped by the
+    walker and rejected as dependency-list entries by the oracle.
+    Top-level singletons like §2, §41, and Annex B remain non-aggregate
+    and are walked as ordinary satisfaction units.
+    """
+    if clause not in toc:
+        return False
+    if "." in clause:
+        return False
+    prefix = clause + "."
+    return any(other.startswith(prefix) for other in toc)
+
+
 def load_toc(lrm_path: str) -> dict[str, tuple[int, int]]:
     """Return a mapping of clause → (start_page, end_page) for ``lrm_path``.
 
