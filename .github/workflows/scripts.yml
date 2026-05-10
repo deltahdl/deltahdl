@@ -6,9 +6,9 @@ jobs:
   static-analysis:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-static-analysis-${{
@@ -86,9 +86,9 @@ jobs:
   #   needs: [test-classify-tests]
   #   runs-on: ubuntu-24.04
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v5
   #     - name: Restore pip cache
-  #       uses: actions/cache@v4
+  #       uses: actions/cache@v5
   #       with:
   #         key: >-
   #           pip-scripts-test-script-${{
@@ -118,9 +118,9 @@ jobs:
   #   needs: [test-classify-file]
   #   runs-on: ubuntu-24.04
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v5
   #     - name: Restore pip cache
-  #       uses: actions/cache@v4
+  #       uses: actions/cache@v5
   #       with:
   #         key: >-
   #           pip-scripts-test-script-${{
@@ -150,9 +150,9 @@ jobs:
   #   needs: [test-lib-classify, test-lib-clause, test-lib-git, test-lib-github]
   #   runs-on: ubuntu-24.04
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v5
   #     - name: Restore pip cache
-  #       uses: actions/cache@v4
+  #       uses: actions/cache@v5
   #       with:
   #         key: >-
   #           pip-scripts-test-script-${{
@@ -182,9 +182,9 @@ jobs:
   #   needs: [test-classify-test]
   #   runs-on: ubuntu-24.04
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v5
   #     - name: Restore pip cache
-  #       uses: actions/cache@v4
+  #       uses: actions/cache@v5
   #       with:
   #         key: >-
   #           pip-scripts-test-script-${{
@@ -217,9 +217,9 @@ jobs:
       - test-lib-lrm-subclause-dependencies
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-script-${{
@@ -249,9 +249,9 @@ jobs:
   #   needs: static-analysis
   #   runs-on: ubuntu-24.04
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v5
   #     - name: Restore pip cache
-  #       uses: actions/cache@v4
+  #       uses: actions/cache@v5
   #       with:
   #         key: >-
   #           pip-scripts-test-lib-${{
@@ -272,9 +272,9 @@ jobs:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-lib-${{
@@ -295,9 +295,9 @@ jobs:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-lib-${{
@@ -318,9 +318,9 @@ jobs:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-lib-${{
@@ -341,9 +341,9 @@ jobs:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-lib-${{
@@ -364,9 +364,9 @@ jobs:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-lib-${{
@@ -387,9 +387,9 @@ jobs:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-lib-${{
@@ -412,9 +412,9 @@ jobs:
       - test-lib-lrm
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-lib-${{
@@ -435,9 +435,9 @@ jobs:
     needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-lib-${{
@@ -458,9 +458,9 @@ jobs:
     needs: test-lib-run-tests-common
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-script-${{
@@ -482,9 +482,9 @@ jobs:
     needs: test-lib-run-tests-common
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-script-${{
@@ -509,9 +509,9 @@ jobs:
   #     - test-satisfy-subclauses
   #   runs-on: ubuntu-24.04
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v5
   #     - name: Restore pip cache
-  #       uses: actions/cache@v4
+  #       uses: actions/cache@v5
   #       with:
   #         key: >-
   #           pip-scripts-test-script-${{
@@ -543,9 +543,9 @@ jobs:
   #     - test-satisfy-clause
   #   runs-on: ubuntu-24.04
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v5
   #     - name: Restore pip cache
-  #       uses: actions/cache@v4
+  #       uses: actions/cache@v5
   #       with:
   #         key: >-
   #           pip-scripts-test-script-${{
@@ -582,9 +582,9 @@ jobs:
       - test-lib-lrm-subclause-dependencies
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-script-${{
@@ -616,9 +616,9 @@ jobs:
       - test-satisfy-subclause
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Restore pip cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           key: >-
             pip-scripts-test-script-${{
