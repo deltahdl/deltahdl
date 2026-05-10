@@ -132,3 +132,87 @@ def test_unresolvable_destination_skips_only_that_entry(
         PdfReader, "get_destination_page_number", stub,
     )
     assert "23.2.1" not in load_toc(path)
+
+
+# --- annex headings ---------------------------------------------------------
+
+
+def test_annex_heading_with_subclauses_present(
+    make_pdf: PdfBuilder,
+    annex_outline: list[tuple[int, str, int]],
+) -> None:
+    """An ``Annex A …`` heading surfaces as the single-letter identifier ``A``."""
+    path = make_pdf("annex.pdf", 1000, annex_outline)
+    assert "A" in load_toc(path)
+
+
+def test_annex_heading_with_subclauses_starts_at_heading_page(
+    make_pdf: PdfBuilder,
+    annex_outline: list[tuple[int, str, int]],
+) -> None:
+    """``Annex A`` starts at the page of its outline entry."""
+    path = make_pdf("annex.pdf", 1000, annex_outline)
+    assert load_toc(path)["A"][0] == 900
+
+
+def test_annex_heading_with_subclauses_spans_subtree(
+    make_pdf: PdfBuilder,
+    annex_outline: list[tuple[int, str, int]],
+) -> None:
+    """``Annex A`` end page reaches the start of the next non-descendant."""
+    path = make_pdf("annex.pdf", 1000, annex_outline)
+    assert load_toc(path)["A"][1] == 939
+
+
+def test_annex_subclauses_still_present(
+    make_pdf: PdfBuilder,
+    annex_outline: list[tuple[int, str, int]],
+) -> None:
+    """The annex subclause ``A.1`` is still in the TOC alongside ``A``."""
+    path = make_pdf("annex.pdf", 1000, annex_outline)
+    assert "A.1" in load_toc(path)
+
+
+def test_annex_heading_keywords_singleton_present(
+    make_pdf: PdfBuilder,
+    annex_outline: list[tuple[int, str, int]],
+) -> None:
+    """``Annex B Keywords``, which has no numbered subclauses, surfaces as ``B``."""
+    path = make_pdf("annex.pdf", 1000, annex_outline)
+    assert "B" in load_toc(path)
+
+
+def test_annex_keywords_singleton_pages(
+    make_pdf: PdfBuilder,
+    annex_outline: list[tuple[int, str, int]],
+) -> None:
+    """Childless Annex B's end page reaches the start of the next non-descendant."""
+    path = make_pdf("annex.pdf", 1000, annex_outline)
+    assert load_toc(path)["B"] == (940, 949)
+
+
+def test_annex_glossary_singleton_present(
+    make_pdf: PdfBuilder,
+    annex_outline: list[tuple[int, str, int]],
+) -> None:
+    """``Annex P Glossary`` surfaces as ``P``."""
+    path = make_pdf("annex.pdf", 1000, annex_outline)
+    assert "P" in load_toc(path)
+
+
+def test_annex_bibliography_singleton_present(
+    make_pdf: PdfBuilder,
+    annex_outline: list[tuple[int, str, int]],
+) -> None:
+    """``Annex Q Bibliography`` surfaces as ``Q``."""
+    path = make_pdf("annex.pdf", 1000, annex_outline)
+    assert "Q" in load_toc(path)
+
+
+def test_annex_singleton_at_document_end_uses_total_pages(
+    make_pdf: PdfBuilder,
+    annex_outline: list[tuple[int, str, int]],
+) -> None:
+    """A childless annex at end-of-document ends at the last PDF page."""
+    path = make_pdf("annex.pdf", 1000, annex_outline)
+    assert load_toc(path)["Q"][1] == 1000

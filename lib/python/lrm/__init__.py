@@ -11,6 +11,7 @@ from lib.python.clause import build_hierarchy
 
 
 _CLAUSE_RE = re.compile(r"^([A-Z]|\d+)(\.\d+){0,4}\b")
+_ANNEX_RE = re.compile(r"^Annex\s+([A-Z])\b")
 _TOC_CACHE: dict[str, dict[str, tuple[int, int]]] = {}
 
 
@@ -23,18 +24,36 @@ def _walk_outline(items: Any) -> Iterator[Any]:
             yield item
 
 
+def _identifier_from_title(title: str) -> str | None:
+    """Return the clause identifier embedded in an outline title, or None.
+
+    Numbered titles like ``23.2.1 Tasks`` and ``A.7 Foo`` resolve to
+    ``23.2.1`` and ``A.7`` via the dotted-decimal regex. Annex headings
+    like ``Annex B Keywords`` resolve to the single-letter identifier
+    ``B`` so the annex appears in ``load_toc`` as a top-level entry on
+    the same footing as numbered chapters.
+    """
+    clause_match = _CLAUSE_RE.match(title)
+    if clause_match is not None:
+        return clause_match.group(0)
+    annex_match = _ANNEX_RE.match(title)
+    if annex_match is not None:
+        return annex_match.group(1)
+    return None
+
+
 def _extract_entries(reader: PdfReader) -> list[tuple[str, int]]:
     """Return ``[(clause, start_page)]`` from a PDF reader, in doc order."""
     entries: list[tuple[str, int]] = []
     for item in _walk_outline(reader.outline):
         title = str(item.title or "")
-        match = _CLAUSE_RE.match(title)
-        if match is None:
+        identifier = _identifier_from_title(title)
+        if identifier is None:
             continue
         page = reader.get_destination_page_number(item)
         if page is None:
             continue
-        entries.append((match.group(0), page + 1))
+        entries.append((identifier, page + 1))
     return entries
 
 

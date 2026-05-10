@@ -22,6 +22,20 @@ def nested_outline() -> list[tuple[int, str, int]]:
 
 
 @pytest.fixture()
+def annex_outline() -> list[tuple[int, str, int]]:
+    """Outline modelled on the LRM annex layout."""
+    return [
+        (1, "40 Last chapter", 800),
+        (1, "Annex A SystemVerilog formal syntax", 900),
+        (2, "A.1 Source text", 900),
+        (2, "A.2 Declarations", 920),
+        (1, "Annex B Keywords", 940),
+        (1, "Annex P Glossary", 950),
+        (1, "Annex Q Bibliography", 960),
+    ]
+
+
+@pytest.fixture()
 def blank_pdf(tmp_path: Path) -> str:
     """Write a single-page PDF with no outline; return its path."""
     path = tmp_path / "blank.pdf"
