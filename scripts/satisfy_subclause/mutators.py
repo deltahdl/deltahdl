@@ -28,16 +28,15 @@ import sys
 from dataclasses import dataclass
 
 from lib.python.clause import STAGE_TO_PREFIX, clause_to_filename
-from lib.python.git import commit_and_push, get_porcelain_changes
-from lib.python.github import format_subclause_label
-from lib.python.lrm import build_lrm_read_instruction
-
-from .oracles import build_env
-from .streaming import (
+from lib.python.claude_cli_streaming import (
     COPYRIGHT_REASON,
+    build_env,
     build_streaming_cmd,
     run_claude_streaming_with_retry,
 )
+from lib.python.git import commit_and_push, get_porcelain_changes
+from lib.python.github import format_subclause_label
+from lib.python.lrm import build_lrm_read_instruction
 
 
 # Mutators may edit, create, delete, and rename source and test files

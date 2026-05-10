@@ -2,18 +2,9 @@
 
 from collections.abc import Callable
 from pathlib import Path
-from types import ModuleType
 from unittest.mock import MagicMock
 
 import pytest
-
-from satisfy_subclause import streaming as _streaming
-
-
-@pytest.fixture()
-def streaming() -> ModuleType:
-    """Return the satisfy_subclause.streaming module."""
-    return _streaming
 
 
 @pytest.fixture()

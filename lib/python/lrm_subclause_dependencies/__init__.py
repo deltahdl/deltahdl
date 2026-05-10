@@ -1,30 +1,29 @@
-"""Read-only oracles for the satisfaction pipeline.
+"""Read-only dependency oracle for LRM subclauses.
 
 A single oracle: ``compute_subclause_dependencies`` returns a
 ``SubclauseDependencies`` list of subclause identifiers ordered
-dependencies-first.
+foundations-first.
 
 The invocation is read-only: the disallowed-tools list blocks every
 mutating tool and ``run_oracle_call`` exits non-zero on any failure.
 """
 
 import json
-import os
 import re
 import sys
 from typing import TypeAlias
 
+from lib.python.claude_cli_streaming import (
+    build_env,
+    build_streaming_cmd,
+    exit_with_error,
+    run_claude_streaming_with_retry,
+)
 from lib.python.lrm import (
     build_lrm_read_instruction,
     is_sub_level_parent,
     is_top_level_aggregate,
     load_toc,
-)
-
-from .streaming import (
-    build_streaming_cmd,
-    exit_with_error,
-    run_claude_streaming_with_retry,
 )
 
 
@@ -46,13 +45,6 @@ DISALLOWED_TOOLS = (
 )
 
 
-def build_env() -> dict[str, str]:
-    """Return a Claude-safe copy of the current environment."""
-    env = os.environ.copy()
-    env.pop("CLAUDECODE", None)
-    return env
-
-
 def run_oracle_call(
     prompt: str,
     *,
@@ -66,17 +58,18 @@ def run_oracle_call(
     events and print Claude's text/tool_use blocks live — oracle passes
     can take many minutes and the user needs to see progress. Wraps
     each call in a content-filter retry loop (max two retries) using
-    the recovery prompt from ``streaming``; the retry call appends
-    ``--continue`` so it resumes the same Claude session. Loud-fatal
-    on a non-zero exit code, a missing result event, or after the
-    retry budget is exhausted. When *effort* is set, the Claude CLI
-    runs at that thinking-budget tier; the retry cmd carries the same
-    effort so the recovery call matches the original session's shape.
-    When *continue_session* is true, the initial cmd also appends
-    ``--continue`` so the call resumes the most recent Claude session
-    rather than starting a fresh one — used by the parse-retry loop in
-    ``compute_subclause_dependencies`` to feed corrective feedback into
-    the same session that produced the rejected response.
+    the recovery prompt from the streaming runner; the retry call
+    appends ``--continue`` so it resumes the same Claude session.
+    Loud-fatal on a non-zero exit code, a missing result event, or
+    after the retry budget is exhausted. When *effort* is set, the
+    Claude CLI runs at that thinking-budget tier; the retry cmd
+    carries the same effort so the recovery call matches the original
+    session's shape. When *continue_session* is true, the initial cmd
+    also appends ``--continue`` so the call resumes the most recent
+    Claude session rather than starting a fresh one — used by the
+    parse-retry loop in ``compute_subclause_dependencies`` to feed
+    corrective feedback into the same session that produced the
+    rejected response.
     """
     cmd = build_streaming_cmd(
         model=model, disallowed_tools=DISALLOWED_TOOLS,

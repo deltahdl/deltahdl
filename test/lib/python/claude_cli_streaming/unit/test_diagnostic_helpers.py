@@ -1,4 +1,4 @@
-"""Unit tests for the diagnostic helpers in satisfy_subclause.streaming."""
+"""Unit tests for the diagnostic helpers in lib.python.claude_cli_streaming."""
 
 from types import ModuleType
 

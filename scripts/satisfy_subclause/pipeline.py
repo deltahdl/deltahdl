@@ -29,13 +29,14 @@ import subprocess
 import sys
 from typing import Any
 
+from lib.python.lrm_subclause_dependencies import compute_subclause_dependencies
+
 from .mutators import (
     CycleMember,
     satisfy_unsatisfied_subclause_set_with_satisfied_dependencies,
     satisfy_unsatisfied_subclause_with_satisfied_dependencies,
     satisfy_unsatisfied_subclause_without_dependencies,
 )
-from .oracles import compute_subclause_dependencies
 
 
 # ---------------------------------------------------------------------------

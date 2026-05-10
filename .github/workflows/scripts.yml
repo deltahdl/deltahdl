@@ -214,6 +214,7 @@ jobs:
     needs:
       - test-lib-cli
       - test-lib-lrm
+      - test-lib-lrm-subclause-dependencies
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -267,6 +268,29 @@ jobs:
   #         --cov-branch
   #         --cov-report=term-missing
   #         --cov-fail-under=100
+  test-lib-claude-cli-streaming:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-lib-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/python/claude_cli_streaming/unit/ -v
+          --cov=lib.python.claude_cli_streaming
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   test-lib-clause:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -379,6 +403,31 @@ jobs:
         run: >-
           python3 -m pytest test/lib/python/lrm/unit/ -v
           --cov=lib.python.lrm
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
+  test-lib-lrm-subclause-dependencies:
+    needs:
+      - test-lib-claude-cli-streaming
+      - test-lib-lrm
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          key: >-
+            pip-scripts-test-lib-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-lib-
+      - name: Install tools
+        run: pip install pypdf pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/python/lrm_subclause_dependencies/unit/ -v
+          --cov=lib.python.lrm_subclause_dependencies
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
@@ -524,11 +573,13 @@ jobs:
   #         test/scripts/satisfy_clauses/e2e/ -v
   test-satisfy-subclause:
     needs:
+      - test-lib-claude-cli-streaming
       - test-lib-clause
       - test-lib-cli
       - test-lib-git
       - test-lib-github
       - test-lib-lrm
+      - test-lib-lrm-subclause-dependencies
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

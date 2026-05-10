@@ -1,14 +1,13 @@
-"""Unit tests for satisfy_subclause.oracles."""
+"""Unit tests for lib.python.lrm_subclause_dependencies."""
 
 from typing import Any
 from unittest.mock import patch
 
 import pytest
 
-from satisfy_subclause.oracles import (
+from lib.python.lrm_subclause_dependencies import (
     DISALLOWED_TOOLS,
     build_dependency_prompt,
-    build_env,
     compute_subclause_dependencies,
     parse_dependencies,
     run_oracle_call,
@@ -91,37 +90,13 @@ def test_disallowed_tools_blocks_python() -> None:
     assert "python *" in DISALLOWED_TOOLS
 
 
-# --- build_env --------------------------------------------------------------
-
-
-def test_build_env_drops_claudecode() -> None:
-    """build_env removes the CLAUDECODE variable when set."""
-    with patch.dict("os.environ", {"CLAUDECODE": "1"}, clear=False):
-        env = build_env()
-    assert "CLAUDECODE" not in env
-
-
-def test_build_env_when_claudecode_unset() -> None:
-    """build_env succeeds when CLAUDECODE is not set."""
-    with patch.dict("os.environ", {}, clear=True):
-        env = build_env()
-    assert "CLAUDECODE" not in env
-
-
-def test_build_env_preserves_other_vars() -> None:
-    """build_env preserves unrelated environment variables."""
-    with patch.dict("os.environ", {"ORACLE_VAR": "value"}, clear=False):
-        env = build_env()
-    assert env.get("ORACLE_VAR") == "value"
-
-
 # --- run_oracle_call --------------------------------------------------------
 
 
 def _patched_streaming(result_text: str = "DONE") -> Any:
     """Patch run_claude_streaming with a fixed return string."""
     return patch(
-        "satisfy_subclause.oracles.run_claude_streaming_with_retry",
+        "lib.python.lrm_subclause_dependencies.run_claude_streaming_with_retry",
         return_value=result_text,
     )
 
@@ -416,7 +391,7 @@ def test_parse_dependencies_accepts_sub_level_under_aggregate() -> None:
 def _patched_oracle(result_text: str) -> Any:
     """Patch run_oracle_call with a fixed return string."""
     return patch(
-        "satisfy_subclause.oracles.run_oracle_call",
+        "lib.python.lrm_subclause_dependencies.run_oracle_call",
         return_value=result_text,
     )
 
@@ -470,7 +445,8 @@ def test_compute_subclause_dependencies_exits_when_aggregate_output_persists() -
     """An aggregate identifier returned every retry exits after the budget is exhausted."""
     aggregate_toc = {"8": (200, 250), "8.1": (200, 210)}
     with _patched_oracle('["8"]'), patch(
-        "satisfy_subclause.oracles.load_toc", return_value=aggregate_toc,
+        "lib.python.lrm_subclause_dependencies.load_toc",
+        return_value=aggregate_toc,
     ):
         with pytest.raises(SystemExit):
             compute_subclause_dependencies(
@@ -481,7 +457,7 @@ def test_compute_subclause_dependencies_exits_when_aggregate_output_persists() -
 def test_compute_subclause_dependencies_loads_toc_from_lrm_path() -> None:
     """compute_subclause_dependencies passes the --lrm path through to load_toc."""
     with _patched_oracle("[]"), patch(
-        "satisfy_subclause.oracles.load_toc", return_value={},
+        "lib.python.lrm_subclause_dependencies.load_toc", return_value={},
     ) as mock_toc:
         compute_subclause_dependencies(
             "33.4", "/tmp/spec.pdf", model="opus",
@@ -520,49 +496,69 @@ _PARENT_TOC: dict[str, tuple[int, int]] = {
 
 def test_build_dependency_prompt_sub_level_parent_mentions_preamble() -> None:
     """A sub-level parent's prompt anchors the rules in the parent's preamble."""
-    with patch("satisfy_subclause.oracles.load_toc", return_value=_PARENT_TOC):
+    with patch(
+        "lib.python.lrm_subclause_dependencies.load_toc",
+        return_value=_PARENT_TOC,
+    ):
         prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
     assert "preamble" in prompt
 
 
 def test_build_dependency_prompt_sub_level_parent_signals_subclauses_separate() -> None:
     """A sub-level parent's prompt names that numbered subclauses are queried separately."""
-    with patch("satisfy_subclause.oracles.load_toc", return_value=_PARENT_TOC):
+    with patch(
+        "lib.python.lrm_subclause_dependencies.load_toc",
+        return_value=_PARENT_TOC,
+    ):
         prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
     assert "queried separately" in prompt
 
 
 def test_build_dependency_prompt_sub_level_parent_grounds_in_normative_rule() -> None:
     """A sub-level parent's prompt still requires a normative-rule grounding."""
-    with patch("satisfy_subclause.oracles.load_toc", return_value=_PARENT_TOC):
+    with patch(
+        "lib.python.lrm_subclause_dependencies.load_toc",
+        return_value=_PARENT_TOC,
+    ):
         prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
     assert "normative rule" in prompt
 
 
 def test_build_dependency_prompt_sub_level_parent_keeps_machinery_anchor() -> None:
     """A sub-level parent's prompt keeps the §Y-machinery prerequisite anchor."""
-    with patch("satisfy_subclause.oracles.load_toc", return_value=_PARENT_TOC):
+    with patch(
+        "lib.python.lrm_subclause_dependencies.load_toc",
+        return_value=_PARENT_TOC,
+    ):
         prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
     assert "machinery" in prompt
 
 
 def test_build_dependency_prompt_sub_level_parent_keeps_json_array() -> None:
     """A sub-level parent's prompt still requests a JSON array."""
-    with patch("satisfy_subclause.oracles.load_toc", return_value=_PARENT_TOC):
+    with patch(
+        "lib.python.lrm_subclause_dependencies.load_toc",
+        return_value=_PARENT_TOC,
+    ):
         prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
     assert "JSON array" in prompt
 
 
 def test_build_dependency_prompt_sub_level_parent_avoids_do_not() -> None:
     """A sub-level parent's prompt avoids the 'do not' phrasing."""
-    with patch("satisfy_subclause.oracles.load_toc", return_value=_PARENT_TOC):
+    with patch(
+        "lib.python.lrm_subclause_dependencies.load_toc",
+        return_value=_PARENT_TOC,
+    ):
         prompt = build_dependency_prompt("33.4", "~/LRM.pdf")
     assert "do not" not in prompt
 
 
 def test_build_dependency_prompt_leaf_omits_preamble() -> None:
     """A leaf target's prompt does not branch into the preamble framing."""
-    with patch("satisfy_subclause.oracles.load_toc", return_value={}):
+    with patch(
+        "lib.python.lrm_subclause_dependencies.load_toc", return_value={},
+    ):
         prompt = build_dependency_prompt("33.4.1.5", "~/LRM.pdf")
     assert "preamble" not in prompt
 
@@ -570,7 +566,10 @@ def test_build_dependency_prompt_leaf_omits_preamble() -> None:
 def test_build_dependency_prompt_top_level_singleton_omits_preamble() -> None:
     """A top-level singleton like §2 is not a parent and gets the leaf prompt."""
     singleton_toc = {"2": (10, 12)}
-    with patch("satisfy_subclause.oracles.load_toc", return_value=singleton_toc):
+    with patch(
+        "lib.python.lrm_subclause_dependencies.load_toc",
+        return_value=singleton_toc,
+    ):
         prompt = build_dependency_prompt("2", "~/LRM.pdf")
     assert "preamble" not in prompt
 
@@ -621,7 +620,7 @@ _RETRY_AGGREGATE_TOC: dict[str, tuple[int, int]] = {
 def _patched_oracle_sequence(*results: str) -> Any:
     """Patch run_oracle_call so each invocation returns the next *results* item."""
     return patch(
-        "satisfy_subclause.oracles.run_oracle_call",
+        "lib.python.lrm_subclause_dependencies.run_oracle_call",
         side_effect=list(results),
     )
 
@@ -629,7 +628,7 @@ def _patched_oracle_sequence(*results: str) -> Any:
 def _patched_retry_toc() -> Any:
     """Patch load_toc so the aggregate-rejection branch fires on '["8"]'."""
     return patch(
-        "satisfy_subclause.oracles.load_toc",
+        "lib.python.lrm_subclause_dependencies.load_toc",
         return_value=_RETRY_AGGREGATE_TOC,
     )
 
@@ -692,7 +691,7 @@ def test_compute_subclause_dependencies_logs_retry_warning_to_stderr(
 def test_compute_subclause_dependencies_recovers_from_invalid_json() -> None:
     """A malformed-JSON response is also a recoverable parse failure."""
     with _patched_oracle_sequence("not an array", "[]") as mock_run, patch(
-        "satisfy_subclause.oracles.load_toc", return_value={},
+        "lib.python.lrm_subclause_dependencies.load_toc", return_value={},
     ):
         compute_subclause_dependencies("33.4", "lrm.pdf", model="opus")
     assert mock_run.call_count == 2

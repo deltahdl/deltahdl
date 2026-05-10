@@ -8,7 +8,7 @@ ordering only consume that list.
 
 from typing import Any
 
-from satisfy_subclause.oracles import compute_subclause_dependencies
+from lib.python.lrm_subclause_dependencies import compute_subclause_dependencies
 
 
 def build_subclause_record(

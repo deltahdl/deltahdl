@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from satisfy_subclause import oracles
 from satisfy_subclause.mutators import CycleMember
 from satisfy_subclause.pipeline import (
     dispatch_cycle,
@@ -583,18 +582,6 @@ def test_dispatch_cycle_passes_subclauses() -> None:
     assert subs_seen == ["33.4.1.5", "33.6"]
 
 
-def test_dispatch_cycle_does_not_call_oracle() -> None:
-    """dispatch_cycle no longer invokes the satisfaction oracle."""
-    mock_issue, mock_mut = _patched_for_cycle()
-    with mock_issue:
-        with mock_mut:
-            dispatch_cycle(
-                ["33.4.1.5", "33.6"], "~/LRM.pdf",
-                model="opus", labels=_LABELS,
-            )
-    assert not hasattr(oracles, "is_subclause_satisfied")
-
-
 # --- satisfy_unsatisfied_subclause -----------------------------------------
 
 
@@ -870,11 +857,6 @@ def test_satisfy_logs_subclause_to_stderr(capsys: pytest.CaptureFixture[str]) ->
                     model="opus", labels=_LABELS,
                 )
     assert "§33.4.1.5" in capsys.readouterr().err
-
-
-def test_satisfy_does_not_call_satisfaction_oracle() -> None:
-    """satisfy_subclause never invokes is_subclause_satisfied (it's removed)."""
-    assert not hasattr(oracles, "is_subclause_satisfied")
 
 
 # --- CycleMember dataclass --------------------------------------------------

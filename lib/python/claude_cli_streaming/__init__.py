@@ -16,9 +16,15 @@ exits 0 without emitting the terminal ``result`` event — a flake we
 can recover from with ``--continue``). Other failures (non-zero exit,
 non-content-filter error result events) are loud-fatal via
 ``exit_with_error``.
+
+``build_env`` returns a Claude-safe copy of the current environment
+with the ``CLAUDECODE`` flag stripped — required when invoking the
+Claude CLI from inside a Claude Code session so the child process
+does not inherit the parent's session-mode flag.
 """
 
 import json
+import os
 import subprocess
 import sys
 from typing import Any, NoReturn
@@ -83,6 +89,18 @@ class MissingResultEventError(Exception):
         super().__init__(
             f"session_id={sid}, last_event={last_event}",
         )
+
+
+def build_env() -> dict[str, str]:
+    """Return a Claude-safe copy of the current environment.
+
+    Strips ``CLAUDECODE`` so a Claude CLI subprocess launched from
+    inside a Claude Code session does not inherit the parent's
+    session-mode flag.
+    """
+    env = os.environ.copy()
+    env.pop("CLAUDECODE", None)
+    return env
 
 
 def _truncate(text: str) -> str:
@@ -324,16 +342,15 @@ def build_streaming_cmd(
 ) -> list[str]:
     """Return a Claude CLI argv for stream-json mode.
 
-    Both oracles and mutators invoke Claude with the same flag shape
-    (only ``--disallowedTools`` differs). Centralise the argv here so
-    pylint's duplicate-code rule does not complain about parallel
-    blocks in the two caller modules. When ``continue_session`` is
-    true, ``--continue`` is appended so the call resumes the most
-    recent Claude session rather than starting a fresh one — used by
-    the eight-step mutator pipeline to keep all steps in one session.
-    When *effort* is set, ``--effort {effort}`` is appended so the
-    Claude CLI applies the named thinking-budget tier; left as ``None``
-    for callers that have not opted into the flag.
+    Centralises the flag shape so callers wiring different
+    ``--disallowedTools`` lists produce identical argvs otherwise.
+    When ``continue_session`` is true, ``--continue`` is appended so
+    the call resumes the most recent Claude session rather than
+    starting a fresh one — used by multi-step pipelines that keep all
+    steps in one session. When *effort* is set, ``--effort {effort}``
+    is appended so the Claude CLI applies the named thinking-budget
+    tier; left as ``None`` for callers that have not opted into the
+    flag.
     """
     cmd = [
         "claude", "-p",
