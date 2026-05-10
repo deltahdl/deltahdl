@@ -466,13 +466,13 @@ def test_compute_subclause_dependencies_logs_subclause_to_stderr(
     assert "§33.4" in capsys.readouterr().err
 
 
-def test_compute_subclause_dependencies_raises_on_aggregate_output() -> None:
-    """An aggregate identifier from the oracle raises rather than silently passing."""
+def test_compute_subclause_dependencies_exits_when_aggregate_output_persists() -> None:
+    """An aggregate identifier returned every retry exits after the budget is exhausted."""
     aggregate_toc = {"8": (200, 250), "8.1": (200, 210)}
     with _patched_oracle('["8"]'), patch(
         "satisfy_subclause.oracles.load_toc", return_value=aggregate_toc,
     ):
-        with pytest.raises(ValueError):
+        with pytest.raises(SystemExit):
             compute_subclause_dependencies(
                 "33.4", "lrm.pdf", model="opus",
             )
@@ -598,3 +598,101 @@ def test_run_oracle_call_retry_cmd_carries_model() -> None:
         run_oracle_call("prompt", model="haiku")
     retry_cmd = mock_stream.call_args[1]["retry_cmd"]
     assert retry_cmd[retry_cmd.index("--model") + 1] == "haiku"
+
+
+# --- run_oracle_call: continue_session opt-in -------------------------------
+
+
+def test_run_oracle_call_initial_cmd_uses_continue_when_opted_in() -> None:
+    """continue_session=True puts --continue into the initial Claude CLI argv."""
+    with _patched_streaming() as mock_stream:
+        run_oracle_call("prompt", model="opus", continue_session=True)
+    assert "--continue" in mock_stream.call_args[0][0]
+
+
+# --- compute_subclause_dependencies: parse-failure retry --------------------
+
+
+_RETRY_AGGREGATE_TOC: dict[str, tuple[int, int]] = {
+    "8": (200, 250), "8.1": (200, 210),
+}
+
+
+def _patched_oracle_sequence(*results: str) -> Any:
+    """Patch run_oracle_call so each invocation returns the next *results* item."""
+    return patch(
+        "satisfy_subclause.oracles.run_oracle_call",
+        side_effect=list(results),
+    )
+
+
+def _patched_retry_toc() -> Any:
+    """Patch load_toc so the aggregate-rejection branch fires on '["8"]'."""
+    return patch(
+        "satisfy_subclause.oracles.load_toc",
+        return_value=_RETRY_AGGREGATE_TOC,
+    )
+
+
+def test_compute_subclause_dependencies_retries_on_parse_failure() -> None:
+    """A rejected oracle response triggers a follow-up run_oracle_call."""
+    with _patched_oracle_sequence('["8"]', "[]") as mock_run, _patched_retry_toc():
+        compute_subclause_dependencies("33.4", "lrm.pdf", model="opus")
+    assert mock_run.call_count == 2
+
+
+def test_compute_subclause_dependencies_retry_resumes_session() -> None:
+    """The retry call sets continue_session=True so it resumes the same session."""
+    with _patched_oracle_sequence('["8"]', "[]") as mock_run, _patched_retry_toc():
+        compute_subclause_dependencies("33.4", "lrm.pdf", model="opus")
+    assert mock_run.call_args_list[1].kwargs["continue_session"] is True
+
+
+def test_compute_subclause_dependencies_retry_prompt_quotes_offender() -> None:
+    """The corrective prompt names the offending entry from the rejection message."""
+    with _patched_oracle_sequence('["8"]', "[]") as mock_run, _patched_retry_toc():
+        compute_subclause_dependencies("33.4", "lrm.pdf", model="opus")
+    assert "'8'" in mock_run.call_args_list[1].args[0]
+
+
+def test_compute_subclause_dependencies_retry_prompt_carries_model() -> None:
+    """The retry call forwards the same model as the initial call."""
+    with _patched_oracle_sequence('["8"]', "[]") as mock_run, _patched_retry_toc():
+        compute_subclause_dependencies("33.4", "lrm.pdf", model="haiku")
+    assert mock_run.call_args_list[1].kwargs["model"] == "haiku"
+
+
+def test_compute_subclause_dependencies_retry_prompt_carries_effort() -> None:
+    """The retry call forwards the same effort as the initial call."""
+    with _patched_oracle_sequence('["8"]', "[]") as mock_run, _patched_retry_toc():
+        compute_subclause_dependencies(
+            "33.4", "lrm.pdf", model="opus", effort="medium",
+        )
+    assert mock_run.call_args_list[1].kwargs["effort"] == "medium"
+
+
+def test_compute_subclause_dependencies_returns_after_successful_retry() -> None:
+    """A clean array on the retry call is returned to the caller."""
+    with _patched_oracle_sequence('["8"]', '["33.6.1"]'), _patched_retry_toc():
+        deps = compute_subclause_dependencies(
+            "33.4", "lrm.pdf", model="opus",
+        )
+    assert deps == ["33.6.1"]
+
+
+def test_compute_subclause_dependencies_logs_retry_warning_to_stderr(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A retry attempt logs a WARNING line to stderr."""
+    with _patched_oracle_sequence('["8"]', "[]"), _patched_retry_toc():
+        compute_subclause_dependencies("33.4", "lrm.pdf", model="opus")
+    assert "WARNING" in capsys.readouterr().err
+
+
+def test_compute_subclause_dependencies_recovers_from_invalid_json() -> None:
+    """A malformed-JSON response is also a recoverable parse failure."""
+    with _patched_oracle_sequence("not an array", "[]") as mock_run, patch(
+        "satisfy_subclause.oracles.load_toc", return_value={},
+    ):
+        compute_subclause_dependencies("33.4", "lrm.pdf", model="opus")
+    assert mock_run.call_count == 2

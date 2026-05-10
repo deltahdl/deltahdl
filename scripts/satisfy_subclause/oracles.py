@@ -23,6 +23,7 @@ from lib.python.lrm import (
 
 from .streaming import (
     build_streaming_cmd,
+    exit_with_error,
     run_claude_streaming_with_retry,
 )
 
@@ -53,7 +54,11 @@ def build_env() -> dict[str, str]:
 
 
 def run_oracle_call(
-    prompt: str, *, model: str, effort: str | None = None,
+    prompt: str,
+    *,
+    model: str,
+    effort: str | None = None,
+    continue_session: bool = False,
 ) -> str:
     """Invoke Claude with read-only tools; return the oracle's ``.result``.
 
@@ -67,9 +72,15 @@ def run_oracle_call(
     retry budget is exhausted. When *effort* is set, the Claude CLI
     runs at that thinking-budget tier; the retry cmd carries the same
     effort so the recovery call matches the original session's shape.
+    When *continue_session* is true, the initial cmd also appends
+    ``--continue`` so the call resumes the most recent Claude session
+    rather than starting a fresh one — used by the parse-retry loop in
+    ``compute_subclause_dependencies`` to feed corrective feedback into
+    the same session that produced the rejected response.
     """
     cmd = build_streaming_cmd(
-        model=model, disallowed_tools=DISALLOWED_TOOLS, effort=effort,
+        model=model, disallowed_tools=DISALLOWED_TOOLS,
+        continue_session=continue_session, effort=effort,
     )
     retry_cmd = build_streaming_cmd(
         model=model, disallowed_tools=DISALLOWED_TOOLS,
@@ -185,15 +196,68 @@ def parse_dependencies(
     return result
 
 
+MAX_PARSE_RETRIES = 2
+
+
+def build_parse_retry_prompt(reason: str) -> str:
+    """Return the corrective prompt fed to a continued session after a parse failure.
+
+    Embeds the rejection *reason* verbatim so the model sees which
+    entry was rejected and why, then restates the array shape so the
+    re-emitted answer follows the schema the parser enforces.
+    """
+    return (
+        f"Your previous JSON array failed validation: {reason}."
+        " Re-emit a single JSON array of subclause-identifier strings"
+        " in the same shape as the original prompt — digit-or-letter"
+        ' heads with dotted decimal parts (e.g. "33.6.1", "A.7").'
+        " An aggregate top-level chapter or annex head with no dotted"
+        ' tail (a bare "8" or "A") is invalid; depend on a specific'
+        ' numbered subclause like "8.1" instead. Output an empty array'
+        " [] if the rejected list was wrong and there are no genuine"
+        " dependencies left."
+    )
+
+
 def compute_subclause_dependencies(
     subclause: str, lrm: str, *, model: str, effort: str | None = None,
 ) -> SubclauseDependencies:
-    """Run the dependency oracle for ``subclause``."""
+    """Run the dependency oracle for ``subclause``.
+
+    Wraps :func:`parse_dependencies` in a corrective-feedback retry
+    loop: a rejected response (malformed JSON, bad identifier shape, or
+    an aggregate top-level head) feeds the parser's rejection message
+    back into the same Claude session via ``--continue`` so the model
+    can fix the offending entry without re-reading the LRM. Loud-fatal
+    once ``MAX_PARSE_RETRIES`` follow-ups have all failed.
+    """
     print(
         f"Dependency oracle: §{subclause}, model {model}",
         file=sys.stderr,
     )
-    prompt = build_dependency_prompt(subclause, lrm)
-    text = run_oracle_call(prompt, model=model, effort=effort)
     toc = load_toc(lrm)
-    return parse_dependencies(text, toc=toc)
+    text = run_oracle_call(
+        build_dependency_prompt(subclause, lrm), model=model, effort=effort,
+    )
+    follow_ups = 0
+    while True:
+        try:
+            return parse_dependencies(text, toc=toc)
+        except ValueError as exc:
+            follow_ups += 1
+            if follow_ups > MAX_PARSE_RETRIES:
+                exit_with_error(
+                    f"Dependency oracle parse failed for §{subclause}"
+                    f" after {MAX_PARSE_RETRIES + 1} attempts: {exc}",
+                    "",
+                )
+            print(
+                f"WARNING: Dependency oracle parse failed for §{subclause}"
+                f" (attempt {follow_ups}): {exc};"
+                " retrying with corrective feedback.",
+                file=sys.stderr,
+            )
+            text = run_oracle_call(
+                build_parse_retry_prompt(str(exc)),
+                model=model, effort=effort, continue_session=True,
+            )
