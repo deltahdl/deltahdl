@@ -287,20 +287,30 @@ def test_build_dependency_prompt_says_empty_if_none() -> None:
 # --- parse_dependencies -----------------------------------------------------
 
 
+_EMPTY_TOC: dict[str, tuple[int, int]] = {}
+_AGGREGATE_TOC: dict[str, tuple[int, int]] = {
+    "8": (200, 250), "8.1": (200, 210),
+    "A": (900, 939), "A.1": (900, 919),
+}
+_SINGLETON_TOC: dict[str, tuple[int, int]] = {
+    "2": (10, 12), "B": (940, 949),
+}
+
+
 def test_parse_dependencies_empty() -> None:
     """An empty array parses to an empty list."""
-    assert not parse_dependencies("[]")
+    assert not parse_dependencies("[]", toc=_EMPTY_TOC)
 
 
 def test_parse_dependencies_single_entry() -> None:
     """A single subclause string parses through verbatim."""
-    assert parse_dependencies('["33.6.1"]') == ["33.6.1"]
+    assert parse_dependencies('["33.6.1"]', toc=_EMPTY_TOC) == ["33.6.1"]
 
 
 def test_parse_dependencies_preserves_order() -> None:
     """Dependencies are returned in the order the oracle listed them."""
     text = '["33.6.1", "33.4.1.5", "33.4.1.6"]'
-    assert parse_dependencies(text) == [
+    assert parse_dependencies(text, toc=_EMPTY_TOC) == [
         "33.6.1", "33.4.1.5", "33.4.1.6",
     ]
 
@@ -308,48 +318,48 @@ def test_parse_dependencies_preserves_order() -> None:
 def test_parse_dependencies_handles_fenced_array() -> None:
     """A fenced JSON array oracle response parses."""
     text = '```json\n["33.6.1"]\n```'
-    assert parse_dependencies(text) == ["33.6.1"]
+    assert parse_dependencies(text, toc=_EMPTY_TOC) == ["33.6.1"]
 
 
 def test_parse_dependencies_handles_unmarked_fence() -> None:
     """A bare ``` fence (no language) parses."""
     text = '```\n["33.6.1"]\n```'
-    assert parse_dependencies(text) == ["33.6.1"]
+    assert parse_dependencies(text, toc=_EMPTY_TOC) == ["33.6.1"]
 
 
 def test_parse_dependencies_handles_text_before_array() -> None:
     """A bare array surrounded by prose parses."""
     text = 'preamble ["33.6.1"] trailer'
-    assert parse_dependencies(text) == ["33.6.1"]
+    assert parse_dependencies(text, toc=_EMPTY_TOC) == ["33.6.1"]
 
 
 def test_parse_dependencies_accepts_annex() -> None:
     """An annex-letter dependency entry is accepted."""
-    assert parse_dependencies('["A.7"]') == ["A.7"]
+    assert parse_dependencies('["A.7"]', toc=_EMPTY_TOC) == ["A.7"]
 
 
 def test_parse_dependencies_rejects_non_string_entry() -> None:
     """A non-string entry in the array is rejected."""
     with pytest.raises(ValueError):
-        parse_dependencies('[42]')
+        parse_dependencies('[42]', toc=_EMPTY_TOC)
 
 
 def test_parse_dependencies_rejects_garbage_entry() -> None:
     """An entry that is not a valid clause identifier is rejected."""
     with pytest.raises(ValueError):
-        parse_dependencies('["not-a-clause"]')
+        parse_dependencies('["not-a-clause"]', toc=_EMPTY_TOC)
 
 
 def test_parse_dependencies_rejects_lowercase_letter() -> None:
     """A lowercase letter clause is rejected."""
     with pytest.raises(ValueError):
-        parse_dependencies('["a.7"]')
+        parse_dependencies('["a.7"]', toc=_EMPTY_TOC)
 
 
 def test_parse_dependencies_rejects_text_without_array() -> None:
     """Output without a JSON array raises ValueError."""
     with pytest.raises(ValueError):
-        parse_dependencies("no array here")
+        parse_dependencies("no array here", toc=_EMPTY_TOC)
 
 
 def test_parse_dependencies_picks_last_array_when_prose_has_brackets() -> None:
@@ -359,7 +369,7 @@ def test_parse_dependencies_picks_last_array_when_prose_has_brackets() -> None:
         "It defers all syntax to Clause 26.\n\n"
         "[]"
     )
-    assert not parse_dependencies(text)
+    assert not parse_dependencies(text, toc=_EMPTY_TOC)
 
 
 def test_parse_dependencies_picks_last_nonempty_array_when_prose_has_brackets() -> None:
@@ -368,7 +378,36 @@ def test_parse_dependencies_picks_last_nonempty_array_when_prose_has_brackets() 
         "Earlier prose [unrelated bracketed text] more prose.\n\n"
         '["33.6.1", "33.4.1.5"]'
     )
-    assert parse_dependencies(text) == ["33.6.1", "33.4.1.5"]
+    assert parse_dependencies(text, toc=_EMPTY_TOC) == [
+        "33.6.1", "33.4.1.5",
+    ]
+
+
+def test_parse_dependencies_rejects_aggregate_chapter_identifier() -> None:
+    """An identifier naming an aggregate top-level chapter is rejected."""
+    with pytest.raises(ValueError):
+        parse_dependencies('["8"]', toc=_AGGREGATE_TOC)
+
+
+def test_parse_dependencies_rejects_aggregate_annex_identifier() -> None:
+    """An identifier naming an aggregate annex is rejected."""
+    with pytest.raises(ValueError):
+        parse_dependencies('["A"]', toc=_AGGREGATE_TOC)
+
+
+def test_parse_dependencies_accepts_singleton_chapter() -> None:
+    """A top-level chapter that is a singleton (no numbered subs) is accepted."""
+    assert parse_dependencies('["2"]', toc=_SINGLETON_TOC) == ["2"]
+
+
+def test_parse_dependencies_accepts_singleton_annex() -> None:
+    """A childless annex (Annex B / P / Q) is accepted as a dep."""
+    assert parse_dependencies('["B"]', toc=_SINGLETON_TOC) == ["B"]
+
+
+def test_parse_dependencies_accepts_sub_level_under_aggregate() -> None:
+    """A sub-level entry under an aggregate parent is accepted."""
+    assert parse_dependencies('["8.1"]', toc=_AGGREGATE_TOC) == ["8.1"]
 
 
 # --- compute_subclause_dependencies -----------------------------------------
@@ -425,6 +464,29 @@ def test_compute_subclause_dependencies_logs_subclause_to_stderr(
     with _patched_oracle("[]"):
         compute_subclause_dependencies("33.4", "lrm.pdf", model="opus")
     assert "§33.4" in capsys.readouterr().err
+
+
+def test_compute_subclause_dependencies_raises_on_aggregate_output() -> None:
+    """An aggregate identifier from the oracle raises rather than silently passing."""
+    aggregate_toc = {"8": (200, 250), "8.1": (200, 210)}
+    with _patched_oracle('["8"]'), patch(
+        "satisfy_subclause.oracles.load_toc", return_value=aggregate_toc,
+    ):
+        with pytest.raises(ValueError):
+            compute_subclause_dependencies(
+                "33.4", "lrm.pdf", model="opus",
+            )
+
+
+def test_compute_subclause_dependencies_loads_toc_from_lrm_path() -> None:
+    """compute_subclause_dependencies passes the --lrm path through to load_toc."""
+    with _patched_oracle("[]"), patch(
+        "satisfy_subclause.oracles.load_toc", return_value={},
+    ) as mock_toc:
+        compute_subclause_dependencies(
+            "33.4", "/tmp/spec.pdf", model="opus",
+        )
+    assert mock_toc.call_args[0][0] == "/tmp/spec.pdf"
 
 
 # --- build_dependency_prompt (positive instructions / f-string fix) ---------

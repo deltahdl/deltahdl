@@ -14,7 +14,11 @@ import re
 import sys
 from typing import TypeAlias
 
-from lib.python.lrm import build_lrm_read_instruction
+from lib.python.lrm import (
+    build_lrm_read_instruction,
+    is_top_level_aggregate,
+    load_toc,
+)
 
 from .streaming import (
     build_streaming_cmd,
@@ -124,8 +128,17 @@ def build_dependency_prompt(subclause: str, lrm: str) -> str:
     )
 
 
-def parse_dependencies(text: str) -> SubclauseDependencies:
-    """Parse the dependency oracle's response into a list of subclause strings."""
+def parse_dependencies(
+    text: str, *, toc: dict[str, tuple[int, int]],
+) -> SubclauseDependencies:
+    """Parse the dependency oracle's response into a list of subclause strings.
+
+    Rejects identifiers that name an aggregate top-level entry in
+    ``toc`` (a chapter or annex with at least one numbered subclause).
+    Such entries are enumeration roots, not satisfiable subclauses, and
+    accepting them as deps was the original source of the cross-chapter
+    cycle in ``docs/dependency_graph.json``.
+    """
     body = _extract_dependency_array(text)
     payload = json.loads(body)
     result: SubclauseDependencies = []
@@ -138,6 +151,11 @@ def parse_dependencies(text: str) -> SubclauseDependencies:
             raise ValueError(
                 f"Dependency entry '{item}' is not a valid subclause"
                 " identifier",
+            )
+        if is_top_level_aggregate(item, toc):
+            raise ValueError(
+                f"Dependency entry '{item}' names an aggregate top-level"
+                " entry; depend on a specific numbered subclause instead",
             )
         result.append(item)
     return result
@@ -153,4 +171,5 @@ def compute_subclause_dependencies(
     )
     prompt = build_dependency_prompt(subclause, lrm)
     text = run_oracle_call(prompt, model=model, effort=effort)
-    return parse_dependencies(text)
+    toc = load_toc(lrm)
+    return parse_dependencies(text, toc=toc)
